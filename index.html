@@ -842,7 +842,7 @@
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
             fly: !!tmpl.fly,
             aggro: tmpl.aggro ?? AGGRO_RANGE,
-            x, y, alive:true, prefix:null,
+            x, y, homeX:x, homeY:y, alive:true, prefix:null,
           };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
@@ -1124,6 +1124,49 @@
       occupied.add(keyXY(e.x,e.y));
       return true;
     }
+    /* --- Idle wander tuning: flip these to change the behaviour at any time --- */
+    const ENEMY_WANDER_ENABLED = true;  // false = enemies stand perfectly still when idle
+    const ENEMY_WANDER_LEASH   = true;  // false = they roam freely instead of sticking near home
+    const ENEMY_WANDER_CHANCE  = 0.3;   // chance per turn that an idle on-screen enemy shuffles
+    const ENEMY_WANDER_RADIUS  = 1;     // how far (in squares) they may stray from their home tile
+    /* ------------------------------------------------------------------------ */
+
+    // Idle enemies the player can actually see shuffle around a little so the world
+    // doesn't look frozen. Only on-screen enemies wander, so off-screen creatures
+    // don't drift away from where they were placed.
+    function enemyIsOnScreen(e){
+      const vx = e.x - targetCamX(), vy = e.y - targetCamY();
+      return vx>=0 && vy>=0 && vx<VIEW_W && vy<VIEW_H;
+    }
+    function enemyWander(e){
+      if(!ENEMY_WANDER_ENABLED) return;
+      if(!chance(ENEMY_WANDER_CHANCE)) return;
+      // Anchor the home tile on first wander, and re-anchor whenever a chase has
+      // already carried the enemy beyond its leash - otherwise it could never move
+      // again after giving up a pursuit.
+      if(e.homeX === undefined || e.homeY === undefined ||
+         Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
+        e.homeX = e.x; e.homeY = e.y;
+      }
+      const options = [];
+      for(let dy=-1; dy<=1; dy++){
+        for(let dx=-1; dx<=1; dx++){
+          if(dx===0 && dy===0) continue;
+          const nx = e.x+dx, ny = e.y+dy;
+          if(ENEMY_WANDER_LEASH &&
+             Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
+          if(nx===player.x && ny===player.y) continue;
+          if(!enemyCanTraverse(e,nx,ny)) continue;
+          if(occupied.has(keyXY(nx,ny))) continue;
+          options.push({x:nx, y:ny});
+        }
+      }
+      if(!options.length) return;
+      const pick = options[randInt(0, options.length-1)];
+      occupied.delete(keyXY(e.x,e.y));
+      e.x = pick.x; e.y = pick.y;
+      occupied.add(keyXY(e.x,e.y));
+    }
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
       if(player.speedPotionTurns > 0){
@@ -1171,6 +1214,7 @@
           }
         } else {
           e.aware = false;
+          if(enemyIsOnScreen(e)) enemyWander(e);
         }
       }
     }
