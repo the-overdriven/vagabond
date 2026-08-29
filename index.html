@@ -1098,10 +1098,15 @@
             const gold = randInt(5,15)*g.tier + Math.round(mf*2);
             player.gold += gold;
             log(`You open a chest and find ${gold} gold!`, 'loot');
+          } else if(roll<0.65){
+            const lowTier = Math.min(2, Math.max(1, g.tier));
+            const item = chance(0.5) ? makeArmorItem(lowTier) : makeShieldItem(lowTier);
+            player.inventory.push(item);
+            log(`You open a chest and find ${item.name}.`, 'loot');
           } else if(roll<0.85){
             addPotion();
             log(`You open a chest and find a Life Potion!`, 'loot');
-          } else if(roll<0.97){
+          } else if(roll<0.91){
             addScroll();
             log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
           } else {
