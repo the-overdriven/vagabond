@@ -775,7 +775,6 @@
         player.lvl++;
         const hpGain = randInt(4,7);
         player.maxHp += hpGain;
-        player.hp = playerMaxHp();
         leveled=true;
         log(`You reached Level ${player.lvl}! (+${hpGain} max HP)`, 'good');
       }
