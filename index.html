@@ -696,6 +696,7 @@
       baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
       gold: 0, deaths: 0, steps: 0,
       invisibleTurns: 0,
+      speedPotionTurns: 0,
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
     };
@@ -735,6 +736,7 @@
       const w = player.equip.weapon;
       if(w){ s += Math.floor(w.spd/2); if(w.mod==='spd') s += w.modAmt; }
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
+      if(player.speedPotionTurns > 0) s += 3;
       return s;
     }
     function playerMf(){
@@ -792,7 +794,7 @@
 
     /* ============================== ENEMIES / ITEMS ON MAP ============================== */
     let enemies = [];
-    let groundItems = []; // {x,y,kind:'gold'|'potion'|'scroll'|'item', amount, item}
+    let groundItems = []; // {x,y,kind:'gold'|'potion'|'speedpotion'|'scroll'|'item', amount, item}
     let occupied = new Set(); // "x,y" for enemies
 
     function keyXY(x,y){ return x+','+y; }
@@ -854,12 +856,20 @@
         groundItems.push({x,y,kind:'potion'});
       }
       // scrolls of invisibility
-      for(let i=0;i<12;i++){
+      for(let i=0;i<9;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
         while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'scroll'});
+      }
+      // speed potions
+      for(let i=0;i<3;i++){
+        let x,y,tries=0;
+        do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
+        while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
+        if(tries>=200) continue;
+        groundItems.push({x,y,kind:'speedpotion'});
       }
     }
 
@@ -986,6 +996,10 @@
       return e && typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE;
     }
     function enemyTurn(){
+      if(player.speedPotionTurns > 0){
+        player.speedPotionTurns--;
+        if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
+      }
       if(player.invisibleTurns > 0){
         player.invisibleTurns--;
         if(player.invisibleTurns === 0) log('The invisibility fades.', 'info');
@@ -1044,6 +1058,11 @@
       if(stack) stack.count = (stack.count||1)+1;
       else player.inventory.push({kind:'scroll', name:'Scroll of Invisibility', count:1});
     }
+    function addSpeedPotion(){
+      const stack = player.inventory.find(i=>i.kind==='speedpotion');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'speedpotion', name:'Potion of Speed', count:1});
+    }
     function checkGroundAt(x,y){
       for(let i=groundItems.length-1;i>=0;i--){
         const g = groundItems[i];
@@ -1060,14 +1079,21 @@
           } else if(roll<0.85){
             addPotion();
             log(`You open a chest and find a Life Potion!`, 'loot');
-          } else {
+          } else if(roll<0.97){
             addScroll();
             log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
+          } else {
+            addSpeedPotion();
+            log(`You open a chest and find a Potion of Speed!`, 'loot');
           }
           groundItems.splice(i,1);
         } else if(g.kind==='potion'){
           addPotion();
           log(`You pick up a Life Potion.`, 'loot');
+          groundItems.splice(i,1);
+        } else if(g.kind==='speedpotion'){
+          addSpeedPotion();
+          log(`You pick up a Potion of Speed.`, 'loot');
           groundItems.splice(i,1);
         } else if(g.kind==='scroll'){
           addScroll();
@@ -1178,7 +1204,8 @@
             const label =
               item.kind === 'chest' ? 'a chest' :
                 item.kind === 'potion' ? 'a potion' :
-                  'a scroll';
+                  item.kind === 'speedpotion' ? 'a speed potion' :
+                    'a scroll';
 
             addNote(label, direction);
             continue;
@@ -1265,6 +1292,7 @@
         if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
         if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', TILE[map[g.y][g.x]].bg);
         else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
       }
       // enemies
@@ -1524,14 +1552,20 @@
         const line = itemStatLine(it);
         const nm = document.createElement('span');
         nm.className='nm '+cls;
-        const countTag = (it.kind==='potion'||it.kind==='scroll') && it.count>1 ? ' x'+it.count : '';
+        const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+        const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const prefix = isBest ? '✅ ' : '';
-        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (it.kind==='potion'||it.kind==='scroll'?'':' [T'+it.tier+']');
+        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (stackable?'':' [T'+it.tier+']');
         row.appendChild(nm);
         if(it.kind==='potion'){
           const btn = document.createElement('button');
           btn.textContent = 'Drink';
           btn.onclick = ()=>{ usePotion(idx); };
+          row.appendChild(btn);
+        } else if(it.kind==='speedpotion'){
+          const btn = document.createElement('button');
+          btn.textContent = 'Drink';
+          btn.onclick = ()=>{ useSpeedPotion(idx); };
           row.appendChild(btn);
         } else if(it.kind==='scroll'){
           const btn = document.createElement('button');
@@ -1576,6 +1610,15 @@
       log('You read the Scroll of Invisibility. The shadows swallow you.', 'good');
       updateHud(); renderInventory();
     }
+    function useSpeedPotion(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='speedpotion') return;
+      it.count = (it.count||1)-1;
+      if(it.count<=0) player.inventory.splice(idx,1);
+      player.speedPotionTurns = 15;
+      log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good');
+      updateHud(); renderInventory();
+    }
 // document.getElementById('useAllPotions').onclick = ()=>{
 //   const idx = player.inventory.findIndex(i=>i.kind==='potion');
 //   if(idx>=0) usePotion(idx); else log("You have no potions.", 'info');
@@ -1586,7 +1629,7 @@
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 2; // v2 adds the discovered (fog-of-war) grid
+    const SAVE_VERSION = 3; // v3 adds speedPotionTurns
 
     function buildSaveObject(){
       return {
@@ -1605,6 +1648,7 @@
           baseAtk:player.baseAtk, baseDef:player.baseDef, baseSpd:player.baseSpd, baseMf:player.baseMf,
           gold:player.gold, deaths:player.deaths, steps:player.steps,
           invisibleTurns:player.invisibleTurns,
+          speedPotionTurns:player.speedPotionTurns,
           equip: player.equip,
           inventory: player.inventory,
         },
@@ -1671,6 +1715,8 @@
       Object.assign(player, data.player);
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
+      player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
+      player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
 
       enemies = (data.enemies||[]).map(e=>({
         name:e.name, baseName:e.baseName, tier:e.tier,
