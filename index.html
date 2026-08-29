@@ -169,7 +169,7 @@
           position: fixed;
           right: 14px;
           top: 380px;
-          width: 220px;
+          width: 250px;
           padding: 7px;
           box-sizing: border-box;
           background: linear-gradient(180deg,var(--panel2),var(--panel));
@@ -179,14 +179,14 @@
           line-height: 1.8;
       }
       #sidePanel{
-          position:fixed; right:14px; top:110px; width:190px; z-index:8;
+          position:fixed; right:14px; top:110px; width:250px; z-index:8;
       }
       .side-box{
           background:linear-gradient(180deg,var(--panel2),var(--panel));
           border:1px solid var(--border); border-radius:6px;
           padding:8px; box-shadow:0 0 18px rgba(0,0,0,0.5);
       }
-      #sideMinimap{display:block; width:100%; height:auto; border:1px solid var(--border); border-radius:4px; background:#050403;}
+      #sideMinimap{display:block; width:100%; height:auto; image-rendering:pixelated; border:1px solid var(--border); border-radius:4px; background:#050403;}
       .mini-actions{display:flex; justify-content:center; margin-top:8px;}
       .overlay{
           position:absolute; inset:0; background:rgba(5,4,3,0.42);
@@ -442,7 +442,7 @@
       {name:"Snake", hp:4, atk:2, def:1, spd:2, tier:1, aggro:2, biomes:['grass','sand','forest']},
       {name:"Scarab", hp:6, atk:1, def:3, spd:2, tier:1, aggro:3, biomes:['sand']},
       {name:"Monkey", hp:6, atk:2, def:1, spd:2, tier:1, aggro:3, biomes:['forest']},
-      {name:"Boar", hp:10, atk:3, def:2, spd:4, tier:1, aggro:4, biomes:['forest','grass']},
+      {name:"Boar", hp:10, atk:3, def:2, spd:4, tier:1, aggro:4, biomes:['forest']},
       {name:"Wolf", hp:8, atk:3, def:2, spd:4, tier:1, aggro:4, biomes:['forest']},
       {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1, aggro:3, biomes:['grass','forest']},
       {name:"Wasp", hp:8, atk:3, def:1, spd:4, tier:1, aggro:4, fly:true, biomes:['forest','grass']},
@@ -1959,8 +1959,14 @@
     const sideMini = document.getElementById('sideMinimap');
     const mctx = mini.getContext('2d');
     const sideCtx = sideMini.getContext('2d');
-    mini.width = MAP_W*3; mini.height = MAP_H*3;
-    sideMini.width = MAP_W*2; sideMini.height = MAP_H*2;
+    // The world map shows the whole island; the side minimap is a zoomed-in window
+    // that scrolls with the player, so it needs its own (larger) tile scale.
+    const MAP_SCALE = 3;
+    const SIDE_SCALE = 4;
+    const SIDE_VIEW_W = 61, SIDE_VIEW_H = 41;
+    const MINI_SCALES = [MAP_SCALE, SIDE_SCALE];
+    mini.width = MAP_W*MAP_SCALE; mini.height = MAP_H*MAP_SCALE;
+    sideMini.width = SIDE_VIEW_W*SIDE_SCALE; sideMini.height = SIDE_VIEW_H*SIDE_SCALE;
     // The minimap terrain is expensive to rasterise (MAP_W*MAP_H fills per canvas),
     // so it lives on cached offscreen canvases that are only patched tile-by-tile as
     // fog of war lifts. Per-frame rendering is then just a blit plus two markers.
@@ -1971,8 +1977,9 @@
       return { canvas:c, ctx:c.getContext('2d'), scale:scale };
     }
     function ensureMiniBases(){
-      if(!miniBases[3]) miniBases[3] = makeMiniBase(3);
-      if(!miniBases[2]) miniBases[2] = makeMiniBase(2);
+      for(const scale of MINI_SCALES){
+        if(!miniBases[scale]) miniBases[scale] = makeMiniBase(scale);
+      }
     }
     function paintMiniTile(base, x, y){
       const s = base.scale;
@@ -1984,7 +1991,7 @@
     }
     function rebuildMinimapBases(){
       ensureMiniBases();
-      for(const scale of [2,3]){
+      for(const scale of MINI_SCALES){
         const base = miniBases[scale];
         base.ctx.clearRect(0, 0, base.canvas.width, base.canvas.height);
         for(let y=0;y<MAP_H;y++){
@@ -1997,22 +2004,34 @@
       if(discovered[y][x]) return;
       discovered[y][x] = true;
       ensureMiniBases();
-      paintMiniTile(miniBases[3], x, y);
-      paintMiniTile(miniBases[2], x, y);
+      for(const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y);
       minimapDirty = true;
     }
-    function renderMinimapCanvas(ctx, scale){
+    // originX/originY are the top-left tile of the visible window (0,0 for the full
+    // world map, a player-centred clamped offset for the zoomed side minimap).
+    function renderMinimapCanvas(ctx, scale, originX, originY){
       ensureMiniBases();
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      ctx.drawImage(miniBases[scale].canvas, 0, 0);
+      const ox = originX || 0, oy = originY || 0;
+      const w = ctx.canvas.width, h = ctx.canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, w, h, 0, 0, w, h);
+      const dot = Math.max(2, scale+2);
       ctx.fillStyle = '#ffe08a';
-      ctx.fillRect(spawnPoint.x*scale-1, spawnPoint.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
+      ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(player.x*scale-1, player.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
+      ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
+    }
+    function sideMiniOrigin(){
+      return {
+        x: Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, player.x - (SIDE_VIEW_W>>1))),
+        y: Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, player.y - (SIDE_VIEW_H>>1)))
+      };
     }
     function renderMinimap(){
-      if(mapOpen) renderMinimapCanvas(mctx, 3);
-      renderMinimapCanvas(sideCtx, 2);
+      if(mapOpen) renderMinimapCanvas(mctx, MAP_SCALE, 0, 0);
+      const o = sideMiniOrigin();
+      renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y);
       minimapDirty = false;
       miniPlayerX = player.x;
       miniPlayerY = player.y;
