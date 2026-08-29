@@ -30,7 +30,6 @@
 - tabs in backpack (armors, shields, weapons, other)
 - automatically wear armor/shield/weapon if you're not wearing any
 - add pick axe (to be able to dig through bolders, costs HP)
-- highlight aggroed mobs with red border
 - special locations? i.e. abandoned church
 - individual aggro distance per mob type
 - walking through forest can spawn low lvl mob
@@ -1263,6 +1262,12 @@
         if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
         const colors = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
         drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
+
+        if(e.aware){
+          ctx.strokeStyle = 'rgba(255,106,93,0.95)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(vx*TILE_PX+2, vy*TILE_PX+2, TILE_PX-4, TILE_PX-4);
+        }
       }
       // player
       {
