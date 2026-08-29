@@ -487,7 +487,7 @@
     const TILE = {
       water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
       river:    {ch:'~', color:'#7fd0d8', bg:'#0e1f22', walk:true},
-      sand:     {ch:'.', color:'#cdb27a', bg:'#221c10', walk:true},
+      sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
       grass:    {ch:'.', color:'#6fae4a', bg:'#101a0c', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
@@ -1126,9 +1126,17 @@
             log(`You open a chest and find ${gold} gold!`, 'loot');
           } else if(roll<0.65){
             const lowTier = Math.min(2, Math.max(1, g.tier));
-            const item = chance(0.5) ? makeArmorItem(lowTier) : makeShieldItem(lowTier);
-            player.inventory.push(item);
-            log(`You open a chest and find ${item.name}.`, 'loot');
+            const pickRoll = rng();
+            let item;
+            if(pickRoll < 0.33) item = makeWeaponItem(lowTier);
+            else if(pickRoll < 0.66) item = makeArmorItem(lowTier);
+            else item = makeShieldItem(lowTier);
+            if(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)){
+              log(`You open a chest and find ${item.name}.`, 'loot');
+            } else {
+              player.inventory.push(item);
+              log(`You open a chest and find ${item.name}.`, 'loot');
+            }
           } else if(roll<0.85){
             addPotion();
             log(`You open a chest and find a Life Potion!`, 'loot');
