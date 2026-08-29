@@ -1008,14 +1008,35 @@
       updateHud();
     }
     function die(){
+      if(deathTransition) return;
       player.deaths++;
       log(`You have fallen... and awaken at the Temple.`, 'bad');
-      player.x = spawnPoint.x; player.y = spawnPoint.y;
-      player.hp = playerMaxHp();
       stopCameraAnimation();
       stopAttackAnimation();
-      snapCameraToPlayer();
-      updateHud();
+      deathTransition = { phase:'out', start: performance.now(), duration: 900 };
+      const step = (now)=>{
+        render(now);
+        if(!deathTransition) return;
+        const elapsed = now - deathTransition.start;
+        if(deathTransition.phase === 'out' && elapsed >= deathTransition.duration){
+          player.x = spawnPoint.x; player.y = spawnPoint.y;
+          player.hp = playerMaxHp();
+          snapCameraToPlayer();
+          updateHud();
+          deathTransition = { phase:'in', start: now, duration: 900 };
+          render(now);
+          requestAnimationFrame(step);
+          return;
+        }
+        if(deathTransition.phase === 'in' && elapsed >= deathTransition.duration){
+          stopDeathTransition();
+          render(now);
+          return;
+        }
+        requestAnimationFrame(step);
+      };
+      render();
+      requestAnimationFrame(step);
     }
 
     /* ============================== ENEMY AI TURN ============================== */
@@ -1174,7 +1195,7 @@
     /* ============================== MOVEMENT ============================== */
     let mapOpen=false, invOpen=false;
     async function tryMove(dx,dy){
-      if(mapOpen || invOpen || cameraAnimating || attackAnim) return;
+      if(mapOpen || invOpen || cameraAnimating || attackAnim || deathTransition) return;
       const nx = player.x+dx, ny = player.y+dy;
       const ek = keyXY(nx,ny);
       const target = enemies.find(e=>e.x===nx && e.y===ny && e.alive);
@@ -1342,6 +1363,7 @@
     let cameraAnimating = false;
     let moveAnim = null;
     let attackAnim = null;
+    let deathTransition = null;
 
     function targetCamX(px){
       const x = px === undefined ? player.x : px;
@@ -1388,6 +1410,9 @@
     }
     function stopAttackAnimation(){
       attackAnim = null;
+    }
+    function stopDeathTransition(){
+      deathTransition = null;
     }
     function animateAttackLunge(fromX, fromY, targetX, targetY){
       stopAttackAnimation();
@@ -1500,6 +1525,17 @@
         }
       } else if(hoveredEnemy && hoveredEnemy.alive){
         drawEnemyRangeOverlay(hoveredEnemy);
+      }
+      if(deathTransition){
+        const elapsed = now - deathTransition.start;
+        let alpha = 0;
+        if(deathTransition.phase === 'out'){
+          alpha = Math.min(1, Math.max(0, elapsed / deathTransition.duration));
+        } else {
+          alpha = Math.max(0, 1 - (elapsed / deathTransition.duration));
+        }
+        ctx.fillStyle = 'rgba(0,0,0,' + alpha + ')';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       renderMinimap();
     }
@@ -1928,6 +1964,7 @@
 
       stopCameraAnimation();
       stopAttackAnimation();
+      stopDeathTransition();
       snapCameraToPlayer();
       updateHud();
       render();
@@ -2030,6 +2067,7 @@
       spawnEnemies();
       spawnGroundStuff();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures are far more aggressive than others. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
+      stopDeathTransition();
       stopAttackAnimation();
       snapCameraToPlayer();
       updateHud();
