@@ -626,12 +626,19 @@ function makeArmorItem(tier){
 }
 function itemStatLine(it){
   const parts=[];
+
   if(it.atk) parts.push('ATK '+it.atk+(it.mod==='atk'?('+'+it.modAmt):''));
   if(it.def) parts.push('DEF '+it.def+(it.mod==='def'?('+'+it.modAmt):''));
   if(it.spd!==undefined) parts.push('SPD '+it.spd+(it.mod==='spd'?('+'+it.modAmt):''));
+
+  if(it.mod==='atk' && !it.atk) parts.push('ATK +'+it.modAmt);
+  if(it.mod==='def' && !it.def) parts.push('DEF +'+it.modAmt);
+  if(it.mod==='spd' && it.spd===undefined) parts.push('SPD +'+it.modAmt);
+
   if(it.mod==='hp') parts.push('HP +'+it.modAmt);
   if(it.mod==='mf') parts.push('MF +'+it.modAmt);
   if(it.mod==='xp') parts.push('XP +'+it.xpBonus+'%');
+
   return parts.join(' ');
 }
 
@@ -658,15 +665,22 @@ function recalcDerived(){
 }
 function playerAtk(){
   let a = player.baseAtk;
-  const w = player.equip.weapon;
-  if(w){ a += w.atk; if(w.mod==='atk') a += w.modAmt; }
+  for(const slot of ['weapon','shield','armor']){
+    const it = player.equip[slot];
+    if(!it) continue;
+    if(it.atk) a += it.atk;
+    if(it.mod==='atk') a += it.modAmt;
+  }
   return a;
 }
+
 function playerDef(){
   let d = player.baseDef;
-  for(const slot of ['shield','armor']){
+  for(const slot of ['weapon','shield','armor']){
     const it = player.equip[slot];
-    if(it){ d += it.def; if(it.mod==='def') d += it.modAmt; }
+    if(!it) continue;
+    if(it.def) d += it.def;
+    if(it.mod==='def') d += it.modAmt;
   }
   return d;
 }
