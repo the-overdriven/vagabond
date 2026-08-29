@@ -769,6 +769,29 @@
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='hp') bonus+=player.equip[slot].modAmt;
       return player.maxHp + bonus;
     }
+    // Snapshots the derived character stats so an equip can report exactly what it
+    // changed (e.g. "+2 ATK, -1 SPD") instead of leaving the player to eyeball the HUD.
+    const TRACKED_STATS = [
+      {key:'ATK', get:()=>playerAtk()},
+      {key:'DEF', get:()=>playerDef()},
+      {key:'SPD', get:()=>playerSpd()},
+      {key:'MF',  get:()=>playerMf()},
+      {key:'HP',  get:()=>playerMaxHp()},
+    ];
+    function statSnapshot(){
+      const snap = {};
+      for(const s of TRACKED_STATS) snap[s.key] = s.get();
+      return snap;
+    }
+    function statDeltaText(before){
+      const parts = [];
+      for(const s of TRACKED_STATS){
+        const delta = s.get() - before[s.key];
+        if(delta) parts.push((delta > 0 ? '+' : '') + delta + ' ' + s.key);
+      }
+      return parts.length ? ' (' + parts.join(', ') + ')' : ' (no stat change)';
+    }
+
     function xpMultiplier(){
       let m=1;
       for(const slot of ['weapon','shield','armor']){
@@ -976,8 +999,9 @@
 
     function maybeAutoEquipWeapon(item, announce = true){
       if(!item || item.kind !== 'weapon' || player.equip.weapon) return false;
+      const before = statSnapshot();
       player.equip.weapon = item;
-      if(announce) log(`You automatically equip the ${item.name}.`, 'good');
+      if(announce) log(`You automatically equip the ${item.name}.${statDeltaText(before)}`, 'good');
       return true;
     }
     function lootFromEnemy(e){
@@ -2021,10 +2045,11 @@
       if(!it) return;
       const slot = it.kind;
       const old = player.equip[slot];
+      const before = statSnapshot();
       player.equip[slot] = it;
       player.inventory.splice(idx,1);
       if(old) player.inventory.push(old);
-      log(`You equip the ${it.name}.`, 'good');
+      log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
       updateHud(); renderInventory();
     }
     function usePotion(idx){
