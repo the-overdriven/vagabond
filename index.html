@@ -161,6 +161,10 @@
           background:#241a11; border:1px solid var(--border); border-radius:3px;
           padding:1px 5px; color:var(--ember-bright); font-size:10px;
       }
+      #hint kbd.locked{
+          background:var(--ember-bright); color:#241a11; border-color:var(--ember-bright);
+          box-shadow:0 0 6px var(--ember-bright);
+      }
       #hint {
           position: fixed;
           right: 14px;
@@ -355,6 +359,7 @@
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
+    <kbd id="kbdCaps">CAPS</kbd> lock enemy ranges on &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
     <kbd>M</kbd> map &nbsp;<br>
     <kbd>K</kbd> save &nbsp;
@@ -1632,7 +1637,20 @@
     }
 
     let hoveredEnemy = null;
+    // Enemy ranges show while CTRL is held, OR permanently once CAPS LOCK latches
+    // them on. Keeping the two sources separate means releasing CTRL (or the window
+    // losing focus) can't clear the sticky toggle.
+    let rangesHeld = false;
+    let rangesLocked = false;
     let showAllVisibleEnemyRanges = false;
+    function refreshRangeVisibility(){
+      const next = rangesHeld || rangesLocked;
+      const capsKbd = document.getElementById('kbdCaps');
+      if(capsKbd) capsKbd.classList.toggle('locked', rangesLocked);
+      if(next === showAllVisibleEnemyRanges) return;
+      showAllVisibleEnemyRanges = next;
+      render();
+    }
     function enemyIsVisibleOnMainView(e){
       if(!e || !e.alive) return false;
       const vx = e.x-camX, vy = e.y-camY;
@@ -2116,10 +2134,13 @@
     window.addEventListener('keydown', (ev)=>{
       const k = ev.key;
       if(k==='Control'){
-        if(!showAllVisibleEnemyRanges){
-          showAllVisibleEnemyRanges = true;
-          render();
-        }
+        rangesHeld = true;
+        refreshRangeVisibility();
+        return;
+      }
+      if(k==='CapsLock'){
+        rangesLocked = !rangesLocked;
+        refreshRangeVisibility();
         return;
       }
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
@@ -2143,16 +2164,12 @@
     });
     window.addEventListener('keyup', (ev)=>{
       if(ev.key!=='Control') return;
-      if(showAllVisibleEnemyRanges){
-        showAllVisibleEnemyRanges = false;
-        render();
-      }
+      rangesHeld = false;
+      refreshRangeVisibility();
     });
     window.addEventListener('blur', ()=>{
-      if(showAllVisibleEnemyRanges){
-        showAllVisibleEnemyRanges = false;
-        render();
-      }
+      rangesHeld = false;
+      refreshRangeVisibility();
     });
 
     /* ============================== INIT ============================== */
