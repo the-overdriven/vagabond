@@ -995,6 +995,25 @@
     function enemyAggroRange(e){
       return e && typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE;
     }
+    function enemyStepTowardPlayer(e){
+      const dx = player.x - e.x, dy = player.y - e.y;
+      const sx = Math.sign(dx), sy = Math.sign(dy);
+      let nx = e.x + sx, ny = e.y + sy;
+      if(!(isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)) && !(nx===player.x&&ny===player.y))){
+        // try only x
+        nx = e.x + sx; ny = e.y;
+        if(!(sx!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
+          nx = e.x; ny = e.y + sy;
+          if(!(sy!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
+            return false; // stuck
+          }
+        }
+      }
+      occupied.delete(keyXY(e.x,e.y));
+      e.x = nx; e.y = ny;
+      occupied.add(keyXY(e.x,e.y));
+      return true;
+    }
     function enemyTurn(){
       if(player.speedPotionTurns > 0){
         player.speedPotionTurns--;
@@ -1026,21 +1045,17 @@
             e.aware = true;
             log(`The ${e.name} has spotted you!`, 'bad');
           }
-          const sx = Math.sign(dx), sy = Math.sign(dy);
-          let nx = e.x + sx, ny = e.y + sy;
-          if(!(isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)) && !(nx===player.x&&ny===player.y))){
-            // try only x
-            nx = e.x + sx; ny = e.y;
-            if(!(sx!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
-              nx = e.x; ny = e.y + sy;
-              if(!(sy!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
-                continue; // stuck
-              }
+          const hasExtraPursuitTurn = e.spd > playerSpeed && chance(0.25);
+          let pursuitActions = hasExtraPursuitTurn ? 2 : 1;
+          while(pursuitActions > 0){
+            const distNow = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y));
+            if(distNow <= ATTACK_RANGE){
+              enemyAttackPlayer(e);
+              break;
             }
+            if(!enemyStepTowardPlayer(e)) break;
+            pursuitActions--;
           }
-          occupied.delete(keyXY(e.x,e.y));
-          e.x = nx; e.y = ny;
-          occupied.add(keyXY(e.x,e.y));
         } else {
           e.aware = false;
         }
