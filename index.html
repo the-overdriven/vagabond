@@ -530,6 +530,8 @@
     let map = []; // map[y][x] = tile key string
     let spawnPoint = {x:0,y:0};
     let discovered = []; // discovered[y][x] = has the player ever seen this tile on the main screen
+    let minimapDirty = true;
+    let miniPlayerX = -1, miniPlayerY = -1;
     function initDiscovered(){
       discovered = [];
       for(let y=0;y<MAP_H;y++) discovered.push(new Array(MAP_W).fill(false));
@@ -1079,6 +1081,7 @@
     function die(){
       if(deathTransition) return;
       player.deaths++;
+      pendingMove = null;
       const deathLogId = log(`You have fallen... and awaken at the Temple.`, 'bad');
       stopCameraAnimation();
       stopAttackAnimation();
@@ -1243,8 +1246,22 @@
 
     /* ============================== MOVEMENT ============================== */
     let mapOpen=false, invOpen=false;
+    // Buffering one move while the step animation plays keeps held-key walking
+    // continuous - without it every input during the 140ms pan is dropped, which
+    // reads as stuttering.
+    let pendingMove = null;
+    function flushPendingMove(){
+      if(!pendingMove) return;
+      const next = pendingMove;
+      pendingMove = null;
+      tryMove(next.dx, next.dy);
+    }
     async function tryMove(dx,dy){
-      if(mapOpen || invOpen || cameraAnimating || attackAnim || deathTransition) return;
+      if(mapOpen || invOpen || deathTransition) return;
+      if(cameraAnimating || attackAnim){
+        pendingMove = {dx:dx, dy:dy};
+        return;
+      }
       const nx = player.x+dx, ny = player.y+dy;
       const ek = keyXY(nx,ny);
       const target = enemies.find(e=>e.x===nx && e.y===ny && e.alive);
@@ -1252,6 +1269,7 @@
         await playerAttackEnemy(target);
         enemyTurn();
         render(); updateHud(); updateTooltip();
+        flushPendingMove();
         return;
       }
       let moved = false;
@@ -1274,6 +1292,7 @@
       if(moved) animateCameraToPlayer(fromPos);
       else render();
       updateTooltip();
+      if(!moved) flushPendingMove();
     }
 
     /* ============================== LOOK / SURROUNDINGS ============================== */
@@ -1453,6 +1472,7 @@
         } else {
           cameraAnimating = false;
           cameraAnimFrame = null;
+          flushPendingMove();
         }
       };
       cameraAnimFrame = requestAnimationFrame(step);
@@ -1526,7 +1546,7 @@
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
           drawTile(px,py,t.ch,t.color,t.bg);
-          discovered[my][mx] = true; // anything drawn on the main screen counts as seen
+          markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
       // ground items
@@ -1586,7 +1606,7 @@
         ctx.fillStyle = 'rgba(0,0,0,' + alpha + ')';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      renderMinimap();
+      if(minimapDirty || miniPlayerX !== player.x || miniPlayerY !== player.y) renderMinimap();
     }
 
 // Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
@@ -1671,29 +1691,60 @@
     const sideCtx = sideMini.getContext('2d');
     mini.width = MAP_W*3; mini.height = MAP_H*3;
     sideMini.width = MAP_W*2; sideMini.height = MAP_H*2;
-    function renderMinimapCanvas(ctx, scale){
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      for(let y=0;y<MAP_H;y++){
-        for(let x=0;x<MAP_W;x++){
-          const px = x*scale, py = y*scale;
-          const tile = TILE[map[y][x]];
-          if(discovered[y][x]){
-            ctx.fillStyle = tile.color;
-            ctx.fillRect(px, py, scale, scale);
-          } else {
-            ctx.fillStyle = 'rgba(3,2,1,0.72)';
-            ctx.fillRect(px, py, scale, scale);
-          }
+    // The minimap terrain is expensive to rasterise (MAP_W*MAP_H fills per canvas),
+    // so it lives on cached offscreen canvases that are only patched tile-by-tile as
+    // fog of war lifts. Per-frame rendering is then just a blit plus two markers.
+    const miniBases = {};
+    function makeMiniBase(scale){
+      const c = document.createElement('canvas');
+      c.width = MAP_W*scale; c.height = MAP_H*scale;
+      return { canvas:c, ctx:c.getContext('2d'), scale:scale };
+    }
+    function ensureMiniBases(){
+      if(!miniBases[3]) miniBases[3] = makeMiniBase(3);
+      if(!miniBases[2]) miniBases[2] = makeMiniBase(2);
+    }
+    function paintMiniTile(base, x, y){
+      const s = base.scale;
+      const c = base.ctx;
+      c.clearRect(x*s, y*s, s, s);
+      c.fillStyle = discovered[y][x] ? TILE[map[y][x]].color : 'rgba(3,2,1,0.72)';
+      c.fillRect(x*s, y*s, s, s);
+    }
+    function rebuildMinimapBases(){
+      ensureMiniBases();
+      for(const scale of [2,3]){
+        const base = miniBases[scale];
+        base.ctx.clearRect(0, 0, base.canvas.width, base.canvas.height);
+        for(let y=0;y<MAP_H;y++){
+          for(let x=0;x<MAP_W;x++) paintMiniTile(base, x, y);
         }
       }
+      minimapDirty = true;
+    }
+    function markDiscovered(x, y){
+      if(discovered[y][x]) return;
+      discovered[y][x] = true;
+      ensureMiniBases();
+      paintMiniTile(miniBases[3], x, y);
+      paintMiniTile(miniBases[2], x, y);
+      minimapDirty = true;
+    }
+    function renderMinimapCanvas(ctx, scale){
+      ensureMiniBases();
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.drawImage(miniBases[scale].canvas, 0, 0);
       ctx.fillStyle = '#ffe08a';
       ctx.fillRect(spawnPoint.x*scale-1, spawnPoint.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(player.x*scale-1, player.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
     }
     function renderMinimap(){
-      renderMinimapCanvas(mctx, 3);
+      if(mapOpen) renderMinimapCanvas(mctx, 3);
       renderMinimapCanvas(sideCtx, 2);
+      minimapDirty = false;
+      miniPlayerX = player.x;
+      miniPlayerY = player.y;
     }
 
     /* ============================== HUD / OVERLAYS ============================== */
@@ -1981,6 +2032,7 @@
         // current surroundings get marked seen automatically by the render() below
         initDiscovered();
       }
+      rebuildMinimapBases();
 
       spawnPoint = {x:data.spawnPoint.x, y:data.spawnPoint.y};
       rngState = data.rngState|0;
@@ -2111,6 +2163,7 @@
     function init(){
       generateMap();
       initDiscovered();
+      rebuildMinimapBases();
       player.x = spawnPoint.x; player.y = spawnPoint.y;
       player.hp = playerMaxHp();
       spawnEnemies();
