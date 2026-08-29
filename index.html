@@ -1183,6 +1183,7 @@
         return;
       }
       let moved = false;
+      const fromPos = {x:player.x, y:player.y};
       if(isWalkable(nx,ny)){
         player.x = nx; player.y = ny;
         player.steps++;
@@ -1198,7 +1199,7 @@
       }
       enemyTurn();
       updateHud();
-      if(moved) animateCameraToPlayer();
+      if(moved) animateCameraToPlayer(fromPos);
       else render();
       updateTooltip();
     }
@@ -1337,12 +1338,15 @@
     let camX=0, camY=0;
     let cameraAnimFrame = null;
     let cameraAnimating = false;
+    let moveAnim = null;
 
-    function targetCamX(){
-      return Math.max(0, Math.min(MAP_W-VIEW_W, player.x - Math.floor(VIEW_W/2)));
+    function targetCamX(px){
+      const x = px === undefined ? player.x : px;
+      return Math.max(0, Math.min(MAP_W-VIEW_W, x - Math.floor(VIEW_W/2)));
     }
-    function targetCamY(){
-      return Math.max(0, Math.min(MAP_H-VIEW_H, player.y - Math.floor(VIEW_H/2)));
+    function targetCamY(py){
+      const y = py === undefined ? player.y : py;
+      return Math.max(0, Math.min(MAP_H-VIEW_H, y - Math.floor(VIEW_H/2)));
     }
     function snapCameraToPlayer(){
       camX = targetCamX();
@@ -1352,84 +1356,97 @@
       if(cameraAnimFrame !== null) cancelAnimationFrame(cameraAnimFrame);
       cameraAnimFrame = null;
       cameraAnimating = false;
+      moveAnim = null;
     }
-    function animateCameraToPlayer(){
-      const fromX = camX, fromY = camY;
-      const toX = targetCamX(), toY = targetCamY();
+    function animateCameraToPlayer(fromPos){
+      const fromX = fromPos && typeof fromPos.x === 'number' ? fromPos.x : player.x;
+      const fromY = fromPos && typeof fromPos.y === 'number' ? fromPos.y : player.y;
+      const toX = player.x, toY = player.y;
       stopCameraAnimation();
+      moveAnim = {
+        fromX: fromX,
+        fromY: fromY,
+        toX: toX,
+        toY: toY,
+        start: performance.now(),
+        duration: 140
+      };
       cameraAnimating = true;
-      const start = performance.now();
-      const duration = 160;
-      const ease = t => (t < 0.5) ? (2*t*t) : (-1 + (4 - 2*t)*t);
       const step = (now)=>{
-        const t = Math.min(1, (now - start) / duration);
-        const p = ease(t);
-        camX = fromX + (toX - fromX) * p;
-        camY = fromY + (toY - fromY) * p;
-        render();
-        if(t < 1){
+        render(now);
+        if(moveAnim){
           cameraAnimFrame = requestAnimationFrame(step);
         } else {
-          camX = toX;
-          camY = toY;
           cameraAnimating = false;
           cameraAnimFrame = null;
-          render();
         }
       };
-      render();
       cameraAnimFrame = requestAnimationFrame(step);
     }
 
-    function render(){
-      const baseCamX = Math.floor(camX);
-      const baseCamY = Math.floor(camY);
-      const offsetX = Math.round((baseCamX - camX) * TILE_PX);
-      const offsetY = Math.round((baseCamY - camY) * TILE_PX);
-
+    function render(now){
+      now = now || performance.now();
+      let viewPlayerX = player.x;
+      let viewPlayerY = player.y;
+      if(moveAnim){
+        const t = Math.min(1, (now - moveAnim.start) / moveAnim.duration);
+        const p = 1 - Math.pow(1 - t, 3);
+        viewPlayerX = moveAnim.fromX + (moveAnim.toX - moveAnim.fromX) * p;
+        viewPlayerY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * p;
+        if(t >= 1){
+          moveAnim = null;
+          viewPlayerX = player.x;
+          viewPlayerY = player.y;
+        }
+      }
+      camX = targetCamX(viewPlayerX);
+      camY = targetCamY(viewPlayerY);
       ctx.fillStyle = '#050403';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for(let vy=0; vy<=VIEW_H; vy++){
         for(let vx=0; vx<=VIEW_W; vx++){
-          const mx = baseCamX+vx, my = baseCamY+vy;
+          const mx = Math.floor(camX)+vx, my = Math.floor(camY)+vy;
           if(mx<0||my<0||mx>=MAP_W||my>=MAP_H){
+           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX);
+           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX);
+           drawTile(px,py,'~',TILE.water.color,TILE.water.bg);
            continue;
           }
           const t = TILE[map[my][mx]];
-          const px = vx*TILE_PX + offsetX;
-          const py = vy*TILE_PX + offsetY;
+          const px = Math.round((mx-camX) * TILE_PX);
+          const py = Math.round((my-camY) * TILE_PX);
           drawTile(px,py,t.ch,t.color,t.bg);
           discovered[my][mx] = true; // anything drawn on the main screen counts as seen
         }
       }
       // ground items
       for(const g of groundItems){
-        const vx = (g.x-camX) * TILE_PX;
-        const vy = (g.y-camY) * TILE_PX;
+        const vx = Math.round((g.x-camX) * TILE_PX);
+        const vy = Math.round((g.y-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
-        if(g.kind==='chest' && !g.opened) drawTile(Math.round(vx),Math.round(vy),'$', '#e8c14a', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='potion') drawTile(Math.round(vx),Math.round(vy),'!', '#e0473f', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='speedpotion') drawTile(Math.round(vx),Math.round(vy),'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='scroll') drawTile(Math.round(vx),Math.round(vy),'?', '#b565d6', TILE[map[g.y][g.x]].bg);
+        if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
       }
       // enemies
       for(const e of enemies){
         if(!e.alive) continue;
-        const vx = (e.x-camX) * TILE_PX, vy = (e.y-camY) * TILE_PX;
+        const vx = Math.round((e.x-camX) * TILE_PX), vy = Math.round((e.y-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         const colors = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
-        drawTile(Math.round(vx),Math.round(vy),e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
+        drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
 
         if(e.aware){
           ctx.strokeStyle = 'rgba(255,106,93,0.95)';
           ctx.lineWidth = 2;
-          ctx.strokeRect(Math.round(vx)+2, Math.round(vy)+2, TILE_PX-4, TILE_PX-4);
+          ctx.strokeRect(vx+2, vy+2, TILE_PX-4, TILE_PX-4);
         }
       }
       // player
       {
-        const vx = Math.round((player.x-camX) * TILE_PX), vy = Math.round((player.y-camY) * TILE_PX);
+        const vx = Math.round((viewPlayerX-camX) * TILE_PX), vy = Math.round((viewPlayerY-camY) * TILE_PX);
         drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', 'rgba(0,0,0,0)');
       }
       // range overlays are drawn last so they tint everything underneath without
