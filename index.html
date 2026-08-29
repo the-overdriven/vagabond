@@ -1354,9 +1354,13 @@
         const vx = player.x-camX, vy = player.y-camY;
         drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', '#241a08');
       }
-      // hovered enemy's range, drawn last so it tints everything underneath (tiles,
-      // items, other enemies) without being erased by their own background fills
-      if(hoveredEnemy && hoveredEnemy.alive){
+      // range overlays are drawn last so they tint everything underneath without
+      // being erased by later tile/entity draws.
+      if(showAllVisibleEnemyRanges){
+        for(const e of enemies){
+          if(enemyIsVisibleOnMainView(e)) drawEnemyRangeOverlay(e);
+        }
+      } else if(hoveredEnemy && hoveredEnemy.alive){
         drawEnemyRangeOverlay(hoveredEnemy);
       }
       renderMinimap();
@@ -1389,6 +1393,12 @@
     }
 
     let hoveredEnemy = null;
+    let showAllVisibleEnemyRanges = false;
+    function enemyIsVisibleOnMainView(e){
+      if(!e || !e.alive) return false;
+      const vx = e.x-camX, vy = e.y-camY;
+      return vx>=0 && vy>=0 && vx<VIEW_W && vy<VIEW_H;
+    }
 
     const tooltip = document.getElementById('tooltip');
     function slug(name){ return name.toLowerCase().replace(/\s+/g,'_'); }
@@ -1830,6 +1840,13 @@
     }
     window.addEventListener('keydown', (ev)=>{
       const k = ev.key;
+      if(k==='Control'){
+        if(!showAllVisibleEnemyRanges){
+          showAllVisibleEnemyRanges = true;
+          render();
+        }
+        return;
+      }
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
       if(k==='m' || k==='M'){ ev.preventDefault(); toggleMap(); return; }
       if(k==='Escape'){ toggleInv(false); toggleMap(false); return; }
@@ -1847,6 +1864,19 @@
       if(moves[key]){
         ev.preventDefault();
         tryMove(moves[key][0], moves[key][1]);
+      }
+    });
+    window.addEventListener('keyup', (ev)=>{
+      if(ev.key!=='Control') return;
+      if(showAllVisibleEnemyRanges){
+        showAllVisibleEnemyRanges = false;
+        render();
+      }
+    });
+    window.addEventListener('blur', ()=>{
+      if(showAllVisibleEnemyRanges){
+        showAllVisibleEnemyRanges = false;
+        render();
       }
     });
 
