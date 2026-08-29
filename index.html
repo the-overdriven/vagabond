@@ -451,7 +451,7 @@
       {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2, aggro:2, biomes:['sand','grass']},
       {name:"Giant Crab", hp:14, atk:3, def:5, spd:5, tier:2, aggro:3, biomes:['sand','river']},
       {name:"Scorpion", hp:15, atk:4, def:2, spd:2, tier:2, aggro:2, biomes:['sand','hill']},
-      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2, aggro:3, biomes:['river','sand','grass']},
+      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2, aggro:3, biomes:['river','forest']},
       {name:"Lion", hp:18, atk:5, def:3, spd:3, tier:2, aggro:3, biomes:['grass','sand']},
 
       {name:"Ghoul", hp:20, atk:4, def:3, spd:2, tier:3, aggro:2, biomes:['grass','forest','hill']},
@@ -1627,6 +1627,20 @@
       ctx.fillText(ch, px+TILE_PX/2, py+3);
     }
 
+    // Creatures get a dark outline so their glyph stays readable on top of bright
+    // terrain (sand, snow) instead of blending into it.
+    const CREATURE_OUTLINE_PX = 3;
+    function drawCreature(px,py,ch,color,alpha){
+      const a = alpha === undefined ? 1 : alpha;
+      ctx.lineWidth = CREATURE_OUTLINE_PX;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,'+(0.85*a)+')';
+      ctx.strokeText(ch, px+TILE_PX/2, py+3);
+      ctx.fillStyle = color;
+      ctx.fillText(ch, px+TILE_PX/2, py+3);
+    }
+
     let camX=0, camY=0;
     let animLoopFrame = null;
     let cameraAnimating = false;
@@ -1803,9 +1817,9 @@
         }
         const vx = Math.round((ex-camX) * TILE_PX), vy = Math.round((ey-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
-        // transparent background so a sliding enemy doesn't drag a solid tile-coloured
-        // block across the terrain it is walking over
-        drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], enemyColors[e.tier], 'rgba(0,0,0,0)');
+        // no tile background is painted, so a sliding enemy doesn't drag a solid
+        // tile-coloured block across the terrain it is walking over
+        drawCreature(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], enemyColors[e.tier]);
 
         if(e.aware){
           ctx.strokeStyle = 'rgba(255,106,93,0.95)';
@@ -1824,7 +1838,8 @@
           py = attackAnim.fromY + (attackAnim.targetY - attackAnim.fromY) * lunge;
         }
         const vx = Math.round((px-camX) * TILE_PX), vy = Math.round((py-camY) * TILE_PX);
-        drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', 'rgba(0,0,0,0)');
+        const faded = player.invisibleTurns>0;
+        drawCreature(vx,vy, '@', faded ? 'rgba(255,246,214,0.45)' : '#fff6d6', faded ? 0.45 : 1);
       }
       // range overlays are drawn last so they tint everything underneath without
       // being erased by later tile/entity draws.
