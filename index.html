@@ -221,6 +221,13 @@
       .statgrid .row .lbl{color:var(--parchment-dim); letter-spacing:0.5px; text-align: right;}
       .statgrid .row b{color:var(--ember-bright); font-weight:700;}
       .invlist{max-height:220px; overflow-y:auto; border-top:1px solid var(--border); padding-top:8px;}
+      .inv-tabs{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px;}
+      .inv-tab{
+          background:#2a1c10; color:var(--parchment-dim); border:1px solid var(--border);
+          border-radius:3px; padding:4px 8px; font-size:10px; cursor:pointer;
+          font-family:inherit; letter-spacing:0.7px; text-transform:uppercase;
+      }
+      .inv-tab.active{background:var(--ember); color:#1a0f05; border-color:var(--ember-bright);}
       .invitem{
           display:flex; justify-content:space-between; align-items:center;
           padding:4px 2px; font-size:12px; border-bottom:1px dashed #33261a;
@@ -303,7 +310,13 @@
         <div class="statgrid" id="statGrid"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">BACKPACK</b>
-
+        </div>
+        <div class="inv-tabs" id="invTabs">
+          <button class="inv-tab active" data-tab="all" type="button">All</button>
+          <button class="inv-tab" data-tab="weapon" type="button">Weapons</button>
+          <button class="inv-tab" data-tab="armor" type="button">Armors</button>
+          <button class="inv-tab" data-tab="shield" type="button">Shields</button>
+          <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
         <div class="closehint">Press <kbd>TAB</kbd> to close</div>
@@ -1383,6 +1396,26 @@
       const winners = valid.filter(entry => entry.score === best);
       return winners.length === 1 ? new Set([winners[0].idx]) : new Set();
     }
+    let invTab = 'all';
+    function setInvTab(tab){
+      invTab = tab;
+      document.querySelectorAll('.inv-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      if(invOpen) renderInventory();
+    }
+    function filterVisibleInventory(){
+      const visible = [];
+      player.inventory.forEach((it, idx)=>{
+        let matches = true;
+        if(invTab === 'weapon') matches = it.kind === 'weapon';
+        else if(invTab === 'armor') matches = it.kind === 'armor';
+        else if(invTab === 'shield') matches = it.kind === 'shield';
+        else if(invTab === 'other') matches = it.kind !== 'weapon' && it.kind !== 'armor' && it.kind !== 'shield';
+        if(matches) visible.push({it, idx});
+      });
+      return visible;
+    }
     function renderInventory(){
       document.getElementById('slotWeapon').querySelector('.val').textContent = slotLabel(player.equip.weapon);
       document.getElementById('slotShield').querySelector('.val').textContent = slotLabel(player.equip.shield);
@@ -1423,12 +1456,14 @@
 
       const list = document.getElementById('invList');
       list.innerHTML = '';
-      if(player.inventory.length===0){
+      const visible = filterVisibleInventory();
+      if(visible.length===0){
         const d = document.createElement('div');
-        d.className='invitem'; d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">Your backpack is empty.</span>';
+        d.className='invitem'; d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">No items in this category.</span>';
         list.appendChild(d);
+        return;
       }
-      player.inventory.forEach((it, idx)=>{
+      visible.forEach(({it, idx})=>{
         const row = document.createElement('div');
         row.className = 'invitem';
         const isBest = (it.kind==='weapon' && best.weapon.has(idx)) ||
@@ -1495,6 +1530,10 @@
 //   const idx = player.inventory.findIndex(i=>i.kind==='potion');
 //   if(idx>=0) usePotion(idx); else log("You have no potions.", 'info');
 // };
+
+    document.querySelectorAll('.inv-tab').forEach(button => {
+      button.addEventListener('click', () => setInvTab(button.dataset.tab));
+    });
 
     /* ============================== SAVE / LOAD ============================== */
     const SAVE_VERSION = 2; // v2 adds the discovered (fog-of-war) grid
