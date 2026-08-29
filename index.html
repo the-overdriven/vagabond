@@ -433,41 +433,48 @@
       {name:"Swift", stat:"spd"},
       {name:"Lucky", stat:"mf"},
     ];
+    // biomes[] restricts where a creature may spawn. Only walkable terrain counts:
+    // grass, forest, sand, hill, snow and river.
     const ENEMY_TEMPLATES = [
-      {name:"Giant Rat", hp:3, atk:1, def:1, spd:2, tier:1, aggro:3},
-      {name:"Goblin", hp:5, atk:2, def:1, spd:2, tier:1, aggro:2},
-      {name:"Giant Bat", hp:4, atk:1, def:1, spd:3, tier:1, aggro:3},
-      {name:"Snake", hp:4, atk:2, def:1, spd:2, tier:1, aggro:2},
-      {name:"Scarab", hp:6, atk:1, def:3, spd:2, tier:1, aggro:3},
-      {name:"Monkey", hp:6, atk:2, def:1, spd:2, tier:1, aggro:3},
-      {name:"Boar", hp:10, atk:3, def:2, spd:4, tier:1, aggro:4},
-      {name:"Wolf", hp:8, atk:3, def:2, spd:4, tier:1, aggro:4},
-      {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1, aggro:3},
-      {name:"Wasp", hp:8, atk:3, def:1, spd:4, tier:1, aggro:4, fly:true},
+      {name:"Giant Rat", hp:3, atk:1, def:1, spd:2, tier:1, aggro:3, biomes:['grass','forest','hill']},
+      {name:"Goblin", hp:5, atk:2, def:1, spd:2, tier:1, aggro:2, biomes:['forest','hill','grass']},
+      {name:"Giant Bat", hp:4, atk:1, def:1, spd:3, tier:1, aggro:3, biomes:['hill','forest']},
+      {name:"Snake", hp:4, atk:2, def:1, spd:2, tier:1, aggro:2, biomes:['grass','sand','forest']},
+      {name:"Scarab", hp:6, atk:1, def:3, spd:2, tier:1, aggro:3, biomes:['sand']},
+      {name:"Monkey", hp:6, atk:2, def:1, spd:2, tier:1, aggro:3, biomes:['forest']},
+      {name:"Boar", hp:10, atk:3, def:2, spd:4, tier:1, aggro:4, biomes:['forest','grass']},
+      {name:"Wolf", hp:8, atk:3, def:2, spd:4, tier:1, aggro:4, biomes:['forest']},
+      {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1, aggro:3, biomes:['grass','forest']},
+      {name:"Wasp", hp:8, atk:3, def:1, spd:4, tier:1, aggro:4, fly:true, biomes:['forest','grass']},
 
-      {name:"Skeleton", hp:9, atk:2, def:3, spd:3, tier:2, aggro:3},
-      {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2, aggro:2},
-      {name:"Giant Crab", hp:14, atk:3, def:5, spd:5, tier:2, aggro:3},
-      {name:"Scorpion", hp:15, atk:4, def:2, spd:2, tier:2, aggro:2},
-      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2, aggro:3},
-      {name:"Lion", hp:18, atk:5, def:3, spd:3, tier:2, aggro:3},
+      {name:"Skeleton", hp:9, atk:2, def:3, spd:3, tier:2, aggro:3, biomes:['grass','hill','sand']},
+      {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2, aggro:2, biomes:['sand','grass']},
+      {name:"Giant Crab", hp:14, atk:3, def:5, spd:5, tier:2, aggro:3, biomes:['sand','river']},
+      {name:"Scorpion", hp:15, atk:4, def:2, spd:2, tier:2, aggro:2, biomes:['sand','hill']},
+      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2, aggro:3, biomes:['river','sand','grass']},
+      {name:"Lion", hp:18, atk:5, def:3, spd:3, tier:2, aggro:3, biomes:['grass','sand']},
 
-      {name:"Ghoul", hp:20, atk:4, def:3, spd:2, tier:3, aggro:2},
-      {name:"Ghost", hp:15, atk:4, def:2, spd:3, tier:3, aggro:3, fly:true},
-      {name:"Orc", hp:18, atk:5, def:3, spd:4, tier:3, aggro:3},
-      {name:"Banshee", hp:22, atk:5, def:2, spd:3, tier:3, aggro:3},
-      {name:"Imp", hp:20, atk:5, def:2, spd:3, tier:3, aggro:3},
-      {name:"Mummy", hp:30, atk:6, def:5, spd:2, tier:3, aggro:2},
-      {name:"Giant Spider", hp:25, atk:6, def:3, spd:5, tier:3, aggro:4},
-      {name:"Minotaur", hp:35, atk:7, def:5, spd:4, tier:3, aggro:3},
-      {name:"Ogre", hp:45, atk:8, def:5, spd:5, tier:3, aggro:2},
+      {name:"Ghoul", hp:20, atk:4, def:3, spd:2, tier:3, aggro:2, biomes:['grass','forest','hill']},
+      {name:"Ghost", hp:15, atk:4, def:2, spd:3, tier:3, aggro:3, fly:true, biomes:['forest','hill','snow']},
+      {name:"Orc", hp:18, atk:5, def:3, spd:4, tier:3, aggro:3, biomes:['hill','grass','forest']},
+      {name:"Banshee", hp:22, atk:5, def:2, spd:3, tier:3, aggro:3, biomes:['snow','hill','forest']},
+      {name:"Imp", hp:20, atk:5, def:2, spd:3, tier:3, aggro:3, biomes:['hill','forest']},
+      {name:"Mummy", hp:30, atk:6, def:5, spd:2, tier:3, aggro:2, biomes:['sand']},
+      {name:"Giant Spider", hp:25, atk:6, def:3, spd:5, tier:3, aggro:4, biomes:['forest','hill']},
+      {name:"White Tiger", hp:28, atk:7, def:4, spd:6, tier:3, aggro:4, biomes:['snow']},
+      {name:"Minotaur", hp:35, atk:7, def:5, spd:4, tier:3, aggro:3, biomes:['hill','forest']},
+      {name:"Ogre", hp:45, atk:8, def:5, spd:5, tier:3, aggro:2, biomes:['hill','grass','forest']},
 
-      {name:"Cyclops", hp:50, atk:9, def:6, spd:2, tier:4, aggro:2},
-      {name:"Beholder", hp:45, atk:8, def:5, spd:2, tier:4, aggro:3},
-      {name:"Wyvern", hp:55, atk:9, def:5, spd:5, tier:4, aggro:5, fly:true},
+      {name:"Cyclops", hp:50, atk:9, def:6, spd:2, tier:4, aggro:2, biomes:['hill','snow']},
+      {name:"Beholder", hp:45, atk:8, def:5, spd:2, tier:4, aggro:3, biomes:['hill','snow']},
+      {name:"Wyvern", hp:55, atk:9, def:5, spd:5, tier:4, aggro:5, fly:true, biomes:['hill','snow']},
 
-      {name:"Lich", hp:60, atk:10, def:6, spd:3, tier:5, aggro:4},
+      {name:"Lich", hp:60, atk:10, def:6, spd:3, tier:5, aggro:4, biomes:['snow','hill']},
     ];
+    const ENEMY_DEFAULT_BIOMES = ['grass','forest','hill','sand','snow','river'];
+    function enemyBiomes(tmpl){
+      return (tmpl && Array.isArray(tmpl.biomes) && tmpl.biomes.length) ? tmpl.biomes : ENEMY_DEFAULT_BIOMES;
+    }
     const ENEMY_PREFIXES = {
       "Fierce":  e=>{e.atk=Math.round(e.atk*1.35); e.aggro=(e.aggro||0)+1;},
       "Tough":   e=>{e.hp=Math.round(e.hp*1.5); e.maxHp=e.hp;},
@@ -497,7 +504,7 @@
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
-      snow:     {ch:'.', color:'#eef5fa', bg:'#12181c', walk:true},
+      snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', walk:true},
       // cavefloor:{ch:'.', color:'#8a7aa5', bg:'#120e18', walk:true},
       // cavewall: {ch:'#', color:'#2a2233', bg:'#0a0810', walk:false},
       temple:   {ch:'\u2626', color:'#ffe08a', bg:'#221a08', walk:true},
@@ -588,6 +595,20 @@
           row.push(t);
         }
         map.push(row);
+      }
+
+      // Arctic north: freeze the top of the world into a ragged snow band. Snow used to
+      // require elevation > 0.86 AND moisture > 0.5, which the island falloff made
+      // almost unreachable, so the biome effectively never generated.
+      const SNOW_BAND = Math.round(MAP_H * 0.22);
+      const snowEdgeFn = makeNoise(30, 8);
+      for(let y=0;y<SNOW_BAND;y++){
+        for(let x=0;x<MAP_W;x++){
+          const t = map[y][x];
+          if(t!=='grass' && t!=='forest' && t!=='hill' && t!=='sand') continue;
+          const coldness = (SNOW_BAND - y)/SNOW_BAND + (snowEdgeFn(x,y,MAP_W,MAP_H) - 0.5)*0.55;
+          if(coldness > 0.32) map[y][x] = 'snow';
+        }
       }
 
       // Scattered boulders: sprinkle extra impassable terrain across walkable lowlands
@@ -844,18 +865,52 @@
     function spawnEnemies(){
       const total = 120;
       const weights = [0.42,0.26,0.17,0.10,0.05]; // tier 1..5
+
+      // Index every legal spawn tile by terrain once. Rejection-sampling the whole map
+      // would almost never land a Mummy on sand or a Lich on snow, so restricted
+      // creatures would silently fail to spawn.
+      const tilesByBiome = {};
+      const allSpawnTiles = [];
+      for(let y=2;y<MAP_H-2;y++){
+        for(let x=2;x<MAP_W-2;x++){
+          const tile = map[y][x];
+          if(tile==='temple' || !isWalkable(x,y)) continue;
+          if(Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) continue;
+          if(!tilesByBiome[tile]) tilesByBiome[tile] = [];
+          tilesByBiome[tile].push(x, y);
+          allSpawnTiles.push(x, y);
+        }
+      }
+      const poolCache = {};
+      function poolFor(tmpl){
+        if(poolCache[tmpl.name]) return poolCache[tmpl.name];
+        let pool = [];
+        for(const biome of enemyBiomes(tmpl)){
+          if(tilesByBiome[biome]) pool = pool.concat(tilesByBiome[biome]);
+        }
+        // If this world happens to contain none of the creature's biomes, fall back to
+        // anywhere walkable rather than dropping it from the world entirely.
+        if(!pool.length) pool = allSpawnTiles;
+        poolCache[tmpl.name] = pool;
+        return pool;
+      }
+
       for(let i=0;i<total;i++){
         let r = rng(), tier=1, acc=0;
         for(let t=0;t<5;t++){ acc+=weights[t]; if(r<=acc){ tier=t+1; break; } }
         const templates = ENEMY_TEMPLATES.filter(e=>e.tier===tier);
         const tmpl = pick(templates);
-        let x,y,tries=0;
-        do{
-          x = randInt(2,MAP_W-3); y = randInt(2,MAP_H-3); tries++;
-        } while((!isWalkable(x,y) || map[y][x]==='temple' ||
-          (Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) ||
-          occupied.has(keyXY(x,y))) && tries<200);
-        if(tries>=200) continue;
+        const pool = poolFor(tmpl);
+        if(!pool.length) continue;
+        let x=0, y=0, tries=0, placed=false;
+        while(tries<200){
+          tries++;
+          const p = randInt(0, (pool.length>>1)-1) * 2;
+          x = pool[p]; y = pool[p+1];
+          if(occupied.has(keyXY(x,y))) continue;
+          placed = true; break;
+        }
+        if(!placed) continue;
         const variance = 0.95 + rng()*0.10;
         const e = {
           name: tmpl.name, tier: tmpl.tier,
