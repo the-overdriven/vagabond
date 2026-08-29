@@ -35,7 +35,6 @@
 - walking through forest can spawn low lvl mob
 - chests should be mostly in remote location and near high tier mobs
 - world should be bigger
-- highlight best in slot items in backpack (highest ATK for weapons and DEF for armors and shields), do not highlight if there are two of same level
 - hovering over items tells what they are
 
  -->
@@ -283,6 +282,9 @@
       #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
       #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
       #tooltip .nm{font-weight:700;}
+      #tooltip .pfx{margin:2px 0 4px; font-size:10px; letter-spacing:0.5px;}
+      #tooltip .pfx .up{color:#7ddc7d;}
+      #tooltip .pfx .down{color:#e0655a;}
       #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
       #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
   </style>
@@ -487,6 +489,37 @@
       "Rabid":   e=>{e.spd=Math.round(e.spd*1.8)+2; e.def=Math.max(0,Math.round(e.def*0.6)); e.aggro=(e.aggro||0)+1;},
       "Champion":e=>{e.hp=Math.round(e.hp*1.6); e.maxHp=e.hp; e.atk=Math.round(e.atk*1.4)+1; e.def=Math.round(e.def*1.3)+1; e.spd=Math.round(e.spd*1.2)+1;},
     };
+    // Stats a prefix is allowed to touch, in tooltip display order.
+    const PREFIX_STATS = [
+      {key:'hp',    label:'HP'},
+      {key:'atk',   label:'ATK'},
+      {key:'def',   label:'DEF'},
+      {key:'spd',   label:'SPD'},
+      {key:'aggro', label:'AGGRO'},
+    ];
+    function prefixBaseStats(e){
+      return {hp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd, aggro:e.aggro};
+    }
+    // What the prefix actually changed. Uses the snapshot taken just before the
+    // prefix was applied so the +-5% spawn variance isn't mistaken for a bonus;
+    // falls back to the raw template for saves written before that was recorded.
+    function enemyPrefixBoosts(e){
+      if(!e || !e.prefix) return [];
+      let base = e.prefixBase;
+      if(!base){
+        const tmpl = enemyTemplateForSavedEnemy(e);
+        if(!tmpl) return [];
+        base = {hp:tmpl.hp, atk:tmpl.atk, def:tmpl.def, spd:tmpl.spd, aggro:tmpl.aggro ?? AGGRO_RANGE};
+      }
+      const now = prefixBaseStats(e);
+      const out = [];
+      for(const s of PREFIX_STATS){
+        const delta = (now[s.key]||0) - (base[s.key]||0);
+        if(delta) out.push({label:s.label, delta:delta});
+      }
+      if(e.crit) out.push({label:'CRIT', delta:null});
+      return out;
+    }
     const ENEMY_TEMPLATE_BY_NAME = Object.fromEntries(ENEMY_TEMPLATES.map(t=>[t.name,t]));
     function enemyTemplateForSavedEnemy(e){
       if(e && e.baseName && ENEMY_TEMPLATE_BY_NAME[e.baseName]) return ENEMY_TEMPLATE_BY_NAME[e.baseName];
@@ -930,6 +963,7 @@
           const names = Object.keys(ENEMY_PREFIXES);
           const pfx = pick(names);
           e.prefix = pfx;
+          e.prefixBase = prefixBaseStats(e);
           ENEMY_PREFIXES[pfx](e);
           e.name = pfx + " " + e.name;
         }
@@ -1928,9 +1962,16 @@
       if(e){
         const hpPct = Math.max(0, e.hp/e.maxHp*100);
         const aggroRange = enemyAggroRange(e);
+        const boosts = enemyPrefixBoosts(e);
+        const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b=>
+          b.delta === null
+            ? '<span class="up">CRIT</span>'
+            : `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
+        ).join(' ')}</div>` : '';
         tooltip.innerHTML = `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
       <div class="nm tier${e.tier}">${e.name}</div>
+      ${boostHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
       <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
@@ -2272,7 +2313,7 @@
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: enemyAggroRange(e),
           fly: !!e.fly,
-          x:e.x, y:e.y, prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
+          x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
       };
@@ -2343,7 +2384,7 @@
         aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
         fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
         x:e.x, y:e.y, alive:true,
-        prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
+        prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
       });
       });
       occupied = new Set();
