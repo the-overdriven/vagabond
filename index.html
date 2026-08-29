@@ -890,10 +890,42 @@
     const logEl = document.getElementById('logpanel');
     const logQueue = [];
     let isTyping = false;
+    let nextLogId = 1;
+    let lastRenderedLogId = 0;
+    let logWaiters = [];
+
+    function notifyLogWaiters(){
+      if(!logWaiters.length) return;
+      const remaining = [];
+      for(const waiter of logWaiters){
+        if(waiter.id <= lastRenderedLogId) waiter.resolve();
+        else remaining.push(waiter);
+      }
+      logWaiters = remaining;
+    }
+
+    function waitForLogId(id){
+      if(lastRenderedLogId >= id) return Promise.resolve();
+      return new Promise(resolve => logWaiters.push({ id: id, resolve: resolve }));
+    }
+
+    // Resolves once every queued message has finished revealing (nothing left to
+    // type and nothing pending in the queue), not merely a specific message id.
+    function waitForLogIdle(){
+      return new Promise(resolve => {
+        const check = () => {
+          if(!isTyping && logQueue.length === 0) resolve();
+          else setTimeout(check, 30);
+        };
+        check();
+      });
+    }
 
     function log(msg, cls) {
-      logQueue.push({ msg, cls: cls || 'info' });
+      const id = nextLogId++;
+      logQueue.push({ id: id, msg: msg, cls: cls || 'info' });
       processLogQueue();
+      return id;
     }
 
     async function processLogQueue() {
@@ -901,7 +933,7 @@
 
       isTyping = true;
 
-      const { msg, cls } = logQueue.shift();
+      const { id, msg, cls } = logQueue.shift();
 
       const div = document.createElement('div');
       div.className = cls;
@@ -927,6 +959,8 @@
       }
 
       isTyping = false;
+      lastRenderedLogId = id;
+      notifyLogWaiters();
       processLogQueue();
     }
 
@@ -992,14 +1026,18 @@
     function enemyAttackPlayer(e){
       if(chance(missChance(e.spd, playerSpd()))){
         log(`The ${e.name} attacks but misses you.`, 'good');
-        return;
+        return false;
       }
       let dmg = damageRoll(e.atk, playerDef());
       if(e.crit && chance(0.15)) dmg = Math.round(dmg*2);
       player.hp -= dmg;
       log(`The ${e.name} hits you for ${dmg}.`, 'bad');
       updateHud();
-      if(player.hp <= 0) die();
+      if(player.hp <= 0){
+        die();
+        return true;
+      }
+      return false;
     }
     function killEnemy(e){
       log(`You have slain the ${e.name}!`, 'good');
@@ -1010,12 +1048,8 @@
       lootFromEnemy(e);
       updateHud();
     }
-    function die(){
-      if(deathTransition) return;
-      player.deaths++;
-      log(`You have fallen... and awaken at the Temple.`, 'bad');
-      stopCameraAnimation();
-      stopAttackAnimation();
+    function startDeathFade(){
+      if(!deathTransition || deathTransition.phase !== 'pending') return;
       deathTransition = { phase:'out', start: performance.now(), duration: 900 };
       const step = (now)=>{
         render(now);
@@ -1038,8 +1072,18 @@
         }
         requestAnimationFrame(step);
       };
-      render();
+      render(performance.now());
       requestAnimationFrame(step);
+    }
+
+    function die(){
+      if(deathTransition) return;
+      player.deaths++;
+      const deathLogId = log(`You have fallen... and awaken at the Temple.`, 'bad');
+      stopCameraAnimation();
+      stopAttackAnimation();
+      deathTransition = { phase:'pending', start: performance.now(), duration: 900 };
+      waitForLogId(deathLogId).then(waitForLogIdle).then(startDeathFade);
     }
 
     /* ============================== ENEMY AI TURN ============================== */
@@ -1075,6 +1119,7 @@
       return true;
     }
     function enemyTurn(){
+      if(player.hp <= 0 || deathTransition) return;
       if(player.speedPotionTurns > 0){
         player.speedPotionTurns--;
         if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
@@ -1089,7 +1134,7 @@
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if(dist === ATTACK_RANGE){
-          enemyAttackPlayer(e);
+          if(enemyAttackPlayer(e)) return;
           continue;
         }
         const aggroRange = enemyAggroRange(e);
@@ -1111,10 +1156,11 @@
           while(pursuitActions > 0){
             const distNow = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y));
             if(distNow <= ATTACK_RANGE){
-              enemyAttackPlayer(e);
+              if(enemyAttackPlayer(e)) return;
               break;
             }
             if(!enemyStepTowardPlayer(e)) break;
+            if(player.hp <= 0 || deathTransition) return;
             pursuitActions--;
           }
         } else {
@@ -1529,7 +1575,7 @@
       } else if(hoveredEnemy && hoveredEnemy.alive){
         drawEnemyRangeOverlay(hoveredEnemy);
       }
-      if(deathTransition){
+      if(deathTransition && (deathTransition.phase === 'out' || deathTransition.phase === 'in')){
         const elapsed = now - deathTransition.start;
         let alpha = 0;
         if(deathTransition.phase === 'out'){
