@@ -540,6 +540,8 @@
       const elevW = [0.55,0.3,0.15];
       const moistFns = [makeNoise(5,5), makeNoise(16,16)];
       const moistW = [0.6,0.4];
+      const roughFn = makeNoise(52, 38);
+      const moistDetailFn = makeNoise(44, 32);
       const lakeFn = makeNoise(9,7);
       const boulderFn = makeNoise(40,30);
 
@@ -553,12 +555,13 @@
       for(let y=0;y<MAP_H;y++){
         for(let x=0;x<MAP_W;x++){
           let e = fbm(elevFns, elevW, x,y,MAP_W,MAP_H);
+          e += (roughFn(x,y,MAP_W,MAP_H) - 0.5) * 0.16;
           const d = Math.sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy))/maxD;
           e -= Math.pow(d,2.2)*0.55; // island falloff
           const lk = lakeFn(x,y,MAP_W,MAP_H);
           if(lk > 0.72 && e > 0.28 && e < 0.6) e -= 0.4; // carve inland lakes
           elev[y][x] = e;
-          moist[y][x] = fbm(moistFns, moistW, x,y,MAP_W,MAP_H);
+          moist[y][x] = fbm(moistFns, moistW, x,y,MAP_W,MAP_H) + (moistDetailFn(x,y,MAP_W,MAP_H) - 0.5) * 0.12;
         }
       }
 
@@ -572,7 +575,7 @@
           else if(e < 0.58){
             if(m > 0.55) t='forest';
             else t='grass';
-          } else if(e < 0.72) t='hill';
+          }           else if(e < 0.68) t='hill';
           else if(e < 0.86) t='mountain';
           else t = (m>0.5) ? 'snow' : 'mountain';
           row.push(t);
