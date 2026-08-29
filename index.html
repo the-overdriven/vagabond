@@ -1011,6 +1011,8 @@
       log(`You have fallen... and awaken at the Temple.`, 'bad');
       player.x = spawnPoint.x; player.y = spawnPoint.y;
       player.hp = playerMaxHp();
+      stopCameraAnimation();
+      snapCameraToPlayer();
       updateHud();
     }
 
@@ -1170,7 +1172,7 @@
     /* ============================== MOVEMENT ============================== */
     let mapOpen=false, invOpen=false;
     function tryMove(dx,dy){
-      if(mapOpen || invOpen) return;
+      if(mapOpen || invOpen || cameraAnimating) return;
       const nx = player.x+dx, ny = player.y+dy;
       const ek = keyXY(nx,ny);
       const target = enemies.find(e=>e.x===nx && e.y===ny && e.alive);
@@ -1180,6 +1182,7 @@
         render(); updateHud(); updateTooltip();
         return;
       }
+      let moved = false;
       if(isWalkable(nx,ny)){
         player.x = nx; player.y = ny;
         player.steps++;
@@ -1191,9 +1194,13 @@
             log('The Temple restores your strength.', 'good');
           }
         }
+        moved = true;
       }
       enemyTurn();
-      render(); updateHud(); updateTooltip();
+      updateHud();
+      if(moved) animateCameraToPlayer();
+      else render();
+      updateTooltip();
     }
 
     /* ============================== LOOK / SURROUNDINGS ============================== */
@@ -1322,57 +1329,107 @@
 
     function drawTile(px,py,ch,color,bg){
       ctx.fillStyle = bg;
-      ctx.fillRect(px*TILE_PX, py*TILE_PX, TILE_PX, TILE_PX);
+      ctx.fillRect(px, py, TILE_PX, TILE_PX);
       ctx.fillStyle = color;
-      ctx.fillText(ch, px*TILE_PX+TILE_PX/2, py*TILE_PX+3);
+      ctx.fillText(ch, px+TILE_PX/2, py+3);
     }
 
-    let camX=0, camY=0; // add near top of RENDERING section
+    let camX=0, camY=0;
+    let cameraAnimFrame = null;
+    let cameraAnimating = false;
+
+    function targetCamX(){
+      return Math.max(0, Math.min(MAP_W-VIEW_W, player.x - Math.floor(VIEW_W/2)));
+    }
+    function targetCamY(){
+      return Math.max(0, Math.min(MAP_H-VIEW_H, player.y - Math.floor(VIEW_H/2)));
+    }
+    function snapCameraToPlayer(){
+      camX = targetCamX();
+      camY = targetCamY();
+    }
+    function stopCameraAnimation(){
+      if(cameraAnimFrame !== null) cancelAnimationFrame(cameraAnimFrame);
+      cameraAnimFrame = null;
+      cameraAnimating = false;
+    }
+    function animateCameraToPlayer(){
+      const fromX = camX, fromY = camY;
+      const toX = targetCamX(), toY = targetCamY();
+      stopCameraAnimation();
+      cameraAnimating = true;
+      const start = performance.now();
+      const duration = 160;
+      const ease = t => (t < 0.5) ? (2*t*t) : (-1 + (4 - 2*t)*t);
+      const step = (now)=>{
+        const t = Math.min(1, (now - start) / duration);
+        const p = ease(t);
+        camX = fromX + (toX - fromX) * p;
+        camY = fromY + (toY - fromY) * p;
+        render();
+        if(t < 1){
+          cameraAnimFrame = requestAnimationFrame(step);
+        } else {
+          camX = toX;
+          camY = toY;
+          cameraAnimating = false;
+          cameraAnimFrame = null;
+          render();
+        }
+      };
+      render();
+      cameraAnimFrame = requestAnimationFrame(step);
+    }
 
     function render(){
-      camX = player.x - Math.floor(VIEW_W/2);
-      camY = player.y - Math.floor(VIEW_H/2);
-      camX = Math.max(0, Math.min(MAP_W-VIEW_W, camX));
-      camY = Math.max(0, Math.min(MAP_H-VIEW_H, camY));
+      const baseCamX = Math.floor(camX);
+      const baseCamY = Math.floor(camY);
+      const offsetX = Math.round((baseCamX - camX) * TILE_PX);
+      const offsetY = Math.round((baseCamY - camY) * TILE_PX);
 
-      for(let vy=0; vy<VIEW_H; vy++){
-        for(let vx=0; vx<VIEW_W; vx++){
-          const mx = camX+vx, my = camY+vy;
+      ctx.fillStyle = '#050403';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for(let vy=0; vy<=VIEW_H; vy++){
+        for(let vx=0; vx<=VIEW_W; vx++){
+          const mx = baseCamX+vx, my = baseCamY+vy;
           if(mx<0||my<0||mx>=MAP_W||my>=MAP_H){
-            ctx.fillStyle = '#000'; ctx.fillRect(vx*TILE_PX,vy*TILE_PX,TILE_PX,TILE_PX);
-            continue;
+           continue;
           }
           const t = TILE[map[my][mx]];
-          drawTile(vx,vy,t.ch,t.color,t.bg);
+          const px = vx*TILE_PX + offsetX;
+          const py = vy*TILE_PX + offsetY;
+          drawTile(px,py,t.ch,t.color,t.bg);
           discovered[my][mx] = true; // anything drawn on the main screen counts as seen
         }
       }
       // ground items
       for(const g of groundItems){
-        const vx = g.x-camX, vy = g.y-camY;
-        if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
-        if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
+        const vx = (g.x-camX) * TILE_PX;
+        const vy = (g.y-camY) * TILE_PX;
+        if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
+        if(g.kind==='chest' && !g.opened) drawTile(Math.round(vx),Math.round(vy),'$', '#e8c14a', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='potion') drawTile(Math.round(vx),Math.round(vy),'!', '#e0473f', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='speedpotion') drawTile(Math.round(vx),Math.round(vy),'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='scroll') drawTile(Math.round(vx),Math.round(vy),'?', '#b565d6', TILE[map[g.y][g.x]].bg);
       }
       // enemies
       for(const e of enemies){
         if(!e.alive) continue;
-        const vx = e.x-camX, vy = e.y-camY;
-        if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
+        const vx = (e.x-camX) * TILE_PX, vy = (e.y-camY) * TILE_PX;
+        if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         const colors = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
-        drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
+        drawTile(Math.round(vx),Math.round(vy),e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
 
         if(e.aware){
           ctx.strokeStyle = 'rgba(255,106,93,0.95)';
           ctx.lineWidth = 2;
-          ctx.strokeRect(vx*TILE_PX+2, vy*TILE_PX+2, TILE_PX-4, TILE_PX-4);
+          ctx.strokeRect(Math.round(vx)+2, Math.round(vy)+2, TILE_PX-4, TILE_PX-4);
         }
       }
       // player
       {
-        const vx = player.x-camX, vy = player.y-camY;
+        const vx = Math.round((player.x-camX) * TILE_PX), vy = Math.round((player.y-camY) * TILE_PX);
         drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', 'rgba(0,0,0,0)');
       }
       // range overlays are drawn last so they tint everything underneath without
@@ -1397,19 +1454,19 @@
           if(dx===0 && dy===0) continue; // leave the enemy's own tile untinted
           const mx = e.x+dx, my = e.y+dy;
           if(mx<0||my<0||mx>=MAP_W||my>=MAP_H) continue;
-          const vx = mx-camX, vy = my-camY;
-          if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
+          const vx = Math.round((mx-camX) * TILE_PX), vy = Math.round((my-camY) * TILE_PX);
+          if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
           const dist = Math.max(Math.abs(dx), Math.abs(dy));
           ctx.fillStyle = dist<=ATTACK_RANGE ? 'rgba(224,71,63,0.40)' : 'rgba(224,71,63,0.16)';
-          ctx.fillRect(vx*TILE_PX, vy*TILE_PX, TILE_PX, TILE_PX);
+          ctx.fillRect(vx, vy, TILE_PX, TILE_PX);
         }
       }
       // outline the enemy's own tile so it's clear which monster the range belongs to
-      const evx = e.x-camX, evy = e.y-camY;
-      if(evx>=0 && evy>=0 && evx<VIEW_W && evy<VIEW_H){
+      const evx = Math.round((e.x-camX) * TILE_PX), evy = Math.round((e.y-camY) * TILE_PX);
+      if(evx>-TILE_PX && evy>-TILE_PX && evx<canvas.width && evy<canvas.height){
         ctx.strokeStyle = 'rgba(232,162,79,0.9)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(evx*TILE_PX+1, evy*TILE_PX+1, TILE_PX-2, TILE_PX-2);
+        ctx.strokeRect(evx+1, evy+1, TILE_PX-2, TILE_PX-2);
       }
     }
 
@@ -1427,7 +1484,7 @@
     function updateTooltip(){
       if(lastMousePx===null) return;
       const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX);
-      const mx = camX+vx, my = camY+vy;
+      const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
       const e = enemies.find(en=>en.alive && en.x===mx && en.y===my) || null;
       if(e !== hoveredEnemy){
         hoveredEnemy = e;
@@ -1809,6 +1866,8 @@
       toggleInv(false);
       toggleMap(false);
 
+      stopCameraAnimation();
+      snapCameraToPlayer();
       updateHud();
       render();
       log('Game loaded.', 'good');
@@ -1910,6 +1969,7 @@
       spawnEnemies();
       spawnGroundStuff();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures are far more aggressive than others. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
+      snapCameraToPlayer();
       updateHud();
       render();
     }
