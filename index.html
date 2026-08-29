@@ -427,50 +427,50 @@
       {name:"Lucky", stat:"mf"},
     ];
     const ENEMY_TEMPLATES = [
-      {name:"Giant Rat", hp:3, atk:1, def:1, spd:2, tier:1},
-      {name:"Goblin", hp:5, atk:2, def:1, spd:2, tier:1},
-      {name:"Giant Bat", hp:4, atk:1, def:1, spd:1, tier:1},
-      {name:"Snake", hp:4, atk:2, def:1, spd:2, tier:1},
-      {name:"Scarab", hp:6, atk:1, def:3, spd:4, tier:1},
-      {name:"Monkey", hp:6, atk:2, def:1, spd:1, tier:1},
-      {name:"Boar", hp:10, atk:3, def:2, spd:3, tier:1},
-      {name:"Wolf", hp:8, atk:3, def:2, spd:1, tier:1},
-      {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1},
-      {name:"Wasp", hp:8, atk:3, def:1, spd:1, tier:1},
+      {name:"Giant Rat", hp:3, atk:1, def:1, spd:2, tier:1, aggro:3},
+      {name:"Goblin", hp:5, atk:2, def:1, spd:2, tier:1, aggro:2},
+      {name:"Giant Bat", hp:4, atk:1, def:1, spd:1, tier:1, aggro:3},
+      {name:"Snake", hp:4, atk:2, def:1, spd:2, tier:1, aggro:2},
+      {name:"Scarab", hp:6, atk:1, def:3, spd:4, tier:1, aggro:3},
+      {name:"Monkey", hp:6, atk:2, def:1, spd:1, tier:1, aggro:3},
+      {name:"Boar", hp:10, atk:3, def:2, spd:3, tier:1, aggro:4},
+      {name:"Wolf", hp:8, atk:3, def:2, spd:1, tier:1, aggro:4},
+      {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1, aggro:3},
+      {name:"Wasp", hp:8, atk:3, def:1, spd:1, tier:1, aggro:4},
 
-      {name:"Skeleton", hp:9, atk:2, def:3, spd:3, tier:2},
-      {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2},
-      {name:"Giant Crab", hp:14, atk:3, def:5, spd:5, tier:2},
-      {name:"Scorpion", hp:15, atk:4, def:3, spd:3, tier:2},
-      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2},
-      {name:"Lion", hp:18, atk:5, def:3, spd:2, tier:2},
+      {name:"Skeleton", hp:9, atk:2, def:3, spd:3, tier:2, aggro:3},
+      {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2, aggro:2},
+      {name:"Giant Crab", hp:14, atk:3, def:5, spd:5, tier:2, aggro:3},
+      {name:"Scorpion", hp:15, atk:4, def:3, spd:3, tier:2, aggro:2},
+      {name:"Lizard Man", hp:16, atk:4, def:3, spd:2, tier:2, aggro:3},
+      {name:"Lion", hp:18, atk:5, def:3, spd:2, tier:2, aggro:3},
 
-      {name:"Ghoul", hp:20, atk:4, def:3, spd:3, tier:3},
-      {name:"Ghost", hp:15, atk:4, def:2, spd:2, tier:3},
-      {name:"Orc", hp:18, atk:5, def:3, spd:4, tier:3},
-      {name:"Banshee", hp:22, atk:5, def:2, spd:2, tier:3},
-      {name:"Imp", hp:20, atk:5, def:2, spd:1, tier:3},
-      {name:"Mummy", hp:30, atk:6, def:5, spd:3, tier:3},
-      {name:"Giant Spider", hp:25, atk:6, def:3, spd:2, tier:3},
-      {name:"Minotaur", hp:35, atk:7, def:5, spd:4, tier:3},
-      {name:"Ogre", hp:45, atk:8, def:5, spd:5, tier:3},
+      {name:"Ghoul", hp:20, atk:4, def:3, spd:3, tier:3, aggro:2},
+      {name:"Ghost", hp:15, atk:4, def:2, spd:2, tier:3, aggro:3},
+      {name:"Orc", hp:18, atk:5, def:3, spd:4, tier:3, aggro:3},
+      {name:"Banshee", hp:22, atk:5, def:2, spd:2, tier:3, aggro:3},
+      {name:"Imp", hp:20, atk:5, def:2, spd:1, tier:3, aggro:3},
+      {name:"Mummy", hp:30, atk:6, def:5, spd:3, tier:3, aggro:2},
+      {name:"Giant Spider", hp:25, atk:6, def:3, spd:2, tier:3, aggro:4},
+      {name:"Minotaur", hp:35, atk:7, def:5, spd:4, tier:3, aggro:3},
+      {name:"Ogre", hp:45, atk:8, def:5, spd:5, tier:3, aggro:2},
 
-      {name:"Cyclops", hp:50, atk:9, def:6, spd:5, tier:4},
-      {name:"Beholder", hp:45, atk:8, def:5, spd:3, tier:4},
-      {name:"Wyvern", hp:55, atk:9, def:5, spd:2, tier:4},
+      {name:"Cyclops", hp:50, atk:9, def:6, spd:5, tier:4, aggro:2},
+      {name:"Beholder", hp:45, atk:8, def:5, spd:3, tier:4, aggro:3},
+      {name:"Wyvern", hp:55, atk:9, def:5, spd:2, tier:4, aggro:5},
 
-      {name:"Lich", hp:60, atk:10, def:6, spd:3, tier:5},
+      {name:"Lich", hp:60, atk:10, def:6, spd:3, tier:5, aggro:4},
     ];
     const ENEMY_PREFIXES = {
-      "Fierce":  e=>{e.atk=Math.round(e.atk*1.35);},
+      "Fierce":  e=>{e.atk=Math.round(e.atk*1.35); e.aggro=(e.aggro||0)+1;},
       "Tough":   e=>{e.hp=Math.round(e.hp*1.5); e.maxHp=e.hp;},
       "Swift":   e=>{e.spd=Math.round(e.spd*1.5)+1;},
       "Sturdy":  e=>{e.def=Math.round(e.def*1.6)+1;},
       "Deadly":  e=>{e.atk=Math.round(e.atk*1.3)+1; e.crit=true;},
       "Brutal":  e=>{e.atk=Math.round(e.atk*1.8)+1;},
-      "Savage":  e=>{e.atk=Math.round(e.atk*1.3); e.spd=Math.round(e.spd*1.3)+1;},
+      "Savage":  e=>{e.atk=Math.round(e.atk*1.3); e.spd=Math.round(e.spd*1.3)+1; e.aggro=(e.aggro||0)+1;},
       "Hardened":e=>{e.hp=Math.round(e.hp*1.4); e.maxHp=e.hp; e.def=Math.round(e.def*1.3)+1;},
-      "Rabid":   e=>{e.spd=Math.round(e.spd*1.8)+2; e.def=Math.max(0,Math.round(e.def*0.6));},
+      "Rabid":   e=>{e.spd=Math.round(e.spd*1.8)+2; e.def=Math.max(0,Math.round(e.def*0.6)); e.aggro=(e.aggro||0)+1;},
       "Champion":e=>{e.hp=Math.round(e.hp*1.6); e.maxHp=e.hp; e.atk=Math.round(e.atk*1.4)+1; e.def=Math.round(e.def*1.3)+1; e.spd=Math.round(e.spd*1.2)+1;},
     };
 
@@ -819,8 +819,9 @@
           atk: Math.max(1,Math.round(tmpl.atk*variance)),
           def: Math.max(0,Math.round(tmpl.def*variance)),
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
-          x, y, alive:true, prefix:null,
-        };
+            aggro: tmpl.aggro ?? AGGRO_RANGE,
+            x, y, alive:true, prefix:null,
+          };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
         if(chance(0.05)){
@@ -980,7 +981,10 @@
 
     /* ============================== ENEMY AI TURN ============================== */
     const ATTACK_RANGE = 1; // Chebyshev distance at which an enemy attacks instead of chasing
-    const AGGRO_RANGE = 3;  // Chebyshev distance at which an enemy notices and starts chasing
+    const AGGRO_RANGE = 3;  // default aggro distance used when a template doesn't specify one
+    function enemyAggroRange(e){
+      return e && typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE;
+    }
     function enemyTurn(){
       if(player.invisibleTurns > 0){
         player.invisibleTurns--;
@@ -995,7 +999,8 @@
           enemyAttackPlayer(e);
           continue;
         }
-        if(dist <= AGGRO_RANGE){
+        const aggroRange = enemyAggroRange(e);
+        if(dist <= aggroRange){
           if(!e.aware){
             e.aware = true;
             log(`The ${e.name} has spotted you!`, 'bad');
@@ -1286,8 +1291,9 @@
 // its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
 // range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
     function drawEnemyRangeOverlay(e){
-      for(let dy=-AGGRO_RANGE; dy<=AGGRO_RANGE; dy++){
-        for(let dx=-AGGRO_RANGE; dx<=AGGRO_RANGE; dx++){
+      const aggroRange = enemyAggroRange(e);
+      for(let dy=-aggroRange; dy<=aggroRange; dy++){
+        for(let dx=-aggroRange; dx<=aggroRange; dx++){
           if(dx===0 && dy===0) continue; // leave the enemy's own tile untinted
           const mx = e.x+dx, my = e.y+dy;
           if(mx<0||my<0||mx>=MAP_W||my>=MAP_H) continue;
@@ -1323,13 +1329,14 @@
       }
       if(e){
         const hpPct = Math.max(0, e.hp/e.maxHp*100);
+        const aggroRange = enemyAggroRange(e);
         tooltip.innerHTML = `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
       <div class="nm tier${e.tier}">${e.name}</div>
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
       <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
-      <span style="color:#e0473f;opacity:0.7">Aggro range ${AGGRO_RANGE}</span>`;
+      <span style="color:#e0473f;opacity:0.7">Aggro range ${aggroRange}</span>`;
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
@@ -1597,6 +1604,7 @@
         enemies: enemies.filter(e=>e.alive).map(e=>({
           name:e.name, baseName:e.baseName, tier:e.tier,
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
+          aggro: enemyAggroRange(e),
           x:e.x, y:e.y, prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
@@ -1660,6 +1668,7 @@
       enemies = (data.enemies||[]).map(e=>({
         name:e.name, baseName:e.baseName, tier:e.tier,
         hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
+        aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
         x:e.x, y:e.y, alive:true,
         prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
       }));
