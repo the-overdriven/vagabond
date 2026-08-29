@@ -1087,6 +1087,7 @@
       pendingMove = null;
       const deathLogId = log(`You have fallen... and awaken at the Temple.`, 'bad');
       stopCameraAnimation();
+      clearEnemyAnims();
       stopAttackAnimation();
       deathTransition = { phase:'pending', start: performance.now(), duration: 900 };
       waitForLogId(deathLogId).then(waitForLogIdle).then(startDeathFade);
@@ -1120,8 +1121,10 @@
         }
       }
       occupied.delete(keyXY(e.x,e.y));
+      const fromX = e.x, fromY = e.y;
       e.x = nx; e.y = ny;
       occupied.add(keyXY(e.x,e.y));
+      beginEnemyMoveAnim(e, fromX, fromY);
       return true;
     }
     /* --- Idle wander tuning: flip these to change the behaviour at any time --- */
@@ -1164,8 +1167,10 @@
       if(!options.length) return false;
       const pick = options[randInt(0, options.length-1)];
       occupied.delete(keyXY(e.x,e.y));
+      const fromX = e.x, fromY = e.y;
       e.x = pick.x; e.y = pick.y;
       occupied.add(keyXY(e.x,e.y));
+      beginEnemyMoveAnim(e, fromX, fromY);
       return true;
     }
     function enemyTurn(){
@@ -1322,7 +1327,7 @@
       if(target){
         await playerAttackEnemy(target);
         enemyTurn();
-        render(); updateHud(); updateTooltip();
+        render(); runAnimationLoop(); updateHud(); updateTooltip();
         flushPendingMove();
         return;
       }
@@ -1344,7 +1349,7 @@
       enemyTurn();
       updateHud();
       if(moved) animateCameraToPlayer(fromPos);
-      else render();
+      else { render(); runAnimationLoop(); }
       updateTooltip();
       if(!moved) flushPendingMove();
     }
@@ -1481,11 +1486,12 @@
     }
 
     let camX=0, camY=0;
-    let cameraAnimFrame = null;
+    let animLoopFrame = null;
     let cameraAnimating = false;
     let moveAnim = null;
     let attackAnim = null;
     let deathTransition = null;
+    const MOVE_ANIM_MS = 140;
 
     function targetCamX(px){
       const x = px === undefined ? player.x : px;
@@ -1499,37 +1505,62 @@
       camX = targetCamX();
       camY = targetCamY();
     }
+
+    // Enemies slide between tiles using the same easing/duration as the player's
+    // camera pan, so a turn reads as one continuous motion rather than a snap.
+    function beginEnemyMoveAnim(e, fromX, fromY){
+      e.animFromX = fromX;
+      e.animFromY = fromY;
+      e.animStart = performance.now();
+    }
+    function clearEnemyAnims(){
+      for(const e of enemies) e.animStart = undefined;
+    }
+    function enemyAnimsPending(){
+      for(const e of enemies){ if(e.animStart !== undefined) return true; }
+      return false;
+    }
+    function animationsPending(){
+      return !!moveAnim || enemyAnimsPending();
+    }
+
+    // A single shared rAF loop drives every in-progress animation. Having one loop
+    // avoids two independent loops both calling render() on the same frame.
+    function runAnimationLoop(){
+      if(animLoopFrame !== null) return;
+      const step = (now)=>{
+        render(now);
+        if(cameraAnimating && !moveAnim){
+          cameraAnimating = false;
+          animLoopFrame = null;
+          flushPendingMove();            // may kick off the next turn (and a new loop)
+          if(animLoopFrame !== null) return;
+        }
+        if(animationsPending()){
+          animLoopFrame = requestAnimationFrame(step);
+        } else {
+          animLoopFrame = null;
+        }
+      };
+      animLoopFrame = requestAnimationFrame(step);
+    }
     function stopCameraAnimation(){
-      if(cameraAnimFrame !== null) cancelAnimationFrame(cameraAnimFrame);
-      cameraAnimFrame = null;
-      cameraAnimating = false;
       moveAnim = null;
+      cameraAnimating = false;
     }
     function animateCameraToPlayer(fromPos){
       const fromX = fromPos && typeof fromPos.x === 'number' ? fromPos.x : player.x;
       const fromY = fromPos && typeof fromPos.y === 'number' ? fromPos.y : player.y;
-      const toX = player.x, toY = player.y;
-      stopCameraAnimation();
       moveAnim = {
         fromX: fromX,
         fromY: fromY,
-        toX: toX,
-        toY: toY,
+        toX: player.x,
+        toY: player.y,
         start: performance.now(),
-        duration: 140
+        duration: MOVE_ANIM_MS
       };
       cameraAnimating = true;
-      const step = (now)=>{
-        render(now);
-        if(moveAnim){
-          cameraAnimFrame = requestAnimationFrame(step);
-        } else {
-          cameraAnimating = false;
-          cameraAnimFrame = null;
-          flushPendingMove();
-        }
-      };
-      cameraAnimFrame = requestAnimationFrame(step);
+      runAnimationLoop();
     }
     function stopAttackAnimation(){
       attackAnim = null;
@@ -1614,12 +1645,25 @@
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
       }
       // enemies
+      const enemyColors = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
       for(const e of enemies){
         if(!e.alive) continue;
-        const vx = Math.round((e.x-camX) * TILE_PX), vy = Math.round((e.y-camY) * TILE_PX);
+        let ex = e.x, ey = e.y;
+        if(e.animStart !== undefined){
+          const t = Math.min(1, (now - e.animStart) / MOVE_ANIM_MS);
+          if(t >= 1){
+            e.animStart = undefined;
+          } else {
+            const p = 1 - Math.pow(1 - t, 3);
+            ex = e.animFromX + (e.x - e.animFromX) * p;
+            ey = e.animFromY + (e.y - e.animFromY) * p;
+          }
+        }
+        const vx = Math.round((ex-camX) * TILE_PX), vy = Math.round((ey-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
-        const colors = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
-        drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], colors[e.tier], TILE[map[e.y][e.x]].bg);
+        // transparent background so a sliding enemy doesn't drag a solid tile-coloured
+        // block across the terrain it is walking over
+        drawTile(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], enemyColors[e.tier], 'rgba(0,0,0,0)');
 
         if(e.aware){
           ctx.strokeStyle = 'rgba(255,106,93,0.95)';
