@@ -163,17 +163,14 @@
       }
       #hint {
           position: fixed;
-          right: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 200px;
+          right: 14px;
+          top: 380px;
+          width: 220px;
           padding: 7px;
           box-sizing: border-box;
- 
-          /* optional */
-          background: rgba(0, 0, 0, 0.75);
-          border-left: 1px solid #555;
- 
+          background: linear-gradient(180deg,var(--panel2),var(--panel));
+          border:1px solid var(--border); border-radius:6px;
+          box-shadow:0 0 18px rgba(0,0,0,0.5);
           font-size: 10px;
           line-height: 1.8;
       }
@@ -354,11 +351,11 @@
   </div>
   <div id="logpanel"></div>
   <div id="hint" style="">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;
-    <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;
-    <kbd>SPACE</kbd> inspect surroundings &nbsp;
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;<br>
+    <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
+    <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
-    <kbd>M</kbd> map &nbsp;
+    <kbd>M</kbd> map &nbsp;<br>
     <kbd>K</kbd> save &nbsp;
     <kbd>L</kbd> load &nbsp;
   </div>
