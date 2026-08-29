@@ -8,11 +8,11 @@
 - mummy should be slow
 - what speed changes?
 - nerf life potions? heal 50%? or make them less common
-- save game to .json?
+- save game to .json? (x)
 - prefixed mobs should give more XP
 - add food? heals minor HP
 - collect berries? more survivalism?
-- uncover map?
+- uncover map? (x)
 - do not heal on level up?
 - possible to run away from enemies? they lose pursuit
 - scorpions and GS poison you?
@@ -419,7 +419,7 @@ const ENEMY_PREFIXES = {
   "Fierce":  e=>{e.atk=Math.round(e.atk*1.35);},
   "Tough":   e=>{e.hp=Math.round(e.hp*1.5); e.maxHp=e.hp;},
   "Swift":   e=>{e.spd=Math.round(e.spd*1.5)+1;},
-  "Armored": e=>{e.def=Math.round(e.def*1.6)+1;},
+  "Sturdy":  e=>{e.def=Math.round(e.def*1.6)+1;},
   "Deadly":  e=>{e.atk=Math.round(e.atk*1.3)+1; e.crit=true;},
   "Brutal":  e=>{e.atk=Math.round(e.atk*1.8)+1;},
   "Savage":  e=>{e.atk=Math.round(e.atk*1.3); e.spd=Math.round(e.spd*1.3)+1;},
@@ -475,6 +475,11 @@ function fbm(fns, weights, x,y,w,h){
 
 let map = []; // map[y][x] = tile key string
 let spawnPoint = {x:0,y:0};
+let discovered = []; // discovered[y][x] = has the player ever seen this tile on the main screen
+function initDiscovered(){
+  discovered = [];
+  for(let y=0;y<MAP_H;y++) discovered.push(new Array(MAP_W).fill(false));
+}
 
 function generateMap(){
   const elevFns = [makeNoise(6,4), makeNoise(14,10), makeNoise(30,22)];
@@ -1172,6 +1177,7 @@ function render(){
       }
       const t = TILE[map[my][mx]];
       drawTile(vx,vy,t.ch,t.color,t.bg);
+      discovered[my][mx] = true; // anything drawn on the main screen counts as seen
     }
   }
   // ground items
@@ -1248,7 +1254,7 @@ function updateTooltip(){
       <div class="nm tier${e.tier}">${e.name}</div>
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
-      <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span> &nbsp;<br>
+      <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
       <span style="color:#e0473f;opacity:0.7">Aggro range ${AGGRO_RANGE}</span>`;
     tooltip.style.left = (lastMousePx+16)+'px';
     tooltip.style.top = (lastMousePy+16)+'px';
@@ -1278,6 +1284,10 @@ function renderMinimap(){
     for(let x=0;x<MAP_W;x++){
       mctx.fillStyle = TILE[map[y][x]].color;
       mctx.fillRect(x*3,y*3,3,3);
+      if(!discovered[y][x]){
+        mctx.fillStyle = 'rgba(3,2,1,0.72)'; // fog: terrain still faintly visible underneath
+        mctx.fillRect(x*3,y*3,3,3);
+      }
     }
   }
   mctx.fillStyle = '#ffe08a';
@@ -1410,7 +1420,7 @@ function useScroll(idx){
 // };
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2; // v2 adds the discovered (fog-of-war) grid
 
 function buildSaveObject(){
   return {
@@ -1419,6 +1429,7 @@ function buildSaveObject(){
     worldSeed: WORLD_SEED,
     rngState: rngState,
     map: map.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
+    discovered: discovered.map(row => row.map(b => b?'1':'0').join('')),
     spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
     worldEdgesReached: Object.assign({}, worldEdgesReached),
     player: {
@@ -1473,6 +1484,18 @@ function loadGameFromObject(data){
   });
   if(decoded.length !== MAP_H) throw new Error('Save file map height does not match.');
   map = decoded;
+
+  if(Array.isArray(data.discovered) && data.discovered.length === MAP_H){
+    discovered = data.discovered.map(rowStr=>{
+      const row = [];
+      for(const ch of rowStr) row.push(ch==='1');
+      return row;
+    });
+  } else {
+    // older save from before fog-of-war existed - start fresh, the player's
+    // current surroundings get marked seen automatically by the render() below
+    initDiscovered();
+  }
 
   spawnPoint = {x:data.spawnPoint.x, y:data.spawnPoint.y};
   rngState = data.rngState|0;
@@ -1562,6 +1585,7 @@ const moves = {
 /* ============================== INIT ============================== */
 function init(){
   generateMap();
+  initDiscovered();
   player.x = spawnPoint.x; player.y = spawnPoint.y;
   player.hp = playerMaxHp();
   spawnEnemies();
