@@ -1130,23 +1130,86 @@
       const tile = map[y][x];
       return tile === 'boulder' || tile === 'water';
     }
-    function enemyStepTowardPlayer(e){
-      const dx = player.x - e.x, dy = player.y - e.y;
-      const sx = Math.sign(dx), sy = Math.sign(dy);
-      let nx = e.x + sx, ny = e.y + sy;
-      if(!(enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)) && !(nx===player.x&&ny===player.y))){
-        // try only x
-        nx = e.x + sx; ny = e.y;
-        if(!(sx!==0 && enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)))){
-          nx = e.x; ny = e.y + sy;
-          if(!(sy!==0 && enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)))){
-            return false; // stuck
+    // How far outside the direct line the chase AI may detour to get around walls,
+    // water, boulders or other monsters standing in the way.
+    const CHASE_DETOUR = 6;
+    const DIRS8 = [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]];
+
+    function enemyTileOpen(e, x, y){
+      return enemyCanTraverse(e,x,y) && !occupied.has(keyXY(x,y)) && !(x===player.x && y===player.y);
+    }
+
+    // Breadth-first search for the shortest route to a tile adjacent to the player,
+    // returning only the first step of that route. The greedy "step diagonally, else
+    // straight" approach used before would simply give up whenever the direct line was
+    // blocked - so two monsters queuing up behind each other, or one standing behind a
+    // boulder, could never walk around the obstruction.
+    function enemyFindStep(e){
+      const minX = Math.max(0, Math.min(e.x, player.x) - CHASE_DETOUR);
+      const maxX = Math.min(MAP_W-1, Math.max(e.x, player.x) + CHASE_DETOUR);
+      const minY = Math.max(0, Math.min(e.y, player.y) - CHASE_DETOUR);
+      const maxY = Math.min(MAP_H-1, Math.max(e.y, player.y) + CHASE_DETOUR);
+      const w = maxX-minX+1, h = maxY-minY+1;
+      const at = (x,y)=> (y-minY)*w + (x-minX);
+
+      const visited = new Uint8Array(w*h);
+      const stepX = new Int32Array(w*h);
+      const stepY = new Int32Array(w*h);
+      visited[at(e.x,e.y)] = 1;
+
+      // Seed with the open neighbours, closest-to-the-player first so that when
+      // several shortest routes tie, the enemy picks the one that closes distance.
+      const seeds = [];
+      for(const [dx,dy] of DIRS8){
+        const nx = e.x+dx, ny = e.y+dy;
+        if(nx<minX||nx>maxX||ny<minY||ny>maxY) continue;
+        if(!enemyTileOpen(e,nx,ny)) continue;
+        seeds.push({x:nx, y:ny, d:Math.max(Math.abs(player.x-nx), Math.abs(player.y-ny))});
+      }
+      seeds.sort((a,b)=>a.d-b.d);
+
+      const queue = [];
+      for(const s of seeds){
+        const i = at(s.x,s.y);
+        if(visited[i]) continue;
+        visited[i] = 1;
+        stepX[i] = s.x; stepY[i] = s.y;
+        if(s.d <= ATTACK_RANGE) return {x:s.x, y:s.y}; // already in striking position
+        queue.push(s.x, s.y);
+      }
+
+      for(let head=0; head<queue.length; head+=2){
+        const cx = queue[head], cy = queue[head+1];
+        const ci = at(cx,cy);
+        for(const [dx,dy] of DIRS8){
+          const nx = cx+dx, ny = cy+dy;
+          if(nx<minX||nx>maxX||ny<minY||ny>maxY) continue;
+          const ni = at(nx,ny);
+          if(visited[ni]) continue;
+          if(!enemyTileOpen(e,nx,ny)) continue;
+          visited[ni] = 1;
+          stepX[ni] = stepX[ci]; stepY[ni] = stepY[ci];
+          if(Math.max(Math.abs(player.x-nx), Math.abs(player.y-ny)) <= ATTACK_RANGE){
+            return {x:stepX[ni], y:stepY[ni]};
           }
+          queue.push(nx, ny);
         }
       }
+      // No route at all - edge toward the player if any neighbour at least helps.
+      let best = null;
+      const current = Math.max(Math.abs(player.x-e.x), Math.abs(player.y-e.y));
+      for(const s of seeds){
+        if(s.d < current && (!best || s.d < best.d)) best = s;
+      }
+      return best ? {x:best.x, y:best.y} : null;
+    }
+
+    function enemyStepTowardPlayer(e){
+      const step = enemyFindStep(e);
+      if(!step) return false; // genuinely boxed in
       occupied.delete(keyXY(e.x,e.y));
       const fromX = e.x, fromY = e.y;
-      e.x = nx; e.y = ny;
+      e.x = step.x; e.y = step.y;
       occupied.add(keyXY(e.x,e.y));
       beginEnemyMoveAnim(e, fromX, fromY);
       return true;
