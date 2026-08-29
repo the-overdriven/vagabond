@@ -946,10 +946,14 @@
     function damageRoll(atk, def){
       return Math.max(1, Math.round(atk - def*0.5 + (rng()*3 - 1)));
     }
+    function missChance(attackerSpd, defenderSpd){
+      const chanceValue = 0.15 + (defenderSpd - attackerSpd) * 0.02;
+      return Math.max(0, Math.min(1, chanceValue));
+    }
 
     function playerAttackEnemy(e){
       const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists';
-      if(chance(0.15)){
+      if(chance(missChance(playerSpd(), e.spd))){
         log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad');
         return;
       }
@@ -961,7 +965,7 @@
       }
     }
     function enemyAttackPlayer(e){
-      if(chance(0.15)){
+      if(chance(missChance(e.spd, playerSpd()))){
         log(`The ${e.name} attacks but misses you.`, 'good');
         return;
       }
