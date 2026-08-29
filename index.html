@@ -1001,6 +1001,13 @@
         }
         const aggroRange = enemyAggroRange(e);
         if(dist <= aggroRange){
+          const playerSpeed = playerSpd();
+          const slowEnough = e.spd * 2 <= playerSpeed;
+          if(e.aware && slowEnough && chance(0.25)){
+            e.aware = false;
+            log(`The ${e.name} loses interest in the chase.`, 'info');
+            continue;
+          }
           if(!e.aware){
             e.aware = true;
             log(`The ${e.name} has spotted you!`, 'bad');
