@@ -24,7 +24,7 @@
 - add a chance for crit hit?
 - separate weapons into two handed (cannot wear shields in that case!)
 - highlight better gear
-- show monster range on hover
+
  -->
 
 <!DOCTYPE html>
@@ -907,6 +907,8 @@ function die(){
 }
 
 /* ============================== ENEMY AI TURN ============================== */
+const ATTACK_RANGE = 1; // Chebyshev distance at which an enemy attacks instead of chasing
+const AGGRO_RANGE = 3;  // Chebyshev distance at which an enemy notices and starts chasing
 function enemyTurn(){
   if(player.invisibleTurns > 0){
     player.invisibleTurns--;
@@ -917,11 +919,11 @@ function enemyTurn(){
     if(!e.alive) continue;
     const dx = player.x - e.x, dy = player.y - e.y;
     const dist = Math.max(Math.abs(dx), Math.abs(dy));
-    if(dist === 1){
+    if(dist === ATTACK_RANGE){
       enemyAttackPlayer(e);
       continue;
     }
-    if(dist <= 3){
+    if(dist <= AGGRO_RANGE){
       if(!e.aware){
         e.aware = true;
         log(`The ${e.name} has spotted you!`, 'bad');
@@ -1193,7 +1195,39 @@ function render(){
     const vx = player.x-camX, vy = player.y-camY;
     drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', '#241a08');
   }
+  // hovered enemy's range, drawn last so it tints everything underneath (tiles,
+  // items, other enemies) without being erased by their own background fills
+  if(hoveredEnemy && hoveredEnemy.alive){
+    drawEnemyRangeOverlay(hoveredEnemy);
+  }
 }
+
+// Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
+// its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
+// range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
+function drawEnemyRangeOverlay(e){
+  for(let dy=-AGGRO_RANGE; dy<=AGGRO_RANGE; dy++){
+    for(let dx=-AGGRO_RANGE; dx<=AGGRO_RANGE; dx++){
+      if(dx===0 && dy===0) continue; // leave the enemy's own tile untinted
+      const mx = e.x+dx, my = e.y+dy;
+      if(mx<0||my<0||mx>=MAP_W||my>=MAP_H) continue;
+      const vx = mx-camX, vy = my-camY;
+      if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
+      const dist = Math.max(Math.abs(dx), Math.abs(dy));
+      ctx.fillStyle = dist<=ATTACK_RANGE ? 'rgba(224,71,63,0.40)' : 'rgba(224,71,63,0.16)';
+      ctx.fillRect(vx*TILE_PX, vy*TILE_PX, TILE_PX, TILE_PX);
+    }
+  }
+  // outline the enemy's own tile so it's clear which monster the range belongs to
+  const evx = e.x-camX, evy = e.y-camY;
+  if(evx>=0 && evy>=0 && evx<VIEW_W && evy<VIEW_H){
+    ctx.strokeStyle = 'rgba(232,162,79,0.9)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(evx*TILE_PX+1, evy*TILE_PX+1, TILE_PX-2, TILE_PX-2);
+  }
+}
+
+let hoveredEnemy = null;
 
 const tooltip = document.getElementById('tooltip');
 function slug(name){ return name.toLowerCase().replace(/\s+/g,'_'); }
@@ -1202,14 +1236,20 @@ function updateTooltip(){
   if(lastMousePx===null) return;
   const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX);
   const mx = camX+vx, my = camY+vy;
-  const e = enemies.find(en=>en.alive && en.x===mx && en.y===my);
+  const e = enemies.find(en=>en.alive && en.x===mx && en.y===my) || null;
+  if(e !== hoveredEnemy){
+    hoveredEnemy = e;
+    render(); // redraw so the range overlay appears/updates/clears immediately
+  }
   if(e){
     const hpPct = Math.max(0, e.hp/e.maxHp*100);
     tooltip.innerHTML = `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
       <div class="nm tier${e.tier}">${e.name}</div>
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
-      HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}`;
+      HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
+      <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span> &nbsp;<br>
+      <span style="color:#e0473f;opacity:0.7">Aggro range ${AGGRO_RANGE}</span>`;
     tooltip.style.left = (lastMousePx+16)+'px';
     tooltip.style.top = (lastMousePy+16)+'px';
     tooltip.style.display = 'block';
@@ -1223,7 +1263,11 @@ canvas.addEventListener('mousemove', (ev)=>{
   lastMousePy = ev.clientY - rect.top;
   updateTooltip();
 });
-canvas.addEventListener('mouseleave', ()=>{ lastMousePx=null; lastMousePy=null; tooltip.style.display='none'; });
+canvas.addEventListener('mouseleave', ()=>{
+  lastMousePx=null; lastMousePy=null; tooltip.style.display='none';
+  if(hoveredEnemy){ hoveredEnemy=null; render(); }
+});
+
 
 /* ============================== MINIMAP ============================== */
 const mini = document.getElementById('minimap');
