@@ -1139,8 +1139,8 @@
       return vx>=0 && vy>=0 && vx<VIEW_W && vy<VIEW_H;
     }
     function enemyWander(e){
-      if(!ENEMY_WANDER_ENABLED) return;
-      if(!chance(ENEMY_WANDER_CHANCE)) return;
+      if(!ENEMY_WANDER_ENABLED) return false;
+      if(!chance(ENEMY_WANDER_CHANCE)) return false;
       // Anchor the home tile on first wander, and re-anchor whenever a chase has
       // already carried the enemy beyond its leash - otherwise it could never move
       // again after giving up a pursuit.
@@ -1161,11 +1161,12 @@
           options.push({x:nx, y:ny});
         }
       }
-      if(!options.length) return;
+      if(!options.length) return false;
       const pick = options[randInt(0, options.length-1)];
       occupied.delete(keyXY(e.x,e.y));
       e.x = pick.x; e.y = pick.y;
       occupied.add(keyXY(e.x,e.y));
+      return true;
     }
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
@@ -1214,7 +1215,15 @@
           }
         } else {
           e.aware = false;
-          if(enemyIsOnScreen(e)) enemyWander(e);
+          // A wander step can carry the enemy into its own aggro range, so re-check
+          // straight away instead of leaving it oblivious until the next turn.
+          if(enemyIsOnScreen(e) && enemyWander(e)){
+            const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y));
+            if(distAfter <= aggroRange){
+              e.aware = true;
+              log(`The ${e.name} wanders right into you and spots you!`, 'bad');
+            }
+          }
         }
       }
     }
