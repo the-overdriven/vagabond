@@ -148,6 +148,7 @@
           font-size:12px;
           overflow-y:auto;
           line-height:1.5;
+          white-space:pre-line;
       }
       #logpanel div.good{color:#8fd08a;}
       #logpanel div.bad{color:#e08a7a;}
@@ -1899,7 +1900,7 @@
       player.hp = playerMaxHp();
       spawnEnemies();
       spawnGroundStuff();
-      log('You awaken at the Temple, mysterious wilds stretch before you.', 'info');
+      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures are far more aggressive than others. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
       updateHud();
       render();
     }
