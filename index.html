@@ -930,10 +930,10 @@
     /* ============================== COMBAT / LOOT ============================== */
     function tierColorClass(tier){ return 'tier'+tier; }
 
-    function maybeAutoEquipWeapon(item){
+    function maybeAutoEquipWeapon(item, announce = true){
       if(!item || item.kind !== 'weapon' || player.equip.weapon) return false;
       player.equip.weapon = item;
-      log(`You automatically equip the ${item.name}.`, 'good');
+      if(announce) log(`You automatically equip the ${item.name}.`, 'good');
       return true;
     }
     function lootFromEnemy(e){
@@ -948,8 +948,9 @@
         if(roll<0.5) item = makeWeaponItem(tier);
         else if(roll<0.75) item = makeArmorItem(tier);
         else item = makeShieldItem(tier);
-        if(item.kind === 'weapon' && maybeAutoEquipWeapon(item)){
+        if(item.kind === 'weapon'){
           log(`The ${e.name} dropped a ${item.name}.`, 'loot');
+          maybeAutoEquipWeapon(item, true);
           return;
         }
         player.inventory.push(item);
