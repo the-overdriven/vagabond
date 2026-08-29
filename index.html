@@ -987,13 +987,11 @@
         if(roll<0.5) item = makeWeaponItem(tier);
         else if(roll<0.75) item = makeArmorItem(tier);
         else item = makeShieldItem(tier);
-        if(item.kind === 'weapon'){
-          log(`The ${e.name} dropped a ${item.name}.`, 'loot');
-          maybeAutoEquipWeapon(item, true);
-          return;
-        }
-        player.inventory.push(item);
         log(`The ${e.name} dropped a ${item.name}.`, 'loot');
+        // Only skip the backpack when the weapon actually went straight to the
+        // empty weapon slot - otherwise the drop would silently vanish.
+        if(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return;
+        player.inventory.push(item);
       }
     }
 
@@ -1208,11 +1206,9 @@
             if(pickRoll < 0.33) item = makeWeaponItem(lowTier);
             else if(pickRoll < 0.66) item = makeArmorItem(lowTier);
             else item = makeShieldItem(lowTier);
-            if(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)){
-              log(`You open a chest and find ${item.name}.`, 'loot');
-            } else {
+            log(`You open a chest and find ${item.name}.`, 'loot');
+            if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
               player.inventory.push(item);
-              log(`You open a chest and find ${item.name}.`, 'loot');
             }
           } else if(roll<0.85){
             addPotion();
