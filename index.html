@@ -169,14 +169,24 @@
           width: 200px;
           padding: 7px;
           box-sizing: border-box;
-
+ 
           /* optional */
           background: rgba(0, 0, 0, 0.75);
           border-left: 1px solid #555;
-
+ 
           font-size: 10px;
           line-height: 1.8;
       }
+      #sidePanel{
+          position:fixed; right:14px; top:110px; width:190px; z-index:8;
+      }
+      .side-box{
+          background:linear-gradient(180deg,var(--panel2),var(--panel));
+          border:1px solid var(--border); border-radius:6px;
+          padding:8px; box-shadow:0 0 18px rgba(0,0,0,0.5);
+      }
+      #sideMinimap{display:block; width:100%; height:auto; border:1px solid var(--border); border-radius:4px; background:#050403;}
+      .mini-actions{display:flex; justify-content:center; margin-top:8px;}
       .overlay{
           position:absolute; inset:0; background:rgba(5,4,3,0.42);
           display:none; align-items:center; justify-content:center; z-index:10;
@@ -197,6 +207,8 @@
           color:var(--ember-bright); margin:0 0 10px 0; font-size:18px;
           border-bottom:1px solid var(--border); padding-bottom:6px;
       }
+      #mapOverlay .panelbox{width:min(72vw, 520px);}
+      #minimap{display:block; width:100%; height:auto; max-height:60vh; aspect-ratio:130/90; image-rendering:pixelated; background:#050403; border:1px solid var(--border); border-radius:4px;}
       .paperdoll{
           display:flex; gap:10px; margin-bottom:14px;
       }
@@ -319,15 +331,25 @@
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
-        <div class="closehint">Press <kbd>TAB</kbd> to close</div>
+        <div class="closehint">
+          <button class="slbtn" id="btnInvToMap" type="button">View Map</button>
+        </div>
       </div>
     </div>
     <div class="overlay" id="mapOverlay">
-      <div class="panelbox" style="width:auto;">
+      <div class="panelbox">
         <h2>World Map</h2>
         <canvas id="minimap"></canvas>
-        <div class="closehint">Press <kbd>M</kbd> to close</div>
+        <div class="closehint">
+          <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
+        </div>
       </div>
+    </div>
+  </div>
+  <div id="sidePanel" class="side-box">
+    <canvas id="sideMinimap"></canvas>
+    <div class="mini-actions">
+      <button class="slbtn" id="btnSideMap" type="button">Map</button>
     </div>
   </div>
   <div id="logpanel"></div>
@@ -1255,6 +1277,7 @@
       if(hoveredEnemy && hoveredEnemy.alive){
         drawEnemyRangeOverlay(hoveredEnemy);
       }
+      renderMinimap();
     }
 
 // Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
@@ -1326,23 +1349,34 @@
 
     /* ============================== MINIMAP ============================== */
     const mini = document.getElementById('minimap');
+    const sideMini = document.getElementById('sideMinimap');
     const mctx = mini.getContext('2d');
+    const sideCtx = sideMini.getContext('2d');
     mini.width = MAP_W*3; mini.height = MAP_H*3;
-    function renderMinimap(){
+    sideMini.width = MAP_W*2; sideMini.height = MAP_H*2;
+    function renderMinimapCanvas(ctx, scale){
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       for(let y=0;y<MAP_H;y++){
         for(let x=0;x<MAP_W;x++){
-          mctx.fillStyle = TILE[map[y][x]].color;
-          mctx.fillRect(x*3,y*3,3,3);
-          if(!discovered[y][x]){
-            mctx.fillStyle = 'rgba(3,2,1,0.72)'; // fog: terrain still faintly visible underneath
-            mctx.fillRect(x*3,y*3,3,3);
+          const px = x*scale, py = y*scale;
+          const tile = TILE[map[y][x]];
+          if(discovered[y][x]){
+            ctx.fillStyle = tile.color;
+            ctx.fillRect(px, py, scale, scale);
+          } else {
+            ctx.fillStyle = 'rgba(3,2,1,0.72)';
+            ctx.fillRect(px, py, scale, scale);
           }
         }
       }
-      mctx.fillStyle = '#ffe08a';
-      mctx.fillRect(spawnPoint.x*3-1, spawnPoint.y*3-1, 5,5);
-      mctx.fillStyle = '#ffffff';
-      mctx.fillRect(player.x*3-1, player.y*3-1, 5,5);
+      ctx.fillStyle = '#ffe08a';
+      ctx.fillRect(spawnPoint.x*scale-1, spawnPoint.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(player.x*scale-1, player.y*scale-1, Math.max(2, scale+2), Math.max(2, scale+2));
+    }
+    function renderMinimap(){
+      renderMinimapCanvas(mctx, 3);
+      renderMinimapCanvas(sideCtx, 2);
     }
 
     /* ============================== HUD / OVERLAYS ============================== */
@@ -1658,6 +1692,15 @@
     document.getElementById('btnSave').addEventListener('click', saveGame);
     document.getElementById('btnLoad').addEventListener('click', ()=>{
       document.getElementById('fileLoad').click();
+    });
+    document.getElementById('btnInvToMap').addEventListener('click', ()=>{
+      toggleInv(false); toggleMap(true);
+    });
+    document.getElementById('btnMapToInv').addEventListener('click', ()=>{
+      toggleMap(false); toggleInv(true);
+    });
+    document.getElementById('btnSideMap').addEventListener('click', ()=>{
+      toggleMap();
     });
     document.getElementById('fileLoad').addEventListener('change', (ev)=>{
       const file = ev.target.files[0];
