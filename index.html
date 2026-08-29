@@ -436,7 +436,7 @@
       {name:"Boar", hp:10, atk:3, def:2, spd:4, tier:1, aggro:4},
       {name:"Wolf", hp:8, atk:3, def:2, spd:4, tier:1, aggro:4},
       {name:"Giant Bug", hp:8, atk:2, def:2, spd:3, tier:1, aggro:3},
-      {name:"Wasp", hp:8, atk:3, def:1, spd:4, tier:1, aggro:4},
+      {name:"Wasp", hp:8, atk:3, def:1, spd:4, tier:1, aggro:4, fly:true},
 
       {name:"Skeleton", hp:9, atk:2, def:3, spd:3, tier:2, aggro:3},
       {name:"Cobra", hp:7, atk:3, def:1, spd:1, tier:2, aggro:2},
@@ -446,7 +446,7 @@
       {name:"Lion", hp:18, atk:5, def:3, spd:3, tier:2, aggro:3},
 
       {name:"Ghoul", hp:20, atk:4, def:3, spd:2, tier:3, aggro:2},
-      {name:"Ghost", hp:15, atk:4, def:2, spd:3, tier:3, aggro:3},
+      {name:"Ghost", hp:15, atk:4, def:2, spd:3, tier:3, aggro:3, fly:true},
       {name:"Orc", hp:18, atk:5, def:3, spd:4, tier:3, aggro:3},
       {name:"Banshee", hp:22, atk:5, def:2, spd:3, tier:3, aggro:3},
       {name:"Imp", hp:20, atk:5, def:2, spd:3, tier:3, aggro:3},
@@ -457,7 +457,7 @@
 
       {name:"Cyclops", hp:50, atk:9, def:6, spd:2, tier:4, aggro:2},
       {name:"Beholder", hp:45, atk:8, def:5, spd:2, tier:4, aggro:3},
-      {name:"Wyvern", hp:55, atk:9, def:5, spd:5, tier:4, aggro:5},
+      {name:"Wyvern", hp:55, atk:9, def:5, spd:5, tier:4, aggro:5, fly:true},
 
       {name:"Lich", hp:60, atk:10, def:6, spd:3, tier:5, aggro:4},
     ];
@@ -473,6 +473,12 @@
       "Rabid":   e=>{e.spd=Math.round(e.spd*1.8)+2; e.def=Math.max(0,Math.round(e.def*0.6)); e.aggro=(e.aggro||0)+1;},
       "Champion":e=>{e.hp=Math.round(e.hp*1.6); e.maxHp=e.hp; e.atk=Math.round(e.atk*1.4)+1; e.def=Math.round(e.def*1.3)+1; e.spd=Math.round(e.spd*1.2)+1;},
     };
+    const ENEMY_TEMPLATE_BY_NAME = Object.fromEntries(ENEMY_TEMPLATES.map(t=>[t.name,t]));
+    function enemyTemplateForSavedEnemy(e){
+      if(e && e.baseName && ENEMY_TEMPLATE_BY_NAME[e.baseName]) return ENEMY_TEMPLATE_BY_NAME[e.baseName];
+      if(e && e.name && ENEMY_TEMPLATE_BY_NAME[e.name]) return ENEMY_TEMPLATE_BY_NAME[e.name];
+      return null;
+    }
 
     /* ============================== MAP GENERATION ============================== */
     const MAP_W = 130, MAP_H = 90;
@@ -823,6 +829,7 @@
           atk: Math.max(1,Math.round(tmpl.atk*variance)),
           def: Math.max(0,Math.round(tmpl.def*variance)),
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
+            fly: !!tmpl.fly,
             aggro: tmpl.aggro ?? AGGRO_RANGE,
             x, y, alive:true, prefix:null,
           };
@@ -1001,16 +1008,21 @@
     function enemyAggroRange(e){
       return e && typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE;
     }
+    function enemyCanTraverse(e, x, y){
+      if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) return false;
+      if(isWalkable(x,y)) return true;
+      return map[y][x] === 'boulder' && !!(e && e.fly);
+    }
     function enemyStepTowardPlayer(e){
       const dx = player.x - e.x, dy = player.y - e.y;
       const sx = Math.sign(dx), sy = Math.sign(dy);
       let nx = e.x + sx, ny = e.y + sy;
-      if(!(isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)) && !(nx===player.x&&ny===player.y))){
+      if(!(enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)) && !(nx===player.x&&ny===player.y))){
         // try only x
         nx = e.x + sx; ny = e.y;
-        if(!(sx!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
+        if(!(sx!==0 && enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)))){
           nx = e.x; ny = e.y + sy;
-          if(!(sy!==0 && isWalkable(nx,ny) && !occupied.has(keyXY(nx,ny)))){
+          if(!(sy!==0 && enemyCanTraverse(e,nx,ny) && !occupied.has(keyXY(nx,ny)))){
             return false; // stuck
           }
         }
@@ -1656,7 +1668,7 @@
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 3; // v3 adds speedPotionTurns
+    const SAVE_VERSION = 4; // v4 adds enemy fly flag
 
     function buildSaveObject(){
       return {
@@ -1683,6 +1695,7 @@
           name:e.name, baseName:e.baseName, tier:e.tier,
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: enemyAggroRange(e),
+          fly: !!e.fly,
           x:e.x, y:e.y, prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
@@ -1745,13 +1758,17 @@
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
 
-      enemies = (data.enemies||[]).map(e=>({
+      enemies = (data.enemies||[]).map(e=>{
+        const tmpl = enemyTemplateForSavedEnemy(e);
+        return ({
         name:e.name, baseName:e.baseName, tier:e.tier,
         hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
         aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
+        fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
         x:e.x, y:e.y, alive:true,
         prefix:e.prefix||null, crit:!!e.crit, aware:!!e.aware,
-      }));
+      });
+      });
       occupied = new Set();
       for(const e of enemies) occupied.add(keyXY(e.x,e.y));
 
