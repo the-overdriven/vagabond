@@ -735,6 +735,8 @@
       let s = player.baseSpd;
       const w = player.equip.weapon;
       if(w){ s += Math.floor(w.spd/2); if(w.mod==='spd') s += w.modAmt; }
+      if(player.equip.shield) s -= 1;
+      if(player.equip.armor) s -= 1;
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
       return s;
