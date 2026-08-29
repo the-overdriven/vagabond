@@ -36,7 +36,7 @@
 - chests should be mostly in remote location and near high tier mobs
 - world should be bigger
 - highlight best in slot items in backpack (highest ATK for weapons and DEF for armors and shields), do not highlight if there are two of same level
-
+- hovering over items tells what they are
 
  -->
 
@@ -928,6 +928,12 @@
     /* ============================== COMBAT / LOOT ============================== */
     function tierColorClass(tier){ return 'tier'+tier; }
 
+    function maybeAutoEquipWeapon(item){
+      if(!item || item.kind !== 'weapon' || player.equip.weapon) return false;
+      player.equip.weapon = item;
+      log(`You automatically equip the ${item.name}.`, 'good');
+      return true;
+    }
     function lootFromEnemy(e){
       const mf = playerMf();
       player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
@@ -940,6 +946,10 @@
         if(roll<0.5) item = makeWeaponItem(tier);
         else if(roll<0.75) item = makeArmorItem(tier);
         else item = makeShieldItem(tier);
+        if(item.kind === 'weapon' && maybeAutoEquipWeapon(item)){
+          log(`The ${e.name} dropped a ${item.name}.`, 'loot');
+          return;
+        }
         player.inventory.push(item);
         log(`The ${e.name} dropped a ${item.name}.`, 'loot');
       }
