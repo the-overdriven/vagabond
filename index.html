@@ -11,7 +11,7 @@
 - add food? heals minor HP
 - collect berries? more survivalism?
 - do not heal on level up?
-- possible to run away from enemies? they lose pursuit, maybe depending on speed/tier
+- possible to run away from enemies? they lose pursuit, maybe depending on speed/tier. or if ur speed is bigger than enemy speed
 - scorpions and GS poison you?
 - what speed rly changes?
 - make map bigger?
@@ -35,7 +35,8 @@
 - individual aggro distance per mob type
 - walking through forest can spawn low lvl mob
 - chests should be mostly in remote location and near high tier mobs
-- map should be bigger
+- world should be bigger
+- highlight best in slot items in backpack (highest ATK for weapons and DEF for armors and shields), do not highlight if there are two of same level
 
 
  -->
@@ -224,6 +225,7 @@
           display:flex; justify-content:space-between; align-items:center;
           padding:4px 2px; font-size:12px; border-bottom:1px dashed #33261a;
       }
+      .invitem.best-slot{}
       .invitem .nm{flex:1;}
       .invitem button{
           background:#2a1c10; color:var(--ember-bright); border:1px solid var(--border);
@@ -1351,6 +1353,36 @@
       const line = itemStatLine(it);
       return it.name + (line? ' \u2022 '+line : '');
     }
+    function bestSlotScore(it){
+      if(!it) return null;
+      if(it.kind==='weapon'){
+        const base = it.atk || 0;
+        const bonus = it.mod === 'atk' ? (it.modAmt || 0) : 0;
+        return base + bonus;
+      }
+      if(it.kind==='armor' || it.kind==='shield'){
+        const base = it.def || 0;
+        const bonus = it.mod === 'def' ? (it.modAmt || 0) : 0;
+        return base + bonus;
+      }
+      return null;
+    }
+    function bestSlotIndexes(kind){
+      const inventoryCandidates = player.inventory
+        .map((it, idx)=>({it, idx, score: bestSlotScore(it)}))
+        .filter(entry => entry.it.kind === kind && entry.score !== null);
+
+      const equipped = player.equip[kind];
+      const equippedScore = equipped ? bestSlotScore(equipped) : null;
+      const threshold = equippedScore !== null ? equippedScore : -Infinity;
+
+      const valid = inventoryCandidates.filter(entry => entry.score > threshold);
+      if(valid.length === 0) return new Set();
+
+      const best = Math.max(...valid.map(entry => entry.score));
+      const winners = valid.filter(entry => entry.score === best);
+      return winners.length === 1 ? new Set([winners[0].idx]) : new Set();
+    }
     function renderInventory(){
       document.getElementById('slotWeapon').querySelector('.val').textContent = slotLabel(player.equip.weapon);
       document.getElementById('slotShield').querySelector('.val').textContent = slotLabel(player.equip.shield);
@@ -1383,6 +1415,12 @@
         sg.appendChild(d);
       }
 
+      const best = {
+        weapon: bestSlotIndexes('weapon'),
+        shield: bestSlotIndexes('shield'),
+        armor: bestSlotIndexes('armor'),
+      };
+
       const list = document.getElementById('invList');
       list.innerHTML = '';
       if(player.inventory.length===0){
@@ -1393,12 +1431,17 @@
       player.inventory.forEach((it, idx)=>{
         const row = document.createElement('div');
         row.className = 'invitem';
+        const isBest = (it.kind==='weapon' && best.weapon.has(idx)) ||
+          (it.kind==='shield' && best.shield.has(idx)) ||
+          (it.kind==='armor' && best.armor.has(idx));
+        if(isBest) row.classList.add('best-slot');
         const cls = it.tier ? tierColorClass(it.tier) : '';
         const line = itemStatLine(it);
         const nm = document.createElement('span');
         nm.className='nm '+cls;
         const countTag = (it.kind==='potion'||it.kind==='scroll') && it.count>1 ? ' x'+it.count : '';
-        nm.textContent = it.name + countTag + (line? ' \u2014 '+line:'') + (it.kind==='potion'||it.kind==='scroll'?'':' [T'+it.tier+']');
+        const prefix = isBest ? '✅ ' : '';
+        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (it.kind==='potion'||it.kind==='scroll'?'':' [T'+it.tier+']');
         row.appendChild(nm);
         if(it.kind==='potion'){
           const btn = document.createElement('button');
