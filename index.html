@@ -1373,7 +1373,7 @@
       // player
       {
         const vx = player.x-camX, vy = player.y-camY;
-        drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', '#241a08');
+        drawTile(vx,vy, '@', player.invisibleTurns>0 ? 'rgba(255,246,214,0.45)' : '#fff6d6', 'rgba(0,0,0,0)');
       }
       // range overlays are drawn last so they tint everything underneath without
       // being erased by later tile/entity draws.
