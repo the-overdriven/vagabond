@@ -1011,7 +1011,9 @@
     function enemyCanTraverse(e, x, y){
       if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) return false;
       if(isWalkable(x,y)) return true;
-      return map[y][x] === 'boulder' && !!(e && e.fly);
+      if(!(e && e.fly)) return false;
+      const tile = map[y][x];
+      return tile === 'boulder' || tile === 'water';
     }
     function enemyStepTowardPlayer(e){
       const dx = player.x - e.x, dy = player.y - e.y;
