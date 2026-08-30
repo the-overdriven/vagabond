@@ -554,14 +554,18 @@
       snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', mini:'#e4eef6', walk:true},
       // cavefloor:{ch:'.', color:'#8a7aa5', bg:'#120e18', walk:true},
       // cavewall: {ch:'#', color:'#2a2233', bg:'#0a0810', walk:false},
-      temple:   {ch:'\u2626', color:'#ffe08a', bg:'#221a08', walk:true},
+      temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
       // A single lore landmark hidden in the mountains: a monolithic black
       // pillar that has no business being there.
       blackpillar: {ch:'\u25ae', color:'#2a2a35', bg:'#0a0a0a', walk:false},
+      // A little cluster of huts marking a small village.
+      village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
+      // Part of the temple grounds - the bell tower. Its bell is missing.
+      belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -717,12 +721,40 @@
         }
       }
       spawnPoint = {x:sx,y:sy};
-      map[sy][sx] = 'temple';
+      // The Temple is a small walled complex, not a single tile: stamp a
+      // random 2x2 / 3x2 / 2x3 footprint of temple ground anchored at the
+      // spawn point (skipping any tile that would land on water/mountain,
+      // which stay impassable).
+      const templeShapes = [[2,2],[3,2],[2,3]];
+      const [tw,th] = pick(templeShapes);
+      const templeTiles = [];
+      for(let dy=0; dy<th; dy++){
+        for(let dx=0; dx<tw; dx++){
+          const tx=sx+dx, ty=sy+dy;
+          if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
+          if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
+          map[ty][tx] = 'temple';
+          templeTiles.push({x:tx,y:ty});
+        }
+      }
+
+      // The temple complex includes a bell tower - tucked into a corner of the
+      // footprint, away from the player's own start tile - whose bell has gone
+      // missing (a small dangling hook for later lore).
+      const bellSpots = templeTiles.filter(t=>!(t.x===sx && t.y===sy));
+      if(bellSpots.length){
+        const spot = pick(bellSpots);
+        map[spot.y][spot.x] = 'belltower';
+      }
 
       // Lore landmark: a single black stone pillar tucked into the mountains
       // near the start. It sits close to the mountain's edge (not deep inside),
       // reachable within about one screen of walking from the temple.
       placeBlackPillar();
+
+      // A small village of huts, somewhere out in the walkable countryside -
+      // not right on top of the temple, but not absurdly far either.
+      placeVillage();
     }
 
     function placeBlackPillar(){
@@ -757,6 +789,44 @@
       // the temple doesn't happen to offer a nearby mountain edge.
       const spot = search(15,45,true) || search(10,80,true) || search(5,Math.max(MAP_W,MAP_H),false);
       if(spot) map[spot.y][spot.x] = 'blackpillar';
+    }
+
+    let villageCenter = null;
+    function placeVillage(){
+      // Find a grass/hill clearing just outside the temple grounds, then grow
+      // a small blob of hut tiles outward from it so it reads as a loose
+      // little settlement right next door.
+      function findCenter(){
+        for(let r=3; r<=15; r+=2){
+          for(let tries=0; tries<20; tries++){
+            const ang = rng()*Math.PI*2;
+            const x = Math.round(spawnPoint.x + Math.cos(ang)*r);
+            const y = Math.round(spawnPoint.y + Math.sin(ang)*r);
+            if(x<4||y<4||x>=MAP_W-4||y>=MAP_H-4) continue;
+            if(map[y][x] !== 'grass' && map[y][x] !== 'hill') continue;
+            return {x,y};
+          }
+        }
+        return null;
+      }
+      const center = findCenter();
+      if(!center) return;
+      villageCenter = center;
+      const huts = [{x:center.x,y:center.y}];
+      const targetHuts = 11 + Math.floor(rng()*4); // 11-14 huts
+      let guard=0;
+      while(huts.length < targetHuts && guard<400){
+        guard++;
+        const base = huts[randInt(0,huts.length-1)];
+        const dx = randInt(-2,2), dy = randInt(-2,2);
+        if(dx===0 && dy===0) continue;
+        const x = base.x+dx, y = base.y+dy;
+        if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
+        if(map[y][x] !== 'grass' && map[y][x] !== 'hill') continue;
+        if(huts.some(h=>h.x===x && h.y===y)) continue;
+        huts.push({x,y});
+      }
+      for(const h of huts) map[h.y][h.x] = 'village';
     }
 
     function isWalkable(x,y){
@@ -964,7 +1034,7 @@
       for(let y=2;y<MAP_H-2;y++){
         for(let x=2;x<MAP_W-2;x++){
           const tile = map[y][x];
-          if(tile==='temple' || !isWalkable(x,y)) continue;
+          if(tile==='temple' || tile==='belltower' || !isWalkable(x,y)) continue;
           if(Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) continue;
           if(!tilesByBiome[tile]) tilesByBiome[tile] = [];
           tilesByBiome[tile].push(x, y);
@@ -1049,7 +1119,7 @@
       for(let i=0;i<45;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
         if(tries>=200) continue;
         const distTier = Math.min(5, 1+Math.floor((Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y))/45));
         groundItems.push({x,y,kind:'chest', tier:distTier, opened:false});
@@ -1058,7 +1128,7 @@
       for(let i=0;i<30;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'potion'});
       }
@@ -1066,7 +1136,7 @@
       for(let i=0;i<9;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'scroll'});
       }
@@ -1074,7 +1144,7 @@
       for(let i=0;i<3;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'speedpotion'});
       }
@@ -1086,10 +1156,15 @@
     // (like idle enemies); the Drunk roams freely with no leash; the Merchant
     // stays put at his stall.
     const NPC_TEMPLATES = [
-      {name:"Old Hunter",   line:"Never enter the forest after midnight.",                         free:false, portrait:"old_hunter"},
-      {name:"Gravedigger",  line:"Midnight? That's when the bells stop.",                           free:false, portrait:"grave_digger"},
-      {name:"Drunk",        line:"Hic! What time it is? There ain't no bells anymore.",              free:true,  portrait:"drunk"},
-      {name:"Merchant",     line:"Gold is easy to find. Secrets are harder. Care to trade?",         free:false, portrait:"merchant", static:true},
+      {name:"Old Hunter",   lines:["Never enter the forest after midnight."],                        free:false, portrait:"old_hunter"},
+      {name:"Gravedigger",  lines:[
+                               "Midnight? That's when the bells stop.",
+                               "Once I get my old name back, I can finally rest.",
+                               "Who digs the grave for the gravedigger?",
+                               "Who keeps checking an empty grave?",
+                             ],                                                                      free:false, portrait:"grave_digger"},
+      {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
+      {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true},
     ];
     let npcs = [];
     function spawnNpcs(){
@@ -1101,9 +1176,9 @@
           y = randInt(Math.max(2,spawnPoint.y-8), Math.min(MAP_H-3,spawnPoint.y+8));
           dist = Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y));
           tries++;
-        } while((!isWalkable(x,y) || map[y][x]==='temple' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
+        } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
-        const npc = { name:tmpl.name, line:tmpl.line, free:!!tmpl.free, static:!!tmpl.static, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
+        const npc = { name:tmpl.name, lines:tmpl.lines, free:!!tmpl.free, static:!!tmpl.static, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
         occupied.add(keyXY(x,y));
       }
@@ -1526,6 +1601,29 @@
       beginEnemyMoveAnim(e, fromX, fromY);
       return true;
     }
+    function enemyStepAwayFromTemple(e){
+      // Flee logic for the temple's no-farming zone: pick the open neighbour tile
+      // that puts the most distance between the enemy and the temple's centre.
+      let best = null, bestDist = -1;
+      for(const [dx,dy] of DIRS8){
+        const nx = e.x+dx, ny = e.y+dy;
+        if(!enemyTileOpen(e,nx,ny)) continue;
+        const d = Math.max(Math.abs(nx-spawnPoint.x), Math.abs(ny-spawnPoint.y));
+        if(d > bestDist){ bestDist = d; best = {x:nx, y:ny}; }
+      }
+      const curDist = Math.max(Math.abs(e.x-spawnPoint.x), Math.abs(e.y-spawnPoint.y));
+      if(!best || bestDist <= curDist) return false; // boxed in or already fleeing correctly
+      occupied.delete(keyXY(e.x,e.y));
+      const fromX = e.x, fromY = e.y;
+      e.x = best.x; e.y = best.y;
+      occupied.add(keyXY(e.x,e.y));
+      beginEnemyMoveAnim(e, fromX, fromY);
+      return true;
+    }
+    // Radius (in tiles, from the temple's centre) that enemies won't linger inside
+    // while the player is standing on temple ground - stops using the Temple's
+    // free healing as a way to safely tank hits mid-fight.
+    const TEMPLE_FLEE_RADIUS = 6;
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
       if(player.speedPotionTurns > 0){
@@ -1537,8 +1635,14 @@
         if(player.invisibleTurns === 0) log('The invisibility fades.', 'info');
         return; // while invisible, enemies neither chase nor attack
       }
+      const playerOnTemple = map[player.y][player.x] === 'temple' || map[player.y][player.x] === 'belltower';
       for(const e of enemies.slice()){
         if(!e.alive) continue;
+        if(playerOnTemple && Math.max(Math.abs(e.x-spawnPoint.x), Math.abs(e.y-spawnPoint.y)) <= TEMPLE_FLEE_RADIUS){
+          if(e.aware){ e.aware = false; log(`The ${e.name} retreats from the sacred ground.`, 'info'); }
+          enemyStepAwayFromTemple(e);
+          continue;
+        }
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if(dist === ATTACK_RANGE){
@@ -1691,7 +1795,7 @@
       }
       const npcTarget = npcs.find(n=>n.x===nx && n.y===ny);
       if(npcTarget){
-        log(`${npcTarget.name} says: ${npcTarget.line}`, 'info');
+        log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info');
         enemyTurn();
         npcTurn();
         render(); runAnimationLoop(); updateHud(); updateTooltip();
@@ -1705,7 +1809,7 @@
         player.steps++;
         checkGroundAt(nx,ny);
         checkWorldEdge();
-        if(map[ny][nx]==='temple'){
+        if(map[ny][nx]==='temple' || map[ny][nx]==='belltower'){
           if(player.hp < playerMaxHp()){
             player.hp = playerMaxHp();
             log('The Temple restores your strength.', 'good');
@@ -1737,6 +1841,8 @@
       temple:"the sacred ground of the Temple",
       boulder:"a cluster of impassable boulders",
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
+      village:"a small hut, part of a village",
+      belltower:"the Temple's bell tower - the bell itself seems to be missing",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
@@ -1811,7 +1917,8 @@
             t === 'mountain' ||
             t === 'cavewall' ||
             t === 'boulder' ||
-            t === 'water'
+            t === 'water' ||
+            t === 'village'
           ) {
             addNote(TILE_DESC[t], direction);
           }
@@ -1839,6 +1946,13 @@
       if (pillarDirection) {
         log(`You see, rising from the mountains, a tall black stone pillar to the ${pillarDirection}.`, 'pillar');
         log('It feels oddly out of place here. You wonder what story lies behind it...', 'info');
+      }
+
+      if (villageCenter) {
+        const vdist = Math.max(Math.abs(player.x-villageCenter.x), Math.abs(player.y-villageCenter.y));
+        if (vdist > 5 && vdist <= 20) {
+          log('You sense a small village is nearby.', 'info');
+        }
       }
     }
 
@@ -2681,6 +2795,16 @@
       rngState = data.rngState|0;
       Object.assign(worldEdgesReached, data.worldEdgesReached||{});
 
+      // villageCenter isn't stored explicitly - it's just wherever 'village'
+      // tiles ended up in the restored map.
+      villageCenter = null;
+      outer:
+      for(let y=0; y<MAP_H; y++){
+        for(let x=0; x<MAP_W; x++){
+          if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
+        }
+      }
+
       Object.assign(player, data.player);
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
@@ -2707,7 +2831,7 @@
         npcs = data.npcs.map(n=>{
           const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
           return {
-            name: n.name, line: tmpl ? tmpl.line : '...', free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
+            name: n.name, lines: tmpl ? tmpl.lines : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
             x:n.x, y:n.y, homeX: n.homeX ?? n.x, homeY: n.homeY ?? n.y,
           };
         });
