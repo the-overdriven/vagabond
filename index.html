@@ -327,6 +327,17 @@
           #hint{ display:none; } /* keyboard legend is meaningless on touch */
           #stage{ max-width:100vw; }
           canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
+          /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
+          #invOverlay, #mapOverlay, #tradeOverlay{
+              position:fixed; inset:0; width:100vw; height:100dvh; min-height:100vh;
+              align-items:stretch; justify-content:stretch; z-index:100;
+          }
+          #invOverlay .panelbox, #mapOverlay .panelbox{
+              width:100%; max-width:none; height:100%; max-height:none;
+              min-height:100%; box-sizing:border-box; border-radius:0;
+              overflow-y:auto;
+          }
+          #mapOverlay .panelbox{width:100%;}
           #mobileInfoPanel{
               display:block; width:100%; max-width:100%; box-sizing:border-box;
               background:linear-gradient(180deg,var(--panel2),var(--panel));
