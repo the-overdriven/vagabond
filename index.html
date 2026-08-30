@@ -269,6 +269,9 @@
           font-family:inherit; letter-spacing:0.5px;
       }
       .slbtn:hover{background:var(--ember); color:#1a0f05;}
+      #tradeOverlay .panelbox{width:min(80vw, 560px);}
+      .trade-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+      .trade-head img{width:64px; height:64px; object-fit:cover; border:1px solid var(--border); border-radius:4px; background:#0a0705;}
 
 
       #tooltip{
@@ -356,6 +359,25 @@
         <canvas id="minimap"></canvas>
         <div class="closehint">
           <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
+        </div>
+      </div>
+    </div>
+    <div class="overlay" id="tradeOverlay">
+      <div class="panelbox" id="tradePanel">
+        <h2>Trade with the Merchant</h2>
+        <div class="trade-head">
+          <img src="npc/merchant.jpg" onerror="this.style.display='none'">
+          <div>
+            <div style="color:var(--parchment-dim);font-size:11px;">Your Gold</div>
+            <div style="color:var(--ember-bright);font-size:16px;" id="tradeGold">0</div>
+          </div>
+        </div>
+        <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">FOR SALE</b>
+        <div class="invlist" id="tradeBuyList"><div class="invitem"><span class="nm" style="color:var(--parchment-dim);">He has nothing to sell yet. Check back later.</span></div></div>
+        <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">YOUR ITEMS</b>
+        <div class="invlist" id="tradeSellList"></div>
+        <div class="closehint">
+          <button class="slbtn" id="btnTradeClose" type="button">Close</button>
         </div>
       </div>
     </div>
@@ -1166,7 +1188,7 @@
                                "Who keeps checking an empty grave?",
                              ],                                                                      free:false, portrait:"grave_digger"},
       {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
-      {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true},
+      {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
     ];
     let npcs = [];
     function spawnNpcs(){
@@ -1180,7 +1202,7 @@
           tries++;
         } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
-        const npc = { name:tmpl.name, lines:tmpl.lines, free:!!tmpl.free, static:!!tmpl.static, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
+        const npc = { name:tmpl.name, lines:tmpl.lines, free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
         occupied.add(keyXY(x,y));
         if(tmpl.name === "Gravedigger"){
@@ -1778,7 +1800,7 @@
 
 
     /* ============================== MOVEMENT ============================== */
-    let mapOpen=false, invOpen=false;
+    let mapOpen=false, invOpen=false, tradeOpen=false;
     // Buffering one move while the step animation plays keeps held-key walking
     // continuous - without it every input during the 140ms pan is dropped, which
     // reads as stuttering.
@@ -1790,7 +1812,7 @@
       tryMove(next.dx, next.dy);
     }
     async function tryMove(dx,dy){
-      if(mapOpen || invOpen || deathTransition) return;
+      if(mapOpen || invOpen || tradeOpen || deathTransition) return;
       if(cameraAnimating || attackAnim){
         pendingMove = {dx:dx, dy:dy};
         return;
@@ -2419,6 +2441,15 @@
       lastMousePx=null; lastMousePy=null; tooltip.style.display='none';
       if(hoveredEnemy){ hoveredEnemy=null; render(); }
     });
+    canvas.addEventListener('click', (ev)=>{
+      if(mapOpen || invOpen || tradeOpen) return;
+      const rect = canvas.getBoundingClientRect();
+      const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+      const vx = Math.floor(px / TILE_PX), vy = Math.floor(py / TILE_PX);
+      const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
+      const n = npcs.find(np=>np.x===mx && np.y===my);
+      if(n) tryOpenTrade(n);
+    });
 
 
     /* ============================== MINIMAP ============================== */
@@ -2667,6 +2698,69 @@
         list.appendChild(row);
       });
     }
+    /* ============================== MERCHANT TRADE ============================== */
+    const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
+    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15 };
+    function itemSellValue(it){
+      if(it.tier){
+        let v = TIER_SELL_VALUE[it.tier] || 0;
+        if(it.mod) v += (it.modAmt||1) * 5;
+        return v;
+      }
+      if(FLAT_SELL_VALUE[it.kind] !== undefined) return FLAT_SELL_VALUE[it.kind];
+      return 0; // tombstones and other lore items aren't sellable
+    }
+    function renderTrade(){
+      document.getElementById('tradeGold').textContent = player.gold;
+      const list = document.getElementById('tradeSellList');
+      list.innerHTML = '';
+      const sellable = [];
+      player.inventory.forEach((it, idx)=>{ if(itemSellValue(it)>0) sellable.push({it, idx}); });
+      if(sellable.length===0){
+        const d = document.createElement('div');
+        d.className='invitem'; d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">You have nothing worth selling.</span>';
+        list.appendChild(d);
+        return;
+      }
+      sellable.forEach(({it, idx})=>{
+        const row = document.createElement('div');
+        row.className = 'invitem';
+        const cls = it.tier ? tierColorClass(it.tier) : '';
+        const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+        const countTag = stackable && it.count>1 ? ' x'+it.count : '';
+        const nm = document.createElement('span');
+        nm.className='nm '+cls;
+        nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
+        row.appendChild(nm);
+        const btn = document.createElement('button');
+        btn.textContent = 'Sell for '+itemSellValue(it)+'g';
+        btn.onclick = ()=>{ sellItem(idx); };
+        row.appendChild(btn);
+        list.appendChild(row);
+      });
+    }
+    function sellItem(idx){
+      const it = player.inventory[idx];
+      if(!it) return;
+      const value = itemSellValue(it);
+      if(value<=0) return;
+      if(it.count && it.count>1){ it.count--; }
+      else { player.inventory.splice(idx,1); }
+      player.gold += value;
+      log(`You sell the ${it.name} for ${value} gold.`, 'good');
+      updateHud(); renderTrade(); renderInventory();
+    }
+    function toggleTrade(force){
+      tradeOpen = (force!==undefined) ? force : !tradeOpen;
+      document.getElementById('tradeOverlay').classList.toggle('show', tradeOpen);
+      if(tradeOpen) renderTrade();
+    }
+    function tryOpenTrade(npc){
+      if(!npc || !npc.trades) return;
+      const dist = Math.max(Math.abs(npc.x-player.x), Math.abs(npc.y-player.y));
+      if(dist>1) return;
+      toggleTrade(true);
+    }
     function equipItem(idx){
       const it = player.inventory[idx];
       if(!it) return;
@@ -2845,7 +2939,7 @@
         npcs = data.npcs.map(n=>{
           const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
           return {
-            name: n.name, lines: tmpl ? tmpl.lines : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
+            name: n.name, lines: tmpl ? tmpl.lines : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
             x:n.x, y:n.y, homeX: n.homeX ?? n.x, homeY: n.homeY ?? n.y,
           };
         });
@@ -2896,6 +2990,12 @@
     document.getElementById('btnSideMap').addEventListener('click', ()=>{
       toggleMap();
     });
+    document.getElementById('btnTradeClose').addEventListener('click', ()=>{
+      toggleTrade(false);
+    });
+    document.getElementById('tradeOverlay').addEventListener('click', (ev)=>{
+      if(ev.target.id === 'tradeOverlay') toggleTrade(false);
+    });
     document.getElementById('fileLoad').addEventListener('change', (ev)=>{
       const file = ev.target.files[0];
       if(file) loadGame(file);
@@ -2927,11 +3027,11 @@
       }
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
       if(k==='m' || k==='M'){ ev.preventDefault(); toggleMap(); return; }
-      if(k==='Escape'){ toggleInv(false); toggleMap(false); return; }
+      if(k==='Escape'){ toggleInv(false); toggleMap(false); toggleTrade(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
       if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
-      if(mapOpen || invOpen) return;
+      if(mapOpen || invOpen || tradeOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); describeSurroundings(); return; } // <-- added
       const moves = {
 
