@@ -1,7 +1,5 @@
 <!-- TODO:
 
-
-- extract WEAPONS, SHIELDS, ARMORS, MODIFIERS, ENEMY_TEMPLATES, ENEMY_DEFAULT_BIOMES, ENEMY_PREFIXES to json files in content folder
 - separate weapons into two handed (cannot wear shields in that case!)
 - preload images
 - gear screen and map screen are mutually exclusive, one closes the other automatically
@@ -1076,7 +1074,7 @@
     function makeWeaponItem(tier){
       const pool = WEAPONS.filter(w=>w.tier<=tier);
       const base = pick(pool.length?pool:WEAPONS.filter(w=>w.tier===1));
-      const item = {kind:'weapon', base:base.name, atk:base.atk, spd:base.spd, tier:base.tier, name:base.name};
+      const item = {kind:'weapon', base:base.name, atk:base.atk, spd:base.spd, tier:base.tier, twoHanded:!!base.twoHanded, name:base.name};
       return rollModifier(base.name, item);
     }
     function makeShieldItem(tier){
@@ -3054,7 +3052,7 @@
     }
     function renderInventory(){
       document.getElementById('slotWeapon').querySelector('.val').textContent = slotLabel(player.equip.weapon);
-      document.getElementById('slotShield').querySelector('.val').textContent = slotLabel(player.equip.shield);
+      document.getElementById('slotShield').querySelector('.val').textContent = player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : slotLabel(player.equip.shield);
       document.getElementById('slotArmor').querySelector('.val').textContent = slotLabel(player.equip.armor);
 
       const sg = document.getElementById('statGrid');
@@ -3156,6 +3154,11 @@
     }
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
+    function ensureMerchantStock(){
+      if(!merchantStock.some(it=>it.kind==='weapon' && it.base==='Two-handed Sword')){
+        merchantStock.push({kind:'weapon', base:'Two-handed Sword', atk:5, spd:4, tier:4, twoHanded:true, name:'Two-handed Sword', merchantPrice:200});
+      }
+    }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
     const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, herb:4, mushroom:3 };
     function itemSellValue(it){
@@ -3188,7 +3191,7 @@
           nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
           row.appendChild(nm);
           const btn = document.createElement('button');
-          const buyValue = itemSellValue(it) * 2;
+          const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2;
           btn.textContent = 'Buy for '+buyValue+'g';
           btn.onclick = ()=>{ buyItem(it); };
           row.appendChild(btn);
@@ -3225,7 +3228,7 @@
     }
     function buyItem(it){
       if(!it) return;
-      const value = itemSellValue(it) * 2;
+      const value = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2;
       if(value<=0 || player.gold<value) return;
       const stackable = isStackableKind(it.kind);
       if(stackable){
@@ -3241,7 +3244,9 @@
         const idx = merchantStock.indexOf(it);
         if(idx<0) return;
         merchantStock.splice(idx,1);
-        player.inventory.push({...it});
+        const bought = {...it};
+        delete bought.merchantPrice;
+        player.inventory.push(bought);
       }
       player.gold -= value;
       log(`You buy the ${it.name} for ${value} gold.`, 'good');
@@ -3283,12 +3288,23 @@
       const it = player.inventory[idx];
       if(!it) return;
       const slot = it.kind;
+      if(slot==='shield' && player.equip.weapon && player.equip.weapon.twoHanded){
+        log('You cannot equip a shield while wielding a two-handed weapon.', 'bad');
+        return;
+      }
       const old = player.equip[slot];
       const before = statSnapshot();
       player.equip[slot] = it;
       player.inventory.splice(idx,1);
       if(old) player.inventory.push(old);
-      log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
+      if(slot==='weapon' && it.twoHanded && player.equip.shield){
+        const oldShield = player.equip.shield;
+        player.equip.shield = null;
+        player.inventory.push(oldShield);
+        log(`You equip the ${it.name} and remove the ${oldShield.name} because it is a two-handed weapon.`, 'good');
+      } else {
+        log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
+      }
       updateHud(); renderInventory();
     }
     function usePotion(idx){
@@ -3476,6 +3492,7 @@
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];
+      ensureMerchantStock();
       foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : []);
 
       enemies = (data.enemies||[]).map(e=>{
@@ -3606,7 +3623,7 @@
       if(k==='Escape'){ toggleInv(false); toggleMap(false); toggleTrade(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
-      if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
+      if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; player.gold = 500; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
       if(mapOpen || invOpen || tradeOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); describeSurroundings(); return; } // <-- added
       if(k==='f' || k==='F'){ ev.preventDefault(); tryForage(); return; }
@@ -3677,6 +3694,7 @@
       spawnBellGuardians();
       spawnGroundStuff();
       spawnNpcs();
+      ensureMerchantStock();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
       stopDeathTransition();
       stopAttackAnimation();
