@@ -1080,6 +1080,74 @@
       }
     }
 
+    /* ============================== NPCs ============================== */
+    // A handful of harmless wanderers scattered near the Temple. Walking into one
+    // just prints their line - no combat. Two stick close to their home tile
+    // (like idle enemies); the Drunk roams freely with no leash; the Merchant
+    // stays put at his stall.
+    const NPC_TEMPLATES = [
+      {name:"Old Hunter",   line:"Never enter the forest after midnight.",                         free:false, portrait:"old_hunter"},
+      {name:"Gravedigger",  line:"Midnight? That's when the bells stop.",                           free:false, portrait:"grave_digger"},
+      {name:"Drunk",        line:"Hic! What time it is? There ain't no bells anymore.",              free:true,  portrait:"drunk"},
+      {name:"Merchant",     line:"Gold is easy to find. Secrets are harder. Care to trade?",         free:false, portrait:"merchant", static:true},
+    ];
+    let npcs = [];
+    function spawnNpcs(){
+      npcs = [];
+      for(const tmpl of NPC_TEMPLATES){
+        let x,y,tries=0,dist=0;
+        do{
+          x = randInt(Math.max(2,spawnPoint.x-8), Math.min(MAP_W-3,spawnPoint.x+8));
+          y = randInt(Math.max(2,spawnPoint.y-8), Math.min(MAP_H-3,spawnPoint.y+8));
+          dist = Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y));
+          tries++;
+        } while((!isWalkable(x,y) || map[y][x]==='temple' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
+        if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
+        const npc = { name:tmpl.name, line:tmpl.line, free:!!tmpl.free, static:!!tmpl.static, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
+        npcs.push(npc);
+        occupied.add(keyXY(x,y));
+      }
+    }
+    function npcIsOnScreen(n){
+      const vx = n.x - targetCamX(), vy = n.y - targetCamY();
+      return vx>=0 && vy>=0 && vx<VIEW_W && vy<VIEW_H;
+    }
+    function npcTurn(){
+      for(const n of npcs){
+        if(n.static) continue;
+        if(!ENEMY_WANDER_ENABLED) continue;
+        if(!chance(ENEMY_WANDER_CHANCE)) continue;
+        if(!npcIsOnScreen(n)) continue;
+        const leash = !n.free;
+        if(leash && Math.max(Math.abs(n.x-n.homeX), Math.abs(n.y-n.homeY)) > ENEMY_WANDER_RADIUS){
+          n.homeX = n.x; n.homeY = n.y;
+        }
+        const options = [];
+        for(let dy=-1; dy<=1; dy++){
+          for(let dx=-1; dx<=1; dx++){
+            if(dx===0 && dy===0) continue;
+            const nx = n.x+dx, ny = n.y+dy;
+            if(leash && Math.max(Math.abs(nx-n.homeX), Math.abs(ny-n.homeY)) > ENEMY_WANDER_RADIUS) continue;
+            if(nx===player.x && ny===player.y) continue;
+            if(!isWalkable(nx,ny)) continue;
+            if(occupied.has(keyXY(nx,ny))) continue;
+            options.push({x:nx, y:ny});
+          }
+        }
+        if(!options.length) continue;
+        const pick = options[randInt(0, options.length-1)];
+        occupied.delete(keyXY(n.x,n.y));
+        const fromX = n.x, fromY = n.y;
+        n.x = pick.x; n.y = pick.y;
+        occupied.add(keyXY(n.x,n.y));
+        beginEnemyMoveAnim(n, fromX, fromY);
+      }
+    }
+    function npcAnimsPending(){
+      for(const n of npcs){ if(n.animStart !== undefined) return true; }
+      return false;
+    }
+
     /* ============================== LOG ============================== */
     const logEl = document.getElementById('logpanel');
     const logQueue = [];
@@ -1616,6 +1684,16 @@
       if(target){
         await playerAttackEnemy(target);
         enemyTurn();
+        npcTurn();
+        render(); runAnimationLoop(); updateHud(); updateTooltip();
+        flushPendingMove();
+        return;
+      }
+      const npcTarget = npcs.find(n=>n.x===nx && n.y===ny);
+      if(npcTarget){
+        log(`${npcTarget.name} says: ${npcTarget.line}`, 'info');
+        enemyTurn();
+        npcTurn();
         render(); runAnimationLoop(); updateHud(); updateTooltip();
         flushPendingMove();
         return;
@@ -1636,6 +1714,7 @@
         moved = true;
       }
       enemyTurn();
+      npcTurn();
       updateHud();
       if(moved) animateCameraToPlayer(fromPos);
       else { render(); runAnimationLoop(); }
@@ -1857,13 +1936,14 @@
     }
     function clearEnemyAnims(){
       for(const e of enemies) e.animStart = undefined;
+      for(const n of npcs) n.animStart = undefined;
     }
     function enemyAnimsPending(){
       for(const e of enemies){ if(e.animStart !== undefined) return true; }
       return false;
     }
     function animationsPending(){
-      return !!moveAnim || enemyAnimsPending() || fxAnims.length>0;
+      return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length>0;
     }
 
     // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -2031,6 +2111,23 @@
           ctx.strokeRect(vx+2, vy+2, TILE_PX-4, TILE_PX-4);
         }
       }
+      // npcs - drawn in white to stand out from the tier-coloured enemy glyphs
+      for(const n of npcs){
+        let nxp = n.x, nyp = n.y;
+        if(n.animStart !== undefined){
+          const t = Math.min(1, (now - n.animStart) / MOVE_ANIM_MS);
+          if(t >= 1){
+            n.animStart = undefined;
+          } else {
+            const p = 1 - Math.pow(1 - t, 3);
+            nxp = n.animFromX + (n.x - n.animFromX) * p;
+            nyp = n.animFromY + (n.y - n.animFromY) * p;
+          }
+        }
+        const vx = Math.round((nxp-camX) * TILE_PX), vy = Math.round((nyp-camY) * TILE_PX);
+        if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
+        drawCreature(vx,vy,n.name[0], '#ffffff');
+      }
       // player
       {
         let px = viewPlayerX;
@@ -2149,6 +2246,17 @@
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
       <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
       <span style="color:#e0473f;opacity:0.7">Aggro range ${aggroRange}</span>`;
+        tooltip.style.left = (lastMousePx+16)+'px';
+        tooltip.style.top = (lastMousePy+16)+'px';
+        tooltip.style.display = 'block';
+        return;
+      }
+      const n = npcs.find(np=>np.x===mx && np.y===my);
+      if(n){
+        tooltip.classList.remove('mini');
+        tooltip.innerHTML = `
+      <img src="npc/${n.portrait}.jpg" onerror="this.style.display='none'">
+      <div class="nm">${n.name}</div>`;
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
@@ -2516,6 +2624,7 @@
           x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
+        npcs: npcs.map(n=>({name:n.name, x:n.x, y:n.y, homeX:n.homeX, homeY:n.homeY})),
         tombstonesRemaining: tombstonesRemaining,
         tombstoneOrder: tombstoneOrder,
       };
@@ -2593,6 +2702,19 @@
       });
       occupied = new Set();
       for(const e of enemies) occupied.add(keyXY(e.x,e.y));
+
+      if(Array.isArray(data.npcs) && data.npcs.length){
+        npcs = data.npcs.map(n=>{
+          const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
+          return {
+            name: n.name, line: tmpl ? tmpl.line : '...', free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
+            x:n.x, y:n.y, homeX: n.homeX ?? n.x, homeY: n.homeY ?? n.y,
+          };
+        });
+        for(const n of npcs) occupied.add(keyXY(n.x,n.y));
+      } else {
+        spawnNpcs(); // older save from before NPCs existed
+      }
 
       groundItems = (data.groundItems||[]).map(g=>({...g}));
 
@@ -2704,6 +2826,7 @@
       player.hp = playerMaxHp();
       spawnEnemies();
       spawnGroundStuff();
+      spawnNpcs();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures are far more aggressive than others. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
       stopDeathTransition();
       stopAttackAnimation();
