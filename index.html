@@ -1367,7 +1367,7 @@
           y = randInt(Math.max(2,origin.y-spread), Math.min(MAP_H-3,origin.y+spread));
           dist = Math.max(Math.abs(x-origin.x), Math.abs(y-origin.y));
           tries++;
-        } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
+        } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='forest' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
         const npc = { name:tmpl.name, lines:linesForNpcTemplate(tmpl), free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
