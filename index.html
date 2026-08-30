@@ -6,7 +6,7 @@
 - chests should be mostly in remote location and near high tier mobs, in that case they should grant better loot
 - big bell weight shouldnt be mentioned from distance
 
-
+- there should be less health potions in the world, especially once meat is introduced
 - penalty for getting killed?
 - add evasion? chance to dodge. or reuse SPD
 - prefixed mobs should give more XP
@@ -49,13 +49,22 @@
 - being ambushed when using autopath should stock autopath
 - individual monster loot table
 - increase monster scale, top tier should be twice as strong, proportionally
-- merchant should have dagger for sale, non-humanoids should not drop gear
+- merchant should have dagger for sale, non-humanoids should not drop gear, merchant should have more stuff in generald
 - being under effect of potion of speed, two moves are treated as 1 turn in autopath
 - high tier monsters should be more lickely to drop items from their tier
 - opening chests can spawn mimics?
 - add scroll of teleport (to temple)
 - rivers are not common enough
 - add swimming skill (number represents how many tiles you can swim before you start drowning)
+- using items should cost a turn
+- old hunter gives a quest to kill 5 xyz enemies and gives sth in return
+- inspect player (p) should tell sth about player, experience HP, worn gear, how heavy backpack is, how char feels.
+OR clicking on player. hovering over player should show the tooltip with worn gear (paper doll) and avatar? and name.
+that means creating game asks for a name and choosing avatar
+- blacksmith to improve weapons, or witch to enchant them (for a fee)
+- mining? to destroy building, gain ore, and use for crafting
+- ability to turn 3 healing herbs to 1 life potion?
+- make some monsters wander outsife of their home tile
  -->
 
 <!DOCTYPE html>
@@ -2018,7 +2027,7 @@
             const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y));
             if(distAfter <= aggroRange){
               e.aware = true;
-              log(`The ${e.name} wanders right into you and spots you!`, 'bad');
+              log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad');
             }
           }
         }
@@ -2315,7 +2324,7 @@
     const TILE_DESC = {
       water:"open water",
       river:"a running river",
-      sand:"warm sand",
+      sand:"sand",
       grass:"a grassy field",
       forest:"dense forest",
       hill:"a rugged hill",
