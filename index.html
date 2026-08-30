@@ -41,6 +41,7 @@
 - move stats in backpack to bottom, add achievments to these stats (killed monsters, strongest monster killed)
 - finish mysteriando
 - grave should have transparent bg
+- discovering edge of the map without fighting anyone grants additional 100xp pacifist bonus
  -->
 
 <!DOCTYPE html>
@@ -445,6 +446,11 @@
     <div class="overlay" id="mapOverlay">
       <div class="panelbox">
         <h2>World Map</h2><button class="slbtn overlay-close" id="btnMapClose" type="button" aria-label="Close map">✕</button>
+        <div style="display:flex;justify-content:center;gap:6px;margin:0 0 6px 0;">
+          <button class="slbtn" id="btnMapZoomOut" type="button" aria-label="Zoom out">−</button>
+          <button class="slbtn" id="btnMapZoomReset" type="button">Reset Zoom</button>
+          <button class="slbtn" id="btnMapZoomIn" type="button" aria-label="Zoom in">+</button>
+        </div>
         <canvas id="minimap"></canvas>
         <div class="closehint">
           <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
@@ -2903,6 +2909,10 @@
     // that scrolls with the player, so it needs its own (larger) tile scale.
     const MAP_SCALE = 3;
     const SIDE_SCALE = 4;
+    const MAP_ZOOMS = [1, 1.5, 2, 3, 4];
+    let mapZoomIndex = 0;
+    let mapPanX = null, mapPanY = null;
+
     const SIDE_VIEW_W = 61, SIDE_VIEW_H = 41;
     const MINI_SCALES = [MAP_SCALE, SIDE_SCALE];
     mini.width = MAP_W*MAP_SCALE; mini.height = MAP_H*MAP_SCALE;
@@ -2951,27 +2961,43 @@
     // world map, a player-centred clamped offset for the zoomed side minimap).
     function renderMinimapCanvas(ctx, scale, originX, originY, showMapPlayer){
       ensureMiniBases();
-      const ox = originX || 0, oy = originY || 0;
       const w = ctx.canvas.width, h = ctx.canvas.height;
       ctx.clearRect(0, 0, w, h);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, w, h, 0, 0, w, h);
-      const dot = Math.max(2, scale+2);
-      ctx.fillStyle = '#ffe08a';
-      ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
       if(showMapPlayer){
-        const px = (player.x-ox)*scale + scale/2;
-        const py = (player.y-oy)*scale + scale/2;
+        const zoom = MAP_ZOOMS[mapZoomIndex];
+        const viewW = w / (scale * zoom);
+        const viewH = h / (scale * zoom);
+        if(mapPanX===null || mapPanY===null){ mapPanX = player.x; mapPanY = player.y; }
+        const ox = Math.max(0, Math.min(MAP_W - viewW, mapPanX - viewW/2));
+        const oy = Math.max(0, Math.min(MAP_H - viewH, mapPanY - viewH/2));
+        ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, viewW*scale, viewH*scale, 0, 0, w, h);
+        if(discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
+          const tx = (spawnPoint.x-ox)*scale*zoom + scale*zoom/2;
+          const ty = (spawnPoint.y-oy)*scale*zoom + scale*zoom/2;
+          ctx.fillStyle = 'purple';
+          ctx.font = `${Math.max(12, scale*5)*zoom}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('☦', tx, ty);
+        }
+        const px = (player.x-ox)*scale*zoom + scale*zoom/2;
+        const py = (player.y-oy)*scale*zoom + scale*zoom/2;
         const pulse = 1 + Math.sin(performance.now()/180)*0.18;
-        const radius = Math.max(4, scale*1.8)*pulse;
+        const radius = Math.max(5, scale*1.8)*zoom*pulse;
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI*2);
         ctx.fillStyle = '#e0473f';
         ctx.fill();
-      }else{
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
+        return;
       }
+      const ox = originX || 0, oy = originY || 0;
+      ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, w, h, 0, 0, w, h);
+      const dot = Math.max(2, scale+2);
+      ctx.fillStyle = '#ffe08a';
+      ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
     }
     function sideMiniOrigin(){
       return {
@@ -3594,6 +3620,87 @@
     document.getElementById('btnTradeClose').addEventListener('click', ()=>{
       toggleTrade(false);
     });
+    document.getElementById('btnMapZoomOut').addEventListener('click', ()=>{
+      if(mapZoomIndex<=0) return;
+      mapZoomIndex--;
+      renderMinimap();
+    });
+    document.getElementById('btnMapZoomIn').addEventListener('click', ()=>{
+      if(mapZoomIndex>=MAP_ZOOMS.length-1) return;
+      mapZoomIndex++;
+      renderMinimap();
+    });
+    document.getElementById('btnMapZoomReset').addEventListener('click', ()=>{
+      mapZoomIndex=0;
+      mapPanX=player.x; mapPanY=player.y;
+      renderMinimap();
+    });
+    mini.style.touchAction = 'none';
+    mini.addEventListener('wheel', (ev)=>{
+      if(!mapOpen) return;
+      ev.preventDefault();
+      if(ev.deltaY<0 && mapZoomIndex<MAP_ZOOMS.length-1) mapZoomIndex++;
+      else if(ev.deltaY>0 && mapZoomIndex>0) mapZoomIndex--;
+      renderMinimap();
+    }, {passive:false});
+    let mapPinchStartDist = null;
+    let mapDragLastX = null, mapDragLastY = null;
+    let mapDragMoved = false;
+    mini.addEventListener('mousedown', (ev)=>{
+      if(!mapOpen || ev.button!==0) return;
+      mapDragLastX=ev.clientX; mapDragLastY=ev.clientY; mapDragMoved=false;
+      mini.style.cursor='grabbing';
+      ev.preventDefault();
+    });
+    window.addEventListener('mousemove', (ev)=>{
+      if(!mapOpen || mapDragLastX===null || mapPinchStartDist!==null) return;
+      const zoom=MAP_ZOOMS[mapZoomIndex], scale=MAP_SCALE;
+      const dx=ev.clientX-mapDragLastX, dy=ev.clientY-mapDragLastY;
+      if(Math.abs(dx)+Math.abs(dy)>1) mapDragMoved=true;
+      mapPanX -= dx/(scale*zoom); mapPanY -= dy/(scale*zoom);
+      mapDragLastX=ev.clientX; mapDragLastY=ev.clientY;
+      renderMinimap();
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(mapDragLastX!==null) mini.style.cursor='';
+      mapDragLastX=null; mapDragLastY=null;
+    });
+    mini.addEventListener('touchstart', (ev)=>{
+      if(!mapOpen) return;
+      if(ev.touches.length===2){
+        mapDragLastX=null; mapDragLastY=null;
+        mapPinchStartDist = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+      } else if(ev.touches.length===1){
+        mapDragLastX=ev.touches[0].clientX; mapDragLastY=ev.touches[0].clientY; mapDragMoved=false;
+      }
+    }, {passive:false});
+    mini.addEventListener('touchmove', (ev)=>{
+      if(!mapOpen) return;
+      if(ev.touches.length===2 && mapPinchStartDist!==null){
+        const dist = Math.hypot(ev.touches[0].clientX-ev.touches[1].clientX, ev.touches[0].clientY-ev.touches[1].clientY);
+        if(Math.abs(dist-mapPinchStartDist)>35){
+          if(dist>mapPinchStartDist && mapZoomIndex<MAP_ZOOMS.length-1) mapZoomIndex++;
+          else if(dist<mapPinchStartDist && mapZoomIndex>0) mapZoomIndex--;
+          mapPinchStartDist=dist;
+          renderMinimap();
+        }
+        ev.preventDefault();
+        return;
+      }
+      if(ev.touches.length===1 && mapDragLastX!==null){
+        const zoom=MAP_ZOOMS[mapZoomIndex], scale=MAP_SCALE;
+        const dx=ev.touches[0].clientX-mapDragLastX, dy=ev.touches[0].clientY-mapDragLastY;
+        if(Math.abs(dx)+Math.abs(dy)>1) mapDragMoved=true;
+        mapPanX -= dx/(scale*zoom); mapPanY -= dy/(scale*zoom);
+        mapDragLastX=ev.touches[0].clientX; mapDragLastY=ev.touches[0].clientY;
+        renderMinimap();
+        ev.preventDefault();
+      }
+    }, {passive:false});
+    mini.addEventListener('touchend', (ev)=>{
+      if(ev.touches.length<2) mapPinchStartDist=null;
+      if(ev.touches.length===0){ mapDragLastX=null; mapDragLastY=null; }
+    }, {passive:false});
     document.getElementById('tradeOverlay').addEventListener('click', (ev)=>{
       if(ev.target.id === 'tradeOverlay') toggleTrade(false);
     });
@@ -3624,7 +3731,7 @@
     function toggleMap(force){
       mapOpen = (force!==undefined) ? force : !mapOpen;
       document.getElementById('mapOverlay').classList.toggle('show', mapOpen);
-      if(mapOpen) renderMinimap();
+      if(mapOpen){ mapPanX = player.x; mapPanY = player.y; renderMinimap(); }
       updateTouchControlsVisibility();
     }
     window.addEventListener('keydown', (ev)=>{
