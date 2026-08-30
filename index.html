@@ -215,7 +215,7 @@
       }
       .overlay-close{
           position:absolute; top:8px; right:10px; width:28px; height:28px;
-          padding:0 !important; font-size:18px; line-height:20px; text-align:center;
+          padding:0; font-size:18px; line-height:26px; text-align:center;
       }
       .panelbox h2{
           font-family:Georgia,serif; font-variant:small-caps; letter-spacing:2px;
@@ -674,7 +674,7 @@
       village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
       // Part of the temple grounds - the bell tower. Its bell is missing.
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
-      // A lone grave, kept near the Gravedigger.
+      // A lone grave marker, kept near the Gravedigger.
       grave:    {ch:'\u2020', color:'#c9c9c9', bg:'#12120f', walk:true},
       // A lore landmark: a huge brass bell, too heavy to carry off, guarded
       // by a pair of brutes near the mountains.
@@ -1671,9 +1671,11 @@
 
     async function playerAttackEnemy(e){
       const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists';
+      updateMobileInfoPanel(e.x,e.y);
       await animateAttackLunge(player.x, player.y, e.x, e.y);
       if(chance(missChance(playerSpd(), e.spd))){
         log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad');
+        updateMobileInfoPanel(e.x,e.y);
         return;
       }
       const dmg = damageRoll(playerAtk(), e.def);
@@ -1681,6 +1683,9 @@
       log(`You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
       if(e.hp <= 0){
         killEnemy(e);
+        updateMobileInfoPanel(e.x,e.y);
+      } else {
+        updateMobileInfoPanel(e.x,e.y);
       }
     }
     function enemyAttackPlayer(e){
@@ -2198,6 +2203,7 @@
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
+        if(mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.';
       }
       enemyTurn();
       npcTurn();
@@ -2225,7 +2231,7 @@
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
       village:"a small hut, part of a village",
       belltower:"the Temple's bell tower - the bell itself seems to be missing",
-      grave:"a lone grave, it is not finished and has no inscription",
+      grave:"a lone grave marker, it is not finished and has no inscription",
       bigbell:"a big brass bell, far too heavy to carry",
     };
     const LOOK_DIRS = [
