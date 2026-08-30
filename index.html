@@ -142,7 +142,7 @@
       @keyframes flicker{
           0%,100%{opacity:1;} 50%{opacity:0.88;}
       }
-      canvas{display:block;}
+      canvas{display:block;cursor:pointer}
       #logpanel{
           width:640px; max-width:92vw;
           height:135px;
@@ -1760,6 +1760,7 @@
       if(deathTransition) return;
       player.deaths++;
       pendingMove = null;
+      clearAutoPath();
       const deathLogId = log(`You have fallen... and awaken at the Temple.`, 'bad');
       stopCameraAnimation();
       clearEnemyAnims();
@@ -2131,11 +2132,72 @@
     // continuous - without it every input during the 140ms pan is dropped, which
     // reads as stuttering.
     let pendingMove = null;
+    let autoPath = null;
     function flushPendingMove(){
+      if(autoPath && autoPath.length){
+        const next = autoPath.shift();
+        if(!next || Math.abs(next.x-player.x)>1 || Math.abs(next.y-player.y)>1 || (next.x===player.x && next.y===player.y)){
+          clearAutoPath();
+          return;
+        }
+        tryMove(next.x-player.x, next.y-player.y);
+        return;
+      }
       if(!pendingMove) return;
       const next = pendingMove;
       pendingMove = null;
       tryMove(next.dx, next.dy);
+    }
+    function clearAutoPath(){
+      autoPath = null;
+    }
+    function findPlayerPath(targetX, targetY){
+      if(targetX<0 || targetY<0 || targetX>=MAP_W || targetY>=MAP_H) return null;
+      if(!isWalkable(targetX,targetY)) return null;
+      if(targetX===player.x && targetY===player.y) return [];
+      const queue = [{x:player.x,y:player.y}];
+      const cameFrom = new Map();
+      cameFrom.set(keyXY(player.x,player.y), null);
+      let found = false;
+      while(queue.length){
+        const cur = queue.shift();
+        if(cur.x===targetX && cur.y===targetY){ found=true; break; }
+        for(const [dx,dy] of DIRS8){
+          const nx=cur.x+dx, ny=cur.y+dy;
+          if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H) continue;
+          if(!isWalkable(nx,ny)) continue;
+          const nk=keyXY(nx,ny);
+          if(cameFrom.has(nk)) continue;
+          if((nx!==targetX || ny!==targetY) && occupied.has(nk)) continue;
+          if((nx!==targetX || ny!==targetY) && npcs.some(n=>n.x===nx && n.y===ny)) continue;
+          cameFrom.set(nk, cur);
+          queue.push({x:nx,y:ny});
+        }
+      }
+      if(!found) return null;
+      const tiles=[];
+      let cur={x:targetX,y:targetY};
+      while(cur.x!==player.x || cur.y!==player.y){
+        tiles.push(cur);
+        cur=cameFrom.get(keyXY(cur.x,cur.y));
+      }
+      tiles.reverse();
+      const steps=[];
+      let fromX=player.x, fromY=player.y;
+      for(const tile of tiles){
+        steps.push({dx:tile.x-fromX,dy:tile.y-fromY,x:tile.x,y:tile.y});
+        fromX=tile.x;
+        fromY=tile.y;
+      }
+      return steps;
+    }
+    function startAutoPath(targetX, targetY){
+      const path=findPlayerPath(targetX,targetY);
+      if(!path || !path.length) return false;
+      clearAutoPath();
+      autoPath=path;
+      flushPendingMove();
+      return true;
     }
     // Low-odds ambush: walking onto forest ground has a small chance of
     // startling a low-tier forest creature out of hiding onto a neighboring
@@ -2186,6 +2248,7 @@
       const ek = keyXY(nx,ny);
       const target = enemies.find(e=>e.x===nx && e.y===ny && e.alive);
       if(target){
+        clearAutoPath();
         await playerAttackEnemy(target);
         enemyTurn();
         npcTurn();
@@ -2195,6 +2258,7 @@
       }
       const npcTarget = npcs.find(n=>n.x===nx && n.y===ny);
       if(npcTarget){
+        clearAutoPath();
         log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info');
         enemyTurn();
         npcTurn();
@@ -2218,6 +2282,8 @@
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
         if(mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.';
+      } else if(autoPath){
+        clearAutoPath();
       }
       enemyTurn();
       npcTurn();
@@ -2656,6 +2722,15 @@
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         drawCreature(vx,vy,n.name[0], '#ffffff');
       }
+      // planned movement path
+      if(autoPath && autoPath.length){
+        for(const step of autoPath){
+          const pvx = Math.round((step.x-camX) * TILE_PX);
+          const pvy = Math.round((step.y-camY) * TILE_PX);
+          ctx.fillStyle = 'rgba(255,224,138,0.28)';
+          ctx.fillRect(pvx+TILE_PX*0.25,pvy+TILE_PX*0.25,TILE_PX*0.5,TILE_PX*0.5);
+        }
+      }
       // player
       {
         let px = viewPlayerX;
@@ -2831,13 +2906,20 @@
       if(hoveredEnemy){ hoveredEnemy=null; render(); }
     });
     function handleCanvasTap(clientX, clientY){
-      if(mapOpen || invOpen || tradeOpen) return;
+      if(mapOpen || invOpen || tradeOpen || cameraAnimating || attackAnim) return;
       const p = canvasEventToBufferXY(clientX, clientY);
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX);
       const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
       updateMobileInfoPanel(mx,my);
       const n = npcs.find(np=>np.x===mx && np.y===my);
-      if(n) tryOpenTrade(n);
+      if(n){ clearAutoPath(); tryOpenTrade(n); return; }
+      const e = enemies.find(en=>en.alive && en.x===mx && en.y===my);
+      if(e){ clearAutoPath(); return; }
+      if(startAutoPath(mx,my)){
+        lastMousePx=null; lastMousePy=null;
+        tooltip.style.display='none';
+        if(hoveredEnemy){ hoveredEnemy=null; render(); }
+      }
     }
     canvas.addEventListener('click', (ev)=>{
       handleCanvasTap(ev.clientX, ev.clientY);
@@ -3555,6 +3637,7 @@
       const key = k.length===1 ? k.toLowerCase() : k;
       if(moves[key]){
         ev.preventDefault();
+        clearAutoPath();
         tryMove(moves[key][0], moves[key][1]);
       }
     });
@@ -3578,8 +3661,8 @@
        updateTouchControlsVisibility(). */
     document.querySelectorAll('.dpad button[data-dx]').forEach(btn=>{
       const dx = parseInt(btn.dataset.dx, 10), dy = parseInt(btn.dataset.dy, 10);
-      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryMove(dx,dy); });
-      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryMove(dx,dy); });
+      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen){ clearAutoPath(); tryMove(dx,dy); } });
+      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen){ clearAutoPath(); tryMove(dx,dy); } });
     });
     const touchSpaceBtn = document.getElementById('touchSpace');
     const touchForageBtn = document.getElementById('touchForage');
