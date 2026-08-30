@@ -600,6 +600,7 @@
     }
 
     function generateMap(){
+      shuffleTombstoneOrder();
       const elevFns = [makeNoise(6,4), makeNoise(14,10), makeNoise(30,22)];
       const elevW = [0.55,0.3,0.15];
       const moistFns = [makeNoise(5,5), makeNoise(16,16)];
@@ -1167,20 +1168,33 @@
       if(announce) log(`You automatically equip the ${item.name}.${statDeltaText(before)}`, 'good');
       return true;
     }
-    // Only four Mysterious Tombstones exist in the entire world - each bears a
-    // single line of the same fractured inscription, revealed one piece at a time.
-    let tombstonesRemaining = 4;
+    // Only six Mysterious Tombstones exist in the entire world - each bears a
+    // single line of the same fractured inscription, revealed in a random order
+    // per world so the story can't be inferred from drop order alone.
+    let tombstonesRemaining = 6;
     const TOMBSTONE_INSCRIPTIONS = [
       "The king never walked upon the earth.",
       "He climbed the mountain alone, and returned wearing a crown no smith had forged.",
       "Three nights later, the priests declared that the gods had chosen him.",
       "He was not chosen. He was shown.",
+      "To hear the ring is to live again.",
+      "A monarch is born noble. Why would he need to climb?",
     ];
+    let tombstoneOrder = TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
+    function shuffleTombstoneOrder(){
+      const order = TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
+      for(let i=order.length-1;i>0;i--){
+        const j = Math.floor(rng()*(i+1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      tombstoneOrder = order;
+    }
     function maybeDropTombstone(e){
       if(tombstonesRemaining <= 0) return false;
       if(e.baseName !== 'Lich') return false;
       if(!chance(0.8)) return false;
-      const inscription = TOMBSTONE_INSCRIPTIONS[TOMBSTONE_INSCRIPTIONS.length - tombstonesRemaining];
+      const slot = TOMBSTONE_INSCRIPTIONS.length - tombstonesRemaining;
+      const inscription = TOMBSTONE_INSCRIPTIONS[tombstoneOrder[slot]];
       tombstonesRemaining--;
       player.inventory.push({kind:'tombstone', name:'Mysterious Tombstone', inscription});
       log(`The ${e.name} dropped a Mysterious Tombstone.`, 'loot');
@@ -2503,6 +2517,7 @@
         })),
         groundItems: groundItems.map(g=>({...g})),
         tombstonesRemaining: tombstonesRemaining,
+        tombstoneOrder: tombstoneOrder,
       };
     }
 
@@ -2562,7 +2577,8 @@
       player.inventory = (data.player && data.player.inventory) || [];
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
-      tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : 4;
+      tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
+      tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
 
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
