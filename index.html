@@ -817,9 +817,15 @@
 
     let villageCenter = null;
     function placeVillage(){
-      // Find a grass/hill clearing just outside the temple grounds, then grow
-      // a small blob of hut tiles outward from it so it reads as a loose
-      // little settlement right next door.
+      // Find a clearing just outside the temple grounds, then grow a small
+      // blob of hut tiles outward from it so it reads as a loose little
+      // settlement right next door. Forest counts as buildable ground too -
+      // a village simply clears the trees it needs, so dense woods around
+      // the temple no longer block it from appearing at all.
+      function buildable(x,y){
+        const t = map[y][x];
+        return t==='grass' || t==='hill' || t==='forest';
+      }
       function findCenter(){
         for(let r=3; r<=15; r+=2){
           for(let tries=0; tries<20; tries++){
@@ -827,7 +833,19 @@
             const x = Math.round(spawnPoint.x + Math.cos(ang)*r);
             const y = Math.round(spawnPoint.y + Math.sin(ang)*r);
             if(x<4||y<4||x>=MAP_W-4||y>=MAP_H-4) continue;
-            if(map[y][x] !== 'grass' && map[y][x] !== 'hill') continue;
+            if(!buildable(x,y)) continue;
+            return {x,y};
+          }
+        }
+        // Fallback: widen the search a lot further out so a village always
+        // finds somewhere to stand, even in heavily forested/mountainous seeds.
+        for(let r=17; r<=60; r+=3){
+          for(let tries=0; tries<30; tries++){
+            const ang = rng()*Math.PI*2;
+            const x = Math.round(spawnPoint.x + Math.cos(ang)*r);
+            const y = Math.round(spawnPoint.y + Math.sin(ang)*r);
+            if(x<4||y<4||x>=MAP_W-4||y>=MAP_H-4) continue;
+            if(!buildable(x,y)) continue;
             return {x,y};
           }
         }
@@ -846,7 +864,7 @@
         if(dx===0 && dy===0) continue;
         const x = base.x+dx, y = base.y+dy;
         if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
-        if(map[y][x] !== 'grass' && map[y][x] !== 'hill') continue;
+        if(!buildable(x,y)) continue;
         if(huts.some(h=>h.x===x && h.y===y)) continue;
         huts.push({x,y});
       }
