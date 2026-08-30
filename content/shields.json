@@ -1,0 +1,5 @@
+[
+  {"name":"Buckler",      "def":1, "tier":1},
+  {"name":"Round Shield", "def":3, "tier":2},
+  {"name":"Tower Shield", "def":6, "tier":4}
+]

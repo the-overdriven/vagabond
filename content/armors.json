@@ -1,0 +1,14 @@
+[
+  {"name":"Robe",            "def":1,  "tier":1},
+  {"name":"Jacket",          "def":1,  "tier":1},
+  {"name":"Cape",            "def":1,  "tier":1},
+  {"name":"Tunic",           "def":2,  "tier":1},
+  {"name":"Leather Armor",   "def":3,  "tier":2},
+  {"name":"Studded Leather", "def":4,  "tier":2},
+  {"name":"Chain Mail",      "def":5,  "tier":3},
+  {"name":"Brass Armor",     "def":6,  "tier":3},
+  {"name":"Splint Mail",     "def":7,  "tier":3},
+  {"name":"Scale Armor",     "def":8,  "tier":4},
+  {"name":"Plate Mail",      "def":10, "tier":4},
+  {"name":"Ancient Armor",   "def":12, "tier":5}
+]
