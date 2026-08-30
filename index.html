@@ -335,9 +335,15 @@
           #invOverlay .panelbox, #mapOverlay .panelbox{
               width:100%; max-width:none; height:100%; max-height:none;
               min-height:100%; box-sizing:border-box; border-radius:0;
-              overflow-y:auto;
+              overflow-y:auto; padding-bottom:140px;
+          }
+          body.overlay-open #logpanel{
+              position:fixed; left:0; bottom:0; z-index:110;
+              width:100%; max-width:none; height:120px; box-sizing:border-box;
+              border-radius:0; margin:0;
           }
           #mapOverlay .panelbox{width:100%;}
+          #invOverlay #statGrid{display:none;}
           #mobileInfoPanel{
               display:block; width:100%; max-width:100%; box-sizing:border-box;
               background:linear-gradient(180deg,var(--panel2),var(--panel));
@@ -667,7 +673,7 @@
       water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
       river:    {ch:'~', color:'#7fd0d8', bg:'#0e1f22', walk:true},
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
-      grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
+      grass:    {ch:'.', color:'#7fae55', bg:'#c9d98a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
@@ -3506,7 +3512,9 @@
     function updateTouchControlsVisibility(){
       const tc = document.getElementById('touchControls');
       if(!tc) return;
-      tc.style.display = (invOpen || mapOpen || tradeOpen) ? 'none' : '';
+      const overlayOpen = invOpen || mapOpen || tradeOpen;
+      tc.style.display = overlayOpen ? 'none' : '';
+      document.body.classList.toggle('overlay-open', overlayOpen);
     }
     function toggleInv(force){
       invOpen = (force!==undefined) ? force : !invOpen;
