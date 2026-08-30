@@ -1922,16 +1922,24 @@
     function isStackableKind(kind){
       return kind==='potion' || kind==='scroll' || kind==='speedpotion' || kind==='herb' || kind==='mushroom';
     }
-    // Foraging: pressing F while standing on forest ground gives a chance to
-    // scrounge up something to eat. Not every tile yields anything - most
-    // presses turn up nothing of note.
+    // Foraging: pressing F while standing on forest ground gives a small
+    // chance to scrounge up something to eat. Each tile can only be
+    // searched once - repeating it just confirms it's already been picked
+    // over, so players can't farm the same spot for infinite herbs.
+    let foragedTiles = new Set();
     function tryForage(){
       if(map[player.y][player.x] !== 'forest') return;
+      const key = keyXY(player.x, player.y);
+      if(foragedTiles.has(key)){
+        log('You already searched here.', 'info');
+        return;
+      }
+      foragedTiles.add(key);
       const roll = rng();
-      if(roll < 0.25){
+      if(roll < 0.15){
         addHerb();
         log('You search through the undergrowth and find a Healing Herb.', 'loot');
-      } else if(roll < 0.40){
+      } else if(roll < 0.25){
         addMushroom();
         log('You search through the undergrowth and find a Mushroom.', 'loot');
       } else {
@@ -3132,6 +3140,7 @@
         tombstonesRemaining: tombstonesRemaining,
         tombstoneOrder: tombstoneOrder,
         merchantStock: merchantStock,
+        foragedTiles: [...foragedTiles],
       };
     }
 
@@ -3214,6 +3223,7 @@
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];
+      foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : []);
 
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
@@ -3357,6 +3367,7 @@
       rebuildMinimapBases();
       player.x = spawnPoint.x; player.y = spawnPoint.y;
       player.hp = playerMaxHp();
+      foragedTiles = new Set();
       spawnEnemies();
       spawnBellGuardians();
       spawnGroundStuff();
