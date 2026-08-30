@@ -295,6 +295,8 @@
       #tooltip .crit{margin:0 0 4px; font-size:10px; letter-spacing:0.5px; color:#e0473f;}
       #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
       #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
+      #tooltip.mini{width:auto; padding:4px 8px;}
+      #tooltip.mini .nm{margin-bottom:0;}
   </style>
 </head>
 <body>
@@ -2008,6 +2010,9 @@
 
     const tooltip = document.getElementById('tooltip');
     function slug(name){ return name.toLowerCase().replace(/\s+/g,'_'); }
+    function groundItemLabel(g){
+      return g.kind==='chest' ? 'Chest' : 'Item';
+    }
     let lastMousePx = null, lastMousePy = null;
     function updateTooltip(){
       if(lastMousePx===null) return;
@@ -2028,6 +2033,7 @@
         const critHtml = e.crit
           ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
           : '';
+        tooltip.classList.remove('mini');
         tooltip.innerHTML = `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
       <div class="nm tier${e.tier}">${e.name}</div>
@@ -2036,6 +2042,15 @@
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
       <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
       <span style="color:#e0473f;opacity:0.7">Aggro range ${aggroRange}</span>`;
+        tooltip.style.left = (lastMousePx+16)+'px';
+        tooltip.style.top = (lastMousePy+16)+'px';
+        tooltip.style.display = 'block';
+        return;
+      }
+      const g = groundItems.find(gi=>gi.x===mx && gi.y===my && !(gi.kind==='chest' && gi.opened));
+      if(g){
+        tooltip.classList.add('mini');
+        tooltip.innerHTML = `<div class="nm">${groundItemLabel(g)}</div>`;
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
