@@ -3235,6 +3235,11 @@
           nm.className='nm '+cls;
           nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
           row.appendChild(nm);
+          const btn = document.createElement('button');
+          const buyValue = itemSellValue(it) * 2;
+          btn.textContent = 'Buy for '+buyValue+'g';
+          btn.onclick = ()=>{ buyItem(it); };
+          row.appendChild(btn);
           buyList.appendChild(row);
         });
       }
@@ -3265,6 +3270,30 @@
         row.appendChild(btn);
         list.appendChild(row);
       });
+    }
+    function buyItem(it){
+      if(!it) return;
+      const value = itemSellValue(it) * 2;
+      if(value<=0 || player.gold<value) return;
+      const stackable = isStackableKind(it.kind);
+      if(stackable){
+        const existing = player.inventory.find(i=>i.kind===it.kind && i.name===it.name);
+        if(existing) existing.count = (existing.count||1)+1;
+        else player.inventory.push({...it, count:1});
+        it.count = (it.count||1)-1;
+        if(it.count<=0){
+          const idx = merchantStock.indexOf(it);
+          if(idx>=0) merchantStock.splice(idx,1);
+        }
+      } else {
+        const idx = merchantStock.indexOf(it);
+        if(idx<0) return;
+        merchantStock.splice(idx,1);
+        player.inventory.push({...it});
+      }
+      player.gold -= value;
+      log(`You buy the ${it.name} for ${value} gold.`, 'good');
+      updateHud(); renderTrade(); renderInventory();
     }
     function sellItem(idx){
       const it = player.inventory[idx];
