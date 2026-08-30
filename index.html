@@ -207,10 +207,15 @@
           border:1px solid var(--border);
           border-radius:6px;
           padding:16px 20px;
+          position:relative;
           width:590px; max-width:94%;
           max-height:90%;
           overflow-y:auto;
           box-shadow:0 0 40px rgba(0,0,0,0.8);
+      }
+      .overlay-close{
+          position:absolute; top:8px; right:10px; width:28px; height:28px;
+          padding:0 !important; font-size:18px; line-height:20px; text-align:center;
       }
       .panelbox h2{
           font-family:Georgia,serif; font-variant:small-caps; letter-spacing:2px;
@@ -401,7 +406,7 @@
     <div id="tooltip"></div>
     <div class="overlay" id="invOverlay">
       <div class="panelbox">
-        <h2>Character</h2>
+        <h2>Character</h2><button class="slbtn overlay-close" id="btnInvClose" type="button" aria-label="Close inventory">✕</button>
         <div class="paperdoll">
           <div class="slot" id="slotWeapon"><div class="label">🗡️ Weapon</div><div class="val">-</div></div>
           <div class="slot" id="slotShield"><div class="label">🛡️ Shield</div><div class="val">-</div></div>
@@ -426,7 +431,7 @@
     </div>
     <div class="overlay" id="mapOverlay">
       <div class="panelbox">
-        <h2>World Map</h2>
+        <h2>World Map</h2><button class="slbtn overlay-close" id="btnMapClose" type="button" aria-label="Close map">✕</button>
         <canvas id="minimap"></canvas>
         <div class="closehint">
           <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
@@ -651,7 +656,7 @@
       water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
       river:    {ch:'~', color:'#7fd0d8', bg:'#0e1f22', walk:true},
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
-      grass:    {ch:'.', color:'#c9d98a', bg:'#2f7a3a', walk:true},
+      grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
@@ -3454,6 +3459,12 @@
     });
     document.getElementById('btnMapToInv').addEventListener('click', ()=>{
       toggleMap(false); toggleInv(true);
+    });
+    document.getElementById('btnInvClose').addEventListener('click', ()=>{
+      toggleInv(false);
+    });
+    document.getElementById('btnMapClose').addEventListener('click', ()=>{
+      toggleMap(false);
     });
     document.getElementById('btnSideMap').addEventListener('click', ()=>{
       toggleMap();
