@@ -2109,6 +2109,14 @@
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
+        return;
+      }
+      if(mx>=0 && my>=0 && mx<MAP_W && my<MAP_H && map[my][mx]==='blackpillar'){
+        tooltip.classList.add('mini');
+        tooltip.innerHTML = `<div class="nm">???</div>`;
+        tooltip.style.left = (lastMousePx+16)+'px';
+        tooltip.style.top = (lastMousePy+16)+'px';
+        tooltip.style.display = 'block';
       } else {
         tooltip.style.display = 'none';
       }
