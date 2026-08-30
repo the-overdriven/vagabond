@@ -393,6 +393,7 @@
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;<br>
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
+    <kbd>F</kbd> forage &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
     <kbd id="kbdCaps">CAPS</kbd> toggle enemy ranges &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
@@ -1321,16 +1322,19 @@
                              ],                                                                      free:false, portrait:"grave_digger"},
       {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
       {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
+      {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true},
     ];
     let npcs = [];
     function spawnNpcs(){
       npcs = [];
       for(const tmpl of NPC_TEMPLATES){
+        const origin = (tmpl.village && villageCenter) ? villageCenter : spawnPoint;
+        const spread = (tmpl.village && villageCenter) ? 6 : 8;
         let x,y,tries=0,dist=0;
         do{
-          x = randInt(Math.max(2,spawnPoint.x-8), Math.min(MAP_W-3,spawnPoint.x+8));
-          y = randInt(Math.max(2,spawnPoint.y-8), Math.min(MAP_H-3,spawnPoint.y+8));
-          dist = Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y));
+          x = randInt(Math.max(2,origin.x-spread), Math.min(MAP_W-3,origin.x+spread));
+          y = randInt(Math.max(2,origin.y-spread), Math.min(MAP_H-3,origin.y+spread));
+          dist = Math.max(Math.abs(x-origin.x), Math.abs(y-origin.y));
           tries++;
         } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
@@ -1884,6 +1888,37 @@
       const stack = player.inventory.find(i=>i.kind==='speedpotion');
       if(stack) stack.count = (stack.count||1)+1;
       else player.inventory.push({kind:'speedpotion', name:'Potion of Speed', count:1});
+    }
+    function addHerb(){
+      const stack = player.inventory.find(i=>i.kind==='herb');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'herb', name:'Healing Herb', count:1});
+    }
+    function addMushroom(){
+      const stack = player.inventory.find(i=>i.kind==='mushroom');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'mushroom', name:'Mushroom', count:1});
+    }
+    // Shared by inventory/trade rendering so every stackable consumable kind
+    // (potions, scrolls, foraged food, ...) is recognised in one place.
+    function isStackableKind(kind){
+      return kind==='potion' || kind==='scroll' || kind==='speedpotion' || kind==='herb' || kind==='mushroom';
+    }
+    // Foraging: pressing F while standing on forest ground gives a chance to
+    // scrounge up something to eat. Not every tile yields anything - most
+    // presses turn up nothing of note.
+    function tryForage(){
+      if(map[player.y][player.x] !== 'forest') return;
+      const roll = rng();
+      if(roll < 0.25){
+        addHerb();
+        log('You search through the undergrowth and find a Healing Herb.', 'loot');
+      } else if(roll < 0.40){
+        addMushroom();
+        log('You search through the undergrowth and find a Mushroom.', 'loot');
+      } else {
+        log('You search through the undergrowth but find nothing of use.', 'info');
+      }
     }
     function checkGroundAt(x,y){
       for(let i=groundItems.length-1;i>=0;i--){
@@ -2826,7 +2861,7 @@
         const line = itemStatLine(it);
         const nm = document.createElement('span');
         nm.className='nm '+cls;
-        const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+        const stackable = isStackableKind(it.kind);
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const prefix = isBest ? '✅ ' : '';
         nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
@@ -2840,6 +2875,16 @@
           const btn = document.createElement('button');
           btn.textContent = 'Drink';
           btn.onclick = ()=>{ useSpeedPotion(idx); };
+          row.appendChild(btn);
+        } else if(it.kind==='herb'){
+          const btn = document.createElement('button');
+          btn.textContent = 'Eat';
+          btn.onclick = ()=>{ useHerb(idx); };
+          row.appendChild(btn);
+        } else if(it.kind==='mushroom'){
+          const btn = document.createElement('button');
+          btn.textContent = 'Eat';
+          btn.onclick = ()=>{ useMushroom(idx); };
           row.appendChild(btn);
         } else if(it.kind==='scroll'){
           const btn = document.createElement('button');
@@ -2863,7 +2908,7 @@
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
-    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15 };
+    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, herb:4, mushroom:3 };
     function itemSellValue(it){
       if(it.tier){
         let v = TIER_SELL_VALUE[it.tier] || 0;
@@ -2887,7 +2932,7 @@
           const row = document.createElement('div');
           row.className = 'invitem';
           const cls = it.tier ? tierColorClass(it.tier) : '';
-          const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+          const stackable = isStackableKind(it.kind);
           const countTag = stackable && it.count>1 ? ' x'+it.count : '';
           const nm = document.createElement('span');
           nm.className='nm '+cls;
@@ -2911,7 +2956,7 @@
         const row = document.createElement('div');
         row.className = 'invitem';
         const cls = it.tier ? tierColorClass(it.tier) : '';
-        const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+        const stackable = isStackableKind(it.kind);
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const nm = document.createElement('span');
         nm.className='nm '+cls;
@@ -2929,7 +2974,7 @@
       if(!it) return;
       const value = itemSellValue(it);
       if(value<=0) return;
-      const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+      const stackable = isStackableKind(it.kind);
       if(stackable){
         it.count = (it.count||1)-1;
         const existing = merchantStock.find(s=>s.kind===it.kind && s.name===it.name);
@@ -2992,6 +3037,31 @@
       if(it.count<=0) player.inventory.splice(idx,1);
       player.speedPotionTurns = 15;
       log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good');
+      updateHud(); renderInventory();
+    }
+    function useHerb(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='herb') return;
+      it.count = (it.count||1)-1;
+      if(it.count<=0) player.inventory.splice(idx,1);
+      const heal = Math.max(1, Math.round(playerMaxHp()*0.25));
+      player.hp = Math.min(playerMaxHp(), player.hp+heal);
+      log(`You eat the Healing Herb and recover ${heal} HP.`, 'good');
+      updateHud(); renderInventory();
+    }
+    function useMushroom(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='mushroom') return;
+      it.count = (it.count||1)-1;
+      if(it.count<=0) player.inventory.splice(idx,1);
+      const amt = Math.max(1, Math.round(playerMaxHp()*0.25));
+      if(chance(0.5)){
+        player.hp = Math.min(playerMaxHp(), player.hp+amt);
+        log(`You eat the Mushroom. It was edible! You recover ${amt} HP.`, 'good');
+      } else {
+        player.hp = Math.max(1, player.hp-amt);
+        log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad');
+      }
       updateHud(); renderInventory();
     }
     function readTombstone(idx){
@@ -3229,6 +3299,7 @@
       if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
       if(mapOpen || invOpen || tradeOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); describeSurroundings(); return; } // <-- added
+      if(k==='f' || k==='F'){ ev.preventDefault(); tryForage(); return; }
       const moves = {
 
         w:[0,-1], s:[0,1], a:[-1,0], d:[1,0],
