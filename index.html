@@ -981,6 +981,19 @@
         huts.push({x,y});
       }
       for(const h of huts) map[h.y][h.x] = 'village';
+      // Keep the woods from crowding right up against the settlement - clear
+      // a buffer ring around the huts so no forest tile sits directly next
+      // to (or inside) the village.
+      const clearRadius = 2;
+      for(const h of huts){
+        for(let dy=-clearRadius; dy<=clearRadius; dy++){
+          for(let dx=-clearRadius; dx<=clearRadius; dx++){
+            const x = h.x+dx, y = h.y+dy;
+            if(x<0||y<0||x>=MAP_W||y>=MAP_H) continue;
+            if(map[y][x] === 'forest') map[y][x] = 'grass';
+          }
+        }
+      }
     }
 
     function isWalkable(x,y){
@@ -1394,6 +1407,7 @@
             if(leash && Math.max(Math.abs(nx-n.homeX), Math.abs(ny-n.homeY)) > ENEMY_WANDER_RADIUS) continue;
             if(nx===player.x && ny===player.y) continue;
             if(!isWalkable(nx,ny)) continue;
+            if(map[ny][nx] === 'forest') continue;
             if(occupied.has(keyXY(nx,ny))) continue;
             options.push({x:nx, y:ny});
           }
