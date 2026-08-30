@@ -270,8 +270,9 @@
       }
       .slbtn:hover{background:var(--ember); color:#1a0f05;}
       #tradeOverlay .panelbox{width:min(80vw, 560px);}
-      .trade-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
-      .trade-head img{width:64px; height:64px; object-fit:cover; border:1px solid var(--border); border-radius:4px; background:#0a0705;}
+      .trade-cols{display:flex; gap:16px;}
+      .trade-col{flex:1; min-width:0;}
+      .trade-col .invlist{max-height:280px;}
 
 
       #tooltip{
@@ -365,17 +366,16 @@
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
         <h2>Trade with the Merchant</h2>
-        <div class="trade-head">
-          <img src="npc/merchant.jpg" onerror="this.style.display='none'">
-          <div>
-            <div style="color:var(--parchment-dim);font-size:11px;">Your Gold</div>
-            <div style="color:var(--ember-bright);font-size:16px;" id="tradeGold">0</div>
+        <div class="trade-cols">
+          <div class="trade-col">
+            <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">FOR SALE</b>
+            <div class="invlist" id="tradeBuyList"><div class="invitem"><span class="nm" style="color:var(--parchment-dim);">He has nothing to sell yet. Check back later.</span></div></div>
+          </div>
+          <div class="trade-col">
+            <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">YOUR ITEMS</b>
+            <div class="invlist" id="tradeSellList"></div>
           </div>
         </div>
-        <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">FOR SALE</b>
-        <div class="invlist" id="tradeBuyList"><div class="invitem"><span class="nm" style="color:var(--parchment-dim);">He has nothing to sell yet. Check back later.</span></div></div>
-        <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">YOUR ITEMS</b>
-        <div class="invlist" id="tradeSellList"></div>
         <div class="closehint">
           <button class="slbtn" id="btnTradeClose" type="button">Close</button>
         </div>
@@ -2424,7 +2424,8 @@
         tooltip.classList.remove('mini');
         tooltip.innerHTML = `
       <img src="npc/${n.portrait}.jpg" onerror="this.style.display='none'">
-      <div class="nm">${n.name}</div>`;
+      <div class="nm">${n.name}</div>
+      ${n.trades ? '<div style="color:var(--parchment-dim);font-size:10px;">Click to trade</div>' : ''}`;
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
@@ -2717,6 +2718,7 @@
       });
     }
     /* ============================== MERCHANT TRADE ============================== */
+    let merchantStock = [];
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
     const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15 };
     function itemSellValue(it){
@@ -2730,6 +2732,28 @@
     }
     function renderTrade(){
       document.getElementById('tradeGold').textContent = player.gold;
+
+      const buyList = document.getElementById('tradeBuyList');
+      buyList.innerHTML = '';
+      if(merchantStock.length===0){
+        const d = document.createElement('div');
+        d.className='invitem'; d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">He has nothing to sell yet. Check back later.</span>';
+        buyList.appendChild(d);
+      } else {
+        merchantStock.forEach((it)=>{
+          const row = document.createElement('div');
+          row.className = 'invitem';
+          const cls = it.tier ? tierColorClass(it.tier) : '';
+          const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+          const countTag = stackable && it.count>1 ? ' x'+it.count : '';
+          const nm = document.createElement('span');
+          nm.className='nm '+cls;
+          nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
+          row.appendChild(nm);
+          buyList.appendChild(row);
+        });
+      }
+
       const list = document.getElementById('tradeSellList');
       list.innerHTML = '';
       const sellable = [];
@@ -2762,8 +2786,17 @@
       if(!it) return;
       const value = itemSellValue(it);
       if(value<=0) return;
-      if(it.count && it.count>1){ it.count--; }
-      else { player.inventory.splice(idx,1); }
+      const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
+      if(stackable){
+        it.count = (it.count||1)-1;
+        const existing = merchantStock.find(s=>s.kind===it.kind && s.name===it.name);
+        if(existing) existing.count = (existing.count||1)+1;
+        else merchantStock.push({kind:it.kind, name:it.name, count:1});
+        if(it.count<=0) player.inventory.splice(idx,1);
+      } else {
+        player.inventory.splice(idx,1);
+        merchantStock.push(it);
+      }
       player.gold += value;
       log(`You sell the ${it.name} for ${value} gold.`, 'good');
       updateHud(); renderTrade(); renderInventory();
@@ -2867,6 +2900,7 @@
         npcs: npcs.map(n=>({name:n.name, x:n.x, y:n.y, homeX:n.homeX, homeY:n.homeY})),
         tombstonesRemaining: tombstonesRemaining,
         tombstoneOrder: tombstoneOrder,
+        merchantStock: merchantStock,
       };
     }
 
@@ -2938,6 +2972,7 @@
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
+      merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];
 
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
