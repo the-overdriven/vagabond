@@ -2016,6 +2016,45 @@
       pendingMove = null;
       tryMove(next.dx, next.dy);
     }
+    // Low-odds ambush: walking onto forest ground has a small chance of
+    // startling a low-tier forest creature out of hiding onto a neighboring
+    // forest tile, if one happens to be free nearby.
+    function maybeSpawnForestAmbush(x,y){
+      if(map[y][x] !== 'forest') return;
+      if(!chance(0.05)) return;
+      const candidates = [];
+      for(const [dx,dy] of DIRS8){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H) continue;
+        if(map[ny][nx] !== 'forest') continue;
+        if(!isWalkable(nx,ny)) continue;
+        if(occupied.has(keyXY(nx,ny))) continue;
+        candidates.push({x:nx,y:ny});
+      }
+      if(!candidates.length) return;
+      const templates = ENEMY_TEMPLATES.filter(t=>(t.tier===1||t.tier===2) && enemyBiomes(t).includes('forest'));
+      if(!templates.length) return;
+      const tmpl = pick(templates);
+      const spot = pick(candidates);
+      const variance = 0.95 + rng()*0.10;
+      const e = {
+        name: tmpl.name, tier: tmpl.tier,
+        hp: Math.max(1,Math.round(tmpl.hp*variance)),
+        atk: Math.max(1,Math.round(tmpl.atk*variance)),
+        def: Math.max(0,Math.round(tmpl.def*variance)),
+        spd: Math.max(1,Math.round(tmpl.spd*variance)),
+        fly: !!tmpl.fly,
+        aggro: tmpl.aggro ?? AGGRO_RANGE,
+        x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, alive:true, prefix:null,
+        aware:true,
+      };
+      e.maxHp = e.hp;
+      e.baseName = tmpl.name;
+      enemies.push(e);
+      occupied.add(keyXY(spot.x, spot.y));
+      log(`A ${e.name} rustles out from the trees nearby!`, 'bad');
+    }
+
     async function tryMove(dx,dy){
       if(mapOpen || invOpen || tradeOpen || deathTransition) return;
       if(cameraAnimating || attackAnim){
@@ -2055,6 +2094,7 @@
             log('The Temple restores your strength.', 'good');
           }
         }
+        maybeSpawnForestAmbush(nx,ny);
         moved = true;
       }
       enemyTurn();
