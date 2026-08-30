@@ -262,6 +262,7 @@
       }
       .invitem button:hover{background:var(--ember); color:#1a0f05;}
       .tier1{color:var(--t1);} .tier2{color:var(--t2);} .tier3{color:var(--t3);}
+      .enemy-tier2{color:#d98a3a;}
       .tier4{color:var(--t4);} .tier5{color:var(--t5);}
       .closehint{text-align:center; color:var(--parchment-dim); font-size:11px; margin-top:10px;}
 
@@ -302,6 +303,7 @@
       #tooltip .crit{margin:0 0 4px; font-size:10px; letter-spacing:0.5px; color:#e0473f;}
       #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
       #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
+      #mobileInfoPanel{display:none;}
       #tooltip.mini{width:auto; padding:4px 8px;}
       #tooltip.mini .nm{margin-bottom:0;}
 
@@ -325,7 +327,7 @@
               background:linear-gradient(180deg,var(--panel2),var(--panel));
               border:1px solid var(--border); border-radius:4px;
               padding:8px 10px; font-size:12px; color:var(--parchment-dim);
-              min-height:64px; flex:1;
+              min-height:64px; flex:1; min-width:0; overflow:hidden; overflow-wrap:anywhere;
           }
           #mobileInfoPanel img{
               width:48px; height:48px; object-fit:cover; border-radius:4px;
@@ -467,6 +469,7 @@
     <div id="touchActions">
       <button id="touchSpace">LOOK</button>
       <button id="touchForage">FORAGE</button>
+      <button id="touchInventory">INV</button>
     </div>
   </div>
   <div id="hint" style="">
@@ -648,7 +651,7 @@
       water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
       river:    {ch:'~', color:'#7fd0d8', bg:'#0e1f22', walk:true},
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
-      grass:    {ch:'.', color:'#6fae4a', bg:'#101a0c', walk:true},
+      grass:    {ch:'.', color:'#c9d98a', bg:'#2f7a3a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
@@ -1324,10 +1327,10 @@
           atk: Math.max(1,Math.round(tmpl.atk*variance)),
           def: Math.max(0,Math.round(tmpl.def*variance)),
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
-            fly: !!tmpl.fly,
-            aggro: tmpl.aggro ?? AGGRO_RANGE,
-            x, y, homeX:x, homeY:y, alive:true, prefix:null,
-          };
+          fly: !!tmpl.fly,
+          aggro: tmpl.aggro ?? AGGRO_RANGE,
+          x, y, homeX:x, homeY:y, alive:true, prefix:null,
+        };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
         if(chance(0.05)){
@@ -1859,7 +1862,7 @@
       // already carried the enemy beyond its leash - otherwise it could never move
       // again after giving up a pursuit.
       if(e.homeX === undefined || e.homeY === undefined ||
-         Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
+        Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
         e.homeX = e.x; e.homeY = e.y;
       }
       const options = [];
@@ -1868,7 +1871,7 @@
           if(dx===0 && dy===0) continue;
           const nx = e.x+dx, ny = e.y+dy;
           if(ENEMY_WANDER_LEASH &&
-             Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
+            Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
           if(nx===player.x && ny===player.y) continue;
           if(!enemyCanTraverse(e,nx,ny)) continue;
           if(occupied.has(keyXY(nx,ny))) continue;
@@ -2392,7 +2395,7 @@
     // (moves down).
     let fxAnims = [];
     const FX_ANIM_MS = 420;
-    const ENEMY_COLORS = {1:'#b8b8b8',2:'#57b35c',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
+    const ENEMY_COLORS = {1:'#b8b8b8',2:'#d98a3a',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
     function groundGlyph(g){
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
       if(g.kind==='potion') return {ch:'!', color:'#e0473f'};
@@ -2544,10 +2547,10 @@
         for(let vx=0; vx<=VIEW_W; vx++){
           const mx = Math.floor(camX)+vx, my = Math.floor(camY)+vy;
           if(mx<0||my<0||mx>=MAP_W||my>=MAP_H){
-           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX);
-           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX);
-           drawTile(px,py,'~',TILE.water.color,TILE.water.bg);
-           continue;
+            const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX);
+            const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX);
+            drawTile(px,py,'~',TILE.water.color,TILE.water.bg);
+            continue;
           }
           const t = TILE[map[my][mx]];
           const px = Math.round((mx-camX) * TILE_PX);
@@ -2735,12 +2738,11 @@
           : '';
         return { mini:false, enemy:e, html: `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
-      <div class="nm tier${e.tier}">${e.name}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
-      <span style="color:#e0473f">Attack range ${ATTACK_RANGE}</span><br>
-      <span style="color:#e0473f;opacity:0.7">Aggro range ${aggroRange}</span>` };
+      <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
       }
       const n = npcs.find(np=>np.x===mx && np.y===my);
       if(n){
@@ -3361,21 +3363,21 @@
       // tiles ended up in the restored map.
       villageCenter = null;
       outer:
-      for(let y=0; y<MAP_H; y++){
-        for(let x=0; x<MAP_W; x++){
-          if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
+        for(let y=0; y<MAP_H; y++){
+          for(let x=0; x<MAP_W; x++){
+            if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
+          }
         }
-      }
 
       // bigBellPos likewise isn't stored explicitly - recover it from the
       // restored map so the Drunk's rumor line still points the right way.
       bigBellPos = null;
       outer2:
-      for(let y=0; y<MAP_H; y++){
-        for(let x=0; x<MAP_W; x++){
-          if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
+        for(let y=0; y<MAP_H; y++){
+          for(let x=0; x<MAP_W; x++){
+            if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
+          }
         }
-      }
 
       Object.assign(player, data.player);
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
@@ -3390,13 +3392,13 @@
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
         return ({
-        name:e.name, baseName:e.baseName, tier:e.tier,
-        hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
-        aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
-        fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
-        x:e.x, y:e.y, alive:true,
-        prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
-      });
+          name:e.name, baseName:e.baseName, tier:e.tier,
+          hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
+          aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
+          fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
+          x:e.x, y:e.y, alive:true,
+          prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
+        });
       });
       occupied = new Set();
       for(const e of enemies) occupied.add(keyXY(e.x,e.y));
@@ -3548,6 +3550,7 @@
     });
     const touchSpaceBtn = document.getElementById('touchSpace');
     const touchForageBtn = document.getElementById('touchForage');
+    const touchInventoryBtn = document.getElementById('touchInventory');
     if(touchSpaceBtn){
       const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) describeSurroundings(); };
       touchSpaceBtn.addEventListener('touchstart', fn);
@@ -3557,6 +3560,11 @@
       const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryForage(); };
       touchForageBtn.addEventListener('touchstart', fn);
       touchForageBtn.addEventListener('click', fn);
+    }
+    if(touchInventoryBtn){
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !tradeOpen) toggleInv(); };
+      touchInventoryBtn.addEventListener('touchstart', fn);
+      touchInventoryBtn.addEventListener('click', fn);
     }
 
     /* ============================== INIT ============================== */
