@@ -587,9 +587,12 @@
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       // A lone grave marker, kept near the Gravedigger.
       grave:    {ch:'\u2020', color:'#c9c9c9', bg:'#12120f', walk:true},
+      // A lore landmark: a huge brass bell, too heavy to carry off, guarded
+      // by a pair of brutes near the mountains.
+      bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -802,8 +805,93 @@
       // A small village of huts, somewhere out in the walkable countryside -
       // not right on top of the temple, but not absurdly far either.
       placeVillage();
+
+      // Lore landmark: a huge brass bell in/next to the mountains, kept
+      // fairly close to the temple (map center), guarded by a pair of brutes.
+      placeBigBell();
     }
 
+    let bigBellPos = null;
+    const BELL_GUARD_EXCLUSION_RADIUS = 8;
+    const BELL_PILLAR_MIN_DIST = 20;
+    function placeBigBell(){
+      // Preferred: a mountain tile near the temple, right on the mountain's
+      // edge (bordering walkable ground) so the guards have room to stand.
+      function search(minR, maxR, requireEdge){
+        for(let r=minR; r<=maxR; r++){
+          for(let dy=-r; dy<=r; dy++){
+            for(let dx=-r; dx<=r; dx++){
+              if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+              const x = spawnPoint.x+dx, y = spawnPoint.y+dy;
+              if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
+              if(map[y][x] !== 'mountain') continue;
+              // Keep well clear of the black pillar - the two landmarks
+              // shouldn't spawn side by side.
+              if(blackPillarPos && Math.max(Math.abs(x-blackPillarPos.x), Math.abs(y-blackPillarPos.y)) < BELL_PILLAR_MIN_DIST) continue;
+              if(requireEdge){
+                let onEdge = false;
+                for(let ny=-1; ny<=1 && !onEdge; ny++){
+                  for(let nx=-1; nx<=1 && !onEdge; nx++){
+                    if(nx===0 && ny===0) continue;
+                    const t = map[y+ny] && map[y+ny][x+nx];
+                    if(t && TILE[t] && TILE[t].walk) onEdge = true;
+                  }
+                }
+                if(!onEdge) continue;
+              }
+              return {x,y};
+            }
+          }
+        }
+        return null;
+      }
+      // At least 20 tiles from the temple, but still "not too far from the
+      // center of the map" overall - widening/dropping the edge requirement
+      // only if the terrain nearby doesn't offer a clean mountain edge.
+      const spot = search(20,40,true) || search(20,60,true) || search(20,Math.max(MAP_W,MAP_H),false);
+      if(!spot) return;
+      map[spot.y][spot.x] = 'bigbell';
+      bigBellPos = spot;
+    }
+
+    function spawnBellGuardians(){
+      if(!bigBellPos) return;
+      const guardName = pick(['Ogre','Cyclops']);
+      const tmpl = ENEMY_TEMPLATES.find(t=>t.name===guardName);
+      if(!tmpl) return;
+      const candidates = [];
+      for(let dy=-1; dy<=1; dy++){
+        for(let dx=-1; dx<=1; dx++){
+          if(dx===0 && dy===0) continue;
+          const x = bigBellPos.x+dx, y = bigBellPos.y+dy;
+          if(x<0||y<0||x>=MAP_W||y>=MAP_H) continue;
+          if(!isWalkable(x,y)) continue;
+          if(occupied.has(keyXY(x,y))) continue;
+          candidates.push({x,y});
+        }
+      }
+      for(let i=0;i<2 && candidates.length;i++){
+        const idx = randInt(0,candidates.length-1);
+        const p = candidates.splice(idx,1)[0];
+        const variance = 0.95 + rng()*0.10;
+        const e = {
+          name: tmpl.name, tier: tmpl.tier,
+          hp: Math.max(1,Math.round(tmpl.hp*variance)),
+          atk: Math.max(1,Math.round(tmpl.atk*variance)),
+          def: Math.max(0,Math.round(tmpl.def*variance)),
+          spd: Math.max(1,Math.round(tmpl.spd*variance)),
+          fly: !!tmpl.fly,
+          aggro: tmpl.aggro ?? AGGRO_RANGE,
+          x:p.x, y:p.y, homeX:p.x, homeY:p.y, alive:true, prefix:null,
+        };
+        e.maxHp = e.hp;
+        e.baseName = tmpl.name;
+        enemies.push(e);
+        occupied.add(keyXY(p.x,p.y));
+      }
+    }
+
+    let blackPillarPos = null;
     function placeBlackPillar(){
       // Preferred: a mountain tile 15-45 tiles from the temple, right on the
       // mountain's edge (bordering walkable ground) so it's easy to reach.
@@ -835,7 +923,7 @@
       // Widen the search and drop the edge requirement if the terrain around
       // the temple doesn't happen to offer a nearby mountain edge.
       const spot = search(15,45,true) || search(10,80,true) || search(5,Math.max(MAP_W,MAP_H),false);
-      if(spot) map[spot.y][spot.x] = 'blackpillar';
+      if(spot){ map[spot.y][spot.x] = 'blackpillar'; blackPillarPos = spot; }
     }
 
     let villageCenter = null;
@@ -1101,6 +1189,9 @@
           const tile = map[y][x];
           if(tile==='temple' || tile==='belltower' || !isWalkable(x,y)) continue;
           if(Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) continue;
+          // Keep the bell's vicinity free of random spawns - the guard pair
+          // should be the only threat there.
+          if(bigBellPos && Math.max(Math.abs(x-bigBellPos.x), Math.abs(y-bigBellPos.y)) < BELL_GUARD_EXCLUSION_RADIUS) continue;
           if(!tilesByBiome[tile]) tilesByBiome[tile] = [];
           tilesByBiome[tile].push(x, y);
           allSpawnTiles.push(x, y);
@@ -1932,6 +2023,7 @@
       village:"a small hut, part of a village",
       belltower:"the Temple's bell tower - the bell itself seems to be missing",
       grave:"a lone grave marker, it is not finished and has no inscription",
+      bigbell:"a big brass bell, far too heavy to carry",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
@@ -1945,6 +2037,7 @@
 
       const notes = {};
       let pillarDirection = null;
+      let bellDirection = null;
 
       function addNote(label, direction) {
         if (!notes[label]) notes[label] = new Set();
@@ -2002,6 +2095,11 @@
             continue;
           }
 
+          if (t === 'bigbell') {
+            bellDirection = direction;
+            continue;
+          }
+
           if (
             t === 'mountain' ||
             t === 'cavewall' ||
@@ -2028,13 +2126,17 @@
 
       if (summary.length) {
         log(`You notice ${summary.join(', ')}.`, 'info');
-      } else if (!pillarDirection) {
+      } else if (!pillarDirection && !bellDirection) {
         log('Nothing of note nearby.', 'info');
       }
 
       if (pillarDirection) {
         log(`You see, rising from the mountains, a tall black stone pillar to the ${pillarDirection}.`, 'pillar');
         log('It feels oddly out of place here. You wonder what story lies behind it...', 'info');
+      }
+
+      if (bellDirection) {
+        log('You see a big brass bell. It is too heavy to carry. Maybe there is a way...', 'pillar');
       }
 
       if (villageCenter) {
@@ -2478,6 +2580,12 @@
       if(mx>=0 && my>=0 && mx<MAP_W && my<MAP_H && map[my][mx]==='blackpillar'){
         tooltip.classList.add('mini');
         tooltip.innerHTML = `<div class="nm">???</div>`;
+        tooltip.style.left = (lastMousePx+16)+'px';
+        tooltip.style.top = (lastMousePy+16)+'px';
+        tooltip.style.display = 'block';
+      } else if(mx>=0 && my>=0 && mx<MAP_W && my<MAP_H && map[my][mx]==='bigbell'){
+        tooltip.classList.add('mini');
+        tooltip.innerHTML = `<div class="nm">Big Bell</div>`;
         tooltip.style.left = (lastMousePx+16)+'px';
         tooltip.style.top = (lastMousePy+16)+'px';
         tooltip.style.display = 'block';
@@ -3151,6 +3259,7 @@
       player.x = spawnPoint.x; player.y = spawnPoint.y;
       player.hp = playerMaxHp();
       spawnEnemies();
+      spawnBellGuardians();
       spawnGroundStuff();
       spawnNpcs();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures are far more aggressive than others. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
