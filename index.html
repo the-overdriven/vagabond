@@ -160,6 +160,7 @@
       #logpanel div.bad{color:#e08a7a;}
       #logpanel div.loot{color:var(--ember-bright);}
       #logpanel div.info{color:var(--parchment-dim);}
+      #logpanel div.pillar{color:white;}
       #hint{
           font-size:11px; color:brown; letter-spacing:1px; text-align:center;
       }
@@ -555,9 +556,12 @@
       // cavewall: {ch:'#', color:'#2a2233', bg:'#0a0810', walk:false},
       temple:   {ch:'\u2626', color:'#ffe08a', bg:'#221a08', walk:true},
       boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
+      // A single lore landmark hidden in the mountains: a monolithic black
+      // pillar that has no business being there.
+      blackpillar: {ch:'\u25ae', color:'#2a2a35', bg:'#0a0a0a', walk:false},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -713,6 +717,45 @@
       }
       spawnPoint = {x:sx,y:sy};
       map[sy][sx] = 'temple';
+
+      // Lore landmark: a single black stone pillar tucked into the mountains
+      // near the start. It sits close to the mountain's edge (not deep inside),
+      // reachable within about one screen of walking from the temple.
+      placeBlackPillar();
+    }
+
+    function placeBlackPillar(){
+      // Preferred: a mountain tile 15-45 tiles from the temple, right on the
+      // mountain's edge (bordering walkable ground) so it's easy to reach.
+      function search(minR, maxR, requireEdge){
+        for(let r=minR; r<=maxR; r++){
+          for(let dy=-r; dy<=r; dy++){
+            for(let dx=-r; dx<=r; dx++){
+              if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+              const x = spawnPoint.x+dx, y = spawnPoint.y+dy;
+              if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
+              if(map[y][x] !== 'mountain') continue;
+              if(requireEdge){
+                let onEdge = false;
+                for(let ny=-1; ny<=1 && !onEdge; ny++){
+                  for(let nx=-1; nx<=1 && !onEdge; nx++){
+                    if(nx===0 && ny===0) continue;
+                    const t = map[y+ny] && map[y+ny][x+nx];
+                    if(t && TILE[t] && TILE[t].walk) onEdge = true;
+                  }
+                }
+                if(!onEdge) continue;
+              }
+              return {x,y};
+            }
+          }
+        }
+        return null;
+      }
+      // Widen the search and drop the edge requirement if the terrain around
+      // the temple doesn't happen to offer a nearby mountain edge.
+      const spot = search(15,45,true) || search(10,80,true) || search(5,Math.max(MAP_W,MAP_H),false);
+      if(spot) map[spot.y][spot.x] = 'blackpillar';
     }
 
     function isWalkable(x,y){
@@ -1562,6 +1605,7 @@
       cavewall:"a solid cave wall",
       temple:"the sacred ground of the Temple",
       boulder:"a cluster of impassable boulders",
+      blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
@@ -1574,6 +1618,7 @@
       log(`You are standing on ${here}.`, 'info');
 
       const notes = {};
+      let pillarDirection = null;
 
       function addNote(label, direction) {
         if (!notes[label]) notes[label] = new Set();
@@ -1626,6 +1671,11 @@
 
           const t = map[ny][nx];
 
+          if (t === 'blackpillar') {
+            pillarDirection = direction;
+            continue;
+          }
+
           if (
             t === 'mountain' ||
             t === 'cavewall' ||
@@ -1651,8 +1701,13 @@
 
       if (summary.length) {
         log(`You notice ${summary.join(', ')}.`, 'info');
-      } else {
+      } else if (!pillarDirection) {
         log('Nothing of note nearby.', 'info');
+      }
+
+      if (pillarDirection) {
+        log(`You see a tall black stone pillar to the ${pillarDirection}.`, 'pillar');
+        log('It feels oddly out of place here. You wonder what story lies behind it...', 'info');
       }
     }
 
