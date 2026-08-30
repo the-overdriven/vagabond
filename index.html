@@ -1324,6 +1324,24 @@
       {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
       {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true},
     ];
+    // The Drunk's rumor about the missing bell points in whatever direction
+    // the bell actually generated - computed at spawn/load time rather than
+    // hardcoded, since it depends on the map seed.
+    function bellDirectionFromSpawn(){
+      if(!bigBellPos) return null;
+      const dx = bigBellPos.x - spawnPoint.x;
+      const dy = bigBellPos.y - spawnPoint.y;
+      if(Math.abs(dx) >= Math.abs(dy)) return dx>=0 ? 'east' : 'west';
+      return dy>=0 ? 'south' : 'north';
+    }
+    function linesForNpcTemplate(tmpl){
+      const lines = tmpl.lines.slice();
+      if(tmpl.name === "Drunk"){
+        const dir = bellDirectionFromSpawn();
+        if(dir) lines.push(`Them hairy mountains... clonk, clonk, clonk all the way ${dir} they went.`);
+      }
+      return lines;
+    }
     let npcs = [];
     function spawnNpcs(){
       npcs = [];
@@ -1338,7 +1356,7 @@
           tries++;
         } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
-        const npc = { name:tmpl.name, lines:tmpl.lines, free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
+        const npc = { name:tmpl.name, lines:linesForNpcTemplate(tmpl), free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
         occupied.add(keyXY(x,y));
         if(tmpl.name === "Gravedigger"){
@@ -3178,6 +3196,16 @@
         }
       }
 
+      // bigBellPos likewise isn't stored explicitly - recover it from the
+      // restored map so the Drunk's rumor line still points the right way.
+      bigBellPos = null;
+      outer2:
+      for(let y=0; y<MAP_H; y++){
+        for(let x=0; x<MAP_W; x++){
+          if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
+        }
+      }
+
       Object.assign(player, data.player);
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
@@ -3205,7 +3233,7 @@
         npcs = data.npcs.map(n=>{
           const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
           return {
-            name: n.name, lines: tmpl ? tmpl.lines : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
+            name: n.name, lines: tmpl ? linesForNpcTemplate(tmpl) : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
             x:n.x, y:n.y, homeX: n.homeX ?? n.x, homeY: n.homeY ?? n.y,
           };
         });
