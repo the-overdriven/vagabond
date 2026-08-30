@@ -1,6 +1,5 @@
 <!-- TODO:
 
-- separate weapons into two handed (cannot wear shields in that case!)
 - preload images
 - gear screen and map screen are mutually exclusive, one closes the other automatically
 - static HP gain on level up
@@ -36,7 +35,6 @@
 - add locations, ruins, etc. that can be explored and looted
 - just as our char animates when attacking enemies, enemies should animate when attacking player
 - You equip the Profound Mace. (+1 ATK, +1 SPD) - doesnt show the xp bonus
-- on mini map show player as bigger red dot (maybe pulsating?)
 - add bestiary
 - reading scroll of invis should make u gray instantly
 - increase speed on every second lvl up?
@@ -2716,7 +2714,7 @@
         ctx.fillStyle = 'rgba(0,0,0,' + alpha + ')';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      if(minimapDirty || miniPlayerX !== player.x || miniPlayerY !== player.y) renderMinimap();
+      if(mapOpen || minimapDirty || miniPlayerX !== player.x || miniPlayerY !== player.y) renderMinimap();
     }
 
 // Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
@@ -2951,7 +2949,7 @@
     }
     // originX/originY are the top-left tile of the visible window (0,0 for the full
     // world map, a player-centred clamped offset for the zoomed side minimap).
-    function renderMinimapCanvas(ctx, scale, originX, originY){
+    function renderMinimapCanvas(ctx, scale, originX, originY, showMapPlayer){
       ensureMiniBases();
       const ox = originX || 0, oy = originY || 0;
       const w = ctx.canvas.width, h = ctx.canvas.height;
@@ -2961,8 +2959,19 @@
       const dot = Math.max(2, scale+2);
       ctx.fillStyle = '#ffe08a';
       ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
+      if(showMapPlayer){
+        const px = (player.x-ox)*scale + scale/2;
+        const py = (player.y-oy)*scale + scale/2;
+        const pulse = 1 + Math.sin(performance.now()/180)*0.18;
+        const radius = Math.max(4, scale*1.8)*pulse;
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, Math.PI*2);
+        ctx.fillStyle = '#e0473f';
+        ctx.fill();
+      }else{
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
+      }
     }
     function sideMiniOrigin(){
       return {
@@ -2970,10 +2979,22 @@
         y: Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, player.y - (SIDE_VIEW_H>>1)))
       };
     }
+    let mapPulseFrame = null;
+    function animateMapPlayer(){
+      if(!mapOpen){
+        mapPulseFrame = null;
+        return;
+      }
+      renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true);
+      mapPulseFrame = requestAnimationFrame(animateMapPlayer);
+    }
     function renderMinimap(){
-      if(mapOpen) renderMinimapCanvas(mctx, MAP_SCALE, 0, 0);
+      if(mapOpen){
+        renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true);
+        if(!mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer);
+      }
       const o = sideMiniOrigin();
-      renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y);
+      renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y, false);
       minimapDirty = false;
       miniPlayerX = player.x;
       miniPlayerY = player.y;
