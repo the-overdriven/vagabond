@@ -984,13 +984,9 @@
         return pool;
       }
 
-      for(let i=0;i<total;i++){
-        let r = rng(), tier=1, acc=0;
-        for(let t=0;t<5;t++){ acc+=weights[t]; if(r<=acc){ tier=t+1; break; } }
-        const templates = ENEMY_TEMPLATES.filter(e=>e.tier===tier);
-        const tmpl = pick(templates);
+      function spawnOneFromTemplate(tmpl){
         const pool = poolFor(tmpl);
-        if(!pool.length) continue;
+        if(!pool.length) return false;
         let x=0, y=0, tries=0, placed=false;
         while(tries<200){
           tries++;
@@ -999,7 +995,7 @@
           if(occupied.has(keyXY(x,y))) continue;
           placed = true; break;
         }
-        if(!placed) continue;
+        if(!placed) return false;
         const variance = 0.95 + rng()*0.10;
         const e = {
           name: tmpl.name, tier: tmpl.tier,
@@ -1023,6 +1019,28 @@
         }
         enemies.push(e);
         occupied.add(keyXY(x,y));
+        return true;
+      }
+
+      for(let i=0;i<total;i++){
+        let r = rng(), tier=1, acc=0;
+        for(let t=0;t<5;t++){ acc+=weights[t]; if(r<=acc){ tier=t+1; break; } }
+        const templates = ENEMY_TEMPLATES.filter(e=>e.tier===tier);
+        const tmpl = pick(templates);
+        spawnOneFromTemplate(tmpl);
+      }
+
+      // The Lich is the sole source of the rare tombstones, so make sure the world
+      // never rolls too few of them - top up to a guaranteed minimum if short.
+      const MIN_LICHES = 6;
+      const lichTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Lich');
+      if(lichTmpl){
+        let lichCount = enemies.filter(e=>e.baseName==='Lich').length;
+        let guard = 0;
+        while(lichCount < MIN_LICHES && guard < 200){
+          guard++;
+          if(spawnOneFromTemplate(lichTmpl)) lichCount++;
+        }
       }
     }
     function spawnGroundStuff(){
@@ -1149,9 +1167,29 @@
       if(announce) log(`You automatically equip the ${item.name}.${statDeltaText(before)}`, 'good');
       return true;
     }
+    // Only four Mysterious Tombstones exist in the entire world - each bears a
+    // single line of the same fractured inscription, revealed one piece at a time.
+    let tombstonesRemaining = 4;
+    const TOMBSTONE_INSCRIPTIONS = [
+      "The king never walked upon the earth.",
+      "He climbed the mountain alone, and returned wearing a crown no smith had forged.",
+      "Three nights later, the priests declared that the gods had chosen him.",
+      "He was not chosen. He was shown.",
+    ];
+    function maybeDropTombstone(e){
+      if(tombstonesRemaining <= 0) return false;
+      if(e.baseName !== 'Lich') return false;
+      if(!chance(0.8)) return false;
+      const inscription = TOMBSTONE_INSCRIPTIONS[TOMBSTONE_INSCRIPTIONS.length - tombstonesRemaining];
+      tombstonesRemaining--;
+      player.inventory.push({kind:'tombstone', name:'Mysterious Tombstone', inscription});
+      log(`The ${e.name} dropped a Mysterious Tombstone.`, 'loot');
+      return true;
+    }
     function lootFromEnemy(e){
       const mf = playerMf();
       player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
+      maybeDropTombstone(e);
       const dropChance = 0.45 + mf*0.02 + e.tier*0.03;
       if(chance(Math.min(0.9,dropChance))){
         const roll = rng();
@@ -2348,7 +2386,7 @@
         const stackable = it.kind==='potion' || it.kind==='scroll' || it.kind==='speedpotion';
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const prefix = isBest ? '✅ ' : '';
-        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (stackable?'':' [T'+it.tier+']');
+        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
         if(it.kind==='potion'){
           const btn = document.createElement('button');
@@ -2364,6 +2402,11 @@
           const btn = document.createElement('button');
           btn.textContent = 'Read';
           btn.onclick = ()=>{ useScroll(idx); };
+          row.appendChild(btn);
+        } else if(it.kind==='tombstone'){
+          const btn = document.createElement('button');
+          btn.textContent = 'Read';
+          btn.onclick = ()=>{ readTombstone(idx); };
           row.appendChild(btn);
         } else {
           const btn = document.createElement('button');
@@ -2413,6 +2456,11 @@
       log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good');
       updateHud(); renderInventory();
     }
+    function readTombstone(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='tombstone') return;
+      log(`You read the inscription on the tombstone, it says "${it.inscription}"`, 'info');
+    }
 // document.getElementById('useAllPotions').onclick = ()=>{
 //   const idx = player.inventory.findIndex(i=>i.kind==='potion');
 //   if(idx>=0) usePotion(idx); else log("You have no potions.", 'info');
@@ -2454,6 +2502,7 @@
           x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
+        tombstonesRemaining: tombstonesRemaining,
       };
     }
 
@@ -2513,6 +2562,7 @@
       player.inventory = (data.player && data.player.inventory) || [];
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
+      tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : 4;
 
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
@@ -2604,6 +2654,7 @@
       if(k==='Escape'){ toggleInv(false); toggleMap(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
+      if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
       if(mapOpen || invOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); describeSurroundings(); return; } // <-- added
       const moves = {
