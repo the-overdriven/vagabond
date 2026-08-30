@@ -563,9 +563,11 @@
       village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
       // Part of the temple grounds - the bell tower. Its bell is missing.
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
+      // A lone grave marker, kept near the Gravedigger.
+      grave:    {ch:'\u2020', color:'#c9c9c9', bg:'#12120f', walk:true},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -1181,6 +1183,17 @@
         const npc = { name:tmpl.name, lines:tmpl.lines, free:!!tmpl.free, static:!!tmpl.static, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
         occupied.add(keyXY(x,y));
+        if(tmpl.name === "Gravedigger"){
+          // A lone grave kept right next to him - fitting company for his line
+          // of work (and a quiet nod to his own unanswered questions).
+          for(const [dx,dy] of DIRS8){
+            const gx = x+dx, gy = y+dy;
+            if(!isWalkable(gx,gy) || occupied.has(keyXY(gx,gy))) continue;
+            if(map[gy][gx]==='temple' || map[gy][gx]==='belltower') continue;
+            map[gy][gx] = 'grave';
+            break;
+          }
+        }
       }
     }
     function npcIsOnScreen(n){
@@ -1843,6 +1856,7 @@
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
       village:"a small hut, part of a village",
       belltower:"the Temple's bell tower - the bell itself seems to be missing",
+      grave:"a lone grave marker, it is not finished and has no inscription",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
