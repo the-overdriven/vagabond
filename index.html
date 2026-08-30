@@ -48,7 +48,6 @@
 - super rare monsters?
 - being ambushed when using autopath should stock autopath
 - individual monster loot table
-- foraged tree tiles should turn more pale
 - increase monster scale, top tier should be twice as strong, proportionally
 - merchant should have dagger for sale, non-humanoids should not drop gear
 - being under effect of potion of speed, two moves are treated as 1 turn in autopath
@@ -59,7 +58,7 @@
 - add swimming skill (number represents how many tiles you can swim before you start drowning)
  -->
 
-<!DOCTYPE html>d
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2080,6 +2079,7 @@
       } else {
         log('You search through the undergrowth but find nothing of use.', 'info');
       }
+      draw();
     }
     function checkGroundAt(x,y){
       for(let i=groundItems.length-1;i>=0;i--){
@@ -2663,7 +2663,8 @@
           const t = TILE[map[my][mx]];
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
-          drawTile(px,py,t.ch,t.color,t.bg);
+          const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
+          drawTile(px,py,t.ch,foraged ? '#a9c397' : t.color,t.bg);
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
@@ -3001,7 +3002,8 @@
       const c = base.ctx;
       c.clearRect(x*s, y*s, s, s);
       const t = TILE[map[y][x]];
-      c.fillStyle = discovered[y][x] ? (t.mini || t.color) : 'rgba(3,2,1,0.72)';
+      const foraged = map[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
+      c.fillStyle = discovered[y][x] ? (foraged ? '#6f8f59' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
