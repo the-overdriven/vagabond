@@ -765,7 +765,30 @@
       // The temple complex includes a bell tower - tucked into a corner of the
       // footprint, away from the player's own start tile - whose bell has gone
       // missing (a small dangling hook for later lore).
-      const bellSpots = templeTiles.filter(t=>!(t.x===sx && t.y===sy));
+      let bellSpots = templeTiles.filter(t=>!(t.x===sx && t.y===sy));
+      if(!bellSpots.length){
+        // The chosen footprint was hemmed in by water/mountain and only the
+        // spawn tile itself qualified as temple ground - find the nearest
+        // other non-water/mountain tile next to the spawn point and fold it
+        // into the temple complex so the bell tower always has somewhere to go.
+        outer:
+        for(let r=1; r<=6; r++){
+          for(let dy=-r; dy<=r; dy++){
+            for(let dx=-r; dx<=r; dx++){
+              if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+              const tx=sx+dx, ty=sy+dy;
+              if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
+              if(tx===sx && ty===sy) continue;
+              if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
+              map[ty][tx] = 'temple';
+              const spot = {x:tx,y:ty};
+              templeTiles.push(spot);
+              bellSpots = [spot];
+              break outer;
+            }
+          }
+        }
+      }
       if(bellSpots.length){
         const spot = pick(bellSpots);
         map[spot.y][spot.x] = 'belltower';
