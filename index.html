@@ -45,7 +45,6 @@
 - Brutal Scorpion tooltip shows +4.1999999 ATK, should be rounded to 4
 - make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility
 - add emojis to items
-- humanoid enemies that drop weapons/armor/shield, should wear them and have them in their tooltip
  -->
 
 <!DOCTYPE html>
@@ -943,11 +942,15 @@
           def: Math.max(0,Math.round(tmpl.def*variance)),
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
           fly: !!tmpl.fly,
+          humanoid: !!tmpl.humanoid,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x:p.x, y:p.y, homeX:p.x, homeY:p.y, alive:true, prefix:null,
+          x:p.x, y:p.y, homeX:p.x, homeY:p.y, alive:true, prefix:null, equipment:null,
         };
         e.maxHp = e.hp;
         e.baseName = tmpl.name;
+        if(e.humanoid){
+          applyEnemyEquipment(e, rollEnemyEquipment(e));
+        }
         enemies.push(e);
         occupied.add(keyXY(p.x,p.y));
       }
@@ -1096,6 +1099,34 @@
       const base = pick(pool.length?pool:ARMORS.filter(a=>a.tier===1));
       const item = {kind:'armor', base:base.name, def:base.def, tier:base.tier, name:base.name};
       return rollModifier(base.name, item);
+    }
+    function rollEnemyEquipment(e){
+      if(!e || !e.humanoid) return null;
+      const dropChance = 0.45 + e.tier*0.03;
+      if(!chance(Math.min(0.9,dropChance))) return null;
+      const roll = rng();
+      if(roll<0.5) return makeWeaponItem(e.tier);
+      if(roll<0.75) return makeArmorItem(e.tier);
+      return makeShieldItem(e.tier);
+    }
+    function applyEnemyEquipment(e, item){
+      if(!e || !item) return;
+      e.equipment = item;
+      if(item.kind==='weapon'){
+        if(item.atk) e.atk += item.atk;
+        if(item.mod==='atk') e.atk += item.modAmt;
+        if(item.spd!==undefined) e.spd += Math.floor(item.spd/2);
+        if(item.mod==='spd') e.spd += item.modAmt;
+      } else {
+        if(item.def) e.def += item.def;
+        if(item.mod==='def') e.def += item.modAmt;
+        e.spd = Math.max(1, e.spd-1);
+        if(item.mod==='spd') e.spd += item.modAmt;
+        if(item.mod==='hp'){
+          e.maxHp += item.modAmt;
+          e.hp += item.modAmt;
+        }
+      }
     }
     function itemStatLine(it){
       const parts=[];
@@ -1306,11 +1337,15 @@
           def: Math.max(0,Math.round(tmpl.def*variance)),
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
           fly: !!tmpl.fly,
+          humanoid: !!tmpl.humanoid,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x, y, homeX:x, homeY:y, alive:true, prefix:null,
+          x, y, homeX:x, homeY:y, alive:true, prefix:null, equipment:null,
         };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
+        if(e.humanoid){
+          applyEnemyEquipment(e, rollEnemyEquipment(e));
+        }
         if(chance(0.05)){
           const names = Object.keys(ENEMY_PREFIXES);
           const pfx = pick(names);
@@ -1611,6 +1646,13 @@
       const mf = playerMf();
       player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
       maybeDropTombstone(e);
+      if(e.humanoid && e.equipment){
+        const item = e.equipment;
+        log(`The ${e.name} dropped a ${item.name}.`, 'loot');
+        if(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return;
+        player.inventory.push(item);
+        return;
+      }
       const dropChance = 0.45 + mf*0.02 + e.tier*0.03;
       if(chance(Math.min(0.9,dropChance))){
         const roll = rng();
@@ -2186,12 +2228,16 @@
         def: Math.max(0,Math.round(tmpl.def*variance)),
         spd: Math.max(1,Math.round(tmpl.spd*variance)),
         fly: !!tmpl.fly,
+        humanoid: !!tmpl.humanoid,
         aggro: tmpl.aggro ?? AGGRO_RANGE,
-        x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, alive:true, prefix:null,
+        x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, alive:true, prefix:null, equipment:null,
         aware:true,
       };
       e.maxHp = e.hp;
       e.baseName = tmpl.name;
+      if(e.humanoid){
+        applyEnemyEquipment(e, rollEnemyEquipment(e));
+      }
       enemies.push(e);
       occupied.add(keyXY(spot.x, spot.y));
       log(`A ${e.name} rustles out from the trees nearby!`, 'bad');
@@ -2795,10 +2841,13 @@
         const critHtml = e.crit
           ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
           : '';
+        const equipmentHtml = e.equipment
+          ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
+          : '';
         return { mini:false, enemy:e, html: `
       <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
-      ${boostHtml}${critHtml}
+      ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
       <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
@@ -3453,6 +3502,8 @@
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: enemyAggroRange(e),
           fly: !!e.fly,
+          humanoid: !!e.humanoid,
+          equipment: e.equipment || null,
           x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
@@ -3553,6 +3604,8 @@
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
           fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
+          humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
+          equipment: e.equipment || null,
           x:e.x, y:e.y, alive:true,
           prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         });
