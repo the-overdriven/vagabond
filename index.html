@@ -1679,15 +1679,18 @@
     }
     function enemyStepAwayFromTemple(e){
       // Flee logic for the temple's no-farming zone: pick the open neighbour tile
-      // that puts the most distance between the enemy and the temple's centre.
+      // that puts the most distance between the enemy and the player - not the
+      // temple's centre - so it keeps retreating away from the player every turn
+      // no matter which direction that leads, even off the visible screen, instead
+      // of just circling the temple at a "safe enough" radius.
       let best = null, bestDist = -1;
       for(const [dx,dy] of DIRS8){
         const nx = e.x+dx, ny = e.y+dy;
         if(!enemyTileOpen(e,nx,ny)) continue;
-        const d = Math.max(Math.abs(nx-spawnPoint.x), Math.abs(ny-spawnPoint.y));
+        const d = Math.max(Math.abs(nx-player.x), Math.abs(ny-player.y));
         if(d > bestDist){ bestDist = d; best = {x:nx, y:ny}; }
       }
-      const curDist = Math.max(Math.abs(e.x-spawnPoint.x), Math.abs(e.y-spawnPoint.y));
+      const curDist = Math.max(Math.abs(e.x-player.x), Math.abs(e.y-player.y));
       if(!best || bestDist <= curDist) return false; // boxed in or already fleeing correctly
       occupied.delete(keyXY(e.x,e.y));
       const fromX = e.x, fromY = e.y;
@@ -1696,10 +1699,15 @@
       beginEnemyMoveAnim(e, fromX, fromY);
       return true;
     }
-    // Radius (in tiles, from the temple's centre) that enemies won't linger inside
-    // while the player is standing on temple ground - stops using the Temple's
-    // free healing as a way to safely tank hits mid-fight.
-    const TEMPLE_FLEE_RADIUS = 6;
+    // While the player stands on temple ground, any enemy currently visible on
+    // screen starts fleeing (regardless of aggro state) - stops using the
+    // Temple's free healing as a way to safely tank hits mid-fight. Once
+    // fleeing starts it keeps going, even after the enemy walks off the visible
+    // screen, until it's put a full FLEE_DISTANCE tiles between itself and the
+    // player - otherwise it would simply freeze right at the screen's edge
+    // (wandering doesn't apply to off-screen enemies either, so nothing would
+    // ever push it further away).
+    const FLEE_DISTANCE = 15;
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
       if(player.speedPotionTurns > 0){
@@ -1714,11 +1722,15 @@
       const playerOnTemple = map[player.y][player.x] === 'temple' || map[player.y][player.x] === 'belltower';
       for(const e of enemies.slice()){
         if(!e.alive) continue;
-        if(playerOnTemple && Math.max(Math.abs(e.x-spawnPoint.x), Math.abs(e.y-spawnPoint.y)) <= TEMPLE_FLEE_RADIUS){
+        const distFromPlayer = Math.max(Math.abs(e.x-player.x), Math.abs(e.y-player.y));
+        const shouldFlee = playerOnTemple && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE;
+        if(shouldFlee){
+          e.fleeingHoly = true;
           if(e.aware){ e.aware = false; log(`The ${e.name} retreats from the sacred ground.`, 'info'); }
           enemyStepAwayFromTemple(e);
           continue;
         }
+        if(e.fleeingHoly) e.fleeingHoly = false;
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if(dist === ATTACK_RANGE){
