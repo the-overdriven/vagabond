@@ -13,11 +13,8 @@
 - do not heal on level up?
 - possible to run away from enemies? they lose pursuit, maybe depending on speed/tier. or if ur speed is bigger than enemy speed
 - scorpions and GS poison you?
-- what speed rly changes?
-- make map bigger?
 - change monster locations?
 - balance monsters, xp
-- quick combat?
 - add a chance for crit hit?
 - separate weapons into two handed (cannot wear shields in that case!)
 - highlight better gear
@@ -34,16 +31,16 @@
 - individual aggro distance per mob type
 - walking through forest can spawn low lvl mob
 - chests should be mostly in remote location and near high tier mobs
-- world should be bigger
 - hovering over items tells what they are
 - make temple more prominent and purple
 
 - Terrain effects. You now have six walkable biomes that are purely decorative. This is the cheapest big win available: forest grants cover (−1 enemy aggro range, or an evasion bonus), hills give high ground (+1 ATK, +vision radius), snow and river cost extra movement or SPD. Suddenly where you fight is a decision, and all the biome work you just did starts paying gameplay dividends instead of just looking nice.
-- static XP gain on level up
+- static HP gain on level up
 - Damage numbers popping off the target on the canvas, rather than only scrolling in the log. The log is where you read what happened; floating text is where you feel it. You already have a per-frame animation loop to hang it on.
 - custom map markers
 - add ability to rest (may be interrupted)
 - preload images
+- snow covered mountains?
 
  -->
 
@@ -691,7 +688,7 @@
       village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
       // Part of the temple grounds - the bell tower. Its bell is missing.
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
-      // A lone grave marker, kept near the Gravedigger.
+      // A lone grave, kept near the Gravedigger.
       grave:    {ch:'\u2020', color:'#c9c9c9', bg:'#12120f', walk:true},
       // A lore landmark: a huge brass bell, too heavy to carry off, guarded
       // by a pair of brutes near the mountains.
@@ -2248,7 +2245,7 @@
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
       village:"a small hut, part of a village",
       belltower:"the Temple's bell tower - the bell itself seems to be missing",
-      grave:"a lone grave marker, it is not finished and has no inscription",
+      grave:"a lone grave, it is not finished and has no inscription",
       bigbell:"a big brass bell, far too heavy to carry",
     };
     const LOOK_DIRS = [
