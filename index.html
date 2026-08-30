@@ -1,47 +1,50 @@
 <!-- TODO:
 
+
+- extract WEAPONS, SHIELDS, ARMORS, MODIFIERS, ENEMY_TEMPLATES, ENEMY_DEFAULT_BIOMES, ENEMY_PREFIXES to json files in content folder
+- separate weapons into two handed (cannot wear shields in that case!)
+- preload images
+- gear screen and map screen are mutually exclusive, one closes the other automatically
+- static HP gain on level up
+- chests should be mostly in remote location and near high tier mobs, in that case they should grant better loot
+- big bell weight shouldnt be mentioned from distance
+
+
 - penalty for getting killed?
-- possible to run away from foes?
-- sell items for gold?
 - add evasion? chance to dodge. or reuse SPD
-- mummy should be slow
-- what speed changes?
-- nerf life potions? heal 50%? or make them less common
 - prefixed mobs should give more XP
-- add food? heals minor HP
+- add food? heals minor HP. looted from selected animals
 - collect berries? more survivalism?
 - do not heal on level up?
-- possible to run away from enemies? they lose pursuit, maybe depending on speed/tier. or if ur speed is bigger than enemy speed
 - scorpions and GS poison you?
-- change monster locations?
 - balance monsters, xp
 - add a chance for crit hit?
-- separate weapons into two handed (cannot wear shields in that case!)
 - highlight better gear
-- monsters have a random chance to walk 1 radius
-- its possible to abuse temple for fights
-- in gear screen equiped items should have the same colour as in backpack
-- gear screen should make it possible to switch to map mode
+- in gear screen equipped items should have the same colour as in backpacks
 
-- mini-map on the side
 - tabs in backpack (armors, shields, weapons, other)
 - automatically wear armor/shield/weapon if you're not wearing any
 - add pick axe (to be able to dig through bolders, costs HP)
-- special locations? i.e. abandoned church
+- special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
 - individual aggro distance per mob type
-- walking through forest can spawn low lvl mob
-- chests should be mostly in remote location and near high tier mobs
-- hovering over items tells what they are
-- make temple more prominent and purple
 
 - Terrain effects. You now have six walkable biomes that are purely decorative. This is the cheapest big win available: forest grants cover (−1 enemy aggro range, or an evasion bonus), hills give high ground (+1 ATK, +vision radius), snow and river cost extra movement or SPD. Suddenly where you fight is a decision, and all the biome work you just did starts paying gameplay dividends instead of just looking nice.
-- static HP gain on level up
-- Damage numbers popping off the target on the canvas, rather than only scrolling in the log. The log is where you read what happened; floating text is where you feel it. You already have a per-frame animation loop to hang it on.
+- in forest there is 33% chance that you sneak through the trees and monster does not aggro you
+- Damage numbers popping off the target on the canvas, rather than only scrolling in the log. The log is where you read what happened; floating text is where you feel it. You already have a per-frame animation loop to hang it on. walking on tile modifies your speed
 - custom map markers
 - add ability to rest (may be interrupted)
-- preload images
 - snow covered mountains?
-
+- add volcanos
+- add locations, ruins, etc. that can be explored and looted
+- just as our char animates when attacking enemies, enemies should animate when attacking player
+- You equip the Profound Mace. (+1 ATK, +1 SPD) - doesnt show the xp bonus
+- on mini map show player as bigger red dot (maybe pulsating?)
+- add bestiary
+- reading scroll of invis should make u gray instantly
+- increase speed on every second lvl up?
+- move stats in backpack to bottom, add achievments to these stats (killed monsters, strongest monster killed)
+- finish mysteriando
+- grave should have transparent bg
  -->
 
 <!DOCTYPE html>
@@ -3725,7 +3728,7 @@
       spawnBellGuardians();
       spawnGroundStuff();
       spawnNpcs();
-      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. Not every beast is worth the bloodshed, and some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
+      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
       stopDeathTransition();
       stopAttackAnimation();
       snapCameraToPlayer();
