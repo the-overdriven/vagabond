@@ -51,6 +51,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Vagabond</title>
   <style>
       :root{
@@ -303,6 +304,50 @@
       #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
       #tooltip.mini{width:auto; padding:4px 8px;}
       #tooltip.mini .nm{margin-bottom:0;}
+
+      /* ============================== MOBILE / TOUCH CONTROLS ==============================
+         Everything below only activates for touch-primary devices (pointer:coarse), so mouse
+         + keyboard desktop play is completely unaffected. It adds an on-screen D-pad for
+         movement/attack/talk (all handled by the same tryMove() used by the keyboard) and
+         makes the canvas/layout shrink to fit small screens. */
+      #touchControls{ display:none; }
+      @media (pointer:coarse){
+        html,body{ overflow:auto; }
+        #root{ padding:6px; gap:6px; }
+        #hud{ font-size:11px; padding:4px 8px; gap:8px; flex-wrap:wrap; justify-content:center; }
+        #hpbarwrap, #xpbarwrap{ width:110px; }
+        #sidePanel{ display:none; } /* desktop-only minimap sidebar - not enough room */
+        #hint{ display:none; } /* keyboard legend is meaningless on touch */
+        #stage{ max-width:100vw; }
+        canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
+        #touchControls{
+          display:flex; justify-content:space-between; align-items:flex-end;
+          position:absolute; left:0; right:0; bottom:8px; padding:0 8px;
+          pointer-events:none; z-index:5;
+        }
+        .dpad{
+          display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px);
+          gap:4px; pointer-events:auto;
+        }
+        .dpad button{
+          width:44px; height:44px; border-radius:6px;
+          background:rgba(26,19,14,0.85); border:1px solid var(--border);
+          color:var(--parchment); font-size:18px; font-family:inherit;
+          -webkit-user-select:none; user-select:none; touch-action:none;
+        }
+        .dpad button:active{ background:var(--ember); color:#1a130e; }
+        .dpad button.empty{ visibility:hidden; }
+        #touchActions{
+          display:flex; flex-direction:column; gap:6px; pointer-events:auto;
+        }
+        #touchActions button{
+          width:56px; height:56px; border-radius:50%;
+          background:rgba(26,19,14,0.85); border:1px solid var(--border);
+          color:var(--parchment); font-size:11px; font-family:inherit; letter-spacing:0.5px;
+          -webkit-user-select:none; user-select:none; touch-action:none;
+        }
+        #touchActions button:active{ background:var(--ember); color:#1a130e; }
+      }
   </style>
 </head>
 <body>
@@ -329,6 +374,17 @@
   </div>
   <div id="stage">
     <canvas id="game"></canvas>
+    <div id="touchControls">
+      <div class="dpad">
+        <button class="empty"></button><button data-dx="0" data-dy="-1">▲</button><button class="empty"></button>
+        <button data-dx="-1" data-dy="0">◀</button><button class="empty"></button><button data-dx="1" data-dy="0">▶</button>
+        <button class="empty"></button><button data-dx="0" data-dy="1">▼</button><button class="empty"></button>
+      </div>
+      <div id="touchActions">
+        <button id="touchSpace">LOOK</button>
+        <button id="touchForage">FORAGE</button>
+      </div>
+    </div>
     <div id="tooltip"></div>
     <div class="overlay" id="invOverlay">
       <div class="panelbox">
@@ -3414,6 +3470,29 @@
       rangesHeld = false;
       refreshRangeVisibility();
     });
+
+    /* ============================== TOUCH CONTROLS (mobile) ==============================
+       Purely additive: reuses the exact same functions the keyboard handler calls, so
+       walking into an enemy/NPC via the D-pad attacks/talks exactly like it does on desktop.
+       These buttons are only ever visible on touch-primary devices (see the pointer:coarse
+       CSS media query), so this has zero effect on mouse/keyboard play. */
+    document.querySelectorAll('.dpad button[data-dx]').forEach(btn=>{
+      const dx = parseInt(btn.dataset.dx, 10), dy = parseInt(btn.dataset.dy, 10);
+      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryMove(dx,dy); });
+      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryMove(dx,dy); });
+    });
+    const touchSpaceBtn = document.getElementById('touchSpace');
+    const touchForageBtn = document.getElementById('touchForage');
+    if(touchSpaceBtn){
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) describeSurroundings(); };
+      touchSpaceBtn.addEventListener('touchstart', fn);
+      touchSpaceBtn.addEventListener('click', fn);
+    }
+    if(touchForageBtn){
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) tryForage(); };
+      touchForageBtn.addEventListener('touchstart', fn);
+      touchForageBtn.addEventListener('click', fn);
+    }
 
     /* ============================== INIT ============================== */
     function init(){
