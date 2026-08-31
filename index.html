@@ -968,8 +968,39 @@ that means creating game asks for a name and choosing avatar
       // Lore landmark: a huge brass bell in/next to the mountains, kept
       // fairly close to the temple (map center), guarded by a pair of brutes.
       placeBigBell();
+      ensureTempleEdgePath();
       surfaceMap = map;
       generateCaves();
+    }
+
+    function ensureTempleEdgePath(){
+      const queue = [{x:spawnPoint.x,y:spawnPoint.y}];
+      const seen = new Set([keyXY(spawnPoint.x,spawnPoint.y)]);
+      while(queue.length){
+        const p = queue.shift();
+        if(p.x===0 || p.y===0 || p.x===MAP_W-1 || p.y===MAP_H-1) return;
+        for(const [dx,dy] of DIRS8){
+          const x=p.x+dx, y=p.y+dy;
+          if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) continue;
+          const key=keyXY(x,y);
+          if(seen.has(key) || !TILE[map[y][x]] || !TILE[map[y][x]].walk) continue;
+          seen.add(key);
+          queue.push({x,y});
+        }
+      }
+      const distances = [
+        {edge:'west',distance:spawnPoint.x},
+        {edge:'east',distance:MAP_W-1-spawnPoint.x},
+        {edge:'north',distance:spawnPoint.y},
+        {edge:'south',distance:MAP_H-1-spawnPoint.y},
+      ];
+      distances.sort((a,b)=>a.distance-b.distance);
+      const edge=distances[0].edge;
+      let x=spawnPoint.x, y=spawnPoint.y;
+      while(x>0 && edge==='west'){ x--; map[y][x]='grass'; }
+      while(x<MAP_W-1 && edge==='east'){ x++; map[y][x]='grass'; }
+      while(y>0 && edge==='north'){ y--; map[y][x]='grass'; }
+      while(y<MAP_H-1 && edge==='south'){ y++; map[y][x]='grass'; }
     }
 
     function blankCaveMap(){
