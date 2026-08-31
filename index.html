@@ -313,7 +313,7 @@ that means creating game asks for a name and choosing avatar
       }
       #tooltip .nm{font-weight:700; margin-bottom:4px;}
       #tooltip img{
-          display:block; width:100%; height:90px; object-fit:contain;
+          display:block; width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain;
           background:#0a0705; border:1px solid var(--border); border-radius:3px; margin-bottom:6px;
       }
       #tooltip .hpbarwrap{
@@ -3285,9 +3285,11 @@ that means creating game asks for a name and choosing avatar
       if(!info){ tooltip.style.display = 'none'; return; }
       tooltip.classList.toggle('mini', info.mini);
       tooltip.innerHTML = info.html;
-      tooltip.style.left = (lastMousePx+16)+'px';
-      tooltip.style.top = (lastMousePy+16)+'px';
       tooltip.style.display = 'block';
+      tooltip.style.left = (lastMousePx+16)+'px';
+      const belowTop = lastMousePy + 16;
+      const aboveTop = lastMousePy - tooltip.offsetHeight - 16;
+      tooltip.style.top = (belowTop + tooltip.offsetHeight > canvas.clientHeight ? aboveTop : belowTop)+'px';
     }
     // Converts a pointer event's viewport coordinates into canvas-buffer pixel
     // coordinates. On mobile the canvas is CSS-scaled (width:100%) to a size
