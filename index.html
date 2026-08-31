@@ -27,7 +27,6 @@
 
 - Terrain effects. You now have six walkable biomes that are purely decorative. This is the cheapest big win available: forest grants cover (−1 enemy aggro range, or an evasion bonus), hills give high ground (+1 ATK, +vision radius), snow and river cost extra movement or SPD. Suddenly where you fight is a decision, and all the biome work you just did starts paying gameplay dividends instead of just looking nice.
 - in forest there is 33% chance that you sneak through the trees and monster does not aggro you
-- Damage numbers popping off the target on the canvas, rather than only scrolling in the log. The log is where you read what happened; floating text is where you feel it. You already have a per-frame animation loop to hang it on. walking on tile modifies your speed
 - custom map markers
 - add ability to rest (may be interrupted)
 - snow covered mountains? mountains in snow biomes should be white and more common
@@ -1310,6 +1309,7 @@ that means creating game asks for a name and choosing avatar
         if(it.def) d += it.def;
         if(it.mod==='def') d += it.modAmt;
       }
+      if(map[player.y] && map[player.y][player.x] === 'hill') d += 1;
       return d;
     }
     function playerSpd(){
@@ -1320,7 +1320,9 @@ that means creating game asks for a name and choosing avatar
       if(player.equip.armor) s -= 1;
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
-      return s;
+      const terrainSpeed = {forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
+      s += terrainSpeed[map[player.y] && map[player.y][player.x]] || 0;
+      return Math.max(1, s);
     }
     function playerMf(){
       let mf = player.baseMf;
@@ -1832,12 +1834,14 @@ that means creating game asks for a name and choosing avatar
       updateMobileInfoPanel(e.x,e.y);
       await animateAttackLunge(player.x, player.y, e.x, e.y);
       if(chance(missChance(playerSpd(), e.spd))){
+        spawnDamageNumber(e.x, e.y, 'Miss!', '#d9d9a3');
         log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad');
         updateMobileInfoPanel(e.x,e.y);
         return;
       }
       const dmg = damageRoll(playerAtk(), e.def);
       e.hp -= dmg;
+      spawnDamageNumber(e.x, e.y, dmg, '#fff6d6');
       log(`You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
       if(e.hp <= 0){
         killEnemy(e);
@@ -1849,12 +1853,14 @@ that means creating game asks for a name and choosing avatar
     function enemyAttackPlayer(e){
       beginEnemyAttackAnim(e);
       if(chance(missChance(e.spd, playerSpd()))){
+        spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3');
         log(`The ${e.name} attacks but misses you.`, 'good');
         return false;
       }
       let dmg = damageRoll(e.atk, playerDef());
       if(e.crit && chance(CRIT_CHANCE)) dmg = Math.round(dmg*2);
       player.hp -= dmg;
+      spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d');
       log(`The ${e.name} hits you for ${dmg}.`, 'bad');
       updateHud();
       if(player.hp <= 0){
@@ -2644,7 +2650,9 @@ that means creating game asks for a name and choosing avatar
     // just vanishing. Used for item/chest pickups (moves up) and enemy deaths
     // (moves down).
     let fxAnims = [];
+    let damageAnims = [];
     const FX_ANIM_MS = 420;
+    const DAMAGE_ANIM_MS = 650;
     const ENEMY_COLORS = {1:'#b8b8b8',2:'#d98a3a',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
     function groundGlyph(g){
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
@@ -2665,6 +2673,10 @@ that means creating game asks for a name and choosing avatar
     function spawnDeathAnim(e){
       const ch = e.name.replace(/^[A-Za-z]+ /,'')[0];
       spawnFxAnim(e.x, e.y, ch, ENEMY_COLORS[e.tier], 1);
+    }
+    function spawnDamageNumber(x, y, amount, color){
+      damageAnims.push({x, y, amount, color, start:performance.now()});
+      runAnimationLoop();
     }
 
     function targetCamX(px){
@@ -2705,7 +2717,7 @@ that means creating game asks for a name and choosing avatar
       return false;
     }
     function animationsPending(){
-      return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length>0;
+      return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length>0 || damageAnims.length>0;
     }
 
     // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -2855,6 +2867,23 @@ that means creating game asks for a name and choosing avatar
           ctx.fillText(p.ch, 0, 3 - TILE_PX/2);
           ctx.restore();
         }
+      }
+      for(let i=damageAnims.length-1; i>=0; i--){
+        const p = damageAnims[i];
+        const t = Math.min(1, (now - p.start) / DAMAGE_ANIM_MS);
+        if(t >= 1){ damageAnims.splice(i,1); continue; }
+        const vx = Math.round((p.x-camX) * TILE_PX);
+        const vy = Math.round((p.y-camY) * TILE_PX - TILE_PX * 0.85 * t);
+        ctx.save();
+        ctx.globalAlpha = 1 - t;
+        ctx.font = "bold 18px Consolas, 'Courier New', monospace";
+        ctx.textAlign = 'center';
+        ctx.fillStyle = p.color;
+        ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(String(p.amount), vx + TILE_PX/2, vy + 2);
+        ctx.fillText(String(p.amount), vx + TILE_PX/2, vy + 2);
+        ctx.restore();
       }
       // enemies
       for(const e of enemies){
