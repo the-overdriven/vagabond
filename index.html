@@ -64,6 +64,10 @@ that means creating game asks for a name and choosing avatar
 - make some monsters wander outsife of their home tile
 - monsters that are close make sounds, to warn player
 - add special herbs (akin to G2)
+- add berries to forage
+- For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom
+- on mobile inventory screen hides hp bar
+- popup do u rly want to exit before closing tab
  -->
 
 <!DOCTYPE html>
@@ -2507,7 +2511,7 @@ that means creating game asks for a name and choosing avatar
           }
         }
         if(map[ny][nx]==='ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest'){
-          log('You enter a dense ancient forest', 'info');
+          log('You enter a dense ancient forest.', 'info');
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -3125,9 +3129,13 @@ that means creating game asks for a name and choosing avatar
         const hpPct = Math.max(0, e.hp/e.maxHp*100);
         const aggroRange = enemyAggroRange(e);
         const boosts = enemyPrefixBoosts(e);
+        const atkColor = e.atk < playerAtk() ? 'var(--parchment-dim)' : 'white';
+        const defColor = e.def < playerDef() ? 'var(--parchment-dim)' : 'white';
+        const playerSpeed = playerSpd();
+        const spdColor = e.spd > playerSpeed ? '#e0473f' : playerSpeed >= e.spd*2 ? 'var(--parchment-dim)' : 'white';
         const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b=>
           `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
-        ).join(' ')}</div>` : '';
+        ).join(', ')}</div>` : '';
         const critHtml = e.crit
           ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
           : '';
@@ -3139,7 +3147,7 @@ that means creating game asks for a name and choosing avatar
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
-      HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br>ATK ${Math.round(e.atk)} &nbsp;DEF ${Math.round(e.def)} &nbsp;SPD ${Math.round(e.spd)}<br>
+      HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br><span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span> &nbsp;<span style="color:${defColor}">DEF ${Math.round(e.def)}</span> &nbsp;<span style="color:${spdColor}">SPD ${Math.round(e.spd)}</span><br>
       <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
       }
       const n = npcs.find(np=>np.x===mx && np.y===my);
