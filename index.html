@@ -1862,7 +1862,8 @@ that means creating game asks for a name and choosing avatar
     }
 
     function damageRoll(atk, def){
-      return Math.max(1, Math.round(atk - def*0.5 + (rng()*3 - 1)));
+      const mitigatedAtk = atk * 10 / (10 + Math.max(0, def));
+      return Math.max(1, Math.round(mitigatedAtk + (rng()*3 - 1)));
     }
     function missChance(attackerSpd, defenderSpd){
       const chanceValue = 0.15 + (defenderSpd - attackerSpd) * 0.02;
@@ -1964,9 +1965,17 @@ that means creating game asks for a name and choosing avatar
       spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0);
       if(glancing){
         if(enemyWeapon){
-          log(`The ${e.name}'s ${enemyWeapon.base} glances off your ${armor.name}! The ${e.name} hits you with their ${enemyWeapon.base} for ${dmg}.`, 'bad');
+          if(dmg === 0){
+            log(`The ${e.name}'s ${enemyWeapon.base} glances off your ${armor.name}!`, 'bad');
+          } else {
+            log(`The ${e.name}'s ${enemyWeapon.base} glances off your ${armor.name}! The ${e.name} hits you with their ${enemyWeapon.base} for ${dmg}.`, 'bad');
+          }
         } else {
-          log(`The ${e.name}'s strike glances off your ${armor.name}! The ${e.name} hits you for ${dmg}.`, 'bad');
+          if(dmg === 0){
+            log(`The ${e.name}'s strike glances off your ${armor.name}!`, 'bad');
+          } else {
+            log(`The ${e.name}'s strike glances off your ${armor.name}! The ${e.name} hits you for ${dmg}.`, 'bad');
+          }
         }
       } else {
         log(`The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad');
