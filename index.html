@@ -991,9 +991,7 @@ that means creating game asks for a name and choosing avatar
         };
         e.maxHp = e.hp;
         e.baseName = tmpl.name;
-        if(e.humanoid){
-          applyEnemyEquipment(e, rollEnemyEquipment(e));
-        }
+        prepareEnemyEquipment(e);
         enemies.push(e);
         occupied.add(keyXY(p.x,p.y));
       }
@@ -1249,6 +1247,22 @@ that means creating game asks for a name and choosing avatar
       if(roll<0.75) return makeArmorItem(e.tier);
       return makeShieldItem(e.tier);
     }
+    function rollEnemyDropEquipment(e){
+      if(!e || !e.humanoid) return null;
+      const mf = playerMf();
+      const dropChance = 0.45 + mf*0.02 + e.tier*0.03;
+      if(!chance(Math.min(0.9,dropChance))) return null;
+      const roll = rng();
+      let tier = e.tier;
+      if(chance(0.35) && tier>1) tier -= 1;
+      if(roll<0.5) return makeWeaponItem(tier);
+      if(roll<0.75) return makeArmorItem(tier);
+      return makeShieldItem(tier);
+    }
+    function prepareEnemyEquipment(e){
+      if(!e || !e.humanoid) return;
+      applyEnemyEquipment(e, rollEnemyEquipment(e) || rollEnemyDropEquipment(e));
+    }
     function applyEnemyEquipment(e, item){
       if(!e || !item) return;
       e.equipment = item;
@@ -1493,9 +1507,7 @@ that means creating game asks for a name and choosing avatar
         };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
-        if(e.humanoid){
-          applyEnemyEquipment(e, rollEnemyEquipment(e));
-        }
+        prepareEnemyEquipment(e);
         if(chance(0.05)){
           const names = Object.keys(ENEMY_PREFIXES);
           const pfx = pick(names);
@@ -1823,6 +1835,9 @@ that means creating game asks for a name and choosing avatar
         player.inventory.push(item);
         return;
       }
+      if(e.humanoid){
+        return;
+      }
       const dropChance = 0.45 + mf*0.02 + e.tier*0.03;
       if(chance(Math.min(0.9,dropChance))){
         const roll = rng();
@@ -1923,7 +1938,7 @@ that means creating game asks for a name and choosing avatar
         const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
           ? e.equipment : null;
         if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon)){
-          log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.name}, striking again!`, 'good');
+          log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good');
           await playerAttackEnemy(e, true);
         }
       }
@@ -1931,7 +1946,7 @@ that means creating game asks for a name and choosing avatar
     function enemyAttackPlayer(e, isExtraAttack=false){
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null;
-      const weaponText = enemyWeapon ? ` with their ${enemyWeapon.name}` : '';
+      const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : '';
       beginEnemyAttackAnim(e);
       if(chance(missChance(e.spd, playerSpd()))){
         spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3');
@@ -1949,7 +1964,7 @@ that means creating game asks for a name and choosing avatar
       spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0);
       if(glancing){
         if(enemyWeapon){
-          log(`The ${e.name}'s ${enemyWeapon.name} glances off your ${armor.name}! The ${e.name} hits you with their ${enemyWeapon.name} for ${dmg}.`, 'bad');
+          log(`The ${e.name}'s ${enemyWeapon.base} glances off your ${armor.name}! The ${e.name} hits you with their ${enemyWeapon.base} for ${dmg}.`, 'bad');
         } else {
           log(`The ${e.name}'s strike glances off your ${armor.name}! The ${e.name} hits you for ${dmg}.`, 'bad');
         }
@@ -1962,7 +1977,7 @@ that means creating game asks for a name and choosing avatar
         return true;
       }
       if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon)){
-        log(`${e.name}'s ${enemyWeapon.name} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad');
+        log(`${e.name}'s ${enemyWeapon.base} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad');
         return enemyAttackPlayer(e, true);
       }
       return false;
@@ -2503,9 +2518,7 @@ that means creating game asks for a name and choosing avatar
       };
       e.maxHp = e.hp;
       e.baseName = tmpl.name;
-      if(e.humanoid){
-        applyEnemyEquipment(e, rollEnemyEquipment(e));
-      }
+      prepareEnemyEquipment(e);
       enemies.push(e);
       occupied.add(keyXY(spot.x, spot.y));
       log(`A ${e.name} rustles out from the trees nearby!`, 'bad');
