@@ -457,8 +457,8 @@ that means creating game asks for a name and choosing avatar
         <div class="inv-tabs" id="invTabs">
           <button class="inv-tab active" data-tab="all" type="button">All</button>
           <button class="inv-tab" data-tab="weapon" type="button">Weapons</button>
-          <button class="inv-tab" data-tab="armor" type="button">Armors</button>
           <button class="inv-tab" data-tab="shield" type="button">Shields</button>
+          <button class="inv-tab" data-tab="armor" type="button">Armors</button>
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
@@ -2335,8 +2335,10 @@ that means creating game asks for a name and choosing avatar
       const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' ? (item.modAmt || 0) : 0;
       if(item.kind === 'weapon'){
         const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0);
-        const spd = (item.spd || 0) + (item.mod === 'spd' ? modBonus : 0);
-        return {sum:atk+spd, tier:item.tier || 0, primary:atk};
+        const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
+          ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
+          : 0;
+        return {sum:atk+otherModifier, tier:item.tier || 0, primary:atk};
       }
       const def = (item.def || 0) + (item.mod === 'def' ? modBonus : 0);
       return {sum:def, tier:item.tier || 0, primary:def};
