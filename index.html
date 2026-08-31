@@ -1059,6 +1059,7 @@ that means creating game asks for a name and choosing avatar
           }
           cm[entrances[1].y][entrances[1].x]='caveentrance';
         }
+        for(const entrance of entrances) cm[entrance.y][entrance.x]='caveentrance';
         caveMaps.push(cm);
         caves.push(cave);
         for(const entrance of entrances) candidates.splice(candidates.indexOf(entrance),1);
@@ -4321,6 +4322,14 @@ that means creating game asks for a name and choosing avatar
           : [{x:c.x,y:c.y}],
       }));
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
+      for(let i=0;i<caveMaps.length;i++){
+        const entrances = caves[i] && caves[i].entrances ? caves[i].entrances : [];
+        for(const entrance of entrances){
+          if(caveMaps[i][entrance.y] && caveMaps[i][entrance.y][entrance.x] !== undefined){
+            caveMaps[i][entrance.y][entrance.x] = 'caveentrance';
+          }
+        }
+      }
       undergroundMap = blankCaveMap();
       for(const cm of caveMaps){
         for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
