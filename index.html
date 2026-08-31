@@ -1884,9 +1884,11 @@ that means creating game asks for a name and choosing avatar
         return false;
       }
       let dmg = damageRoll(e.atk, playerDef());
-      if(e.crit && chance(CRIT_CHANCE)) dmg = Math.round(dmg*2);
+      const critical = e.crit && chance(CRIT_CHANCE);
+      if(critical) dmg = Math.round(dmg*2);
       player.hp -= dmg;
-      spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d');
+      if(critical) spawnDamageNumber(player.x, player.y, 'Crit!', '#f0b35a');
+      spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0);
       log(`The ${e.name} hits you for ${dmg}.`, 'bad');
       updateHud();
       if(player.hp <= 0){
@@ -2701,8 +2703,8 @@ that means creating game asks for a name and choosing avatar
       const ch = e.name.replace(/^[A-Za-z]+ /,'')[0];
       spawnFxAnim(e.x, e.y, ch, ENEMY_COLORS[e.tier], 1);
     }
-    function spawnDamageNumber(x, y, amount, color){
-      damageAnims.push({x, y, amount, color, start:performance.now()});
+    function spawnDamageNumber(x, y, amount, color, delay){
+      damageAnims.push({x, y, amount, color, start:performance.now(), delay:delay || 0});
       runAnimationLoop();
     }
 
@@ -2897,7 +2899,9 @@ that means creating game asks for a name and choosing avatar
       }
       for(let i=damageAnims.length-1; i>=0; i--){
         const p = damageAnims[i];
-        const t = Math.min(1, (now - p.start) / DAMAGE_ANIM_MS);
+        const elapsed = now - p.start;
+        if(elapsed < p.delay) continue;
+        const t = Math.min(1, (elapsed - p.delay) / DAMAGE_ANIM_MS);
         if(t >= 1){ damageAnims.splice(i,1); continue; }
         const vx = Math.round((p.x-camX) * TILE_PX);
         const vy = Math.round((p.y-camY) * TILE_PX - TILE_PX * 0.85 * t);
