@@ -601,17 +601,28 @@ that means creating game asks for a name and choosing avatar
       ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes;
       ENEMY_PREFIXES = content.enemyPrefixes;
     }
+    const preloadedImageUrls = new Map();
     async function preloadImages(){
       const paths = [];
       for(const tmpl of ENEMY_TEMPLATES) paths.push('enemies/' + slug(tmpl.name) + '.jpg');
       for(const tmpl of NPC_TEMPLATES) paths.push('npc/' + tmpl.portrait + '.jpg');
-      await Promise.all([...new Set(paths)].map(path=>new Promise(resolve=>{
-        const image = new Image();
-        image.decoding = 'sync';
-        image.onload = ()=>image.decode().then(resolve, resolve);
-        image.onerror = resolve;
-        image.src = path;
-      })));
+      await Promise.all([...new Set(paths)].map(async path=>{
+        try{
+          const response = await fetch(path);
+          if(!response.ok) throw new Error(`Failed to preload ${path} (${response.status})`);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          preloadedImageUrls.set(path, url);
+        }catch(err){
+          console.warn(err.message);
+        }
+      }));
+    }
+    function imageSrc(path){
+      return preloadedImageUrls.get(path) || path;
     }
     function applyEnemyPrefix(e, prefix){
       const effects = ENEMY_PREFIXES[prefix] || {};
@@ -3478,7 +3489,7 @@ that means creating game asks for a name and choosing avatar
           ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
           : '';
         return { mini:false, enemy:e, html: `
-      <img src="enemies/${slug(e.baseName)}.jpg" onerror="this.style.display='none'">
+      <img src="${imageSrc(`enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
@@ -3488,7 +3499,7 @@ that means creating game asks for a name and choosing avatar
       const n = currentZ===0 && npcs.find(np=>np.x===mx && np.y===my);
       if(n){
         return { mini:false, enemy:null, html: `
-      <img src="npc/${n.portrait}.jpg" onerror="this.style.display='none'">
+      <img src="${imageSrc(`npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="nm">${n.name}</div>
       ${n.trades ? '<div style="color:var(--parchment-dim);font-size:10px;">Click to trade</div>' : ''}` };
       }
