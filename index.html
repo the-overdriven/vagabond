@@ -621,6 +621,9 @@ that means creating game asks for a name and choosing avatar
         if(typeof e[stat] === 'number') e[stat] = Math.round(e[stat]);
       }
     }
+    function inspect(){
+      if(!enterCave()) describeSurroundings();
+    }
     const ENEMY_DEFAULT_BIOMES_FALLBACK = ['grass','forest','hill','sand','snow','river'];
     function enemyBiomes(tmpl){
       return (tmpl && Array.isArray(tmpl.biomes) && tmpl.biomes.length) ? tmpl.biomes : (ENEMY_DEFAULT_BIOMES.length ? ENEMY_DEFAULT_BIOMES : ENEMY_DEFAULT_BIOMES_FALLBACK);
@@ -2779,8 +2782,8 @@ that means creating game asks for a name and choosing avatar
         }
         if(map[ny][nx]==='caveentrance'){
           log(currentZ===0
-            ? 'You\'re standing at the entrance to the cave. Press space, if you dare to enter.'
-            : "You're standing at the cave exit. Press space, to come back to surface.", 'info');
+            ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
+            : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -4527,7 +4530,7 @@ that means creating game asks for a name and choosing avatar
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
       if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; player.gold = 500; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
       if(mapOpen || invOpen || tradeOpen) return;
-      if(k===' ' || k==='Spacebar'){ ev.preventDefault(); if(!enterCave()) describeSurroundings(); return; }
+      if(k===' ' || k==='Spacebar'){ ev.preventDefault(); inspect(); return; }
       if(k==='f' || k==='F'){ ev.preventDefault(); lootSkeletonOrForage(); return; }
       const moves = {
 
@@ -4573,7 +4576,7 @@ that means creating game asks for a name and choosing avatar
     const touchForageBtn = document.getElementById('touchForage');
     const touchInventoryBtn = document.getElementById('touchInventory');
     if(touchSpaceBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) describeSurroundings(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) inspect(); };
       touchSpaceBtn.addEventListener('touchstart', fn);
       touchSpaceBtn.addEventListener('click', fn);
     }
