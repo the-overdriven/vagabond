@@ -730,20 +730,22 @@ that means creating game asks for a name and choosing avatar
 
     let map = []; // map[y][x] = tile key string
     let surfaceMap = null;
+    let undergroundMap = null;
     let caveMaps = [];
     let caves = [];
+    let undergroundDiscovered = [];
     let currentZ = 0;
     let currentCave = -1;
     function onCurrentLevel(entity){
       const level = entity.level || 0;
-      return level === 0 ? currentZ === 0 : currentZ === level && entity.caveIndex === currentCave;
+      return level === 0 ? currentZ === 0 : currentZ === level;
     }
     function enterCave(){
       if(currentZ===0){
         if(map[player.y][player.x] !== 'caveentrance') return false;
         const cave = caves.findIndex(c=>c.entrances.some(e=>e.x===player.x && e.y===player.y));
         if(cave < 0) return false;
-        currentCave = cave; currentZ = -1; map = caveMaps[cave];
+        currentCave = cave; currentZ = -1; map = undergroundMap;
         log('You descend into the cave.', 'info');
       } else {
         if(map[player.y][player.x] !== 'caveentrance') return false;
@@ -957,6 +959,7 @@ that means creating game asks for a name and choosing avatar
     function generateCaves(){
       caves = [];
       caveMaps = [];
+      undergroundMap = blankCaveMap();
       const candidates = [];
       for(let y=2;y<MAP_H-2;y++) for(let x=2;x<MAP_W-2;x++){
         if(map[y][x] !== 'mountain') continue;
@@ -1009,6 +1012,12 @@ that means creating game asks for a name and choosing avatar
         caveMaps.push(cm);
         caves.push(cave);
         for(const entrance of entrances) candidates.splice(candidates.indexOf(entrance),1);
+      }
+      for(const cm of caveMaps){
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+          if(cm[y][x] !== 'cavewall') undergroundMap[y][x] = cm[y][x];
+        }
+        undergroundDiscovered = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
       }
     }
 
@@ -3625,7 +3634,7 @@ that means creating game asks for a name and choosing avatar
       const terrainMap = currentZ===0 ? (surfaceMap || map) : map;
       const t = TILE[terrainMap[y][x]];
       const foraged = terrainMap[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
-      const visible = currentZ < 0 || discovered[y][x];
+      const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x];
       c.fillStyle = visible ? (foraged ? '#554f2a' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
@@ -3641,9 +3650,9 @@ that means creating game asks for a name and choosing avatar
       minimapDirty = true;
     }
     function markDiscovered(x, y){
-      if(currentZ !== 0) return;
-      if(discovered[y][x]) return;
-      discovered[y][x] = true;
+      const seen = currentZ === 0 ? discovered : undergroundDiscovered;
+      if(seen[y][x]) return;
+      seen[y][x] = true;
       ensureMiniBases();
       for(const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y);
       minimapDirty = true;
@@ -3665,12 +3674,14 @@ that means creating game asks for a name and choosing avatar
         ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, viewW*scale, viewH*scale, 0, 0, w, h);
         if(currentZ===0) ctx.fillStyle = '#ff6b2e';
         for(const cave of currentZ===0 ? caves : []){
-          if(!discovered[cave.y] || !discovered[cave.y][cave.x]) continue;
-         const cx = (cave.x-ox)*scale*zoom + scale*zoom/2;
-         const cy = (cave.y-oy)*scale*zoom + scale*zoom/2;
+         for(const entrance of cave.entrances || [{x:cave.x,y:cave.y}]){
+         if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
+         const cx = (entrance.x-ox)*scale*zoom + scale*zoom/2;
+         const cy = (entrance.y-oy)*scale*zoom + scale*zoom/2;
          if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2*zoom, cy-2*zoom, 4*zoom, 4*zoom);
+         }
         }
-        if(discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
+        if(currentZ===0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
           const tx = (spawnPoint.x-ox)*scale*zoom + scale*zoom/2;
           const ty = (spawnPoint.y-oy)*scale*zoom + scale*zoom/2;
           ctx.fillStyle = 'purple';
@@ -3693,14 +3704,18 @@ that means creating game asks for a name and choosing avatar
       ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, w, h, 0, 0, w, h);
       ctx.fillStyle = '#ff6b2e';
       for(const cave of currentZ===0 ? caves : []){
-        if(!discovered[cave.y] || !discovered[cave.y][cave.x]) continue;
-        const cx = (cave.x-ox)*scale + scale/2;
-        const cy = (cave.y-oy)*scale + scale/2;
+        for(const entrance of cave.entrances || [{x:cave.x,y:cave.y}]){
+        if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
+        const cx = (entrance.x-ox)*scale + scale/2;
+        const cy = (entrance.y-oy)*scale + scale/2;
         if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2, cy-2, 4, 4);
+        }
       }
       const dot = Math.max(2, scale+2);
-      ctx.fillStyle = '#ffe08a';
-      ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
+      if(currentZ===0){
+        ctx.fillStyle = '#ffe08a';
+        ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
+      }
       ctx.fillStyle = map[player.y] && map[player.y][player.x] === 'caveentrance' ? '#ff8c32' : '#ffffff';
       ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
     }
@@ -4182,6 +4197,7 @@ that means creating game asks for a name and choosing avatar
         currentZ: currentZ,
         currentCave: currentCave,
         discovered: discovered.map(row => row.map(b => b?'1':'0').join('')),
+        undergroundDiscovered: undergroundDiscovered.map(row => row.map(b => b?'1':'0').join('')),
         spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
         player: {
@@ -4255,7 +4271,13 @@ that means creating game asks for a name and choosing avatar
           : [{x:c.x,y:c.y}],
       }));
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
-      map = data.currentZ < 0 && caveMaps[data.currentCave] ? caveMaps[data.currentCave] : surfaceMap;
+      undergroundMap = blankCaveMap();
+      for(const cm of caveMaps){
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+          if(cm[y][x] !== 'cavewall') undergroundMap[y][x] = cm[y][x];
+        }
+      }
+      map = data.currentZ < 0 && undergroundMap ? undergroundMap : surfaceMap;
       currentZ = data.currentZ < 0 && caveMaps[data.currentCave] ? -1 : 0;
       currentCave = currentZ < 0 ? data.currentCave : -1;
 
@@ -4269,6 +4291,11 @@ that means creating game asks for a name and choosing avatar
         // older save from before fog-of-war existed - start fresh, the player's
         // current surroundings get marked seen automatically by the render() below
         initDiscovered();
+      }
+      if(Array.isArray(data.undergroundDiscovered) && data.undergroundDiscovered.length === MAP_H){
+        undergroundDiscovered = data.undergroundDiscovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'));
+      } else {
+        undergroundDiscovered = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
       }
       rebuildMinimapBases();
 
