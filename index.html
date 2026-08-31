@@ -3,19 +3,18 @@
 - preload images
 - gear screen and map screen are mutually exclusive, one closes the other automatically
 - static HP gain on level up
+- crit hit chance should be shown in char screen
+- stats in character screen should appear below backpack and be collapsible (desktop only)
+
 - chests should be mostly in remote location and near high tier mobs, in that case they should grant better loot
 - big bell weight shouldnt be mentioned from distance
-
 - there should be less health potions in the world, especially once meat is introduced
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
-- add evasion? chance to dodge. or reuse SPD
 - prefixed mobs should give more XP
 - add food? heals minor HP. looted from selected animals
 - collect berries? more survivalism?
-- do not heal on level up?
 - scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal
 - balance monsters, xp
-- add a chance for crit hit?
 - highlight better gear
 - in gear screen equipped items should have the same colour as in backpacks
 
@@ -267,6 +266,9 @@ that means creating game asks for a name and choosing avatar
       }
       .statgrid .row .lbl{color:var(--parchment-dim); letter-spacing:0.5px; text-align: right;}
       .statgrid .row b{color:var(--ember-bright); font-weight:700;}
+      .stats-details{margin-top:12px; border-top:1px solid var(--border); padding-top:8px;}
+      .stats-details summary{cursor:pointer; color:var(--ember-bright); font-size:12px; letter-spacing:1px; font-weight:700;}
+      .stats-details .statgrid{margin-top:8px; margin-bottom:0;}
       .invlist{max-height:220px; overflow-y:auto; border-top:1px solid var(--border); padding-top:8px;}
       .inv-tabs{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px;}
       .inv-tab{
@@ -363,7 +365,7 @@ that means creating game asks for a name and choosing avatar
               border-radius:0; margin:0;
           }
           #mapOverlay .panelbox{width:100%;}
-          #invOverlay #statGrid{display:none;}
+          #invOverlay .stats-details{display:none;}
           #mobileInfoPanel{
               display:block; width:100%; max-width:100%; box-sizing:border-box;
               background:linear-gradient(180deg,var(--panel2),var(--panel));
@@ -449,7 +451,6 @@ that means creating game asks for a name and choosing avatar
           <div class="slot" id="slotShield"><div class="label">🛡️ Shield</div><div class="val">-</div></div>
           <div class="slot" id="slotArmor"><div class="label">🧥 Armor</div><div class="val">-</div></div>
         </div>
-        <div class="statgrid" id="statGrid"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <b style="color:var(--ember-bright);font-size:12px;letter-spacing:1px;">BACKPACK</b>
         </div>
@@ -461,6 +462,10 @@ that means creating game asks for a name and choosing avatar
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
+        <details class="stats-details">
+          <summary>CHARACTER STATS</summary>
+          <div class="statgrid" id="statGrid"></div>
+        </details>
         <div class="closehint">
           <button class="slbtn" id="btnInvToMap" type="button">View Map</button>
         </div>
@@ -585,6 +590,15 @@ that means creating game asks for a name and choosing avatar
       ENEMY_TEMPLATES = content.enemyTemplates;
       ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes;
       ENEMY_PREFIXES = content.enemyPrefixes;
+    }
+    function preloadImages(){
+      const paths = [];
+      for(const tmpl of ENEMY_TEMPLATES) paths.push('enemies/' + slug(tmpl.name) + '.jpg');
+      for(const tmpl of NPC_TEMPLATES) paths.push('npc/' + tmpl.portrait + '.jpg');
+      for(const path of paths){
+        const image = new Image();
+        image.src = path;
+      }
     }
     function applyEnemyPrefix(e, prefix){
       const effects = ENEMY_PREFIXES[prefix] || {};
@@ -1377,7 +1391,7 @@ that means creating game asks for a name and choosing avatar
       while(player.xp >= xpToNext(player.lvl)){
         player.xp -= xpToNext(player.lvl);
         player.lvl++;
-        const hpGain = randInt(4,7);
+        const hpGain = 5;
         player.maxHp += hpGain;
         leveled=true;
         log(`You reached Level ${player.lvl}! (+${hpGain} max HP)`, 'good');
@@ -3439,7 +3453,9 @@ that means creating game asks for a name and choosing avatar
       const rows = [
         // ['🎚️ Level', player.lvl],
         ['✨ XP to Next Level', player.xp+' / '+xpToNext(player.lvl)],
+        ['📈 XP Bonus', Math.round((xpMultiplier()-1)*100)+'%'],
         ['❤️ HP', player.hp+' / '+playerMaxHp()],
+        ['💥 Crit Chance', Math.round(CRIT_CHANCE*100)+'%'],
         // ['⚔️ Attack', playerAtk()],
         // ['🛡️ Defense', playerDef()],
         // ['⚡ Speed', playerSpd()],
@@ -4061,13 +4077,17 @@ that means creating game asks for a name and choosing avatar
       document.body.classList.toggle('overlay-open', overlayOpen);
     }
     function toggleInv(force){
-      invOpen = (force!==undefined) ? force : !invOpen;
+      const next = (force!==undefined) ? force : !invOpen;
+      if(next && mapOpen) toggleMap(false);
+      invOpen = next;
       document.getElementById('invOverlay').classList.toggle('show', invOpen);
       if(invOpen) renderInventory();
       updateTouchControlsVisibility();
     }
     function toggleMap(force){
-      mapOpen = (force!==undefined) ? force : !mapOpen;
+      const next = (force!==undefined) ? force : !mapOpen;
+      if(next && invOpen) toggleInv(false);
+      mapOpen = next;
       document.getElementById('mapOverlay').classList.toggle('show', mapOpen);
       if(mapOpen){ mapPanX = player.x; mapPanY = player.y; renderMinimap(); }
       updateTouchControlsVisibility();
@@ -4150,6 +4170,7 @@ that means creating game asks for a name and choosing avatar
 
     /* ============================== INIT ============================== */
     function init(){
+      preloadImages();
       generateMap();
       initDiscovered();
       rebuildMinimapBases();
