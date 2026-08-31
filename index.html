@@ -1460,7 +1460,7 @@ that means creating game asks for a name and choosing avatar
           const distantPool = [];
           for(let i=0; i<pool.length; i+=2){
             const x = pool[i], y = pool[i+1];
-            if(Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y)) >= 30){
+            if(Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y)) >= 50){
               distantPool.push(x, y);
             }
           }
