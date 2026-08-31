@@ -1,5 +1,5 @@
 [
-  {"name":"Buckler",      "def":1, "tier":1},
-  {"name":"Round Shield", "def":3, "tier":2},
-  {"name":"Tower Shield", "def":6, "tier":4}
+  {"name":"Buckler",      "def":2, "tier":1},
+  {"name":"Round Shield", "def":5, "tier":2},
+  {"name":"Tower Shield", "def":10, "tier":4}
 ]
