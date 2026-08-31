@@ -1335,10 +1335,10 @@ that means creating game asks for a name and choosing avatar
       return d;
     }
     function playerSpd(){
-      let s = player.baseSpd;
+      let s = player.baseSpd + Math.floor(player.lvl/2);
       const w = player.equip.weapon;
       if(w){ s += Math.floor(w.spd/2); if(w.mod==='spd') s += w.modAmt; }
-      if(player.equip.shield) s -= 1;
+      if(player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2;
       if(player.equip.armor) s -= 1;
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
