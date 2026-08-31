@@ -62,6 +62,9 @@ that means creating game asks for a name and choosing avatar
 - For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom
 - on mobile inventory screen hides hp bar
 - popup do u rly want to exit before closing tab
+- log hints to msg log with H
+- allow skipping turns with key (t)
+- chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
  -->
 
 <!DOCTYPE html>
@@ -1913,10 +1916,13 @@ that means creating game asks for a name and choosing avatar
       }
     }
     function enemyAttackPlayer(e, isExtraAttack=false){
+      const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
+        ? e.equipment : null;
+      const weaponText = enemyWeapon ? ` with their ${enemyWeapon.name}` : '';
       beginEnemyAttackAnim(e);
       if(chance(missChance(e.spd, playerSpd()))){
         spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3');
-        log(`The ${e.name} attacks but misses you.`, 'good');
+        log(`The ${e.name} attacks${weaponText} but misses you.`, 'good');
         return false;
       }
       let dmg = damageRoll(e.atk, playerDef());
@@ -1925,14 +1931,12 @@ that means creating game asks for a name and choosing avatar
       player.hp -= dmg;
       if(critical) spawnDamageNumber(player.x, player.y, 'Crit!', '#f0b35a');
       spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0);
-      log(`The ${e.name} hits you for ${dmg}.`, 'bad');
+      log(`The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad');
       updateHud();
       if(player.hp <= 0){
         die();
         return true;
       }
-      const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
-        ? e.equipment : null;
       if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon)){
         log(`${e.name}'s ${enemyWeapon.name} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad');
         return enemyAttackPlayer(e, true);
