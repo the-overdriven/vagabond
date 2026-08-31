@@ -1210,12 +1210,22 @@ that means creating game asks for a name and choosing avatar
     }
 
     /* ============================== ITEM / ENTITY FACTORIES ============================== */
+    function rollModifierAmount(stat){
+      if(stat === 'hp') return 1 + Math.floor(Math.pow(rng(),5) * 50);
+      const roll = randInt(1,100);
+      if(roll<=45) return 1;
+      if(roll<=75) return 2;
+      if(roll<=90) return 3;
+      if(roll<=97) return 4;
+      if(roll<=99) return 5;
+      return randInt(6,10);
+    }
     function rollModifier(baseName, item){
       if(!chance(0.20)) return item;
       const mod = pick(MODIFIERS);
       item.mod = mod.stat;
       item.name = mod.name + " " + baseName;
-      const amt = randInt(1,3);
+      const amt = rollModifierAmount(mod.stat);
       item.modAmt = amt;
       if(mod.stat==='xp') item.xpBonus = randInt(5,15); // % bonus
       return item;
