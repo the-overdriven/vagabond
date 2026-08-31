@@ -336,6 +336,33 @@ that means creating game asks for a name and choosing avatar
       #tooltip.mini{width:auto; padding:4px 8px;}
       #tooltip.mini .nm{margin-bottom:0;}
 
+      /* ============================== RACE SELECTION ============================== */
+      #raceOverlay{background:rgba(5,4,3,0.92); z-index:40;}
+      #raceOverlay .panelbox{width:min(94vw, 860px); max-height:92vh; overflow-y:auto;}
+      #raceName{
+          background:#120d09; border:1px solid var(--border); border-radius:4px;
+          color:var(--parchment); font-family:inherit; font-size:13px; padding:6px 8px; width:220px;
+      }
+      #raceName:focus{outline:none; border-color:var(--ember);}
+      .race-namerow{display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;}
+      .race-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;}
+      .race-card{
+          background:var(--panel); border:1px solid var(--border); border-radius:5px;
+          padding:6px; cursor:pointer; text-align:center; color:var(--parchment);
+          font-family:inherit; font-size:10px; line-height:1.35;
+      }
+      .race-card img{width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:4px; display:block; margin-bottom:5px;}
+      .race-card .rname{color:var(--ember-bright); font-weight:700; font-size:12px; letter-spacing:0.5px;}
+      .race-card .rbonus{color:var(--parchment-dim); margin-top:3px;}
+      .race-card:hover{border-color:var(--ember);}
+      .race-card.sel{border-color:var(--ember-bright); background:#2c2013; box-shadow:0 0 0 1px var(--ember-bright) inset;}
+      .race-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap;}
+      #raceError{color:var(--blood); font-size:11px;}
+      #btnBegin{font-size:13px; padding:8px 18px;}
+      @media (max-width:720px), (pointer:coarse){
+          .race-grid{grid-template-columns:repeat(2, 1fr);}
+      }
+
       /* ============================== MOBILE / TOUCH CONTROLS ==============================
          Everything below only activates for touch-primary devices (pointer:coarse), so mouse
          + keyboard desktop play is completely unaffected. It adds an on-screen D-pad for
@@ -352,11 +379,11 @@ that means creating game asks for a name and choosing avatar
           #stage{ max-width:100vw; }
           canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
           /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
-          #invOverlay, #mapOverlay, #tradeOverlay{
+          #invOverlay, #mapOverlay, #tradeOverlay, #raceOverlay{
               position:fixed; inset:0; width:100vw; height:100dvh; min-height:100vh;
               align-items:stretch; justify-content:stretch; z-index:100;
           }
-          #invOverlay .panelbox, #mapOverlay .panelbox{
+          #invOverlay .panelbox, #mapOverlay .panelbox, #raceOverlay .panelbox{
               width:100%; max-width:none; height:100%; max-height:none;
               min-height:100%; box-sizing:border-box; border-radius:0;
               overflow-y:auto; padding-bottom:140px;
@@ -452,9 +479,26 @@ that means creating game asks for a name and choosing avatar
   <div id="stage">
     <canvas id="game"></canvas>
     <div id="tooltip"></div>
+    <div class="overlay" id="raceOverlay">
+      <div class="panelbox">
+        <h2>Choose Your Blood</h2>
+        <div class="race-namerow">
+          <label for="raceName" style="font-size:12px;letter-spacing:1px;color:var(--ember-bright);">NAME</label>
+          <input type="text" id="raceName" maxlength="18" placeholder="Vagabond" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="race-grid" id="raceGrid"></div>
+        <div class="race-foot">
+          <span id="raceError"></span>
+          <span style="display:flex; gap:8px; align-items:center;">
+            <button class="slbtn" id="btnRaceLoad" type="button" title="Load an existing character from a .json save">📂 Load save</button>
+            <button class="slbtn" id="btnBegin" type="button">Begin your journey</button>
+          </span>
+        </div>
+      </div>
+    </div>
     <div class="overlay" id="invOverlay">
       <div class="panelbox">
-        <h2>Character</h2><button class="slbtn overlay-close" id="btnInvClose" type="button" aria-label="Close inventory">✕</button>
+        <h2 id="charTitle">Character</h2><button class="slbtn overlay-close" id="btnInvClose" type="button" aria-label="Close inventory">✕</button>
         <div class="paperdoll">
           <div class="slot" id="slotWeapon"><div class="label">🗡️ Weapon</div><div class="val">-</div></div>
           <div class="slot" id="slotShield"><div class="label">🛡️ Shield</div><div class="val">-</div></div>
@@ -606,6 +650,7 @@ that means creating game asks for a name and choosing avatar
       const paths = [];
       for(const tmpl of ENEMY_TEMPLATES) paths.push('enemies/' + slug(tmpl.name) + '.jpg');
       for(const tmpl of NPC_TEMPLATES) paths.push('npc/' + tmpl.portrait + '.jpg');
+      for(const race of RACES) paths.push('avatars/' + race.avatar);
       await Promise.all([...new Set(paths)].map(async path=>{
         try{
           const response = await fetch(path);
@@ -1366,6 +1411,13 @@ that means creating game asks for a name and choosing avatar
       }
       return tile.walk;
     }
+    // Merlings swim, so open water counts as walkable for the player only -
+    // enemies and world generation keep using the strict isWalkable().
+    function isWalkableForPlayer(x,y){
+      if(isWalkable(x,y)) return true;
+      if(x<0||y<0||x>=MAP_W||y>=MAP_H) return false;
+      return raceHas('swims') && map[y][x] === 'water';
+    }
 
     /* ============================== ITEM / ENTITY FACTORIES ============================== */
     function rollModifierAmount(stat){
@@ -1478,8 +1530,44 @@ that means creating game asks for a name and choosing avatar
     }
 
     /* ============================== PLAYER ============================== */
+    // Each race grants exactly one distinct, playstyle-shaping perk. The perk
+    // fields below are read by the systems they affect (see raceBonus(),
+    // xpMultiplier(), enemyAggroRange(), consumablePower(), etc.) so nothing
+    // here has to be baked into the player's stored base stats - that keeps
+    // saves portable and lets the HUD show the bonus live.
+    const RACES = [
+      {id:'human',     name:'Human',     avatar:'human.jpg',      bonus:'+20% XP gain rate',                     xp:0.20},
+      {id:'halfling',  name:'Halfling',  avatar:'halfling.jpg',   bonus:'-1 AGGRO range from all enemies',    aggro:-1},
+      {id:'catling',   name:'Catling',   avatar:'catling.jpg',    bonus:'+3 SPD',                             stats:{spd:3}},
+      {id:'dwarf',     name:'Dwarf',     avatar:'dwarf.jpg',      bonus:'+3 DEF',                             stats:{def:3}},
+      {id:'orc',       name:'Orc',       avatar:'orc.jpg',        bonus:'+3 ATK',                             stats:{atk:3}},
+      {id:'leprechaun',name:'Leprechaun',avatar:'leprechaun.jpg', bonus:'+5 Magic Find',                      stats:{mf:5}},
+      {id:'elf',       name:'Elf',       avatar:'elf.jpg',        bonus:'+2 GRACE, never ambushed in forest', grace:2, noForestAmbush:true},
+      {id:'wyrdling',  name:'Wyrdling',  avatar:'wyrdling.jpg',   bonus:'Consumables are 25% more effective', consumables:1.25},
+      {id:'merling',   name:'Merling',   avatar:'merling.jpg',    bonus:'Unlimited swimming',       swims:true},
+      {id:'troll',     name:'Troll',     avatar:'troll.jpg',      bonus:'Regenerates 1 HP every 5 turns',     regenEvery:5},
+    ];
+    const DEFAULT_RACE = 'human';
+    function raceDef(){
+      return RACES.find(r=>r.id===player.race) || RACES.find(r=>r.id===DEFAULT_RACE);
+    }
+    function raceBonus(stat){
+      const race = raceDef();
+      return (race && race.stats && race.stats[stat]) || 0;
+    }
+    function raceHas(flag){
+      const race = raceDef();
+      return !!(race && race[flag]);
+    }
+    // Wyrdlings squeeze more out of every potion, herb and scroll.
+    function consumablePower(amount){
+      const race = raceDef();
+      const mult = race && race.consumables ? race.consumables : 1;
+      return Math.max(1, Math.round(amount * mult));
+    }
     const player = {
       x: 0, y: 0,
+      name: 'Vagabond', race: DEFAULT_RACE,
       lvl: 1, xp: 0,
       maxHp: 50, hp: 50,
       baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
@@ -1500,7 +1588,7 @@ that means creating game asks for a name and choosing avatar
       player._bonusHp = bonusHp;
     }
     function playerAtk(){
-      let a = player.baseAtk;
+      let a = player.baseAtk + raceBonus('atk');
       for(const slot of ['weapon','shield','armor']){
         const it = player.equip[slot];
         if(!it) continue;
@@ -1511,7 +1599,7 @@ that means creating game asks for a name and choosing avatar
     }
 
     function playerDef(){
-      let d = player.baseDef;
+      let d = player.baseDef + raceBonus('def');
       for(const slot of ['weapon','shield','armor']){
         const it = player.equip[slot];
         if(!it) continue;
@@ -1522,7 +1610,7 @@ that means creating game asks for a name and choosing avatar
       return d;
     }
     function playerSpd(){
-      let s = player.baseSpd + Math.floor(player.lvl/2);
+      let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl/2);
       if(player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2;
       if(player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0);
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
@@ -1532,9 +1620,15 @@ that means creating game asks for a name and choosing avatar
     }
     function playerGrace(){
       const weapon = player.equip.weapon;
-      return weaponGrace(weapon);
+      return weaponGrace(weapon) + raceGrace();
     }
-    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
+    // Elves add a flat bonus to every grace check they take part in - both when
+    // they try to outpace an enemy's weapon and when an enemy tries to outpace theirs.
+    function raceGrace(){
+      const race = raceDef();
+      return (race && race.grace) || 0;
+    }
+    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2, water:-2};
     const TERRAIN_DEFENSE = {hill:1};
     function enemyHomeTileType(e){
       if(e && e.homeTileType) return e.homeTileType;
@@ -1557,7 +1651,7 @@ that means creating game asks for a name and choosing avatar
       return Math.max(1, e.spd + enemyTileEffects(e).speed);
     }
     function playerMf(){
-      let mf = player.baseMf;
+      let mf = player.baseMf + raceBonus('mf');
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='mf') mf+=player.equip[slot].modAmt;
       return mf;
     }
@@ -1592,6 +1686,8 @@ that means creating game asks for a name and choosing avatar
 
     function xpMultiplier(){
       let m=1;
+      const race = raceDef();
+      if(race && race.xp) m += race.xp;
       for(const slot of ['weapon','shield','armor']){
         const it = player.equip[slot];
         if(it && it.mod==='xp') m += it.xpBonus/100;
@@ -2099,14 +2195,14 @@ that means creating game asks for a name and choosing avatar
       return equipment && equipment.kind === 'armor' ? equipment : null;
     }
 
-    function weaponCombatDelay(weapon){
-      return weapon && weapon.kind === 'weapon'
-        ? Math.max(1, 6 - weaponGrace(weapon))
-        : null;
+    function weaponCombatDelay(weapon, isPlayer=false){
+      if(!(weapon && weapon.kind === 'weapon')) return null;
+      const grace = weaponGrace(weapon) + (isPlayer ? raceGrace() : 0);
+      return Math.max(1, 6 - grace);
     }
-    function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon){
-      const attackerDelay = weaponCombatDelay(attackerWeapon);
-      const defenderDelay = weaponCombatDelay(defenderWeapon);
+    function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer=false, defenderIsPlayer=false){
+      const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer);
+      const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer);
       return attackerDelay !== null && defenderDelay !== null &&
         attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
     }
@@ -2172,7 +2268,7 @@ that means creating game asks for a name and choosing avatar
         updateMobileInfoPanel(e.x,e.y);
         const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
           ? e.equipment : null;
-        if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon)){
+        if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)){
           log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good');
           await playerAttackEnemy(e, true);
         }
@@ -2219,7 +2315,7 @@ that means creating game asks for a name and choosing avatar
         die();
         return true;
       }
-      if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon)){
+      if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true)){
         log(`${e.name}'s ${enemyWeapon.base} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad');
         return enemyAttackPlayer(e, true);
       }
@@ -2282,6 +2378,15 @@ that means creating game asks for a name and choosing avatar
     const AGGRO_RANGE = 3;  // default aggro distance used when a template doesn't specify one
     function enemyAggroRange(e){
       return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE;
+    }
+    // Halflings are overlooked: every enemy notices them one tile later. Kept
+    // separate from enemyAggroRange() so the raw template value is what gets saved.
+    function raceAggroMod(){
+      const race = raceDef();
+      return (race && race.aggro) || 0;
+    }
+    function effectiveAggroRange(e){
+      return Math.max(1, enemyAggroRange(e) + raceAggroMod());
     }
     function enemyCanTraverse(e, x, y){
       if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) return false;
@@ -2451,8 +2556,20 @@ that means creating game asks for a name and choosing avatar
     // (wandering doesn't apply to off-screen enemies either, so nothing would
     // ever push it further away).
     const FLEE_DISTANCE = 15;
+    let turnCount = 0;
+    // Trolls knit their flesh back together on their own - a slow trickle that
+    // ticks once per elapsed turn regardless of what the player did with it.
+    function tickRaceRegen(){
+      const race = raceDef();
+      if(!race || !race.regenEvery) return;
+      if(player.hp <= 0 || player.hp >= playerMaxHp()) return;
+      if(turnCount % race.regenEvery !== 0) return;
+      player.hp = Math.min(playerMaxHp(), player.hp + 1);
+    }
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
+      turnCount++;
+      tickRaceRegen();
       if(player.speedPotionTurns > 0){
         player.speedPotionTurns--;
         if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
@@ -2480,7 +2597,7 @@ that means creating game asks for a name and choosing avatar
           if(enemyAttackPlayer(e)) return;
           continue;
         }
-        const aggroRange = enemyAggroRange(e);
+        const aggroRange = effectiveAggroRange(e);
         if(dist <= aggroRange){
           const playerSpeed = playerSpd();
           const effectiveEnemySpeed = enemySpd(e);
@@ -2683,6 +2800,7 @@ that means creating game asks for a name and choosing avatar
 
     /* ============================== MOVEMENT ============================== */
     let mapOpen=false, invOpen=false, tradeOpen=false;
+    let raceOpen=false; // the race/name selection screen blocks all play input
     // Buffering one move while the step animation plays keeps held-key walking
     // continuous - without it every input during the 140ms pan is dropped, which
     // reads as stuttering.
@@ -2708,7 +2826,7 @@ that means creating game asks for a name and choosing avatar
     }
     function findPlayerPath(targetX, targetY){
       if(targetX<0 || targetY<0 || targetX>=MAP_W || targetY>=MAP_H) return null;
-      if(!isWalkable(targetX,targetY)) return null;
+      if(!isWalkableForPlayer(targetX,targetY)) return null;
       if(targetX===player.x && targetY===player.y) return [];
       const queue = [{x:player.x,y:player.y}];
       const cameFrom = new Map();
@@ -2720,7 +2838,7 @@ that means creating game asks for a name and choosing avatar
         for(const [dx,dy] of DIRS8){
           const nx=cur.x+dx, ny=cur.y+dy;
           if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H) continue;
-          if(!isWalkable(nx,ny)) continue;
+          if(!isWalkableForPlayer(nx,ny)) continue;
           const nk=keyXY(nx,ny);
           if(cameFrom.has(nk)) continue;
           if((nx!==targetX || ny!==targetY) && occupied.has(nk)) continue;
@@ -2757,6 +2875,7 @@ that means creating game asks for a name and choosing avatar
     // Low-odds ambushes start ordinary forest creatures, or stronger creatures
     // when the player enters the ancient forest.
     function maybeSpawnForestAmbush(x,y){
+      if(raceHas('noForestAmbush')) return; // elves move through woodland unseen
       const ancient = map[y][x] === 'ancientForest';
       if(map[y][x] !== 'forest' && !ancient) return;
       if(!chance(0.05)) return;
@@ -2797,7 +2916,7 @@ that means creating game asks for a name and choosing avatar
     }
 
     async function tryMove(dx,dy){
-      if(mapOpen || invOpen || tradeOpen || deathTransition) return;
+      if(mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return;
       if(cameraAnimating || attackAnim){
         pendingMove = {dx:dx, dy:dy};
         return;
@@ -2826,11 +2945,14 @@ that means creating game asks for a name and choosing avatar
       }
       let moved = false;
       const fromPos = {x:player.x, y:player.y};
-      if(isWalkable(nx,ny)){
+      if(isWalkableForPlayer(nx,ny)){
         player.x = nx; player.y = ny;
         player.steps++;
         checkGroundAt(nx,ny);
         checkWorldEdge();
+        if(map[ny][nx]==='water' && map[fromPos.y][fromPos.x] !== 'water'){
+          log('You slip into the water and swim with ease.', 'info');
+        }
         if(map[ny][nx]==='temple' || map[ny][nx]==='belltower'){
           if(player.hp < playerMaxHp()){
             player.hp = playerMaxHp();
@@ -3427,7 +3549,7 @@ that means creating game asks for a name and choosing avatar
 // its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
 // range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
     function drawEnemyRangeOverlay(e){
-      const aggroRange = enemyAggroRange(e);
+      const aggroRange = effectiveAggroRange(e);
       for(let dy=-aggroRange; dy<=aggroRange; dy++){
         for(let dx=-aggroRange; dx<=aggroRange; dx++){
           if(dx===0 && dy===0) continue; // leave the enemy's own tile untinted
@@ -3500,10 +3622,18 @@ that means creating game asks for a name and choosing avatar
     // tap-to-inspect panel (touchstart) - builds the same info for whatever
     // occupies tile (mx,my), so both surfaces stay in sync automatically.
     function tileInspectInfo(mx,my){
+      if(mx===player.x && my===player.y){
+        const race = raceDef();
+        return { mini:false, enemy:null, html: `
+      <img src="${imageSrc('avatars/'+race.avatar)}" onerror="this.style.display='none'">
+      <div class="nm">${player.name}</div>
+      <div style="color:var(--ember-bright);font-size:11px;">${race.name}</div>
+      <div style="color:var(--parchment-dim);font-size:10px;margin-top:2px;">${race.bonus}</div>` };
+      }
       const e = enemies.find(en=>onCurrentLevel(en) && en.alive && en.x===mx && en.y===my) || null;
       if(e){
         const hpPct = Math.max(0, e.hp/e.maxHp*100);
-        const aggroRange = enemyAggroRange(e);
+        const aggroRange = effectiveAggroRange(e);
         const boosts = enemyPrefixBoosts(e);
         const atkColor = e.atk < playerAtk() ? 'var(--parchment-dim)' : 'white';
         const effectiveEnemyDef = enemyDef(e);
@@ -3594,7 +3724,7 @@ that means creating game asks for a name and choosing avatar
       if(hoveredEnemy){ hoveredEnemy=null; render(); }
     });
     function handleCanvasTap(clientX, clientY){
-      if(mapOpen || invOpen || tradeOpen || cameraAnimating || attackAnim) return;
+      if(mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim) return;
       const p = canvasEventToBufferXY(clientX, clientY);
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX);
       const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
@@ -3885,6 +4015,9 @@ that means creating game asks for a name and choosing avatar
       return visible;
     }
     function renderInventory(){
+      const race = raceDef();
+      const charTitle = document.getElementById('charTitle');
+      if(charTitle) charTitle.textContent = `${player.name} the ${race.name}`;
       setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon);
       setSlotLabel(
         document.getElementById('slotShield').querySelector('.val'),
@@ -3896,6 +4029,7 @@ that means creating game asks for a name and choosing avatar
       const sg = document.getElementById('statGrid');
       sg.innerHTML = '';
       const rows = [
+        ['🧬 Race', race.name + ' (' + race.bonus + ')'],
         // ['🎚️ Level', player.lvl],
         ['✨ XP to Next Level', player.xp+' / '+xpToNext(player.lvl)],
         ['📈 XP Bonus', Math.round((xpMultiplier()-1)*100)+'%'],
@@ -4181,7 +4315,7 @@ that means creating game asks for a name and choosing avatar
       if(!it || it.kind!=='scroll') return;
       it.count = (it.count||1)-1;
       if(it.count<=0) player.inventory.splice(idx,1);
-      player.invisibleTurns = 15;
+      player.invisibleTurns = consumablePower(15);
       log('You read the Scroll of Invisibility. The shadows swallow you.', 'good');
       updateHud(); renderInventory();
     }
@@ -4190,7 +4324,7 @@ that means creating game asks for a name and choosing avatar
       if(!it || it.kind!=='speedpotion') return;
       it.count = (it.count||1)-1;
       if(it.count<=0) player.inventory.splice(idx,1);
-      player.speedPotionTurns = 15;
+      player.speedPotionTurns = consumablePower(15);
       log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good');
       updateHud(); renderInventory();
     }
@@ -4199,7 +4333,7 @@ that means creating game asks for a name and choosing avatar
       if(!it || it.kind!=='herb') return;
       it.count = (it.count||1)-1;
       if(it.count<=0) player.inventory.splice(idx,1);
-      const heal = Math.max(1, Math.round(playerMaxHp()*0.25));
+      const heal = consumablePower(Math.max(1, Math.round(playerMaxHp()*0.25)));
       player.hp = Math.min(playerMaxHp(), player.hp+heal);
       log(`You eat the Healing Herb and recover ${heal} HP.`, 'good');
       updateHud(); renderInventory();
@@ -4211,8 +4345,9 @@ that means creating game asks for a name and choosing avatar
       if(it.count<=0) player.inventory.splice(idx,1);
       const amt = Math.max(1, Math.round(playerMaxHp()*0.25));
       if(chance(0.5)){
-        player.hp = Math.min(playerMaxHp(), player.hp+amt);
-        log(`You eat the Mushroom. It was edible! You recover ${amt} HP.`, 'good');
+        const healed = consumablePower(amt);
+        player.hp = Math.min(playerMaxHp(), player.hp+healed);
+        log(`You eat the Mushroom. It was edible! You recover ${healed} HP.`, 'good');
       } else {
         player.hp = Math.max(1, player.hp-amt);
         log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad');
@@ -4234,7 +4369,7 @@ that means creating game asks for a name and choosing avatar
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 6; // v6 adds generated underground caves
+    const SAVE_VERSION = 7; // v7 adds the player's name and race
 
     function buildSaveObject(){
       return {
@@ -4253,6 +4388,7 @@ that means creating game asks for a name and choosing avatar
         worldEdgesReached: Object.assign({}, worldEdgesReached),
         player: {
           x:player.x, y:player.y,
+          name:player.name, race:player.race,
           lvl:player.lvl, xp:player.xp,
           maxHp:player.maxHp, hp:player.hp,
           baseAtk:player.baseAtk, baseDef:player.baseDef, baseSpd:player.baseSpd, baseMf:player.baseMf,
@@ -4383,6 +4519,9 @@ that means creating game asks for a name and choosing avatar
         }
 
       Object.assign(player, data.player);
+      // pre-v7 saves have no race/name - those characters were all plain humans
+      if(!RACES.some(r=>r.id===player.race)) player.race = DEFAULT_RACE;
+      if(typeof player.name !== 'string' || !player.name.trim()) player.name = 'Vagabond';
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
@@ -4432,6 +4571,7 @@ that means creating game asks for a name and choosing avatar
 
       toggleInv(false);
       toggleMap(false);
+      closeRaceSelect(); // a loaded character already has a name and a race
 
       stopCameraAnimation();
       stopAttackAnimation();
@@ -4598,6 +4738,7 @@ that means creating game asks for a name and choosing avatar
       updateTouchControlsVisibility();
     }
     window.addEventListener('keydown', (ev)=>{
+      if(raceOpen) return; // name field is being typed into; game keys are dead
       const k = ev.key;
       if(k==='Control'){
         rangesHeld = true;
@@ -4655,33 +4796,95 @@ that means creating game asks for a name and choosing avatar
        updateTouchControlsVisibility(). */
     document.querySelectorAll('.dpad button[data-dx]').forEach(btn=>{
       const dx = parseInt(btn.dataset.dx, 10), dy = parseInt(btn.dataset.dy, 10);
-      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen){ clearAutoPath(); tryMove(dx,dy); } });
-      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen){ clearAutoPath(); tryMove(dx,dy); } });
+      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
+      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
     });
     const touchSpaceBtn = document.getElementById('touchSpace');
     const touchForageBtn = document.getElementById('touchForage');
     const touchInventoryBtn = document.getElementById('touchInventory');
     const touchMapBtn = document.getElementById('touchMap');
     if(touchSpaceBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) inspect(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) inspect(); };
       touchSpaceBtn.addEventListener('touchstart', fn);
       touchSpaceBtn.addEventListener('click', fn);
     }
     if(touchForageBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen) lootSkeletonOrForage(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) lootSkeletonOrForage(); };
       touchForageBtn.addEventListener('touchstart', fn);
       touchForageBtn.addEventListener('click', fn);
     }
     if(touchInventoryBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !tradeOpen) toggleInv(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !tradeOpen && !raceOpen) toggleInv(); };
       touchInventoryBtn.addEventListener('touchstart', fn);
       touchInventoryBtn.addEventListener('click', fn);
     }
     if(touchMapBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!invOpen && !tradeOpen) toggleMap(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(!invOpen && !tradeOpen && !raceOpen) toggleMap(); };
       touchMapBtn.addEventListener('touchstart', fn);
       touchMapBtn.addEventListener('click', fn);
     }
+
+    /* ============================== RACE SELECTION SCREEN ==============================
+       Shown once, before the first turn. The world is already generated behind it, so
+       picking a race only decides which perks the (already placed) character carries.
+       Loading a save file skips/dismisses this screen entirely. */
+    let selectedRaceId = DEFAULT_RACE;
+    function buildRaceGrid(){
+      const grid = document.getElementById('raceGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+      for(const race of RACES){
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'race-card' + (race.id===selectedRaceId ? ' sel' : '');
+        card.dataset.race = race.id;
+        card.innerHTML = `
+          <img src="${imageSrc('avatars/'+race.avatar)}" alt="${race.name}" onerror="this.style.display='none'">
+          <div class="rname">${race.name}</div>
+          <div class="rbonus">${race.bonus}</div>`;
+        card.addEventListener('click', ()=>{
+          selectedRaceId = race.id;
+          for(const other of grid.querySelectorAll('.race-card')) other.classList.toggle('sel', other.dataset.race===race.id);
+          document.getElementById('raceError').textContent = '';
+        });
+        grid.appendChild(card);
+      }
+    }
+    function openRaceSelect(){
+      raceOpen = true;
+      buildRaceGrid();
+      document.getElementById('raceOverlay').classList.add('show');
+      const nameInput = document.getElementById('raceName');
+      nameInput.value = '';
+      setTimeout(()=>nameInput.focus(), 50);
+    }
+    function closeRaceSelect(){
+      raceOpen = false;
+      document.getElementById('raceOverlay').classList.remove('show');
+    }
+    function confirmRaceSelect(){
+      const nameInput = document.getElementById('raceName');
+      const name = (nameInput.value || '').trim();
+      if(!name){
+        document.getElementById('raceError').textContent = 'Every wanderer needs a name.';
+        nameInput.focus();
+        return;
+      }
+      player.name = name;
+      player.race = selectedRaceId;
+      player.hp = playerMaxHp();
+      closeRaceSelect();
+      const race = raceDef();
+      log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good');
+      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
+      updateHud();
+      render();
+    }
+    document.getElementById('btnBegin').addEventListener('click', confirmRaceSelect);
+    document.getElementById('btnRaceLoad').addEventListener('click', ()=>document.getElementById('fileLoad').click());
+    document.getElementById('raceName').addEventListener('keydown', (ev)=>{
+      if(ev.key==='Enter'){ ev.preventDefault(); confirmRaceSelect(); }
+    });
 
     /* ============================== INIT ============================== */
     async function init(){
@@ -4698,12 +4901,12 @@ that means creating game asks for a name and choosing avatar
       spawnCaveContents();
       spawnNpcs();
       ensureMerchantStock();
-      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
       stopDeathTransition();
       stopAttackAnimation();
       snapCameraToPlayer();
       updateHud();
       render();
+      openRaceSelect();
     }
     loadContent().then(()=>init()).catch(err=>{
       console.error(err);
