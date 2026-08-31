@@ -398,7 +398,7 @@ that means creating game asks for a name and choosing avatar
           .touch-map{
               width:56px; height:56px; border-radius:50%;
               background:rgba(26,19,14,0.85); border:1px solid var(--border);
-              color:var(--parchment); font-size:11px; font-family:inherit; letter-spacing:0.5px;
+              color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
               -webkit-user-select:none; user-select:none; touch-action:none;
           }
           .touch-map:active{ background:var(--ember); color:#1a130e; }
@@ -420,7 +420,7 @@ that means creating game asks for a name and choosing avatar
           #touchActions button{
               width:56px; height:56px; border-radius:50%;
               background:rgba(26,19,14,0.85); border:1px solid var(--border);
-              color:var(--parchment); font-size:11px; font-family:inherit; letter-spacing:0.5px;
+              color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
               -webkit-user-select:none; user-select:none; touch-action:none;
           }
           #touchActions button:active{ background:var(--ember); color:#1a130e; }
@@ -524,6 +524,7 @@ that means creating game asks for a name and choosing avatar
   <div id="mobileInfoPanel">Tap an enemy or NPC to inspect it.</div>
   <div id="touchControls">
     <button id="touchMap" class="touch-map">MAP</button>
+    <button id="touchInventory" class="touch-map">INV</button>
     <div class="dpad">
       <button data-dx="-1" data-dy="-1">↖</button><button data-dx="0" data-dy="-1">▲</button><button data-dx="1" data-dy="-1">↗</button>
       <button data-dx="-1" data-dy="0">◀</button><button class="empty"></button><button data-dx="1" data-dy="0">▶</button>
@@ -532,7 +533,6 @@ that means creating game asks for a name and choosing avatar
     <div id="touchActions">
       <button id="touchSpace">INSPECT</button>
       <button id="touchForage">FORAGE</button>
-      <button id="touchInventory">INV</button>
     </div>
   </div>
   <div id="hint" style="">
