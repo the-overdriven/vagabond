@@ -968,6 +968,7 @@ that means creating game asks for a name and choosing avatar
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
           fly: !!tmpl.fly,
           humanoid: !!tmpl.humanoid,
+          evades: !!tmpl.evades,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
           x:p.x, y:p.y, homeX:p.x, homeY:p.y, alive:true, prefix:null, equipment:null,
         };
@@ -1463,6 +1464,7 @@ that means creating game asks for a name and choosing avatar
           spd: Math.max(1,Math.round(tmpl.spd*variance)),
           fly: !!tmpl.fly,
           humanoid: !!tmpl.humanoid,
+          evades: !!tmpl.evades,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
           x, y, homeX:x, homeY:y, alive:true, prefix:null, equipment:null,
         };
@@ -1833,6 +1835,27 @@ that means creating game asks for a name and choosing avatar
       const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists';
       updateMobileInfoPanel(e.x,e.y);
       await animateAttackLunge(player.x, player.y, e.x, e.y);
+      if(e.evades && chance(0.30)){
+        const fromX = e.x, fromY = e.y;
+        const options = [];
+        for(const [dx,dy] of DIRS8){
+          const nx = e.x+dx, ny = e.y+dy;
+          if(!isWalkable(nx,ny) || (nx===player.x && ny===player.y)) continue;
+          if(occupied.has(keyXY(nx,ny)) || npcs.some(n=>n.x===nx && n.y===ny)) continue;
+          options.push({x:nx, y:ny});
+        }
+        if(options.length){
+          const destination = pick(options);
+          occupied.delete(keyXY(e.x,e.y));
+          e.x = destination.x; e.y = destination.y;
+          occupied.add(keyXY(e.x,e.y));
+          beginEnemyMoveAnim(e, fromX, fromY);
+          spawnDamageNumber(fromX, fromY, 'Miss!', '#d9d9a3');
+          log(`The ${e.name} evades your attack.`, 'bad');
+          updateMobileInfoPanel(e.x,e.y);
+          return;
+        }
+      }
       if(chance(missChance(playerSpd(), e.spd))){
         spawnDamageNumber(e.x, e.y, 'Miss!', '#d9d9a3');
         log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad');
@@ -2385,6 +2408,7 @@ that means creating game asks for a name and choosing avatar
         spd: Math.max(1,Math.round(tmpl.spd*variance)),
         fly: !!tmpl.fly,
         humanoid: !!tmpl.humanoid,
+        evades: !!tmpl.evades,
         aggro: tmpl.aggro ?? AGGRO_RANGE,
         x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, alive:true, prefix:null, equipment:null,
         aware:true,
@@ -3726,6 +3750,7 @@ that means creating game asks for a name and choosing avatar
           aggro: enemyAggroRange(e),
           fly: !!e.fly,
           humanoid: !!e.humanoid,
+          evades: !!e.evades,
           equipment: e.equipment || null,
           x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
@@ -3828,6 +3853,7 @@ that means creating game asks for a name and choosing avatar
           aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
           fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
           humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
+          evades: typeof e.evades === 'boolean' ? e.evades : !!(tmpl && tmpl.evades),
           equipment: e.equipment || null,
           x:e.x, y:e.y, alive:true,
           prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
