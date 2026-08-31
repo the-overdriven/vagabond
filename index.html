@@ -1236,7 +1236,7 @@ that means creating game asks for a name and choosing avatar
     function makeWeaponItem(tier){
       const pool = WEAPONS.filter(w=>w.tier<=tier);
       const base = pick(pool.length?pool:WEAPONS.filter(w=>w.tier===1));
-      const item = {kind:'weapon', base:base.name, atk:base.atk, spd:base.spd, tier:base.tier, twoHanded:!!base.twoHanded, name:base.name};
+      const item = {kind:'weapon', base:base.name, atk:base.atk, grace:base.grace, tier:base.tier, twoHanded:!!base.twoHanded, name:base.name};
       return rollModifier(base.name, item);
     }
     function makeShieldItem(tier){
@@ -1298,17 +1298,28 @@ that means creating game asks for a name and choosing avatar
 
       if(it.atk) parts.push('ATK '+it.atk+(it.mod==='atk'?('+'+it.modAmt):''));
       if(it.def) parts.push('DEF '+it.def+(it.mod==='def'?('+'+it.modAmt):''));
-      if(it.spd!==undefined) parts.push('SPD '+it.spd+(it.mod==='spd'?('+'+it.modAmt):''));
+      if(it.kind === 'weapon' && (it.grace!==undefined || it.spd!==undefined)){
+        const baseGrace = it.grace !== undefined ? it.grace : 6 - it.spd;
+        const graceBonus = it.mod === 'grace' ? it.modAmt : 0;
+        parts.push('GRACE '+baseGrace+(graceBonus ? (graceBonus > 0 ? '+' : '')+graceBonus : ''));
+      }
+      if(it.kind !== 'weapon' && it.spd!==undefined) parts.push('SPD '+it.spd+(it.mod==='spd'?('+'+it.modAmt):''));
 
       if(it.mod==='atk' && !it.atk) parts.push('ATK +'+it.modAmt);
       if(it.mod==='def' && !it.def) parts.push('DEF +'+it.modAmt);
-      if(it.mod==='spd' && it.spd===undefined) parts.push('SPD +'+it.modAmt);
+      if(it.mod==='grace' && it.grace===undefined) parts.push('GRACE +'+it.modAmt);
+      if(it.mod==='spd' && (it.kind === 'weapon' || it.spd===undefined)) parts.push('SPD +'+it.modAmt);
 
       if(it.mod==='hp') parts.push('HP +'+it.modAmt);
       if(it.mod==='mf') parts.push('MF +'+it.modAmt);
       if(it.mod==='xp') parts.push('XP +'+it.xpBonus+'%');
 
       return parts.join(', ');
+    }
+    function weaponGrace(weapon){
+      if(!weapon || weapon.kind !== 'weapon') return 0;
+      const baseGrace = weapon.grace !== undefined ? weapon.grace : 6 - weapon.spd;
+      return weapon.mod === 'grace' ? baseGrace + weapon.modAmt : baseGrace;
     }
 
     /* ============================== PLAYER ============================== */
@@ -1359,10 +1370,14 @@ that means creating game asks for a name and choosing avatar
       let s = player.baseSpd + Math.floor(player.lvl/2);
       if(player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2;
       if(player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0);
-      for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
+      for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
       s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0;
       return Math.max(1, s);
+    }
+    function playerGrace(){
+      const weapon = player.equip.weapon;
+      return weaponGrace(weapon);
     }
     const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
     const TERRAIN_DEFENSE = {hill:1};
@@ -1397,11 +1412,12 @@ that means creating game asks for a name and choosing avatar
       return player.maxHp + bonus;
     }
     // Snapshots the derived character stats so an equip can report exactly what it
-    // changed (e.g. "+2 ATK, -1 SPD") instead of leaving the player to eyeball the HUD.
+    // changed (e.g. "+2 ATK, +2 GRACE") instead of leaving the player to eyeball the HUD.
     const TRACKED_STATS = [
       {key:'ATK', get:()=>playerAtk()},
       {key:'DEF', get:()=>playerDef()},
       {key:'SPD', get:()=>playerSpd()},
+      {key:'GRACE', get:()=>playerGrace()},
       {key:'MF',  get:()=>playerMf()},
       {key:'HP',  get:()=>playerMaxHp()},
     ];
@@ -1907,16 +1923,16 @@ that means creating game asks for a name and choosing avatar
       return equipment && equipment.kind === 'armor' ? equipment : null;
     }
 
-    function weaponCombatSpd(weapon){
+    function weaponCombatDelay(weapon){
       return weapon && weapon.kind === 'weapon'
-        ? weapon.spd + (weapon.mod === 'spd' ? weapon.modAmt : 0)
+        ? Math.max(1, 6 - weaponGrace(weapon))
         : null;
     }
     function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon){
-      const attackerSpd = weaponCombatSpd(attackerWeapon);
-      const defenderSpd = weaponCombatSpd(defenderWeapon);
-      return attackerSpd !== null && defenderSpd !== null &&
-        attackerSpd < defenderSpd && chance((defenderSpd-attackerSpd)*0.10);
+      const attackerDelay = weaponCombatDelay(attackerWeapon);
+      const defenderDelay = weaponCombatDelay(defenderWeapon);
+      return attackerDelay !== null && defenderDelay !== null &&
+        attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
     }
 
     async function playerAttackEnemy(e, isExtraAttack=false){
@@ -2365,7 +2381,7 @@ that means creating game asks for a name and choosing avatar
       return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll';
     }
     function equipmentSortValues(item){
-      const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' ? (item.modAmt || 0) : 0;
+      const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' || item.mod === 'grace' ? (item.modAmt || 0) : 0;
       if(item.kind === 'weapon'){
         const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0);
         const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
@@ -3683,7 +3699,7 @@ that means creating game asks for a name and choosing avatar
     function makeMerchantMagicWeapon(){
       const base = pick(WEAPONS.filter(w=>w.name==='Dagger' || w.name==='Short Sword' || w.name==='Club'));
       const item = {
-        kind:'weapon', base:base.name, atk:base.atk, spd:base.spd,
+        kind:'weapon', base:base.name, atk:base.atk, grace:base.grace,
         tier:base.tier, twoHanded:!!base.twoHanded, name:base.name
       };
       const mod = pick(MODIFIERS);
@@ -3697,7 +3713,7 @@ that means creating game asks for a name and choosing avatar
     }
     function ensureMerchantStock(){
       if(!merchantStock.some(it=>it.kind==='weapon' && it.base==='Two-handed Sword')){
-        merchantStock.push({kind:'weapon', base:'Two-handed Sword', atk:5, spd:4, tier:4, twoHanded:true, name:'Two-handed Sword', merchantPrice:200});
+        merchantStock.push({kind:'weapon', base:'Two-handed Sword', atk:5, grace:2, tier:4, twoHanded:true, name:'Two-handed Sword', merchantPrice:200});
       }
       if(!merchantStock.some(it=>it.merchantMagicLowTier)){
         merchantStock.push(makeMerchantMagicWeapon());
