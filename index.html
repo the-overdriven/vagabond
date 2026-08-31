@@ -651,6 +651,7 @@ that means creating game asks for a name and choosing avatar
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
       grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
+      ancientForest: {ch:'\u2663', color:'#1d5227', bg:'#071007', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
       // snow is drawn as dark speckles on a bright field, so its glyph colour is
@@ -674,7 +675,7 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -888,6 +889,10 @@ that means creating game asks for a name and choosing avatar
       // not right on top of the temple, but not absurdly far either.
       placeVillage();
 
+      // Dense ancient woodland is deliberately placed well beyond the village,
+      // and only on a broad, already-forested patch of terrain.
+      placeAncientForest();
+
       // Lore landmark: a huge brass bell in/next to the mountains, kept
       // fairly close to the temple (map center), guarded by a pair of brutes.
       placeBigBell();
@@ -1034,6 +1039,7 @@ that means creating game asks for a name and choosing avatar
             return {x,y};
           }
         }
+
         // Fallback: widen the search a lot further out so a village always
         // finds somewhere to stand, even in heavily forested/mountainous seeds.
         for(let r=17; r<=60; r+=3){
@@ -1076,6 +1082,102 @@ that means creating game asks for a name and choosing avatar
             const x = h.x+dx, y = h.y+dy;
             if(x<0||y<0||x>=MAP_W||y>=MAP_H) continue;
             if(map[y][x] === 'forest') map[y][x] = 'grass';
+          }
+        }
+      }
+    }
+
+    const ANCIENT_FOREST_SIZE = 10;
+    const ANCIENT_FOREST_MIN_VILLAGE_DIST = 30;
+    function placeAncientForest(){
+      const size = ANCIENT_FOREST_SIZE;
+      let best = null;
+      let bestScore = -1;
+      function consider(x,y){
+        if(villageCenter && Math.max(Math.abs(x-villageCenter.x), Math.abs(y-villageCenter.y)) < ANCIENT_FOREST_MIN_VILLAGE_DIST) return;
+        let forestCount = 0;
+        for(let dy=0; dy<size; dy++){
+          for(let dx=0; dx<size; dx++){
+            if(map[y+dy][x+dx] === 'forest') forestCount++;
+          }
+        }
+        if(forestCount > bestScore){
+          bestScore = forestCount;
+          best = {x,y};
+        }
+      }
+      for(let y=2; y<MAP_H-size-2; y++){
+        for(let x=2; x<MAP_W-size-2; x++) consider(x,y);
+      }
+      // Require at least 70% existing forest before converting the footprint.
+      if(!best || bestScore < size*size*0.7) return;
+      for(let dy=0; dy<size; dy++){
+        for(let dx=0; dx<size; dx++) map[best.y+dy][best.x+dx] = 'ancientForest';
+      }
+
+      // Keep the guaranteed 10x10 core, then grow unevenly through adjacent
+      // forest so the biome has a natural, branching outline.
+      const frontier = [];
+      const queued = new Set();
+      function queueForest(x,y){
+        if(x<1 || y<1 || x>=MAP_W-1 || y>=MAP_H-1) return;
+        const key = keyXY(x,y);
+        if(queued.has(key) || map[y][x] !== 'forest') return;
+        queued.add(key);
+        frontier.push({x,y});
+      }
+      for(let y=best.y; y<best.y+size; y++){
+        queueForest(best.x-1,y);
+        queueForest(best.x+size,y);
+      }
+      for(let x=best.x; x<best.x+size; x++){
+        queueForest(x,best.y-1);
+        queueForest(x,best.y+size);
+      }
+      let grown = 0;
+      while(frontier.length && grown < 180){
+        const index = randInt(0, frontier.length-1);
+        const tile = frontier.splice(index,1)[0];
+        if(rng() > 0.72) continue;
+        map[tile.y][tile.x] = 'ancientForest';
+        grown++;
+        for(const [dx,dy] of DIRS8){
+          if(rng() < 0.82) queueForest(tile.x+dx, tile.y+dy);
+        }
+      }
+
+      // Remove any ordinary-forest pockets trapped inside the new outline.
+      let minX = MAP_W, minY = MAP_H, maxX = -1, maxY = -1;
+      for(let y=0; y<MAP_H; y++){
+        for(let x=0; x<MAP_W; x++){
+          if(map[y][x] !== 'ancientForest') continue;
+          minX = Math.min(minX, x); minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        }
+      }
+      const checked = new Set();
+      for(let y=minY; y<=maxY; y++){
+        for(let x=minX; x<=maxX; x++){
+          if(map[y][x] !== 'forest' || checked.has(keyXY(x,y))) continue;
+          const component = [], queue = [{x,y}];
+          const componentKeys = new Set([keyXY(x,y)]);
+          let touchesBounds = false;
+          while(queue.length){
+            const tile = queue.shift();
+            component.push(tile);
+            if(tile.x===minX || tile.x===maxX || tile.y===minY || tile.y===maxY) touchesBounds = true;
+            for(const [dx,dy] of DIRS8){
+              const nx = tile.x+dx, ny = tile.y+dy;
+              const key = keyXY(nx,ny);
+              if(nx<minX || nx>maxX || ny<minY || ny>maxY || componentKeys.has(key)) continue;
+              if(map[ny][nx] !== 'forest') continue;
+              componentKeys.add(key);
+              queue.push({x:nx,y:ny});
+            }
+          }
+          for(const key of componentKeys) checked.add(key);
+          if(!touchesBounds){
+            for(const tile of component) map[tile.y][tile.x] = 'ancientForest';
           }
         }
       }
@@ -1314,7 +1416,7 @@ that means creating game asks for a name and choosing avatar
       for(let y=2;y<MAP_H-2;y++){
         for(let x=2;x<MAP_W-2;x++){
           const tile = map[y][x];
-          if(tile==='temple' || tile==='belltower' || !isWalkable(x,y)) continue;
+          if(tile==='temple' || tile==='belltower' || tile==='ancientForest' || !isWalkable(x,y)) continue;
           if(Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) continue;
           // Keep the bell's vicinity free of random spawns - the guard pair
           // should be the only threat there.
@@ -1443,7 +1545,7 @@ that means creating game asks for a name and choosing avatar
     // (like idle enemies); the Drunk roams freely with no leash; the Merchant
     // stays put at his stall.
     const NPC_TEMPLATES = [
-      {name:"Old Hunter",   lines:["Never enter the forest after midnight."],                        free:false, portrait:"old_hunter"},
+      {name:"Old Hunter",   lines:[],                                                               free:false, portrait:"old_hunter"},
       {name:"Gravedigger",  lines:[
           "Midnight? That's when the bells stop.",
           "Once I get my old name back, I can finally rest.",
@@ -1464,8 +1566,28 @@ that means creating game asks for a name and choosing avatar
       if(Math.abs(dx) >= Math.abs(dy)) return dx>=0 ? 'east' : 'west';
       return dy>=0 ? 'south' : 'north';
     }
+    function ancientForestDirectionFromSpawn(){
+      let totalX = 0, totalY = 0, count = 0;
+      for(let y=0; y<MAP_H; y++){
+        for(let x=0; x<MAP_W; x++){
+          if(map[y][x] !== 'ancientForest') continue;
+          totalX += x;
+          totalY += y;
+          count++;
+        }
+      }
+      if(!count) return null;
+      const dx = totalX/count - spawnPoint.x;
+      const dy = totalY/count - spawnPoint.y;
+      if(Math.abs(dx) >= Math.abs(dy)) return dx>=0 ? 'east' : 'west';
+      return dy>=0 ? 'south' : 'north';
+    }
     function linesForNpcTemplate(tmpl){
       const lines = tmpl.lines.slice();
+      if(tmpl.name === "Old Hunter"){
+        const dir = ancientForestDirectionFromSpawn();
+        if(dir) lines.push(`Do not enter the ancient forest in the ${dir} after midnight.`);
+      }
       if(tmpl.name === "Drunk"){
         const dir = bellDirectionFromSpawn();
         if(dir) lines.push(`Them hairy mountains... clonk, clonk, clonk all the way ${dir} they went.`);
@@ -2072,6 +2194,10 @@ that means creating game asks for a name and choosing avatar
     // over, so players can't farm the same spot for infinite herbs.
     let foragedTiles = new Set();
     function tryForage(){
+      if(map[player.y][player.x] === 'ancientForest'){
+        log("You don't dare to forage in the ancient forest. Something old might be watching from between the trees.", 'info');
+        return;
+      }
       if(map[player.y][player.x] !== 'forest') return;
       const key = keyXY(player.x, player.y);
       if(foragedTiles.has(key)){
@@ -2222,23 +2348,23 @@ that means creating game asks for a name and choosing avatar
       flushPendingMove();
       return true;
     }
-    // Low-odds ambush: walking onto forest ground has a small chance of
-    // startling a low-tier forest creature out of hiding onto a neighboring
-    // forest tile, if one happens to be free nearby.
+    // Low-odds ambushes start ordinary forest creatures, or stronger creatures
+    // when the player enters the ancient forest.
     function maybeSpawnForestAmbush(x,y){
-      if(map[y][x] !== 'forest') return;
+      const ancient = map[y][x] === 'ancientForest';
+      if(map[y][x] !== 'forest' && !ancient) return;
       if(!chance(0.05)) return;
       const candidates = [];
       for(const [dx,dy] of DIRS8){
         const nx=x+dx, ny=y+dy;
         if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H) continue;
-        if(map[ny][nx] !== 'forest') continue;
+        if(map[ny][nx] !== (ancient ? 'ancientForest' : 'forest')) continue;
         if(!isWalkable(nx,ny)) continue;
         if(occupied.has(keyXY(nx,ny))) continue;
         candidates.push({x:nx,y:ny});
       }
       if(!candidates.length) return;
-      const templates = ENEMY_TEMPLATES.filter(t=>(t.tier===1||t.tier===2) && enemyBiomes(t).includes('forest'));
+      const templates = ENEMY_TEMPLATES.filter(t=>(ancient ? t.tier>=3 : (t.tier===1||t.tier===2)) && enemyBiomes(t).includes('forest'));
       if(!templates.length) return;
       const tmpl = pick(templates);
       const spot = pick(candidates);
@@ -2306,6 +2432,9 @@ that means creating game asks for a name and choosing avatar
             log('The Temple restores your strength.', 'good');
           }
         }
+        if(map[ny][nx]==='ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest'){
+          log('You enter a dense ancient forest', 'info');
+        }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
         if(mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.';
@@ -2328,6 +2457,7 @@ that means creating game asks for a name and choosing avatar
       sand:"sand",
       grass:"a grassy field",
       forest:"dense forest",
+      ancientForest:"a dense ancient forest",
       hill:"a rugged hill",
       mountain:"an impassable mountain",
       snow:"a snow-covered slope",
@@ -3498,7 +3628,7 @@ that means creating game asks for a name and choosing avatar
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 4; // v4 adds enemy fly flag
+    const SAVE_VERSION = 5; // v5 adds the ancient forest biome
 
     function buildSaveObject(){
       return {
