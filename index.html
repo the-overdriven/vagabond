@@ -7,7 +7,7 @@
 - prefixed mobs should give more XP
 - add food? heals minor HP. looted from selected animals
 - collect berries? more survivalism?
-- scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal
+- scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons
 - balance monsters, xp
 - highlight better gear
 - in gear screen equipped items should have the same colour as in backpacks
@@ -299,7 +299,7 @@ that means creating game asks for a name and choosing avatar
           font-family:inherit; letter-spacing:0.5px;
       }
       .slbtn:hover{background:var(--ember); color:#1a0f05;}
-      #tradeOverlay .panelbox{width:min(80vw, 560px);}
+      #tradeOverlay .panelbox{width:min(92vw, 900px);}
       .trade-cols{display:flex; gap:16px;}
       .trade-col{flex:1; min-width:0;}
       .trade-col .invlist{max-height:280px;}
@@ -3637,7 +3637,7 @@ that means creating game asks for a name and choosing avatar
         const stackable = isStackableKind(it.kind);
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const prefix = isBest ? '✅ ' : '';
-        nm.textContent = prefix + it.name + countTag + (line? ' \u2014 '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
+        nm.textContent = prefix + it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
         if(it.kind==='potion'){
           const btn = document.createElement('button');
@@ -3730,9 +3730,10 @@ that means creating game asks for a name and choosing avatar
           const cls = it.tier ? tierColorClass(it.tier) : '';
           const stackable = isStackableKind(it.kind);
           const countTag = stackable && it.count>1 ? ' x'+it.count : '';
+          const line = itemStatLine(it);
           const nm = document.createElement('span');
           nm.className='nm '+cls;
-          nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
+          nm.textContent = it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
           row.appendChild(nm);
           const btn = document.createElement('button');
           const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2;
@@ -3759,9 +3760,10 @@ that means creating game asks for a name and choosing avatar
         const cls = it.tier ? tierColorClass(it.tier) : '';
         const stackable = isStackableKind(it.kind);
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
+        const line = itemStatLine(it);
         const nm = document.createElement('span');
         nm.className='nm '+cls;
-        nm.textContent = it.name + countTag + (it.tier!==undefined?' [T'+it.tier+']':'');
+        nm.textContent = it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
         const btn = document.createElement('button');
         btn.textContent = 'Sell for '+itemSellValue(it)+'g';
