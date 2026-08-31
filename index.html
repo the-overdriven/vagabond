@@ -3641,9 +3641,27 @@ that means creating game asks for a name and choosing avatar
     }
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
+    function makeMerchantMagicWeapon(){
+      const base = pick(WEAPONS.filter(w=>w.name==='Dagger' || w.name==='Short Sword' || w.name==='Club'));
+      const item = {
+        kind:'weapon', base:base.name, atk:base.atk, spd:base.spd,
+        tier:base.tier, twoHanded:!!base.twoHanded, name:base.name
+      };
+      const mod = pick(MODIFIERS);
+      item.mod = mod.stat;
+      item.name = mod.name + ' ' + base.name;
+      item.modAmt = rollModifierAmount(mod.stat);
+      if(mod.stat==='xp') item.xpBonus = randInt(5,15);
+      item.merchantMagicLowTier = true;
+      item.merchantPrice = itemSellValue(item) * 2;
+      return item;
+    }
     function ensureMerchantStock(){
       if(!merchantStock.some(it=>it.kind==='weapon' && it.base==='Two-handed Sword')){
         merchantStock.push({kind:'weapon', base:'Two-handed Sword', atk:5, spd:4, tier:4, twoHanded:true, name:'Two-handed Sword', merchantPrice:200});
+      }
+      if(!merchantStock.some(it=>it.merchantMagicLowTier)){
+        merchantStock.push(makeMerchantMagicWeapon());
       }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
