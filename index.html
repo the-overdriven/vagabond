@@ -1352,7 +1352,7 @@ that means creating game asks for a name and choosing avatar
         if(it.def) d += it.def;
         if(it.mod==='def') d += it.modAmt;
       }
-      if(map[player.y] && map[player.y][player.x] === 'hill') d += 1;
+      d += TERRAIN_DEFENSE[map[player.y] && map[player.y][player.x]] || 0;
       return d;
     }
     function playerSpd(){
@@ -1361,9 +1361,30 @@ that means creating game asks for a name and choosing avatar
       if(player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0);
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
-      const terrainSpeed = {forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
-      s += terrainSpeed[map[player.y] && map[player.y][player.x]] || 0;
+      s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0;
       return Math.max(1, s);
+    }
+    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
+    const TERRAIN_DEFENSE = {hill:1};
+    function enemyHomeTileType(e){
+      if(e && e.homeTileType) return e.homeTileType;
+      if(!e || !map[e.homeY === undefined ? e.y : e.homeY]) return null;
+      return map[e.homeY === undefined ? e.y : e.homeY][e.homeX === undefined ? e.x : e.homeX] || null;
+    }
+    function enemyTileEffects(e){
+      const tile = e && map[e.y] ? map[e.y][e.x] : null;
+      if(!tile) return {speed:0, defense:0};
+      const terrainSpeed = TERRAIN_SPEED[tile] || 0;
+      return {
+        speed: terrainSpeed >= 0 || tile !== enemyHomeTileType(e) ? terrainSpeed : 0,
+        defense: TERRAIN_DEFENSE[tile] || 0,
+      };
+    }
+    function enemyDef(e){
+      return Math.max(0, e.def + enemyTileEffects(e).defense);
+    }
+    function enemySpd(e){
+      return Math.max(1, e.spd + enemyTileEffects(e).speed);
     }
     function playerMf(){
       let mf = player.baseMf;
@@ -1516,7 +1537,7 @@ that means creating game asks for a name and choosing avatar
           humanoid: !!tmpl.humanoid,
           evades: !!tmpl.evades,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x, y, homeX:x, homeY:y, alive:true, prefix:null, equipment:null,
+          x, y, homeX:x, homeY:y, homeTileType:map[y][x], alive:true, prefix:null, equipment:null,
         };
         e.maxHp = e.hp;
         e.baseName = tmpl.name; // keep clean name for image lookup, separate from display name
@@ -1923,15 +1944,15 @@ that means creating game asks for a name and choosing avatar
           return;
         }
       }
-      if(chance(missChance(playerSpd(), e.spd))){
+      if(chance(missChance(playerSpd(), enemySpd(e)))){
         spawnDamageNumber(e.x, e.y, 'Miss!', '#d9d9a3');
         log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad');
         updateMobileInfoPanel(e.x,e.y);
         return;
       }
       const armor = equippedArmor(e.equipment);
-      const glancing = armor && chance(missChance(playerSpd(), e.spd));
-      let dmg = damageRoll(playerAtk(), e.def);
+      const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)));
+      let dmg = damageRoll(playerAtk(), enemyDef(e));
       if(glancing) dmg = Math.floor(dmg / 3);
       e.hp -= dmg;
       spawnDamageNumber(e.x, e.y, dmg, '#fff6d6');
@@ -1962,13 +1983,13 @@ that means creating game asks for a name and choosing avatar
         ? e.equipment : null;
       const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : '';
       beginEnemyAttackAnim(e);
-      if(chance(missChance(e.spd, playerSpd()))){
+      if(chance(missChance(enemySpd(e), playerSpd()))){
         spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3');
         log(`The ${e.name} attacks${weaponText} but misses you.`, 'good');
         return false;
       }
       const armor = equippedArmor(player.equip.armor);
-      const glancing = armor && chance(missChance(e.spd, playerSpd()));
+      const glancing = armor && chance(missChance(enemySpd(e), playerSpd()));
       let dmg = damageRoll(e.atk, playerDef());
       const critical = e.crit && chance(CRIT_CHANCE);
       if(critical) dmg = Math.round(dmg*2);
@@ -2262,7 +2283,8 @@ that means creating game asks for a name and choosing avatar
         const aggroRange = enemyAggroRange(e);
         if(dist <= aggroRange){
           const playerSpeed = playerSpd();
-          const slowEnough = e.spd * 2 <= playerSpeed;
+          const effectiveEnemySpeed = enemySpd(e);
+          const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed;
           if(e.aware && slowEnough && chance(0.25)){
             e.aware = false;
             log(`The ${e.name} loses interest in the chase.`, 'info');
@@ -2272,7 +2294,7 @@ that means creating game asks for a name and choosing avatar
             e.aware = true;
             log(`The ${e.name} has spotted you!`, 'bad');
           }
-          const hasExtraPursuitTurn = e.spd > playerSpeed && chance(0.25);
+          const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25);
           if(hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad');
           let pursuitActions = hasExtraPursuitTurn ? 2 : 1;
           while(pursuitActions > 0){
@@ -2537,7 +2559,7 @@ that means creating game asks for a name and choosing avatar
         humanoid: !!tmpl.humanoid,
         evades: !!tmpl.evades,
         aggro: tmpl.aggro ?? AGGRO_RANGE,
-        x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, alive:true, prefix:null, equipment:null,
+        x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, homeTileType:map[spot.y][spot.x], alive:true, prefix:null, equipment:null,
         aware:true,
       };
       e.maxHp = e.hp;
@@ -3209,9 +3231,11 @@ that means creating game asks for a name and choosing avatar
         const aggroRange = enemyAggroRange(e);
         const boosts = enemyPrefixBoosts(e);
         const atkColor = e.atk < playerAtk() ? 'var(--parchment-dim)' : 'white';
-        const defColor = e.def < playerDef() ? 'var(--parchment-dim)' : 'white';
+        const effectiveEnemyDef = enemyDef(e);
+        const effectiveEnemySpeed = enemySpd(e);
+        const defColor = effectiveEnemyDef < playerDef() ? 'var(--parchment-dim)' : 'white';
         const playerSpeed = playerSpd();
-        const spdColor = e.spd > playerSpeed ? '#e0473f' : playerSpeed >= e.spd*2 ? 'var(--parchment-dim)' : 'white';
+        const spdColor = effectiveEnemySpeed > playerSpeed ? '#e0473f' : playerSpeed >= effectiveEnemySpeed*2 ? 'var(--parchment-dim)' : 'white';
         const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b=>
           `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
         ).join(', ')}</div>` : '';
@@ -3226,7 +3250,7 @@ that means creating game asks for a name and choosing avatar
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
-      HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br><span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span> &nbsp;<span style="color:${defColor}">DEF ${Math.round(e.def)}</span> &nbsp;<span style="color:${spdColor}">SPD ${Math.round(e.spd)}</span><br>
+      HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br><span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span> &nbsp;<span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span> &nbsp;<span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br>
       <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
       }
       const n = npcs.find(np=>np.x===mx && np.y===my);
@@ -3915,7 +3939,7 @@ that means creating game asks for a name and choosing avatar
           humanoid: !!e.humanoid,
           evades: !!e.evades,
           equipment: e.equipment || null,
-          x:e.x, y:e.y, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
+          x:e.x, y:e.y, homeTileType:e.homeTileType||null, prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         })),
         groundItems: groundItems.map(g=>({...g})),
         npcs: npcs.map(n=>({name:n.name, x:n.x, y:n.y, homeX:n.homeX, homeY:n.homeY})),
@@ -4018,7 +4042,7 @@ that means creating game asks for a name and choosing avatar
           humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
           evades: typeof e.evades === 'boolean' ? e.evades : !!(tmpl && tmpl.evades),
           equipment: e.equipment || null,
-          x:e.x, y:e.y, alive:true,
+          x:e.x, y:e.y, homeTileType:e.homeTileType || null, alive:true,
           prefix:e.prefix||null, prefixBase:e.prefixBase||null, crit:!!e.crit, aware:!!e.aware,
         });
       });
