@@ -3806,7 +3806,7 @@ that means creating game asks for a name and choosing avatar
         const oldShield = player.equip.shield;
         player.equip.shield = null;
         player.inventory.push(oldShield);
-        log(`You equip the ${it.name} and remove the ${oldShield.name} because it is a two-handed weapon.`, 'good');
+        log(`You equip the ${it.name} and remove the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, 'good');
       } else {
         log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
       }
