@@ -598,6 +598,9 @@ that means creating game asks for a name and choosing avatar
         if(effect.min !== undefined) value = Math.max(effect.min, value);
         e[stat] = value;
       }
+      for(const stat of ['hp','maxHp','atk','def','spd','aggro']){
+        if(typeof e[stat] === 'number') e[stat] = Math.round(e[stat]);
+      }
     }
     const ENEMY_DEFAULT_BIOMES_FALLBACK = ['grass','forest','hill','sand','snow','river'];
     function enemyBiomes(tmpl){
@@ -631,7 +634,7 @@ that means creating game asks for a name and choosing avatar
       const out = [];
       for(const s of PREFIX_STATS){
         const delta = (now[s.key]||0) - (base[s.key]||0);
-        if(delta) out.push({label:s.label, delta:delta});
+        if(delta) out.push({label:s.label, delta:Math.round(delta)});
       }
       return out;
     }
@@ -1948,7 +1951,7 @@ that means creating game asks for a name and choosing avatar
     const ATTACK_RANGE = 1; // Chebyshev distance at which an enemy attacks instead of chasing
     const AGGRO_RANGE = 3;  // default aggro distance used when a template doesn't specify one
     function enemyAggroRange(e){
-      return e && typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE;
+      return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE;
     }
     function enemyCanTraverse(e, x, y){
       if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) return false;
@@ -3095,7 +3098,7 @@ that means creating game asks for a name and choosing avatar
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
-      HP ${e.hp} / ${e.maxHp}<br>ATK ${e.atk} &nbsp;DEF ${e.def} &nbsp;SPD ${e.spd}<br>
+      HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br>ATK ${Math.round(e.atk)} &nbsp;DEF ${Math.round(e.def)} &nbsp;SPD ${Math.round(e.spd)}<br>
       <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
       }
       const n = npcs.find(np=>np.x===mx && np.y===my);
