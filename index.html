@@ -1253,8 +1253,6 @@ that means creating game asks for a name and choosing avatar
       if(item.kind==='weapon'){
         if(item.atk) e.atk += item.atk;
         if(item.mod==='atk') e.atk += item.modAmt;
-        if(item.spd!==undefined) e.spd += Math.floor(item.spd/2);
-        if(item.mod==='spd') e.spd += item.modAmt;
       } else {
         if(item.def) e.def += item.def;
         if(item.mod==='def') e.def += item.modAmt;
@@ -1281,7 +1279,7 @@ that means creating game asks for a name and choosing avatar
       if(it.mod==='mf') parts.push('MF +'+it.modAmt);
       if(it.mod==='xp') parts.push('XP +'+it.xpBonus+'%');
 
-      return parts.join(' ');
+      return parts.join(', ');
     }
 
     /* ============================== PLAYER ============================== */
@@ -1330,8 +1328,6 @@ that means creating game asks for a name and choosing avatar
     }
     function playerSpd(){
       let s = player.baseSpd + Math.floor(player.lvl/2);
-      const w = player.equip.weapon;
-      if(w){ s += Math.floor(w.spd/2); if(w.mod==='spd') s += w.modAmt; }
       if(player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2;
       if(player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0);
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
@@ -1856,7 +1852,19 @@ that means creating game asks for a name and choosing avatar
       return Math.max(0, Math.min(1, chanceValue));
     }
 
-    async function playerAttackEnemy(e){
+    function weaponCombatSpd(weapon){
+      return weapon && weapon.kind === 'weapon'
+        ? weapon.spd + (weapon.mod === 'spd' ? weapon.modAmt : 0)
+        : null;
+    }
+    function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon){
+      const attackerSpd = weaponCombatSpd(attackerWeapon);
+      const defenderSpd = weaponCombatSpd(defenderWeapon);
+      return attackerSpd !== null && defenderSpd !== null &&
+        attackerSpd < defenderSpd && chance((defenderSpd-attackerSpd)*0.10);
+    }
+
+    async function playerAttackEnemy(e, isExtraAttack=false){
       const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists';
       updateMobileInfoPanel(e.x,e.y);
       await animateAttackLunge(player.x, player.y, e.x, e.y);
@@ -1896,9 +1904,15 @@ that means creating game asks for a name and choosing avatar
         updateMobileInfoPanel(e.x,e.y);
       } else {
         updateMobileInfoPanel(e.x,e.y);
+        const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
+          ? e.equipment : null;
+        if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon)){
+          log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.name}, striking again!`, 'good');
+          await playerAttackEnemy(e, true);
+        }
       }
     }
-    function enemyAttackPlayer(e){
+    function enemyAttackPlayer(e, isExtraAttack=false){
       beginEnemyAttackAnim(e);
       if(chance(missChance(e.spd, playerSpd()))){
         spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3');
@@ -1916,6 +1930,12 @@ that means creating game asks for a name and choosing avatar
       if(player.hp <= 0){
         die();
         return true;
+      }
+      const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
+        ? e.equipment : null;
+      if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon)){
+        log(`${e.name}'s ${enemyWeapon.name} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad');
+        return enemyAttackPlayer(e, true);
       }
       return false;
     }
