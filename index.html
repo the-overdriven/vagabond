@@ -84,7 +84,7 @@ that means creating game asks for a name and choosing avatar
           --parchment:#ddc9a3;
           --parchment-dim:#9c8b6c;
           --t1:#b8b8b8;
-          --t2:#57b35c;
+          --t2:#d98a3a;
           --t3:#4aa3d1;
           --t4:#b565d6;
           --t5:#e0473f;
@@ -252,6 +252,8 @@ that means creating game asks for a name and choosing avatar
       }
       .slot .label{color:var(--parchment-dim); font-size:9px; text-transform:uppercase; letter-spacing:1px;}
       .slot .val{color:var(--parchment); margin-top:4px;}
+      .slot .val.tier1{color:var(--t1);} .slot .val.tier2{color:var(--t2);}
+      .slot .val.tier3{color:var(--t3);} .slot .val.tier4{color:var(--t4);} .slot .val.tier5{color:var(--t5);}
       .statgrid{
           display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;
           font-size:14px; margin-bottom:14px;
@@ -3528,6 +3530,10 @@ that means creating game asks for a name and choosing avatar
       const line = itemStatLine(it);
       return it.name + (line? ' \u2022 '+line : '');
     }
+    function setSlotLabel(element, item, fallback='-'){
+      element.className = 'val' + (item && item.tier ? ' '+tierColorClass(item.tier) : '');
+      element.textContent = item ? slotLabel(item) : fallback;
+    }
     function bestSlotScore(it){
       if(!it) return null;
       if(it.kind==='weapon'){
@@ -3591,9 +3597,13 @@ that means creating game asks for a name and choosing avatar
       return visible;
     }
     function renderInventory(){
-      document.getElementById('slotWeapon').querySelector('.val').textContent = slotLabel(player.equip.weapon);
-      document.getElementById('slotShield').querySelector('.val').textContent = player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : slotLabel(player.equip.shield);
-      document.getElementById('slotArmor').querySelector('.val').textContent = slotLabel(player.equip.armor);
+      setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon);
+      setSlotLabel(
+        document.getElementById('slotShield').querySelector('.val'),
+        player.equip.shield,
+        player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
+      );
+      setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
 
       const sg = document.getElementById('statGrid');
       sg.innerHTML = '';
