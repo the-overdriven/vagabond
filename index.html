@@ -61,7 +61,6 @@ that means creating game asks for a name and choosing avatar
 - add berries to forage
 - For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom
 - on mobile inventory screen hides hp bar
-- popup do u rly want to exit before closing tab
 - log hints to msg log with H
 - allow skipping turns with key (t)
 - chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
@@ -4195,6 +4194,10 @@ that means creating game asks for a name and choosing avatar
     window.addEventListener('blur', ()=>{
       rangesHeld = false;
       refreshRangeVisibility();
+    });
+    window.addEventListener('beforeunload', (ev)=>{
+      ev.preventDefault();
+      ev.returnValue = '';
     });
 
     /* ============================== TOUCH CONTROLS (mobile) ==============================
