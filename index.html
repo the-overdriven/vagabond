@@ -591,14 +591,17 @@ that means creating game asks for a name and choosing avatar
       ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes;
       ENEMY_PREFIXES = content.enemyPrefixes;
     }
-    function preloadImages(){
+    async function preloadImages(){
       const paths = [];
       for(const tmpl of ENEMY_TEMPLATES) paths.push('enemies/' + slug(tmpl.name) + '.jpg');
       for(const tmpl of NPC_TEMPLATES) paths.push('npc/' + tmpl.portrait + '.jpg');
-      for(const path of paths){
+      await Promise.all([...new Set(paths)].map(path=>new Promise(resolve=>{
         const image = new Image();
+        image.decoding = 'sync';
+        image.onload = ()=>image.decode().then(resolve, resolve);
+        image.onerror = resolve;
         image.src = path;
-      }
+      })));
     }
     function applyEnemyPrefix(e, prefix){
       const effects = ENEMY_PREFIXES[prefix] || {};
@@ -4285,8 +4288,8 @@ that means creating game asks for a name and choosing avatar
     }
 
     /* ============================== INIT ============================== */
-    function init(){
-      preloadImages();
+    async function init(){
+      await preloadImages();
       generateMap();
       initDiscovered();
       rebuildMinimapBases();
