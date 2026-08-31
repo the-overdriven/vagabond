@@ -1854,6 +1854,9 @@ that means creating game asks for a name and choosing avatar
       const chanceValue = 0.15 + (defenderSpd - attackerSpd) * 0.02;
       return Math.max(0, Math.min(1, chanceValue));
     }
+    function equippedArmor(equipment){
+      return equipment && equipment.kind === 'armor' ? equipment : null;
+    }
 
     function weaponCombatSpd(weapon){
       return weapon && weapon.kind === 'weapon'
@@ -1898,10 +1901,21 @@ that means creating game asks for a name and choosing avatar
         updateMobileInfoPanel(e.x,e.y);
         return;
       }
-      const dmg = damageRoll(playerAtk(), e.def);
+      const armor = equippedArmor(e.equipment);
+      const glancing = armor && chance(missChance(playerSpd(), e.spd));
+      let dmg = damageRoll(playerAtk(), e.def);
+      if(glancing) dmg = Math.floor(dmg / 3);
       e.hp -= dmg;
       spawnDamageNumber(e.x, e.y, dmg, '#fff6d6');
-      log(`You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
+      if(glancing){
+        if(player.equip.weapon){
+          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.name}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
+        } else {
+          log(`Your strike glances off the ${e.name}'s ${armor.name}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
+        }
+      } else {
+        log(`You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good');
+      }
       if(e.hp <= 0){
         killEnemy(e);
         updateMobileInfoPanel(e.x,e.y);
@@ -1925,13 +1939,24 @@ that means creating game asks for a name and choosing avatar
         log(`The ${e.name} attacks${weaponText} but misses you.`, 'good');
         return false;
       }
+      const armor = equippedArmor(player.equip.armor);
+      const glancing = armor && chance(missChance(e.spd, playerSpd()));
       let dmg = damageRoll(e.atk, playerDef());
       const critical = e.crit && chance(CRIT_CHANCE);
       if(critical) dmg = Math.round(dmg*2);
+      if(glancing) dmg = Math.floor(dmg / 3);
       player.hp -= dmg;
       if(critical) spawnDamageNumber(player.x, player.y, 'Crit!', '#f0b35a');
       spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0);
-      log(`The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad');
+      if(glancing){
+        if(enemyWeapon){
+          log(`The ${e.name}'s ${enemyWeapon.name} glances off your ${armor.name}! The ${e.name} hits you with their ${enemyWeapon.name} for ${dmg}.`, 'bad');
+        } else {
+          log(`The ${e.name}'s strike glances off your ${armor.name}! The ${e.name} hits you for ${dmg}.`, 'bad');
+        }
+      } else {
+        log(`The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad');
+      }
       updateHud();
       if(player.hp <= 0){
         die();
