@@ -1389,7 +1389,7 @@ that means creating game asks for a name and choosing avatar
       while(player.xp >= xpToNext(player.lvl)){
         player.xp -= xpToNext(player.lvl);
         player.lvl++;
-        const hpGain = 5;
+        const hpGain = 10;
         player.maxHp += hpGain;
         leveled=true;
         log(`You reached Level ${player.lvl}! (+${hpGain} max HP)`, 'good');
