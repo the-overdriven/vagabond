@@ -738,7 +738,7 @@ that means creating game asks for a name and choosing avatar
     function enterCave(){
       if(currentZ===0){
         if(map[player.y][player.x] !== 'caveentrance') return false;
-        const cave = caves.findIndex(c=>c.x===player.x && c.y===player.y);
+        const cave = caves.findIndex(c=>c.entrances.some(e=>e.x===player.x && e.y===player.y));
         if(cave < 0) return false;
         currentCave = cave; currentZ = -1; map = caveMaps[cave];
         log('You descend into the cave.', 'info');
@@ -970,8 +970,14 @@ that means creating game asks for a name and choosing avatar
           if(c && caves.every(v=>Math.max(Math.abs(v.x-c.x),Math.abs(v.y-c.y))>10)) spot=c;
         }
         if(!spot) continue;
-        map[spot.y][spot.x] = 'caveentrance';
-        const cave = {x:spot.x,y:spot.y, entrance:{x:spot.x,y:spot.y}};
+        const entrances = [spot];
+        if(i===0){
+          const second = candidates.find(c=>c!==spot && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))>=8 && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))<=18)
+            || candidates.find(c=>c!==spot);
+          if(second) entrances.push(second);
+        }
+        for(const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance';
+        const cave = {x:spot.x,y:spot.y, entrances:entrances.map(p=>({x:p.x,y:p.y}))};
         const cm = blankCaveMap();
         let x=spot.x,y=spot.y;
         const minX=Math.max(2,spot.x-8), maxX=Math.min(MAP_W-3,spot.x+8);
@@ -982,11 +988,24 @@ that means creating game asks for a name and choosing avatar
           x = Math.max(minX,Math.min(maxX,x+dx));
           y = Math.max(minY,Math.min(maxY,y+dy));
         }
-        for(let yy=spot.y-2;yy<=spot.y;yy++) for(let xx=spot.x-1;xx<=spot.x+1;xx++) cm[yy][xx]='cavefloor';
-        cm[spot.y][spot.x] = 'caveentrance';
+        for(const entrance of entrances){
+          for(let yy=entrance.y-2;yy<=entrance.y;yy++) for(let xx=entrance.x-1;xx<=entrance.x+1;xx++){
+            if(xx>=0 && yy>=0 && xx<MAP_W && yy<MAP_H) cm[yy][xx]='cavefloor';
+          }
+          cm[entrance.y][entrance.x] = 'caveentrance';
+        }
+        if(entrances.length>1){
+          let cx=entrances[0].x, cy=entrances[0].y;
+          while(cx!==entrances[1].x || cy!==entrances[1].y){
+            cm[cy][cx]='cavefloor';
+            cx += Math.sign(entrances[1].x-cx);
+            cy += Math.sign(entrances[1].y-cy);
+          }
+          cm[entrances[1].y][entrances[1].x]='caveentrance';
+        }
         caveMaps.push(cm);
         caves.push(cave);
-        candidates.splice(candidates.indexOf(spot),1);
+        for(const entrance of entrances) candidates.splice(candidates.indexOf(entrance),1);
       }
     }
 
@@ -1669,8 +1688,8 @@ that means creating game asks for a name and choosing avatar
       const rat = ENEMY_TEMPLATES.find(t=>t.name==='Giant Rat');
       for(let caveIndex=0;caveIndex<caveMaps.length;caveIndex++){
         const cm = caveMaps[caveIndex], open = [];
-        const caveEntrance = caves[caveIndex].entrance;
-        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(cm[y][x]==='cavefloor' && !(x===caveEntrance.x&&y===caveEntrance.y)) open.push({x,y});
+        const caveEntrances = caves[caveIndex].entrances;
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(cm[y][x]==='cavefloor' && !caveEntrances.some(e=>x===e.x&&y===e.y)) open.push({x,y});
         for(let i=0;i<4 && open.length;i++){
           const tmpl = pick([bat,rat].filter(Boolean)); if(!tmpl) continue;
           const p = pick(open);
@@ -1682,8 +1701,8 @@ that means creating game asks for a name and choosing avatar
         }
         const chestSpot=pick(open), campSpot=pick(open), skeletonSpot=pick(open);
         if(chestSpot) groundItems.push({x:chestSpot.x,y:chestSpot.y,kind:'chest',tier:1,opened:false,level:-1,caveIndex});
-        if(campSpot) groundItems.push({x:campSpot.x,y:campSpot.y,kind:'campfire',description:pick(CAMPFIRE_INSPECTIONS),level:-1,caveIndex});
-        if(skeletonSpot) groundItems.push({x:skeletonSpot.x,y:skeletonSpot.y,kind:'skeleton',looted:false,description:pick(SKELETON_INSPECTIONS),level:-1,caveIndex});
+        if(campSpot && chance(0.6)) groundItems.push({x:campSpot.x,y:campSpot.y,kind:'campfire',description:pick(CAMPFIRE_INSPECTIONS),level:-1,caveIndex});
+        if(skeletonSpot && chance(0.6)) groundItems.push({x:skeletonSpot.x,y:skeletonSpot.y,kind:'skeleton',looted:false,description:pick(SKELETON_INSPECTIONS),level:-1,caveIndex});
       }
     }
     function spawnGroundStuff(){
@@ -4226,6 +4245,12 @@ that means creating game asks for a name and choosing avatar
       if(decoded.length !== MAP_H) throw new Error('Save file map height does not match.');
       surfaceMap = decoded;
       caves = Array.isArray(data.caves) ? data.caves : [];
+      caves = caves.map(c=>({
+        ...c,
+        entrances: Array.isArray(c.entrances) && c.entrances.length
+          ? c.entrances
+          : [{x:c.x,y:c.y}],
+      }));
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
       map = data.currentZ < 0 && caveMaps[data.currentCave] ? caveMaps[data.currentCave] : surfaceMap;
       currentZ = data.currentZ < 0 && caveMaps[data.currentCave] ? -1 : 0;
