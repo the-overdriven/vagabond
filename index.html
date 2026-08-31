@@ -531,7 +531,7 @@ that means creating game asks for a name and choosing avatar
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;<br>
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
-    <kbd>F</kbd> forage (in forest) &nbsp;<br>
+    <kbd>F</kbd> forage (or loot) &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
     <kbd id="kbdCaps">CAPS</kbd> toggle enemy ranges &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
@@ -678,8 +678,9 @@ that means creating game asks for a name and choosing avatar
       // snow is drawn as dark speckles on a bright field, so its glyph colour is
       // useless on the minimap -- `mini` overrides what the minimaps sample.
       snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', mini:'#e4eef6', walk:true},
-      // cavefloor:{ch:'.', color:'#8a7aa5', bg:'#120e18', walk:true},
-      // cavewall: {ch:'#', color:'#2a2233', bg:'#0a0810', walk:false},
+      cavefloor: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
+      cavewall:  {ch:'#', color:'#493022', bg:'#0d0805', walk:false},
+      caveentrance: {ch:'∩', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
       temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
       // A single lore landmark hidden in the mountains: a monolithic black
@@ -696,7 +697,7 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
 // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
     function makeNoise(cellsX, cellsY){
@@ -725,6 +726,32 @@ that means creating game asks for a name and choosing avatar
     }
 
     let map = []; // map[y][x] = tile key string
+    let surfaceMap = null;
+    let caveMaps = [];
+    let caves = [];
+    let currentZ = 0;
+    let currentCave = -1;
+    function onCurrentLevel(entity){
+      const level = entity.level || 0;
+      return level === 0 ? currentZ === 0 : currentZ === level && entity.caveIndex === currentCave;
+    }
+    function enterCave(){
+      if(currentZ===0){
+        if(map[player.y][player.x] !== 'caveentrance') return false;
+        const cave = caves.findIndex(c=>c.x===player.x && c.y===player.y);
+        if(cave < 0) return false;
+        currentCave = cave; currentZ = -1; map = caveMaps[cave];
+        log('You descend into the cave.', 'info');
+      } else {
+        if(map[player.y][player.x] !== 'caveentrance') return false;
+        const cave = caves[currentCave];
+        map = surfaceMap; currentZ = 0;
+        currentCave = -1;
+        log('You climb back out into the mountain air.', 'info');
+      }
+      stopCameraAnimation(); snapCameraToPlayer(); minimapDirty = true; render(); updateHud();
+      return true;
+    }
     let spawnPoint = {x:0,y:0};
     let discovered = []; // discovered[y][x] = has the player ever seen this tile on the main screen
     let minimapDirty = true;
@@ -917,6 +944,50 @@ that means creating game asks for a name and choosing avatar
       // Lore landmark: a huge brass bell in/next to the mountains, kept
       // fairly close to the temple (map center), guarded by a pair of brutes.
       placeBigBell();
+      surfaceMap = map;
+      generateCaves();
+    }
+
+    function blankCaveMap(){
+      return Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill('cavewall'));
+    }
+    function generateCaves(){
+      caves = [];
+      caveMaps = [];
+      const candidates = [];
+      for(let y=2;y<MAP_H-2;y++) for(let x=2;x<MAP_W-2;x++){
+        if(map[y][x] !== 'mountain') continue;
+        const edge = DIRS8.some(([dx,dy])=>{
+          const t = map[y+dy] && map[y+dy][x+dx];
+          return t && TILE[t] && TILE[t].walk;
+        });
+        if(edge) candidates.push({x,y});
+      }
+      for(let i=0;i<6;i++){
+        let spot = null;
+        for(let tries=0;tries<500 && !spot;tries++){
+          const c = pick(candidates);
+          if(c && caves.every(v=>Math.max(Math.abs(v.x-c.x),Math.abs(v.y-c.y))>10)) spot=c;
+        }
+        if(!spot) continue;
+        map[spot.y][spot.x] = 'caveentrance';
+        const cave = {x:spot.x,y:spot.y, entrance:{x:spot.x,y:spot.y}};
+        const cm = blankCaveMap();
+        let x=spot.x,y=spot.y;
+        const minX=Math.max(2,spot.x-8), maxX=Math.min(MAP_W-3,spot.x+8);
+        const minY=Math.max(2,spot.y-8), maxY=Math.min(MAP_H-3,spot.y+8);
+        for(let step=0;step<180;step++){
+          cm[y][x] = 'cavefloor';
+          const [dx,dy] = pick(DIRS8);
+          x = Math.max(minX,Math.min(maxX,x+dx));
+          y = Math.max(minY,Math.min(maxY,y+dy));
+        }
+        for(let yy=spot.y-2;yy<=spot.y;yy++) for(let xx=spot.x-1;xx<=spot.x+1;xx++) cm[yy][xx]='cavefloor';
+        cm[spot.y][spot.x] = 'caveentrance';
+        caveMaps.push(cm);
+        caves.push(cave);
+        candidates.splice(candidates.indexOf(spot),1);
+      }
     }
 
     let bigBellPos = null;
@@ -1481,7 +1552,7 @@ that means creating game asks for a name and choosing avatar
 
     /* ============================== ENEMIES / ITEMS ON MAP ============================== */
     let enemies = [];
-    let groundItems = []; // {x,y,kind:'gold'|'potion'|'speedpotion'|'scroll'|'item', amount, item}
+    let groundItems = []; // level 0 is surface, level -1 is the shared cave layer
     let occupied = new Set(); // "x,y" for enemies
 
     function keyXY(x,y){ return x+','+y; }
@@ -1498,7 +1569,7 @@ that means creating game asks for a name and choosing avatar
       for(let y=2;y<MAP_H-2;y++){
         for(let x=2;x<MAP_W-2;x++){
           const tile = map[y][x];
-          if(tile==='temple' || tile==='belltower' || tile==='ancientForest' || !isWalkable(x,y)) continue;
+          if(tile==='temple' || tile==='belltower' || tile==='ancientForest' || tile==='caveentrance' || !isWalkable(x,y)) continue;
           if(Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y) < 20) continue;
           // Keep the bell's vicinity free of random spawns - the guard pair
           // should be the only threat there.
@@ -1546,7 +1617,7 @@ that means creating game asks for a name and choosing avatar
         if(!placed) return false;
         const variance = 0.95 + rng()*0.10;
         const e = {
-          name: tmpl.name, tier: tmpl.tier,
+          name: tmpl.name, tier: tmpl.tier, level:0,
           hp: Math.max(1,Math.round(tmpl.hp*variance)),
           atk: Math.max(1,Math.round(tmpl.atk*variance)),
           def: Math.max(0,Math.round(tmpl.def*variance)),
@@ -1572,7 +1643,6 @@ that means creating game asks for a name and choosing avatar
         occupied.add(keyXY(x,y));
         return true;
       }
-
       for(let i=0;i<total;i++){
         let r = rng(), tier=1, acc=0;
         for(let t=0;t<5;t++){ acc+=weights[t]; if(r<=acc){ tier=t+1; break; } }
@@ -1594,12 +1664,34 @@ that means creating game asks for a name and choosing avatar
         }
       }
     }
+    function spawnCaveContents(){
+      const bat = ENEMY_TEMPLATES.find(t=>t.name==='Giant Bat');
+      const rat = ENEMY_TEMPLATES.find(t=>t.name==='Giant Rat');
+      for(let caveIndex=0;caveIndex<caveMaps.length;caveIndex++){
+        const cm = caveMaps[caveIndex], open = [];
+        const caveEntrance = caves[caveIndex].entrance;
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(cm[y][x]==='cavefloor' && !(x===caveEntrance.x&&y===caveEntrance.y)) open.push({x,y});
+        for(let i=0;i<4 && open.length;i++){
+          const tmpl = pick([bat,rat].filter(Boolean)); if(!tmpl) continue;
+          const p = pick(open);
+          enemies.push({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier,level:-1,caveIndex,
+            hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,
+            humanoid:!!tmpl.humanoid,evades:!!tmpl.evades,aggro:tmpl.aggro ?? AGGRO_RANGE,
+            x:p.x,y:p.y,homeX:p.x,homeY:p.y,homeTileType:'cavefloor',alive:true,prefix:null,equipment:null});
+          open.splice(open.indexOf(p),1);
+        }
+        const chestSpot=pick(open), campSpot=pick(open), skeletonSpot=pick(open);
+        if(chestSpot) groundItems.push({x:chestSpot.x,y:chestSpot.y,kind:'chest',tier:1,opened:false,level:-1,caveIndex});
+        if(campSpot) groundItems.push({x:campSpot.x,y:campSpot.y,kind:'campfire',description:pick(CAMPFIRE_INSPECTIONS),level:-1,caveIndex});
+        if(skeletonSpot) groundItems.push({x:skeletonSpot.x,y:skeletonSpot.y,kind:'skeleton',looted:false,description:pick(SKELETON_INSPECTIONS),level:-1,caveIndex});
+      }
+    }
     function spawnGroundStuff(){
       // chests
       for(let i=0;i<45;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') && tries<200);
         if(tries>=200) continue;
         const distTier = Math.min(5, 1+Math.floor((Math.abs(x-spawnPoint.x)+Math.abs(y-spawnPoint.y))/45));
         groundItems.push({x,y,kind:'chest', tier:distTier, opened:false});
@@ -1608,7 +1700,7 @@ that means creating game asks for a name and choosing avatar
       for(let i=0;i<30;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'potion'});
       }
@@ -1616,7 +1708,7 @@ that means creating game asks for a name and choosing avatar
       for(let i=0;i<9;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'scroll'});
       }
@@ -1624,7 +1716,7 @@ that means creating game asks for a name and choosing avatar
       for(let i=0;i<3;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
-        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower') && tries<200);
+        while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') && tries<200);
         if(tries>=200) continue;
         groundItems.push({x,y,kind:'speedpotion'});
       }
@@ -2290,7 +2382,7 @@ that means creating game asks for a name and choosing avatar
       }
       const playerOnTemple = map[player.y][player.x] === 'temple' || map[player.y][player.x] === 'belltower';
       for(const e of enemies.slice()){
-        if(!e.alive) continue;
+        if(!e.alive || !onCurrentLevel(e)) continue;
         const distFromPlayer = Math.max(Math.abs(e.x-player.x), Math.abs(e.y-player.y));
         const shouldFlee = playerOnTemple && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE;
         if(shouldFlee){
@@ -2399,6 +2491,8 @@ that means creating game asks for a name and choosing avatar
     // searched once - repeating it just confirms it's already been picked
     // over, so players can't farm the same spot for infinite herbs.
     let foragedTiles = new Set();
+    let suppressLootLog = false;
+    let lastLootResult = '';
     function tryForage(){
       if(map[player.y][player.x] === 'ancientForest'){
         log("You don't dare to forage in the ancient forest. Something old might be watching from between the trees.", 'info');
@@ -2423,9 +2517,26 @@ that means creating game asks for a name and choosing avatar
       }
       draw();
     }
+    function lootSkeletonOrForage(){
+      const skeleton = groundItems.find(g=>onCurrentLevel(g) && g.kind==='skeleton' && g.x===player.x && g.y===player.y);
+      if(skeleton){
+        if(skeleton.looted){ log('The skeleton has already been searched.', 'info'); return; }
+        skeleton.looted = true;
+        const chest = {x:skeleton.x,y:skeleton.y,kind:'chest',tier:1,opened:false,level:-1,caveIndex:skeleton.caveIndex};
+        groundItems.push(chest);
+        suppressLootLog = true;
+        checkGroundAt(player.x, player.y);
+        suppressLootLog = false;
+        log(`You search the skeleton and take what remains: ${lastLootResult}`, 'loot');
+        draw();
+        return;
+      }
+      tryForage();
+    }
     function checkGroundAt(x,y){
       for(let i=groundItems.length-1;i>=0;i--){
         const g = groundItems[i];
+        if(!onCurrentLevel(g)) continue;
         if(g.x!==x || g.y!==y) continue;
         if(g.kind==='chest'){
           if(g.opened) continue;
@@ -2435,7 +2546,8 @@ that means creating game asks for a name and choosing avatar
           if(roll<0.45){
             const gold = randInt(5,15)*g.tier + Math.round(mf*2);
             player.gold += gold;
-            log(`You open a chest and find ${gold} gold!`, 'loot');
+            lastLootResult = `${gold} gold.`;
+            if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
           } else if(roll<0.65){
             const lowTier = Math.min(2, Math.max(1, g.tier));
             const pickRoll = rng();
@@ -2443,22 +2555,28 @@ that means creating game asks for a name and choosing avatar
             if(pickRoll < 0.33) item = makeWeaponItem(lowTier);
             else if(pickRoll < 0.66) item = makeArmorItem(lowTier);
             else item = makeShieldItem(lowTier);
-            log(`You open a chest and find ${item.name}.`, 'loot');
+            lastLootResult = `${item.name}.`;
+            if(!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot');
             if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
               player.inventory.push(item);
             }
           } else if(roll<0.85){
             addPotion();
-            log(`You open a chest and find a Life Potion!`, 'loot');
+            lastLootResult = 'a Life Potion.';
+            if(!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot');
           } else if(roll<0.91){
             addScroll();
-            log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
+            lastLootResult = 'a Scroll of Invisibility.';
+            if(!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
           } else {
             addSpeedPotion();
-            log(`You open a chest and find a Potion of Speed!`, 'loot');
+            lastLootResult = 'a Potion of Speed.';
+            if(!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot');
           }
           spawnPickupAnim(g);
           groundItems.splice(i,1);
+        } else if(g.kind==='skeleton' || g.kind==='campfire'){
+          continue;
         } else if(g.kind==='potion'){
           addPotion();
           log(`You pick up a Life Potion.`, 'loot');
@@ -2604,7 +2722,7 @@ that means creating game asks for a name and choosing avatar
       }
       const nx = player.x+dx, ny = player.y+dy;
       const ek = keyXY(nx,ny);
-      const target = enemies.find(e=>e.x===nx && e.y===ny && e.alive);
+      const target = enemies.find(e=>onCurrentLevel(e) && e.x===nx && e.y===ny && e.alive);
       if(target){
         clearAutoPath();
         await playerAttackEnemy(target);
@@ -2614,7 +2732,7 @@ that means creating game asks for a name and choosing avatar
         flushPendingMove();
         return;
       }
-      const npcTarget = npcs.find(n=>n.x===nx && n.y===ny);
+      const npcTarget = currentZ===0 && npcs.find(n=>n.x===nx && n.y===ny);
       if(npcTarget){
         clearAutoPath();
         log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info');
@@ -2637,8 +2755,13 @@ that means creating game asks for a name and choosing avatar
             log('The Temple restores your strength.', 'good');
           }
         }
-        if(map[ny][nx]==='ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest'){
+        if(currentZ===0 && map[ny][nx]==='ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest'){
           log('You enter a dense ancient forest.', 'info');
+        }
+        if(map[ny][nx]==='caveentrance'){
+          log(currentZ===0
+            ? 'You\'re standing at the entrance to the cave. Press space, if you dare to enter.'
+            : "You're standing at the cave exit. Press space, to come back to surface.", 'info');
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -2666,7 +2789,7 @@ that means creating game asks for a name and choosing avatar
       hill:"a rugged hill",
       mountain:"an impassable mountain",
       snow:"a snow-covered slope",
-      cavefloor:"the violet-tinged floor of a cave",
+      cavefloor:"the brown dirt floor of a cave",
       cavewall:"a solid cave wall",
       temple:"the sacred ground of the Temple",
       boulder:"a cluster of impassable boulders",
@@ -2685,6 +2808,12 @@ that means creating game asks for a name and choosing avatar
     function describeSurroundings() {
       const here = TILE_DESC[map[player.y][player.x]] || 'unfamiliar ground';
       log(`You are standing on ${here}.`, 'info');
+      const currentGround = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y);
+      if(currentGround && currentGround.kind==='skeleton'){
+        log(`Skeleton${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info');
+      } else if(currentGround && currentGround.kind==='campfire'){
+        log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info');
+      }
 
       const notes = {};
       let pillarDirection = null;
@@ -2715,7 +2844,7 @@ that means creating game asks for a name and choosing avatar
                           'southeast';
 
           const enemy = enemies.find(
-            en => en.alive && en.x === nx && en.y === ny
+            en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
           );
 
           if (enemy) {
@@ -2724,7 +2853,7 @@ that means creating game asks for a name and choosing avatar
           }
 
           const item = groundItems.find(
-            g => g.x === nx && g.y === ny &&
+            g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
               !(g.kind === 'chest' && g.opened)
           );
 
@@ -2853,6 +2982,8 @@ that means creating game asks for a name and choosing avatar
     const ENEMY_COLORS = {1:'#b8b8b8',2:'#d98a3a',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
     function groundGlyph(g){
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
+      if(g.kind==='campfire') return {ch:'*', color:'#e8a24f'};
+      if(g.kind==='skeleton') return {ch:'╶☠╴', color:g.looted ? '#777' : '#d0d0c0'};
       if(g.kind==='potion') return {ch:'!', color:'#e0473f'};
       if(g.kind==='speedpotion') return {ch:'!', color:'#59b8ff'};
       if(g.kind==='scroll') return {ch:'?', color:'#b565d6'};
@@ -2909,6 +3040,7 @@ that means creating game asks for a name and choosing avatar
     }
     function enemyAnimsPending(){
       for(const e of enemies){
+        if(!onCurrentLevel(e)) continue;
         if(e.animStart !== undefined || e.attackStart !== undefined) return true;
       }
       return false;
@@ -3038,6 +3170,7 @@ that means creating game asks for a name and choosing avatar
       }
       // ground items
       for(const g of groundItems){
+        if(!onCurrentLevel(g)) continue;
         const vx = Math.round((g.x-camX) * TILE_PX);
         const vy = Math.round((g.y-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
@@ -3045,6 +3178,8 @@ that means creating game asks for a name and choosing avatar
         else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', TILE[map[g.y][g.x]].bg);
         else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='campfire') drawTile(vx,vy,'*', '#e8a24f', TILE[map[g.y][g.x]].bg);
+        else if(g.kind==='skeleton') drawTile(vx,vy,'╶☠╴', g.looted ? '#777' : '#d0d0c0', TILE[map[g.y][g.x]].bg);
       }
       // fx animations: symbol bumps up/down, shrinks, and fades out
       if(fxAnims.length){
@@ -3086,6 +3221,7 @@ that means creating game asks for a name and choosing avatar
       }
       // enemies
       for(const e of enemies){
+        if(!onCurrentLevel(e)) continue;
         if(!e.alive) continue;
         let ex = e.x, ey = e.y;
         if(e.animStart !== undefined){
@@ -3119,6 +3255,7 @@ that means creating game asks for a name and choosing avatar
       }
       // npcs - drawn in white to stand out from the tier-coloured enemy glyphs
       for(const n of npcs){
+        if(currentZ!==0) continue;
         let nxp = n.x, nyp = n.y;
         if(n.animStart !== undefined){
           const t = Math.min(1, (now - n.animStart) / MOVE_ANIM_MS);
@@ -3171,10 +3308,20 @@ that means creating game asks for a name and choosing avatar
           drawCreature(vx,vy, '@', playerColor, playerAlpha);
         }
       }
+      if(currentZ < 0){
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(canvas.width-86, 6, 78, 25);
+        ctx.fillStyle = '#e8a24f';
+        ctx.font = "bold 16px Consolas, 'Courier New', monospace";
+        ctx.fillText('Z -1', canvas.width-47, 10);
+        ctx.restore();
+      }
       // range overlays are drawn last so they tint everything underneath without
       // being erased by later tile/entity draws.
       if(showAllVisibleEnemyRanges){
         for(const e of enemies){
+          if(!onCurrentLevel(e)) continue;
           if(enemyIsVisibleOnMainView(e)) drawEnemyRangeOverlay(e);
         }
       } else if(hoveredEnemy && hoveredEnemy.alive){
@@ -3244,14 +3391,34 @@ that means creating game asks for a name and choosing avatar
     const tooltip = document.getElementById('tooltip');
     function slug(name){ return name.toLowerCase().replace(/\s+/g,'_'); }
     function groundItemLabel(g){
-      return g.kind==='chest' ? 'Chest' : 'Item';
+      return g.kind==='chest' ? 'Chest' : g.kind==='skeleton' ? 'Skeleton' : g.kind==='campfire' ? 'Abandoned Campfire' : 'Item';
     }
+    const CAMPFIRE_INSPECTIONS = [
+      'Cold ash. The fire died in a hurry.',
+      'The embers are long dead.',
+      'Someone left this fire unfinished.',
+      'Cold ashes. No warmth remains.',
+      'The wood is blackened, but barely burned.',
+      'Whoever has this place home has long abandoned it.',
+    ];
+    const SKELETON_INSPECTIONS = [
+      'The bones are picked clean.',
+      'The corpse lies twisted in the dirt.',
+      'Long dead. Not long forgotten.',
+      'Something tore the flesh from the bones.',
+      'The skull is cracked.',
+      'The bones bear strange bite marks.',
+      'Whatever killed them left little behind.',
+      'The dead body have been here a long time.',
+      'A crude death. A lonely grave.',
+      'The remains are disturbingly fresh.',
+    ];
     let lastMousePx = null, lastMousePy = null;
     // Shared by both the desktop floating tooltip (mousemove) and the mobile
     // tap-to-inspect panel (touchstart) - builds the same info for whatever
     // occupies tile (mx,my), so both surfaces stay in sync automatically.
     function tileInspectInfo(mx,my){
-      const e = enemies.find(en=>en.alive && en.x===mx && en.y===my) || null;
+      const e = enemies.find(en=>onCurrentLevel(en) && en.alive && en.x===mx && en.y===my) || null;
       if(e){
         const hpPct = Math.max(0, e.hp/e.maxHp*100);
         const aggroRange = enemyAggroRange(e);
@@ -3279,15 +3446,17 @@ that means creating game asks for a name and choosing avatar
       HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}<br><span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span> &nbsp;<span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span> &nbsp;<span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br>
       <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>` };
       }
-      const n = npcs.find(np=>np.x===mx && np.y===my);
+      const n = currentZ===0 && npcs.find(np=>np.x===mx && np.y===my);
       if(n){
         return { mini:false, enemy:null, html: `
       <img src="npc/${n.portrait}.jpg" onerror="this.style.display='none'">
       <div class="nm">${n.name}</div>
       ${n.trades ? '<div style="color:var(--parchment-dim);font-size:10px;">Click to trade</div>' : ''}` };
       }
-      const g = groundItems.find(gi=>gi.x===mx && gi.y===my && !(gi.kind==='chest' && gi.opened));
+      const g = groundItems.find(gi=>onCurrentLevel(gi) && gi.x===mx && gi.y===my && !(gi.kind==='chest' && gi.opened));
       if(g){
+        if(g.kind==='campfire') return { mini:true, enemy:null, html:`<div class="nm">An abandoned campfire.</div>` };
+        if(g.kind==='skeleton') return { mini:true, enemy:null, html:`<div class="nm">Skeleton${g.looted ? ' (searched)' : ''}</div>` };
         return { mini:true, enemy:null, html: `<div class="nm">${groundItemLabel(g)}</div>` };
       }
       if(mx>=0 && my>=0 && mx<MAP_W && my<MAP_H && map[my][mx]==='blackpillar'){
@@ -3348,9 +3517,9 @@ that means creating game asks for a name and choosing avatar
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX);
       const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
       updateMobileInfoPanel(mx,my);
-      const n = npcs.find(np=>np.x===mx && np.y===my);
+      const n = currentZ===0 && npcs.find(np=>np.x===mx && np.y===my);
       if(n){ clearAutoPath(); tryOpenTrade(n); return; }
-      const e = enemies.find(en=>en.alive && en.x===mx && en.y===my);
+      const e = enemies.find(en=>onCurrentLevel(en) && en.alive && en.x===mx && en.y===my);
       if(e){ clearAutoPath(); return; }
       if(startAutoPath(mx,my)){
         lastMousePx=null; lastMousePy=null;
@@ -3403,23 +3572,39 @@ that means creating game asks for a name and choosing avatar
     // so it lives on cached offscreen canvases that are only patched tile-by-tile as
     // fog of war lifts. Per-frame rendering is then just a blit plus two markers.
     const miniBases = {};
+    let miniBaseLevel = null, miniBaseCave = null;
     function makeMiniBase(scale){
       const c = document.createElement('canvas');
       c.width = MAP_W*scale; c.height = MAP_H*scale;
       return { canvas:c, ctx:c.getContext('2d'), scale:scale };
     }
     function ensureMiniBases(){
+      let changed = false;
+      if(miniBaseLevel !== currentZ || miniBaseCave !== currentCave){
+        for(const key of Object.keys(miniBases)) delete miniBases[key];
+        miniBaseLevel = currentZ;
+        miniBaseCave = currentCave;
+        changed = true;
+      }
       for(const scale of MINI_SCALES){
         if(!miniBases[scale]) miniBases[scale] = makeMiniBase(scale);
+      }
+      if(changed){
+        for(const scale of MINI_SCALES){
+          const base = miniBases[scale];
+          for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) paintMiniTile(base, x, y);
+        }
       }
     }
     function paintMiniTile(base, x, y){
       const s = base.scale;
       const c = base.ctx;
       c.clearRect(x*s, y*s, s, s);
-      const t = TILE[map[y][x]];
-      const foraged = map[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
-      c.fillStyle = discovered[y][x] ? (foraged ? '#554f2a' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
+      const terrainMap = currentZ===0 ? (surfaceMap || map) : map;
+      const t = TILE[terrainMap[y][x]];
+      const foraged = terrainMap[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
+      const visible = currentZ < 0 || discovered[y][x];
+      c.fillStyle = visible ? (foraged ? '#554f2a' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
@@ -3434,6 +3619,7 @@ that means creating game asks for a name and choosing avatar
       minimapDirty = true;
     }
     function markDiscovered(x, y){
+      if(currentZ !== 0) return;
       if(discovered[y][x]) return;
       discovered[y][x] = true;
       ensureMiniBases();
@@ -3455,6 +3641,13 @@ that means creating game asks for a name and choosing avatar
         const ox = Math.max(0, Math.min(MAP_W - viewW, mapPanX - viewW/2));
         const oy = Math.max(0, Math.min(MAP_H - viewH, mapPanY - viewH/2));
         ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, viewW*scale, viewH*scale, 0, 0, w, h);
+        if(currentZ===0) ctx.fillStyle = '#ff6b2e';
+        for(const cave of currentZ===0 ? caves : []){
+          if(!discovered[cave.y] || !discovered[cave.y][cave.x]) continue;
+         const cx = (cave.x-ox)*scale*zoom + scale*zoom/2;
+         const cy = (cave.y-oy)*scale*zoom + scale*zoom/2;
+         if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2*zoom, cy-2*zoom, 4*zoom, 4*zoom);
+        }
         if(discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
           const tx = (spawnPoint.x-ox)*scale*zoom + scale*zoom/2;
           const ty = (spawnPoint.y-oy)*scale*zoom + scale*zoom/2;
@@ -3470,16 +3663,23 @@ that means creating game asks for a name and choosing avatar
         const radius = Math.max(5, scale*1.8)*zoom*pulse;
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI*2);
-        ctx.fillStyle = '#e0473f';
+        ctx.fillStyle = map[player.y] && map[player.y][player.x] === 'caveentrance' ? '#ff8c32' : '#e0473f';
         ctx.fill();
         return;
       }
       const ox = originX || 0, oy = originY || 0;
       ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, w, h, 0, 0, w, h);
+      ctx.fillStyle = '#ff6b2e';
+      for(const cave of currentZ===0 ? caves : []){
+        if(!discovered[cave.y] || !discovered[cave.y][cave.x]) continue;
+        const cx = (cave.x-ox)*scale + scale/2;
+        const cy = (cave.y-oy)*scale + scale/2;
+        if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2, cy-2, 4, 4);
+      }
       const dot = Math.max(2, scale+2);
       ctx.fillStyle = '#ffe08a';
       ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = map[player.y] && map[player.y][player.x] === 'caveentrance' ? '#ff8c32' : '#ffffff';
       ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
     }
     function sideMiniOrigin(){
@@ -3946,7 +4146,7 @@ that means creating game asks for a name and choosing avatar
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 5; // v5 adds the ancient forest biome
+    const SAVE_VERSION = 6; // v6 adds generated underground caves
 
     function buildSaveObject(){
       return {
@@ -3954,7 +4154,11 @@ that means creating game asks for a name and choosing avatar
         savedAt: new Date().toISOString(),
         worldSeed: WORLD_SEED,
         rngState: rngState,
-        map: map.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
+        map: surfaceMap.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
+        caveMaps: caveMaps.map(cm=>cm.map(row=>row.map(t=>TILE_CODE[t] || '#').join(''))),
+        caves: caves,
+        currentZ: currentZ,
+        currentCave: currentCave,
         discovered: discovered.map(row => row.map(b => b?'1':'0').join('')),
         spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
@@ -3970,7 +4174,7 @@ that means creating game asks for a name and choosing avatar
           inventory: player.inventory,
         },
         enemies: enemies.filter(e=>e.alive).map(e=>({
-          name:e.name, baseName:e.baseName, tier:e.tier,
+          name:e.name, baseName:e.baseName, tier:e.tier, level:e.level||0, caveIndex:e.caveIndex,
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: enemyAggroRange(e),
           fly: !!e.fly,
@@ -4020,7 +4224,12 @@ that means creating game asks for a name and choosing avatar
         return row;
       });
       if(decoded.length !== MAP_H) throw new Error('Save file map height does not match.');
-      map = decoded;
+      surfaceMap = decoded;
+      caves = Array.isArray(data.caves) ? data.caves : [];
+      caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
+      map = data.currentZ < 0 && caveMaps[data.currentCave] ? caveMaps[data.currentCave] : surfaceMap;
+      currentZ = data.currentZ < 0 && caveMaps[data.currentCave] ? -1 : 0;
+      currentCave = currentZ < 0 ? data.currentCave : -1;
 
       if(Array.isArray(data.discovered) && data.discovered.length === MAP_H){
         discovered = data.discovered.map(rowStr=>{
@@ -4073,7 +4282,7 @@ that means creating game asks for a name and choosing avatar
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
         return ({
-          name:e.name, baseName:e.baseName, tier:e.tier,
+          name:e.name, baseName:e.baseName, tier:e.tier, level:e.level||0, caveIndex:e.caveIndex,
           hp:e.hp, maxHp:e.maxHp, atk:e.atk, def:e.def, spd:e.spd,
           aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
           fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
@@ -4100,7 +4309,12 @@ that means creating game asks for a name and choosing avatar
         spawnNpcs(); // older save from before NPCs existed
       }
 
-      groundItems = (data.groundItems||[]).map(g=>({...g}));
+      groundItems = (data.groundItems||[]).map(g=>{
+        const item = {...g};
+        if(!item.description && item.kind==='campfire') item.description = pick(CAMPFIRE_INSPECTIONS);
+        if(!item.description && item.kind==='skeleton') item.description = pick(SKELETON_INSPECTIONS);
+        return item;
+      });
 
       toggleInv(false);
       toggleMap(false);
@@ -4288,8 +4502,8 @@ that means creating game asks for a name and choosing avatar
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
       if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; player.gold = 500; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
       if(mapOpen || invOpen || tradeOpen) return;
-      if(k===' ' || k==='Spacebar'){ ev.preventDefault(); describeSurroundings(); return; } // <-- added
-      if(k==='f' || k==='F'){ ev.preventDefault(); tryForage(); return; }
+      if(k===' ' || k==='Spacebar'){ ev.preventDefault(); if(!enterCave()) describeSurroundings(); return; }
+      if(k==='f' || k==='F'){ ev.preventDefault(); lootSkeletonOrForage(); return; }
       const moves = {
 
         w:[0,-1], s:[0,1], a:[-1,0], d:[1,0],
@@ -4361,6 +4575,7 @@ that means creating game asks for a name and choosing avatar
       spawnEnemies();
       spawnBellGuardians();
       spawnGroundStuff();
+      spawnCaveContents();
       spawnNpcs();
       ensureMerchantStock();
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info');
