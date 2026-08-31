@@ -1235,7 +1235,7 @@ that means creating game asks for a name and choosing avatar
     function makeArmorItem(tier){
       const pool = ARMORS.filter(a=>a.tier<=tier);
       const base = pick(pool.length?pool:ARMORS.filter(a=>a.tier===1));
-      const item = {kind:'armor', base:base.name, def:base.def, tier:base.tier, name:base.name};
+      const item = {kind:'armor', base:base.name, def:base.def, tier:base.tier, speedPenalty:base.speedPenalty || 0, name:base.name};
       return rollModifier(base.name, item);
     }
     function rollEnemyEquipment(e){
@@ -1333,7 +1333,7 @@ that means creating game asks for a name and choosing avatar
       const w = player.equip.weapon;
       if(w){ s += Math.floor(w.spd/2); if(w.mod==='spd') s += w.modAmt; }
       if(player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2;
-      if(player.equip.armor) s -= 1;
+      if(player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0);
       for(const slot of ['shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
       const terrainSpeed = {forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2};
