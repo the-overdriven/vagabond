@@ -33,7 +33,6 @@
 - snow covered mountains? mountains in snow biomes should be white and more common
 - add volcanos
 - add locations, ruins, etc. that can be explored and looted
-- just as our char animates when attacking enemies, enemies should animate when attacking player
 - You equip the Profound Mace. (+1 ATK, +1 SPD) - doesnt show the xp bonus
 - add bestiary
 - reading scroll of invis should make u gray instantly
@@ -66,6 +65,7 @@ that means creating game asks for a name and choosing avatar
 - ability to turn 3 healing herbs to 1 life potion?
 - make some monsters wander outsife of their home tile
 - monsters that are close make sounds, to warn player
+- add special herbs (akin to G2)
  -->
 
 <!DOCTYPE html>
@@ -1847,6 +1847,7 @@ that means creating game asks for a name and choosing avatar
       }
     }
     function enemyAttackPlayer(e){
+      beginEnemyAttackAnim(e);
       if(chance(missChance(e.spd, playerSpd()))){
         log(`The ${e.name} attacks but misses you.`, 'good');
         return false;
@@ -2685,12 +2686,21 @@ that means creating game asks for a name and choosing avatar
       e.animFromY = fromY;
       e.animStart = performance.now();
     }
+    function beginEnemyAttackAnim(e){
+      e.attackStart = performance.now();
+      runAnimationLoop();
+    }
     function clearEnemyAnims(){
-      for(const e of enemies) e.animStart = undefined;
+      for(const e of enemies){
+        e.animStart = undefined;
+        e.attackStart = undefined;
+      }
       for(const n of npcs) n.animStart = undefined;
     }
     function enemyAnimsPending(){
-      for(const e of enemies){ if(e.animStart !== undefined) return true; }
+      for(const e of enemies){
+        if(e.animStart !== undefined || e.attackStart !== undefined) return true;
+      }
       return false;
     }
     function animationsPending(){
@@ -2850,6 +2860,13 @@ that means creating game asks for a name and choosing avatar
             ex = e.animFromX + (e.x - e.animFromX) * p;
             ey = e.animFromY + (e.y - e.animFromY) * p;
           }
+        }
+        if(e.attackStart !== undefined){
+          const t = Math.min(1, (now - e.attackStart) / 220);
+          const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35;
+          ex = e.x + (player.x - e.x) * lunge;
+          ey = e.y + (player.y - e.y) * lunge;
+          if(t >= 1) e.attackStart = undefined;
         }
         const vx = Math.round((ex-camX) * TILE_PX), vy = Math.round((ey-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
