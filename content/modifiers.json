@@ -1,6 +1,6 @@
 [
   {"name":"Profound", "stat":"xp" },
-  {"name":"Vital",    "stat":"hp" },
+  {"name":"Resilient","stat":"hp" },
   {"name":"Mighty",   "stat":"atk"},
   {"name":"Sturdy",   "stat":"def"},
   {"name":"Swift",    "stat":"spd"},
