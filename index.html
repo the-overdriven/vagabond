@@ -1456,6 +1456,16 @@ that means creating game asks for a name and choosing avatar
         // If this world happens to contain none of the creature's biomes, fall back to
         // anywhere walkable rather than dropping it from the world entirely.
         if(!pool.length) pool = allSpawnTiles;
+        if(tmpl.tier >= 3){
+          const distantPool = [];
+          for(let i=0; i<pool.length; i+=2){
+            const x = pool[i], y = pool[i+1];
+            if(Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y)) >= 30){
+              distantPool.push(x, y);
+            }
+          }
+          pool = distantPool;
+        }
         poolCache[tmpl.name] = pool;
         return pool;
       }
