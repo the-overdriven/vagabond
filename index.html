@@ -65,6 +65,7 @@ that means creating game asks for a name and choosing avatar
 - mining? to destroy building, gain ore, and use for crafting
 - ability to turn 3 healing herbs to 1 life potion?
 - make some monsters wander outsife of their home tile
+- monsters that are close make sounds, to warn player
  -->
 
 <!DOCTYPE html>
@@ -2673,7 +2674,7 @@ that means creating game asks for a name and choosing avatar
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          drawTile(px,py,t.ch,foraged ? '#a9c397' : t.color,t.bg);
+          drawTile(px,py,t.ch,foraged ? '#554f2a' : t.color,t.bg);
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
@@ -3012,7 +3013,7 @@ that means creating game asks for a name and choosing avatar
       c.clearRect(x*s, y*s, s, s);
       const t = TILE[map[y][x]];
       const foraged = map[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
-      c.fillStyle = discovered[y][x] ? (foraged ? '#6f8f59' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
+      c.fillStyle = discovered[y][x] ? (foraged ? '#554f2a' : (t.mini || t.color)) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
