@@ -406,12 +406,18 @@ that means creating game asks for a name and choosing avatar
           }
           #mapOverlay .panelbox{width:100%;}
           #invOverlay .stats-details{display:none;}
+          /* Log grows/shrinks to take whatever space mobileInfoPanel isn't
+             using, instead of both fighting over a fixed split. */
+          #logpanel{
+              height:auto; flex:1 1 auto; min-height:44px; max-height:45vh;
+          }
           #mobileInfoPanel{
               display:block; width:100%; max-width:100%; box-sizing:border-box;
               background:linear-gradient(180deg,var(--panel2),var(--panel));
               border:1px solid var(--border); border-radius:4px;
               padding:8px 10px; font-size:12px; color:var(--parchment-dim);
-              min-height:64px; flex:1; min-width:0; overflow:hidden; overflow-wrap:anywhere;
+              min-height:34px; max-height:38vh; flex:0 1 auto; min-width:0;
+              overflow-y:auto; overflow-wrap:anywhere;
           }
           #mobileInfoPanel img{
               width:48px; height:48px; object-fit:cover; border-radius:4px;
