@@ -675,6 +675,7 @@ that means creating game asks for a name and choosing avatar
     let ARTIFACT_PREFIXES = [];
     let ARTIFACT_EPITHETS = [];
     let ARTIFACT_NAMES_DWARF = [];
+    let ARTIFACT_VOCATIONS_DWARF = [];
     let ARTIFACT_EFFECTS = [];
     let ARTIFACT_CURSES = [];
     let ARTIFACT_DESC = {};
@@ -691,6 +692,7 @@ that means creating game asks for a name and choosing avatar
         artifactPrefixes:'artifact_prefixes.json',
         artifactEpithets:'artifact_epithets.json',
         artifactNamesDwarf:'random_names_dwarf.json',
+        artifactVocationsDwarf:'random_vocations_dwarf.json',
         artifactEffects:'artifact_effects.json',
         artifactCurses:'artifact_curses.json',
         artifactDesc:'artifact_desc_fragments.json'
@@ -712,6 +714,7 @@ that means creating game asks for a name and choosing avatar
       ARTIFACT_PREFIXES = content.artifactPrefixes;
       ARTIFACT_EPITHETS = content.artifactEpithets;
       ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf;
+      ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf;
       ARTIFACT_EFFECTS = content.artifactEffects;
       ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : [];
       ARTIFACT_DESC = content.artifactDesc;
@@ -1564,9 +1567,70 @@ that means creating game asks for a name and choosing avatar
         .replace(/\{name\}/g, name || '')
         .replace(/\{possessor\}/g, possessor || '');
     }
-    function generateArtifactDescription(noun, name, effect, curse, possessor){
+
+    // Vocation data is intentionally accepted in a few simple JSON shapes:
+    // ["geomancer", "blacksmith"] or
+    // [{"name":"geomancer"}, {"vocation":"blacksmith"}].
+    function normalizeDwarfVocation(v){
+      if(v === null || v === undefined) return '';
+      if(typeof v === 'string') return v.trim();
+      if(typeof v === 'object'){
+        return String(v.name ?? v.vocation ?? v.title ?? '').trim();
+      }
+      return String(v).trim();
+    }
+
+    function dwarfVocationText(){
+      const pool = (Array.isArray(ARTIFACT_VOCATIONS_DWARF) ? ARTIFACT_VOCATIONS_DWARF : [])
+        .map(normalizeDwarfVocation)
+        .filter(Boolean);
+      const vocation = pool.length ? pick(pool).toLowerCase() : 'craftsman';
+      return vocation.replace(/^dwarven\\s+/i, '').trim();
+    }
+
+    function makeDwarfOwnerLore(possessor){
+      if(!possessor) return null;
+
+      const vocation = dwarfVocationText();
+
+      // Exactly 50% chance of an unknown death year.
+      const deathKnown = chance(0.50);
+      // Keep the lifespan plausible for generated lore.
+      const birthYear = randInt(120, 980);
+      const lifespan = randInt(38, 126);
+      const deathYear = birthYear + lifespan;
+
+      const reputations = [
+        'famous',
+        'scandalous',
+        'notorious',
+        'shady',
+        'dreaded',
+        'disreputable',
+        'disgraced',
+        'dubious',
+        'legendary',
+        'cursed'
+      ];
+      const reputation = pick(reputations);
+
+      return {
+        vocation,
+        reputation,
+        birthYear,
+        deathYear: deathKnown ? deathYear : null,
+        text: `${possessor} was a ${reputation} dwarven ${vocation} who lived between ${birthYear} - ${deathKnown ? deathYear : '???'}.`
+      };
+    }
+
+    function generateArtifactDescription(noun, name, effect, curse, possessor, ownerLore){
       const desc = ARTIFACT_DESC || {};
       const lines = [];
+
+      // Named artifacts always reveal who their namesake was after identification.
+      // Cursed/non-named artifacts keep the existing procedural description system.
+      if(ownerLore) lines.push(ownerLore.text);
+
       if(desc.intro && desc.intro.length) lines.push(pick(desc.intro));
       const flavorLines = desc[effect.flavor];
       if(flavorLines && flavorLines.length) lines.push(pick(flavorLines));
@@ -1619,9 +1683,10 @@ that means creating game asks for a name and choosing avatar
       // Every non-cursed artifact gets a named owner. Cursed artifacts use
       // the cursed prefix instead and do not get an "of <dwarf>" name.
       // Keep the owner's identity separate because descriptions may refer to it.
-      let name, possessor = null;
+      let name, possessor = null, ownerLore = null;
       if(!isCursed && ARTIFACT_NAMES_DWARF.length){
         possessor = pick(ARTIFACT_NAMES_DWARF);
+        ownerLore = makeDwarfOwnerLore(possessor);
       }
 
       if(isCursed && ARTIFACT_PREFIXES.length){
@@ -1657,7 +1722,9 @@ that means creating game asks for a name and choosing avatar
         maxHpPct: effect.maxHpPct || 0,
         curse,
         curseTimer: 0,
-        description: generateArtifactDescription(noun, name, effect, curse, possessor),
+        possessor,
+        ownerLore,
+        description: generateArtifactDescription(noun, name, effect, curse, possessor, ownerLore),
       };
       return item;
     }
@@ -1669,13 +1736,30 @@ that means creating game asks for a name and choosing avatar
       const it = player.inventory[idx];
       if(!it || it.kind!=='artifact' || it.identified) return;
       it.identified = true;
+      ensureArtifactOwnerLore(it);
       log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good');
       log(it.description, 'loot');
       updateHud(); renderInventory();
     }
+    function ensureArtifactOwnerLore(it){
+      if(!it || it.kind!=='artifact' || !it.possessor) return;
+      if(!it.ownerLore){
+        it.ownerLore = makeDwarfOwnerLore(it.possessor);
+      }
+      if(!it.description || !it.description.includes(it.ownerLore.text)){
+        const effect = (ARTIFACT_EFFECTS || []).find(fx=>fx.id===it.effectId);
+        if(effect){
+          it.description = generateArtifactDescription(
+            it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
+          );
+        }
+      }
+    }
+
     function inspectArtifact(idx){
       const it = player.inventory[idx];
       if(!it || it.kind!=='artifact' || !it.identified) return;
+      ensureArtifactOwnerLore(it);
       log(it.description, 'info');
     }
     function forEachActiveArtifact(fn){
