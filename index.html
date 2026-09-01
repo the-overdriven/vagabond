@@ -9,7 +9,6 @@
 - collect berries? more survivalism?
 - scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons
 - balance monsters, xp
-- highlight better gear
 - in gear screen equipped items should have the same colour as in backpacks
 
 - tabs in backpack (armors, shields, weapons, other)
@@ -33,7 +32,6 @@
 - finish mysteriando
 - grave should have transparent bg
 - discovering edge of the map without fighting anyone grants additional 100xp pacifist bonus
-- Brutal Scorpion tooltip shows +4.1999999 ATK, should be rounded to 4
 - make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility
 - add emojis to items
 - super rare monsters?
@@ -70,8 +68,21 @@ that means creating game asks for a name and choosing avatar
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Vagabond</title>
+
+  <!-- PWA: manifest + install/display metadata -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0906">
+  <meta name="background-color" content="#0b0906">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- iOS standalone-mode hints (Android/Brave uses the manifest above) -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vagabond">
   <style>
       :root{
           --void:#0b0906;
@@ -4955,6 +4966,18 @@ that means creating game asks for a name and choosing avatar
     });
 
   })();
+</script>
+<script>
+  // Registers the service worker (required by Chromium/Brave for the
+  // "Add to Home screen" install prompt and for standalone/fullscreen
+  // display). Safe to no-op if unsupported or served over plain HTTP.
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(err=>{
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
 </script>
 </body>
 </html>
