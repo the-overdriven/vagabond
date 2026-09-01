@@ -1155,6 +1155,19 @@ that means creating game asks for a name and choosing avatar
         }
         undergroundDiscovered = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
       }
+      // Two caves' floor blobs can overlap in world space (they're only kept
+      // >10 tiles apart at their primary spot, not along their whole random
+      // walk), so the merge above can let one cave's plain floor tile paint
+      // over a neighboring cave's entrance tile. Re-stamp every entrance last
+      // so you always land on (and can always leave from) the exact tile you
+      // came in through.
+      for(const cave of caves){
+        for(const entrance of cave.entrances){
+          if(undergroundMap[entrance.y] && undergroundMap[entrance.y][entrance.x] !== undefined){
+            undergroundMap[entrance.y][entrance.x] = 'caveentrance';
+          }
+        }
+      }
     }
 
     let bigBellPos = null;
@@ -3541,7 +3554,7 @@ that means creating game asks for a name and choosing avatar
         const playerColor = faded ? 'rgba(255,246,214,0.45)' : '#fff6d6';
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
-          (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
+        (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
           ? Math.min(Math.PI/2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI/2)
           : 0;
         if(deathRotation){
@@ -4524,6 +4537,16 @@ that means creating game asks for a name and choosing avatar
       for(const cm of caveMaps){
         for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
           if(cm[y][x] !== 'cavewall') undergroundMap[y][x] = cm[y][x];
+        }
+      }
+      // See generateCaves(): overlapping cave floors can clobber a
+      // neighboring cave's entrance tile during the merge above, so re-stamp
+      // every declared entrance last.
+      for(const cave of caves){
+        for(const entrance of cave.entrances || []){
+          if(undergroundMap[entrance.y] && undergroundMap[entrance.y][entrance.x] !== undefined){
+            undergroundMap[entrance.y][entrance.x] = 'caveentrance';
+          }
         }
       }
       map = data.currentZ < 0 && undergroundMap ? undergroundMap : surfaceMap;
