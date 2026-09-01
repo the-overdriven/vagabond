@@ -4517,18 +4517,27 @@ that means creating game asks for a name and choosing avatar
         nm.textContent = prefix + artifactDisplayName(it) + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
         if(it.kind==='artifact'){
-          const btn = document.createElement('button');
           if(!it.identified){
+            const btn = document.createElement('button');
             btn.textContent = '?';
             btn.title = 'Identify';
             btn.onclick = ()=>{ identifyArtifact(idx); };
+            row.appendChild(btn);
           } else {
-            btn.textContent = (it.artifactSlot && it.artifactSlot!=='trinket') ? 'Equip' : 'Inspect';
-            btn.onclick = (it.artifactSlot && it.artifactSlot!=='trinket')
-              ? ()=>{ equipItem(idx); }
-              : ()=>{ inspectArtifact(idx); };
+            // All identified artifacts can always be inspected.
+            const inspectBtn = document.createElement('button');
+            inspectBtn.textContent = 'Inspect';
+            inspectBtn.onclick = ()=>{ inspectArtifact(idx); };
+            row.appendChild(inspectBtn);
+
+            // Equippable artifacts also get an Equip button.
+            if(it.artifactSlot && it.artifactSlot!=='trinket'){
+              const equipBtn = document.createElement('button');
+              equipBtn.textContent = 'Equip';
+              equipBtn.onclick = ()=>{ equipItem(idx); };
+              row.appendChild(equipBtn);
+            }
           }
-          row.appendChild(btn);
         } else if(it.kind==='potion'){
           const btn = document.createElement('button');
           btn.textContent = 'Drink';
