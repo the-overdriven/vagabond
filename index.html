@@ -13,7 +13,7 @@
 
 - tabs in backpack (armors, shields, weapons, other)
 - automatically wear armor/shield/weapon if you're not wearing any
-- add pick axe (to be able to dig through bolders, costs HP)
+- add pick axe (to be able to dig through boulders, costs HP)
 - special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
 - individual aggro distance per mob type
 
@@ -43,7 +43,7 @@
 - high tier monsters should be more lickely to drop items from their tier
 - opening chests can spawn mimics?
 - add scroll of teleport (to temple)
-- rivers are not common enough
+- rivers are not common enough, add bridges
 - add swimming skill (number represents how many tiles you can swim before you start drowning)
 - using items should cost a turn
 - old hunter gives a quest to kill 5 xyz enemies and gives sth in return
@@ -62,7 +62,31 @@ that means creating game asks for a name and choosing avatar
 - log hints to msg log with H
 - allow skipping turns with key (t)
 - chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
- -->
+- talking to NPC should stop their movement for a while, so you can talk to them without them running away
+- add physical wounds / states:
+  - bleeding: lose 1 HP per turn until healed
+  - broken leg: SPD halved until healed
+  - broken arm: ATK halved until healed or can't use shield
+  - poisoned: lose 1 HP per turn until cured
+  - cursed: random stat is halved until cured
+  - burned: lose 1 HP per turn until healed, ATK halved until healed
+  - frozen: cannot move or attack for a few turns, SPD halved until healed
+  - head wound: temporary confusion
+- unidentified scrolls/potions
+- enemies that killed you, grow their stats
+- add traps
+- Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
+- add unidentified artifacts with description can be identified with "?" btn (next to equip), all procedurally generated, i.e.
+  - "The Cursed Token" (tier 4) - an ancient figure that grants +3 DEF (when in inventory), but also curses the player with random negative effects every few turns
+  - "The Tome of Forgotten Knowledge" (tier 3) - a book that grants +1 ATK and +1 DEF, but also reduces the player's maximum HP by 10%
+  - "The Axe of Hroth" (tier 4) - description: Hroth killed his brother with this axe. His brother's ghost supposedly follows whoever carries it.
+  Should follow the pattern:
+  Cursed <item>
+  The <item> of <name>, random names are in random_names_dwarf.json, create more json files if needed like artifact_prefixes.json
+  they can be dropped by respective tier monsters, at least one can be sold by merchant
+  before identifying it just says "unidentified <item>"
+  descriptions should also be procedurally generated, go wild. ask if you need more info.
+  -->
 
 <!DOCTYPE html>
 <html lang="en">
