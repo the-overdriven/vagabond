@@ -731,9 +731,9 @@ that means creating game asks for a name and choosing avatar
         paths = only;
       } else {
         paths = [];
-        for(const tmpl of ENEMY_TEMPLATES) paths.push('enemies/' + slug(tmpl.name) + '.jpg');
-        for(const tmpl of NPC_TEMPLATES) paths.push('npc/' + tmpl.portrait + '.jpg');
-        for(const race of RACES) paths.push('avatars/' + race.avatar);
+        for(const tmpl of ENEMY_TEMPLATES) paths.push('img/enemies/' + slug(tmpl.name) + '.jpg');
+        for(const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg');
+        for(const race of RACES) paths.push('img/avatars/' + race.avatar);
       }
       await Promise.all([...new Set(paths)].map(async path=>{
         if(preloadedImageUrls.has(path)) return;
@@ -4037,7 +4037,7 @@ that means creating game asks for a name and choosing avatar
       if(mx===player.x && my===player.y){
         const race = raceDef();
         return { mini:false, enemy:null, html: `
-      <img src="${imageSrc('avatars/'+race.avatar)}" onerror="this.style.display='none'">
+      <img src="${imageSrc('img/avatars/'+race.avatar)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${player.name}</div>
       <div style="color:var(--ember-bright);font-size:11px;">${race.name}</div>
@@ -4065,7 +4065,7 @@ that means creating game asks for a name and choosing avatar
           ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
           : '';
         return { mini:false, enemy:e, html: `
-      <img src="${imageSrc(`enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
+      <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
@@ -4082,7 +4082,7 @@ that means creating game asks for a name and choosing avatar
       const n = currentZ===0 && npcs.find(np=>np.x===mx && np.y===my);
       if(n){
         return { mini:false, enemy:null, html: `
-      <img src="${imageSrc(`npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
+      <img src="${imageSrc(`img/npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${n.name}</div>
       ${n.trades ? '<div style="color:var(--parchment-dim);font-size:10px;">Click to trade</div>' : ''}
@@ -5315,7 +5315,7 @@ that means creating game asks for a name and choosing avatar
         card.className = 'race-card' + (race.id===selectedRaceId ? ' sel' : '');
         card.dataset.race = race.id;
         card.innerHTML = `
-          <img src="${imageSrc('avatars/'+race.avatar)}" alt="${race.name}" onerror="this.style.display='none'">
+          <img src="${imageSrc('img/avatars/'+race.avatar)}" alt="${race.name}" onerror="this.style.display='none'">
           <div class="rname">${race.name}</div>
           <div class="rbonus">${race.bonus}</div>`;
         card.addEventListener('click', ()=>{
@@ -5335,7 +5335,7 @@ that means creating game asks for a name and choosing avatar
         const race = RACES.find(r=>r.id===card.dataset.race);
         if(!race) continue;
         const img = card.querySelector('img');
-        const src = imageSrc('avatars/'+race.avatar);
+        const src = imageSrc('img/avatars/'+race.avatar);
         if(img && img.getAttribute('src') !== src) img.setAttribute('src', src);
       }
     }
