@@ -3,7 +3,7 @@
     "id": "warding_curse_def",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"def": 3},
+    "bonuses": {"def": [3, 8]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -11,7 +11,7 @@
     "id": "warding_curse_atk",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": 3},
+    "bonuses": {"atk": [3, 8]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -19,7 +19,7 @@
     "id": "minor_curse_both",
     "tier": 3,
     "namePattern": "named",
-    "bonuses": {"atk": 1, "def": 1},
+    "bonuses": {"atk": [1, 5], "def": [1, 5]},
     "maxHpPct": 0,
     "flavor": "haunting"
   },
@@ -27,7 +27,7 @@
     "id": "greater_curse_def",
     "tier": 5,
     "namePattern": "named",
-    "bonuses": {"def": 5},
+    "bonuses": {"def": [4, 10]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -35,7 +35,7 @@
     "id": "greedy_curse",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"mf": 4},
+    "bonuses": {"mf": [3, 10]},
     "maxHpPct": 0,
     "flavor": "greed"
   },
@@ -43,7 +43,7 @@
     "id": "forgotten_knowledge",
     "tier": 3,
     "namePattern": "named",
-    "bonuses": {"atk": 1, "def": 1},
+    "bonuses": {"atk": [1, 5], "def": [1, 5]},
     "maxHpPct": -10,
     "flavor": "knowledge"
   },
@@ -51,7 +51,7 @@
     "id": "deep_knowledge",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": 2, "def": 1},
+    "bonuses": {"atk": [2, 8], "def": [2, 7]},
     "maxHpPct": -15,
     "flavor": "knowledge"
   },
@@ -59,7 +59,7 @@
     "id": "haunted_weapon_spirit",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": 2},
+    "bonuses": {"atk": [3, 8], "spd": [1, 4]},
     "maxHpPct": 0,
     "flavor": "haunting"
   },
@@ -83,7 +83,7 @@
     "id": "guardians_favor",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"def": 2, "hp": 5},
+    "bonuses": {"def": [2, 8], "hp": [3, 10]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -91,7 +91,11 @@
     "id": "blessed_relic",
     "tier": 5,
     "namePattern": "named",
-    "bonuses": {"atk": 2, "def": 2, "mf": 2},
+    "bonuses": {
+      "atk": [3, 10],
+      "def": [3, 10],
+      "mf": [2, 8]
+    },
     "maxHpPct": 0,
     "flavor": "blessing"
   },
@@ -99,7 +103,7 @@
     "id": "restless_spirit",
     "tier": 3,
     "namePattern": "named",
-    "bonuses": {"mf": 2},
+    "bonuses": {"mf": [1, 5], "spd": [1, 3]},
     "maxHpPct": 0,
     "flavor": "haunting"
   },
@@ -107,7 +111,11 @@
     "id": "sundering_curse",
     "tier": 5,
     "namePattern": "named",
-    "bonuses": {"atk": 4, "def": 4},
+    "bonuses": {
+      "atk": [4, 10],
+      "def": [4, 10],
+      "spd": [1, 5]
+    },
     "maxHpPct": -10,
     "flavor": "haunting"
   }

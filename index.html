@@ -76,6 +76,16 @@ that means creating game asks for a name and choosing avatar
 - enemies that killed you, grow their stats
 - add traps
 - Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
+- add unidentified artifacts with description can be identified with "?" btn (next to equip), all procedurally generated, i.e.
+  - "The Cursed Token" (tier 4) - an ancient figure that grants +3 DEF (when in inventory), but also curses the player with random negative effects every few turns
+  - "The Tome of Forgotten Knowledge" (tier 3) - a book that grants +1 ATK and +1 DEF, but also reduces the player's maximum HP by 10%
+  - "The Axe of Hroth" (tier 4) - description: Hroth killed his brother with this axe. His brother's ghost supposedly follows whoever carries it.
+  Should follow the pattern:
+  Cursed <item>
+  The <item> of <name>, random names are in random_names_dwarf.json, create more json files if needed like artifact_prefixes.json
+  they can be dropped by respective tier monsters, at least one can be sold by merchant
+  before identifying it just says "unidentified <item>"
+  descriptions should also be procedurally generated, go wild.
   -->
 
 <!DOCTYPE html>
@@ -1575,6 +1585,22 @@ that means creating game asks for a name and choosing avatar
       return 'trinket';
     }
 
+    // Resolve artifact bonus ranges when the item is created. A bonus like
+    // [3,10] means the generated artifact gets one random value from 3 through 10.
+    function rollArtifactBonuses(bonuses){
+      const result = {};
+      for(const [stat, value] of Object.entries(bonuses || {})){
+        if(Array.isArray(value) && value.length >= 2){
+          const lo = Number(value[0]);
+          const hi = Number(value[1]);
+          result[stat] = randInt(Math.min(lo, hi), Math.max(lo, hi));
+        } else {
+          result[stat] = value;
+        }
+      }
+      return result;
+    }
+
     function makeArtifactItem(tier){
       if(!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length || !ARTIFACT_NOUNS || !ARTIFACT_NOUNS.length) return null;
       let pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier<=tier);
@@ -1627,7 +1653,7 @@ that means creating game asks for a name and choosing avatar
         kind:'artifact', name, noun, tier: effect.tier, effectId: effect.id,
         artifactSlot: slot,
         identified:false,
-        bonuses: {...(effect.bonuses||{})},
+        bonuses: rollArtifactBonuses(effect.bonuses),
         maxHpPct: effect.maxHpPct || 0,
         curse,
         curseTimer: 0,
@@ -1777,6 +1803,7 @@ that means creating game asks for a name and choosing avatar
           if(it.bonuses.def) parts.push('DEF +'+it.bonuses.def);
           if(it.bonuses.hp) parts.push('HP +'+it.bonuses.hp);
           if(it.bonuses.mf) parts.push('MF +'+it.bonuses.mf);
+          if(it.bonuses.spd) parts.push('SPD +'+it.bonuses.spd);
         }
         if(it.maxHpPct) parts.push('Max HP '+it.maxHpPct+'%');
         // CURSED is an instance property, not an artifact-effect property.
@@ -2441,7 +2468,13 @@ that means creating game asks for a name and choosing avatar
       const mf = playerMf();
       player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
       maybeDropTombstone(e);
-      const artifactChance = 0.03 + e.tier*0.015;
+      // T1 = 1.00%
+      // T2 = 1.75%
+      // T3 = 2.50%
+      // T4 = 3.25%
+      // T5 = 4.00%
+      // T6 = 4.75%
+      const artifactChance = 0.01 + (e.tier - 1) * 0.0075;
       if(chance(Math.min(0.12, artifactChance))){
         const art = makeArtifactItem(e.tier);
         if(art){
