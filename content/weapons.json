@@ -11,7 +11,7 @@
   {"name":"One-handed Axe",   "atk":5,  "grace":3, "twoHanded": false, "tier":2},
   {"name":"Morning Star",     "atk":6,  "grace":2, "twoHanded": false, "tier":3},
   {"name":"Lance",            "atk":7,  "grace":2, "twoHanded": true,  "tier":3},
-  {"name":"Flail",            "atk":7,  "grace":2,  "twoHanded": false, "tier":3},
+  {"name":"Flail",            "atk":7,  "grace":2, "twoHanded": false, "tier":3},
   {"name":"Two-handed Sword", "atk":9,  "grace":2, "twoHanded": true,  "tier":4},
   {"name":"War Hammer",       "atk":10, "grace":1, "twoHanded": true,  "tier":4},
   {"name":"Two-handed Axe",   "atk":11, "grace":1, "twoHanded": true,  "tier":4},

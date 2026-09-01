@@ -5,7 +5,7 @@
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
 - prefixed mobs should give more XP
-- add food? heals minor HP. looted from selected animals
+- add food? heals minor HP. looted from selected animals. or found in forest (berries)
 - collect berries? more survivalism?
 - scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons
 - balance monsters, xp
@@ -398,6 +398,7 @@ that means creating game asks for a name and choosing avatar
           .race-grid{grid-template-columns:repeat(2, 1fr);}
       }
 
+
       /* ============================== MOBILE / TOUCH CONTROLS ==============================
          Everything below only activates for touch-primary devices (pointer:coarse), so mouse
          + keyboard desktop play is completely unaffected. It adds an on-screen D-pad for
@@ -648,9 +649,9 @@ that means creating game asks for a name and choosing avatar
     "use strict";
 
     /* ============================== RNG ============================== */
-// rngState is kept as a plain, reassignable variable (rather than hidden inside
-// a closure) so a save file can capture the exact RNG position and a loaded
-// game continues the same random sequence instead of restarting it.
+    // rngState is kept as a plain, reassignable variable (rather than hidden inside
+    // a closure) so a save file can capture the exact RNG position and a loaded
+    // game continues the same random sequence instead of restarting it.
     const WORLD_SEED = Date.now() & 0xffffffff;
     let rngState = WORLD_SEED;
     function rng(){
@@ -847,7 +848,7 @@ that means creating game asks for a name and choosing avatar
       // by a pair of brutes near the mountains.
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
-// Single-char codes for compact map serialization in save files.
+    // Single-char codes for compact map serialization in save files.
     const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
 
@@ -2065,12 +2066,12 @@ that means creating game asks for a name and choosing avatar
     // Snapshots the derived character stats so an equip can report exactly what it
     // changed (e.g. "+2 ATK, +2 GRACE") instead of leaving the player to eyeball the HUD.
     const TRACKED_STATS = [
-      {key:'ATK', get:()=>playerAtk()},
-      {key:'DEF', get:()=>playerDef()},
-      {key:'SPD', get:()=>playerSpd()},
+      {key:'ATK',   get:()=>playerAtk()},
+      {key:'DEF',   get:()=>playerDef()},
+      {key:'SPD',   get:()=>playerSpd()},
       {key:'GRACE', get:()=>playerGrace()},
-      {key:'MF',  get:()=>playerMf()},
-      {key:'HP',  get:()=>playerMaxHp()},
+      {key:'MF',    get:()=>playerMf()},
+      {key:'HP',    get:()=>playerMaxHp()},
     ];
     function statSnapshot(){
       const snap = {};
@@ -2113,8 +2114,8 @@ that means creating game asks for a name and choosing avatar
     }
 
     /* ============================== EXPLORATION ============================== */
-// One-time reward for reaching each of the four edges of the map - a rare
-// milestone, not something that fires from ordinary wandering.
+    // One-time reward for reaching each of the four edges of the map - a rare
+    // milestone, not something that fires from ordinary wandering.
     const EDGE_MARGIN = 2; // how close to the true map boundary counts as "the edge"
     const EDGE_XP = 100;
     const worldEdgesReached = {north:false, south:false, east:false, west:false};
@@ -2314,7 +2315,7 @@ that means creating game asks for a name and choosing avatar
           "Once I get my old name back, I can finally rest.",
           "Who digs the grave for the gravedigger?",
           "Who keeps checking an empty grave?",
-        ],                                                                      free:false, portrait:"grave_digger"},
+        ], free:false, portrait:"grave_digger"},
       {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
       {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
       {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true},
@@ -3212,9 +3213,6 @@ that means creating game asks for a name and choosing avatar
       }
     }
 
-
-
-
     /* ============================== MOVEMENT ============================== */
     let mapOpen=false, invOpen=false, tradeOpen=false;
     let raceOpen=false; // the race/name selection screen blocks all play input
@@ -3548,11 +3546,7 @@ that means creating game asks for a name and choosing avatar
       }
     }
 
-
     /* ============================== RENDERING ============================== */
-
-
-
 
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -3962,9 +3956,9 @@ that means creating game asks for a name and choosing avatar
       if(mapOpen || minimapDirty || miniPlayerX !== player.x || miniPlayerY !== player.y) renderMinimap();
     }
 
-// Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
-// its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
-// range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
+    // Highlights the tiles a hovered enemy can see/act on: a bright inner ring for
+    // its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
+    // range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
     function drawEnemyRangeOverlay(e){
       const aggroRange = effectiveAggroRange(e);
       for(let dy=-aggroRange; dy<=aggroRange; dy++){
@@ -4190,7 +4184,6 @@ that means creating game asks for a name and choosing avatar
       if(!info){ mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.'; return; }
       mobileInfoPanel.innerHTML = info.html;
     }
-
 
     /* ============================== MINIMAP ============================== */
     const mini = document.getElementById('minimap');
@@ -4577,6 +4570,7 @@ that means creating game asks for a name and choosing avatar
         list.appendChild(row);
       });
     }
+
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
     function makeMerchantMagicWeapon(){
@@ -5266,6 +5260,7 @@ that means creating game asks for a name and choosing avatar
       ev.returnValue = '';
     });
 
+
     /* ============================== TOUCH CONTROLS (mobile) ==============================
        Purely additive: reuses the exact same functions the keyboard handler calls, so
        walking into an enemy/NPC via the D-pad attacks/talks exactly like it does on desktop,
@@ -5303,6 +5298,7 @@ that means creating game asks for a name and choosing avatar
       touchMapBtn.addEventListener('touchstart', fn);
       touchMapBtn.addEventListener('click', fn);
     }
+
 
     /* ============================== RACE SELECTION SCREEN ==============================
        Shown once, before the first turn. The world is already generated behind it, so
