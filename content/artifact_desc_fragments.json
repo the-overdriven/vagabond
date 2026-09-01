@@ -1,0 +1,53 @@
+{
+  "intro": [
+    "An ancient {noun}, its surface worn smooth by centuries of unknown hands.",
+    "A weathered {noun}, half-buried when it was found, still faintly warm to the touch.",
+    "This {noun} hums faintly when held, as though something inside it is still awake.",
+    "No two accounts of this {noun} agree on where it came from, only that it was never meant to be found.",
+    "The {noun} is heavier than it looks, and colder than the air around it.",
+    "Strange markings cover the {noun}, in a script no scholar of this age can read.",
+    "Dust never seems to settle on this {noun}, no matter how long it sits untouched.",
+    "The {noun} was pried from something's grip. What, exactly, nobody wants to guess."
+  ],
+  "curse": [
+    "Those who carried it before you did not carry it for long.",
+    "It resents being owned, and it has ways of making that known.",
+    "Old wives say something like this chooses its victims, not the other way around.",
+    "You can feel it watching you from inside your pack, waiting for the right moment.",
+    "It grants strength, yes — but strength borrowed always comes due."
+  ],
+  "knowledge": [
+    "Whatever knowledge it holds was never meant to be understood by the living.",
+    "Reading it feels like remembering something that never happened to you.",
+    "Every page, every rune, seems to cost something to understand.",
+    "The wisdom inside is real. So is the price for keeping it."
+  ],
+  "haunting": [
+    "{name} did not rest easy, and neither, it seems, does what he left behind.",
+    "There is a presence bound to it — patient, cold, and not entirely gone.",
+    "Sometimes, in the dark, you swear you hear it breathing.",
+    "It was not meant to be carried alone. It no longer is."
+  ],
+  "lore": [
+    "{name} killed his brother with this {noun}. His brother's ghost supposedly follows whoever carries it.",
+    "It is said {name} never let this {noun} out of his sight, not even in death.",
+    "The last owner's name was scratched out of every record that mentions this {noun}.",
+    "Legend credits {name} with both its making and its ruin, though no two tellings agree which came first.",
+    "{name}'s name is carved into it in letters too small to have been written by human hands."
+  ],
+  "guardian": [
+    "It was carried by those sworn to protect something greater than themselves.",
+    "Whatever it once guarded is long gone. The habit of guarding, however, remains.",
+    "It seems to settle, almost gratefully, into the hands of someone willing to stand and hold a line."
+  ],
+  "blessing": [
+    "Rare among things pulled from the dark, this one seems to mean you well.",
+    "It carries no weight of malice — only the quiet favor of something long forgotten.",
+    "Holding it feels, for once, like being looked after rather than watched."
+  ],
+  "loss_note": [
+    "Something about it draws on your own vitality just to remain whole.",
+    "You feel a little thinner, a little less yourself, the longer you carry it.",
+    "It borrows from your strength to keep its secrets intact."
+  ]
+}

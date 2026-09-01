@@ -76,16 +76,6 @@ that means creating game asks for a name and choosing avatar
 - enemies that killed you, grow their stats
 - add traps
 - Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
-- add unidentified artifacts with description can be identified with "?" btn (next to equip), all procedurally generated, i.e.
-  - "The Cursed Token" (tier 4) - an ancient figure that grants +3 DEF (when in inventory), but also curses the player with random negative effects every few turns
-  - "The Tome of Forgotten Knowledge" (tier 3) - a book that grants +1 ATK and +1 DEF, but also reduces the player's maximum HP by 10%
-  - "The Axe of Hroth" (tier 4) - description: Hroth killed his brother with this axe. His brother's ghost supposedly follows whoever carries it.
-  Should follow the pattern:
-  Cursed <item>
-  The <item> of <name>, random names are in random_names_dwarf.json, create more json files if needed like artifact_prefixes.json
-  they can be dropped by respective tier monsters, at least one can be sold by merchant
-  before identifying it just says "unidentified <item>"
-  descriptions should also be procedurally generated, go wild. ask if you need more info.
   -->
 
 <!DOCTYPE html>
@@ -671,6 +661,13 @@ that means creating game asks for a name and choosing avatar
     let ENEMY_TEMPLATES = [];
     let ENEMY_DEFAULT_BIOMES = [];
     let ENEMY_PREFIXES = {};
+    let ARTIFACT_NOUNS = [];
+    let ARTIFACT_PREFIXES = [];
+    let ARTIFACT_EPITHETS = [];
+    let ARTIFACT_NAMES_DWARF = [];
+    let ARTIFACT_EFFECTS = [];
+    let ARTIFACT_CURSES = [];
+    let ARTIFACT_DESC = {};
     async function loadContent(){
       const files = {
         weapons:'weapons.json',
@@ -679,7 +676,14 @@ that means creating game asks for a name and choosing avatar
         modifiers:'modifiers.json',
         enemyTemplates:'enemy_templates.json',
         enemyDefaultBiomes:'enemy_default_biomes.json',
-        enemyPrefixes:'enemy_prefixes.json'
+        enemyPrefixes:'enemy_prefixes.json',
+        artifactNouns:'artifact_nouns.json',
+        artifactPrefixes:'artifact_prefixes.json',
+        artifactEpithets:'artifact_epithets.json',
+        artifactNamesDwarf:'random_names_dwarf.json',
+        artifactEffects:'artifact_effects.json',
+        artifactCurses:'artifact_curses.json',
+        artifactDesc:'artifact_desc_fragments.json'
       };
       const content = {};
       for(const [key,file] of Object.entries(files)){
@@ -694,6 +698,13 @@ that means creating game asks for a name and choosing avatar
       ENEMY_TEMPLATES = content.enemyTemplates;
       ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes;
       ENEMY_PREFIXES = content.enemyPrefixes;
+      ARTIFACT_NOUNS = content.artifactNouns;
+      ARTIFACT_PREFIXES = content.artifactPrefixes;
+      ARTIFACT_EPITHETS = content.artifactEpithets;
+      ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf;
+      ARTIFACT_EFFECTS = content.artifactEffects;
+      ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : [];
+      ARTIFACT_DESC = content.artifactDesc;
     }
     const preloadedImageUrls = new Map();
     // Fetches images as blobs so tooltips keep working fully offline. Pass a
@@ -1537,6 +1548,172 @@ that means creating game asks for a name and choosing avatar
       const item = {kind:'armor', base:base.name, def:base.def, tier:base.tier, speedPenalty:base.speedPenalty || 0, name:base.name};
       return rollModifier(base.name, item);
     }
+    /* ---- Unidentified artifacts: procedurally named/described passive items ---- */
+    function fillArtifactText(str, noun, name){
+      return str.replace(/\{noun\}/g, noun.toLowerCase()).replace(/\{name\}/g, name || '');
+    }
+    function generateArtifactDescription(noun, name, effect, curse){
+      const desc = ARTIFACT_DESC || {};
+      const lines = [];
+      if(desc.intro && desc.intro.length) lines.push(pick(desc.intro));
+      const flavorLines = desc[effect.flavor];
+      if(flavorLines && flavorLines.length) lines.push(pick(flavorLines));
+      if(curse && desc.curse && desc.curse.length && effect.flavor!=='curse') lines.push(pick(desc.curse));
+      if(effect.maxHpPct < 0 && desc.loss_note && desc.loss_note.length) lines.push(pick(desc.loss_note));
+      return lines.map(l=>fillArtifactText(l, noun, name)).join(' ');
+    }
+    // Artifact equipment is real gear when it is a weapon, shield, or armor.
+    // Other artifacts (tokens, tomes, rings, etc.) remain passive while carried.
+    function artifactEquipSlot(effect, noun){
+      if(effect && ['weapon','shield','armor','trinket'].includes(effect.slot)) return effect.slot;
+      const n = String(noun || '').toLowerCase();
+      if(WEAPONS.some(w=>String(w.name).toLowerCase()===n)) return 'weapon';
+      if(SHIELDS.some(s=>String(s.name).toLowerCase()===n)) return 'shield';
+      if(ARMORS.some(a=>String(a.name).toLowerCase()===n)) return 'armor';
+      return 'trinket';
+    }
+
+    function makeArtifactItem(tier){
+      if(!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length || !ARTIFACT_NOUNS || !ARTIFACT_NOUNS.length) return null;
+      let pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier<=tier);
+      if(!pool.length) pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier===Math.min(...ARTIFACT_EFFECTS.map(f=>f.tier)));
+      const effect = pick(pool);
+      const noun = pick(ARTIFACT_NOUNS);
+      const slot = artifactEquipSlot(null, noun);
+      const needsPossessor = effect.flavor === 'lore' || effect.flavor === 'haunting';
+      const isCursed = chance(0.10);
+
+      let name, possessor = null;
+      if(isCursed && ARTIFACT_PREFIXES.length){
+        name = pick(ARTIFACT_PREFIXES) + ' ' + noun;
+      } else {
+        if(ARTIFACT_NAMES_DWARF.length && (needsPossessor || chance(0.5))){
+          possessor = pick(ARTIFACT_NAMES_DWARF);
+          name = 'The ' + noun + ' of ' + possessor;
+        } else if(ARTIFACT_EPITHETS.length){
+          name = 'The ' + noun + ' of ' + pick(ARTIFACT_EPITHETS);
+        } else {
+          name = 'The ' + noun;
+        }
+      }
+
+      // Preserve the existing curse behaviour as a pool of possible curse
+      // templates, but apply one only to the 10% of artifacts that roll cursed.
+      let curse = null;
+      if(isCursed){
+        const curseSource = pick(ARTIFACT_CURSES);
+        if(curseSource){
+          curse = {
+            everyTurns: curseSource.everyTurns,
+            types: Array.isArray(curseSource.types) ? curseSource.types.slice() : []
+          };
+        } else {
+          curse = {everyTurns: randInt(8,12), types:['hp','gold','atk_debuff','def_debuff','spd_debuff']};
+        }
+      }
+
+      const item = {
+        kind:'artifact', name, noun, tier: effect.tier, effectId: effect.id,
+        artifactSlot: slot,
+        identified:false,
+        bonuses: {...(effect.bonuses||{})},
+        maxHpPct: effect.maxHpPct || 0,
+        curse,
+        curseTimer: 0,
+        description: generateArtifactDescription(noun, name, effect, curse),
+      };
+      return item;
+    }
+    function artifactDisplayName(it){
+      if(it.kind!=='artifact') return it.name;
+      return it.identified ? it.name : ('Unidentified ' + it.noun);
+    }
+    function identifyArtifact(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='artifact' || it.identified) return;
+      it.identified = true;
+      log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good');
+      log(it.description, 'loot');
+      updateHud(); renderInventory();
+    }
+    function inspectArtifact(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='artifact' || !it.identified) return;
+      log(it.description, 'info');
+    }
+    function forEachActiveArtifact(fn){
+      for(const it of player.inventory){
+        if(it.kind==='artifact' && it.artifactSlot==='trinket') fn(it);
+      }
+      for(const slot of ['weapon','shield','armor']){
+        const it = player.equip[slot];
+        if(it && it.kind==='artifact') fn(it);
+      }
+    }
+    function artifactBonusSum(stat){
+      let sum = 0;
+      forEachActiveArtifact(it=>{
+        if(it.bonuses && it.bonuses[stat]) sum += it.bonuses[stat];
+      });
+      return sum;
+    }
+    function artifactMaxHpPct(){
+      let pct = 0;
+      forEachActiveArtifact(it=>{
+        if(it.maxHpPct) pct += it.maxHpPct;
+      });
+      return pct;
+    }
+    const CURSE_EVENT_LINES_NAMED = {
+      hp: (it,amt)=>`The ${it.name} saps ${amt} HP from you!`,
+      gold: (it,amt)=>`The ${it.name} plucks ${amt} gold from your pouch and it's gone.`,
+      atk_debuff: (it)=>`The ${it.name} weakens your arm.`,
+      def_debuff: (it)=>`The ${it.name} chills your bones, leaving you exposed.`,
+      spd_debuff: (it)=>`The ${it.name} drags at your limbs.`,
+    };
+    const CURSE_EVENT_LINES_UNKNOWN = {
+      hp: (amt)=>`A cold weight in your pack drains ${amt} HP from you!`,
+      gold: (amt)=>`Something in your pack pilfers ${amt} gold, then goes still.`,
+      atk_debuff: ()=>`A chill runs down your arm from somewhere in your pack.`,
+      def_debuff: ()=>`A shiver of dread leaves you feeling exposed.`,
+      spd_debuff: ()=>`Your limbs feel suddenly, inexplicably heavy.`,
+    };
+    function triggerArtifactCurse(it){
+      const type = pick(it.curse.types);
+      if(type==='hp'){
+        const amt = randInt(1,3);
+        player.hp = Math.max(1, player.hp - amt);
+        log(it.identified ? CURSE_EVENT_LINES_NAMED.hp(it,amt) : CURSE_EVENT_LINES_UNKNOWN.hp(amt), 'bad');
+      } else if(type==='gold'){
+        const amt = Math.min(player.gold, randInt(1,5));
+        player.gold -= amt;
+        log(it.identified ? CURSE_EVENT_LINES_NAMED.gold(it,amt) : CURSE_EVENT_LINES_UNKNOWN.gold(amt), 'bad');
+      } else if(type==='atk_debuff' || type==='def_debuff' || type==='spd_debuff'){
+        const stat = type.split('_')[0];
+        player.curseDebuffs.push({stat, amt:-randInt(1,2), turnsLeft:randInt(3,6)});
+        log(it.identified ? CURSE_EVENT_LINES_NAMED[type](it) : CURSE_EVENT_LINES_UNKNOWN[type](), 'bad');
+      }
+      updateHud();
+    }
+    function tickArtifactCurses(){
+      for(const it of player.inventory){
+        if(it.kind!=='artifact' || !it.curse) continue;
+        it.curseTimer = (it.curseTimer||0) + 1;
+        if(it.curseTimer >= it.curse.everyTurns){
+          it.curseTimer = 0;
+          triggerArtifactCurse(it);
+        }
+      }
+      if(player.curseDebuffs.length){
+        for(const d of player.curseDebuffs) d.turnsLeft--;
+        player.curseDebuffs = player.curseDebuffs.filter(d=>d.turnsLeft>0);
+      }
+    }
+    function curseDebuffSum(stat){
+      let sum = 0;
+      for(const d of player.curseDebuffs) if(d.stat===stat) sum += d.amt;
+      return sum;
+    }
     function rollEnemyEquipment(e){
       if(!e || !e.humanoid) return null;
       const dropChance = 0.45 + e.tier*0.03;
@@ -1582,6 +1759,21 @@ that means creating game asks for a name and choosing avatar
     function itemStatLine(it){
       const parts=[];
 
+      if(it.kind==='artifact'){
+        if(!it.identified) return '???';
+        if(it.bonuses){
+          if(it.bonuses.atk) parts.push('ATK +'+it.bonuses.atk);
+          if(it.bonuses.def) parts.push('DEF +'+it.bonuses.def);
+          if(it.bonuses.hp) parts.push('HP +'+it.bonuses.hp);
+          if(it.bonuses.mf) parts.push('MF +'+it.bonuses.mf);
+        }
+        if(it.maxHpPct) parts.push('Max HP '+it.maxHpPct+'%');
+        // CURSED is an instance property, not an artifact-effect property.
+        // Only artifacts that actually rolled a curse should display it.
+        if(it.curse !== null && it.curse !== undefined) parts.push('CURSED');
+        if(it.artifactSlot && it.artifactSlot!=='trinket') parts.push(it.artifactSlot.toUpperCase());
+        return parts.join(', ');
+      }
       if(it.atk) parts.push('ATK '+it.atk+(it.mod==='atk'?('+'+it.modAmt):''));
       if(it.def) parts.push('DEF '+it.def+(it.mod==='def'?('+'+it.modAmt):''));
       if(it.kind === 'weapon' && (it.grace!==undefined || it.spd!==undefined)){
@@ -1653,6 +1845,7 @@ that means creating game asks for a name and choosing avatar
       gold: 0, deaths: 0, steps: 0,
       invisibleTurns: 0,
       speedPotionTurns: 0,
+      curseDebuffs: [],
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
     };
@@ -1674,6 +1867,7 @@ that means creating game asks for a name and choosing avatar
         if(it.atk) a += it.atk;
         if(it.mod==='atk') a += it.modAmt;
       }
+      a += artifactBonusSum('atk') + curseDebuffSum('atk');
       return a;
     }
 
@@ -1686,6 +1880,7 @@ that means creating game asks for a name and choosing avatar
         if(it.mod==='def') d += it.modAmt;
       }
       d += TERRAIN_DEFENSE[map[player.y] && map[player.y][player.x]] || 0;
+      d += artifactBonusSum('def') + curseDebuffSum('def');
       return d;
     }
     function playerSpd(){
@@ -1695,6 +1890,7 @@ that means creating game asks for a name and choosing avatar
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='spd') s+=player.equip[slot].modAmt;
       if(player.speedPotionTurns > 0) s += 3;
       s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0;
+      s += curseDebuffSum('spd');
       return Math.max(1, s);
     }
     function playerGrace(){
@@ -1732,12 +1928,17 @@ that means creating game asks for a name and choosing avatar
     function playerMf(){
       let mf = player.baseMf + raceBonus('mf');
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='mf') mf+=player.equip[slot].modAmt;
+      mf += artifactBonusSum('mf');
       return mf;
     }
     function playerMaxHp(){
       let bonus=0;
       for(const slot of ['weapon','shield','armor']) if(player.equip[slot] && player.equip[slot].mod==='hp') bonus+=player.equip[slot].modAmt;
-      return player.maxHp + bonus;
+      bonus += artifactBonusSum('hp');
+      let total = player.maxHp + bonus;
+      const pct = artifactMaxHpPct();
+      if(pct) total = Math.max(1, Math.round(total * (1 + pct/100)));
+      return total;
     }
     // Snapshots the derived character stats so an equip can report exactly what it
     // changed (e.g. "+2 ATK, +2 GRACE") instead of leaving the player to eyeball the HUD.
@@ -2229,6 +2430,14 @@ that means creating game asks for a name and choosing avatar
       const mf = playerMf();
       player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
       maybeDropTombstone(e);
+      const artifactChance = 0.03 + e.tier*0.015;
+      if(chance(Math.min(0.12, artifactChance))){
+        const art = makeArtifactItem(e.tier);
+        if(art){
+          log(`The ${e.name} dropped ${artifactDisplayName(art)}.`, 'loot');
+          player.inventory.push(art);
+        }
+      }
       if(e.humanoid && e.equipment){
         const item = e.equipment;
         log(`The ${e.name} dropped a ${item.name}.`, 'loot');
@@ -2649,6 +2858,7 @@ that means creating game asks for a name and choosing avatar
       if(player.hp <= 0 || deathTransition) return;
       turnCount++;
       tickRaceRegen();
+      tickArtifactCurses();
       if(player.speedPotionTurns > 0){
         player.speedPotionTurns--;
         if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
@@ -4176,9 +4386,22 @@ that means creating game asks for a name and choosing avatar
         const stackable = isStackableKind(it.kind);
         const countTag = stackable && it.count>1 ? ' x'+it.count : '';
         const prefix = isBest ? '✅ ' : '';
-        nm.textContent = prefix + it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
+        nm.textContent = prefix + artifactDisplayName(it) + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
-        if(it.kind==='potion'){
+        if(it.kind==='artifact'){
+          const btn = document.createElement('button');
+          if(!it.identified){
+            btn.textContent = '?';
+            btn.title = 'Identify';
+            btn.onclick = ()=>{ identifyArtifact(idx); };
+          } else {
+            btn.textContent = (it.artifactSlot && it.artifactSlot!=='trinket') ? 'Equip' : 'Inspect';
+            btn.onclick = (it.artifactSlot && it.artifactSlot!=='trinket')
+              ? ()=>{ equipItem(idx); }
+              : ()=>{ inspectArtifact(idx); };
+          }
+          row.appendChild(btn);
+        } else if(it.kind==='potion'){
           const btn = document.createElement('button');
           btn.textContent = 'Drink';
           btn.onclick = ()=>{ usePotion(idx); };
@@ -4241,6 +4464,13 @@ that means creating game asks for a name and choosing avatar
       if(!merchantStock.some(it=>it.merchantMagicLowTier)){
         merchantStock.push(makeMerchantMagicWeapon());
       }
+      if(!merchantStock.some(it=>it.kind==='artifact')){
+        const art = makeArtifactItem(3);
+        if(art){
+          art.merchantPrice = TIER_SELL_VALUE[art.tier] * 2;
+          merchantStock.push(art);
+        }
+      }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
     const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, herb:4, mushroom:3 };
@@ -4272,7 +4502,7 @@ that means creating game asks for a name and choosing avatar
           const line = itemStatLine(it);
           const nm = document.createElement('span');
           nm.className='nm '+cls;
-          nm.textContent = it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
+          nm.textContent = artifactDisplayName(it) + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
           row.appendChild(nm);
           const btn = document.createElement('button');
           const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2;
@@ -4302,7 +4532,7 @@ that means creating game asks for a name and choosing avatar
         const line = itemStatLine(it);
         const nm = document.createElement('span');
         nm.className='nm '+cls;
-        nm.textContent = it.name + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
+        nm.textContent = artifactDisplayName(it) + countTag + (line? ' | '+line:'') + (it.tier!==undefined?' [T'+it.tier+']':'');
         row.appendChild(nm);
         const btn = document.createElement('button');
         btn.textContent = 'Sell for '+itemSellValue(it)+'g';
@@ -4334,7 +4564,7 @@ that means creating game asks for a name and choosing avatar
         player.inventory.push(bought);
       }
       player.gold -= value;
-      log(`You buy the ${it.name} for ${value} gold.`, 'good');
+      log(`You buy the ${artifactDisplayName(it)} for ${value} gold.`, 'good');
       updateHud(); renderTrade(); renderInventory();
     }
     function sellItem(idx){
@@ -4354,7 +4584,7 @@ that means creating game asks for a name and choosing avatar
         merchantStock.push(it);
       }
       player.gold += value;
-      log(`You sell the ${it.name} for ${value} gold.`, 'good');
+      log(`You sell the ${artifactDisplayName(it)} for ${value} gold.`, 'good');
       updateHud(); renderTrade(); renderInventory();
     }
     function toggleTrade(force){
@@ -4372,16 +4602,26 @@ that means creating game asks for a name and choosing avatar
     function equipItem(idx){
       const it = player.inventory[idx];
       if(!it) return;
-      const slot = it.kind;
+
+      // Artifacts that are physical gear use the normal equipment slots.
+      // Trinkets stay passive in the backpack and are not equipable.
+      const slot = it.kind==='artifact' ? it.artifactSlot : it.kind;
+      if(!['weapon','shield','armor'].includes(slot)){
+        if(it.kind==='artifact') log('This artifact has no equipment slot; its power is carried with you.', 'info');
+        return;
+      }
+
       if(slot==='shield' && player.equip.weapon && player.equip.weapon.twoHanded){
         log('You cannot equip a shield while wielding a two-handed weapon.', 'bad');
         return;
       }
+
       const old = player.equip[slot];
       const before = statSnapshot();
       player.equip[slot] = it;
       player.inventory.splice(idx,1);
       if(old) player.inventory.push(old);
+
       if(slot==='weapon' && it.twoHanded && player.equip.shield){
         const oldShield = player.equip.shield;
         player.equip.shield = null;
@@ -4486,6 +4726,7 @@ that means creating game asks for a name and choosing avatar
           gold:player.gold, deaths:player.deaths, steps:player.steps,
           invisibleTurns:player.invisibleTurns,
           speedPotionTurns:player.speedPotionTurns,
+          curseDebuffs: player.curseDebuffs,
           equip: player.equip,
           inventory: player.inventory,
         },
@@ -4627,6 +4868,7 @@ that means creating game asks for a name and choosing avatar
       player.inventory = (data.player && data.player.inventory) || [];
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
+      player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : [];
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];

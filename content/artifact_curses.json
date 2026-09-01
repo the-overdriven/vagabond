@@ -1,0 +1,10 @@
+[
+  {"id":"warding_curse_def","everyTurns":6,"types":["hp","atk_debuff"]},
+  {"id":"warding_curse_atk","everyTurns":6,"types":["hp","def_debuff"]},
+  {"id":"minor_curse_both","everyTurns":5,"types":["gold","spd_debuff"]},
+  {"id":"greater_curse_def","everyTurns":4,"types":["hp","hp","atk_debuff"]},
+  {"id":"greedy_curse","everyTurns":7,"types":["gold","gold"]},
+  {"id":"haunting_curse","everyTurns":8,"types":["def_debuff"]},
+  {"id":"restless_curse","everyTurns":5,"types":["hp"]},
+  {"id":"sundering_curse","everyTurns":5,"types":["hp","atk_debuff","def_debuff"]}
+]
