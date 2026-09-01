@@ -64,8 +64,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else (content JSON, avatars/enemies/npc images, CSS-in-page
-  // assets): cache-first, then fetch and stash a copy for next time.
+  // Content JSON (game data that changes during development, like
+  // artifact_effects.json): network-first, so edits show up immediately.
+  // Falls back to the cached copy only when offline.
+  if (url.pathname.includes('/content/')) {
+    event.respondWith(
+      fetch(req).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(RUNTIME).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Everything else (avatars/enemies/npc images, CSS-in-page assets):
+  // cache-first, then fetch and stash a copy for next time.
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
