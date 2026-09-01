@@ -3909,12 +3909,12 @@ that means creating game asks for a name and choosing avatar
         ctx.drawImage(miniBases[scale].canvas, ox*scale, oy*scale, viewW*scale, viewH*scale, 0, 0, w, h);
         if(currentZ===0) ctx.fillStyle = '#ff6b2e';
         for(const cave of currentZ===0 ? caves : []){
-         for(const entrance of cave.entrances || [{x:cave.x,y:cave.y}]){
-         if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
-         const cx = (entrance.x-ox)*scale*zoom + scale*zoom/2;
-         const cy = (entrance.y-oy)*scale*zoom + scale*zoom/2;
-         if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2*zoom, cy-2*zoom, 4*zoom, 4*zoom);
-         }
+          for(const entrance of cave.entrances || [{x:cave.x,y:cave.y}]){
+            if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
+            const cx = (entrance.x-ox)*scale*zoom + scale*zoom/2;
+            const cy = (entrance.y-oy)*scale*zoom + scale*zoom/2;
+            if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2*zoom, cy-2*zoom, 4*zoom, 4*zoom);
+          }
         }
         if(currentZ===0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
           const tx = (spawnPoint.x-ox)*scale*zoom + scale*zoom/2;
@@ -3940,10 +3940,10 @@ that means creating game asks for a name and choosing avatar
       ctx.fillStyle = '#ff6b2e';
       for(const cave of currentZ===0 ? caves : []){
         for(const entrance of cave.entrances || [{x:cave.x,y:cave.y}]){
-        if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
-        const cx = (entrance.x-ox)*scale + scale/2;
-        const cy = (entrance.y-oy)*scale + scale/2;
-        if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2, cy-2, 4, 4);
+          if(!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue;
+          const cx = (entrance.x-ox)*scale + scale/2;
+          const cy = (entrance.y-oy)*scale + scale/2;
+          if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2, cy-2, 4, 4);
         }
       }
       const dot = Math.max(2, scale+2);
