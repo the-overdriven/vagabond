@@ -1579,7 +1579,13 @@ that means creating game asks for a name and choosing avatar
       if(!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length || !ARTIFACT_NOUNS || !ARTIFACT_NOUNS.length) return null;
       let pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier<=tier);
       if(!pool.length) pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier===Math.min(...ARTIFACT_EFFECTS.map(f=>f.tier)));
-      const effect = pick(pool);
+      // Keep truly effect-less lore artifacts rare: 4% of artifact drops.
+      // When no empty effect is available for the current tier, use a normal effect.
+      const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0);
+      const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0);
+      const effect = emptyEffects.length && chance(0.04)
+        ? pick(emptyEffects)
+        : pick(normalEffects.length ? normalEffects : pool);
       const noun = pick(ARTIFACT_NOUNS);
       const slot = artifactEquipSlot(null, noun);
       const isCursed = chance(0.10);
