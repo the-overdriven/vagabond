@@ -1549,10 +1549,12 @@ that means creating game asks for a name and choosing avatar
       return rollModifier(base.name, item);
     }
     /* ---- Unidentified artifacts: procedurally named/described passive items ---- */
-    function fillArtifactText(str, noun, name){
-      return str.replace(/\{noun\}/g, noun.toLowerCase()).replace(/\{name\}/g, name || '');
+    function fillArtifactText(str, noun, name, possessor){
+      return str.replace(/\{noun\}/g, noun.toLowerCase())
+        .replace(/\{name\}/g, name || '')
+        .replace(/\{possessor\}/g, possessor || '');
     }
-    function generateArtifactDescription(noun, name, effect, curse){
+    function generateArtifactDescription(noun, name, effect, curse, possessor){
       const desc = ARTIFACT_DESC || {};
       const lines = [];
       if(desc.intro && desc.intro.length) lines.push(pick(desc.intro));
@@ -1560,7 +1562,7 @@ that means creating game asks for a name and choosing avatar
       if(flavorLines && flavorLines.length) lines.push(pick(flavorLines));
       if(curse && desc.curse && desc.curse.length && effect.flavor!=='curse') lines.push(pick(desc.curse));
       if(effect.maxHpPct < 0 && desc.loss_note && desc.loss_note.length) lines.push(pick(desc.loss_note));
-      return lines.map(l=>fillArtifactText(l, noun, name)).join(' ');
+      return lines.map(l=>fillArtifactText(l, noun, name, possessor)).join(' ');
     }
     // Artifact equipment is real gear when it is a weapon, shield, or armor.
     // Other artifacts (tokens, tomes, rings, etc.) remain passive while carried.
@@ -1583,14 +1585,19 @@ that means creating game asks for a name and choosing avatar
       const needsPossessor = effect.flavor === 'lore' || effect.flavor === 'haunting';
       const isCursed = chance(0.10);
 
+      // Lore/haunting text may refer to the person who once owned the artifact.
+      // Keep that identity separate from the artifact's generated display name.
       let name, possessor = null;
+      if(needsPossessor && ARTIFACT_NAMES_DWARF.length){
+        possessor = pick(ARTIFACT_NAMES_DWARF);
+      }
+
       if(isCursed && ARTIFACT_PREFIXES.length){
         name = pick(ARTIFACT_PREFIXES) + ' ' + noun;
       } else {
-        if(ARTIFACT_NAMES_DWARF.length && (needsPossessor || chance(0.5))){
-          possessor = pick(ARTIFACT_NAMES_DWARF);
+        if(possessor){
           name = 'The ' + noun + ' of ' + possessor;
-        } else if(ARTIFACT_EPITHETS.length){
+        } else if(ARTIFACT_EPITHETS.length && chance(0.5)){
           name = 'The ' + noun + ' of ' + pick(ARTIFACT_EPITHETS);
         } else {
           name = 'The ' + noun;
@@ -1620,7 +1627,7 @@ that means creating game asks for a name and choosing avatar
         maxHpPct: effect.maxHpPct || 0,
         curse,
         curseTimer: 0,
-        description: generateArtifactDescription(noun, name, effect, curse),
+        description: generateArtifactDescription(noun, name, effect, curse, possessor),
       };
       return item;
     }
