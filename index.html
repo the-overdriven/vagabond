@@ -1582,26 +1582,24 @@ that means creating game asks for a name and choosing avatar
       const effect = pick(pool);
       const noun = pick(ARTIFACT_NOUNS);
       const slot = artifactEquipSlot(null, noun);
-      const needsPossessor = effect.flavor === 'lore' || effect.flavor === 'haunting';
       const isCursed = chance(0.10);
 
-      // Lore/haunting text may refer to the person who once owned the artifact.
-      // Keep that identity separate from the artifact's generated display name.
+      // Every non-cursed artifact gets a named owner. Cursed artifacts use
+      // the cursed prefix instead and do not get an "of <dwarf>" name.
+      // Keep the owner's identity separate because descriptions may refer to it.
       let name, possessor = null;
-      if(needsPossessor && ARTIFACT_NAMES_DWARF.length){
+      if(!isCursed && ARTIFACT_NAMES_DWARF.length){
         possessor = pick(ARTIFACT_NAMES_DWARF);
       }
 
       if(isCursed && ARTIFACT_PREFIXES.length){
         name = pick(ARTIFACT_PREFIXES) + ' ' + noun;
+      } else if(possessor){
+        name = 'The ' + noun + ' of ' + possessor;
+      } else if(ARTIFACT_EPITHETS.length){
+        name = 'The ' + noun + ' of ' + pick(ARTIFACT_EPITHETS);
       } else {
-        if(possessor){
-          name = 'The ' + noun + ' of ' + possessor;
-        } else if(ARTIFACT_EPITHETS.length && chance(0.5)){
-          name = 'The ' + noun + ' of ' + pick(ARTIFACT_EPITHETS);
-        } else {
-          name = 'The ' + noun;
-        }
+        name = 'The ' + noun;
       }
 
       // Preserve the existing curse behaviour as a pool of possible curse
