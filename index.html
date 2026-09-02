@@ -86,7 +86,8 @@ that means creating game asks for a name and choosing avatar
   they can be dropped by respective tier monsters, at least one can be sold by merchant
   before identifying it just says "unidentified <item>"
   descriptions should also be procedurally generated, go wild.
-  -->
+- merchant: add scroll of teleportation (to village) and more items, at least one shield and armor
+-->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -108,401 +109,401 @@ that means creating game asks for a name and choosing avatar
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
   <style>
-      :root{
-          --void:#0b0906;
-          --panel:#1a130e;
-          --panel2:#231a12;
-          --border:#4a3320;
-          --ember:#c97a2e;
-          --ember-bright:#e8a24f;
-          --blood:#b5423a;
-          --parchment:#ddc9a3;
-          --parchment-dim:#9c8b6c;
-          --t1:#b8b8b8;
-          --t2:#d98a3a;
-          --t3:#4aa3d1;
-          --t4:#b565d6;
-          --t5:#e0473f;
+    :root{
+      --void:#0b0906;
+      --panel:#1a130e;
+      --panel2:#231a12;
+      --border:#4a3320;
+      --ember:#c97a2e;
+      --ember-bright:#e8a24f;
+      --blood:#b5423a;
+      --parchment:#ddc9a3;
+      --parchment-dim:#9c8b6c;
+      --t1:#b8b8b8;
+      --t2:#d98a3a;
+      --t3:#4aa3d1;
+      --t4:#b565d6;
+      --t5:#e0473f;
+    }
+    *{box-sizing:border-box;}
+    html,body{
+      margin:0; padding:0; width:100%; height:100%;
+      background:gray;
+      color:white;
+      font-family:'Consolas','JetBrains Mono','Courier New',monospace;
+      overflow:hidden;
+    }
+    #root{
+      display:flex; flex-direction:column; align-items:center;
+      height:100%; width:100%;
+      padding:10px; gap:8px;
+    }
+    h1{
+      font-family:Georgia,'Times New Roman',serif;
+      font-weight:700;
+      letter-spacing:4px;
+      font-variant:small-caps;
+      color:var(--ember-bright);
+      text-shadow:0 0 12px rgba(232,162,79,0.35), 0 2px 0 #000;
+      margin:2px 0 0 0;
+      font-size:22px;
+    }
+    .subtitle{
+      color:var(--parchment-dim);
+      font-size:11px;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      margin-bottom:2px;
+    }
+    #hud{
+      display:flex; gap:14px; align-items:center;
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border);
+      border-radius:4px;
+      padding:6px 14px;
+      font-size:13px;
+      box-shadow:inset 0 0 10px rgba(0,0,0,0.5);
+    }
+    #hud .stat{white-space:nowrap;}
+    #hud .stat b{color:var(--ember-bright);}
+    #hpbarwrap{
+      width:160px; height:14px; background:#2a0f0d; border:1px solid #5a1f1a;
+      border-radius:2px; overflow:hidden; position:relative;
+    }
+    #hpbar{
+      height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);
+      transition:width 0.2s ease;
+    }
+    #hptext{
+      position:absolute; left:0; right:0; top:0; text-align:center;
+      font-size:10px; line-height:14px; color:#fff; text-shadow:0 1px 2px #000;
+    }
+    #xpbarwrap{
+      width:160px; height:8px; background:#141425; border:1px solid #2c2c4a;
+      border-radius:2px; overflow:hidden;
+    }
+    #xpbar{height:100%; background:linear-gradient(90deg,#3a5a9a,#6f9ce0);}
+    #stage{
+      position:relative;
+      border:2px solid var(--border);
+      border-radius:4px;
+      box-shadow:0 0 30px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.6);
+      background:#050403;
+    }
+    #stage::after{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+      animation:flicker 5s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion:reduce){ #stage::after{animation:none;} }
+    @keyframes flicker{
+      0%,100%{opacity:1;} 50%{opacity:0.88;}
+    }
+    canvas{display:block;cursor:pointer}
+    #logpanel{
+      width:640px; max-width:92vw;
+      height:135px;
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border);
+      border-radius:4px;
+      padding:6px 10px;
+      font-size:12px;
+      overflow-y:auto;
+      line-height:1.5;
+      white-space:pre-line;
+    }
+    #logpanel div.good{color:#8fd08a;}
+    #logpanel div.bad{color:#e08a7a;}
+    #logpanel div.loot{color:var(--ember-bright);}
+    #logpanel div.info{color:var(--parchment-dim);}
+    #logpanel div.pillar{color:white;}
+    #hint{
+      font-size:11px; color:brown; letter-spacing:1px; text-align:center;
+    }
+    #hint kbd{
+      background:#241a11; border:1px solid var(--border); border-radius:3px;
+      padding:1px 5px; color:var(--ember-bright); font-size:10px;
+    }
+    #hint kbd.locked{
+      background:var(--ember-bright); color:#241a11; border-color:var(--ember-bright);
+      box-shadow:0 0 6px var(--ember-bright);
+    }
+    #hint {
+      position: fixed;
+      right: 14px;
+      top: 380px;
+      width: 250px;
+      padding: 7px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border); border-radius:6px;
+      box-shadow:0 0 18px rgba(0,0,0,0.5);
+      font-size: 10px;
+      line-height: 1.8;
+    }
+    #sidePanel{
+      position:fixed; right:14px; top:110px; width:250px; z-index:8;
+    }
+    .side-box{
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border); border-radius:6px;
+      padding:8px; box-shadow:0 0 18px rgba(0,0,0,0.5);
+    }
+    #sideMinimap{display:block; width:100%; height:auto; image-rendering:pixelated; border:1px solid var(--border); border-radius:4px; background:#050403;}
+    .mini-actions{display:flex; justify-content:center; margin-top:8px;}
+    .overlay{
+      position:absolute; inset:0; background:rgba(5,4,3,0.42);
+      display:none; align-items:center; justify-content:center; z-index:10;
+    }
+    .overlay.show{display:flex;}
+    .panelbox{
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:16px 20px;
+      position:relative;
+      width:590px; max-width:94%;
+      max-height:90%;
+      overflow-y:auto;
+      box-shadow:0 0 40px rgba(0,0,0,0.8);
+    }
+    .overlay-close{
+      position:absolute; top:8px; right:10px; width:28px; height:28px;
+      padding:0; font-size:18px; line-height:26px; text-align:center;
+    }
+    .panelbox h2{
+      font-family:Georgia,serif; font-variant:small-caps; letter-spacing:2px;
+      color:var(--ember-bright); margin:0 0 10px 0; font-size:18px;
+      border-bottom:1px solid var(--border); padding-bottom:6px;
+    }
+    #mapOverlay .panelbox{width:min(72vw, 520px);}
+    #minimap{display:block; width:100%; height:auto; max-height:60vh; aspect-ratio:130/90; image-rendering:pixelated; background:#050403; border:1px solid var(--border); border-radius:4px;}
+    .paperdoll{
+      display:flex; gap:10px; margin-bottom:14px;
+    }
+    .slot{
+      flex:1; background:#100b08; border:1px solid var(--border); border-radius:4px;
+      padding:8px; text-align:center; font-size:11px; min-height:52px;
+    }
+    .slot .label{color:var(--parchment-dim); font-size:9px; text-transform:uppercase; letter-spacing:1px;}
+    .slot .val{color:var(--parchment); margin-top:4px;}
+    .slot .val.tier1{color:var(--t1);} .slot .val.tier2{color:var(--t2);}
+    .slot .val.tier3{color:var(--t3);} .slot .val.tier4{color:var(--t4);} .slot .val.tier5{color:var(--t5);}
+    .statgrid{
+      display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;
+      font-size:14px; margin-bottom:14px;
+    }
+    .statgrid .row{
+      display:flex; justify-content:space-between; align-items:baseline;
+      border-bottom:1px dashed #33261a; padding:2px 0;
+
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+    }
+    .statgrid .row .lbl{color:var(--parchment-dim); letter-spacing:0.5px; text-align: right;}
+    .statgrid .row b{color:var(--ember-bright); font-weight:700;}
+    .stats-details{margin-top:12px; border-top:1px solid var(--border); padding-top:8px;}
+    .stats-details summary{cursor:pointer; color:var(--ember-bright); font-size:12px; letter-spacing:1px; font-weight:700;}
+    .stats-details .statgrid{margin-top:8px; margin-bottom:0;}
+    .invlist{max-height:220px; overflow-y:auto; border-top:1px solid var(--border); padding-top:8px;}
+    .inv-tabs{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px;}
+    .inv-tab{
+      background:#2a1c10; color:var(--parchment-dim); border:1px solid var(--border);
+      border-radius:3px; padding:4px 8px; font-size:10px; cursor:pointer;
+      font-family:inherit; letter-spacing:0.7px; text-transform:uppercase;
+    }
+    .inv-tab.active{background:var(--ember); color:#1a0f05; border-color:var(--ember-bright);}
+    .invitem{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:4px 2px; font-size:12px; border-bottom:1px dashed #33261a;
+    }
+    .invitem.best-slot{}
+    .invitem .nm{flex:1;}
+    .invitem button{
+      background:#2a1c10; color:var(--ember-bright); border:1px solid var(--border);
+      border-radius:3px; padding:2px 8px; font-size:10px; cursor:pointer;
+    }
+    .invitem button:hover{background:var(--ember); color:#1a0f05;}
+    .tier1{color:var(--t1);} .tier2{color:var(--t2);} .tier3{color:var(--t3);}
+    .enemy-tier2{color:#d98a3a;}
+    .tier4{color:var(--t4);} .tier5{color:var(--t5);}
+    .closehint{text-align:center; color:var(--parchment-dim); font-size:11px; margin-top:10px;}
+
+    .slbtn{
+      background:#2a1c10; color:var(--ember-bright); border:1px solid var(--border);
+      border-radius:4px; padding:4px 10px; font-size:12px; cursor:pointer;
+      font-family:inherit; letter-spacing:0.5px;
+    }
+    .slbtn:hover{background:var(--ember); color:#1a0f05;}
+    #tradeOverlay .panelbox{width:min(92vw, 900px);}
+    .trade-cols{display:flex; gap:16px;}
+    .trade-col{flex:1; min-width:0;}
+    .trade-col .invlist{max-height:280px;}
+
+
+    #tooltip{
+      position:absolute; display:none; z-index:20; pointer-events:none;
+      background:linear-gradient(180deg,var(--panel2),var(--panel));
+      border:1px solid var(--border); border-radius:4px;
+      padding:8px 10px; font-size:12px; width:170px;
+    }
+    #tooltip .nm{font-weight:700; margin-bottom:4px;}
+    #tooltip img{
+      display:block; width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain;
+      background:#0a0705; border:1px solid var(--border); border-radius:3px; margin-bottom:6px;
+    }
+    #tooltip .hpbarwrap{
+      width:100%; height:8px; background:#2a0f0d; border:1px solid #5a1f1a;
+      border-radius:2px; overflow:hidden; margin:4px 0;
+    }
+    #tooltip .hpbar{height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);}
+    #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
+    #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
+    #tooltip .nm{font-weight:700;}
+    #tooltip .pfx{margin:2px 0 4px; font-size:10px; letter-spacing:0.5px;}
+    #tooltip .pfx .up{color:#7ddc7d;}
+    #tooltip .pfx .down{color:#e0655a;}
+    #tooltip .crit{margin:0 0 4px; font-size:10px; letter-spacing:0.5px; color:#e0473f;}
+    #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
+    #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
+    #mobileInfoPanel{display:none;}
+    #tooltip.mini{width:auto; padding:4px 8px;}
+    #tooltip.mini .nm{margin-bottom:0;}
+
+    /* ============================== RACE SELECTION ============================== */
+    #raceOverlay{background:rgba(5,4,3,0.92); z-index:40;}
+    #raceOverlay .panelbox{width:min(94vw, 860px); max-height:92vh; overflow-y:auto;}
+    #raceName{
+      background:#120d09; border:1px solid var(--border); border-radius:4px;
+      color:var(--parchment); font-family:inherit; font-size:13px; padding:6px 8px; width:220px;
+    }
+    #raceName:focus{outline:none; border-color:var(--ember);}
+    .race-namerow{display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;}
+    .race-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;}
+    .race-card{
+      background:var(--panel); border:1px solid var(--border); border-radius:5px;
+      padding:6px; cursor:pointer; text-align:center; color:var(--parchment);
+      font-family:inherit; font-size:10px; line-height:1.35;
+    }
+    .race-card img{width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:4px; display:block; margin-bottom:5px;}
+    .race-card .rname{color:var(--ember-bright); font-weight:700; font-size:12px; letter-spacing:0.5px;}
+    .race-card .rbonus{color:var(--parchment-dim); margin-top:3px;}
+    .race-card:hover{border-color:var(--ember);}
+    .race-card.sel{border-color:var(--ember-bright); background:#2c2013; box-shadow:0 0 0 1px var(--ember-bright) inset;}
+    .race-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap;}
+    #raceError{color:var(--blood); font-size:11px;}
+    #btnBegin{font-size:13px; padding:8px 18px;}
+    @media (max-width:720px), (pointer:coarse){
+      .race-grid{grid-template-columns:repeat(2, 1fr);}
+    }
+
+
+    /* ============================== MOBILE / TOUCH CONTROLS ==============================
+       Everything below only activates for touch-primary devices (pointer:coarse), so mouse
+       + keyboard desktop play is completely unaffected. It adds an on-screen D-pad for
+       movement/attack/talk (all handled by the same tryMove() used by the keyboard) and
+       makes the canvas/layout shrink to fit small screens. */
+    #touchControls{ display:none; }
+    @media (pointer:coarse){
+      html,body{ overflow:auto; }
+      #root{ padding:6px; gap:6px; }
+      #hud{ font-size:11px; padding:4px 8px; gap:8px; flex-wrap:wrap; justify-content:center; }
+      #hpbarwrap, #xpbarwrap{ width:110px; }
+      #sidePanel{ display:none; } /* desktop-only minimap sidebar - not enough room */
+      #hint{ display:none; } /* keyboard legend is meaningless on touch */
+      #stage{ max-width:100vw; }
+      canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
+      /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
+      #invOverlay, #mapOverlay, #tradeOverlay, #raceOverlay{
+        position:fixed; inset:0; width:100vw; height:100dvh; min-height:100vh;
+        align-items:stretch; justify-content:stretch; z-index:100;
       }
-      *{box-sizing:border-box;}
-      html,body{
-          margin:0; padding:0; width:100%; height:100%;
-          background:gray;
-          color:white;
-          font-family:'Consolas','JetBrains Mono','Courier New',monospace;
-          overflow:hidden;
+      #invOverlay .panelbox, #mapOverlay .panelbox, #raceOverlay .panelbox{
+        width:100%; max-width:none; height:100%; max-height:none;
+        min-height:100%; box-sizing:border-box; border-radius:0;
+        overflow-y:auto; padding-bottom:140px;
       }
-      #root{
-          display:flex; flex-direction:column; align-items:center;
-          height:100%; width:100%;
-          padding:10px; gap:8px;
+      body.overlay-open #logpanel{
+        position:fixed; left:0; bottom:0; z-index:110;
+        width:100%; max-width:none; height:120px; box-sizing:border-box;
+        border-radius:0; margin:0;
       }
-      h1{
-          font-family:Georgia,'Times New Roman',serif;
-          font-weight:700;
-          letter-spacing:4px;
-          font-variant:small-caps;
-          color:var(--ember-bright);
-          text-shadow:0 0 12px rgba(232,162,79,0.35), 0 2px 0 #000;
-          margin:2px 0 0 0;
-          font-size:22px;
-      }
-      .subtitle{
-          color:var(--parchment-dim);
-          font-size:11px;
-          letter-spacing:2px;
-          text-transform:uppercase;
-          margin-bottom:2px;
-      }
-      #hud{
-          display:flex; gap:14px; align-items:center;
-          background:linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border);
-          border-radius:4px;
-          padding:6px 14px;
-          font-size:13px;
-          box-shadow:inset 0 0 10px rgba(0,0,0,0.5);
-      }
-      #hud .stat{white-space:nowrap;}
-      #hud .stat b{color:var(--ember-bright);}
-      #hpbarwrap{
-          width:160px; height:14px; background:#2a0f0d; border:1px solid #5a1f1a;
-          border-radius:2px; overflow:hidden; position:relative;
-      }
-      #hpbar{
-          height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);
-          transition:width 0.2s ease;
-      }
-      #hptext{
-          position:absolute; left:0; right:0; top:0; text-align:center;
-          font-size:10px; line-height:14px; color:#fff; text-shadow:0 1px 2px #000;
-      }
-      #xpbarwrap{
-          width:160px; height:8px; background:#141425; border:1px solid #2c2c4a;
-          border-radius:2px; overflow:hidden;
-      }
-      #xpbar{height:100%; background:linear-gradient(90deg,#3a5a9a,#6f9ce0);}
-      #stage{
-          position:relative;
-          border:2px solid var(--border);
-          border-radius:4px;
-          box-shadow:0 0 30px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.6);
-          background:#050403;
-      }
-      #stage::after{
-          content:"";
-          position:absolute; inset:0; pointer-events:none;
-          background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
-          animation:flicker 5s ease-in-out infinite;
-      }
-      @media (prefers-reduced-motion:reduce){ #stage::after{animation:none;} }
-      @keyframes flicker{
-          0%,100%{opacity:1;} 50%{opacity:0.88;}
-      }
-      canvas{display:block;cursor:pointer}
+      #mapOverlay .panelbox{width:100%;}
+      #invOverlay .stats-details{display:none;}
+      /* Log grows/shrinks to take whatever space mobileInfoPanel isn't
+         using, instead of both fighting over a fixed split. mobileInfoPanel
+         never shrinks below its own content (flex-shrink:0) - the log is
+         the one that gives up space when the info panel needs to grow. */
       #logpanel{
-          width:640px; max-width:92vw;
-          height:135px;
-          background:linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border);
-          border-radius:4px;
-          padding:6px 10px;
-          font-size:12px;
-          overflow-y:auto;
-          line-height:1.5;
-          white-space:pre-line;
+        height:auto; flex:1 1 auto; min-height:30px; max-height:45vh;
       }
-      #logpanel div.good{color:#8fd08a;}
-      #logpanel div.bad{color:#e08a7a;}
-      #logpanel div.loot{color:var(--ember-bright);}
-      #logpanel div.info{color:var(--parchment-dim);}
-      #logpanel div.pillar{color:white;}
-      #hint{
-          font-size:11px; color:brown; letter-spacing:1px; text-align:center;
+      #mobileInfoPanel{
+        display:flex; align-items:flex-start; gap:10px;
+        width:100%; max-width:100%; box-sizing:border-box;
+        background:linear-gradient(180deg,var(--panel2),var(--panel));
+        border:1px solid var(--border); border-radius:4px;
+        padding:8px 10px; font-size:12px; color:var(--parchment-dim);
+        min-height:34px; max-height:42vh; flex:0 0 auto; min-width:0;
+        overflow-y:auto; overflow-wrap:anywhere;
       }
-      #hint kbd{
-          background:#241a11; border:1px solid var(--border); border-radius:3px;
-          padding:1px 5px; color:var(--ember-bright); font-size:10px;
+      #mobileInfoPanel img{
+        width:52px; height:52px; object-fit:cover; border-radius:4px;
+        border:1px solid var(--border); flex:0 0 auto; margin:0;
       }
-      #hint kbd.locked{
-          background:var(--ember-bright); color:#241a11; border-color:var(--ember-bright);
-          box-shadow:0 0 6px var(--ember-bright);
+      #mobileInfoPanel .info-body{ flex:1 1 auto; min-width:0; }
+      #mobileInfoPanel .nm{font-weight:700; color:var(--parchment); margin-bottom:4px;}
+      #mobileInfoPanel .hprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+      #mobileInfoPanel .hpbarwrap{
+        width:110px; height:10px; background:#2a0f0d; border:1px solid #5a1f1a;
+        border-radius:2px; overflow:hidden; margin:2px 0; flex:0 0 auto;
       }
-      #hint {
-          position: fixed;
-          right: 14px;
-          top: 380px;
-          width: 250px;
-          padding: 7px;
-          box-sizing: border-box;
-          background: linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border); border-radius:6px;
-          box-shadow:0 0 18px rgba(0,0,0,0.5);
-          font-size: 10px;
-          line-height: 1.8;
+      #mobileInfoPanel .hpbar{height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);}
+      #mobileInfoPanel .hpnum{ white-space:nowrap; }
+      #mobileInfoPanel .statrow{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:2px; }
+      #mobileInfoPanel .statrow .statsep{ display:none; }
+      #mobileInfoPanel .statrow .statbreak{ display:none; }
+      #mobileInfoPanel .tier1{color:var(--t1);} #mobileInfoPanel .tier2{color:var(--t2);}
+      #mobileInfoPanel .tier3{color:var(--t3);} #mobileInfoPanel .tier4{color:var(--t4);} #mobileInfoPanel .tier5{color:var(--t5);}
+      #mobileInfoPanel .pfx .up{color:#7ddc7d;} #mobileInfoPanel .pfx .down{color:#e0655a;}
+      #mobileInfoPanel .crit{color:#e0473f;}
+      #touchControls{
+        display:flex; justify-content:center; align-items:center;
+        gap:20px;
+        width:100%; max-width:100%;
+        margin-top:4px;
       }
-      #sidePanel{
-          position:fixed; right:14px; top:110px; width:250px; z-index:8;
+      .touch-map{
+        width:56px; height:56px; border-radius:50%;
+        background:rgba(26,19,14,0.85); border:1px solid var(--border);
+        color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
+        -webkit-user-select:none; user-select:none; touch-action:none;
       }
-      .side-box{
-          background:linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border); border-radius:6px;
-          padding:8px; box-shadow:0 0 18px rgba(0,0,0,0.5);
+      .touch-map:active{ background:var(--ember); color:#1a130e; }
+      .dpad{
+        display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px);
+        gap:4px;
       }
-      #sideMinimap{display:block; width:100%; height:auto; image-rendering:pixelated; border:1px solid var(--border); border-radius:4px; background:#050403;}
-      .mini-actions{display:flex; justify-content:center; margin-top:8px;}
-      .overlay{
-          position:absolute; inset:0; background:rgba(5,4,3,0.42);
-          display:none; align-items:center; justify-content:center; z-index:10;
+      .dpad button{
+        width:44px; height:44px; border-radius:6px;
+        background:rgba(26,19,14,0.85); border:1px solid var(--border);
+        color:var(--parchment); font-size:18px; font-family:inherit;
+        -webkit-user-select:none; user-select:none; touch-action:none;
       }
-      .overlay.show{display:flex;}
-      .panelbox{
-          background:linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border);
-          border-radius:6px;
-          padding:16px 20px;
-          position:relative;
-          width:590px; max-width:94%;
-          max-height:90%;
-          overflow-y:auto;
-          box-shadow:0 0 40px rgba(0,0,0,0.8);
+      .dpad button:active{ background:var(--ember); color:#1a130e; }
+      .dpad button.empty{ visibility:hidden; }
+      #touchActions{
+        display:flex; flex-direction:column; gap:6px;
       }
-      .overlay-close{
-          position:absolute; top:8px; right:10px; width:28px; height:28px;
-          padding:0; font-size:18px; line-height:26px; text-align:center;
+      #touchActions button{
+        width:56px; height:56px; border-radius:50%;
+        background:rgba(26,19,14,0.85); border:1px solid var(--border);
+        color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
+        -webkit-user-select:none; user-select:none; touch-action:none;
       }
-      .panelbox h2{
-          font-family:Georgia,serif; font-variant:small-caps; letter-spacing:2px;
-          color:var(--ember-bright); margin:0 0 10px 0; font-size:18px;
-          border-bottom:1px solid var(--border); padding-bottom:6px;
-      }
-      #mapOverlay .panelbox{width:min(72vw, 520px);}
-      #minimap{display:block; width:100%; height:auto; max-height:60vh; aspect-ratio:130/90; image-rendering:pixelated; background:#050403; border:1px solid var(--border); border-radius:4px;}
-      .paperdoll{
-          display:flex; gap:10px; margin-bottom:14px;
-      }
-      .slot{
-          flex:1; background:#100b08; border:1px solid var(--border); border-radius:4px;
-          padding:8px; text-align:center; font-size:11px; min-height:52px;
-      }
-      .slot .label{color:var(--parchment-dim); font-size:9px; text-transform:uppercase; letter-spacing:1px;}
-      .slot .val{color:var(--parchment); margin-top:4px;}
-      .slot .val.tier1{color:var(--t1);} .slot .val.tier2{color:var(--t2);}
-      .slot .val.tier3{color:var(--t3);} .slot .val.tier4{color:var(--t4);} .slot .val.tier5{color:var(--t5);}
-      .statgrid{
-          display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;
-          font-size:14px; margin-bottom:14px;
-      }
-      .statgrid .row{
-          display:flex; justify-content:space-between; align-items:baseline;
-          border-bottom:1px dashed #33261a; padding:2px 0;
-
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 12px;
-      }
-      .statgrid .row .lbl{color:var(--parchment-dim); letter-spacing:0.5px; text-align: right;}
-      .statgrid .row b{color:var(--ember-bright); font-weight:700;}
-      .stats-details{margin-top:12px; border-top:1px solid var(--border); padding-top:8px;}
-      .stats-details summary{cursor:pointer; color:var(--ember-bright); font-size:12px; letter-spacing:1px; font-weight:700;}
-      .stats-details .statgrid{margin-top:8px; margin-bottom:0;}
-      .invlist{max-height:220px; overflow-y:auto; border-top:1px solid var(--border); padding-top:8px;}
-      .inv-tabs{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px;}
-      .inv-tab{
-          background:#2a1c10; color:var(--parchment-dim); border:1px solid var(--border);
-          border-radius:3px; padding:4px 8px; font-size:10px; cursor:pointer;
-          font-family:inherit; letter-spacing:0.7px; text-transform:uppercase;
-      }
-      .inv-tab.active{background:var(--ember); color:#1a0f05; border-color:var(--ember-bright);}
-      .invitem{
-          display:flex; justify-content:space-between; align-items:center;
-          padding:4px 2px; font-size:12px; border-bottom:1px dashed #33261a;
-      }
-      .invitem.best-slot{}
-      .invitem .nm{flex:1;}
-      .invitem button{
-          background:#2a1c10; color:var(--ember-bright); border:1px solid var(--border);
-          border-radius:3px; padding:2px 8px; font-size:10px; cursor:pointer;
-      }
-      .invitem button:hover{background:var(--ember); color:#1a0f05;}
-      .tier1{color:var(--t1);} .tier2{color:var(--t2);} .tier3{color:var(--t3);}
-      .enemy-tier2{color:#d98a3a;}
-      .tier4{color:var(--t4);} .tier5{color:var(--t5);}
-      .closehint{text-align:center; color:var(--parchment-dim); font-size:11px; margin-top:10px;}
-
-      .slbtn{
-          background:#2a1c10; color:var(--ember-bright); border:1px solid var(--border);
-          border-radius:4px; padding:4px 10px; font-size:12px; cursor:pointer;
-          font-family:inherit; letter-spacing:0.5px;
-      }
-      .slbtn:hover{background:var(--ember); color:#1a0f05;}
-      #tradeOverlay .panelbox{width:min(92vw, 900px);}
-      .trade-cols{display:flex; gap:16px;}
-      .trade-col{flex:1; min-width:0;}
-      .trade-col .invlist{max-height:280px;}
-
-
-      #tooltip{
-          position:absolute; display:none; z-index:20; pointer-events:none;
-          background:linear-gradient(180deg,var(--panel2),var(--panel));
-          border:1px solid var(--border); border-radius:4px;
-          padding:8px 10px; font-size:12px; width:170px;
-      }
-      #tooltip .nm{font-weight:700; margin-bottom:4px;}
-      #tooltip img{
-          display:block; width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain;
-          background:#0a0705; border:1px solid var(--border); border-radius:3px; margin-bottom:6px;
-      }
-      #tooltip .hpbarwrap{
-          width:100%; height:8px; background:#2a0f0d; border:1px solid #5a1f1a;
-          border-radius:2px; overflow:hidden; margin:4px 0;
-      }
-      #tooltip .hpbar{height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);}
-      #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
-      #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
-      #tooltip .nm{font-weight:700;}
-      #tooltip .pfx{margin:2px 0 4px; font-size:10px; letter-spacing:0.5px;}
-      #tooltip .pfx .up{color:#7ddc7d;}
-      #tooltip .pfx .down{color:#e0655a;}
-      #tooltip .crit{margin:0 0 4px; font-size:10px; letter-spacing:0.5px; color:#e0473f;}
-      #tooltip .t1{color:var(--t1);} #tooltip .t2{color:var(--t2);}
-      #tooltip .t3{color:var(--t3);} #tooltip .t4{color:var(--t4);} #tooltip .t5{color:var(--t5);}
-      #mobileInfoPanel{display:none;}
-      #tooltip.mini{width:auto; padding:4px 8px;}
-      #tooltip.mini .nm{margin-bottom:0;}
-
-      /* ============================== RACE SELECTION ============================== */
-      #raceOverlay{background:rgba(5,4,3,0.92); z-index:40;}
-      #raceOverlay .panelbox{width:min(94vw, 860px); max-height:92vh; overflow-y:auto;}
-      #raceName{
-          background:#120d09; border:1px solid var(--border); border-radius:4px;
-          color:var(--parchment); font-family:inherit; font-size:13px; padding:6px 8px; width:220px;
-      }
-      #raceName:focus{outline:none; border-color:var(--ember);}
-      .race-namerow{display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;}
-      .race-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;}
-      .race-card{
-          background:var(--panel); border:1px solid var(--border); border-radius:5px;
-          padding:6px; cursor:pointer; text-align:center; color:var(--parchment);
-          font-family:inherit; font-size:10px; line-height:1.35;
-      }
-      .race-card img{width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:4px; display:block; margin-bottom:5px;}
-      .race-card .rname{color:var(--ember-bright); font-weight:700; font-size:12px; letter-spacing:0.5px;}
-      .race-card .rbonus{color:var(--parchment-dim); margin-top:3px;}
-      .race-card:hover{border-color:var(--ember);}
-      .race-card.sel{border-color:var(--ember-bright); background:#2c2013; box-shadow:0 0 0 1px var(--ember-bright) inset;}
-      .race-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap;}
-      #raceError{color:var(--blood); font-size:11px;}
-      #btnBegin{font-size:13px; padding:8px 18px;}
-      @media (max-width:720px), (pointer:coarse){
-          .race-grid{grid-template-columns:repeat(2, 1fr);}
-      }
-
-
-      /* ============================== MOBILE / TOUCH CONTROLS ==============================
-         Everything below only activates for touch-primary devices (pointer:coarse), so mouse
-         + keyboard desktop play is completely unaffected. It adds an on-screen D-pad for
-         movement/attack/talk (all handled by the same tryMove() used by the keyboard) and
-         makes the canvas/layout shrink to fit small screens. */
-      #touchControls{ display:none; }
-      @media (pointer:coarse){
-          html,body{ overflow:auto; }
-          #root{ padding:6px; gap:6px; }
-          #hud{ font-size:11px; padding:4px 8px; gap:8px; flex-wrap:wrap; justify-content:center; }
-          #hpbarwrap, #xpbarwrap{ width:110px; }
-          #sidePanel{ display:none; } /* desktop-only minimap sidebar - not enough room */
-          #hint{ display:none; } /* keyboard legend is meaningless on touch */
-          #stage{ max-width:100vw; }
-          canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
-          /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
-          #invOverlay, #mapOverlay, #tradeOverlay, #raceOverlay{
-              position:fixed; inset:0; width:100vw; height:100dvh; min-height:100vh;
-              align-items:stretch; justify-content:stretch; z-index:100;
-          }
-          #invOverlay .panelbox, #mapOverlay .panelbox, #raceOverlay .panelbox{
-              width:100%; max-width:none; height:100%; max-height:none;
-              min-height:100%; box-sizing:border-box; border-radius:0;
-              overflow-y:auto; padding-bottom:140px;
-          }
-          body.overlay-open #logpanel{
-              position:fixed; left:0; bottom:0; z-index:110;
-              width:100%; max-width:none; height:120px; box-sizing:border-box;
-              border-radius:0; margin:0;
-          }
-          #mapOverlay .panelbox{width:100%;}
-          #invOverlay .stats-details{display:none;}
-          /* Log grows/shrinks to take whatever space mobileInfoPanel isn't
-             using, instead of both fighting over a fixed split. mobileInfoPanel
-             never shrinks below its own content (flex-shrink:0) - the log is
-             the one that gives up space when the info panel needs to grow. */
-          #logpanel{
-              height:auto; flex:1 1 auto; min-height:30px; max-height:45vh;
-          }
-          #mobileInfoPanel{
-              display:flex; align-items:flex-start; gap:10px;
-              width:100%; max-width:100%; box-sizing:border-box;
-              background:linear-gradient(180deg,var(--panel2),var(--panel));
-              border:1px solid var(--border); border-radius:4px;
-              padding:8px 10px; font-size:12px; color:var(--parchment-dim);
-              min-height:34px; max-height:42vh; flex:0 0 auto; min-width:0;
-              overflow-y:auto; overflow-wrap:anywhere;
-          }
-          #mobileInfoPanel img{
-              width:52px; height:52px; object-fit:cover; border-radius:4px;
-              border:1px solid var(--border); flex:0 0 auto; margin:0;
-          }
-          #mobileInfoPanel .info-body{ flex:1 1 auto; min-width:0; }
-          #mobileInfoPanel .nm{font-weight:700; color:var(--parchment); margin-bottom:4px;}
-          #mobileInfoPanel .hprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-          #mobileInfoPanel .hpbarwrap{
-              width:110px; height:10px; background:#2a0f0d; border:1px solid #5a1f1a;
-              border-radius:2px; overflow:hidden; margin:2px 0; flex:0 0 auto;
-          }
-          #mobileInfoPanel .hpbar{height:100%; background:linear-gradient(90deg,#7a1c17,var(--blood),#e0655a);}
-          #mobileInfoPanel .hpnum{ white-space:nowrap; }
-          #mobileInfoPanel .statrow{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:2px; }
-          #mobileInfoPanel .statrow .statsep{ display:none; }
-          #mobileInfoPanel .statrow .statbreak{ display:none; }
-          #mobileInfoPanel .tier1{color:var(--t1);} #mobileInfoPanel .tier2{color:var(--t2);}
-          #mobileInfoPanel .tier3{color:var(--t3);} #mobileInfoPanel .tier4{color:var(--t4);} #mobileInfoPanel .tier5{color:var(--t5);}
-          #mobileInfoPanel .pfx .up{color:#7ddc7d;} #mobileInfoPanel .pfx .down{color:#e0655a;}
-          #mobileInfoPanel .crit{color:#e0473f;}
-          #touchControls{
-              display:flex; justify-content:center; align-items:center;
-              gap:20px;
-              width:100%; max-width:100%;
-              margin-top:4px;
-          }
-          .touch-map{
-              width:56px; height:56px; border-radius:50%;
-              background:rgba(26,19,14,0.85); border:1px solid var(--border);
-              color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
-              -webkit-user-select:none; user-select:none; touch-action:none;
-          }
-          .touch-map:active{ background:var(--ember); color:#1a130e; }
-          .dpad{
-              display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,44px);
-              gap:4px;
-          }
-          .dpad button{
-              width:44px; height:44px; border-radius:6px;
-              background:rgba(26,19,14,0.85); border:1px solid var(--border);
-              color:var(--parchment); font-size:18px; font-family:inherit;
-              -webkit-user-select:none; user-select:none; touch-action:none;
-          }
-          .dpad button:active{ background:var(--ember); color:#1a130e; }
-          .dpad button.empty{ visibility:hidden; }
-          #touchActions{
-              display:flex; flex-direction:column; gap:6px;
-          }
-          #touchActions button{
-              width:56px; height:56px; border-radius:50%;
-              background:rgba(26,19,14,0.85); border:1px solid var(--border);
-              color:var(--parchment); font-size:10px; font-family:inherit; letter-spacing:0.5px;
-              -webkit-user-select:none; user-select:none; touch-action:none;
-          }
-          #touchActions button:active{ background:var(--ember); color:#1a130e; }
-      }
+      #touchActions button:active{ background:var(--ember); color:#1a130e; }
+    }
   </style>
 </head>
 <body>
@@ -1061,22 +1062,22 @@ that means creating game asks for a name and choosing avatar
         // other non-water/mountain tile next to the spawn point and fold it
         // into the temple complex so the bell tower always has somewhere to go.
         outer:
-          for(let r=1; r<=6; r++){
-            for(let dy=-r; dy<=r; dy++){
-              for(let dx=-r; dx<=r; dx++){
-                if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
-                const tx=sx+dx, ty=sy+dy;
-                if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
-                if(tx===sx && ty===sy) continue;
-                if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
-                map[ty][tx] = 'temple';
-                const spot = {x:tx,y:ty};
-                templeTiles.push(spot);
-                bellSpots = [spot];
-                break outer;
-              }
-            }
-          }
+                for(let r=1; r<=6; r++){
+                  for(let dy=-r; dy<=r; dy++){
+                    for(let dx=-r; dx<=r; dx++){
+                      if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+                      const tx=sx+dx, ty=sy+dy;
+                      if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
+                      if(tx===sx && ty===sy) continue;
+                      if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
+                      map[ty][tx] = 'temple';
+                      const spot = {x:tx,y:ty};
+                      templeTiles.push(spot);
+                      bellSpots = [spot];
+                      break outer;
+                    }
+                  }
+                }
       }
       if(bellSpots.length){
         const spot = pick(bellSpots);
@@ -1163,7 +1164,7 @@ that means creating game asks for a name and choosing avatar
         const entrances = [spot];
         if(i===0){
           const second = candidates.find(c=>c!==spot && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))>=8 && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))<=18)
-            || candidates.find(c=>c!==spot);
+                  || candidates.find(c=>c!==spot);
           if(second) entrances.push(second);
         }
         for(const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance';
@@ -1565,8 +1566,8 @@ that means creating game asks for a name and choosing avatar
     /* ---- Unidentified artifacts: procedurally named/described passive items ---- */
     function fillArtifactText(str, noun, name, possessor){
       return str.replace(/\{noun\}/g, noun.toLowerCase())
-        .replace(/\{name\}/g, name || '')
-        .replace(/\{possessor\}/g, possessor || '');
+              .replace(/\{name\}/g, name || '')
+              .replace(/\{possessor\}/g, possessor || '');
     }
 
     // Vocation data is intentionally accepted in a few simple JSON shapes:
@@ -1583,8 +1584,8 @@ that means creating game asks for a name and choosing avatar
 
     function dwarfVocationText(){
       const pool = (Array.isArray(ARTIFACT_VOCATIONS_DWARF) ? ARTIFACT_VOCATIONS_DWARF : [])
-        .map(normalizeDwarfVocation)
-        .filter(Boolean);
+              .map(normalizeDwarfVocation)
+              .filter(Boolean);
       const vocation = pool.length ? pick(pool).toLowerCase() : 'craftsman';
       return vocation.replace(/^dwarven\\s+/i, '').trim();
     }
@@ -1675,8 +1676,8 @@ that means creating game asks for a name and choosing avatar
       const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0);
       const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0);
       const effect = emptyEffects.length && chance(0.04)
-        ? pick(emptyEffects)
-        : pick(normalEffects.length ? normalEffects : pool);
+              ? pick(emptyEffects)
+              : pick(normalEffects.length ? normalEffects : pool);
       const noun = pick(ARTIFACT_NOUNS);
       const slot = artifactEquipSlot(null, noun);
       const isCursed = chance(0.10);
@@ -1736,6 +1737,16 @@ that means creating game asks for a name and choosing avatar
     function identifyArtifact(idx){
       const it = player.inventory[idx];
       if(!it || it.kind!=='artifact' || it.identified) return;
+      const scroll = player.inventory.find(i=>i.kind==='idscroll');
+      if(!scroll){
+        log(`The moment you take it in your hands, you can tell this isn't an ordinary ${it.noun.toLowerCase()}. It feels different somehow, but you can't tell why. You'll need a Scroll of Identification to make sense of this.`, 'info');
+        return;
+      }
+      scroll.count = (scroll.count||1)-1;
+      if(scroll.count<=0){
+        const scrollIdx = player.inventory.indexOf(scroll);
+        if(scrollIdx>=0) player.inventory.splice(scrollIdx,1);
+      }
       it.identified = true;
       ensureArtifactOwnerLore(it);
       log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good');
@@ -1751,7 +1762,7 @@ that means creating game asks for a name and choosing avatar
         const effect = (ARTIFACT_EFFECTS || []).find(fx=>fx.id===it.effectId);
         if(effect){
           it.description = generateArtifactDescription(
-            it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
+                  it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
           );
         }
       }
@@ -2621,7 +2632,7 @@ that means creating game asks for a name and choosing avatar
       const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer);
       const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer);
       return attackerDelay !== null && defenderDelay !== null &&
-        attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
+              attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
     }
 
     async function playerAttackEnemy(e, isExtraAttack=false){
@@ -2684,7 +2695,7 @@ that means creating game asks for a name and choosing avatar
       } else {
         updateMobileInfoPanel(e.x,e.y);
         const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
-          ? e.equipment : null;
+                ? e.equipment : null;
         if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)){
           log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good');
           await playerAttackEnemy(e, true);
@@ -2693,7 +2704,7 @@ that means creating game asks for a name and choosing avatar
     }
     function enemyAttackPlayer(e, isExtraAttack=false){
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
-        ? e.equipment : null;
+              ? e.equipment : null;
       const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : '';
       beginEnemyAttackAnim(e);
       if(chance(missChance(enemySpd(e), playerSpd()))){
@@ -2917,7 +2928,7 @@ that means creating game asks for a name and choosing avatar
       // already carried the enemy beyond its leash - otherwise it could never move
       // again after giving up a pursuit.
       if(e.homeX === undefined || e.homeY === undefined ||
-        Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
+              Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
         e.homeX = e.x; e.homeY = e.y;
       }
       const options = [];
@@ -2926,7 +2937,7 @@ that means creating game asks for a name and choosing avatar
           if(dx===0 && dy===0) continue;
           const nx = e.x+dx, ny = e.y+dy;
           if(ENEMY_WANDER_LEASH &&
-            Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
+                  Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
           if(nx===player.x && ny===player.y) continue;
           if(!enemyCanTraverse(e,nx,ny)) continue;
           if(occupied.has(keyXY(nx,ny))) continue;
@@ -3068,6 +3079,11 @@ that means creating game asks for a name and choosing avatar
       if(stack) stack.count = (stack.count||1)+1;
       else player.inventory.push({kind:'scroll', name:'Scroll of Invisibility', count:1});
     }
+    function addIdScroll(){
+      const stack = player.inventory.find(i=>i.kind==='idscroll');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'idscroll', name:'Scroll of Identification', count:1});
+    }
     function addSpeedPotion(){
       const stack = player.inventory.find(i=>i.kind==='speedpotion');
       if(stack) stack.count = (stack.count||1)+1;
@@ -3086,18 +3102,18 @@ that means creating game asks for a name and choosing avatar
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
     function isStackableKind(kind){
-      return kind==='potion' || kind==='scroll' || kind==='speedpotion' || kind==='herb' || kind==='mushroom';
+      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='herb' || kind==='mushroom';
     }
     function isConsumableKind(kind){
-      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll';
+      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll' || kind==='idscroll';
     }
     function equipmentSortValues(item){
       const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' || item.mod === 'grace' ? (item.modAmt || 0) : 0;
       if(item.kind === 'weapon'){
         const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0);
         const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
-          ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
-          : 0;
+                ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
+                : 0;
         return {sum:atk+otherModifier, tier:item.tier || 0, primary:atk};
       }
       const def = (item.def || 0) + (item.mod === 'def' ? modBonus : 0);
@@ -3159,13 +3175,16 @@ that means creating game asks for a name and choosing avatar
           if(g.opened) continue;
           g.opened = true;
           const mf = playerMf();
-          const roll = rng();
-          if(roll<0.45){
+          // Weighted pool (weights, not percentages) so the Scroll of
+          // Identification's drop chance stays exactly a third of the
+          // Potion of Speed's, whatever the other weights are tuned to.
+          const roll = rng()*103;
+          if(roll<45){
             const gold = randInt(5,15)*g.tier + Math.round(mf*2);
             player.gold += gold;
             lastLootResult = `${gold} gold.`;
             if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
-          } else if(roll<0.65){
+          } else if(roll<65){
             const lowTier = Math.min(2, Math.max(1, g.tier));
             const pickRoll = rng();
             let item;
@@ -3177,18 +3196,22 @@ that means creating game asks for a name and choosing avatar
             if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
               player.inventory.push(item);
             }
-          } else if(roll<0.85){
+          } else if(roll<85){
             addPotion();
             lastLootResult = 'a Life Potion.';
             if(!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot');
-          } else if(roll<0.91){
+          } else if(roll<91){
             addScroll();
             lastLootResult = 'a Scroll of Invisibility.';
             if(!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
-          } else {
+          } else if(roll<100){
             addSpeedPotion();
             lastLootResult = 'a Potion of Speed.';
             if(!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot');
+          } else {
+            addIdScroll();
+            lastLootResult = 'a Scroll of Identification.';
+            if(!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot');
           }
           spawnPickupAnim(g);
           groundItems.splice(i,1);
@@ -3379,8 +3402,8 @@ that means creating game asks for a name and choosing avatar
         }
         if(map[ny][nx]==='caveentrance'){
           log(currentZ===0
-            ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
-            : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
+                  ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
+                  : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -3453,17 +3476,17 @@ that means creating game asks for a name and choosing avatar
           if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
 
           const direction =
-            dx === 0 && dy < 0 ? 'north' :
-              dx === 0 && dy > 0 ? 'south' :
-                dx < 0 && dy === 0 ? 'west' :
-                  dx > 0 && dy === 0 ? 'east' :
-                    dx < 0 && dy < 0 ? 'northwest' :
-                      dx > 0 && dy < 0 ? 'northeast' :
-                        dx < 0 && dy > 0 ? 'southwest' :
-                          'southeast';
+                  dx === 0 && dy < 0 ? 'north' :
+                          dx === 0 && dy > 0 ? 'south' :
+                                  dx < 0 && dy === 0 ? 'west' :
+                                          dx > 0 && dy === 0 ? 'east' :
+                                                  dx < 0 && dy < 0 ? 'northwest' :
+                                                          dx > 0 && dy < 0 ? 'northeast' :
+                                                                  dx < 0 && dy > 0 ? 'southwest' :
+                                                                          'southeast';
 
           const enemy = enemies.find(
-            en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
+                  en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
           );
 
           if (enemy) {
@@ -3472,16 +3495,16 @@ that means creating game asks for a name and choosing avatar
           }
 
           const item = groundItems.find(
-            g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
-              !(g.kind === 'chest' && g.opened)
+                  g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
+                          !(g.kind === 'chest' && g.opened)
           );
 
           if (item) {
             const label =
-              item.kind === 'chest' ? 'a chest' :
-                item.kind === 'potion' ? 'a potion' :
-                  item.kind === 'speedpotion' ? 'a speed potion' :
-                    'a scroll';
+                    item.kind === 'chest' ? 'a chest' :
+                            item.kind === 'potion' ? 'a potion' :
+                                    item.kind === 'speedpotion' ? 'a speed potion' :
+                                            'a scroll';
 
             addNote(label, direction);
             continue;
@@ -3500,11 +3523,11 @@ that means creating game asks for a name and choosing avatar
           }
 
           if (
-            t === 'mountain' ||
-            t === 'cavewall' ||
-            t === 'boulder' ||
-            t === 'water' ||
-            t === 'village'
+                  t === 'mountain' ||
+                  t === 'cavewall' ||
+                  t === 'boulder' ||
+                  t === 'water' ||
+                  t === 'village'
           ) {
             addNote(TILE_DESC[t], direction);
           }
@@ -3911,8 +3934,8 @@ that means creating game asks for a name and choosing avatar
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
         (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
-          ? Math.min(Math.PI/2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI/2)
-          : 0;
+                ? Math.min(Math.PI/2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI/2)
+                : 0;
         if(deathRotation){
           ctx.save();
           ctx.translate(vx + TILE_PX/2, vy + TILE_PX/2);
@@ -4056,14 +4079,14 @@ that means creating game asks for a name and choosing avatar
         const playerSpeed = playerSpd();
         const spdColor = effectiveEnemySpeed > playerSpeed ? '#e0473f' : playerSpeed >= effectiveEnemySpeed*2 ? 'var(--parchment-dim)' : 'white';
         const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b=>
-          `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
+                `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
         ).join(', ')}</div>` : '';
         const critHtml = e.crit
-          ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
-          : '';
+                ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
+                : '';
         const equipmentHtml = e.equipment
-          ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
-          : '';
+                ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
+                : '';
         return { mini:false, enemy:e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
@@ -4390,8 +4413,8 @@ that means creating game asks for a name and choosing avatar
     }
     function bestSlotIndexes(kind){
       const inventoryCandidates = player.inventory
-        .map((it, idx)=>({it, idx, score: bestSlotScore(it)}))
-        .filter(entry => entry.it.kind === kind && entry.score !== null);
+              .map((it, idx)=>({it, idx, score: bestSlotScore(it)}))
+              .filter(entry => entry.it.kind === kind && entry.score !== null);
 
       const equipped = player.equip[kind];
       const equippedScore = equipped ? bestSlotScore(equipped) : null;
@@ -4442,9 +4465,9 @@ that means creating game asks for a name and choosing avatar
       if(charTitle) charTitle.textContent = `${player.name} the ${race.name}`;
       setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon);
       setSlotLabel(
-        document.getElementById('slotShield').querySelector('.val'),
-        player.equip.shield,
-        player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
+              document.getElementById('slotShield').querySelector('.val'),
+              player.equip.shield,
+              player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
       );
       setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
 
@@ -4497,8 +4520,8 @@ that means creating game asks for a name and choosing avatar
         const row = document.createElement('div');
         row.className = 'invitem';
         const isBest = (it.kind==='weapon' && best.weapon.has(idx)) ||
-          (it.kind==='shield' && best.shield.has(idx)) ||
-          (it.kind==='armor' && best.armor.has(idx));
+                (it.kind==='shield' && best.shield.has(idx)) ||
+                (it.kind==='armor' && best.armor.has(idx));
         if(isBest) row.classList.add('best-slot');
         const cls = it.tier ? tierColorClass(it.tier) : '';
         const line = itemStatLine(it);
@@ -4513,7 +4536,7 @@ that means creating game asks for a name and choosing avatar
           if(!it.identified){
             const btn = document.createElement('button');
             btn.textContent = '?';
-            btn.title = 'Identify';
+            btn.title = 'Identify (requires a Scroll of Identification)';
             btn.onclick = ()=>{ identifyArtifact(idx); };
             row.appendChild(btn);
           } else {
@@ -4556,6 +4579,9 @@ that means creating game asks for a name and choosing avatar
           btn.textContent = 'Read';
           btn.onclick = ()=>{ useScroll(idx); };
           row.appendChild(btn);
+        } else if(it.kind==='idscroll'){
+          // No standalone action - it's consumed automatically via the "?"
+          // identify button on an unidentified artifact.
         } else if(it.kind==='tombstone'){
           const btn = document.createElement('button');
           btn.textContent = 'Read';
@@ -4602,9 +4628,12 @@ that means creating game asks for a name and choosing avatar
           merchantStock.push(art);
         }
       }
+      if(!merchantStock.some(it=>it.kind==='idscroll')){
+        merchantStock.push({kind:'idscroll', name:'Scroll of Identification', count:1, merchantPrice:40});
+      }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
-    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, herb:4, mushroom:3 };
+    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, idscroll:20, herb:4, mushroom:3 };
     function itemSellValue(it){
       if(it.tier){
         let v = TIER_SELL_VALUE[it.tier] || 0;
@@ -4917,8 +4946,8 @@ that means creating game asks for a name and choosing avatar
       caves = caves.map(c=>({
         ...c,
         entrances: Array.isArray(c.entrances) && c.entrances.length
-          ? c.entrances
-          : [{x:c.x,y:c.y}],
+                ? c.entrances
+                : [{x:c.x,y:c.y}],
       }));
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
       for(let i=0;i<caveMaps.length;i++){
@@ -4975,21 +5004,21 @@ that means creating game asks for a name and choosing avatar
       // tiles ended up in the restored map.
       villageCenter = null;
       outer:
-        for(let y=0; y<MAP_H; y++){
-          for(let x=0; x<MAP_W; x++){
-            if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
-          }
-        }
+              for(let y=0; y<MAP_H; y++){
+                for(let x=0; x<MAP_W; x++){
+                  if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
+                }
+              }
 
       // bigBellPos likewise isn't stored explicitly - recover it from the
       // restored map so the Drunk's rumor line still points the right way.
       bigBellPos = null;
       outer2:
-        for(let y=0; y<MAP_H; y++){
-          for(let x=0; x<MAP_W; x++){
-            if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
-          }
-        }
+              for(let y=0; y<MAP_H; y++){
+                for(let x=0; x<MAP_W; x++){
+                  if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
+                }
+              }
 
       Object.assign(player, data.player);
       // pre-v7 saves have no race/name - those characters were all plain humans
