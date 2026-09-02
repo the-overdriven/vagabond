@@ -3916,7 +3916,7 @@ that means creating game asks for a name and choosing avatar
     ctx.textAlign = 'center';
 
     function tileBackground(x,y,tileKey){
-      const baseKey = tileUnderlays[keyXY(x,y)] || tileKey;
+      const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x,y)] || tileKey) : tileKey);
       const base = TILE[baseKey];
       return base ? base.bg : '#050403';
     }
