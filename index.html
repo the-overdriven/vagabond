@@ -834,6 +834,11 @@ that means creating game asks for a name and choosing avatar
       cavefloor: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
       cavewall:  {ch:'#', color:'#493022', bg:'#0d0805', walk:false},
       caveentrance: {ch:'∩', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
+      // z:-2 and deeper: same colours as the shallow cave floor (by design),
+      // but a distinct key so goblins/skeletons can be told apart from bats/rats.
+      cavefloor2: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
+      cavedown:  {ch:'v', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
+      caveup:    {ch:'^', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
       temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
       // A single lore landmark hidden in the mountains: a monolithic black
@@ -850,8 +855,13 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
+    // Tiles the player can "inspect" while standing on them to change z level.
+    // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
+    // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
+    // level never means adding another transition tile type.
+    const CAVE_TRANSITION_TILES = new Set(['caveentrance','cavedown','caveup']);
 
     function makeNoise(cellsX, cellsY){
       const grid = [];
@@ -880,29 +890,66 @@ that means creating game asks for a name and choosing avatar
 
     let map = []; // map[y][x] = tile key string
     let surfaceMap = null;
-    let undergroundMap = null;
-    let caveMaps = [];
-    let caves = [];
-    let undergroundDiscovered = [];
+    let undergroundMap = null;       // z:-1 shared map (storage)
+    let caveMaps = [];               // z:-1 per-cave local template maps (storage)
+    let caves = [];                  // z:-1 cave descriptors (storage)
+    let undergroundDiscoveredL1 = []; // z:-1 discovery grid (storage)
+    // Deeper levels (z:-2 and beyond), generalized so adding another level is
+    // just another entry here instead of a new set of hardcoded variables.
+    // deepLevels[i] = the level at depth (i+2), i.e. deepLevels[0] is z:-2.
+    // Each entry: {map, caveMaps, caves, discovered}.
+    let deepLevels = [];
+    let undergroundDiscovered = []; // ACTIVE underground discovery grid, swapped on every level transition
     let currentZ = 0;
     let currentCave = -1;
+    // depth here means "levels below the surface": 1 = z:-1, 2 = z:-2, ...
+    function depthUndergroundMap(depth){
+      if(depth<=0) return null;
+      if(depth===1) return undergroundMap;
+      const lvl = deepLevels[depth-2];
+      return lvl ? lvl.map : null;
+    }
+    function depthUndergroundDiscovered(depth){
+      if(depth<=0) return null;
+      if(depth===1) return undergroundDiscoveredL1;
+      const lvl = deepLevels[depth-2];
+      return lvl ? lvl.discovered : null;
+    }
     function onCurrentLevel(entity){
       const level = entity.level || 0;
       return level === 0 ? currentZ === 0 : currentZ === level;
     }
     function enterCave(){
+      const tile = map[player.y] && map[player.y][player.x];
       if(currentZ===0){
-        if(map[player.y][player.x] !== 'caveentrance') return false;
+        if(tile !== 'caveentrance') return false;
         const cave = caves.findIndex(c=>c.entrances.some(e=>e.x===player.x && e.y===player.y));
         if(cave < 0) return false;
-        currentCave = cave; currentZ = -1; map = undergroundMap;
+        currentCave = cave; currentZ = -1;
+        map = depthUndergroundMap(1); undergroundDiscovered = depthUndergroundDiscovered(1);
         log('You descend into the cave.', 'info');
-      } else {
-        if(map[player.y][player.x] !== 'caveentrance') return false;
-        const cave = caves[currentCave];
+      } else if(tile === 'caveentrance'){
+        // Only the true top-level ascent (z:-1 -> surface) is "back to the
+        // surface" - every deeper ascent uses 'caveup' below instead.
         map = surfaceMap; currentZ = 0;
         currentCave = -1;
         log('You climb back out into the mountain air.', 'info');
+      } else if(tile === 'cavedown'){
+        const depth = -currentZ, nextDepth = depth+1;
+        const nextMap = depthUndergroundMap(nextDepth);
+        if(!nextMap) return false;
+        currentZ = -nextDepth;
+        map = nextMap; undergroundDiscovered = depthUndergroundDiscovered(nextDepth);
+        log('You squeeze through the crack and descend deeper into the dark.', 'info');
+      } else if(tile === 'caveup'){
+        const depth = -currentZ, prevDepth = depth-1;
+        const prevMap = depthUndergroundMap(prevDepth);
+        if(!prevMap) return false;
+        currentZ = -prevDepth;
+        map = prevMap; undergroundDiscovered = depthUndergroundDiscovered(prevDepth);
+        log('You climb back up to the upper cave.', 'info');
+      } else {
+        return false;
       }
       stopCameraAnimation(); snapCameraToPlayer(); minimapDirty = true; render(); updateHud();
       return true;
@@ -1203,8 +1250,8 @@ that means creating game asks for a name and choosing avatar
         for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
           if(cm[y][x] !== 'cavewall') undergroundMap[y][x] = cm[y][x];
         }
-        undergroundDiscovered = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
       }
+      undergroundDiscoveredL1 = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
       // Two caves' floor blobs can overlap in world space (they're only kept
       // >10 tiles apart at their primary spot, not along their whole random
       // walk), so the merge above can let one cave's plain floor tile paint
@@ -1218,6 +1265,77 @@ that means creating game asks for a name and choosing avatar
           }
         }
       }
+      // z:-2: about half of the z:-1 caves get a stairway down into their own
+      // small deeper cave, sharing one map with every other z:-2 cave (same
+      // pattern as z:-1 sharing undergroundMap). Written generically so a
+      // future z:-3 is just another generateDeepLevel() call.
+      deepLevels = [generateDeepLevel(caves, caveMaps, undergroundMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')];
+      undergroundDiscovered = undergroundDiscoveredL1;
+    }
+    // Carves a random-walk blob of `floorTile` into a blank local cave map
+    // `cm`, starting from `spot` - the same technique generateCaves() uses
+    // to build z:-1 caves, reused for every deeper level.
+    function carveCaveBlob(cm, spot, floorTile, steps=180, radius=8){
+      let x=spot.x, y=spot.y;
+      const minX=Math.max(2,spot.x-radius), maxX=Math.min(MAP_W-3,spot.x+radius);
+      const minY=Math.max(2,spot.y-radius), maxY=Math.min(MAP_H-3,spot.y+radius);
+      for(let step=0;step<steps;step++){
+        cm[y][x] = floorTile;
+        const [dx,dy] = pick(DIRS8);
+        x = Math.max(minX,Math.min(maxX,x+dx));
+        y = Math.max(minY,Math.min(maxY,y+dy));
+      }
+    }
+    // Builds one deeper level from the level above it. For each parent cave
+    // (~50% chance), stamps a `downTile` stairway on a random open parent
+    // floor tile, then carves a matching blob of `floorTile` into a brand
+    // new local map with an `upTile` at the exact same x,y - so entrance and
+    // exit always share coordinates. All the new local maps are merged into
+    // one shared map for the level, same as generateCaves() does for z:-1.
+    // Calling this again with the returned level's own caves/caveMaps/map as
+    // the "parent" args is all that's needed to add another level further down.
+    function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile){
+      const levelCaves = [];
+      const levelCaveMaps = [];
+      for(let i=0;i<parentCaves.length;i++){
+        if(!chance(0.5)) continue;
+        const cm = parentCaveMaps[i];
+        const entrances = parentCaves[i].entrances || [];
+        const open = [];
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+          if(cm[y][x]===parentFloorTile && !entrances.some(e=>e.x===x && e.y===y)) open.push({x,y});
+        }
+        const spot = pick(open);
+        if(!spot) continue;
+        // Stamp the stairway into both the parent's per-cave template and its
+        // already-merged shared map, so a save/reload re-stamp (see
+        // loadGameFromObject) rebuilds it the same way.
+        cm[spot.y][spot.x] = downTile;
+        if(parentMap[spot.y] && parentMap[spot.y][spot.x] !== undefined) parentMap[spot.y][spot.x] = downTile;
+
+        const cm2 = blankCaveMap();
+        carveCaveBlob(cm2, spot, floorTile);
+        cm2[spot.y][spot.x] = upTile;
+        levelCaveMaps.push(cm2);
+        levelCaves.push({x:spot.x, y:spot.y, entrances:[{x:spot.x, y:spot.y}]});
+      }
+      const levelMap = blankCaveMap();
+      for(const cm of levelCaveMaps){
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+          if(cm[y][x] !== 'cavewall') levelMap[y][x] = cm[y][x];
+        }
+      }
+      for(const cave of levelCaves){
+        for(const entrance of cave.entrances){
+          if(levelMap[entrance.y] && levelMap[entrance.y][entrance.x] !== undefined) levelMap[entrance.y][entrance.x] = upTile;
+        }
+      }
+      return {
+        map: levelMap,
+        caveMaps: levelCaveMaps,
+        caves: levelCaves,
+        discovered: Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false)),
+      };
     }
 
     let bigBellPos = null;
@@ -2278,6 +2396,56 @@ that means creating game asks for a name and choosing avatar
         if(skeletonSpot && chance(0.6)) groundItems.push({x:skeletonSpot.x,y:skeletonSpot.y,kind:'skeleton',looted:false,description:pick(SKELETON_INSPECTIONS),level:-1,caveIndex});
       }
     }
+    // Ranks a deep-cave template's floor tiles by how many of their 8
+    // neighbours are wall (or off the edge of the local map), so chests can
+    // be dropped hugging the walls/corners instead of out in the open.
+    function deepCaveCornerSpots(cm, floorTile, entrances){
+      const scored = [];
+      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+        if(cm[y][x] !== floorTile) continue;
+        if(entrances.some(e=>e.x===x && e.y===y)) continue;
+        let wallNeighbors = 0;
+        for(const [dx,dy] of DIRS8){
+          const t = cm[y+dy] && cm[y+dy][x+dx];
+          if(!t || t==='cavewall') wallNeighbors++;
+        }
+        if(wallNeighbors>=3) scored.push({x,y,wallNeighbors});
+      }
+      scored.sort((a,b)=>b.wallNeighbors-a.wallNeighbors);
+      return scored;
+    }
+    // Populates every z:-2 (and deeper) cave: one monster type per cave,
+    // chosen 50/50, so goblins and skeletons are always in separate caves and
+    // never spawn next to each other. Also drops one generous, corner-hugging
+    // chest per cave.
+    function spawnDeepCaveContents(){
+      const goblinTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Goblin') || {
+        name:'Goblin', tier:1, hp:14, atk:4, def:1, spd:5, fly:false, humanoid:true, evades:false, aggro:AGGRO_RANGE,
+      };
+      const skeletonTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Skeleton') || {
+        name:'Skeleton', tier:1, hp:12, atk:5, def:2, spd:4, fly:false, humanoid:true, evades:false, aggro:AGGRO_RANGE,
+      };
+      for(const level of deepLevels){
+        for(let caveIndex=0;caveIndex<level.caveMaps.length;caveIndex++){
+          const cm = level.caveMaps[caveIndex];
+          const caveEntrances = level.caves[caveIndex].entrances;
+          const open = [];
+          for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(cm[y][x]==='cavefloor2' && !caveEntrances.some(e=>x===e.x&&y===e.y)) open.push({x,y});
+          const tmpl = chance(0.5) ? goblinTmpl : skeletonTmpl;
+          for(let i=0;i<4 && open.length;i++){
+            const p = pick(open);
+            enemies.push({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:-2,caveIndex,
+              hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,
+              humanoid: tmpl.humanoid !== false,evades:!!tmpl.evades,aggro:tmpl.aggro ?? AGGRO_RANGE,
+              x:p.x,y:p.y,homeX:p.x,homeY:p.y,homeTileType:'cavefloor2',alive:true,prefix:null,equipment:null});
+            open.splice(open.indexOf(p),1);
+          }
+          const cornerSpots = deepCaveCornerSpots(cm, 'cavefloor2', caveEntrances);
+          const chestSpot = cornerSpots.length ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length))) : pick(open);
+          if(chestSpot) groundItems.push({x:chestSpot.x,y:chestSpot.y,kind:'chest',tier:2,opened:false,level:-2,caveIndex,generous:true});
+        }
+      }
+    }
     function spawnGroundStuff(){
       // chests
       for(let i=0;i<45;i++){
@@ -3175,17 +3343,20 @@ that means creating game asks for a name and choosing avatar
           if(g.opened) continue;
           g.opened = true;
           const mf = playerMf();
+          // Chests flagged 'generous' (deep-cave corner chests, for now) roll
+          // better gold, skip the usual tier-2 gear cap, and add a bonus on top.
+          const generous = !!g.generous;
           // Weighted pool (weights, not percentages) so the Scroll of
           // Identification's drop chance stays exactly a third of the
           // Potion of Speed's, whatever the other weights are tuned to.
           const roll = rng()*103;
           if(roll<45){
-            const gold = randInt(5,15)*g.tier + Math.round(mf*2);
+            const gold = randInt(5,15)*g.tier + Math.round(mf*2) + (generous ? randInt(20,45)*g.tier : 0);
             player.gold += gold;
             lastLootResult = `${gold} gold.`;
             if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
           } else if(roll<65){
-            const lowTier = Math.min(2, Math.max(1, g.tier));
+            const lowTier = generous ? Math.min(4, Math.max(1, g.tier)) : Math.min(2, Math.max(1, g.tier));
             const pickRoll = rng();
             let item;
             if(pickRoll < 0.33) item = makeWeaponItem(lowTier);
@@ -3212,6 +3383,11 @@ that means creating game asks for a name and choosing avatar
             addIdScroll();
             lastLootResult = 'a Scroll of Identification.';
             if(!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot');
+          }
+          if(generous){
+            const bonusGold = randInt(15,30)*Math.max(1,g.tier) + Math.round(mf);
+            player.gold += bonusGold;
+            if(!suppressLootLog) log(`The chest conceals a hidden compartment of an extra ${bonusGold} gold.`, 'loot');
           }
           spawnPickupAnim(g);
           groundItems.splice(i,1);
@@ -3400,10 +3576,17 @@ that means creating game asks for a name and choosing avatar
         if(currentZ===0 && map[ny][nx]==='ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest'){
           log('You enter a dense ancient forest.', 'info');
         }
-        if(map[ny][nx]==='caveentrance'){
-          log(currentZ===0
-                  ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
-                  : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
+        if(CAVE_TRANSITION_TILES.has(map[ny][nx])){
+          const onto = map[ny][nx];
+          if(onto === 'caveentrance'){
+            log(currentZ===0
+                    ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
+                    : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
+          } else if(onto === 'cavedown'){
+            log('You\'re standing over a narrow crack descending further into the dark. Press "inspect" to climb down.', 'info');
+          } else if(onto === 'caveup'){
+            log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info');
+          }
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -3433,6 +3616,9 @@ that means creating game asks for a name and choosing avatar
       snow:"a snow-covered slope",
       cavefloor:"the brown dirt floor of a cave",
       cavewall:"a solid cave wall",
+      cavefloor2:"the cold stone floor of a deeper cave",
+      cavedown:"a narrow crack descending further into the dark",
+      caveup:"a rough passage leading back up",
       temple:"the sacred ground of the Temple",
       boulder:"a cluster of impassable boulders",
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
@@ -3952,7 +4138,7 @@ that means creating game asks for a name and choosing avatar
         ctx.fillRect(canvas.width-86, 6, 78, 25);
         ctx.fillStyle = '#e8a24f';
         ctx.font = "bold 16px Consolas, 'Courier New', monospace";
-        ctx.fillText('Z -1', canvas.width-47, 10);
+        ctx.fillText('Z ' + currentZ, canvas.width-47, 10);
         ctx.restore();
       }
       // range overlays are drawn last so they tint everything underneath without
@@ -4322,7 +4508,7 @@ that means creating game asks for a name and choosing avatar
         const radius = Math.max(5, scale*1.8)*zoom*pulse;
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI*2);
-        ctx.fillStyle = map[player.y] && map[player.y][player.x] === 'caveentrance' ? '#ff8c32' : '#e0473f';
+        ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#e0473f';
         ctx.fill();
         return;
       }
@@ -4342,7 +4528,7 @@ that means creating game asks for a name and choosing avatar
         ctx.fillStyle = '#ffe08a';
         ctx.fillRect((spawnPoint.x-ox)*scale-1, (spawnPoint.y-oy)*scale-1, dot, dot);
       }
-      ctx.fillStyle = map[player.y] && map[player.y][player.x] === 'caveentrance' ? '#ff8c32' : '#ffffff';
+      ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#ffffff';
       ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
     }
     function sideMiniOrigin(){
@@ -4874,7 +5060,14 @@ that means creating game asks for a name and choosing avatar
         currentZ: currentZ,
         currentCave: currentCave,
         discovered: discovered.map(row => row.map(b => b?'1':'0').join('')),
-        undergroundDiscovered: undergroundDiscovered.map(row => row.map(b => b?'1':'0').join('')),
+        undergroundDiscovered: undergroundDiscoveredL1.map(row => row.map(b => b?'1':'0').join('')),
+        // z:-2 and deeper. An array so adding more levels later never needs
+        // another save-format field - just another entry.
+        deepLevels: deepLevels.map(lvl=>({
+          caveMaps: lvl.caveMaps.map(cm=>cm.map(row=>row.map(t=>TILE_CODE[t] || '#').join(''))),
+          caves: lvl.caves,
+          discovered: lvl.discovered.map(row=>row.map(b=>b?'1':'0').join('')),
+        })),
         spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
         player: {
@@ -4974,9 +5167,41 @@ that means creating game asks for a name and choosing avatar
           }
         }
       }
-      map = data.currentZ < 0 && undergroundMap ? undergroundMap : surfaceMap;
-      currentZ = data.currentZ < 0 && caveMaps[data.currentCave] ? -1 : 0;
-      currentCave = currentZ < 0 ? data.currentCave : -1;
+      // z:-2 and deeper. Rebuilt the same way z:-1 is above: decode each
+      // level's per-cave templates, re-stamp caveup at every declared
+      // entrance (mirrors the caveentrance re-stamp above), then merge into
+      // one shared map per level.
+      deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map(lvlData=>{
+        const lvlCaveMaps = (lvlData.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
+        let lvlCaves = Array.isArray(lvlData.caves) ? lvlData.caves : [];
+        lvlCaves = lvlCaves.map(c=>({
+          ...c,
+          entrances: Array.isArray(c.entrances) && c.entrances.length ? c.entrances : [{x:c.x,y:c.y}],
+        }));
+        for(let i=0;i<lvlCaveMaps.length;i++){
+          const entrances = lvlCaves[i] ? lvlCaves[i].entrances : [];
+          for(const entrance of entrances){
+            if(lvlCaveMaps[i][entrance.y] && lvlCaveMaps[i][entrance.y][entrance.x] !== undefined){
+              lvlCaveMaps[i][entrance.y][entrance.x] = 'caveup';
+            }
+          }
+        }
+        const lvlMap = blankCaveMap();
+        for(const cm of lvlCaveMaps){
+          for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+            if(cm[y][x] !== 'cavewall') lvlMap[y][x] = cm[y][x];
+          }
+        }
+        for(const cave of lvlCaves){
+          for(const entrance of cave.entrances || []){
+            if(lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) lvlMap[entrance.y][entrance.x] = 'caveup';
+          }
+        }
+        const lvlDiscovered = (Array.isArray(lvlData.discovered) && lvlData.discovered.length === MAP_H)
+                ? lvlData.discovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'))
+                : Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
+        return { map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered };
+      });
 
       if(Array.isArray(data.discovered) && data.discovered.length === MAP_H){
         discovered = data.discovered.map(rowStr=>{
@@ -4990,9 +5215,26 @@ that means creating game asks for a name and choosing avatar
         initDiscovered();
       }
       if(Array.isArray(data.undergroundDiscovered) && data.undergroundDiscovered.length === MAP_H){
-        undergroundDiscovered = data.undergroundDiscovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'));
+        undergroundDiscoveredL1 = data.undergroundDiscovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'));
       } else {
-        undergroundDiscovered = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
+        undergroundDiscoveredL1 = Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
+      }
+
+      // Resolve currentZ/map/currentCave for whatever depth the save was on
+      // (0 = surface, 1 = z:-1, 2 = z:-2, ...), falling back to the surface
+      // if that depth's map can't be reconstructed (e.g. a corrupt save).
+      const savedDepth = data.currentZ < 0 ? -data.currentZ : 0;
+      const savedDepthMap = depthUndergroundMap(savedDepth);
+      if(savedDepth >= 1 && savedDepthMap){
+        currentZ = -savedDepth;
+        map = savedDepthMap;
+        currentCave = savedDepth===1 ? data.currentCave : -1;
+        undergroundDiscovered = depthUndergroundDiscovered(savedDepth);
+      } else {
+        currentZ = 0;
+        map = surfaceMap;
+        currentCave = -1;
+        undergroundDiscovered = undergroundDiscoveredL1;
       }
       rebuildMinimapBases();
 
@@ -5420,6 +5662,7 @@ that means creating game asks for a name and choosing avatar
       spawnBellGuardians();
       spawnGroundStuff();
       spawnCaveContents();
+      spawnDeepCaveContents();
       spawnNpcs();
       ensureMerchantStock();
       stopDeathTransition();
