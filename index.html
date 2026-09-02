@@ -5016,6 +5016,16 @@ that means creating game asks for a name and choosing avatar
       if(!merchantStock.some(it=>it.merchantMagicLowTier)){
         merchantStock.push(makeMerchantMagicWeapon());
       }
+      if(!merchantStock.some(it=>it.kind==='shield' && it.tier===1)){
+        const shield = makeShieldItem(1);
+        shield.merchantPrice = itemSellValue(shield) * 2;
+        merchantStock.push(shield);
+      }
+      if(!merchantStock.some(it=>it.kind==='armor' && it.tier===1)){
+        const armor = makeArmorItem(1);
+        armor.merchantPrice = itemSellValue(armor) * 2;
+        merchantStock.push(armor);
+      }
       if(!merchantStock.some(it=>it.kind==='artifact')){
         const art = makeArtifactItem(3);
         if(art){
