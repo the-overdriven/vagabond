@@ -1,5 +1,4 @@
 <!-- TODO:
-
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
@@ -54,7 +53,6 @@ that means creating game asks for a name and choosing avatar
 - For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom
 - on mobile inventory screen hides hp bar
 - log hints to msg log with H
-- allow skipping turns with key (t)
 - chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - talking to NPC should stop their movement for a while, so you can talk to them without them running away
 - add physical wounds / states:
@@ -631,6 +629,7 @@ that means creating game asks for a name and choosing avatar
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
+    <kbd>T</kbd> wait / skip turn &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
     <kbd id="kbdCaps">CAPS</kbd> toggle enemy ranges &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
@@ -3759,6 +3758,19 @@ that means creating game asks for a name and choosing avatar
       if(!moved) flushPendingMove();
     }
 
+    function skipTurn(){
+      if(mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return;
+      if(cameraAnimating || attackAnim) return;
+      clearAutoPath();
+      log('You wait.', 'info');
+      enemyTurn();
+      npcTurn();
+      render();
+      runAnimationLoop();
+      updateHud();
+      updateTooltip();
+    }
+
     /* ============================== LOOK / SURROUNDINGS ============================== */
     const TILE_DESC = {
       water:"open water",
@@ -5695,6 +5707,7 @@ that means creating game asks for a name and choosing avatar
         refreshRangeVisibility();
         return;
       }
+
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
       if(k==='m' || k==='M'){ ev.preventDefault(); toggleMap(); return; }
       if(k==='Escape'){ toggleInv(false); toggleMap(false); toggleTrade(false); return; }
@@ -5704,6 +5717,7 @@ that means creating game asks for a name and choosing avatar
       if(mapOpen || invOpen || tradeOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); inspect(); return; }
       if(k==='f' || k==='F'){ ev.preventDefault(); lootSkeletonOrForage(); return; }
+      if(k==='t' || k==='T'){ ev.preventDefault(); skipTurn(); return; }
       const moves = {
 
         w:[0,-1], s:[0,1], a:[-1,0], d:[1,0],
