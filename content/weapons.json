@@ -3,6 +3,7 @@
   {"name":"Short Sword",      "atk":2,  "grace":4, "twoHanded": false, "tier":1},
   {"name":"Club",             "atk":2,  "grace":2, "twoHanded": false, "tier":1},
   {"name":"Rapier",           "atk":3,  "grace":5, "twoHanded": false, "tier":2},
+  {"name":"Staff",            "atk":4,  "grace":2, "twoHanded": true,  "tier":2},
   {"name":"Long Sword",       "atk":5,  "grace":3, "twoHanded": false, "tier":2},
   {"name":"Scimitar",         "atk":5,  "grace":4, "twoHanded": false, "tier":2},
   {"name":"Mace",             "atk":5,  "grace":3, "twoHanded": false, "tier":2},

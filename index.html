@@ -1,10 +1,5 @@
 <!-- TODO:
 
-- grave glyph tile still does not have transparent background. if it's on a hill, it should have hill background
-- taiga trees were supposed to have transparent background as well. they also have no flavor text when inspecting them (when standing on them), it only shows "you are standing on unfamiliar ground"
-- also attempting to forage in taiga biome, shouldn't work and log should say "The snow-choked taiga yields no food. Only frozen roots and dead needles."
-- add freezing in taiga? depends on y level. it should feel unhospitable
-
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
@@ -13,6 +8,7 @@
 - collect berries? more survivalism?
 - scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons
 - balance monsters, xp
+- add a way to protect against freezing
 
 - add pick axe (to be able to dig through boulders, costs HP)
 - special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
@@ -520,6 +516,7 @@ that means creating game asks for a name and choosing avatar
     <div class="stat">🍀MF <b id="hMf"></b></div>
     <div class="stat">💰Gold <b id="hGold">0</b></div>
     <div class="stat">💀Deaths <b id="hDeaths">0</b></div>
+    <div class="stat" id="hStatus" style="color:#9c8b6c; font-weight:bold;"></div>
     <div class="stat" style="display:flex; gap:6px;">
       <button class="slbtn" id="btnSave" title="Save game to a .json file">💾 Save</button>
       <button class="slbtn" id="btnLoad" title="Load game from a .json file">📂 Load</button>
@@ -2165,6 +2162,7 @@ that means creating game asks for a name and choosing avatar
       gold: 0, deaths: 0, steps: 0,
       invisibleTurns: 0,
       speedPotionTurns: 0,
+      freezing: {active:false, turns:0},
       curseDebuffs: [],
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
@@ -3281,9 +3279,40 @@ that means creating game asks for a name and choosing avatar
       if(turnCount % race.regenEvery !== 0) return;
       player.hp = Math.min(playerMaxHp(), player.hp + 1);
     }
+    function tickFreezing(){
+      // Freezing exists only on the surface. Snow and taiga are both inherently
+      // hostile cold terrain; once the player leaves them, the status clears.
+      const tile = currentZ===0 && map[player.y] ? map[player.y][player.x] : null;
+      const cold = tile === 'snow' || tile === 'taiga';
+      if(!player.freezing) player.freezing = {active:false, turns:0};
+      if(!cold){
+        if(player.freezing.active){
+          player.freezing.active = false;
+          player.freezing.turns = 0;
+          log('You leave the frozen wastes and begin to thaw.', 'info');
+        }
+        return;
+      }
+      if(!player.freezing.active){
+        player.freezing.active = true;
+        player.freezing.turns = 0;
+        log('You are freezing. The cold is biting through your clothes.', 'bad');
+      }
+      player.freezing.turns++;
+      if(player.freezing.turns >= 5){
+        player.freezing.turns = 0;
+        player.hp = Math.max(0, player.hp - 1);
+        log('The freezing cold bites you for 1 HP.', 'bad');
+        updateHud();
+        if(player.hp <= 0){ die(); }
+      }
+    }
+
     function enemyTurn(){
       if(player.hp <= 0 || deathTransition) return;
       turnCount++;
+      tickFreezing();
+      if(player.hp <= 0 || deathTransition) return;
       tickRaceRegen();
       tickArtifactCurses();
       if(player.speedPotionTurns > 0){
@@ -4712,6 +4741,8 @@ that means creating game asks for a name and choosing avatar
       document.getElementById('hMf').textContent = playerMf();
       document.getElementById('hGold').textContent = player.gold;
       document.getElementById('hDeaths').textContent = player.deaths;
+      const statusEl = document.getElementById('hStatus');
+      statusEl.textContent = player.freezing && player.freezing.active ? '❄️ Freezing' : '';
     }
 
     function slotLabel(it){
@@ -4954,8 +4985,12 @@ that means creating game asks for a name and choosing avatar
           merchantStock.push(art);
         }
       }
-      if(!merchantStock.some(it=>it.kind==='idscroll')){
-        merchantStock.push({kind:'idscroll', name:'Scroll of Identification', count:1, merchantPrice:40});
+      let idScrollStock = merchantStock.find(it=>it.kind==='idscroll');
+      if(!idScrollStock){
+        merchantStock.push({kind:'idscroll', name:'Scroll of Identification', count:3, merchantPrice:100});
+      } else {
+        idScrollStock.count = Math.max(3, idScrollStock.count || 1);
+        idScrollStock.merchantPrice = Math.max(100, idScrollStock.merchantPrice || 0);
       }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
@@ -5220,6 +5255,7 @@ that means creating game asks for a name and choosing avatar
           gold:player.gold, deaths:player.deaths, steps:player.steps,
           invisibleTurns:player.invisibleTurns,
           speedPotionTurns:player.speedPotionTurns,
+          freezing: player.freezing,
           curseDebuffs: player.curseDebuffs,
           equip: player.equip,
           inventory: player.inventory,
