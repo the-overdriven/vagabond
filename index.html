@@ -675,6 +675,7 @@ that means creating game asks for a name and choosing avatar
     let ARTIFACT_CURSES = [];
     let ARTIFACT_DESC = {};
     let DWARVEN_RUIN_ENTRANCES = [];
+    let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false;
     async function loadContent(){
       const files = {
         weapons:'weapons.json',
@@ -3933,7 +3934,21 @@ that means creating game asks for a name and choosing avatar
       {dx:-1,dy:-1,name:'northwest'}, {dx:1,dy:-1,name:'northeast'},
       {dx:-1,dy:1,name:'southwest'}, {dx:1,dy:1,name:'southeast'},
     ];
+    function spawnAncientBellLich(){
+      if(ancientBellLichSpawned) return;
+      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(map[y][x]==='ancientForest' && !occupied.has(keyXY(x,y))){
+        npcs.push({name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:true,static:true,trades:false,portrait:'lich',x,y,homeX:x,homeY:y});
+        ancientBellLichSpawned=true; return;
+      }
+    }
     function describeSurroundings() {
+      if(map[player.y]?.[player.x]==='belltower'){
+        if(!bellReturnedToChapel && player.inventory.some(i=>i.kind==='bigbell')){
+          player.inventory.splice(player.inventory.findIndex(i=>i.kind==='bigbell'),1); bellReturnedToChapel=true;
+          log('You return the missing bell to the chapel. The parishioners are eternally grateful. They insist you do the honours and ring it.', 'good'); updateHud(); return;
+        }
+        if(bellReturnedToChapel && !bellRung){ bellRung=true; log('You ring the bell. Its thunderous peal echoes through the village and beyond. Loud enough to wake the dead. Perhaps, somewhere, it did.', 'good'); spawnAncientBellLich(); return; }
+      }
       const here = TILE_DESC[map[player.y][player.x]] || 'unfamiliar ground';
       log(`You are standing on ${here}.`, 'info');
       const currentGround = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y);
@@ -5116,6 +5131,8 @@ that means creating game asks for a name and choosing avatar
           const btn=document.createElement('button'); btn.textContent='?'; btn.title='Inspect wheelbarrow';
           btn.onclick=()=>log('Small wheelbarrow made of an unknown alloy. Surprisingly light and durable.', 'info');
           row.appendChild(btn);
+        } else if(it.kind==='bigbell'){
+          const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('An enormous brass bell, impossibly heavy.', 'info'); row.appendChild(btn);
         } else if(it.kind==='tombstone'){
           const btn = document.createElement('button');
           btn.textContent = 'Read';
