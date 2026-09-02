@@ -889,9 +889,10 @@ that means creating game asks for a name and choosing avatar
     }
 
     let map = []; // map[y][x] = tile key string
-    // Transparent landmark/biome glyphs keep their original terrain here.
-    let surfaceUnderlays = {};
     let surfaceMap = null;
+    // Transparent landmark/biome glyphs replace their map tile in storage, so
+    // remember what terrain was underneath them for rendering and saves.
+    let tileUnderlays = {};
     let undergroundMap = null;       // z:-1 shared map (storage)
     let caveMaps = [];               // z:-1 per-cave local template maps (storage)
     let caves = [];                  // z:-1 cave descriptors (storage)
@@ -967,7 +968,7 @@ that means creating game asks for a name and choosing avatar
 
     function generateSurface(){
       shuffleTombstoneOrder();
-      surfaceUnderlays = {};
+      tileUnderlays = {};
       map.length = 0; // a retried world must not append onto the discarded one
       const elevFns = [makeNoise(6,4), makeNoise(14,10), makeNoise(30,22)];
       const elevW = [0.55,0.3,0.15];
@@ -1006,7 +1007,15 @@ that means creating game asks for a name and choosing avatar
           if(e < 0.24) t='water';
           else if(e < 0.29) t='sand';
           else if(e < 0.58){
-            if(m > 0.55) t='forest';
+            // Forest thins sharply toward the north. Normal forest belongs to the
+            // temperate band; the snowy north should be taiga/snow, not ordinary
+            // woodland. The gradual latitude penalty still allows an occasional
+            // forest tile right at the southern edge of the snow country.
+            const northness = y / Math.max(1, MAP_H - 1);
+            const forestChance = northness > 0.18
+                    ? Math.max(0.08, 1 - (northness - 0.18) / 0.14)
+                    : 1;
+            if(m > 0.55 && rng() < forestChance) t='forest';
             else t='grass';
           }           else if(e < 0.68) t='hill';
           else if(e < 0.86) t='mountain';
@@ -1030,12 +1039,35 @@ that means creating game asks for a name and choosing avatar
         }
       }
       // Snowy north: exposed mountains get a snow cap, with a few more peaks
-      // breaking through the tundra. A small number of snow tiles become sparse
-      // forest, so the far north is not a completely treeless wasteland.
+      // breaking through the tundra. Ordinary forest does NOT grow inside the
+      // snow biome; taiga is the only normal tree cover there.
       for(let y=0;y<SNOW_BAND;y++){
         for(let x=0;x<MAP_W;x++){
           if(map[y][x]==='mountain' && chance(0.85)) map[y][x] = 'snowmountain';
-          else if(map[y][x]==='snow' && chance(0.045)) map[y][x] = 'forest';
+        }
+      }
+
+      // At the southern edge of the snow biome, prevent normal forest from forming
+      // dense pockets against snow/taiga. Isolated trees can still survive beside
+      // the snow line, but the farther north we go, the less common they become.
+      const FOREST_NORTH_TRANSITION = Math.round(MAP_H * 0.10);
+      for(let y=SNOW_BAND; y<Math.min(MAP_H, SNOW_BAND + FOREST_NORTH_TRANSITION); y++){
+        const northFade = (y - SNOW_BAND + 1) / FOREST_NORTH_TRANSITION;
+        for(let x=0;x<MAP_W;x++){
+          if(map[y][x] !== 'forest') continue;
+          let coldNeighbors = 0;
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+            if(dx===0 && dy===0) continue;
+            const nx=x+dx, ny=y+dy;
+            if(nx<0 || ny<0 || nx>=MAP_W || ny>=MAP_H) continue;
+            const nt = map[ny][nx];
+            if(nt==='snow' || nt==='taiga' || nt==='snowmountain') coldNeighbors++;
+          }
+          const denseCold = coldNeighbors >= 3;
+          const forestKeepChance = denseCold
+                  ? Math.max(0.02, 0.16 * (1 - northFade))
+                  : Math.max(0.10, 0.70 * (1 - northFade));
+          if(rng() > forestKeepChance) map[y][x] = 'grass';
         }
       }
       for(let y=0;y<SNOW_BAND;y++){
@@ -1047,7 +1079,10 @@ that means creating game asks for a name and choosing avatar
       // directly out of the snow, so they keep the snow underneath visible.
       for(let y=0;y<SNOW_BAND;y++){
         for(let x=0;x<MAP_W;x++){
-          if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'taiga';
+          if(map[y][x]==='snow' && chance(0.035)){
+            tileUnderlays[keyXY(x,y)] = 'snow';
+            map[y][x] = 'taiga';
+          }
         }
       }
 
@@ -2628,7 +2663,7 @@ that means creating game asks for a name and choosing avatar
             const gx = x+dx, gy = y+dy;
             if(!isWalkable(gx,gy) || occupied.has(keyXY(gx,gy))) continue;
             if(map[gy][gx]==='temple' || map[gy][gx]==='belltower') continue;
-            surfaceUnderlays[keyXY(gx,gy)] = map[gy][gx];
+            tileUnderlays[keyXY(gx,gy)] = map[gy][gx];
             map[gy][gx] = 'grave';
             break;
           }
@@ -3844,14 +3879,10 @@ that means creating game asks for a name and choosing avatar
     ctx.font = (TILE_PX-4)+"px Consolas, 'Courier New', monospace";
     ctx.textAlign = 'center';
 
-    function tileBackground(x,y){
-      const tileKey = map[y] && map[y][x];
-      if(tileKey === 'taiga') return TILE.snow.bg;
-      if(tileKey === 'grave'){
-        const underlay = surfaceUnderlays[keyXY(x,y)];
-        return underlay && TILE[underlay] ? TILE[underlay].bg : TILE.grass.bg;
-      }
-      return TILE[tileKey] ? TILE[tileKey].bg : '#050403';
+    function tileBackground(x,y,tileKey){
+      const baseKey = tileUnderlays[keyXY(x,y)] || tileKey;
+      const base = TILE[baseKey];
+      return base ? base.bg : '#050403';
     }
 
     function drawTile(px,py,ch,color,bg){
@@ -4077,7 +4108,7 @@ that means creating game asks for a name and choosing avatar
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          drawTile(px,py,t.ch,foraged ? '#554f2a' : t.color,tileBackground(mx,my));
+          drawTile(px,py,t.ch,foraged ? '#554f2a' : t.color,tileBackground(mx,my,map[my][mx]));
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
@@ -4087,12 +4118,12 @@ that means creating game asks for a name and choosing avatar
         const vx = Math.round((g.x-camX) * TILE_PX);
         const vy = Math.round((g.y-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
-        if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', tileBackground(g.x,g.y));
-        else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='campfire') drawTile(vx,vy,'*', '#e8a24f', TILE[map[g.y][g.x]].bg);
-        else if(g.kind==='skeleton') drawTile(vx,vy,'╶☠╴', g.looted ? '#777' : '#d0d0c0', TILE[map[g.y][g.x]].bg);
+        if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='campfire') drawTile(vx,vy,'*', '#e8a24f', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='skeleton') drawTile(vx,vy,'╶☠╴', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x,g.y,map[g.y][g.x]));
       }
       // fx animations: symbol bumps up/down, shrinks, and fades out
       if(fxAnims.length){
@@ -4533,16 +4564,14 @@ that means creating game asks for a name and choosing avatar
       const c = base.ctx;
       c.clearRect(x*s, y*s, s, s);
       const terrainMap = currentZ===0 ? (surfaceMap || map) : map;
-      const t = TILE[terrainMap[y][x]];
-      const foraged = terrainMap[y][x]==='forest' && foragedTiles.has(keyXY(x,y));
+      const tileKey = terrainMap[y][x];
+      const t = TILE[tileKey];
+      const underKey = tileUnderlays[keyXY(x,y)] || tileKey;
+      const under = TILE[underKey] || t;
+      const foraged = tileKey==='forest' && foragedTiles.has(keyXY(x,y));
       const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x];
-      let miniTerrainColor = t.mini || t.color;
-      if(terrainMap[y][x] === 'taiga') miniTerrainColor = TILE.snow.mini || TILE.snow.color;
-      else if(terrainMap[y][x] === 'grave'){
-        const underlay = surfaceUnderlays[keyXY(x,y)];
-        if(underlay && TILE[underlay]) miniTerrainColor = TILE[underlay].mini || TILE[underlay].color;
-      }
-      c.fillStyle = visible ? (foraged ? '#554f2a' : miniTerrainColor) : 'rgba(3,2,1,0.72)';
+      c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='grave' || tileKey==='taiga'
+              ? (under.mini || under.color) : (t.mini || t.color))) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
@@ -5141,7 +5170,7 @@ that means creating game asks for a name and choosing avatar
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 7; // v7 adds the player's name and race
+    const SAVE_VERSION = 8; // v8 preserves terrain underneath transparent taiga/grave glyphs
 
     function buildSaveObject(){
       return {
@@ -5150,7 +5179,7 @@ that means creating game asks for a name and choosing avatar
         worldSeed: WORLD_SEED,
         rngState: rngState,
         map: surfaceMap.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
-        surfaceUnderlays: Object.assign({}, surfaceUnderlays),
+        tileUnderlays: tileUnderlays,
         caveMaps: caveMaps.map(cm=>cm.map(row=>row.map(t=>TILE_CODE[t] || '#').join(''))),
         caves: caves,
         currentZ: currentZ,
@@ -5231,10 +5260,28 @@ that means creating game asks for a name and choosing avatar
       });
       if(decoded.length !== MAP_H) throw new Error('Save file map height does not match.');
       surfaceMap = decoded;
-      surfaceUnderlays = (data.surfaceUnderlays && typeof data.surfaceUnderlays === 'object')
-              ? Object.assign({}, data.surfaceUnderlays) : {};
-      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
-        if(surfaceMap[y][x] === 'taiga' && !surfaceUnderlays[keyXY(x,y)]) surfaceUnderlays[keyXY(x,y)] = 'snow';
+      tileUnderlays = (data.tileUnderlays && typeof data.tileUnderlays === 'object')
+              ? Object.assign({}, data.tileUnderlays) : {};
+      // Saves from before v8 did not record the transparent tile's base terrain.
+      // Taiga is always generated from snow; old graves get a nearby hill/terrain
+      // fallback so they do not render as a solid black square.
+      for(let y=0;y<MAP_H;y++){
+        for(let x=0;x<MAP_W;x++){
+          const tileKey = surfaceMap[y][x];
+          const k = keyXY(x,y);
+          if(tileKey==='taiga' && !tileUnderlays[k]) tileUnderlays[k] = 'snow';
+          if(tileKey==='grave' && !tileUnderlays[k]){
+            let fallback = null;
+            for(const [dx,dy] of DIRS8){
+              const nx=x+dx, ny=y+dy;
+              if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H) continue;
+              const neighbor = surfaceMap[ny][nx];
+              if(neighbor==='hill'){ fallback='hill'; break; }
+              if(!fallback && TILE[neighbor] && TILE[neighbor].walk) fallback=neighbor;
+            }
+            tileUnderlays[k] = fallback || 'grass';
+          }
+        }
       }
       caves = Array.isArray(data.caves) ? data.caves : [];
       caves = caves.map(c=>({
