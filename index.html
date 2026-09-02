@@ -1,9 +1,6 @@
 <!-- TODO:
 
-- add few chest 3 tiers that are in remote location and near high tier mobs (3+)
-- snow covered mountains? mountains in snow biomes should be white and more common
-- reading scroll of invis should make u gray instantly
-- grave (near grave digger, near village) should have transparent bg
+
 
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
@@ -826,6 +823,7 @@ that means creating game asks for a name and choosing avatar
       ancientForest: {ch:'\u2663', color:'#1d5227', bg:'#071007', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
+      snowmountain: {ch:'\u25b2', color:'#ffffff', bg:'#dfeaf2', walk:false},
       // snow is drawn as dark speckles on a bright field, so its glyph colour is
       // useless on the minimap -- `mini` overrides what the minimaps sample.
       snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', mini:'#e4eef6', walk:true},
@@ -847,13 +845,13 @@ that means creating game asks for a name and choosing avatar
       // Part of the temple grounds - the bell tower. Its bell is missing.
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       // A lone grave, kept near the Gravedigger.
-      grave:    {ch:'\u2020', color:'#c9c9c9', bg:'#12120f', walk:true},
+      grave:    {ch:'\u2020', color:'#c9c9c9', bg:'transparent', walk:true},
       // A lore landmark: a huge brass bell, too heavy to carry off, guarded
       // by a pair of brutes near the mountains.
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snowmountain:'M',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
@@ -1025,6 +1023,21 @@ that means creating game asks for a name and choosing avatar
         }
       }
 
+      // Snowy north: exposed mountains get a snow cap, with a few more peaks
+      // breaking through the tundra. A small number of snow tiles become sparse
+      // forest, so the far north is not a completely treeless wasteland.
+      for(let y=0;y<SNOW_BAND;y++){
+        for(let x=0;x<MAP_W;x++){
+          if(map[y][x]==='mountain' && chance(0.85)) map[y][x] = 'snowmountain';
+          else if(map[y][x]==='snow' && chance(0.045)) map[y][x] = 'forest';
+        }
+      }
+      for(let y=0;y<SNOW_BAND;y++){
+        for(let x=0;x<MAP_W;x++){
+          if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'snowmountain';
+        }
+      }
+
       // Scattered boulders: sprinkle extra impassable terrain across walkable lowlands
       for(let y=0;y<MAP_H;y++){
         for(let x=0;x<MAP_W;x++){
@@ -1046,7 +1059,7 @@ that means creating game asks for a name and choosing avatar
         if(elev[y][x] < 0.6) continue;
         for(let step=0; step<400; step++){
           if(map[y][x]==='water') break;
-          if(map[y][x]!=='mountain' && map[y][x]!=='cavewall') map[y][x]='river';
+          if(map[y][x]!=='mountain' && map[y][x]!=='snowmountain' && map[y][x]!=='cavewall') map[y][x]='river';
           // find lowest neighbor
           let bestX=x, bestY=y, bestE=elev[y][x];
           for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
@@ -1091,7 +1104,7 @@ that means creating game asks for a name and choosing avatar
         for(let dx=0; dx<tw; dx++){
           const tx=sx+dx, ty=sy+dy;
           if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
-          if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
+          if(map[ty][tx]==='water' || map[ty][tx]==='mountain' || map[ty][tx]==='snowmountain') continue;
           map[ty][tx] = 'temple';
           templeTiles.push({x:tx,y:ty});
         }
@@ -1114,7 +1127,7 @@ that means creating game asks for a name and choosing avatar
                       const tx=sx+dx, ty=sy+dy;
                       if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
                       if(tx===sx && ty===sy) continue;
-                      if(map[ty][tx]==='water' || map[ty][tx]==='mountain') continue;
+                      if(map[ty][tx]==='water' || map[ty][tx]==='mountain' || map[ty][tx]==='snowmountain') continue;
                       map[ty][tx] = 'temple';
                       const spot = {x:tx,y:ty};
                       templeTiles.push(spot);
@@ -1192,7 +1205,7 @@ that means creating game asks for a name and choosing avatar
       undergroundMap = blankCaveMap();
       const candidates = [];
       for(let y=2;y<MAP_H-2;y++) for(let x=2;x<MAP_W-2;x++){
-        if(map[y][x] !== 'mountain') continue;
+        if(map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue;
         const edge = DIRS8.some(([dx,dy])=>{
           const t = map[y+dy] && map[y+dy][x+dx];
           return t && TILE[t] && TILE[t].walk;
@@ -1349,7 +1362,7 @@ that means creating game asks for a name and choosing avatar
               if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
               const x = spawnPoint.x+dx, y = spawnPoint.y+dy;
               if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
-              if(map[y][x] !== 'mountain') continue;
+              if(map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue;
               // Keep well clear of the black pillar - the two landmarks
               // shouldn't spawn side by side.
               if(blackPillarPos && Math.max(Math.abs(x-blackPillarPos.x), Math.abs(y-blackPillarPos.y)) < BELL_PILLAR_MIN_DIST) continue;
@@ -1430,7 +1443,7 @@ that means creating game asks for a name and choosing avatar
               if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
               const x = spawnPoint.x+dx, y = spawnPoint.y+dy;
               if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
-              if(map[y][x] !== 'mountain') continue;
+              if(map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue;
               if(requireEdge){
                 let onEdge = false;
                 for(let ny=-1; ny<=1 && !onEdge; ny++){
@@ -2457,6 +2470,36 @@ that means creating game asks for a name and choosing avatar
         }
       }
     }
+    function spawnRemoteHighTierChests(){
+      // A few valuable tier-3 chests are deliberately placed in remote areas,
+      // inside the aggro range of tier-3+ monsters so reaching them carries risk.
+      const candidates = enemies.filter(e=>e.alive && e.level===0 && e.tier>=3 && e.x>=0 && e.y>=0);
+      let placed = 0;
+      const used = new Set(groundItems.filter(g=>g.kind==='chest' && onCurrentLevel(g)).map(g=>keyXY(g.x,g.y)));
+      const shuffled = candidates.slice();
+      for(let i=shuffled.length-1;i>0;i--){ const j=randInt(0,i); [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]]; }
+      for(const e of shuffled){
+        if(placed>=4) break;
+        const aggroRange = effectiveAggroRange(e);
+        const remote = villageCenter && Math.max(Math.abs(e.x-villageCenter.x),Math.abs(e.y-villageCenter.y)) >= 35;
+        if(!remote || aggroRange < 1) continue;
+        const spots = [];
+        for(let dy=-aggroRange;dy<=aggroRange;dy++) for(let dx=-aggroRange;dx<=aggroRange;dx++){
+          const x=e.x+dx, y=e.y+dy;
+          if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2) continue;
+          if(Math.max(Math.abs(dx),Math.abs(dy)) > aggroRange) continue;
+          if(!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') continue;
+          if(occupied.has(keyXY(x,y)) || used.has(keyXY(x,y))) continue;
+          spots.push({x,y});
+        }
+        if(!spots.length) continue;
+        const spot=pick(spots);
+        groundItems.push({x:spot.x,y:spot.y,kind:'chest',tier:3,opened:false});
+        used.add(keyXY(spot.x,spot.y));
+        placed++;
+      }
+    }
+
     function spawnGroundStuff(){
       // chests
       for(let i=0;i<45;i++){
@@ -4131,7 +4174,7 @@ that means creating game asks for a name and choosing avatar
         }
         const vx = Math.round((px-camX) * TILE_PX), vy = Math.round((py-camY) * TILE_PX);
         const faded = player.invisibleTurns>0;
-        const playerColor = faded ? 'rgba(255,246,214,0.45)' : '#fff6d6';
+        const playerColor = faded ? '#888888' : '#fff6d6';
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
         (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
@@ -5009,7 +5052,7 @@ that means creating game asks for a name and choosing avatar
       if(it.count<=0) player.inventory.splice(idx,1);
       player.invisibleTurns = consumablePower(15);
       log('You read the Scroll of Invisibility. The shadows swallow you.', 'good');
-      updateHud(); renderInventory();
+      updateHud(); renderInventory(); render();
     }
     function useSpeedPotion(idx){
       const it = player.inventory[idx];
@@ -5675,6 +5718,7 @@ that means creating game asks for a name and choosing avatar
       foragedTiles = new Set();
       spawnEnemies();
       spawnBellGuardians();
+      spawnRemoteHighTierChests();
       spawnGroundStuff();
       spawnCaveContents();
       spawnDeepCaveContents();
