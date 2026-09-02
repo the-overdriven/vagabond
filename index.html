@@ -18,7 +18,7 @@
 - special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
 - individual aggro distance per mob type
 
-- more Terrain effects. forest grants cover (−1 enemy aggro range) or chance to sneak by
+- Terrain effects. You now have six walkable biomes that are purely decorative. This is the cheapest big win available: forest grants cover (−1 enemy aggro range), hills give high ground (+1 ATK, +vision radius), snow and river cost extra movement or SPD. Suddenly where you fight is a decision, and all the biome work you just did starts paying gameplay dividends instead of just looking nice.
 - in forest there is 33% chance that you sneak through the trees and monster does not aggro you
 - custom map markers
 - add ability to rest (may be interrupted)
@@ -1075,14 +1075,44 @@ that means creating game asks for a name and choosing avatar
           if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'snowmountain';
         }
       }
-      // Sparse taiga in the northern snow biome: these are trees growing
-      // directly out of the snow, so they keep the snow underneath visible.
+      // Dense taiga in the northern snow biome: trees grow in broad, irregular
+      // stands rather than as isolated specks. They still grow directly out of
+      // the snow so the snow underlay remains visible through their transparent glyph.
+      // First seed the biome fairly generously, then let the seeds spread into
+      // neighboring snow to form natural-looking wooded patches.
+      const taigaSeeds = [];
       for(let y=0;y<SNOW_BAND;y++){
         for(let x=0;x<MAP_W;x++){
-          if(map[y][x]==='snow' && chance(0.035)){
-            tileUnderlays[keyXY(x,y)] = 'snow';
-            map[y][x] = 'taiga';
+          if(map[y][x]==='snow' && chance(0.10)) taigaSeeds.push({x,y});
+        }
+      }
+      for(const seed of taigaSeeds){
+        if(map[seed.y][seed.x] !== 'snow') continue;
+        tileUnderlays[keyXY(seed.x,seed.y)] = 'snow';
+        map[seed.y][seed.x] = 'taiga';
+      }
+      // Several growth passes make taiga noticeably denser, while retaining
+      // holes and ragged edges instead of turning the whole snow band into forest.
+      for(let pass=0; pass<3; pass++){
+        const additions = [];
+        for(let y=0;y<SNOW_BAND;y++){
+          for(let x=0;x<MAP_W;x++){
+            if(map[y][x] !== 'snow') continue;
+            let nearbyTaiga = 0;
+            for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+              if(dx===0 && dy===0) continue;
+              const nx=x+dx, ny=y+dy;
+              if(nx<0 || ny<0 || nx>=MAP_W || ny>=SNOW_BAND) continue;
+              if(map[ny][nx] === 'taiga') nearbyTaiga++;
+            }
+            const growChance = nearbyTaiga >= 3 ? 0.58 : nearbyTaiga >= 1 ? 0.28 : 0.04;
+            if(chance(growChance)) additions.push({x,y});
           }
+        }
+        for(const tile of additions){
+          if(map[tile.y][tile.x] !== 'snow') continue;
+          tileUnderlays[keyXY(tile.x,tile.y)] = 'snow';
+          map[tile.y][tile.x] = 'taiga';
         }
       }
 
@@ -3721,7 +3751,7 @@ that means creating game asks for a name and choosing avatar
       sand:"sand",
       grass:"a grassy field",
       forest:"dense forest",
-      taiga:"a snow-choked taiga, dense with stunted conifers",
+      taiga:"a snow-choked taiga, where dark trees claw through the frozen ground",
       ancientForest:"a dense ancient forest",
       hill:"a rugged hill",
       mountain:"an impassable mountain",
