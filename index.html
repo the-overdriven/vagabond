@@ -1,7 +1,5 @@
 <!-- TODO:
 
-
-
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
@@ -820,6 +818,7 @@ that means creating game asks for a name and choosing avatar
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
       grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
+      taiga:    {ch:'\u2663', color:'#49664f', bg:'transparent', walk:true},
       ancientForest: {ch:'\u2663', color:'#1d5227', bg:'#071007', walk:true},
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
@@ -851,7 +850,7 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',ancientForest:'a',hill:'h',mountain:'m',snowmountain:'M',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
@@ -1022,7 +1021,6 @@ that means creating game asks for a name and choosing avatar
           if(coldness > 0.32) map[y][x] = 'snow';
         }
       }
-
       // Snowy north: exposed mountains get a snow cap, with a few more peaks
       // breaking through the tundra. A small number of snow tiles become sparse
       // forest, so the far north is not a completely treeless wasteland.
@@ -1035,6 +1033,13 @@ that means creating game asks for a name and choosing avatar
       for(let y=0;y<SNOW_BAND;y++){
         for(let x=0;x<MAP_W;x++){
           if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'snowmountain';
+        }
+      }
+      // Sparse taiga in the northern snow biome: these are trees growing
+      // directly out of the snow, so they keep the snow underneath visible.
+      for(let y=0;y<SNOW_BAND;y++){
+        for(let x=0;x<MAP_W;x++){
+          if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'taiga';
         }
       }
 
@@ -4174,7 +4179,7 @@ that means creating game asks for a name and choosing avatar
         }
         const vx = Math.round((px-camX) * TILE_PX), vy = Math.round((py-camY) * TILE_PX);
         const faded = player.invisibleTurns>0;
-        const playerColor = faded ? '#888888' : '#fff6d6';
+        const playerColor = faded ? 'rgba(255,246,214,0.45)' : '#fff6d6';
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
         (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
