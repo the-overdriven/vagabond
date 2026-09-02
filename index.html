@@ -11,7 +11,6 @@
 
 - add pick axe (to be able to dig through boulders, costs HP)
 - special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
-- individual aggro distance per mob type
 
 - Terrain effects. You now have six walkable biomes that are purely decorative. This is the cheapest big win available: forest grants cover (−1 enemy aggro range), hills give high ground (+1 ATK, +vision radius), snow and river cost extra movement or SPD. Suddenly where you fight is a decision, and all the biome work you just did starts paying gameplay dividends instead of just looking nice.
 - in forest there is 33% chance that you sneak through the trees and monster does not aggro you
@@ -35,7 +34,7 @@
 - being under effect of potion of speed, two moves are treated as 1 turn in autopath
 - high tier monsters should be more lickely to drop items from their tier
 - opening chests can spawn mimics?
-- add scroll of teleport (to temple)
+
 - rivers are not common enough, add bridges
 - add swimming skill (number represents how many tiles you can swim before you start drowning)
 - using items should cost a turn
@@ -3037,6 +3036,23 @@ that means creating game asks for a name and choosing avatar
       lootFromEnemy(e);
       updateHud();
     }
+    // Returns the player to the temple, shared by death recovery and teleportation.
+    function returnPlayerToTemple(){
+      currentZ = 0;
+      currentCave = -1;
+      map = surfaceMap;
+      undergroundDiscovered = undergroundDiscoveredL1;
+      player.x = spawnPoint.x;
+      player.y = spawnPoint.y;
+      player.hp = playerMaxHp();
+      pendingMove = null;
+      clearAutoPath();
+      stopCameraAnimation();
+      clearEnemyAnims();
+      stopAttackAnimation();
+      snapCameraToPlayer();
+    }
+
     function startDeathFade(){
       if(!deathTransition || deathTransition.phase !== 'pending') return;
       deathTransition = { phase:'out', start: performance.now(), duration: 900, deathStart: deathTransition.deathStart };
@@ -3047,13 +3063,7 @@ that means creating game asks for a name and choosing avatar
         if(deathTransition.phase === 'out' && elapsed >= deathTransition.duration){
           // Death always returns the player to the Temple on the surface, even
           // if death occurred in a cave or deeper underground level.
-          currentZ = 0;
-          currentCave = -1;
-          map = surfaceMap;
-          undergroundDiscovered = undergroundDiscoveredL1;
-          player.x = spawnPoint.x; player.y = spawnPoint.y;
-          player.hp = playerMaxHp();
-          snapCameraToPlayer();
+          returnPlayerToTemple();
           updateHud();
           deathTransition = { phase:'in', start: now, duration: 900, rotation: 0 };
           render(now);
@@ -3394,6 +3404,11 @@ that means creating game asks for a name and choosing avatar
       if(stack) stack.count = (stack.count||1)+1;
       else player.inventory.push({kind:'scroll', name:'Scroll of Invisibility', count:1});
     }
+    function addTeleportScroll(){
+      const stack = player.inventory.find(i=>i.kind==='teleportscroll');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'teleportscroll', name:'Scroll of Teleportation', count:1});
+    }
     function addIdScroll(){
       const stack = player.inventory.find(i=>i.kind==='idscroll');
       if(stack) stack.count = (stack.count||1)+1;
@@ -3417,10 +3432,10 @@ that means creating game asks for a name and choosing avatar
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
     function isStackableKind(kind){
-      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='herb' || kind==='mushroom';
+      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom';
     }
     function isConsumableKind(kind){
-      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll' || kind==='idscroll';
+      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll' || kind==='idscroll' || kind==='teleportscroll';
     }
     function equipmentSortValues(item){
       const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' || item.mod === 'grace' ? (item.modAmt || 0) : 0;
@@ -4948,6 +4963,11 @@ that means creating game asks for a name and choosing avatar
           btn.textContent = 'Read';
           btn.onclick = ()=>{ useScroll(idx); };
           row.appendChild(btn);
+        } else if(it.kind==='teleportscroll'){
+          const btn = document.createElement('button');
+          btn.textContent = 'Read';
+          btn.onclick = ()=>{ useTeleportScroll(idx); };
+          row.appendChild(btn);
         } else if(it.kind==='idscroll'){
           // No standalone action - it's consumed automatically via the "?"
           // identify button on an unidentified artifact.
@@ -5003,6 +5023,9 @@ that means creating game asks for a name and choosing avatar
       } else {
         idScrollStock.count = Math.max(3, idScrollStock.count || 1);
         idScrollStock.merchantPrice = Math.max(100, idScrollStock.merchantPrice || 0);
+      }
+      if(!merchantStock.some(it=>it.kind==='teleportscroll')){
+        merchantStock.push({kind:'teleportscroll', name:'Scroll of Teleportation', count:5, merchantPrice:100});
       }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
@@ -5182,6 +5205,17 @@ that means creating game asks for a name and choosing avatar
       player.invisibleTurns = consumablePower(15);
       log('You read the Scroll of Invisibility. The shadows swallow you.', 'good');
       updateHud(); renderInventory(); render();
+    }
+    function useTeleportScroll(idx){
+      const it = player.inventory[idx];
+      if(!it || it.kind!=='teleportscroll') return;
+      it.count = (it.count||1)-1;
+      if(it.count<=0) player.inventory.splice(idx,1);
+      log('You read the Scroll of Teleportation. Darkness swallows you - and the temple takes you back.', 'good');
+            returnPlayerToTemple();
+      toggleInv(false);
+      updateHud();
+      render();
     }
     function useSpeedPotion(idx){
       const it = player.inventory[idx];
