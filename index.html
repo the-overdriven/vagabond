@@ -854,6 +854,7 @@ that means creating game asks for a name and choosing avatar
       village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
       // Part of the temple grounds - the bell tower. Its bell is missing.
       belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
+      ruinedchapel: {ch:'†', color:'#8b8175', bg:'#211d1a', walk:true},
       // A lone grave, kept near the Gravedigger.
       grave:    {ch:'\u2020', color:'#c9c9c9', bg:'transparent', walk:true},
       // A lore landmark: a huge brass bell, too heavy to carry off, guarded
@@ -861,7 +862,7 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',ruinedchapel:'c',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
@@ -2688,7 +2689,7 @@ that means creating game asks for a name and choosing avatar
       let shape=pick(shapes), origin=null;
       for(let attempt=0;attempt<100&&!origin;attempt++){
         const candidate={x:forest.x+randInt(-8,8),y:forest.y+randInt(-8,8)};
-        if(shape.every(([sx,sy])=>{const x=candidate.x+sx,y=candidate.y+sy; return x>=2&&y>=2&&x<MAP_W-2&&y<MAP_H-2&&isWalkable(x,y)&&map[y][x]!=='ancientForest'&&map[y][x]!=='temple'&&map[y][x]!=='belltower';})) origin=candidate;
+        if(shape.every(([sx,sy])=>{const x=candidate.x+sx,y=candidate.y+sy; return x>=2&&y>=2&&x<MAP_W-2&&y<MAP_H-2&&isWalkable(x,y)&&map[y][x]!=='ancientForest'&&map[y][x]!=='temple'&&map[y][x]!=='belltower'&&map[y][x]!=='ruinedchapel';})) origin=candidate;
         else if(attempt===99){
           for(const alt of shapes){
             for(let y=forest.y-10;y<=forest.y+15&&!origin;y++) for(let x=forest.x-10;x<=forest.x+15&&!origin;x++) if(alt.every(([sx,sy])=>isWalkable(x+sx,y+sy)&&map[y+sy][x+sx]!=='ancientForest')){shape=alt;origin={x,y};}
@@ -2697,7 +2698,7 @@ that means creating game asks for a name and choosing avatar
       }
       if(!origin) return;
       for(const [sx,sy] of shape){ const x=origin.x+sx,y=origin.y+sy;
-        if(!isWalkable(x,y)||map[y][x]==='ancientForest'||map[y][x]==='temple') continue;
+        if(!isWalkable(x,y)||map[y][x]==='ancientForest'||map[y][x]==='temple'||map[y][x]==='ruinedchapel') continue;
         const name=pick(ARTIFACT_NAMES_DWARF); const n=typeof name==='string'?name:(name.name||'Unknown Dwarf');
         const death=placed===oddIndex?randInt(701,780):randInt(520,700);
         const birth=placed===oddIndex?death-70:Math.max(120,death-randInt(35,80));
@@ -2707,7 +2708,7 @@ that means creating game asks for a name and choosing avatar
       if(graveKeys.length){
         const [gx,gy]=graveKeys[0].split(',').map(Number);
         const chapelSpot=DIRS8.map(([dx,dy])=>({x:gx+dx,y:gy+dy})).find(p=>isWalkable(p.x,p.y)&&map[p.y][p.x]!=='grave');
-        if(chapelSpot) map[chapelSpot.y][chapelSpot.x]='belltower';
+        if(chapelSpot) map[chapelSpot.y][chapelSpot.x]='ruinedchapel';
       }
       const gh=ENEMY_TEMPLATES.find(t=>t.name==='Ghoul');
     }
@@ -3982,7 +3983,8 @@ that means creating game asks for a name and choosing avatar
       boulder:"a cluster of impassable boulders",
       blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
       village:"a small hut, part of a village",
-      belltower:"a ruined chapel, forgotten by both the living and the gods",
+      belltower:"the Temple's bell tower - the bell itself seems to be missing",
+      ruinedchapel:"a ruined chapel, forgotten by both the living and the gods",
       grave:"a lone grave, it is not finished and has no inscription",
       bigbell:"a big brass bell, far too heavy to carry",
       marble:"cracked marble flooring, stained by dust and old ash",
@@ -5204,7 +5206,7 @@ that means creating game asks for a name and choosing avatar
         } else if(it.kind==='bigbell'){
           const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('An enormous brass bell, impossibly heavy.', 'info'); row.appendChild(btn);
         } else if(it.kind==='oddTombstone'){
-          const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('Odd tombstone found in the ruined cementary.', 'info'); row.appendChild(btn);
+          const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('Odd tombstone found in the ruined cemetery.', 'info'); row.appendChild(btn);
         } else if(it.kind==='shovel'){
           const btn=document.createElement('button'); btn.textContent='Dig'; btn.onclick=()=>log('There is nothing to dig here.', 'info'); row.appendChild(btn);
         } else if(it.kind==='tombstone'){
