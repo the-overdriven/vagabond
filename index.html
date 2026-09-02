@@ -674,6 +674,7 @@ that means creating game asks for a name and choosing avatar
     let ARTIFACT_EFFECTS = [];
     let ARTIFACT_CURSES = [];
     let ARTIFACT_DESC = {};
+    let DWARVEN_RUIN_ENTRANCES = [];
     async function loadContent(){
       const files = {
         weapons:'weapons.json',
@@ -690,7 +691,8 @@ that means creating game asks for a name and choosing avatar
         artifactVocationsDwarf:'random_vocations_dwarf.json',
         artifactEffects:'artifact_effects.json',
         artifactCurses:'artifact_curses.json',
-        artifactDesc:'artifact_desc_fragments.json'
+        artifactDesc:'artifact_desc_fragments.json',
+        dwarvenRuinEntrances:'dwarven_ruin_entrances.json'
       };
       const content = {};
       for(const [key,file] of Object.entries(files)){
@@ -713,6 +715,7 @@ that means creating game asks for a name and choosing avatar
       ARTIFACT_EFFECTS = content.artifactEffects;
       ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : [];
       ARTIFACT_DESC = content.artifactDesc;
+      DWARVEN_RUIN_ENTRANCES = content.dwarvenRuinEntrances;
     }
     const preloadedImageUrls = new Map();
     // Fetches images as blobs so tooltips keep working fully offline. Pass a
@@ -922,26 +925,7 @@ that means creating game asks for a name and choosing avatar
       const level = entity.level || 0;
       return level === 0 ? currentZ === 0 : currentZ === level;
     }
-    const DWARVEN_RUIN_ENTRANCES = [
-      'The gates gape open. No voices come from within. A foul stench drifts out, carrying the scent of rot.',
-      'The settlement lies eerily silent beyond the gates. The wind carries a stench of decay.',
-      'You stand before the open gates. There are no guards, no lights, no movement. Only the stink of death wafting from within.',
-      'The gates stand open, but the settlement beyond is deathly still. Bones litter the streets, half-hidden beneath the dust.',
-      'Something is terribly wrong. The settlement is abandoned, its gates hanging open and its streets strewn with bones.',
-      'A putrid stench seeps through the open gates. Beyond them, an empty settlement waits in absolute silence.',
-      'The entrance stands unguarded. No hearth-fire burns within. You can smell the rot from here.',
-      'The road into the settlement is littered with bones. Whatever happened here, it left no one to close the gates.',
-      'The gates are open. The corridors inside are empty. Even from here, you can smell something long dead.',
-      'You see no movement beyond the gates. Only bones scattered across the ground.',
-      'The gates yawn open into darkness. No forge burns within. An unnatural silence hangs beyond them, thick with the stench of decay.',
-      'Darkness swallows the fort beyond the entrance. Not a single forge glows. From within comes only a silence that feels wrong.',
-      'The entrance lies open before you. Beyond it, darkness and absolute silence. The air carries the faint, sickening smell of rot.',
-      'No light escapes the gates. The darkness within is complete, and the silence so deep you can almost hear your own heartbeat.',
-      'The fort lies dark and silent beyond the gates. A foul stench seeps from within, carrying the unmistakable scent of death.',
-      'The open gates reveal nothing but darkness. No voices. No hammers. No forge-fire. Only the stale smell of something long dead.',
-      'Something has silenced the fort. Its gates stand open, its halls swallowed by darkness, and not a sound stirs beyond.',
-      'You stand before the open gates. Darkness fills the fort beyond. The silence is absolute - and the air reeks of decay.'
-    ];
+    /* Entrance flavor is loaded from content/dwarven_ruin_entrances.json. */
     function restoreCaveEntrancesOnSurface(){
       if(!surfaceMap || !Array.isArray(caves)) return;
       for(const cave of caves) for(const e of (cave.entrances||[])){
