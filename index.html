@@ -2778,15 +2778,17 @@ that means creating game asks for a name and choosing avatar
     let npcs = [];
     function ensureGravediggerGrave(){
       const digger=npcs.find(n=>n.name==='Gravedigger');
-      if(!digger) return;
-      if(gravediggerGraveKey && map[+gravediggerGraveKey.split(',')[1]]?.[+gravediggerGraveKey.split(',')[0]]==='grave') return;
+      if(!digger || !surfaceMap) return;
+      const sx=gravediggerGraveKey && +gravediggerGraveKey.split(',')[0], sy=gravediggerGraveKey && +gravediggerGraveKey.split(',')[1];
+      if(gravediggerGraveKey && surfaceMap[sy]?.[sx]==='grave') return;
       for(let radius=1;radius<=20;radius++) for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
         if(Math.max(Math.abs(dx),Math.abs(dy))!==radius) continue;
         const gx=digger.x+dx,gy=digger.y+dy,key=keyXY(gx,gy);
-        if(!isWalkable(gx,gy)||map[gy][gx]==='belltower'||map[gy][gx]==='grave') continue;
+        const walkable=TILE[surfaceMap[gy]?.[gx]]?.walk;
+        if(!walkable||surfaceMap[gy][gx]==='belltower'||surfaceMap[gy][gx]==='grave') continue;
         const blocker=enemies.find(e=>e.alive&&e.level===0&&e.x===gx&&e.y===gy);
         if(blocker){ blocker.alive=false; occupied.delete(key); enemies=enemies.filter(e=>e!==blocker); }
-        tileUnderlays[key]=map[gy][gx]; map[gy][gx]='grave'; gravediggerGraveKey=key; return;
+        tileUnderlays[key]=surfaceMap[gy][gx]; surfaceMap[gy][gx]='grave'; gravediggerGraveKey=key; return;
       }
     }
     function spawnNpcs(){
@@ -4003,7 +4005,7 @@ that means creating game asks for a name and choosing avatar
     function spawnAncientBellLich(){
       if(ancientBellLichSpawned) return;
       for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(map[y][x]==='ancientForest' && !occupied.has(keyXY(x,y))){
-        npcs.push({name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:true,static:true,trades:false,portrait:'lich',x,y,homeX:x,homeY:y});
+        npcs.push({name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:false,static:false,trades:false,portrait:'lich',x,y,homeX:x,homeY:y});
         ancientBellLichSpawned=true; return;
       }
     }
