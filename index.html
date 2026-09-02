@@ -2417,7 +2417,7 @@ that means creating game asks for a name and choosing avatar
     // Populates every z:-2 (and deeper) cave: one monster type per cave,
     // chosen 50/50, so goblins and skeletons are always in separate caves and
     // never spawn next to each other. Also drops one generous, corner-hugging
-    // chest per cave.
+    // chest per cave (tier 3+).
     function spawnDeepCaveContents(){
       const goblinTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Goblin') || {
         name:'Goblin', tier:1, hp:14, atk:4, def:1, spd:5, fly:false, humanoid:true, evades:false, aggro:AGGRO_RANGE,
@@ -2441,8 +2441,21 @@ that means creating game asks for a name and choosing avatar
             open.splice(open.indexOf(p),1);
           }
           const cornerSpots = deepCaveCornerSpots(cm, 'cavefloor2', caveEntrances);
-          const chestSpot = cornerSpots.length ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length))) : pick(open);
-          if(chestSpot) groundItems.push({x:chestSpot.x,y:chestSpot.y,kind:'chest',tier:2,opened:false,level:-2,caveIndex,generous:true});
+          const chestSpot = cornerSpots.length
+                  ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length)))
+                  : pick(open);
+
+          if(chestSpot){
+            groundItems.push({
+              x: chestSpot.x,
+              y: chestSpot.y,
+              kind: 'chest',
+              tier: 3,
+              opened: false,
+              level: -2,
+              caveIndex
+            });
+          }
         }
       }
     }
@@ -3339,58 +3352,62 @@ that means creating game asks for a name and choosing avatar
         const g = groundItems[i];
         if(!onCurrentLevel(g)) continue;
         if(g.x!==x || g.y!==y) continue;
-        if(g.kind==='chest'){
+        if(g.kind === 'chest'){
           if(g.opened) continue;
           g.opened = true;
+
           const mf = playerMf();
-          // Chests flagged 'generous' (deep-cave corner chests, for now) roll
-          // better gold, skip the usual tier-2 gear cap, and add a bonus on top.
-          const generous = !!g.generous;
-          // Weighted pool (weights, not percentages) so the Scroll of
-          // Identification's drop chance stays exactly a third of the
-          // Potion of Speed's, whatever the other weights are tuned to.
-          const roll = rng()*103;
-          if(roll<45){
-            const gold = randInt(5,15)*g.tier + Math.round(mf*2) + (generous ? randInt(20,45)*g.tier : 0);
+          const chestTier = Math.max(1, g.tier);
+
+          const roll = rng() * 103;
+
+          if(roll < 45){
+            const gold = randInt(5, 15) * chestTier + Math.round(mf * 2);
+
             player.gold += gold;
             lastLootResult = `${gold} gold.`;
             if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
-          } else if(roll<65){
-            const lowTier = generous ? Math.min(4, Math.max(1, g.tier)) : Math.min(2, Math.max(1, g.tier));
+
+          } else if(roll < 65){
+            const itemTier = Math.min(chestTier, 4);
+
             const pickRoll = rng();
             let item;
-            if(pickRoll < 0.33) item = makeWeaponItem(lowTier);
-            else if(pickRoll < 0.66) item = makeArmorItem(lowTier);
-            else item = makeShieldItem(lowTier);
+
+            if(pickRoll < 0.33) item = makeWeaponItem(itemTier);
+            else if(pickRoll < 0.66) item = makeArmorItem(itemTier);
+            else item = makeShieldItem(itemTier);
+
             lastLootResult = `${item.name}.`;
             if(!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot');
+
             if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
               player.inventory.push(item);
             }
-          } else if(roll<85){
+
+          } else if(roll < 85){
             addPotion();
             lastLootResult = 'a Life Potion.';
             if(!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot');
-          } else if(roll<91){
+
+          } else if(roll < 91){
             addScroll();
             lastLootResult = 'a Scroll of Invisibility.';
             if(!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
-          } else if(roll<100){
+
+          } else if(roll < 100){
             addSpeedPotion();
             lastLootResult = 'a Potion of Speed.';
             if(!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot');
+
           } else {
             addIdScroll();
             lastLootResult = 'a Scroll of Identification.';
             if(!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot');
           }
-          if(generous){
-            const bonusGold = randInt(15,30)*Math.max(1,g.tier) + Math.round(mf);
-            player.gold += bonusGold;
-            if(!suppressLootLog) log(`The chest conceals a hidden compartment of an extra ${bonusGold} gold.`, 'loot');
-          }
+
           spawnPickupAnim(g);
-          groundItems.splice(i,1);
+          groundItems.splice(i, 1);
         } else if(g.kind==='skeleton' || g.kind==='campfire'){
           continue;
         } else if(g.kind==='potion'){
