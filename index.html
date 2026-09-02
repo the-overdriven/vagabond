@@ -839,7 +839,7 @@ that means creating game asks for a name and choosing avatar
       caveup:    {ch:'^', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
       marble:    {ch:'=', color:'#c8c2b4', bg:'#302d2a', walk:true},
       dwarvengate:{ch:'Ω', color:'#e8b85b', bg:'#241b12', walk:true},
-      dwarvenstatue:{ch:'♜', color:'#817769', bg:'#171514', walk:false},
+      dwarvenstatue:{ch:'♜', color:'#817769', bg:'#171514', walk:true},
       dwarvenwall:{ch:'▓', color:'#756b60', bg:'#151311', walk:false},
       dwarvenrubble:{ch:'░', color:'#62574c', bg:'#201b17', walk:true},
       temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
@@ -1390,11 +1390,17 @@ that means creating game asks for a name and choosing avatar
       dwarvenRuin={x:x0,y:y0,caveIndex:caveMaps.length-1};
       const ghost=ENEMY_TEMPLATES.find(t=>t.name==='Ghost');
       if(ghost){ for(let i=0;i<3;i++){ let gx=x0+randInt(-25,25), gy=y0+randInt(-18,18); if(cm[gy]?.[gx]==='marble'){ enemies.push({name:'Ghost',baseName:'Ghost',tier:ghost.tier||2,level:-1,caveIndex:dwarvenRuin.caveIndex,hp:ghost.hp,maxHp:ghost.hp,atk:ghost.atk,def:ghost.def,spd:ghost.spd,fly:true,humanoid:false,evades:true,aggro:ghost.aggro??AGGRO_RANGE,x:gx,y:gy,homeX:gx,homeY:gy,homeTileType:'marble',alive:true,prefix:null,equipment:null}); } } }
-      for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:-1,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of iron ale.','A workbench collapsed under its own tools.','A Dwarven lintel bears a name worn smooth by generations.'])}); }
+      for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:-1,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of ale.','A workbench collapsed under its own tools.','A Dwarven lintel bears a name worn smooth by generations.'])}); }
       const anvilSpot={x:x0+5,y:y0+2}; if(cm[anvilSpot.y]?.[anvilSpot.x]==='marble') groundItems.push({x:anvilSpot.x,y:anvilSpot.y,kind:'anvil',level:-1,caveIndex:dwarvenRuin.caveIndex,description:'The abandoned anvil is cold; its surface is scarred by a thousand unfinished blades.'});
       let artifactSpot=(cm[y0+14]?.[x0+22]==='marble')?{x:x0+22,y:y0+14}:null;
       if(!artifactSpot) for(let yy=minY+2;yy<maxY-1&&!artifactSpot;yy++) for(let xx=minX+2;xx<maxX-1&&!artifactSpot;xx++) if(cm[yy][xx]==='marble') artifactSpot={x:xx,y:yy};
       if(artifactSpot) groundItems.push({x:artifactSpot.x,y:artifactSpot.y,kind:'chest',tier:5,artifactGuaranteed:true,opened:false,level:-1,caveIndex:dwarvenRuin.caveIndex});
+      let deepSpot=null;
+      for(let xx=maxX-4;xx>=minX+3&&!deepSpot;xx--) for(let yy=minY+3;yy<=maxY-3&&!deepSpot;yy++) if(cm[yy][xx]==='marble') deepSpot={x:xx,y:yy};
+      if(deepSpot){
+        groundItems.push({x:deepSpot.x,y:deepSpot.y,kind:'wheelbarrow',level:-1,caveIndex:dwarvenRuin.caveIndex,description:'You see a wheelbarrow. This thing has not been used in years. The craftsmanship, however, is of the highest quality and unknown material. It appears to be surprisingly light - you can pick it up if you want to. Though you\'re not sure why you would need it.'});
+        if(cm[deepSpot.y][deepSpot.x-1]==='marble') groundItems.push({x:deepSpot.x-1,y:deepSpot.y,kind:'goldcoin',level:-1,caveIndex:dwarvenRuin.caveIndex,description:'You see a single, enormous gold coin. A skeleton lies crushed beneath it, its bones flattened under the weight. Poor greedy soul.'});
+      }
       for(let i=0;i<9;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='dwarvenrubble') groundItems.push({x,y,kind:'dwarvenremains',looted:false,level:-1,caveIndex:dwarvenRuin.caveIndex,description:'The bones are laid where the collapse caught them.'}); }
     }
     // Carves a random-walk blob of `floorTile` into a blank local cave map
@@ -2279,6 +2285,7 @@ that means creating game asks for a name and choosing avatar
       if(player.speedPotionTurns > 0) s += 3;
       s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0;
       s += curseDebuffSum('spd');
+      if(player.inventory.some(i=>i.kind==='bigbell')) s -= 5;
       return Math.max(1, s);
     }
     function playerGrace(){
@@ -3563,6 +3570,21 @@ that means creating game asks for a name and choosing avatar
       draw();
     }
     function lootSkeletonOrForage(){
+      if(map[player.y]?.[player.x]==='bigbell'){
+        const bar=player.inventory.find(i=>i.kind==='wheelbarrow');
+        if(!bar){ log('The enormous bell is far too heavy to move by hand.', 'info'); return; }
+        player.inventory.push({kind:'bigbell',name:'Enormous Brass Bell',description:'The bell is impossibly heavy, but the unknown-alloy wheelbarrow bears its weight.'});
+        map[player.y][player.x]=tileUnderlays[keyXY(player.x,player.y)] || 'hill';
+        bigBellPos=null;
+        log('With considerable effort, you hoist the enormous bell onto the wheelbarrow. Somehow, it holds. Pushing it will be slow, but possible.', 'loot');
+        updateHud(); draw(); return;
+      }
+      const wheelbarrow = groundItems.find(g=>onCurrentLevel(g) && g.kind==='wheelbarrow' && g.x===player.x && g.y===player.y);
+      if(wheelbarrow){
+        player.inventory.push({kind:'wheelbarrow',name:'Unknown-Alloy Wheelbarrow',description:wheelbarrow.description});
+        groundItems.splice(groundItems.indexOf(wheelbarrow),1);
+        log('You pick up the surprisingly light wheelbarrow.', 'loot'); draw(); return;
+      }
       const skeleton = groundItems.find(g=>onCurrentLevel(g) && g.kind==='skeleton' && g.x===player.x && g.y===player.y);
       if(skeleton){
         if(skeleton.looted){ log('The skeleton has already been searched.', 'info'); return; }
@@ -3903,6 +3925,7 @@ that means creating game asks for a name and choosing avatar
       dwarvenstatue:"a ruined Dwarven sentinel, still watching the dark",
       dwarvenwall:"a hewn Dwarven wall, scarred by collapse and time",
       dwarvenrubble:"a dangerous heap of fallen masonry",
+      dwarvenstatue:"an ancient stone column. It seems to have outlived everyone who built it. The column depicts proud dwarven warrior carved in stone, forever standing guard",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
@@ -3922,6 +3945,8 @@ that means creating game asks for a name and choosing avatar
         log(`Abandoned Dwarven remains. ${currentGround.description}`, 'info');
       } else if(currentGround && (currentGround.kind==='dwarvenremains' || currentGround.kind==='anvil')){
         log(`${currentGround.kind==='anvil' ? 'An abandoned Dwarven anvil' : 'Dwarven remains'}. ${currentGround.description}`, 'info');
+      } else if(currentGround && (currentGround.kind==='wheelbarrow' || currentGround.kind==='goldcoin')){
+        log(currentGround.description, 'info');
       }
 
       const notes = {};
@@ -3993,6 +4018,7 @@ that means creating game asks for a name and choosing avatar
                   t === 'mountain' ||
                   t === 'cavewall' ||
                   t === 'dwarvenwall' ||
+                  t === 'dwarvenstatue' ||
                   t === 'boulder' ||
                   t === 'water' ||
                   t === 'village'
@@ -4098,6 +4124,8 @@ that means creating game asks for a name and choosing avatar
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
       if(g.kind==='campfire') return {ch:'*', color:'#e8a24f'};
       if(g.kind==='skeleton') return {ch:'╶☠╴', color:g.looted ? '#777' : '#d0d0c0'};
+      if(g.kind==='wheelbarrow') return {ch:'▱', color:'#b8b8b8'};
+      if(g.kind==='goldcoin') return {ch:'●', color:'#f0c84b'};
       if(g.kind==='dwarvenremains') return {ch:'🦴', color:'#d0c7b4'};
       if(g.kind==='anvil') return {ch:'♠', color:'#9d9d9d'};
       if(g.kind==='potion') return {ch:'!', color:'#e0473f'};
@@ -4296,6 +4324,8 @@ that means creating game asks for a name and choosing avatar
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='campfire') drawTile(vx,vy,'*', '#e8a24f', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='skeleton') drawTile(vx,vy,'╶☠╴', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='wheelbarrow') drawTile(vx,vy,'▱', '#b8b8b8', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='goldcoin') drawTile(vx,vy,'●', '#f0c84b', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='dwarvenremains') drawTile(vx,vy,'🦴', '#d0c7b4', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='anvil') drawTile(vx,vy,'♠', '#9d9d9d', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='ruinprop') drawTile(vx,vy,'†', '#a89270', tileBackground(g.x,g.y,map[g.y][g.x]));
@@ -5082,6 +5112,10 @@ that means creating game asks for a name and choosing avatar
         } else if(it.kind==='idscroll'){
           // No standalone action - it's consumed automatically via the "?"
           // identify button on an unidentified artifact.
+        } else if(it.kind==='wheelbarrow'){
+          const btn=document.createElement('button'); btn.textContent='?'; btn.title='Inspect wheelbarrow';
+          btn.onclick=()=>log('Small wheelbarrow made of an unknown alloy. Surprisingly light and durable.', 'info');
+          row.appendChild(btn);
         } else if(it.kind==='tombstone'){
           const btn = document.createElement('button');
           btn.textContent = 'Read';
