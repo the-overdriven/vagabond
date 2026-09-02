@@ -834,6 +834,11 @@ that means creating game asks for a name and choosing avatar
       cavefloor2: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
       cavedown:  {ch:'v', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
       caveup:    {ch:'^', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
+      marble:    {ch:'=', color:'#c8c2b4', bg:'#302d2a', walk:true},
+      dwarvengate:{ch:'Ω', color:'#e8b85b', bg:'#241b12', walk:true},
+      dwarvenstatue:{ch:'♜', color:'#817769', bg:'#171514', walk:false},
+      dwarvenwall:{ch:'▓', color:'#756b60', bg:'#151311', walk:false},
+      dwarvenrubble:{ch:'░', color:'#62574c', bg:'#201b17', walk:true},
       temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
       boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
       // A single lore landmark hidden in the mountains: a monolithic black
@@ -850,13 +855,13 @@ that means creating game asks for a name and choosing avatar
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
     // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
     // level never means adding another transition tile type.
-    const CAVE_TRANSITION_TILES = new Set(['caveentrance','cavedown','caveup']);
+    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup']);
 
     function makeNoise(cellsX, cellsY){
       const grid = [];
@@ -917,21 +922,59 @@ that means creating game asks for a name and choosing avatar
       const level = entity.level || 0;
       return level === 0 ? currentZ === 0 : currentZ === level;
     }
+    const DWARVEN_RUIN_ENTRANCES = [
+      'The gates gape open. No voices come from within. A foul stench drifts out, carrying the scent of rot.',
+      'The settlement lies eerily silent beyond the gates. The wind carries a stench of decay.',
+      'You stand before the open gates. There are no guards, no lights, no movement. Only the stink of death wafting from within.',
+      'The gates stand open, but the settlement beyond is deathly still. Bones litter the streets, half-hidden beneath the dust.',
+      'Something is terribly wrong. The settlement is abandoned, its gates hanging open and its streets strewn with bones.',
+      'A putrid stench seeps through the open gates. Beyond them, an empty settlement waits in absolute silence.',
+      'The entrance stands unguarded. No hearth-fire burns within. You can smell the rot from here.',
+      'The road into the settlement is littered with bones. Whatever happened here, it left no one to close the gates.',
+      'The gates are open. The corridors inside are empty. Even from here, you can smell something long dead.',
+      'You see no movement beyond the gates. Only bones scattered across the ground.',
+      'The gates yawn open into darkness. No forge burns within. An unnatural silence hangs beyond them, thick with the stench of decay.',
+      'Darkness swallows the fort beyond the entrance. Not a single forge glows. From within comes only a silence that feels wrong.',
+      'The entrance lies open before you. Beyond it, darkness and absolute silence. The air carries the faint, sickening smell of rot.',
+      'No light escapes the gates. The darkness within is complete, and the silence so deep you can almost hear your own heartbeat.',
+      'The fort lies dark and silent beyond the gates. A foul stench seeps from within, carrying the unmistakable scent of death.',
+      'The open gates reveal nothing but darkness. No voices. No hammers. No forge-fire. Only the stale smell of something long dead.',
+      'Something has silenced the fort. Its gates stand open, its halls swallowed by darkness, and not a sound stirs beyond.',
+      'You stand before the open gates. Darkness fills the fort beyond. The silence is absolute - and the air reeks of decay.'
+    ];
+    function restoreCaveEntrancesOnSurface(){
+      if(!surfaceMap || !Array.isArray(caves)) return;
+      for(const cave of caves) for(const e of (cave.entrances||[])){
+        if(surfaceMap[e.y]?.[e.x] && surfaceMap[e.y][e.x]!=='dwarvengate') surfaceMap[e.y][e.x]='caveentrance';
+      }
+    }
     function enterCave(){
       const tile = map[player.y] && map[player.y][player.x];
       if(currentZ===0){
-        if(tile !== 'caveentrance') return false;
+        if(tile !== 'caveentrance' && tile !== 'dwarvengate') return false;
         const cave = caves.findIndex(c=>c.entrances.some(e=>e.x===player.x && e.y===player.y));
         if(cave < 0) return false;
         currentCave = cave; currentZ = -1;
         map = depthUndergroundMap(1); undergroundDiscovered = depthUndergroundDiscovered(1);
-        log('You descend into the cave.', 'info');
-      } else if(tile === 'caveentrance'){
+        if(tile==='dwarvengate') log(pick(DWARVEN_RUIN_ENTRANCES), 'info');
+        else log('You descend into the cave.', 'info');
+      } else if(tile === 'caveentrance' || tile === 'dwarvengate'){
         // Only the true top-level ascent (z:-1 -> surface) is "back to the
         // surface" - every deeper ascent uses 'caveup' below instead.
+        // Re-stamp the return tile before switching maps. This makes the
+        // surface exit self-healing even for older saves that stored a
+        // mountain tile at the cave's declared entrance.
+        const returnCave = caves[currentCave];
+        const returnEntrance = (returnCave && returnCave.entrances.find(e=>e.x===player.x && e.y===player.y)) ||
+                caves.flatMap(c=>c.entrances||[]).find(e=>e.x===player.x && e.y===player.y);
+        if(returnEntrance && surfaceMap[returnEntrance.y]){
+          if(surfaceMap[returnEntrance.y][returnEntrance.x] !== 'dwarvengate') surfaceMap[returnEntrance.y][returnEntrance.x] = 'caveentrance';
+        }
+        restoreCaveEntrancesOnSurface();
         map = surfaceMap; currentZ = 0;
         currentCave = -1;
-        log('You climb back out into the mountain air.', 'info');
+        if(tile==='dwarvengate') log('You climb back through the open gates into the mountain air. The silence of the dead settlement fades behind you.', 'info');
+        else log('You climb back out into the mountain air.', 'info');
       } else if(tile === 'cavedown'){
         const depth = -currentZ, nextDepth = depth+1;
         const nextMap = depthUndergroundMap(nextDepth);
@@ -1216,7 +1259,7 @@ that means creating game asks for a name and choosing avatar
         }
         console.warn(`Discarding world ${attempt}: the Temple has no walkable route to a map edge. Generating a new world.`);
       }
-      surfaceMap = map;
+      surfaceMap = map.map(row=>row.slice());
       generateCaves();
     }
 
@@ -1318,12 +1361,57 @@ that means creating game asks for a name and choosing avatar
           }
         }
       }
+      buildDwarvenRuin();
       // z:-2: about half of the z:-1 caves get a stairway down into their own
       // small deeper cave, sharing one map with every other z:-2 cave (same
       // pattern as z:-1 sharing undergroundMap). Written generically so a
       // future z:-3 is just another generateDeepLevel() call.
       deepLevels = [generateDeepLevel(caves, caveMaps, undergroundMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')];
       undergroundDiscovered = undergroundDiscoveredL1;
+    }
+
+    // A constructed ruin deliberately occupies a broad, two-screen footprint.
+    // The same world coordinates are used on the surface and below, keeping the
+    // gate's descent intuitive and making the layout persist in saves.
+    let dwarvenRuin = null;
+    function buildDwarvenRuin(){
+      const candidates=[];
+      for(let y=8;y<MAP_H-8;y++) for(let x=8;x<MAP_W-8;x++){
+        if(map[y][x]!=='mountain' && map[y][x]!=='snowmountain') continue;
+        if(DIRS8.some(([dx,dy])=>TILE[map[y+dy]?.[x+dx]]?.walk)) candidates.push({x,y});
+      }
+      if(!candidates.length) return;
+      const gate=pick(candidates), x0=gate.x, y0=gate.y;
+      map[y0][x0]='dwarvengate';
+      if(x0>0) map[y0][x0-1]='dwarvenstatue';
+      if(x0<MAP_W-1) map[y0][x0+1]='dwarvenstatue';
+      if(surfaceMap){ surfaceMap[y0][x0]='dwarvengate'; if(x0>0) surfaceMap[y0][x0-1]='dwarvenstatue'; if(x0<MAP_W-1) surfaceMap[y0][x0+1]='dwarvenstatue'; }
+      const cm=blankCaveMap(), minX=Math.max(2,x0-34), maxX=Math.min(MAP_W-3,x0+34), minY=Math.max(2,y0-24), maxY=Math.min(MAP_H-3,y0+24);
+      // Corridors and chambers: mostly 2-3 tiles wide, with long runs between
+      // a handful of larger rooms so this reads as a settlement, not a clearing.
+      const carve=(x,y)=>{ if(x>=minX&&x<=maxX&&y>=minY&&y<=maxY) cm[y][x]='marble'; };
+      for(let y=minY+2;y<=maxY-2;y++) for(let x=minX+2;x<=maxX-2;x++){
+        if((x%19<3)||(y%17<3)||((x- x0)*(x-x0)+(y-y0)*(y-y0)<90)) carve(x,y);
+      }
+      [[x0-22,y0-15,15,11],[x0+18,y0-14,18,13],[x0-18,y0+13,20,10],[x0+20,y0+14,16,11]].forEach(([cx,cy,w,h])=>{
+        for(let y=cy;y<cy+h;y++) for(let x=cx;x<cx+w;x++) carve(x,y);
+      });
+      for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) if(cm[y][x]==='cavewall' && DIRS8.some(([dx,dy])=>cm[y+dy]?.[x+dx]==='marble')) cm[y][x]='dwarvenwall';
+      cm[y0][x0]='dwarvengate';
+      // Break the clean grid with collapses and missing flooring.
+      for(let i=0;i<70;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') cm[y][x]=chance(.65)?'dwarvenrubble':'dwarvenwall'; }
+      caveMaps.push(cm); caves.push({x:x0,y:y0,entrances:[{x:x0,y:y0}]});
+      for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) if(cm[y][x]!=='cavewall' && undergroundMap[y][x]==='cavewall') undergroundMap[y][x]=cm[y][x];
+      undergroundMap[y0][x0]='dwarvengate';
+      dwarvenRuin={x:x0,y:y0,caveIndex:caveMaps.length-1};
+      const ghost=ENEMY_TEMPLATES.find(t=>t.name==='Ghost');
+      if(ghost){ for(let i=0;i<3;i++){ let gx=x0+randInt(-25,25), gy=y0+randInt(-18,18); if(cm[gy]?.[gx]==='marble'){ enemies.push({name:'Ghost',baseName:'Ghost',tier:ghost.tier||2,level:-1,caveIndex:dwarvenRuin.caveIndex,hp:ghost.hp,maxHp:ghost.hp,atk:ghost.atk,def:ghost.def,spd:ghost.spd,fly:true,humanoid:false,evades:true,aggro:ghost.aggro??AGGRO_RANGE,x:gx,y:gy,homeX:gx,homeY:gy,homeTileType:'marble',alive:true,prefix:null,equipment:null}); } } }
+      for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:-1,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of iron ale.','A workbench collapsed under its own tools.','A Dwarven lintel bears a name worn smooth by generations.'])}); }
+      const anvilSpot={x:x0+5,y:y0+2}; if(cm[anvilSpot.y]?.[anvilSpot.x]==='marble') groundItems.push({x:anvilSpot.x,y:anvilSpot.y,kind:'anvil',level:-1,caveIndex:dwarvenRuin.caveIndex,description:'The abandoned anvil is cold; its surface is scarred by a thousand unfinished blades.'});
+      let artifactSpot=(cm[y0+14]?.[x0+22]==='marble')?{x:x0+22,y:y0+14}:null;
+      if(!artifactSpot) for(let yy=minY+2;yy<maxY-1&&!artifactSpot;yy++) for(let xx=minX+2;xx<maxX-1&&!artifactSpot;xx++) if(cm[yy][xx]==='marble') artifactSpot={x:xx,y:yy};
+      if(artifactSpot) groundItems.push({x:artifactSpot.x,y:artifactSpot.y,kind:'chest',tier:5,artifactGuaranteed:true,opened:false,level:-1,caveIndex:dwarvenRuin.caveIndex});
+      for(let i=0;i<9;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='dwarvenrubble') groundItems.push({x,y,kind:'dwarvenremains',looted:false,level:-1,caveIndex:dwarvenRuin.caveIndex,description:'The bones are laid where the collapse caught them.'}); }
     }
     // Carves a random-walk blob of `floorTile` into a blank local cave map
     // `cm`, starting from `spot` - the same technique generateCaves() uses
@@ -3518,6 +3606,12 @@ that means creating game asks for a name and choosing avatar
           const mf = playerMf();
           const chestTier = Math.max(1, g.tier);
 
+          if(g.artifactGuaranteed){
+            const art=makeArtifactItem(chestTier); player.inventory.push(art);
+            lastLootResult=`${artifactDisplayName(art)}.`;
+            if(!suppressLootLog) log(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, 'loot');
+            spawnPickupAnim(g); groundItems.splice(i,1); continue;
+          }
           const roll = rng() * 103;
 
           if(roll < 45){
@@ -3567,7 +3661,7 @@ that means creating game asks for a name and choosing avatar
 
           spawnPickupAnim(g);
           groundItems.splice(i, 1);
-        } else if(g.kind==='skeleton' || g.kind==='campfire'){
+        } else if(g.kind==='skeleton' || g.kind==='dwarvenremains' || g.kind==='anvil' || g.kind==='campfire'){
           continue;
         } else if(g.kind==='potion'){
           addPotion();
@@ -3754,7 +3848,11 @@ that means creating game asks for a name and choosing avatar
         }
         if(CAVE_TRANSITION_TILES.has(map[ny][nx])){
           const onto = map[ny][nx];
-          if(onto === 'caveentrance'){
+          if(onto === 'dwarvengate'){
+            log(currentZ===0
+                    ? 'You stand beneath the open Dwarven gates. Press "inspect" to enter the settlement.'
+                    : 'You stand at the Dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
+          } else if(onto === 'caveentrance'){
             log(currentZ===0
                     ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
                     : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
@@ -3816,6 +3914,11 @@ that means creating game asks for a name and choosing avatar
       belltower:"the Temple's bell tower - the bell itself seems to be missing",
       grave:"a lone grave, it is not finished and has no inscription",
       bigbell:"a big brass bell, far too heavy to carry",
+      marble:"cracked marble flooring, stained by dust and old ash",
+      dwarvengate:"the sealed Dwarven gate, its lintel carved with a broken crown",
+      dwarvenstatue:"a ruined Dwarven sentinel, still watching the dark",
+      dwarvenwall:"a hewn Dwarven wall, scarred by collapse and time",
+      dwarvenrubble:"a dangerous heap of fallen masonry",
     };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
@@ -3831,6 +3934,10 @@ that means creating game asks for a name and choosing avatar
         log(`Skeleton${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info');
       } else if(currentGround && currentGround.kind==='campfire'){
         log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info');
+      } else if(currentGround && currentGround.kind==='ruinprop'){
+        log(`Abandoned Dwarven remains. ${currentGround.description}`, 'info');
+      } else if(currentGround && (currentGround.kind==='dwarvenremains' || currentGround.kind==='anvil')){
+        log(`${currentGround.kind==='anvil' ? 'An abandoned Dwarven anvil' : 'Dwarven remains'}. ${currentGround.description}`, 'info');
       }
 
       const notes = {};
@@ -3901,6 +4008,7 @@ that means creating game asks for a name and choosing avatar
           if (
                   t === 'mountain' ||
                   t === 'cavewall' ||
+                  t === 'dwarvenwall' ||
                   t === 'boulder' ||
                   t === 'water' ||
                   t === 'village'
@@ -4006,6 +4114,8 @@ that means creating game asks for a name and choosing avatar
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
       if(g.kind==='campfire') return {ch:'*', color:'#e8a24f'};
       if(g.kind==='skeleton') return {ch:'╶☠╴', color:g.looted ? '#777' : '#d0d0c0'};
+      if(g.kind==='dwarvenremains') return {ch:'🦴', color:'#d0c7b4'};
+      if(g.kind==='anvil') return {ch:'♠', color:'#9d9d9d'};
       if(g.kind==='potion') return {ch:'!', color:'#e0473f'};
       if(g.kind==='speedpotion') return {ch:'!', color:'#59b8ff'};
       if(g.kind==='scroll') return {ch:'?', color:'#b565d6'};
@@ -4202,6 +4312,9 @@ that means creating game asks for a name and choosing avatar
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='campfire') drawTile(vx,vy,'*', '#e8a24f', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='skeleton') drawTile(vx,vy,'╶☠╴', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='dwarvenremains') drawTile(vx,vy,'🦴', '#d0c7b4', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='anvil') drawTile(vx,vy,'♠', '#9d9d9d', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='ruinprop') drawTile(vx,vy,'†', '#a89270', tileBackground(g.x,g.y,map[g.y][g.x]));
       }
       // fx animations: symbol bumps up/down, shrinks, and fades out
       if(fxAnims.length){
@@ -4695,6 +4808,10 @@ that means creating game asks for a name and choosing avatar
             if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2*zoom, cy-2*zoom, 4*zoom, 4*zoom);
           }
         }
+        if(currentZ===0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]){
+          const tx=(dwarvenRuin.x-ox)*scale*zoom+scale*zoom/2, ty=(dwarvenRuin.y-oy)*scale*zoom+scale*zoom/2;
+          ctx.fillStyle='#e8b85b'; ctx.font=`${Math.max(12,scale*5)*zoom}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('♜',tx,ty);
+        }
         if(currentZ===0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]){
           const tx = (spawnPoint.x-ox)*scale*zoom + scale*zoom/2;
           const ty = (spawnPoint.y-oy)*scale*zoom + scale*zoom/2;
@@ -4724,6 +4841,10 @@ that means creating game asks for a name and choosing avatar
           const cy = (entrance.y-oy)*scale + scale/2;
           if(cx>=0 && cy>=0 && cx<w && cy<h) ctx.fillRect(cx-2, cy-2, 4, 4);
         }
+      }
+      if(currentZ===0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]){
+        const tx=(dwarvenRuin.x-ox)*scale+scale/2, ty=(dwarvenRuin.y-oy)*scale+scale/2;
+        ctx.fillStyle='#e8b85b'; ctx.font=`${Math.max(12,scale*5)}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('♜',tx,ty);
       }
       const dot = Math.max(2, scale+2);
       if(currentZ===0){
@@ -5343,6 +5464,7 @@ that means creating game asks for a name and choosing avatar
 
     function saveGame(){
       try{
+        restoreCaveEntrancesOnSurface();
         const data = buildSaveObject();
         const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
         const url = URL.createObjectURL(blob);
@@ -5374,6 +5496,10 @@ that means creating game asks for a name and choosing avatar
       });
       if(decoded.length !== MAP_H) throw new Error('Save file map height does not match.');
       surfaceMap = decoded;
+      dwarvenRuin = null;
+      for(let y=0;y<MAP_H && !dwarvenRuin;y++) for(let x=0;x<MAP_W;x++){
+        if(surfaceMap[y][x]==='dwarvengate') { dwarvenRuin={x,y,caveIndex:-1}; break; }
+      }
       tileUnderlays = (data.tileUnderlays && typeof data.tileUnderlays === 'object')
               ? Object.assign({}, data.tileUnderlays) : {};
       // Saves from before v8 did not record the transparent tile's base terrain.
@@ -5404,12 +5530,25 @@ that means creating game asks for a name and choosing avatar
                 ? c.entrances
                 : [{x:c.x,y:c.y}],
       }));
+      if(dwarvenRuin) dwarvenRuin.caveIndex=caves.findIndex(c=>c.entrances.some(e=>e.x===dwarvenRuin.x&&e.y===dwarvenRuin.y));
+      // The surface map is the authoritative return destination. Older saves
+      // (and saves made while a cave map was active) could lose the entrance
+      // glyph when switching back to the surface, leaving only the mountain
+      // tile beside the player. Restore every declared entrance at its exact
+      // coordinate; preserve the special Dwarven gate if present.
+      for(const cave of caves){
+        for(const entrance of cave.entrances){
+          if(surfaceMap[entrance.y] && surfaceMap[entrance.y][entrance.x] !== 'dwarvengate'){
+            surfaceMap[entrance.y][entrance.x] = 'caveentrance';
+          }
+        }
+      }
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
       for(let i=0;i<caveMaps.length;i++){
         const entrances = caves[i] && caves[i].entrances ? caves[i].entrances : [];
         for(const entrance of entrances){
           if(caveMaps[i][entrance.y] && caveMaps[i][entrance.y][entrance.x] !== undefined){
-            caveMaps[i][entrance.y][entrance.x] = 'caveentrance';
+            caveMaps[i][entrance.y][entrance.x] = surfaceMap[entrance.y]?.[entrance.x]==='dwarvengate' ? 'dwarvengate' : 'caveentrance';
           }
         }
       }
@@ -5425,7 +5564,7 @@ that means creating game asks for a name and choosing avatar
       for(const cave of caves){
         for(const entrance of cave.entrances || []){
           if(undergroundMap[entrance.y] && undergroundMap[entrance.y][entrance.x] !== undefined){
-            undergroundMap[entrance.y][entrance.x] = 'caveentrance';
+            undergroundMap[entrance.y][entrance.x] = surfaceMap[entrance.y]?.[entrance.x]==='dwarvengate' ? 'dwarvengate' : 'caveentrance';
           }
         }
       }
@@ -5575,6 +5714,15 @@ that means creating game asks for a name and choosing avatar
         if(!item.description && item.kind==='skeleton') item.description = pick(SKELETON_INSPECTIONS);
         return item;
       });
+      if(dwarvenRuin && dwarvenRuin.caveIndex>=0){
+        const chest=groundItems.find(g=>g.kind==='chest' && g.level===-1 && g.caveIndex===dwarvenRuin.caveIndex && !g.opened);
+        if(chest) chest.artifactGuaranteed=true;
+        if(!chest){
+          const cm=caveMaps[dwarvenRuin.caveIndex], spot=[];
+          if(cm) for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(cm[y][x]==='marble') spot.push({x,y});
+          if(spot.length){ const p=spot[Math.floor(spot.length/2)]; groundItems.push({x:p.x,y:p.y,kind:'chest',tier:5,artifactGuaranteed:true,opened:false,level:-1,caveIndex:dwarvenRuin.caveIndex}); }
+        }
+      }
 
       toggleInv(false);
       toggleMap(false);
@@ -5763,7 +5911,25 @@ that means creating game asks for a name and choosing avatar
       if(k==='Escape'){ toggleInv(false); toggleMap(false); toggleTrade(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
-      if(k==='g' || k==='G'){ player.baseAtk = 50; player.baseDef = 50; player.gold = 500; updateHud(); log('You feel suddenly, suspiciously powerful.', 'good'); return; }
+      if(k==='g' || k==='G'){
+        // God mode also reveals every generated level, including the shared
+        // cave layer and any deeper maps, so the minimap never hides content.
+        const reveal = grid => { if(grid) for(const row of grid) row.fill(true); };
+        reveal(discovered);
+        reveal(undergroundDiscoveredL1);
+        for(const level of deepLevels) reveal(level.discovered);
+        player.baseAtk = 50;
+        player.baseDef = 50;
+        player.baseSpd = 50;
+        player.baseMf = 25;
+        player.gold = 500;
+        // The minimap is cached for performance; filling the discovery grids
+        // alone leaves the old fog-painted pixels in those canvases.
+        rebuildMinimapBases();
+        updateHud(); render();
+        log('God mode: every map revealed. SPD 50. MF 25.', 'good');
+        return;
+      }
       if(mapOpen || invOpen || tradeOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); inspect(); return; }
       if(k==='f' || k==='F'){ ev.preventDefault(); lootSkeletonOrForage(); return; }
