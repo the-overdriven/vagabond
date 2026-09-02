@@ -3,7 +3,7 @@
 - grave glyph tile still does not have transparent background. if it's on a hill, it should have hill background
 - taiga trees were supposed to have transparent background as well. they also have no flavor text when inspecting them (when standing on them), it only shows "you are standing on unfamiliar ground"
 - also attempting to forage in taiga biome, shouldn't work and log should say "The snow-choked taiga yields no food. Only frozen roots and dead needles."
-
+- add freezing in taiga? depends on y level. it should feel unhospitable
 
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
@@ -2244,7 +2244,7 @@ that means creating game asks for a name and choosing avatar
       const race = raceDef();
       return (race && race.grace) || 0;
     }
-    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, river:-2, water:-2};
+    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, taiga:-1, river:-2, water:-2};
     const TERRAIN_DEFENSE = {hill:1};
     function enemyHomeTileType(e){
       if(e && e.homeTileType) return e.homeTileType;
@@ -3068,6 +3068,12 @@ that means creating game asks for a name and choosing avatar
         if(!deathTransition) return;
         const elapsed = now - deathTransition.start;
         if(deathTransition.phase === 'out' && elapsed >= deathTransition.duration){
+          // Death always returns the player to the Temple on the surface, even
+          // if death occurred in a cave or deeper underground level.
+          currentZ = 0;
+          currentCave = -1;
+          map = surfaceMap;
+          undergroundDiscovered = undergroundDiscoveredL1;
           player.x = spawnPoint.x; player.y = spawnPoint.y;
           player.hp = playerMaxHp();
           snapCameraToPlayer();
