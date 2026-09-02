@@ -2265,6 +2265,7 @@ that means creating game asks for a name and choosing avatar
       {key:'GRACE', get:()=>playerGrace()},
       {key:'MF',    get:()=>playerMf()},
       {key:'HP',    get:()=>playerMaxHp()},
+      {key:'XP',    get:()=>Math.round((xpMultiplier()-1)*100)},
     ];
     function statSnapshot(){
       const snap = {};
@@ -2273,11 +2274,16 @@ that means creating game asks for a name and choosing avatar
     }
     function statDeltaText(before){
       const parts = [];
-      for(const s of TRACKED_STATS){
-        const delta = s.get() - before[s.key];
-        if(delta) parts.push((delta > 0 ? '+' : '') + delta + ' ' + s.key);
-      }
-      return parts.length ? ' (' + parts.join(', ') + ')' : ' (no stat change)';
+        for(const s of TRACKED_STATS){
+            const delta = s.get() - before[s.key];
+            if(!delta) continue;
+            if(s.key === 'XP'){
+                parts.push((delta > 0 ? '+' : '') + delta + '% XP BONUS');
+            } else {
+                parts.push((delta > 0 ? '+' : '') + delta + ' ' + s.key);
+            }
+        }
+        return parts.length ? ' (' + parts.join(', ') + ')' : ' (no stat change)';
     }
 
     function xpMultiplier(){
