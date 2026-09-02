@@ -1007,15 +1007,7 @@ that means creating game asks for a name and choosing avatar
           if(e < 0.24) t='water';
           else if(e < 0.29) t='sand';
           else if(e < 0.58){
-            // Forest thins sharply toward the north. Normal forest belongs to the
-            // temperate band; the snowy north should be taiga/snow, not ordinary
-            // woodland. The gradual latitude penalty still allows an occasional
-            // forest tile right at the southern edge of the snow country.
-            const northness = y / Math.max(1, MAP_H - 1);
-            const forestChance = northness > 0.18
-                    ? Math.max(0.08, 1 - (northness - 0.18) / 0.14)
-                    : 1;
-            if(m > 0.55 && rng() < forestChance) t='forest';
+            if(m > 0.55) t='forest';
             else t='grass';
           }           else if(e < 0.68) t='hill';
           else if(e < 0.86) t='mountain';
@@ -1047,29 +1039,6 @@ that means creating game asks for a name and choosing avatar
         }
       }
 
-      // At the southern edge of the snow biome, prevent normal forest from forming
-      // dense pockets against snow/taiga. Isolated trees can still survive beside
-      // the snow line, but the farther north we go, the less common they become.
-      const FOREST_NORTH_TRANSITION = Math.round(MAP_H * 0.10);
-      for(let y=SNOW_BAND; y<Math.min(MAP_H, SNOW_BAND + FOREST_NORTH_TRANSITION); y++){
-        const northFade = (y - SNOW_BAND + 1) / FOREST_NORTH_TRANSITION;
-        for(let x=0;x<MAP_W;x++){
-          if(map[y][x] !== 'forest') continue;
-          let coldNeighbors = 0;
-          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
-            if(dx===0 && dy===0) continue;
-            const nx=x+dx, ny=y+dy;
-            if(nx<0 || ny<0 || nx>=MAP_W || ny>=MAP_H) continue;
-            const nt = map[ny][nx];
-            if(nt==='snow' || nt==='taiga' || nt==='snowmountain') coldNeighbors++;
-          }
-          const denseCold = coldNeighbors >= 3;
-          const forestKeepChance = denseCold
-                  ? Math.max(0.02, 0.16 * (1 - northFade))
-                  : Math.max(0.10, 0.70 * (1 - northFade));
-          if(rng() > forestKeepChance) map[y][x] = 'grass';
-        }
-      }
       for(let y=0;y<SNOW_BAND;y++){
         for(let x=0;x<MAP_W;x++){
           if(map[y][x]==='snow' && chance(0.035)) map[y][x] = 'snowmountain';
@@ -1637,10 +1606,20 @@ that means creating game asks for a name and choosing avatar
       for(let y=2; y<MAP_H-size-2; y++){
         for(let x=2; x<MAP_W-size-2; x++) consider(x,y);
       }
-      // Require at least 70% existing forest before converting the footprint.
-      if(!best || bestScore < size*size*0.7) return;
+      // Ancient forest is a special landmark, so don't make its existence depend
+      // on finding an unusually dense 10x10 patch of ordinary forest. Recent terrain
+      // balancing can legitimately produce thinner woods, which used to make this
+      // function silently fail and left Old Hunter with no dialogue.
+      // Require a modest forest presence, then let the ancient wood reclaim the
+      // remaining suitable temperate ground in the footprint.
+      const minForest = Math.max(18, Math.floor(size*size*0.22));
+      if(!best || bestScore < minForest) return;
       for(let dy=0; dy<size; dy++){
-        for(let dx=0; dx<size; dx++) map[best.y+dy][best.x+dx] = 'ancientForest';
+        for(let dx=0; dx<size; dx++){
+          const x = best.x+dx, y = best.y+dy;
+          const tile = map[y][x];
+          if(tile==='forest' || tile==='grass') map[y][x] = 'ancientForest';
+        }
       }
 
       // Keep the guaranteed 10x10 core, then grow unevenly through adjacent
@@ -2662,6 +2641,7 @@ that means creating game asks for a name and choosing avatar
       if(tmpl.name === "Old Hunter"){
         const dir = ancientForestDirectionFromSpawn();
         if(dir) lines.push(`Do not enter the ancient forest in the ${dir} after midnight.`);
+        else lines.push('The old hunter watches the tree line in silence.');
       }
       if(tmpl.name === "Drunk"){
         const dir = bellDirectionFromSpawn();
