@@ -1806,7 +1806,7 @@ That last one especially feels like Vagabond.
       ensureArtifactOwnerLore(it);
       log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good');
       log(it.description, 'loot');
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function ensureArtifactOwnerLore(it){
       if(!it || it.kind!=='artifact' || !it.possessor) return;
@@ -5316,7 +5316,7 @@ That last one especially feels like Vagabond.
       } else {
         log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
       }
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function unequipItem(slot){
       if(!['weapon','shield','armor'].includes(slot)) return;
@@ -5326,7 +5326,17 @@ That last one especially feels like Vagabond.
       player.equip[slot] = null;
       player.inventory.push(item);
       log(`You unequip the ${item.name}.${statDeltaText(before)}`, 'good');
-      updateHud(); renderInventory();
+      consumeItemTurn();
+    }
+    // Inventory actions are player actions: they advance the world once even
+    // though the inventory overlay remains open.
+    function consumeItemTurn(){
+      enemyTurn();
+      npcTurn();
+      updateHud();
+      render();
+      renderInventory();
+      updateTooltip();
     }
     function usePotion(idx){
       const it = player.inventory[idx];
@@ -5335,7 +5345,7 @@ That last one especially feels like Vagabond.
       if(it.count<=0) player.inventory.splice(idx,1);
       player.hp = playerMaxHp();
       log('You drink a Life Potion and feel fully restored.', 'good');
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function useScroll(idx){
       const it = player.inventory[idx];
@@ -5344,7 +5354,7 @@ That last one especially feels like Vagabond.
       if(it.count<=0) player.inventory.splice(idx,1);
       player.invisibleTurns = consumablePower(15);
       log('You read the Scroll of Invisibility. The shadows swallow you.', 'good');
-      updateHud(); renderInventory(); render();
+      consumeItemTurn();
     }
     function useTeleportScroll(idx){
       const it = player.inventory[idx];
@@ -5354,8 +5364,7 @@ That last one especially feels like Vagabond.
       log('You read the Scroll of Teleportation. Darkness swallows you - and the temple takes you back.', 'good');
       returnPlayerToTemple();
       toggleInv(false);
-      updateHud();
-      render();
+      consumeItemTurn();
     }
     function useSpeedPotion(idx){
       const it = player.inventory[idx];
@@ -5364,7 +5373,7 @@ That last one especially feels like Vagabond.
       if(it.count<=0) player.inventory.splice(idx,1);
       player.speedPotionTurns = consumablePower(15);
       log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good');
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function useHerb(idx){
       const it = player.inventory[idx];
@@ -5374,7 +5383,7 @@ That last one especially feels like Vagabond.
       const heal = consumablePower(Math.max(1, Math.round(playerMaxHp()*0.25)));
       player.hp = Math.min(playerMaxHp(), player.hp+heal);
       log(`You eat the Healing Herb and recover ${heal} HP.`, 'good');
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function useMushroom(idx){
       const it = player.inventory[idx];
@@ -5390,12 +5399,13 @@ That last one especially feels like Vagabond.
         player.hp = Math.max(1, player.hp-amt);
         log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad');
       }
-      updateHud(); renderInventory();
+      consumeItemTurn();
     }
     function readTombstone(idx){
       const it = player.inventory[idx];
       if(!it || it.kind!=='tombstone') return;
       log(`You read the inscription on the tombstone, it says "${it.inscription}"`, 'info');
+      consumeItemTurn();
     }
 // document.getElementById('useAllPotions').onclick = ()=>{
 //   const idx = player.inventory.findIndex(i=>i.kind==='potion');

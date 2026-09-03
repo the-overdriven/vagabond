@@ -335,7 +335,7 @@ canvas{display:block;cursor:pointer}
     max-height:none; flex:1 1 auto; min-height:0;
     /* The close bar is fixed over the bottom of the overlay. Keep enough
        scrollable space after the final row for it to move above that bar. */
-    padding-bottom:90px; box-sizing:border-box;
+    padding-bottom:140px; box-sizing:border-box;
   }
   body.overlay-open #logpanel{
     position:fixed; left:0; bottom:0; z-index:110;
