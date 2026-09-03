@@ -2896,14 +2896,12 @@ leveling is too quick and linear
       // code kept/commented for easy reinstatement rather than deleted.
       // player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
       maybeDropTombstone(e);
-      // T1 = 1.00%
-      // T2 = 1.75%
-      // T3 = 2.50%
-      // T4 = 3.25%
-      // T5 = 4.00%
-      // T6 = 4.75%
-      const artifactChance = (0.01 + (e.tier - 1) * 0.0075) * (1 + mf*0.05);
-      if(chance(Math.min(0.12, artifactChance))){
+      // Artifact drops are reduced to 40% of their former chance (60% rarer).
+      // Guaranteed artifact chests are intentionally unaffected.
+      const artifactDropRate = 0.4;
+      const artifactChance = artifactDropRate *
+        (0.01 + (e.tier - 1) * 0.0075) * (1 + mf*0.05);
+      if(chance(Math.min(0.12 * artifactDropRate, artifactChance))){
         const art = makeArtifactItem(e.tier, mf);
         if(art){
           log(`The ${e.name} dropped ${artifactDisplayName(art)}.`, 'loot');

@@ -1410,10 +1410,14 @@ Artifact drop chance by enemy tier:
 | 4 | 3.25% |
 | 5 | 4.00% |
 
+The actual enemy-drop chance is 40% of these base values, making artifacts
+60% rarer than the values shown above. Magic Find still modifies the reduced
+chance. Guaranteed artifact chests are unaffected.
+
 Artifact chance is capped at:
 
 ```text
-12%
+4.8%
 ```
 
 Artifact chance and quality (effect tier, curse odds) scale with Magic Find

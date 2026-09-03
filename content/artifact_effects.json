@@ -3,7 +3,7 @@
     "id": "warding_curse_def",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"def": [3, 8]},
+    "bonuses": {"def": [2, 5]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -11,7 +11,7 @@
     "id": "warding_curse_atk",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": [3, 8]},
+    "bonuses": {"atk": [2, 5]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -27,7 +27,7 @@
     "id": "greater_curse_def",
     "tier": 5,
     "namePattern": "named",
-    "bonuses": {"def": [4, 10]},
+    "bonuses": {"def": [2, 5]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -51,7 +51,7 @@
     "id": "deep_knowledge",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": [2, 8], "def": [2, 7]},
+    "bonuses": {"atk": [2, 5], "def": [2, 5]},
     "maxHpPct": -15,
     "flavor": "knowledge"
   },
@@ -59,7 +59,7 @@
     "id": "haunted_weapon_spirit",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"atk": [3, 8], "spd": [1, 4]},
+    "bonuses": {"atk": [2, 5], "spd": [1, 4]},
     "maxHpPct": 0,
     "flavor": "haunting"
   },
@@ -83,7 +83,7 @@
     "id": "guardians_favor",
     "tier": 4,
     "namePattern": "named",
-    "bonuses": {"def": [2, 8], "hp": [3, 10]},
+    "bonuses": {"def": [2, 5], "hp": [3, 10]},
     "maxHpPct": 0,
     "flavor": "guardian"
   },
@@ -92,8 +92,8 @@
     "tier": 5,
     "namePattern": "named",
     "bonuses": {
-      "atk": [3, 10],
-      "def": [3, 10],
+      "atk": [2, 5],
+      "def": [2, 5],
       "mf": [2, 8]
     },
     "maxHpPct": 0,
@@ -112,8 +112,8 @@
     "tier": 5,
     "namePattern": "named",
     "bonuses": {
-      "atk": [4, 10],
-      "def": [4, 10],
+      "atk": [2, 5],
+      "def": [2, 5],
       "spd": [1, 5]
     },
     "maxHpPct": -10,
