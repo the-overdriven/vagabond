@@ -424,11 +424,21 @@ Five NPC spawn near the village.
 
 ## Black Pillar
 
+<details>
+<summary>Reveal</summary>
+
+
 A black stone pillar placed in/near mountains.
 
 It is intentionally unexplained and primarily serves as a mystery/lore element.
 
+</details>
+
 ## Big Brass Bell
+
+<details>
+<summary>Reveal</summary>
+
 
 A large brass bell placed near mountains and guarded by two brutes (randomly picked: either cyclops, or ogres).
 
@@ -436,7 +446,13 @@ It cannot initially be carried normally.
 
 A later mystery interaction allows it to be moved.
 
+</details>
+
 ## Ancient Forest
+
+<details>
+<summary>Reveal</summary>
+
 
 A special forest biome associated with:
 
@@ -447,13 +463,25 @@ A special forest biome associated with:
 
 Normal foraging is disabled there.
 
+</details>
+
 ## Cemetery
+
+<details>
+<summary>Reveal</summary>
+
 
 A cemetery generated near the Ancient Forest.
 
 It contains several tombstones, including one anomalous tombstone.
 
+</details>
+
 ## Dwarven Ruin / Fort
+
+<details>
+<summary>Reveal</summary>
+
 
 A large underground Dwarven settlement/ruin containing:
 
@@ -470,6 +498,8 @@ A large underground Dwarven settlement/ruin containing:
 - deeper-level connections
 
 ---
+
+</details>
 
 # 14. Underground Structure
 
@@ -1259,7 +1289,12 @@ Enemy kills can provide:
 
 1. Equipment/other loot
 2. Artifacts (low chance)
-3. Mysterious tombstones (only liches)
+3. <details>
+<summary>Mysterious tombstones (only liches)</summary>
+
+Mysterious tombstones (only liches)
+
+</details>
 
 Enemy gold is based on:
 
