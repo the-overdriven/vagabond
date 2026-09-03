@@ -4357,7 +4357,7 @@ That last one especially feels like Vagabond.
           const py = Math.round((my-camY) * TILE_PX);
           const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx,my));
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          drawTile(px,py,tree ? '\u2663' : t.ch,tree ? '#164c23' : (foraged ? '#164c23' : t.color),tileBackground(mx,my,map[my][mx]));
+          drawTile(px,py,tree ? '\u2663' : t.ch,tree ? '#164c23' : (foraged ? '#554f2a' : t.color),tileBackground(mx,my,map[my][mx]));
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
