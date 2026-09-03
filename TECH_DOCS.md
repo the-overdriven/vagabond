@@ -423,10 +423,8 @@ A procedurally positioned settlement containing several huts.
 Five NPC spawn near the village.
 
 ## Black Pillar
-
 <details>
-<summary>Reveal</summary>
-
+  <summary>Details</summary>
 
 A black stone pillar placed in/near mountains.
 
@@ -435,10 +433,8 @@ It is intentionally unexplained and primarily serves as a mystery/lore element.
 </details>
 
 ## Big Brass Bell
-
 <details>
-<summary>Reveal</summary>
-
+  <summary>Details</summary>
 
 A large brass bell placed near mountains and guarded by two brutes (randomly picked: either cyclops, or ogres).
 
@@ -449,10 +445,8 @@ A later mystery interaction allows it to be moved.
 </details>
 
 ## Ancient Forest
-
 <details>
-<summary>Reveal</summary>
-
+  <summary>Details</summary>
 
 A special forest biome associated with:
 
@@ -466,10 +460,8 @@ Normal foraging is disabled there.
 </details>
 
 ## Cemetery
-
 <details>
-<summary>Reveal</summary>
-
+  <summary>Details</summary>
 
 A cemetery generated near the Ancient Forest.
 
@@ -478,10 +470,8 @@ It contains several tombstones, including one anomalous tombstone.
 </details>
 
 ## Dwarven Ruin / Fort
-
 <details>
-<summary>Reveal</summary>
-
+  <summary>Details</summary>
 
 A large underground Dwarven settlement/ruin containing:
 
@@ -497,9 +487,9 @@ A large underground Dwarven settlement/ruin containing:
 - a guaranteed artifact chest
 - deeper-level connections
 
----
-
 </details>
+
+---
 
 # 14. Underground Structure
 
@@ -1290,7 +1280,7 @@ Enemy kills can provide:
 1. Equipment/other loot
 2. Artifacts (low chance)
 3. <details>
-<summary>Mysterious tombstones (only liches)</summary>
+  <summary>Mysterious tombstones (only liches)</summary>
 
 Mysterious tombstones (only liches)
 
@@ -1470,6 +1460,8 @@ The Merchant additionally supports trading. Trading is possible by clicking on t
 ---
 
 # 51. Old Hunter
+<details>
+  <summary>Details</summary>
 
 The Old Hunter is associated with the Ancient Forest.
 
@@ -1477,9 +1469,13 @@ His warning contains a direction derived from the actual generated Ancient Fores
 
 He warns the player about entering the Ancient Forest in a particular direction after midnight.
 
+</details>
+
 ---
 
 # 52. Gravedigger
+<details>
+  <summary>Details</summary>
 
 The Gravedigger is associated with the cemetery mystery.
 
@@ -1497,13 +1493,19 @@ There is currently no use for the shovel.
 
 After interaction, the delivered tombstone is inserted beneath the grave next to the gravedigger.
 
+</details>
+
 ---
 
 # 53. Drunk
+<details>
+  <summary>Details</summary>
 
 The Drunk provides dialogue concerning the missing bell.
 
 His direction hint is dynamically calculated from the generated Big Bell location.
+
+</details>
 
 ---
 
@@ -1532,6 +1534,8 @@ Planned Herbalist ideas in source comments are not treated as current mechanics.
 ---
 
 # 56. Mysteries
+<details>
+  <summary>Details</summary>
 
 The game deliberately withholds explanations for some world elements.
 
@@ -1546,9 +1550,13 @@ Important mystery systems currently include:
 - Dwarven Fort
 - Ancient Bell Lich
 
+</details>
+
 ---
 
 # 57. Missing Temple Bell
+<details>
+  <summary>Details</summary>
 
 The Temple has a bell tower where the bell is missing.
 
@@ -1564,9 +1572,13 @@ The player can:
 
 Ringing the bell causes a major world/lore event.
 
+</details>
+
 ---
 
 # 58. Ancient Bell Lich
+<details>
+  <summary>Details</summary>
 
 After the bell is returned to the Temple and rung, an Ancient Lich can appear near the Cemetery, somewhere near the Ancient Forest.
 
@@ -1579,9 +1591,13 @@ Its dialogue connects:
 
 This is an implemented mystery progression chain.
 
+</details>
+
 ---
 
 # 59. Black Pillar
+<details>
+  <summary>Details</summary>
 
 The Black Pillar is currently primarily a lore mystery.
 
@@ -1589,9 +1605,13 @@ Its connection to the Ancient Lich suggests that its appearance changed the worl
 
 No broad mechanical effect should be assumed unless implementation confirms one.
 
+</details>
+
 ---
 
 # 60. Mysterious Tombstones
+<details>
+  <summary>Details</summary>
 
 There are:
 
@@ -1618,9 +1638,13 @@ The story concerns:
 - resurrection
 - whether the king was truly noble
 
+</details>
+
 ---
 
 # 61. Cemetery Mystery
+<details>
+  <summary>Details</summary>
 
 The generated cemetery contains ordinary Dwarven tombstones and exactly one anomalous tombstone.
 
@@ -1634,9 +1658,13 @@ Odd Tombstone
 
 It can then be given to the Gravedigger.
 
+</details>
+
 ---
 
 # 62. Dwarven Fort Mystery / Props
+<details>
+  <summary>Details</summary>
 
 The Dwarven ruin contains environmental story objects such as:
 
@@ -1653,9 +1681,13 @@ Some are currently lore/inspection objects.
 
 The wheelbarrow is mechanically significant because it enables moving the Big Bell.
 
+</details>
+
 ---
 
 # 63. Bell Movement
+<details>
+  <summary>Details</summary>
 
 The Big Bell cannot initially be picked up normally.
 
@@ -1682,6 +1714,8 @@ SPD -5
 The bell can then be returned to the Temple.
 
 This is a complete environmental-object → discovery → item → transport → world-event chain.
+
+</details>
 
 ---
 
