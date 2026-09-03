@@ -197,7 +197,21 @@ Level therefore provides:
 
 MF comes from base MF, race bonuses, equipment modifiers, and artifacts.
 
-Magic Find influences loot chances.
+Magic Find influences loot chances **and** loot quality:
+
+- Gold drops from enemies are currently disabled (see ï¿½43. Loot).
+- Artifact drop chance from enemy kills scales with MF using the same
+  `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 12%.
+- Non-humanoid enemy gear drop chance scales with MF (unchanged: `+MF*0.02`),
+  and MF also reduces the chance of that gear rolling one tier lower
+  (`35% - MF*1%`, floor 5%).
+- Item "quality": MF increases the chance any weapon/armor/shield rolls a
+  stat modifier at all (`20% + MF*1%`, capped 60%), biases the rolled
+  modifier amount upward, and reduces artifact curse chance
+  (`10% - MF*0.5%`, floor 2%) while giving a chance to roll the artifact
+  effect pool one tier higher (`MF*3%`, capped 50%).
+- Chest loot (gold amount, and the equipment/artifact found inside) also
+  scales with MF the same way.
 
 ## Max HP
 
@@ -416,6 +430,12 @@ The Temple:
 
 Enemies flee from the Temple.
 
+The bell tower tile (see "Missing Temple Bell") is carved out of the
+Temple's own generated footprint - it is Temple ground under a different
+glyph, not a separate landmark. It therefore shares every "standing on
+Temple ground" behavior: it heals the player on entry and causes nearby
+enemies to flee, exactly like the plain `temple` tile.
+
 ## Village
 
 A procedurally positioned settlement containing several huts.
@@ -486,6 +506,11 @@ A large underground Dwarven settlement/ruin containing:
 - a giant gold coin
 - a guaranteed artifact chest
 - deeper-level connections
+
+When these props (and other named ground objects such as skeletons,
+campfires, dwarven remains, or a wheelbarrow) are picked up by the
+"inspect surroundings" scan of nearby tiles, each is labeled by its own
+name (e.g. "an anvil").
 
 </details>
 
@@ -821,6 +846,11 @@ Default aggro range is approximately:
 
 Standing in enemy's aggro range, triggers the enemy to chase their victim.
 
+Any enemy that attacks the player becomes aggroed (shown as a red border
+around the enemy) in the same turn, even if the enemy's aggro range is very
+low (e.g. 1) and it was already standing adjacent to the player before ever
+entering the normal aggro-range check.
+
 Halfling reduces effective enemy detection range by 1.
 
 Enemies can lose interest in the case if player's speed is at least twice time higher.
@@ -874,6 +904,10 @@ Attack range:
 ```text
 1 tile
 ```
+
+The enemy inspect tooltip displays the player's calculated
+chance to hit that enemy, using the same miss-chance formula as combat
+(`1 - missChance(playerSPD, enemySPD)`).
 
 Combat includes:
 
@@ -1285,13 +1319,15 @@ Enemy kills can provide:
 Mysterious tombstones (only liches)
 </details>
 
-Enemy gold is based on:
+Gold drops from enemy kills are currently **disabled** (the calculation is
+still present in a code comment for easy reinstatement):
 
 ```text
-random(1–5) × enemy tier
+random(1–5) × enemy tier, modified by Magic Find
 ```
 
-and is modified by Magic Find.
+Chests and Magic Find still grant gold normally; only the per-kill enemy gold
+was removed.
 
 Artifact drop chance by enemy tier:
 
@@ -1308,6 +1344,9 @@ Artifact chance is capped at:
 ```text
 12%
 ```
+
+Artifact chance and quality (effect tier, curse odds) scale with Magic Find
+(see "Magic Find" above).
 
 ---
 
@@ -1402,6 +1441,10 @@ As for all consumable, the effect is increased for Wyrdling race.
 
 Identifies an artifact.
 
+Chest loot odds for consumables/gold/gear are resolved from one roll out of 110. 
+Current approximate shares: gold 41%, gear 18%, Life Potion 18%, Scroll of
+Invisibility 5.5%, Potion of Speed 8%, Scroll of Identification **9%**.
+
 ## Healing Herb
 
 Foraged item. When eaten, always heals 25% HP.
@@ -1491,6 +1534,12 @@ Shovel
 There is currently no use for the shovel.
 
 After interaction, the delivered tombstone is inserted beneath the grave next to the gravedigger.
+
+The grave tile next to the Gravedigger is persisted across save/load: the
+game records which tile it occupies and restores that reference on load
+(falling back to scanning the restored map for an existing grave tile if an
+older save lacks the reference). Loading a save must never place an
+additional grave near the Gravedigger.
 
 </details>
 
