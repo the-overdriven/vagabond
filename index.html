@@ -3230,6 +3230,8 @@ That last one especially feels like Vagabond.
     // ever push it further away).
     const FLEE_DISTANCE = 15;
     let turnCount = 0;
+    let consecutiveWaitTurns = 0;
+    const MAX_CONSECUTIVE_WAIT_TURNS = 10;
     // Trolls knit their flesh back together on their own - a slow trickle that
     // ticks once per elapsed turn regardless of what the player did with it.
     function tickRaceRegen(){
@@ -3692,6 +3694,7 @@ That last one especially feels like Vagabond.
       const target = enemies.find(e=>onCurrentLevel(e) && e.x===nx && e.y===ny && e.alive);
       if(target){
         clearAutoPath();
+        consecutiveWaitTurns = 0;
         await playerAttackEnemy(target);
         enemyTurn();
         npcTurn();
@@ -3702,6 +3705,7 @@ That last one especially feels like Vagabond.
       const npcTarget = currentZ===0 && npcs.find(n=>n.x===nx && n.y===ny);
       if(npcTarget){
         clearAutoPath();
+        consecutiveWaitTurns = 0;
         if(npcTarget.name==='Gravedigger' && player.inventory.some(i=>i.kind==='oddTombstone')){
           const odd=player.inventory.find(i=>i.kind==='oddTombstone'); player.inventory.splice(player.inventory.indexOf(odd),1); player.inventory.push({kind:'shovel',name:'Shovel'});
           if(gravediggerGraveKey) cemeteryTombstones[gravediggerGraveKey]={name:odd.tombName,birth:odd.tombBirth,death:odd.tombDeath,odd:false,inscription:odd.inscription};
@@ -3750,9 +3754,16 @@ That last one especially feels like Vagabond.
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
+        consecutiveWaitTurns = 0;
         if(mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.';
       } else if(autoPath){
         clearAutoPath();
+      }
+      // A blocked movement attempt is not an action and must not advance time.
+      if(!moved){
+        if(autoPath) clearAutoPath();
+        render(); runAnimationLoop(); updateTooltip();
+        return;
       }
       enemyTurn();
       npcTurn();
@@ -3766,7 +3777,12 @@ That last one especially feels like Vagabond.
     function skipTurn(){
       if(mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return;
       if(cameraAnimating || attackAnim) return;
+      if(consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS){
+        log(`You cannot wait more than ${MAX_CONSECUTIVE_WAIT_TURNS} turns in a row.`, 'info');
+        return;
+      }
       clearAutoPath();
+      consecutiveWaitTurns++;
       log('You wait.', 'info');
       enemyTurn();
       npcTurn();
@@ -4936,6 +4952,18 @@ That last one especially feels like Vagabond.
         player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
       );
       setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
+      ['weapon','shield','armor'].forEach(slot=>{
+        const slotEl = document.getElementById('slot'+slot[0].toUpperCase()+slot.slice(1));
+        let btn = slotEl.querySelector('.unequip-btn');
+        if(!btn){
+          btn = document.createElement('button');
+          btn.className = 'unequip-btn';
+          btn.textContent = 'Unequip';
+          btn.onclick = ()=>unequipItem(slot);
+          slotEl.appendChild(btn);
+        }
+        btn.disabled = !player.equip[slot];
+      });
 
       const sg = document.getElementById('statGrid');
       sg.innerHTML = '';
@@ -5288,6 +5316,16 @@ That last one especially feels like Vagabond.
       } else {
         log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good');
       }
+      updateHud(); renderInventory();
+    }
+    function unequipItem(slot){
+      if(!['weapon','shield','armor'].includes(slot)) return;
+      const item = player.equip[slot];
+      if(!item) return;
+      const before = statSnapshot();
+      player.equip[slot] = null;
+      player.inventory.push(item);
+      log(`You unequip the ${item.name}.${statDeltaText(before)}`, 'good');
       updateHud(); renderInventory();
     }
     function usePotion(idx){

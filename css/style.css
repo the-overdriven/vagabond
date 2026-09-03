@@ -189,6 +189,13 @@ canvas{display:block;cursor:pointer}
 .slot .val{color:var(--parchment); margin-top:4px;}
 .slot .val.tier1{color:var(--t1);} .slot .val.tier2{color:var(--t2);}
 .slot .val.tier3{color:var(--t3);} .slot .val.tier4{color:var(--t4);} .slot .val.tier5{color:var(--t5);}
+.slot .unequip-btn{
+  display:block; margin:7px auto 0; background:#2a1c10; color:var(--ember-bright);
+  border:1px solid var(--border); border-radius:3px; padding:2px 8px;
+  font:inherit; font-size:10px; cursor:pointer;
+}
+.slot .unequip-btn:hover:not(:disabled){background:var(--ember); color:#1a0f05;}
+.slot .unequip-btn:disabled{opacity:.45; cursor:default;}
 .statgrid{
   display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;
   font-size:14px; margin-bottom:14px;

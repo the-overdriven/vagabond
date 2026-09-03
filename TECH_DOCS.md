@@ -288,6 +288,12 @@ Waiting also consumes a turn.
 
 `T` is the wait action.
 
+An attempted move into a non-walkable tile does not consume a turn. Waiting is
+limited to 10 consecutive turns; after that, another wait is refused. Moving,
+attacking, or interacting resets the consecutive-wait counter. This prevents
+indefinitely waiting to repeatedly trigger regeneration (notably the Troll's
+1 HP every 5 turns).
+
 During enemy turns, relevant temporary systems tick, including:
 
 - global turn counter
