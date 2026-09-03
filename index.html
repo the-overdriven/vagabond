@@ -1632,8 +1632,10 @@ That last one especially feels like Vagabond.
       return tile==='temple' || tile==='belltower';
     }
     function isWalkableForPlayer(x,y){
-      if(isWalkable(x,y)) return true;
       if(x<0||y<0||x>=MAP_W||y>=MAP_H) return false;
+      if(!map[y]) return false; // world not generated yet
+      if(player.godMode) return true;
+      if(isWalkable(x,y)) return true;
       return raceHas('swims') && map[y] && map[y][x] === 'water';
     }
 
@@ -4918,6 +4920,9 @@ That last one especially feels like Vagabond.
         ctx.arc(px, py, radius, 0, Math.PI*2);
         ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#e0473f';
         ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = Math.max(1, 2*zoom);
+        ctx.stroke();
         return;
       }
       const ox = originX || 0, oy = originY || 0;
