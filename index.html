@@ -224,7 +224,7 @@ That last one especially feels like Vagabond.
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260903-2">
 </head>
 <body>
 <div id="root">
@@ -635,6 +635,8 @@ That last one especially feels like Vagabond.
     // Transparent landmark/biome glyphs replace their map tile in storage, so
     // remember what terrain was underneath them for rendering and saves.
     let tileUnderlays = {};
+    // Visual-only trees scattered through broad grassland.
+    let grasslandTrees = new Set();
     let undergroundMap = null;       // z:-1 shared map (storage)
     let caveMaps = [];               // z:-1 per-cave local template maps (storage)
     let caves = [];                  // z:-1 cave descriptors (storage)
@@ -748,6 +750,7 @@ That last one especially feels like Vagabond.
     function generateSurface(){
       shuffleTombstoneOrder();
       tileUnderlays = {};
+      grasslandTrees = new Set();
       map.length = 0; // a retried world must not append onto the discarded one
       const elevFns = [makeNoise(6,4), makeNoise(14,10), makeNoise(30,22)];
       const elevW = [0.55,0.3,0.15];
@@ -873,6 +876,21 @@ That last one especially feels like Vagabond.
             if(b > 0.80) map[y][x] = 'boulder';
           }
         }
+      }
+
+      // Lone trees in broad grassland: sparse, well-spaced visual features.
+      for(let y=4;y<MAP_H-4;y++) for(let x=4;x<MAP_W-4;x++){
+        if(map[y][x] !== 'grass' || chance(0.982)) continue;
+        let grassCount = 0;
+        for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++)
+          if(map[y+dy][x+dx] === 'grass') grassCount++;
+        if(grassCount < 57) continue;
+        let tooClose = false;
+        for(const key of grasslandTrees){
+          const [tx,ty] = key.split(',').map(Number);
+          if(Math.max(Math.abs(tx-x), Math.abs(ty-y)) < 8){ tooClose=true; break; }
+        }
+        if(!tooClose) grasslandTrees.add(keyXY(x,y));
       }
 
       // Rivers: from random high points, descend toward water
@@ -4309,8 +4327,9 @@ That last one especially feels like Vagabond.
           const t = TILE[map[my][mx]];
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
+          const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx,my));
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          drawTile(px,py,t.ch,foraged ? '#554f2a' : t.color,tileBackground(mx,my,map[my][mx]));
+          drawTile(px,py,tree ? '\u2663' : t.ch,tree ? '#164c23' : (foraged ? '#164c23' : t.color),tileBackground(mx,my,map[my][mx]));
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
@@ -5493,7 +5512,7 @@ That last one especially feels like Vagabond.
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 8; // v8 preserves terrain underneath transparent taiga/grave glyphs
+    const SAVE_VERSION = 9; // v9 persists scattered grassland trees
 
     function buildSaveObject(){
       return {
@@ -5503,6 +5522,7 @@ That last one especially feels like Vagabond.
         rngState: rngState,
         map: surfaceMap.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
         tileUnderlays: tileUnderlays,
+        grasslandTrees: [...grasslandTrees],
         caveMaps: caveMaps.map(cm=>cm.map(row=>row.map(t=>TILE_CODE[t] || '#').join(''))),
         caves: caves,
         currentZ: currentZ,
@@ -5594,6 +5614,7 @@ That last one especially feels like Vagabond.
       }
       tileUnderlays = (data.tileUnderlays && typeof data.tileUnderlays === 'object')
         ? Object.assign({}, data.tileUnderlays) : {};
+      grasslandTrees = new Set(Array.isArray(data.grasslandTrees) ? data.grasslandTrees : []);
       // Saves from before v8 did not record the transparent tile's base terrain.
       // Taiga is always generated from snow; old graves get a nearby hill/terrain
       // fallback so they do not render as a solid black square.
