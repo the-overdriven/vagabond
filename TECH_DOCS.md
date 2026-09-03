@@ -1279,11 +1279,11 @@ Enemy kills can provide:
 
 1. Equipment/other loot
 2. Artifacts (low chance)
-3. <details>
-  <summary>Mysterious tombstones (only liches)</summary>
 
+Also: 
+<details>
+<summary>Mysterious tombstones (only liches)</summary>
 Mysterious tombstones (only liches)
-
 </details>
 
 Enemy gold is based on:
