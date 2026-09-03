@@ -261,6 +261,7 @@ That last one especially feels like Vagabond.
         </div>
         <div class="race-grid" id="raceGrid"></div>
         <div class="race-foot">
+          <label class="permadeath-option" for="permadeathToggle"><input type="checkbox" id="permadeathToggle"> Permadeath</label>
           <span id="raceError"></span>
           <span class="inline-actions">
             <button class="slbtn" id="btnRaceLoad" type="button" title="Load an existing character from a .json save">📂 Load save</button>
@@ -2104,6 +2105,7 @@ That last one especially feels like Vagabond.
       godMode: false,
       speedPotionTurns: 0,
       freezing: {active:false, turns:0},
+      permadeath: false,
       curseDebuffs: [],
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
@@ -3040,7 +3042,7 @@ That last one especially feels like Vagabond.
       }
       updateHud();
       if(player.hp <= 0){
-        die();
+        die(e);
         return true;
       }
       if(!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true)){
@@ -3076,9 +3078,29 @@ That last one especially feels like Vagabond.
       snapCameraToPlayer();
     }
 
+    function createPermadeathBody(killer){
+      const gear = ['weapon','shield','armor'].map(slot=>player.equip[slot]).filter(Boolean);
+      const bestTier = gear.length ? Math.max(...gear.map(i=>i.tier||0)) : -1;
+      const best = gear.filter(i=>(i.tier||0)===bestTier);
+      const bodyGear = best.length ? {...pick(best)} : null;
+      const remainingWeapons = gear.filter(i=>!bodyGear || i !== bodyGear).filter(i=>i.kind==='weapon');
+      if(killer && killer.humanoid && !killer.equipment && remainingWeapons.length){
+        killer.equipment = {...pick(remainingWeapons)};
+        log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad');
+      }
+      groundItems.push({x:player.x,y:player.y,level:currentZ,kind:'deadbody',name:player.name,
+        race:raceDef().name,killer:killer && killer.name ? killer.name : '???',gear:bodyGear,gold:Math.floor(player.gold*0.1),looted:false});
+    }
+    function resetForNewCharacter(){
+      Object.assign(player,{x:spawnPoint.x,y:spawnPoint.y,name:'Vagabond',race:DEFAULT_RACE,lvl:1,xp:0,maxHp:50,hp:50,
+        baseAtk:2,baseDef:0,baseSpd:3,baseMf:0,gold:0,deaths:0,steps:0,invisibleTurns:0,
+        speedPotionTurns:0,freezing:{active:false,turns:0},curseDebuffs:[],equip:{weapon:null,shield:null,armor:null},inventory:[],permadeath:false});
+      selectedRaceId=DEFAULT_RACE;
+    }
+
     function startDeathFade(){
       if(!deathTransition || deathTransition.phase !== 'pending') return;
-      deathTransition = { phase:'out', start: performance.now(), duration: 900, deathStart: deathTransition.deathStart };
+      deathTransition = { phase:'out', start: performance.now(), duration: 900, deathStart: deathTransition.deathStart, permadeath: deathTransition.permadeath };
       const step = (now)=>{
         render(now);
         if(!deathTransition) return;
@@ -3086,7 +3108,14 @@ That last one especially feels like Vagabond.
         if(deathTransition.phase === 'out' && elapsed >= deathTransition.duration){
           // Death always returns the player to the Temple on the surface, even
           // if death occurred in a cave or deeper underground level.
-          returnPlayerToTemple();
+          if(!deathTransition.permadeath) returnPlayerToTemple();
+          else {
+            stopDeathTransition();
+            resetForNewCharacter();
+            openRaceSelect();
+            render(now);
+            return;
+          }
           updateHud();
           deathTransition = { phase:'in', start: now, duration: 900, rotation: 0 };
           render(now);
@@ -3104,16 +3133,17 @@ That last one especially feels like Vagabond.
       requestAnimationFrame(step);
     }
 
-    function die(){
+    function die(killer=null){
       if(deathTransition) return;
       player.deaths++;
       pendingMove = null;
       clearAutoPath();
-      const deathLogId = log(`You have fallen... and awaken at the Temple.`, 'bad');
+      if(player.permadeath) createPermadeathBody(killer);
+      const deathLogId = log(player.permadeath ? `You have fallen... Your journey ends here.` : `You have fallen... and awaken at the Temple.`, 'bad');
       stopCameraAnimation();
       clearEnemyAnims();
       stopAttackAnimation();
-      deathTransition = { phase:'pending', start: performance.now(), duration: 900, deathStart: performance.now(), rotation: 0 };
+      deathTransition = { phase:'pending', start: performance.now(), duration: 900, deathStart: performance.now(), rotation: 0, permadeath:player.permadeath };
       startDeathRotationAnimation();
       waitForLogId(deathLogId).then(waitForLogIdle).then(startDeathFade);
     }
@@ -3539,6 +3569,18 @@ That last one especially feels like Vagabond.
         log('You pick up the surprisingly light wheelbarrow.', 'loot'); draw(); return;
       }
       const skeleton = groundItems.find(g=>onCurrentLevel(g) && g.kind==='skeleton' && g.x===player.x && g.y===player.y);
+      const deadBody = groundItems.find(g=>onCurrentLevel(g) && g.kind==='deadbody' && g.x===player.x && g.y===player.y);
+      if(deadBody){
+        if(deadBody.looted){ log('This dead body has already been looted.', 'info'); return; }
+        deadBody.looted=true;
+        if(deadBody.gear) player.inventory.push(deadBody.gear);
+        if(deadBody.gold) player.gold += deadBody.gold;
+        if(deadBody.gear && deadBody.gold) log(`You retrieve ${deadBody.gear.name} and ${deadBody.gold} gold.`, 'loot');
+        else if(deadBody.gear) log(`You retrieve ${deadBody.gear.name}.`, 'loot');
+        else if(deadBody.gold) log(`You retrieve ${deadBody.gold} gold.`, 'loot');
+        else log('You retrieve nothing.', 'loot');
+        updateHud(); draw(); return;
+      }
       if(skeleton){
         if(skeleton.looted){ log('The skeleton has already been searched.', 'info'); return; }
         skeleton.looted = true;
@@ -3620,6 +3662,8 @@ That last one especially feels like Vagabond.
 
           spawnPickupAnim(g);
           groundItems.splice(i, 1);
+        } else if(g.kind==='deadbody'){
+          continue;
         } else if(g.kind==='skeleton' || g.kind==='dwarvenremains' || g.kind==='anvil' || g.kind==='campfire'){
           continue;
         } else if(g.kind==='potion'){
@@ -3955,6 +3999,9 @@ That last one especially feels like Vagabond.
       } else if(currentGround && (currentGround.kind==='wheelbarrow' || currentGround.kind==='goldcoin')){
         log(currentGround.description, 'info');
         inspectedGround = true;
+      } else if(currentGround && currentGround.kind==='deadbody'){
+        log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info');
+        inspectedGround = true;
       }
       if(inspectedGround) return;
 
@@ -4009,6 +4056,7 @@ That last one especially feels like Vagabond.
                       item.kind === 'idscroll' ? 'a scroll' :
                         item.kind === 'teleportscroll' ? 'a scroll' :
                           item.kind === 'skeleton' ? 'a skeleton' :
+                            item.kind === 'deadbody' ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.` :
                             item.kind === 'campfire' ? 'a campfire' :
                               item.kind === 'anvil' ? 'an anvil' :
                                 item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
@@ -4170,6 +4218,7 @@ That last one especially feels like Vagabond.
     const ENEMY_COLORS = {1:'#b8b8b8',2:'#d98a3a',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
     function groundGlyph(g){
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
+      if(g.kind==='deadbody') return {ch:'☠', color:'rgb(232, 162, 79)'};
       if(g.kind==='campfire') return {ch:'*', color:'#e8a24f'};
       if(g.kind==='skeleton') return {ch:'╶☠╴', color:g.looted ? '#777' : '#d0d0c0'};
       if(g.kind==='wheelbarrow') return {ch:'▱', color:'#b8b8b8'};
@@ -4368,6 +4417,7 @@ That last one especially feels like Vagabond.
         const vy = Math.round((g.y-camY) * TILE_PX);
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         if(g.kind==='chest' && !g.opened) drawTile(vx,vy,'$', '#e8c14a', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='deadbody') drawTile(vx,vy,'☠', g.looted ? '#777' : 'rgb(232, 162, 79)', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='potion') drawTile(vx,vy,'!', '#e0473f', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='speedpotion') drawTile(vx,vy,'!', '#59b8ff', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='scroll') drawTile(vx,vy,'?', '#b565d6', tileBackground(g.x,g.y,map[g.y][g.x]));
@@ -4604,7 +4654,7 @@ That last one especially feels like Vagabond.
     const tooltip = document.getElementById('tooltip');
     function slug(name){ return name.toLowerCase().replace(/\s+/g,'_'); }
     function groundItemLabel(g){
-      return g.kind==='chest' ? 'Chest' : g.kind==='skeleton' ? 'Skeleton' : g.kind==='campfire' ? 'Abandoned Campfire' : 'Item';
+      return g.kind==='chest' ? 'Chest' : g.kind==='skeleton' ? 'Skeleton' : g.kind==='campfire' ? 'Abandoned Campfire' : g.kind==='deadbody' ? `dead ${g.race || '???'}` : 'Item';
     }
     const CAMPFIRE_INSPECTIONS = [
       'Cold ash. The fire died in a hurry.',
@@ -4638,7 +4688,7 @@ That last one especially feels like Vagabond.
       <img src="${imageSrc('img/avatars/'+race.avatar)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${player.name}</div>
-      <div style="color:var(--ember-bright);font-size:11px;">${race.name}</div>
+      <div style="color:var(--ember-bright);font-size:11px;">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
       <div style="color:var(--parchment-dim);font-size:10px;margin-top:2px;">${race.bonus}</div>
       </div>` };
       }
@@ -4689,6 +4739,7 @@ That last one especially feels like Vagabond.
       const g = groundItems.find(gi=>onCurrentLevel(gi) && gi.x===mx && gi.y===my && !(gi.kind==='chest' && gi.opened));
       if(g){
         if(g.kind==='campfire') return { mini:true, enemy:null, html:`<div class="nm">An abandoned campfire.</div>` };
+        if(g.kind==='deadbody') return { mini:true, enemy:null, html:`<div class="nm">dead ${g.race || '???'}</div>` };
         if(g.kind==='skeleton') return { mini:true, enemy:null, html:`<div class="nm">Skeleton${g.looted ? ' (searched)' : ''}</div>` };
         return { mini:true, enemy:null, html: `<div class="nm">${groundItemLabel(g)}</div>` };
       }
@@ -5522,8 +5573,9 @@ That last one especially feels like Vagabond.
         player.hp = Math.min(playerMaxHp(), player.hp+healed);
         log(`You eat the Mushroom. It was edible! You recover ${healed} HP.`, 'good');
       } else {
-        player.hp = Math.max(1, player.hp-amt);
+        player.hp = Math.max(0, player.hp-amt);
         log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad');
+        if(player.hp <= 0) die();
       }
       consumeItemTurn();
     }
@@ -5543,7 +5595,7 @@ That last one especially feels like Vagabond.
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 9; // v9 persists scattered grassland trees
+    const SAVE_VERSION = 10; // v10 persists permadeath state and bodies
 
     function buildSaveObject(){
       return {
@@ -5572,6 +5624,7 @@ That last one especially feels like Vagabond.
         player: {
           x:player.x, y:player.y,
           name:player.name, race:player.race,
+          permadeath:player.permadeath,
           lvl:player.lvl, xp:player.xp,
           maxHp:player.maxHp, hp:player.hp,
           baseAtk:player.baseAtk, baseDef:player.baseDef, baseSpd:player.baseSpd, baseMf:player.baseMf,
@@ -5817,6 +5870,7 @@ That last one especially feels like Vagabond.
       player.godMode = !!player.godMode;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
       player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : [];
+      player.permadeath = !!player.permadeath;
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length===TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];
@@ -6246,6 +6300,7 @@ That last one especially feels like Vagabond.
       raceOpen = true;
       buildRaceGrid();
       document.getElementById('raceOverlay').classList.add('show');
+      document.getElementById('permadeathToggle').checked = false;
       const nameInput = document.getElementById('raceName');
       nameInput.value = '';
       setTimeout(()=>nameInput.focus(), 50);
@@ -6264,6 +6319,7 @@ That last one especially feels like Vagabond.
       }
       player.name = name;
       player.race = selectedRaceId;
+      player.permadeath = document.getElementById('permadeathToggle').checked;
       player.hp = playerMaxHp();
       closeRaceSelect();
       const race = raceDef();

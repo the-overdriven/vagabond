@@ -329,6 +329,8 @@ body.hint-collapsed #hint .panel-toggle{
 .race-card:hover{border-color:var(--ember);}
 .race-card.sel{border-color:var(--ember-bright); background:#2c2013; box-shadow:0 0 0 1px var(--ember-bright) inset;}
 .race-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap;}
+.permadeath-option{color:rgb(232, 162, 79); cursor:pointer; user-select:none;}
+.permadeath-option input{cursor:pointer;}
 #raceError{color:var(--blood); font-size:11px;}
 #btnBegin{font-size:13px; padding:8px 18px;}
 @media (max-width:720px), (pointer:coarse){

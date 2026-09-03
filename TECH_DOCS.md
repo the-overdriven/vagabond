@@ -1053,9 +1053,33 @@ This can apply in either direction:
 
 # 31. Death
 
-Death is **not permadeath**.
+Normal death is **not permadeath**; the optional mode below deliberately changes
+that behavior.
 
-When HP reaches zero:
+An optional **Permadeath** checkbox is available on the race-selection screen.
+When selected, the character tooltip displays “Permadeath”. On death, the
+current character leaves a persistent dead body at the death position instead
+of returning to the Temple. The world, enemies, ground objects, and generated
+maps remain intact; after the death fade a new character can be selected in
+the same world with fresh level, equipment, inventory, HP, gold, and other
+character stats.
+
+The body inscription reads `Here lies <name>, killed by <enemy>`. Environmental
+deaths (for example freezing or poisonous mushrooms) use `???` as the killer.
+Bodies are rendered on the map with a skull glyph and remain on the level where
+the death occurred (surface or underground). Walking onto a body does not loot
+it; the forage/loot action retrieves its contents. Its tooltip reads only
+`dead <race>` when inspected on the map, while standing on it displays the
+memorial inscription and `Pay respects or retrieve what is left.` The tooltip
+itself only says `dead <race>`.
+After looting, the corpse skull is rendered gray.
+The body can be looted once for 10% of the dead character’s carried gold and
+one randomly selected item from the highest-tier equipped weapon, shield, or
+armor. If the killer is an unarmed humanoid and another equipped item remains,
+that humanoid takes one such item and wields it. Bodies are saved as world
+ground objects, so this state survives save/load.
+
+When HP reaches zero in normal mode:
 
 - death counter increases
 - death animation occurs
@@ -1998,9 +2022,11 @@ Random gameplay should use the existing RNG architecture and preserve its save/l
 
 When a feature changes the world, determine whether the change must survive save/load.
 
-## Rule E - Death is not a run reset
+## Rule E - Death behavior is explicit
 
-Do not introduce traditional roguelike assumptions such as permadeath or character reset without deliberately changing the death model.
+Normal death remains a Temple recovery. Optional Permadeath deliberately changes
+the model: the world persists while the character is replaced and leaves a
+recoverable body.
 
 ## Rule F - Mysteries are stateful
 
@@ -2012,8 +2038,6 @@ Mysteries often progress through actual interactions and world state rather than
 
 Unless the implementation changes, do not assume the following exist:
 
-- permadeath
-- corpse recovery
 - general crafting
 - general mining
 - skill tree
