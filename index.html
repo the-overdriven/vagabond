@@ -1,10 +1,5 @@
 <!-- TODO:
 
-- You have wandered farther north than any soul before you - the world ends here, this should work only on surface
-- item symbols in dwarf fort shouldn't be represented by a cross, use ⚙ and ¤
-- mobile controls are wonky, sometimes tapping once moves char by 2 tiles, investigate
-- conflate directions when inspecting surroundings: i.e. if the same object (such as impassable boulders) is north and north-east, say only: north
-
 - [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
 The bell is here. It hangs silently in the tower, exactly where it belongs.
 - [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
@@ -2191,6 +2186,9 @@ That last one especially feels like Vagabond.
     const EDGE_XP = 100;
     const worldEdgesReached = {north:false, south:false, east:false, west:false};
     function checkWorldEdge(){
+      // The surface is the only world whose outer boundary represents the
+      // unexplored edge. Underground maps reuse the same coordinates.
+      if(currentZ !== 0) return;
       let dir = null;
       if(!worldEdgesReached.north && player.y <= EDGE_MARGIN) dir = 'north';
       else if(!worldEdgesReached.south && player.y >= MAP_H-1-EDGE_MARGIN) dir = 'south';
@@ -3852,17 +3850,24 @@ That last one especially feels like Vagabond.
       const here = TILE_DESC[map[player.y][player.x]] || 'unfamiliar ground';
       log(`You are standing on ${here}.`, 'info');
       const currentGround = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y);
+      let inspectedGround = false;
       if(currentGround && currentGround.kind==='skeleton'){
         log(`Skeleton${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info');
+        inspectedGround = true;
       } else if(currentGround && currentGround.kind==='campfire'){
         log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info');
+        inspectedGround = true;
       } else if(currentGround && currentGround.kind==='ruinprop'){
         log(`Abandoned dwarven remains. ${currentGround.description}`, 'info');
+        inspectedGround = true;
       } else if(currentGround && (currentGround.kind==='dwarvenremains' || currentGround.kind==='anvil')){
         log(`${currentGround.kind==='anvil' ? 'An abandoned dwarven anvil' : 'dwarven remains'}. ${currentGround.description}`, 'info');
+        inspectedGround = true;
       } else if(currentGround && (currentGround.kind==='wheelbarrow' || currentGround.kind==='goldcoin')){
         log(currentGround.description, 'info');
+        inspectedGround = true;
       }
+      if(inspectedGround) return;
 
       const notes = {};
       let pillarDirection = null;
@@ -3956,14 +3961,21 @@ That last one especially feels like Vagabond.
 
       const summary = Object.entries(notes).map(([label, directions]) => {
         const dirs = [...directions];
+        // A cardinal direction subsumes its adjacent diagonal sectors. This
+        // avoids verbose output such as "north and northeast" for one object.
+        if(dirs.includes('north')) { directions.delete('northwest'); directions.delete('northeast'); }
+        if(dirs.includes('south')) { directions.delete('southwest'); directions.delete('southeast'); }
+        if(dirs.includes('east')) { directions.delete('northeast'); directions.delete('southeast'); }
+        if(dirs.includes('west')) { directions.delete('northwest'); directions.delete('southwest'); }
+        const conflatedDirs = [...directions];
 
-        if (dirs.length === 1)
-          return `${label} to the ${dirs[0]}`;
+        if (conflatedDirs.length === 1)
+          return `${label} to the ${conflatedDirs[0]}`;
 
-        if (dirs.length === 2)
-          return `${label} to the ${dirs[0]} and ${dirs[1]}`;
+        if (conflatedDirs.length === 2)
+          return `${label} to the ${conflatedDirs[0]} and ${conflatedDirs[1]}`;
 
-        return `${label} to the ${dirs.slice(0, -1).join(', ')}, and ${dirs.at(-1)}`;
+        return `${label} to the ${conflatedDirs.slice(0, -1).join(', ')}, and ${conflatedDirs.at(-1)}`;
       });
 
       if (summary.length) {
@@ -4048,8 +4060,8 @@ That last one especially feels like Vagabond.
       if(g.kind==='skeleton') return {ch:'╶☠╴', color:g.looted ? '#777' : '#d0d0c0'};
       if(g.kind==='wheelbarrow') return {ch:'▱', color:'#b8b8b8'};
       if(g.kind==='goldcoin') return {ch:'●', color:'#f0c84b'};
-      if(g.kind==='dwarvenremains') return {ch:'🦴', color:'#d0c7b4'};
-      if(g.kind==='anvil') return {ch:'♠', color:'#9d9d9d'};
+      if(g.kind==='dwarvenremains') return {ch:'¤', color:'#d0c7b4'};
+      if(g.kind==='anvil') return {ch:'⚙', color:'#9d9d9d'};
       if(g.kind==='potion') return {ch:'!', color:'#e0473f'};
       if(g.kind==='speedpotion') return {ch:'!', color:'#59b8ff'};
       if(g.kind==='scroll') return {ch:'?', color:'#b565d6'};
@@ -6020,30 +6032,30 @@ That last one especially feels like Vagabond.
        updateTouchControlsVisibility(). */
     document.querySelectorAll('.dpad button[data-dx]').forEach(btn=>{
       const dx = parseInt(btn.dataset.dx, 10), dy = parseInt(btn.dataset.dy, 10);
-      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
-      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
+      btn.addEventListener('touchstart', (ev)=>{ ev.preventDefault(); btn.dataset.touchHandled='1'; if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
+      btn.addEventListener('click', (ev)=>{ ev.preventDefault(); if(btn.dataset.touchHandled){ delete btn.dataset.touchHandled; return; } if(!mapOpen && !invOpen && !tradeOpen && !raceOpen){ clearAutoPath(); tryMove(dx,dy); } });
     });
     const touchSpaceBtn = document.getElementById('touchSpace');
     const touchForageBtn = document.getElementById('touchForage');
     const touchInventoryBtn = document.getElementById('touchInventory');
     const touchMapBtn = document.getElementById('touchMap');
     if(touchSpaceBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) inspect(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(ev.type==='touchstart') touchSpaceBtn.dataset.touchHandled='1'; else if(touchSpaceBtn.dataset.touchHandled){ delete touchSpaceBtn.dataset.touchHandled; return; } if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) inspect(); };
       touchSpaceBtn.addEventListener('touchstart', fn);
       touchSpaceBtn.addEventListener('click', fn);
     }
     if(touchForageBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) lootSkeletonOrForage(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(ev.type==='touchstart') touchForageBtn.dataset.touchHandled='1'; else if(touchForageBtn.dataset.touchHandled){ delete touchForageBtn.dataset.touchHandled; return; } if(!mapOpen && !invOpen && !tradeOpen && !raceOpen) lootSkeletonOrForage(); };
       touchForageBtn.addEventListener('touchstart', fn);
       touchForageBtn.addEventListener('click', fn);
     }
     if(touchInventoryBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!mapOpen && !tradeOpen && !raceOpen) toggleInv(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(ev.type==='touchstart') touchInventoryBtn.dataset.touchHandled='1'; else if(touchInventoryBtn.dataset.touchHandled){ delete touchInventoryBtn.dataset.touchHandled; return; } if(!mapOpen && !tradeOpen && !raceOpen) toggleInv(); };
       touchInventoryBtn.addEventListener('touchstart', fn);
       touchInventoryBtn.addEventListener('click', fn);
     }
     if(touchMapBtn){
-      const fn = (ev)=>{ ev.preventDefault(); if(!invOpen && !tradeOpen && !raceOpen) toggleMap(); };
+      const fn = (ev)=>{ ev.preventDefault(); if(ev.type==='touchstart') touchMapBtn.dataset.touchHandled='1'; else if(touchMapBtn.dataset.touchHandled){ delete touchMapBtn.dataset.touchHandled; return; } if(!invOpen && !tradeOpen && !raceOpen) toggleMap(); };
       touchMapBtn.addEventListener('touchstart', fn);
       touchMapBtn.addEventListener('click', fn);
     }
