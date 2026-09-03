@@ -89,6 +89,7 @@ h1{
   box-shadow:0 0 30px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.6);
   background:#050403;
 }
+#stage{ width:var(--game-width, 840px); max-width:calc(100vw - 28px); }
 #stage::after{
   content:"";
   position:absolute; inset:0; pointer-events:none;
@@ -96,6 +97,7 @@ h1{
   animation:flicker 5s ease-in-out infinite;
 }
 @media (prefers-reduced-motion:reduce){ #stage::after{animation:none;} }
+@media (pointer:fine){ #stage::after{background:none;} }
 @keyframes flicker{
   0%,100%{opacity:1;} 50%{opacity:0.88;}
 }
@@ -117,6 +119,13 @@ canvas{display:block;cursor:pointer}
 #logpanel div.loot{color:var(--ember-bright);}
 #logpanel div.info{color:var(--parchment-dim);}
 #logpanel div.pillar{color:white;}
+@media (pointer:fine){
+  #root{padding-bottom:0;}
+  #logpanel{margin-top:auto;}
+  #stage{width:calc(var(--game-width, 840px) + 4px); max-width:none; transform:translateX(-146px);}
+  body.side-collapsed #stage{transform:translateX(-14px);}
+  #logpanel{width:640px; max-width:92vw; margin-top:-8px;}
+}
 #hint{
   font-size:11px; color:brown; letter-spacing:1px; text-align:center;
 }
@@ -140,6 +149,30 @@ canvas{display:block;cursor:pointer}
   box-shadow:0 0 18px rgba(0,0,0,0.5);
   font-size: 10px;
   line-height: 1.8;
+}
+.panel-toggle{
+  position:absolute; top:6px; left:-22px; width:22px; height:34px;
+  padding:0; color:var(--ember-bright); background:var(--panel2);
+  border:1px solid var(--border); border-right:0; border-radius:4px 0 0 4px;
+  font:18px inherit; cursor:pointer;
+}
+#hint .panel-toggle{left:-22px;}
+body.side-collapsed #sidePanel{display:block; width:10px; padding:0; overflow:visible;}
+body.side-collapsed #sidePanel #sideMinimap,
+body.side-collapsed #sidePanel .mini-actions{display:none;}
+body.side-collapsed #btnSideCollapse{
+  position:fixed; right:14px; top:110px; left:auto; z-index:20;
+  width:28px; height:40px; border:1px solid var(--border); border-radius:4px;
+}
+body.hint-collapsed #hint{
+  width:0; height:0; padding:0; overflow:visible; white-space:nowrap;
+  background:none; border-color:transparent; box-shadow:none; color:transparent;
+}
+body.hint-collapsed #hint kbd{display:none;}
+body.hint-collapsed #hint .panel-toggle{left:-22px;}
+body.hint-collapsed #hint .panel-toggle{
+  position:fixed; right:14px; top:380px; left:auto; z-index:20;
+  width:28px; height:40px; border:1px solid var(--border); border-radius:4px;
 }
 #sidePanel{
   position:fixed; right:14px; top:110px; width:250px; z-index:8;
@@ -321,6 +354,8 @@ canvas{display:block;cursor:pointer}
   #hint{ display:none; } /* keyboard legend is meaningless on touch */
   #stage{ max-width:100vw; }
   canvas#game{ width:100%; height:auto; max-width:100vw; touch-action:none; }
+  #stage{width:100%; max-width:100%;}
+  .panel-toggle{display:none;}
   /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
   #invOverlay, #mapOverlay, #tradeOverlay, #raceOverlay{
     position:fixed; left:0; right:0; top:var(--mobile-hud-height, 56px); bottom:0;

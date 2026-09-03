@@ -334,6 +334,7 @@ That last one especially feels like Vagabond.
     </div>
   </div>
   <div id="sidePanel" class="side-box">
+    <button class="panel-toggle" id="btnSideCollapse" type="button" aria-label="Collapse map panel" title="Collapse map panel">›</button>
     <canvas id="sideMinimap"></canvas>
     <div class="mini-actions">
       <button class="slbtn" id="btnSideMap" type="button">Map</button>
@@ -357,6 +358,7 @@ That last one especially feels like Vagabond.
     </div>
   </div>
   <div id="hint">
+    <button class="panel-toggle" id="btnHintCollapse" type="button" aria-label="Collapse keyboard hints" title="Collapse keyboard hints">›</button>
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;<br>
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
@@ -4088,13 +4090,36 @@ That last one especially feels like Vagabond.
 
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-    const VIEW_W = 21, VIEW_H = 13;
+    let VIEW_W = 21, VIEW_H = 13;
     const TILE_PX = 40;
     canvas.width = VIEW_W*TILE_PX;
     canvas.height = VIEW_H*TILE_PX;
     ctx.textBaseline = 'top';
     ctx.font = (TILE_PX-4)+"px Consolas, 'Courier New', monospace";
     ctx.textAlign = 'center';
+
+    function resizeDesktopViewport(){
+      if(window.matchMedia('(pointer:coarse)').matches) return;
+      const sideOpen = !document.body.classList.contains('side-collapsed');
+      const reserved = sideOpen ? 292 : 28;
+      const nextWidth = Math.max(21, Math.floor((window.innerWidth - reserved - 28) / TILE_PX));
+      const logPanel = document.getElementById('logpanel');
+      const stageTop = document.getElementById('stage').getBoundingClientRect().top;
+      const availableHeight = window.innerHeight - stageTop - logPanel.getBoundingClientRect().height - 8;
+      const nextHeight = Math.max(13, Math.floor((availableHeight - 4) / TILE_PX));
+      if(nextWidth === VIEW_W && nextHeight === VIEW_H) return;
+      VIEW_W = nextWidth;
+      VIEW_H = nextHeight;
+      canvas.width = VIEW_W*TILE_PX;
+      canvas.height = VIEW_H*TILE_PX;
+      ctx.font = (TILE_PX-4)+"px Consolas, 'Courier New', monospace";
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'center';
+      document.documentElement.style.setProperty('--game-width', `${canvas.width}px`);
+      // During startup the viewport is sized before the world is generated.
+      // Rendering here would index the still-empty map.
+      if(map.length) render();
+    }
 
     function tileBackground(x,y,tileKey){
       const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x,y)] || tileKey) : tileKey);
@@ -6025,6 +6050,21 @@ That last one especially feels like Vagabond.
       mobileSafeAreaObserver.observe(document.getElementById('logpanel'));
     }
     window.addEventListener('resize', updateMobileSafeAreas);
+    document.getElementById('btnSideCollapse').addEventListener('click', ()=>{
+      document.body.classList.toggle('side-collapsed');
+      const collapsed=document.body.classList.contains('side-collapsed');
+      document.getElementById('btnSideCollapse').textContent=collapsed?'‹':'›';
+      document.getElementById('btnSideCollapse').setAttribute('aria-label', collapsed?'Expand map panel':'Collapse map panel');
+      resizeDesktopViewport();
+    });
+    document.getElementById('btnHintCollapse').addEventListener('click', ()=>{
+      document.body.classList.toggle('hint-collapsed');
+      const collapsed=document.body.classList.contains('hint-collapsed');
+      document.getElementById('btnHintCollapse').textContent=collapsed?'‹':'›';
+      document.getElementById('btnHintCollapse').setAttribute('aria-label', collapsed?'Expand keyboard hints':'Collapse keyboard hints');
+    });
+    window.addEventListener('resize', resizeDesktopViewport);
+    resizeDesktopViewport();
     updateMobileSafeAreas();
     function toggleInv(force){
       const next = (force!==undefined) ? force : !invOpen;
