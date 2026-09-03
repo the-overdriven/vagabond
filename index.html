@@ -6109,6 +6109,8 @@ that means creating game asks for a name and choosing avatar
         reveal(discovered);
         reveal(undergroundDiscoveredL1);
         for(const level of deepLevels) reveal(level.discovered);
+        player.hp = 500;
+        player.maxHp = 500;
         player.baseAtk = 50;
         player.baseDef = 50;
         player.baseSpd = 50;
