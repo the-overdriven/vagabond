@@ -383,6 +383,15 @@ Current terrain includes:
 - boulders
 - special landmarks
 
+Grassland tree decoration:
+
+- Lone trees are placed visually on broad, grass-dominated areas during surface
+  generation.
+- They remain separated by at least six tiles so they do not form a forest.
+- Trees are visual-only: the underlying grass remains walkable and retains its
+  normal terrain effects.
+- Tree locations are persisted in save files.
+
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, Dwarven walls, rubble, and Dwarven structures.
 
 Normally impassable terrain includes mountains, snow mountains, volcanoes,

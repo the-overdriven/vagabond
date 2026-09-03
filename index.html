@@ -878,9 +878,10 @@ That last one especially feels like Vagabond.
         }
       }
 
-      // Lone trees in broad grassland: sparse, well-spaced visual features.
+      // Lone trees in broad grassland: scattered visual features with enough
+      // density to make large open fields feel naturally wooded.
       for(let y=4;y<MAP_H-4;y++) for(let x=4;x<MAP_W-4;x++){
-        if(map[y][x] !== 'grass' || chance(0.982)) continue;
+        if(map[y][x] !== 'grass' || chance(0.955)) continue;
         let grassCount = 0;
         for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++)
           if(map[y+dy][x+dx] === 'grass') grassCount++;
@@ -888,7 +889,7 @@ That last one especially feels like Vagabond.
         let tooClose = false;
         for(const key of grasslandTrees){
           const [tx,ty] = key.split(',').map(Number);
-          if(Math.max(Math.abs(tx-x), Math.abs(ty-y)) < 8){ tooClose=true; break; }
+          if(Math.max(Math.abs(tx-x), Math.abs(ty-y)) < 6){ tooClose=true; break; }
         }
         if(!tooClose) grasslandTrees.add(keyXY(x,y));
       }
