@@ -553,7 +553,7 @@ That last one especially feels like Vagabond.
     const MAP_W = 260, MAP_H = 180;
     const TILE = {
       water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
-      river:    {ch:'~', color:'#7fd0d8', bg:'#0e1f22', walk:true},
+      river:    {ch:'~', color:'#7fd0d8', bg:'#207f9a', walk:true},
       sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
       grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
       forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
@@ -562,6 +562,8 @@ That last one especially feels like Vagabond.
       hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
       mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
       snowmountain: {ch:'\u25b2', color:'#ffffff', bg:'#dfeaf2', walk:false},
+      volcano:  {ch:'\u25b2', color:'#ff6b35', bg:'#24100d', walk:false},
+      lava:     {ch:'\u2248', color:'#ff3b1f', bg:'#35100d', walk:false},
       // snow is drawn as dark speckles on a bright field, so its glyph colour is
       // useless on the minimap -- `mini` overrides what the minimaps sample.
       snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', mini:'#e4eef6', walk:true},
@@ -595,7 +597,7 @@ That last one especially feels like Vagabond.
       bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
     };
     // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',ruinedchapel:'c',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
+    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',volcano:'V',lava:'L',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',ruinedchapel:'c',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
     const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
@@ -787,7 +789,7 @@ That last one especially feels like Vagabond.
             if(m > 0.55) t='forest';
             else t='grass';
           }           else if(e < 0.68) t='hill';
-          else if(e < 0.86) t='mountain';
+          else if(e < 0.82) t='mountain';
           else t = (m>0.5) ? 'snow' : 'mountain';
           row.push(t);
         }
@@ -874,15 +876,34 @@ That last one especially feels like Vagabond.
       }
 
       // Rivers: from random high points, descend toward water
+      // Rivers begin in the highlands. Pick actual mountain cells so every
+      // headwater visibly emerges from a mountain range.
+      const mountainSources = [];
+      for(let y=4;y<MAP_H-4;y++) for(let x=4;x<MAP_W-4;x++){
+        if(map[y][x]==='mountain' || map[y][x]==='snowmountain') mountainSources.push({x,y});
+      }
       const riverSources = [];
-      for(let i=0;i<9;i++){
-        riverSources.push({x:randInt(4,MAP_W-5), y:randInt(4,MAP_H-5)});
+      for(let i=0;i<Math.min(14,mountainSources.length);i++){
+        const idx=randInt(0,mountainSources.length-1);
+        riverSources.push(mountainSources.splice(idx,1)[0]);
       }
       for(const src of riverSources){
         let x=src.x, y=src.y;
-        if(elev[y][x] < 0.6) continue;
-        for(let step=0; step<400; step++){
+        let previousX=-1, previousY=-1;
+        if(elev[y][x] < 0.44) continue;
+        for(let step=0; step<350; step++){
           if(map[y][x]==='water') break;
+          // Keep channels one tile wide. A river may continue through its
+          // own previous tile, but must not merge with or run alongside an
+          // already-carved channel.
+          let besideRiver = false;
+          for(let dy=-1;dy<=1 && !besideRiver;dy++) for(let dx=-1;dx<=1;dx++){
+            if(dx===0 && dy===0) continue;
+            const nx=x+dx, ny=y+dy;
+            if(nx===previousX && ny===previousY) continue;
+            if(map[ny] && map[ny][nx]==='river'){ besideRiver=true; break; }
+          }
+          if(besideRiver) break;
           if(map[y][x]!=='mountain' && map[y][x]!=='snowmountain' && map[y][x]!=='cavewall') map[y][x]='river';
           // find lowest neighbor
           let bestX=x, bestY=y, bestE=elev[y][x];
@@ -893,6 +914,7 @@ That last one especially feels like Vagabond.
             if(elev[ny][nx] < bestE){ bestE=elev[ny][nx]; bestX=nx; bestY=ny; }
           }
           if(bestX===x && bestY===y) break;
+          previousX=x; previousY=y;
           x=bestX; y=bestY;
         }
       }
@@ -983,6 +1005,34 @@ That last one especially feels like Vagabond.
       // Lore landmark: a huge brass bell in/next to the mountains, kept
       // fairly close to the temple (map center), guarded by a pair of brutes.
       placeBigBell();
+
+      // Every world has one volcano, with a chance of a second. Each one is a
+      // broad volcanic formation rather than a single recoloured mountain tile.
+      placeVolcanoes();
+    }
+
+    function placeVolcanoes(){
+      const candidates = [];
+      for(let y=3;y<MAP_H-3;y++) for(let x=3;x<MAP_W-3;x++){
+        if(map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue;
+        if(Math.max(Math.abs(x-spawnPoint.x), Math.abs(y-spawnPoint.y)) < 25) continue;
+        candidates.push({x,y});
+      }
+      if(!candidates.length) return; // practically impossible on the island generator
+      const count = rng() < 0.35 ? 2 : 1;
+      const chosen = [];
+      while(chosen.length < count && candidates.length){
+        const spot = candidates.splice(randInt(0,candidates.length-1),1)[0];
+        if(chosen.every(other => Math.max(Math.abs(spot.x-other.x), Math.abs(spot.y-other.y)) >= 20)){
+          chosen.push(spot);
+          map[spot.y][spot.x] = 'volcano';
+          for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){
+            if(dx===0 && dy===0 || Math.max(Math.abs(dx),Math.abs(dy)) > 2) continue;
+            const x=spot.x+dx, y=spot.y+dy;
+            if(map[y] && (map[y][x]==='mountain' || map[y][x]==='snowmountain')) map[y][x]='lava';
+          }
+        }
+      }
     }
 
     // A temple walled in by mountains with no route to any map edge is a dead
@@ -2028,6 +2078,7 @@ That last one especially feels like Vagabond.
       baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
       gold: 0, deaths: 0, steps: 0,
       invisibleTurns: 0,
+      godMode: false,
       speedPotionTurns: 0,
       freezing: {active:false, turns:0},
       curseDebuffs: [],
@@ -3279,9 +3330,9 @@ That last one especially feels like Vagabond.
         player.speedPotionTurns--;
         if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
       }
-      if(player.invisibleTurns > 0){
-        player.invisibleTurns--;
-        if(player.invisibleTurns === 0) log('The invisibility fades.', 'info');
+      if(player.godMode || player.invisibleTurns > 0){
+        if(!player.godMode) player.invisibleTurns--;
+        if(!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info');
         return; // while invisible, enemies neither chase nor attack
       }
       const playerOnTemple = isTempleGround(map[player.y][player.x]);
@@ -3641,6 +3692,9 @@ That last one especially feels like Vagabond.
     // Low-odds ambushes start ordinary forest creatures, or stronger creatures
     // when the player enters the ancient forest.
     function maybeSpawnForestAmbush(x,y){
+      // Ambushes are surprise attacks; a hidden player cannot trigger one,
+      // including the permanent invisibility granted by god mode.
+      if(player.godMode || player.invisibleTurns > 0) return;
       if(raceHas('noForestAmbush')) return; // elves move through woodland unseen
       const ancient = map[y][x] === 'ancientForest';
       if(map[y][x] !== 'forest' && !ancient) return;
@@ -3801,6 +3855,8 @@ That last one especially feels like Vagabond.
       ancientForest:"a dense ancient forest",
       hill:"a rugged hill",
       mountain:"an impassable mountain",
+      volcano:"a smoking volcano, its red throat glowing beneath the ash",
+      lava:"a field of glowing lava and black volcanic rock",
       snow:"a snow-covered slope",
       cavefloor:"the brown dirt floor of a cave",
       cavewall:"a solid cave wall",
@@ -3950,6 +4006,8 @@ That last one especially feels like Vagabond.
 
           if (
             t === 'mountain' ||
+            t === 'volcano' ||
+            t === 'lava' ||
             t === 'cavewall' ||
             t === 'dwarvenwall' ||
             t === 'dwarvenstatue' ||
@@ -4392,7 +4450,7 @@ That last one especially feels like Vagabond.
           py = attackAnim.fromY + (attackAnim.targetY - attackAnim.fromY) * lunge;
         }
         const vx = Math.round((px-camX) * TILE_PX), vy = Math.round((py-camY) * TILE_PX);
-        const faded = player.invisibleTurns>0;
+        const faded = player.godMode || player.invisibleTurns>0;
         const playerColor = faded ? 'rgba(255,246,214,0.45)' : '#fff6d6';
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
@@ -5461,6 +5519,7 @@ That last one especially feels like Vagabond.
           baseAtk:player.baseAtk, baseDef:player.baseDef, baseSpd:player.baseSpd, baseMf:player.baseMf,
           gold:player.gold, deaths:player.deaths, steps:player.steps,
           invisibleTurns:player.invisibleTurns,
+          godMode:player.godMode,
           speedPotionTurns:player.speedPotionTurns,
           freezing: player.freezing,
           curseDebuffs: player.curseDebuffs,
@@ -5696,6 +5755,7 @@ That last one especially feels like Vagabond.
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
+      player.godMode = !!player.godMode;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
       player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : [];
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
@@ -5985,6 +6045,7 @@ That last one especially feels like Vagabond.
         player.baseDef = 50;
         player.baseSpd = 50;
         player.baseMf = 25;
+        player.godMode = true;
         player.gold = 500;
         // The minimap is cached for performance; filling the discovery grids
         // alone leaves the old fog-painted pixels in those canvases.
