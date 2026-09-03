@@ -1382,7 +1382,7 @@ Artifact chance and quality (effect tier, curse odds) scale with Magic Find
 
 # 44. Enemy Equipment Drops
 
-Humanoid enemies can carry equipment.
+Humanoid enemies can carry equipment. The worn items have an effect on enemy's stats and can be inspected from a distance.
 
 Possible equipment includes:
 

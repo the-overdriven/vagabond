@@ -4660,7 +4660,7 @@ That last one especially feels like Vagabond.
           ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
           : '';
         const equipmentHtml = e.equipment
-          ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
+          ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
           : '';
         return { mini:false, enemy:e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
@@ -6059,14 +6059,18 @@ That last one especially feels like Vagabond.
       document.body.classList.toggle('side-collapsed');
       const collapsed=document.body.classList.contains('side-collapsed');
       document.getElementById('btnSideCollapse').textContent=collapsed?'‹':'›';
-      document.getElementById('btnSideCollapse').setAttribute('aria-label', collapsed?'Expand map panel':'Collapse map panel');
+      const sideLabel=collapsed?'Expand map panel':'Collapse map panel';
+      document.getElementById('btnSideCollapse').setAttribute('aria-label', sideLabel);
+      document.getElementById('btnSideCollapse').title=sideLabel;
       resizeDesktopViewport();
     });
     document.getElementById('btnHintCollapse').addEventListener('click', ()=>{
       document.body.classList.toggle('hint-collapsed');
       const collapsed=document.body.classList.contains('hint-collapsed');
       document.getElementById('btnHintCollapse').textContent=collapsed?'‹':'›';
-      document.getElementById('btnHintCollapse').setAttribute('aria-label', collapsed?'Expand keyboard hints':'Collapse keyboard hints');
+      const hintLabel=collapsed?'Expand keyboard hints':'Collapse keyboard hints';
+      document.getElementById('btnHintCollapse').setAttribute('aria-label', hintLabel);
+      document.getElementById('btnHintCollapse').title=hintLabel;
     });
     window.addEventListener('resize', resizeDesktopViewport);
     resizeDesktopViewport();
