@@ -186,16 +186,18 @@ canvas{display:block;cursor:pointer}
   padding:8px; text-align:center; font-size:11px; min-height:52px;
 }
 .slot .label{color:var(--parchment-dim); font-size:9px; text-transform:uppercase; letter-spacing:1px;}
-.slot .val{color:var(--parchment); margin-top:4px;}
+.slot .val{display:inline; color:var(--parchment); margin-top:4px;}
 .slot .val.tier1{color:var(--t1);} .slot .val.tier2{color:var(--t2);}
 .slot .val.tier3{color:var(--t3);} .slot .val.tier4{color:var(--t4);} .slot .val.tier5{color:var(--t5);}
 .slot .unequip-btn{
-  display:block; margin:7px auto 0; background:#2a1c10; color:var(--ember-bright);
-  border:1px solid var(--border); border-radius:3px; padding:2px 8px;
-  font:inherit; font-size:10px; cursor:pointer;
+  display:inline-flex; vertical-align:middle; align-items:center; justify-content:center;
+  appearance:none; -webkit-appearance:none; width:12px; height:12px; margin-left:2px; padding:0;
+  background:transparent !important; background-image:none !important; box-shadow:none;
+  color:rgb(232, 162, 79) !important; border:0; border-radius:0;
+  font:inherit; font-size:12px; line-height:12px; cursor:pointer;
 }
-.slot .unequip-btn:hover:not(:disabled){background:var(--ember); color:#1a0f05;}
-.slot .unequip-btn:disabled{opacity:.45; cursor:default;}
+.slot .unequip-btn:hover{background:transparent !important; color:rgb(232, 162, 79) !important;}
+.slot .unequip-btn[hidden]{display:none !important;}
 .statgrid{
   display:grid; grid-template-columns:1fr 1fr; gap:4px 24px;
   font-size:14px; margin-bottom:14px;

@@ -3980,10 +3980,6 @@ That last one especially feels like Vagabond.
         log('It feels oddly out of place here. You wonder what story lies behind it...', 'info');
       }
 
-      if (bellDirection) {
-        log('You see a big brass bell. It is too heavy to carry. Maybe there is a way...', 'pillar');
-      }
-
       if (villageCenter) {
         const vdist = Math.max(Math.abs(player.x-villageCenter.x), Math.abs(player.y-villageCenter.y));
         if (vdist > 5 && vdist <= 20) {
@@ -4954,15 +4950,18 @@ That last one especially feels like Vagabond.
       setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
       ['weapon','shield','armor'].forEach(slot=>{
         const slotEl = document.getElementById('slot'+slot[0].toUpperCase()+slot.slice(1));
-        let btn = slotEl.querySelector('.unequip-btn');
+        const valueEl = slotEl.querySelector('.val');
+        let btn = valueEl.querySelector('.unequip-btn');
         if(!btn){
           btn = document.createElement('button');
           btn.className = 'unequip-btn';
-          btn.textContent = 'Unequip';
+          btn.textContent = '✕';
+          btn.title = 'Unequip';
+          btn.setAttribute('aria-label', 'Unequip');
           btn.onclick = ()=>unequipItem(slot);
-          slotEl.appendChild(btn);
+          valueEl.appendChild(btn);
         }
-        btn.disabled = !player.equip[slot];
+        btn.hidden = !player.equip[slot];
       });
 
       const sg = document.getElementById('statGrid');
