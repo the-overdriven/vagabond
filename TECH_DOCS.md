@@ -853,7 +853,7 @@ entering the normal aggro-range check.
 
 Halfling reduces effective enemy detection range by 1.
 
-Enemies can lose interest in the case if player's speed is at least twice time higher.
+Enemies can lose interest in the chase if player's speed is at least twice time higher.
 
 Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
 
@@ -1070,6 +1070,8 @@ Equipping a two-handed weapon automatically removes the equipped shield and retu
 
 If the player has no weapon, looted weapons are automatically equipped.
 
+Shields and armors are not automatically equipped, because equipping them decreases speed.
+
 ---
 
 # 33. Weapons
@@ -1137,7 +1139,7 @@ Current armor:
 | Plate Mail | 4 | 20 | 2 |
 | Ancient Armor | 5 | 24 | 2 |
 
-Armor also participates in the general equipment speed penalty.
+Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
 
 ---
 
