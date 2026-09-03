@@ -347,6 +347,16 @@ The world has an island-style elevation falloff.
 
 The Temple is placed near the map center.
 
+Rivers are seeded from mountain and snow-mountain cells and follow downhill
+paths toward lower terrain or the surrounding sea. They are generated as
+single-tile-wide channels and may be long, but separate channels do not merge
+or run alongside one another.
+
+Each world contains one volcano, with a chance of a second. A volcano is an
+impassable central cone surrounded by a small impassable lava field. Volcanoes
+are placed on mountain terrain and are represented by the `volcano` and `lava`
+tile keys.
+
 ---
 
 # 10. Surface Terrain
@@ -364,6 +374,8 @@ Current terrain includes:
 - water
 - mountains
 - snow mountains
+- volcanoes
+- lava fields
 - temple
 - village
 - graves
@@ -373,7 +385,8 @@ Current terrain includes:
 
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, Dwarven walls, rubble, and Dwarven structures.
 
-Normally impassable terrain includes mountains, boulders, and water for non-Merlings.
+Normally impassable terrain includes mountains, snow mountains, volcanoes,
+lava, boulders, and water for non-Merlings.
 
 ---
 
@@ -2110,6 +2123,7 @@ These remain **PLANNED** unless implementation confirms otherwise.
 - [x] 260×180 world
 - [x] Multiple terrain types
 - [x] Rivers
+- [x] Volcanoes and lava fields
 - [x] Snow
 - [x] Taiga
 - [x] Ancient Forest
