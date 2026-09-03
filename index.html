@@ -1,22 +1,11 @@
 <!-- TODO:
 
-fixes:
-- reloading a save spawns new grave near gravedigger every time
-- magic find affects only gold drop chance, should affect gear/artifact drop chance and quality!
-- remove gold drops from enemies (only comment out the code)
-- remove attack range from tooltip and show hit chance in tooltip
-- the scroll of identify has too low drop chance
-- bell tower doesn't heal anymore, it should be treated same as sacred temple ground
-- inspecting surroundings, implies that anvil is a scroll
-- every time monster attacks it should turn on aggro (red border), cuz sometimes they dont
-
 - [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
 The bell is here. It hangs silently in the tower, exactly where it belongs.
 - [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
 - [mysteriando] When the Drunk hears the Bell ring he only says:
 Drunk says: I'm done! No more drink! I heard a bell that's not there.
 - remove wheelbarrow after delivering the bell
-
 
 - add ability to unequip gear
 - mobile controls are wonky
@@ -1112,7 +1101,7 @@ That last one especially feels like Vagabond.
         // mountain tile at the cave's declared entrance.
         const returnCave = caves[currentCave];
         const returnEntrance = (returnCave && returnCave.entrances.find(e=>e.x===player.x && e.y===player.y)) ||
-                caves.flatMap(c=>c.entrances||[]).find(e=>e.x===player.x && e.y===player.y);
+          caves.flatMap(c=>c.entrances||[]).find(e=>e.x===player.x && e.y===player.y);
         if(returnEntrance && surfaceMap[returnEntrance.y]){
           if(surfaceMap[returnEntrance.y][returnEntrance.x] !== 'dwarvengate') surfaceMap[returnEntrance.y][returnEntrance.x] = 'caveentrance';
         }
@@ -1359,22 +1348,22 @@ That last one especially feels like Vagabond.
         // other non-water/mountain tile next to the spawn point and fold it
         // into the temple complex so the bell tower always has somewhere to go.
         outer:
-                for(let r=1; r<=6; r++){
-                  for(let dy=-r; dy<=r; dy++){
-                    for(let dx=-r; dx<=r; dx++){
-                      if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
-                      const tx=sx+dx, ty=sy+dy;
-                      if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
-                      if(tx===sx && ty===sy) continue;
-                      if(map[ty][tx]==='water' || map[ty][tx]==='mountain' || map[ty][tx]==='snowmountain') continue;
-                      map[ty][tx] = 'temple';
-                      const spot = {x:tx,y:ty};
-                      templeTiles.push(spot);
-                      bellSpots = [spot];
-                      break outer;
-                    }
-                  }
-                }
+          for(let r=1; r<=6; r++){
+            for(let dy=-r; dy<=r; dy++){
+              for(let dx=-r; dx<=r; dx++){
+                if(Math.max(Math.abs(dx),Math.abs(dy)) !== r) continue;
+                const tx=sx+dx, ty=sy+dy;
+                if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H) continue;
+                if(tx===sx && ty===sy) continue;
+                if(map[ty][tx]==='water' || map[ty][tx]==='mountain' || map[ty][tx]==='snowmountain') continue;
+                map[ty][tx] = 'temple';
+                const spot = {x:tx,y:ty};
+                templeTiles.push(spot);
+                bellSpots = [spot];
+                break outer;
+              }
+            }
+          }
       }
       if(bellSpots.length){
         const spot = pick(bellSpots);
@@ -1462,7 +1451,7 @@ That last one especially feels like Vagabond.
         const entrances = [spot];
         if(i===0){
           const second = candidates.find(c=>c!==spot && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))>=8 && Math.max(Math.abs(c.x-spot.x),Math.abs(c.y-spot.y))<=18)
-                  || candidates.find(c=>c!==spot);
+            || candidates.find(c=>c!==spot);
           if(second) entrances.push(second);
         }
         for(const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance';
@@ -1967,6 +1956,14 @@ That last one especially feels like Vagabond.
     }
     // Merlings swim, so open water counts as walkable for the player only -
     // enemies and world generation keep using the strict isWalkable().
+    // The bell tower tile is carved out of the Temple's own footprint during
+    // world generation (see the Temple-complex generation code) - it is
+    // Temple ground wearing a different glyph, not a separate landmark, so it
+    // must share every "standing on Temple ground" behavior (healing, enemy
+    // flee) with the plain 'temple' tile.
+    function isTempleGround(tile){
+      return tile==='temple' || tile==='belltower';
+    }
     function isWalkableForPlayer(x,y){
       if(isWalkable(x,y)) return true;
       if(x<0||y<0||x>=MAP_W||y>=MAP_H) return false;
@@ -1974,9 +1971,11 @@ That last one especially feels like Vagabond.
     }
 
     /* ============================== ITEM / ENTITY FACTORIES ============================== */
-    function rollModifierAmount(stat){
-      if(stat === 'hp') return 1 + Math.floor(Math.pow(rng(),5) * 50);
-      const roll = randInt(1,100);
+    function rollModifierAmount(stat, mf=0){
+      // Magic Find nudges the roll upward so higher-MF characters trend
+      // toward better modifier amounts, without guaranteeing them.
+      if(stat === 'hp') return 1 + Math.floor(Math.pow(rng(),5) * 50) + Math.floor(mf*0.3);
+      const roll = Math.min(100, randInt(1,100) + Math.round(mf*0.5));
       if(roll<=45) return 1;
       if(roll<=75) return 2;
       if(roll<=90) return 3;
@@ -1984,39 +1983,41 @@ That last one especially feels like Vagabond.
       if(roll<=99) return 5;
       return randInt(6,10);
     }
-    function rollModifier(baseName, item){
-      if(!chance(0.20)) return item;
+    function rollModifier(baseName, item, mf=0){
+      // Magic Find increases the chance an item rolls a modifier at all -
+      // this is the "quality" half of MF's effect on gear.
+      if(!chance(Math.min(0.6, 0.20 + mf*0.01))) return item;
       const mod = pick(MODIFIERS);
       item.mod = mod.stat;
       item.name = mod.name + " " + baseName;
-      const amt = rollModifierAmount(mod.stat);
+      const amt = rollModifierAmount(mod.stat, mf);
       item.modAmt = amt;
       if(mod.stat==='xp') item.xpBonus = randInt(5,15); // % bonus
       return item;
     }
-    function makeWeaponItem(tier){
+    function makeWeaponItem(tier, mf=0){
       const pool = WEAPONS.filter(w=>w.tier<=tier);
       const base = pick(pool.length?pool:WEAPONS.filter(w=>w.tier===1));
       const item = {kind:'weapon', base:base.name, atk:base.atk, grace:base.grace, tier:base.tier, twoHanded:!!base.twoHanded, name:base.name};
-      return rollModifier(base.name, item);
+      return rollModifier(base.name, item, mf);
     }
-    function makeShieldItem(tier){
+    function makeShieldItem(tier, mf=0){
       const pool = SHIELDS.filter(s=>s.tier<=tier);
       const base = pick(pool.length?pool:SHIELDS.filter(s=>s.tier===1));
       const item = {kind:'shield', base:base.name, def:base.def, tier:base.tier, name:base.name};
-      return rollModifier(base.name, item);
+      return rollModifier(base.name, item, mf);
     }
-    function makeArmorItem(tier){
+    function makeArmorItem(tier, mf=0){
       const pool = ARMORS.filter(a=>a.tier<=tier);
       const base = pick(pool.length?pool:ARMORS.filter(a=>a.tier===1));
       const item = {kind:'armor', base:base.name, def:base.def, tier:base.tier, speedPenalty:base.speedPenalty || 0, name:base.name};
-      return rollModifier(base.name, item);
+      return rollModifier(base.name, item, mf);
     }
     /* ---- Unidentified artifacts: procedurally named/described passive items ---- */
     function fillArtifactText(str, noun, name, possessor){
       return str.replace(/\{noun\}/g, noun.toLowerCase())
-              .replace(/\{name\}/g, name || '')
-              .replace(/\{possessor\}/g, possessor || '');
+        .replace(/\{name\}/g, name || '')
+        .replace(/\{possessor\}/g, possessor || '');
     }
 
     // Vocation data is intentionally accepted in a few simple JSON shapes:
@@ -2033,8 +2034,8 @@ That last one especially feels like Vagabond.
 
     function dwarfVocationText(){
       const pool = (Array.isArray(ARTIFACT_VOCATIONS_DWARF) ? ARTIFACT_VOCATIONS_DWARF : [])
-              .map(normalizeDwarfVocation)
-              .filter(Boolean);
+        .map(normalizeDwarfVocation)
+        .filter(Boolean);
       const vocation = pool.length ? pick(pool).toLowerCase() : 'craftsman';
       return vocation.replace(/^dwarven\\s+/i, '').trim();
     }
@@ -2116,8 +2117,12 @@ That last one especially feels like Vagabond.
       return result;
     }
 
-    function makeArtifactItem(tier){
+    function makeArtifactItem(tier, mf=0){
       if(!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length || !ARTIFACT_NOUNS || !ARTIFACT_NOUNS.length) return null;
+      // Magic Find's "quality" effect on artifacts: a chance to roll the
+      // effect pool as if the source were one tier higher, and a reduced
+      // chance of the artifact turning out cursed.
+      if(mf>0 && chance(Math.min(0.5, mf*0.03))) tier += 1;
       let pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier<=tier);
       if(!pool.length) pool = ARTIFACT_EFFECTS.filter(fx=>fx.tier===Math.min(...ARTIFACT_EFFECTS.map(f=>f.tier)));
       // Keep truly effect-less lore artifacts rare: 4% of artifact drops.
@@ -2125,11 +2130,11 @@ That last one especially feels like Vagabond.
       const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0);
       const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0);
       const effect = emptyEffects.length && chance(0.04)
-              ? pick(emptyEffects)
-              : pick(normalEffects.length ? normalEffects : pool);
+        ? pick(emptyEffects)
+        : pick(normalEffects.length ? normalEffects : pool);
       const noun = pick(ARTIFACT_NOUNS);
       const slot = artifactEquipSlot(null, noun);
-      const isCursed = chance(0.10);
+      const isCursed = chance(Math.max(0.02, 0.10 - mf*0.005));
 
       // Every non-cursed artifact gets a named owner. Cursed artifacts use
       // the cursed prefix instead and do not get an "of <dwarf>" name.
@@ -2211,7 +2216,7 @@ That last one especially feels like Vagabond.
         const effect = (ARTIFACT_EFFECTS || []).find(fx=>fx.id===it.effectId);
         if(effect){
           it.description = generateArtifactDescription(
-                  it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
+            it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
           );
         }
       }
@@ -2543,16 +2548,16 @@ That last one especially feels like Vagabond.
     }
     function statDeltaText(before){
       const parts = [];
-        for(const s of TRACKED_STATS){
-            const delta = s.get() - before[s.key];
-            if(!delta) continue;
-            if(s.key === 'XP'){
-                parts.push((delta > 0 ? '+' : '') + delta + '% XP BONUS');
-            } else {
-                parts.push((delta > 0 ? '+' : '') + delta + ' ' + s.key);
-            }
+      for(const s of TRACKED_STATS){
+        const delta = s.get() - before[s.key];
+        if(!delta) continue;
+        if(s.key === 'XP'){
+          parts.push((delta > 0 ? '+' : '') + delta + '% XP BONUS');
+        } else {
+          parts.push((delta > 0 ? '+' : '') + delta + ' ' + s.key);
         }
-        return parts.length ? ' (' + parts.join(', ') + ')' : ' (no stat change)';
+      }
+      return parts.length ? ' (' + parts.join(', ') + ')' : ' (no stat change)';
     }
 
     function xpMultiplier(){
@@ -2781,8 +2786,8 @@ That last one especially feels like Vagabond.
           }
           const cornerSpots = deepCaveCornerSpots(cm, 'cavefloor2', caveEntrances);
           const chestSpot = cornerSpots.length
-                  ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length)))
-                  : pick(open);
+            ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length)))
+            : pick(open);
 
           if(chestSpot){
             groundItems.push({
@@ -2966,6 +2971,16 @@ That last one especially feels like Vagabond.
       if(!digger || !surfaceMap) return;
       const sx=gravediggerGraveKey && +gravediggerGraveKey.split(',')[0], sy=gravediggerGraveKey && +gravediggerGraveKey.split(',')[1];
       if(gravediggerGraveKey && surfaceMap[sy]?.[sx]==='grave') return;
+      // gravediggerGraveKey isn't always known here (e.g. right after loading
+      // an older save that predates persisting this key) - before carving a
+      // brand new grave, check whether the restored map already has one next
+      // to the Gravedigger and adopt it. Without this, reloading a save would
+      // stamp a fresh grave near him every time.
+      for(let radius=1;radius<=20;radius++) for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
+        if(Math.max(Math.abs(dx),Math.abs(dy))!==radius) continue;
+        const gx=digger.x+dx,gy=digger.y+dy;
+        if(surfaceMap[gy]?.[gx]==='grave'){ gravediggerGraveKey=keyXY(gx,gy); return; }
+      }
       for(let radius=1;radius<=20;radius++) for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++){
         if(Math.max(Math.abs(dx),Math.abs(dy))!==radius) continue;
         const gx=digger.x+dx,gy=digger.y+dy,key=keyXY(gx,gy);
@@ -3171,7 +3186,9 @@ That last one especially feels like Vagabond.
     }
     function lootFromEnemy(e){
       const mf = playerMf();
-      player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
+      // Gold drops from enemies have been disabled (per design decision) -
+      // code kept/commented for easy reinstatement rather than deleted.
+      // player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
       maybeDropTombstone(e);
       // T1 = 1.00%
       // T2 = 1.75%
@@ -3179,9 +3196,9 @@ That last one especially feels like Vagabond.
       // T4 = 3.25%
       // T5 = 4.00%
       // T6 = 4.75%
-      const artifactChance = 0.01 + (e.tier - 1) * 0.0075;
+      const artifactChance = (0.01 + (e.tier - 1) * 0.0075) * (1 + mf*0.05);
       if(chance(Math.min(0.12, artifactChance))){
-        const art = makeArtifactItem(e.tier);
+        const art = makeArtifactItem(e.tier, mf);
         if(art){
           log(`The ${e.name} dropped ${artifactDisplayName(art)}.`, 'loot');
           player.inventory.push(art);
@@ -3201,11 +3218,11 @@ That last one especially feels like Vagabond.
       if(chance(Math.min(0.9,dropChance))){
         const roll = rng();
         let tier = e.tier;
-        if(chance(0.35) && tier>1) tier -= 1;
+        if(chance(Math.max(0.05, 0.35 - mf*0.01)) && tier>1) tier -= 1;
         let item;
-        if(roll<0.5) item = makeWeaponItem(tier);
-        else if(roll<0.75) item = makeArmorItem(tier);
-        else item = makeShieldItem(tier);
+        if(roll<0.5) item = makeWeaponItem(tier, mf);
+        else if(roll<0.75) item = makeArmorItem(tier, mf);
+        else item = makeShieldItem(tier, mf);
         log(`The ${e.name} dropped a ${item.name}.`, 'loot');
         // Only skip the backpack when the weapon actually went straight to the
         // empty weapon slot - otherwise the drop would silently vanish.
@@ -3241,7 +3258,7 @@ That last one especially feels like Vagabond.
       const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer);
       const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer);
       return attackerDelay !== null && defenderDelay !== null &&
-              attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
+        attackerDelay < defenderDelay && chance((defenderDelay-attackerDelay)*0.10);
     }
 
     async function playerAttackEnemy(e, isExtraAttack=false){
@@ -3304,7 +3321,7 @@ That last one especially feels like Vagabond.
       } else {
         updateMobileInfoPanel(e.x,e.y);
         const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
-                ? e.equipment : null;
+          ? e.equipment : null;
         if(!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)){
           log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good');
           await playerAttackEnemy(e, true);
@@ -3313,7 +3330,7 @@ That last one especially feels like Vagabond.
     }
     function enemyAttackPlayer(e, isExtraAttack=false){
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
-              ? e.equipment : null;
+        ? e.equipment : null;
       const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : '';
       beginEnemyAttackAnim(e);
       if(chance(missChance(enemySpd(e), playerSpd()))){
@@ -3554,7 +3571,7 @@ That last one especially feels like Vagabond.
       // already carried the enemy beyond its leash - otherwise it could never move
       // again after giving up a pursuit.
       if(e.homeX === undefined || e.homeY === undefined ||
-              Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
+        Math.max(Math.abs(e.x-e.homeX), Math.abs(e.y-e.homeY)) > ENEMY_WANDER_RADIUS){
         e.homeX = e.x; e.homeY = e.y;
       }
       const options = [];
@@ -3563,7 +3580,7 @@ That last one especially feels like Vagabond.
           if(dx===0 && dy===0) continue;
           const nx = e.x+dx, ny = e.y+dy;
           if(ENEMY_WANDER_LEASH &&
-                  Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
+            Math.max(Math.abs(nx-e.homeX), Math.abs(ny-e.homeY)) > ENEMY_WANDER_RADIUS) continue;
           if(nx===player.x && ny===player.y) continue;
           if(!enemyCanTraverse(e,nx,ny)) continue;
           if(occupied.has(keyXY(nx,ny))) continue;
@@ -3665,7 +3682,7 @@ That last one especially feels like Vagabond.
         if(player.invisibleTurns === 0) log('The invisibility fades.', 'info');
         return; // while invisible, enemies neither chase nor attack
       }
-      const playerOnTemple = map[player.y][player.x] === 'temple';
+      const playerOnTemple = isTempleGround(map[player.y][player.x]);
       for(const e of enemies.slice()){
         if(!e.alive || !onCurrentLevel(e)) continue;
         const distFromPlayer = Math.max(Math.abs(e.x-player.x), Math.abs(e.y-player.y));
@@ -3680,6 +3697,10 @@ That last one especially feels like Vagabond.
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.max(Math.abs(dx), Math.abs(dy));
         if(dist === ATTACK_RANGE){
+          // An enemy that attacks is aggroed on the player, full stop - this
+          // must be true even when its aggro range is so low (e.g. 1) that it
+          // never went through the "spotted you" branch below.
+          if(!e.aware){ e.aware = true; log(`The ${e.name} has spotted you!`, 'bad'); }
           if(enemyAttackPlayer(e)) return;
           continue;
         }
@@ -3774,8 +3795,8 @@ That last one especially feels like Vagabond.
       if(item.kind === 'weapon'){
         const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0);
         const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
-                ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
-                : 0;
+          ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
+          : 0;
         return {sum:atk+otherModifier, tier:item.tier || 0, primary:atk};
       }
       const def = (item.def || 0) + (item.mod === 'def' ? modBonus : 0);
@@ -3862,12 +3883,12 @@ That last one especially feels like Vagabond.
           const chestTier = Math.max(1, g.tier);
 
           if(g.artifactGuaranteed){
-            const art=makeArtifactItem(chestTier); player.inventory.push(art);
+            const art=makeArtifactItem(chestTier, mf); player.inventory.push(art);
             lastLootResult=`${artifactDisplayName(art)}.`;
             if(!suppressLootLog) log(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, 'loot');
             spawnPickupAnim(g); groundItems.splice(i,1); continue;
           }
-          const roll = rng() * 103;
+          const roll = rng() * 110;
 
           if(roll < 45){
             const gold = randInt(5, 15) * chestTier + Math.round(mf * 2);
@@ -3882,9 +3903,9 @@ That last one especially feels like Vagabond.
             const pickRoll = rng();
             let item;
 
-            if(pickRoll < 0.33) item = makeWeaponItem(itemTier);
-            else if(pickRoll < 0.66) item = makeArmorItem(itemTier);
-            else item = makeShieldItem(itemTier);
+            if(pickRoll < 0.33) item = makeWeaponItem(itemTier, mf);
+            else if(pickRoll < 0.66) item = makeArmorItem(itemTier, mf);
+            else item = makeShieldItem(itemTier, mf);
 
             lastLootResult = `${item.name}.`;
             if(!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot');
@@ -4096,7 +4117,7 @@ That last one especially feels like Vagabond.
         if(map[ny][nx]==='water' && map[fromPos.y][fromPos.x] !== 'water'){
           log('You slip into the water and swim with ease.', 'info');
         }
-        if(map[ny][nx]==='temple'){
+        if(isTempleGround(map[ny][nx])){
           if(player.hp < playerMaxHp()){
             player.hp = playerMaxHp();
             log('The Temple restores your strength.', 'good');
@@ -4109,12 +4130,12 @@ That last one especially feels like Vagabond.
           const onto = map[ny][nx];
           if(onto === 'dwarvengate'){
             log(currentZ===0
-                    ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
-                    : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
+              ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
+              : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
           } else if(onto === 'caveentrance'){
             log(currentZ===0
-                    ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
-                    : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
+              ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
+              : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info');
           } else if(onto === 'cavedown'){
             log('You\'re standing over a narrow crack descending further into the dark. Press "inspect" to climb down.', 'info');
           } else if(onto === 'caveup'){
@@ -4242,17 +4263,17 @@ That last one especially feels like Vagabond.
           if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
 
           const direction =
-                  dx === 0 && dy < 0 ? 'north' :
-                          dx === 0 && dy > 0 ? 'south' :
-                                  dx < 0 && dy === 0 ? 'west' :
-                                          dx > 0 && dy === 0 ? 'east' :
-                                                  dx < 0 && dy < 0 ? 'northwest' :
-                                                          dx > 0 && dy < 0 ? 'northeast' :
-                                                                  dx < 0 && dy > 0 ? 'southwest' :
-                                                                          'southeast';
+            dx === 0 && dy < 0 ? 'north' :
+              dx === 0 && dy > 0 ? 'south' :
+                dx < 0 && dy === 0 ? 'west' :
+                  dx > 0 && dy === 0 ? 'east' :
+                    dx < 0 && dy < 0 ? 'northwest' :
+                      dx > 0 && dy < 0 ? 'northeast' :
+                        dx < 0 && dy > 0 ? 'southwest' :
+                          'southeast';
 
           const enemy = enemies.find(
-                  en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
+            en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
           );
 
           if (enemy) {
@@ -4261,16 +4282,27 @@ That last one especially feels like Vagabond.
           }
 
           const item = groundItems.find(
-                  g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
-                          !(g.kind === 'chest' && g.opened)
+            g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
+              !(g.kind === 'chest' && g.opened)
           );
 
           if (item) {
             const label =
-                    item.kind === 'chest' ? 'a chest' :
-                            item.kind === 'potion' ? 'a potion' :
-                                    item.kind === 'speedpotion' ? 'a speed potion' :
-                                            'a scroll';
+              item.kind === 'chest' ? 'a chest' :
+                item.kind === 'potion' ? 'a potion' :
+                  item.kind === 'speedpotion' ? 'a speed potion' :
+                    item.kind === 'scroll' ? 'a scroll' :
+                      item.kind === 'idscroll' ? 'a scroll' :
+                        item.kind === 'teleportscroll' ? 'a scroll' :
+                          item.kind === 'skeleton' ? 'a skeleton' :
+                            item.kind === 'campfire' ? 'a campfire' :
+                              item.kind === 'anvil' ? 'an anvil' :
+                                item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
+                                  item.kind === 'goldcoin' ? 'a giant gold coin' :
+                                    (item.kind === 'dwarvenremains' || item.kind === 'ruinprop') ? 'dwarven remains' :
+                                      item.kind === 'oddTombstone' ? 'a tombstone' :
+                                        item.kind === 'shovel' ? 'a shovel' :
+                                          'something';
 
             addNote(label, direction);
             continue;
@@ -4289,13 +4321,13 @@ That last one especially feels like Vagabond.
           }
 
           if (
-                  t === 'mountain' ||
-                  t === 'cavewall' ||
-                  t === 'dwarvenwall' ||
-                  t === 'dwarvenstatue' ||
-                  t === 'boulder' ||
-                  t === 'water' ||
-                  t === 'village'
+            t === 'mountain' ||
+            t === 'cavewall' ||
+            t === 'dwarvenwall' ||
+            t === 'dwarvenstatue' ||
+            t === 'boulder' ||
+            t === 'water' ||
+            t === 'village'
           ) {
             addNote(TILE_DESC[t], direction);
           }
@@ -4719,8 +4751,8 @@ That last one especially feels like Vagabond.
         const playerAlpha = faded ? 0.45 : 1;
         const deathRotation = deathTransition &&
         (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
-                ? Math.min(Math.PI/2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI/2)
-                : 0;
+          ? Math.min(Math.PI/2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI/2)
+          : 0;
         if(deathRotation){
           ctx.save();
           ctx.translate(vx + TILE_PX/2, vy + TILE_PX/2);
@@ -4864,14 +4896,14 @@ That last one especially feels like Vagabond.
         const playerSpeed = playerSpd();
         const spdColor = effectiveEnemySpeed > playerSpeed ? '#e0473f' : playerSpeed >= effectiveEnemySpeed*2 ? 'var(--parchment-dim)' : 'white';
         const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b=>
-                `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
+          `<span class="${b.delta>0?'up':'down'}">${b.delta>0?'+':''}${b.delta} ${b.label}</span>`
         ).join(', ')}</div>` : '';
         const critHtml = e.crit
-                ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
-                : '';
+          ? `<div class="crit">${Math.round(CRIT_CHANCE*100)}% chance to crit (double damage)</div>`
+          : '';
         const equipmentHtml = e.equipment
-                ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
-                : '';
+          ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Wearing: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
+          : '';
         return { mini:false, enemy:e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
@@ -4883,7 +4915,7 @@ That last one especially feels like Vagabond.
       </div>
       <div class="statrow">
       <span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span><span class="statsep">&nbsp;</span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep">&nbsp;</span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
-      <span style="color:#e0473f">Attack ${ATTACK_RANGE} · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
+      <span style="color:#e0473f">Hit ${Math.round((1-missChance(playerSpeed, effectiveEnemySpeed))*100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>` };
       }
@@ -5050,7 +5082,7 @@ That last one especially feels like Vagabond.
       const foraged = tileKey==='forest' && foragedTiles.has(keyXY(x,y));
       const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x];
       c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='grave' || tileKey==='taiga'
-              ? (under.mini || under.color) : (t.mini || t.color))) : 'rgba(3,2,1,0.72)';
+        ? (under.mini || under.color) : (t.mini || t.color))) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
@@ -5212,8 +5244,8 @@ That last one especially feels like Vagabond.
     }
     function bestSlotIndexes(kind){
       const inventoryCandidates = player.inventory
-              .map((it, idx)=>({it, idx, score: bestSlotScore(it)}))
-              .filter(entry => entry.it.kind === kind && entry.score !== null);
+        .map((it, idx)=>({it, idx, score: bestSlotScore(it)}))
+        .filter(entry => entry.it.kind === kind && entry.score !== null);
 
       const equipped = player.equip[kind];
       const equippedScore = equipped ? bestSlotScore(equipped) : null;
@@ -5264,9 +5296,9 @@ That last one especially feels like Vagabond.
       if(charTitle) charTitle.textContent = `${player.name} the ${race.name}`;
       setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon);
       setSlotLabel(
-              document.getElementById('slotShield').querySelector('.val'),
-              player.equip.shield,
-              player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
+        document.getElementById('slotShield').querySelector('.val'),
+        player.equip.shield,
+        player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
       );
       setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
 
@@ -5319,8 +5351,8 @@ That last one especially feels like Vagabond.
         const row = document.createElement('div');
         row.className = 'invitem';
         const isBest = (it.kind==='weapon' && best.weapon.has(idx)) ||
-                (it.kind==='shield' && best.shield.has(idx)) ||
-                (it.kind==='armor' && best.armor.has(idx));
+          (it.kind==='shield' && best.shield.has(idx)) ||
+          (it.kind==='armor' && best.armor.has(idx));
         if(isBest) row.classList.add('best-slot');
         const cls = it.tier ? tierColorClass(it.tier) : '';
         const line = itemStatLine(it);
@@ -5647,7 +5679,7 @@ That last one especially feels like Vagabond.
       it.count = (it.count||1)-1;
       if(it.count<=0) player.inventory.splice(idx,1);
       log('You read the Scroll of Teleportation. Darkness swallows you - and the temple takes you back.', 'good');
-            returnPlayerToTemple();
+      returnPlayerToTemple();
       toggleInv(false);
       updateHud();
       render();
@@ -5757,6 +5789,7 @@ That last one especially feels like Vagabond.
         tombstoneOrder: tombstoneOrder,
         merchantStock: merchantStock,
         foragedTiles: [...foragedTiles],
+        gravediggerGraveKey: gravediggerGraveKey,
       };
     }
 
@@ -5799,7 +5832,7 @@ That last one especially feels like Vagabond.
         if(surfaceMap[y][x]==='dwarvengate') { dwarvenRuin={x,y,caveIndex:-1}; break; }
       }
       tileUnderlays = (data.tileUnderlays && typeof data.tileUnderlays === 'object')
-              ? Object.assign({}, data.tileUnderlays) : {};
+        ? Object.assign({}, data.tileUnderlays) : {};
       // Saves from before v8 did not record the transparent tile's base terrain.
       // Taiga is always generated from snow; old graves get a nearby hill/terrain
       // fallback so they do not render as a solid black square.
@@ -5825,8 +5858,8 @@ That last one especially feels like Vagabond.
       caves = caves.map(c=>({
         ...c,
         entrances: Array.isArray(c.entrances) && c.entrances.length
-                ? c.entrances
-                : [{x:c.x,y:c.y}],
+          ? c.entrances
+          : [{x:c.x,y:c.y}],
       }));
       if(dwarvenRuin) dwarvenRuin.caveIndex=caves.findIndex(c=>c.entrances.some(e=>e.x===dwarvenRuin.x&&e.y===dwarvenRuin.y));
       // The surface map is the authoritative return destination. Older saves
@@ -5897,8 +5930,8 @@ That last one especially feels like Vagabond.
           }
         }
         const lvlDiscovered = (Array.isArray(lvlData.discovered) && lvlData.discovered.length === MAP_H)
-                ? lvlData.discovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'))
-                : Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
+          ? lvlData.discovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'))
+          : Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
         return { map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered };
       });
 
@@ -5945,21 +5978,21 @@ That last one especially feels like Vagabond.
       // tiles ended up in the restored map.
       villageCenter = null;
       outer:
-              for(let y=0; y<MAP_H; y++){
-                for(let x=0; x<MAP_W; x++){
-                  if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
-                }
-              }
+        for(let y=0; y<MAP_H; y++){
+          for(let x=0; x<MAP_W; x++){
+            if(map[y][x]==='village'){ villageCenter = {x,y}; break outer; }
+          }
+        }
 
       // bigBellPos likewise isn't stored explicitly - recover it from the
       // restored map so the Drunk's rumor line still points the right way.
       bigBellPos = null;
       outer2:
-              for(let y=0; y<MAP_H; y++){
-                for(let x=0; x<MAP_W; x++){
-                  if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
-                }
-              }
+        for(let y=0; y<MAP_H; y++){
+          for(let x=0; x<MAP_W; x++){
+            if(map[y][x]==='bigbell'){ bigBellPos = {x,y}; break outer2; }
+          }
+        }
 
       Object.assign(player, data.player);
       // pre-v7 saves have no race/name - those characters were all plain humans
@@ -6005,6 +6038,11 @@ That last one especially feels like Vagabond.
       } else {
         spawnNpcs(); // older save from before NPCs existed
       }
+      // Restore the grave key so ensureGravediggerGrave() recognizes the grave
+      // that's already sitting in the restored map instead of placing a new
+      // one. Older saves (pre this field) fall back to the map scan inside
+      // ensureGravediggerGrave() itself.
+      gravediggerGraveKey = typeof data.gravediggerGraveKey === 'string' ? data.gravediggerGraveKey : null;
       ensureGravediggerGrave();
 
       groundItems = (data.groundItems||[]).map(g=>{
