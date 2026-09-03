@@ -6,7 +6,7 @@
   {"name":"Staff",            "atk":4,  "grace":2, "twoHanded": true,  "tier":2},
   {"name":"Long Sword",       "atk":5,  "grace":3, "twoHanded": false, "tier":2},
   {"name":"Scimitar",         "atk":5,  "grace":4, "twoHanded": false, "tier":2},
-  {"name":"Mace",             "atk":5,  "grace":3, "twoHanded": false, "tier":2},
+  {"name":"Mace",             "atk":5,  "grace":2, "twoHanded": false, "tier":2},
   {"name":"Scepter",          "atk":4,  "grace":3, "twoHanded": false, "tier":2},
   {"name":"Spear",            "atk":5,  "grace":2, "twoHanded": true,  "tier":2},
   {"name":"One-handed Axe",   "atk":5,  "grace":3, "twoHanded": false, "tier":2},

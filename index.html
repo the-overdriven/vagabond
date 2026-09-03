@@ -4212,10 +4212,11 @@ That last one especially feels like Vagabond.
       {dx:-1,dy:-1,name:'northwest'}, {dx:1,dy:-1,name:'northeast'},
       {dx:-1,dy:1,name:'southwest'}, {dx:1,dy:1,name:'southeast'},
     ];
+    const ANCIENT_BELL_LICH = {name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:false,static:false,trades:false,portrait:'lich'};
     function spawnAncientBellLich(){
       if(ancientBellLichSpawned) return;
       for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(map[y][x]==='ancientForest' && !occupied.has(keyXY(x,y))){
-        npcs.push({name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:false,static:false,trades:false,portrait:'lich',x,y,homeX:x,homeY:y});
+        npcs.push({...ANCIENT_BELL_LICH,x,y,homeX:x,homeY:y});
         ancientBellLichSpawned=true; return;
       }
     }
@@ -6033,6 +6034,7 @@ That last one especially feels like Vagabond.
 
       if(Array.isArray(data.npcs) && data.npcs.length){
         npcs = data.npcs.map(n=>{
+          if(n.name==='Ancient Lich') return {...ANCIENT_BELL_LICH,x:n.x,y:n.y,homeX:n.homeX ?? n.x,homeY:n.homeY ?? n.y};
           const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
           return {
             name: n.name, lines: tmpl ? linesForNpcTemplate(tmpl) : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
