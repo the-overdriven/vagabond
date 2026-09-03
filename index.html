@@ -2131,7 +2131,17 @@ leveling is too quick and linear
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
     };
-    function xpToNext(lvl){ return Math.floor(14 * Math.pow(lvl, 1.55)) + 10; }
+    // XP needed for each level, tuned against the intended pacing:
+    // lvl 2 ~= 3m, lvl 5 ~= 10m, lvl 10 ~= 1h10m and lvl 15 ~= 7h.
+    // The cubic term makes the later levels accelerate naturally instead of
+    // requiring a separate hard-coded XP value for every level.
+    const EARLY_XP_TO_NEXT = [24, 16, 20];
+    function xpToNext(lvl){
+      if(lvl <= EARLY_XP_TO_NEXT.length){
+        return EARLY_XP_TO_NEXT[lvl - 1];
+      }
+      return Math.round(20 * Math.pow(lvl / 4, 3));
+    }
     function recalcDerived(){
       // bonuses from modifiers on equipped gear + inventory 'vital'/'lucky' aren't passive; only equipped gear counts
       let bonusHp=0;
