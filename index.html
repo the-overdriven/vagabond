@@ -1,4 +1,29 @@
 <!-- TODO:
+
+fixes:
+- reloading a save spawns new grave near gravedigger every time
+- magic find affects only gold drop chance, should affect gear/artifact drop chance and quality!
+- remove gold drops from enemies (only comment out the code)
+- remove attack range from tooltip and show hit chance in tooltip
+- the scroll of identify has too low drop chance
+- bell tower doesn't heal anymore, it should be treated same as sacred temple ground
+- inspecting surroundings, implies that anvil is a scroll
+- every time monster attacks it should turn on aggro (red border), cuz sometimes they dont
+
+- [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
+The bell is here. It hangs silently in the tower, exactly where it belongs.
+- [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
+- [mysteriando] When the Drunk hears the Bell ring he only says:
+Drunk says: I'm done! No more drink! I heard a bell that's not there.
+- remove wheelbarrow after delivering the bell
+
+
+- add ability to unequip gear
+- mobile controls are wonky
+- when inspecting special items (when standing on their tiles) do not inspect surroundings
+- conflate directions
+- curse: enemy increase aggro
+- artifact modifier idea: boost equipped gear
 - big bell weight shouldnt be mentioned from distance
 - there should be less health potions in the world, especially once meat is introduced, meat will slowly regen HP
 - penalty for getting killed? option: permadeath. corpse left on the ground. here lies. killed by. 50% of items and gold can be retrieved. without permadeath it's the same but you keep the char and drop only gold.
@@ -81,6 +106,111 @@ that means creating game asks for a name and choosing avatar
   before identifying it just says "unidentified <item>"
   descriptions should also be procedurally generated, go wild.
 - merchant: add scroll of teleportation (to village) and more items, at least one shield and armor
+
+witch can enchant items, but also remove curses and identify artifacts
+
+randomly appearing ghost (far away) to freak player out
+
+curses ideas:
+- The HP loss curse stops while you're at full HP.
+- Hungry ... - you randomly lose 1 herb/mushroom
+- bad trip - all enemies are listed as stronger than they actually are
+- drunk - sometimes walks randomly
+- missing an attack hurts you (critical miss)
+- paralyzed fear - being close to enemy slows you down
+
+artifact idea:
+- Charismatic ... - decrease merchant prices
+- wind walker - no SPD penalty on terrain
+
+synergies:
+Dancer's Ring - If your attack delay (grace) is ≤2, +2 SPD.
+Rapier of the Gale - If your SPD exceeds the enemy's SPD, +2 ATK.
+
+or every speed penalty gives additional DEF
+
+The Glass Cannon: +4 ATK while wearing no (heavy) armor and shield and when low on HP
+
+Windstep
+When your SPD exceeds the enemy's SPD by 3+, attacks have a chance to immediately move you one tile backward (before enemy manages to strike again).
+
+artifact idea:
+Killing a humanoid non-ghost spawns ghost (50% chance)
+
+being hurt attracts certain enemies
+
+make descriptions more coherent with bonus
+Guardian artifact
+Mechanics tend toward:
+DEF
+HP
+shielding
+protecting
+retaliation
+Description language:
+oath
+watch
+guard
+sentinel
+gate
+Haunting artifact
+Mechanics:
+SPD
+awareness
+enemy manipulation
+HP sacrifice
+Language:
+whisper
+dead
+shadow
+memory
+Greed artifact
+Mechanics:
+gold
+MF
+loot
+merchant interactions
+Language:
+coin
+hunger
+wealth
+hoard
+Knowledge artifact
+Mechanics:
+identification
+map
+enemy information
+sacrificing HP for power
+Language:
+forgotten
+scholar
+eye
+truth
+
+goblins should flee and get a swarm bonus when there is goblin nearby
+
+ghost can move behind walls
+
+!! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
+
+spider can pull the player towards it
+
+!! add Yeti!!!
+
+Barbarian Fur - prevents freezing in taiga
+
+The treasure hunter
+MF artifacts + Greed curse + gold-based artifact.
+The player becomes increasingly wealthy but increasingly vulnerable to the curse.
+
+The hermit
+Light armor + forest artifact + stealth/invisibility effects.
+Excellent at avoiding fights, weaker when cornered.
+
+The cursed scholar
+Knowledge artifact + identification/map effects + HP sacrifice.
+The player intentionally accepts danger in exchange for information.
+That last one especially feels like Vagabond.
 -->
 
 <!DOCTYPE html>
@@ -1003,7 +1133,7 @@ that means creating game asks for a name and choosing avatar
           // The fort is a direct surface destination in both directions.
           map = surfaceMap; currentZ = 0; currentCave = -1;
           if(surfaceMap[dwarvenRuin.y]) surfaceMap[dwarvenRuin.y][dwarvenRuin.x] = 'dwarvengate';
-          log('You climb back through the Dwarven gates into the mountain air.', 'info');
+          log('You climb back through the dwarven gates into the mountain air.', 'info');
           stopCameraAnimation(); snapCameraToPlayer(); minimapDirty = true; render(); updateHud();
           return true;
         }
@@ -1450,8 +1580,8 @@ that means creating game asks for a name and choosing avatar
       const ghost=ENEMY_TEMPLATES.find(t=>t.name==='Ghost');
       const ruinLevel=targetLevel ? -3 : -1;
       if(ghost){ for(let i=0;i<3;i++){ let gx=x0+randInt(-25,25), gy=y0+randInt(-18,18); if(cm[gy]?.[gx]==='marble'){ enemies.push({name:'Ghost',baseName:'Ghost',tier:ghost.tier||2,level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,hp:ghost.hp,maxHp:ghost.hp,atk:ghost.atk,def:ghost.def,spd:ghost.spd,fly:true,humanoid:false,evades:true,aggro:ghost.aggro??AGGRO_RANGE,x:gx,y:gy,homeX:gx,homeY:gy,homeTileType:'marble',alive:true,prefix:null,equipment:null}); } } }
-      for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of ale.','A workbench collapsed under its own tools.','A Dwarven lintel bears a name worn smooth by generations.'])}); }
-      const anvilSpot={x:x0+5,y:y0+2}; if(cm[anvilSpot.y]?.[anvilSpot.x]==='marble') groundItems.push({x:anvilSpot.x,y:anvilSpot.y,kind:'anvil',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'The abandoned Dwarven anvil is cold; its surface is scarred by a thousand unfinished blades.'});
+      for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of ale.','A workbench collapsed under its own tools.','A dwarven lintel bears a name worn smooth by generations.'])}); }
+      const anvilSpot={x:x0+5,y:y0+2}; if(cm[anvilSpot.y]?.[anvilSpot.x]==='marble') groundItems.push({x:anvilSpot.x,y:anvilSpot.y,kind:'anvil',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'The abandoned dwarven anvil is cold; its surface is scarred by a thousand unfinished blades.'});
       let artifactSpot=(cm[y0+14]?.[x0+22]==='marble')?{x:x0+22,y:y0+14}:null;
       if(!artifactSpot) for(let yy=minY+2;yy<maxY-1&&!artifactSpot;yy++) for(let xx=minX+2;xx<maxX-1&&!artifactSpot;xx++) if(cm[yy][xx]==='marble') artifactSpot={x:xx,y:yy};
       if(artifactSpot) groundItems.push({x:artifactSpot.x,y:artifactSpot.y,kind:'chest',tier:5,artifactGuaranteed:true,opened:false,level:ruinLevel,caveIndex:dwarvenRuin.caveIndex});
@@ -3979,8 +4109,8 @@ that means creating game asks for a name and choosing avatar
           const onto = map[ny][nx];
           if(onto === 'dwarvengate'){
             log(currentZ===0
-                    ? 'You stand beneath the open Dwarven gates. Press "inspect" to enter the settlement.'
-                    : 'You stand at the Dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
+                    ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
+                    : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
           } else if(onto === 'caveentrance'){
             log(currentZ===0
                     ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
@@ -4045,9 +4175,9 @@ that means creating game asks for a name and choosing avatar
       grave:"a lone grave, it is not finished and has no inscription",
       bigbell:"a big brass bell, far too heavy to carry",
       marble:"cracked marble flooring, stained by dust and old ash",
-      dwarvengate:"the sealed Dwarven gate, its lintel carved with a broken crown",
-      dwarvenstatue:"a ruined Dwarven sentinel, still watching the dark",
-      dwarvenwall:"a hewn Dwarven wall, scarred by collapse and time",
+      dwarvengate:"the sealed dwarven gate, its lintel carved with a broken crown",
+      dwarvenstatue:"a ruined dwarven sentinel, still watching the dark",
+      dwarvenwall:"a hewn dwarven wall, scarred by collapse and time",
       dwarvenrubble:"a dangerous heap of fallen masonry",
       dwarvenstatue:"an ancient stone column. It seems to have outlived everyone who built it. The column depicts proud dwarven warrior carved in stone, forever standing guard",
     };
@@ -4086,9 +4216,9 @@ that means creating game asks for a name and choosing avatar
       } else if(currentGround && currentGround.kind==='campfire'){
         log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info');
       } else if(currentGround && currentGround.kind==='ruinprop'){
-        log(`Abandoned Dwarven remains. ${currentGround.description}`, 'info');
+        log(`Abandoned dwarven remains. ${currentGround.description}`, 'info');
       } else if(currentGround && (currentGround.kind==='dwarvenremains' || currentGround.kind==='anvil')){
-        log(`${currentGround.kind==='anvil' ? 'An abandoned Dwarven anvil' : 'Dwarven remains'}. ${currentGround.description}`, 'info');
+        log(`${currentGround.kind==='anvil' ? 'An abandoned dwarven anvil' : 'dwarven remains'}. ${currentGround.description}`, 'info');
       } else if(currentGround && (currentGround.kind==='wheelbarrow' || currentGround.kind==='goldcoin')){
         log(currentGround.description, 'info');
       }
