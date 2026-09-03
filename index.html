@@ -5790,6 +5790,7 @@ That last one especially feels like Vagabond.
         merchantStock: merchantStock,
         foragedTiles: [...foragedTiles],
         gravediggerGraveKey: gravediggerGraveKey,
+        cemeteryTombstones: cemeteryTombstones,
       };
     }
 
@@ -6043,6 +6044,12 @@ That last one especially feels like Vagabond.
       // one. Older saves (pre this field) fall back to the map scan inside
       // ensureGravediggerGrave() itself.
       gravediggerGraveKey = typeof data.gravediggerGraveKey === 'string' ? data.gravediggerGraveKey : null;
+      // Cemetery tombstone names/dates/inscriptions live only in this dict -
+      // they cannot be reconstructed from the map's plain 'grave' tiles.
+      // Older saves predating this field will show generic grave text for
+      // existing tombstones (data genuinely wasn't saved), but going forward
+      // this keeps inscriptions intact across save/load.
+      cemeteryTombstones = (data.cemeteryTombstones && typeof data.cemeteryTombstones === 'object') ? data.cemeteryTombstones : {};
       ensureGravediggerGrave();
 
       groundItems = (data.groundItems||[]).map(g=>{

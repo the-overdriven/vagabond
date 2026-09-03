@@ -1696,6 +1696,10 @@ The story concerns:
 
 The generated cemetery contains ordinary Dwarven tombstones and exactly one anomalous tombstone.
 
+Each tombstone's name/dates/inscription is persisted across save/load
+alongside the grave tiles themselves, so reloading a save does not blank out
+cemetery inscriptions back to generic "unfinished grave" text.
+
 The odd tombstone has a future death date.
 
 It can be picked up as:
