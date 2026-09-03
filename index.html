@@ -3330,14 +3330,21 @@ That last one especially feels like Vagabond.
         player.speedPotionTurns--;
         if(player.speedPotionTurns === 0) log('The speed boost wears off.', 'info');
       }
-      if(player.godMode || player.invisibleTurns > 0){
+      const playerHidden = player.godMode || player.invisibleTurns > 0;
+      if(playerHidden){
         if(!player.godMode) player.invisibleTurns--;
         if(!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info');
-        return; // while invisible, enemies neither chase nor attack
       }
       const playerOnTemple = isTempleGround(map[player.y][player.x]);
       for(const e of enemies.slice()){
         if(!e.alive || !onCurrentLevel(e)) continue;
+        if(playerHidden){
+          // Invisibility blocks awareness and combat, but does not freeze the
+          // world: monsters continue their ordinary wandering behavior.
+          e.aware = false;
+          if(enemyIsOnScreen(e)) enemyWander(e);
+          continue;
+        }
         const distFromPlayer = Math.max(Math.abs(e.x-player.x), Math.abs(e.y-player.y));
         const shouldFlee = playerOnTemple && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE;
         if(shouldFlee){
