@@ -324,7 +324,12 @@ canvas{display:block;cursor:pointer}
     overflow-y:auto; padding-bottom:140px;
   }
   #invOverlay .panelbox{display:flex; flex-direction:column; min-height:0;}
-  #invOverlay .invlist{max-height:none; flex:1 1 auto; min-height:0;}
+  #invOverlay .invlist{
+    max-height:none; flex:1 1 auto; min-height:0;
+    /* The close bar is fixed over the bottom of the overlay. Keep enough
+       scrollable space after the final row for it to move above that bar. */
+    padding-bottom:90px; box-sizing:border-box;
+  }
   body.overlay-open #logpanel{
     position:fixed; left:0; bottom:0; z-index:110;
     width:100%; max-width:none; height:120px; box-sizing:border-box;
