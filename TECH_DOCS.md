@@ -201,7 +201,7 @@ Magic Find influences loot chances **and** loot quality:
 
 - Gold drops from enemies are currently disabled (see ï¿½43. Loot).
 - Artifact drop chance from enemy kills scales with MF using the same
-  `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 12%.
+  `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 4.8%.
 - Non-humanoid enemy gear drop chance scales with MF (unchanged: `+MF*0.02`),
   and MF also reduces the chance of that gear rolling one tier lower
   (`35% - MF*1%`, floor 5%).
@@ -1280,6 +1280,21 @@ Current content includes approximately:
 8 curse definitions
 ```
 
+After an enemy has rolled an artifact drop, the artifact effect tier is chosen
+uniformly from the effects available to that enemy tier. The current pool has
+4 tier-3 effects, 6 tier-4 effects, and 4 tier-5 effects:
+
+| Source enemy tier | Tier 3 effect | Tier 4 effect | Tier 5 effect |
+|---|---:|---:|---:|
+| 1-3 | 100% | 0% | 0% |
+| 4 | 40% | 60% | 0% |
+| 5 | 28.6% | 42.9% | 28.6% |
+
+Tier-1 and tier-2 sources fall back to the lowest available effect tier,
+which is currently tier 3. Magic Find gives a chance to treat the source as
+one tier higher before selecting the effect: `min(50%, MF x 3%)`. For example,
+MF 10 gives a 30% chance to use the next source tier's distribution.
+
 ---
 
 # 39. Artifact Naming
@@ -1404,21 +1419,31 @@ Artifact drop chance by enemy tier:
 
 | Tier | Base chance |
 |---|---:|
-| 1 | 1.00% |
-| 2 | 1.75% |
-| 3 | 2.50% |
-| 4 | 3.25% |
-| 5 | 4.00% |
+| 1 | 0.40% |
+| 2 | 0.70% |
+| 3 | 1.00% |
+| 4 | 1.30% |
+| 5 | 1.60% |
 
-The actual enemy-drop chance is 40% of these base values, making artifacts
-60% rarer than the values shown above. Magic Find still modifies the reduced
-chance. Guaranteed artifact chests are unaffected.
+These are the chances for any artifact to drop from an enemy; higher-tier
+enemies intentionally have a higher artifact drop chance. They do not describe
+the chance of a high-tier artifact effect. When an artifact drops, its effect
+pool is limited by the enemy tier (with Magic Find occasionally allowing one
+tier higher), so high-tier effects remain available only from stronger and
+rarer sources. Magic Find modifies the drop chances below. Guaranteed artifact
+chests are unaffected.
 
-Artifact chance is capped at:
+Any-artifact enemy drop chance is capped at:
 
 ```text
 4.8%
 ```
+
+The cap is reached only at high Magic Find. The minimum MF needed is
+approximately 220 for tier 1, 117 for tier 2, 76 for tier 3, 54 for tier 4,
+or 40 for tier 5. Therefore, a 4.8% chance for any artifact is possible
+against a tier-5 enemy when the player has MF 40 or higher; lower-tier enemies
+require even more MF.
 
 Artifact chance and quality (effect tier, curse odds) scale with Magic Find
 (see "Magic Find" above).
