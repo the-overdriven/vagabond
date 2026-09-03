@@ -1280,9 +1280,8 @@ Enemy kills can provide:
 1. Equipment/other loot
 2. Artifacts (low chance)
 
-Also: 
 <details>
-<summary>Mysterious tombstones (only liches)</summary>
+<summary>Also</summary>
 Mysterious tombstones (only liches)
 </details>
 
