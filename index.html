@@ -1,10 +1,5 @@
 <!-- TODO:
 
-- move whole CSS to dedicated css files
-- inventory has limited height on mobile, let it expand until until the remaining available height
-- on desktop, when hovering on walkable tiles show autopath's path,
-also, automatically stop the autopath when an enemy attacks us
-
 - [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
 The bell is here. It hangs silently in the tower, exactly where it belongs.
 - [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
@@ -2932,6 +2927,7 @@ That last one especially feels like Vagabond.
       }
     }
     function enemyAttackPlayer(e, isExtraAttack=false){
+      clearAutoPath();
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null;
       const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : '';
@@ -3569,6 +3565,7 @@ That last one especially feels like Vagabond.
     // reads as stuttering.
     let pendingMove = null;
     let autoPath = null;
+    let hoveredAutoPath = null;
     function flushPendingMove(){
       if(autoPath && autoPath.length){
         const next = autoPath.shift();
@@ -3586,6 +3583,9 @@ That last one especially feels like Vagabond.
     }
     function clearAutoPath(){
       autoPath = null;
+    }
+    function clearHoveredAutoPath(){
+      if(hoveredAutoPath){ hoveredAutoPath = null; render(); }
     }
     function findPlayerPath(targetX, targetY){
       if(targetX<0 || targetY<0 || targetX>=MAP_W || targetY>=MAP_H) return null;
@@ -4330,14 +4330,29 @@ That last one especially feels like Vagabond.
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         drawCreature(vx,vy,n.name[0], '#ffffff');
       }
-      // planned movement path
-      if(autoPath && autoPath.length){
-        for(const step of autoPath){
+      // planned movement path, or the route a desktop click would use
+      const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath;
+      if(previewPath && previewPath.length){
+        for(const step of previewPath){
           const pvx = Math.round((step.x-camX) * TILE_PX);
           const pvy = Math.round((step.y-camY) * TILE_PX);
           ctx.fillStyle = 'rgba(255,224,138,0.28)';
           ctx.fillRect(pvx+TILE_PX*0.25,pvy+TILE_PX*0.25,TILE_PX*0.5,TILE_PX*0.5);
         }
+        const last = previewPath[previewPath.length-1];
+        const lx = Math.round((last.x-camX) * TILE_PX);
+        const ly = Math.round((last.y-camY) * TILE_PX);
+        ctx.save();
+        ctx.fillStyle = 'rgba(20,14,10,0.9)';
+        ctx.beginPath();
+        ctx.arc(lx+TILE_PX*0.78, ly+TILE_PX*0.22, TILE_PX*0.18, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#ffe08a';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(previewPath.length), lx+TILE_PX*0.78, ly+TILE_PX*0.22);
+        ctx.restore();
       }
       // player
       {
@@ -4585,10 +4600,23 @@ That last one especially feels like Vagabond.
       lastMousePx = p.px;
       lastMousePy = p.py;
       updateTooltip();
+      if(!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim){
+        const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX);
+        const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
+        const blocked = enemies.some(e=>onCurrentLevel(e) && e.alive && e.x===mx && e.y===my) ||
+          (currentZ===0 && npcs.some(n=>n.x===mx && n.y===my));
+        const nextPath = blocked ? null : findPlayerPath(mx,my);
+        const oldEnd = hoveredAutoPath?.at(-1), newEnd = nextPath?.at(-1);
+        if(!oldEnd || !newEnd || oldEnd.x!==newEnd.x || oldEnd.y!==newEnd.y || hoveredAutoPath.length!==nextPath.length){
+          hoveredAutoPath = nextPath?.length ? nextPath : null;
+          render();
+        }
+      }
     });
     canvas.addEventListener('mouseleave', ()=>{
       lastMousePx=null; lastMousePy=null; tooltip.style.display='none';
       if(hoveredEnemy){ hoveredEnemy=null; render(); }
+      clearHoveredAutoPath();
     });
     function handleCanvasTap(clientX, clientY){
       if(mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim) return;
@@ -5879,7 +5907,7 @@ That last one especially feels like Vagabond.
 
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
       if(k==='m' || k==='M'){ ev.preventDefault(); toggleMap(); return; }
-      if(k==='Escape'){ toggleInv(false); toggleMap(false); toggleTrade(false); return; }
+      if(k==='Escape'){ clearAutoPath(); toggleInv(false); toggleMap(false); toggleTrade(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
       if(k==='g' || k==='G'){

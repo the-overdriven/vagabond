@@ -323,6 +323,8 @@ canvas{display:block;cursor:pointer}
     min-height:100%; box-sizing:border-box; border-radius:0;
     overflow-y:auto; padding-bottom:140px;
   }
+  #invOverlay .panelbox{display:flex; flex-direction:column; min-height:0;}
+  #invOverlay .invlist{max-height:none; flex:1 1 auto; min-height:0;}
   body.overlay-open #logpanel{
     position:fixed; left:0; bottom:0; z-index:110;
     width:100%; max-width:none; height:120px; box-sizing:border-box;
