@@ -2633,6 +2633,16 @@ The player intentionally accepts danger in exchange for information.
       return e || null;
     }
     function hunterDirection(q){
+      if(q?.type==='investigate_area' && Number.isFinite(q.targetX) && Number.isFinite(q.targetY)) {
+        const h=npcs.find(n=>n.name==='Old Hunter');
+        if(!h) return 'somewhere in the wilds';
+        const dx=q.targetX-h.x, dy=q.targetY-h.y;
+        if(Math.abs(dx)<3 && Math.abs(dy)<3) return 'nearby';
+        const ew=Math.abs(dx)>Math.abs(dy)*1.6 ? (dx>0?'east':'west') : '';
+        const ns=Math.abs(dy)>Math.abs(dx)*1.6 ? (dy>0?'south':'north') : '';
+        if(ew) return ew; if(ns) return ns;
+        return `${dy>0?'south':'north'}-${dx>0?'east':'west'}`;
+      }
       const e=hunterTargetEnemy(q); if(!e) return 'somewhere in the wilds';
       const h=npcs.find(n=>n.name==='Old Hunter');
       if(!h) return 'somewhere in the wilds';
@@ -2646,6 +2656,37 @@ The player intentionally accepts danger in exchange for information.
     function hunterLivingEnemies(){ hunterEnsureIds(); return enemies.filter(e=>e.alive && e.baseName && Number(e.tier||0)>=3); }
     function hunterPrefixedEnemies(){ return hunterLivingEnemies().filter(e=>!!e.prefix); }
     function hunterReward(){ return 100; }
+    function hunterInvestigationCandidate(){
+      // Investigation quests point to recognizable landmarks, never arbitrary
+      // walkable tiles. Cave entrances and the dwarven gate are the primary
+      // targets because the player can identify them immediately on the map.
+      const landmarkTiles = new Set(['caveentrance','dwarvengate']);
+      const candidates=[];
+      for(let y=1;y<MAP_H-1;y++) for(let x=1;x<MAP_W-1;x++){
+        const tile=map[y]?.[x];
+        if(landmarkTiles.has(tile) && Math.max(Math.abs(x-player.x),Math.abs(y-player.y))>=8)
+          candidates.push({x,y,tile});
+      }
+      if(!candidates.length) return null;
+      const target=candidates[randInt(0,candidates.length-1)];
+      return {
+        type:'investigate_area',
+        targetX:target.x,
+        targetY:target.y,
+        targetTile:target.tile,
+        targetLabel:target.tile==='dwarvengate' ? 'the dwarven fort entrance' : 'a cave entrance',
+        radius:0,
+        rewardXp:100
+      };
+    }
+    function checkOldHunterInvestigation(){
+      const q=oldHunterQuest;
+      if(!q || q.state!=='active' || q.type!=='investigate_area') return;
+      if(Math.max(Math.abs(player.x-q.targetX),Math.abs(player.y-q.targetY))<=q.radius){
+        q.progress=1; q.state='ready';
+        log(`You investigate the area. Whatever happened here, the Old Hunter should hear about it.`, 'info');
+      }
+    }
     function hunterCandidates(){
       hunterEnsureIds();
       const out=[]; const living=hunterLivingEnemies(); const marked=hunterPrefixedEnemies();
@@ -2670,6 +2711,8 @@ The player intentionally accepts danger in exchange for information.
     function generateOldHunterQuest(){
       if(oldHunterQuest && oldHunterQuest.state==='active') return oldHunterQuest;
       const options=hunterCandidates(); if(!options.length) return null;
+      const investigation=Math.random()<0.3 ? hunterInvestigationCandidate() : null;
+      if(investigation){ oldHunterQuest={id:`hunter_${++oldHunterQuestSerial}`,state:'active',giver:'Old Hunter',progress:0,createdAtTurn:0,...investigation}; return oldHunterQuest; }
       // Give a 50% chance to receive a killing quest, but only from
       // prefixed tier 3+ monsters. Item quests remain eligible otherwise.
       const killOptions=options.filter(q=>q.type==='kill_specific' || q.type==='kill_group');
@@ -2688,6 +2731,7 @@ The player intentionally accepts danger in exchange for information.
     function hunterFlavor(q){
       const place=pick(['the old road','the ruined fort','the edge of the forest','the abandoned cemetery','the mountain pass','the dark country beyond the chapel']);
       const reason=pick(['something has been feeding there','the tracks stop where the dead begin to walk','travellers have gone missing along that path','I found fresh blood where no living thing should have been','the silence has become too deep, even for these hills']);
+      if(q.type==='investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterDirection(q)} of here. Go there and investigate the place, then report back to me.`,`Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterDirection(q)} of here. Find the entrance and look carefully around it. Tell me what you discover.`]);
       if(q.type==='kill_specific') return pick([
         `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind — that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
         `Old Hunter says: I know the trail of a ${q.targetName}. It has crossed ${place}, ${hunterDirection(q)} of here, three nights in a row. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
@@ -2717,12 +2761,14 @@ The player intentionally accepts danger in exchange for information.
       if((oldHunterQuest.type==='kill_group' && oldHunterQuest.progress>=oldHunterQuest.required) || oldHunterQuest.progress>=1) oldHunterQuest.state='ready';
     }
     function hunterActiveFlavor(q){
+      if(q.type==='investigate_area') return `Old Hunter says: Have you investigated the area yet? I am still waiting to hear what you found.`;
       if(q.type==='kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterDirection(q)} of here.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterDirection(q)} of here.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterDirection(q)} of here, and do not mistake another beast for it.`]);
       if(q.type==='kill_group') return pick([`Old Hunter says: The trouble ${hunterDirection(q)} of here has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterDirection(q)} of here.`, `Old Hunter says: The hills ${hunterDirection(q)} of here are not quiet yet. Do what you went out there to do.`]);
       if(q.type==='recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`]);
       return pick([`Old Hunter says: The missing ${q.targetItemName} has not found its way back yet. Keep searching.`, `Old Hunter says: I still need that ${q.targetItemName}. Somewhere, it is waiting to be found.`, `Old Hunter says: The trail to the lost ${q.targetItemName} has not gone cold. Not yet.`]);
     }
     function hunterCompletionFlavor(q){
+      if(q.type==='investigate_area') return `Old Hunter says: You investigated the area. Good. I can put that worry to rest.`;
       if(q.type==='kill_specific') return `Old Hunter says: You dealt with that particular beast. Good. I can finally sleep easier.`;
       if(q.type==='kill_group') return `Old Hunter says: You thinned their numbers. The roads should be quieter now. Thank you.`;
       if(q.type==='recover_item') return `Old Hunter says: You brought my ${q.targetItemName} back. I thought I would never see it again. Thank you.`;
@@ -4022,6 +4068,7 @@ The player intentionally accepts danger in exchange for information.
       const fromPos = {x:player.x, y:player.y};
       if(isWalkableForPlayer(nx,ny)){
         player.x = nx; player.y = ny;
+        checkOldHunterInvestigation();
         player.steps++;
         checkGroundAt(nx,ny);
         checkWorldEdge();
