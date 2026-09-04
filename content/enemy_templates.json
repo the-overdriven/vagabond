@@ -14,7 +14,7 @@
   {"name":"Giant Crab",   "hp":28,  "atk":4,  "def":5, "spd":3, "tier":2, "aggro":3, "biomes":["sand","river"],          "evades": false, "humanoid": false, "fly":null},
   {"name":"Scorpion",     "hp":16,  "atk":6,  "def":2, "spd":2, "tier":2, "aggro":2, "biomes":["sand","hill"],           "evades": false, "humanoid": false, "fly":null},
   {"name":"Lizard Man",   "hp":32,  "atk":6,  "def":3, "spd":2, "tier":2, "aggro":3, "biomes":["river","forest"],        "evades": false, "humanoid": true,  "fly":null},
-  {"name":"Lion",         "hp":36,  "atk":7,  "def":3, "spd":4, "tier":2, "aggro":3, "biomes":["grass","sand"],          "evades": false, "humanoid": false, "fly":null},
+  {"name":"Lion",         "hp":36,  "atk":7,  "def":3, "spd":4, "tier":3, "aggro":3, "biomes":["grass","sand"],          "evades": false, "humanoid": false, "fly":null},
   {"name":"Ghoul",        "hp":40,  "atk":5,  "def":3, "spd":2, "tier":3, "aggro":2, "biomes":["grass","forest","hill"], "evades": false, "humanoid": true,  "fly":null},
   {"name":"Ghost",        "hp":30,  "atk":6,  "def":2, "spd":3, "tier":3, "aggro":3, "biomes":["forest","hill","snow"],  "evades": false, "humanoid": true,  "fly":true},
   {"name":"Orc",          "hp":36,  "atk":7,  "def":3, "spd":3, "tier":3, "aggro":3, "biomes":["hill","grass","forest"], "evades": false, "humanoid": true,  "fly":null},

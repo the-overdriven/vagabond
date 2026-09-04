@@ -4541,6 +4541,10 @@ The player intentionally accepts danger in exchange for information.
     const FX_ANIM_MS = 420;
     const DAMAGE_ANIM_MS = 650;
     const ENEMY_COLORS = {1:'#b8b8b8',2:'#d98a3a',3:'#4aa3d1',4:'#b565d6',5:'#e0473f'};
+    function enemyGlyph(e){
+      const ch = e.name.replace(/^[A-Za-z]+ /,'')[0];
+      return e.tier <= 2 ? ch.toLowerCase() : ch;
+    }
     function groundGlyph(g){
       if(g.kind==='chest') return {ch:'$', color:'#e8c14a'};
       if(g.kind==='deadbody') return {ch:'☠', color:'rgb(232, 162, 79)'};
@@ -4565,8 +4569,7 @@ The player intentionally accepts danger in exchange for information.
       spawnFxAnim(g.x, g.y, glyph.ch, glyph.color, -1);
     }
     function spawnDeathAnim(e){
-      const ch = e.name.replace(/^[A-Za-z]+ /,'')[0];
-      spawnFxAnim(e.x, e.y, ch, ENEMY_COLORS[e.tier], 1);
+      spawnFxAnim(e.x, e.y, enemyGlyph(e), ENEMY_COLORS[e.tier], 1);
     }
     function spawnDamageNumber(x, y, amount, color, delay){
       damageAnims.push({x, y, amount, color, start:performance.now(), delay:delay || 0});
@@ -4821,7 +4824,7 @@ The player intentionally accepts danger in exchange for information.
         if(vx<-TILE_PX||vy<-TILE_PX||vx>canvas.width||vy>canvas.height) continue;
         // no tile background is painted, so a sliding enemy doesn't drag a solid
         // tile-coloured block across the terrain it is walking over
-        drawCreature(vx,vy,e.name.replace(/^[A-Za-z]+ /,'')[0], ENEMY_COLORS[e.tier]);
+        drawCreature(vx,vy,enemyGlyph(e), ENEMY_COLORS[e.tier]);
 
         if(e.aware){
           ctx.strokeStyle = 'rgba(255,106,93,0.95)';
