@@ -2133,10 +2133,10 @@ The player intentionally accepts danger in exchange for information.
     // 8 XP/minute. These are per-level costs (not cumulative XP), so the early
     // curve can match the measured 3 -> 5 -> 7.5 minute pacing while the late
     // curve accelerates sharply.
-    const XP_TO_NEXT = [20, 24, 29, 35, 40, 56, 80, 104, 200, 240, 400, 480, 720, 960];
+    const XP_TO_NEXT = [40, 48, 58, 70, 80, 112, 160, 208, 400, 480, 800, 960, 1440, 1920];
     function xpToNext(lvl){
       if(lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1];
-      return Math.round(960 * Math.pow(lvl / 14, 2.2));
+      return Math.round(1920 * Math.pow(lvl / 14, 2.2));
     }
     function recalcDerived(){
       // bonuses from modifiers on equipped gear + inventory 'vital'/'lucky' aren't passive; only equipped gear counts

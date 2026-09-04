@@ -225,28 +225,28 @@ XP required for the next level uses a fast early-game calibration followed by
 a steep progression curve:
 
 ```text
-level 1 -> 2: 20 XP
-level 2 -> 3: 24 XP
-level 3 -> 4: 29 XP
-level 4 -> 5: 35 XP
-level 5 -> 6: 40 XP
-level 6 -> 7: 56 XP
-level 7 -> 8: 80 XP
-level 8 -> 9: 104 XP
-level 9 -> 10: 200 XP
-level 10 -> 11: 240 XP
-level 11 -> 12: 400 XP
-level 12 -> 13: 480 XP
-level 13 -> 14: 720 XP
-level 14 -> 15: 960 XP
+level 1 -> 2: 40 XP
+level 2 -> 3: 48 XP
+level 3 -> 4: 58 XP
+level 4 -> 5: 70 XP
+level 5 -> 6: 80 XP
+level 6 -> 7: 112 XP
+level 7 -> 8: 160 XP
+level 8 -> 9: 208 XP
+level 9 -> 10: 400 XP
+level 10 -> 11: 480 XP
+level 11 -> 12: 800 XP
+level 12 -> 13: 960 XP
+level 13 -> 14: 1,440 XP
+level 14 -> 15: 1,920 XP
 
-For level 15 onward, the threshold is `round(960 x (level / 14)^2.2)`.
+For level 15 onward, the threshold is `round(1,920 x (level / 14)^2.2)`.
 ```
 
 i.e.
-Level 15 → 16: 1,117 XP
-Level 16 → 17: 1,288 XP
-Level 20 → 21: 2,104 XP
+Level 15 → 16: 2,234 XP
+Level 16 → 17: 2,576 XP
+Level 20 → 21: 2,208 XP
 
 This produces approximately levels 2–15 at 3, 5, 7.5, 10, 15, 22, 32, 45,
 70, 100, 150, 210, 300, and 420 minutes respectively. Actual timing varies
@@ -1613,7 +1613,7 @@ As for all consumable, the effect is increased for Wyrdling race.
 
 Identifies an artifact.
 
-Chest loot odds for consumables/gold/gear are resolved from one roll out of 110. 
+Chest loot odds for consumables/gold/gear are resolved from one roll out of 110.
 Current approximate shares: gold 41%, gear 18%, Life Potion 18%, Scroll of
 Invisibility 5.5%, Potion of Speed 8%, Scroll of Identification **9%**.
 
