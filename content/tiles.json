@@ -196,12 +196,6 @@
       "bg": "transparent",
       "walk": true
     },
-    "cryptgrave": {
-      "ch": "⚰",
-      "color": "#aaa39a",
-      "bg": "#171412",
-      "walk": true
-    },
     "coffin": {
       "ch": "⚰",
       "color": "#aaa39a",
@@ -237,7 +231,6 @@
     "belltower": "y",
     "ruinedchapel": "c",
     "grave": "e",
-    "cryptgrave": "Q",
     "coffin": "q",
     "bigbell": "z",
     "cavefloor": ".",
@@ -279,7 +272,6 @@
     "belltower": "the Temple's bell tower - the bell itself seems to be missing",
     "ruinedchapel": "a ruined chapel, forgotten by both the living and the gods",
     "grave": "a lone grave, it is not finished and has no inscription",
-    "cryptgrave": "an empty grave in the crypt",
     "coffin": "a stone coffin in the crypt",
     "bigbell": "a big brass bell, far too heavy to carry",
     "marble": "cracked marble flooring, stained by dust and old ash",

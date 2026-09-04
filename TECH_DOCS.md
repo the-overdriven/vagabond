@@ -608,9 +608,11 @@ It is not generated as a normal random cave.
 Crypt coffins use their own four crypt inscriptions; they are unrelated to the
 mysterious tombstone inscriptions dropped by Liches. Each of the four lines is
 assigned to one coffin only. If the crypt contains more coffins than lines,
-the remaining coffins say `Stone coffin. It's empty.`. All crypt burial tiles
-use the `⚰️` symbol. The unfinished-grave description is reserved for the
-Gravedigger's grave and is not used in the crypt.
+one additional coffin says `Stone coffin. It's empty.` and all remaining
+coffins say `Stone coffin. The slab is heavy.`. Coffins use the `⚰` symbol and
+are the only burial tile generated in the crypt. The unfinished-grave
+description is reserved for the Gravedigger's grave and is not used in the
+crypt.
 
 The crypt has dedicated transition text: entering says the player descends
 beneath the ruined chapel, and leaving says the player climbs out of the crypt

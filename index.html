@@ -4496,7 +4496,7 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function tileBackground(x,y,tileKey){
-      if(tileKey==='coffin' || tileKey==='cryptgrave') return '#171412';
+      if(tileKey==='coffin') return '#171412';
       const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x,y)] || tileKey) : tileKey);
       const base = TILE[baseKey];
       return base ? base.bg : '#050403';
@@ -4732,8 +4732,8 @@ The player intentionally accepts danger in exchange for information.
           const py = Math.round((my-camY) * TILE_PX);
           const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx,my));
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          const glyph = tileKey==='coffin' || tileKey==='cryptgrave' ? '⚰' : t.ch;
-          const color = tileKey==='coffin' || tileKey==='cryptgrave' ? '#aaa39a' : (tree ? '#164c23' : (foraged ? '#554f2a' : t.color));
+          const glyph = tileKey==='coffin' ? '⚰' : t.ch;
+          const color = tileKey==='coffin' ? '#aaa39a' : (tree ? '#164c23' : (foraged ? '#554f2a' : t.color));
           drawTile(px,py,tree ? '\u2663' : glyph,color,tileBackground(mx,my,tileKey));
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
@@ -5211,7 +5211,7 @@ The player intentionally accepts danger in exchange for information.
       const under = TILE[underKey] || t;
       const foraged = tileKey==='forest' && foragedTiles.has(keyXY(x,y));
       const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x];
-      c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='coffin' || tileKey==='cryptgrave' ? '#aaa39a' : (tileKey==='grave' || tileKey==='taiga'
+      c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='coffin' ? '#aaa39a' : (tileKey==='grave' || tileKey==='taiga'
         ? (under.mini || under.color) : (t.mini || t.color)))) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
@@ -6117,11 +6117,11 @@ The player intentionally accepts danger in exchange for information.
         const crypt=caves[cryptCaveIndex];
         for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
           const key=keyXY(x,y), tile=caveMaps[cryptCaveIndex][y][x];
-          if(tile==='grave' || tile==='cryptgrave' || key===crypt?.emptyGrave) caveMaps[cryptCaveIndex][y][x]='coffin';
+          if(tile==='grave') caveMaps[cryptCaveIndex][y][x]='coffin';
           else if(tile==='cavefloor') caveMaps[cryptCaveIndex][y][x]='cryptfloor';
         }
-        // Re-stamp all declared crypt burial positions. This repairs older
-        // saves whose legacy tile codes decoded as cave walls or other tiles.
+        // Re-stamp all declared crypt burial positions from the current world
+        // descriptor so the merged map always matches the generated layout.
         const cryptInscriptions={};
         for(let i=0;i<(crypt.graves||[]).length;i++){
           const key=crypt.graves[i], [x,y]=key.split(',').map(Number);
@@ -6147,7 +6147,7 @@ The player intentionally accepts danger in exchange for information.
         }
       }
       // Crypt burial positions are authoritative descriptor data. Re-stamp
-      // them after merging so legacy saves cannot leave them as cave walls.
+      // them after merging so the final map matches the crypt layout.
       if(cryptCaveIndex>=0){
         for(const key of caves[cryptCaveIndex].graves || []){
           const [x,y]=key.split(',').map(Number);
