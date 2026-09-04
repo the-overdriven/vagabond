@@ -3993,6 +3993,7 @@ The player intentionally accepts danger in exchange for information.
     // searched once - repeating it just confirms it's already been picked
     // over, so players can't farm the same spot for infinite herbs.
     let foragedTiles = new Set();
+    let dugSandTiles = new Set();
     let suppressLootLog = false;
     let lastLootResult = '';
     // Forage odds/results come from content/loot_tables.json's `forage` table.
@@ -4033,6 +4034,7 @@ The player intentionally accepts danger in exchange for information.
         return;
       }
       const key = keyXY(player.x, player.y);
+      dugSandTiles.add(key);
       if(treasureMapSpot && key === keyXY(treasureMapSpot.x, treasureMapSpot.y)){
         const existing = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y && g.kind==='treasurecasket');
         if(existing){ log('You have already unearthed the old rotten casket.', 'info'); return; }
@@ -4043,7 +4045,7 @@ The player intentionally accepts danger in exchange for information.
       const roll = randInt(1,100);
       if(roll <= 5) log('You hit something hard. It turns out to be a stone.', 'loot');
       else if(roll <= 8){ player.gold += 1; log('Your shovel uncovers a gold coin.', 'loot'); }
-      else if(roll <= 11){ player.inventory.push({kind:'seashell',name:'Seashell',value:10}); log('You uncover a pretty seashell.', 'loot'); }
+      else if(roll <= 11){ player.inventory.push({kind:'seashell',name:'Seashell',value:10}); log('You uncover a pretty seashell, worth 10 gold.', 'loot'); }
       else if(roll <= 13) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot');
       else if(roll <= 16){
         const spots=[];
@@ -4740,6 +4742,7 @@ The player intentionally accepts danger in exchange for information.
       if(tileKey==='coffin') return '#171412';
       const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x,y)] || tileKey) : tileKey);
       const base = TILE[baseKey];
+      if(baseKey==='sand' && dugSandTiles.has(keyXY(x,y))) return '#9a8050';
       return base ? base.bg : '#050403';
     }
 
@@ -6318,6 +6321,7 @@ The player intentionally accepts danger in exchange for information.
         tombstoneOrder: tombstoneOrder,
         merchantStock: merchantStock,
         foragedTiles: [...foragedTiles],
+        dugSandTiles: [...dugSandTiles],
         gravediggerGraveKey: gravediggerGraveKey,
         cemeteryTombstones: cemeteryTombstones,
       };
@@ -6624,6 +6628,7 @@ The player intentionally accepts danger in exchange for information.
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : [];
       ensureMerchantStock();
       foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : []);
+      dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : []);
 
       enemies = (data.enemies||[]).map(e=>{
         const tmpl = enemyTemplateForSavedEnemy(e);
