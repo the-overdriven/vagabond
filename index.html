@@ -1,5 +1,6 @@
 <!-- TODO:
 
+- [mysteriando] the shoddy staircase should be unlocked by stepping on a pressure plate
 - [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
 The bell is here. It hangs silently in the tower, exactly where it belongs.
 - [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
@@ -339,6 +340,15 @@ The player intentionally accepts danger in exchange for information.
         </div>
       </div>
     </div>
+    <div class="overlay" id="treasureMapOverlay">
+      <div class="panelbox">
+        <h2>Old Treasure Map</h2><button class="slbtn overlay-close" id="btnTreasureMapClose" type="button" aria-label="Close map">✕</button>
+        <canvas id="treasureMapCanvas"></canvas>
+        <div class="closehint">
+          <button class="slbtn" id="btnTreasureMapCloseBottom" type="button">Close</button>
+        </div>
+      </div>
+    </div>
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
         <h2 id="tradeTitle">Trade with the Merchant</h2>
@@ -476,6 +486,17 @@ The player intentionally accepts danger in exchange for information.
       'There is an inscription engraved on the stone coffin: Here lies the man who rang the bell.',
       'There is an inscription engraved on the stone coffin: The only safe place is where the living would never look.'
     ];
+    // Crypt level 2 (z:-4): a single dedicated tighter/darker map beneath the
+    // crypt, reached via cryptstairsdown/cryptstairsup rather than the shared
+    // z:-2 cavedown/caveup depth chain (which the crypt's own tiles never
+    // match, keeping it fully separate from that shared layer and from the
+    // Dwarven Fort's reserved z:-3).
+    let cryptLevel2 = null; // {map, discovered, x, y, trapSprung, trapPos}
+    let treasureMapSpot = null; // {x,y} sand tile the treasure map points to
+    const CRYPT2_EXPLORER_FLAVOR = "The bones of a long-dead explorer lie curled beside a collapsed sarcophagus. A satchel, rotted to scraps, rests beside them.";
+    const CRYPT2_TRAP_DISCOVER = "The lid of this sarcophagus lies askew, scraped aside from within. Dust has settled unevenly around it, as if something clawed its way out long ago.";
+    const CRYPT2_TRAP_TRIGGER = "Stone grinds against stone as the sarcophagus lid slides free. All around you, bones stir in their burial niches and rise.";
+    const CRYPT2_TRAP_SPENT = "The sarcophagus stands open and empty. Whatever rose from it is already loose in the dark.";
     let cemeteryTombstones = {};
     let gravediggerGraveKey = null;
     let oldHunterQuest = null;
@@ -557,6 +578,40 @@ The player intentionally accepts danger in exchange for information.
       EDGE_XP = content.mapConfig.exploration.edgeRewardXp;
       MIN_LICHES = content.mapConfig.spawning.minLiches;
       MERCHANT_STOCK_CONFIG = content.merchantStockConfig;
+      injectCryptLevel2Content();
+    }
+    // Crypt level 2 introduces a few new tile types. Rather than requiring an
+    // edit to the (externally hosted) content/tiles.json, they're patched
+    // into the loaded tile tables here at runtime.
+    function injectCryptLevel2Content(){
+      const defs = {
+        cryptstairsdown: {walk:true,  ch:'>', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
+        cryptstairsup:   {walk:true,  ch:'<', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
+        crypt2floor:     {walk:true,  ch:'.', color:'#4c463c', bg:'#050403', mini:'#221f1a'},
+        cryptrubble:     {walk:true,  ch:'%', color:'#443f34', bg:'#050403', mini:'#221f1a'},
+        crypt2niche:     {walk:false, ch:'n', color:'#2a261e', bg:'#050403', mini:'#161310'},
+        sarcophagus:     {walk:true,  ch:'\u26B0', color:'#6a6255', bg:'#050403', mini:'#332f27'},
+        crypttrap:       {walk:true,  ch:'\u26B0', color:'#8a5a3c', bg:'#050403', mini:'#332f27'},
+        crypttrapsprung: {walk:true,  ch:'\u26B0', color:'#39352d', bg:'#050403', mini:'#1c1a16'},
+      };
+      const codes = {
+        cryptstairsdown:'\u2401', cryptstairsup:'\u2402', crypt2floor:'\u2403',
+        cryptrubble:'\u2404', crypt2niche:'\u2405', sarcophagus:'\u2406',
+        crypttrap:'\u2407', crypttrapsprung:'\u2408',
+      };
+      const descs = {
+        cryptstairsdown: 'a shoddy old stone staircase leading down',
+        cryptstairsup: 'a shoddy old stone staircase leading up',
+        crypt2floor: 'cracked, ancient stone floor',
+        cryptrubble: 'a collapsed section of the passage',
+        crypt2niche: 'a burial niche carved into the stone',
+        sarcophagus: 'an old stone sarcophagus',
+        crypttrap: 'an old stone sarcophagus',
+        crypttrapsprung: 'a shattered, empty sarcophagus',
+      };
+      for(const [key,def] of Object.entries(defs)) TILE[key] = def;
+      for(const [key,c] of Object.entries(codes)){ TILE_CODE[key]=c; CODE_TILE[c]=key; }
+      Object.assign(TILE_DESC, descs);
     }
     const preloadedImageUrls = new Map();
     // Fetches images as blobs so tooltips keep working fully offline. Pass a
@@ -660,7 +715,7 @@ The player intentionally accepts danger in exchange for information.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
     // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
     // level never means adding another transition tile type.
-    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup']);
+    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup','cryptstairsdown','cryptstairsup']);
 
     function makeNoise(cellsX, cellsY){
       const grid = [];
@@ -776,6 +831,16 @@ The player intentionally accepts danger in exchange for information.
         currentZ = -nextDepth;
         map = nextMap; undergroundDiscovered = depthUndergroundDiscovered(nextDepth);
         log('You squeeze through the crack and descend deeper into the dark.', 'info');
+      } else if(tile === 'cryptstairsdown'){
+        if(!cryptLevel2) return false;
+        currentZ = -4; currentCave = -1;
+        map = cryptLevel2.map; undergroundDiscovered = cryptLevel2.discovered;
+        log('The staircase descends into darkness. The ceiling is low here, and the old stone presses close around you. You have to stoop as you descend.', 'info');
+      } else if(tile === 'cryptstairsup'){
+        if(cryptCaveIndex < 0) return false;
+        currentCave = cryptCaveIndex; currentZ = -1;
+        map = undergroundMap; undergroundDiscovered = undergroundDiscoveredL1;
+        log('You climb back toward the light. The low ceiling forces you to stoop, and the old stone seems to press closer with every step.', 'info');
       } else if(tile === 'caveup'){
         if(currentZ === -3 && dwarvenRuin){
           // The fort is a direct surface destination in both directions.
@@ -1137,6 +1202,15 @@ The player intentionally accepts danger in exchange for information.
         }
         console.warn(`Discarding world ${attempt}: the crypt is connected to a random cave. Generating a new world.`);
       }
+      placeTreasureMapSpot();
+    }
+    // Picks the sand tile the treasure map's X marks. Chosen once per world so
+    // the map item is a genuine, resolvable clue rather than decoration.
+    function placeTreasureMapSpot(){
+      treasureMapSpot = null;
+      const sandTiles = [];
+      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(surfaceMap[y][x]==='sand') sandTiles.push({x,y});
+      if(sandTiles.length) treasureMapSpot = pick(sandTiles);
     }
 
     function templeReachesEdge(){
@@ -1238,6 +1312,7 @@ The player intentionally accepts danger in exchange for information.
         }
       }
       buildCrypt();
+      buildCryptLevel2();
       const cryptInvalid = cryptConnectedToRandomCave();
       // z:-2: about half of the z:-1 caves get a stairway down into their own
       // small deeper cave, sharing one map with every other z:-2 cave (same
@@ -1311,6 +1386,74 @@ The player intentionally accepts danger in exchange for information.
       const cave={x:x0,y:y0,entrances:[{x:x0,y:y0}],crypt:true,graves:graves.map(g=>keyXY(g.x,g.y)),inscriptions};
       cryptCaveIndex=caves.length; caves.push(cave); caveMaps.push(cm);
       for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) if(cm[y][x]!=='cavewall') undergroundMap[y][x]=cm[y][x];
+    }
+
+    // A tighter, darker, more claustrophobic crypt level lives beneath the
+    // first. Reached only via a dedicated staircase at the southernmost,
+    // centre tile of the first level's aisle - never via the generic shared
+    // z:-2 cavedown/caveup chain. Level 1 itself is untouched here beyond
+    // stamping that one staircase tile.
+    function buildCryptLevel2(){
+      cryptLevel2 = null;
+      if(cryptCaveIndex < 0) return;
+      const crypt = caves[cryptCaveIndex];
+      const cm1 = caveMaps[cryptCaveIndex];
+      if(!crypt || !cm1) return;
+      const x0 = crypt.x;
+      let stairY = -1;
+      for(let y=MAP_H-1; y>=0; y--){ if(cm1[y] && cm1[y][x0]==='cryptfloor'){ stairY=y; break; } }
+      if(stairY < 0) return;
+      cm1[stairY][x0] = 'cryptstairsdown';
+      if(undergroundMap[stairY] && undergroundMap[stairY][x0] !== undefined) undergroundMap[stairY][x0] = 'cryptstairsdown';
+
+      const cm2 = blankCaveMap();
+      const minX = Math.max(2, x0-2), maxX = Math.min(MAP_W-3, x0+2);
+      const minY = Math.max(2, stairY-16), maxY = Math.min(MAP_H-3, stairY);
+      for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) cm2[y][x] = 'crypt2floor';
+      cm2[stairY][x0] = 'cryptstairsup';
+
+      // Collapsed sections along the edges break up the corridor so it never
+      // reads as a clean, uniform hallway like the level above.
+      for(let i=0;i<Math.max(3,Math.round((maxY-minY)*0.3));i++){
+        const y = randInt(minY+1, maxY-1), x = chance(0.5) ? minX : maxX;
+        if(cm2[y][x]==='crypt2floor') cm2[y][x] = 'cryptrubble';
+      }
+      // A few forced pinch points make the passage genuinely tighter than
+      // level 1's open aisle.
+      for(let i=0;i<3;i++){
+        const y = randInt(minY+3, maxY-3);
+        if(chance(0.5)) cm2[y][minX] = 'cavewall'; else cm2[y][maxX] = 'cavewall';
+      }
+      // Burial niches lining the walls - decorative only.
+      for(let y=minY+1;y<maxY;y+=2){
+        if(cm2[y][minX-1] !== undefined && cm2[y][minX-1]==='cavewall' && chance(0.6)) cm2[y][minX-1] = 'crypt2niche';
+        if(cm2[y][maxX+1] !== undefined && cm2[y][maxX+1]==='cavewall' && chance(0.6)) cm2[y][maxX+1] = 'crypt2niche';
+      }
+      // A cluster of sarcophagi down the centre line - one is a trap, the
+      // rest are just atmosphere.
+      const spots = [];
+      for(let y=minY+2;y<maxY-1;y+=3) if(cm2[y][x0]==='crypt2floor') spots.push({x:x0,y});
+      for(let i=spots.length-1;i>0;i--){ const j=randInt(0,i); [spots[i],spots[j]]=[spots[j],spots[i]]; }
+      let trapPos = null;
+      spots.forEach((spot,i)=>{
+        if(i===0){ cm2[spot.y][spot.x]='crypttrap'; trapPos={x:spot.x,y:spot.y}; }
+        else cm2[spot.y][spot.x]='sarcophagus';
+      });
+
+      // A forgotten burial chamber at the far, deepest end holds a long-dead
+      // explorer and the treasure map.
+      const explorerSpot = {x:x0, y:Math.min(maxY, minY+1)};
+      if(cm2[explorerSpot.y] && cm2[explorerSpot.y][explorerSpot.x]==='crypt2floor' &&
+        !(trapPos && trapPos.x===explorerSpot.x && trapPos.y===explorerSpot.y)){
+        groundItems.push({x:explorerSpot.x, y:explorerSpot.y, kind:'explorerremains', level:-4, looted:false,
+          description: CRYPT2_EXPLORER_FLAVOR});
+      }
+
+      cryptLevel2 = {
+        map: cm2,
+        discovered: Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false)),
+        x: x0, y: stairY, trapSprung:false, trapPos,
+      };
     }
 
     // A constructed ruin deliberately occupies a broad, two-screen footprint.
@@ -3890,6 +4033,14 @@ The player intentionally accepts danger in exchange for information.
         groundItems.splice(groundItems.indexOf(wheelbarrow),1);
         log('You pick up the surprisingly light wheelbarrow.', 'loot'); draw(); return;
       }
+      const explorer = groundItems.find(g=>onCurrentLevel(g) && g.kind==='explorerremains' && g.x===player.x && g.y===player.y);
+      if(explorer){
+        if(explorer.looted){ log('You\'ve already searched these remains.', 'info'); return; }
+        explorer.looted = true;
+        player.inventory.push({kind:'treasuremap', name:'Old Treasure Map'});
+        log('Tucked beneath the ribs, you find a weathered, folded map.', 'loot');
+        draw(); return;
+      }
       const skeleton = groundItems.find(g=>onCurrentLevel(g) && g.kind==='skeleton' && g.x===player.x && g.y===player.y);
       const deadBody = groundItems.find(g=>onCurrentLevel(g) && g.kind==='deadbody' && g.x===player.x && g.y===player.y);
       if(deadBody){
@@ -3990,7 +4141,7 @@ The player intentionally accepts danger in exchange for information.
           groundItems.splice(i, 1);
         } else if(g.kind==='deadbody'){
           continue;
-        } else if(g.kind==='skeleton' || g.kind==='dwarvenremains' || g.kind==='anvil' || g.kind==='campfire'){
+        } else if(g.kind==='skeleton' || g.kind==='dwarvenremains' || g.kind==='anvil' || g.kind==='campfire' || g.kind==='explorerremains'){
           continue;
         } else if(g.kind==='potion'){
           addPotion();
@@ -4215,7 +4366,14 @@ The player intentionally accepts danger in exchange for information.
             log('You\'re standing over a narrow crack descending further into the dark. Press "inspect" to climb down.', 'info');
           } else if(onto === 'caveup'){
             log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info');
+          } else if(onto === 'cryptstairsdown'){
+            log('A shoddy old stone staircase leads down into deeper dark. Press "inspect" to descend.', 'info');
+          } else if(onto === 'cryptstairsup'){
+            log('The old stone staircase leads back up. Press "inspect" to climb up.', 'info');
           }
+        }
+        if(currentZ===-4 && cryptLevel2 && map[ny][nx]==='crypttrap'){
+          log(CRYPT2_TRAP_DISCOVER, 'info');
         }
         maybeSpawnForestAmbush(nx,ny);
         moved = true;
@@ -4272,6 +4430,34 @@ The player intentionally accepts danger in exchange for information.
       }
     }
     function describeSurroundings() {
+      if(currentZ===-4 && cryptLevel2 && map[player.y]?.[player.x]==='crypttrap'){
+        cryptLevel2.trapSprung = true;
+        map[player.y][player.x] = 'crypttrapsprung';
+        log(CRYPT2_TRAP_TRIGGER, 'bad');
+        const skeletonTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Skeleton') || {
+          name:'Skeleton', tier:1, hp:12, atk:5, def:2, spd:4, fly:false, humanoid:true, evades:false, aggro:AGGRO_RANGE,
+        };
+        const open = [];
+        for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){
+          const x=player.x+dx, y=player.y+dy;
+          if(map[y] && map[y][x]==='crypt2floor') open.push({x,y});
+        }
+        for(let i=0;i<3 && open.length;i++){
+          const p = open.splice(randInt(0,open.length-1),1)[0];
+          addEnemy({name:skeletonTmpl.name, baseName:skeletonTmpl.name, tier:skeletonTmpl.tier||1, level:-4,
+            hp:skeletonTmpl.hp, maxHp:skeletonTmpl.hp, atk:skeletonTmpl.atk, def:skeletonTmpl.def, spd:skeletonTmpl.spd,
+            fly:!!skeletonTmpl.fly, humanoid: skeletonTmpl.humanoid !== false, evades:!!skeletonTmpl.evades,
+            aggro: skeletonTmpl.aggro ?? AGGRO_RANGE, x:p.x, y:p.y, homeX:p.x, homeY:p.y, homeTileType:'crypt2floor',
+            alive:true, prefix:null, equipment:null});
+        }
+        return;
+      }
+      if(currentZ===-4 && map[player.y]?.[player.x]==='crypttrapsprung'){
+        log(CRYPT2_TRAP_SPENT, 'info'); return;
+      }
+      if(currentZ===-4 && map[player.y]?.[player.x]==='sarcophagus'){
+        log('An old stone sarcophagus, sealed and undisturbed.', 'info'); return;
+      }
       if(currentZ===-1 && cryptCaveIndex>=0 && map[player.y]?.[player.x]==='coffin'){
         const graveKey=keyXY(player.x,player.y);
         const stored=caves[cryptCaveIndex]?.inscriptions?.[graveKey];
@@ -4322,6 +4508,10 @@ The player intentionally accepts danger in exchange for information.
         inspectedGround = true;
       } else if(currentGround && (currentGround.kind==='wheelbarrow' || currentGround.kind==='goldcoin')){
         log(currentGround.description, 'info');
+        inspectedGround = true;
+      } else if(currentGround && currentGround.kind==='explorerremains'){
+        log(currentGround.description, 'info');
+        if(!currentGround.looted) log('There\'s something among the remains - press "F" to search them.', 'info');
         inspectedGround = true;
       } else if(currentGround && currentGround.kind==='deadbody'){
         log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info');
@@ -4386,9 +4576,10 @@ The player intentionally accepts danger in exchange for information.
                                   item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
                                     item.kind === 'goldcoin' ? 'a giant gold coin' :
                                       (item.kind === 'dwarvenremains' || item.kind === 'ruinprop') ? 'dwarven remains' :
-                                        item.kind === 'oddTombstone' ? 'a tombstone' :
-                                          item.kind === 'shovel' ? 'a shovel' :
-                                            'something';
+                                        item.kind === 'explorerremains' ? 'a long-dead explorer\'s remains' :
+                                          item.kind === 'oddTombstone' ? 'a tombstone' :
+                                            item.kind === 'shovel' ? 'a shovel' :
+                                              'something';
 
             addNote(label, direction);
             continue;
@@ -4759,6 +4950,7 @@ The player intentionally accepts danger in exchange for information.
         else if(g.kind==='dwarvenremains') drawTile(vx,vy,'¤', '#d0c7b4', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='anvil') drawTile(vx,vy,'♠', '#9d9d9d', tileBackground(g.x,g.y,map[g.y][g.x]));
         else if(g.kind==='ruinprop') drawTile(vx,vy,'¤', '#a89270', tileBackground(g.x,g.y,map[g.y][g.x]));
+        else if(g.kind==='explorerremains') drawTile(vx,vy,'☠', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x,g.y,map[g.y][g.x]));
       }
       // fx animations: symbol bumps up/down, shrinks, and fades out
       if(fxAnims.length){
@@ -5310,6 +5502,52 @@ The player intentionally accepts danger in exchange for information.
       ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#ffffff';
       ctx.fillRect((player.x-ox)*scale-1, (player.y-oy)*scale-1, dot, dot);
     }
+    // Compass + rough-distance clue relative to the village, so the treasure
+    // map points to a real, resolvable spot rather than being decorative.
+    function treasureMapClueText(){
+      if(!treasureMapSpot) return 'The parchment is too faded to make out any clue.';
+      const origin = villageCenter || spawnPoint;
+      const dx = treasureMapSpot.x - origin.x, dy = treasureMapSpot.y - origin.y;
+      const ns = Math.abs(dy) > Math.abs(dx)*0.5 ? (dy<0?'north':'south') : '';
+      const ew = Math.abs(dx) > Math.abs(dy)*0.5 ? (dx<0?'west':'east') : '';
+      const dir = (ns+ew) || 'nearby';
+      const dist = Math.round(Math.max(Math.abs(dx), Math.abs(dy)));
+      const far = dist > 60 ? 'a great distance' : dist > 25 ? 'a fair distance' : 'not far';
+      return `A shaky hand has marked a lone X beside a stretch of dunes, ${far} to the ${dir} of the village.`;
+    }
+    function inspectTreasureMap(){
+      log('You unfold the old map. Faded ink traces the shape of the coastline, and a single X is marked beside a patch of sand.', 'info');
+      log(treasureMapClueText(), 'info');
+      toggleTreasureMap(true);
+    }
+    const treasureMapCanvas = document.getElementById('treasureMapCanvas');
+    const tmCtx = treasureMapCanvas && treasureMapCanvas.getContext('2d');
+    const TM_SCALE = 2;
+    function renderTreasureMapCanvas(){
+      if(!tmCtx) return;
+      treasureMapCanvas.width = MAP_W*TM_SCALE; treasureMapCanvas.height = MAP_H*TM_SCALE;
+      tmCtx.fillStyle = '#d8c9a3';
+      tmCtx.fillRect(0,0,treasureMapCanvas.width,treasureMapCanvas.height);
+      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+        const t = TILE[surfaceMap[y][x]];
+        tmCtx.fillStyle = t ? (t.mini || t.color) : '#000';
+        tmCtx.fillRect(x*TM_SCALE, y*TM_SCALE, TM_SCALE, TM_SCALE);
+      }
+      if(treasureMapSpot){
+        const cx = treasureMapSpot.x*TM_SCALE + TM_SCALE/2, cy = treasureMapSpot.y*TM_SCALE + TM_SCALE/2;
+        tmCtx.strokeStyle = '#8a1c1c'; tmCtx.lineWidth = 3;
+        tmCtx.beginPath(); tmCtx.moveTo(cx-6,cy-6); tmCtx.lineTo(cx+6,cy+6);
+        tmCtx.moveTo(cx+6,cy-6); tmCtx.lineTo(cx-6,cy+6); tmCtx.stroke();
+      }
+    }
+    let treasureMapOpen = false;
+    function toggleTreasureMap(force){
+      const next = (force!==undefined) ? force : !treasureMapOpen;
+      treasureMapOpen = next;
+      const overlay = document.getElementById('treasureMapOverlay');
+      if(overlay) overlay.classList.toggle('show', treasureMapOpen);
+      if(treasureMapOpen) renderTreasureMapCanvas();
+    }
     function sideMiniOrigin(){
       return {
         x: Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, player.x - (SIDE_VIEW_W>>1))),
@@ -5578,6 +5816,8 @@ The player intentionally accepts danger in exchange for information.
           row.appendChild(btn);
         } else if(it.kind==='bigbell'){
           const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('An enormous brass bell, impossibly heavy.', 'info'); row.appendChild(btn);
+        } else if(it.kind==='treasuremap'){
+          const btn=document.createElement('button'); btn.textContent='Inspect'; btn.onclick=()=>inspectTreasureMap(); row.appendChild(btn);
         } else if(it.kind==='oddTombstone'){
           const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('Odd tombstone found in the ruined cemetery.', 'info'); row.appendChild(btn);
         } else if(it.kind==='shovel'){
@@ -5983,6 +6223,12 @@ The player intentionally accepts danger in exchange for information.
           caves: lvl.caves,
           discovered: lvl.discovered.map(row=>row.map(b=>b?'1':'0').join('')),
         })),
+        cryptLevel2: cryptLevel2 ? {
+          map: cryptLevel2.map.map(row=>row.map(t=>TILE_CODE[t] || '#').join('')),
+          discovered: cryptLevel2.discovered.map(row=>row.map(b=>b?'1':'0').join('')),
+          x: cryptLevel2.x, y: cryptLevel2.y, trapSprung: cryptLevel2.trapSprung, trapPos: cryptLevel2.trapPos,
+        } : null,
+        treasureMapSpot: treasureMapSpot,
         spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
         oldHunterQuest: oldHunterQuest,
@@ -6203,6 +6449,19 @@ The player intentionally accepts danger in exchange for information.
         return { map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered };
       });
 
+      cryptLevel2 = null;
+      if(data.cryptLevel2 && Array.isArray(data.cryptLevel2.map) && data.cryptLevel2.map.length === MAP_H){
+        const lvlMap = data.cryptLevel2.map.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall'));
+        const lvlDiscovered = (Array.isArray(data.cryptLevel2.discovered) && data.cryptLevel2.discovered.length === MAP_H)
+          ? data.cryptLevel2.discovered.map(rowStr=>[...rowStr].map(ch=>ch==='1'))
+          : Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false));
+        cryptLevel2 = {
+          map: lvlMap, discovered: lvlDiscovered,
+          x: data.cryptLevel2.x, y: data.cryptLevel2.y,
+          trapSprung: !!data.cryptLevel2.trapSprung, trapPos: data.cryptLevel2.trapPos || null,
+        };
+      }
+      treasureMapSpot = (data.treasureMapSpot && Number.isFinite(data.treasureMapSpot.x)) ? data.treasureMapSpot : null;
       if(Array.isArray(data.discovered) && data.discovered.length === MAP_H){
         discovered = data.discovered.map(rowStr=>{
           const row = [];
@@ -6224,8 +6483,10 @@ The player intentionally accepts danger in exchange for information.
       // (0 = surface, 1 = z:-1, 2 = z:-2, ...), falling back to the surface
       // if that depth's map can't be reconstructed (e.g. a corrupt save).
       const savedDepth = data.currentZ < 0 ? -data.currentZ : 0;
-      const savedDepthMap = depthUndergroundMap(savedDepth);
-      if(savedDepth >= 1 && savedDepthMap){
+      const savedDepthMap = savedDepth === 4 ? (cryptLevel2 && cryptLevel2.map) : depthUndergroundMap(savedDepth);
+      if(savedDepth === 4 && cryptLevel2){
+        currentZ = -4; map = cryptLevel2.map; currentCave = -1; undergroundDiscovered = cryptLevel2.discovered;
+      } else if(savedDepth >= 1 && savedDepthMap){
         currentZ = -savedDepth;
         map = savedDepthMap;
         currentCave = savedDepth===1 ? data.currentCave : -1;
@@ -6522,6 +6783,11 @@ The player intentionally accepts danger in exchange for information.
     document.getElementById('tradeOverlay').addEventListener('click', (ev)=>{
       if(ev.target.id === 'tradeOverlay') toggleTrade(false);
     });
+    document.getElementById('treasureMapOverlay').addEventListener('click', (ev)=>{
+      if(ev.target.id === 'treasureMapOverlay') toggleTreasureMap(false);
+    });
+    document.getElementById('btnTreasureMapClose').addEventListener('click', ()=>toggleTreasureMap(false));
+    document.getElementById('btnTreasureMapCloseBottom').addEventListener('click', ()=>toggleTreasureMap(false));
     document.getElementById('fileLoad').addEventListener('change', (ev)=>{
       const file = ev.target.files[0];
       if(file) loadGame(file);
@@ -6536,7 +6802,7 @@ The player intentionally accepts danger in exchange for information.
     function updateTouchControlsVisibility(){
       const tc = document.getElementById('touchControls');
       if(!tc) return;
-      const overlayOpen = invOpen || mapOpen || tradeOpen;
+      const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen;
       tc.style.display = overlayOpen ? 'none' : '';
       document.body.classList.toggle('overlay-open', overlayOpen);
       requestAnimationFrame(updateMobileSafeAreas);
@@ -6607,7 +6873,7 @@ The player intentionally accepts danger in exchange for information.
 
       if(k==='Tab'){ ev.preventDefault(); toggleInv(); return; }
       if(k==='m' || k==='M'){ ev.preventDefault(); toggleMap(); return; }
-      if(k==='Escape'){ clearAutoPath(); toggleInv(false); toggleMap(false); toggleTrade(false); return; }
+      if(k==='Escape'){ clearAutoPath(); toggleInv(false); toggleMap(false); toggleTrade(false); toggleTreasureMap(false); return; }
       if(k==='k' || k==='K'){ ev.preventDefault(); saveGame(); return; }
       if(k==='l' || k==='L'){ ev.preventDefault(); document.getElementById('fileLoad').click(); return; }
       if(k==='g' || k==='G'){
@@ -6617,6 +6883,7 @@ The player intentionally accepts danger in exchange for information.
         reveal(discovered);
         reveal(undergroundDiscoveredL1);
         for(const level of deepLevels) reveal(level.discovered);
+        if(cryptLevel2) reveal(cryptLevel2.discovered);
         player.hp = 500;
         player.maxHp = 500;
         player.baseAtk = 50;
@@ -6632,7 +6899,7 @@ The player intentionally accepts danger in exchange for information.
         log('God mode: every map revealed. SPD 50. MF 25.', 'good');
         return;
       }
-      if(mapOpen || invOpen || tradeOpen) return;
+      if(mapOpen || invOpen || tradeOpen || treasureMapOpen) return;
       if(k===' ' || k==='Spacebar'){ ev.preventDefault(); inspect(); return; }
       if(k==='f' || k==='F'){ ev.preventDefault(); lootSkeletonOrForage(); return; }
       if(k==='t' || k==='T'){ ev.preventDefault(); skipTurn(); return; }
