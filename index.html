@@ -1189,13 +1189,24 @@ The player intentionally accepts danger in exchange for information.
             console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`);
             surfaceMap = map.map(row=>row.slice());
             generateCaves();
+            // Cave generation stamps entrances onto `map`; keep the canonical
+            // surface copy in sync even when this is the final fallback world.
+            surfaceMap = map.map(row=>row.slice());
             break;
           }
           console.warn(`Discarding world ${attempt}: the Temple has no walkable route to a map edge. Generating a new world.`);
           continue;
         }
         surfaceMap = map.map(row=>row.slice());
-        if(generateCaves()) break;
+        const cavesValid = generateCaves();
+        // `surfaceMap` was snapshotted before cave generation, but the
+        // entrance tiles are stamped during generateCaves(). Without this
+        // refresh the minimap can show descriptor-based entrance markers
+        // while the game canvas still renders the original mountain tile.
+        surfaceMap = map.map(row=>row.slice());
+        if(cavesValid){
+          break;
+        }
         if(attempt === MAX_WORLD_ATTEMPTS){
           console.warn(`World generation failed to keep the crypt separate from random caves in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`);
           break;

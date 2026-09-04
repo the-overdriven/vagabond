@@ -635,6 +635,11 @@ Cave interiors are produced using bounded random walks.
 
 Entrance tiles are re-stamped after merging so overlapping caves do not destroy entrances.
 
+After cave generation, the generated surface is copied back into the canonical
+`surfaceMap`. This preserves the stamped entrance tiles when the game returns
+to the surface or renders from the canonical surface state; it does not change
+the underground merge or crypt-separation validation.
+
 ---
 
 # 16. World Connectivity
