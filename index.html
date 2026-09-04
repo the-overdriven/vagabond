@@ -3971,7 +3971,7 @@ The player intentionally accepts danger in exchange for information.
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
     function isStackableKind(kind){
-      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='seashell';
+      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='seashell' || kind==='amber';
     }
     function isConsumableKind(kind){
       return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='scroll' || kind==='idscroll' || kind==='teleportscroll';
@@ -4047,13 +4047,17 @@ The player intentionally accepts danger in exchange for information.
       const roll = randInt(1,100);
       if(roll <= 5) log('You hit something hard. It turns out to be a stone.', 'loot');
       else if(roll <= 8){ player.gold += 1; log('Your shovel uncovers a gold coin.', 'loot'); }
-      else if(roll <= 11){ const stack = player.inventory.find(i=>i.kind==='seashell'); if(stack) stack.count=(stack.count||1)+1; else player.inventory.push({kind:'seashell',name:'Seashell',value:10,count:1}); log('You uncover a pretty seashell, worth 10 gold.', 'loot'); }
+      else if(roll <= 10){ const stack = player.inventory.find(i=>i.kind==='amber'); if(stack) stack.count=(stack.count||1)+1; else player.inventory.push({kind:'amber',name:'Amber',value:20,count:1}); log('You uncover a piece of amber.', 'loot'); }
+      else if(roll <= 11){ const stack = player.inventory.find(i=>i.kind==='seashell'); if(stack) stack.count=(stack.count||1)+1; else player.inventory.push({kind:'seashell',name:'Seashell',value:10,count:1}); log('You uncover a pretty seashell.', 'loot'); }
+      else if(roll <= 12) log('You dig up a rusted spoon. Judging by its condition, someone has been waiting a very long time for dinner.', 'loot');
       else if(roll <= 13) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot');
+      else if(roll <= 14) log('You dig out a bone. Whatever it was, it died ages ago.', 'loot');
+      else if(roll <= 15) log('You dig out a shovel handle, snapped in half. Someone else tried digging here.', 'loot');
       else if(roll <= 16){
         const spots=[];
         for(const [dx,dy] of DIRS8){ const x=player.x+dx,y=player.y+dy; if(isWalkable(x,y) && !enemies.some(e=>onCurrentLevel(e)&&e.alive&&e.x===x&&e.y===y) && !(x===player.x&&y===player.y)) spots.push({x,y}); }
-        if(spots.length){ const pos=pick(spots); const tmpl=ENEMY_TEMPLATES.find(t=>t.name==='Scarab') || {name:'Scarab',tier:1,hp:10,atk:3,def:1,spd:4,aggro:AGGRO_RANGE};
-          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you—a scarab!', 'bad'); }
+        if(spots.length){ const pos=pick(spots); const tmpl=ENEMY_TEMPLATES.find(t=>t.name==='Scarab');
+          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you - a scarab!', 'bad'); }
         else log('You hear something moving beneath the sand, but nothing emerges.', 'info');
       } else log('You dig carefully, but find nothing.', 'info');
       render(); updateHud();
