@@ -1610,8 +1610,9 @@ Each forest tile can only be foraged once.
 Results:
 
 ```text
-15% → Healing Herb
-10% → Mushroom
+9% → Handful of Berries
+8% → Healing Herb
+8% → Mushroom
 75% → Nothing
 ```
 
@@ -1641,7 +1642,7 @@ Current named NPCs:
 
 NPCs generally provide dialogue/exploration interactions.
 
-The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him.
+The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent.
 
 ---
 
@@ -1717,7 +1718,7 @@ Stackable consumables are handled as stacks.
 
 # 55. Herbalist
 
-Current implemented behavior is primarily dialogue concerning forest dangers and remedies.
+The Herbalist opens services while adjacent: Mushrooms cost 5g each to purify, with a 50% chance of poison and removal; successful results become Edible Mushrooms. Three Healing Herbs plus 10g become a Life Potion. Berries grant stacking Troll-like regeneration for 100 turns.
 
 Her sole purpose is to hint player that forests can be foraged for remedies, but also to warn that forests are dangerous (forest tiles can trigger an ambush).
 

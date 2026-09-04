@@ -1,4 +1,18 @@
 <!-- TODO:
+- life potions are too common, make their loose drops in the world 50% less common
+we need to do something with herbalist, new services screen (works by clicking when standing next to her, like with merchant)
+- For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom (5g per mushroom), 50% chance of each mushroom to be poisonous and thus removed
+- also: after delivering 3 healing herbs and 10g she can make a life potion
+- add berries to forage
+9% -> Handful of Berries
+8% → Healing Herb
+8% → Mushroom
+75% → Nothing
+Eating berries adds Regen status equivalent to troll's regen, but only for 100 turns. the effect can stack.
+as always, cross-check TECH_DOCS.md and update where needed
+
+- You equip the... should also say what you UNEQUIP
+
 - You leave the frozen wastes and begin to thaw.
 running river in taiga should be frozen river and also freeze
 - after certain level you're no longer ambushed ? in normal fores. or chance increased
@@ -28,6 +42,7 @@ Drunk says: I'm done! No more drink! I heard a bell that's not there.
 - add a way to protect against freezing
 - the world should feel like it lives its own life, i.e. world changes, fighting monsters, wandering NPC and monsters
 - add grace modifier to artifacts
+- gear shouldn't be dropped by non-humanoids
 
 - add pick axe (to be able to dig through boulders, costs HP)
 - special locations? i.e. abandoned church, crypt, special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
@@ -68,8 +83,8 @@ The witch has a crystal ball that can give the player cryptic clues about the lo
 - make some monsters wander outsife of their home tile
 - monsters that are close make sounds, to warn player
 - add special herbs (akin to G2)
-- add berries to forage
-- For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom
+
+
 - on mobile inventory screen hides hp bar
 - log hints to msg log with H
 - chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
@@ -315,7 +330,7 @@ The player intentionally accepts danger in exchange for information.
     </div>
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
-        <h2>Trade with the Merchant</h2>
+        <h2 id="tradeTitle">Trade with the Merchant</h2>
         <div class="trade-gold">Gold: <span id="tradeGold">0</span></div>
         <div class="trade-cols">
           <div class="trade-col">
@@ -2103,6 +2118,7 @@ The player intentionally accepts danger in exchange for information.
       invisibleTurns: 0,
       godMode: false,
       speedPotionTurns: 0,
+      berryRegenTurns: 0,
       freezing: {active:false, turns:0},
       permadeath: false,
       curseDebuffs: [],
@@ -2528,7 +2544,7 @@ The player intentionally accepts danger in exchange for information.
         groundItems.push({x,y,kind:'chest', tier:distTier, opened:false});
       }
       // loose potions
-      for(let i=0;i<30;i++){
+      for(let i=0;i<15;i++){
         let x,y,tries=0;
         do{ x=randInt(2,MAP_W-3); y=randInt(2,MAP_H-3); tries++; }
         while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='caveentrance') && tries<200);
@@ -2608,7 +2624,7 @@ The player intentionally accepts danger in exchange for information.
         ], free:false, portrait:"grave_digger"},
       {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
       {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
-      {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true},
+      {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true, services:true},
     ];
     // The Drunk's rumor about the missing bell points in whatever direction
     // the bell actually generated - computed at spawn/load time rather than
@@ -2688,7 +2704,7 @@ The player intentionally accepts danger in exchange for information.
           tries++;
         } while((!isWalkable(x,y) || map[y][x]==='temple' || map[y][x]==='belltower' || map[y][x]==='forest' || dist<2 || occupied.has(keyXY(x,y))) && tries<300);
         if(tries>=300) continue; // extremely unlikely on a cramped map - just skip this one
-        const npc = { name:tmpl.name, lines:linesForNpcTemplate(tmpl), free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
+        const npc = { name:tmpl.name, lines:linesForNpcTemplate(tmpl), free:!!tmpl.free, static:!!tmpl.static, trades:!!tmpl.trades, services:!!tmpl.services, portrait:tmpl.portrait, x, y, homeX:x, homeY:y };
         npcs.push(npc);
         occupied.add(keyXY(x,y));
         if(tmpl.name === "Gravedigger"){
@@ -3350,6 +3366,12 @@ The player intentionally accepts danger in exchange for information.
       if(turnCount % race.regenEvery !== 0) return;
       player.hp = Math.min(playerMaxHp(), player.hp + 1);
     }
+    function tickBerryRegen(){
+      if(player.berryRegenTurns > 0){
+        player.berryRegenTurns--;
+        if(turnCount % 5 === 0) player.hp = Math.min(playerMaxHp(), player.hp + consumablePower(1));
+      }
+    }
     function tickFreezing(){
       // Freezing exists only on the surface. Snow and taiga are both inherently
       // hostile cold terrain; once the player leaves them, the status clears.
@@ -3385,6 +3407,7 @@ The player intentionally accepts danger in exchange for information.
       tickFreezing();
       if(player.hp <= 0 || deathTransition) return;
       tickRaceRegen();
+      tickBerryRegen();
       tickArtifactCurses();
       if(player.speedPotionTurns > 0){
         player.speedPotionTurns--;
@@ -3502,13 +3525,23 @@ The player intentionally accepts danger in exchange for information.
       if(stack) stack.count = (stack.count||1)+1;
       else player.inventory.push({kind:'mushroom', name:'Mushroom', count:1});
     }
+    function addEdibleMushroom(){
+      const stack = player.inventory.find(i=>i.kind==='ediblemushroom');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'ediblemushroom', name:'Edible Mushroom', count:1});
+    }
+    function addBerries(){
+      const stack = player.inventory.find(i=>i.kind==='berries');
+      if(stack) stack.count = (stack.count||1)+1;
+      else player.inventory.push({kind:'berries', name:'Handful of Berries', count:1});
+    }
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
     function isStackableKind(kind){
-      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom';
+      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries';
     }
     function isConsumableKind(kind){
-      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='scroll' || kind==='idscroll' || kind==='teleportscroll';
+      return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='scroll' || kind==='idscroll' || kind==='teleportscroll';
     }
     function equipmentSortValues(item){
       const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' || item.mod === 'grace' ? (item.modAmt || 0) : 0;
@@ -3546,7 +3579,10 @@ The player intentionally accepts danger in exchange for information.
       }
       foragedTiles.add(key);
       const roll = rng();
-      if(roll < 0.15){
+      if(roll < 0.09){
+        addBerries();
+        log('You search through the undergrowth and find a Handful of Berries.', 'loot');
+      } else if(roll < 0.17){
         addHerb();
         log('You search through the undergrowth and find a Healing Herb.', 'loot');
       } else if(roll < 0.25){
@@ -5252,6 +5288,9 @@ The player intentionally accepts danger in exchange for information.
           btn.textContent = 'Eat';
           btn.onclick = ()=>{ useMushroom(idx); };
           row.appendChild(btn);
+        } else if(it.kind==='ediblemushroom' || it.kind==='berries'){
+          const btn = document.createElement('button'); btn.textContent='Eat';
+          btn.onclick = ()=>{ it.kind==='berries' ? useBerries(idx) : useEdibleMushroom(idx); }; row.appendChild(btn);
         } else if(it.kind==='scroll'){
           const btn = document.createElement('button');
           btn.textContent = 'Read';
@@ -5292,6 +5331,7 @@ The player intentionally accepts danger in exchange for information.
 
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
+    let serviceNpc = null;
     function makeMerchantMagicWeapon(){
       const base = pick(WEAPONS.filter(w=>w.name==='Dagger' || w.name==='Short Sword' || w.name==='Club'));
       const item = {
@@ -5343,7 +5383,7 @@ The player intentionally accepts danger in exchange for information.
       }
     }
     const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
-    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, idscroll:20, herb:4, mushroom:3 };
+    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, idscroll:20, herb:4, mushroom:3, ediblemushroom:5, berries:2 };
     function itemSellValue(it){
       if(it.tier){
         let v = TIER_SELL_VALUE[it.tier] || 0;
@@ -5354,6 +5394,17 @@ The player intentionally accepts danger in exchange for information.
       return 0; // tombstones and other lore items aren't sellable
     }
     function renderTrade(){
+      const herbalist = serviceNpc && serviceNpc.name === 'Herbalist';
+      document.getElementById('tradeTitle').textContent = herbalist ? 'Services of the Herbalist' : 'Trade with the Merchant';
+      if(herbalist){
+        const buyList = document.getElementById('tradeBuyList'); buyList.innerHTML='';
+        const addService = (label, action) => { const row=document.createElement('div'); row.className='invitem'; const b=document.createElement('button'); b.textContent=label; b.onclick=action; row.appendChild(b); buyList.appendChild(row); };
+        addService('Purify mushrooms (5g each)', purifyMushrooms);
+        addService('Make Life Potion (3 herbs + 10g)', makeHerbalistPotion);
+        document.getElementById('tradeSellList').innerHTML='<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>';
+        document.getElementById('tradeGold').textContent = player.gold;
+        return;
+      }
       document.getElementById('tradeGold').textContent = player.gold;
 
       const buyList = document.getElementById('tradeBuyList');
@@ -5464,10 +5515,25 @@ The player intentionally accepts danger in exchange for information.
       updateTouchControlsVisibility();
     }
     function tryOpenTrade(npc){
-      if(!npc || !npc.trades) return;
+      if(!npc || (!npc.trades && !npc.services)) return;
       const dist = Math.max(Math.abs(npc.x-player.x), Math.abs(npc.y-player.y));
       if(dist>1) return;
+      serviceNpc = npc;
       toggleTrade(true);
+    }
+    function purifyMushrooms(){
+      const it=player.inventory.find(i=>i.kind==='mushroom'); const count=it ? (it.count||1) : 0;
+      if(!count || player.gold < count*5) return log('You need mushrooms and 5g per mushroom.', 'info');
+      player.gold -= count*5; player.inventory.splice(player.inventory.indexOf(it),1);
+      let edible=0; for(let i=0;i<count;i++) if(chance(0.5)) edible++;
+      for(let i=0;i<edible;i++) addEdibleMushroom();
+      log(`The Herbalist identifies ${edible} edible mushroom${edible===1?'':'s'}.`, 'good'); updateHud(); renderTrade(); renderInventory();
+    }
+    function makeHerbalistPotion(){
+      const it=player.inventory.find(i=>i.kind==='herb');
+      if(!it || (it.count||1)<3 || player.gold<10) return log('You need 3 Healing Herbs and 10g.', 'info');
+      it.count-=3; if(it.count<=0) player.inventory.splice(player.inventory.indexOf(it),1); player.gold-=10; addPotion();
+      log('The Herbalist brews a Life Potion for you.', 'good'); updateHud(); renderTrade(); renderInventory();
     }
     function equipItem(idx){
       const it = player.inventory[idx];
@@ -5586,6 +5652,18 @@ The player intentionally accepts danger in exchange for information.
       }
       consumeItemTurn();
     }
+    function useEdibleMushroom(idx){
+      const it=player.inventory[idx]; if(!it || it.kind!=='ediblemushroom') return;
+      it.count=(it.count||1)-1; if(it.count<=0) player.inventory.splice(idx,1);
+      const healed=consumablePower(Math.max(1,Math.round(playerMaxHp()*0.25))); player.hp=Math.min(playerMaxHp(),player.hp+healed);
+      log(`You eat the Edible Mushroom and recover ${healed} HP.`, 'good'); consumeItemTurn();
+    }
+    function useBerries(idx){
+      const it=player.inventory[idx]; if(!it || it.kind!=='berries') return;
+      it.count=(it.count||1)-1; if(it.count<=0) player.inventory.splice(idx,1);
+      player.berryRegenTurns=(player.berryRegenTurns||0)+100;
+      log('You eat the berries. A gentle regeneration takes hold.', 'good'); consumeItemTurn();
+    }
     function readTombstone(idx){
       const it = player.inventory[idx];
       if(!it || it.kind!=='tombstone') return;
@@ -5639,6 +5717,7 @@ The player intentionally accepts danger in exchange for information.
           invisibleTurns:player.invisibleTurns,
           godMode:player.godMode,
           speedPotionTurns:player.speedPotionTurns,
+          berryRegenTurns:player.berryRegenTurns,
           freezing: player.freezing,
           curseDebuffs: player.curseDebuffs,
           equip: player.equip,
@@ -5876,6 +5955,7 @@ The player intentionally accepts danger in exchange for information.
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.godMode = !!player.godMode;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
+      player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns|0) : 0;
       player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : [];
       player.permadeath = !!player.permadeath;
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining|0) : TOMBSTONE_INSCRIPTIONS.length;
@@ -5906,7 +5986,7 @@ The player intentionally accepts danger in exchange for information.
           if(n.name==='Ancient Lich') return {...ANCIENT_BELL_LICH,x:n.x,y:n.y,homeX:n.homeX ?? n.x,homeY:n.homeY ?? n.y};
           const tmpl = NPC_TEMPLATES.find(t=>t.name===n.name);
           return {
-            name: n.name, lines: tmpl ? linesForNpcTemplate(tmpl) : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
+            name: n.name, lines: tmpl ? linesForNpcTemplate(tmpl) : ['...'], free: tmpl ? !!tmpl.free : false, static: tmpl ? !!tmpl.static : false, trades: tmpl ? !!tmpl.trades : false, services: tmpl ? !!tmpl.services : false, portrait: tmpl ? tmpl.portrait : slug(n.name),
             x:n.x, y:n.y, homeX: n.homeX ?? n.x, homeY: n.homeY ?? n.y,
           };
         });
