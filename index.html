@@ -5982,7 +5982,10 @@ The player intentionally accepts danger in exchange for information.
         if(it.mod) v += (it.modAmt||1) * 5;
         return v;
       }
-      if(FLAT_SELL_VALUE[it.kind] !== undefined) return FLAT_SELL_VALUE[it.kind];
+      if(FLAT_SELL_VALUE && FLAT_SELL_VALUE[it.kind] !== undefined) return FLAT_SELL_VALUE[it.kind];
+      // Foraged valuables carry their own sell value, so they remain sellable
+      // even when the external loot-table config does not list their kind.
+      if(it.kind==='seashell' || it.kind==='amber') return it.value || 0;
       return 0; // tombstones and other lore items aren't sellable
     }
     function renderTrade(){
