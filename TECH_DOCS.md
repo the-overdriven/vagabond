@@ -1686,6 +1686,23 @@ His warning contains a direction derived from the actual generated Ancient Fores
 
 He warns the player about entering the Ancient Forest in a particular direction after midnight.
 
+## Procedurally generated quests
+
+The Old Hunter can generate a new quest when the player interacts with him and has no active quest. Quest objectives are selected from the current world state rather than from a fixed quest list.
+
+There is a 30% chance to receive an investigation quest. Investigation quests target a recognizable, procedurally generated landmark, such as a cave entrance or the dwarven fort entrance. The target is stored by its map coordinates and landmark type, so the quest points to an actual location rather than an arbitrary wilderness tile.
+
+The quest dialogue names the landmark and gives its direction relative to the Old Hunter. The player completes the investigation simply by entering the target tile; no additional interaction or hidden object search is required. The quest then becomes ready to turn in at the Old Hunter.
+
+Other generated quest types include:
+
+- **Kill a specific monster:** kill a particular eligible, prefixed tier-3-or-higher monster.
+- **Recover an item:** retrieve an item carried by a particular monster.
+
+Kill quests are restricted to eligible prefixed monsters, while item quests are generated from living eligible enemies or qualifying ground items. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
+
+Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
+
 </details>
 
 ---
