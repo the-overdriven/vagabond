@@ -6,6 +6,9 @@ The bell is here. It hangs silently in the tower, exactly where it belongs.
 - [mysteriando] When the Drunk hears the Bell ring he only says:
 Drunk says: I'm done! No more drink! I heard a bell that's not there.
 - remove wheelbarrow after delivering the bell
+- [mysteriando] when ancient lich wakes up, the crypt is open. inside the crypt there is an empty grave and map to buried key
+after unburrying the treasure, gravedigger's description gains: "The gravedigger rests here" and gravedigger disappears
+shovel can be used on sand, there is a chance to dig out many things (check kazordoon game)
 
 - extract more content to .json
 - life potions are too common, make their loose drops in the world 50% less common
@@ -464,6 +467,8 @@ The player intentionally accepts danger in exchange for information.
     let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false;
     let cemeteryTombstones = {};
     let gravediggerGraveKey = null;
+    let oldHunterQuest = null;
+    let oldHunterQuestSerial = 0;
     async function loadContent(){
       const files = {
         weapons:'gear_weapons.json',
@@ -1273,7 +1278,7 @@ The player intentionally accepts danger in exchange for information.
       }
       const ghost=ENEMY_TEMPLATES.find(t=>t.name==='Ghost');
       const ruinLevel=targetLevel ? -3 : -1;
-      if(ghost){ for(let i=0;i<8;i++){ let gx=x0+randInt(-25,25), gy=y0+randInt(-18,18); if(cm[gy]?.[gx]==='marble'){ enemies.push({name:'Ghost',baseName:'Ghost',tier:ghost.tier||2,level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,hp:ghost.hp,maxHp:ghost.hp,atk:ghost.atk,def:ghost.def,spd:ghost.spd,fly:true,humanoid:false,evades:true,aggro:ghost.aggro??AGGRO_RANGE,x:gx,y:gy,homeX:gx,homeY:gy,homeTileType:'marble',alive:true,prefix:null,equipment:null}); } } }
+      if(ghost){ for(let i=0;i<8;i++){ let gx=x0+randInt(-25,25), gy=y0+randInt(-18,18); if(cm[gy]?.[gx]==='marble'){ addEnemy({name:'Ghost',baseName:'Ghost',tier:ghost.tier||2,level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,hp:ghost.hp,maxHp:ghost.hp,atk:ghost.atk,def:ghost.def,spd:ghost.spd,fly:true,humanoid:false,evades:true,aggro:ghost.aggro??AGGRO_RANGE,x:gx,y:gy,homeX:gx,homeY:gy,homeTileType:'marble',alive:true,prefix:null,equipment:null}); } } }
       for(let i=0;i<18;i++){ const x=randInt(minX+2,maxX-2), y=randInt(minY+2,maxY-2); if(cm[y][x]==='marble') groundItems.push({x,y,kind:'ruinprop',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:pick(['A snapped pick lies beneath the dust.','A cracked keg still smells faintly of ale.','A workbench collapsed under its own tools.','A dwarven lintel bears a name worn smooth by generations.'])}); }
       const anvilSpot={x:x0+5,y:y0+2}; if(cm[anvilSpot.y]?.[anvilSpot.x]==='marble') groundItems.push({x:anvilSpot.x,y:anvilSpot.y,kind:'anvil',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'The abandoned dwarven anvil is cold; its surface is scarred by a thousand unfinished blades.'});
       let artifactSpot=(cm[y0+14]?.[x0+22]==='marble')?{x:x0+22,y:y0+14}:null;
@@ -1429,7 +1434,7 @@ The player intentionally accepts danger in exchange for information.
         e.maxHp = e.hp;
         e.baseName = tmpl.name;
         prepareEnemyEquipment(e);
-        enemies.push(e);
+        addEnemy(e);
         occupied.add(keyXY(p.x,p.y));
       }
     }
@@ -2386,7 +2391,7 @@ The player intentionally accepts danger in exchange for information.
           applyEnemyPrefix(e, pfx);
           e.name = pfx + " " + e.name;
         }
-        enemies.push(e);
+        addEnemy(e);
         occupied.add(keyXY(x,y));
         return true;
       }
@@ -2420,7 +2425,7 @@ The player intentionally accepts danger in exchange for information.
         for(let i=0;i<4 && open.length;i++){
           const tmpl = pick([bat,rat].filter(Boolean)); if(!tmpl) continue;
           const p = pick(open);
-          enemies.push({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier,level:-1,caveIndex,
+          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier,level:-1,caveIndex,
             hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,
             humanoid:!!tmpl.humanoid,evades:!!tmpl.evades,aggro:tmpl.aggro ?? AGGRO_RANGE,
             x:p.x,y:p.y,homeX:p.x,homeY:p.y,homeTileType:'cavefloor',alive:true,prefix:null,equipment:null});
@@ -2470,7 +2475,7 @@ The player intentionally accepts danger in exchange for information.
           const tmpl = chance(0.5) ? goblinTmpl : skeletonTmpl;
           for(let i=0;i<4 && open.length;i++){
             const p = pick(open);
-            enemies.push({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:-2,caveIndex,
+            addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:-2,caveIndex,
               hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,
               humanoid: tmpl.humanoid !== false,evades:!!tmpl.evades,aggro:tmpl.aggro ?? AGGRO_RANGE,
               x:p.x,y:p.y,homeX:p.x,homeY:p.y,homeTileType:'cavefloor2',alive:true,prefix:null,equipment:null});
@@ -2599,8 +2604,124 @@ The player intentionally accepts danger in exchange for information.
       if(!gh) return;
       const graves=Object.keys(cemeteryTombstones).map(k=>k.split(',').map(Number));
       if(!graves.length) return;
-      for(let i=0;i<3;i++){ const [gx,gy]=graves[i%graves.length]; const x=gx+1,y=gy; if(!isWalkable(x,y)||occupied.has(keyXY(x,y))) continue; enemies.push({name:'Ghoul',baseName:'Ghoul',tier:gh.tier,hp:gh.hp,maxHp:gh.hp,atk:gh.atk,def:gh.def,spd:gh.spd,aggro:gh.aggro??AGGRO_RANGE,x,y,homeX:x,homeY:y,level:0,alive:true,humanoid:true,fly:false,evades:false}); occupied.add(keyXY(x,y)); }
+      for(let i=0;i<3;i++){ const [gx,gy]=graves[i%graves.length]; const x=gx+1,y=gy; if(!isWalkable(x,y)||occupied.has(keyXY(x,y))) continue; addEnemy({name:'Ghoul',baseName:'Ghoul',tier:gh.tier,hp:gh.hp,maxHp:gh.hp,atk:gh.atk,def:gh.def,spd:gh.spd,aggro:gh.aggro??AGGRO_RANGE,x,y,homeX:x,homeY:y,level:0,alive:true,humanoid:true,fly:false,evades:false}); occupied.add(keyXY(x,y)); }
     }
+    /* ============================== OLD HUNTER PROCEDURAL QUEST ============================== */
+    let nextEnemyId = 1;
+    function addEnemy(enemy){
+      if(!enemy.id) enemy.id = `enemy_${nextEnemyId++}`;
+      else { const m=String(enemy.id).match(/^enemy_(\d+)$/); if(m) nextEnemyId=Math.max(nextEnemyId, Number(m[1])+1); }
+      enemies.push(enemy);
+      return enemy;
+    }
+    function hunterEnsureIds(){
+      let nextItem = 1;
+      for(const e of enemies){
+        if(!e.id) e.id = `enemy_${nextEnemyId++}`;
+        else { const m=String(e.id).match(/^enemy_(\d+)$/); if(m) nextEnemyId=Math.max(nextEnemyId, Number(m[1])+1); }
+      }
+      for(const g of groundItems) if(!g.id) g.id = `item_${nextItem++}`;
+    }
+    function hunterTargetEnemy(q){
+      if(!q || !['kill_specific','recover_item'].includes(q.type)) return null;
+      hunterEnsureIds();
+      let e = enemies.find(x=>x.id===q.targetEnemyId && x.alive);
+      if(!e && q.targetName){
+        e = enemies.find(x=>x.alive && x.name===q.targetName && (!q.targetItemName || (x.equipment && (x.equipment.name===q.targetItemName || x.equipment.base===q.targetItemName))));
+        if(e) q.targetEnemyId=e.id;
+      }
+      return e || null;
+    }
+    function hunterDirection(q){
+      const e=hunterTargetEnemy(q); if(!e) return 'somewhere in the wilds';
+      const h=npcs.find(n=>n.name==='Old Hunter');
+      if(!h) return 'somewhere in the wilds';
+      const dx=e.x-h.x, dy=e.y-h.y;
+      if(Math.abs(dx)<3 && Math.abs(dy)<3) return 'nearby';
+      const ew=Math.abs(dx)>Math.abs(dy)*1.6 ? (dx>0?'east':'west') : '';
+      const ns=Math.abs(dy)>Math.abs(dx)*1.6 ? (dy>0?'south':'north') : '';
+      if(ew) return ew; if(ns) return ns;
+      return `${dy>0?'south':'north'}-${dx>0?'east':'west'}`;
+    }
+    function hunterLivingEnemies(){ hunterEnsureIds(); return enemies.filter(e=>e.alive && e.baseName); }
+    function hunterReward(enemyList=[], bonus=0){ return Math.max(80, Math.round(enemyList.reduce((n,e)=>n+xpForEnemy(e),0)*1.25)+bonus); }
+    function hunterCandidates(){
+      hunterEnsureIds();
+      const out=[]; const living=hunterLivingEnemies();
+      for(const e of living) out.push({type:'kill_specific', targetEnemyId:e.id, targetName:e.name, rewardXp:hunterReward([e],50)});
+      const groups={};
+      for(const e of living) (groups[e.baseName] ||= []).push(e);
+      for(const [name,list] of Object.entries(groups)) if(list.length>=2){
+        const required=Math.min(list.length, randInt(2, Math.min(6,list.length)));
+        const targets=list.slice(0,required);
+        out.push({type:'kill_group', targetBaseName:name, required, targetEnemyIds:targets.map(e=>e.id), rewardXp:hunterReward(targets,75)});
+      }
+      for(const e of living){
+        if(e.equipment) out.push({type:'recover_item', targetEnemyId:e.id, targetItemName:e.equipment.name||e.equipment.base||'the stolen item', targetItem:e.equipment, targetName:e.name, rewardXp:hunterReward([e],120)});
+      }
+      for(const g of groundItems){
+        if(g.artifactGuaranteed || g.kind==='artifact' || g.kind==='gear' || g.item){
+          out.push({type:'deliver_item', targetItemId:g.id, targetItemName:g.name||g.item?.name||g.description||'the lost item', rewardXp:150});
+        }
+      }
+      return out;
+    }
+    function generateOldHunterQuest(){
+      if(oldHunterQuest && oldHunterQuest.state==='active') return oldHunterQuest;
+      const options=hunterCandidates(); if(!options.length) return null;
+      const q=options[randInt(0,options.length-1)];
+      oldHunterQuest={id:`hunter_${++oldHunterQuestSerial}`,state:'active',giver:'Old Hunter',progress:0,createdAtTurn:0,...q};
+      return oldHunterQuest;
+    }
+    function hunterPlural(name, count=2){
+      if(count===1) return name;
+      return /s$/i.test(name) ? name : `${name}s`;
+    }
+    function hunterFlavor(q){
+      const place=pick(['the old road','the ruined fort','the edge of the forest','the abandoned cemetery','the mountain pass','the dark country beyond the chapel']);
+      const reason=pick(['something has been feeding there','the tracks stop where the dead begin to walk','travellers have gone missing along that path','I found fresh blood where no living thing should have been','the silence has become too deep, even for these hills']);
+      if(q.type==='kill_specific') return pick([
+        `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind — that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
+        `Old Hunter says: I know the trail of a ${q.targetName}. It has crossed ${place}, ${hunterDirection(q)} of here, three nights in a row. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
+        `Old Hunter says: A ${q.targetName} has made ${place}, ${hunterDirection(q)} of here, unsafe. I have seen what it leaves behind. Track the individual one, not some other beast wearing the same face.`
+      ]);
+      if(q.type==='kill_group') return pick([
+        `Old Hunter says: ${hunterPlural(q.targetBaseName)} have gathered around ${place}, ${hunterDirection(q)} of here. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
+        `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} near ${place}, ${hunterDirection(q)} of here. They are not merely passing through — they are settling in. Thin their numbers before someone else pays for it.`,
+        `Old Hunter says: The ${hunterPlural(q.targetBaseName)} have been disturbing the dead and frightening the living around ${place}, ${hunterDirection(q)} of here. Bring down ${q.required} of them. That should quiet things for a while.`
+      ]);
+      if(q.type==='recover_item') return pick([
+        `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterDirection(q)} of here, near ${place}. Bring the old thing back — it has more history than that thief deserves.`,
+        `Old Hunter says: A ${q.targetName} carries my ${q.targetItemName}, ${hunterDirection(q)} of here. I want the item, not excuses. Track the creature, take it back, and try not to damage it.`,
+        `Old Hunter says: That ${q.targetName} has something of mine: ${q.targetItemName}. It was stolen, and I would like to see it returned before the trail goes cold. The thief is currently ${hunterDirection(q)} of here.`
+      ]);
+      return pick([
+        `Old Hunter says: I need ${q.targetItemName}. It was left somewhere around ${place}, ${hunterDirection(q)} of here, and I have reason to believe it is still there. Find it and bring it to me.`,
+        `Old Hunter says: A useful piece of gear — ${q.targetItemName} — has gone missing near ${place}, ${hunterDirection(q)} of here. I do not care who finds it first. I care that it comes back.`,
+        `Old Hunter says: I lost track of ${q.targetItemName} out in ${place}, ${hunterDirection(q)} of here. ${reason}. Search the area and return it to me if you find it.`
+      ]);
+    }
+    function onOldHunterEnemyKilled(e){
+      if(!oldHunterQuest || oldHunterQuest.state!=='active') return;
+      if(oldHunterQuest.type==='kill_specific' && e.id===oldHunterQuest.targetEnemyId) oldHunterQuest.progress=1;
+      else if(oldHunterQuest.type==='kill_group' && e.baseName===oldHunterQuest.targetBaseName) oldHunterQuest.progress++;
+      else if(oldHunterQuest.type==='recover_item' && (e.id===oldHunterQuest.targetEnemyId || (e.baseName===oldHunterQuest.targetName && e.equipment && (e.equipment.name===oldHunterQuest.targetItemName || e.equipment.base===oldHunterQuest.targetItemName)))) oldHunterQuest.progress=1;
+      if((oldHunterQuest.type==='kill_group' && oldHunterQuest.progress>=oldHunterQuest.required) || oldHunterQuest.progress>=1) oldHunterQuest.state='ready';
+    }
+    function hunterActiveFlavor(q){
+      if(q.type==='kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterDirection(q)} of here.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterDirection(q)} of here.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterDirection(q)} of here, and do not mistake another beast for it.`]);
+      if(q.type==='kill_group') return pick([`Old Hunter says: The trouble ${hunterDirection(q)} of here has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterDirection(q)} of here.`, `Old Hunter says: The hills ${hunterDirection(q)} of here are not quiet yet. Do what you went out there to do.`]);
+      if(q.type==='recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`]);
+      return pick([`Old Hunter says: The missing ${q.targetItemName} has not found its way back yet. Keep searching.`, `Old Hunter says: I still need that ${q.targetItemName}. Somewhere, it is waiting to be found.`, `Old Hunter says: The trail to the lost ${q.targetItemName} has not gone cold. Not yet.`]);
+    }
+    function interactOldHunter(){
+      if(oldHunterQuest?.state==='ready'){ log(`Old Hunter says: Good work. You've earned this.`, 'info'); gainXp(oldHunterQuest.rewardXp); oldHunterQuest=null; return true; }
+      if(oldHunterQuest?.state==='active'){ log(hunterActiveFlavor(oldHunterQuest), 'info'); return true; }
+      const q=generateOldHunterQuest();
+      log(q ? hunterFlavor(q) : `Old Hunter says: Nothing out there needs my attention right now.`, 'info');
+      return true;
+    }
+
     /* ============================== NPCs ============================== */
     // A handful of harmless wanderers scattered near the Temple. Walking into one
     // just prints their line - no combat. Two stick close to their home tile
@@ -3823,7 +3944,7 @@ The player intentionally accepts danger in exchange for information.
       e.maxHp = e.hp;
       e.baseName = tmpl.name;
       prepareEnemyEquipment(e);
-      enemies.push(e);
+      addEnemy(e);
       occupied.add(keyXY(spot.x, spot.y));
       log(`A ${e.name} rustles out from the trees nearby!`, 'bad');
     }
@@ -4780,7 +4901,7 @@ The player intentionally accepts danger in exchange for information.
       const mx = Math.floor(camX+vx), my = Math.floor(camY+vy);
       updateMobileInfoPanel(mx,my);
       const n = currentZ===0 && npcs.find(np=>np.x===mx && np.y===my);
-      if(n){ clearAutoPath(); tryOpenTrade(n); return; }
+      if(n){ clearAutoPath(); if(n.name==='Old Hunter') interactOldHunter(); else tryOpenTrade(n); return; }
       const e = enemies.find(en=>onCurrentLevel(en) && en.alive && en.x===mx && en.y===my);
       if(e){ clearAutoPath(); return; }
       if(startAutoPath(mx,my)){
@@ -5613,7 +5734,7 @@ The player intentionally accepts danger in exchange for information.
     });
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 10; // v10 persists permadeath state and bodies
+    const SAVE_VERSION = 11; // v10 persists permadeath state and bodies
 
     function buildSaveObject(){
       return {
@@ -5639,6 +5760,7 @@ The player intentionally accepts danger in exchange for information.
         })),
         spawnPoint: {x:spawnPoint.x, y:spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
+        oldHunterQuest: oldHunterQuest,
         player: {
           x:player.x, y:player.y,
           name:player.name, race:player.race,
@@ -5858,6 +5980,19 @@ The player intentionally accepts danger in exchange for information.
       spawnPoint = {x:data.spawnPoint.x, y:data.spawnPoint.y};
       rngState = data.rngState|0;
       Object.assign(worldEdgesReached, data.worldEdgesReached||{});
+      oldHunterQuest = data.oldHunterQuest || null;
+      hunterEnsureIds();
+      // Recover-item quests can survive older saves where enemy IDs were not persisted.
+      if(oldHunterQuest?.type==='recover_item' && oldHunterQuest.state==='active'){
+        const carried = player.inventory?.some(i => i && (i.name===oldHunterQuest.targetItemName || i.base===oldHunterQuest.targetItemName));
+        if(carried){ oldHunterQuest.progress=1; oldHunterQuest.state='ready'; }
+        else {
+          const match = enemies.find(e => e.alive && e.baseName===oldHunterQuest.targetName && e.equipment && (e.equipment.name===oldHunterQuest.targetItemName || e.equipment.base===oldHunterQuest.targetItemName));
+          if(match) oldHunterQuest.targetEnemyId=match.id;
+        }
+      }
+      if(oldHunterQuest && ['kill_specific','recover_item'].includes(oldHunterQuest.type)) hunterTargetEnemy(oldHunterQuest);
+      if(oldHunterQuest) oldHunterQuestSerial = Math.max(oldHunterQuestSerial, parseInt(String(oldHunterQuest.id).split('_')[1]) || 0);
 
       // villageCenter isn't stored explicitly - it's just wherever 'village'
       // tiles ended up in the restored map.
