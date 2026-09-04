@@ -2125,16 +2125,14 @@ The player intentionally accepts danger in exchange for information.
       equip: {weapon:null, shield:null, armor:null},
       inventory: [],
     };
-    // XP needed for each level, tuned against the intended pacing:
-    // lvl 2 ~= 3m, lvl 5 ~= 10m, lvl 10 ~= 1h10m and lvl 15 ~= 7h.
-    // The cubic term makes the later levels accelerate naturally instead of
-    // requiring a separate hard-coded XP value for every level.
-    const EARLY_XP_TO_NEXT = [24, 16, 20];
+    // XP thresholds calibrated from the intended cumulative times at roughly
+    // 8 XP/minute. These are per-level costs (not cumulative XP), so the early
+    // curve can match the measured 3 -> 5 -> 7.5 minute pacing while the late
+    // curve accelerates sharply.
+    const XP_TO_NEXT = [20, 24, 29, 35, 40, 56, 80, 104, 200, 240, 400, 480, 720, 960];
     function xpToNext(lvl){
-      if(lvl <= EARLY_XP_TO_NEXT.length){
-        return EARLY_XP_TO_NEXT[lvl - 1];
-      }
-      return Math.round(20 * Math.pow(lvl / 4, 3));
+      if(lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1];
+      return Math.round(960 * Math.pow(lvl / 14, 2.2));
     }
     function recalcDerived(){
       // bonuses from modifiers on equipped gear + inventory 'vital'/'lucky' aren't passive; only equipped gear counts

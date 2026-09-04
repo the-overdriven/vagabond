@@ -222,27 +222,35 @@ Max HP receives flat bonuses first, then artifact percentage modifiers.
 # 5. Leveling
 
 XP required for the next level uses a fast early-game calibration followed by
-a cubic progression curve:
+a steep progression curve:
 
 ```text
-level 1 -> 2: 24 XP
-level 2 -> 3: 16 XP
-level 3 -> 4: 20 XP
+level 1 -> 2: 20 XP
+level 2 -> 3: 24 XP
+level 3 -> 4: 29 XP
+level 4 -> 5: 35 XP
+level 5 -> 6: 40 XP
+level 6 -> 7: 56 XP
+level 7 -> 8: 80 XP
+level 8 -> 9: 104 XP
+level 9 -> 10: 200 XP
+level 10 -> 11: 240 XP
+level 11 -> 12: 400 XP
+level 12 -> 13: 480 XP
+level 13 -> 14: 720 XP
+level 14 -> 15: 960 XP
 
-level 4+: round(20 x (level / 4)^3)
+For level 15 onward, the threshold is `round(960 x (level / 14)^2.2)`.
 ```
 
-The cubic curve keeps the early levels quick while making later levels take
-progressively longer. At roughly 8 XP per minute, this is approximately level
-5 at 10 minutes, level 10 at 1 hour 25 minutes, and level 15 at 7 hours 20
-minutes. Actual timing varies with enemy encounters, XP bonuses, and
-exploration.
+i.e.
+Level 15 → 16: 1,117 XP
+Level 16 → 17: 1,288 XP
+Level 20 → 21: 2,104 XP
 
-Legacy formula (no longer used):
-
-```text
-floor(14 × level^1.55) + 10
-```
+This produces approximately levels 2–15 at 3, 5, 7.5, 10, 15, 22, 32, 45,
+70, 100, 150, 210, 300, and 420 minutes respectively. Actual timing varies
+with enemy encounters, XP bonuses, and exploration.
 
 On level-up:
 
