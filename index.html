@@ -3971,7 +3971,7 @@ The player intentionally accepts danger in exchange for information.
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
     function isStackableKind(kind){
-      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries';
+      return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='seashell';
     }
     function isConsumableKind(kind){
       return kind==='potion' || kind==='speedpotion' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='scroll' || kind==='idscroll' || kind==='teleportscroll';
@@ -4040,35 +4040,35 @@ The player intentionally accepts danger in exchange for information.
       if(treasureMapSpot && key === keyXY(treasureMapSpot.x, treasureMapSpot.y)){
         const existing = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y && g.kind==='treasurecasket');
         if(existing){ log('You have already unearthed the old rotten casket.', 'info'); return; }
-        groundItems.push({x:player.x,y:player.y,kind:'treasurecasket',opened:false,description:'An old rotten casket, half-swallowed by the sand.'});
+        player.inventory.push({kind:'treasurecasket',name:'Old Rotten Casket',description:'An old rotten casket, half-swallowed by the sand.'});
         log('Your shovel strikes something hard. Beneath the sand lies an old rotten casket.', 'loot');
         render(); return;
       }
       const roll = randInt(1,100);
       if(roll <= 5) log('You hit something hard. It turns out to be a stone.', 'loot');
       else if(roll <= 8){ player.gold += 1; log('Your shovel uncovers a gold coin.', 'loot'); }
-      else if(roll <= 11){ player.inventory.push({kind:'seashell',name:'Seashell',value:10}); log('You uncover a pretty seashell, worth 10 gold.', 'loot'); }
+      else if(roll <= 11){ const stack = player.inventory.find(i=>i.kind==='seashell'); if(stack) stack.count=(stack.count||1)+1; else player.inventory.push({kind:'seashell',name:'Seashell',value:10,count:1}); log('You uncover a pretty seashell, worth 10 gold.', 'loot'); }
       else if(roll <= 13) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot');
       else if(roll <= 16){
         const spots=[];
         for(const [dx,dy] of DIRS8){ const x=player.x+dx,y=player.y+dy; if(isWalkable(x,y) && !enemies.some(e=>onCurrentLevel(e)&&e.alive&&e.x===x&&e.y===y) && !(x===player.x&&y===player.y)) spots.push({x,y}); }
         if(spots.length){ const pos=pick(spots); const tmpl=ENEMY_TEMPLATES.find(t=>t.name==='Scarab') || {name:'Scarab',tier:1,hp:10,atk:3,def:1,spd:4,aggro:AGGRO_RANGE};
-          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you - a scarab!', 'bad'); }
+          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you—a scarab!', 'bad'); }
         else log('You hear something moving beneath the sand, but nothing emerges.', 'info');
       } else log('You dig carefully, but find nothing.', 'info');
       render(); updateHud();
     }
     function openTreasureCasket(){
-      const c=groundItems.find(g=>onCurrentLevel(g)&&g.x===player.x&&g.y===player.y&&g.kind==='treasurecasket');
-      if(!c){ log('There is no casket here.', 'info'); return; }
+      const idx=player.inventory.findIndex(i=>i.kind==='treasurecasket');
+      if(idx<0){ log('You do not have a casket to open.', 'info'); return; }
       const gold=randInt(30,100); player.gold+=gold;
+      player.inventory.splice(idx,1);
       player.inventory.push({kind:'blackkey',name:'Black Key'});
-      groundItems.splice(groundItems.indexOf(c),1);
       log(`You open the old rotten casket. It falls apart, spilling ${gold} gold and a Black Key into your hands.`, 'loot');
-      draw(); updateHud();
+      render(); updateHud();
+      renderInventory();
     }
     function lootSkeletonOrForage(){
-      if(groundItems.some(g=>onCurrentLevel(g)&&g.x===player.x&&g.y===player.y&&g.kind==='treasurecasket')){ openTreasureCasket(); return; }
       const tomb=cemeteryTombstones[keyXY(player.x,player.y)];
       if(tomb?.odd){ player.inventory.push({kind:'oddTombstone',name:'Odd Tombstone',tombName:tomb.name,tombBirth:tomb.birth,tombDeath:tomb.death,inscription:tomb.inscription}); delete cemeteryTombstones[keyXY(player.x,player.y)]; map[player.y][player.x]=tileUnderlays[keyXY(player.x,player.y)]||'grass'; log('You pick up the loose tombstone.', 'loot'); draw(); return; }
       if(map[player.y]?.[player.x]==='bigbell'){
@@ -5871,6 +5871,12 @@ The player intentionally accepts danger in exchange for information.
           row.appendChild(btn);
         } else if(it.kind==='bigbell'){
           const btn=document.createElement('button'); btn.textContent='?'; btn.onclick=()=>log('An enormous brass bell, impossibly heavy.', 'info'); row.appendChild(btn);
+        } else if(it.kind==='treasurecasket'){
+          const btn=document.createElement('button'); btn.textContent='Open'; btn.onclick=()=>openTreasureCasket(); row.appendChild(btn);
+        } else if(it.kind==='blackkey'){
+          const btn=document.createElement('button'); btn.textContent='?';
+          btn.onclick=()=>log('A dark stone key bound to a worn cord, untouched by the passage of time.', 'info');
+          row.appendChild(btn);
         } else if(it.kind==='treasuremap'){
           const btn=document.createElement('button'); btn.textContent='Inspect'; btn.onclick=()=>inspectTreasureMap(); row.appendChild(btn);
         } else if(it.kind==='oddTombstone'){
