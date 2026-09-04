@@ -2644,13 +2644,14 @@ The player intentionally accepts danger in exchange for information.
       return `${dy>0?'south':'north'}-${dx>0?'east':'west'}`;
     }
     function hunterLivingEnemies(){ hunterEnsureIds(); return enemies.filter(e=>e.alive && e.baseName && Number(e.tier||0)>=3); }
+    function hunterPrefixedEnemies(){ return hunterLivingEnemies().filter(e=>!!e.prefix); }
     function hunterReward(){ return 100; }
     function hunterCandidates(){
       hunterEnsureIds();
-      const out=[]; const living=hunterLivingEnemies();
-      for(const e of living) out.push({type:'kill_specific', targetEnemyId:e.id, targetName:e.name, rewardXp:hunterReward([e],50)});
+      const out=[]; const living=hunterLivingEnemies(); const marked=hunterPrefixedEnemies();
+      for(const e of marked) out.push({type:'kill_specific', targetEnemyId:e.id, targetName:e.name, rewardXp:hunterReward([e],50)});
       const groups={};
-      for(const e of living) (groups[e.baseName] ||= []).push(e);
+      for(const e of marked) (groups[e.baseName] ||= []).push(e);
       for(const [name,list] of Object.entries(groups)) if(list.length>=2){
         const required=Math.min(list.length, randInt(2, Math.min(6,list.length)));
         const targets=list.slice(0,required);
@@ -2669,7 +2670,14 @@ The player intentionally accepts danger in exchange for information.
     function generateOldHunterQuest(){
       if(oldHunterQuest && oldHunterQuest.state==='active') return oldHunterQuest;
       const options=hunterCandidates(); if(!options.length) return null;
-      const q=options[randInt(0,options.length-1)];
+      // Give a 50% chance to receive a killing quest, but only from
+      // prefixed tier 3+ monsters. Item quests remain eligible otherwise.
+      const killOptions=options.filter(q=>q.type==='kill_specific' || q.type==='kill_group');
+      const itemOptions=options.filter(q=>q.type==='recover_item' || q.type==='deliver_item');
+      let pool=options;
+      if(killOptions.length && itemOptions.length) pool=Math.random()<0.5 ? killOptions : itemOptions;
+      else if(killOptions.length) pool=killOptions;
+      const q=pool[randInt(0,pool.length-1)];
       oldHunterQuest={id:`hunter_${++oldHunterQuestSerial}`,state:'active',giver:'Old Hunter',progress:0,createdAtTurn:0,...q};
       return oldHunterQuest;
     }
