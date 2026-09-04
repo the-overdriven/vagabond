@@ -199,7 +199,7 @@ MF comes from base MF, race bonuses, equipment modifiers, and artifacts.
 
 Magic Find influences loot chances **and** loot quality:
 
-- Gold drops from enemies are currently disabled (see ï¿½43. Loot).
+- Gold drops from enemies are currently disabled (see 43. Loot).
 - Artifact drop chance from enemy kills scales with MF using the same
   `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 4.8%.
 - Non-humanoid enemy gear drop chance scales with MF (unchanged: `+MF*0.02`),
@@ -409,7 +409,7 @@ Grassland tree decoration:
   normal terrain effects.
 - Tree locations are persisted in save files.
 
-Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, Dwarven walls, rubble, and Dwarven structures.
+Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 
 Normally impassable terrain includes mountains, snow mountains, volcanoes,
 lava, boulders, and water for non-Merlings.
@@ -538,9 +538,9 @@ It contains several tombstones, including one anomalous tombstone.
 <details>
   <summary>Details</summary>
 
-A large underground Dwarven settlement/ruin containing:
+A large underground dwarven settlement/ruin containing:
 
-- Dwarven architecture
+- dwarven architecture
 - marble flooring
 - walls
 - rubble
@@ -867,6 +867,23 @@ round
 min
 from
 ```
+
+## Enemy XP
+
+XP awarded for killing an enemy is calculated from its final spawned stats:
+
+```text
+base XP = tier x 10 + floor((max HP + ATK x 2 + DEF x 2) / 3)
+```
+
+If the enemy has a prefix, the result is multiplied by 1.5 and rounded:
+
+```text
+prefixed enemy XP = round(base XP x 1.5)
+```
+
+Therefore, prefixed enemies yield 50% more XP than an otherwise identical
+enemy. The player's race and equipment XP bonuses are applied afterward.
 
 ---
 
@@ -1262,8 +1279,8 @@ Artifact generation uses separate content pools for:
 - nouns
 - prefixes
 - epithets
-- Dwarven names
-- Dwarven vocations
+- dwarven names
+- dwarven vocations
 - effects
 - curses
 - description fragments
@@ -1280,9 +1297,11 @@ Current content includes approximately:
 8 curse definitions
 ```
 
-After an enemy has rolled an artifact drop, the artifact effect tier is chosen
-uniformly from the effects available to that enemy tier. The current pool has
-4 tier-3 effects, 6 tier-4 effects, and 4 tier-5 effects:
+These percentages apply only after an enemy has already rolled an artifact
+drop. They do not describe the chance of getting an artifact in the first
+place. Once the drop happens, the effect tier is selected uniformly from the
+effects available to that enemy tier. The current pool has 4 tier-3 effects,
+6 tier-4 effects, and 4 tier-5 effects:
 
 | Source enemy tier | Tier 3 effect | Tier 4 effect | Tier 5 effect |
 |---|---:|---:|---:|
@@ -1290,20 +1309,41 @@ uniformly from the effects available to that enemy tier. The current pool has
 | 4 | 40% | 60% | 0% |
 | 5 | 28.6% | 42.9% | 28.6% |
 
+Examples, assuming no Magic Find:
+
+- Tier-1 enemy: if it drops an artifact, it is tier 3 (100% of the time).
+- Tier-2 enemy: if it drops an artifact, it is tier 3 (100% of the time).
+- Tier-3 enemy: if it drops an artifact, it is tier 3 (100% of the time).
+- Tier-4 enemy: if it drops an artifact, there is a 40% chance of tier 3 and a
+  60% chance of tier 4.
+- Tier-5 enemy: if it drops an artifact, there is a 28.6% chance of tier 3, a
+  42.9% chance of tier 4, and a 28.6% chance of tier 5.
+
 Tier-1 and tier-2 sources fall back to the lowest available effect tier,
-which is currently tier 3. Magic Find gives a chance to treat the source as
-one tier higher before selecting the effect: `min(50%, MF x 3%)`. For example,
+which is currently tier 3. Magic Find can treat the source as one tier higher
+before selecting the effect. The chance is `min(50%, MF x 3%)`; for example,
 MF 10 gives a 30% chance to use the next source tier's distribution.
 
 ---
 
 # 39. Artifact Naming
 
-Non-cursed artifacts can use a Dwarven-owner naming pattern such as:
+Non-cursed artifacts can use a dwarven-owner naming pattern such as:
 
 ```text
 The <noun> of <Dwarf Name>
 ```
+
+Cursed artifacts use a cursed prefix directly before the artifact noun and do
+not receive a dwarven-owner name:
+
+```text
+<Cursed Prefix> <noun>
+```
+
+For example, a cursed artifact might be named `Forgotten Amulet`. If no cursed
+prefix is available, the naming code falls back to the normal epithet pattern
+(`The <noun> of <Epithet>`) or simply `The <noun>`.
 
 Unidentified artifacts display:
 
@@ -1551,13 +1591,17 @@ Foraged item. When eaten, always heals 25% HP.
 
 ## Mushroom
 
-Foraged item. There is 50% chance of healing, or damaging HP.
+Foraged item. There is a 50% chance of healing or damaging HP. Both outcomes
+use 25% of the player's maximum HP: healing is affected by consumable bonuses,
+while poison damage is not. Damage is rounded and cannot be lower than 1 HP.
 
 ---
 
 # 48. Foraging
 
-`F` performs foraging/search actions where appropriate.
+`F` performs foraging, searching, and occasional looting/pickup actions where
+appropriate. For example, it can forage forest tiles, search skeletons, loot
+dead bodies, or pick up certain special objects.
 
 Ordinary forest tiles can be foraged.
 
@@ -1794,7 +1838,7 @@ The story concerns:
 <details>
   <summary>Details</summary>
 
-The generated cemetery contains ordinary Dwarven tombstones and exactly one anomalous tombstone.
+The generated cemetery contains ordinary dwarven tombstones and exactly one anomalous tombstone.
 
 Each tombstone's name/dates/inscription is persisted across save/load
 alongside the grave tiles themselves, so reloading a save does not blank out
@@ -1818,7 +1862,7 @@ It can then be given to the Gravedigger.
 <details>
   <summary>Details</summary>
 
-The Dwarven ruin contains environmental story objects such as:
+The dwarven ruin contains environmental story objects such as:
 
 - anvil
 - wheelbarrow
@@ -1914,7 +1958,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-8
+10
 ```
 
 Saves are JSON files.
