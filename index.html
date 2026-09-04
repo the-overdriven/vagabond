@@ -2688,9 +2688,8 @@ The player intentionally accepts danger in exchange for information.
         if(!h) return 'somewhere in the wilds';
         const dx=q.targetX-h.x, dy=q.targetY-h.y;
         if(Math.abs(dx)<3 && Math.abs(dy)<3) return 'nearby';
-        const ew=Math.abs(dx)>Math.abs(dy)*1.6 ? (dx>0?'east':'west') : '';
-        const ns=Math.abs(dy)>Math.abs(dx)*1.6 ? (dy>0?'south':'north') : '';
-        if(ew) return ew; if(ns) return ns;
+        if(Math.abs(dx)<3) return dy>0?'south':'north';
+        if(Math.abs(dy)<3) return dx>0?'east':'west';
         return `${dy>0?'south':'north'}-${dx>0?'east':'west'}`;
       }
       const e=hunterTargetEnemy(q); if(!e) return 'somewhere in the wilds';
@@ -2811,7 +2810,7 @@ The player intentionally accepts danger in exchange for information.
       if((oldHunterQuest.type==='kill_group' && oldHunterQuest.progress>=oldHunterQuest.required) || oldHunterQuest.progress>=1) oldHunterQuest.state='ready';
     }
     function hunterActiveFlavor(q){
-      if(q.type==='investigate_area') return `Old Hunter says: Have you investigated the area yet? I am still waiting to hear what you found.`;
+      if(q.type==='investigate_area') return `Old Hunter says: Have you investigated the area in the ${hunterDirection(q)} yet? I am still waiting to hear what you found.`;
       if(q.type==='kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterDirection(q)} of here.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterDirection(q)} of here.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterDirection(q)} of here, and do not mistake another beast for it.`]);
       if(q.type==='kill_group') return pick([`Old Hunter says: The trouble ${hunterDirection(q)} of here has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterDirection(q)} of here.`, `Old Hunter says: The hills ${hunterDirection(q)} of here are not quiet yet. Do what you went out there to do.`]);
       if(q.type==='recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`]);
