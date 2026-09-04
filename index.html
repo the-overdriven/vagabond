@@ -2627,7 +2627,7 @@ The player intentionally accepts danger in exchange for information.
       hunterEnsureIds();
       let e = enemies.find(x=>x.id===q.targetEnemyId && x.alive);
       if(!e && q.targetName){
-        e = enemies.find(x=>x.alive && x.name===q.targetName && (!q.targetItemName || (x.equipment && (x.equipment.name===q.targetItemName || x.equipment.base===q.targetItemName))));
+        e = enemies.find(x=>x.alive && (x.name===q.targetName || x.baseName===q.targetName) && (!q.targetItemName || (x.equipment && (x.equipment.name===q.targetItemName || x.equipment.base===q.targetItemName))));
         if(e) q.targetEnemyId=e.id;
       }
       return e || null;
@@ -2643,8 +2643,8 @@ The player intentionally accepts danger in exchange for information.
       if(ew) return ew; if(ns) return ns;
       return `${dy>0?'south':'north'}-${dx>0?'east':'west'}`;
     }
-    function hunterLivingEnemies(){ hunterEnsureIds(); return enemies.filter(e=>e.alive && e.baseName); }
-    function hunterReward(enemyList=[], bonus=0){ return Math.max(80, Math.round(enemyList.reduce((n,e)=>n+xpForEnemy(e),0)*1.25)+bonus); }
+    function hunterLivingEnemies(){ hunterEnsureIds(); return enemies.filter(e=>e.alive && e.baseName && Number(e.tier||0)>=3); }
+    function hunterReward(){ return 100; }
     function hunterCandidates(){
       hunterEnsureIds();
       const out=[]; const living=hunterLivingEnemies();
@@ -2661,7 +2661,7 @@ The player intentionally accepts danger in exchange for information.
       }
       for(const g of groundItems){
         if(g.artifactGuaranteed || g.kind==='artifact' || g.kind==='gear' || g.item){
-          out.push({type:'deliver_item', targetItemId:g.id, targetItemName:g.name||g.item?.name||g.description||'the lost item', rewardXp:150});
+          out.push({type:'deliver_item', targetItemId:g.id, targetItemName:g.name||g.item?.name||g.description||'the lost item', rewardXp:100});
         }
       }
       return out;
@@ -2703,8 +2703,8 @@ The player intentionally accepts danger in exchange for information.
     }
     function onOldHunterEnemyKilled(e){
       if(!oldHunterQuest || oldHunterQuest.state!=='active') return;
-      if(oldHunterQuest.type==='kill_specific' && e.id===oldHunterQuest.targetEnemyId) oldHunterQuest.progress=1;
-      else if(oldHunterQuest.type==='kill_group' && e.baseName===oldHunterQuest.targetBaseName) oldHunterQuest.progress++;
+      if(oldHunterQuest.type==='kill_specific' && (e.id===oldHunterQuest.targetEnemyId || (e.baseName===oldHunterQuest.targetName || e.name===oldHunterQuest.targetName))) oldHunterQuest.progress=1;
+      else if(oldHunterQuest.type==='kill_group' && (oldHunterQuest.targetEnemyIds?.includes(e.id) || (!Array.isArray(oldHunterQuest.targetEnemyIds) && e.baseName===oldHunterQuest.targetBaseName))) oldHunterQuest.progress++;
       else if(oldHunterQuest.type==='recover_item' && (e.id===oldHunterQuest.targetEnemyId || (e.baseName===oldHunterQuest.targetName && e.equipment && (e.equipment.name===oldHunterQuest.targetItemName || e.equipment.base===oldHunterQuest.targetItemName)))) oldHunterQuest.progress=1;
       if((oldHunterQuest.type==='kill_group' && oldHunterQuest.progress>=oldHunterQuest.required) || oldHunterQuest.progress>=1) oldHunterQuest.state='ready';
     }
@@ -2714,8 +2714,32 @@ The player intentionally accepts danger in exchange for information.
       if(q.type==='recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`]);
       return pick([`Old Hunter says: The missing ${q.targetItemName} has not found its way back yet. Keep searching.`, `Old Hunter says: I still need that ${q.targetItemName}. Somewhere, it is waiting to be found.`, `Old Hunter says: The trail to the lost ${q.targetItemName} has not gone cold. Not yet.`]);
     }
+    function hunterCompletionFlavor(q){
+      if(q.type==='kill_specific') return `Old Hunter says: You dealt with that particular beast. Good. I can finally sleep easier.`;
+      if(q.type==='kill_group') return `Old Hunter says: You thinned their numbers. The roads should be quieter now. Thank you.`;
+      if(q.type==='recover_item') return `Old Hunter says: You brought my ${q.targetItemName} back. I thought I would never see it again. Thank you.`;
+      return `Old Hunter says: You returned the lost ${q.targetItemName}. I am grateful. Thank you.`;
+    }
+    function removeHunterQuestItem(q){
+      if(!q || !['recover_item','deliver_item'].includes(q.type) || !Array.isArray(player.inventory)) return;
+      const name=q.targetItemName;
+      const i=player.inventory.findIndex(item=>item && (item.name===name || item.base===name));
+      if(i>=0) player.inventory.splice(i,1);
+    }
     function interactOldHunter(){
-      if(oldHunterQuest?.state==='ready'){ log(`Old Hunter says: Good work. You've earned this.`, 'info'); gainXp(oldHunterQuest.rewardXp); oldHunterQuest=null; return true; }
+      if(oldHunterQuest?.state==='ready'){
+        const q=oldHunterQuest;
+        removeHunterQuestItem(q);
+        log(hunterCompletionFlavor(q), 'info');
+        gainXp(100);
+        oldHunterQuest={...q, state:'completed'};
+        updateHud();
+        return true;
+      }
+      if(oldHunterQuest?.state==='completed'){
+        log(`Old Hunter says: Thank you again for dealing with that matter.`, 'info');
+        return true;
+      }
       if(oldHunterQuest?.state==='active'){ log(hunterActiveFlavor(oldHunterQuest), 'info'); return true; }
       const q=generateOldHunterQuest();
       log(q ? hunterFlavor(q) : `Old Hunter says: Nothing out there needs my attention right now.`, 'info');
@@ -3169,6 +3193,9 @@ The player intentionally accepts danger in exchange for information.
     }
     function killEnemy(e){
       log(`You have slain the ${e.name}!`, 'good');
+      // Notify quest logic before removing the corpse. Recover-item quests
+      // must inspect the weapon/equipment the monster was carrying.
+      onOldHunterEnemyKilled(e);
       e.alive = false;
       spawnDeathAnim(e);
       occupied.delete(keyXY(e.x,e.y));
@@ -5983,6 +6010,20 @@ The player intentionally accepts danger in exchange for information.
       oldHunterQuest = data.oldHunterQuest || null;
       hunterEnsureIds();
       // Recover-item quests can survive older saves where enemy IDs were not persisted.
+      // Repair legacy specific-kill quests whose target ID was lost or changed.
+      if(oldHunterQuest?.type==='kill_specific' && oldHunterQuest.state==='active'){
+        const byId = enemies.find(e => e.alive && e.id===oldHunterQuest.targetEnemyId);
+        const named = enemies.filter(e => e.alive && (e.name===oldHunterQuest.targetName || e.baseName===oldHunterQuest.targetName));
+        if(byId){
+          oldHunterQuest.targetEnemyId = byId.id;
+        } else if(named.length===1){
+          oldHunterQuest.targetEnemyId = named[0].id;
+        } else if(named.length===0){
+          // All enemies are persisted in saves; no living target means it was killed.
+          oldHunterQuest.progress=1;
+          oldHunterQuest.state='ready';
+        }
+      }
       if(oldHunterQuest?.type==='recover_item' && oldHunterQuest.state==='active'){
         const carried = player.inventory?.some(i => i && (i.name===oldHunterQuest.targetItemName || i.base===oldHunterQuest.targetItemName));
         if(carried){ oldHunterQuest.progress=1; oldHunterQuest.state='ready'; }
