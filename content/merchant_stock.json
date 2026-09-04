@@ -1,0 +1,20 @@
+{
+  "fixedItems": [
+    {"kind": "weapon", "base": "Two-handed Sword", "atk": 5, "grace": 2, "tier": 4, "twoHanded": true, "name": "Two-handed Sword", "merchantPrice": 200}
+  ],
+  "magicWeapon": {
+    "_note": "A random enchanted low-tier weapon is generated from this pool of base weapon names plus a random modifier from content/modifiers.json.",
+    "basePool": ["Dagger", "Short Sword", "Club"],
+    "priceMultiplier": 2
+  },
+  "guaranteedGear": {
+    "_note": "One guaranteed item of each kind/tier below is kept in stock; price = itemSellValue() * priceMultiplier.",
+    "shield": {"tier": 1, "priceMultiplier": 2},
+    "armor": {"tier": 1, "priceMultiplier": 2},
+    "artifact": {"tier": 3, "priceMultiplier": 2}
+  },
+  "scrolls": {
+    "idScroll": {"kind": "idscroll", "name": "Scroll of Identification", "minCount": 3, "minPrice": 100},
+    "teleportScroll": {"kind": "teleportscroll", "name": "Scroll of Teleportation", "count": 5, "merchantPrice": 100}
+  }
+}

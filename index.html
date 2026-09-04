@@ -460,6 +460,7 @@ The player intentionally accepts danger in exchange for information.
     let EDGE_MARGIN = 2;
     let EDGE_XP = 100;
     let MIN_LICHES = 6;
+    let MERCHANT_STOCK_CONFIG = {};
     let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false;
     let cemeteryTombstones = {};
     let gravediggerGraveKey = null;
@@ -486,7 +487,8 @@ The player intentionally accepts danger in exchange for information.
         messages:'messages.json',
         tiles:'tiles.json',
         lootTables:'loot_tables.json',
-        mapConfig:'map_config.json'
+        mapConfig:'map_config.json',
+        merchantStockConfig:'merchant_stock.json'
       };
       const content = {};
       for(const [key,file] of Object.entries(files)){
@@ -538,6 +540,7 @@ The player intentionally accepts danger in exchange for information.
       EDGE_MARGIN = content.mapConfig.exploration.edgeMargin;
       EDGE_XP = content.mapConfig.exploration.edgeRewardXp;
       MIN_LICHES = content.mapConfig.spawning.minLiches;
+      MERCHANT_STOCK_CONFIG = content.merchantStockConfig;
     }
     const preloadedImageUrls = new Map();
     // Fetches images as blobs so tooltips keep working fully offline. Pass a
@@ -5251,8 +5254,11 @@ The player intentionally accepts danger in exchange for information.
     /* ============================== MERCHANT TRADE ============================== */
     let merchantStock = [];
     let serviceNpc = null;
+    // Merchant stock composition/prices now come from content/merchant_stock.json
+    // (MERCHANT_STOCK_CONFIG); this only decides *what* stays stocked.
     function makeMerchantMagicWeapon(){
-      const base = pick(WEAPONS.filter(w=>w.name==='Dagger' || w.name==='Short Sword' || w.name==='Club'));
+      const cfg = MERCHANT_STOCK_CONFIG.magicWeapon;
+      const base = pick(WEAPONS.filter(w=>cfg.basePool.includes(w.name)));
       const item = {
         kind:'weapon', base:base.name, atk:base.atk, grace:base.grace,
         tier:base.tier, twoHanded:!!base.twoHanded, name:base.name
@@ -5263,42 +5269,47 @@ The player intentionally accepts danger in exchange for information.
       item.modAmt = rollModifierAmount(mod.stat);
       if(mod.stat==='xp') item.xpBonus = randInt(5,15);
       item.merchantMagicLowTier = true;
-      item.merchantPrice = itemSellValue(item) * 2;
+      item.merchantPrice = itemSellValue(item) * cfg.priceMultiplier;
       return item;
     }
     function ensureMerchantStock(){
-      if(!merchantStock.some(it=>it.kind==='weapon' && it.base==='Two-handed Sword')){
-        merchantStock.push({kind:'weapon', base:'Two-handed Sword', atk:5, grace:2, tier:4, twoHanded:true, name:'Two-handed Sword', merchantPrice:200});
+      for(const fixedItem of MERCHANT_STOCK_CONFIG.fixedItems){
+        if(!merchantStock.some(it=>it.kind===fixedItem.kind && it.base===fixedItem.base && it.name===fixedItem.name)){
+          merchantStock.push({...fixedItem});
+        }
       }
       if(!merchantStock.some(it=>it.merchantMagicLowTier)){
         merchantStock.push(makeMerchantMagicWeapon());
       }
-      if(!merchantStock.some(it=>it.kind==='shield' && it.tier===1)){
-        const shield = makeShieldItem(1);
-        shield.merchantPrice = itemSellValue(shield) * 2;
+      const gear = MERCHANT_STOCK_CONFIG.guaranteedGear;
+      if(!merchantStock.some(it=>it.kind==='shield' && it.tier===gear.shield.tier)){
+        const shield = makeShieldItem(gear.shield.tier);
+        shield.merchantPrice = itemSellValue(shield) * gear.shield.priceMultiplier;
         merchantStock.push(shield);
       }
-      if(!merchantStock.some(it=>it.kind==='armor' && it.tier===1)){
-        const armor = makeArmorItem(1);
-        armor.merchantPrice = itemSellValue(armor) * 2;
+      if(!merchantStock.some(it=>it.kind==='armor' && it.tier===gear.armor.tier)){
+        const armor = makeArmorItem(gear.armor.tier);
+        armor.merchantPrice = itemSellValue(armor) * gear.armor.priceMultiplier;
         merchantStock.push(armor);
       }
       if(!merchantStock.some(it=>it.kind==='artifact')){
-        const art = makeArtifactItem(3);
+        const art = makeArtifactItem(gear.artifact.tier);
         if(art){
-          art.merchantPrice = SELL_VALUE_BY_TIER[art.tier] * 2;
+          art.merchantPrice = SELL_VALUE_BY_TIER[art.tier] * gear.artifact.priceMultiplier;
           merchantStock.push(art);
         }
       }
-      let idScrollStock = merchantStock.find(it=>it.kind==='idscroll');
+      const idCfg = MERCHANT_STOCK_CONFIG.scrolls.idScroll;
+      let idScrollStock = merchantStock.find(it=>it.kind===idCfg.kind);
       if(!idScrollStock){
-        merchantStock.push({kind:'idscroll', name:'Scroll of Identification', count:3, merchantPrice:100});
+        merchantStock.push({kind:idCfg.kind, name:idCfg.name, count:idCfg.minCount, merchantPrice:idCfg.minPrice});
       } else {
-        idScrollStock.count = Math.max(3, idScrollStock.count || 1);
-        idScrollStock.merchantPrice = Math.max(100, idScrollStock.merchantPrice || 0);
+        idScrollStock.count = Math.max(idCfg.minCount, idScrollStock.count || 1);
+        idScrollStock.merchantPrice = Math.max(idCfg.minPrice, idScrollStock.merchantPrice || 0);
       }
-      if(!merchantStock.some(it=>it.kind==='teleportscroll')){
-        merchantStock.push({kind:'teleportscroll', name:'Scroll of Teleportation', count:5, merchantPrice:100});
+      const tpCfg = MERCHANT_STOCK_CONFIG.scrolls.teleportScroll;
+      if(!merchantStock.some(it=>it.kind===tpCfg.kind)){
+        merchantStock.push({kind:tpCfg.kind, name:tpCfg.name, count:tpCfg.count, merchantPrice:tpCfg.merchantPrice});
       }
     }
     // SELL_VALUE_BY_TIER / FLAT_SELL_VALUE now loaded from content/loot_tables.json.
