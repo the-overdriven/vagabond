@@ -629,6 +629,12 @@ World generation checks whether the Temple can reach a map edge through walkable
 
 If the generated world fails this condition, it is regenerated.
 
+The z:-1 crypt must remain a separate walkable region from all randomly
+generated caves. After the crypt and caves are merged, generation flood-fills
+the shared underground map from the crypt entrance. If that traversal reaches
+any non-crypt cave floor or entrance, the entire world is discarded and
+regenerated. This prevents random cave geometry from opening into the crypt.
+
 Maximum attempts:
 
 ```text

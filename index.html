@@ -1112,15 +1112,24 @@ The player intentionally accepts danger in exchange for information.
     function generateMap(){
       for(let attempt=1; attempt<=MAX_WORLD_ATTEMPTS; attempt++){
         generateSurface();
-        if(templeReachesEdge()) break;
+        if(!templeReachesEdge()){
+          if(attempt === MAX_WORLD_ATTEMPTS){
+            console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`);
+            surfaceMap = map.map(row=>row.slice());
+            generateCaves();
+            break;
+          }
+          console.warn(`Discarding world ${attempt}: the Temple has no walkable route to a map edge. Generating a new world.`);
+          continue;
+        }
+        surfaceMap = map.map(row=>row.slice());
+        if(generateCaves()) break;
         if(attempt === MAX_WORLD_ATTEMPTS){
-          console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`);
+          console.warn(`World generation failed to keep the crypt separate from random caves in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`);
           break;
         }
-        console.warn(`Discarding world ${attempt}: the Temple has no walkable route to a map edge. Generating a new world.`);
+        console.warn(`Discarding world ${attempt}: the crypt is connected to a random cave. Generating a new world.`);
       }
-      surfaceMap = map.map(row=>row.slice());
-      generateCaves();
     }
 
     function templeReachesEdge(){
@@ -1222,6 +1231,7 @@ The player intentionally accepts danger in exchange for information.
         }
       }
       buildCrypt();
+      const cryptInvalid = cryptConnectedToRandomCave();
       // z:-2: about half of the z:-1 caves get a stairway down into their own
       // small deeper cave, sharing one map with every other z:-2 cave (same
       // pattern as z:-1 sharing undergroundMap). Written generically so a
@@ -1232,6 +1242,36 @@ The player intentionally accepts danger in exchange for information.
       deepLevels.push({map:blankCaveMap(), caveMaps:[], caves:[], discovered:Array.from({length:MAP_H}, ()=>new Array(MAP_W).fill(false))});
       buildDwarvenRuin(deepLevels[1]);
       undergroundDiscovered = undergroundDiscoveredL1;
+      return !cryptInvalid;
+    }
+
+    // The crypt must remain a separate z:-1 region. Check the actual merged
+    // map, since overlapping cave templates can create a route even when the
+    // cave descriptors themselves are far apart.
+    function cryptConnectedToRandomCave(){
+      if(cryptCaveIndex < 0) return false;
+      const crypt = caves[cryptCaveIndex];
+      const entrance = crypt?.entrances?.[0];
+      if(!entrance) return false;
+      const queue = [entrance];
+      const seen = new Set([keyXY(entrance.x, entrance.y)]);
+      while(queue.length){
+        const p = queue.shift();
+        for(let i=0;i<caves.length;i++){
+          if(i === cryptCaveIndex || caves[i]?.crypt) continue;
+          if((caves[i].entrances||[]).some(e=>e.x===p.x && e.y===p.y)) return true;
+          if(caveMaps[i]?.[p.y]?.[p.x] === 'cavefloor') return true;
+        }
+        for(const [dx,dy] of DIRS8){
+          const x=p.x+dx, y=p.y+dy;
+          if(x<0 || y<0 || x>=MAP_W || y>=MAP_H) continue;
+          const key=keyXY(x,y);
+          if(seen.has(key) || !TILE[undergroundMap[y][x]]?.walk) continue;
+          seen.add(key);
+          queue.push({x,y});
+        }
+      }
+      return false;
     }
 
     // The chapel's crypt is deliberately compact: a long central aisle with
@@ -1334,7 +1374,7 @@ The player intentionally accepts danger in exchange for information.
       let deepSpot=null;
       for(let xx=maxX-4;xx>=minX+3&&!deepSpot;xx--) for(let yy=minY+3;yy<=maxY-3&&!deepSpot;yy++) if(cm[yy][xx]==='marble') deepSpot={x:xx,y:yy};
       if(deepSpot){
-        groundItems.push({x:deepSpot.x,y:deepSpot.y,kind:'wheelbarrow',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'You see a wheelbarrow. This thing has not been used in years. The craftsmanship, however, is of the highest quality and unknown material. It appears to be surprisingly light - you can pick it up if you want to. Though you\'re not sure why you would need it.'});
+        groundItems.push({x:deepSpot.x,y:deepSpot.y,kind:'wheelbarrow',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'You something resembling a wheelbarrow. This thing has not been used in years. The craftsmanship, however, is of the highest quality and unknown material. It appears to be surprisingly light - you can pick it up if you want to. Though you\'re not sure why you would need it.'});
         const coinSpot=[[deepSpot.x-1,deepSpot.y],[deepSpot.x+1,deepSpot.y],[deepSpot.x,deepSpot.y-1],[deepSpot.x,deepSpot.y+1]]
           .map(([x,y])=>({x,y})).find(p=>cm[p.y]?.[p.x]==='marble');
         if(coinSpot) groundItems.push({x:coinSpot.x,y:coinSpot.y,kind:'goldcoin',level:ruinLevel,caveIndex:dwarvenRuin.caveIndex,description:'You see a single, enormous gold coin. A skeleton lies crushed beneath it, its bones flattened under the weight. Poor greedy soul.'});
@@ -4136,7 +4176,7 @@ The player intentionally accepts danger in exchange for information.
         }
         if(currentZ===0 && map[ny][nx]==='ruinedchapel' && map[fromPos.y][fromPos.x] !== 'ruinedchapel'){
           log(bellRung
-            ? 'The ruined chapel is no longer sealed. Beyond the broken doorway, a narrow passage descends into darkness.'
+            ? 'The ruined chapel is no longer sealed. There are no marks of a breach - it looks like it was opened from the inside. Beyond the broken doorway, a narrow passage descends into darkness.'
             : "The ruined chapel is forgotten by both the living and the gods. Its doors are sealed; no living hand has opened them in ages.", 'info');
         }
         if(CAVE_TRANSITION_TILES.has(map[ny][nx])){
