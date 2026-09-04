@@ -1,9 +1,8 @@
 <!-- TODO:
 
 - [mysteriando] the shoddy staircase should be unlocked by stepping on a pressure plate
-- [mysteriando] inspecting bell tower after delivering the bell should say the bell is there
-The bell is here. It hangs silently in the tower, exactly where it belongs.
-- [mysteriando] ancient lich wakes up near the crypt, not ancient forest and the crypt opens
+- [mysteriando] talking to ancient lich with key on your neck gives new dialogue
+
 - [mysteriando] When the Drunk hears the Bell ring he only says:
 Drunk says: I'm done! No more drink! I heard a bell that's not there.
 - remove wheelbarrow after delivering the bell
@@ -4004,6 +4003,15 @@ The player intentionally accepts danger in exchange for information.
       nothing: ()=>{ log('You search through the undergrowth but find nothing of use.', 'info'); },
     };
     function tryForage(){
+      const tile = map[player.y]?.[player.x];
+      if(tile === 'sand'){
+        if(player.inventory.some(i=>i.kind==='shovel')){
+          tryDig();
+        } else {
+          log('You need a shovel to dig in sand.', 'info');
+        }
+        return;
+      }
       if(map[player.y][player.x] === 'taiga'){
         log('The snow-choked taiga yields no food. Only frozen roots and dead needles.', 'info');
         return;
