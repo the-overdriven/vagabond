@@ -1500,7 +1500,31 @@ Artifact chance and quality (effect tier, curse odds) scale with Magic Find
 
 # 44. Enemy Equipment Drops
 
-Humanoid enemies can carry equipment. The worn items have an effect on enemy's stats and can be inspected from a distance.
+Humanoid enemies can carry equipment. The worn items have an effect on the
+enemy's stats and can be inspected from a distance.
+
+On spawn, a humanoid gets up to two independent equipment rolls. The first
+roll has a chance of `min(90%, 45% + tier*3%)`. If it fails, a fallback roll is
+made with a chance of `min(90%, 45% + MF*2% + tier*3%)`. Therefore the actual
+chance that a humanoid is wearing at least one item is:
+
+```text
+1 - (1 - firstRoll) * (1 - fallbackRoll)
+```
+
+At MF 0, the resulting chances are:
+
+| Enemy tier | Chance of wearing gear |
+| --- | ---: |
+| 1 | 72.96% |
+| 2 | 75.99% |
+| 3 | 78.84% |
+| 4 | 81.49% |
+| 5 | 84.00% |
+
+Magic Find increases only the fallback roll by `2%` per MF, up to a 90%
+roll chance, so the combined chance also increases with MF. The item type is
+selected independently: weapon 50%, armor 25%, or shield 25%.
 
 Possible equipment includes:
 
