@@ -2095,22 +2095,22 @@ Therefore:
 
 Current desktop controls include:
 
-| Key | Action |
-|---|---|
-| WASD | Move |
-| Q/E/Z/C | Diagonal movement |
-| Arrow keys | Move |
-| Space | Inspect / interact |
-| F | Forage / search / special pickup |
-| T | Wait |
-| Tab | Inventory |
-| M | Map |
-| K | Save |
-| L | Load |
-| Escape | Close overlays |
-| Control | Show enemy ranges |
-| Caps Lock | Lock enemy ranges |
-| G | Debug/god mode |
+| Key | Action                                                         |
+|---|----------------------------------------------------------------|
+| WASD | Move                                                           |
+| Q/E/Z/C | Diagonal movement                                              |
+| Arrow keys | Move                                                           |
+| Space | Inspect / interact                                             |
+| F | Forage / search / special pickup / dig (in sand with a shovel) |
+| T | Wait                                                           |
+| Tab | Inventory                                                      |
+| M | Map                                                            |
+| K | Save                                                           |
+| L | Load                                                           |
+| Escape | Close overlays                                                 |
+| Control | Show enemy ranges                                              |
+| Caps Lock | Lock enemy ranges                                              |
+| G | Debug/god mode                                                 |
 
 ---
 
@@ -2548,11 +2548,13 @@ The same character continues after death.
 
 # 79. Digging
 
-Digging is performed with `tryDig()`.
+Digging is performed with `tryDig()`. The forage key (`F`) automatically calls the digging action when the player has a shovel and is standing on sand.
 
 ## Rules
 
 - Digging requires a shovel.
+- Pressing `F` while holding a shovel and standing on a `sand` tile automatically digs.
+- Pressing `F` on any non-sand tile does not dig; it uses the normal forage/search/special-pickup behavior instead.
 - The player can dig only while standing on a `sand` tile.
 - Attempting to dig on any other tile logs:
   ```text
