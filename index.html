@@ -1,4 +1,7 @@
 <!-- TODO:
+
+
+- extract more content to .json
 - life potions are too common, make their loose drops in the world 50% less common
 we need to do something with herbalist, new services screen (works by clicking when standing next to her, like with merchant)
 - For a fee, the herbalist removes poisonous mushrooms and creates new item: edible mushroom (5g per mushroom), 50% chance of each mushroom to be poisonous and thus removed
@@ -5525,7 +5528,8 @@ The player intentionally accepts danger in exchange for information.
       player.gold -= count*5; player.inventory.splice(player.inventory.indexOf(it),1);
       let edible=0; for(let i=0;i<count;i++) if(chance(0.5)) edible++;
       for(let i=0;i<edible;i++) addEdibleMushroom();
-      log(`The Herbalist identifies ${edible} edible mushroom${edible===1?'':'s'}.`, 'good'); updateHud(); renderTrade(); renderInventory();
+      const removed=count-edible;
+      log(`The Herbalist purifies ${edible} mushroom${edible===1?'':'s'} and removes ${removed} poisonous mushroom${removed===1?'':'s'}.`, 'good'); updateHud(); renderTrade(); renderInventory();
     }
     function makeHerbalistPotion(){
       const it=player.inventory.find(i=>i.kind==='herb');
@@ -5659,6 +5663,9 @@ The player intentionally accepts danger in exchange for information.
     function useBerries(idx){
       const it=player.inventory[idx]; if(!it || it.kind!=='berries') return;
       it.count=(it.count||1)-1; if(it.count<=0) player.inventory.splice(idx,1);
+      if(raceDef()?.id==='troll'){
+        log('You eat the berries, but they have no effect on you.', 'info'); consumeItemTurn(); return;
+      }
       player.berryRegenTurns=(player.berryRegenTurns||0)+100;
       log('You eat the berries. A gentle regeneration takes hold.', 'good'); consumeItemTurn();
     }

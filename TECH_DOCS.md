@@ -1624,9 +1624,7 @@ Results:
 75% → Nothing
 ```
 
-Taiga cannot be foraged.
-
-Ancient Forest cannot be foraged.
+Taiga and Ancient Forest cannot be foraged.
 
 ---
 
