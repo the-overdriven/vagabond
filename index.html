@@ -4035,12 +4035,14 @@ The player intentionally accepts danger in exchange for information.
       }
       const key = keyXY(player.x, player.y);
       dugSandTiles.add(key);
+      // Redraw immediately so the darker sand is visible.
+      render();
       if(treasureMapSpot && key === keyXY(treasureMapSpot.x, treasureMapSpot.y)){
         const existing = groundItems.find(g=>onCurrentLevel(g) && g.x===player.x && g.y===player.y && g.kind==='treasurecasket');
         if(existing){ log('You have already unearthed the old rotten casket.', 'info'); return; }
         groundItems.push({x:player.x,y:player.y,kind:'treasurecasket',opened:false,description:'An old rotten casket, half-swallowed by the sand.'});
         log('Your shovel strikes something hard. Beneath the sand lies an old rotten casket.', 'loot');
-        draw(); return;
+        render(); return;
       }
       const roll = randInt(1,100);
       if(roll <= 5) log('You hit something hard. It turns out to be a stone.', 'loot');
@@ -4051,10 +4053,10 @@ The player intentionally accepts danger in exchange for information.
         const spots=[];
         for(const [dx,dy] of DIRS8){ const x=player.x+dx,y=player.y+dy; if(isWalkable(x,y) && !enemies.some(e=>onCurrentLevel(e)&&e.alive&&e.x===x&&e.y===y) && !(x===player.x&&y===player.y)) spots.push({x,y}); }
         if(spots.length){ const pos=pick(spots); const tmpl=ENEMY_TEMPLATES.find(t=>t.name==='Scarab') || {name:'Scarab',tier:1,hp:10,atk:3,def:1,spd:4,aggro:AGGRO_RANGE};
-          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you—a scarab!', 'bad'); }
+          addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier||1,level:currentZ,caveIndex:currentCave,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,fly:!!tmpl.fly,humanoid:false,evades:!!tmpl.evades,aggro:tmpl.aggro??AGGRO_RANGE,x:pos.x,y:pos.y,homeX:pos.x,homeY:pos.y,homeTileType:map[pos.y][pos.x],alive:true,prefix:null,equipment:null}); log('Something bursts from the sand beside you - a scarab!', 'bad'); }
         else log('You hear something moving beneath the sand, but nothing emerges.', 'info');
       } else log('You dig carefully, but find nothing.', 'info');
-      draw(); updateHud();
+      render(); updateHud();
     }
     function openTreasureCasket(){
       const c=groundItems.find(g=>onCurrentLevel(g)&&g.x===player.x&&g.y===player.y&&g.kind==='treasurecasket');
