@@ -197,9 +197,16 @@
       "walk": true
     },
     "cryptgrave": {
-      "ch": "†",
+      "ch": "⚰",
       "color": "#aaa39a",
       "bg": "#171412",
+      "walk": true
+    },
+    "coffin": {
+      "ch": "⚰",
+      "color": "#aaa39a",
+      "bg": "#171412",
+      "mini": "#aaa39a",
       "walk": true
     },
     "bigbell": {
@@ -230,7 +237,8 @@
     "belltower": "y",
     "ruinedchapel": "c",
     "grave": "e",
-    "cryptgrave": "u",
+    "cryptgrave": "Q",
+    "coffin": "q",
     "bigbell": "z",
     "cavefloor": ".",
     "cryptfloor": ",",
@@ -259,7 +267,7 @@
     "lava": "a field of glowing lava and black volcanic rock",
     "snow": "a snow-covered slope",
     "cavefloor": "the brown dirt floor of a cave",
-    "cryptfloor": "The floor is made of cold, weathered stone slabs. Some are cracked, others have shifted, and a few seem to have been disturbed from below. You get the uneasy feeling that the crypt has not been as empty as it looks",
+    "cryptfloor": "a crypt floor. The floor is made of cold, weathered stone slabs. Some are cracked, others have shifted, and a few seem to have been disturbed from below. You get the uneasy feeling that the crypt has not been as empty as it looks",
     "cavewall": "a solid cave wall",
     "cavefloor2": "the cold stone floor of a deeper cave",
     "cavedown": "a narrow crack descending further into the dark",
@@ -271,7 +279,8 @@
     "belltower": "the Temple's bell tower - the bell itself seems to be missing",
     "ruinedchapel": "a ruined chapel, forgotten by both the living and the gods",
     "grave": "a lone grave, it is not finished and has no inscription",
-    "cryptgrave": "a grave in the crypt",
+    "cryptgrave": "an empty grave in the crypt",
+    "coffin": "a stone coffin in the crypt",
     "bigbell": "a big brass bell, far too heavy to carry",
     "marble": "cracked marble flooring, stained by dust and old ash",
     "dwarvengate": "the sealed dwarven gate, its lintel carved with a broken crown",

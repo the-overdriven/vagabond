@@ -470,6 +470,12 @@ The player intentionally accepts danger in exchange for information.
     let MERCHANT_STOCK_CONFIG = {};
     let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false;
     let cryptCaveIndex = -1;
+    const CRYPT_INSCRIPTIONS = [
+      'There is an inscription engraved on the stone coffin: The dead know more than the living.',
+      'There is an inscription engraved on the stone coffin: What was buried, is not lost.',
+      'There is an inscription engraved on the stone coffin: Here lies the man who rang the bell.',
+      'There is an inscription engraved on the stone coffin: The only safe place is where the living would never look.'
+    ];
     let cemeteryTombstones = {};
     let gravediggerGraveKey = null;
     let oldHunterQuest = null;
@@ -743,6 +749,7 @@ The player intentionally accepts danger in exchange for information.
         currentCave = cave; currentZ = -1;
         map = depthUndergroundMap(1); undergroundDiscovered = depthUndergroundDiscovered(1);
         if(tile==='dwarvengate') log(pick(DWARVEN_RUIN_ENTRANCES), 'info');
+        else if(cave===cryptCaveIndex || caves[cave]?.crypt) log('You descend beneath the ruined chapel into the crypt.', 'info');
         else log('You descend into the cave.', 'info');
       } else if(tile === 'caveentrance' || tile === 'dwarvengate'){
         // Only the true top-level ascent (z:-1 -> surface) is "back to the
@@ -750,7 +757,7 @@ The player intentionally accepts danger in exchange for information.
         // Re-stamp the return tile before switching maps. This makes the
         // surface exit self-healing even for older saves that stored a
         // mountain tile at the cave's declared entrance.
-        const returnCave = caves[currentCave];
+        const returnCave = caves.find(c=>(c.entrances||[]).some(e=>e.x===player.x && e.y===player.y)) || caves[currentCave];
         const returnEntrance = (returnCave && returnCave.entrances.find(e=>e.x===player.x && e.y===player.y)) ||
           caves.flatMap(c=>c.entrances||[]).find(e=>e.x===player.x && e.y===player.y);
         if(returnEntrance && surfaceMap[returnEntrance.y] && !(returnCave && returnCave.crypt)){
@@ -760,7 +767,7 @@ The player intentionally accepts danger in exchange for information.
         map = surfaceMap; currentZ = 0;
         currentCave = -1;
         if(tile==='dwarvengate') log('You climb back through the open gates into the mountain air. The silence of the dead settlement fades behind you.', 'info');
-        else if(returnCave && returnCave.crypt) log('You climb back into the ruined chapel.', 'info');
+        else if(returnCave?.crypt || (currentZ===-1 && cryptCaveIndex>=0 && currentCave===cryptCaveIndex)) log('You climb out of the crypt and back into the ruined chapel.', 'info');
         else log('You climb back out into the mountain air.', 'info');
       } else if(tile === 'cavedown'){
         const depth = -currentZ, nextDepth = depth+1;
@@ -1275,7 +1282,7 @@ The player intentionally accepts danger in exchange for information.
     }
 
     // The chapel's crypt is deliberately compact: a long central aisle with
-    // graves pressed into either wall, and one grave left conspicuously empty.
+    // coffins pressed into either wall.
     function buildCrypt(){
       cryptCaveIndex = -1;
       let chapel = null;
@@ -1289,11 +1296,19 @@ The player intentionally accepts danger in exchange for information.
       cm[y0][x0]='caveentrance';
       const graves=[];
       for(let y=minY+2;y<=maxY-2;y+=3){
-        for(const x of [minX+1,maxX-1]){ cm[y][x]='grave'; graves.push({x,y}); }
+        for(const x of [minX+1,maxX-1]){ cm[y][x]='coffin'; graves.push({x,y}); }
       }
-      const empty=graves[Math.floor(graves.length/2)];
-      if(empty) cm[empty.y][empty.x]='cryptgrave';
-      const cave={x:x0,y:y0,entrances:[{x:x0,y:y0}],crypt:true,graves:graves.map(g=>keyXY(g.x,g.y)),emptyGrave:empty?keyXY(empty.x,empty.y):null};
+      const shuffledGraves = graves.slice();
+      for(let i=shuffledGraves.length-1;i>0;i--){
+        const j=randInt(0,i); [shuffledGraves[i],shuffledGraves[j]]=[shuffledGraves[j],shuffledGraves[i]];
+      }
+      const inscriptions={};
+      shuffledGraves.forEach((g,i)=>{
+        if(i < CRYPT_INSCRIPTIONS.length) inscriptions[keyXY(g.x,g.y)] = CRYPT_INSCRIPTIONS[i];
+        else if(i === CRYPT_INSCRIPTIONS.length) inscriptions[keyXY(g.x,g.y)] = "Stone coffin. It's empty.";
+        else inscriptions[keyXY(g.x,g.y)] = 'Stone coffin. The slab is heavy.';
+      });
+      const cave={x:x0,y:y0,entrances:[{x:x0,y:y0}],crypt:true,graves:graves.map(g=>keyXY(g.x,g.y)),inscriptions};
       cryptCaveIndex=caves.length; caves.push(cave); caveMaps.push(cm);
       for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) if(cm[y][x]!=='cavewall') undergroundMap[y][x]=cm[y][x];
     }
@@ -4186,7 +4201,11 @@ The player intentionally accepts danger in exchange for information.
               ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
               : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info');
           } else if(onto === 'caveentrance'){
-            const cryptExit = currentZ === -1 && caves[currentCave]?.crypt;
+            const cryptExit = currentZ === -1 && (
+              currentCave === cryptCaveIndex ||
+              caves[currentCave]?.crypt ||
+              (caves[cryptCaveIndex]?.entrances || []).some(e=>e.x===nx && e.y===ny)
+            );
             log(currentZ===0
               ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
               : cryptExit
@@ -4253,11 +4272,11 @@ The player intentionally accepts danger in exchange for information.
       }
     }
     function describeSurroundings() {
-      if(currentZ===-1 && cryptCaveIndex>=0 && currentCave===cryptCaveIndex && map[player.y]?.[player.x]==='grave'){
-        log(pick(['The dead know more than the living.', 'What was buried, is not lost.', 'Here lies the man who rang the bell.', 'The only safe place is where the living would never look.']), 'info'); return;
-      }
-      if(map[player.y]?.[player.x]==='cryptgrave'){
-        log('The grave is empty. Whatever was buried here is not lost.', 'info'); return;
+      if(currentZ===-1 && cryptCaveIndex>=0 && map[player.y]?.[player.x]==='coffin'){
+        const graveKey=keyXY(player.x,player.y);
+        const stored=caves[cryptCaveIndex]?.inscriptions?.[graveKey];
+        log(stored || 'Stone coffin. The slab is heavy.', 'info');
+        return;
       }
       if(currentZ===0 && map[player.y]?.[player.x]==='ruinedchapel'){
         const bellEventComplete = bellRung || ancientBellLichSpawned || npcs.some(n=>n.name==='Ancient Lich');
@@ -4270,6 +4289,9 @@ The player intentionally accepts danger in exchange for information.
         log(tomb.inscription || `The tombstone bears the name ${tomb.name}. Born ${tomb.birth}, died ${tomb.death}.`, 'info');
         if(tomb.odd) log('This tombstone feels strangely out of place. Too clean. Above all, the death date points to future! After closer inspection it seems completely loose. You can pick it up.', 'info');
         return;
+      }
+      if(gravediggerGraveKey===keyXY(player.x,player.y)){
+        log('You are standing on a lone grave, it is not finished and has no inscription.', 'info'); return;
       }
       if(map[player.y]?.[player.x]==='belltower'){
         if(!bellReturnedToChapel && player.inventory.some(i=>i.kind==='bigbell')){
@@ -4474,6 +4496,7 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function tileBackground(x,y,tileKey){
+      if(tileKey==='coffin' || tileKey==='cryptgrave') return '#171412';
       const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x,y)] || tileKey) : tileKey);
       const base = TILE[baseKey];
       return base ? base.bg : '#050403';
@@ -4703,12 +4726,15 @@ The player intentionally accepts danger in exchange for information.
             drawTile(px,py,'~',TILE.water.color,TILE.water.bg);
             continue;
           }
-          const t = TILE[map[my][mx]];
+          const tileKey = map[my][mx];
+          const t = TILE[tileKey] || TILE.cavewall || TILE.grass;
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
           const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx,my));
           const foraged = map[my][mx]==='forest' && foragedTiles.has(keyXY(mx,my));
-          drawTile(px,py,tree ? '\u2663' : t.ch,tree ? '#164c23' : (foraged ? '#554f2a' : t.color),tileBackground(mx,my,map[my][mx]));
+          const glyph = tileKey==='coffin' || tileKey==='cryptgrave' ? '⚰' : t.ch;
+          const color = tileKey==='coffin' || tileKey==='cryptgrave' ? '#aaa39a' : (tree ? '#164c23' : (foraged ? '#554f2a' : t.color));
+          drawTile(px,py,tree ? '\u2663' : glyph,color,tileBackground(mx,my,tileKey));
           markDiscovered(mx, my); // anything drawn on the main screen counts as seen
         }
       }
@@ -5180,13 +5206,13 @@ The player intentionally accepts danger in exchange for information.
       c.clearRect(x*s, y*s, s, s);
       const terrainMap = currentZ===0 ? (surfaceMap || map) : map;
       const tileKey = terrainMap[y][x];
-      const t = TILE[tileKey];
+      const t = TILE[tileKey] || TILE.cavewall || TILE.grass;
       const underKey = tileUnderlays[keyXY(x,y)] || tileKey;
       const under = TILE[underKey] || t;
       const foraged = tileKey==='forest' && foragedTiles.has(keyXY(x,y));
       const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x];
-      c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='grave' || tileKey==='taiga'
-        ? (under.mini || under.color) : (t.mini || t.color))) : 'rgba(3,2,1,0.72)';
+      c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey==='coffin' || tileKey==='cryptgrave' ? '#aaa39a' : (tileKey==='grave' || tileKey==='taiga'
+        ? (under.mini || under.color) : (t.mini || t.color)))) : 'rgba(3,2,1,0.72)';
       c.fillRect(x*s, y*s, s, s);
     }
     function rebuildMinimapBases(){
@@ -6088,8 +6114,23 @@ The player intentionally accepts danger in exchange for information.
       }
       caveMaps = (data.caveMaps||[]).map(rows=>rows.map(rowStr=>[...rowStr].map(ch=>CODE_TILE[ch]||'cavewall')));
       if(cryptCaveIndex>=0 && caveMaps[cryptCaveIndex]){
-        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++)
-          if(caveMaps[cryptCaveIndex][y][x]==='cavefloor') caveMaps[cryptCaveIndex][y][x]='cryptfloor';
+        const crypt=caves[cryptCaveIndex];
+        for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
+          const key=keyXY(x,y), tile=caveMaps[cryptCaveIndex][y][x];
+          if(tile==='grave' || tile==='cryptgrave' || key===crypt?.emptyGrave) caveMaps[cryptCaveIndex][y][x]='coffin';
+          else if(tile==='cavefloor') caveMaps[cryptCaveIndex][y][x]='cryptfloor';
+        }
+        // Re-stamp all declared crypt burial positions. This repairs older
+        // saves whose legacy tile codes decoded as cave walls or other tiles.
+        const cryptInscriptions={};
+        for(let i=0;i<(crypt.graves||[]).length;i++){
+          const key=crypt.graves[i], [x,y]=key.split(',').map(Number);
+          if(caveMaps[cryptCaveIndex][y]?.[x] !== undefined) caveMaps[cryptCaveIndex][y][x]='coffin';
+          if(i<CRYPT_INSCRIPTIONS.length) cryptInscriptions[key]=CRYPT_INSCRIPTIONS[i];
+          else if(i===CRYPT_INSCRIPTIONS.length) cryptInscriptions[key]="Stone coffin. It's empty.";
+          else cryptInscriptions[key]='Stone coffin. The slab is heavy.';
+        }
+        crypt.inscriptions=cryptInscriptions;
       }
       for(let i=0;i<caveMaps.length;i++){
         const entrances = caves[i] && caves[i].entrances ? caves[i].entrances : [];
@@ -6103,6 +6144,14 @@ The player intentionally accepts danger in exchange for information.
       for(const cm of caveMaps){
         for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++){
           if(cm[y][x] !== 'cavewall') undergroundMap[y][x] = cm[y][x];
+        }
+      }
+      // Crypt burial positions are authoritative descriptor data. Re-stamp
+      // them after merging so legacy saves cannot leave them as cave walls.
+      if(cryptCaveIndex>=0){
+        for(const key of caves[cryptCaveIndex].graves || []){
+          const [x,y]=key.split(',').map(Number);
+          if(undergroundMap[y]?.[x] !== undefined) undergroundMap[y][x]='coffin';
         }
       }
       // See generateCaves(): overlapping cave floors can clobber a
@@ -6766,7 +6815,7 @@ The player intentionally accepts danger in exchange for information.
     }
     loadContent().then(()=>init()).catch(err=>{
       console.error(err);
-      alert("Failed to load game content. Please run the game through a local web server so the content JSON files can be loaded.");
+      alert("Failed to load game content: " + (err?.message || err) + "\n\nIf this is a file:// page, run the game through a local web server so the content JSON files can be loaded.");
     });
 
   })();

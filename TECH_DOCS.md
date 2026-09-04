@@ -605,6 +605,18 @@ Reserved for the Dwarven Fort.
 
 It is not generated as a normal random cave.
 
+Crypt coffins use their own four crypt inscriptions; they are unrelated to the
+mysterious tombstone inscriptions dropped by Liches. Each of the four lines is
+assigned to one coffin only. If the crypt contains more coffins than lines,
+the remaining coffins say `Stone coffin. It's empty.`. All crypt burial tiles
+use the `⚰️` symbol. The unfinished-grave description is reserved for the
+Gravedigger's grave and is not used in the crypt.
+
+The crypt has dedicated transition text: entering says the player descends
+beneath the ruined chapel, and leaving says the player climbs out of the crypt
+into the ruined chapel. These messages must not use the ordinary cave
+entrance/exit text about mountain air.
+
 ---
 
 # 15. Cave Generation
