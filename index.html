@@ -429,6 +429,37 @@ The player intentionally accepts danger in exchange for information.
     let ARTIFACT_CURSES = [];
     let ARTIFACT_DESC = {};
     let DWARVEN_RUIN_ENTRANCES = [];
+    // Content that used to be inline literals, now loaded from content/*.json
+    // by loadContent() (see below). Declared here (rather than at their old
+    // in-file location) since they're populated asynchronously before any
+    // gameplay code runs.
+    let RACES = [];
+    let NPC_TEMPLATES = [];
+    let ANCIENT_BELL_LICH = {};
+    let TOMBSTONE_INSCRIPTIONS = [];
+    let CAMPFIRE_INSPECTIONS = [];
+    let SKELETON_INSPECTIONS = [];
+    let CURSE_EVENT_LINES_NAMED = {};
+    let CURSE_EVENT_LINES_UNKNOWN = {};
+    let TILE = {};
+    let TILE_CODE = {};
+    let CODE_TILE = {};
+    let TILE_DESC = {};
+    let TERRAIN_SPEED = {};
+    let TERRAIN_DEFENSE = {};
+    let SELL_VALUE_BY_TIER = [];
+    let FLAT_SELL_VALUE = {};
+    let FORAGE_TABLE = {};
+    let CHEST_LOOT_TABLE = {};
+    let MAP_W = 260, MAP_H = 180;
+    let MAX_WORLD_ATTEMPTS = 50;
+    let BELL_GUARD_EXCLUSION_RADIUS = 8;
+    let BELL_PILLAR_MIN_DIST = 20;
+    let ANCIENT_FOREST_SIZE = 10;
+    let ANCIENT_FOREST_MIN_VILLAGE_DIST = 30;
+    let EDGE_MARGIN = 2;
+    let EDGE_XP = 100;
+    let MIN_LICHES = 6;
     let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false;
     let cemeteryTombstones = {};
     let gravediggerGraveKey = null;
@@ -449,7 +480,13 @@ The player intentionally accepts danger in exchange for information.
         artifactEffects:'artifact_effects.json',
         artifactCurses:'artifact_curses.json',
         artifactDesc:'artifact_desc_fragments.json',
-        dwarvenRuinEntrances:'dwarven_ruin_entrances.json'
+        dwarvenRuinEntrances:'dwarven_ruin_entrances.json',
+        races:'races.json',
+        npcs:'npcs.json',
+        messages:'messages.json',
+        tiles:'tiles.json',
+        lootTables:'loot_tables.json',
+        mapConfig:'map_config.json'
       };
       const content = {};
       for(const [key,file] of Object.entries(files)){
@@ -473,6 +510,34 @@ The player intentionally accepts danger in exchange for information.
       ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : [];
       ARTIFACT_DESC = content.artifactDesc;
       DWARVEN_RUIN_ENTRANCES = content.dwarvenRuinEntrances;
+      RACES = content.races;
+      NPC_TEMPLATES = content.npcs.templates;
+      ANCIENT_BELL_LICH = content.npcs.ancientBellLich;
+      TOMBSTONE_INSCRIPTIONS = content.messages.tombstoneInscriptions;
+      CAMPFIRE_INSPECTIONS = content.messages.campfireInspections;
+      SKELETON_INSPECTIONS = content.messages.skeletonInspections;
+      CURSE_EVENT_LINES_NAMED = content.messages.curseEventLines.named;
+      CURSE_EVENT_LINES_UNKNOWN = content.messages.curseEventLines.unknown;
+      TILE = content.tiles.tiles;
+      TILE_CODE = content.tiles.tileCode;
+      CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
+      TILE_DESC = content.tiles.tileDesc;
+      TERRAIN_SPEED = content.tiles.terrainSpeed;
+      TERRAIN_DEFENSE = content.tiles.terrainDefense;
+      SELL_VALUE_BY_TIER = content.lootTables.sellValues.byTier;
+      FLAT_SELL_VALUE = content.lootTables.sellValues.flat;
+      FORAGE_TABLE = content.lootTables.forage;
+      CHEST_LOOT_TABLE = content.lootTables.chestLoot;
+      MAP_W = content.mapConfig.world.width;
+      MAP_H = content.mapConfig.world.height;
+      MAX_WORLD_ATTEMPTS = content.mapConfig.world.maxGenerationAttempts;
+      BELL_GUARD_EXCLUSION_RADIUS = content.mapConfig.landmarks.bellGuardExclusionRadius;
+      BELL_PILLAR_MIN_DIST = content.mapConfig.landmarks.bellPillarMinDistance;
+      ANCIENT_FOREST_SIZE = content.mapConfig.landmarks.ancientForestSize;
+      ANCIENT_FOREST_MIN_VILLAGE_DIST = content.mapConfig.landmarks.ancientForestMinVillageDistance;
+      EDGE_MARGIN = content.mapConfig.exploration.edgeMargin;
+      EDGE_XP = content.mapConfig.exploration.edgeRewardXp;
+      MIN_LICHES = content.mapConfig.spawning.minLiches;
     }
     const preloadedImageUrls = new Map();
     // Fetches images as blobs so tooltips keep working fully offline. Pass a
@@ -571,55 +636,7 @@ The player intentionally accepts danger in exchange for information.
     }
 
     /* ============================== MAP GENERATION ============================== */
-    const MAP_W = 260, MAP_H = 180;
-    const TILE = {
-      water:    {ch:'~', color:'#4f8fc9', bg:'#0c1a26', walk:false},
-      river:    {ch:'~', color:'#7fd0d8', bg:'#207f9a', walk:true},
-      sand:     {ch:'.', color:'#c99b3a', bg:'#f3e0a3', walk:true},
-      grass:    {ch:'.', color:'#7fae55', bg:'#2f7a3a', walk:true},
-      forest:   {ch:'\u2663', color:'#2f7a3a', bg:'#0b160b', walk:true},
-      taiga:    {ch:'\u2663', color:'#49664f', bg:'transparent', walk:true},
-      ancientForest: {ch:'\u2663', color:'#1d5227', bg:'#071007', walk:true},
-      hill:     {ch:'\u2229', color:'#a8945f', bg:'#1a160c', walk:true},
-      mountain: {ch:'\u25b2', color:'#8d8d8d', bg:'#141414', walk:false},
-      snowmountain: {ch:'\u25b2', color:'#ffffff', bg:'#dfeaf2', walk:false},
-      volcano:  {ch:'\u25b2', color:'#ff6b35', bg:'#24100d', walk:false},
-      lava:     {ch:'\u2248', color:'#ff3b1f', bg:'#35100d', walk:false},
-      // snow is drawn as dark speckles on a bright field, so its glyph colour is
-      // useless on the minimap -- `mini` overrides what the minimaps sample.
-      snow:     {ch:'.', color:'#12181c', bg:'#eef5fa', mini:'#e4eef6', walk:true},
-      cavefloor: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
-      cavewall:  {ch:'#', color:'#493022', bg:'#0d0805', walk:false},
-      caveentrance: {ch:'∩', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
-      // z:-2 and deeper: same colours as the shallow cave floor (by design),
-      // but a distinct key so goblins/skeletons can be told apart from bats/rats.
-      cavefloor2: {ch:'.', color:'#9a6a45', bg:'#24140d', walk:true},
-      cavedown:  {ch:'v', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
-      caveup:    {ch:'^', color:'#e8a24f', mini:'#ff6b2e', bg:'#24140d', walk:true},
-      marble:    {ch:'=', color:'#c8c2b4', bg:'#302d2a', walk:true},
-      dwarvengate:{ch:'Ω', color:'#e8b85b', bg:'#241b12', walk:true},
-      dwarvenstatue:{ch:'♜', color:'#817769', bg:'#171514', walk:true},
-      dwarvenwall:{ch:'▓', color:'#756b60', bg:'#151311', walk:false},
-      dwarvenrubble:{ch:'░', color:'#62574c', bg:'#201b17', walk:true},
-      temple:   {ch:'\u2626', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
-      boulder:  {ch:'\u25cf', color:'#7a7a7a', bg:'#141414', walk:false},
-      // A single lore landmark hidden in the mountains: a monolithic black
-      // pillar that has no business being there.
-      blackpillar: {ch:'\u25ae', color:'#2a2a35', bg:'#0a0a0a', walk:false},
-      // A little cluster of huts marking a small village.
-      village:  {ch:'\u2302', color:'#e0b080', bg:'#241a10', walk:true},
-      // Part of the temple grounds - the bell tower. Its bell is missing.
-      belltower: {ch:'\u26EA', color:'#d9b3ff', bg:'#1c0f2e', walk:true},
-      ruinedchapel: {ch:'†', color:'#8b8175', bg:'#211d1a', walk:true},
-      // A lone grave, kept near the Gravedigger.
-      grave:    {ch:'\u2020', color:'#c9c9c9', bg:'transparent', walk:true},
-      // A lore landmark: a huge brass bell, too heavy to carry off, guarded
-      // by a pair of brutes near the mountains.
-      bigbell:  {ch:'\u237E', color:'#d9a441', bg:'#141414', walk:true},
-    };
-    // Single-char codes for compact map serialization in save files.
-    const TILE_CODE = {water:'w',river:'r',sand:'s',grass:'g',forest:'f',snowmountain:'M',taiga:'i',ancientForest:'a',hill:'h',mountain:'m',volcano:'V',lava:'L',snow:'n',temple:'t',boulder:'b',blackpillar:'p',village:'v',belltower:'y',ruinedchapel:'c',grave:'e',bigbell:'z',cavefloor:'.',cavewall:'#',caveentrance:'o',cavefloor2:'2',cavedown:'d',caveup:'u',marble:'=',dwarvengate:'G',dwarvenstatue:'S',dwarvenwall:'W',dwarvenrubble:'R'};
-    const CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k,v])=>[v,k]));
+    // TILE_CODE / CODE_TILE now loaded from content/tiles.json (see loadContent()).
     // Tiles the player can "inspect" while standing on them to change z level.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
     // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
@@ -1078,7 +1095,6 @@ The player intentionally accepts danger in exchange for information.
     // A temple walled in by mountains with no route to any map edge is a dead
     // world - the player could never reach the edges or most of the content. We
     // don't repair such a map, we throw it away and roll a fresh one.
-    const MAX_WORLD_ATTEMPTS = 50;
     function generateMap(){
       for(let attempt=1; attempt<=MAX_WORLD_ATTEMPTS; attempt++){
         generateSurface();
@@ -1335,8 +1351,6 @@ The player intentionally accepts danger in exchange for information.
     }
 
     let bigBellPos = null;
-    const BELL_GUARD_EXCLUSION_RADIUS = 8;
-    const BELL_PILLAR_MIN_DIST = 20;
     function placeBigBell(){
       // Preferred: a mountain tile near the temple, right on the mountain's
       // edge (bordering walkable ground) so the guards have room to stand.
@@ -1522,8 +1536,6 @@ The player intentionally accepts danger in exchange for information.
       }
     }
 
-    const ANCIENT_FOREST_SIZE = 10;
-    const ANCIENT_FOREST_MIN_VILLAGE_DIST = 30;
     function placeAncientForest(){
       const size = ANCIENT_FOREST_SIZE;
       let best = null;
@@ -1939,34 +1951,26 @@ The player intentionally accepts danger in exchange for information.
       });
       return pct;
     }
-    const CURSE_EVENT_LINES_NAMED = {
-      hp: (it,amt)=>`The ${it.name} saps ${amt} HP from you!`,
-      gold: (it,amt)=>`The ${it.name} plucks ${amt} gold from your pouch and it's gone.`,
-      atk_debuff: (it)=>`The ${it.name} weakens your arm.`,
-      def_debuff: (it)=>`The ${it.name} chills your bones, leaving you exposed.`,
-      spd_debuff: (it)=>`The ${it.name} drags at your limbs.`,
-    };
-    const CURSE_EVENT_LINES_UNKNOWN = {
-      hp: (amt)=>`A cold weight in your pack drains ${amt} HP from you!`,
-      gold: (amt)=>`Something in your pack pilfers ${amt} gold, then goes still.`,
-      atk_debuff: ()=>`A chill runs down your arm from somewhere in your pack.`,
-      def_debuff: ()=>`A shiver of dread leaves you feeling exposed.`,
-      spd_debuff: ()=>`Your limbs feel suddenly, inexplicably heavy.`,
-    };
+    // CURSE_EVENT_LINES_NAMED/UNKNOWN are now string templates (content/messages.json)
+    // with {name}/{amt} placeholders, filled in by curseLine() below.
+    function curseLine(type, it, amt){
+      const tmpl = (it.identified ? CURSE_EVENT_LINES_NAMED : CURSE_EVENT_LINES_UNKNOWN)[type] || '';
+      return tmpl.replace('{name}', it.name).replace('{amt}', amt);
+    }
     function triggerArtifactCurse(it){
       const type = pick(it.curse.types);
       if(type==='hp'){
         const amt = randInt(1,3);
         player.hp = Math.max(1, player.hp - amt);
-        log(it.identified ? CURSE_EVENT_LINES_NAMED.hp(it,amt) : CURSE_EVENT_LINES_UNKNOWN.hp(amt), 'bad');
+        log(curseLine('hp', it, amt), 'bad');
       } else if(type==='gold'){
         const amt = Math.min(player.gold, randInt(1,5));
         player.gold -= amt;
-        log(it.identified ? CURSE_EVENT_LINES_NAMED.gold(it,amt) : CURSE_EVENT_LINES_UNKNOWN.gold(amt), 'bad');
+        log(curseLine('gold', it, amt), 'bad');
       } else if(type==='atk_debuff' || type==='def_debuff' || type==='spd_debuff'){
         const stat = type.split('_')[0];
         player.curseDebuffs.push({stat, amt:-randInt(1,2), turnsLeft:randInt(3,6)});
-        log(it.identified ? CURSE_EVENT_LINES_NAMED[type](it) : CURSE_EVENT_LINES_UNKNOWN[type](), 'bad');
+        log(curseLine(type, it), 'bad');
       }
       updateHud();
     }
@@ -2082,18 +2086,6 @@ The player intentionally accepts danger in exchange for information.
     // xpMultiplier(), enemyAggroRange(), consumablePower(), etc.) so nothing
     // here has to be baked into the player's stored base stats - that keeps
     // saves portable and lets the HUD show the bonus live.
-    const RACES = [
-      {id:'human',     name:'Human',     avatar:'human.jpg',      bonus:'+20% XP gain rate',                     xp:0.20},
-      {id:'halfling',  name:'Halfling',  avatar:'halfling.jpg',   bonus:'-1 AGGRO range from all enemies',    aggro:-1},
-      {id:'catling',   name:'Catling',   avatar:'catling.jpg',    bonus:'+3 SPD',                             stats:{spd:3}},
-      {id:'dwarf',     name:'Dwarf',     avatar:'dwarf.jpg',      bonus:'+3 DEF',                             stats:{def:3}},
-      {id:'orc',       name:'Orc',       avatar:'orc.jpg',        bonus:'+3 ATK',                             stats:{atk:3}},
-      {id:'leprechaun',name:'Leprechaun',avatar:'leprechaun.jpg', bonus:'+5 Magic Find',                      stats:{mf:5}},
-      {id:'elf',       name:'Elf',       avatar:'elf.jpg',        bonus:'+2 GRACE, never ambushed in forest', grace:2, noForestAmbush:true},
-      {id:'wyrdling',  name:'Wyrdling',  avatar:'wyrdling.jpg',   bonus:'Consumables are 25% more effective', consumables:1.25},
-      {id:'merling',   name:'Merling',   avatar:'merling.jpg',    bonus:'Unlimited swimming',       swims:true},
-      {id:'troll',     name:'Troll',     avatar:'troll.jpg',      bonus:'Regenerates 1 HP every 5 turns',     regenEvery:5},
-    ];
     const DEFAULT_RACE = 'human';
     function raceDef(){
       return RACES.find(r=>r.id===player.race) || RACES.find(r=>r.id===DEFAULT_RACE);
@@ -2192,8 +2184,6 @@ The player intentionally accepts danger in exchange for information.
       const race = raceDef();
       return (race && race.grace) || 0;
     }
-    const TERRAIN_SPEED = {grass:1, forest:-1, ancientForest:-1, sand:-1, snow:-1, taiga:-1, river:-2, water:-2};
-    const TERRAIN_DEFENSE = {hill:1};
     function enemyHomeTileType(e){
       if(e && e.homeTileType) return e.homeTileType;
       if(!e || !map[e.homeY === undefined ? e.y : e.homeY]) return null;
@@ -2288,8 +2278,6 @@ The player intentionally accepts danger in exchange for information.
     /* ============================== EXPLORATION ============================== */
     // One-time reward for reaching each of the four edges of the map - a rare
     // milestone, not something that fires from ordinary wandering.
-    const EDGE_MARGIN = 2; // how close to the true map boundary counts as "the edge"
-    const EDGE_XP = 100;
     const worldEdgesReached = {north:false, south:false, east:false, west:false};
     function checkWorldEdge(){
       // The surface is the only world whose outer boundary represents the
@@ -2409,7 +2397,6 @@ The player intentionally accepts danger in exchange for information.
 
       // The Lich is the sole source of the rare tombstones, so make sure the world
       // never rolls too few of them - top up to a guaranteed minimum if short.
-      const MIN_LICHES = 6;
       const lichTmpl = ENEMY_TEMPLATES.find(t=>t.name==='Lich');
       if(lichTmpl){
         let lichCount = enemies.filter(e=>e.baseName==='Lich').length;
@@ -2616,18 +2603,6 @@ The player intentionally accepts danger in exchange for information.
     // just prints their line - no combat. Two stick close to their home tile
     // (like idle enemies); the Drunk roams freely with no leash; the Merchant
     // stays put at his stall.
-    const NPC_TEMPLATES = [
-      {name:"Old Hunter",   lines:[],                                                               free:false, portrait:"old_hunter"},
-      {name:"Gravedigger",  lines:[
-          "Midnight? That's when the bells stop.",
-          "Once I get my old name back, I can finally rest.",
-          "Who digs the grave for the gravedigger?",
-          "Who keeps checking an empty grave?",
-        ], free:false, portrait:"grave_digger"},
-      {name:"Drunk",        lines:["Hic! What time it is? There ain't no bells anymore."],            free:true,  portrait:"drunk"},
-      {name:"Merchant",     lines:["Gold is easy to find. Secrets are harder. Care to trade?"],       free:false, portrait:"merchant", static:true, trades:true},
-      {name:"Herbalist",    lines:["The forest is dangerous but holds many remedies, if you know where to look."], free:false, portrait:"herbalist", village:true, services:true},
-    ];
     // The Drunk's rumor about the missing bell points in whatever direction
     // the bell actually generated - computed at spawn/load time rather than
     // hardcoded, since it depends on the map seed.
@@ -2858,14 +2833,6 @@ The player intentionally accepts danger in exchange for information.
     // single line of the same fractured inscription, revealed in a random order
     // per world so the story can't be inferred from drop order alone.
     let tombstonesRemaining = 6;
-    const TOMBSTONE_INSCRIPTIONS = [
-      "The king never walked upon the earth.",
-      "He climbed the mountain alone, and returned wearing a crown no smith had forged.",
-      "Three nights later, the priests declared that the gods had chosen him.",
-      "He was not chosen. He was shown.",
-      "To hear the ring is to live again.",
-      "A monarch is born noble. Why would he need to climb?",
-    ];
     let tombstoneOrder = TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
     function shuffleTombstoneOrder(){
       const order = TOMBSTONE_INSCRIPTIONS.map((_,i)=>i);
@@ -3564,6 +3531,13 @@ The player intentionally accepts danger in exchange for information.
     let foragedTiles = new Set();
     let suppressLootLog = false;
     let lastLootResult = '';
+    // Forage odds/results come from content/loot_tables.json's `forage` table.
+    const FORAGE_RESULT_HANDLERS = {
+      berries: ()=>{ addBerries(); log('You search through the undergrowth and find a Handful of Berries.', 'loot'); },
+      herb: ()=>{ addHerb(); log('You search through the undergrowth and find a Healing Herb.', 'loot'); },
+      mushroom: ()=>{ addMushroom(); log('You search through the undergrowth and find a Mushroom.', 'loot'); },
+      nothing: ()=>{ log('You search through the undergrowth but find nothing of use.', 'info'); },
+    };
     function tryForage(){
       if(map[player.y][player.x] === 'taiga'){
         log('The snow-choked taiga yields no food. Only frozen roots and dead needles.', 'info');
@@ -3573,7 +3547,7 @@ The player intentionally accepts danger in exchange for information.
         log("You don't dare to forage in the ancient forest. Something old might be watching from between the trees.", 'info');
         return;
       }
-      if(map[player.y][player.x] !== 'forest') return;
+      if(map[player.y][player.x] !== (FORAGE_TABLE.terrain || 'forest')) return;
       const key = keyXY(player.x, player.y);
       if(foragedTiles.has(key)){
         log('You already searched here.', 'info');
@@ -3581,18 +3555,11 @@ The player intentionally accepts danger in exchange for information.
       }
       foragedTiles.add(key);
       const roll = rng();
-      if(roll < 0.09){
-        addBerries();
-        log('You search through the undergrowth and find a Handful of Berries.', 'loot');
-      } else if(roll < 0.17){
-        addHerb();
-        log('You search through the undergrowth and find a Healing Herb.', 'loot');
-      } else if(roll < 0.25){
-        addMushroom();
-        log('You search through the undergrowth and find a Mushroom.', 'loot');
-      } else {
-        log('You search through the undergrowth but find nothing of use.', 'info');
+      let result = FORAGE_TABLE.elseResult || 'nothing';
+      for(const entry of (FORAGE_TABLE.table || [])){
+        if(roll < entry.upTo){ result = entry.result; break; }
       }
+      (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)();
       draw();
     }
     function lootSkeletonOrForage(){
@@ -3640,6 +3607,49 @@ The player intentionally accepts danger in exchange for information.
       }
       tryForage();
     }
+    // Chest loot outcomes: thresholds/odds come from content/loot_tables.json
+    // (CHEST_LOOT_TABLE); these handlers apply whichever outcome was rolled.
+    const CHEST_LOOT_HANDLERS = {
+      gold: (chestTier, mf, entry)=>{
+        const gold = randInt(entry.goldMin, entry.goldMax) * (entry.goldPerTier ? chestTier : 1) + Math.round(mf * (entry.mfGoldMultiplier||0));
+        player.gold += gold;
+        lastLootResult = `${gold} gold.`;
+        if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
+      },
+      gear: (chestTier, mf, entry)=>{
+        const itemTier = Math.min(chestTier, entry.gearMaxTier || chestTier);
+        const pickRoll = rng();
+        let item;
+        if(pickRoll < entry.weaponChance) item = makeWeaponItem(itemTier, mf);
+        else if(pickRoll < entry.weaponChance + entry.armorChance) item = makeArmorItem(itemTier, mf);
+        else item = makeShieldItem(itemTier, mf);
+        lastLootResult = `${item.name}.`;
+        if(!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot');
+        if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
+          player.inventory.push(item);
+        }
+      },
+      potion: ()=>{
+        addPotion();
+        lastLootResult = 'a Life Potion.';
+        if(!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot');
+      },
+      scrollOfInvisibility: ()=>{
+        addScroll();
+        lastLootResult = 'a Scroll of Invisibility.';
+        if(!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
+      },
+      speedPotion: ()=>{
+        addSpeedPotion();
+        lastLootResult = 'a Potion of Speed.';
+        if(!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot');
+      },
+      idScroll: ()=>{
+        addIdScroll();
+        lastLootResult = 'a Scroll of Identification.';
+        if(!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot');
+      },
+    };
     function checkGroundAt(x,y){
       for(let i=groundItems.length-1;i>=0;i--){
         const g = groundItems[i];
@@ -3658,52 +3668,13 @@ The player intentionally accepts danger in exchange for information.
             if(!suppressLootLog) log(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, 'loot');
             spawnPickupAnim(g); groundItems.splice(i,1); continue;
           }
-          const roll = rng() * 110;
-
-          if(roll < 45){
-            const gold = randInt(5, 15) * chestTier + Math.round(mf * 2);
-
-            player.gold += gold;
-            lastLootResult = `${gold} gold.`;
-            if(!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot');
-
-          } else if(roll < 65){
-            const itemTier = Math.min(chestTier, 4);
-
-            const pickRoll = rng();
-            let item;
-
-            if(pickRoll < 0.33) item = makeWeaponItem(itemTier, mf);
-            else if(pickRoll < 0.66) item = makeArmorItem(itemTier, mf);
-            else item = makeShieldItem(itemTier, mf);
-
-            lastLootResult = `${item.name}.`;
-            if(!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot');
-
-            if(!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))){
-              player.inventory.push(item);
-            }
-
-          } else if(roll < 85){
-            addPotion();
-            lastLootResult = 'a Life Potion.';
-            if(!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot');
-
-          } else if(roll < 91){
-            addScroll();
-            lastLootResult = 'a Scroll of Invisibility.';
-            if(!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot');
-
-          } else if(roll < 100){
-            addSpeedPotion();
-            lastLootResult = 'a Potion of Speed.';
-            if(!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot');
-
-          } else {
-            addIdScroll();
-            lastLootResult = 'a Scroll of Identification.';
-            if(!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot');
+          const roll = rng() * (CHEST_LOOT_TABLE.scale || 110);
+          let chestEntry = null;
+          for(const entry of (CHEST_LOOT_TABLE.table || [])){
+            if(roll < entry.upTo){ chestEntry = entry; break; }
           }
+          const chestResult = chestEntry ? chestEntry.result : (CHEST_LOOT_TABLE.elseResult || 'idScroll');
+          (CHEST_LOOT_HANDLERS[chestResult] || CHEST_LOOT_HANDLERS.idScroll)(chestTier, mf, chestEntry || {});
 
           spawnPickupAnim(g);
           groundItems.splice(i, 1);
@@ -3964,46 +3935,12 @@ The player intentionally accepts danger in exchange for information.
     }
 
     /* ============================== LOOK / SURROUNDINGS ============================== */
-    const TILE_DESC = {
-      water:"open water",
-      river:"a running river",
-      sand:"sand",
-      grass:"a grassy field",
-      forest:"dense forest",
-      taiga:"a snow-choked taiga, where dark trees claw through the frozen ground",
-      ancientForest:"a dense ancient forest",
-      hill:"a rugged hill",
-      mountain:"an impassable mountain",
-      volcano:"a smoking volcano, its red throat glowing beneath the ash",
-      lava:"a field of glowing lava and black volcanic rock",
-      snow:"a snow-covered slope",
-      cavefloor:"the brown dirt floor of a cave",
-      cavewall:"a solid cave wall",
-      cavefloor2:"the cold stone floor of a deeper cave",
-      cavedown:"a narrow crack descending further into the dark",
-      caveup:"a rough passage leading back up",
-      temple:"the sacred ground of the Temple",
-      boulder:"a cluster of impassable boulders",
-      blackpillar:"a tall black stone pillar rising from the mountain\'s peak",
-      village:"a small hut, part of a village",
-      belltower:"the Temple's bell tower - the bell itself seems to be missing",
-      ruinedchapel:"a ruined chapel, forgotten by both the living and the gods",
-      grave:"a lone grave, it is not finished and has no inscription",
-      bigbell:"a big brass bell, far too heavy to carry",
-      marble:"cracked marble flooring, stained by dust and old ash",
-      dwarvengate:"the sealed dwarven gate, its lintel carved with a broken crown",
-      dwarvenstatue:"a ruined dwarven sentinel, still watching the dark",
-      dwarvenwall:"a hewn dwarven wall, scarred by collapse and time",
-      dwarvenrubble:"a dangerous heap of fallen masonry",
-      dwarvenstatue:"an ancient stone column. It seems to have outlived everyone who built it. The column depicts proud dwarven warrior carved in stone, forever standing guard",
-    };
     const LOOK_DIRS = [
       {dx:0,dy:-1,name:'north'}, {dx:0,dy:1,name:'south'},
       {dx:-1,dy:0,name:'west'}, {dx:1,dy:0,name:'east'},
       {dx:-1,dy:-1,name:'northwest'}, {dx:1,dy:-1,name:'northeast'},
       {dx:-1,dy:1,name:'southwest'}, {dx:1,dy:1,name:'southeast'},
     ];
-    const ANCIENT_BELL_LICH = {name:'Ancient Lich',lines:['The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck.'],free:false,static:false,trades:false,portrait:'lich'};
     function spawnAncientBellLich(){
       if(ancientBellLichSpawned) return;
       for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) if(map[y][x]==='ancientForest' && !occupied.has(keyXY(x,y))){
@@ -4102,14 +4039,14 @@ The player intentionally accepts danger in exchange for information.
                         item.kind === 'teleportscroll' ? 'a scroll' :
                           item.kind === 'skeleton' ? 'a skeleton' :
                             item.kind === 'deadbody' ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.` :
-                            item.kind === 'campfire' ? 'a campfire' :
-                              item.kind === 'anvil' ? 'an anvil' :
-                                item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
-                                  item.kind === 'goldcoin' ? 'a giant gold coin' :
-                                    (item.kind === 'dwarvenremains' || item.kind === 'ruinprop') ? 'dwarven remains' :
-                                      item.kind === 'oddTombstone' ? 'a tombstone' :
-                                        item.kind === 'shovel' ? 'a shovel' :
-                                          'something';
+                              item.kind === 'campfire' ? 'a campfire' :
+                                item.kind === 'anvil' ? 'an anvil' :
+                                  item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
+                                    item.kind === 'goldcoin' ? 'a giant gold coin' :
+                                      (item.kind === 'dwarvenremains' || item.kind === 'ruinprop') ? 'dwarven remains' :
+                                        item.kind === 'oddTombstone' ? 'a tombstone' :
+                                          item.kind === 'shovel' ? 'a shovel' :
+                                            'something';
 
             addNote(label, direction);
             continue;
@@ -4701,26 +4638,6 @@ The player intentionally accepts danger in exchange for information.
     function groundItemLabel(g){
       return g.kind==='chest' ? 'Chest' : g.kind==='skeleton' ? 'Skeleton' : g.kind==='campfire' ? 'Abandoned Campfire' : g.kind==='deadbody' ? `dead ${g.race || '???'}` : 'Item';
     }
-    const CAMPFIRE_INSPECTIONS = [
-      'Cold ash. The fire died in a hurry.',
-      'The embers are long dead.',
-      'Someone left this fire unfinished.',
-      'Cold ashes. No warmth remains.',
-      'The wood is blackened, but barely burned.',
-      'Whoever has called this place home has long abandoned it.',
-    ];
-    const SKELETON_INSPECTIONS = [
-      'The bones are picked clean.',
-      'The corpse lies twisted in the dirt.',
-      'Long dead. Not long forgotten.',
-      'Something tore the flesh from the bones.',
-      'The skull is cracked.',
-      'The bones bear strange bite marks.',
-      'Whatever killed them left little behind.',
-      'The dead body have been here a long time.',
-      'A crude death. A lonely grave.',
-      'The remains are disturbingly fresh.',
-    ];
     let lastMousePx = null, lastMousePy = null;
     // Shared by both the desktop floating tooltip (mousemove) and the mobile
     // tap-to-inspect panel (touchstart) - builds the same info for whatever
@@ -5369,7 +5286,7 @@ The player intentionally accepts danger in exchange for information.
       if(!merchantStock.some(it=>it.kind==='artifact')){
         const art = makeArtifactItem(3);
         if(art){
-          art.merchantPrice = TIER_SELL_VALUE[art.tier] * 2;
+          art.merchantPrice = SELL_VALUE_BY_TIER[art.tier] * 2;
           merchantStock.push(art);
         }
       }
@@ -5384,11 +5301,10 @@ The player intentionally accepts danger in exchange for information.
         merchantStock.push({kind:'teleportscroll', name:'Scroll of Teleportation', count:5, merchantPrice:100});
       }
     }
-    const TIER_SELL_VALUE = [0, 15, 30, 55, 90, 140]; // indexed by tier 1-5
-    const FLAT_SELL_VALUE = { potion:8, speedpotion:12, scroll:15, idscroll:20, herb:4, mushroom:3, ediblemushroom:5, berries:2 };
+    // SELL_VALUE_BY_TIER / FLAT_SELL_VALUE now loaded from content/loot_tables.json.
     function itemSellValue(it){
       if(it.tier){
-        let v = TIER_SELL_VALUE[it.tier] || 0;
+        let v = SELL_VALUE_BY_TIER[it.tier] || 0;
         if(it.mod) v += (it.modAmt||1) * 5;
         return v;
       }

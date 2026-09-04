@@ -1,0 +1,81 @@
+[
+  {
+    "id": "human",
+    "name": "Human",
+    "avatar": "human.jpg",
+    "bonus": "+20% XP gain rate",
+    "xp": 0.2
+  },
+  {
+    "id": "halfling",
+    "name": "Halfling",
+    "avatar": "halfling.jpg",
+    "bonus": "-1 AGGRO range from all enemies",
+    "aggro": -1
+  },
+  {
+    "id": "catling",
+    "name": "Catling",
+    "avatar": "catling.jpg",
+    "bonus": "+3 SPD",
+    "stats": {
+      "spd": 3
+    }
+  },
+  {
+    "id": "dwarf",
+    "name": "Dwarf",
+    "avatar": "dwarf.jpg",
+    "bonus": "+3 DEF",
+    "stats": {
+      "def": 3
+    }
+  },
+  {
+    "id": "orc",
+    "name": "Orc",
+    "avatar": "orc.jpg",
+    "bonus": "+3 ATK",
+    "stats": {
+      "atk": 3
+    }
+  },
+  {
+    "id": "leprechaun",
+    "name": "Leprechaun",
+    "avatar": "leprechaun.jpg",
+    "bonus": "+5 Magic Find",
+    "stats": {
+      "mf": 5
+    }
+  },
+  {
+    "id": "elf",
+    "name": "Elf",
+    "avatar": "elf.jpg",
+    "bonus": "+2 GRACE, never ambushed in forest",
+    "grace": 2,
+    "noForestAmbush": true
+  },
+  {
+    "id": "wyrdling",
+    "name": "Wyrdling",
+    "avatar": "wyrdling.jpg",
+    "bonus": "Consumables are 25% more effective",
+    "consumables": 1.25
+  },
+  {
+    "id": "merling",
+    "name": "Merling",
+    "avatar": "merling.jpg",
+    "bonus": "Unlimited swimming",
+    "swims": true
+  },
+  {
+    "id": "troll",
+    "name": "Troll",
+    "avatar": "troll.jpg",
+    "bonus": "Regenerates 1 HP every 5 turns",
+    "regenEvery": 5
+  }
+]

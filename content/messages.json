@@ -1,0 +1,46 @@
+{
+  "tombstoneInscriptions": [
+    "The king never walked upon the earth.",
+    "He climbed the mountain alone, and returned wearing a crown no smith had forged.",
+    "Three nights later, the priests declared that the gods had chosen him.",
+    "He was not chosen. He was shown.",
+    "To hear the ring is to live again.",
+    "A monarch is born noble. Why would he need to climb?"
+  ],
+  "campfireInspections": [
+    "Cold ash. The fire died in a hurry.",
+    "The embers are long dead.",
+    "Someone left this fire unfinished.",
+    "Cold ashes. No warmth remains.",
+    "The wood is blackened, but barely burned.",
+    "Whoever has called this place home has long abandoned it."
+  ],
+  "skeletonInspections": [
+    "The bones are picked clean.",
+    "The corpse lies twisted in the dirt.",
+    "Long dead. Not long forgotten.",
+    "Something tore the flesh from the bones.",
+    "The skull is cracked.",
+    "The bones bear strange bite marks.",
+    "Whatever killed them left little behind.",
+    "The dead body have been here a long time.",
+    "A crude death. A lonely grave.",
+    "The remains are disturbingly fresh."
+  ],
+  "curseEventLines": {
+    "named": {
+      "hp": "The {name} saps {amt} HP from you!",
+      "gold": "The {name} plucks {amt} gold from your pouch and it's gone.",
+      "atk_debuff": "The {name} weakens your arm.",
+      "def_debuff": "The {name} chills your bones, leaving you exposed.",
+      "spd_debuff": "The {name} drags at your limbs."
+    },
+    "unknown": {
+      "hp": "A cold weight in your pack drains {amt} HP from you!",
+      "gold": "Something in your pack pilfers {amt} gold, then goes still.",
+      "atk_debuff": "A chill runs down your arm from somewhere in your pack.",
+      "def_debuff": "A shiver of dread leaves you feeling exposed.",
+      "spd_debuff": "Your limbs feel suddenly, inexplicably heavy."
+    }
+  }
+}

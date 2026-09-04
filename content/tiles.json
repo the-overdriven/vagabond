@@ -1,0 +1,279 @@
+{
+  "tiles": {
+    "water": {
+      "ch": "~",
+      "color": "#4f8fc9",
+      "bg": "#0c1a26",
+      "walk": false
+    },
+    "river": {
+      "ch": "~",
+      "color": "#7fd0d8",
+      "bg": "#207f9a",
+      "walk": true
+    },
+    "sand": {
+      "ch": ".",
+      "color": "#c99b3a",
+      "bg": "#f3e0a3",
+      "walk": true
+    },
+    "grass": {
+      "ch": ".",
+      "color": "#7fae55",
+      "bg": "#2f7a3a",
+      "walk": true
+    },
+    "forest": {
+      "ch": "♣",
+      "color": "#2f7a3a",
+      "bg": "#0b160b",
+      "walk": true
+    },
+    "taiga": {
+      "ch": "♣",
+      "color": "#49664f",
+      "bg": "transparent",
+      "walk": true
+    },
+    "ancientForest": {
+      "ch": "♣",
+      "color": "#1d5227",
+      "bg": "#071007",
+      "walk": true
+    },
+    "hill": {
+      "ch": "∩",
+      "color": "#a8945f",
+      "bg": "#1a160c",
+      "walk": true
+    },
+    "mountain": {
+      "ch": "▲",
+      "color": "#8d8d8d",
+      "bg": "#141414",
+      "walk": false
+    },
+    "snowmountain": {
+      "ch": "▲",
+      "color": "#ffffff",
+      "bg": "#dfeaf2",
+      "walk": false
+    },
+    "volcano": {
+      "ch": "▲",
+      "color": "#ff6b35",
+      "bg": "#24100d",
+      "walk": false
+    },
+    "lava": {
+      "ch": "≈",
+      "color": "#ff3b1f",
+      "bg": "#35100d",
+      "walk": false
+    },
+    "snow": {
+      "ch": ".",
+      "color": "#12181c",
+      "bg": "#eef5fa",
+      "mini": "#e4eef6",
+      "walk": true
+    },
+    "cavefloor": {
+      "ch": ".",
+      "color": "#9a6a45",
+      "bg": "#24140d",
+      "walk": true
+    },
+    "cavewall": {
+      "ch": "#",
+      "color": "#493022",
+      "bg": "#0d0805",
+      "walk": false
+    },
+    "caveentrance": {
+      "ch": "∩",
+      "color": "#e8a24f",
+      "bg": "#24140d",
+      "mini": "#ff6b2e",
+      "walk": true
+    },
+    "cavefloor2": {
+      "ch": ".",
+      "color": "#9a6a45",
+      "bg": "#24140d",
+      "walk": true
+    },
+    "cavedown": {
+      "ch": "v",
+      "color": "#e8a24f",
+      "bg": "#24140d",
+      "mini": "#ff6b2e",
+      "walk": true
+    },
+    "caveup": {
+      "ch": "^",
+      "color": "#e8a24f",
+      "bg": "#24140d",
+      "mini": "#ff6b2e",
+      "walk": true
+    },
+    "marble": {
+      "ch": "=",
+      "color": "#c8c2b4",
+      "bg": "#302d2a",
+      "walk": true
+    },
+    "dwarvengate": {
+      "ch": "Ω",
+      "color": "#e8b85b",
+      "bg": "#241b12",
+      "walk": true
+    },
+    "dwarvenstatue": {
+      "ch": "♜",
+      "color": "#817769",
+      "bg": "#171514",
+      "walk": true
+    },
+    "dwarvenwall": {
+      "ch": "▓",
+      "color": "#756b60",
+      "bg": "#151311",
+      "walk": false
+    },
+    "dwarvenrubble": {
+      "ch": "░",
+      "color": "#62574c",
+      "bg": "#201b17",
+      "walk": true
+    },
+    "temple": {
+      "ch": "☦",
+      "color": "#d9b3ff",
+      "bg": "#1c0f2e",
+      "walk": true
+    },
+    "boulder": {
+      "ch": "●",
+      "color": "#7a7a7a",
+      "bg": "#141414",
+      "walk": false
+    },
+    "blackpillar": {
+      "ch": "▮",
+      "color": "#2a2a35",
+      "bg": "#0a0a0a",
+      "walk": false
+    },
+    "village": {
+      "ch": "⌂",
+      "color": "#e0b080",
+      "bg": "#241a10",
+      "walk": true
+    },
+    "belltower": {
+      "ch": "⛪",
+      "color": "#d9b3ff",
+      "bg": "#1c0f2e",
+      "walk": true
+    },
+    "ruinedchapel": {
+      "ch": "†",
+      "color": "#8b8175",
+      "bg": "#211d1a",
+      "walk": true
+    },
+    "grave": {
+      "ch": "†",
+      "color": "#c9c9c9",
+      "bg": "transparent",
+      "walk": true
+    },
+    "bigbell": {
+      "ch": "⍾",
+      "color": "#d9a441",
+      "bg": "#141414",
+      "walk": true
+    }
+  },
+  "tileCode": {
+    "water": "w",
+    "river": "r",
+    "sand": "s",
+    "grass": "g",
+    "forest": "f",
+    "snowmountain": "M",
+    "taiga": "i",
+    "ancientForest": "a",
+    "hill": "h",
+    "mountain": "m",
+    "volcano": "V",
+    "lava": "L",
+    "snow": "n",
+    "temple": "t",
+    "boulder": "b",
+    "blackpillar": "p",
+    "village": "v",
+    "belltower": "y",
+    "ruinedchapel": "c",
+    "grave": "e",
+    "bigbell": "z",
+    "cavefloor": ".",
+    "cavewall": "#",
+    "caveentrance": "o",
+    "cavefloor2": "2",
+    "cavedown": "d",
+    "caveup": "u",
+    "marble": "=",
+    "dwarvengate": "G",
+    "dwarvenstatue": "S",
+    "dwarvenwall": "W",
+    "dwarvenrubble": "R"
+  },
+  "tileDesc": {
+    "water": "open water",
+    "river": "a running river",
+    "sand": "sand",
+    "grass": "a grassy field",
+    "forest": "dense forest",
+    "taiga": "a snow-choked taiga, where dark trees claw through the frozen ground",
+    "ancientForest": "a dense ancient forest",
+    "hill": "a rugged hill",
+    "mountain": "an impassable mountain",
+    "volcano": "a smoking volcano, its red throat glowing beneath the ash",
+    "lava": "a field of glowing lava and black volcanic rock",
+    "snow": "a snow-covered slope",
+    "cavefloor": "the brown dirt floor of a cave",
+    "cavewall": "a solid cave wall",
+    "cavefloor2": "the cold stone floor of a deeper cave",
+    "cavedown": "a narrow crack descending further into the dark",
+    "caveup": "a rough passage leading back up",
+    "temple": "the sacred ground of the Temple",
+    "boulder": "a cluster of impassable boulders",
+    "blackpillar": "a tall black stone pillar rising from the mountain\\'s peak",
+    "village": "a small hut, part of a village",
+    "belltower": "the Temple's bell tower - the bell itself seems to be missing",
+    "ruinedchapel": "a ruined chapel, forgotten by both the living and the gods",
+    "grave": "a lone grave, it is not finished and has no inscription",
+    "bigbell": "a big brass bell, far too heavy to carry",
+    "marble": "cracked marble flooring, stained by dust and old ash",
+    "dwarvengate": "the sealed dwarven gate, its lintel carved with a broken crown",
+    "dwarvenstatue": "an ancient stone column. It seems to have outlived everyone who built it. The column depicts proud dwarven warrior carved in stone, forever standing guard",
+    "dwarvenwall": "a hewn dwarven wall, scarred by collapse and time",
+    "dwarvenrubble": "a dangerous heap of fallen masonry"
+  },
+  "terrainSpeed": {
+    "grass": 1,
+    "forest": -1,
+    "ancientForest": -1,
+    "sand": -1,
+    "snow": -1,
+    "taiga": -1,
+    "river": -2,
+    "water": -2
+  },
+  "terrainDefense": {
+    "hill": 1
+  }
+}

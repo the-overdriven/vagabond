@@ -1,0 +1,77 @@
+{
+  "sellValues": {
+    "byTier": [
+      0,
+      15,
+      30,
+      55,
+      90,
+      140
+    ],
+    "_byTierNote": "indexed by item tier 1-5 (index 0 unused)",
+    "flat": {
+      "potion": 8,
+      "speedpotion": 12,
+      "scroll": 15,
+      "idscroll": 20,
+      "herb": 4,
+      "mushroom": 3,
+      "ediblemushroom": 5,
+      "berries": 2
+    }
+  },
+  "forage": {
+    "_note": "Rolled on forest tiles via tryForage(); each tile can only be foraged once. Thresholds are cumulative on a 0-1 roll.",
+    "terrain": "forest",
+    "table": [
+      {
+        "upTo": 0.09,
+        "result": "berries"
+      },
+      {
+        "upTo": 0.17,
+        "result": "herb"
+      },
+      {
+        "upTo": 0.25,
+        "result": "mushroom"
+      }
+    ],
+    "elseResult": "nothing"
+  },
+  "chestLoot": {
+    "_note": "Rolled on a 0-scale roll in checkGroundAt() when a chest is opened; guaranteed-artifact chests skip this roll entirely. First matching entry (roll < upTo) wins; elseResult covers anything above the last entry.",
+    "scale": 110,
+    "table": [
+      {
+        "upTo": 45,
+        "result": "gold",
+        "goldMin": 5,
+        "goldMax": 15,
+        "goldPerTier": true,
+        "mfGoldMultiplier": 2
+      },
+      {
+        "upTo": 65,
+        "result": "gear",
+        "gearMaxTier": 4,
+        "weaponChance": 0.33,
+        "armorChance": 0.33,
+        "shieldChance": 0.34
+      },
+      {
+        "upTo": 85,
+        "result": "potion"
+      },
+      {
+        "upTo": 91,
+        "result": "scrollOfInvisibility"
+      },
+      {
+        "upTo": 100,
+        "result": "speedPotion"
+      }
+    ],
+    "elseResult": "idScroll"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "world": {
+    "width": 260,
+    "height": 180,
+    "maxGenerationAttempts": 50
+  },
+  "landmarks": {
+    "bellGuardExclusionRadius": 8,
+    "bellPillarMinDistance": 20,
+    "ancientForestSize": 10,
+    "ancientForestMinVillageDistance": 30
+  },
+  "exploration": {
+    "edgeMargin": 2,
+    "edgeRewardXp": 100
+  },
+  "spawning": {
+    "minLiches": 6
+  }
+}

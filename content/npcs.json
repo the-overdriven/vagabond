@@ -1,0 +1,59 @@
+{
+  "templates": [
+    {
+      "name": "Old Hunter",
+      "lines": [],
+      "free": false,
+      "portrait": "old_hunter"
+    },
+    {
+      "name": "Gravedigger",
+      "lines": [
+        "Midnight? That's when the bells stop.",
+        "Once I get my old name back, I can finally rest.",
+        "Who digs the grave for the gravedigger?",
+        "Who keeps checking an empty grave?"
+      ],
+      "free": false,
+      "portrait": "grave_digger"
+    },
+    {
+      "name": "Drunk",
+      "lines": [
+        "Hic! What time it is? There ain't no bells anymore."
+      ],
+      "free": true,
+      "portrait": "drunk"
+    },
+    {
+      "name": "Merchant",
+      "lines": [
+        "Gold is easy to find. Secrets are harder. Care to trade?"
+      ],
+      "free": false,
+      "portrait": "merchant",
+      "static": true,
+      "trades": true
+    },
+    {
+      "name": "Herbalist",
+      "lines": [
+        "The forest is dangerous but holds many remedies, if you know where to look."
+      ],
+      "free": false,
+      "portrait": "herbalist",
+      "village": true,
+      "services": true
+    }
+  ],
+  "ancientBellLich": {
+    "name": "Ancient Lich",
+    "lines": [
+      "The bell... I have not heard its sweet voice in a very long time. The world I knew is long gone. So much changed after the pillar rose. And my key... I can no longer feel its weight upon my neck."
+    ],
+    "free": false,
+    "static": false,
+    "trades": false,
+    "portrait": "lich"
+  }
+}
