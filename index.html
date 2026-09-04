@@ -4042,6 +4042,10 @@ The player intentionally accepts danger in exchange for information.
         return;
       }
       const key = keyXY(player.x, player.y);
+      if(dugSandTiles.has(key)){
+        log('You have already dug here.', 'info');
+        return;
+      }
       dugSandTiles.add(key);
       // Redraw immediately so the darker sand is visible.
       render();
