@@ -2546,7 +2546,84 @@ The same character continues after death.
 
 ---
 
-# 79. Status Vocabulary for Future Development
+# 79. Digging
+
+Digging is performed with `tryDig()`.
+
+## Rules
+
+- Digging requires a shovel.
+- The player can dig only while standing on a `sand` tile.
+- Attempting to dig on any other tile logs:
+  ```text
+  You can only dig in sand.
+  ```
+- The tile is recorded in `dugSandTiles` and immediately redrawn so the darker sand becomes visible.
+- Digging the same treasure-map location does not create another casket if the casket is already present in the player's inventory or on the current level.
+- The treasure-map location takes priority over the normal digging loot table.
+
+## Treasure-map reward
+
+When the player digs at the treasure map's marked X:
+
+- An `Old Rotten Casket` is added directly to the player's inventory.
+- The casket is not placed on the ground.
+- The following message is logged:
+  ```text
+  Your shovel strikes something hard. Beneath the sand lies an old rotten casket.
+  ```
+
+## Normal digging loot
+
+If the dig is not at the treasure-map location, a roll from 1 to 100 determines the result:
+
+| Roll | Result |
+|---|---|
+| 1–5 | Find a stone |
+| 6–8 | Find 1 gold coin |
+| 9–10 | Find Amber |
+| 11 | Find a Seashell |
+| 12 | Find a rusted spoon |
+| 13 | Find a pair of old, worn boots, which are discarded |
+| 14 | Find a bone |
+| 15 | Find a broken shovel handle |
+| 16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
+| 17–100 | Find nothing |
+
+Amber (worth 20g) and Seashell (worth 10g) are stackable inventory items.
+
+## Scarab spawning
+
+On the Scarab result:
+
+- The game searches the eight adjacent tiles.
+- The destination must be walkable.
+- The destination must not contain a living enemy on the current level.
+- The destination cannot be the player's current tile.
+- The Scarab is created from the `Scarab` entry in `ENEMY_TEMPLATES`.
+- No fallback enemy template is used.
+- The Scarab's HP, attack, defense, speed, and other properties come from that template.
+- If no valid adjacent tile exists, no Scarab is spawned and the game logs:
+  ```text
+  You hear something moving beneath the sand, but nothing emerges.
+  ```
+
+Successful Scarab spawn message:
+
+```text
+Something bursts from the sand beside you - a scarab!
+```
+
+## Visual and turn effects
+
+- Digging immediately calls `render()` so the dug-sand appearance is visible.
+- The final digging action calls `render()` and `updateHud()`.
+- Treasure-casket discovery also refreshes the rendered game state immediately.
+- Digging consumes the normal action/turn flow of the calling interaction.
+
+---
+
+# 80. Status Vocabulary for Future Development
 
 Keep feature status simple:
 
@@ -2563,7 +2640,7 @@ Use these labels when future features are discussed or documented.
 
 ---
 
-# 80. Future Feature Review Format
+# 81. Future Feature Review Format
 
 When adding a feature, review it against the current specification using:
 
@@ -2620,7 +2697,7 @@ This is the preferred way to keep future features consistent with Vagabond's cur
 
 ---
 
-# 81. Canonical Rule
+# 82. Canonical Rule
 
 When there is a conflict between:
 
