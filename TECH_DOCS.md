@@ -221,36 +221,42 @@ Max HP receives flat bonuses first, then artifact percentage modifiers.
 
 # 5. Leveling
 
-XP required for the next level uses a fast early-game calibration followed by
-a steep progression curve:
+XP required for the next level uses a fixed calibration table for levels 1–15,
+followed by a steep progression curve:
 
 ```text
-level 1 -> 2: 40 XP
-level 2 -> 3: 48 XP
-level 3 -> 4: 58 XP
-level 4 -> 5: 70 XP
-level 5 -> 6: 80 XP
-level 6 -> 7: 112 XP
-level 7 -> 8: 160 XP
-level 8 -> 9: 208 XP
-level 9 -> 10: 400 XP
-level 10 -> 11: 480 XP
-level 11 -> 12: 800 XP
-level 12 -> 13: 960 XP
-level 13 -> 14: 1,440 XP
-level 14 -> 15: 1,920 XP
-
-For level 15 onward, the threshold is `round(1,920 x (level / 14)^2.2)`.
+level 1 -> 2: 60 XP
+level 2 -> 3: 120 XP
+level 3 -> 4: 144 XP
+level 4 -> 5: 200 XP
+level 5 -> 6: 240 XP
+level 6 -> 7: 336 XP
+level 7 -> 8: 480 XP
+level 8 -> 9: 624 XP
+level 9 -> 10: 1,200 XP
+level 10 -> 11: 1,440 XP
+level 11 -> 12: 2,400 XP
+level 12 -> 13: 2,880 XP
+level 13 -> 14: 4,320 XP
+level 14 -> 15: 5,760 XP
 ```
 
-i.e.
-Level 15 → 16: 2,234 XP
-Level 16 → 17: 2,576 XP
-Level 20 → 21: 2,208 XP
+The implementation uses:
 
-This produces approximately levels 2–15 at 3, 5, 7.5, 10, 15, 22, 32, 45,
-70, 100, 150, 210, 300, and 420 minutes respectively. Actual timing varies
-with enemy encounters, XP bonuses, and exploration.
+```js
+const XP_TO_NEXT = [60, 120, 144, 200, 240, 336, 480, 624, 1200, 1440, 2400, 2880, 4320, 5760]
+
+function xpToNext(lvl) {
+  if (lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1]
+  return Math.round(1920 * Math.pow(lvl / 14, 2.2)) * 3
+}
+```
+
+For level 15 onward, the threshold is therefore:
+
+```text
+round(1,920 x (level / 14)^2.2) x 3
+```
 
 On level-up:
 
@@ -263,112 +269,31 @@ XP is affected by the player's XP multiplier.
 
 Human currently has a permanent +20% XP multiplier.
 
-### Leveling calibration and kill-count reference
+### Cumulative XP reference
 
-The original XP thresholds and timing estimates above are retained. The following
-tables add cumulative XP and an illustrative enemy-kill reference without
-replacing the original information.
-
-Current cumulative XP required to reach each level:
+Cumulative XP required to reach each level under the current thresholds:
 
 | Target level | Cumulative XP |
 |---|---:|
-| 2 | 40 |
-| 3 | 88 |
-| 4 | 146 |
-| 5 | 216 |
-| 6 | 296 |
-| 7 | 408 |
-| 8 | 568 |
-| 9 | 776 |
-| 10 | 1,176 |
-| 11 | 1,656 |
-| 12 | 2,456 |
-| 13 | 3,416 |
-| 14 | 4,856 |
-| 15 | 6,776 |
-
-Using the current `xpForEnemy(e)` formula, the tier-3 enemy XP values are
-approximately:
-
-| Enemy | XP |
-|---|---:|
-| Lion | 48 |
-| Ghoul | 48 |
-| Ghost | 45 |
-| Orc | 48 |
-| Imp | 49 |
-| Mummy | 58 |
-| Giant Spider | 54 |
-| White Tiger | 58 |
-| Minotaur | 64 |
-| Ogre | 71 |
-
-The average tier-3 enemy is worth approximately **54 XP**. Based on that average,
-the current progression requires approximately:
-
-| Target level | Average tier-3 kills |
-|---|---:|
-| 2 | 0.7 |
-| 3 | 1.6 |
-| 4 | 2.7 |
-| 5 | 4.0 |
-| 6 | 5.5 |
-| 7 | 7.5 |
-| 8 | 10.5 |
-| 9 | 14.3 |
-| 10 | 21.7 |
-| 11 | 30.5 |
-| 12 | 45.2 |
-| 13 | 62.9 |
-| 14 | 89.4 |
-| 15 | 124.8 |
-
-For comparison, if the intended pacing is roughly one average tier-3 kill every
-1.5 minutes, the desired cumulative kill counts would be:
-
-| Target level | Desired average tier-3 kills |
-|---|---:|
-| 2 | 2 |
-| 3 | 3 |
-| 4 | 5 |
-| 5 | 7 |
-| 6 | 10 |
-| 7 | 15 |
-| 8 | 21 |
-| 9 | 30 |
-| 10 | 47 |
-| 11 | 67 |
-| 12 | 100 |
-| 13 | 140 |
-| 14 | 200 |
-| 15 | 280 |
+| 2 | 60 |
+| 3 | 180 |
+| 4 | 324 |
+| 5 | 524 |
+| 6 | 764 |
+| 7 | 1,100 |
+| 8 | 1,580 |
+| 9 | 2,204 |
+| 10 | 3,404 |
+| 11 | 4,844 |
+| 12 | 7,244 |
+| 13 | 10,124 |
+| 14 | 14,444 |
+| 15 | 20,204 |
 
 Actual progression depends on encounter frequency, enemy composition, prefixes,
 exploration, and XP multipliers.
 
 ---
-
-
-### Calibrated progression target
-
-The following table is an additional calibration reference. It does not replace
-the original XP thresholds, timing estimates, cumulative XP table, or kill-count
-reference above.
-
-| Target level | Desired average tier-3 kills |
-|---|---:|
-| 2 | 2 |
-| 3 | 4 |
-| 4 | 8 |
-| 5 | 16 |
-| 6 | 32 - 2 |
-| 7 | 64 - 4 |
-| 8 | 128 - 16 |
-| 9 | 256 - 32 |
-| 10 | 512 - 64 |
-| 11 | 1024 - 128 |
-| 12 | 2056 - 256 |
 
 # 6. Movement
 
