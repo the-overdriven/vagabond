@@ -2972,7 +2972,12 @@ The player intentionally accepts danger in exchange for information.
       if(oldHunterQuest && oldHunterQuest.state==='active') return oldHunterQuest;
       const options=hunterCandidates(); if(!options.length) return null;
       const investigation=Math.random()<0.3 ? hunterInvestigationCandidate() : null;
-      if(investigation){ oldHunterQuest={id:`hunter_${++oldHunterQuestSerial}`,state:'active',giver:'Old Hunter',progress:0,createdAtTurn:0,...investigation}; return oldHunterQuest; }
+      if(investigation){
+        oldHunterQuest={id:`hunter_${++oldHunterQuestSerial}`,state:'active',giver:'Old Hunter',progress:0,createdAtTurn:0,...investigation};
+        revealArea(investigation.targetX, investigation.targetY, investigation.radius);
+        render();
+        return oldHunterQuest;
+      }
       // Give a 50% chance to receive a killing quest, but only from
       // prefixed tier 3+ monsters. Item quests remain eligible otherwise.
       const killOptions=options.filter(q=>q.type==='kill_specific' || q.type==='kill_group');
@@ -2991,25 +2996,25 @@ The player intentionally accepts danger in exchange for information.
     function hunterFlavor(q){
       const place=pick(['the old road','the ruined fort','the edge of the forest','the abandoned cemetery','the mountain pass','the dark country beyond the chapel']);
       const reason=pick(['something has been feeding there','the tracks stop where the dead begin to walk','travellers have gone missing along that path','I found fresh blood where no living thing should have been','the silence has become too deep, even for these hills']);
-      if(q.type==='investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterDirection(q)} of here. Go there and investigate the place, then report back to me.`,`Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterDirection(q)} of here. Find the entrance and look carefully around it. Tell me what you discover.`]);
+      if(q.type==='investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterDirection(q)} of here. Go there and investigate the place, then report back to me. I'll mark the location on your map.`,`Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterDirection(q)} of here. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`]);
       if(q.type==='kill_specific') return pick([
-        `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind — that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
+        `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
         `Old Hunter says: I know the trail of a ${q.targetName}. It has crossed ${place}, ${hunterDirection(q)} of here, three nights in a row. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
         `Old Hunter says: A ${q.targetName} has made ${place}, ${hunterDirection(q)} of here, unsafe. I have seen what it leaves behind. Track the individual one, not some other beast wearing the same face.`
       ]);
       if(q.type==='kill_group') return pick([
         `Old Hunter says: ${hunterPlural(q.targetBaseName)} have gathered around ${place}, ${hunterDirection(q)} of here. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
-        `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} near ${place}, ${hunterDirection(q)} of here. They are not merely passing through — they are settling in. Thin their numbers before someone else pays for it.`,
+        `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} near ${place}, ${hunterDirection(q)} of here. They are not merely passing through - they are settling in. Thin their numbers before someone else pays for it.`,
         `Old Hunter says: The ${hunterPlural(q.targetBaseName)} have been disturbing the dead and frightening the living around ${place}, ${hunterDirection(q)} of here. Bring down ${q.required} of them. That should quiet things for a while.`
       ]);
       if(q.type==='recover_item') return pick([
-        `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterDirection(q)} of here, near ${place}. Bring the old thing back — it has more history than that thief deserves.`,
+        `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterDirection(q)} of here, near ${place}. Bring the old thing back - it has more history than that thief deserves.`,
         `Old Hunter says: A ${q.targetName} carries my ${q.targetItemName}, ${hunterDirection(q)} of here. I want the item, not excuses. Track the creature, take it back, and try not to damage it.`,
         `Old Hunter says: That ${q.targetName} has something of mine: ${q.targetItemName}. It was stolen, and I would like to see it returned before the trail goes cold. The thief is currently ${hunterDirection(q)} of here.`
       ]);
       return pick([
         `Old Hunter says: I need ${q.targetItemName}. It was left somewhere around ${place}, ${hunterDirection(q)} of here, and I have reason to believe it is still there. Find it and bring it to me.`,
-        `Old Hunter says: A useful piece of gear — ${q.targetItemName} — has gone missing near ${place}, ${hunterDirection(q)} of here. I do not care who finds it first. I care that it comes back.`,
+        `Old Hunter says: A useful piece of gear - ${q.targetItemName} - has gone missing near ${place}, ${hunterDirection(q)} of here. I do not care who finds it first. I care that it comes back.`,
         `Old Hunter says: I lost track of ${q.targetItemName} out in ${place}, ${hunterDirection(q)} of here. ${reason}. Search the area and return it to me if you find it.`
       ]);
     }
@@ -5515,6 +5520,17 @@ The player intentionally accepts danger in exchange for information.
       ensureMiniBases();
       for(const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y);
       minimapDirty = true;
+    }
+    // Reveals a (radius*2+1) square centered on (cx,cy) on the current level's
+    // discovery grid, e.g. for a quest-giver "marking" a location on the map.
+    function revealArea(cx, cy, radius){
+      for(let y=cy-radius; y<=cy+radius; y++){
+        if(y<0 || y>=MAP_H) continue;
+        for(let x=cx-radius; x<=cx+radius; x++){
+          if(x<0 || x>=MAP_W) continue;
+          markDiscovered(x, y);
+        }
+      }
     }
     // originX/originY are the top-left tile of the visible window (0,0 for the full
     // world map, a player-centred clamped offset for the zoomed side minimap).

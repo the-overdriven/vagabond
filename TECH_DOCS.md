@@ -1717,7 +1717,9 @@ The Old Hunter can generate a new quest when the player interacts with him and h
 
 There is a 30% chance to receive an investigation quest. Investigation quests target a recognizable, procedurally generated landmark, such as a cave entrance or the dwarven fort entrance. The target is stored by its map coordinates and landmark type, so the quest points to an actual location rather than an arbitrary wilderness tile.
 
-The quest dialogue names the landmark and gives its direction relative to the Old Hunter. The player completes the investigation simply by getting near the target tile within 2 squares; no additional interaction or hidden object search is required. The quest then becomes ready to turn in at the Old Hunter.
+The quest dialogue names the landmark and gives its direction relative to the Old Hunter, and ends with "I'll mark the location on your map." The player completes the investigation simply by getting near the target tile within 2 squares; no additional interaction or hidden object search is required. The quest then becomes ready to turn in at the Old Hunter.
+
+As soon as the quest is generated, the Old Hunter also marks the location for real: a 5x5 area (the target tile plus 2 tiles in every direction - the same radius used for quest completion) is immediately revealed on the discovery grid, whether or not the player has actually been there.
 
 Other generated quest types include:
 
