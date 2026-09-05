@@ -471,20 +471,68 @@ The player intentionally accepts danger in exchange for information.
     // consumer (randInt/pick/chance and anything calling rng() directly)
     // is captured/replayed uniformly. See the REPLAY section below for the
     // rest of the state these two branches read/write.
+    // --- Temporary debug instrumentation for tracking down the replay desync ---
+    // Every rng() call gets logged with which line called it and whether it
+    // happened during live play, recording, or replay. After reproducing the
+    // desync, call dumpRngLog() in the console (or click the on-screen link it
+    // creates) to download rng-log.json, do it for both the recording run and
+    // the replay of it, and diff them - the first index where "at" differs
+    // between the two files is the exact function causing the drift. Safe to
+    // strip out once the bug is found; adds no gameplay behavior.
+    const RNG_DEBUG = true
+    let rngLog = []
+    function rngDebugCaller() {
+      const stack = (new Error()).stack || ''
+      const lines = stack.split('\n')
+      return (lines[3] || lines[2] || lines[1] || '').trim()
+    }
+    window.dumpRngLog = function () {
+      const blob = new Blob([JSON.stringify(rngLog, null, 2)], {type: 'application/json'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const ts = new Date().toISOString().replace(/[:.]/g, '-')
+      a.href = url
+      a.download = `rng-log-${ts}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      console.log(`Dumped ${rngLog.length} rng() calls.`)
+    }
+    window.clearRngLog = function () {
+      rngLog = []
+      console.log('rng log cleared.')
+    }
+    // --- End temporary debug instrumentation ---
+
+    let replayRngCallers = []
     function rng() {
+      let value
+      const caller = RNG_DEBUG ? rngDebugCaller() : ''
       if (replayPlaying) {
         if (replayRngIndex >= activeReplay.rng.length) {
           replayDesync(`Replay desynchronized: game requested RNG value #${replayRngIndex + 1}, but the replay contains only ${activeReplay.rng.length} values.`)
           return 0
         }
-        return activeReplay.rng[replayRngIndex++]
+        value = activeReplay.rng[replayRngIndex++]
+      } else {
+        rngState |= 0
+        rngState = (rngState + 0x6D2B79F5) | 0
+        let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        value = ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        if (replayRecording) replayData.rng.push(value)
       }
-      rngState |= 0
-      rngState = (rngState + 0x6D2B79F5) | 0
-      let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296
-      if (replayRecording) replayData.rng.push(value)
+      if (RNG_DEBUG) {
+        rngLog.push({
+          i: rngLog.length,
+          v: value,
+          mode: replayPlaying ? 'replay' : (replayRecording ? 'record' : 'live'),
+          at: caller,
+          replayActionIndex: replayPlaying ? replayActionIndex : null
+        })
+        if (replayPlaying) replayRngCallers.push(caller)
+      }
       return value
     }
 
@@ -2630,6 +2678,8 @@ The player intentionally accepts danger in exchange for information.
         log(`The moment you take it in your hands, you can tell this isn't an ordinary ${it.noun.toLowerCase()}. It feels different somehow, but you can't tell why. You'll need a Scroll of Identification to make sense of this.`, 'info')
         return
       }
+      ensureReplayItemIds()
+      recordReplayAction({type:'useItem', action:'identifyArtifact', idx, replayId:it.replayId})
       scroll.count = (scroll.count || 1) - 1
       if (scroll.count <= 0) {
         const scrollIdx = player.inventory.indexOf(scroll)
@@ -3789,6 +3839,7 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function interactOldHunter() {
+      recordReplayAction({type:'talk', npc:'Old Hunter'})
       if (oldHunterQuest?.state === 'ready') {
         const q = oldHunterQuest
         removeHunterQuestItem(q)
@@ -4946,7 +4997,10 @@ The player intentionally accepts danger in exchange for information.
       const tile = map[player.y]?.[player.x]
       if (tile === 'sand') {
         if (player.inventory.some(i => i.kind === 'shovel')) {
-          tryDig()
+          // F on sand is the same player action as using the shovel directly;
+          // keep one replay action, rather than recording both forage and dig.
+          recordReplayAction({type:'dig'})
+          tryDig({recordReplay:false})
         } else {
           log('You need a shovel to dig in sand.', 'info')
         }
@@ -4976,10 +5030,9 @@ The player intentionally accepts danger in exchange for information.
         }
       }
       (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
-      draw()
     }
 
-    function tryDig() {
+    function tryDig(options = {}) {
       const tile = map[player.y]?.[player.x]
       if (tile !== 'sand') {
         log('You can only dig in sand.', 'info')
@@ -4990,6 +5043,7 @@ The player intentionally accepts danger in exchange for information.
         log('You have already dug here.', 'info')
         return
       }
+      if (options.recordReplay !== false) recordReplayAction({type:'dig'})
       dugSandTiles.add(key)
       // Redraw immediately so the darker sand is visible.
       render()
@@ -5087,9 +5141,12 @@ The player intentionally accepts danger in exchange for information.
     function toggleBlackKey() {
       const it = player.inventory.find(i => i.kind === 'blackkey')
       if (player.equip.blackkey) {
+        recordReplayAction({type:'blackKey', equipped:false})
         player.equip.blackkey = null
         log('You remove the Black Key from your neck. For a moment, you feel as though something has been taken from you.', 'good')
       } else if (it) {
+        ensureReplayItemIds()
+        recordReplayAction({type:'blackKey', equipped:true, replayId:it.replayId})
         player.equip.blackkey = it
         log('You place the Black Key around your neck. It hangs against your chest, cold as a winter grave.', 'good')
       } else {
@@ -5105,6 +5162,8 @@ The player intentionally accepts danger in exchange for information.
         log('You do not have a casket to open.', 'info')
         return
       }
+      ensureReplayItemIds()
+      recordReplayAction({type:'openCasket', replayId:player.inventory[idx]?.replayId, idx})
       const gold = randInt(30, 100)
       player.gold += gold
       player.inventory.splice(idx, 1)
@@ -5116,8 +5175,9 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function lootSkeletonOrForage() {
-      recordReplayAction({type: 'forage'})
       const tomb = cemeteryTombstones[keyXY(player.x, player.y)]
+      const sandWithShovel = map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
+      if (!sandWithShovel) recordReplayAction({type: 'forage'})
       if (tomb?.odd) {
         player.inventory.push({
           kind: 'oddTombstone',
@@ -5130,7 +5190,6 @@ The player intentionally accepts danger in exchange for information.
         delete cemeteryTombstones[keyXY(player.x, player.y)]
         map[player.y][player.x] = tileUnderlays[keyXY(player.x, player.y)] || 'grass'
         log('You pick up the loose tombstone.', 'loot')
-        draw()
         return
       }
       if (map[player.y]?.[player.x] === 'bigbell') {
@@ -5148,7 +5207,6 @@ The player intentionally accepts danger in exchange for information.
         bigBellPos = null
         log('With considerable effort, you hoist the enormous bell onto the wheelbarrow. Somehow, it holds. Pushing it will be slow, but possible.', 'loot')
         updateHud()
-        draw()
         return
       }
       const wheelbarrow = groundItems.find(g => onCurrentLevel(g) && g.kind === 'wheelbarrow' && g.x === player.x && g.y === player.y)
@@ -5160,7 +5218,6 @@ The player intentionally accepts danger in exchange for information.
         })
         groundItems.splice(groundItems.indexOf(wheelbarrow), 1)
         log('You pick up the surprisingly light wheelbarrow.', 'loot')
-        draw()
         return
       }
       const explorer = groundItems.find(g => onCurrentLevel(g) && g.kind === 'explorerremains' && g.x === player.x && g.y === player.y)
@@ -5172,7 +5229,6 @@ The player intentionally accepts danger in exchange for information.
         explorer.looted = true
         player.inventory.push({kind: 'treasuremap', name: 'Old Treasure Map'})
         log('Tucked beneath the ribs, you find a weathered, folded map.', 'loot')
-        draw()
         return
       }
       const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
@@ -5190,7 +5246,6 @@ The player intentionally accepts danger in exchange for information.
         else if (deadBody.gold) log(`You retrieve ${deadBody.gold} gold.`, 'loot')
         else log('You retrieve nothing.', 'loot')
         updateHud()
-        draw()
         return
       }
       if (skeleton) {
@@ -5213,7 +5268,6 @@ The player intentionally accepts danger in exchange for information.
         checkGroundAt(player.x, player.y)
         suppressLootLog = false
         log(`You search the skeleton and take what remains: ${lastLootResult}`, 'loot')
-        draw()
         return
       }
       tryForage()
@@ -7524,6 +7578,8 @@ The player intentionally accepts danger in exchange for information.
 
     function buyItem(it) {
       if (!it) return
+      ensureReplayItemIds()
+      const replayId = it.replayId
       const value = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2
       if (value <= 0 || player.gold < value) return
       const stackable = isStackableKind(it.kind)
@@ -7545,6 +7601,7 @@ The player intentionally accepts danger in exchange for information.
         player.inventory.push(bought)
       }
       player.gold -= value
+      recordReplayAction({type:'buy', replayId, fallbackIndex: merchantStock.findIndex(stock => stock?.replayId === replayId), kind:it.kind, name:it.name})
       log(`You buy the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
       updateHud()
       renderTrade()
@@ -7552,8 +7609,10 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function sellItem(idx) {
+      ensureReplayItemIds()
       const it = player.inventory[idx]
       if (!it) return
+      const replayId = it.replayId
       const value = itemSellValue(it)
       if (value <= 0) return
       const stackable = isStackableKind(it.kind)
@@ -7568,6 +7627,7 @@ The player intentionally accepts danger in exchange for information.
         merchantStock.push(it)
       }
       player.gold += value
+      recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name})
       log(`You sell the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
       updateHud()
       renderTrade()
@@ -7596,6 +7656,7 @@ The player intentionally accepts danger in exchange for information.
       if (!count || player.gold < count * 2)
         return log('You need mushrooms and 2g per mushroom.', 'info')
 
+      recordReplayAction({type:'herbalist', action:'purifyMushrooms'})
       player.gold -= count * 2
 
       // Remove all mushroom stacks, including unidentified ones.
@@ -7616,6 +7677,7 @@ The player intentionally accepts danger in exchange for information.
     function makeHerbalistPotion() {
       const it = player.inventory.find(i => i.kind === 'herb')
       if (!it || (it.count || 1) < 3 || player.gold < 10) return log('You need 3 Healing Herbs and 10g.', 'info')
+      recordReplayAction({type:'herbalist', action:'makePotion'})
       it.count -= 3
       if (it.count <= 0) player.inventory.splice(player.inventory.indexOf(it), 1)
       player.gold -= 10
@@ -7643,6 +7705,8 @@ The player intentionally accepts danger in exchange for information.
         return
       }
 
+      ensureReplayItemIds(); recordReplayAction({type:'equip', idx, replayId:player.inventory[idx]?.replayId})
+
       const old = player.equip[slot]
       const before = statSnapshot()
       player.equip[slot] = it
@@ -7664,6 +7728,7 @@ The player intentionally accepts danger in exchange for information.
       if (!['weapon', 'shield', 'armor'].includes(slot)) return
       const item = player.equip[slot]
       if (!item) return
+      recordReplayAction({type:'unequip', slot})
       const before = statSnapshot()
       player.equip[slot] = null
       player.inventory.push(item)
@@ -7685,6 +7750,7 @@ The player intentionally accepts danger in exchange for information.
     function usePotion(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'potion') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'potion', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       player.hp = playerMaxHp()
@@ -7695,6 +7761,7 @@ The player intentionally accepts danger in exchange for information.
     function useScroll(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'scroll') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scroll', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       player.invisibleTurns = consumablePower(15)
@@ -7705,6 +7772,7 @@ The player intentionally accepts danger in exchange for information.
     function useTeleportScroll(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'teleportscroll') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'teleportscroll', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       log('You read the Scroll of Teleportation. Darkness swallows you - and the temple takes you back.', 'good')
@@ -7716,6 +7784,7 @@ The player intentionally accepts danger in exchange for information.
     function useSpeedPotion(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'speedpotion') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'speedpotion', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       player.speedPotionTurns = consumablePower(15)
@@ -7726,6 +7795,7 @@ The player intentionally accepts danger in exchange for information.
     function useHerb(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'herb') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'herb', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       const heal = consumablePower(Math.max(1, Math.round(playerMaxHp() * 0.25)))
@@ -7737,6 +7807,7 @@ The player intentionally accepts danger in exchange for information.
     function useMushroom(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'mushroom') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'mushroom', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       const amt = Math.max(1, Math.round(playerMaxHp() * 0.25))
@@ -7755,6 +7826,7 @@ The player intentionally accepts danger in exchange for information.
     function useEdibleMushroom(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'ediblemushroom') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'ediblemushroom', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       const healed = consumablePower(Math.max(1, Math.round(playerMaxHp() * 0.25)))
@@ -7766,6 +7838,7 @@ The player intentionally accepts danger in exchange for information.
     function useBerries(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'berries') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'berries', idx, replayId:player.inventory[idx]?.replayId})
       it.count = (it.count || 1) - 1
       if (it.count <= 0) player.inventory.splice(idx, 1)
       if (raceDef()?.id === 'troll') {
@@ -7781,6 +7854,7 @@ The player intentionally accepts danger in exchange for information.
     function readTombstone(idx) {
       const it = player.inventory[idx]
       if (!it || it.kind !== 'tombstone') return
+      ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'tombstone', idx, replayId:player.inventory[idx]?.replayId})
       log(`You read the inscription on the tombstone, it says "${it.inscription}"`, 'info')
       consumeItemTurn()
     }
@@ -7817,22 +7891,74 @@ The player intentionally accepts danger in exchange for information.
     let replayActionIndex = 0
     let replayRngIndex = 0
     let replayTimer = null
+    // Always expose the latest diagnostic as a real global and on window.
+    // This makes it accessible from the browser console as either
+    // `lastReplayDiagnostic` or `window.lastReplayDiagnostic`.
+    var lastReplayDiagnostic = null
+    window.lastReplayDiagnostic = null
     let preReplaySnapshot = null // whatever save was on screen before "Show Replay" rewound it
 
-    // Called from tryMove/inspect/lootSkeletonOrForage/skipTurn at the exact
-    // point each is accepted by the game - never from raw keydown, so held
-    // modifier keys, name typing, and other UI-only input never get recorded.
+    // Replay item identity is independent of array position. Inventory order can
+    // change after buying/selling/equipping, so recording only `idx` is fragile.
+    // IDs are assigned lazily to every gameplay item and persist in saves/replays.
+    let nextReplayItemId = 1
+    function ensureReplayItemIds() {
+      const seen = new Set()
+      const containers = [
+        player?.inventory || [],
+        merchantStock || [],
+        groundItems || [],
+        player?.equip ? Object.values(player.equip).filter(Boolean) : []
+      ]
+      for (const list of containers) for (const item of list) {
+        if (!item || typeof item !== 'object') continue
+        if (!item.replayId || seen.has(item.replayId)) item.replayId = `replay_item_${nextReplayItemId++}`
+        seen.add(item.replayId)
+        const m = String(item.replayId).match(/^replay_item_(\d+)$/)
+        if (m) nextReplayItemId = Math.max(nextReplayItemId, Number(m[1]) + 1)
+      }
+    }
+
+    function findReplayItemIndex(list, replayId, fallbackIdx) {
+      ensureReplayItemIds()
+      if (replayId) {
+        const idx = list.findIndex(item => item?.replayId === replayId)
+        if (idx >= 0) return idx
+      }
+      return Number.isInteger(fallbackIdx) ? fallbackIdx : -1
+    }
+
+    // Called at the exact point an action is accepted by the game - never from
+    // raw keydown, so held modifier keys and UI-only input are not recorded.
     function recordReplayAction(action) {
       if (!replayRecording || replayPlaying) return
-      replayData.actions.push(action)
+      ensureReplayItemIds()
+      const previous = replayData.actions.at(-1)
+      if (previous && previous._rngEnd === undefined) {
+        previous._rngEnd = replayData.rng.length
+        if (!Array.isArray(replayData._rngCallers)) replayData._rngCallers = []
+        replayData._rngCallers[previous._recordedActionIndex] = replayRngCallers.slice()
+      }
+      replayRngCallers = []
+      replayData.actions.push({
+        ...action,
+        _recordedActionIndex: replayData.actions.length,
+        _rngStart: replayData.rng.length
+      })
     }
 
     function startReplayRecording() {
       restoreCaveEntrancesOnSurface()
       // replayRecording is still false here, so this snapshot has no nested
       // .replay field of its own.
+      ensureReplayItemIds()
       const snapshot = buildSaveObject()
-      replayData = {version: REPLAY_VERSION, initialState: snapshot, actions: [], rng: []}
+      // buildSaveObject contains live gameplay object references. Freeze the replay
+      // starting state now; otherwise inventory/equipment/enemy objects mutate while
+      // the recording continues and playback may start from a later-run state.
+      const initialState = JSON.parse(JSON.stringify(snapshot))
+      replayData = {version: REPLAY_VERSION, initialState, actions: [], rng: [], _rngCallers: []}
+      replayRngCallers = []
       replayRecording = true
     }
 
@@ -7868,8 +7994,22 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function finishReplayPlayback() {
+      const totalActions = activeReplay.actions.length
+      const completedActions = replayActionIndex
+      const remainingActions = activeReplay.actions.slice(completedActions)
+      const diagnostic = {
+        completedActions,
+        totalActions,
+        consumedRng: replayRngIndex,
+        recordedRng: activeReplay.rng.length,
+        remainingActions
+      }
+      console.warn('[Replay diagnostic]', diagnostic)
+      lastReplayDiagnostic = diagnostic
+      window.lastReplayDiagnostic = diagnostic
+      console.log("Replay diagnostic available as window.lastReplayDiagnostic", diagnostic)
       if (replayRngIndex !== activeReplay.rng.length) {
-        log(`Replay finished, but consumed ${replayRngIndex} of ${activeReplay.rng.length} recorded RNG values - the current game version may have diverged from this run.`, 'info')
+        log(`Replay finished, but consumed ${replayRngIndex} of ${activeReplay.rng.length} recorded RNG values - the current game version may have diverged from this run. Check the console for [Replay diagnostic].`, 'info')
       } else {
         log('Replay finished.', 'good')
       }
@@ -7890,6 +8030,61 @@ The player intentionally accepts danger in exchange for information.
         case 'skipTurn':
           skipTurn()
           break
+        case 'talk':
+          if (action.npc === 'Old Hunter') interactOldHunter()
+          break
+        case 'buy': {
+          ensureReplayItemIds()
+          let item = merchantStock.find(it => it?.replayId === action.replayId)
+          if (!item && action.kind) item = merchantStock.find(it => it?.kind === action.kind && it?.name === action.name)
+          if (!item && Number.isInteger(action.fallbackIndex)) item = merchantStock[action.fallbackIndex]
+          if (!item) return replayDesync(`Replay desynchronized: could not find merchant item ${action.replayId || action.name || ''}.`)
+          buyItem(item)
+          break
+        }
+        case 'sell': {
+          ensureReplayItemIds()
+          const idx = findReplayItemIndex(player.inventory, action.replayId, action.fallbackIndex)
+          if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find sold item ${action.replayId || action.name || ''}.`)
+          sellItem(idx)
+          break
+        }
+        case 'herbalist':
+          if (action.action === 'purifyMushrooms') purifyMushrooms()
+          else if (action.action === 'makePotion') makeHerbalistPotion()
+          break
+        case 'dig':
+          tryDig({recordReplay:false})
+          break
+        case 'openCasket': {
+          const idx = findReplayItemIndex(player.inventory, action.replayId, action.idx)
+          if (idx < 0 || player.inventory[idx]?.kind !== 'treasurecasket') return replayDesync(`Replay desynchronized: could not find treasure casket ${action.replayId || ''}.`)
+          openTreasureCasket()
+          break
+        }
+        case 'blackKey': {
+          const shouldEquip = !!action.equipped
+          const isEquipped = !!player.equip.blackkey
+          if (shouldEquip !== isEquipped) toggleBlackKey()
+          break
+        }
+        case 'equip': {
+          const idx = findReplayItemIndex(player.inventory, action.replayId, action.idx)
+          if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find equipped item ${action.replayId || ''}.`)
+          equipItem(idx)
+          break
+        }
+        case 'unequip':
+          unequipItem(action.slot)
+          break
+        case 'useItem': {
+          const idx = findReplayItemIndex(player.inventory, action.replayId, action.idx)
+          if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find inventory item ${action.replayId || ''}.`)
+          const fn = {potion: usePotion, scroll: useScroll, teleportscroll: useTeleportScroll, speedpotion: useSpeedPotion, herb: useHerb, mushroom: useMushroom, ediblemushroom: useEdibleMushroom, berries: useBerries, tombstone: readTombstone, identifyArtifact}[action.action]
+          if (!fn) return replayDesync(`Replay desynchronized: unknown item action ${action.action}.`)
+          fn(idx)
+          break
+        }
         default:
           break
       }
@@ -7907,9 +8102,35 @@ The player intentionally accepts danger in exchange for information.
         finishReplayPlayback()
         return
       }
+      const actionIndex = replayActionIndex
       const action = activeReplay.actions[replayActionIndex++]
+      replayRngCallers = []
+      const rngBefore = replayRngIndex
       await runReplayAction(action)
+      const rngAfter = replayRngIndex
+      const expectedRng = Number.isInteger(action._rngStart)
+        ? ((Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart) ? activeReplay.actions[actionIndex + 1]._rngStart : activeReplay.rng.length) - action._rngStart)
+        : null
+      const actualRng = rngAfter - rngBefore
+      console.debug('[Replay action]', {actionIndex, action, rngBefore, rngAfter, rngConsumed: actualRng, expectedRng})
       if (!replayPlaying) return // a desync mid-action already stopped playback
+      if (expectedRng !== null && actualRng !== expectedRng) {
+        const expectedCallers = (Array.isArray(activeReplay._rngCallers) && activeReplay._rngCallers[actionIndex]) || null
+        lastReplayDiagnostic = {
+          actionIndex, action, rngBefore, rngAfter, actualRng, expectedRng,
+          actualRngCallers: replayRngCallers.slice(),
+          expectedRngCallers: expectedCallers,
+          totalRecordedRng: activeReplay.rng.length,
+          previousAction: actionIndex > 0 ? activeReplay.actions[actionIndex - 1] : null,
+          nextAction: activeReplay.actions[actionIndex + 1] || null,
+          actualRngValues: rngLog.slice(-actualRng).map(x => x.v),
+          message: 'First replay action with different RNG consumption'
+        }
+        window.lastReplayDiagnostic = lastReplayDiagnostic
+        console.error('[Replay desync]', lastReplayDiagnostic)
+        replayDesync(`Replay desynchronized on action #${actionIndex + 1}: expected ${expectedRng} RNG value(s), but this action consumed ${actualRng}. Check window.lastReplayDiagnostic.`)
+        return
+      }
       scheduleNextReplayAction()
     }
 
@@ -8052,6 +8273,9 @@ The player intentionally accepts danger in exchange for information.
           prefixBase: e.prefixBase || null,
           crit: !!e.crit,
           aware: !!e.aware,
+          homeX: e.homeX,
+          homeY: e.homeY,
+          fleeingHoly: !!e.fleeingHoly,
         })),
         groundItems: groundItems.map(g => ({...g})),
         npcs: npcs.map(n => ({name: n.name, x: n.x, y: n.y, homeX: n.homeX, homeY: n.homeY})),
@@ -8418,6 +8642,7 @@ The player intentionally accepts danger in exchange for information.
           equipment: e.equipment || null,
           x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
           prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,
+          homeX: e.homeX, homeY: e.homeY, fleeingHoly: !!e.fleeingHoly,
         })
       })
       occupied = new Set()
