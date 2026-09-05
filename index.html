@@ -252,10 +252,9 @@ The player intentionally accepts danger in exchange for information.
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
   <link rel="stylesheet" href="css/style.css?v=20260903-2">
-  <!-- Inventory item icons: kept inline since style.css wasn't touched here. -->
   <style>
       .invitem .item-icon{flex:0 0 auto; width:20px; height:20px; margin-right:6px; display:inline-flex; align-items:center; justify-content:center;}
-      .invitem .item-icon svg{width:100%; height:100%; display:block;}
+      .invitem .item-icon img{width:100%; height:100%; display:block;}
   </style>
 </head>
 <body>
@@ -633,6 +632,7 @@ The player intentionally accepts danger in exchange for information.
         for(const tmpl of ENEMY_TEMPLATES) paths.push('img/enemies/' + slug(tmpl.name) + '.jpg');
         for(const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg');
         for(const race of RACES) paths.push('img/avatars/' + race.avatar);
+        for(const kind of ITEM_ICON_KINDS) paths.push('img/icons/' + kind + '.svg');
       }
       await Promise.all([...new Set(paths)].map(async path=>{
         if(preloadedImageUrls.has(path)) return;
@@ -3976,35 +3976,18 @@ The player intentionally accepts danger in exchange for information.
     }
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
-    // Small (20px) inline SVG icons that prefix inventory rows. Kinds not
-    // listed here (rare curiosities like tombstones) simply render with no icon.
-    const ITEM_ICON_SVG = {
-      herb: '<svg viewBox="0 0 24 24"><path d="M12 21c-1-4-1-8 0-12 3 1 5 3 5 6 0 3-2 5-5 6z" fill="#5da84a"/><path d="M12 21c1-4 1-8 0-12-3 1-5 3-5 6 0 3 2 5 5 6z" fill="#3f7a34"/></svg>',
-      mushroom: '<svg viewBox="0 0 24 24"><rect x="10" y="13" width="4" height="7" rx="1" fill="#e8d9b0"/><path d="M4 13c0-5 4-9 8-9s8 4 8 9H4z" fill="#b3382c"/><circle cx="8" cy="10" r="1.1" fill="#f2e9d8"/><circle cx="13" cy="8.3" r="1" fill="#f2e9d8"/><circle cx="16" cy="11" r="1" fill="#f2e9d8"/></svg>',
-      ediblemushroom: '<svg viewBox="0 0 24 24"><rect x="10" y="13" width="4" height="7" rx="1" fill="#e8d9b0"/><path d="M4 13c0-5 4-9 8-9s8 4 8 9H4z" fill="#a9793f"/></svg>',
-      berries: '<svg viewBox="0 0 24 24"><path d="M11 7c1-2 3-3 5-3-1 2-2 4-4 4" fill="none" stroke="#4a8a3a" stroke-width="1.4"/><circle cx="9" cy="14" r="3" fill="#8a2140"/><circle cx="14" cy="14" r="3" fill="#a8264c"/><circle cx="11.5" cy="10" r="3" fill="#8a2140"/></svg>',
-      potion: '<svg viewBox="0 0 24 24"><rect x="9.5" y="2" width="5" height="2" rx="0.6" fill="#8a6b4a"/><path d="M10 3h4v4l3 5v6a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-6l3-5V3z" fill="#5b3a29"/><path d="M8.6 13h6.8l1 3.2a2 2 0 0 1-2 2.3H9.6a2 2 0 0 1-2-2.3l1-3.2z" fill="#c23b3b"/></svg>',
-      speedpotion: '<svg viewBox="0 0 24 24"><rect x="9.5" y="2" width="5" height="2" rx="0.6" fill="#8a6b4a"/><path d="M10 3h4v4l3 5v6a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-6l3-5V3z" fill="#5b3a29"/><path d="M8.6 13h6.8l1 3.2a2 2 0 0 1-2 2.3H9.6a2 2 0 0 1-2-2.3l1-3.2z" fill="#e0b030"/><path d="M12.7 12l-2 3h1.6l-1 2.6 2.4-3.2h-1.6z" fill="#fff6c8"/></svg>',
-      scroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><path d="M7.5 9.5h9M7.5 12h9M7.5 14.5h6" stroke="#8a7548" stroke-width="1"/></svg>',
-      idscroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><circle cx="12" cy="12" r="2.3" fill="none" stroke="#5b3a29" stroke-width="1.2"/><circle cx="12" cy="12" r="0.8" fill="#5b3a29"/></svg>',
-      teleportscroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><path d="M9 12a3 3 0 1 1 3 3" fill="none" stroke="#4a3b8a" stroke-width="1.3"/><circle cx="12" cy="15" r="0.9" fill="#4a3b8a"/></svg>',
-      weapon: '<svg viewBox="0 0 24 24"><rect x="8" y="14" width="8" height="2" rx="0.5" fill="#7a5a2e"/><rect x="11" y="16" width="2" height="5" rx="0.6" fill="#4a3620"/><path d="M11 1l1 2 1-2v14h-2z" fill="#d6dbe0"/></svg>',
-      armor: '<svg viewBox="0 0 24 24"><path d="M9 5 5 7 6 21 18 21 19 7 15 5 12 9 9 5Z" fill="#8a5a2e" stroke="#5c3a1c" stroke-width="0.6"/><path d="M9 5 12 9 15 5" fill="none" stroke="#5c3a1c" stroke-width="1"/><path d="M8 12h8M8 15h8M8 18h8" stroke="#5c3a1c" stroke-width="0.8"/><circle cx="12" cy="12" r="0.6" fill="#c9a25a"/><circle cx="12" cy="15" r="0.6" fill="#c9a25a"/><circle cx="12" cy="18" r="0.6" fill="#c9a25a"/></svg>',
-      shield: '<svg viewBox="0 0 24 24"><path d="M12 3l6 2v5c0 5-3 9-6 11-3-2-6-6-6-11V5l6-2z" fill="#8a929c"/><path d="M12 3l6 2v5c0 5-3 9-6 11V3z" fill="#6b727c"/></svg>',
-      tombstone: '<svg viewBox="0 0 24 24"><path d="M7 21V10a5 5 0 0 1 10 0v11H7z" fill="#8a8f95"/><path d="M7 21V10a5 5 0 0 1 5-5v16H7z" fill="#787d83"/><rect x="6" y="20" width="12" height="2" rx="0.5" fill="#5c6066"/></svg>',
-      oddTombstone: '<svg viewBox="0 0 24 24"><path d="M7 21V10a5 5 0 0 1 10 0v11H7z" fill="#7a8a7a"/><path d="M7 21V10a5 5 0 0 1 5-5v16H7z" fill="#68785e"/><rect x="6" y="20" width="12" height="2" rx="0.5" fill="#4c5a48"/><path d="M10 10l2 3-2 3M14 10l-2 3 2 3" stroke="#c9d8b0" stroke-width="0.9" fill="none"/></svg>',
-      wheelbarrow: '<svg viewBox="0 0 24 24"><path d="M8 9h11l-2 8H9z" fill="#8a929c" stroke="#5c636b" stroke-width="0.6"/><path d="M18 12h4M18 15h3" stroke="#7a5a2e" stroke-width="1.4"/><circle cx="6" cy="18" r="3" fill="#3a3a3a"/><circle cx="6" cy="18" r="1.1" fill="#8a8a8a"/></svg>',
-      bigbell: '<svg viewBox="0 0 24 24"><path d="M12 3a2 2 0 0 1 2 2v1c3 1 5 4 5 8v2H5v-2c0-4 2-7 5-8V5a2 2 0 0 1 2-2z" fill="#c9922e"/><rect x="4" y="16" width="16" height="2" rx="1" fill="#a5741f"/><circle cx="12" cy="20.5" r="1.4" fill="#8a5f18"/></svg>',
-      blackkey: '<svg viewBox="0 0 24 24"><circle cx="8" cy="6" r="4" fill="none" stroke="#1e1e1e" stroke-width="2.4"/><rect x="7" y="10" width="2.2" height="10" fill="#1e1e1e"/><rect x="9.2" y="16" width="3" height="2" fill="#1e1e1e"/><rect x="9.2" y="19" width="4" height="2" fill="#1e1e1e"/></svg>',
-      artifact: '<svg viewBox="0 0 24 24"><path d="M5 7h14l-3-4H8z" fill="#b47ef0"/><path d="M5 7l7 14L5 7z" fill="#6a34ad"/><path d="M19 7l-7 14 7-14z" fill="#7a3fc0"/><path d="M12 3l3 4-3 14-3-14z" fill="#8a4fd6"/></svg>',
-      treasuremap: '<svg viewBox="0 0 24 24"><path d="M4 6l5-2 5 2 6-2v14l-6 2-5-2-5 2V6z" fill="#d8c48a" stroke="#8a7548" stroke-width="0.6"/><path d="M9 4v14M14 6v14" stroke="#8a7548" stroke-width="0.6" stroke-dasharray="2 1.5"/><path d="M11 11l4 4M15 11l-4 4" stroke="#a5322a" stroke-width="1.4"/></svg>',
-      treasurecasket: '<svg viewBox="0 0 24 24"><path d="M4 10c0-3 3-5 8-5s8 2 8 5H4z" fill="#8a692f"/><rect x="4" y="10" width="16" height="8" rx="1" fill="#7a5a2e"/><rect x="10.5" y="10" width="3" height="4" rx="0.6" fill="#e0b030"/></svg>',
-      amber: '<svg viewBox="0 0 24 24"><path d="M12 3l6 6-2 9H8l-2-9z" fill="#d68a2c"/><path d="M12 3l6 6-6 3z" fill="#f0aa46"/></svg>',
-      seashell: '<svg viewBox="0 0 24 24"><path d="M12 4c5 2 8 7 8 13H4c0-6 3-11 8-13z" fill="#e8d9c0"/><path d="M12 6v11M9 8.5l1.5 8.5M15 8.5L13.5 17M6.7 11l2 6.5M17.3 11l-2 6.5" stroke="#b89a72" stroke-width="0.8"/></svg>',
-      shovel: '<svg viewBox="0 0 24 24"><rect x="11" y="2" width="2" height="12" fill="#7a5a2e"/><path d="M8 13h8l-1.5 5a2.5 2.5 0 0 1-5 0L8 13z" fill="#9aa0a6"/></svg>',
-    };
+    // Item icons live in img/icons so they can be cached and used offline.
+    // Kinds not listed here simply render with no icon.
+    const ITEM_ICON_KINDS = [
+      'herb', 'mushroom', 'ediblemushroom', 'berries', 'potion', 'speedpotion',
+      'scroll', 'idscroll', 'teleportscroll', 'weapon', 'armor', 'shield',
+      'tombstone', 'oddTombstone', 'wheelbarrow', 'bigbell', 'blackkey',
+      'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
+    ];
     function itemIconHTML(kind){
-      return ITEM_ICON_SVG[kind] || '';
+      return ITEM_ICON_KINDS.includes(kind)
+        ? `<img src="${imageSrc('img/icons/' + kind + '.svg')}" alt="" aria-hidden="true">`
+        : '';
     }
     function isStackableKind(kind){
       return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='seashell' || kind==='amber';
