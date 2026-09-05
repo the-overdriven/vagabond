@@ -442,6 +442,7 @@ The player intentionally accepts danger in exchange for information.
     let ARTIFACT_PREFIXES = [];
     let ARTIFACT_EPITHETS = [];
     let ARTIFACT_NAMES_DWARF = [];
+    let HUMAN_NAMES = ['Alden','Mira','Edrin','Halen','Bran','Tomas'];
     let ARTIFACT_VOCATIONS_DWARF = [];
     let ARTIFACT_EFFECTS = [];
     let ARTIFACT_CURSES = [];
@@ -515,6 +516,7 @@ The player intentionally accepts danger in exchange for information.
         artifactPrefixes:'artifact_prefixes.json',
         artifactEpithets:'artifact_epithets.json',
         artifactNamesDwarf:'random_names_dwarf.json',
+        humanNames:'random_names_human.json',
         artifactVocationsDwarf:'random_vocations_dwarf.json',
         artifactEffects:'artifact_effects.json',
         artifactCurses:'artifact_curses.json',
@@ -545,6 +547,7 @@ The player intentionally accepts danger in exchange for information.
       ARTIFACT_PREFIXES = content.artifactPrefixes;
       ARTIFACT_EPITHETS = content.artifactEpithets;
       ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf;
+      HUMAN_NAMES = content.humanNames || HUMAN_NAMES;
       ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf;
       ARTIFACT_EFFECTS = content.artifactEffects;
       ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : [];
@@ -717,7 +720,7 @@ The player intentionally accepts danger in exchange for information.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
     // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
     // level never means adding another transition tile type.
-    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup','cryptstairsdown','cryptstairsup']);
+    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup','cryptstairsdown','cryptstairsup','mausoleumtrapdoor','mausoleumexit']);
 
     function makeNoise(cellsX, cellsY){
       const grid = [];
@@ -781,13 +784,35 @@ The player intentionally accepts danger in exchange for information.
       return level === 0 ? currentZ === 0 : currentZ === level;
     }
     /* Entrance flavor is loaded from content/dwarven_ruin_entrances.json. */
+    let villageHuts = [];
+
     function restoreCaveEntrancesOnSurface(){
       if(!surfaceMap || !Array.isArray(caves)) return;
       for(const cave of caves) { if(cave.crypt) continue; for(const e of (cave.entrances||[])){
         if(surfaceMap[e.y]?.[e.x] && surfaceMap[e.y][e.x]!=='dwarvengate') surfaceMap[e.y][e.x]='caveentrance';
       }}
     }
+    function createMausoleum(){
+      const w=15,h=11, m=Array.from({length:h},()=>Array(w).fill('crypt2floor'));
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++) if(x===0||y===0||x===w-1||y===h-1) m[y][x]='mountain';
+      m[1][Math.floor(w/2)]='mausoleumexit';
+      m[5][7]='sarcophagus';
+      return m;
+    }
+    function enterMausoleum(){
+      if(currentZ===0 && map[player.y]?.[player.x]==='mausoleumtrapdoor'){
+        if(!player.equip.blackkey){ log('The marked trapdoor will not yield. The Black Key is not merely a key; it must be worn.', 'info'); return true; }
+        mausoleumMap=createMausoleum(); map=mausoleumMap; currentZ=-5; currentCave=-1; player.x=7; player.y=9;
+        log('You press the Black Key against the mark. The stone gives way, revealing a small mausoleum beneath the hut.', 'info'); render(); updateHud(); return true;
+      }
+      if(currentZ===-5 && map[player.y]?.[player.x]==='mausoleumexit'){
+        map=surfaceMap; currentZ=0; player.x=villageHuts.find(h=>h.mausoleum)?.x||player.x; player.y=(villageHuts.find(h=>h.mausoleum)?.y||player.y);
+        log('You climb back into the hut. The trapdoor closes behind you.', 'info'); render(); updateHud(); return true;
+      }
+      return false;
+    }
     function enterCave(){
+      if(enterMausoleum()) return true;
       const tile = map[player.y] && map[player.y][player.x];
       if(currentZ===0){
         if(tile !== 'caveentrance' && tile !== 'dwarvengate') return false;
@@ -1146,6 +1171,7 @@ The player intentionally accepts danger in exchange for information.
       // and only on a broad, already-forested patch of terrain.
       placeAncientForest();
       placeCemetery();
+      syncMausoleumHutToOddTombstone();
 
       // Lore landmark: a huge brass bell in/next to the mountains, kept
       // fairly close to the temple (map center), guarded by a pair of brutes.
@@ -1735,6 +1761,22 @@ The player intentionally accepts danger in exchange for information.
     }
 
     let villageCenter = null;
+    let mausoleumDiscovered = false;
+    let mausoleumOpen = false;
+    let mausoleumMap = null;
+    let mausoleumDiscoveredOnce = false;
+    function syncMausoleumHutToOddTombstone(){
+      if(!villageHuts.length) return;
+      const oddName = Object.values(cemeteryTombstones).find(t=>t.odd)?.name;
+      if(!oddName) return;
+      // The anomalous tombstone is randomized; never hardcode its name.
+      // Make exactly one generated hut belong to that same person.
+      for(const hut of villageHuts) hut.mausoleum = false;
+      const target = villageHuts[0];
+      target.name = oddName;
+      target.mausoleum = true;
+    }
+
     function placeVillage(){
       // Find a clearing just outside the temple grounds, then grow a small
       // blob of hut tiles outward from it so it reads as a loose little
@@ -1787,6 +1829,17 @@ The player intentionally accepts danger in exchange for information.
         if(!buildable(x,y)) continue;
         if(huts.some(h=>h.x===x && h.y===y)) continue;
         huts.push({x,y});
+      }
+      villageHuts = huts.map((h,i)=>({x:h.x,y:h.y,name:pick(HUMAN_NAMES)||'Alden',mausoleum:false}));
+      // The hut belonging to the person named on the anomalous tombstone
+      // must always exist and be the hidden-mausoleum hut.
+      const oddName = Object.values(cemeteryTombstones).find(t=>t.odd)?.name;
+      const targetHut = oddName
+        ? (villageHuts.find(h=>h.name===oddName) || villageHuts[0])
+        : villageHuts[0];
+      if(targetHut){
+        targetHut.mausoleum = true;
+        if(oddName) targetHut.name = oddName;
       }
       for(const h of huts) map[h.y][h.x] = 'village';
       // Keep the woods from crowding right up against the settlement - clear
@@ -2386,7 +2439,7 @@ The player intentionally accepts danger in exchange for information.
       freezing: {active:false, turns:0},
       permadeath: false,
       curseDebuffs: [],
-      equip: {weapon:null, shield:null, armor:null},
+      equip: {weapon:null, shield:null, armor:null, blackkey:null},
       inventory: [],
     };
     // XP thresholds calibrated from the intended cumulative times at roughly
@@ -4095,6 +4148,22 @@ The player intentionally accepts danger in exchange for information.
       } else log('You dig carefully, but find nothing.', 'info');
       render(); updateHud();
     }
+    // The Black Key is a special togglable quest item. Unlike normal equipment,
+    // equipping it must never remove it from the inventory or use the regular
+    // weapon/shield/armor equip flow.
+    function toggleBlackKey(){
+      const it = player.inventory.find(i=>i.kind==='blackkey');
+      if(player.equip.blackkey){
+        player.equip.blackkey = null;
+        log('You remove the Black Key from your neck. For a moment, you feel as though something has been taken from you.', 'good');
+      } else if(it){
+        player.equip.blackkey = it;
+        log('You place the Black Key around your neck. It hangs against your chest, cold as a winter grave.', 'good');
+      } else {
+        log('You do not have the Black Key.', 'info');
+      }
+      updateHud(); renderInventory();
+    }
     function openTreasureCasket(){
       const idx=player.inventory.findIndex(i=>i.kind==='treasurecasket');
       if(idx<0){ log('You do not have a casket to open.', 'info'); return; }
@@ -4403,7 +4472,9 @@ The player intentionally accepts danger in exchange for information.
           const odd=player.inventory.find(i=>i.kind==='oddTombstone'); player.inventory.splice(player.inventory.indexOf(odd),1); player.inventory.push({kind:'shovel',name:'Shovel'});
           if(gravediggerGraveKey) cemeteryTombstones[gravediggerGraveKey]={name:odd.tombName,birth:odd.tombBirth,death:odd.tombDeath,odd:false,inscription:odd.inscription};
           log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info');
-        } else log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info');
+        } else if (npcTarget.name === 'Ancient Lich' && player.equip.blackkey)
+          log('Ancient Lich says: A key such as this is not meant for pockets. It must be close to the heart. No, I don\'t want it back. Although you seem lost, like a child, it has chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.', 'info')
+        else log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info')
         enemyTurn();
         npcTurn();
         render(); runAnimationLoop(); updateHud(); updateTooltip();
@@ -4568,6 +4639,14 @@ The player intentionally accepts danger in exchange for information.
       }
       if(gravediggerGraveKey===keyXY(player.x,player.y)){
         log('You are standing on a lone grave, it is not finished and has no inscription.', 'info'); return;
+      }
+      if(map[player.y]?.[player.x]==='mausoleumtrapdoor'){ enterMausoleum(); return; }
+      if(currentZ===-5 && map[player.y]?.[player.x]==='sarcophagus'){ log('At its centre stands a single stone coffin. The lid is black, polished smooth, and carved with the same symbol as the Black Pillar. The inscription reads: \"The first to rule, the last to remember.\" The coffin is empty.', 'info'); return; }
+      if(map[player.y]?.[player.x]==='village'){
+        const hut=villageHuts.find(h=>h.x===player.x&&h.y===player.y);
+        if(hut && player.equip.blackkey){ if(hut.mausoleum){ log('The Black Key grows heavier against your heart. Beneath the carpet, you discover a marked trapdoor. You press the key against its black mark, and hear stone grinding beneath the hut. Press \"inspect\" again to descend.', 'info'); map[player.y][player.x]='mausoleumtrapdoor'; mausoleumDiscovered=true; } else log(`This thatched hut belongs to a human peasant ${hut.name}. You look inside, but find nothing extraordinary.`, 'info'); }
+        else if(hut) log(`This thatched hut belongs to a human peasant ${hut.name}. You look inside, but find nothing extraordinary.`, 'info');
+        return;
       }
       if(map[player.y]?.[player.x]==='belltower'){
         if(!bellReturnedToChapel && player.inventory.some(i=>i.kind==='bigbell')){
@@ -5929,9 +6008,11 @@ The player intentionally accepts danger in exchange for information.
         } else if(it.kind==='treasurecasket'){
           const btn=document.createElement('button'); btn.textContent='Open'; btn.onclick=()=>openTreasureCasket(); row.appendChild(btn);
         } else if(it.kind==='blackkey'){
-          const btn=document.createElement('button'); btn.textContent='?';
-          btn.onclick=()=>log('A dark stone key bound to a worn cord, untouched by the passage of time.', 'info');
-          row.appendChild(btn);
+          const btn=document.createElement('button'); btn.textContent=player.equip.blackkey ? 'Unequip' : 'Equip';
+          btn.onclick=()=>toggleBlackKey(); row.appendChild(btn);
+          const inspect=document.createElement('button'); inspect.textContent='?';
+          inspect.onclick=()=>log('A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth.', 'info');
+          row.appendChild(inspect);
         } else if(it.kind==='treasuremap'){
           const btn=document.createElement('button'); btn.textContent='Inspect'; btn.onclick=()=>inspectTreasureMap(); row.appendChild(btn);
         } else if(it.kind==='oddTombstone'){
@@ -6382,6 +6463,8 @@ The player intentionally accepts danger in exchange for information.
         bellReturnedToChapel: bellReturnedToChapel,
         bellRung: bellRung,
         ancientBellLichSpawned: ancientBellLichSpawned,
+        villageHuts: villageHuts,
+        mausoleumDiscovered: mausoleumDiscovered,
         player: {
           x:player.x, y:player.y,
           name:player.name, race:player.race,
@@ -6702,6 +6785,8 @@ The player intentionally accepts danger in exchange for information.
       bellReturnedToChapel = !!data.bellReturnedToChapel;
       bellRung = !!data.bellRung;
       ancientBellLichSpawned = !!data.ancientBellLichSpawned;
+      villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts;
+      mausoleumDiscovered = !!data.mausoleumDiscovered;
       // Reconcile progression for saves made before the explicit quest fields
       // existed, or saves where only one side of the event was serialized.
       if(!bellRung && Array.isArray(data.npcs) && data.npcs.some(n=>n.name==='Ancient Lich')) bellRung = true;
@@ -6711,6 +6796,12 @@ The player intentionally accepts danger in exchange for information.
       if(typeof player.name !== 'string' || !player.name.trim()) player.name = 'Vagabond';
       player.equip = (data.player && data.player.equip) || {weapon:null, shield:null, armor:null};
       player.inventory = (data.player && data.player.inventory) || [];
+      // Migrate saves from the earlier Black Key implementation, which
+      // removed the key from inventory when it was equipped.
+      player.equip.blackkey = player.equip.blackkey || null;
+      if(player.equip.blackkey && !player.inventory.some(i=>i.kind==='blackkey')){
+        player.inventory.push({kind:'blackkey', name:'Black Key'});
+      }
       player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns|0) : 0;
       player.godMode = !!player.godMode;
       player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns|0) : 0;
