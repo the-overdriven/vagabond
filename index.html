@@ -2913,7 +2913,7 @@ The player intentionally accepts danger in exchange for information.
       lvl: 1, xp: 0,
       maxHp: 50, hp: 50,
       baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
-      gold: 0, deaths: 0, steps: 0,
+      gold: 0, deaths: 0, steps: 0, kills: 0,
       invisibleTurns: 0,
       godMode: false,
       speedPotionTurns: 0,
@@ -4385,6 +4385,7 @@ The player intentionally accepts danger in exchange for information.
       // must inspect the weapon/equipment the monster was carrying.
       onOldHunterEnemyKilled(e)
       e.alive = false
+      player.kills++
       spawnDeathAnim(e)
       occupied.delete(keyXY(e.x, e.y))
       enemies = enemies.filter(x => x !== e)
@@ -4435,6 +4436,13 @@ The player intentionally accepts danger in exchange for information.
     }
 
     function resetForNewCharacter() {
+      // A permadeath always starts the next character back on the surface at
+      // the Temple, even when the previous character died underground.
+      currentZ = 0
+      currentCave = -1
+      map = surfaceMap
+      undergroundDiscovered = undergroundDiscoveredL1
+
       Object.assign(player, {
         x: spawnPoint.x,
         y: spawnPoint.y,
@@ -4509,7 +4517,12 @@ The player intentionally accepts danger in exchange for information.
       pendingMove = null
       clearAutoPath()
       if (player.permadeath) createPermadeathBody(killer)
-      const deathLogId = log(player.permadeath ? `You have fallen... Your journey ends here.` : `You have fallen... and awaken at the Temple.`, 'bad')
+      const deathLogId = log(
+        player.permadeath
+          ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
+          : `You have fallen... and awaken at the Temple.`,
+        'bad'
+      )
       stopCameraAnimation()
       clearEnemyAnims()
       stopAttackAnimation()
@@ -7200,6 +7213,7 @@ The player intentionally accepts danger in exchange for information.
         // ['💰 Gold', player.gold],
         // ['💀 Deaths', player.deaths],
         ['👣 Steps Taken', player.steps],
+        ['☠️ Creatures Slain', player.kills],
         ['📍 Position', player.x + ', ' + player.y],
       ]
       for (const [k, v] of rows) {
@@ -8240,7 +8254,7 @@ The player intentionally accepts danger in exchange for information.
           lvl: player.lvl, xp: player.xp,
           maxHp: player.maxHp, hp: player.hp,
           baseAtk: player.baseAtk, baseDef: player.baseDef, baseSpd: player.baseSpd, baseMf: player.baseMf,
-          gold: player.gold, deaths: player.deaths, steps: player.steps,
+          gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
           invisibleTurns: player.invisibleTurns,
           godMode: player.godMode,
           speedPotionTurns: player.speedPotionTurns,
