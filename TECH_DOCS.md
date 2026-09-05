@@ -349,6 +349,27 @@ exploration, and XP multipliers.
 
 ---
 
+
+### Calibrated progression target
+
+The following table is an additional calibration reference. It does not replace
+the original XP thresholds, timing estimates, cumulative XP table, or kill-count
+reference above.
+
+| Target level | Desired average tier-3 kills |
+|---|---:|
+| 2 | 2 |
+| 3 | 4 |
+| 4 | 8 |
+| 5 | 16 |
+| 6 | 32 - 2 |
+| 7 | 64 - 4 |
+| 8 | 128 - 16 |
+| 9 | 256 - 32 |
+| 10 | 512 - 64 |
+| 11 | 1024 - 128 |
+| 12 | 2056 - 256 |
+
 # 6. Movement
 
 The game uses an **8-direction grid**.
