@@ -1610,7 +1610,7 @@ Grants approximately:
 15 turns invisibility
 ```
 
-Wyrdling race modifies consumable effectiveness.
+Wyrdling increases the duration by 25%. Example: 15 turns become 18.75 turns (rounded to 19 turns).
 
 While invisible, enemies do not chase or attack the player. Invisibility can be also used to kill stronger enemies, without being hit.
 
@@ -1632,7 +1632,7 @@ for:
 15 turns
 ```
 
-As for all consumable, the effect is increased for Wyrdling race.
+Wyrdling increases both the effect and duration by 25%. Example: +3 SPD for 15 turns becomes +3.75 SPD (rounded to 4 SPD) for 18.75 turns (rounded to 19 turns).
 
 ## Scroll of Identification
 
@@ -1646,11 +1646,22 @@ Invisibility 5.5%, Potion of Speed 8%, Scroll of Identification **9%**.
 
 Foraged item. When eaten, always heals 25% HP.
 
+Wyrdling increases the healing effect by 25%. Example: 25% HP becomes 31.25% HP (rounds to nearest whole number, on level 1: 31 HP instead of 25 HP).
+
+## Handful of Berries
+
+Foraged item. Grants stacking Troll-like regeneration for 100 turns.
+
+Wyrdling increases the duration by 25%. Example: 100 turns become 125 turns.
+
 ## Mushroom
 
 Foraged item. There is a 50% chance of healing or damaging HP. Both outcomes
 use 25% of the player's maximum HP: healing is affected by consumable bonuses,
 while poison damage is not. Damage is rounded and cannot be lower than 1 HP.
+
+Wyrdling increases the healing effect by 25%, but does not increase poison damage.
+Example: a healing result restores 25% HP normally or 31.25% HP for a Wyrdling.
 
 ---
 
@@ -1742,15 +1753,7 @@ The Gravedigger is associated with the cemetery mystery.
 
 The anomalous tombstone can trigger a special quest interaction.
 
-The player can give the odd tombstone to the Gravedigger.
-
-The interaction provides:
-
-```text
-Shovel
-```
-
-There is currently no use for the shovel.
+The player can give the odd tombstone to the Gravedigger and gets a shovel in return.
 
 After interaction, the delivered tombstone is inserted beneath the grave next to the gravedigger.
 
@@ -2594,6 +2597,9 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
 
 ## Treasure-map reward
 
+<details>
+  <summary>Treasure-map reward</summary>
+
 When the player digs at the treasure map's marked X:
 
 - An `Old Rotten Casket` is added directly to the player's inventory.
@@ -2605,7 +2611,12 @@ When the player digs at the treasure map's marked X:
   Your shovel strikes something hard. Beneath the sand lies an old rotten casket.
   ```
 
+</details>
+
 ## Normal digging loot
+
+<details>
+  <summary>Normal digging loot</summary>
 
 If the dig is not at the treasure-map location, a roll from 1 to 100 determines the result:
 
@@ -2621,6 +2632,8 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 | 15 | Find a broken shovel handle |
 | 16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
 | 17–100 | Find nothing |
+
+</details>
 
 Amber (worth 20g) and Seashell (worth 10g) are stackable inventory items.
 
