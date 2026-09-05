@@ -263,6 +263,90 @@ XP is affected by the player's XP multiplier.
 
 Human currently has a permanent +20% XP multiplier.
 
+### Leveling calibration and kill-count reference
+
+The original XP thresholds and timing estimates above are retained. The following
+tables add cumulative XP and an illustrative enemy-kill reference without
+replacing the original information.
+
+Current cumulative XP required to reach each level:
+
+| Target level | Cumulative XP |
+|---|---:|
+| 2 | 40 |
+| 3 | 88 |
+| 4 | 146 |
+| 5 | 216 |
+| 6 | 296 |
+| 7 | 408 |
+| 8 | 568 |
+| 9 | 776 |
+| 10 | 1,176 |
+| 11 | 1,656 |
+| 12 | 2,456 |
+| 13 | 3,416 |
+| 14 | 4,856 |
+| 15 | 6,776 |
+
+Using the current `xpForEnemy(e)` formula, the tier-3 enemy XP values are
+approximately:
+
+| Enemy | XP |
+|---|---:|
+| Lion | 48 |
+| Ghoul | 48 |
+| Ghost | 45 |
+| Orc | 48 |
+| Imp | 49 |
+| Mummy | 58 |
+| Giant Spider | 54 |
+| White Tiger | 58 |
+| Minotaur | 64 |
+| Ogre | 71 |
+
+The average tier-3 enemy is worth approximately **54 XP**. Based on that average,
+the current progression requires approximately:
+
+| Target level | Average tier-3 kills |
+|---|---:|
+| 2 | 0.7 |
+| 3 | 1.6 |
+| 4 | 2.7 |
+| 5 | 4.0 |
+| 6 | 5.5 |
+| 7 | 7.5 |
+| 8 | 10.5 |
+| 9 | 14.3 |
+| 10 | 21.7 |
+| 11 | 30.5 |
+| 12 | 45.2 |
+| 13 | 62.9 |
+| 14 | 89.4 |
+| 15 | 124.8 |
+
+For comparison, if the intended pacing is roughly one average tier-3 kill every
+1.5 minutes, the desired cumulative kill counts would be:
+
+| Target level | Desired average tier-3 kills |
+|---|---:|
+| 2 | 2 |
+| 3 | 3 |
+| 4 | 5 |
+| 5 | 7 |
+| 6 | 10 |
+| 7 | 15 |
+| 8 | 21 |
+| 9 | 30 |
+| 10 | 47 |
+| 11 | 67 |
+| 12 | 100 |
+| 13 | 140 |
+| 14 | 200 |
+| 15 | 280 |
+
+Actual progression depends on encounter frequency, enemy composition, prefixes,
+exploration, and XP multipliers.
+
 ---
 
 # 6. Movement
