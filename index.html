@@ -2860,11 +2860,13 @@ The player intentionally accepts danger in exchange for information.
     // 8 XP/minute. These are per-level costs (not cumulative XP), so the early
     // curve can match the measured 3 -> 5 -> 7.5 minute pacing while the late
     // curve accelerates sharply.
-    const XP_TO_NEXT = [40, 48, 58, 70, 80, 112, 160, 208, 400, 480, 800, 960, 1440, 1920]
+    const AVERAGE_TIER3_XP = 54
 
     function xpToNext(lvl) {
-      if (lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1]
-      return Math.round(1920 * Math.pow(lvl / 14, 2.2))
+      if (lvl <= 1) return Math.round(AVERAGE_TIER3_XP * 2)
+      const cumulativeXp = Math.round(AVERAGE_TIER3_XP * 2 * Math.pow(2, lvl - 1))
+      const previousCumulativeXp = Math.round(AVERAGE_TIER3_XP * 2 * Math.pow(2, lvl - 2))
+      return cumulativeXp - previousCumulativeXp
     }
 
     function recalcDerived() {
