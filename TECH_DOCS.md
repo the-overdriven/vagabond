@@ -1790,9 +1790,9 @@ Stackable consumables are handled as stacks.
 
 # 55. Herbalist
 
-The Herbalist opens services while adjacent: Mushrooms cost 5g each to purify, with a 50% chance of poison and removal; successful results become Edible Mushrooms. Three Healing Herbs plus 10g become a Life Potion. Berries grant stacking Troll-like regeneration for 100 turns.
+The Herbalist opens services while adjacent: Mushrooms cost 2g each to purify, with a 50% chance of poison and removal; successful results become Edible Mushrooms. Three Healing Herbs plus 10g become a Life Potion. Berries grant stacking Troll-like regeneration for 100 turns.
 
-Her sole purpose is to hint player that forests can be foraged for remedies, but also to warn that forests are dangerous (forest tiles can trigger an ambush).
+Her other purpose is to hint player that forests can be foraged for remedies, but also to warn that forests are dangerous (forest tiles can trigger an ambush).
 
 Planned Herbalist ideas in source comments are not treated as current mechanics.
 

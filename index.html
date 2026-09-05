@@ -6038,7 +6038,7 @@ The player intentionally accepts danger in exchange for information.
       if(herbalist){
         const buyList = document.getElementById('tradeBuyList'); buyList.innerHTML='';
         const addService = (label, action) => { const row=document.createElement('div'); row.className='invitem'; const b=document.createElement('button'); b.textContent=label; b.onclick=action; row.appendChild(b); buyList.appendChild(row); };
-        addService('Purify mushrooms (5g each)', purifyMushrooms);
+        addService('Purify mushrooms (2g each)', purifyMushrooms);
         addService('Make Life Potion (3 herbs + 10g)', makeHerbalistPotion);
         document.getElementById('tradeSellList').innerHTML='<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>';
         document.getElementById('tradeGold').textContent = player.gold;
@@ -6175,13 +6175,27 @@ The player intentionally accepts danger in exchange for information.
       toggleTrade(true);
     }
     function purifyMushrooms(){
-      const it=player.inventory.find(i=>i.kind==='mushroom'); const count=it ? (it.count||1) : 0;
-      if(!count || player.gold < count*5) return log('You need mushrooms and 5g per mushroom.', 'info');
-      player.gold -= count*5; player.inventory.splice(player.inventory.indexOf(it),1);
-      let edible=0; for(let i=0;i<count;i++) if(chance(0.5)) edible++;
-      for(let i=0;i<edible;i++) addEdibleMushroom();
-      const removed=count-edible;
-      log(`The Herbalist purifies ${edible} mushroom${edible===1?'':'s'} and removes ${removed} poisonous mushroom${removed===1?'':'s'}.`, 'good'); updateHud(); renderTrade(); renderInventory();
+      const mushrooms = player.inventory.filter(i => i.kind === 'mushroom');
+      const count = mushrooms.reduce((sum, i) => sum + (i.count || 1), 0);
+
+      if(!count || player.gold < count * 2)
+        return log('You need mushrooms and 2g per mushroom.', 'info');
+
+      player.gold -= count * 2;
+
+      // Remove all mushroom stacks, including unidentified ones.
+      player.inventory = player.inventory.filter(i => i.kind !== 'mushroom');
+
+      let edible = 0;
+      for(let i = 0; i < count; i++) if(chance(0.5)) edible++;
+
+      for(let i = 0; i < edible; i++) addEdibleMushroom();
+
+      const removed = count - edible;
+      log(`The Herbalist purifies ${edible} mushroom${edible===1?'':'s'} and removes ${removed} poisonous mushroom${removed===1?'':'s'}.`, 'good');
+      updateHud();
+      renderTrade();
+      renderInventory();
     }
     function makeHerbalistPotion(){
       const it=player.inventory.find(i=>i.kind==='herb');
