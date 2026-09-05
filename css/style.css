@@ -209,8 +209,8 @@ body.hint-collapsed #hint .panel-toggle{
   color:var(--ember-bright); margin:0 0 10px 0; font-size:18px;
   border-bottom:1px solid var(--border); padding-bottom:6px;
 }
-#mapOverlay .panelbox{width:min(72vw, 520px);}
-#minimap{display:block; width:100%; height:auto; max-height:60vh; aspect-ratio:130/90; image-rendering:pixelated; background:#050403; border:1px solid var(--border); border-radius:4px;}
+#mapOverlay .panelbox, #treasureMapOverlay .panelbox{width:min(72vw, 520px);}
+#minimap, #treasureMapCanvas{display:block; width:100%; height:auto; max-height:60vh; aspect-ratio:130/90; image-rendering:pixelated; background:#050403; border:1px solid var(--border); border-radius:4px;}
 .paperdoll{
   display:flex; gap:10px; margin-bottom:14px;
 }
@@ -359,12 +359,12 @@ body.hint-collapsed #hint .panel-toggle{
   #stage{width:100%; max-width:100%;}
   .panel-toggle{display:none;}
   /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
-  #invOverlay, #mapOverlay, #tradeOverlay, #raceOverlay{
+  #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay{
     position:fixed; left:0; right:0; top:var(--mobile-hud-height, 56px); bottom:0;
     width:100vw; height:calc(100dvh - var(--mobile-hud-height, 56px)); min-height:calc(100vh - var(--mobile-hud-height, 56px));
     align-items:stretch; justify-content:stretch; z-index:100;
   }
-  #invOverlay .panelbox, #mapOverlay .panelbox, #tradeOverlay .panelbox, #raceOverlay .panelbox{
+  #invOverlay .panelbox, #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #tradeOverlay .panelbox, #raceOverlay .panelbox{
     width:100%; max-width:none; height:100%; max-height:none;
     min-height:100%; box-sizing:border-box; border-radius:0;
     overflow-y:auto; padding-bottom:140px;
@@ -381,9 +381,9 @@ body.hint-collapsed #hint .panel-toggle{
     width:100%; max-width:none; height:120px; box-sizing:border-box;
     border-radius:0; margin:0;
   }
-  #mapOverlay .panelbox{width:100%;}
+  #mapOverlay .panelbox, #treasureMapOverlay .panelbox{width:100%;}
   #tradeOverlay .panelbox{width:100%; max-width:none;}
-  #invOverlay .closehint, #mapOverlay .closehint{
+  #invOverlay .closehint, #mapOverlay .closehint, #treasureMapOverlay .closehint{
     display:flex; justify-content:center; gap:10px;
     position:fixed; left:0; right:0; bottom:var(--mobile-log-height, 120px); z-index:115;
     box-sizing:border-box; margin:0; padding:10px;
