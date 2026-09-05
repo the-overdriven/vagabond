@@ -3695,7 +3695,7 @@ The player intentionally accepts danger in exchange for information.
       if (oldHunterQuest && oldHunterQuest.state === 'active') return oldHunterQuest
       const options = hunterCandidates()
       if (!options.length) return null
-      const investigation = Math.random() < 0.3 ? hunterInvestigationCandidate() : null
+      const investigation = chance(0.3) ? hunterInvestigationCandidate() : null
       if (investigation) {
         oldHunterQuest = {
           id: `hunter_${++oldHunterQuestSerial}`,
@@ -3713,7 +3713,7 @@ The player intentionally accepts danger in exchange for information.
       const killOptions = options.filter(q => q.type === 'kill_specific' || q.type === 'kill_group')
       const itemOptions = options.filter(q => q.type === 'recover_item' || q.type === 'deliver_item')
       let pool = options
-      if (killOptions.length && itemOptions.length) pool = Math.random() < 0.5 ? killOptions : itemOptions
+      if (killOptions.length && itemOptions.length) pool = chance(0.5) ? killOptions : itemOptions
       else if (killOptions.length) pool = killOptions
       const q = pool[randInt(0, pool.length - 1)]
       oldHunterQuest = {
@@ -3957,9 +3957,19 @@ The player intentionally accepts danger in exchange for information.
       ensureGravediggerGrave()
     }
 
+    // Wander eligibility used to depend on the live canvas viewport (VIEW_W/
+    // VIEW_H), which tracks window size/sidebar state and is NOT part of the
+    // replay's recorded/replayed state. That meant whether chance()/rng() got
+    // called for a given NPC each turn could differ between recording and
+    // playback (different window size, device, sidebar toggled), silently
+    // shifting every rng() call after that point out of alignment with what
+    // was recorded. Gating on distance from the player instead keeps this a
+    // pure function of state that's actually part of the replay (player.x/y,
+    // n.x/n.y), so it plays back identically no matter what window it's
+    // watched in.
+    const NPC_WANDER_ACTIVE_RADIUS = 20
     function npcIsOnScreen(n) {
-      const vx = n.x - targetCamX(), vy = n.y - targetCamY()
-      return vx >= 0 && vy >= 0 && vx < VIEW_W && vy < VIEW_H
+      return Math.max(Math.abs(n.x - player.x), Math.abs(n.y - player.y)) <= NPC_WANDER_ACTIVE_RADIUS
     }
 
     function npcTurn() {
@@ -4585,12 +4595,15 @@ The player intentionally accepts danger in exchange for information.
     const ENEMY_WANDER_RADIUS = 1     // how far (in squares) they may stray from their home tile
     /* ------------------------------------------------------------------------ */
 
-    // Idle enemies the player can actually see shuffle around a little so the world
-    // doesn't look frozen. Only on-screen enemies wander, so off-screen creatures
-    // don't drift away from where they were placed.
+    // Idle enemies near the player shuffle around a little so the world doesn't
+    // look frozen. Only enemies within range wander, so distant creatures don't
+    // drift away from where they were placed.
+    // See the comment on npcIsOnScreen above: this must stay independent of
+    // the live rendering viewport so replay's rng() call count can never
+    // drift based on window size/device.
+    const ENEMY_WANDER_ACTIVE_RADIUS = 20
     function enemyIsOnScreen(e) {
-      const vx = e.x - targetCamX(), vy = e.y - targetCamY()
-      return vx >= 0 && vy >= 0 && vx < VIEW_W && vy < VIEW_H
+      return Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ENEMY_WANDER_ACTIVE_RADIUS
     }
 
     function enemyWander(e) {
