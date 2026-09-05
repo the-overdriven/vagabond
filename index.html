@@ -1405,7 +1405,10 @@ The player intentionally accepts danger in exchange for information.
       // Dense ancient woodland is deliberately placed well beyond the village,
       // and only on a broad, already-forested patch of terrain.
       placeAncientForest()
+      // The cemetery generates the anomalous dwarven name first; only then are
+      // hut names assigned so exactly one hut inherits that name.
       placeCemetery()
+      assignVillageHutNames()
       syncMausoleumHutToOddTombstone()
 
       // Lore landmark: a huge brass bell in/next to the mountains, kept
@@ -2169,39 +2172,52 @@ The player intentionally accepts danger in exchange for information.
     let mausoleumOpen = false
     let mausoleumMap = null
     let mausoleumDiscoveredOnce = false
+    // The exact surface hut belonging to the anomalous cemetery tombstone is
+    // persisted as an extra durable anchor. The shared dwarven name remains the
+    // canonical world-generation relationship.
+    let mausoleumHutPos = null
 
     function syncMausoleumHutToOddTombstone() {
       if (!villageHuts.length) return
       const oddName = Object.values(cemeteryTombstones).find(t => t.odd)?.name
       if (!oddName) return
-      // The anomalous tombstone is randomized; never hardcode its name.
-      // Make exactly one generated hut belong to that same person.
+      // The anomalous tombstone's dwarven name is the source of truth. Do not
+      // silently rename an arbitrary hut or pick a central hut if the link is
+      // missing; a generated world should already contain the matching name.
+      const target = villageHuts.find(h => h.name === oddName)
+      if (!target) return
       for (const hut of villageHuts) hut.mausoleum = false
-      const target = villageHuts[0]
-      target.name = oddName
       target.mausoleum = true
+      mausoleumHutPos = {x: target.x, y: target.y}
     }
 
     function reconcileVillageHuts() {
-      const staleMausoleum = villageHuts.find(h => h.mausoleum && map[h.y]?.[h.x] !== 'village')
       villageHuts = villageHuts.filter(h => map[h.y]?.[h.x] === 'village')
       const known = new Set(villageHuts.map(h => keyXY(h.x, h.y)))
       for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
         if (map[y]?.[x] !== 'village' || known.has(keyXY(x, y))) continue
         // Older saves can contain village tiles that were not included in the
-        // villageHuts metadata. Give those tiles stable fallback identities so
-        // they remain inspectable after loading.
+        // villageHuts metadata. Give those tiles stable fallback human names so
+        // they remain inspectable after loading. Do not invent a mausoleum link.
         const nameIndex = Math.abs((x * 31 + y * 17) % HUMAN_NAMES.length)
         villageHuts.push({x, y, name: HUMAN_NAMES[nameIndex] || 'Alden', mausoleum: false})
         known.add(keyXY(x, y))
       }
-      if (staleMausoleum && villageHuts.length && !villageHuts.some(h => h.mausoleum)) {
-        const nearest = villageHuts.reduce((best, hut) => {
-          const distance = Math.max(Math.abs(hut.x - staleMausoleum.x), Math.abs(hut.y - staleMausoleum.y))
-          const bestDistance = Math.max(Math.abs(best.x - staleMausoleum.x), Math.abs(best.y - staleMausoleum.y))
-          return distance < bestDistance ? hut : best
-        })
-        nearest.mausoleum = true
+
+      // First recover an explicitly persisted mausoleum coordinate; otherwise
+      // recover the canonical hut by matching the anomalous tombstone's name.
+      let target = null
+      if (mausoleumHutPos && map[mausoleumHutPos.y]?.[mausoleumHutPos.x] === 'village') {
+        target = villageHuts.find(h => h.x === mausoleumHutPos.x && h.y === mausoleumHutPos.y) || null
+      }
+      if (!target) {
+        const oddName = Object.values(cemeteryTombstones).find(t => t.odd)?.name
+        target = oddName ? villageHuts.find(h => h.name === oddName) || null : null
+      }
+      if (target) {
+        for (const hut of villageHuts) hut.mausoleum = false
+        target.mausoleum = true
+        mausoleumHutPos = {x: target.x, y: target.y}
       }
     }
 
@@ -2260,17 +2276,10 @@ The player intentionally accepts danger in exchange for information.
         if (huts.some(h => h.x === x && h.y === y)) continue
         huts.push({x, y})
       }
-      villageHuts = huts.map((h, i) => ({x: h.x, y: h.y, name: pick(HUMAN_NAMES) || 'Alden', mausoleum: false}))
-      // The hut belonging to the person named on the anomalous tombstone
-      // must always exist and be the hidden-mausoleum hut.
-      const oddName = Object.values(cemeteryTombstones).find(t => t.odd)?.name
-      const targetHut = oddName
-        ? (villageHuts.find(h => h.name === oddName) || villageHuts[0])
-        : villageHuts[0]
-      if (targetHut) {
-        targetHut.mausoleum = true
-        if (oddName) targetHut.name = oddName
-      }
+      // Generate the settlement geometry first. Hut names are assigned only
+      // after the cemetery has generated its anomalous dwarven name, so one hut
+      // can receive that exact name and become the mausoleum hut.
+      villageHuts = huts.map(h => ({x: h.x, y: h.y, name: null, mausoleum: false}))
       for (const h of huts) map[h.y][h.x] = 'village'
       // Keep the woods from crowding right up against the settlement - clear
       // a buffer ring around the huts so no forest tile sits directly next
@@ -3495,6 +3504,26 @@ The player intentionally accepts danger in exchange for information.
         while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
         if (tries >= 200) continue
         groundItems.push({x, y, kind: 'speedpotion'})
+      }
+    }
+
+    function assignVillageHutNames() {
+      if (!villageHuts.length) return
+      const oddName = Object.values(cemeteryTombstones).find(t => t.odd)?.name
+      villageHuts.forEach(h => { h.name = null; h.mausoleum = false })
+
+      // The first generated hut is the stable mausoleum hut. Its name comes
+      // directly from the anomalous dwarven tombstone; no RNG is used for it.
+      const mausoleumHut = villageHuts[0]
+      if (oddName) {
+        mausoleumHut.name = oddName
+        mausoleumHut.mausoleum = true
+        mausoleumHutPos = {x: mausoleumHut.x, y: mausoleumHut.y}
+      }
+
+      // Every remaining hut gets a normal random human name.
+      for (let i = 1; i < villageHuts.length; i++) {
+        villageHuts[i].name = pick(HUMAN_NAMES) || 'Alden'
       }
     }
 
@@ -8246,6 +8275,7 @@ The player intentionally accepts danger in exchange for information.
         bellRung: bellRung,
         ancientBellLichSpawned: ancientBellLichSpawned,
         villageHuts: villageHuts,
+        mausoleumHutPos: mausoleumHutPos,
         mausoleumDiscovered: mausoleumDiscovered,
         player: {
           x: player.x, y: player.y,
@@ -8613,9 +8643,17 @@ The player intentionally accepts danger in exchange for information.
       bellReturnedToChapel = !!data.bellReturnedToChapel
       bellRung = !!data.bellRung
       ancientBellLichSpawned = !!data.ancientBellLichSpawned
+      mausoleumDiscovered = !!data.mausoleumDiscovered
+      mausoleumDiscoveredOnce = !!data.mausoleumDiscoveredOnce
+      mausoleumHutPos = data.mausoleumHutPos && Number.isFinite(data.mausoleumHutPos.x) && Number.isFinite(data.mausoleumHutPos.y)
+        ? {x: data.mausoleumHutPos.x, y: data.mausoleumHutPos.y}
+        : null
+      // Tombstone metadata must be restored before hut reconciliation so the
+      // anomalous dwarven name can identify the matching hut.
+      cemeteryTombstones = (data.cemeteryTombstones && typeof data.cemeteryTombstones === 'object') ? data.cemeteryTombstones : {}
       villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts
       reconcileVillageHuts()
-      mausoleumDiscovered = !!data.mausoleumDiscovered
+      syncMausoleumHutToOddTombstone()
       // Reconcile progression for saves made before the explicit quest fields
       // existed, or saves where only one side of the event was serialized.
       if (!bellRung && Array.isArray(data.npcs) && data.npcs.some(n => n.name === 'Ancient Lich')) bellRung = true
