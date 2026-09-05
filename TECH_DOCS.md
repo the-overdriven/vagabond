@@ -2790,3 +2790,65 @@ and the actual implemented behavior:
 If the implementation is ambiguous, mark the rule as **BUG/SUSPICIOUS** or **UNKNOWN** rather than inventing an answer.
 
 The purpose of this document is to describe **Vagabond as it exists**, not an imagined or idealized version of the game.
+
+---
+
+# 83. Replay System
+
+**Status: IMPLEMENTED**
+
+An opt-in **Save replay** checkbox sits next to Permadeath on the race-select
+screen. It is per-character: choosing it starts recording; a new character
+always starts unrecorded unless the box is checked again.
+
+## Storage
+
+`save.replay = {version: 1, initialState, actions: [], rng: []}`, present on
+the JSON save only while recording is active for that character. `version`
+here is the replay format version, independent of the game's own
+`SAVE_VERSION`. `initialState` is an ordinary `buildSaveObject()` snapshot
+taken the instant a run truly begins (right after character creation -
+the world/spawn/enemies already exist by then, per section 3), so replay
+reconstruction reuses the normal load path instead of a parallel format.
+
+## RNG
+
+The single central `rng()` is the only recording/substitution point.
+`randInt`/`pick`/`chance` are unaffected since they already call `rng()`.
+While recording, every value `rng()` returns is appended to `replay.rng`.
+While playing back, `rng()` instead returns `replay.rng[replayRngIndex++]`
+and does not touch `rngState`. Requesting a value past the end of the
+array stops playback and logs a desync message naming the requested index
+and the recorded length.
+
+## Actions
+
+Recorded at the point each is accepted, inside `tryMove`/`inspect`/
+`lootSkeletonOrForage`/`skipTurn` themselves (after their existing
+UI/animation guard clauses, before anything the action does), not from raw
+keydown. Held modifiers, CapsLock, save/load shortcuts, and name typing
+never become replay actions. Mouse/touch input reaches the same recording
+points since both call the same functions.
+
+## Playback
+
+**Show Replay** (HUD, next to Save/Load) appears whenever replay data
+exists for the current save. Clicking it:
+loads the initial-state snapshot, resets `turnCount`/`consecutiveWaitTurns`/
+`oldHunterQuestSerial` to zero (turn-driven counters aren't part of the
+save format; their true value at run start is zero), then executes
+recorded actions in order through the normal action functions with a
+500ms gap between actions (not between individual RNG calls - an action's
+enemy/NPC turn and every RNG call inside it happen together, then the
+delay, then the next action). Button becomes **Pause Replay** while
+playing, **Resume Replay** while paused. Watching a replay freezes it
+(recording does not resume afterward); the pre-replay save is kept in
+memory but not restorable from the UI in this first version. Normal input
+(keyboard, canvas clicks, touch controls) is inert while playback runs;
+Load still works and cancels playback first.
+
+## Not implemented (by design, v1)
+
+Export/import, sharing, thumbnails, scrubbing, fast-forward, variable
+speed, frame stepping, video/screenshots, a dedicated Stop button, and
+restoring the pre-replay state from the UI.
