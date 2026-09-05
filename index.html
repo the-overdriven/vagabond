@@ -589,19 +589,20 @@ The player intentionally accepts danger in exchange for information.
     // into the loaded tile tables here at runtime.
     function injectCryptLevel2Content(){
       const defs = {
-        cryptstairsdown: {walk:true,  ch:'>', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
-        cryptstairsup:   {walk:true,  ch:'<', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
-        crypt2floor:     {walk:true,  ch:'.', color:'#4c463c', bg:'#050403', mini:'#221f1a'},
-        cryptrubble:     {walk:true,  ch:'%', color:'#443f34', bg:'#050403', mini:'#221f1a'},
-        crypt2niche:     {walk:false, ch:'n', color:'#2a261e', bg:'#050403', mini:'#161310'},
-        sarcophagus:     {walk:true,  ch:'\u26B0', color:'#6a6255', bg:'#050403', mini:'#332f27'},
-        crypttrap:       {walk:true,  ch:'\u26B0', color:'#8a5a3c', bg:'#050403', mini:'#332f27'},
-        crypttrapsprung: {walk:true,  ch:'\u26B0', color:'#39352d', bg:'#050403', mini:'#1c1a16'},
+        cryptstairsdown:  {walk:true,  ch:'>', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
+        cryptstairsup:    {walk:true,  ch:'<', color:'#c9bfae', bg:'#0c0a08', mini:'#8a7a5c'},
+        mausoleumstairsup:{walk:true, ch:'<', color:'#d6c7a5', bg:'#0c0a08', mini:'#9a8458'},
+        crypt2floor:      {walk:true,  ch:'.', color:'#4c463c', bg:'#050403', mini:'#221f1a'},
+        cryptrubble:      {walk:true,  ch:'%', color:'#443f34', bg:'#050403', mini:'#221f1a'},
+        crypt2niche:      {walk:false, ch:'n', color:'#2a261e', bg:'#050403', mini:'#161310'},
+        sarcophagus:      {walk:true,  ch:'\u26B0', color:'#6a6255', bg:'#050403', mini:'#332f27'},
+        crypttrap:        {walk:true,  ch:'\u26B0', color:'#8a5a3c', bg:'#050403', mini:'#332f27'},
+        crypttrapsprung:  {walk:true,  ch:'\u26B0', color:'#39352d', bg:'#050403', mini:'#1c1a16'},
       };
       const codes = {
         cryptstairsdown:'\u2401', cryptstairsup:'\u2402', crypt2floor:'\u2403',
         cryptrubble:'\u2404', crypt2niche:'\u2405', sarcophagus:'\u2406',
-        crypttrap:'\u2407', crypttrapsprung:'\u2408',
+        crypttrap:'\u2407', crypttrapsprung:'\u2408', mausoleumstairsup:'\u2409',
       };
       const descs = {
         cryptstairsdown: 'a shoddy old stone staircase leading down',
@@ -612,6 +613,7 @@ The player intentionally accepts danger in exchange for information.
         sarcophagus: 'an old stone sarcophagus',
         crypttrap: 'an old stone sarcophagus',
         crypttrapsprung: 'a shattered, empty sarcophagus',
+        mausoleumstairsup: 'a grand stone staircase leading up to the royal mausoleum’s entrance',
       };
       for(const [key,def] of Object.entries(defs)) TILE[key] = def;
       for(const [key,c] of Object.entries(codes)){ TILE_CODE[key]=c; CODE_TILE[c]=key; }
@@ -720,7 +722,7 @@ The player intentionally accepts danger in exchange for information.
     // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
     // every deeper transition (z:-1<->-2, -2<->-3, ...), so adding another
     // level never means adding another transition tile type.
-    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup','cryptstairsdown','cryptstairsup','mausoleumtrapdoor','mausoleumexit']);
+    const CAVE_TRANSITION_TILES = new Set(['caveentrance','dwarvengate','cavedown','caveup','cryptstairsdown','cryptstairsup','mausoleumtrapdoor','mausoleumstairsup']);
 
     function makeNoise(cellsX, cellsY){
       const grid = [];
@@ -793,20 +795,39 @@ The player intentionally accepts danger in exchange for information.
       }}
     }
     function createMausoleum(){
-      const w=15,h=11, m=Array.from({length:h},()=>Array(w).fill('crypt2floor'));
+      const w=9,h=9, m=Array.from({length:h},()=>Array(w).fill('crypt2floor'));
       for(let y=0;y<h;y++) for(let x=0;x<w;x++) if(x===0||y===0||x===w-1||y===h-1) m[y][x]='mountain';
-      m[1][Math.floor(w/2)]='mausoleumexit';
-      m[5][7]='sarcophagus';
+      // The staircase stays close to the southern wall, as in the original layout.
+      m[7][4]='mausoleumstairsup';
+      m[4][4]='sarcophagus';
       return m;
     }
     function enterMausoleum(){
-      if(currentZ===0 && map[player.y]?.[player.x]==='mausoleumtrapdoor'){
+      const hut = villageHuts.find(h=>h.mausoleum);
+      if(currentZ===0 && mausoleumDiscovered && hut && player.x===hut.x && player.y===hut.y){
         if(!player.equip.blackkey){ log('The marked trapdoor will not yield. The Black Key is not merely a key; it must be worn.', 'info'); return true; }
-        mausoleumMap=createMausoleum(); map=mausoleumMap; currentZ=-5; currentCave=-1; player.x=7; player.y=9;
-        log('You press the Black Key against the mark. The stone gives way, revealing a small mausoleum beneath the hut.', 'info'); render(); updateHud(); return true;
+        if(!undergroundMap) return true;
+        mausoleumMap=createMausoleum();
+        const ox=hut?.x ?? player.x, oy=hut?.y ?? player.y;
+        for(let y=0;y<mausoleumMap.length;y++) for(let x=0;x<mausoleumMap[0].length;x++){
+          const wx=ox+x-4, wy=oy+y-7;
+          if(wx>=0&&wy>=0&&wx<MAP_W&&wy<MAP_H && mausoleumMap[y][x]!=='mountain') undergroundMap[wy][wx]=mausoleumMap[y][x];
+        }
+        undergroundMap[oy][ox]='mausoleumstairsup';
+        // Four high-tier chests are generated only on the first entry.
+        const mausoleumChestSpots = [[1,1],[7,1],[1,7],[7,7]];
+        if(!mausoleumDiscoveredOnce){
+          for(const [cx,cy] of mausoleumChestSpots){
+            const wx=ox+cx-4, wy=oy+cy-7;
+            groundItems.push({x:wx,y:wy,kind:'chest',tier:5,opened:false,level:-1,mausoleumChest:true});
+          }
+          mausoleumDiscoveredOnce=true;
+        }
+        map=undergroundMap; currentZ=-1; currentCave=-1; player.x=ox; player.y=oy;
+        log('The revealed trapdoor opens onto a narrow staircase descending into darkness.', 'info'); render(); updateHud(); return true;
       }
-      if(currentZ===-5 && map[player.y]?.[player.x]==='mausoleumexit'){
-        map=surfaceMap; currentZ=0; player.x=villageHuts.find(h=>h.mausoleum)?.x||player.x; player.y=(villageHuts.find(h=>h.mausoleum)?.y||player.y);
+      if(currentZ===-1 && map[player.y]?.[player.x]==='mausoleumstairsup'){
+        map=surfaceMap; currentZ=0; player.x=hut?.x ?? player.x; player.y=hut?.y ?? player.y;
         log('You climb back into the hut. The trapdoor closes behind you.', 'info'); render(); updateHud(); return true;
       }
       return false;
@@ -1350,6 +1371,7 @@ The player intentionally accepts danger in exchange for information.
           }
         }
       }
+      if(mausoleumAdjacentToRandomCave()) return false;
       buildCrypt();
       buildCryptLevel2();
       const cryptInvalid = cryptConnectedToRandomCave();
@@ -1369,6 +1391,20 @@ The player intentionally accepts danger in exchange for information.
     // The crypt must remain a separate z:-1 region. Check the actual merged
     // map, since overlapping cave templates can create a route even when the
     // cave descriptors themselves are far apart.
+    function mausoleumAdjacentToRandomCave(){
+      const hut = villageHuts.find(h=>h.mausoleum);
+      if(!hut) return false;
+      for(const cave of caves){
+        if(cave.crypt) continue;
+        for(const e of (cave.entrances||[])){
+          if(Math.max(Math.abs(e.x-hut.x),Math.abs(e.y-hut.y))<=1) return true;
+        }
+        const cm=caveMaps[caves.indexOf(cave)];
+        if(cm?.[hut.y]?.[hut.x]==='cavefloor') return true;
+      }
+      return false;
+    }
+
     function cryptConnectedToRandomCave(){
       if(cryptCaveIndex < 0) return false;
       const crypt = caves[cryptCaveIndex];
@@ -4473,7 +4509,7 @@ The player intentionally accepts danger in exchange for information.
           if(gravediggerGraveKey) cemeteryTombstones[gravediggerGraveKey]={name:odd.tombName,birth:odd.tombBirth,death:odd.tombDeath,odd:false,inscription:odd.inscription};
           log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info');
         } else if (npcTarget.name === 'Ancient Lich' && player.equip.blackkey)
-          log('Ancient Lich says: A key such as this is not meant for pockets. It must be close to the heart. No, I don\'t want it back. Although you seem lost, like a child, it has chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.', 'info')
+          log('Ancient Lich says: A key such as this is not meant for pockets. It must be close to the heart. No, I don\'t want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.', 'info')
         else log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info')
         enemyTurn();
         npcTurn();
@@ -4641,10 +4677,10 @@ The player intentionally accepts danger in exchange for information.
         log('You are standing on a lone grave, it is not finished and has no inscription.', 'info'); return;
       }
       if(map[player.y]?.[player.x]==='mausoleumtrapdoor'){ enterMausoleum(); return; }
-      if(currentZ===-5 && map[player.y]?.[player.x]==='sarcophagus'){ log('At its centre stands a single stone coffin. The lid is black, polished smooth, and carved with the same symbol as the Black Pillar. The inscription reads: \"The first to rule, the last to remember.\" The coffin is empty.', 'info'); return; }
+      if(currentZ===-1 && map[player.y]?.[player.x]==='sarcophagus'){ log('At its centre stands a single dark stone coffin. The mausoleum around it is small, but richly appointed: carved pillars, worn royal reliefs, and dark stonework polished by generations of careful hands. The coffin\'s lid is black, polished smooth, and carved with a symbol resembling a pillar and a crown. An inscription reads: \"The first to rule, the last to remember\" The coffin is empty.', 'info'); return; }
       if(map[player.y]?.[player.x]==='village'){
         const hut=villageHuts.find(h=>h.x===player.x&&h.y===player.y);
-        if(hut && player.equip.blackkey){ if(hut.mausoleum){ log('The Black Key grows heavier against your heart. Beneath the carpet, you discover a marked trapdoor. You press the key against its black mark, and hear stone grinding beneath the hut. Press \"inspect\" again to descend.', 'info'); map[player.y][player.x]='mausoleumtrapdoor'; mausoleumDiscovered=true; } else log(`This thatched hut belongs to a human peasant ${hut.name}. You look inside, but find nothing extraordinary.`, 'info'); }
+        if(hut && player.equip.blackkey){ if(hut.mausoleum){ log('The Black Key grows heavier against your heart once you enter the hut. Beneath the carpet, you discover a marked trapdoor. You press the key against its black mark, and hear stone grinding beneath the hut. Press \"inspect\" again to descend.', 'info'); mausoleumDiscovered=true; } else log(`This thatched hut belongs to a human peasant ${hut.name}. You look inside, but find nothing extraordinary.`, 'info'); }
         else if(hut) log(`This thatched hut belongs to a human peasant ${hut.name}. You look inside, but find nothing extraordinary.`, 'info');
         return;
       }
@@ -4940,11 +4976,13 @@ The player intentionally accepts danger in exchange for information.
 
     function targetCamX(px){
       const x = px === undefined ? player.x : px;
-      return Math.max(0, Math.min(MAP_W-VIEW_W, x - Math.floor(VIEW_W/2)));
+      const width = map && map[0] ? map[0].length : MAP_W;
+      return Math.max(0, Math.min(Math.max(0, width-VIEW_W), x - Math.floor(VIEW_W/2)));
     }
     function targetCamY(py){
       const y = py === undefined ? player.y : py;
-      return Math.max(0, Math.min(MAP_H-VIEW_H, y - Math.floor(VIEW_H/2)));
+      const height = map ? map.length : MAP_H;
+      return Math.max(0, Math.min(Math.max(0, height-VIEW_H), y - Math.floor(VIEW_H/2)));
     }
     function snapCameraToPlayer(){
       camX = targetCamX();
@@ -5085,13 +5123,15 @@ The player intentionally accepts danger in exchange for information.
       for(let vy=0; vy<=VIEW_H; vy++){
         for(let vx=0; vx<=VIEW_W; vx++){
           const mx = Math.floor(camX)+vx, my = Math.floor(camY)+vy;
-          if(mx<0||my<0||mx>=MAP_W||my>=MAP_H){
+          const mapW = map && map[0] ? map[0].length : MAP_W;
+          const mapH = map ? map.length : MAP_H;
+          if(mx<0||my<0||mx>=mapW||my>=mapH){
             const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX);
             const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX);
             drawTile(px,py,'~',TILE.water.color,TILE.water.bg);
             continue;
           }
-          const tileKey = map[my][mx];
+          const tileKey = map[my]?.[mx] || 'crypt2floor';
           const t = TILE[tileKey] || TILE.cavewall || TILE.grass;
           const px = Math.round((mx-camX) * TILE_PX);
           const py = Math.round((my-camY) * TILE_PX);
