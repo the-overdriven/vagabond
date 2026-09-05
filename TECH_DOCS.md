@@ -997,10 +997,20 @@ Current wandering settings:
 ```text
 Enabled: yes
 Chance per turn: 30%
-Wander radius: 1 tile
+Wander radius: 1 tile (how far from its home tile a wandering enemy/NPC may stray)
+Active range: 20 tiles from the player (Chebyshev distance)
 ```
 
-Wandering is limited to enemies visible on screen.
+Wandering is limited to enemies/NPCs within the active range of the player,
+not to what the camera viewport happens to be showing. This is deliberate:
+the check used to be "is this enemy on screen", which depended on the live
+canvas viewport (window size, sidebar collapsed/expanded, desktop vs mobile).
+That made the number of `chance()`/`rng()` calls per turn depend on the
+player's window at the time, which silently desynced Replay System (section
+83) playback whenever a recording was watched in a differently-sized window
+    than it was made in. The fixed 20-tile radius depends only on player and
+    enemy/NPC position - both part of replayed state - so replay is unaffected
+    by window size, device, or sidebar state.
 
 ---
 
@@ -1009,6 +1019,11 @@ Wandering is limited to enemies visible on screen.
 The Temple is a safety zone.
 
 Enemies near the Temple flee when the player is on Temple ground.
+
+An enemy starts fleeing once it is within the same 20-tile active range used
+for wandering (section 22) - or is already fleeing - while the player stands
+on Temple ground. Once started, fleeing continues (even if the enemy moves
+outside that range) until it reaches the flee distance below.
 
 Flee distance is approximately:
 
@@ -2820,6 +2835,28 @@ While playing back, `rng()` instead returns `replay.rng[replayRngIndex++]`
 and does not touch `rngState`. Requesting a value past the end of the
 array stops playback and logs a desync message naming the requested index
 and the recorded length.
+
+Old Hunter quest generation (section 51) previously rolled its
+investigation-vs-normal-quest split and its kill-vs-item pool split with raw
+`Math.random()`, bypassing `replay.rng` entirely. Both now go through
+`chance()` like the rest of the game, so generating an Old Hunter quest
+during a recording no longer desyncs replay of that run.
+
+## Determinism note: enemy/NPC wander and Temple flee
+
+Wander eligibility (section 22) and the Temple flee trigger (section 23)
+used to gate their `chance()` roll behind whether the enemy/NPC was inside
+the live camera viewport. Viewport size tracks the browser window (and
+sidebar state), which is not part of `initialState` or the recorded action
+stream - so the same recording could consume a different number of `rng()`
+values depending on the window it was replayed in, desyncing every roll
+after that point for the rest of the run. Both checks now use a fixed
+20-tile radius from the player instead, which depends only on replayed
+state (player and enemy/NPC position) and so is immune to window size,
+device, or sidebar state. Any future gameplay check that gates a `rng()`
+call should be written the same way: derive eligibility only from state
+that lives in `initialState`/the action stream, never from rendering-layer
+state like `VIEW_W`/`VIEW_H`, `camX`/`camY`, or `performance.now()`.
 
 ## Actions
 
