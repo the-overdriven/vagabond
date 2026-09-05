@@ -525,6 +525,38 @@ A procedurally positioned settlement containing several huts.
 
 Five NPC spawn near the village.
 
+### Hut generation
+<details>
+  <summary>Details</summary>
+The cemetery's anomalous/odd tombstone is generated with a **dwarven name**.
+That name is the canonical identity link for the hidden mausoleum hut:
+
+```text
+odd cemetery tombstone name
+        ↓
+one village hut gets the exact same name
+        ↓
+that hut is marked mausoleum=true
+```
+
+The remaining huts receive random names from `HUMAN_NAMES`. The odd-name hut is
+not selected by a later random roll and must not be replaced by a guessed
+central/nearest hut. This relationship is established during world creation
+and remains fixed for the lifetime of the world.
+
+Because village placement must remain spatially constrained relative to the
+Temple/Ancient Forest, the village **geometry** is generated before the
+cemetery, but hut **names/mausoleum identity** are assigned only after the
+cemetery has generated the anomalous dwarven name. This preserves the intended
+logical generation order without changing the village's placement rules.
+
+The exact mausoleum hut coordinate is also persisted as `mausoleumHutPos` in
+saves. On load, the coordinate is preferred when valid; otherwise the game
+recovers the relationship by matching a hut's name to the anomalous tombstone's
+name. The loader does not invent a mausoleum by centrality or connectivity.
+
+</details>
+
 ## Black Pillar
 <details>
   <summary>Details</summary>
@@ -2842,6 +2874,10 @@ references directly would allow later inventory/equipment/merchant/enemy changes
 to mutate the supposed starting state and make playback begin from the wrong
 state. Playback restores this snapshot through the normal load path rather than
 using a separate replay-specific world format.
+The mausoleum fix adds `mausoleumHutPos` to normal saves as an additive field
+alongside `villageHuts` and `cemeteryTombstones`. `SAVE_VERSION` remains 11
+because older saves can continue to load without this field; the loader falls
+back to the existing odd-name relationship when possible.
 
 ## Recorded actions
 
