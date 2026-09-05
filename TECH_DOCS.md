@@ -2107,7 +2107,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-10
+11
 ```
 
 Saves are JSON files.
@@ -2818,74 +2818,121 @@ always starts unrecorded unless the box is checked again.
 
 ## Storage
 
-`save.replay = {version: 1, initialState, actions: [], rng: []}`, present on
-the JSON save only while recording is active for that character. `version`
-here is the replay format version, independent of the game's own
-`SAVE_VERSION`. `initialState` is an ordinary `buildSaveObject()` snapshot
-taken the instant a run truly begins (right after character creation -
-the world/spawn/enemies already exist by then, per section 3), so replay
-reconstruction reuses the normal load path instead of a parallel format.
+The replay payload is stored inside the normal save as:
+
+```text
+save.replay = {
+  version: 1,
+  initialState,
+  actions: [],
+  rng: [],
+  _rngCallers: []
+}
+```
+
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 11).
+The replay field is written only while replay recording is active for that
+character; saves made without recording do not gain an empty replay structure.
+
+`initialState` is captured when the run truly begins, immediately after
+character creation, after the world/spawn/enemies already exist. The snapshot is
+deep-cloned before recording continues. This is important because
+`buildSaveObject()` contains live gameplay object references; storing those
+references directly would allow later inventory/equipment/merchant/enemy changes
+to mutate the supposed starting state and make playback begin from the wrong
+state. Playback restores this snapshot through the normal load path rather than
+using a separate replay-specific world format.
+
+## Recorded actions
+
+Replay records gameplay actions at their shared gameplay-function entry points,
+not raw keyboard events. Current action types are:
+
+- `move` - one requested grid movement, including movement into an enemy (attack),
+  an NPC (interaction), or an otherwise non-walkable destination;
+- `inspect` - inspect / surroundings action;
+- `forage` - normal forage/search/loot action;
+- `dig` - shovel digging, including the sand+shovel `F` shortcut;
+- `skipTurn` - wait action;
+- `talk` - currently Old Hunter direct interaction;
+- `buy` / `sell` - Merchant transactions;
+- `herbalist` - mushroom purification or potion creation;
+- `equip` / `unequip` - equipment changes;
+- `blackKey` - Black Key equip/unequip state change;
+- `openCasket` - opening the Old Rotten Casket;
+- `useItem` - consumable use and artifact identification.
+
+Inventory-dependent actions carry a stable `replayId` for the relevant item.
+Array indices are retained as fallbacks for compatibility, but playback first
+resolves the recorded item identity so inventory reordering from previous actions
+does not silently target a different item. Replay IDs are assigned to gameplay
+items and persist through saves/replays.
+
+Actions are recorded from the actual gameplay functions shared by keyboard,
+mouse/canvas, and touch input. UI-only input, held modifiers, CapsLock, save/load
+shortcuts, and character-name typing are not replay actions. An action entry does
+not necessarily mean that a turn was consumed: for example, a blocked movement
+or the wait-limit refusal can still reproduce as the same requested action.
 
 ## RNG
 
-The single central `rng()` is the only recording/substitution point.
-`randInt`/`pick`/`chance` are unaffected since they already call `rng()`.
-While recording, every value `rng()` returns is appended to `replay.rng`.
-While playing back, `rng()` instead returns `replay.rng[replayRngIndex++]`
-and does not touch `rngState`. Requesting a value past the end of the
-array stops playback and logs a desync message naming the requested index
-and the recorded length.
+The single central `rng()` is the recording/substitution point. `randInt`,
+`pick`, and `chance` already route through it. While recording, every returned
+RNG value is appended to `replay.rng`. While playing back, `rng()` consumes the
+corresponding recorded value instead of advancing `rngState`.
 
-Old Hunter quest generation (section 51) previously rolled its
-investigation-vs-normal-quest split and its kill-vs-item pool split with raw
-`Math.random()`, bypassing `replay.rng` entirely. Both now go through
-`chance()` like the rest of the game, so generating an Old Hunter quest
-during a recording no longer desyncs replay of that run.
+The replay also stores per-action RNG boundaries (`_rngStart`/`_rngEnd`) and,
+for recorded actions, optional `_rngCallers` diagnostic information. Playback
+compares the number of RNG values consumed by each action with the recorded
+boundary. This catches the first action whose RNG consumption has changed,
+rather than allowing the sequence to drift silently until a later visible result
+differs.
 
-## Determinism note: enemy/NPC wander and Temple flee
+If playback requests an RNG value beyond the recorded array, playback stops and
+reports a desynchronization. `window.lastReplayDiagnostic` contains the latest
+diagnostic, including the action index, expected/actual RNG counts, relevant
+actions, and actual RNG values/caller information when available. A completed
+replay also reports whether it consumed exactly the recorded RNG length.
 
-Wander eligibility (section 22) and the Temple flee trigger (section 23)
-used to gate their `chance()` roll behind whether the enemy/NPC was inside
-the live camera viewport. Viewport size tracks the browser window (and
-sidebar state), which is not part of `initialState` or the recorded action
-stream - so the same recording could consume a different number of `rng()`
-values depending on the window it was replayed in, desyncing every roll
-after that point for the rest of the run. Both checks now use a fixed
-20-tile radius from the player instead, which depends only on replayed
-state (player and enemy/NPC position) and so is immune to window size,
-device, or sidebar state. Any future gameplay check that gates a `rng()`
-call should be written the same way: derive eligibility only from state
-that lives in `initialState`/the action stream, never from rendering-layer
-state like `VIEW_W`/`VIEW_H`, `camX`/`camY`, or `performance.now()`.
+**Determinism rule:** any gameplay condition that controls whether an RNG call
+happens must depend only on replayed gameplay state, not rendering/browser state.
+In particular, enemy/NPC wandering and Temple fleeing use a fixed 20-tile active
+radius from the player rather than the live camera viewport. This prevents
+window size, device, sidebar state, or other viewport differences from changing
+RNG consumption during playback.
 
-## Actions
-
-Recorded at the point each is accepted, inside `tryMove`/`inspect`/
-`lootSkeletonOrForage`/`skipTurn` themselves (after their existing
-UI/animation guard clauses, before anything the action does), not from raw
-keydown. Held modifiers, CapsLock, save/load shortcuts, and name typing
-never become replay actions. Mouse/touch input reaches the same recording
-points since both call the same functions.
+Old Hunter quest generation also uses the seeded RNG path (`chance()`), so its
+procedural quest selection is included in the recorded RNG sequence.
 
 ## Playback
 
-**Show Replay** (HUD, next to Save/Load) appears whenever replay data
-exists for the current save. Clicking it:
-loads the initial-state snapshot, resets `turnCount`/`consecutiveWaitTurns`/
-`oldHunterQuestSerial` to zero (turn-driven counters aren't part of the
-save format; their true value at run start is zero), then executes
-recorded actions in order through the normal action functions with a
-500ms gap between actions (not between individual RNG calls - an action's
-enemy/NPC turn and every RNG call inside it happen together, then the
-delay, then the next action). Button becomes **Pause Replay** while
-playing, **Resume Replay** while paused. Watching a replay freezes it
-(recording does not resume afterward); the pre-replay save is kept in
-memory but not restorable from the UI in this first version. Normal input
-(keyboard, canvas clicks, touch controls) is inert while playback runs;
-Load still works and cancels playback first.
+**Show Replay** (HUD, next to Save/Load) appears whenever replay data exists for
+the current save. Clicking it:
+
+1. keeps the pre-replay state in memory;
+2. closes transient overlays and clears pathing/pending movement;
+3. loads the replay's deep-cloned `initialState` through the normal load path;
+4. disables recording while watching so playback cannot append new actions;
+5. resets `turnCount`, `consecutiveWaitTurns`, and `oldHunterQuestSerial` to their
+   run-start values;
+6. executes the recorded actions in order through the normal gameplay functions.
+
+The current inter-action playback delay is **169 ms**. The delay is between
+whole actions, not individual RNG calls: an action's movement/combat/loot and its
+enemy/NPC turn happen together before the next action is scheduled.
+
+The replay button becomes **Pause Replay** while playing and **Resume Replay**
+while paused. Normal keyboard, canvas-click, and touch gameplay input is inert
+while playback runs. Loading a save still works and cancels playback first.
+
+A replay is therefore a deterministic re-execution of the recorded player action
+stream against the recorded starting state and recorded RNG outcomes; it is not
+a video recording or a sequence of pre-rendered frames.
 
 ## Not implemented (by design, v1)
 
-Export/import, sharing, thumbnails, scrubbing, fast-forward, variable
-speed, frame stepping, video/screenshots, a dedicated Stop button, and
-restoring the pre-replay state from the UI.
+Export/import, sharing, thumbnails, scrubbing, fast-forward, variable speed,
+frame stepping, video/screenshots, a dedicated Stop button, and restoring the
+pre-replay state from the UI remain unimplemented. The pre-replay snapshot is
+kept in memory for the current playback session but is not exposed as a restore
+operation.
