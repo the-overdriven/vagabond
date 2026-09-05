@@ -1,11 +1,11 @@
 <!-- TODO:
 
+- small icons should prefix items in inventory list
+
 - [mysteriando] the shoddy staircase should be unlocked by stepping on a pressure plate
 - [mysteriando] talking to ancient lich with key on your neck gives new dialogue
 
 - [mysteriando] When the Drunk hears the Bell ring he only says:
-Drunk says: I'm done! No more drink! I heard a bell that's not there.
-- remove wheelbarrow after delivering the bell
 - [mysteriando] when ancient lich wakes up, the crypt is open. inside the crypt there is an empty grave and map to buried key
 after unburying the treasure, gravedigger's description gains: "The gravedigger rests here" and gravedigger disappears
 shovel can be used on sand, there is a chance to dig out many things (check kazordoon game)
@@ -14,6 +14,8 @@ shovel can be used on sand, there is a chance to dig out many things (check kazo
 - add steal mechanic?
 - every wolf has a chance to spawn with another wolf
 
+
+- When the player enters the temple, fleeing mobs should move 2 tiles per turn instead of 1.
 - extract more content to .json
 - life potions are too common, make their loose drops in the world 50% less common
 we need to do something with herbalist, new services screen (works by clicking when standing next to her, like with merchant)
@@ -250,6 +252,11 @@ The player intentionally accepts danger in exchange for information.
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
   <link rel="stylesheet" href="css/style.css?v=20260903-2">
+  <!-- Inventory item icons: kept inline since style.css wasn't touched here. -->
+  <style>
+      .invitem .item-icon{flex:0 0 auto; width:20px; height:20px; margin-right:6px; display:inline-flex; align-items:center; justify-content:center;}
+      .invitem .item-icon svg{width:100%; height:100%; display:block;}
+  </style>
 </head>
 <body>
 <div id="root">
@@ -3969,6 +3976,31 @@ The player intentionally accepts danger in exchange for information.
     }
     // Shared by inventory/trade rendering so every stackable consumable kind
     // (potions, scrolls, foraged food, ...) is recognised in one place.
+    // Small (20px) inline SVG icons that prefix inventory rows. Kinds not
+    // listed here (rare curiosities like tombstones) simply render with no icon.
+    const ITEM_ICON_SVG = {
+      herb: '<svg viewBox="0 0 24 24"><path d="M12 21c-1-4-1-8 0-12 3 1 5 3 5 6 0 3-2 5-5 6z" fill="#5da84a"/><path d="M12 21c1-4 1-8 0-12-3 1-5 3-5 6 0 3 2 5 5 6z" fill="#3f7a34"/></svg>',
+      mushroom: '<svg viewBox="0 0 24 24"><rect x="10" y="13" width="4" height="7" rx="1" fill="#e8d9b0"/><path d="M4 13c0-5 4-9 8-9s8 4 8 9H4z" fill="#b3382c"/><circle cx="8" cy="10" r="1.1" fill="#f2e9d8"/><circle cx="13" cy="8.3" r="1" fill="#f2e9d8"/><circle cx="16" cy="11" r="1" fill="#f2e9d8"/></svg>',
+      ediblemushroom: '<svg viewBox="0 0 24 24"><rect x="10" y="13" width="4" height="7" rx="1" fill="#e8d9b0"/><path d="M4 13c0-5 4-9 8-9s8 4 8 9H4z" fill="#a9793f"/></svg>',
+      berries: '<svg viewBox="0 0 24 24"><path d="M11 7c1-2 3-3 5-3-1 2-2 4-4 4" fill="none" stroke="#4a8a3a" stroke-width="1.4"/><circle cx="9" cy="14" r="3" fill="#8a2140"/><circle cx="14" cy="14" r="3" fill="#a8264c"/><circle cx="11.5" cy="10" r="3" fill="#8a2140"/></svg>',
+      potion: '<svg viewBox="0 0 24 24"><rect x="9.5" y="2" width="5" height="2" rx="0.6" fill="#8a6b4a"/><path d="M10 3h4v4l3 5v6a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-6l3-5V3z" fill="#5b3a29"/><path d="M8.6 13h6.8l1 3.2a2 2 0 0 1-2 2.3H9.6a2 2 0 0 1-2-2.3l1-3.2z" fill="#c23b3b"/></svg>',
+      speedpotion: '<svg viewBox="0 0 24 24"><rect x="9.5" y="2" width="5" height="2" rx="0.6" fill="#8a6b4a"/><path d="M10 3h4v4l3 5v6a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-6l3-5V3z" fill="#5b3a29"/><path d="M8.6 13h6.8l1 3.2a2 2 0 0 1-2 2.3H9.6a2 2 0 0 1-2-2.3l1-3.2z" fill="#e0b030"/><path d="M12.7 12l-2 3h1.6l-1 2.6 2.4-3.2h-1.6z" fill="#fff6c8"/></svg>',
+      scroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><path d="M7.5 9.5h9M7.5 12h9M7.5 14.5h6" stroke="#8a7548" stroke-width="1"/></svg>',
+      idscroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><circle cx="12" cy="12" r="2.3" fill="none" stroke="#5b3a29" stroke-width="1.2"/><circle cx="12" cy="12" r="0.8" fill="#5b3a29"/></svg>',
+      teleportscroll: '<svg viewBox="0 0 24 24"><rect x="4" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="17" y="6" width="3" height="12" rx="1.4" fill="#c9b27e"/><rect x="5" y="7" width="14" height="10" rx="1" fill="#e8dcb8"/><path d="M9 12a3 3 0 1 1 3 3" fill="none" stroke="#4a3b8a" stroke-width="1.3"/><circle cx="12" cy="15" r="0.9" fill="#4a3b8a"/></svg>',
+      weapon: '<svg viewBox="0 0 24 24"><rect x="8" y="14" width="8" height="2" rx="0.5" fill="#7a5a2e"/><rect x="11" y="16" width="2" height="5" rx="0.6" fill="#4a3620"/><path d="M11 1l1 2 1-2v14h-2z" fill="#d6dbe0"/></svg>',
+      armor: '<svg viewBox="0 0 24 24"><path d="M12 3l6 2v5c0 5-3 9-6 11-3-2-6-6-6-11V5l6-2z" fill="#8a929c"/><path d="M12 3l6 2v5c0 5-3 9-6 11V3z" fill="#6b727c"/></svg>',
+      shield: '<svg viewBox="0 0 24 24"><path d="M12 2l7 3v6c0 5-3 8.5-7 11-4-2.5-7-6-7-11V5l7-3z" fill="#6b4a2e"/><path d="M12 2l7 3v6c0 5-3 8.5-7 11V2z" fill="#563a24"/></svg>',
+      artifact: '<svg viewBox="0 0 24 24"><path d="M5 7h14l-3-4H8z" fill="#b47ef0"/><path d="M5 7l7 14L5 7z" fill="#6a34ad"/><path d="M19 7l-7 14 7-14z" fill="#7a3fc0"/><path d="M12 3l3 4-3 14-3-14z" fill="#8a4fd6"/></svg>',
+      treasuremap: '<svg viewBox="0 0 24 24"><path d="M4 6l5-2 5 2 6-2v14l-6 2-5-2-5 2V6z" fill="#d8c48a" stroke="#8a7548" stroke-width="0.6"/><path d="M9 4v14M14 6v14" stroke="#8a7548" stroke-width="0.6" stroke-dasharray="2 1.5"/><path d="M11 11l4 4M15 11l-4 4" stroke="#a5322a" stroke-width="1.4"/></svg>',
+      treasurecasket: '<svg viewBox="0 0 24 24"><path d="M4 10c0-3 3-5 8-5s8 2 8 5H4z" fill="#8a692f"/><rect x="4" y="10" width="16" height="8" rx="1" fill="#7a5a2e"/><rect x="10.5" y="10" width="3" height="4" rx="0.6" fill="#e0b030"/></svg>',
+      amber: '<svg viewBox="0 0 24 24"><path d="M12 3l6 6-2 9H8l-2-9z" fill="#d68a2c"/><path d="M12 3l6 6-6 3z" fill="#f0aa46"/></svg>',
+      seashell: '<svg viewBox="0 0 24 24"><path d="M12 4c5 2 8 7 8 13H4c0-6 3-11 8-13z" fill="#e8d9c0"/><path d="M12 6v11M9 8.5l1.5 8.5M15 8.5L13.5 17M6.7 11l2 6.5M17.3 11l-2 6.5" stroke="#b89a72" stroke-width="0.8"/></svg>',
+      shovel: '<svg viewBox="0 0 24 24"><rect x="11" y="2" width="2" height="12" fill="#7a5a2e"/><path d="M8 13h8l-1.5 5a2.5 2.5 0 0 1-5 0L8 13z" fill="#9aa0a6"/></svg>',
+    };
+    function itemIconHTML(kind){
+      return ITEM_ICON_SVG[kind] || '';
+    }
     function isStackableKind(kind){
       return kind==='potion' || kind==='scroll' || kind==='idscroll' || kind==='speedpotion' || kind==='teleportscroll' || kind==='herb' || kind==='mushroom' || kind==='ediblemushroom' || kind==='berries' || kind==='seashell' || kind==='amber';
     }
@@ -5816,6 +5848,13 @@ The player intentionally accepts danger in exchange for information.
         if(isBest) row.classList.add('best-slot');
         const cls = it.tier ? tierColorClass(it.tier) : '';
         const line = itemStatLine(it);
+        const iconSvg = itemIconHTML(it.kind);
+        if(iconSvg){
+          const iconEl = document.createElement('span');
+          iconEl.className = 'item-icon';
+          iconEl.innerHTML = iconSvg;
+          row.appendChild(iconEl);
+        }
         const nm = document.createElement('span');
         nm.className='nm '+cls;
         const stackable = isStackableKind(it.kind);
