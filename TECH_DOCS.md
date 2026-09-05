@@ -1760,6 +1760,17 @@ game records which tile it occupies and restores that reference on load
 older save lacks the reference). Loading a save must never place an
 additional grave near the Gravedigger.
 
+When the player digs up the Old Rotten Casket at the treasure map's marked
+location, the cemetery mystery reaches its closing state:
+
+- the Gravedigger NPC disappears
+- the grave tile remains in the world
+- inspecting that grave includes `The gravedigger rests here.`
+
+This state is persisted through the `treasureMapUnearthed` save field. Loading
+an older or otherwise incomplete save that contains this flag also removes any
+remaining Gravedigger instance instead of respawning him.
+
 </details>
 
 ---
@@ -1768,9 +1779,24 @@ additional grave near the Gravedigger.
 <details>
   <summary>Details</summary>
 
-The Drunk provides dialogue concerning the missing bell.
+The Drunk provides dialogue concerning the missing bell. After the bell event,
+his only normal dialogue is:
+
+```text
+I'm done! No more drink! I heard a bell that's not there.
+```
 
 His direction hint is dynamically calculated from the generated Big Bell location.
+
+After the treasure-map casket is unearthed, each post-bell Drunk interaction
+has a 50% chance to use the following line instead:
+
+```text
+Gravedigger? What gravedigger? I don't remember us having one.
+```
+
+This chance is enabled for the remainder of the world and is restored from the
+persisted treasure-map completion state.
 
 </details>
 
@@ -2572,6 +2598,8 @@ When the player digs at the treasure map's marked X:
 
 - An `Old Rotten Casket` is added directly to the player's inventory.
 - The casket is not placed on the ground.
+- The treasure-map completion state is set, removing the Gravedigger NPC and
+  updating his grave's description; the grave itself remains present.
 - The following message is logged:
   ```text
   Your shovel strikes something hard. Beneath the sand lies an old rotten casket.

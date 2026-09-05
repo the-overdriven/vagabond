@@ -1,16 +1,7 @@
 <!-- TODO:
 
-- small icons should prefix items in inventory list
 
-- [mysteriando] the shoddy staircase should be unlocked by stepping on a pressure plate
-- [mysteriando] talking to ancient lich with key on your neck gives new dialogue
-- [mysteriando] When the Drunk hears the Bell ring he only says:
-- [mysteriando] when ancient lich wakes up, the crypt is open. inside the crypt there is an empty grave and map to buried key
-
-
-after unburying the treasure (from treasure map), gravedigger's description gains: "The gravedigger rests here." and gravedigger NPC disappears
-drunk gains new random dialogue: Gravedigger? What gravedigger? I don't remember we had any.
-
+- [mysteriando] the shoddy staircase should be unlocked by stepping on a pressure plate?
 
 - doing old hunter quest should unlock something, not only give xp
 - add steal mechanic?
@@ -556,6 +547,7 @@ The player intentionally accepts danger in exchange for information.
     // Dwarven Fort's reserved z:-3).
     let cryptLevel2 = null // {map, discovered, x, y, trapSprung, trapPos}
     let treasureMapSpot = null // {x,y} sand tile the treasure map points to
+    let treasureMapUnearthed = false
     const CRYPT2_EXPLORER_FLAVOR = 'The bones of a long-dead explorer lie curled beside a collapsed sarcophagus. A satchel, rotted to scraps, rests beside them.'
     const CRYPT2_TRAP_DISCOVER = 'The lid of this sarcophagus lies askew, scraped aside from within. Dust has settled unevenly around it, as if something clawed its way out long ago.'
     const CRYPT2_TRAP_TRIGGER = 'Stone grinds against stone as the sarcophagus lid slides free. All around you, bones stir in their burial niches and rise.'
@@ -1683,7 +1675,8 @@ The player intentionally accepts danger in exchange for information.
       // level 1's open aisle.
       for (let i = 0; i < 3; i++) {
         const y = randInt(minY + 3, maxY - 3)
-        if (chance(0.5)) cm2[y][minX] = 'cavewall' else cm2[y][maxX] = 'cavewall'
+        if (chance(0.5)) cm2[y][minX] = 'cavewall'
+        else cm2[y][maxX] = 'cavewall'
       }
       // Burial niches lining the walls - decorative only.
       for (let y = minY + 1; y < maxY; y += 2) {
@@ -2120,6 +2113,29 @@ The player intentionally accepts danger in exchange for information.
       const target = villageHuts[0]
       target.name = oddName
       target.mausoleum = true
+    }
+
+    function reconcileVillageHuts() {
+      const staleMausoleum = villageHuts.find(h => h.mausoleum && map[h.y]?.[h.x] !== 'village')
+      villageHuts = villageHuts.filter(h => map[h.y]?.[h.x] === 'village')
+      const known = new Set(villageHuts.map(h => keyXY(h.x, h.y)))
+      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+        if (map[y]?.[x] !== 'village' || known.has(keyXY(x, y))) continue
+        // Older saves can contain village tiles that were not included in the
+        // villageHuts metadata. Give those tiles stable fallback identities so
+        // they remain inspectable after loading.
+        const nameIndex = Math.abs((x * 31 + y * 17) % HUMAN_NAMES.length)
+        villageHuts.push({x, y, name: HUMAN_NAMES[nameIndex] || 'Alden', mausoleum: false})
+        known.add(keyXY(x, y))
+      }
+      if (staleMausoleum && villageHuts.length && !villageHuts.some(h => h.mausoleum)) {
+        const nearest = villageHuts.reduce((best, hut) => {
+          const distance = Math.max(Math.abs(hut.x - staleMausoleum.x), Math.abs(hut.y - staleMausoleum.y))
+          const bestDistance = Math.max(Math.abs(best.x - staleMausoleum.x), Math.abs(best.y - staleMausoleum.y))
+          return distance < bestDistance ? hut : best
+        })
+        nearest.mausoleum = true
+      }
     }
 
     function placeVillage() {
@@ -3821,7 +3837,9 @@ The player intentionally accepts danger in exchange for information.
         else lines.push('The old hunter watches the tree line in silence.')
       }
       if (tmpl.name === 'Drunk') {
-        if (bellRung) return ['I\'m done! No more drink! I heard a bell that\'s not there.']
+        if (bellRung) {
+          return ['I\'m done! No more drink! I heard a bell that\'s not there.']
+        }
         const dir = bellDirectionFromSpawn()
         if (dir) lines.push(`Them hairy mountains... clonk, clonk, clonk all the way ${dir} they went.`)
       }
@@ -3865,6 +3883,18 @@ The player intentionally accepts danger in exchange for information.
         gravediggerGraveKey = key
         return
       }
+    }
+
+    function completeTreasureMapBurial() {
+      treasureMapUnearthed = true
+      const removed = npcs.find(n => n.name === 'Gravedigger')
+      if (removed) {
+        npcs = npcs.filter(n => n !== removed)
+        occupied.delete(keyXY(removed.x, removed.y))
+      }
+      const drunk = npcs.find(n => n.name === 'Drunk')
+      const drunkTemplate = NPC_TEMPLATES.find(t => t.name === 'Drunk')
+      if (drunk && drunkTemplate) drunk.lines = linesForNpcTemplate(drunkTemplate)
     }
 
     function spawnNpcs() {
@@ -4946,6 +4976,7 @@ The player intentionally accepts danger in exchange for information.
           name: 'Old Rotten Casket',
           description: 'An old rotten casket, half-swallowed by the sand.'
         })
+        completeTreasureMapBurial()
         log('Your shovel strikes something hard. Beneath the sand lies an old rotten casket.', 'loot')
         render()
         return
@@ -4957,7 +4988,8 @@ The player intentionally accepts danger in exchange for information.
         log('Your shovel uncovers a gold coin.', 'loot')
       } else if (roll <= 10) {
         const stack = player.inventory.find(i => i.kind === 'amber')
-        if (stack) stack.count = (stack.count || 1) + 1 else player.inventory.push({
+        if (stack) stack.count = (stack.count || 1) + 1
+        else player.inventory.push({
           kind: 'amber',
           name: 'Amber',
           value: 20,
@@ -4966,7 +4998,8 @@ The player intentionally accepts danger in exchange for information.
         log('You uncover a piece of amber.', 'loot')
       } else if (roll <= 11) {
         const stack = player.inventory.find(i => i.kind === 'seashell')
-        if (stack) stack.count = (stack.count || 1) + 1 else player.inventory.push({
+        if (stack) stack.count = (stack.count || 1) + 1
+        else player.inventory.push({
           kind: 'seashell',
           name: 'Seashell',
           value: 10,
@@ -5442,7 +5475,13 @@ The player intentionally accepts danger in exchange for information.
           log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info')
         } else if (npcTarget.name === 'Ancient Lich' && player.equip.blackkey)
           log('Ancient Lich says: A key such as this is not meant for pockets. It must be close to the heart. No, I don\'t want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.', 'info')
-        else log(`${npcTarget.name} says: ${pick(npcTarget.lines)}`, 'info')
+        else {
+          const drunkGravediggerLine = 'Gravedigger? What gravedigger? I don\'t remember us having one.'
+          const dialogue = npcTarget.name === 'Drunk' && bellRung && treasureMapUnearthed && chance(0.5)
+            ? drunkGravediggerLine
+            : pick(npcTarget.lines)
+          log(`${npcTarget.name} says: ${dialogue}`, 'info')
+        }
         enemyTurn()
         npcTurn()
         render()
@@ -5656,12 +5695,15 @@ The player intentionally accepts danger in exchange for information.
       }
       const tomb = cemeteryTombstones[keyXY(player.x, player.y)]
       if (tomb) {
-        log(tomb.inscription || `The tombstone bears the name ${tomb.name}. Born ${tomb.birth}, died ${tomb.death}.`, 'info')
+        const description = tomb.inscription || `The tombstone bears the name ${tomb.name}. Born ${tomb.birth}, died ${tomb.death}.`
+        log(gravediggerGraveKey === keyXY(player.x, player.y) && treasureMapUnearthed
+          ? `${description} The epitathy says: "The gravedigger rests here"`
+          : description, 'info')
         if (tomb.odd) log('This tombstone feels strangely out of place. Too clean. Above all, the death date points to future! After closer inspection it seems completely loose. You can pick it up.', 'info')
         return
       }
       if (gravediggerGraveKey === keyXY(player.x, player.y)) {
-        log('You are standing on a lone grave, it is not finished and has no inscription.', 'info')
+        log(`You are standing on a lone grave, it is not finished and has no inscription.${treasureMapUnearthed ? ' The gravedigger rests here.' : ''}`, 'info')
         return
       }
       if (map[player.y]?.[player.x] === 'mausoleumtrapdoor') {
@@ -5669,11 +5711,11 @@ The player intentionally accepts danger in exchange for information.
         return
       }
       if (currentZ === -1 && map[player.y]?.[player.x] === 'sarcophagus') {
-        log('At its centre stands a single dark stone coffin. The mausoleum around it is small, but richly appointed: carved pillars, worn royal reliefs, and dark stonework polished by generations of careful hands. The coffin\'s lid is black, polished smooth, and carved with a symbol resembling a pillar and a crown. An inscription reads: \"The first to rule, the last to remember\" The coffin is empty.', 'info')
+        log('At its centre stands a single dark stone coffin. The mausoleum around it is small, but richly appointed: carved pillars, worn royal reliefs, and dark stonework polished by generations of careful hands. The coffin\'s lid is black, polished smooth, and carved with a symbol resembling a pillar and a crown. An inscription reads: \"The first to rule, the last to remember\". The coffin is empty.', 'info')
         return
       }
-      if (map[player.y]?.[player.x] === 'village') {
-        const hut = villageHuts.find(h => h.x === player.x && h.y === player.y)
+      const hut = currentZ === 0 ? villageHuts.find(h => h.x === player.x && h.y === player.y) : null
+      if (map[player.y]?.[player.x] === 'village' || hut) {
         if (hut && player.equip.blackkey) {
           if (hut.mausoleum) {
             log('The Black Key grows heavier against your heart once you enter the hut. Beneath the carpet, you discover a marked trapdoor. You press the key against its black mark, and hear stone grinding beneath the hut. Press \"inspect\" again to descend.', 'info')
@@ -6613,7 +6655,8 @@ The player intentionally accepts danger in exchange for information.
       const n = currentZ === 0 && npcs.find(np => np.x === mx && np.y === my)
       if (n) {
         clearAutoPath()
-        if (n.name === 'Old Hunter') interactOldHunter() else tryOpenTrade(n)
+        if (n.name === 'Old Hunter') interactOldHunter()
+        else tryOpenTrade(n)
         return
       }
       const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my)
@@ -7751,6 +7794,7 @@ The player intentionally accepts danger in exchange for information.
           x: cryptLevel2.x, y: cryptLevel2.y, trapSprung: cryptLevel2.trapSprung, trapPos: cryptLevel2.trapPos,
         } : null,
         treasureMapSpot: treasureMapSpot,
+        treasureMapUnearthed: treasureMapUnearthed,
         spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
         worldEdgesReached: Object.assign({}, worldEdgesReached),
         oldHunterQuest: oldHunterQuest,
@@ -8007,6 +8051,7 @@ The player intentionally accepts danger in exchange for information.
         }
       }
       treasureMapSpot = (data.treasureMapSpot && Number.isFinite(data.treasureMapSpot.x)) ? data.treasureMapSpot : null
+      treasureMapUnearthed = !!data.treasureMapUnearthed
       if (Array.isArray(data.discovered) && data.discovered.length === MAP_H) {
         discovered = data.discovered.map(rowStr => {
           const row = []
@@ -8111,6 +8156,7 @@ The player intentionally accepts danger in exchange for information.
       bellRung = !!data.bellRung
       ancientBellLichSpawned = !!data.ancientBellLichSpawned
       villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts
+      reconcileVillageHuts()
       mausoleumDiscovered = !!data.mausoleumDiscovered
       // Reconcile progression for saves made before the explicit quest fields
       // existed, or saves where only one side of the event was serialized.
@@ -8185,6 +8231,7 @@ The player intentionally accepts danger in exchange for information.
       } else {
         spawnNpcs() // older save from before NPCs existed
       }
+      if (treasureMapUnearthed) completeTreasureMapBurial()
       if (bellRung) {
         const lich = npcs.find(n => n.name === 'Ancient Lich')
         if (lich) ancientBellLichSpawned = true
@@ -8628,7 +8675,8 @@ The player intentionally accepts danger in exchange for information.
     if (touchSpaceBtn) {
       const fn = (ev) => {
         ev.preventDefault()
-        if (ev.type === 'touchstart') touchSpaceBtn.dataset.touchHandled = '1' else if (touchSpaceBtn.dataset.touchHandled) {
+        if (ev.type === 'touchstart') touchSpaceBtn.dataset.touchHandled = '1'
+        else if (touchSpaceBtn.dataset.touchHandled) {
           delete touchSpaceBtn.dataset.touchHandled
           return
         }
@@ -8640,7 +8688,8 @@ The player intentionally accepts danger in exchange for information.
     if (touchForageBtn) {
       const fn = (ev) => {
         ev.preventDefault()
-        if (ev.type === 'touchstart') touchForageBtn.dataset.touchHandled = '1' else if (touchForageBtn.dataset.touchHandled) {
+        if (ev.type === 'touchstart') touchForageBtn.dataset.touchHandled = '1'
+        else if (touchForageBtn.dataset.touchHandled) {
           delete touchForageBtn.dataset.touchHandled
           return
         }
@@ -8652,7 +8701,8 @@ The player intentionally accepts danger in exchange for information.
     if (touchInventoryBtn) {
       const fn = (ev) => {
         ev.preventDefault()
-        if (ev.type === 'touchstart') touchInventoryBtn.dataset.touchHandled = '1' else if (touchInventoryBtn.dataset.touchHandled) {
+        if (ev.type === 'touchstart') touchInventoryBtn.dataset.touchHandled = '1'
+        else if (touchInventoryBtn.dataset.touchHandled) {
           delete touchInventoryBtn.dataset.touchHandled
           return
         }
@@ -8664,7 +8714,8 @@ The player intentionally accepts danger in exchange for information.
     if (touchMapBtn) {
       const fn = (ev) => {
         ev.preventDefault()
-        if (ev.type === 'touchstart') touchMapBtn.dataset.touchHandled = '1' else if (touchMapBtn.dataset.touchHandled) {
+        if (ev.type === 'touchstart') touchMapBtn.dataset.touchHandled = '1'
+        else if (touchMapBtn.dataset.touchHandled) {
           delete touchMapBtn.dataset.touchHandled
           return
         }
