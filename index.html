@@ -1,46 +1,58 @@
 <!-- TODO:
 
+- docs: add: when inspecting special items (when standing on their tiles) do not inspect surroundings
+- docs: On level-up: - mention that every second level up increases SPD !
+- docs: Crypt coffins use their own four crypt inscriptions; -> why its in z -3 section? or add crypt header
+- docs: Higher-tier enemies are generally placed farther from the Temple. - what is the logic?
+- docs: what is a mitigated attack? evasion or miss?
+- docs: how magic find affects gear worn by humanoid enemies? isnt that generated before we even meet the enemy?
+- docs: Chest loot odds for consumables/gold/gear are resolved from one roll out of 110. -> wrong section
+- docs: mention digging in foraging section
+- docs: Berries grant stacking Troll-like regeneration for 100 turns. -> remove from herbalist
 - fix: current grace should be listed in char sheet under stats
 - fix: You reached Level 2! (+10 max HP) - should also give SPD bonus, every second lvl
-- [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - fix: one of the huts has grave flavor text when inspecting
 - fix: mausoleum is not generated not in worldgen?
 - fix: Drunk is talking about the bell way too late! and drunk has his old clonk clonk dialogue after delivering the bell
-- feat: treasure map should be in sepia
-- feat: discovered world edges - add to stats
 - fix: using herbalist services should log the costs
 - fix: When sorting weapons, the XP bonus should be scaled.
 - fix: hills should be more pale
 - fix: can flying mobs fly over lava and volcano? they should
-- balance: leveling still too fast after lvl 4
-- dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide
+- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide
 - remove this fix: // The surface map is the authoritative return destination. (spawning entrances on exit)
 - fix: remove HUMAN_NAMES fallback
 - fix: grace checks shouldnt apply when player is invisible
-- balance: increase chance for digging a scarab, decrease chance for amber
 - fix: talking to old hunter by clicking/tapping on him should require standing next to him
-- feat: doing old hunter quest should unlock something, not only give xp
-- feat: add steal/stealth mechanic?
-- feat: every wolf has a chance to spawn with another wolf
 - fix: When the player enters the temple, fleeing mobs should move 2 tiles per turn instead of 1.
-- refactor: extract more content to .json
-- feat: You equip the... should also say what you UNEQUIP first (in same line)
 - fix: You leave the frozen wastes and begin to thaw. - running river in taiga should be frozen river and also make char freeze (and decrease SPD)
+- fix: big bell weight shouldnt be mentioned from distance
+- fix: talking to NPC should stop their movement for a while, so you can talk to them without them running away
+- [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
+- balance: leveling still too fast after lvl 4
+- balance: increase chance for digging a scarab, decrease chance for amber
+- balance: penalty for getting killed? drop gold or random item where you died?
+- balance: gear shouldn't be dropped by non-humanoids, increase gear drops in chests, add few in sand in the map (placed in worldgen, not subject to foraging rng)
+- balance: boost potion of speed: potion of speed should grant 3 spd + 1/3 current spd + wyrdling bonus
+- balance: increase aggro of all mobs by 1? and make last tile 50% chance to aggro?
+- balance: high tier monsters should be more lickely to wear and drop items from their tier
+- balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
+- feat: treasure map should be in sepia
+- feat: discovered world edges - add to stats
+- feat: every wolf has a chance to spawn with another wolf
+- feat: old hunter quest should unlock something, not only give xp
+- feat: add steal/stealth mechanic?
+- feat: You equip the... should also say what you UNEQUIP first (in same line)
 - feat: add more artifacts bonuses and curses
 - feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - feat: Add an enemy that becomes enraged when its HP falls below 30% and gets bonus to atk
 - feat: [inventory] add "consumables" category (apple emoji?), automatically hide "all" category when having more than 10 items
-- docs: add: when inspecting special items (when standing on their tiles) do not inspect surroundings
 - feat: aoe dmg? for offensive char types
 - feat: curse idea: enemy increase aggro
 - feat: artifact modifier idea: boost equipped gear
-- fix: big bell weight shouldnt be mentioned from distance
 - feat: introduce meat: will slowly regen HP (add enemy property: edible)
-- balance: penalty for getting killed? drop gold or random item where you died?
 - feat: add a way to protect against freezing, i.e. Barbarian Fur
 - feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
 - feat: add grace modifier to artifacts
-- balance: gear shouldn't be dropped by non-humanoids, increase gear drops in chests, add few in sand in the map (placed in worldgen, not subject to foraging rng)
 - feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
 - feat: add swimming (skill? (number represents how many tiles you can swim before you start drowning))
 - feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
@@ -53,25 +65,12 @@
 - feat: super rare monsters? i.e. yeti
 - feat: individual monster loot table, outside of tier logic
 - feat: add more items to merchant, life potions?
-- balance: boost potion of speed: potion of speed should grant 3 spd + 1/3 current spd + wyrdling bonus
-- docs: On level-up: - mention that every second level up increases SPD !
-- balance: increase aggro of all mobs by 1? and make last tile 50% chance to aggro?
-- docs: Crypt coffins use their own four crypt inscriptions; -> why its in z -3 section? or add crypt header
-- docs: Higher-tier enemies are generally placed farther from the Temple. - what is the logic?
-- docs: what is a mitigated attack? evasion or miss?
 - feat: generate icons for different weapons and armor, axes, spears, etc.
-- docs: how magic find affects gear worn by humanoid enemies? isnt that generated before we even meet the enemy?
-- docs: Chest loot odds for consumables/gold/gear are resolved from one roll out of 110. -> wrong section
-- docs: mention digging in foraging section
-- docs: Berries grant stacking Troll-like regeneration for 100 turns. -> remove from herbalist
-- balance: high tier monsters should be more lickely to wear and drop items from their tier
 - feat: inspect player (p) should tell sth about player, experience HP, worn gear, how heavy backpack is, how char feels. OR clicking on player. hovering over player should show the tooltip with worn gear (paper doll) and avatar? and name.
 - feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
 - feat: monsters that are close make sounds, to warn player
 - feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
-- balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
-- fix: talking to NPC should stop their movement for a while, so you can talk to them without them running away
-
+- refactor: move more to content .json
 - feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
   goblins should flee and get a swarm bonus when there is goblin nearby
   ghost can move behind walls
