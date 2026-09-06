@@ -18,6 +18,7 @@
 - fix: remove HUMAN_NAMES fallback
 - fix: grace checks shouldnt apply when player is invisible
 - balance: increase chance for digging a scarab, decrease chance for amber
+- fix: talking to old hunter by clicking/tapping on him should require standing next to him
 - feat: doing old hunter quest should unlock something, not only give xp
 - feat: add steal/stealth mechanic?
 - feat: every wolf has a chance to spawn with another wolf
@@ -36,10 +37,6 @@
 - fix: big bell weight shouldnt be mentioned from distance
 - feat: introduce meat: will slowly regen HP (add enemy property: edible)
 - balance: penalty for getting killed? drop gold or random item where you died?
-- feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
-  goblins should flee and get a swarm bonus when there is goblin nearby
-  ghost can move behind walls
-  spider can pull the player towards it
 - feat: add a way to protect against freezing, i.e. Barbarian Fur
 - feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
 - feat: add grace modifier to artifacts
@@ -74,6 +71,16 @@
 - feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
 - balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - fix: talking to NPC should stop their movement for a while, so you can talk to them without them running away
+
+- feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
+  goblins should flee and get a swarm bonus when there is goblin nearby
+  ghost can move behind walls
+  spider can pull the player towards it
+- feat: unidentified scrolls/potions
+- feat: enemies that killed you, grow their stats, and are distinguishable
+- feat: add traps, once we have proper dungeons
+- feat: Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
+- feat: randomly appearing ghost (far away) to freak player out (in mysteriando)
 - feat: add physical wounds / states:
   - bleeding: lose 1 HP per turn until healed
   - poisoned: lose 1 HP per turn until cured
@@ -82,11 +89,6 @@
   - frozen: cannot move or attack for a few turns, SPD halved until healed
   - paralyzed/webbed
   - confused, walking in random direction
-- feat: unidentified scrolls/potions
-- feat: enemies that killed you, grow their stats, and are distinguishable
-- feat: add traps, once we have proper dungeons
-- feat: Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
-- feat: randomly appearing ghost (far away) to freak player out (in mysteriando)
 - feat: curses ideas:
   - The HP loss curse stops while you're at full HP.
   - Hungry ... - you randomly lose 1 herb/mushroom/meat/berries
