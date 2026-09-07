@@ -2652,15 +2652,11 @@
         if (scrollIdx >= 0) player.inventory.splice(scrollIdx, 1)
       }
       it.identified = true
-      // Artifact lore/description is normally generated lazily for legacy items.
-      // During replay, regenerate it from the replay RNG stream even if the loaded
-      // snapshot happens to contain stale/partial lore metadata. The recorded
-      // identification action includes those RNG calls, so this keeps the RNG
-      // boundary identical to the original run.
-      if (replaySimulationMode && it.possessor) {
-        it.ownerLore = null
-        it.description = null
-      }
+      // Identification itself must not regenerate already-created artifact lore.
+      // Artifact owner lore and description are generated when the artifact is
+      // created and their RNG belongs to that creation action, not identification.
+      // Regenerating them here would consume those RNG values a second time during
+      // replay and shift the stream before consumeItemTurn().
       ensureArtifactOwnerLore(it)
       log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good')
       log(it.description, 'loot')
@@ -4261,7 +4257,7 @@
       updateMobileInfoPanel(e.x, e.y)
       // The lunge is cosmetic. Never let a replay action wait for rAF while the
       // document is hidden, because browsers throttle/suspend rAF in background tabs.
-      if (!replaySimulationMode) await animateAttackLunge(player.x, player.y, e.x, e.y)
+      if (!replayAnimationsDisabled) await animateAttackLunge(player.x, player.y, e.x, e.y)
       if (e.evades && chance(0.30)) {
         const fromX = e.x, fromY = e.y
         const options = []
@@ -4322,8 +4318,7 @@
           ? e.equipment : null
         if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)) {
           log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good')
-          if (replaySimulationMode) playerAttackEnemy(e, true)
-          else await playerAttackEnemy(e, true)
+          await playerAttackEnemy(e, true)
         }
       }
     }
@@ -4524,7 +4519,7 @@
       stopCameraAnimation()
       clearEnemyAnims()
       stopAttackAnimation()
-      if (replaySimulationMode) {
+      if (replayAnimationsDisabled) {
         // Death transitions are visual only. Apply the actual gameplay result now so
         // the next recorded action is never blocked by log typing or rAF.
         deathTransition = null
@@ -5547,7 +5542,7 @@
 
     async function tryMove(dx, dy) {
       if (mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return
-      if (!replaySimulationMode && (cameraAnimating || attackAnim)) {
+      if (!replayAnimationsDisabled && (cameraAnimating || attackAnim)) {
         pendingMove = {dx: dx, dy: dy}
         return
       }
@@ -6104,6 +6099,7 @@
     let cameraAnimating = false
     let moveAnim = null
     let attackAnim = null
+    let attackAnimResolve = null
     let deathTransition = null
     const MOVE_ANIM_MS = 140
 
@@ -6182,7 +6178,7 @@
     }
 
     function beginEnemyAttackAnim(e) {
-      if (replaySimulationMode) {
+      if (replayAnimationsDisabled) {
         e.attackStart = undefined
         return
       }
@@ -6237,7 +6233,7 @@
     }
 
     function animateCameraToPlayer(fromPos) {
-      if (replaySimulationMode) {
+      if (replayAnimationsDisabled) {
         moveAnim = null
         cameraAnimating = false
         snapCameraToPlayer()
@@ -6266,6 +6262,27 @@
       deathTransition = null
     }
 
+    // If the tab is backgrounded while an attack/camera animation is awaiting
+    // rAF, resolve/snap it immediately. This is the crucial bridge between the
+    // normal animated replay path and background-tab throttling.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) return
+      if (attackAnim) {
+        attackAnim = null
+        if (attackAnimResolve) {
+          const resolve = attackAnimResolve
+          attackAnimResolve = null
+          resolve()
+        }
+      }
+      if (cameraAnimating || moveAnim) {
+        stopCameraAnimation()
+        snapCameraToPlayer()
+        render()
+      }
+      clearEnemyAnims()
+    })
+
     function startDeathRotationAnimation() {
       const step = (now) => {
         if (!deathTransition || deathTransition.phase !== 'pending') return
@@ -6276,8 +6293,13 @@
     }
 
     function animateAttackLunge(fromX, fromY, targetX, targetY) {
-      if (replaySimulationMode) {
+      if (replayAnimationsDisabled) {
         attackAnim = null
+        if (attackAnimResolve) {
+          const resolve = attackAnimResolve
+          attackAnimResolve = null
+          resolve()
+        }
         return Promise.resolve()
       }
       stopAttackAnimation()
@@ -6291,14 +6313,17 @@
       }
       render()
       return new Promise(resolve => {
+        attackAnimResolve = resolve
         const step = (now) => {
           render(now)
           if (!attackAnim) {
+            if (attackAnimResolve === resolve) attackAnimResolve = null
             resolve()
             return
           }
           if (now - attackAnim.start >= attackAnim.duration) {
             attackAnim = null
+            if (attackAnimResolve === resolve) attackAnimResolve = null
             render()
             resolve()
             return
@@ -7924,8 +7949,8 @@
        array instead of generating new randomness, so the exact same code
        path (movement/combat/loot/etc.) reproduces the exact same run. */
     const REPLAY_VERSION = 1
+    const REPLAY_ACTION_DELAY_MS = 12
     // const REPLAY_ACTION_DELAY_MS = 169
-    const REPLAY_ACTION_DELAY_MS = 29
 
     let replayRecording = false // true once "Save replay" was chosen for the current character
     let replayData = null       // {version, initialState, actions, rng} being recorded (or last loaded)
@@ -7940,6 +7965,7 @@
     // is true, gameplay actions must finish synchronously so a background-tab throttle
     // of requestAnimationFrame() cannot stall or reorder the deterministic simulation.
     let replaySimulationMode = false
+    let replayAnimationsDisabled = false
     let replayNextActionAt = 0
     let replayActionRunning = false
     // Always expose the latest diagnostic as a real global and on window.
@@ -7954,6 +7980,10 @@
     // IDs are assigned lazily to every gameplay item and persist in saves/replays.
     let nextReplayItemId = 1
     function ensureReplayItemIds() {
+      // Replay playback must never lazily rewrite item identities. Older replays
+      // contain IDs that were assigned only while recording, so assigning new IDs
+      // during playback can steal/relabel an existing replay_item_N.
+      if (replayPlaying) return
       const seen = new Set()
       const containers = [
         player?.inventory || [],
@@ -8039,6 +8069,7 @@
       replayPlaying = false
       replayPaused = false
       replaySimulationMode = false
+      replayAnimationsDisabled = false
       replayNextActionAt = 0
       activeReplay = null
       replayActionIndex = 0
@@ -8087,7 +8118,6 @@
           if (action.npc === 'Old Hunter') interactOldHunter()
           break
         case 'buy': {
-          ensureReplayItemIds()
           let item = merchantStock.find(it => it?.replayId === action.replayId)
           if (!item && action.kind) item = merchantStock.find(it => it?.kind === action.kind && it?.name === action.name)
           if (!item && Number.isInteger(action.fallbackIndex)) item = merchantStock[action.fallbackIndex]
@@ -8096,8 +8126,9 @@
           break
         }
         case 'sell': {
-          ensureReplayItemIds()
-          const idx = findReplayItemIndex(player.inventory, action.replayId, action.fallbackIndex)
+          let idx = -1
+          if (Number.isInteger(action.fallbackIndex) && player.inventory[action.fallbackIndex]) idx = action.fallbackIndex
+          if (idx < 0) idx = findReplayItemIndex(player.inventory, action.replayId, -1)
           if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find sold item ${action.replayId || action.name || ''}.`)
           sellItem(idx)
           break
@@ -8131,8 +8162,45 @@
           unequipItem(action.slot)
           break
         case 'useItem': {
-          const idx = findReplayItemIndex(player.inventory, action.replayId, action.idx)
-          if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find inventory item ${action.replayId || ''}.`)
+          // Old replays contain both an inventory index and a lazily-assigned
+          // replayId. Either can be stale after an earlier item-order divergence.
+          // For identification, the only safe target is an artifact that is still
+          // unidentified. Prefer the recorded slot when it has that property;
+          // otherwise use the recorded id, then a deterministic fallback that does
+          // not steal an artifact reserved by a later identification action.
+          let idx = -1
+          if (action.action === 'identifyArtifact') {
+            if (Number.isInteger(action.idx)) {
+              const indexedItem = player.inventory[action.idx]
+              if (indexedItem?.kind === 'artifact' && !indexedItem.identified) idx = action.idx
+            }
+            if (idx < 0 && action.replayId) {
+              const byId = player.inventory.findIndex(item => item?.replayId === action.replayId && item?.kind === 'artifact' && !item.identified)
+              if (byId >= 0) idx = byId
+            }
+            if (idx < 0) {
+              const laterIds = new Set(activeReplay.actions.slice(replayActionIndex).filter(a => a.type === 'useItem' && a.action === 'identifyArtifact' && a.replayId).map(a => a.replayId))
+              idx = player.inventory.findIndex(item => item?.kind === 'artifact' && !item.identified && !laterIds.has(item.replayId))
+            }
+          } else {
+            // For legacy recordings, the recorded slot is the compatibility anchor.
+            // Use it first when it still contains a usable item; replay IDs are then
+            // only a secondary lookup for newer recordings.
+            if (Number.isInteger(action.idx) && player.inventory[action.idx]) {
+              idx = action.idx
+            } else {
+              idx = findReplayItemIndex(player.inventory, action.replayId, -1)
+            }
+          }
+          if (idx < 0 || !player.inventory[idx]) {
+            const snapshot = player.inventory.map((item, i) => ({
+              i, replayId: item?.replayId || null, kind: item?.kind || null,
+              name: item?.name || null, identified: item?.identified ?? null,
+              count: item?.count ?? null
+            }))
+            console.warn('[Replay item resolution failed]', { actionIndex: replayActionIndex - 1, action, inventory: snapshot })
+            return replayDesync(`Replay desynchronized: could not find inventory item ${action.replayId || ''}.`)
+          }
           const fn = {potion: usePotion, scroll: useScroll, teleportscroll: useTeleportScroll, speedpotion: useSpeedPotion, herb: useHerb, mushroom: useMushroom, ediblemushroom: useEdibleMushroom, berries: useBerries, tombstone: readTombstone, identifyArtifact}[action.action]
           if (!fn) return replayDesync(`Replay desynchronized: unknown item action ${action.action}.`)
           fn(idx)
@@ -8172,7 +8240,11 @@
         replayRngCallers = []
         const rngBefore = replayRngIndex
 
+        // Replay is always simulation-first. Visual animations are disabled
+        // whether the tab is active or backgrounded; no rAF-driven effect may
+        // delay or alter the deterministic action/RNG sequence.
         replaySimulationMode = true
+        replayAnimationsDisabled = true
         try {
           // IMPORTANT: await the action before checking RNG. Combat actions such as
           // tryMove() are async, so checking immediately would see only part of the
@@ -8180,6 +8252,7 @@
           await runReplayAction(action)
         } finally {
           replaySimulationMode = false
+          replayAnimationsDisabled = false
         }
 
         const rngAfter = replayRngIndex
@@ -8249,7 +8322,7 @@
       // loadGameFromObject() restores replayData/replayRecording from
       // data.replay - the snapshot has none, so it clears both; restore the
       // replay we're about to watch right after.
-      loadGameFromObject(JSON.parse(JSON.stringify(replayToPlay.initialState)))
+      loadGameFromObject(JSON.parse(JSON.stringify(replayToPlay.initialState)), {isReplayInit: true})
       replayData = replayToPlay
       replayRecording = false // watching freezes this replay; it is not extended by further play
       // These turn-driven counters aren't part of the save format at all
@@ -8432,7 +8505,8 @@
       }
     }
 
-    function loadGameFromObject(data) {
+    function loadGameFromObject(data, opts = {}) {
+      const isReplayInit = !!opts.isReplayInit
       if (!data || typeof data !== 'object' || !Array.isArray(data.map)) {
         throw new Error('That does not look like a Vagabond save file.')
       }
@@ -8748,7 +8822,13 @@
       tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length
       tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length === TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_, i) => i)
       merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : []
-      ensureMerchantStock()
+      // Replay's initialState is a snapshot of an already-current-version live
+      // game - it never needs backfilling, and doing so here would call rng()
+      // outside the recorded action stream (replayPlaying/replayRecording are
+      // still false at this point), silently diverging merchant stock from
+      // what the recorded buy/sell actions expect. Only genuine save-file
+      // loads (pre-this-field saves) need this.
+      if (!isReplayInit) ensureMerchantStock()
       foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : [])
       dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : [])
 
@@ -8823,8 +8903,12 @@
 
       groundItems = (data.groundItems || []).map(g => {
         const item = {...g}
-        if (!item.description && item.kind === 'campfire') item.description = pick(CAMPFIRE_INSPECTIONS)
-        if (!item.description && item.kind === 'skeleton') item.description = pick(SKELETON_INSPECTIONS)
+        // Same rng()-outside-the-action-stream hazard as ensureMerchantStock
+        // above - skip this backfill for replay restores.
+        if (!isReplayInit) {
+          if (!item.description && item.kind === 'campfire') item.description = pick(CAMPFIRE_INSPECTIONS)
+          if (!item.description && item.kind === 'skeleton') item.description = pick(SKELETON_INSPECTIONS)
+        }
         return item
       })
       if (dwarvenRuin && dwarvenRuin.caveIndex >= 0) {
