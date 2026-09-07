@@ -440,8 +440,20 @@
     let rngLog = []
     function rngDebugCaller() {
       const stack = (new Error()).stack || ''
-      const lines = stack.split('\n')
-      return (lines[3] || lines[2] || lines[1] || '').trim()
+      const lines = stack.split('\n').map(s => s.trim()).filter(Boolean)
+      // rngDebugCaller -> rng -> randInt/chance/pick -> the real gameplay
+      // consumer. Keep several frames instead of only the immediate helper.
+      const frames = lines.slice(2, 10)
+      const cleaned = frames.map(frame => frame.replace(/^at\s+/, ''))
+      const direct = cleaned[0] || ''
+      const semantic = cleaned.find(frame =>
+        !/^(rng|randInt|chance|pick|rngDebugCaller)\b/.test(frame)
+      ) || direct
+      return {
+        direct,
+        semantic,
+        stack: cleaned
+      }
     }
     window.dumpRngLog = function () {
       const blob = new Blob([JSON.stringify(rngLog, null, 2)], {type: 'application/json'})
@@ -459,6 +471,42 @@
     window.clearRngLog = function () {
       rngLog = []
       console.log('rng log cleared.')
+    }
+    // Grabs just the entries around a given rng index (defaults to the range
+    // implied by window.lastReplayDiagnostic, padded by `pad` on each side)
+    // and copies them to the clipboard as JSON - avoids downloading/pasting
+    // a multi-MB file when you only need the handful of calls right around
+    // a desync point.
+    window.copyRngSlice = function (lo, hi, pad) {
+      pad = pad === undefined ? 30 : pad
+      if (lo === undefined || hi === undefined) {
+        const d = window.lastReplayDiagnostic
+        if (!d) {
+          console.warn('No lastReplayDiagnostic available - pass lo/hi explicitly, e.g. copyRngSlice(1450, 1500).')
+          return
+        }
+        // lastReplayDiagnostic's indices are positions in activeReplay.rng
+        // (per-run, starts at 0 after character creation) - NOT the same
+        // counter as rngLog.i, which counts every rng() call since page
+        // load, including the ~thousands consumed by one-time world
+        // generation before recording even starts. Filtering rngLog by
+        // raw .i using the diagnostic's numbers silently grabs the wrong
+        // era of the log. Filter by replayActionIndex instead, which is
+        // self-consistent with the diagnostic's actionIndex.
+        const slice = rngLog.filter(e =>
+          e.mode === 'replay' && e.replayActionIndex !== null &&
+          Math.abs(e.replayActionIndex - d.actionIndex) <= 1
+        )
+        const text = JSON.stringify(slice, null, 2)
+        copy(text)
+        console.log(`Copied ${slice.length} rng() calls around actionIndex ${d.actionIndex} to clipboard.`)
+        return slice
+      }
+      const slice = rngLog.filter(e => e.i >= lo && e.i <= hi)
+      const text = JSON.stringify(slice, null, 2)
+      copy(text) // devtools console helper; falls back below if unavailable
+      console.log(`Copied ${slice.length} rng() calls (i=${lo}..${hi}) to clipboard.`)
+      return slice
     }
     // --- End temporary debug instrumentation ---
 
@@ -485,10 +533,19 @@
           i: rngLog.length,
           v: value,
           mode: replayPlaying ? 'replay' : (replayRecording ? 'record' : 'live'),
-          at: caller,
-          replayActionIndex: replayPlaying ? replayActionIndex : null
+          at: caller.direct,
+          semanticCaller: caller.semantic,
+          stack: caller.stack,
+          replayActionIndex: replayPlaying ? replayCurrentActionIndex : null
         })
-        if (replayPlaying) replayRngCallers.push(caller)
+        replayRngCallers.push({
+          rngIndex: replayPlaying ? (replayRngIndex - 1) : null,
+          value,
+          direct: caller.direct,
+          semantic: caller.semantic,
+          stack: caller.stack,
+          actionIndex: replayPlaying ? replayCurrentActionIndex : null
+        })
       }
       return value
     }
@@ -3999,27 +4056,58 @@
       ensureGravediggerGrave()
     }
 
-    // Wander eligibility used to depend on the live canvas viewport (VIEW_W/
-    // VIEW_H), which tracks window size/sidebar state and is NOT part of the
-    // replay's recorded/replayed state. That meant whether chance()/rng() got
-    // called for a given NPC each turn could differ between recording and
-    // playback (different window size, device, sidebar toggled), silently
-    // shifting every rng() call after that point out of alignment with what
-    // was recorded. Gating on distance from the player instead keeps this a
-    // pure function of state that's actually part of the replay (player.x/y,
-    // n.x/n.y), so it plays back identically no matter what window it's
-    // watched in.
-    const NPC_WANDER_ACTIVE_RADIUS = 20
-    function npcIsOnScreen(n) {
-      return Math.max(Math.abs(n.x - player.x), Math.abs(n.y - player.y)) <= NPC_WANDER_ACTIVE_RADIUS
-    }
+    // NPC wandering uses the same 20-square Chebyshev-radius eligibility
+    // check as enemy wandering. Do this check BEFORE chance() so distant NPCs
+    // do not consume RNG and shift the deterministic replay stream.
 
     function npcTurn() {
-      for (const n of npcs) {
-        if (n.static) continue
-        if (!ENEMY_WANDER_ENABLED) continue
-        if (!chance(ENEMY_WANDER_CHANCE)) continue
-        if (!npcIsOnScreen(n)) continue
+      const npcDiag = []
+      if (replayPlaying) {
+        replayNpcDiagnostics = npcDiag
+      }
+      for (let npcIndex = 0; npcIndex < npcs.length; npcIndex++) {
+        const n = npcs[npcIndex]
+        const before = replayPlaying ? replayRngIndex : null
+        const meta = replayPlaying ? {
+          npcIndex,
+          name: n.name,
+          x: n.x, y: n.y,
+          homeX: n.homeX, homeY: n.homeY,
+          static: !!n.static,
+          free: !!n.free,
+          onScreen: null,
+          rngBefore: before,
+          rngAfter: before,
+          chanceResult: null,
+          moved: false
+        } : null
+        if (n.static) {
+          if (meta) { meta.skip = 'static'; npcDiag.push(meta) }
+          continue
+        }
+        if (!ENEMY_WANDER_ENABLED) {
+          if (meta) { meta.skip = 'wander-disabled'; npcDiag.push(meta) }
+          continue
+        }
+        // Reuse the exact same distance-based wandering eligibility as
+        // enemyTurn/enemyWander: 20-square Chebyshev radius around the player.
+        // Crucially, this happens before chance(), so an ineligible NPC consumes
+        // no RNG at all.
+        const inWanderRange = enemyIsOnScreen(n)
+        if (meta) meta.onScreen = inWanderRange
+        if (!inWanderRange) {
+          if (meta) { meta.skip = 'out-of-range'; npcDiag.push(meta) }
+          continue
+        }
+        const wandered = chance(ENEMY_WANDER_CHANCE)
+        if (meta) {
+          meta.chanceResult = wandered
+          meta.rngAfter = replayRngIndex
+        }
+        if (!wandered) {
+          if (meta) { meta.skip = 'chance-failed'; npcDiag.push(meta) }
+          continue
+        }
         const leash = !n.free
         if (leash && Math.max(Math.abs(n.x - n.homeX), Math.abs(n.y - n.homeY)) > ENEMY_WANDER_RADIUS) {
           n.homeX = n.x
@@ -4038,15 +4126,25 @@
             options.push({x: nx, y: ny})
           }
         }
-        if (!options.length) continue
+        if (!options.length) {
+          if (meta) { meta.rngAfter = replayRngIndex; meta.skip = 'no-options'; npcDiag.push(meta) }
+          continue
+        }
         const pick = options[randInt(0, options.length - 1)]
+        if (meta) {
+          meta.rngAfter = replayRngIndex
+          meta.options = options.length
+          meta.picked = {x: pick.x, y: pick.y}
+        }
         occupied.delete(keyXY(n.x, n.y))
         const fromX = n.x, fromY = n.y
         n.x = pick.x
         n.y = pick.y
         occupied.add(keyXY(n.x, n.y))
         beginEnemyMoveAnim(n, fromX, fromY)
+        if (meta) { meta.moved = true; meta.rngAfter = replayRngIndex; npcDiag.push(meta) }
       }
+      if (replayPlaying && npcDiag.length === 0) replayNpcDiagnostics = npcDiag
     }
 
     function npcAnimsPending() {
@@ -7968,6 +8066,13 @@
     let replayAnimationsDisabled = false
     let replayNextActionAt = 0
     let replayActionRunning = false
+    // Per-action replay boundary diagnostics. Each entry captures the RNG cursor
+    // before/after the action, the recorded boundaries, and the exact calls made
+    // while that action was running. This is intentionally separate from rngLog,
+    // whose global index also includes RNG consumed before recording/replay.
+    let replayActionDiagnostics = []
+    let replayCurrentActionIndex = null
+    let replayNpcDiagnostics = []
     // Always expose the latest diagnostic as a real global and on window.
     // This makes it accessible from the browser console as either
     // `lastReplayDiagnostic` or `window.lastReplayDiagnostic`.
@@ -8074,6 +8179,7 @@
       activeReplay = null
       replayActionIndex = 0
       replayRngIndex = 0
+      replayCurrentActionIndex = null
       updateReplayButton()
     }
 
@@ -8089,6 +8195,7 @@
         remainingActions
       }
       console.warn('[Replay diagnostic]', diagnostic)
+      diagnostic.actionBoundaries = replayActionDiagnostics.slice(-50)
       lastReplayDiagnostic = diagnostic
       window.lastReplayDiagnostic = diagnostic
       console.log("Replay diagnostic available as window.lastReplayDiagnostic", diagnostic)
@@ -8237,6 +8344,7 @@
       (replayNextActionAt <= now || processed === 0)) {
         const actionIndex = replayActionIndex
         const action = activeReplay.actions[replayActionIndex++]
+        replayCurrentActionIndex = actionIndex
         replayRngCallers = []
         const rngBefore = replayRngIndex
 
@@ -8256,34 +8364,104 @@
         }
 
         const rngAfter = replayRngIndex
-        const expectedRng = Number.isInteger(action._rngStart)
-          ? ((Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart) ? activeReplay.actions[actionIndex + 1]._rngStart : activeReplay.rng.length) - action._rngStart)
+        const expectedStart = Number.isInteger(action._rngStart) ? action._rngStart : null
+        const expectedEnd = expectedStart !== null
+          ? (Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart)
+            ? activeReplay.actions[actionIndex + 1]._rngStart
+            : activeReplay.rng.length)
           : null
+        const expectedRng = expectedStart !== null ? (expectedEnd - expectedStart) : null
         const actualRng = rngAfter - rngBefore
-        console.debug('[Replay action]', {actionIndex, action, rngBefore, rngAfter, rngConsumed: actualRng, expectedRng})
+        const boundaryDiagnostic = {
+          actionIndex,
+          userActionNumber: actionIndex + 1,
+          type: action.type,
+          action: JSON.parse(JSON.stringify(action)),
+          cursorBefore: rngBefore,
+          cursorAfter: rngAfter,
+          actualRng,
+          recordedRngStart: expectedStart,
+          recordedRngEnd: expectedEnd,
+          expectedRng,
+          cursorOffset: expectedStart !== null ? (rngBefore - expectedStart) : null,
+          rngIndexOffset: expectedStart !== null && replayRngCallers.length
+            ? (replayRngCallers[0].rngIndex - expectedStart) : null,
+          firstActualRngIndex: replayRngCallers.length ? replayRngCallers[0].rngIndex : null,
+          lastActualRngIndex: replayRngCallers.length ? replayRngCallers.at(-1).rngIndex : null,
+          actualRngCalls: replayRngCallers.map((e, n) => ({
+            call: n + 1,
+            replayRngIndex: e.rngIndex,
+            value: e.value,
+            semantic: e.semantic,
+            direct: e.direct
+          }))
+        }
+        replayActionDiagnostics.push(boundaryDiagnostic)
+        if (replayActionDiagnostics.length > 200) replayActionDiagnostics.shift()
+        console.debug('[Replay action boundary]', boundaryDiagnostic)
         if (!replayPlaying) {
           replayActionRunning = false
           return
         }
         if (expectedRng !== null && actualRng !== expectedRng) {
+          const extraCalls = replayRngCallers.slice(expectedRng).map((e, n) => ({
+            extraCall: n + 1,
+            replayRngIndex: e.rngIndex,
+            value: e.value,
+            direct: e.direct,
+            semantic: e.semantic,
+            stack: e.stack
+          }))
           const expectedCallers = (Array.isArray(activeReplay._rngCallers) && activeReplay._rngCallers[actionIndex]) || null
           lastReplayDiagnostic = {
             actionIndex, action, rngBefore, rngAfter, actualRng, expectedRng,
             actualRngCallers: replayRngCallers.slice(),
+            extraRngCalls: extraCalls,
+            actualRngSources: replayRngCallers.map((e, n) => ({
+              call: n + 1,
+              replayRngIndex: e.rngIndex,
+              value: e.value,
+              direct: e.direct,
+              semantic: e.semantic,
+              stack: e.stack
+            })),
+            // Group calls by the first non-RNG helper in the stack. This makes
+            // the culprit obvious without manually reading every frame.
+            npcDiagnostics: replayNpcDiagnostics.map(x => ({...x})),
+            npcSummary: {
+              total: npcs.length,
+              nonStatic: npcs.filter(n => !n.static).length,
+              static: npcs.filter(n => !!n.static).length,
+              roster: npcs.map((n, i) => ({
+                npcIndex: i, name: n.name, x: n.x, y: n.y,
+                homeX: n.homeX, homeY: n.homeY, static: !!n.static, free: !!n.free
+              }))
+            },
+            actualRngSourceSummary: replayRngCallers.reduce((m, e) => {
+              const key = e.semantic || e.direct || '(unknown)'
+              if (!m[key]) m[key] = {count: 0, rngIndices: [], values: []}
+              m[key].count++
+              m[key].rngIndices.push(e.rngIndex)
+              m[key].values.push(e.value)
+              return m
+            }, {}),
             expectedRngCallers: expectedCallers,
+            actionBoundaries: replayActionDiagnostics.slice(-20),
             totalRecordedRng: activeReplay.rng.length,
             previousAction: actionIndex > 0 ? activeReplay.actions[actionIndex - 1] : null,
             nextAction: activeReplay.actions[actionIndex + 1] || null,
-            actualRngValues: rngLog.slice(-actualRng).map(x => x.v),
+            actualRngValues: replayRngCallers.map(x => x.value),
             message: 'First replay action with different RNG consumption'
           }
           window.lastReplayDiagnostic = lastReplayDiagnostic
           console.error('[Replay desync]', lastReplayDiagnostic)
+          replayCurrentActionIndex = null
           replayDesync(`Replay desynchronized on action #${actionIndex + 1}: expected ${expectedRng} RNG value(s), but this action consumed ${actualRng}. Check window.lastReplayDiagnostic.`)
           replayActionRunning = false
           return
         }
 
+        replayCurrentActionIndex = null
         replayNextActionAt += REPLAY_ACTION_DELAY_MS
         processed++
 
@@ -8306,6 +8484,8 @@
     }
 
     function startReplayPlayback() {
+      replayActionDiagnostics = []
+      replayCurrentActionIndex = null
       if (!replayData || !replayData.actions || !replayData.actions.length) return
       stopReplayPlayback()
       const replayToPlay = replayData
