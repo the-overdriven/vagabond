@@ -2932,10 +2932,13 @@ replay also reports whether it consumed exactly the recorded RNG length.
 
 **Determinism rule:** any gameplay condition that controls whether an RNG call
 happens must depend only on replayed gameplay state, not rendering/browser state.
-In particular, enemy/NPC wandering and Temple fleeing use a fixed 20-tile active
-radius from the player rather than the live camera viewport. This prevents
-window size, device, sidebar state, or other viewport differences from changing
-RNG consumption during playback.
+In particular, enemy/NPC wandering and Temple fleeing use the same fixed
+20-tile active-range helper (`enemyIsOnScreen`) based on Chebyshev distance from
+the player, rather than the live camera viewport. NPC wandering performs this
+range check **before** `chance(ENEMY_WANDER_CHANCE)`, so an NPC outside the active
+range consumes no wander RNG. This keeps enemy and NPC wandering on the same
+spatial rule and prevents window size, device, sidebar state, or other viewport
+differences from changing RNG consumption during playback.
 
 Old Hunter quest generation also uses the seeded RNG path (`chance()`), so its
 procedural quest selection is included in the recorded RNG sequence.
