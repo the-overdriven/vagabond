@@ -2652,6 +2652,15 @@
         if (scrollIdx >= 0) player.inventory.splice(scrollIdx, 1)
       }
       it.identified = true
+      // Artifact lore/description is normally generated lazily for legacy items.
+      // During replay, regenerate it from the replay RNG stream even if the loaded
+      // snapshot happens to contain stale/partial lore metadata. The recorded
+      // identification action includes those RNG calls, so this keeps the RNG
+      // boundary identical to the original run.
+      if (replaySimulationMode && it.possessor) {
+        it.ownerLore = null
+        it.description = null
+      }
       ensureArtifactOwnerLore(it)
       log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good')
       log(it.description, 'loot')
