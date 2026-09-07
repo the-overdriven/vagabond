@@ -4250,7 +4250,9 @@
     async function playerAttackEnemy(e, isExtraAttack = false) {
       const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
       updateMobileInfoPanel(e.x, e.y)
-      await animateAttackLunge(player.x, player.y, e.x, e.y)
+      // The lunge is cosmetic. Never let a replay action wait for rAF while the
+      // document is hidden, because browsers throttle/suspend rAF in background tabs.
+      if (!replaySimulationMode) await animateAttackLunge(player.x, player.y, e.x, e.y)
       if (e.evades && chance(0.30)) {
         const fromX = e.x, fromY = e.y
         const options = []
@@ -4311,7 +4313,8 @@
           ? e.equipment : null
         if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)) {
           log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good')
-          await playerAttackEnemy(e, true)
+          if (replaySimulationMode) playerAttackEnemy(e, true)
+          else await playerAttackEnemy(e, true)
         }
       }
     }
@@ -4512,6 +4515,22 @@
       stopCameraAnimation()
       clearEnemyAnims()
       stopAttackAnimation()
+      if (replaySimulationMode) {
+        // Death transitions are visual only. Apply the actual gameplay result now so
+        // the next recorded action is never blocked by log typing or rAF.
+        deathTransition = null
+        if (!player.permadeath) {
+          returnPlayerToTemple()
+          updateHud()
+          updateTooltip()
+          render()
+        } else {
+          resetForNewCharacter()
+          openRaceSelect()
+          render()
+        }
+        return
+      }
       deathTransition = {
         phase: 'pending',
         start: performance.now(),
@@ -5519,7 +5538,7 @@
 
     async function tryMove(dx, dy) {
       if (mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return
-      if (cameraAnimating || attackAnim) {
+      if (!replaySimulationMode && (cameraAnimating || attackAnim)) {
         pendingMove = {dx: dx, dy: dy}
         return
       }
@@ -6154,6 +6173,10 @@
     }
 
     function beginEnemyAttackAnim(e) {
+      if (replaySimulationMode) {
+        e.attackStart = undefined
+        return
+      }
       e.attackStart = performance.now()
       runAnimationLoop()
     }
@@ -6205,6 +6228,13 @@
     }
 
     function animateCameraToPlayer(fromPos) {
+      if (replaySimulationMode) {
+        moveAnim = null
+        cameraAnimating = false
+        snapCameraToPlayer()
+        render()
+        return
+      }
       const fromX = fromPos && typeof fromPos.x === 'number' ? fromPos.x : player.x
       const fromY = fromPos && typeof fromPos.y === 'number' ? fromPos.y : player.y
       moveAnim = {
@@ -6237,6 +6267,10 @@
     }
 
     function animateAttackLunge(fromX, fromY, targetX, targetY) {
+      if (replaySimulationMode) {
+        attackAnim = null
+        return Promise.resolve()
+      }
       stopAttackAnimation()
       attackAnim = {
         fromX: fromX,
@@ -7881,7 +7915,8 @@
        array instead of generating new randomness, so the exact same code
        path (movement/combat/loot/etc.) reproduces the exact same run. */
     const REPLAY_VERSION = 1
-    const REPLAY_ACTION_DELAY_MS = 169
+    // const REPLAY_ACTION_DELAY_MS = 169
+    const REPLAY_ACTION_DELAY_MS = 29
 
     let replayRecording = false // true once "Save replay" was chosen for the current character
     let replayData = null       // {version, initialState, actions, rng} being recorded (or last loaded)
@@ -7892,6 +7927,12 @@
     let replayActionIndex = 0
     let replayRngIndex = 0
     let replayTimer = null
+    // Replay simulation is deliberately independent of visual animation. When this
+    // is true, gameplay actions must finish synchronously so a background-tab throttle
+    // of requestAnimationFrame() cannot stall or reorder the deterministic simulation.
+    let replaySimulationMode = false
+    let replayNextActionAt = 0
+    let replayActionRunning = false
     // Always expose the latest diagnostic as a real global and on window.
     // This makes it accessible from the browser console as either
     // `lastReplayDiagnostic` or `window.lastReplayDiagnostic`.
@@ -7988,6 +8029,8 @@
       }
       replayPlaying = false
       replayPaused = false
+      replaySimulationMode = false
+      replayNextActionAt = 0
       activeReplay = null
       replayActionIndex = 0
       replayRngIndex = 0
@@ -8091,47 +8134,92 @@
       }
     }
 
-    function scheduleNextReplayAction() {
+    function scheduleNextReplayAction(delayOverride) {
       if (!replayPlaying || replayPaused) return
-      replayTimer = setTimeout(playNextReplayAction, REPLAY_ACTION_DELAY_MS)
+      if (replayTimer) {
+        clearTimeout(replayTimer)
+        replayTimer = null
+      }
+      const delay = delayOverride === undefined
+        ? Math.max(0, replayNextActionAt - performance.now())
+        : Math.max(0, delayOverride)
+      replayTimer = setTimeout(playNextReplayAction, delay)
     }
 
     async function playNextReplayAction() {
       replayTimer = null
-      if (!replayPlaying || replayPaused) return
+      if (!replayPlaying || replayPaused || replayActionRunning) return
+      replayActionRunning = true
+
+      // A background tab may get its timer callback late. Catch up all actions whose
+      // scheduled time has passed instead of treating the delayed callback as one
+      // normal replay step. This preserves the replay's timeline across tab switches.
+      let processed = 0
+      const now = performance.now()
+      while (replayPlaying && !replayPaused && replayActionIndex < activeReplay.actions.length &&
+      (replayNextActionAt <= now || processed === 0)) {
+        const actionIndex = replayActionIndex
+        const action = activeReplay.actions[replayActionIndex++]
+        replayRngCallers = []
+        const rngBefore = replayRngIndex
+
+        replaySimulationMode = true
+        try {
+          // IMPORTANT: await the action before checking RNG. Combat actions such as
+          // tryMove() are async, so checking immediately would see only part of the
+          // action (this caused the first-fight desync).
+          await runReplayAction(action)
+        } finally {
+          replaySimulationMode = false
+        }
+
+        const rngAfter = replayRngIndex
+        const expectedRng = Number.isInteger(action._rngStart)
+          ? ((Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart) ? activeReplay.actions[actionIndex + 1]._rngStart : activeReplay.rng.length) - action._rngStart)
+          : null
+        const actualRng = rngAfter - rngBefore
+        console.debug('[Replay action]', {actionIndex, action, rngBefore, rngAfter, rngConsumed: actualRng, expectedRng})
+        if (!replayPlaying) {
+          replayActionRunning = false
+          return
+        }
+        if (expectedRng !== null && actualRng !== expectedRng) {
+          const expectedCallers = (Array.isArray(activeReplay._rngCallers) && activeReplay._rngCallers[actionIndex]) || null
+          lastReplayDiagnostic = {
+            actionIndex, action, rngBefore, rngAfter, actualRng, expectedRng,
+            actualRngCallers: replayRngCallers.slice(),
+            expectedRngCallers: expectedCallers,
+            totalRecordedRng: activeReplay.rng.length,
+            previousAction: actionIndex > 0 ? activeReplay.actions[actionIndex - 1] : null,
+            nextAction: activeReplay.actions[actionIndex + 1] || null,
+            actualRngValues: rngLog.slice(-actualRng).map(x => x.v),
+            message: 'First replay action with different RNG consumption'
+          }
+          window.lastReplayDiagnostic = lastReplayDiagnostic
+          console.error('[Replay desync]', lastReplayDiagnostic)
+          replayDesync(`Replay desynchronized on action #${actionIndex + 1}: expected ${expectedRng} RNG value(s), but this action consumed ${actualRng}. Check window.lastReplayDiagnostic.`)
+          replayActionRunning = false
+          return
+        }
+
+        replayNextActionAt += REPLAY_ACTION_DELAY_MS
+        processed++
+
+        // Prevent a pathological/corrupt replay from monopolising the main thread.
+        // A normal background catch-up will finish on the next timer callback.
+        if (processed >= 200) break
+      }
+
+      if (!replayPlaying || replayPaused) {
+        replayActionRunning = false
+        return
+      }
       if (replayActionIndex >= activeReplay.actions.length) {
+        replayActionRunning = false
         finishReplayPlayback()
         return
       }
-      const actionIndex = replayActionIndex
-      const action = activeReplay.actions[replayActionIndex++]
-      replayRngCallers = []
-      const rngBefore = replayRngIndex
-      await runReplayAction(action)
-      const rngAfter = replayRngIndex
-      const expectedRng = Number.isInteger(action._rngStart)
-        ? ((Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart) ? activeReplay.actions[actionIndex + 1]._rngStart : activeReplay.rng.length) - action._rngStart)
-        : null
-      const actualRng = rngAfter - rngBefore
-      console.debug('[Replay action]', {actionIndex, action, rngBefore, rngAfter, rngConsumed: actualRng, expectedRng})
-      if (!replayPlaying) return // a desync mid-action already stopped playback
-      if (expectedRng !== null && actualRng !== expectedRng) {
-        const expectedCallers = (Array.isArray(activeReplay._rngCallers) && activeReplay._rngCallers[actionIndex]) || null
-        lastReplayDiagnostic = {
-          actionIndex, action, rngBefore, rngAfter, actualRng, expectedRng,
-          actualRngCallers: replayRngCallers.slice(),
-          expectedRngCallers: expectedCallers,
-          totalRecordedRng: activeReplay.rng.length,
-          previousAction: actionIndex > 0 ? activeReplay.actions[actionIndex - 1] : null,
-          nextAction: activeReplay.actions[actionIndex + 1] || null,
-          actualRngValues: rngLog.slice(-actualRng).map(x => x.v),
-          message: 'First replay action with different RNG consumption'
-        }
-        window.lastReplayDiagnostic = lastReplayDiagnostic
-        console.error('[Replay desync]', lastReplayDiagnostic)
-        replayDesync(`Replay desynchronized on action #${actionIndex + 1}: expected ${expectedRng} RNG value(s), but this action consumed ${actualRng}. Check window.lastReplayDiagnostic.`)
-        return
-      }
+      replayActionRunning = false
       scheduleNextReplayAction()
     }
 
@@ -8166,6 +8254,10 @@
       replayRngIndex = 0
       replayPlaying = true
       replayPaused = false
+      replaySimulationMode = false
+      // The first action keeps the existing visual delay, but subsequent actions are
+      // tied to this monotonic timeline rather than to timer callback frequency.
+      replayNextActionAt = performance.now() + REPLAY_ACTION_DELAY_MS
       updateReplayButton()
       log('Watching replay from the beginning...', 'info')
       scheduleNextReplayAction()
@@ -8184,9 +8276,20 @@
     function resumeReplay() {
       if (!replayPlaying || !replayPaused) return
       replayPaused = false
+      // Pausing freezes the replay timeline; resume from now with the normal delay.
+      replayNextActionAt = performance.now() + REPLAY_ACTION_DELAY_MS
       updateReplayButton()
       scheduleNextReplayAction()
     }
+
+    // If a hidden-tab timer was throttled, visibilitychange gives us an immediate
+    // chance to catch up as soon as the document becomes interactive again.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && replayPlaying && !replayPaused) {
+        playNextReplayAction()
+        render()
+      }
+    })
 
     function toggleReplayPlayback() {
       if (!replayPlaying) startReplayPlayback()
