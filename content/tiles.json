@@ -44,7 +44,7 @@
     },
     "hill": {
       "ch": "∩",
-      "color": "#a8945f",
+      "color": "#c8b98a",
       "bg": "#1a160c",
       "walk": true
     },
