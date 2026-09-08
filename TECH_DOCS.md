@@ -1425,13 +1425,13 @@ Current armor:
 | Cloak | 1 | 3 | 0 |
 | Tunic | 1 | 4 | 0 |
 | Leather Armor | 2 | 6 | 0 |
-| Studded Leather | 2 | 8 | 0 |
-| Chain Mail | 3 | 11 | 0 |
-| Brass Armor | 3 | 13 | 1 |
-| Splint Mail | 3 | 14 | 1 |
-| Scale Armor | 4 | 16 | 1 |
-| Plate Mail | 4 | 20 | 2 |
-| Ancient Armor | 5 | 24 | 2 |
+| Studded Leather | 2 | 7 | 0 |
+| Chain Mail | 3 | 9 | 0 |
+| Brass Armor | 2 | 10 | 3 |
+| Splint Mail | 3 | 11 | 1 |
+| Scale Armor | 4 | 13 | 1 |
+| Plate Mail | 4 | 15 | 2 |
+| Ancient Armor | 5 | 17 | 2 |
 
 Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
 
