@@ -1364,6 +1364,25 @@
         }
       }
 
+      // Guarantee at least one frozen river in the northern snow region.
+      // Natural river generation can produce no northern channel in some worlds;
+      // carve a short, walkable frozen channel rather than silently omitting it.
+      let frozenRiverCount = 0
+      for (let yy = 0; yy < SNOW_BAND; yy++) for (let xx = 0; xx < MAP_W; xx++)
+        if (map[yy][xx] === 'frozenriver') frozenRiverCount++
+      if (frozenRiverCount === 0) {
+        const fx = Math.max(3, Math.min(MAP_W - 4, randInt(6, MAP_W - 7)))
+        const fy = Math.max(3, Math.floor(SNOW_BAND * 0.45))
+        const length = Math.max(5, Math.min(12, SNOW_BAND - fy - 2))
+        for (let i = 0; i < length; i++) {
+          const yy = fy + i
+          if (yy >= SNOW_BAND || yy >= MAP_H - 2) break
+          if (map[yy][fx] === 'mountain' || map[yy][fx] === 'snowmountain' || map[yy][fx] === 'water') continue
+          map[yy][fx] = 'frozenriver'
+          tileUnderlays[keyXY(fx, yy)] = 'snow'
+        }
+      }
+
       // NOTE: cave generation ('cavefloor'/'cavewall') used to live here, but those
       // tile keys have no entry in TILE{} (they're commented out above) - any cave
       // tile that scrolled into view would crash render(). Removed until caves are
