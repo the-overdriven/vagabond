@@ -2,14 +2,6 @@
 
 - tests: add e2e tests
 
-## World generation & terrain
-- fix: hills should be more pale (color, not background)
-- fix: mausoleum is not generated not in worldgen? it seems to be generated only when i walk to it via hut entrance. but it should generate as other underground locations at the beginning of the game (but make sure there is no cave nearby).
-- fix: can flying mobs fly over lava and volcano? they should. nothing should stop them except walls.
-- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide, also dwarven ruins are not random enough, they are too similar on every run
-- fix: remove HUMAN_NAMES fallback
-- fix: You leave the frozen wastes and begin to thaw. - running river in taiga should be frozen river and also make char freeze (and decrease SPD)
-
 ## Tile inspection & flavor text
 - fix:
   You are standing on a big brass bell, far too heavy to carry.
@@ -589,7 +581,7 @@
     let ARTIFACT_PREFIXES = []
     let ARTIFACT_EPITHETS = []
     let ARTIFACT_NAMES_DWARF = []
-    let HUMAN_NAMES = ['Alden', 'Mira', 'Edrin', 'Halen', 'Bran', 'Tomas']
+    let HUMAN_NAMES = []
     let ARTIFACT_VOCATIONS_DWARF = []
     let ARTIFACT_EFFECTS = []
     let ARTIFACT_CURSES = []
@@ -696,7 +688,7 @@
       ARTIFACT_PREFIXES = content.artifactPrefixes
       ARTIFACT_EPITHETS = content.artifactEpithets
       ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf
-      HUMAN_NAMES = content.humanNames || HUMAN_NAMES
+      HUMAN_NAMES = content.humanNames
       ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf
       ARTIFACT_EFFECTS = content.artifactEffects
       ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : []
@@ -738,6 +730,13 @@
     // edit to the (externally hosted) content/tiles.json, they're patched
     // into the loaded tile tables here at runtime.
     function injectCryptLevel2Content() {
+      // Keep generated rivers renderable even when the external tile data is older.
+      const riverDefs = {
+        river: {walk: true, ch: '~', color: '#7fd0d8', bg: '#207f9a', mini: '#207f9a'},
+        frozenriver: {walk: true, ch: '~', color: '#d9f3f5', bg: '#8bb8c2', mini: '#8bb8c2'},
+      }
+      for (const [key, def] of Object.entries(riverDefs)) TILE[key] = TILE[key] || def
+
       const defs = {
         cryptstairsdown: {walk: true, ch: '>', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
         cryptstairsup: {walk: true, ch: '<', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
@@ -987,6 +986,19 @@
       return m
     }
 
+    function initializeMausoleum() {
+      const hut = villageHuts.find(h => h.mausoleum)
+      if (!hut || !undergroundMap || mausoleumMap) return
+      if (mausoleumAdjacentToRandomCave()) return
+      mausoleumMap = createMausoleum()
+      const ox = hut.x, oy = hut.y
+      for (let y = 0; y < mausoleumMap.length; y++) for (let x = 0; x < mausoleumMap[0].length; x++) {
+        const wx = ox + x - 4, wy = oy + y - 7
+        if (wx >= 0 && wy >= 0 && wx < MAP_W && wy < MAP_H && mausoleumMap[y][x] !== 'mountain') undergroundMap[wy][wx] = mausoleumMap[y][x]
+      }
+      undergroundMap[oy][ox] = 'mausoleumstairsup'
+    }
+
     function enterMausoleum() {
       const hut = villageHuts.find(h => h.mausoleum)
       if (currentZ === 0 && mausoleumDiscovered && hut && player.x === hut.x && player.y === hut.y) {
@@ -995,7 +1007,7 @@
           return true
         }
         if (!undergroundMap) return true
-        mausoleumMap = createMausoleum()
+        initializeMausoleum()
         const ox = hut?.x ?? player.x, oy = hut?.y ?? player.y
         for (let y = 0; y < mausoleumMap.length; y++) for (let x = 0; x < mausoleumMap[0].length; x++) {
           const wx = ox + x - 4, wy = oy + y - 7
@@ -1330,7 +1342,8 @@
             }
           }
           if (besideRiver) break
-          if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain' && map[y][x] !== 'cavewall') map[y][x] = 'river'
+          if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain' && map[y][x] !== 'cavewall') map[y][x] = (y < SNOW_BAND ? 'frozenriver' : 'river')
+          if (y < SNOW_BAND) tileUnderlays[keyXY(x, y)] = 'snow'
           // find lowest neighbor
           let bestX = x, bestY = y, bestE = elev[y][x]
           for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -1640,6 +1653,7 @@
         discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
       })
       buildDwarvenRuin(deepLevels[1])
+      initializeMausoleum()
       undergroundDiscovered = undergroundDiscoveredL1
       return !cryptInvalid
     }
@@ -1822,12 +1836,33 @@
     let dwarvenRuin = null
 
     function buildDwarvenRuin(targetLevel) {
+      const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+      const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
       const candidates = []
       for (let y = 8; y < MAP_H - 8; y++) for (let x = 8; x < MAP_W - 8; x++) {
         if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
         if (DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) candidates.push({x, y})
       }
-      if (!candidates.length) return
+      // The fort is mandatory. Prefer a natural mountain entrance, but if
+      // the generated world has no suitable mountain tile, create a small
+      // snowy mountain outcrop in the north and place the gate there.
+      if (!candidates.length) {
+        const fallback = []
+        const northLimit = Math.max(12, Math.floor(MAP_H * 0.28))
+        for (let y = 8; y < northLimit; y++) for (let x = 8; x < MAP_W - 8; x++) {
+          if (!TILE[map[y]?.[x]]?.walk) continue
+          if (!DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) continue
+          fallback.push({x, y})
+        }
+        const gate = fallback.length ? pick(fallback) : {x: Math.floor(MAP_W / 2), y: 10}
+        const {x: fx, y: fy} = gate
+        for (let yy = fy - 3; yy <= fy + 3; yy++) for (let xx = fx - 3; xx <= fx + 3; xx++) {
+          if (yy < 1 || yy >= MAP_H - 1 || xx < 1 || xx >= MAP_W - 1) continue
+          if (Math.abs(xx - fx) <= 1 && Math.abs(yy - fy) <= 1) continue
+          map[yy][xx] = 'snowmountain'
+        }
+        candidates.push({x: fx, y: fy})
+      }
       const gate = pick(candidates), x0 = gate.x, y0 = gate.y
       map[y0][x0] = 'dwarvengate'
       if (x0 > 0) map[y0][x0 - 1] = 'dwarvenstatue'
@@ -1839,42 +1874,130 @@
       }
       const cm = blankCaveMap(), minX = Math.max(2, x0 - 34), maxX = Math.min(MAP_W - 3, x0 + 34),
         minY = Math.max(2, y0 - 24), maxY = Math.min(MAP_H - 3, y0 + 24)
-      // Corridors and chambers: mostly 2-3 tiles wide, with long runs between
-      // a handful of larger rooms so this reads as a settlement, not a clearing.
+      // Generate a larger, irregular fort: sealed rooms with single entrances,
+      // connected by deliberately non-intersecting 2-3 tile-wide corridors.
       const carve = (x, y) => {
         if (x >= minX && x <= maxX && y >= minY && y <= maxY) cm[y][x] = 'marble'
       }
-      for (let y = minY + 2; y <= maxY - 2; y++) for (let x = minX + 2; x <= maxX - 2; x++) {
-        if ((x % 19 < 3) || (y % 17 < 3) || ((x - x0) * (x - x0) + (y - y0) * (y - y0) < 90)) carve(x, y)
+      const carveWide = (x, y, width = 2) => {
+        const span = Math.max(2, width)
+        for (let dy = 0; dy < span; dy++) for (let dx = 0; dx < span; dx++) carve(x + dx - Math.floor(span / 2), y + dy - Math.floor(span / 2))
       }
-      const rooms = [[x0 - 22, y0 - 15, 15, 11], [x0 + 18, y0 - 14, 18, 13], [x0 - 18, y0 + 13, 20, 10], [x0 + 20, y0 + 14, 16, 11]]
-      rooms.forEach(([cx, cy, w, h]) => {
-        for (let y = cy; y < cy + h; y++) for (let x = cx; x < cx + w; x++) carve(x, y)
-      })
-      for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
-      cm[y0][x0] = 'dwarvengate'
-      // Break the clean grid with collapses and missing flooring.
-      for (let i = 0; i < 70; i++) {
-        const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
-        if (cm[y][x] === 'marble') cm[y][x] = chance(.65) ? 'dwarvenrubble' : 'dwarvenwall'
+      const rooms = []
+      const roomCount = randInt(7, 11)
+      for (let attempt = 0; rooms.length < roomCount && attempt < 300; attempt++) {
+        const w = randInt(7, 14), h = randInt(6, 11)
+        const rx = randInt(minX + 4, maxX - w - 4), ry = randInt(minY + 4, maxY - h - 4)
+        const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
+        if (rooms.every(r => candidate.x > r.x + r.w + 3 || candidate.x + candidate.w + 3 < r.x || candidate.y > r.y + r.h + 3 || candidate.y + candidate.h + 3 < r.y)) rooms.push(candidate)
       }
-      // Restore a direct, two-tile-wide route from the entrance to every room
-      // after the collapse pass, so no chamber can become isolated.
-      const connect = (target) => {
-        let x = x0, y = y0
-        while (x !== target.x || y !== target.y) {
-          cm[y][x] = 'marble'
-          if (x !== target.x) x += Math.sign(target.x - x)
-          else y += Math.sign(target.y - y)
-          cm[y][x] = 'marble'
-          if (x !== target.x && y + 1 < maxY && cm[y + 1][x] === 'cavewall') cm[y + 1][x] = 'marble'
+      const entranceRoom = {x: x0 - 4, y: y0 - 4, w: 9, h: 9, cx: x0, cy: y0}
+      rooms.unshift(entranceRoom)
+      for (const r of rooms) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) carve(x, y)
+      const connected = [rooms[0]]
+      while (connected.length < rooms.length) {
+        let best = null
+        for (const r of rooms) if (!connected.includes(r)) for (const c of connected) {
+          const d = Math.abs(r.cx - c.cx) + Math.abs(r.cy - c.cy)
+          if (!best || d < best.d) best = {r, c, d}
+        }
+        const {r, c} = best
+        const horizontalFirst = chance(.5)
+        const corridor = (x1, y1, x2, y2) => {
+          const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
+          while (x1 !== x2) { carveWide(x1, y1, chance(.35) ? 3 : 2); x1 += sx }
+          while (y1 !== y2) { carveWide(x1, y1, chance(.35) ? 3 : 2); y1 += sy }
+          carveWide(x2, y2, 2)
+        }
+        if (horizontalFirst) { corridor(c.cx, c.cy, r.cx, c.cy); corridor(r.cx, c.cy, r.cx, r.cy) }
+        else { corridor(c.cx, c.cy, c.cx, r.cy); corridor(c.cx, r.cy, r.cx, r.cy) }
+        connected.push(r)
+      }
+      // Give every room exactly one doorway into its corridor network.
+      // The doorway is carved AFTER the walls are built: this prevents a room
+      // from being sealed by a wall where the corridor enters it.
+      for (let i = 1; i < rooms.length; i++) {
+        const r = rooms[i], parent = connected[i - 1] || rooms[0]
+        const horizontal = Math.abs(parent.cx - r.cx) >= Math.abs(parent.cy - r.cy)
+        let dx = r.cx, dy = r.cy
+        if (horizontal) {
+          if (parent.cx < r.cx) { dx = r.x; dy = r.cy } else { dx = r.x + r.w - 1; dy = r.cy }
+        } else {
+          if (parent.cy < r.cy) { dx = r.cx; dy = r.y } else { dx = r.cx; dy = r.y + r.h - 1 }
+        }
+        for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
+          if (xx === r.x || xx === r.x + r.w - 1 || yy === r.y || yy === r.y + r.h - 1) cm[yy][xx] = 'dwarvenwall'
+        }
+        // Open a genuine two-tile-wide doorway on the side facing the parent.
+        // The corridor approaches the room from that same side.
+        if (horizontal) {
+          const sideX = parent.cx < r.cx ? r.x : r.x + r.w - 1
+          const inward = parent.cx < r.cx ? 1 : -1
+          for (let oy = -1; oy <= 0; oy++) {
+            const yy = Math.max(r.y + 1, Math.min(r.y + r.h - 2, r.cy + oy))
+            cm[yy][sideX] = 'marble'
+            cm[yy][sideX + inward] = 'marble'
+          }
+        } else {
+          const sideY = parent.cy < r.cy ? r.y : r.y + r.h - 1
+          const inward = parent.cy < r.cy ? 1 : -1
+          for (let ox = -1; ox <= 0; ox++) {
+            const xx = Math.max(r.x + 1, Math.min(r.x + r.w - 2, r.cx + ox))
+            cm[sideY][xx] = 'marble'
+            cm[sideY + inward][xx] = 'marble'
+          }
         }
       }
-      for (const [cx, cy, w, h] of rooms) {
-        connect({
-          x: Math.max(minX + 2, Math.min(maxX - 2, cx + Math.floor(w / 2))),
-          y: Math.max(minY + 2, Math.min(maxY - 2, cy + Math.floor(h / 2)))
-        })
+      for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
+      cm[y0][x0] = 'dwarvengate'
+      for (let i = 0; i < 45; i++) {
+        const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
+        if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > 8) cm[y][x] = chance(.65) ? 'dwarvenrubble' : 'dwarvenwall'
+      }
+      // Final connectivity repair: every outermost walkable fort tile must
+      // have a path to the gate.  Room walls and rubble can otherwise seal
+      // off a room even when its doorway was carved correctly.
+      const fortWalkable = (x, y) => {
+        const t = cm[y]?.[x]
+        return t === 'marble' || t === 'dwarvengate' || t === 'dwarvenrubble'
+      }
+      const reachableFromGate = () => {
+        const seen = new Set(), queue = [{x: x0, y: y0}]
+        seen.add(`${x0},${y0}`)
+        for (let qi = 0; qi < queue.length; qi++) {
+          const p = queue[qi]
+          for (const [dx, dy] of DIRS4) {
+            const nx = p.x + dx, ny = p.y + dy, key = `${nx},${ny}`
+            if (nx < minX || nx > maxX || ny < minY || ny > maxY || seen.has(key) || !fortWalkable(nx, ny)) continue
+            seen.add(key); queue.push({x: nx, y: ny})
+          }
+        }
+        return seen
+      }
+      const outerFortTiles = []
+      for (let yy = minY; yy <= maxY; yy++) for (let xx = minX; xx <= maxX; xx++) {
+        if (!fortWalkable(xx, yy)) continue
+        if (DIRS4.some(([dx, dy]) => !fortWalkable(xx + dx, yy + dy))) outerFortTiles.push({x: xx, y: yy})
+      }
+      let reachable = reachableFromGate()
+      for (const tile of outerFortTiles) {
+        if (reachable.has(`${tile.x},${tile.y}`)) continue
+        // Find the nearest reachable tile and carve a two-tile-wide route.
+        let best = null
+        for (const key of reachable) {
+          const [rx, ry] = key.split(',').map(Number)
+          const d = Math.abs(rx - tile.x) + Math.abs(ry - tile.y)
+          if (!best || d < best.d) best = {x: rx, y: ry, d}
+        }
+        if (!best) continue
+        let cx = tile.x, cy = tile.y
+        const step = (x, y) => {
+          carve(x, y); carve(x + 1, y); carve(x, y + 1); carve(x + 1, y + 1)
+        }
+        while (cx !== best.x) { step(cx, cy); cx += Math.sign(best.x - cx) }
+        while (cy !== best.y) { step(cx, cy); cy += Math.sign(best.y - cy) }
+        step(best.x, best.y)
+        reachable = reachableFromGate()
       }
       const ruinCave = {x: x0, y: y0, entrances: [{x: x0, y: y0}]}
       const ruinMap = targetLevel ? targetLevel.map : undergroundMap
@@ -1943,8 +2066,17 @@
           description: pick(['A snapped pick lies beneath the dust.', 'A cracked keg still smells faintly of ale.', 'A workbench collapsed under its own tools.', 'A dwarven lintel bears a name worn smooth by generations.'])
         })
       }
-      const anvilSpot = {x: x0 + 5, y: y0 + 2}
-      if (cm[anvilSpot.y]?.[anvilSpot.x] === 'marble') groundItems.push({
+      // Place the anvil on a valid, reachable marble tile. The old fixed
+      // offset could land on a wall or rubble after the fort was randomized.
+      const anvilCandidates = []
+      for (let y = minY + 1; y < maxY; y++) for (let x = minX + 1; x < maxX; x++) {
+        if (cm[y]?.[x] !== 'marble') continue
+        if (Math.abs(x - x0) + Math.abs(y - y0) < 8) continue
+        if (groundItems.some(i => i.level === ruinLevel && i.caveIndex === dwarvenRuin.caveIndex && i.x === x && i.y === y)) continue
+        anvilCandidates.push({x, y})
+      }
+      const anvilSpot = anvilCandidates.length ? anvilCandidates[randInt(0, anvilCandidates.length - 1)] : null
+      if (anvilSpot) groundItems.push({
         x: anvilSpot.x,
         y: anvilSpot.y,
         kind: 'anvil',
@@ -1952,11 +2084,13 @@
         caveIndex: dwarvenRuin.caveIndex,
         description: 'The abandoned dwarven anvil is cold; its surface is scarred by a thousand unfinished blades.'
       })
-      let artifactSpot = (cm[y0 + 14]?.[x0 + 22] === 'marble') ? {x: x0 + 22, y: y0 + 14} : null
-      if (!artifactSpot) for (let yy = minY + 2; yy < maxY - 1 && !artifactSpot; yy++) for (let xx = minX + 2; xx < maxX - 1 && !artifactSpot; xx++) if (cm[yy][xx] === 'marble') artifactSpot = {
-        x: xx,
-        y: yy
+      const ruinFloorSpots = []
+      for (let yy = minY + 3; yy < maxY - 2; yy++) for (let xx = minX + 3; xx < maxX - 2; xx++) {
+        if (cm[yy][xx] === 'marble') ruinFloorSpots.push({x: xx, y: yy})
       }
+      const shuffledRuinSpots = ruinFloorSpots.sort(() => Math.random() - 0.5)
+      const farFrom = (p, q, distance = 10) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) >= distance
+      let artifactSpot = shuffledRuinSpots.find(p => farFrom(p, {x: x0, y: y0}, 18)) || shuffledRuinSpots[0]
       if (artifactSpot) groundItems.push({
         x: artifactSpot.x,
         y: artifactSpot.y,
@@ -1967,11 +2101,8 @@
         level: ruinLevel,
         caveIndex: dwarvenRuin.caveIndex
       })
-      let deepSpot = null
-      for (let xx = maxX - 4; xx >= minX + 3 && !deepSpot; xx--) for (let yy = minY + 3; yy <= maxY - 3 && !deepSpot; yy++) if (cm[yy][xx] === 'marble') deepSpot = {
-        x: xx,
-        y: yy
-      }
+      let deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, 16) && farFrom(p, {x: x0, y: y0}, 18))
+      if (!deepSpot) deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, 8))
       if (deepSpot) {
         groundItems.push({
           x: deepSpot.x,
@@ -2229,7 +2360,7 @@
         // villageHuts metadata. Give those tiles stable fallback human names so
         // they remain inspectable after loading. Do not invent a mausoleum link.
         const nameIndex = Math.abs((x * 31 + y * 17) % HUMAN_NAMES.length)
-        villageHuts.push({x, y, name: HUMAN_NAMES[nameIndex] || 'Alden', mausoleum: false})
+        villageHuts.push({x, y, name: HUMAN_NAMES[nameIndex], mausoleum: false})
         known.add(keyXY(x, y))
       }
 
@@ -3016,6 +3147,7 @@
       for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
       if (player.speedPotionTurns > 0) s += 3
       s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0
+      if (map[player.y]?.[player.x] === 'frozenriver' || (map[player.y]?.[player.x] === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')) s -= 1
       s += curseDebuffSum('spd')
       if (player.inventory.some(i => i.kind === 'bigbell')) s -= 5
       return Math.max(1, s)
@@ -3557,7 +3689,7 @@
 
       // Every remaining hut gets a normal random human name.
       for (let i = 1; i < villageHuts.length; i++) {
-        villageHuts[i].name = pick(HUMAN_NAMES) || 'Alden'
+        villageHuts[i].name = pick(HUMAN_NAMES)
       }
     }
 
@@ -4891,7 +5023,7 @@
       // Freezing exists only on the surface. Snow and taiga are both inherently
       // hostile cold terrain; once the player leaves them, the status clears.
       const tile = currentZ === 0 && map[player.y] ? map[player.y][player.x] : null
-      const cold = tile === 'snow' || tile === 'taiga'
+      const cold = tile === 'snow' || tile === 'taiga' || (tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow'))
       if (!player.freezing) player.freezing = {active: false, turns: 0}
       if (!cold) {
         if (player.freezing.active) {
@@ -7053,6 +7185,7 @@
 
     function markDiscovered(x, y) {
       const seen = currentZ === 0 ? discovered : undergroundDiscovered
+      if (!seen || !seen[y] || x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return
       if (seen[y][x]) return
       seen[y][x] = true
       ensureMiniBases()

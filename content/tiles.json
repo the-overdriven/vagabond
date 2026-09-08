@@ -44,7 +44,7 @@
     },
     "hill": {
       "ch": "∩",
-      "color": "#c8b98a",
+      "color": "#6f6959",
       "bg": "#1a160c",
       "walk": true
     },
@@ -213,6 +213,7 @@
   "tileCode": {
     "water": "w",
     "river": "r",
+    "frozenriver": "F",
     "sand": "s",
     "grass": "g",
     "forest": "f",
@@ -249,6 +250,7 @@
   "tileDesc": {
     "water": "open water",
     "river": "a running river",
+    "frozenriver": "a frozen river, its surface sealed beneath a sheet of ice",
     "sand": "sand",
     "grass": "a grassy field",
     "forest": "dense forest",
