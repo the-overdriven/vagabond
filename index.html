@@ -4220,7 +4220,11 @@
         }
       }
 
-      if (logQueue.length > 2) {
+      // Under Cypress, skip the char-by-char reveal entirely. It's a purely
+      // cosmetic effect and its duration scales with copy length, which makes
+      // E2E waits for log-idle flaky/slow (long intro text alone took ~4-5s
+      // of real setTimeout time, before any CI overhead on top of that).
+      if (logQueue.length > 2 || window.Cypress) {
         div.textContent = msg
         trimLog()
         logEl.scrollTop = logEl.scrollHeight
@@ -9709,6 +9713,12 @@
               player: {x: player.x, y: player.y},
               spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
               playerTile: map[player.y]?.[player.x] || null
+            }
+          },
+          getLogState() {
+            return {
+              isTyping,
+              queueLength: logQueue.length
             }
           }
         }

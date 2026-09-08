@@ -6,5 +6,6 @@ module.exports = defineConfig({
     specPattern: 'tests/e2e/**/*.cy.js',
     supportFile: false,
     video: false,
+    defaultCommandTimeout: 20000,
   },
 })

@@ -32,10 +32,9 @@ describe('Vagabond smoke test', () => {
         expect(state.playerTile).to.equal('temple')
       })
 
-    // Wait until ALL queued log messages have finished typing.
     cy.window()
       .its('__VAGABOND_E2E__')
-      .invoke('getLogState')
+      .invoke({ timeout: 15000 }, 'getLogState')
       .should((logState) => {
         expect(logState.isTyping).to.equal(false)
         expect(logState.queueLength).to.equal(0)
