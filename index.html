@@ -1,17 +1,6 @@
 <!-- TODO:
 
-- docs: add: when inspecting special items (when standing on their tiles) do not inspect surroundings
-- docs: On level-up: - mention that every second level up increases SPD !
-- docs: Crypt coffins use their own four crypt inscriptions; -> why its in z -3 section? or add crypt header
-- docs: Higher-tier enemies are generally placed farther from the Temple. - what is the logic?
-- docs: what is a mitigated attack? evasion or miss? pls clarify.
-- docs: how magic find affects gear worn by humanoid enemies? isnt that generated before we even meet the enemy?
-- docs: Chest loot odds for consumables/gold/gear are resolved from one roll out of 110. -> wrong section
-- docs: mention digging in foraging section
-- docs: Berries grant stacking Troll-like regeneration for 100 turns. -> remove from herbalist
-- docs: I have no idea how item costs are calculated. pls document it.
-
-- fix: replay desync, record some test runs
+- tests: add e2e tests
 
 - fix:
   You are standing on a big brass bell, far too heavy to carry.
@@ -104,6 +93,7 @@
 - feat: monsters that are close make sounds, to warn player
 - feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
 - refactor: move more to content .json
+- refactor: Separate game state from game logic
 - feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
   goblins should flee and get a swarm bonus when there is goblin nearby
   ghost can move behind walls
