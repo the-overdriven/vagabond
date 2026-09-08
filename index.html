@@ -2,38 +2,48 @@
 
 - tests: add e2e tests
 
+## World generation & terrain
+- fix: snake shouldnt spawn on sand
+- fix: hills should be more pale
+- fix: mausoleum is not generated not in worldgen?
+- fix: can flying mobs fly over lava and volcano? they should. nothing should stop them except walls.
+- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide, also dwarven ruins are not random enough
+- fix: remove HUMAN_NAMES fallback
+- fix: You leave the frozen wastes and begin to thaw. - running river in taiga should be frozen river and also make char freeze (and decrease SPD)
+
+## Tile inspection & flavor text
 - fix:
   You are standing on a big brass bell, far too heavy to carry.
   You notice a smoking volcano, its red throat glowing beneath the ash to the northwest
   this tile should ignore surroundings
 - fix: looting sarcophagus with F should trigger trap, not inspecting it
+- fix: one of the huts has grave flavor text when inspecting
+- fix: big bell weight shouldnt be mentioned from distance
+- fix: rename "skeleton" to skeletal remains
+
+## Save/load & inventory
 - fix: loading a save that was saved in the mausoleum spawns character in a wall
-- fix: snake shouldnt spawn on sand
 - fix: reduce save size
-- fix: foraging and digging should consume a turn
-- fix: "Resilient" prefix should floor at higher bonus
 - fix: merchant trade: Scroll of Teleportation doesnt appear in "your items"
 - fix: returning old hunter's quest item doesnt remove it from inventory
+- fix: When sorting weapons, the XP bonus should be scaled.
+
+## Character stats, combat & progression
+- fix: "Resilient" prefix should floor at higher bonus
 - fix: monster tooltips should separate ATK and DEF and SPD just like it separates Hit chance and AGGRO range
 - fix: current grace should be listed in char sheet under stats
 - fix: HP in stats is redundant
 - fix: You reached Level 2! (+10 max HP) - should also give SPD bonus, every second lvl
-- fix: one of the huts has grave flavor text when inspecting
-- fix: mausoleum is not generated not in worldgen?
-- fix: Drunk is talking about the bell way too late! and drunk has his old clonk clonk dialogue after delivering the bell
-- fix: using herbalist services should log the costs
-- fix: When sorting weapons, the XP bonus should be scaled.
-- fix: hills should be more pale
-- fix: can flying mobs fly over lava and volcano? they should
-- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide, also dwarven ruins are not random enough
-- fix: remove HUMAN_NAMES fallback
 - fix: grace checks shouldnt apply when player is invisible
+
+## Turn economy & NPC interaction
+- fix: foraging and digging should consume a turn
+- fix: using herbalist services should log the costs
 - fix: talking to old hunter by clicking/tapping on him should require standing next to him
 - fix: When the player enters the temple, fleeing mobs should move 2 tiles per turn instead of 1.
-- fix: You leave the frozen wastes and begin to thaw. - running river in taiga should be frozen river and also make char freeze (and decrease SPD)
-- fix: big bell weight shouldnt be mentioned from distance
 - fix: talking to NPC should stop their movement for a while, so you can talk to them without them running away
-- fix: rename "skeleton" to skeletal remains
+- fix: Drunk is talking about the bell way too late! and drunk has his old clonk clonk dialogue after delivering the bell
+
 - remove this fix: // The surface map is the authoritative return destination. (spawning entrances on exit)
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: brass armor should remove more speed
