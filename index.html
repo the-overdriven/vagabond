@@ -9699,6 +9699,20 @@
       snapCameraToPlayer()
       updateHud()
       render()
+      // Small read-only hook used by E2E tests. It is only exposed when the page
+      // is running inside Cypress and does not become part of normal gameplay.
+      if (window.Cypress) {
+        window.__VAGABOND_E2E__ = {
+          getState() {
+            return {
+              currentZ,
+              player: {x: player.x, y: player.y},
+              spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
+              playerTile: map[player.y]?.[player.x] || null
+            }
+          }
+        }
+      }
       // The overlay opens immediately, with cards showing at once so the player
       // can never hit "Begin" before seeing the choices, and play input is
       // blocked from the very first frame. Avatars are then re-pointed at

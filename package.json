@@ -1,0 +1,14 @@
+{
+  "name": "vagabond",
+  "private": true,
+  "scripts": {
+    "test:e2e": "cypress run",
+    "test:e2e:headed": "cypress run --headed --browser edge",
+    "start": "http-server . -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "cypress": "15.3.0",
+    "http-server": "14.1.1",
+    "wait-on": "8.0.3"
+  }
+}
