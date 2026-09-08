@@ -36,7 +36,6 @@
 
 - remove this fix: // The surface map is the authoritative return destination. (spawning entrances on exit)
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
-- balance: brass armor should remove more speed
 - balance: long sword should have more grace than one handed axe
 - balance: elf's grace does nothing when wielding dagger/rapier because the delay formula is max(1, 6 - GRACE)
 - balance: all monsters, including unarmed non-humanoids should have GRACE, so that elf's grace becomes more useful
@@ -49,62 +48,63 @@
 - balance: increase aggro of all mobs by 1? and make last tile 50% chance to aggro?
 - balance: high tier monsters should be more lickely to wear and drop items from their tier
 - balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
-- feat: on mobile it should be possible to drag and hold canvas down to get more canvas space and less message log
-- feat: add Level Up! popup
-- feat: add battle hammer (one-handed)
-- feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
-- feat: xp bar should show numbers and "xp" (on the bar, not next to it)
-- feat: treasure map should be in sepia
-- feat: discovered world edges - add to stats
-- feat: add stun (enemy doesn't do anything for x turns - can use it to escape)
-- feat: every wolf has a chance to spawn with another wolf
-- feat: old hunter quest should unlock something, not only give xp
-- feat: add steal/stealth mechanic?
-- feat: You equip the... should also say what you UNEQUIP first (in same line)
-- feat: add more artifacts bonuses and curses
-- feat: when forage does something special, highlight it on desktop (i.e. loot skeleton)
-- add HP bars to symbols/glyphs, can be toggable
-- feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
-- feat: Add an enemy that becomes enraged when its HP falls below 30% and gets bonus to atk
-- feat: [inventory] add "consumables" category (apple emoji?), automatically hide "all" category when having more than 10 items
-- feat: aoe dmg? for offensive char types
-- feat: curse idea: enemy increase aggro
-- feat: artifact modifier idea: boost equipped gear
-- feat: artifact idea: that makes weaker monsters run away
-- feat: introduce meat: will slowly regen HP (add enemy property: edible)
-- feat: add a way to protect against freezing, i.e. Barbarian Fur
-- feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
-- feat: add grace modifier to artifacts
-- feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
-- feat: add swimming (skill? (number represents how many tiles you can swim before you start drowning))
-- feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
-- feat: More terrain effects. forest grants cover (−1 enemy aggro range), in forest there is 33% chance that you sneak through the trees and monster does not aggro you
-- feat: custom map markers
-- feat: add limited ability to rest (may be interrupted), might require setting up camp. abandoned campfire could be reused
-- feat: bestiary
-- feat: add achievments to stats: strongest monster killed
-- feat: make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility
-- feat: super rare monsters? i.e. yeti
-- feat: individual monster loot table, outside of tier logic
-- feat: add more items to merchant, life potions?
-- feat: generate icons for different weapons and armor, axes, spears, etc.
-- feat: inspect player (p) should tell sth about player, experience HP, worn gear, how heavy backpack is, how char feels. OR clicking on player. hovering over player should show the tooltip with worn gear (paper doll) and avatar? and name.
-- feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
-- feat: monsters that are close make sounds, to warn player
-- feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
-- refactor: move more to content .json
-- refactor: Separate game state from game logic
-- feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
+
+- !1 feat: skip log typing animation in replays too?
+- !1 feat: on mobile it should be possible to drag and hold canvas down to get more canvas space and less message log
+- !1 feat: add Level Up! popup
+- !1 feat: add battle hammer (one-handed)
+- !1 feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
+- !1 feat: xp bar should show numbers and "xp" (on the bar, not next to it), desktop only
+- !1 feat: treasure map should be in sepia
+- !1 feat: discovered world edges - add to stats
+- !4 feat: add stun (enemy doesn't do anything for x turns - can use it to escape)
+- !4 feat: old hunter quest should unlock something, not only give xp
+- !5 feat: add steal/stealth mechanic?
+- !1 feat: You equip the... should also say what you UNEQUIP first (in same line)
+- !2 feat: when forage does something special, highlight it on desktop (i.e. loot skeleton)
+- !2 feat: add HP bars to symbols/glyphs, can be toggable, only on desktop
+- !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
+- !2 feat: [inventory] add "consumables" category (apple emoji?), automatically hide "all" category when having more than 10 items
+- !4 feat: aoe dmg? for offensive char types
+- !3 feat: introduce meat: will slowly regen HP (add enemy property: edible)
+- !2 feat: add a way to protect against freezing, i.e. Barbarian Fur
+- !4 feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
+- !2 feat: add grace modifier to artifacts
+- !3 feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
+- !2 feat: add swimming (skill? (number represents how many tiles you can swim before you start drowning))
+- !4 feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
+- !3 feat: More terrain effects. forest grants cover (−1 enemy aggro range), in forest there is 33% chance that you sneak through the trees and monster does not aggro you
+- !2 feat: custom map markers
+- !3 feat: add limited ability to rest (may be interrupted), might require setting up camp. abandoned campfire could be reused
+- !5 feat: bestiary
+- !1 feat: add achievments to stats: strongest monster killed
+- !2 feat: super rare monsters? i.e. yeti
+- !3 feat: individual monster loot table, outside of tier logic
+- !2 feat: add more items to merchant, life potions? rebalance item prices
+- !1 feat: generate icons for different weapons and armor, axes, spears, etc.
+- !2 feat: inspect player (p) should tell sth about player, experience HP, worn gear, how heavy backpack is, how char feels. OR clicking on player. hovering over player should show the tooltip with worn gear (paper doll) and avatar? and name.
+- !3 feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
+- !2 feat: monsters that are close make sounds, to warn player (log)
+- !3 feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
+- !2 refactor: move more to content .json
+- !1 refactor: remove remaining fallbacks, such as const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin') || {
+- !3 refactor: Separate game state from game logic
+- !2 feat: every wolf has a chance to spawn with another wolf
+- !3 feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
+  brutes have throwback, lich can dispell invisibility
+  Add an enemy that becomes enraged when its HP falls below 30% and gets bonus to atk
+  every wolf can summon a wolf
   goblins should flee and get a swarm bonus when there is goblin nearby
   ghost can move behind walls
   spider can pull the player towards it
-- feat: unidentified scrolls/potions
-- feat: enemies that killed you, grow their stats, and are distinguishable
-- feat: idea: add sleeping mobs (aggro 0)
-- feat: add traps, once we have proper dungeons
-- feat: Monsters can fight monsters when they walk into each other aggro range (only when player sees them on screen), if one is killed they drop loot on the ground
-- feat: randomly appearing ghost (far away) to freak player out (in mysteriando)
-- feat: add physical wounds / states:
+- !4 feat: unidentified scrolls/potions
+- !2 feat: enemies that killed you, grow their stats, and are distinguishable
+- !2 feat: idea: add sleeping mobs (aggro 0) zzz
+- !4 feat: add traps, once we have proper dungeons
+- !3 feat: grottos eventually found via dwarven fort
+- !3 feat: Monsters can fight monsters when they walk into each other aggro range (only when player is within radius), if one is killed they drop loot on the ground
+- !4 feat: randomly appearing ghost (far away) to freak player out (in mysteriando)
+- !3 feat: add physical wounds / states:
   - bleeding: lose 1 HP per turn until healed
   - poisoned: lose 1 HP per turn until cured
   - cursed: random stat is halved until cured
@@ -112,17 +112,20 @@
   - frozen: cannot move or attack for a few turns, SPD halved until healed
   - paralyzed/webbed
   - confused, walking in random direction
-- feat: curses ideas:
+- !3 feat: revise curses, curses ideas:
   - The HP loss curse stops while you're at full HP.
   - Hungry ... - you randomly lose 1 herb/mushroom/meat/berries
   - bad trip - all enemies are listed as stronger than they actually are
   - drunk - sometimes walks randomly
   - missing an attack hurts you (critical miss)
   - paralyzed fear - being close to enemy slows you down
-- feat: artifact idea:
+- !3 feat: artifact ideas. add more artifacts bonuses and curses:
+  - artifact modifier idea: boost equipped gear
+  - artifact idea: that makes weaker monsters run away
+  - curse idea: enemy increase aggro
   - Charismatic ... - decrease merchant prices
   - wind walker - no SPD penalty on terrain
-- feat: artifact synergies:
+- !2 feat: artifact synergies:
   - Dancer's Ring - If your attack delay (grace) is ≤2, +2 SPD.
   - Rapier of the Gale - If your SPD exceeds the enemy's SPD, +2 ATK.
   - every speed penalty gives additional DEF
@@ -131,7 +134,7 @@
   - artifact idea: Soulreaper: Killing a humanoid non-ghost spawns ghost (50% chance)
   - being hurt attracts certain/all enemies
   - artifact idea: all hits always connect (good for def builds)
-- feat: make descriptions more coherent with bonuses
+- !3 feat: make descriptions more coherent with bonuses
     Guardian artifact
       Mechanics tend toward:
       DEF
