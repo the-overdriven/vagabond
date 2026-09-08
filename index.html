@@ -4,10 +4,10 @@
 
 ## World generation & terrain
 - fix: snake shouldnt spawn on sand
-- fix: hills should be more pale
-- fix: mausoleum is not generated not in worldgen?
+- fix: hills should be more pale (color, not background)
+- fix: mausoleum is not generated not in worldgen? it seems to be generated only when i walk to it via hut entrance. but it should generate as other underground locations at the beginning of the game (but make sure there is no cave nearby).
 - fix: can flying mobs fly over lava and volcano? they should. nothing should stop them except walls.
-- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide, also dwarven ruins are not random enough
+- fix: dwarven fort: ghost can be rendered in the ground & dwarven corridors must be min. 2 sqm wide, also dwarven ruins are not random enough, they are too similar on every run
 - fix: remove HUMAN_NAMES fallback
 - fix: You leave the frozen wastes and begin to thaw. - running river in taiga should be frozen river and also make char freeze (and decrease SPD)
 
@@ -15,10 +15,9 @@
 - fix:
   You are standing on a big brass bell, far too heavy to carry.
   You notice a smoking volcano, its red throat glowing beneath the ash to the northwest
-  this tile should ignore surroundings
+  this tile should ignore surroundings! since bell is an item.
 - fix: looting sarcophagus with F should trigger trap, not inspecting it
-- fix: one of the huts has grave flavor text when inspecting
-- fix: big bell weight shouldnt be mentioned from distance
+- fix: one of the huts has grave flavor text when inspecting (hard to reproduce)
 - fix: rename "skeleton" to skeletal remains
 
 ## Save/load & inventory
