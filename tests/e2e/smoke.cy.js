@@ -1,3 +1,21 @@
+// Starts a fresh game with the given character name and waits for the race
+// overlay to close. Callers add their own assertions after this.
+function beginNewGame(name = 'E2E Tester') {
+  cy.visit('/')
+
+  cy.get('#raceOverlay .panelbox')
+    .should('be.visible')
+
+  cy.get('#raceName')
+    .clear()
+    .type(name)
+
+  cy.get('#btnBegin').click()
+
+  cy.get('#raceOverlay')
+    .should('not.have.class', 'show')
+}
+
 // Waits until ALL queued log messages have finished typing. This is given
 // its own explicit timeout (rather than raising defaultCommandTimeout
 // globally) so a slow log doesn't mask real failures elsewhere in the
@@ -13,15 +31,13 @@ function waitForLogIdle() {
     })
 }
 
+function pressKey(overrides) {
+  cy.window().trigger('keydown', { bubbles: true, ...overrides })
+}
+
 // Space = inspect surroundings.
 function pressInspect() {
-  cy.window().trigger('keydown', {
-    key: ' ',
-    code: 'Space',
-    which: 32,
-    keyCode: 32,
-    bubbles: true,
-  })
+  pressKey({ key: ' ', code: 'Space', which: 32, keyCode: 32 })
 }
 
 const ARROW_KEYS = {
@@ -33,29 +49,23 @@ const ARROW_KEYS = {
 
 // Moves the player one tile in the given direction ('up' | 'down' | 'left' | 'right').
 function pressMove(direction) {
-  cy.window().trigger('keydown', {
-    ...ARROW_KEYS[direction],
-    bubbles: true,
-  })
+  pressKey(ARROW_KEYS[direction])
+}
+
+// Tab = toggle the inventory overlay.
+function pressToggleInventory() {
+  pressKey({ key: 'Tab', code: 'Tab', which: 9, keyCode: 9 })
+}
+
+// M = toggle the map overlay.
+function pressToggleMap() {
+  pressKey({ key: 'm', code: 'KeyM', which: 77, keyCode: 77 })
 }
 
 describe('Vagabond smoke test', () => {
   it('starts the game and inspects the Temple with Space', () => {
-    cy.visit('/')
-
-    cy.get('#raceOverlay .panelbox')
-      .should('be.visible')
-
     const name = 'E2E Tester'
-
-    cy.get('#raceName')
-      .clear()
-      .type(name)
-
-    cy.get('#btnBegin').click()
-
-    cy.get('#raceOverlay')
-      .should('not.have.class', 'show')
+    beginNewGame(name)
 
     cy.get('#logpanel .good')
       .should('have.length.at.least', 1)
@@ -72,6 +82,18 @@ describe('Vagabond smoke test', () => {
         expect(state.player.y).to.equal(state.spawnPoint.y)
         expect(state.playerTile).to.equal('temple')
       })
+
+    // Starting HUD stats for a fresh Human character.
+    cy.get('#hLvl').should('have.text', '1')
+    cy.get('#hptext').should('have.text', '50 / 50')
+    cy.get('#hpbar').invoke('attr', 'style').should('include', 'width: 100%')
+    cy.get('#xpbar').invoke('attr', 'style').should('include', 'width: 0%')
+    cy.get('#hAtk').should('have.text', '2')
+    cy.get('#hDef').should('have.text', '1')
+    cy.get('#hSpd').should('have.text', '3')
+    cy.get('#hMf').should('have.text', '0')
+    cy.get('#hGold').should('have.text', '0')
+    cy.get('#hDeaths').should('have.text', '0')
 
     waitForLogIdle()
     pressInspect()
@@ -110,5 +132,40 @@ describe('Vagabond smoke test', () => {
 
     cy.get('#logpanel .info')
       .should('contain', 'You stand beneath the open dwarven gates')
+  })
+
+  it('opens the inventory and map overlays and switches between them', () => {
+    beginNewGame()
+    waitForLogIdle()
+
+    cy.get('#invOverlay').should('not.have.class', 'show')
+    cy.get('#mapOverlay').should('not.have.class', 'show')
+
+    // Tab opens the inventory.
+    pressToggleInventory()
+    cy.get('#invOverlay').should('have.class', 'show')
+    cy.get('#mapOverlay').should('not.have.class', 'show')
+
+    // The inventory's "View Map" button swaps over to the map overlay.
+    cy.get('#btnInvToMap').click()
+    cy.get('#mapOverlay').should('have.class', 'show')
+    cy.get('#invOverlay').should('not.have.class', 'show')
+
+    // The map's "Inventory" button swaps back.
+    cy.get('#btnMapToInv').click()
+    cy.get('#invOverlay').should('have.class', 'show')
+    cy.get('#mapOverlay').should('not.have.class', 'show')
+
+    // Close the inventory, then open the map directly with 'M'.
+    cy.get('#btnInvClose').click()
+    cy.get('#invOverlay').should('not.have.class', 'show')
+
+    pressToggleMap()
+    cy.get('#mapOverlay').should('have.class', 'show')
+    cy.get('#invOverlay').should('not.have.class', 'show')
+
+    // 'M' again toggles the map closed.
+    pressToggleMap()
+    cy.get('#mapOverlay').should('not.have.class', 'show')
   })
 })
