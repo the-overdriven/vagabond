@@ -89,7 +89,7 @@ describe('Vagabond smoke test', () => {
     cy.get('#hpbar').invoke('attr', 'style').should('include', 'width: 100%')
     cy.get('#xpbar').invoke('attr', 'style').should('include', 'width: 0%')
     cy.get('#hAtk').should('have.text', '2')
-    cy.get('#hDef').should('have.text', '1')
+    cy.get('#hDef').should('have.text', '0')
     cy.get('#hSpd').should('have.text', '3')
     cy.get('#hMf').should('have.text', '0')
     cy.get('#hGold').should('have.text', '0')
@@ -128,6 +128,7 @@ describe('Vagabond smoke test', () => {
     // Walk onto the gate tile - stepping onto a dwarvengate tile is what
     // logs this message, not inspecting it.
     pressMove('right')
+    cy.get('#hDef').should('have.text', '1') // hill gives +1 DEF
     pressMove('left')
 
     cy.get('#logpanel .info')
