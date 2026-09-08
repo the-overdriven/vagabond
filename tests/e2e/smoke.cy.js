@@ -127,9 +127,9 @@ describe('Vagabond smoke test', () => {
 
     // Walk onto the gate tile - stepping onto a dwarvengate tile is what
     // logs this message, not inspecting it.
-    pressMove('right')
+    pressMove('down')
     cy.get('#hDef').should('have.text', '1') // hill gives +1 DEF
-    pressMove('left')
+    pressMove('up')
 
     cy.get('#logpanel .info')
       .should('contain', 'You stand beneath the open dwarven gates')
