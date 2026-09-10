@@ -1,16 +1,5 @@
 <!-- TODO:
 
-- tests: add e2e tests
-
-## Tile inspection & flavor text
-- fix:
-  You are standing on a big brass bell, far too heavy to carry.
-  You notice a smoking volcano, its red throat glowing beneath the ash to the northwest
-  this tile should ignore surroundings! since bell is an item.
-- fix: looting sarcophagus with F should trigger trap, not inspecting it
-- fix: one of the huts has grave flavor text when inspecting (hard to reproduce)
-- fix: rename "skeleton" to skeletal remains
-
 ## Save/load & inventory
 - fix: loading a save that was saved in the mausoleum spawns character in a wall
 - fix: reduce save size
@@ -3730,11 +3719,11 @@
         const candidate = {x: forest.x + randInt(-8, 8), y: forest.y + randInt(-8, 8)}
         if (shape.every(([sx, sy]) => {
           const x = candidate.x + sx, y = candidate.y + sy
-          return x >= 2 && y >= 2 && x < MAP_W - 2 && y < MAP_H - 2 && isWalkable(x, y) && map[y][x] !== 'ancientForest' && map[y][x] !== 'temple' && map[y][x] !== 'belltower' && map[y][x] !== 'ruinedchapel'
+          return x >= 2 && y >= 2 && x < MAP_W - 2 && y < MAP_H - 2 && isWalkable(x, y) && map[y][x] !== 'ancientForest' && map[y][x] !== 'temple' && map[y][x] !== 'belltower' && map[y][x] !== 'ruinedchapel' && map[y][x] !== 'village'
         })) origin = candidate
         else if (attempt === 99) {
           for (const alt of shapes) {
-            for (let y = forest.y - 10; y <= forest.y + 15 && !origin; y++) for (let x = forest.x - 10; x <= forest.x + 15 && !origin; x++) if (alt.every(([sx, sy]) => isWalkable(x + sx, y + sy) && map[y + sy][x + sx] !== 'ancientForest')) {
+            for (let y = forest.y - 10; y <= forest.y + 15 && !origin; y++) for (let x = forest.x - 10; x <= forest.x + 15 && !origin; x++) if (alt.every(([sx, sy]) => isWalkable(x + sx, y + sy) && map[y + sy][x + sx] !== 'ancientForest' && map[y + sy][x + sx] !== 'village')) {
               shape = alt
               origin = {x, y}
             }
@@ -3744,7 +3733,7 @@
       if (!origin) return
       for (const [sx, sy] of shape) {
         const x = origin.x + sx, y = origin.y + sy
-        if (!isWalkable(x, y) || map[y][x] === 'ancientForest' || map[y][x] === 'temple' || map[y][x] === 'ruinedchapel') continue
+        if (!isWalkable(x, y) || map[y][x] === 'ancientForest' || map[y][x] === 'temple' || map[y][x] === 'ruinedchapel' || map[y][x] === 'village') continue
         const name = pick(ARTIFACT_NAMES_DWARF)
         const n = typeof name === 'string' ? name : (name.name || 'Unknown Dwarf')
         const death = placed === oddIndex ? randInt(701, 780) : randInt(520, 700)
@@ -4154,7 +4143,7 @@
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
         const gx = digger.x + dx, gy = digger.y + dy, key = keyXY(gx, gy)
         const walkable = TILE[surfaceMap[gy]?.[gx]]?.walk
-        if (!walkable || surfaceMap[gy][gx] === 'belltower' || surfaceMap[gy][gx] === 'grave') continue
+        if (!walkable || surfaceMap[gy][gx] === 'belltower' || surfaceMap[gy][gx] === 'grave' || surfaceMap[gy][gx] === 'village') continue
         const blocker = enemies.find(e => e.alive && e.level === 0 && e.x === gx && e.y === gy)
         if (blocker) {
           blocker.alive = false
@@ -4214,7 +4203,7 @@
           for (const [dx, dy] of DIRS8) {
             const gx = x + dx, gy = y + dy
             if (!isWalkable(gx, gy) || occupied.has(keyXY(gx, gy))) continue
-            if (map[gy][gx] === 'temple' || map[gy][gx] === 'belltower') continue
+            if (map[gy][gx] === 'temple' || map[gy][gx] === 'belltower' || map[gy][gx] === 'village') continue
             tileUnderlays[keyXY(gx, gy)] = map[gy][gx]
             map[gy][gx] = 'grave'
             gravediggerGraveKey = keyXY(gx, gy)
@@ -5485,6 +5474,18 @@
         log('You pick up the loose tombstone.', 'loot')
         return
       }
+      if (currentZ === -4 && cryptLevel2 && map[player.y]?.[player.x] === 'crypttrap') {
+        springCrypt2Trap()
+        return
+      }
+      if (currentZ === -4 && map[player.y]?.[player.x] === 'crypttrapsprung') {
+        log(CRYPT2_TRAP_SPENT, 'info')
+        return
+      }
+      if (currentZ === -4 && map[player.y]?.[player.x] === 'sarcophagus') {
+        log('There is nothing to loot here.', 'info')
+        return
+      }
       if (map[player.y]?.[player.x] === 'bigbell') {
         const bar = player.inventory.find(i => i.kind === 'wheelbarrow')
         if (!bar) {
@@ -5543,7 +5544,7 @@
       }
       if (skeleton) {
         if (skeleton.looted) {
-          log('The skeleton has already been searched.', 'info')
+          log('These skeletal remains have already been searched.', 'info')
           return
         }
         skeleton.looted = true
@@ -5560,7 +5561,7 @@
         suppressLootLog = true
         checkGroundAt(player.x, player.y)
         suppressLootLog = false
-        log(`You search the skeleton and take what remains: ${lastLootResult}`, 'loot')
+        log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot')
         return
       }
       tryForage()
@@ -5987,54 +5988,68 @@
       }
     }
 
+    // Map tiles that are themselves a unique lore item (not a biome), so
+    // standing on one shouldn't also print notes about nearby terrain.
+    const STANDALONE_LANDMARK_TILES = new Set(['bigbell', 'blackpillar'])
+
+    // Springs the crypt-level-2 sarcophagus trap: marks it sprung, swaps the
+    // tile, and rises a few skeletons nearby. Triggered by looting (F) the
+    // disguised sarcophagus, not by inspecting it - inspecting alone must
+    // not be able to tell the trap apart from a real sarcophagus.
+    function springCrypt2Trap() {
+      cryptLevel2.trapSprung = true
+      map[player.y][player.x] = 'crypttrapsprung'
+      log(CRYPT2_TRAP_TRIGGER, 'bad')
+      const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton') || {
+        name: 'Skeleton',
+        tier: 1,
+        hp: 12,
+        atk: 5,
+        def: 2,
+        spd: 4,
+        fly: false,
+        humanoid: true,
+        evades: false,
+        aggro: AGGRO_RANGE,
+      }
+      const open = []
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const x = player.x + dx, y = player.y + dy
+        if (map[y] && map[y][x] === 'crypt2floor') open.push({x, y})
+      }
+      for (let i = 0; i < 3 && open.length; i++) {
+        const p = open.splice(randInt(0, open.length - 1), 1)[0]
+        addEnemy({
+          name: skeletonTmpl.name,
+          baseName: skeletonTmpl.name,
+          tier: skeletonTmpl.tier || 1,
+          level: -4,
+          hp: skeletonTmpl.hp,
+          maxHp: skeletonTmpl.hp,
+          atk: skeletonTmpl.atk,
+          def: skeletonTmpl.def,
+          spd: skeletonTmpl.spd,
+          fly: !!skeletonTmpl.fly,
+          humanoid: skeletonTmpl.humanoid !== false,
+          evades: !!skeletonTmpl.evades,
+          aggro: skeletonTmpl.aggro ?? AGGRO_RANGE,
+          x: p.x,
+          y: p.y,
+          homeX: p.x,
+          homeY: p.y,
+          homeTileType: 'crypt2floor',
+          alive: true,
+          prefix: null,
+          equipment: null
+        })
+      }
+    }
+
     function describeSurroundings() {
       if (currentZ === -4 && cryptLevel2 && map[player.y]?.[player.x] === 'crypttrap') {
-        cryptLevel2.trapSprung = true
-        map[player.y][player.x] = 'crypttrapsprung'
-        log(CRYPT2_TRAP_TRIGGER, 'bad')
-        const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton') || {
-          name: 'Skeleton',
-          tier: 1,
-          hp: 12,
-          atk: 5,
-          def: 2,
-          spd: 4,
-          fly: false,
-          humanoid: true,
-          evades: false,
-          aggro: AGGRO_RANGE,
-        }
-        const open = []
-        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
-          const x = player.x + dx, y = player.y + dy
-          if (map[y] && map[y][x] === 'crypt2floor') open.push({x, y})
-        }
-        for (let i = 0; i < 3 && open.length; i++) {
-          const p = open.splice(randInt(0, open.length - 1), 1)[0]
-          addEnemy({
-            name: skeletonTmpl.name,
-            baseName: skeletonTmpl.name,
-            tier: skeletonTmpl.tier || 1,
-            level: -4,
-            hp: skeletonTmpl.hp,
-            maxHp: skeletonTmpl.hp,
-            atk: skeletonTmpl.atk,
-            def: skeletonTmpl.def,
-            spd: skeletonTmpl.spd,
-            fly: !!skeletonTmpl.fly,
-            humanoid: skeletonTmpl.humanoid !== false,
-            evades: !!skeletonTmpl.evades,
-            aggro: skeletonTmpl.aggro ?? AGGRO_RANGE,
-            x: p.x,
-            y: p.y,
-            homeX: p.x,
-            homeY: p.y,
-            homeTileType: 'crypt2floor',
-            alive: true,
-            prefix: null,
-            equipment: null
-          })
-        }
+        // Indistinguishable from a real sarcophagus on inspection - looting
+        // it with "F" is what springs the trap, not inspecting.
+        log('An old stone sarcophagus, sealed and undisturbed.', 'info')
         return
       }
       if (currentZ === -4 && map[player.y]?.[player.x] === 'crypttrapsprung') {
@@ -6123,12 +6138,17 @@
           return
         }
       }
-      const here = TILE_DESC[map[player.y][player.x]] || 'unfamiliar ground'
+      const hereTile = map[player.y][player.x]
+      const here = TILE_DESC[hereTile] || 'unfamiliar ground'
       log(`You are standing on ${here}.`, 'info')
+      // Standalone lore-item tiles (bell, pillar) are themselves the point of
+      // interest - unlike a biome tile, they shouldn't also report on the
+      // surrounding terrain/enemies/items.
+      if (STANDALONE_LANDMARK_TILES.has(hereTile)) return
       const currentGround = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y)
       let inspectedGround = false
       if (currentGround && currentGround.kind === 'skeleton') {
-        log(`Skeleton${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info')
+        log(`Skeletal Remains${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info')
         inspectedGround = true
       } else if (currentGround && currentGround.kind === 'campfire') {
         log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info')
@@ -6204,7 +6224,7 @@
                       item.kind === 'idscroll' ? 'a scroll' :
                         item.kind === 'teleportscroll' ? 'a scroll' :
                           item.kind === 'treasurecasket' ? 'an old casket' :
-                            item.kind === 'skeleton' ? 'a skeleton' :
+                            item.kind === 'skeleton' ? 'skeletal remains' :
                               item.kind === 'deadbody' ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.` :
                                 item.kind === 'campfire' ? 'a campfire' :
                                   item.kind === 'anvil' ? 'an anvil' :
@@ -6905,7 +6925,7 @@
     }
 
     function groundItemLabel(g) {
-      return g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeleton' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
+      return g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
     }
 
     let lastMousePx = null, lastMousePy = null
@@ -6989,7 +7009,7 @@
         if (g.kind === 'skeleton') return {
           mini: true,
           enemy: null,
-          html: `<div class="nm">Skeleton${g.looted ? ' (searched)' : ''}</div>`
+          html: `<div class="nm">Skeletal Remains${g.looted ? ' (searched)' : ''}</div>`
         }
         return {mini: true, enemy: null, html: `<div class="nm">${groundItemLabel(g)}</div>`}
       }
