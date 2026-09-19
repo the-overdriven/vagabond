@@ -9158,19 +9158,6 @@
         if (surfaceMap[cryptEntrance.y]?.[cryptEntrance.x]) surfaceMap[cryptEntrance.y][cryptEntrance.x] = 'ruinedchapel'
       }
       if (dwarvenRuin) dwarvenRuin.caveIndex = caves.findIndex(c => c.entrances.some(e => e.x === dwarvenRuin.x && e.y === dwarvenRuin.y))
-      // The surface map is the authoritative return destination. Older saves
-      // (and saves made while a cave map was active) could lose the entrance
-      // glyph when switching back to the surface, leaving only the mountain
-      // tile beside the player. Restore every declared entrance at its exact
-      // coordinate; preserve the special Dwarven gate if present.
-      for (const cave of caves) {
-        if (cave.crypt) continue
-        for (const entrance of cave.entrances) {
-          if (surfaceMap[entrance.y] && surfaceMap[entrance.y][entrance.x] !== 'dwarvengate') {
-            surfaceMap[entrance.y][entrance.x] = 'caveentrance'
-          }
-        }
-      }
       caveMaps = (data.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
       if (cryptCaveIndex >= 0 && caveMaps[cryptCaveIndex]) {
         const crypt = caves[cryptCaveIndex]
