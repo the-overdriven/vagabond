@@ -1,6 +1,5 @@
 <!-- TODO:
 
-- remove this fix: // The surface map is the authoritative return destination. (spawning entrances on exit)
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: long sword should have more grace than one handed axe
 - balance: elf's grace does nothing when wielding dagger/rapier because the delay formula is max(1, 6 - GRACE)
@@ -2085,35 +2084,41 @@
       const ghost = ENEMY_TEMPLATES.find(t => t.name === 'Ghost')
       const ruinLevel = targetLevel ? -3 : -1
       if (ghost) {
-        for (let i = 0; i < 8; i++) {
-          let gx = x0 + randInt(-25, 25), gy = y0 + randInt(-18, 18)
-          if (cm[gy]?.[gx] === 'marble') {
-            addEnemy({
-              name: 'Ghost',
-              baseName: 'Ghost',
-              tier: ghost.tier || 2,
-              level: ruinLevel,
-              levelKind: 'chain',
-              caveIndex: dwarvenRuin.caveIndex,
-              hp: ghost.hp,
-              maxHp: ghost.hp,
-              atk: ghost.atk,
-              def: ghost.def,
-              spd: ghost.spd,
-              fly: true,
-              humanoid: false,
-              evades: true,
-              aggro: ghost.aggro ?? AGGRO_RANGE,
-              x: gx,
-              y: gy,
-              homeX: gx,
-              homeY: gy,
-              homeTileType: 'marble',
-              alive: true,
-              prefix: null,
-              equipment: null
-            })
-          }
+        // Spawn eight ghosts on actual fort floor tiles
+        const ghostSpots = []
+        for (let gy = minY + 1; gy < maxY; gy++) for (let gx = minX + 1; gx < maxX; gx++) {
+          if (cm[gy]?.[gx] !== 'marble') continue
+          if (Math.abs(gx - x0) + Math.abs(gy - y0) < 8) continue
+          ghostSpots.push({x: gx, y: gy})
+        }
+        for (let i = 0; i < 8 && ghostSpots.length; i++) {
+          const pickIndex = randInt(0, ghostSpots.length - 1)
+          const {x: gx, y: gy} = ghostSpots.splice(pickIndex, 1)[0]
+          addEnemy({
+            name: 'Ghost',
+            baseName: 'Ghost',
+            tier: ghost.tier || 2,
+            level: ruinLevel,
+            levelKind: 'chain',
+            caveIndex: dwarvenRuin.caveIndex,
+            hp: ghost.hp,
+            maxHp: ghost.hp,
+            atk: ghost.atk,
+            def: ghost.def,
+            spd: ghost.spd,
+            fly: true,
+            humanoid: false,
+            evades: true,
+            aggro: ghost.aggro ?? AGGRO_RANGE,
+            x: gx,
+            y: gy,
+            homeX: gx,
+            homeY: gy,
+            homeTileType: 'marble',
+            alive: true,
+            prefix: null,
+            equipment: null
+          })
         }
       }
       for (let i = 0; i < 18; i++) {
@@ -8892,7 +8897,7 @@
     }
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 12 // v11 normalizes underground z-depths and distinguishes crypt2 from generic z:-2
+    const SAVE_VERSION = 13
 
     // Run-length encoding for the save file's map/discovery grids. Every
     // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -9036,6 +9041,7 @@
           baseName: e.baseName,
           tier: e.tier,
           level: e.level || 0,
+          levelKind: e.levelKind || null,
           caveIndex: e.caveIndex,
           hp: e.hp,
           maxHp: e.maxHp,
@@ -9157,7 +9163,13 @@
         const cryptEntrance = caves[cryptCaveIndex].entrances[0]
         if (surfaceMap[cryptEntrance.y]?.[cryptEntrance.x]) surfaceMap[cryptEntrance.y][cryptEntrance.x] = 'ruinedchapel'
       }
-      if (dwarvenRuin) dwarvenRuin.caveIndex = caves.findIndex(c => c.entrances.some(e => e.x === dwarvenRuin.x && e.y === dwarvenRuin.y))
+      // The surface gate still has a z:-1 link cave, but the fort itself lives
+      // on chain depth 3 (z:-3). Its real caveIndex is restored after deepLevels
+      // have been decoded below.
+      if (dwarvenRuin) {
+        dwarvenRuin.caveIndex = -1
+        dwarvenRuin.level = -3
+      }
       caveMaps = (data.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
       if (cryptCaveIndex >= 0 && caveMaps[cryptCaveIndex]) {
         const crypt = caves[cryptCaveIndex]
@@ -9243,6 +9255,14 @@
         const lvlDiscovered = decodeBoolGrid(lvlData.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
         return {map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered}
       })
+
+      if (dwarvenRuin && deepLevels[1]) {
+        const fortCaveIndex = deepLevels[1].caves.findIndex(c =>
+          (c.entrances || []).some(e => e.x === dwarvenRuin.x && e.y === dwarvenRuin.y)
+        )
+        dwarvenRuin.caveIndex = fortCaveIndex
+        dwarvenRuin.level = -3
+      }
 
       cryptLevel2 = null
       if (data.cryptLevel2) {
@@ -9421,11 +9441,26 @@
         const tmpl = enemyTemplateForSavedEnemy(e)
         let level = e.level || 0
         let levelKind = e.levelKind || null
-        // Legacy saves used z:-3/z:-4 for generic deep/fort entities and z:-2
-        // for crypt2 entities. Preserve that distinction when migrating.
-        if (!levelKind && level === -3) { level = -2; levelKind = 'chain' }
-        else if (!levelKind && level === -4) { level = -3; levelKind = 'chain' }
-        else if (!levelKind && level === -2) levelKind = 'crypt2'
+        // v13+ saves preserve levelKind directly. v11/v12 already use the new
+        // z:-1/-2/-3 chain numbering but accidentally omitted enemy.levelKind,
+        // so never remap their z values. For z:-2, distinguish the dedicated
+        // crypt map by its saved home tile. Only pre-v11 saves need the old
+        // z:-3 -> -2 and z:-4 -> -3 migration.
+        if (!levelKind) {
+          if ((data.version || 0) >= 11) {
+            levelKind = (level === -2 && e.homeTileType === 'crypt2floor') ? 'crypt2' : (level < 0 ? 'chain' : null)
+          } else if (level === -3) {
+            level = -2
+            levelKind = 'chain'
+          } else if (level === -4) {
+            level = -3
+            levelKind = 'chain'
+          } else if (level === -2) {
+            levelKind = 'crypt2'
+          } else if (level < 0) {
+            levelKind = 'chain'
+          }
+        }
         return ({
           name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
           hp: e.hp, maxHp: e.maxHp, atk: e.atk, def: e.def, spd: e.spd,
@@ -9506,17 +9541,33 @@
         }
         return item
       })
-      if (dwarvenRuin && dwarvenRuin.caveIndex >= 0) {
-        const chest = groundItems.find(g => g.kind === 'chest' && g.level === -1 && g.caveIndex === dwarvenRuin.caveIndex && !g.opened)
-        if (chest) chest.artifactGuaranteed = true
-        if (!chest) {
-          const cm = caveMaps[dwarvenRuin.caveIndex], spot = []
-          if (cm) for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (cm[y][x] === 'marble') spot.push({
-            x,
-            y
-          })
-          if (spot.length) {
-            const p = spot[Math.floor(spot.length / 2)]
+      if (dwarvenRuin && dwarvenRuin.caveIndex >= 0 && deepLevels[1]) {
+        const fortMap = deepLevels[1].caveMaps[dwarvenRuin.caveIndex]
+        // Repair saves made while the fort transition was being changed: locate
+        // an unopened chest that is actually on this fort's marble floor, then
+        // normalize its level metadata and restore the guaranteed artifact flag.
+        let chest = groundItems.find(g =>
+          g.kind === 'chest' && !g.opened && g.level === -3 && g.levelKind === 'chain' &&
+          g.caveIndex === dwarvenRuin.caveIndex
+        )
+        if (!chest && fortMap) {
+          chest = groundItems.find(g =>
+            g.kind === 'chest' && !g.opened && fortMap[g.y]?.[g.x] === 'marble' &&
+            (g.level === -3 || g.level === -1)
+          )
+        }
+        if (chest) {
+          chest.level = -3
+          chest.levelKind = 'chain'
+          chest.caveIndex = dwarvenRuin.caveIndex
+          chest.artifactGuaranteed = true
+        } else {
+          const spots = []
+          if (fortMap) for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+            if (fortMap[y][x] === 'marble') spots.push({x, y})
+          }
+          if (spots.length) {
+            const p = spots[Math.floor(spots.length / 2)]
             groundItems.push({
               x: p.x,
               y: p.y,
@@ -9524,7 +9575,8 @@
               tier: 5,
               artifactGuaranteed: true,
               opened: false,
-              level: dwarvenRuin.level || -1,
+              level: -3,
+              levelKind: 'chain',
               caveIndex: dwarvenRuin.caveIndex
             })
           }
