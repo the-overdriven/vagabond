@@ -6296,7 +6296,7 @@
         inspectedGround = true
       } else if (currentGround && currentGround.kind === 'explorerremains') {
         log(currentGround.description, 'info')
-        if (!currentGround.looted) log('There\'s something among the remains - press "F" to search them.', 'info')
+        if (!currentGround.looted) log('There\'s something among the remains - press forage key to search them.', 'info')
         inspectedGround = true
       } else if (currentGround && currentGround.kind === 'deadbody') {
         log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
