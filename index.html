@@ -1,8 +1,6 @@
 <!-- TODO:
 
 ## Save/load & inventory
-- fix: loading a save that was saved in the mausoleum spawns character in a wall
-- fix: reduce save size
 - fix: merchant trade: Scroll of Teleportation doesnt appear in "your items"
 - fix: returning old hunter's quest item doesnt remove it from inventory
 - fix: When sorting weapons, the XP bonus should be scaled.
@@ -2389,10 +2387,15 @@
     }
 
     function reconcileVillageHuts() {
-      villageHuts = villageHuts.filter(h => map[h.y]?.[h.x] === 'village')
+      // Village huts live on the surface layer only. Use surfaceMap explicitly
+      // rather than the currently active `map` - a save made while underground
+      // (a cave, the crypt, or the mausoleum) would otherwise have `map` pointing
+      // at that underground layer here, wiping out every hut (and with it the
+      // mausoleum link) because none of their coordinates read as 'village' there.
+      villageHuts = villageHuts.filter(h => surfaceMap[h.y]?.[h.x] === 'village')
       const known = new Set(villageHuts.map(h => keyXY(h.x, h.y)))
       for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-        if (map[y]?.[x] !== 'village' || known.has(keyXY(x, y))) continue
+        if (surfaceMap[y]?.[x] !== 'village' || known.has(keyXY(x, y))) continue
         // Older saves can contain village tiles that were not included in the
         // villageHuts metadata. Give those tiles stable fallback human names so
         // they remain inspectable after loading. Do not invent a mausoleum link.
@@ -2404,7 +2407,7 @@
       // First recover an explicitly persisted mausoleum coordinate; otherwise
       // recover the canonical hut by matching the anomalous tombstone's name.
       let target = null
-      if (mausoleumHutPos && map[mausoleumHutPos.y]?.[mausoleumHutPos.x] === 'village') {
+      if (mausoleumHutPos && surfaceMap[mausoleumHutPos.y]?.[mausoleumHutPos.x] === 'village') {
         target = villageHuts.find(h => h.x === mausoleumHutPos.x && h.y === mausoleumHutPos.y) || null
       }
       if (!target) {
@@ -8765,31 +8768,111 @@
     /* ============================== SAVE / LOAD ============================== */
     const SAVE_VERSION = 11 // v10 persists permadeath state and bodies
 
+    // Run-length encoding for the save file's map/discovery grids. Every
+    // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
+    // fog-of-war discovered/undergroundDiscovered bitmasks, ...) is MAP_W x
+    // MAP_H of mostly one repeated character (background cavewall,
+    // undiscovered '0', ...), so collapsing runs of the same character
+    // shrinks the save file drastically without touching any of the
+    // in-memory grid representations - only the encode/decode helpers below
+    // (and their call sites in buildSaveObject/loadGameFromObject) know
+    // about it. Each run is written as <char><count> and runs are joined
+    // with '|', so decoding is unambiguous even if a tile code is itself a
+    // digit (TILE_CODE's characters are content-defined, not under our control).
+    function rleEncode(str) {
+      const out = []
+      let i = 0
+      while (i < str.length) {
+        const ch = str[i]
+        let j = i + 1
+        while (j < str.length && str[j] === ch) j++
+        out.push(ch + (j - i))
+        i = j
+      }
+      return out.join('|')
+    }
+
+    function rleDecode(str) {
+      if (!str) return ''
+      let out = ''
+      for (const token of str.split('|')) out += token[0].repeat(Number(token.slice(1)))
+      return out
+    }
+
+    // Encodes a MAP_H x MAP_W grid of tile names as one RLE string.
+    function encodeTileGrid(grid, fallbackCode) {
+      return rleEncode(grid.map(row => row.map(t => TILE_CODE[t] || fallbackCode).join('')).join(''))
+    }
+
+    // Decodes either the new single-string RLE format or the legacy
+    // array-of-row-strings format (pre-compression saves) back into a
+    // MAP_H x MAP_W grid of tile names. Returns null on a dimension
+    // mismatch so callers can fall back the same way they did before.
+    function decodeTileGrid(encoded, fallbackTile) {
+      if (typeof encoded === 'string') {
+        const flat = rleDecode(encoded)
+        if (flat.length !== MAP_W * MAP_H) return null
+        const rows = []
+        for (let y = 0; y < MAP_H; y++) rows.push([...flat.slice(y * MAP_W, (y + 1) * MAP_W)].map(ch => CODE_TILE[ch] || fallbackTile))
+        return rows
+      }
+      if (!Array.isArray(encoded) || encoded.length !== MAP_H) return null
+      const rows = []
+      for (const rowStr of encoded) {
+        const row = []
+        for (const ch of rowStr) row.push(CODE_TILE[ch] || fallbackTile)
+        if (row.length !== MAP_W) return null
+        rows.push(row)
+      }
+      return rows
+    }
+
+    // Same idea as encodeTileGrid/decodeTileGrid, for the boolean fog-of-war grids.
+    function encodeBoolGrid(grid) {
+      return rleEncode(grid.map(row => row.map(b => b ? '1' : '0').join('')).join(''))
+    }
+
+    function decodeBoolGrid(encoded) {
+      if (typeof encoded === 'string') {
+        const flat = rleDecode(encoded)
+        if (flat.length !== MAP_W * MAP_H) return null
+        const rows = []
+        for (let y = 0; y < MAP_H; y++) rows.push([...flat.slice(y * MAP_W, (y + 1) * MAP_W)].map(ch => ch === '1'))
+        return rows
+      }
+      if (!Array.isArray(encoded) || encoded.length !== MAP_H) return null
+      return encoded.map(rowStr => {
+        const row = []
+        for (const ch of rowStr) row.push(ch === '1')
+        return row
+      })
+    }
+
     function buildSaveObject() {
       return {
         version: SAVE_VERSION,
         savedAt: new Date().toISOString(),
         worldSeed: WORLD_SEED,
         rngState: rngState,
-        map: surfaceMap.map(row => row.map(t => TILE_CODE[t] || 'g').join('')),
+        map: encodeTileGrid(surfaceMap, 'g'),
         tileUnderlays: tileUnderlays,
         grasslandTrees: [...grasslandTrees],
-        caveMaps: caveMaps.map(cm => cm.map(row => row.map(t => TILE_CODE[t] || '#').join(''))),
+        caveMaps: caveMaps.map(cm => encodeTileGrid(cm, '#')),
         caves: caves,
         currentZ: currentZ,
         currentCave: currentCave,
-        discovered: discovered.map(row => row.map(b => b ? '1' : '0').join('')),
-        undergroundDiscovered: undergroundDiscoveredL1.map(row => row.map(b => b ? '1' : '0').join('')),
+        discovered: encodeBoolGrid(discovered),
+        undergroundDiscovered: encodeBoolGrid(undergroundDiscoveredL1),
         // Generic chain levels (z:-3 and z:-4). An array so adding more
         // levels later never needs another save-format field - just another entry.
         deepLevels: deepLevels.map(lvl => ({
-          caveMaps: lvl.caveMaps.map(cm => cm.map(row => row.map(t => TILE_CODE[t] || '#').join(''))),
+          caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
           caves: lvl.caves,
-          discovered: lvl.discovered.map(row => row.map(b => b ? '1' : '0').join('')),
+          discovered: encodeBoolGrid(lvl.discovered),
         })),
         cryptLevel2: cryptLevel2 ? {
-          map: cryptLevel2.map.map(row => row.map(t => TILE_CODE[t] || '#').join('')),
-          discovered: cryptLevel2.discovered.map(row => row.map(b => b ? '1' : '0').join('')),
+          map: encodeTileGrid(cryptLevel2.map, '#'),
+          discovered: encodeBoolGrid(cryptLevel2.discovered),
           x: cryptLevel2.x, y: cryptLevel2.y, trapSprung: cryptLevel2.trapSprung, trapPos: cryptLevel2.trapPos,
         } : null,
         treasureMapSpot: treasureMapSpot,
@@ -8803,6 +8886,7 @@
         villageHuts: villageHuts,
         mausoleumHutPos: mausoleumHutPos,
         mausoleumDiscovered: mausoleumDiscovered,
+        mausoleumDiscoveredOnce: mausoleumDiscoveredOnce,
         player: {
           x: player.x, y: player.y,
           name: player.name, race: player.race,
@@ -8890,20 +8974,15 @@
 
     function loadGameFromObject(data, opts = {}) {
       const isReplayInit = !!opts.isReplayInit
-      if (!data || typeof data !== 'object' || !Array.isArray(data.map)) {
+      if (!data || typeof data !== 'object' || (!Array.isArray(data.map) && typeof data.map !== 'string')) {
         throw new Error('That does not look like a Vagabond save file.')
       }
       // A load (manual, or the internal rewind-to-start a replay performs)
       // always supersedes whatever playback might currently be running.
       stopReplayPlayback()
 
-      const decoded = data.map.map(rowStr => {
-        const row = []
-        for (const ch of rowStr) row.push(CODE_TILE[ch] || 'grass')
-        if (row.length !== MAP_W) throw new Error('Save file map width does not match.')
-        return row
-      })
-      if (decoded.length !== MAP_H) throw new Error('Save file map height does not match.')
+      const decoded = decodeTileGrid(data.map, 'grass')
+      if (!decoded) throw new Error('Save file map dimensions do not match.')
       surfaceMap = decoded
       dwarvenRuin = null
       for (let y = 0; y < MAP_H && !dwarvenRuin; y++) for (let x = 0; x < MAP_W; x++) {
@@ -8965,7 +9044,7 @@
           }
         }
       }
-      caveMaps = (data.caveMaps || []).map(rows => rows.map(rowStr => [...rowStr].map(ch => CODE_TILE[ch] || 'cavewall')))
+      caveMaps = (data.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
       if (cryptCaveIndex >= 0 && caveMaps[cryptCaveIndex]) {
         const crypt = caves[cryptCaveIndex]
         for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
@@ -9022,7 +9101,7 @@
       // entrance (mirrors the caveentrance re-stamp above), then merge into
       // one shared map per level.
       deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map(lvlData => {
-        const lvlCaveMaps = (lvlData.caveMaps || []).map(rows => rows.map(rowStr => [...rowStr].map(ch => CODE_TILE[ch] || 'cavewall')))
+        const lvlCaveMaps = (lvlData.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
         let lvlCaves = Array.isArray(lvlData.caves) ? lvlData.caves : []
         lvlCaves = lvlCaves.map(c => ({
           ...c,
@@ -9047,42 +9126,33 @@
             if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) lvlMap[entrance.y][entrance.x] = 'caveup'
           }
         }
-        const lvlDiscovered = (Array.isArray(lvlData.discovered) && lvlData.discovered.length === MAP_H)
-          ? lvlData.discovered.map(rowStr => [...rowStr].map(ch => ch === '1'))
-          : Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
+        const lvlDiscovered = decodeBoolGrid(lvlData.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
         return {map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered}
       })
 
       cryptLevel2 = null
-      if (data.cryptLevel2 && Array.isArray(data.cryptLevel2.map) && data.cryptLevel2.map.length === MAP_H) {
-        const lvlMap = data.cryptLevel2.map.map(rowStr => [...rowStr].map(ch => CODE_TILE[ch] || 'cavewall'))
-        const lvlDiscovered = (Array.isArray(data.cryptLevel2.discovered) && data.cryptLevel2.discovered.length === MAP_H)
-          ? data.cryptLevel2.discovered.map(rowStr => [...rowStr].map(ch => ch === '1'))
-          : Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
-        cryptLevel2 = {
-          map: lvlMap, discovered: lvlDiscovered,
-          x: data.cryptLevel2.x, y: data.cryptLevel2.y,
-          trapSprung: !!data.cryptLevel2.trapSprung, trapPos: data.cryptLevel2.trapPos || null,
+      if (data.cryptLevel2) {
+        const lvlMap = decodeTileGrid(data.cryptLevel2.map, 'cavewall')
+        if (lvlMap) {
+          const lvlDiscovered = decodeBoolGrid(data.cryptLevel2.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
+          cryptLevel2 = {
+            map: lvlMap, discovered: lvlDiscovered,
+            x: data.cryptLevel2.x, y: data.cryptLevel2.y,
+            trapSprung: !!data.cryptLevel2.trapSprung, trapPos: data.cryptLevel2.trapPos || null,
+          }
         }
       }
       treasureMapSpot = (data.treasureMapSpot && Number.isFinite(data.treasureMapSpot.x)) ? data.treasureMapSpot : null
       treasureMapUnearthed = !!data.treasureMapUnearthed
-      if (Array.isArray(data.discovered) && data.discovered.length === MAP_H) {
-        discovered = data.discovered.map(rowStr => {
-          const row = []
-          for (const ch of rowStr) row.push(ch === '1')
-          return row
-        })
+      const decodedDiscovered = decodeBoolGrid(data.discovered)
+      if (decodedDiscovered) {
+        discovered = decodedDiscovered
       } else {
         // older save from before fog-of-war existed - start fresh, the player's
         // current surroundings get marked seen automatically by the render() below
         initDiscovered()
       }
-      if (Array.isArray(data.undergroundDiscovered) && data.undergroundDiscovered.length === MAP_H) {
-        undergroundDiscoveredL1 = data.undergroundDiscovered.map(rowStr => [...rowStr].map(ch => ch === '1'))
-      } else {
-        undergroundDiscoveredL1 = Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
-      }
+      undergroundDiscoveredL1 = decodeBoolGrid(data.undergroundDiscovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
 
       // Resolve currentZ/map/currentCave for whatever z the save was on
       // (0 = surface, -1 = shared underground level 1, -2 = crypt level 2,
@@ -9184,6 +9254,17 @@
       villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts
       reconcileVillageHuts()
       syncMausoleumHutToOddTombstone()
+      // The mausoleum's tiles are stamped directly into undergroundMap at
+      // discovery time rather than persisted with the rest of the map, so a
+      // fresh load has to re-stamp them here whenever the mausoleum was ever
+      // found - otherwise the area (including a player who saved while
+      // standing inside it) reverts to whatever plain cave/blank tiles
+      // undergroundMap was rebuilt with above, and the player can end up
+      // spawning inside a wall. mausoleumMap is a deterministic layout keyed
+      // off mausoleumHutPos, so recomputing it here is always safe. Reset it
+      // first - it may already be set from an earlier session in this tab.
+      mausoleumMap = null
+      if (mausoleumDiscovered) initializeMausoleum()
       // Reconcile progression for saves made before the explicit quest fields
       // existed, or saves where only one side of the event was serialized.
       if (!bellRung && Array.isArray(data.npcs) && data.npcs.some(n => n.name === 'Ancient Lich')) bellRung = true
