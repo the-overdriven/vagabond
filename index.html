@@ -1,7 +1,6 @@
 <!-- TODO:
 
 ## Save/load & inventory
-- fix: merchant trade: Scroll of Teleportation doesnt appear in "your items"
 - fix: returning old hunter's quest item doesnt remove it from inventory
 - fix: When sorting weapons, the XP bonus should be scaled.
 
@@ -7845,6 +7844,14 @@
       // Foraged valuables carry their own sell value, so they remain sellable
       // even when the external loot-table config does not list their kind.
       if (it.kind === 'seashell' || it.kind === 'amber') return it.value || 0
+      // Anything the merchant himself stocks (Scroll of Teleportation, etc.)
+      // is inherently worth something even if the external loot table has no
+      // entry for it - he recognizes his own wares. Price it off whatever he
+      // charges to buy that same kind, at the buy = 2x sell ratio used
+      // everywhere else (see buyItem() above), instead of special-casing
+      // item kinds by name here.
+      const stocked = it.merchantPrice !== undefined ? it : merchantStock.find(s => s.kind === it.kind && s.merchantPrice !== undefined)
+      if (stocked) return Math.max(1, Math.round(stocked.merchantPrice / 2))
       return 0 // tombstones and other lore items aren't sellable
     }
 
