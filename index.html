@@ -1,15 +1,5 @@
 <!-- TODO:
 
-## Turn economy & NPC interaction
-- fix: foraging and digging should consume a turn
-- fix: using herbalist services should log the costs (how much we paid)
-- fix: talking to old hunter by clicking/tapping on him should require standing next to him
-- fix: When the player enters the temple, fleeing mobs should move 2 tiles per turn instead of 1.
-- fix: talking to NPC should stop their movement for a while, so you can talk to them without them running away
-- fix: Drunk is talking about the bell way too late! and drunk has his old clonk clonk dialogue after delivering the bell
-- fix: there is a chance that merchant spawns on a village hut - prevent it
-- fix: there is a chance that the big bell renders surrounded by mountains or other non-walkable tiles - prevent it
-
 - remove this fix: // The surface map is the authoritative return destination. (spawning entrances on exit)
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: long sword should have more grace than one handed axe
@@ -2269,6 +2259,26 @@
       if (!spot) return
       map[spot.y][spot.x] = 'bigbell'
       bigBellPos = spot
+      // The last-resort fallback above drops the walkable-edge requirement,
+      // so the bell can end up fully sealed in by mountains. Guarantee at
+      // least one walkable neighbor so it's always reachable.
+      let hasWalkableNeighbor = false
+      for (let ny = -1; ny <= 1 && !hasWalkableNeighbor; ny++) {
+        for (let nx = -1; nx <= 1 && !hasWalkableNeighbor; nx++) {
+          if (nx === 0 && ny === 0) continue
+          const t = map[spot.y + ny] && map[spot.y + ny][spot.x + nx]
+          if (t && TILE[t] && TILE[t].walk) hasWalkableNeighbor = true
+        }
+      }
+      if (!hasWalkableNeighbor) {
+        for (const [dx, dy] of DIRS8) {
+          const nx = spot.x + dx, ny = spot.y + dy
+          if (map[ny] && map[ny][nx] !== undefined) {
+            map[ny][nx] = 'grass'
+            break
+          }
+        }
+      }
     }
 
     function spawnBellGuardians() {
@@ -4063,6 +4073,7 @@
 
     function interactOldHunter() {
       recordReplayAction({type:'talk', npc:'Old Hunter'})
+      freezeNpcFromWandering(npcs.find(n => n.name === 'Old Hunter'))
       if (oldHunterQuest?.state === 'ready') {
         const q = oldHunterQuest
         removeHunterQuestItem(q)
@@ -4129,10 +4140,23 @@
         if (bellRung) {
           return ['I\'m done! No more drink! I heard a bell that\'s not there.']
         }
-        const dir = bellDirectionFromSpawn()
-        if (dir) lines.push(`Them hairy mountains... clonk, clonk, clonk all the way ${dir} they went.`)
+        // Once the bell has actually been found and returned, the old rumor
+        // about which direction it went is stale - don't keep repeating it.
+        if (!bellReturnedToChapel) {
+          const dir = bellDirectionFromSpawn()
+          if (dir) lines.push(`Them hairy mountains... clonk, clonk, clonk all the way ${dir} they went.`)
+        }
       }
       return lines
+    }
+
+    // Recomputes the Drunk's dialogue pool from his template - needed whenever
+    // bell-related state changes mid-game, since his lines are only otherwise
+    // set once, at spawn.
+    function refreshDrunkLines() {
+      const drunk = npcs.find(n => n.name === 'Drunk')
+      const drunkTemplate = NPC_TEMPLATES.find(t => t.name === 'Drunk')
+      if (drunk && drunkTemplate) drunk.lines = linesForNpcTemplate(drunkTemplate)
     }
 
     let npcs = []
@@ -4181,9 +4205,7 @@
         npcs = npcs.filter(n => n !== removed)
         occupied.delete(keyXY(removed.x, removed.y))
       }
-      const drunk = npcs.find(n => n.name === 'Drunk')
-      const drunkTemplate = NPC_TEMPLATES.find(t => t.name === 'Drunk')
-      if (drunk && drunkTemplate) drunk.lines = linesForNpcTemplate(drunkTemplate)
+      refreshDrunkLines()
     }
 
     function spawnNpcs() {
@@ -4197,7 +4219,7 @@
           y = randInt(Math.max(2, origin.y - spread), Math.min(MAP_H - 3, origin.y + spread))
           dist = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
           tries++
-        } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || dist < 2 || occupied.has(keyXY(x, y))) && tries < 300)
+        } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < 2 || occupied.has(keyXY(x, y))) && tries < 300)
         if (tries >= 300) continue // extremely unlikely on a cramped map - just skip this one
         const npc = {
           name: tmpl.name,
@@ -4258,6 +4280,11 @@
         } : null
         if (n.static) {
           if (meta) { meta.skip = 'static'; npcDiag.push(meta) }
+          continue
+        }
+        if (n.talkFreezeTurns > 0) {
+          n.talkFreezeTurns--
+          if (meta) { meta.skip = 'talk-freeze'; npcDiag.push(meta) }
           continue
         }
         if (!ENEMY_WANDER_ENABLED) {
@@ -4523,7 +4550,8 @@
     }
 
     function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false) {
-      // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks
+      // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks in
+      // either direction - it's not meant to be a fair, ongoing exchange of blows.
       if ((attackerIsPlayer || defenderIsPlayer) && (player.godMode || player.invisibleTurns > 0)) return false
       const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer)
       const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer)
@@ -4947,6 +4975,13 @@
     const ENEMY_WANDER_RADIUS = 1     // how far (in squares) they may stray from their home tile
     /* ------------------------------------------------------------------------ */
 
+    // How many of the player's turns an NPC stands still after being talked
+    // to, so a conversation doesn't get cut short by them wandering off mid-chat.
+    const NPC_TALK_FREEZE_TURNS = 6
+    function freezeNpcFromWandering(n) {
+      if (n) n.talkFreezeTurns = NPC_TALK_FREEZE_TURNS
+    }
+
     // Idle enemies near the player shuffle around a little so the world doesn't
     // look frozen. Only enemies within range wander, so distant creatures don't
     // drift away from where they were placed.
@@ -5116,6 +5151,7 @@
             log(`The ${e.name} retreats from the sacred ground.`, 'info')
           }
           enemyStepAwayFromTemple(e)
+          enemyStepAwayFromTemple(e) // monsters flee quickly
           continue
         }
         if (e.fleeingHoly) e.fleeingHoly = false
@@ -5333,6 +5369,10 @@
         }
       }
       (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
+      enemyTurn()
+      npcTurn()
+      updateHud()
+      render()
     }
 
     function tryDig(options = {}) {
@@ -5348,6 +5388,11 @@
       }
       if (options.recordReplay !== false) recordReplayAction({type:'dig'})
       dugSandTiles.add(key)
+      // Digging is a real action once the tile is marked dug, regardless of
+      // what (if anything) it turns up, so the world gets a turn here.
+      enemyTurn()
+      npcTurn()
+      updateHud()
       // Redraw immediately so the darker sand is visible.
       render()
       if (treasureMapSpot && key === keyXY(treasureMapSpot.x, treasureMapSpot.y)) {
@@ -5860,6 +5905,7 @@
       if (npcTarget) {
         clearAutoPath()
         consecutiveWaitTurns = 0
+        freezeNpcFromWandering(npcTarget)
         if (npcTarget.name === 'Gravedigger' && player.inventory.some(i => i.kind === 'oddTombstone')) {
           const odd = player.inventory.find(i => i.kind === 'oddTombstone')
           player.inventory.splice(player.inventory.indexOf(odd), 1)
@@ -6144,12 +6190,14 @@
           const barIndex = player.inventory.findIndex(i => i.kind === 'wheelbarrow')
           if (barIndex >= 0) player.inventory.splice(barIndex, 1)
           bellReturnedToChapel = true
+          refreshDrunkLines()
           log('You return the missing bell to the chapel. The parishioners are eternally grateful. They insist you do the honours and ring it.', 'good')
           updateHud()
           return
         }
         if (bellReturnedToChapel && !bellRung) {
           bellRung = true
+          refreshDrunkLines()
           log('You ring the bell. Its thunderous peal echoes through the village and beyond. Loud enough to wake the dead. Perhaps, somewhere, it did.', 'good')
           spawnAncientBellLich()
           return
@@ -7120,8 +7168,10 @@
       const n = currentZ === 0 && npcs.find(np => np.x === mx && np.y === my)
       if (n) {
         clearAutoPath()
-        if (n.name === 'Old Hunter') interactOldHunter()
-        else tryOpenTrade(n)
+        if (n.name === 'Old Hunter') {
+          const adjacent = Math.max(Math.abs(n.x - player.x), Math.abs(n.y - player.y)) <= 1
+          if (adjacent) interactOldHunter()
+        } else tryOpenTrade(n)
         return
       }
       const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my)
@@ -8035,6 +8085,7 @@
       if (!npc || (!npc.trades && !npc.services)) return
       const dist = Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y))
       if (dist > 1) return
+      freezeNpcFromWandering(npc)
       serviceNpc = npc
       toggleTrade(true)
     }
@@ -8058,7 +8109,7 @@
       for (let i = 0; i < edible; i++) addEdibleMushroom()
 
       const removed = count - edible
-      log(`The Herbalist purifies ${edible} mushroom${edible === 1 ? '' : 's'} and removes ${removed} poisonous mushroom${removed === 1 ? '' : 's'}.`, 'good')
+      log(`The Herbalist purifies ${edible} mushroom${edible === 1 ? '' : 's'} and removes ${removed} poisonous mushroom${removed === 1 ? '' : 's'} for ${count * 2}g.`, 'good')
       updateHud()
       renderTrade()
       renderInventory()
@@ -8072,7 +8123,7 @@
       if (it.count <= 0) player.inventory.splice(player.inventory.indexOf(it), 1)
       player.gold -= 10
       addPotion()
-      log('The Herbalist brews a Life Potion for you.', 'good')
+      log('The Herbalist brews a Life Potion for you for 10g.', 'good')
       updateHud()
       renderTrade()
       renderInventory()
