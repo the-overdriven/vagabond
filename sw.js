@@ -1,4 +1,15 @@
-const CACHE_VERSION = 'vagabond-v1';
+// ---------------------------------------------------------------------------
+// HOW TO SHIP AN UPDATE
+//   1. Deploy your new files (images, JSON, index.html ...).
+//   2. Bump CACHE_VERSION below and deploy sw.js as well.
+//
+// The phone notices that sw.js changed, installs the new worker, deletes every
+// old cache and re-downloads everything fresh. Even if you forget step 2,
+// images are re-checked against the server on every use (see the image
+// handler at the bottom), so they catch up on the next launch.
+// ---------------------------------------------------------------------------
+const CACHE_PREFIX = 'vagabond-';
+const CACHE_VERSION = CACHE_PREFIX + 'v2'; // <-- bump me on every content/image release
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -22,14 +33,26 @@ const PRECACHE_URLS = [
   './content/enemy_prefixes.json'
 ];
 
+// Ask the server every time (cheap conditional request, 304 if unchanged)
+// instead of letting the phone's own HTTP cache hand back a stale file.
+// Without this, a freshly bumped service worker could re-download the OLD
+// images straight out of the HTTP cache.
+const fresh = (req) => fetch(req, { cache: 'no-cache' });
+
+// Write to a cache without racing the worker being shut down.
+const stash = (event, cacheName, key, res) =>
+  event.waitUntil(caches.open(cacheName).then((cache) => cache.put(key, res)));
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(PRECACHE).then((cache) =>
       // Cache items individually so one missing/renamed file doesn't fail
-      // the whole install step.
+      // the whole install step. `reload` skips the HTTP cache so the new
+      // version never precaches stale copies.
       Promise.all(
         PRECACHE_URLS.map((url) =>
-          cache.add(url).catch((err) => console.warn('Precache skip:', url, err))
+          cache.add(new Request(url, { cache: 'reload' }))
+            .catch((err) => console.warn('Precache skip:', url, err))
         )
       )
     ).then(() => self.skipWaiting())
@@ -41,7 +64,9 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== PRECACHE && key !== RUNTIME)
+          // Only touch our own caches, and drop every previous version
+          // (this is what wipes the old images).
+          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== PRECACHE && key !== RUNTIME)
           .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
@@ -55,11 +80,15 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Page navigations: try the network first (so updates show up), fall
-  // back to the cached shell when offline.
+  // Page navigations: network first (so updates show up), fall back to the
+  // cached shell when offline. Every successful load refreshes the offline
+  // copy, so the fallback is never older than the last time you were online.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => caches.match('./index.html'))
+      fresh(req).then((res) => {
+        if (res && res.ok) stash(event, PRECACHE, './index.html', res.clone());
+        return res;
+      }).catch(() => caches.match('./index.html'))
     );
     return;
   }
@@ -69,29 +98,33 @@ self.addEventListener('fetch', (event) => {
   // Falls back to the cached copy only when offline.
   if (url.pathname.includes('/content/')) {
     event.respondWith(
-      fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(RUNTIME).then((cache) => cache.put(req, copy));
-        }
+      fresh(req).then((res) => {
+        if (res && res.ok) stash(event, RUNTIME, req, res.clone());
         return res;
       }).catch(() => caches.match(req))
     );
     return;
   }
 
-  // Everything else (avatars/enemies/npc images, CSS-in-page assets):
-  // cache-first, then fetch and stash a copy for next time.
+  // Everything else (avatars/enemies/npc images, icons): stale-while-revalidate.
+  // Serve the cached copy instantly (fast + works offline), but ALWAYS
+  // re-check the server in the background and overwrite the cache if the file
+  // changed. Old cache-first behaviour never looked at the server again,
+  // which is why updated images never showed up.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(RUNTIME).then((cache) => cache.put(req, copy));
-        }
+    caches.open(RUNTIME).then(async (cache) => {
+      const cached = await cache.match(req);
+
+      const refresh = fresh(req).then((res) => {
+        if (res && res.ok) cache.put(req, res.clone());
         return res;
-      }).catch(() => cached);
+      }).catch(() => null);
+
+      if (cached) {
+        event.waitUntil(refresh); // keep the worker alive until the refresh lands
+        return cached;
+      }
+      return (await refresh) || Response.error();
     })
   );
 });
