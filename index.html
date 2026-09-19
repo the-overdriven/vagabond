@@ -193,6 +193,13 @@
           height: 100%;
           display: block;
       }
+
+      /* Keep enemy stat separators visible in the tap-to-inspect panel on touch devices. */
+      @media (pointer: coarse) {
+          #mobileInfoPanel .statsep {
+              display: inline !important;
+          }
+      }
   </style>
 </head>
 <body>
@@ -5353,18 +5360,29 @@
     }
 
     function equipmentSortValues(item) {
-      const modBonus = item.mod === 'atk' || item.mod === 'def' || item.mod === 'spd' || item.mod === 'grace' ? (item.modAmt || 0) : 0
-      if (item.kind === 'weapon') {
-        const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0)
-        const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
-          // xpBonus is a flat 5-15% roll, on a much bigger scale than atk/modAmt
-          // (typically 1-5) - scale it down so it doesn't dominate the sort.
-          ? (item.mod === 'xp' ? Math.round((item.xpBonus || 0) / 3) : (item.modAmt || 0))
-          : 0
-        return {sum: 3 * atk + otherModifier, tier: item.tier || 0, primary: atk} // ATK should be 3x more important for sorting
+      const primaryStat = item.kind === 'weapon' ? 'atk' : 'def'
+      const primary = (item[primaryStat] || 0) + (item.mod === primaryStat ? (item.modAmt || 0) : 0)
+
+      // Secondary modifiers matter for ranking too. XP uses a percentage-sized
+      // value (5-15), so scale it down to the same rough range as flat bonuses.
+      // GRACE currently affects combat only when it is on a weapon, so do not
+      // give shields/armor credit for a modifier that has no gameplay effect.
+      let secondary = 0
+      if (item.mod && item.mod !== primaryStat) {
+        if (item.mod === 'xp') secondary = Math.round((item.xpBonus || 0) / 3)
+        else if (item.mod !== 'grace' || item.kind === 'weapon') secondary = item.modAmt || 0
       }
-      const def = (item.def || 0) + (item.mod === 'def' ? modBonus : 0)
-      return {sum: def, tier: item.tier || 0, primary: def}
+
+      // Keep the slot's defining combat stat dominant while still allowing
+      // meaningful secondary bonuses (SPD, HP, MF, off-stat ATK/DEF, GRACE)
+      // to distinguish otherwise similar gear.
+      return {sum: 3 * primary + secondary, tier: item.tier || 0, primary}
+    }
+
+    function compareEquipmentItems(a, b) {
+      const left = equipmentSortValues(a)
+      const right = equipmentSortValues(b)
+      return right.sum - left.sum || right.tier - left.tier || right.primary - left.primary
     }
 
     // Foraging: pressing F while standing on forest ground gives a small
@@ -7584,36 +7602,25 @@
       element.textContent = item ? slotLabel(item) : fallback
     }
 
-    function bestSlotScore(it) {
-      if (!it) return null
-      if (it.kind === 'weapon') {
-        const base = it.atk || 0
-        const bonus = it.mod === 'atk' ? (it.modAmt || 0) : 0
-        return base + bonus
-      }
-      if (it.kind === 'armor' || it.kind === 'shield') {
-        const base = it.def || 0
-        const bonus = it.mod === 'def' ? (it.modAmt || 0) : 0
-        return base + bonus
-      }
-      return null
-    }
-
     function bestSlotIndexes(kind) {
       const inventoryCandidates = player.inventory
-        .map((it, idx) => ({it, idx, score: bestSlotScore(it)}))
-        .filter(entry => entry.it.kind === kind && entry.score !== null)
+        .map((it, idx) => ({it, idx}))
+        .filter(entry => entry.it.kind === kind)
 
+      if (inventoryCandidates.length === 0) return new Set()
+
+      // Use exactly the same ranking as the inventory sort. The equipped item
+      // remains the baseline: a checkmark means this inventory item is a real
+      // upgrade according to that shared ranking, not merely higher ATK/DEF.
+      const ranked = [...inventoryCandidates].sort((a, b) => compareEquipmentItems(a.it, b.it) || a.idx - b.idx)
+      const winner = ranked[0]
       const equipped = player.equip[kind]
-      const equippedScore = equipped ? bestSlotScore(equipped) : null
-      const threshold = equippedScore !== null ? equippedScore : -Infinity
+      if (equipped && compareEquipmentItems(winner.it, equipped) >= 0) return new Set()
 
-      const valid = inventoryCandidates.filter(entry => entry.score > threshold)
-      if (valid.length === 0) return new Set()
-
-      const best = Math.max(...valid.map(entry => entry.score))
-      const winners = valid.filter(entry => entry.score === best)
-      return winners.length === 1 ? new Set([winners[0].idx]) : new Set()
+      // If multiple inventory items are genuinely tied by the ranking values,
+      // don't arbitrarily mark one of them as the sole best-in-slot choice.
+      const tied = ranked.filter(entry => compareEquipmentItems(entry.it, winner.it) === 0)
+      return tied.length === 1 ? new Set([winner.idx]) : new Set()
     }
 
     let invTab = 'all'
@@ -7642,11 +7649,7 @@
           return rank(a) - rank(b) || a.idx - b.idx
         })
       } else if (invTab === 'weapon' || invTab === 'armor' || invTab === 'shield') {
-        visible.sort((a, b) => {
-          const left = equipmentSortValues(a.it)
-          const right = equipmentSortValues(b.it)
-          return right.sum - left.sum || right.tier - left.tier || right.primary - left.primary || a.idx - b.idx
-        })
+        visible.sort((a, b) => compareEquipmentItems(a.it, b.it) || a.idx - b.idx)
       }
       return visible
     }
