@@ -8148,6 +8148,11 @@
       if (!npc || (!npc.trades && !npc.services)) return
       const dist = Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y))
       if (dist > 1) return
+      // Opening a service window is not a turn, but it *does* mutate gameplay
+      // state: the NPC is frozen from wandering for several future turns.
+      // Record that interaction or replay will let a non-static Herbalist wander,
+      // consuming RNG values that the live run never consumed.
+      recordReplayAction({type:'openTrade', npc:npc.name})
       freezeNpcFromWandering(npc)
       serviceNpc = npc
       toggleTrade(true)
@@ -8383,7 +8388,9 @@
        produced since that point, in order - playback substitutes from this
        array instead of generating new randomness, so the exact same code
        path (movement/combat/loot/etc.) reproduces the exact same run. */
-    const REPLAY_VERSION = 1
+    // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
+    // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
+    const REPLAY_VERSION = 2
     const REPLAY_ACTION_DELAY_MS = 12
     // const REPLAY_ACTION_DELAY_MS = 169
 
@@ -8561,6 +8568,16 @@
         case 'talk':
           if (action.npc === 'Old Hunter') interactOldHunter()
           break
+        case 'openTrade': {
+          const npc = npcs.find(n => n.name === action.npc)
+          if (!npc) return replayDesync(`Replay desynchronized: could not find service NPC ${action.npc || ''}.`)
+          // Mirror only the gameplay state changed by clicking the NPC. Do not
+          // open the visual trade overlay during replay; UI timing must not affect
+          // deterministic simulation.
+          freezeNpcFromWandering(npc)
+          serviceNpc = npc
+          break
+        }
         case 'buy': {
           let item = merchantStock.find(it => it?.replayId === action.replayId)
           if (!item && action.kind) item = merchantStock.find(it => it?.kind === action.kind && it?.name === action.name)
@@ -8897,7 +8914,7 @@
     }
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 13
+    const SAVE_VERSION = 13 // v13 preserves enemy levelKind; v11 normalized underground z-depths and distinguished crypt2 from generic z:-2
 
     // Run-length encoding for the save file's map/discovery grids. Every
     // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
