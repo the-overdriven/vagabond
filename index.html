@@ -557,7 +557,7 @@
       return arr[Math.floor(rng() * arr.length)]
     }
 
-    // Weighted pick: each item's chance is proportional to weightFn(item).
+    // Weighted pick: each chance is proportional to weightFn(entity).
     // Falls back to a uniform pick(arr) if every weight is 0 (or missing).
     function pickWeighted(arr, weightFn) {
       let total = 0
