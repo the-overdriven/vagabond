@@ -625,6 +625,25 @@ A large underground dwarven settlement/ruin containing:
 - a guaranteed artifact chest
 - deeper-level connections
 
+The fort is the dedicated generic-chain level at **z:-3**. Fort enemies and
+ground objects use `level: -3`, `levelKind: 'chain'`, and the fort's
+`caveIndex` so they remain associated with the correct map identity.
+
+Fort ghost placement is guaranteed from actual valid floor candidates rather
+than from a fixed number of blind coordinate attempts. During world generation,
+the game collects marble tiles inside the fort, excludes tiles too close to the
+entrance, and randomly chooses up to **8 distinct positions**. Therefore a
+normally generated fort receives eight Ghosts as long as at least eight valid
+candidate tiles exist.
+
+The guaranteed artifact chest is created as a tier-5 chest with
+`artifactGuaranteed: true` on the fort's z:-3 chain map. During save loading,
+the loader also repairs transitional/older fort saves: it reconstructs the
+fort's `caveIndex` from the z:-3 deep-level cave data, normalizes a matching
+unopened fort chest to `level: -3` / `levelKind: 'chain'`, restores the
+guaranteed-artifact flag, or recreates the chest on a marble fort tile when no
+matching unopened chest can be recovered.
+
 When these props (and other named ground objects such as skeletons,
 campfires, dwarven remains, or a wheelbarrow) are picked up by the
 "inspect surroundings" scan of nearby tiles, each is labeled by its own
@@ -2460,7 +2479,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-11
+13
 ```
 
 Saves are JSON files.
@@ -2481,6 +2500,11 @@ Saved state includes substantial world and player information, including:
 - merchant inventory
 - foraged tiles
 
+Enemy save records now persist `levelKind` in addition to numeric `level` and
+`caveIndex`. This is required because a z value alone does not uniquely identify
+a map: for example, generic deeper caves and Crypt Level 2 can both use z:-2.
+Version 13 was introduced to preserve this enemy map identity explicitly.
+
 ---
 
 # 67. Save Compatibility
@@ -2493,6 +2517,23 @@ Examples include handling:
 - missing NPC data
 - older terrain-underlay information
 - older cave entrance representations
+- underground level renumbering from the older z-depth scheme
+- missing enemy `levelKind` metadata
+- transitional Dwarven Fort chest metadata / placement
+
+For enemy levels specifically:
+
+- **v13+** saves persist `levelKind` directly.
+- **v11-v12** already use the current z:-1 / z:-2 / z:-3 chain numbering but
+  accidentally omitted enemy `levelKind`. Their numeric z values are therefore
+  kept unchanged; the loader reconstructs map identity, including recognizing
+  Crypt Level 2 at z:-2 from its saved home-tile information.
+- **pre-v11** saves can still require the old depth migration
+  (`z:-3 -> z:-2`, `z:-4 -> z:-3`) before assigning the appropriate level kind.
+
+This version-aware migration is important for the Dwarven Fort: a current
+z:-3 Ghost must not be mistaken for an old-format z:-3 deeper-cave enemy and
+moved to z:-2 during load.
 - older discovery data
 
 Any persistent feature should therefore be evaluated for:
@@ -3183,7 +3224,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 11).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 13).
 The replay field is written only while replay recording is active for that
 character; saves made without recording do not gain an empty replay structure.
 
@@ -3195,10 +3236,12 @@ references directly would allow later inventory/equipment/merchant/enemy changes
 to mutate the supposed starting state and make playback begin from the wrong
 state. Playback restores this snapshot through the normal load path rather than
 using a separate replay-specific world format.
-The mausoleum fix adds `mausoleumHutPos` to normal saves as an additive field
-alongside `villageHuts` and `cemeteryTombstones`. `SAVE_VERSION` remains 11
-because older saves can continue to load without this field; the loader falls
-back to the existing odd-name relationship when possible.
+The mausoleum fix added `mausoleumHutPos` to normal saves as an additive field
+alongside `villageHuts` and `cemeteryTombstones`. That change did not itself
+require a save-version bump because older saves can continue to load without the
+field; the loader falls back to the existing odd-name relationship when
+possible. The current game save version is 13 for later compatibility changes,
+including explicit enemy `levelKind` persistence.
 
 ## Recorded actions
 
