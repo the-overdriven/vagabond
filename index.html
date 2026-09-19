@@ -610,10 +610,9 @@
       'There is an inscription engraved on the stone coffin: The only safe place is where the living would never look.'
     ]
     // Crypt level 2 (z:-2): a single dedicated tighter/darker map beneath the
-    // crypt, reached via cryptstairsdown/cryptstairsup. z:-2 is reserved
-    // exclusively for this map - the shared cavedown/caveup depth chain
-    // skips over it (generic deep cave is z:-3, Dwarven Fort is z:-4) so the
-    // two never collide on the same z value.
+    // crypt, reached via cryptstairsdown/cryptstairsup. Crypt Level 2 uses
+    // z:-2 just like the generic second underground level; currentLevelKind()
+    // distinguishes the two map identities.
     let cryptLevel2 = null // {map, discovered, x, y, trapSprung, trapPos}
     let treasureMapSpot = null // {x,y} sand tile the treasure map points to
     let treasureMapUnearthed = false
@@ -922,24 +921,27 @@
     // Deeper levels in the generic cavedown/caveup chain, generalized so
     // adding another level is just another entry here instead of a new set
     // of hardcoded variables. deepLevels[i] = the level at chain-depth (i+2).
-    // z:-2 is deliberately NOT part of this chain - it's reserved for the
-    // crypt's own second level (see cryptLevel2 above) - so chain-depth 2
-    // lives at z:-3 and chain-depth 3 at z:-4. CHAIN_Z_BY_DEPTH/
-    // CHAIN_DEPTH_BY_Z below translate between the two numberings.
-    // Each entry: {map, caveMaps, caves, discovered}.
+    // z:-2 is a normal shared underground depth and may also be used by the
+    // crypt's dedicated second map. Map identity, not the z number, keeps those
+    // two maps separate. Each entry: {map, caveMaps, caves, discovered}.
     let deepLevels = []
     let undergroundDiscovered = [] // ACTIVE underground discovery grid, swapped on every level transition
     let currentZ = 0
     let currentCave = -1
 
-    // The generic cavedown/caveup chain's depth-1/2/3 map to z:-1/-3/-4 -
-    // z:-2 is skipped so it never collides with the crypt's own z:-2 second
-    // level, which is reached through separate cryptstairsdown/up tiles and
-    // isn't part of this chain at all.
-    const CHAIN_Z_BY_DEPTH = [-1, -3, -4]
-    const CHAIN_DEPTH_BY_Z = {[-1]: 1, [-3]: 2, [-4]: 3}
+    // The generic cavedown/caveup chain follows the actual underground depth:
+    // depth 1 = z:-1, depth 2 = z:-2, depth 3 = z:-3. The crypt's dedicated
+    // second map also uses z:-2, but is identified by its map type when active.
+    const CHAIN_Z_BY_DEPTH = [-1, -2, -3]
+    const CHAIN_DEPTH_BY_Z = {[-1]: 1, [-2]: 2, [-3]: 3}
 
-    // depth here means "chain position below the surface": 1 = z:-1, 2 = z:-3, 3 = z:-4.
+    function currentLevelKind() {
+      if (currentZ === 0) return 'surface'
+      if (cryptLevel2 && map === cryptLevel2.map) return 'crypt2'
+      return 'chain'
+    }
+
+    // depth here means "chain position below the surface": 1 = z:-1, 2 = z:-2, 3 = z:-3.
     function depthUndergroundMap(depth) {
       if (depth <= 0) return null
       if (depth === 1) return undergroundMap
@@ -955,6 +957,7 @@
     }
 
     function onCurrentLevel(entity) {
+      if (entity?.levelKind && entity.levelKind !== currentLevelKind()) return false
       const level = entity.level || 0
       return level === 0 ? currentZ === 0 : currentZ === level
     }
@@ -1047,10 +1050,9 @@
       if (currentZ === 0) {
         if (tile !== 'caveentrance' && tile !== 'dwarvengate') return false
         if (tile === 'dwarvengate' && deepLevels[1]) {
-          // The Dwarven gate is a direct entrance to the fort, which lives
-          // on z:-4 rather than in the ordinary z:-1 cave layer.
+          // The Dwarven gate is a direct entrance to the fort at z:-3.
           currentCave = -1
-          currentZ = -4
+          currentZ = -3
           map = depthUndergroundMap(3)
           undergroundDiscovered = depthUndergroundDiscovered(3)
           if (!map) return false
@@ -1113,7 +1115,7 @@
         undergroundDiscovered = undergroundDiscoveredL1
         log('You climb back toward the light. The low ceiling forces you to stoop, and the old stone seems to press closer with every step.', 'info')
       } else if (tile === 'caveup') {
-        if (currentZ === -4 && dwarvenRuin) {
+        if (currentZ === -3 && dwarvenRuin) {
           // The fort is a direct surface destination in both directions.
           map = surfaceMap
           currentZ = 0
@@ -1572,7 +1574,47 @@
       return Array.from({length: MAP_H}, () => new Array(MAP_W).fill('cavewall'))
     }
 
+    // Random z:-1 caves must not be generated against the crypt footprint.
+    // buildCrypt() occupies roughly x +/-3 and y +/-12 around the ruined chapel;
+    // this clearance also covers the maximum +/-8 tile random-walk radius, so a
+    // generated cave blob cannot touch the crypt even if its primary spot is
+    // outside the exclusion area. The final connectivity check remains as a
+    // defensive fallback for any future geometry changes.
+    const CRYPT_CAVE_CLEARANCE = 8
+    let cryptCaveExclusionCenter = null
+
+    function cryptCaveExclusionContains(x, y) {
+      const c = cryptCaveExclusionCenter
+      if (!c) return false
+      return Math.max(Math.abs(x - c.x) - 3, Math.abs(y - c.y) - 12) <= CRYPT_CAVE_CLEARANCE
+    }
+
+    function caveMapTouchesCryptExclusion(cm) {
+      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+        if (cm[y][x] !== 'cavewall' && cryptCaveExclusionContains(x, y)) return true
+      }
+      return false
+    }
+
+    function segmentTouchesCryptExclusion(a, b) {
+      const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y))
+      for (let i = 0; i <= steps; i++) {
+        const t = steps ? i / steps : 0
+        const x = Math.round(a.x + (b.x - a.x) * t)
+        const y = Math.round(a.y + (b.y - a.y) * t)
+        if (cryptCaveExclusionContains(x, y)) return true
+      }
+      return false
+    }
+
     function generateCaves() {
+      cryptCaveExclusionCenter = null
+      for (let y = 1; y < MAP_H - 1 && !cryptCaveExclusionCenter; y++) for (let x = 1; x < MAP_W - 1; x++) {
+        if (surfaceMap?.[y]?.[x] === 'ruinedchapel') {
+          cryptCaveExclusionCenter = {x, y}
+          break
+        }
+      }
       caves = []
       caveMaps = []
       undergroundMap = blankCaveMap()
@@ -1583,7 +1625,7 @@
           const t = map[y + dy] && map[y + dy][x + dx]
           return t && TILE[t] && TILE[t].walk
         })
-        if (edge) candidates.push({x, y})
+        if (edge && !cryptCaveExclusionContains(x, y)) candidates.push({x, y})
       }
       for (let i = 0; i < 6; i++) {
         let spot = null
@@ -1594,11 +1636,13 @@
         if (!spot) continue
         const entrances = [spot]
         if (i === 0) {
-          const second = candidates.find(c => c !== spot && Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) >= 8 && Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) <= 18)
-            || candidates.find(c => c !== spot)
+          const second = candidates.find(c => c !== spot &&
+              Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) >= 8 &&
+              Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) <= 18 &&
+              !segmentTouchesCryptExclusion(spot, c))
+            || candidates.find(c => c !== spot && !segmentTouchesCryptExclusion(spot, c))
           if (second) entrances.push(second)
         }
-        for (const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance'
         const cave = {x: spot.x, y: spot.y, entrances: entrances.map(p => ({x: p.x, y: p.y}))}
         const cm = blankCaveMap()
         let x = spot.x, y = spot.y
@@ -1626,6 +1670,8 @@
           cm[entrances[1].y][entrances[1].x] = 'caveentrance'
         }
         for (const entrance of entrances) cm[entrance.y][entrance.x] = 'caveentrance'
+        if (caveMapTouchesCryptExclusion(cm)) continue
+        for (const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance'
         caveMaps.push(cm)
         caves.push(cave)
         for (const entrance of entrances) candidates.splice(candidates.indexOf(entrance), 1)
@@ -1653,13 +1699,13 @@
       buildCrypt()
       buildCryptLevel2()
       const cryptInvalid = cryptConnectedToRandomCave()
-      // z:-3: about half of the z:-1 caves get a stairway down into their own
-      // small deeper cave, sharing one map with every other z:-3 cave (same
+      // z:-2: about half of the z:-1 caves get a stairway down into their own
+      // small deeper cave, sharing one map with every other z:-2 cave (same
       // pattern as z:-1 sharing undergroundMap). Written generically so a
       // future generic level is just another generateDeepLevel() call.
       deepLevels = [generateDeepLevel(caves, caveMaps, undergroundMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')]
-      // z:-4 is reserved for the Dwarven Fort. Caves stop at z:-3, so the
-      // fort can never overlap a generated cave blob.
+      // z:-3 is reserved for the Dwarven Fort. It is the third level in the
+      // generic chain and is not generated as a random cave blob.
       deepLevels.push({
         map: blankCaveMap(),
         caveMaps: [],
@@ -1832,7 +1878,7 @@
       if (cm2[explorerSpot.y] && cm2[explorerSpot.y][explorerSpot.x] === 'crypt2floor' &&
         !(trapPos && trapPos.x === explorerSpot.x && trapPos.y === explorerSpot.y)) {
         groundItems.push({
-          x: explorerSpot.x, y: explorerSpot.y, kind: 'explorerremains', level: -2, looted: false,
+          x: explorerSpot.x, y: explorerSpot.y, kind: 'explorerremains', level: -2, levelKind: 'crypt2', looted: false,
           description: CRYPT2_EXPLORER_FLAVOR
         })
       }
@@ -2021,7 +2067,7 @@
       ruinCaves.push(ruinCave)
       for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] !== 'cavewall' && ruinMap[y][x] === 'cavewall') ruinMap[y][x] = cm[y][x]
       ruinMap[y0][x0] = targetLevel ? 'caveup' : 'dwarvengate'
-      dwarvenRuin = {x: x0, y: y0, caveIndex: ruinMaps.length - 1, level: targetLevel ? -4 : -1}
+      dwarvenRuin = {x: x0, y: y0, caveIndex: ruinMaps.length - 1, level: targetLevel ? -3 : -1}
       if (targetLevel) {
         // Connect the surface gate to the reserved fort level through the
         // ordinary cave layers without generating any cave geometry there.
@@ -2037,7 +2083,7 @@
         deepLevels[0].caves.push({x: x0, y: y0, entrances: [{x: x0, y: y0}]})
       }
       const ghost = ENEMY_TEMPLATES.find(t => t.name === 'Ghost')
-      const ruinLevel = targetLevel ? -4 : -1
+      const ruinLevel = targetLevel ? -3 : -1
       if (ghost) {
         for (let i = 0; i < 8; i++) {
           let gx = x0 + randInt(-25, 25), gy = y0 + randInt(-18, 18)
@@ -2047,6 +2093,7 @@
               baseName: 'Ghost',
               tier: ghost.tier || 2,
               level: ruinLevel,
+              levelKind: 'chain',
               caveIndex: dwarvenRuin.caveIndex,
               hp: ghost.hp,
               maxHp: ghost.hp,
@@ -2076,6 +2123,7 @@
           y,
           kind: 'ruinprop',
           level: ruinLevel,
+          levelKind: 'chain',
           caveIndex: dwarvenRuin.caveIndex,
           description: pick(['A snapped pick lies beneath the dust.', 'A cracked keg still smells faintly of ale.', 'A workbench collapsed under its own tools.', 'A dwarven lintel bears a name worn smooth by generations.'])
         })
@@ -2095,6 +2143,7 @@
         y: anvilSpot.y,
         kind: 'anvil',
         level: ruinLevel,
+        levelKind: 'chain',
         caveIndex: dwarvenRuin.caveIndex,
         description: 'The abandoned dwarven anvil is cold; its surface is scarred by a thousand unfinished blades.'
       })
@@ -2113,6 +2162,7 @@
         artifactGuaranteed: true,
         opened: false,
         level: ruinLevel,
+        levelKind: 'chain',
         caveIndex: dwarvenRuin.caveIndex
       })
       let deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, 16) && farFrom(p, {x: x0, y: y0}, 18))
@@ -2123,6 +2173,7 @@
           y: deepSpot.y,
           kind: 'wheelbarrow',
           level: ruinLevel,
+          levelKind: 'chain',
           caveIndex: dwarvenRuin.caveIndex,
           description: 'You something resembling a wheelbarrow. This thing has not been used in years. The craftsmanship, however, is of the highest quality and unknown material. It appears to be surprisingly light - you can pick it up if you want to. Though you\'re not sure why you would need it.'
         })
@@ -2133,6 +2184,7 @@
           y: coinSpot.y,
           kind: 'goldcoin',
           level: ruinLevel,
+          levelKind: 'chain',
           caveIndex: dwarvenRuin.caveIndex,
           description: 'You see a single, enormous gold coin. A skeleton lies crushed beneath it, its bones flattened under the weight. Poor greedy soul.'
         })
@@ -2145,6 +2197,7 @@
           kind: 'dwarvenremains',
           looted: false,
           level: ruinLevel,
+          levelKind: 'chain',
           caveIndex: dwarvenRuin.caveIndex,
           description: 'The bones are laid where the collapse caught them.'
         })
@@ -3541,7 +3594,7 @@
       return scored
     }
 
-    // Populates every generic chain cave (z:-3 and z:-4): one monster group per
+    // Populates every generic chain cave (z:-2 and z:-3): one monster group per
     // cave, chosen from goblins, skeletons, skinks, ratlings, or kobolds, so
     // different monster types are always in separate caves and never spawn
     // next to each other. Also drops one generous, corner-hugging chest per
@@ -3553,7 +3606,9 @@
       const ratlingTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Ratling')
       const koboldTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Kobold')
       const groupTemplates = [goblinTmpl, skeletonTmpl, skinkTmpl, ratlingTmpl, koboldTmpl].filter(Boolean)
-      for (const level of deepLevels) {
+      for (let levelIndex = 0; levelIndex < deepLevels.length; levelIndex++) {
+        const level = deepLevels[levelIndex]
+        const levelZ = CHAIN_Z_BY_DEPTH[levelIndex + 1]
         for (let caveIndex = 0; caveIndex < level.caveMaps.length; caveIndex++) {
           const cm = level.caveMaps[caveIndex]
           const caveEntrances = level.caves[caveIndex].entrances
@@ -3569,7 +3624,8 @@
               name: tmpl.name,
               baseName: tmpl.name,
               tier: tmpl.tier || 1,
-              level: -3,
+              level: levelZ,
+              levelKind: 'chain',
               caveIndex,
               hp: tmpl.hp,
               maxHp: tmpl.hp,
@@ -3603,7 +3659,8 @@
               kind: 'chest',
               tier: 3,
               opened: false,
-              level: -3,
+              level: levelZ,
+              levelKind: 'chain',
               caveIndex
             })
           }
@@ -6091,6 +6148,7 @@
           baseName: skeletonTmpl.name,
           tier: skeletonTmpl.tier || 1,
           level: -2,
+          levelKind: 'crypt2',
           hp: skeletonTmpl.hp,
           maxHp: skeletonTmpl.hp,
           atk: skeletonTmpl.atk,
@@ -8834,7 +8892,7 @@
     }
 
     /* ============================== SAVE / LOAD ============================== */
-    const SAVE_VERSION = 11 // v10 persists permadeath state and bodies
+    const SAVE_VERSION = 12 // v11 normalizes underground z-depths and distinguishes crypt2 from generic z:-2
 
     // Run-length encoding for the save file's map/discovery grids. Every
     // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -8928,10 +8986,11 @@
         caveMaps: caveMaps.map(cm => encodeTileGrid(cm, '#')),
         caves: caves,
         currentZ: currentZ,
+        currentLevelKind: currentLevelKind(),
         currentCave: currentCave,
         discovered: encodeBoolGrid(discovered),
         undergroundDiscovered: encodeBoolGrid(undergroundDiscoveredL1),
-        // Generic chain levels (z:-3 and z:-4). An array so adding more
+        // Generic chain levels (z:-2 and z:-3). An array so adding more
         // levels later never needs another save-format field - just another entry.
         deepLevels: deepLevels.map(lvl => ({
           caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
@@ -9164,7 +9223,7 @@
           }
         }
       }
-      // Generic chain levels (z:-3, z:-4). Rebuilt the same way z:-1 is above: decode each
+      // Generic chain levels (z:-2, z:-3). Rebuilt the same way z:-1 is above: decode each
       // level's per-cave templates, re-stamp caveup at every declared
       // entrance (mirrors the caveentrance re-stamp above), then merge into
       // one shared map per level.
@@ -9222,15 +9281,19 @@
       }
       undergroundDiscoveredL1 = decodeBoolGrid(data.undergroundDiscovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
 
-      // Resolve currentZ/map/currentCave for whatever z the save was on
-      // (0 = surface, -1 = shared underground level 1, -2 = crypt level 2,
-      // -3/-4 = the generic cavedown/caveup chain), falling back to the
-      // surface if that level's map can't be reconstructed (e.g. a corrupt
-      // save, or an older save using the pre-renumbering z values).
-      const savedZ = typeof data.currentZ === 'number' ? data.currentZ : 0
+      // Resolve currentZ/map/currentCave for whatever z the save was on.
+      // New saves also record currentLevelKind because z:-2 is shared by the
+      // generic deep cave map and the crypt's dedicated second map. Older saves
+      // used z:-2 exclusively for crypt2, so they retain that interpretation.
+      let savedZ = typeof data.currentZ === 'number' ? data.currentZ : 0
+      const savedKind = typeof data.currentLevelKind === 'string' ? data.currentLevelKind : null
+      // Migrate the old generic chain numbering: z:-3 -> z:-2, z:-4 -> z:-3.
+      if (!savedKind && savedZ === -3) savedZ = -2
+      else if (!savedKind && savedZ === -4) savedZ = -3
       const savedChainDepth = CHAIN_DEPTH_BY_Z[savedZ]
       const savedChainMap = savedChainDepth ? depthUndergroundMap(savedChainDepth) : null
-      if (savedZ === -2 && cryptLevel2) {
+      const loadCrypt2 = savedKind === 'crypt2' || (!savedKind && data.currentZ === -2)
+      if (loadCrypt2 && cryptLevel2) {
         currentZ = -2
         map = cryptLevel2.map
         currentCave = -1
@@ -9369,8 +9432,15 @@
 
       enemies = (data.enemies || []).map(e => {
         const tmpl = enemyTemplateForSavedEnemy(e)
+        let level = e.level || 0
+        let levelKind = e.levelKind || null
+        // Legacy saves used z:-3/z:-4 for generic deep/fort entities and z:-2
+        // for crypt2 entities. Preserve that distinction when migrating.
+        if (!levelKind && level === -3) { level = -2; levelKind = 'chain' }
+        else if (!levelKind && level === -4) { level = -3; levelKind = 'chain' }
+        else if (!levelKind && level === -2) levelKind = 'crypt2'
         return ({
-          name: e.name, baseName: e.baseName, tier: e.tier, level: e.level || 0, caveIndex: e.caveIndex,
+          name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
           hp: e.hp, maxHp: e.maxHp, atk: e.atk, def: e.def, spd: e.spd,
           aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
           fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
@@ -9438,6 +9508,9 @@
 
       groundItems = (data.groundItems || []).map(g => {
         const item = {...g}
+        if (!item.levelKind && item.level === -3) { item.level = -2; item.levelKind = 'chain' }
+        else if (!item.levelKind && item.level === -4) { item.level = -3; item.levelKind = 'chain' }
+        else if (!item.levelKind && item.level === -2) item.levelKind = 'crypt2'
         // Same rng()-outside-the-action-stream hazard as ensureMerchantStock
         // above - skip this backfill for replay restores.
         if (!isReplayInit) {
