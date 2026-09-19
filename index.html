@@ -5356,7 +5356,7 @@
           // (typically 1-5) - scale it down so it doesn't dominate the sort.
           ? (item.mod === 'xp' ? Math.round((item.xpBonus || 0) / 3) : (item.modAmt || 0))
           : 0
-        return {sum: atk + otherModifier, tier: item.tier || 0, primary: atk}
+        return {sum: 3 * atk + otherModifier, tier: item.tier || 0, primary: atk} // ATK should be 3x more important for sorting
       }
       const def = (item.def || 0) + (item.mod === 'def' ? modBonus : 0)
       return {sum: def, tier: item.tier || 0, primary: def}
