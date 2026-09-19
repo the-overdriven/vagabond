@@ -1,15 +1,11 @@
 <!-- TODO:
 
-## Save/load & inventory
-- fix: returning old hunter's quest item doesnt remove it from inventory
-- fix: When sorting weapons, the XP bonus should be scaled.
-
 ## Character stats, combat & progression
 - fix: "Resilient" prefix should floor at higher bonus
-- fix: monster tooltips should separate ATK and DEF and SPD just like it separates Hit chance and AGGRO range
+- fix: monster tooltips should separate ATK and DEF and SPD just like it separates Hit chance and AGGRO range (with centered dot symbol)
 - fix: current grace should be listed in char sheet under stats
-- fix: HP in stats is redundant
-- fix: You reached Level 2! (+10 max HP) - should also give SPD bonus, every second lvl
+- fix: HP in stats is redundant, remove
+- fix: You reached Level 2! (+10 max HP) - should also give SPD bonus, every second lvl and mention it on level up
 - fix: grace checks shouldnt apply when player is invisible
 
 ## Turn economy & NPC interaction
@@ -3990,6 +3986,12 @@
         progress: 0,
         createdAtTurn: 0, ...q
       }
+      // Tag the actual item object (not just its name) so it can be found and
+      // removed unambiguously later, even if the player is carrying another
+      // item that happens to share the same display name.
+      if (oldHunterQuest.type === 'recover_item' && oldHunterQuest.targetItem) {
+        oldHunterQuest.targetItem.hunterQuestId = oldHunterQuest.id
+      }
       return oldHunterQuest
     }
 
@@ -4050,8 +4052,17 @@
 
     function removeHunterQuestItem(q) {
       if (!q || !['recover_item', 'deliver_item'].includes(q.type) || !Array.isArray(player.inventory)) return
-      const name = q.targetItemName
-      const i = player.inventory.findIndex(item => item && (item.name === name || item.base === name))
+      // Prefer matching the exact item (by quest tag, then by object identity)
+      // over matching by name/base - two items can share a display name
+      // (e.g. two plain "Iron Sword"s), and name-matching could otherwise
+      // remove the wrong copy and leave the actual quest item behind.
+      let i = -1
+      if (q.id) i = player.inventory.findIndex(item => item && item.hunterQuestId === q.id)
+      if (i < 0 && q.targetItem) i = player.inventory.indexOf(q.targetItem)
+      if (i < 0) {
+        const name = q.targetItemName
+        i = player.inventory.findIndex(item => item && (item.name === name || item.base === name))
+      }
       if (i >= 0) player.inventory.splice(i, 1)
     }
 
@@ -5251,7 +5262,9 @@
       if (item.kind === 'weapon') {
         const atk = (item.atk || 0) + (item.mod === 'atk' ? modBonus : 0)
         const otherModifier = item.mod && item.mod !== 'atk' && item.mod !== 'spd'
-          ? (item.mod === 'xp' ? (item.xpBonus || 0) : (item.modAmt || 0))
+          // xpBonus is a flat 5-15% roll, on a much bigger scale than atk/modAmt
+          // (typically 1-5) - scale it down so it doesn't dominate the sort.
+          ? (item.mod === 'xp' ? Math.round((item.xpBonus || 0) / 3) : (item.modAmt || 0))
           : 0
         return {sum: atk + otherModifier, tier: item.tier || 0, primary: atk}
       }
