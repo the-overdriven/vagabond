@@ -1,13 +1,5 @@
 <!-- TODO:
 
-## Character stats, combat & progression
-- fix: "Resilient" prefix should floor at higher bonus
-- fix: monster tooltips should separate ATK and DEF and SPD just like it separates Hit chance and AGGRO range (with centered dot symbol)
-- fix: current grace should be listed in char sheet under stats
-- fix: HP in stats is redundant, remove
-- fix: You reached Level 2! (+10 max HP) - should also give SPD bonus, every second lvl and mention it on level up
-- fix: grace checks shouldnt apply when player is invisible
-
 ## Turn economy & NPC interaction
 - fix: foraging and digging should consume a turn
 - fix: using herbalist services should log the costs
@@ -2637,7 +2629,7 @@
     function rollModifierAmount(stat, mf = 0) {
       // Magic Find nudges the roll upward so higher-MF characters trend
       // toward better modifier amounts, without guaranteeing them.
-      if (stat === 'hp') return 1 + Math.floor(Math.pow(rng(), 5) * 50) + Math.floor(mf * 0.3)
+      if (stat === 'hp') return 10 + Math.floor(Math.pow(rng(), 5) * 50) + Math.floor(mf * 0.3)
       const roll = Math.min(100, randInt(1, 100) + Math.round(mf * 0.5))
       if (roll <= 45) return 1
       if (roll <= 75) return 2
@@ -3294,8 +3286,9 @@
         player.lvl++
         const hpGain = 10
         player.maxHp += hpGain
+        const spdGain = player.lvl % 2 === 0 ? 1 : 0
         leveled = true
-        log(`You reached Level ${player.lvl}! (+${hpGain} max HP)`, 'good')
+        log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''})`, 'good')
       }
       if (leveled) updateHud()
     }
@@ -4528,6 +4521,8 @@
     }
 
     function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false) {
+      // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks
+      if ((attackerIsPlayer || defenderIsPlayer) && (player.godMode || player.invisibleTurns > 0)) return false
       const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer)
       const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer)
       return attackerDelay !== null && defenderDelay !== null &&
@@ -7001,7 +6996,7 @@
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
       </div>
       <div class="statrow">
-      <span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span><span class="statsep">&nbsp;</span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep">&nbsp;</span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
+      <span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
       <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>`
@@ -7575,7 +7570,7 @@
         // ['🎚️ Level', player.lvl],
         ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
         ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
-        ['❤️ HP', player.hp + ' / ' + playerMaxHp()],
+        ['🤺 Grace', playerGrace()],
         ['💥 Crit Chance', Math.round(CRIT_CHANCE * 100) + '%'],
         // ['⚔️ Attack', playerAtk()],
         // ['🛡️ Defense', playerDef()],
