@@ -76,7 +76,6 @@
 - !2 feat: monsters that are close make sounds, to warn player (log)
 - !3 feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
 - !2 refactor: move more to content .json
-- !1 refactor: remove remaining fallbacks, such as const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin') || {
 - !3 refactor: Separate game state from game logic
 - !2 feat: every wolf has a chance to spawn with another wolf
 - !3 feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
@@ -3539,35 +3538,18 @@
       return scored
     }
 
-    // Populates every generic chain cave (z:-3 and z:-4): one monster type per
-    // cave, chosen 50/50, so goblins and skeletons are always in separate
-    // caves and never spawn next to each other. Also drops one generous,
-    // corner-hugging chest per cave (tier 3+).
+    // Populates every generic chain cave (z:-3 and z:-4): one monster group per
+    // cave, chosen from goblins, skeletons, skinks, ratlings, or kobolds, so
+    // different monster types are always in separate caves and never spawn
+    // next to each other. Also drops one generous, corner-hugging chest per
+    // cave (tier 3+).
     function spawnDeepCaveContents() {
-      const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin') || {
-        name: 'Goblin',
-        tier: 1,
-        hp: 14,
-        atk: 4,
-        def: 1,
-        spd: 5,
-        fly: false,
-        humanoid: true,
-        evades: false,
-        aggro: AGGRO_RANGE,
-      }
-      const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton') || {
-        name: 'Skeleton',
-        tier: 1,
-        hp: 12,
-        atk: 5,
-        def: 2,
-        spd: 4,
-        fly: false,
-        humanoid: true,
-        evades: false,
-        aggro: AGGRO_RANGE,
-      }
+      const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin')
+      const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton')
+      const skinkTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skink')
+      const ratlingTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Ratling')
+      const koboldTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Kobold')
+      const groupTemplates = [goblinTmpl, skeletonTmpl, skinkTmpl, ratlingTmpl, koboldTmpl].filter(Boolean)
       for (const level of deepLevels) {
         for (let caveIndex = 0; caveIndex < level.caveMaps.length; caveIndex++) {
           const cm = level.caveMaps[caveIndex]
@@ -3577,7 +3559,7 @@
             x,
             y
           })
-          const tmpl = chance(0.5) ? goblinTmpl : skeletonTmpl
+          const tmpl = pick(groupTemplates)
           for (let i = 0; i < 4 && open.length; i++) {
             const p = pick(open)
             addEnemy({
