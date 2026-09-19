@@ -557,6 +557,20 @@
       return arr[Math.floor(rng() * arr.length)]
     }
 
+    // Weighted pick: each item's chance is proportional to weightFn(item).
+    // Falls back to a uniform pick(arr) if every weight is 0 (or missing).
+    function pickWeighted(arr, weightFn) {
+      let total = 0
+      for (const item of arr) total += weightFn(item) || 0
+      if (total <= 0) return pick(arr)
+      let r = rng() * total
+      for (const item of arr) {
+        r -= weightFn(item) || 0
+        if (r <= 0) return item
+      }
+      return arr[arr.length - 1]
+    }
+
     function chance(p) {
       return rng() < p
     }
@@ -3418,7 +3432,7 @@
           }
         }
         const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier)
-        const tmpl = pick(templates)
+        const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
         spawnOneFromTemplate(tmpl)
       }
 
@@ -5793,7 +5807,7 @@
       if (!candidates.length) return
       const templates = ENEMY_TEMPLATES.filter(t => (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest'))
       if (!templates.length) return
-      const tmpl = pick(templates)
+      const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
       const spot = pick(candidates)
       const variance = 0.95 + rng() * 0.10
       const e = {
