@@ -3,6 +3,7 @@
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 
+- fix: when dying, skeleton remains should appear *after* we are teleported to temple
 - !1 feat: add hotkey to toggle ASCII/tiles
 - !1 feat: add prefix "Light" to weapons (grace +1)
 - !1 feat: all items should have a base cost in .json
@@ -192,6 +193,12 @@
           width: 100%;
           height: 100%;
           display: block;
+      }
+
+      .race-card img {
+          object-fit: contain;
+          image-rendering: auto;
+          background: transparent;
       }
 
       /* Keep enemy stat separators visible in the tap-to-inspect panel on touch devices. */
@@ -650,6 +657,40 @@
 
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
+  const PLAYER_RACE_IMAGES = Object.freeze({
+    human: 'img/tiles/player.png',
+    catling: 'img/tiles/player-catling.png',
+    dwarf: 'img/tiles/player-dwarf.png',
+    elf: 'img/tiles/player-elf.png',
+    halfling: 'img/tiles/player-halfling.png',
+    leprechaun: 'img/tiles/player-leprechaun.png',
+    merling: 'img/tiles/player-merling.png',
+    orc: 'img/tiles/player-orc.png',
+    troll: 'img/tiles/player-troll.png',
+    wyrdling: 'img/tiles/player-wyrdling.png',
+  })
+
+  const RACE_SELECTION_IMAGES = Object.freeze({
+    human: 'img/race-select/human.png',
+    catling: 'img/race-select/catling.png',
+    dwarf: 'img/race-select/dwarf.png',
+    elf: 'img/race-select/elf.png',
+    halfling: 'img/race-select/halfling.png',
+    leprechaun: 'img/race-select/leprechaun.png',
+    merling: 'img/race-select/merling.png',
+    orc: 'img/race-select/orc.png',
+    troll: 'img/race-select/troll.png',
+    wyrdling: 'img/race-select/wyrdling.png',
+  })
+
+  function playerRaceImagePath(raceId = player?.race) {
+    return PLAYER_RACE_IMAGES[raceId] || RENDER_STYLE?.player?.image
+  }
+
+  function raceSelectionImagePath(raceId) {
+    return RACE_SELECTION_IMAGES[raceId] || playerRaceImagePath(raceId)
+  }
+
   // Fetches images as blobs so tooltips keep working fully offline. Pass a
   // subset of paths to prioritise them; called with no argument it warms
   // everything. Already-cached paths are skipped, so the two calls made
@@ -662,9 +703,10 @@
       paths = []
       for (const tmpl of ENEMY_TEMPLATES) paths.push('img/enemies/' + slug(tmpl.name) + '.jpg')
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
-      for (const race of RACES) paths.push('img/avatars/' + race.avatar)
       for (const kind of ITEM_ICON_KINDS) paths.push('img/icons/' + kind + '.svg')
       if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
+      paths.push(...Object.values(PLAYER_RACE_IMAGES))
+      paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
         if (visual?.image) paths.push(visual.image)
       }
@@ -4302,7 +4344,11 @@
   }
 
   function drawPlayerVisual(px, py, color, alpha) {
-    if (drawImageVisual(px, py, RENDER_STYLE.player, alpha)) return
+    const image = playerRaceImagePath()
+    const visual = image === RENDER_STYLE.player.image
+      ? RENDER_STYLE.player
+      : {...RENDER_STYLE.player, image}
+    if (drawImageVisual(px, py, visual, alpha)) return
     drawCreature(px, py, RENDER_STYLE.player.glyph, color, alpha)
   }
 
@@ -4855,7 +4901,7 @@
       const race = raceDef()
       return {
         mini: false, enemy: null, html: `
-      <img src="${imageSrc('img/avatars/' + race.avatar)}" onerror="this.style.display='none'">
+      <img src="${imageSrc(raceSelectionImagePath(race.id))}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${player.name}</div>
       <div style="color:var(--ember-bright);font-size:11px;">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
@@ -6596,7 +6642,7 @@
       card.className = 'race-card' + (race.id === selectedRaceId ? ' sel' : '')
       card.dataset.race = race.id
       card.innerHTML = `
-          <img src="${imageSrc('img/avatars/' + race.avatar)}" alt="${race.name}" onerror="this.style.display='none'">
+          <img src="${imageSrc(raceSelectionImagePath(race.id))}" alt="${race.name}" onerror="this.style.display='none'">
           <div class="rname">${race.name}</div>
           <div class="rbonus">${race.bonus}</div>`
       card.addEventListener('click', () => {
@@ -6617,7 +6663,7 @@
       const race = RACES.find(r => r.id === card.dataset.race)
       if (!race) continue
       const img = card.querySelector('img')
-      const src = imageSrc('img/avatars/' + race.avatar)
+      const src = imageSrc(raceSelectionImagePath(race.id))
       if (img && img.getAttribute('src') !== src) img.setAttribute('src', src)
     }
   }
@@ -6700,6 +6746,7 @@
     updateHud()
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
+    initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
     for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
@@ -6727,11 +6774,11 @@
     }
     // The overlay opens immediately, with cards showing at once so the player
     // can never hit "Begin" before seeing the choices, and play input is
-    // blocked from the very first frame. Avatars are then re-pointed at
+    // blocked from the very first frame. Race sprites are then re-pointed at
     // cached blob URLs so they survive going offline; everything else streams
     // in behind the race screen while the player is choosing.
     openRaceSelect()
-    await preloadImages(RACES.map(race => 'avatars/' + race.avatar))
+    await preloadImages(RACES.map(race => raceSelectionImagePath(race.id)))
     refreshRaceAvatars()
     preloadImages().catch(err => console.warn(err))
   }
