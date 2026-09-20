@@ -58,7 +58,11 @@
       "img/backgrounds/river.jpg"
     ],
     "frozenriver": [
-      "img/backgrounds/river.jpg"
+      "img/backgrounds/frozen_river.jpg",
+      "img/backgrounds/frozen_river2.jpg",
+      "img/backgrounds/frozen_river3.jpg",
+      "img/backgrounds/frozen_river4.jpg",
+      "img/backgrounds/frozen_river5.jpg"
     ],
     "water": [
       "img/backgrounds/river.jpg"
