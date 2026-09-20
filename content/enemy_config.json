@@ -1,0 +1,45 @@
+{
+  "combat": {
+    "attackRange": 1,
+    "defaultAggroRange": 3,
+    "criticalHitChance": 0.15
+  },
+  "pathfinding": {
+    "chaseDetour": 6
+  },
+  "wandering": {
+    "enabled": true,
+    "leash": true,
+    "chance": 0.3,
+    "radius": 1,
+    "activeRadius": 20
+  },
+  "npc": {
+    "talkFreezeTurns": 6
+  },
+  "temple": {
+    "fleeDistance": 15
+  },
+  "prefixStats": [
+    {
+      "key": "hp",
+      "label": "HP"
+    },
+    {
+      "key": "atk",
+      "label": "ATK"
+    },
+    {
+      "key": "def",
+      "label": "DEF"
+    },
+    {
+      "key": "spd",
+      "label": "SPD"
+    },
+    {
+      "key": "aggro",
+      "label": "AGGRO"
+    }
+  ]
+}

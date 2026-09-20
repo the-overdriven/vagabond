@@ -570,6 +570,7 @@
   let ARTIFACT_NAMES_DWARF = []
   let HUMAN_NAMES = []
   let ARTIFACT_VOCATIONS_DWARF = []
+  let ARTIFACT_REPUTATIONS_DWARF = []
   let ARTIFACT_EFFECTS = []
   let ARTIFACT_CURSES = []
   let ARTIFACT_DESC = {}
@@ -606,14 +607,21 @@
   let EDGE_XP = 100
   let MIN_LICHES = 6
   let MERCHANT_STOCK_CONFIG = {}
+  let ATTACK_RANGE = 1
+  let AGGRO_RANGE = 3
+  let CRIT_CHANCE = 0.15
+  let CHASE_DETOUR = 6
+  let ENEMY_WANDER_ENABLED = true
+  let ENEMY_WANDER_LEASH = true
+  let ENEMY_WANDER_CHANCE = 0.3
+  let ENEMY_WANDER_RADIUS = 1
+  let NPC_TALK_FREEZE_TURNS = 6
+  let ENEMY_WANDER_ACTIVE_RADIUS = 20
+  let FLEE_DISTANCE = 15
+  let PREFIX_STATS = []
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
   let cryptCaveIndex = -1
-  const CRYPT_INSCRIPTIONS = [
-    'There is an inscription engraved on the stone coffin: The dead know more than the living.',
-    'There is an inscription engraved on the stone coffin: What was buried, is not lost.',
-    'There is an inscription engraved on the stone coffin: Here lies the man who rang the bell.',
-    'There is an inscription engraved on the stone coffin: The only safe place is where the living would never look.'
-  ]
+  let CRYPT_INSCRIPTIONS = []
   // Crypt level 2 (z:-2): a single dedicated tighter/darker map beneath the
   // crypt, reached via cryptstairsdown/cryptstairsup. Crypt Level 2 uses
   // z:-2 just like the generic second underground level; currentLevelKind()
@@ -621,10 +629,10 @@
   let cryptLevel2 = null // {map, discovered, x, y, trapSprung, trapPos}
   let treasureMapSpot = null // {x,y} sand tile the treasure map points to
   let treasureMapUnearthed = false
-  const CRYPT2_EXPLORER_FLAVOR = 'The bones of a long-dead explorer lie curled beside a collapsed sarcophagus. A satchel, rotted to scraps, rests beside them.'
-  const CRYPT2_TRAP_DISCOVER = 'The lid of this sarcophagus lies askew, scraped aside from within. Dust has settled unevenly around it, as if something clawed its way out long ago.'
-  const CRYPT2_TRAP_TRIGGER = 'Stone grinds against stone as the sarcophagus lid slides free. All around you, bones stir in their burial niches and rise.'
-  const CRYPT2_TRAP_SPENT = 'The sarcophagus stands open and empty. Whatever rose from it is already loose in the dark.'
+  let CRYPT2_EXPLORER_FLAVOR = ''
+  let CRYPT2_TRAP_DISCOVER = ''
+  let CRYPT2_TRAP_TRIGGER = ''
+  let CRYPT2_TRAP_SPENT = ''
   let cemeteryTombstones = {}
   let gravediggerGraveKey = null
   let oldHunterQuest = null
@@ -639,12 +647,14 @@
       enemyTemplates: 'enemy_templates.json',
       enemyDefaultBiomes: 'enemy_default_biomes.json',
       enemyPrefixes: 'enemy_prefixes.json',
+      enemyConfig: 'enemy_config.json',
       artifactNouns: 'artifact_nouns.json',
       artifactPrefixes: 'artifact_prefixes.json',
       artifactEpithets: 'artifact_epithets.json',
       artifactNamesDwarf: 'random_names_dwarf.json',
       humanNames: 'random_names_human.json',
       artifactVocationsDwarf: 'random_vocations_dwarf.json',
+      artifactReputationsDwarf: 'random_reputations_dwarf.json',
       artifactEffects: 'artifact_effects.json',
       artifactCurses: 'artifact_curses.json',
       artifactDesc: 'artifact_desc_fragments.json',
@@ -670,12 +680,25 @@
     ENEMY_TEMPLATES = content.enemyTemplates
     ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes
     ENEMY_PREFIXES = content.enemyPrefixes
+    ATTACK_RANGE = content.enemyConfig.combat.attackRange
+    AGGRO_RANGE = content.enemyConfig.combat.defaultAggroRange
+    CRIT_CHANCE = content.enemyConfig.combat.criticalHitChance
+    CHASE_DETOUR = content.enemyConfig.pathfinding.chaseDetour
+    ENEMY_WANDER_ENABLED = content.enemyConfig.wandering.enabled
+    ENEMY_WANDER_LEASH = content.enemyConfig.wandering.leash
+    ENEMY_WANDER_CHANCE = content.enemyConfig.wandering.chance
+    ENEMY_WANDER_RADIUS = content.enemyConfig.wandering.radius
+    ENEMY_WANDER_ACTIVE_RADIUS = content.enemyConfig.wandering.activeRadius
+    NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
+    FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
+    PREFIX_STATS = content.enemyConfig.prefixStats
     ARTIFACT_NOUNS = content.artifactNouns
     ARTIFACT_PREFIXES = content.artifactPrefixes
     ARTIFACT_EPITHETS = content.artifactEpithets
     ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf
     HUMAN_NAMES = content.humanNames
     ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf
+    ARTIFACT_REPUTATIONS_DWARF = content.artifactReputationsDwarf
     ARTIFACT_EFFECTS = content.artifactEffects
     ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : []
     ARTIFACT_DESC = content.artifactDesc
@@ -688,6 +711,11 @@
     SKELETON_INSPECTIONS = content.messages.skeletonInspections
     CURSE_EVENT_LINES_NAMED = content.messages.curseEventLines.named
     CURSE_EVENT_LINES_UNKNOWN = content.messages.curseEventLines.unknown
+    CRYPT_INSCRIPTIONS = content.messages.crypt.inscriptions
+    CRYPT2_EXPLORER_FLAVOR = content.messages.crypt.level2.explorerFlavor
+    CRYPT2_TRAP_DISCOVER = content.messages.crypt.level2.trapDiscover
+    CRYPT2_TRAP_TRIGGER = content.messages.crypt.level2.trapTrigger
+    CRYPT2_TRAP_SPENT = content.messages.crypt.level2.trapSpent
     TILE = content.tiles.tiles
     TILE_CODE = content.tiles.tileCode
     CODE_TILE = Object.fromEntries(Object.entries(TILE_CODE).map(([k, v]) => [v, k]))
@@ -709,7 +737,6 @@
     EDGE_XP = content.mapConfig.exploration.edgeRewardXp
     MIN_LICHES = content.mapConfig.spawning.minLiches
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
-    injectCryptLevel2Content()
   }
 
   const preloadedImageUrls = new Map()
@@ -777,22 +804,11 @@
     if (!enterCave()) describeSurroundings()
   }
 
-  const ENEMY_DEFAULT_BIOMES_FALLBACK = ['grass', 'forest', 'hill', 'sand', 'snow', 'river']
-
   function enemyBiomes(tmpl) {
-    return (tmpl && Array.isArray(tmpl.biomes) && tmpl.biomes.length) ? tmpl.biomes : (ENEMY_DEFAULT_BIOMES.length ? ENEMY_DEFAULT_BIOMES : ENEMY_DEFAULT_BIOMES_FALLBACK)
+    return (tmpl && Array.isArray(tmpl.biomes) && tmpl.biomes.length) ? tmpl.biomes : ENEMY_DEFAULT_BIOMES
   }
 
-  // Chance for a `Deadly` enemy to double the damage of a hit that already landed.
-  const CRIT_CHANCE = 0.15
-  // Stats a prefix is allowed to touch, in tooltip display order.
-  const PREFIX_STATS = [
-    {key: 'hp', label: 'HP'},
-    {key: 'atk', label: 'ATK'},
-    {key: 'def', label: 'DEF'},
-    {key: 'spd', label: 'SPD'},
-    {key: 'aggro', label: 'AGGRO'},
-  ]
+  // Enemy combat/prefix tuning is loaded from content/enemy_config.json.
 
   function prefixBaseStats(e) {
     return {hp: e.maxHp, atk: e.atk, def: e.def, spd: e.spd, aggro: e.aggro}
@@ -1131,19 +1147,7 @@
     const lifespan = randInt(38, 126)
     const deathYear = Math.min(700, birthYear + lifespan)
 
-    const reputations = [
-      'famous',
-      'scandalous',
-      'notorious',
-      'shady',
-      'dreaded',
-      'disreputable',
-      'disgraced',
-      'dubious',
-      'legendary',
-      'cursed'
-    ]
-    const reputation = pick(reputations)
+    const reputation = pick(ARTIFACT_REPUTATIONS_DWARF)
 
     return {
       vocation,
@@ -2684,8 +2688,7 @@
   }
 
   /* ============================== ENEMY AI TURN ============================== */
-  const ATTACK_RANGE = 1 // Chebyshev distance at which an enemy attacks instead of chasing
-  const AGGRO_RANGE = 3  // default aggro distance used when a template doesn't specify one
+  // Enemy tuning values in this section are loaded from content/enemy_config.json.
   function enemyAggroRange(e) {
     return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE
   }
@@ -2711,7 +2714,6 @@
 
   // How far outside the direct line the chase AI may detour to get around walls,
   // water, boulders or other monsters standing in the way.
-  const CHASE_DETOUR = 6
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
 
   function enemyTileOpen(e, x, y) {
@@ -2797,16 +2799,9 @@
     return true
   }
 
-  /* --- Idle wander tuning: flip these to change the behaviour at any time --- */
-  const ENEMY_WANDER_ENABLED = true  // false = enemies stand perfectly still when idle
-  const ENEMY_WANDER_LEASH = true  // false = they roam freely instead of sticking near home
-  const ENEMY_WANDER_CHANCE = 0.3   // chance per turn that an idle on-screen enemy shuffles
-  const ENEMY_WANDER_RADIUS = 1     // how far (in squares) they may stray from their home tile
-  /* ------------------------------------------------------------------------ */
 
   // How many of the player's turns an NPC stands still after being talked
   // to, so a conversation doesn't get cut short by them wandering off mid-chat.
-  const NPC_TALK_FREEZE_TURNS = 6
   function freezeNpcFromWandering(n) {
     if (n) n.talkFreezeTurns = NPC_TALK_FREEZE_TURNS
   }
@@ -2817,7 +2812,6 @@
   // See the comment on npcIsOnScreen above: this must stay independent of
   // the live rendering viewport so replay's rng() call count can never
   // drift based on window size/device.
-  const ENEMY_WANDER_ACTIVE_RADIUS = 20
   function enemyIsOnScreen(e) {
     return Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ENEMY_WANDER_ACTIVE_RADIUS
   }
@@ -2892,7 +2886,6 @@
   // player - otherwise it would simply freeze right at the screen's edge
   // (wandering doesn't apply to off-screen enemies either, so nothing would
   // ever push it further away).
-  const FLEE_DISTANCE = 15
   let turnCount = 0
   let consecutiveWaitTurns = 0
   const MAX_CONSECUTIVE_WAIT_TURNS = 10

@@ -1,52 +1,5 @@
 'use strict'
 
-// Crypt level 2 introduces a few new tile types. Rather than requiring an
-// edit to the (externally hosted) content/tiles.json, they're patched
-// into the loaded tile tables here at runtime.
-function injectCryptLevel2Content() {
-  // Keep generated rivers renderable even when the external tile data is older.
-  const riverDefs = {
-    river: {walk: true, ch: '~', color: '#7fd0d8', bg: '#207f9a', mini: '#207f9a'},
-    frozenriver: {walk: true, ch: '~', color: '#d9f3f5', bg: '#8bb8c2', mini: '#8bb8c2'},
-  }
-  for (const [key, def] of Object.entries(riverDefs)) TILE[key] = TILE[key] || def
-
-  const defs = {
-    cryptstairsdown: {walk: true, ch: '>', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
-    cryptstairsup: {walk: true, ch: '<', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
-    mausoleumstairsup: {walk: true, ch: '<', color: '#d6c7a5', bg: '#0c0a08', mini: '#9a8458'},
-    crypt2floor: {walk: true, ch: '.', color: '#4c463c', bg: '#050403', mini: '#221f1a'},
-    cryptrubble: {walk: true, ch: '%', color: '#443f34', bg: '#050403', mini: '#221f1a'},
-    crypt2niche: {walk: false, ch: 'n', color: '#2a261e', bg: '#050403', mini: '#161310'},
-    sarcophagus: {walk: true, ch: '\u26B0', color: '#6a6255', bg: '#050403', mini: '#332f27'},
-    crypttrap: {walk: true, ch: '\u26B0', color: '#8a5a3c', bg: '#050403', mini: '#332f27'},
-    crypttrapsprung: {walk: true, ch: '\u26B0', color: '#39352d', bg: '#050403', mini: '#1c1a16'},
-  }
-  const codes = {
-    cryptstairsdown: '\u2401', cryptstairsup: '\u2402', crypt2floor: '\u2403',
-    cryptrubble: '\u2404', crypt2niche: '\u2405', sarcophagus: '\u2406',
-    crypttrap: '\u2407', crypttrapsprung: '\u2408', mausoleumstairsup: '\u2409',
-  }
-  const descs = {
-    cryptstairsdown: 'a shoddy old stone staircase leading down',
-    cryptstairsup: 'a shoddy old stone staircase leading up',
-    crypt2floor: 'cracked, ancient stone floor',
-    cryptrubble: 'a collapsed section of the passage',
-    crypt2niche: 'a burial niche carved into the stone',
-    sarcophagus: 'an old stone sarcophagus',
-    crypttrap: 'an old stone sarcophagus',
-    crypttrapsprung: 'a shattered, empty sarcophagus',
-    mausoleumstairsup: 'a grand stone staircase leading up to the royal mausoleum’s entrance',
-  }
-  for (const [key, def] of Object.entries(defs)) TILE[key] = def
-  for (const [key, c] of Object.entries(codes)) {
-    TILE_CODE[key] = c
-    CODE_TILE[c] = key
-  }
-  Object.assign(TILE_DESC, descs)
-}
-
-
 /* ============================== MAP GENERATION ============================== */
 function makeNoise(cellsX, cellsY) {
   const grid = []

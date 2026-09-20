@@ -10,7 +10,8 @@
       "ch": "~",
       "color": "#7fd0d8",
       "bg": "#207f9a",
-      "walk": true
+      "walk": true,
+      "mini": "#207f9a"
     },
     "sand": {
       "ch": ".",
@@ -208,6 +209,76 @@
       "color": "#d9a441",
       "bg": "#141414",
       "walk": true
+    },
+    "frozenriver": {
+      "walk": true,
+      "ch": "~",
+      "color": "#d9f3f5",
+      "bg": "#8bb8c2",
+      "mini": "#8bb8c2"
+    },
+    "cryptstairsdown": {
+      "walk": true,
+      "ch": ">",
+      "color": "#c9bfae",
+      "bg": "#0c0a08",
+      "mini": "#8a7a5c"
+    },
+    "cryptstairsup": {
+      "walk": true,
+      "ch": "<",
+      "color": "#c9bfae",
+      "bg": "#0c0a08",
+      "mini": "#8a7a5c"
+    },
+    "mausoleumstairsup": {
+      "walk": true,
+      "ch": "<",
+      "color": "#d6c7a5",
+      "bg": "#0c0a08",
+      "mini": "#9a8458"
+    },
+    "crypt2floor": {
+      "walk": true,
+      "ch": ".",
+      "color": "#4c463c",
+      "bg": "#050403",
+      "mini": "#221f1a"
+    },
+    "cryptrubble": {
+      "walk": true,
+      "ch": "%",
+      "color": "#443f34",
+      "bg": "#050403",
+      "mini": "#221f1a"
+    },
+    "crypt2niche": {
+      "walk": false,
+      "ch": "n",
+      "color": "#2a261e",
+      "bg": "#050403",
+      "mini": "#161310"
+    },
+    "sarcophagus": {
+      "walk": true,
+      "ch": "⚰",
+      "color": "#6a6255",
+      "bg": "#050403",
+      "mini": "#332f27"
+    },
+    "crypttrap": {
+      "walk": true,
+      "ch": "⚰",
+      "color": "#8a5a3c",
+      "bg": "#050403",
+      "mini": "#332f27"
+    },
+    "crypttrapsprung": {
+      "walk": true,
+      "ch": "⚰",
+      "color": "#39352d",
+      "bg": "#050403",
+      "mini": "#1c1a16"
     }
   },
   "tileCode": {
@@ -245,7 +316,16 @@
     "dwarvengate": "G",
     "dwarvenstatue": "S",
     "dwarvenwall": "W",
-    "dwarvenrubble": "R"
+    "dwarvenrubble": "R",
+    "cryptstairsdown": "␁",
+    "cryptstairsup": "␂",
+    "crypt2floor": "␃",
+    "cryptrubble": "␄",
+    "crypt2niche": "␅",
+    "sarcophagus": "␆",
+    "crypttrap": "␇",
+    "crypttrapsprung": "␈",
+    "mausoleumstairsup": "␉"
   },
   "tileDesc": {
     "water": "open water",
@@ -280,7 +360,16 @@
     "dwarvengate": "the sealed dwarven gate, its lintel carved with a broken crown",
     "dwarvenstatue": "an ancient stone column. It seems to have outlived everyone who built it. The column depicts proud dwarven warrior carved in stone, forever standing guard",
     "dwarvenwall": "a hewn dwarven wall, scarred by collapse and time",
-    "dwarvenrubble": "a dangerous heap of fallen masonry"
+    "dwarvenrubble": "a dangerous heap of fallen masonry",
+    "cryptstairsdown": "a shoddy old stone staircase leading down",
+    "cryptstairsup": "a shoddy old stone staircase leading up",
+    "crypt2floor": "cracked, ancient stone floor",
+    "cryptrubble": "a collapsed section of the passage",
+    "crypt2niche": "a burial niche carved into the stone",
+    "sarcophagus": "an old stone sarcophagus",
+    "crypttrap": "an old stone sarcophagus",
+    "crypttrapsprung": "a shattered, empty sarcophagus",
+    "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum’s entrance"
   },
   "terrainSpeed": {
     "grass": 1,

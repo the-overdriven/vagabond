@@ -42,5 +42,19 @@
       "def_debuff": "A shiver of dread leaves you feeling exposed.",
       "spd_debuff": "Your limbs feel suddenly, inexplicably heavy."
     }
+  },
+  "crypt": {
+    "inscriptions": [
+      "There is an inscription engraved on the stone coffin: The dead know more than the living.",
+      "There is an inscription engraved on the stone coffin: What was buried, is not lost.",
+      "There is an inscription engraved on the stone coffin: Here lies the man who rang the bell.",
+      "There is an inscription engraved on the stone coffin: The only safe place is where the living would never look."
+    ],
+    "level2": {
+      "explorerFlavor": "The bones of a long-dead explorer lie curled beside a collapsed sarcophagus. A satchel, rotted to scraps, rests beside them.",
+      "trapDiscover": "The lid of this sarcophagus lies askew, scraped aside from within. Dust has settled unevenly around it, as if something clawed its way out long ago.",
+      "trapTrigger": "Stone grinds against stone as the sarcophagus lid slides free. All around you, bones stir in their burial niches and rise.",
+      "trapSpent": "The sarcophagus stands open and empty. Whatever rose from it is already loose in the dark."
+    }
   }
 }
