@@ -580,7 +580,7 @@
       lootTables: 'loot_tables.json',
       mapConfig: 'map_config.json',
       merchantStockConfig: 'merchant_stock.json',
-      rendering: 'rendering.json',
+      rendering: 'rendering.json'
     }
     const content = {}
     for (const [key, file] of Object.entries(files)) {
@@ -656,6 +656,7 @@
   }
 
   const preloadedImageUrls = new Map()
+  const preloadedImages = new Map()
   // Fetches images as blobs so tooltips keep working fully offline. Pass a
   // subset of paths to prioritise them; called with no argument it warms
   // everything. Already-cached paths are skipped, so the two calls made
@@ -670,6 +671,7 @@
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
       for (const race of RACES) paths.push('img/avatars/' + race.avatar)
       for (const kind of ITEM_ICON_KINDS) paths.push('img/icons/' + kind + '.svg')
+      if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
     }
     await Promise.all([...new Set(paths)].map(async path => {
       if (preloadedImageUrls.has(path)) return
@@ -682,6 +684,7 @@
         image.src = url
         await image.decode()
         preloadedImageUrls.set(path, url)
+        preloadedImages.set(path, image)
       } catch (err) {
         console.warn(err.message)
       }
@@ -4198,6 +4201,28 @@
     ctx.fillText(ch, px + TILE_PX / 2, py + 3)
   }
 
+  function drawImageVisual(px, py, visual, alpha) {
+    if (!visual?.image) return false
+    const image = preloadedImages.get(visual.image)
+    if (!image) return false
+    const a = alpha === undefined ? 1 : alpha
+    const scale = visual.scale ?? 1
+    const size = TILE_PX * scale
+    const x = px + (TILE_PX - size) / 2
+    const y = py + (TILE_PX - size) / 2
+    ctx.save()
+    ctx.globalAlpha = a
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(image, x, y, size, size)
+    ctx.restore()
+    return true
+  }
+
+  function drawPlayerVisual(px, py, color, alpha) {
+    if (drawImageVisual(px, py, RENDER_STYLE.player, alpha)) return
+    drawCreature(px, py, RENDER_STYLE.player.glyph, color, alpha)
+  }
+
   let camX = 0, camY = 0
   let animLoopFrame = null
   let cameraAnimating = false
@@ -4632,10 +4657,10 @@
         ctx.save()
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
         ctx.rotate(deathRotation)
-        drawCreature(-TILE_PX / 2, -TILE_PX / 2, RENDER_STYLE.player.glyph, playerColor, playerAlpha)
+        drawPlayerVisual(-TILE_PX / 2, -TILE_PX / 2, playerColor, playerAlpha)
         ctx.restore()
       } else {
-        drawCreature(vx, vy, RENDER_STYLE.player.glyph, playerColor, playerAlpha)
+        drawPlayerVisual(vx, vy, playerColor, playerAlpha)
       }
     }
     if (currentZ < 0) {
@@ -6547,6 +6572,7 @@
     stopAttackAnimation()
     snapCameraToPlayer()
     updateHud()
+    if (RENDER_STYLE?.player?.image) await preloadImages([RENDER_STYLE.player.image])
     render()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.

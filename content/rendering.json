@@ -103,7 +103,9 @@
     "glyph": "@",
     "color": "#fff6d6",
     "fadedColor": "rgba(255,246,214,0.45)",
-    "fadedAlpha": 0.45
+    "fadedAlpha": 0.45,
+    "image": "img/tiles/player.png",
+    "scale": 1.0
   },
   "damage": {
     "miss": "#d9d9a3",
