@@ -529,6 +529,9 @@
   let EDGE_MARGIN, EDGE_XP, MIN_LICHES
   let MERCHANT_STOCK_CONFIG = {}
   let RENDER_STYLE = {}
+  let PLAYER_RACE_IMAGES = {}
+  let RACE_SELECTION_IMAGES = {}
+  let PLAYER_TERRAIN_BACKGROUNDS = {}
   let ATTACK_RANGE, AGGRO_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
@@ -579,7 +582,8 @@
       lootTables: 'loot_tables.json',
       mapConfig: 'map_config.json',
       merchantStockConfig: 'merchant_stock.json',
-      rendering: 'rendering.json'
+      rendering: 'rendering.json',
+      playerVisuals: 'player_visuals.json'
     }
     const content = {}
     for (const [key, file] of Object.entries(files)) {
@@ -653,54 +657,13 @@
     MIN_LICHES = content.mapConfig.spawning.minLiches
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
     RENDER_STYLE = content.rendering
+    PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}
+    RACE_SELECTION_IMAGES = content.playerVisuals.raceSelectionImages || {}
+    PLAYER_TERRAIN_BACKGROUNDS = content.playerVisuals.playerTerrainBackgrounds || {}
   }
 
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
-  const PLAYER_RACE_IMAGES = Object.freeze({
-    human: 'img/tiles/player.png',
-    catling: 'img/tiles/player-catling.png',
-    dwarf: 'img/tiles/player-dwarf.png',
-    elf: 'img/tiles/player-elf.png',
-    halfling: 'img/tiles/player-halfling.png',
-    leprechaun: 'img/tiles/player-leprechaun.png',
-    merling: 'img/tiles/player-merling.png',
-    orc: 'img/tiles/player-orc.png',
-    troll: 'img/tiles/player-troll.png',
-    wyrdling: 'img/tiles/player-wyrdling.png',
-  })
-
-  const RACE_SELECTION_IMAGES = Object.freeze({
-    human: 'img/race-select/human.png',
-    catling: 'img/race-select/catling.png',
-    dwarf: 'img/race-select/dwarf.png',
-    elf: 'img/race-select/elf.png',
-    halfling: 'img/race-select/halfling.png',
-    leprechaun: 'img/race-select/leprechaun.png',
-    merling: 'img/race-select/merling.png',
-    orc: 'img/race-select/orc.png',
-    troll: 'img/race-select/troll.png',
-    wyrdling: 'img/race-select/wyrdling.png',
-  })
-
-  const PLAYER_TERRAIN_BACKGROUNDS = Object.freeze({
-    grass: ['img/backgrounds/grassland.jpg', 'img/backgrounds/grassland2.jpg'],
-    forest: ['img/backgrounds/forest.jpg', 'img/backgrounds/forest2.jpg', 'img/backgrounds/forest3.jpg'],
-    ancientForest: ['img/backgrounds/ancient_forest.jpg', 'img/backgrounds/ancient_forest2.jpg'],
-    sand: ['img/backgrounds/sand.jpg', 'img/backgrounds/sand2.jpg', 'img/backgrounds/sand3.jpg', 'img/backgrounds/sand4.jpg'],
-    snow: ['img/backgrounds/snow.jpg'],
-    taiga: ['img/backgrounds/taiga.jpg'],
-    hill: ['img/backgrounds/hill.jpg'],
-    mountain: ['img/backgrounds/hill.jpg'],
-    river: ['img/backgrounds/river.jpg'],
-    frozenriver: ['img/backgrounds/river.jpg'],
-    water: ['img/backgrounds/river.jpg'],
-    village: ['img/backgrounds/grassland.jpg', 'img/backgrounds/grassland2.jpg'],
-    caveentrance: ['img/backgrounds/hill.jpg'],
-    dwarvengate: ['img/backgrounds/hill.jpg'],
-    temple: ['img/backgrounds/temple.jpg'],
-    belltower: ['img/backgrounds/bell_tower.jpg', 'img/backgrounds/bell_tower2.jpg', 'img/backgrounds/bell_tower3.jpg'],
-  })
 
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
   const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
@@ -4945,7 +4908,7 @@
       const race = raceDef()
       const backgroundPath = playerTerrainBackgroundPath(mx, my)
       const backgroundStyle = backgroundPath
-        ? `background-image:url('${imageSrc(backgroundPath)}');background-size:cover;background-position:center;background-repeat:no-repeat;`
+        ? `background-image:linear-gradient(rgba(45,45,45,.38),rgba(45,45,45,.38)),url('${imageSrc(backgroundPath)}');background-size:cover;background-position:center;background-repeat:no-repeat;`
         : ''
       return {
         mini: false, enemy: null, html: `
