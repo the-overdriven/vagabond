@@ -665,6 +665,9 @@
       for (const race of RACES) paths.push('img/avatars/' + race.avatar)
       for (const kind of ITEM_ICON_KINDS) paths.push('img/icons/' + kind + '.svg')
       if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
+      for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
+        if (visual?.image) paths.push(visual.image)
+      }
     }
     await Promise.all([...new Set(paths)].map(async path => {
       if (preloadedImageUrls.has(path)) return
@@ -4593,6 +4596,8 @@
       const vy = Math.round((g.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
+      const visual = RENDER_STYLE.groundItems[g.kind]
+      if (drawImageVisual(vx, vy, visual)) continue
       const glyph = groundGlyph(g)
       if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
     }
@@ -6693,7 +6698,12 @@
     stopAttackAnimation()
     snapCameraToPlayer()
     updateHud()
-    if (RENDER_STYLE?.player?.image) await preloadImages([RENDER_STYLE.player.image])
+    const initialVisuals = []
+    if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
+    for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+    }
+    if (initialVisuals.length) await preloadImages(initialVisuals)
     render()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
