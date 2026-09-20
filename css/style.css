@@ -1081,7 +1081,7 @@ body.hint-collapsed #hint .panel-toggle {
   #mobileCanvasResizeHandle {
     position: absolute;
     left: 50%;
-    bottom: -11px;
+    bottom: -20px;
     z-index: 35;
     width: 42px;
     height: 24px;
@@ -1091,9 +1091,9 @@ body.hint-collapsed #hint .panel-toggle {
     align-items: center;
     justify-content: center;
     gap: 0;
-    color: rgba(225, 225, 225, 0.78);
-    background: rgba(95, 95, 95, 0.58);
-    border: 1px solid rgba(210, 210, 210, 0.28);
+    color: rgba(225, 225, 225, 0.58);
+    background: rgba(95, 95, 95, 0.30);
+    border: 1px solid rgba(210, 210, 210, 0.18);
     border-radius: 8px;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.48);
     font: 900 9px/8px Arial, sans-serif;
@@ -1109,8 +1109,8 @@ body.hint-collapsed #hint .panel-toggle {
   }
 
   #mobileCanvasResizeHandle.dragging {
-    background: rgba(115, 115, 115, 0.78);
-    color: rgba(255, 255, 255, 0.95);
+    background: rgba(115, 115, 115, 0.50);
+    color: rgba(255, 255, 255, 0.82);
   }
 
   .panel-toggle {
