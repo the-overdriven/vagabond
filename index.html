@@ -2,13 +2,6 @@
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
-- balance: leveling still too fast after lvl 4, increase required xp for levels above 4 by 50%
-- balance: slightly increase chance for digging a scarab, slightly decrease chance for amber
-- balance: penalty for getting killed? drop one random item where you died? can use remainings glyph like for skeleton remainings. but do not conflate with existing remainings!
-- balance: gear shouldn't be dropped by non-humanoids, slightly increase gear drops in chests, add few in sand in the map (placed in worldgen, not subject to foraging rng)
-- balance: boost potion of speed: potion of speed should grant 3 spd + 1/3 of current spd + wyrdling bonus
-- balance: increase aggro of all mobs by 1? and make last tile have 30% chance to give up the chase? also colour the last tiles of the aggro overlay with more transparent red.
-- balance: high tier monsters should be slightly more lickely to wear and drop items from their tier (in other words: less likely to drop items below their tier)
 
 - !1 feat: add hotkey to toggle ASCII/tiles
 - !1 feat: add prefix "Light" to weapons (grace +1)
@@ -529,7 +522,7 @@
   let EDGE_MARGIN, EDGE_XP, MIN_LICHES
   let MERCHANT_STOCK_CONFIG = {}
   let RENDER_STYLE = {}
-  let ATTACK_RANGE, AGGRO_RANGE, CRIT_CHANCE, CHASE_DETOUR
+  let ATTACK_RANGE, AGGRO_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
@@ -596,6 +589,7 @@
     ENEMY_PREFIXES = content.enemyPrefixes
     ATTACK_RANGE = content.enemyConfig.combat.attackRange
     AGGRO_RANGE = content.enemyConfig.combat.defaultAggroRange
+    OUTER_AGGRO_GIVE_UP_CHANCE = content.enemyConfig.combat.outerAggroGiveUpChance ?? 0.3
     CRIT_CHANCE = content.enemyConfig.combat.criticalHitChance
     CHASE_DETOUR = content.enemyConfig.pathfinding.chaseDetour
     ENEMY_WANDER_ENABLED = content.enemyConfig.wandering.enabled
@@ -1332,7 +1326,8 @@
     if (!chance(Math.min(0.9, dropChance))) return null
     const roll = rng()
     let tier = e.tier
-    if (chance(0.35) && tier > 1) tier -= 1
+    const lowerTierChance = Math.max(0.05, 0.35 - (tier - 1) * 0.05 - mf * 0.01)
+    if (chance(lowerTierChance) && tier > 1) tier -= 1
     if (roll < 0.5) return makeWeaponItem(tier)
     if (roll < 0.75) return makeArmorItem(tier)
     return makeShieldItem(tier)
@@ -1446,6 +1441,7 @@
     invisibleTurns: 0,
     godMode: false,
     speedPotionTurns: 0,
+    speedPotionBonus: 0,
     berryRegenTurns: 0,
     freezing: {active: false, turns: 0},
     permadeath: false,
@@ -1453,11 +1449,11 @@
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
-  const XP_TO_NEXT = [60, 120, 144, 200, 240, 336, 480, 624, 1200, 1440, 2400, 2880, 4320, 5760]
+  const XP_TO_NEXT = [60, 120, 144, 250, 360, 504, 720, 936, 1800, 2160, 3600, 4320, 6480, 8640]
 
   function xpToNext(lvl) {
     if (lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1]
-    return Math.round(1920 * Math.pow(lvl / 14, 2.2)) * 3
+    return Math.round(Math.round(1920 * Math.pow(lvl / 14, 2.2)) * 4.5)
   }
 
   function recalcDerived() {
@@ -1500,7 +1496,7 @@
     if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
     if (player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0)
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
-    if (player.speedPotionTurns > 0) s += 3
+    if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
     s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0
     if (map[player.y]?.[player.x] === 'frozenriver' || (map[player.y]?.[player.x] === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')) s -= 1
     s += curseDebuffSum('spd')
@@ -2259,21 +2255,6 @@
     if (e.humanoid) {
       return
     }
-    const dropChance = 0.45 + mf * 0.02 + e.tier * 0.03
-    if (chance(Math.min(0.9, dropChance))) {
-      const roll = rng()
-      let tier = e.tier
-      if (chance(Math.max(0.05, 0.35 - mf * 0.01)) && tier > 1) tier -= 1
-      let item
-      if (roll < 0.5) item = makeWeaponItem(tier, mf)
-      else if (roll < 0.75) item = makeArmorItem(tier, mf)
-      else item = makeShieldItem(tier, mf)
-      log(`The ${e.name} dropped a ${item.name}.`, 'loot')
-      // Only skip the backpack when the weapon actually went straight to the
-      // empty weapon slot - otherwise the drop would silently vanish.
-      if (item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return
-      player.inventory.push(item)
-    }
   }
 
   function xpForEnemy(e) {
@@ -2510,6 +2491,32 @@
     })
   }
 
+  function createNormalDeathRemains() {
+    const equipped = new Set(Object.values(player.equip).filter(Boolean))
+    const candidates = player.inventory
+      .map((item, index) => ({item, index}))
+      .filter(entry => !equipped.has(entry.item))
+    if (!candidates.length) return null
+    const dropped = pick(candidates)
+    const item = {...dropped.item}
+    if ((dropped.item.count || 1) > 1) {
+      dropped.item.count--
+      item.count = 1
+    } else {
+      player.inventory.splice(dropped.index, 1)
+    }
+    groundItems.push({
+      x: player.x,
+      y: player.y,
+      level: currentZ,
+      levelKind: currentLevelKind(),
+      caveIndex: currentCave,
+      kind: 'playerremains',
+      item
+    })
+    return item
+  }
+
   function resetForNewCharacter() {
     // A permadeath always starts the next character back on the surface at
     // the Temple, even when the previous character died underground.
@@ -2536,6 +2543,7 @@
       steps: 0,
       invisibleTurns: 0,
       speedPotionTurns: 0,
+      speedPotionBonus: 0,
       freezing: {active: false, turns: 0},
       curseDebuffs: [],
       equip: {weapon: null, shield: null, armor: null},
@@ -2591,11 +2599,13 @@
     player.deaths++
     pendingMove = null
     clearAutoPath()
+    let droppedItem = null
     if (player.permadeath) createPermadeathBody(killer)
+    else droppedItem = createNormalDeathRemains()
     const deathLogId = log(
       player.permadeath
         ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
-        : `You have fallen... and awaken at the Temple.`,
+        : `You have fallen... and awaken at the Temple.${droppedItem ? ` You dropped ${droppedItem.name} where you fell.` : ''}`,
       'bad'
     )
     stopCameraAnimation()
@@ -2889,7 +2899,10 @@
     tickArtifactCurses()
     if (player.speedPotionTurns > 0) {
       player.speedPotionTurns--
-      if (player.speedPotionTurns === 0) log('The speed boost wears off.', 'info')
+      if (player.speedPotionTurns === 0) {
+        player.speedPotionBonus = 0
+        log('The speed boost wears off.', 'info')
+      }
     }
     const playerHidden = player.godMode || player.invisibleTurns > 0
     if (playerHidden) {
@@ -2937,6 +2950,11 @@
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
+        if (e.aware && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
+          e.aware = false
+          log(`The ${e.name} gives up the chase.`, 'info')
+          continue
+        }
         if (e.aware && slowEnough && chance(0.25)) {
           e.aware = false
           log(`The ${e.name} loses interest in the chase.`, 'info')
@@ -3191,7 +3209,7 @@
     else if (roll <= 8) {
       player.gold += 1
       log('Your shovel uncovers a gold coin.', 'loot')
-    } else if (roll <= 10) {
+    } else if (roll <= 9) {
       const stack = player.inventory.find(i => i.kind === 'amber')
       if (stack) stack.count = (stack.count || 1) + 1
       else player.inventory.push({
@@ -3201,7 +3219,7 @@
         count: 1
       })
       log('You uncover a piece of amber.', 'loot')
-    } else if (roll <= 11) {
+    } else if (roll <= 10) {
       const stack = player.inventory.find(i => i.kind === 'seashell')
       if (stack) stack.count = (stack.count || 1) + 1
       else player.inventory.push({
@@ -3211,10 +3229,10 @@
         count: 1
       })
       log('You uncover a pretty seashell.', 'loot')
-    } else if (roll <= 12) log('You dig up a rusted spoon. Judging by its condition, someone has been waiting a very long time for dinner.', 'loot')
-    else if (roll <= 13) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot')
-    else if (roll <= 14) log('You dig out a bone. Whatever it was, it died ages ago.', 'loot')
-    else if (roll <= 15) log('You dig out a shovel handle, snapped in half. Someone else tried digging here.', 'loot')
+    } else if (roll <= 11) log('You dig up a rusted spoon. Judging by its condition, someone has been waiting a very long time for dinner.', 'loot')
+    else if (roll <= 12) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot')
+    else if (roll <= 13) log('You dig out a bone. Whatever it was, it died ages ago.', 'loot')
+    else if (roll <= 14) log('You dig out a shovel handle, snapped in half. Someone else tried digging here.', 'loot')
     else if (roll <= 16) {
       const spots = []
       for (const [dx, dy] of DIRS8) {
@@ -3368,6 +3386,16 @@
     }
     const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
+    const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
+    if (playerRemains) {
+      if (playerRemains.item) player.inventory.push(playerRemains.item)
+      log(playerRemains.item ? `You recover ${playerRemains.item.name} from your remains.` : 'Nothing remains to recover.', 'loot')
+      spawnPickupAnim(playerRemains)
+      groundItems.splice(groundItems.indexOf(playerRemains), 1)
+      updateHud()
+      render()
+      return
+    }
     if (deadBody) {
       if (deadBody.looted) {
         log('This dead body has already been looted.', 'info')
@@ -3486,7 +3514,7 @@
 
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
-      } else if (g.kind === 'deadbody') {
+      } else if (g.kind === 'deadbody' || g.kind === 'playerremains') {
         continue
       } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || g.kind === 'campfire' || g.kind === 'explorerremains') {
         continue
@@ -3503,6 +3531,12 @@
       } else if (g.kind === 'scroll') {
         addScroll()
         log(`You pick up a Scroll of Invisibility.`, 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
+      } else if (g.kind === 'gear' && g.item) {
+        const item = g.item
+        log(`You pick up ${item.name} from the sand.`, 'loot')
+        if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) player.inventory.push(item)
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
       }
@@ -4003,6 +4037,9 @@
     } else if (currentGround && currentGround.kind === 'deadbody') {
       log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
       inspectedGround = true
+    } else if (currentGround && currentGround.kind === 'playerremains') {
+      log('These are the remains of your last defeat. Press the forage key to recover the item you dropped.', 'info')
+      inspectedGround = true
     }
     if (inspectedGround) return
 
@@ -4058,6 +4095,8 @@
             teleportscroll: 'a scroll',
             treasurecasket: 'an old casket',
             skeleton: 'skeletal remains',
+            playerremains: 'your remains',
+            gear: 'a piece of equipment',
             campfire: 'a campfire',
             anvil: 'an anvil',
             wheelbarrow: 'a wheelbarrow',
@@ -4730,7 +4769,11 @@
         const vx = Math.round((mx - camX) * TILE_PX), vy = Math.round((my - camY) * TILE_PX)
         if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
         const dist = Math.max(Math.abs(dx), Math.abs(dy))
-        ctx.fillStyle = dist <= ATTACK_RANGE ? RENDER_STYLE.overlays.attackRange : RENDER_STYLE.overlays.aggroRange
+        ctx.fillStyle = dist <= ATTACK_RANGE
+          ? RENDER_STYLE.overlays.attackRange
+          : dist === aggroRange
+            ? (RENDER_STYLE.overlays.aggroRangeEdge || RENDER_STYLE.overlays.aggroRange)
+            : RENDER_STYLE.overlays.aggroRange
         ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
       }
     }
@@ -4773,7 +4816,7 @@
   }
 
   function groundItemLabel(g) {
-    return g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
+    return g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'gear' ? (g.item?.name || 'Equipment') : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
   }
 
   let lastMousePx = null, lastMousePy = null
@@ -4853,6 +4896,11 @@
         mini: true,
         enemy: null,
         html: `<div class="nm">dead ${g.race || '???'}</div>`
+      }
+      if (g.kind === 'playerremains') return {
+        mini: true,
+        enemy: null,
+        html: `<div class="nm">Your Remains</div><div style="color:var(--parchment-dim);font-size:10px;">Forage to recover the dropped item</div>`
       }
       if (g.kind === 'skeleton') return {
         mini: true,
@@ -6006,6 +6054,8 @@
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'speedpotion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    const baseBoost = 3 + Math.round(playerSpd() / 3)
+    player.speedPotionBonus = consumablePower(baseBoost)
     player.speedPotionTurns = consumablePower(15)
     log('You drink a Potion of Speed. Your legs feel lightning-fast.', 'good')
     consumeItemTurn()

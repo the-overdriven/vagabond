@@ -2026,6 +2026,22 @@ function spawnGroundStuff() {
     if (tries >= 200) continue
     groundItems.push({x, y, kind: 'speedpotion'})
   }
+  // A handful of equipment pieces are generated directly on surface sand.
+  // They are persistent world objects, not results from the repeatable forage
+  // or digging loot rolls.
+  const occupiedGround = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
+  const sandSpots = []
+  for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
+    if (map[y][x] !== 'sand' || occupiedGround.has(keyXY(x, y)) || occupied.has(keyXY(x, y))) continue
+    sandSpots.push({x, y})
+  }
+  for (let i = 0; i < 5 && sandSpots.length; i++) {
+    const spot = sandSpots.splice(randInt(0, sandSpots.length - 1), 1)[0]
+    const tier = Math.min(4, 1 + Math.floor((Math.abs(spot.x - spawnPoint.x) + Math.abs(spot.y - spawnPoint.y)) / 45))
+    const gearRoll = rng()
+    const item = gearRoll < 0.5 ? makeWeaponItem(tier) : gearRoll < 0.75 ? makeArmorItem(tier) : makeShieldItem(tier)
+    groundItems.push({x: spot.x, y: spot.y, kind: 'gear', item})
+  }
 }
 
 function assignVillageHutNames() {

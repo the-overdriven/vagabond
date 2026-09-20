@@ -202,9 +202,9 @@ Magic Find influences loot chances **and** loot quality:
 - Gold drops from enemies are currently disabled (see 43. Loot).
 - Artifact drop chance from enemy kills scales with MF using the same
   `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 4.8%.
-- Non-humanoid enemy gear drop chance scales with MF (unchanged: `+MF*0.02`),
-  and MF also reduces the chance of that gear rolling one tier lower
-  (`35% - MF*1%`, floor 5%).
+- Only humanoid enemies can wear and drop normal equipment. MF improves the
+  humanoid fallback equipment roll and reduces its chance to roll one tier
+  below the enemy (`35% - (tier - 1)*5% - MF*1%`, floor 5%).
 - Item "quality": MF increases the chance any weapon/armor/shield rolls a
   stat modifier at all (`20% + MF*1%`, capped 60%), biases the rolled
   modifier amount upward, and reduces artifact curse chance
@@ -228,34 +228,34 @@ followed by a steep progression curve:
 level 1 -> 2: 60 XP
 level 2 -> 3: 120 XP
 level 3 -> 4: 144 XP
-level 4 -> 5: 200 XP
-level 5 -> 6: 240 XP
-level 6 -> 7: 336 XP
-level 7 -> 8: 480 XP
-level 8 -> 9: 624 XP
-level 9 -> 10: 1,200 XP
-level 10 -> 11: 1,440 XP
-level 11 -> 12: 2,400 XP
-level 12 -> 13: 2,880 XP
-level 13 -> 14: 4,320 XP
-level 14 -> 15: 5,760 XP
+level 4 -> 5: 250 XP
+level 5 -> 6: 360 XP
+level 6 -> 7: 504 XP
+level 7 -> 8: 720 XP
+level 8 -> 9: 936 XP
+level 9 -> 10: 1,800 XP
+level 10 -> 11: 2,160 XP
+level 11 -> 12: 3,600 XP
+level 12 -> 13: 4,320 XP
+level 13 -> 14: 6,480 XP
+level 14 -> 15: 8,640 XP
 ```
 
 The implementation uses:
 
 ```js
-const XP_TO_NEXT = [60, 120, 144, 200, 240, 336, 480, 624, 1200, 1440, 2400, 2880, 4320, 5760]
+const XP_TO_NEXT = [60, 120, 144, 250, 360, 504, 720, 936, 1800, 2160, 3600, 4320, 6480, 8640]
 
 function xpToNext(lvl) {
   if (lvl <= XP_TO_NEXT.length) return XP_TO_NEXT[lvl - 1]
-  return Math.round(1920 * Math.pow(lvl / 14, 2.2)) * 3
+  return Math.round(Math.round(1920 * Math.pow(lvl / 14, 2.2)) * 4.5)
 }
 ```
 
 For level 15 onward, the threshold is therefore:
 
 ```text
-round(1,920 x (level / 14)^2.2) x 3
+round(round(1,920 x (level / 14)^2.2) x 4.5)
 ```
 
 On level-up:
@@ -271,27 +271,6 @@ Therefore, the level-based SPD gains occur at levels 2, 4, 6, 8, etc.
 XP is affected by the player's XP multiplier.
 
 Human currently has a permanent +20% XP multiplier.
-
-### Cumulative XP reference
-
-Cumulative XP required to reach each level under the current thresholds:
-
-| Target level | Cumulative XP |
-|---|---:|
-| 2 | 60 |
-| 3 | 180 |
-| 4 | 324 |
-| 5 | 524 |
-| 6 | 764 |
-| 7 | 1,100 |
-| 8 | 1,580 |
-| 9 | 2,204 |
-| 10 | 3,404 |
-| 11 | 4,844 |
-| 12 | 7,244 |
-| 13 | 10,124 |
-| 14 | 14,444 |
-| 15 | 20,204 |
 
 Actual progression depends on encounter frequency, enemy composition, prefixes,
 exploration, and XP multipliers.
@@ -1106,10 +1085,10 @@ Enemies have:
 - Temple fleeing
 - pursuit/pathfinding
 
-Default aggro range is approximately:
+The default aggro range is:
 
 ```text
-3
+4
 ```
 
 Standing in enemy's aggro range, triggers the enemy to chase their victim.
@@ -1119,9 +1098,14 @@ around the enemy) in the same turn, even if the enemy's aggro range is very
 low (e.g. 1) and it was already standing adjacent to the player before ever
 entering the normal aggro-range check.
 
-Halfling reduces effective enemy detection range by 1.
+All explicit enemy-template aggro values were also increased by 1. Halfling
+reduces effective enemy detection range by 1.
 
-Enemies can lose interest in the chase if player's speed is at least twice time higher.
+An already-aware enemy standing on the outermost tile of its effective aggro
+range has a 30% chance per turn to give up the chase. That outer ring is drawn
+with a more transparent red than the rest of the aggro overlay.
+
+Enemies can also lose interest in the chase if the player's speed is at least twice as high.
 
 Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
 
@@ -1416,6 +1400,11 @@ ground objects, so this state survives save/load.
 When HP reaches zero in normal mode:
 
 - death counter increases
+- one random unequipped backpack item is dropped at the death position, if one
+  is available; one unit is removed when the selected item is a stack
+- a distinct `playerremains` ground object holds that item and uses the
+  skeletal-remains glyph without becoming a `skeleton` or permadeath `deadbody`
+- the forage/loot action restores the item and removes `playerremains` from the world
 - death animation occurs
 - player returns to Temple
 - HP is restored
@@ -1431,6 +1420,10 @@ The player's:
 - gold
 
 are not wiped by death.
+
+Normal-mode `playerremains` exist only in non-permadeath runs. Permadeath
+continues to use its separate persistent `deadbody` object and existing corpse
+loot rules; looting a permadeath body does not remove that body.
 
 Current death behavior is therefore:
 
@@ -1828,6 +1821,16 @@ not improve the quality of the worn item.**
 
 The first equipment roll does not use MF. If that roll fails, MF increases the
 fallback roll's chance by `2%` per MF, capped at the overall 90% roll chance.
+The first roll creates equipment at the enemy's own tier. On the fallback
+roll, the chance to generate one tier lower is:
+
+```text
+max(5%, 35% - (enemy tier - 1) × 5% - MF × 1%)
+```
+
+At MF 0 this is 30% for tier 2, 25% for tier 3, 20% for tier 4, and 15% for
+tier 5, making stronger humanoids increasingly likely to wear and ultimately
+drop equipment matching their own tier.
 
 Crucially, both equipment-generation paths create the item without passing MF
 into the item generator. Therefore MF does **not**:
@@ -1872,9 +1875,7 @@ Possible equipment includes:
 - armor
 - shield
 
-Non-humanoid enemies have a separate equipment-drop path in `lootFromEnemy()`,
-where Magic Find does affect the drop chance and can affect whether the drop
-rolls one tier lower.
+Non-humanoid enemies do not wear or drop normal weapons, armor, or shields.
 
 ---
 
@@ -1916,8 +1917,8 @@ The current approximate shares are:
 | Result | Approx. share |
 |---|---:|
 | Gold | 41% |
-| Gear | 18% |
-| Life Potion | 18% |
+| Gear | 23% |
+| Life Potion | 14% |
 | Scroll of Invisibility | 5.5% |
 | Potion of Speed | 8% |
 | Scroll of Identification | 9% |
@@ -1928,6 +1929,10 @@ configured chances.
 
 Gear generated from a chest uses the chest tier (capped by the entry's
 `gearMaxTier`) and passes the player's Magic Find into the item generator.
+
+World generation also places five loose equipment objects directly on random
+surface sand tiles. These are persistent `gear` ground objects, are unrelated
+to the digging/foraging RNG, and are picked up by stepping onto them.
 
 A chest marked `artifactGuaranteed` skips the normal 110-point loot roll and
 directly creates an artifact using the chest tier and the player's Magic Find.
@@ -1973,7 +1978,7 @@ Returns the player to the Temple.
 Grants:
 
 ```text
-+3 SPD
+round_with_consumable_bonus(3 + round(current SPD / 3))
 ```
 
 for:
@@ -1982,7 +1987,11 @@ for:
 15 turns
 ```
 
-Wyrdling increases both the effect and duration by 25%. Example: +3 SPD for 15 turns becomes +3.75 SPD (rounded to 4 SPD) for 18.75 turns (rounded to 19 turns).
+The player's current SPD is sampled immediately before the potion activates,
+so the potion never feeds its own bonus back into the formula. Wyrdling
+increases the complete calculated effect and duration by 25%. For example, a
+player at 6 SPD receives `3 + round(6/3) = +5 SPD`; a Wyrdling receives +6 SPD
+after the 25% bonus is rounded, for 19 turns.
 
 ## Scroll of Identification
 
@@ -2048,20 +2057,7 @@ The treasure-map location is checked before the normal digging loot roll. At
 the marked location, digging produces the `Old Rotten Casket` instead of a
 normal digging result.
 
-For normal sand, digging uses a separate 1–100 roll. Current results are:
-
-```text
-1–5   → stone
-6–8   → 1 gold
-9–10  → Amber
-11    → Seashell
-12    → rusted spoon
-13    → discarded old boots
-14    → bone
-15    → broken shovel handle
-16    → Scarab (if a valid adjacent tile exists)
-17–100 → nothing
-```
+For normal sand, digging uses a separate 1–100 roll. Current results are listed under "Normal digging loot" section.
 
 See section 79 for the full digging rules and treasure-map interaction.
 
@@ -3120,13 +3116,13 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 |---|---|
 | 1–5 | Find a stone |
 | 6–8 | Find 1 gold coin |
-| 9–10 | Find Amber |
-| 11 | Find a Seashell |
-| 12 | Find a rusted spoon |
-| 13 | Find a pair of old, worn boots, which are discarded |
-| 14 | Find a bone |
-| 15 | Find a broken shovel handle |
-| 16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
+| 9 | Find Amber |
+| 10 | Find a Seashell |
+| 11 | Find a rusted spoon |
+| 12 | Find a pair of old, worn boots, which are discarded |
+| 13 | Find a bone |
+| 14 | Find a broken shovel handle |
+| 15–16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
 | 17–100 | Find nothing |
 
 </details>

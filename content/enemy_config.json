@@ -1,7 +1,8 @@
 {
   "combat": {
     "attackRange": 1,
-    "defaultAggroRange": 3,
+    "defaultAggroRange": 4,
+    "outerAggroGiveUpChance": 0.3,
     "criticalHitChance": 0.15
   },
   "pathfinding": {

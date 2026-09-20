@@ -52,7 +52,7 @@
         "mfGoldMultiplier": 2
       },
       {
-        "upTo": 65,
+        "upTo": 70,
         "result": "gear",
         "gearMaxTier": 4,
         "weaponChance": 0.33,

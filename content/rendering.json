@@ -37,6 +37,10 @@
       "color": "rgb(232, 162, 79)",
       "lootedColor": "#777"
     },
+    "playerremains": {
+      "glyph": "╶☠╴",
+      "color": "#e8a24f"
+    },
     "campfire": {
       "glyph": "*",
       "color": "#e8a24f"
@@ -73,6 +77,10 @@
     "scroll": {
       "glyph": "?",
       "color": "#b565d6"
+    },
+    "gear": {
+      "glyph": "†",
+      "color": "#c9b37a"
     },
     "ruinprop": {
       "glyph": "¤",
@@ -121,6 +129,7 @@
     "pathCounterText": "#ffe08a",
     "attackRange": "rgba(224,71,63,0.40)",
     "aggroRange": "rgba(224,71,63,0.16)",
+    "aggroRangeEdge": "rgba(224,71,63,0.08)",
     "rangeOwnerOutline": "rgba(232,162,79,0.9)"
   },
   "depthLabel": {
