@@ -1,18 +1,16 @@
 <!-- TODO:
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
-- balance: long sword should have more grace than one handed axe
 - balance: elf's grace does nothing when wielding dagger/rapier because the delay formula is max(1, 6 - GRACE)
-- balance: all monsters, including unarmed non-humanoids should have GRACE, so that elf's grace becomes more useful
+- balance: all monsters, including unarmed non-humanoids should have GRACE, so that elf's grace becomes more useful. in the log, when it says that your weapon outpaces enemy weapon, log just "enemy" if they happen to have no weapon. consequentially, enemies dont need weapons to use grace checks. but player still needs a weapon
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 - balance: leveling still too fast after lvl 4
 - balance: increase chance for digging a scarab, decrease chance for amber
 - balance: penalty for getting killed? drop gold or random item where you died?
-- balance: gear shouldn't be dropped by non-humanoids, increase gear drops in chests, add few in sand in the map (placed in worldgen, not subject to foraging rng)
-- balance: boost potion of speed: potion of speed should grant 3 spd + 1/3 current spd + wyrdling bonus
+- balance: gear shouldn't be dropped by non-humanoids, slightly increase gear drops in chests, add few in sand in the map (placed in worldgen, not subject to foraging rng)
+- balance: boost potion of speed: potion of speed should grant 3 spd + 1/3 of current spd + wyrdling bonus
 - balance: increase aggro of all mobs by 1? and make last tile 50% chance to aggro?
-- balance: high tier monsters should be more lickely to wear and drop items from their tier
-- balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
+- balance: high tier monsters should be slightly more lickely to wear and drop items from their tier (in other words: less likely to drop items below their tier)
 
 - !1 feat: add hotkey to toggle ASCII/tiles
 - !1 feat: all items should have a base cost in .json
@@ -32,6 +30,7 @@
 - !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - !1 feat: add achievments to stats: strongest monster killed
 - !1 feat: generate icons for different weapons and armor, axes, spears, etc.
+- !2 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - !2 feat: add friendly animals near the village (random)
 - !2 feat: add domesticated animals that protect against wild creatures, e.g. a cat attacking rats, bugs, and bats; a dog attacking wolves and goblins; a rare goat eating poisonous mushrooms; a sheep that can be sheared for wool to improve armor protection against cold
 - !2 feat: tamed cat/dog/goat/sheep
@@ -3630,7 +3629,7 @@
     prepareEnemyEquipment(e)
     addEnemy(e)
     occupied.add(keyXY(spot.x, spot.y))
-    log(`A ${e.name} rustles out from the trees nearby!`, 'bad')
+    log(`Ambush! A sneaky ${e.name} rustles out from the trees nearby!`, 'bad')
   }
 
   async function tryMove(dx, dy) {
