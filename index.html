@@ -5680,7 +5680,26 @@
 
   function ensureMerchantStock() {
     for (const fixedItem of MERCHANT_STOCK_CONFIG.fixedItems) {
-      if (!merchantStock.some(it => it.kind === fixedItem.kind && it.base === fixedItem.base && it.name === fixedItem.name)) {
+      const existing = merchantStock.find(it => it.kind === fixedItem.kind && it.base === fixedItem.base)
+      if (fixedItem.kind === 'weapon') {
+        const base = WEAPONS.find(w => w.name === fixedItem.base)
+        if (!base) {
+          console.warn(`Merchant fixed weapon not found in gear_weapons.json: ${fixedItem.base}`)
+          continue
+        }
+        const canonicalItem = {
+          kind: 'weapon',
+          base: base.name,
+          atk: base.atk,
+          grace: base.grace,
+          tier: base.tier,
+          twoHanded: !!base.twoHanded,
+          name: base.name,
+          merchantPrice: fixedItem.merchantPrice
+        }
+        if (existing) Object.assign(existing, canonicalItem)
+        else merchantStock.push(canonicalItem)
+      } else if (!existing) {
         merchantStock.push({...fixedItem})
       }
     }

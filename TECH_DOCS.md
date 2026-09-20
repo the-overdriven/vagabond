@@ -2280,6 +2280,16 @@ Merchant-generated stock can therefore use configured price multipliers or
 fixed prices from `content/merchant_stock.json`. The exact multipliers and
 fixed prices are configuration data, not hard-coded in `itemSellValue()`.
 
+Fixed merchant weapons use `base` as a reference into
+`content/gear_weapons.json`; combat stats are not duplicated in merchant
+configuration. The guaranteed Two-handed Sword therefore inherits the
+canonical tier-4 definition (9 ATK, 2 GRACE, two-handed), while
+`merchant_stock.json` supplies only its fixed 200g purchase price. If a
+configured weapon name cannot be resolved, the item is skipped and a warning
+is written to the console. `ensureMerchantStock()` also reapplies the canonical
+weapon fields to a matching item already present in saved merchant stock, which
+repairs older saves containing the obsolete ATK-5 copy.
+
 The important distinction is:
 
 ```text

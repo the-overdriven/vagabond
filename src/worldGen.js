@@ -2026,9 +2026,9 @@ function spawnGroundStuff() {
     if (tries >= 200) continue
     groundItems.push({x, y, kind: 'speedpotion'})
   }
-  // A handful of equipment pieces are generated directly on surface sand.
-  // They are persistent world objects, not results from the repeatable forage
-  // or digging loot rolls.
+  // A handful of equipment pieces are buried beneath surface sand. Their
+  // positions and items are fixed during world generation; digging merely
+  // reveals the predetermined object rather than rolling forage loot.
   const occupiedGround = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const sandSpots = []
   for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
@@ -2040,7 +2040,14 @@ function spawnGroundStuff() {
     const tier = Math.min(4, 1 + Math.floor((Math.abs(spot.x - spawnPoint.x) + Math.abs(spot.y - spawnPoint.y)) / 45))
     const gearRoll = rng()
     const item = gearRoll < 0.5 ? makeWeaponItem(tier) : gearRoll < 0.75 ? makeArmorItem(tier) : makeShieldItem(tier)
-    groundItems.push({x: spot.x, y: spot.y, kind: 'gear', item})
+    groundItems.push({x: spot.x, y: spot.y, kind: 'buriedgear', item})
+  }
+  // Two rarer buried finds are full artifacts. Their artifact tier is rolled
+  // independently during world generation, and they remain hidden until dug up.
+  for (let i = 0; i < 2 && sandSpots.length; i++) {
+    const spot = sandSpots.splice(randInt(0, sandSpots.length - 1), 1)[0]
+    const item = makeArtifactItem(randInt(3, 5))
+    groundItems.push({x: spot.x, y: spot.y, kind: 'buriedartifact', item})
   }
 }
 
