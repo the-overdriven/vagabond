@@ -3080,14 +3080,16 @@
     const primaryStat = item.kind === 'weapon' ? 'atk' : 'def'
     const primary = (item[primaryStat] || 0) + (item.mod === primaryStat ? (item.modAmt || 0) : 0)
 
-    // Secondary modifiers matter for ranking too. XP uses a percentage-sized
-    // value (5-15), so scale it down to the same rough range as flat bonuses.
-    // GRACE currently affects combat only when it is on a weapon, so do not
-    // give shields/armor credit for a modifier that has no gameplay effect.
-    let secondary = 0
+    // A weapon's built-in GRACE is part of its combat value. This also ensures
+    // equal-total-ATK weapons prefer the more graceful weapon before tier is
+    // used as a later tiebreaker. Secondary modifiers matter for ranking too.
+    // XP uses a percentage-sized value (5-15), so scale it down to the same
+    // rough range as flat bonuses. GRACE affects combat only on weapons, so do
+    // not give shields/armor credit for an ineffective GRACE modifier.
+    let secondary = item.kind === 'weapon' ? (item.grace || 0) : 0
     if (item.mod && item.mod !== primaryStat) {
-      if (item.mod === 'xp') secondary = Math.round((item.xpBonus || 0) / 3)
-      else if (item.mod !== 'grace' || item.kind === 'weapon') secondary = item.modAmt || 0
+      if (item.mod === 'xp') secondary += Math.round((item.xpBonus || 0) / 3)
+      else if (item.mod !== 'grace' || item.kind === 'weapon') secondary += item.modAmt || 0
     }
 
     // Keep the slot's defining combat stat dominant while still allowing
@@ -5382,17 +5384,18 @@
 
     if (inventoryCandidates.length === 0) return new Set()
 
-    // Use exactly the same ranking as the inventory sort. The equipped item
-    // remains the baseline: a checkmark means this inventory item is a real
-    // upgrade according to that shared ranking, not merely higher ATK/DEF.
+    // Use the inventory ranking to find the leading candidate, but only the
+    // calculated score can make it a real upgrade. Tier and primary-stat
+    // tiebreakers may order equal-score items; they must not create a checkmark.
     const ranked = [...inventoryCandidates].sort((a, b) => compareEquipmentItems(a.it, b.it) || a.idx - b.idx)
     const winner = ranked[0]
+    const winnerScore = equipmentSortValues(winner.it).sum
     const equipped = player.equip[kind]
-    if (equipped && compareEquipmentItems(winner.it, equipped) >= 0) return new Set()
+    if (equipped && winnerScore <= equipmentSortValues(equipped).sum) return new Set()
 
-    // If multiple inventory items are genuinely tied by the ranking values,
-    // don't arbitrarily mark one of them as the sole best-in-slot choice.
-    const tied = ranked.filter(entry => compareEquipmentItems(entry.it, winner.it) === 0)
+    // If multiple inventory items share the best score, don't let sorting
+    // tiebreakers arbitrarily mark one as the sole best-in-slot choice.
+    const tied = ranked.filter(entry => equipmentSortValues(entry.it).sum === winnerScore)
     return tied.length === 1 ? new Set([winner.idx]) : new Set()
   }
 
