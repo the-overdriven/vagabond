@@ -712,52 +712,6 @@
     injectCryptLevel2Content()
   }
 
-  // Crypt level 2 introduces a few new tile types. Rather than requiring an
-  // edit to the (externally hosted) content/tiles.json, they're patched
-  // into the loaded tile tables here at runtime.
-  function injectCryptLevel2Content() {
-    // Keep generated rivers renderable even when the external tile data is older.
-    const riverDefs = {
-      river: {walk: true, ch: '~', color: '#7fd0d8', bg: '#207f9a', mini: '#207f9a'},
-      frozenriver: {walk: true, ch: '~', color: '#d9f3f5', bg: '#8bb8c2', mini: '#8bb8c2'},
-    }
-    for (const [key, def] of Object.entries(riverDefs)) TILE[key] = TILE[key] || def
-
-    const defs = {
-      cryptstairsdown: {walk: true, ch: '>', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
-      cryptstairsup: {walk: true, ch: '<', color: '#c9bfae', bg: '#0c0a08', mini: '#8a7a5c'},
-      mausoleumstairsup: {walk: true, ch: '<', color: '#d6c7a5', bg: '#0c0a08', mini: '#9a8458'},
-      crypt2floor: {walk: true, ch: '.', color: '#4c463c', bg: '#050403', mini: '#221f1a'},
-      cryptrubble: {walk: true, ch: '%', color: '#443f34', bg: '#050403', mini: '#221f1a'},
-      crypt2niche: {walk: false, ch: 'n', color: '#2a261e', bg: '#050403', mini: '#161310'},
-      sarcophagus: {walk: true, ch: '\u26B0', color: '#6a6255', bg: '#050403', mini: '#332f27'},
-      crypttrap: {walk: true, ch: '\u26B0', color: '#8a5a3c', bg: '#050403', mini: '#332f27'},
-      crypttrapsprung: {walk: true, ch: '\u26B0', color: '#39352d', bg: '#050403', mini: '#1c1a16'},
-    }
-    const codes = {
-      cryptstairsdown: '\u2401', cryptstairsup: '\u2402', crypt2floor: '\u2403',
-      cryptrubble: '\u2404', crypt2niche: '\u2405', sarcophagus: '\u2406',
-      crypttrap: '\u2407', crypttrapsprung: '\u2408', mausoleumstairsup: '\u2409',
-    }
-    const descs = {
-      cryptstairsdown: 'a shoddy old stone staircase leading down',
-      cryptstairsup: 'a shoddy old stone staircase leading up',
-      crypt2floor: 'cracked, ancient stone floor',
-      cryptrubble: 'a collapsed section of the passage',
-      crypt2niche: 'a burial niche carved into the stone',
-      sarcophagus: 'an old stone sarcophagus',
-      crypttrap: 'an old stone sarcophagus',
-      crypttrapsprung: 'a shattered, empty sarcophagus',
-      mausoleumstairsup: 'a grand stone staircase leading up to the royal mausoleum’s entrance',
-    }
-    for (const [key, def] of Object.entries(defs)) TILE[key] = def
-    for (const [key, c] of Object.entries(codes)) {
-      TILE_CODE[key] = c
-      CODE_TILE[c] = key
-    }
-    Object.assign(TILE_DESC, descs)
-  }
-
   const preloadedImageUrls = new Map()
   // Fetches images as blobs so tooltips keep working fully offline. Pass a
   // subset of paths to prioritise them; called with no argument it warms
@@ -878,9 +832,6 @@
 
   // Runtime level / mausoleum state belongs to the game, not world generation.
   let isMausoleumDiscovered = false
-  let mausoleumMap = null
-  let isMausoleumDiscoveredOnce = false
-  let mausoleumHutPos = null
 
 
   /* ============================== LEVEL / MOVEMENT RUNTIME ============================== */
@@ -926,28 +877,12 @@
         log('The marked trapdoor will not yield. The Black Key is not merely a key; it must be worn.', 'info')
         return true
       }
-      if (!undergroundMap) return true
-      initializeMausoleum()
-      const ox = hut?.x ?? player.x, oy = hut?.y ?? player.y
-      for (let y = 0; y < mausoleumMap.length; y++) for (let x = 0; x < mausoleumMap[0].length; x++) {
-        const wx = ox + x - 4, wy = oy + y - 7
-        if (wx >= 0 && wy >= 0 && wx < MAP_W && wy < MAP_H && mausoleumMap[y][x] !== 'mountain') undergroundMap[wy][wx] = mausoleumMap[y][x]
-      }
-      undergroundMap[oy][ox] = 'mausoleumstairsup'
-      // Four high-tier chests are generated only on the first entry.
-      const mausoleumChestSpots = [[1, 1], [7, 1], [1, 7], [7, 7]]
-      if (!isMausoleumDiscoveredOnce) {
-        for (const [cx, cy] of mausoleumChestSpots) {
-          const wx = ox + cx - 4, wy = oy + cy - 7
-          groundItems.push({x: wx, y: wy, kind: 'chest', tier: 5, opened: false, level: -1, mausoleumChest: true})
-        }
-        isMausoleumDiscoveredOnce = true
-      }
+      if (!undergroundMap || !mausoleumMap) return true
       map = undergroundMap
       currentZ = -1
       currentCave = -1
-      player.x = ox
-      player.y = oy
+      player.x = hut.x
+      player.y = hut.y
       log('The revealed trapdoor opens onto a narrow staircase descending into darkness.', 'info')
       render()
       updateHud()
@@ -998,21 +933,12 @@
     } else if (tile === 'caveentrance' || tile === 'dwarvengate') {
       // Only the true top-level ascent (z:-1 -> surface) is "back to the
       // surface" - every deeper ascent uses 'caveup' below instead.
-      // Re-stamp the return tile before switching maps. This makes the
-      // surface exit self-healing even for older saves that stored a
-      // mountain tile at the cave's declared entrance.
       const returnCave = caves.find(c => (c.entrances || []).some(e => e.x === player.x && e.y === player.y)) || caves[currentCave]
-      const returnEntrance = (returnCave && returnCave.entrances.find(e => e.x === player.x && e.y === player.y)) ||
-        caves.flatMap(c => c.entrances || []).find(e => e.x === player.x && e.y === player.y)
-      if (returnEntrance && surfaceMap[returnEntrance.y] && !(returnCave && returnCave.crypt)) {
-        if (surfaceMap[returnEntrance.y][returnEntrance.x] !== 'dwarvengate') surfaceMap[returnEntrance.y][returnEntrance.x] = 'caveentrance'
-      }
-      restoreCaveEntrancesOnSurface()
       map = surfaceMap
       currentZ = 0
       currentCave = -1
       if (tile === 'dwarvengate') log('You climb back through the open gates into the mountain air. The silence of the dead settlement fades behind you.', 'info')
-      else if (returnCave?.crypt || (currentZ === -1 && cryptCaveIndex >= 0 && currentCave === cryptCaveIndex)) log('You climb out of the crypt and back into the ruined chapel.', 'info')
+      else if (returnCave?.crypt) log('You climb out of the crypt and back into the ruined chapel.', 'info')
       else log('You climb back out into the mountain air.', 'info')
     } else if (tile === 'cavedown') {
       const depth = CHAIN_DEPTH_BY_Z[currentZ], nextDepth = depth + 1
@@ -1791,491 +1717,6 @@
     gainXp(EDGE_XP)
   }
 
-  /* ============================== ENEMIES / ITEMS ON MAP ============================== */
-  let enemies = []
-  let groundItems = [] // level 0 is surface, level -1 is the shared cave layer
-  let occupied = new Set() // "x,y" for enemies
-
-  function keyXY(x, y) {
-    return x + ',' + y
-  }
-
-  function spawnEnemies() {
-    const total = 120
-    const weights = [0.42, 0.26, 0.17, 0.10, 0.05] // tier 1..5
-
-    // Index every legal spawn tile by terrain once. Rejection-sampling the whole map
-    // would almost never land a Mummy on sand or a Lich on snow, so restricted
-    // creatures would silently fail to spawn.
-    const tilesByBiome = {}
-    const allSpawnTiles = []
-    for (let y = 2; y < MAP_H - 2; y++) {
-      for (let x = 2; x < MAP_W - 2; x++) {
-        const tile = map[y][x]
-        if (tile === 'temple' || tile === 'belltower' || tile === 'ancientForest' || tile === 'caveentrance' || !isWalkable(x, y)) continue
-        if (Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y) < 20) continue
-        // Keep the bell's vicinity free of random spawns - the guard pair
-        // should be the only threat there.
-        if (bigBellPos && Math.max(Math.abs(x - bigBellPos.x), Math.abs(y - bigBellPos.y)) < BELL_GUARD_EXCLUSION_RADIUS) continue
-        if (!tilesByBiome[tile]) tilesByBiome[tile] = []
-        tilesByBiome[tile].push(x, y)
-        allSpawnTiles.push(x, y)
-      }
-    }
-    const poolCache = {}
-
-    function poolFor(tmpl) {
-      if (poolCache[tmpl.name]) return poolCache[tmpl.name]
-      let pool = []
-      for (const biome of enemyBiomes(tmpl)) {
-        if (tilesByBiome[biome]) pool = pool.concat(tilesByBiome[biome])
-      }
-      // If this world happens to contain none of the creature's biomes, fall back to
-      // anywhere walkable rather than dropping it from the world entirely.
-      if (!pool.length) pool = allSpawnTiles
-      if (tmpl.tier >= 3) {
-        const distantPool = []
-        for (let i = 0; i < pool.length; i += 2) {
-          const x = pool[i], y = pool[i + 1]
-          if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) >= 50) {
-            distantPool.push(x, y)
-          }
-        }
-        pool = distantPool
-      }
-      poolCache[tmpl.name] = pool
-      return pool
-    }
-
-    function spawnOneFromTemplate(tmpl) {
-      const pool = poolFor(tmpl)
-      if (!pool.length) return false
-      let x = 0, y = 0, tries = 0, placed = false
-      while (tries < 200) {
-        tries++
-        const p = randInt(0, (pool.length >> 1) - 1) * 2
-        x = pool[p]
-        y = pool[p + 1]
-        if (occupied.has(keyXY(x, y))) continue
-        placed = true
-        break
-      }
-      if (!placed) return false
-      const variance = 0.95 + rng() * 0.10
-      const e = {
-        name: tmpl.name, tier: tmpl.tier, level: 0,
-        hp: Math.max(1, Math.round(tmpl.hp * variance)),
-        atk: Math.max(1, Math.round(tmpl.atk * variance)),
-        def: Math.max(0, Math.round(tmpl.def * variance)),
-        spd: Math.max(1, Math.round(tmpl.spd * variance)),
-        fly: !!tmpl.fly,
-        humanoid: !!tmpl.humanoid,
-        evades: !!tmpl.evades,
-        aggro: tmpl.aggro ?? AGGRO_RANGE,
-        x, y, homeX: x, homeY: y, homeTileType: map[y][x], alive: true, prefix: null, equipment: null,
-      }
-      e.maxHp = e.hp
-      e.baseName = tmpl.name // keep clean name for image lookup, separate from display name
-      prepareEnemyEquipment(e)
-      if (chance(0.05)) {
-        const names = Object.keys(ENEMY_PREFIXES)
-        const pfx = pick(names)
-        e.prefix = pfx
-        e.prefixBase = prefixBaseStats(e)
-        applyEnemyPrefix(e, pfx)
-        e.name = pfx + ' ' + e.name
-      }
-      addEnemy(e)
-      occupied.add(keyXY(x, y))
-      return true
-    }
-
-    for (let i = 0; i < total; i++) {
-      let r = rng(), tier = 1, acc = 0
-      for (let t = 0; t < 5; t++) {
-        acc += weights[t]
-        if (r <= acc) {
-          tier = t + 1
-          break
-        }
-      }
-      const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier)
-      const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
-      spawnOneFromTemplate(tmpl)
-    }
-
-    // The Lich is the sole source of the rare tombstones, so make sure the world
-    // never rolls too few of them - top up to a guaranteed minimum if short.
-    const lichTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Lich')
-    if (lichTmpl) {
-      let lichCount = enemies.filter(e => e.baseName === 'Lich').length
-      let guard = 0
-      while (lichCount < MIN_LICHES && guard < 200) {
-        guard++
-        if (spawnOneFromTemplate(lichTmpl)) lichCount++
-      }
-    }
-  }
-
-  function spawnCaveContents() {
-    const bat = ENEMY_TEMPLATES.find(t => t.name === 'Giant Bat')
-    const rat = ENEMY_TEMPLATES.find(t => t.name === 'Giant Rat')
-    for (let caveIndex = 0; caveIndex < caveMaps.length; caveIndex++) {
-      if (caves[caveIndex]?.crypt) continue
-      const cm = caveMaps[caveIndex], open = []
-      const caveEntrances = caves[caveIndex].entrances
-      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (cm[y][x] === 'cavefloor' && !caveEntrances.some(e => x === e.x && y === e.y)) open.push({
-        x,
-        y
-      })
-      for (let i = 0; i < 4 && open.length; i++) {
-        const tmpl = pick([bat, rat].filter(Boolean))
-        if (!tmpl) continue
-        const p = pick(open)
-        addEnemy({
-          name: tmpl.name,
-          baseName: tmpl.name,
-          tier: tmpl.tier,
-          level: -1,
-          caveIndex,
-          hp: tmpl.hp,
-          maxHp: tmpl.hp,
-          atk: tmpl.atk,
-          def: tmpl.def,
-          spd: tmpl.spd,
-          fly: !!tmpl.fly,
-          humanoid: !!tmpl.humanoid,
-          evades: !!tmpl.evades,
-          aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x: p.x,
-          y: p.y,
-          homeX: p.x,
-          homeY: p.y,
-          homeTileType: 'cavefloor',
-          alive: true,
-          prefix: null,
-          equipment: null
-        })
-        open.splice(open.indexOf(p), 1)
-      }
-      const chestSpot = pick(open), campSpot = pick(open), skeletonSpot = pick(open)
-      if (chestSpot) groundItems.push({
-        x: chestSpot.x,
-        y: chestSpot.y,
-        kind: 'chest',
-        tier: 1,
-        opened: false,
-        level: -1,
-        caveIndex
-      })
-      if (campSpot && chance(0.6)) groundItems.push({
-        x: campSpot.x,
-        y: campSpot.y,
-        kind: 'campfire',
-        description: pick(CAMPFIRE_INSPECTIONS),
-        level: -1,
-        caveIndex
-      })
-      if (skeletonSpot && chance(0.6)) groundItems.push({
-        x: skeletonSpot.x,
-        y: skeletonSpot.y,
-        kind: 'skeleton',
-        looted: false,
-        description: pick(SKELETON_INSPECTIONS),
-        level: -1,
-        caveIndex
-      })
-    }
-  }
-
-  // Ranks a deep-cave template's floor tiles by how many of their 8
-  // neighbours are wall (or off the edge of the local map), so chests can
-  // be dropped hugging the walls/corners instead of out in the open.
-  function deepCaveCornerSpots(cm, floorTile, entrances) {
-    const scored = []
-    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-      if (cm[y][x] !== floorTile) continue
-      if (entrances.some(e => e.x === x && e.y === y)) continue
-      let wallNeighbors = 0
-      for (const [dx, dy] of DIRS8) {
-        const t = cm[y + dy] && cm[y + dy][x + dx]
-        if (!t || t === 'cavewall') wallNeighbors++
-      }
-      if (wallNeighbors >= 3) scored.push({x, y, wallNeighbors})
-    }
-    scored.sort((a, b) => b.wallNeighbors - a.wallNeighbors)
-    return scored
-  }
-
-  // Populates every generic chain cave (z:-2 and z:-3): one monster group per
-  // cave, chosen from goblins, skeletons, skinks, ratlings, or kobolds, so
-  // different monster types are always in separate caves and never spawn
-  // next to each other. Also drops one generous, corner-hugging chest per
-  // cave (tier 3+).
-  function spawnDeepCaveContents() {
-    const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin')
-    const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton')
-    const skinkTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skink')
-    const ratlingTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Ratling')
-    const koboldTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Kobold')
-    const groupTemplates = [goblinTmpl, skeletonTmpl, skinkTmpl, ratlingTmpl, koboldTmpl].filter(Boolean)
-    for (let levelIndex = 0; levelIndex < deepLevels.length; levelIndex++) {
-      const level = deepLevels[levelIndex]
-      const levelZ = CHAIN_Z_BY_DEPTH[levelIndex + 1]
-      for (let caveIndex = 0; caveIndex < level.caveMaps.length; caveIndex++) {
-        const cm = level.caveMaps[caveIndex]
-        const caveEntrances = level.caves[caveIndex].entrances
-        const open = []
-        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (cm[y][x] === 'cavefloor2' && !caveEntrances.some(e => x === e.x && y === e.y)) open.push({
-          x,
-          y
-        })
-        const tmpl = pick(groupTemplates)
-        for (let i = 0; i < 4 && open.length; i++) {
-          const p = pick(open)
-          addEnemy({
-            name: tmpl.name,
-            baseName: tmpl.name,
-            tier: tmpl.tier || 1,
-            level: levelZ,
-            levelKind: 'chain',
-            caveIndex,
-            hp: tmpl.hp,
-            maxHp: tmpl.hp,
-            atk: tmpl.atk,
-            def: tmpl.def,
-            spd: tmpl.spd,
-            fly: !!tmpl.fly,
-            humanoid: tmpl.humanoid !== false,
-            evades: !!tmpl.evades,
-            aggro: tmpl.aggro ?? AGGRO_RANGE,
-            x: p.x,
-            y: p.y,
-            homeX: p.x,
-            homeY: p.y,
-            homeTileType: 'cavefloor2',
-            alive: true,
-            prefix: null,
-            equipment: null
-          })
-          open.splice(open.indexOf(p), 1)
-        }
-        const cornerSpots = deepCaveCornerSpots(cm, 'cavefloor2', caveEntrances)
-        const chestSpot = cornerSpots.length
-          ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length)))
-          : pick(open)
-
-        if (chestSpot) {
-          groundItems.push({
-            x: chestSpot.x,
-            y: chestSpot.y,
-            kind: 'chest',
-            tier: 3,
-            opened: false,
-            level: levelZ,
-            levelKind: 'chain',
-            caveIndex
-          })
-        }
-      }
-    }
-  }
-
-  function spawnRemoteHighTierChests() {
-    // A few valuable tier-3 chests are deliberately placed in remote areas,
-    // inside the aggro range of tier-3+ monsters so reaching them carries risk.
-    const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= 3 && e.x >= 0 && e.y >= 0)
-    let placed = 0
-    const used = new Set(groundItems.filter(g => g.kind === 'chest' && onCurrentLevel(g)).map(g => keyXY(g.x, g.y)))
-    const shuffled = candidates.slice()
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = randInt(0, i);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-    }
-    for (const e of shuffled) {
-      if (placed >= 4) break
-      const aggroRange = effectiveAggroRange(e)
-      const remote = villageCenter && Math.max(Math.abs(e.x - villageCenter.x), Math.abs(e.y - villageCenter.y)) >= 35
-      if (!remote || aggroRange < 1) continue
-      const spots = []
-      for (let dy = -aggroRange; dy <= aggroRange; dy++) for (let dx = -aggroRange; dx <= aggroRange; dx++) {
-        const x = e.x + dx, y = e.y + dy
-        if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2) continue
-        if (Math.max(Math.abs(dx), Math.abs(dy)) > aggroRange) continue
-        if (!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') continue
-        if (occupied.has(keyXY(x, y)) || used.has(keyXY(x, y))) continue
-        spots.push({x, y})
-      }
-      if (!spots.length) continue
-      const spot = pick(spots)
-      groundItems.push({x: spot.x, y: spot.y, kind: 'chest', tier: 3, opened: false})
-      used.add(keyXY(spot.x, spot.y))
-      placed++
-    }
-  }
-
-  function spawnGroundStuff() {
-    // chests
-    for (let i = 0; i < 45; i++) {
-      let x, y, tries = 0
-      do {
-        x = randInt(2, MAP_W - 3)
-        y = randInt(2, MAP_H - 3)
-        tries++
-      }
-      while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-      if (tries >= 200) continue
-      const distTier = Math.min(5, 1 + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / 45))
-      groundItems.push({x, y, kind: 'chest', tier: distTier, opened: false})
-    }
-    // loose potions
-    for (let i = 0; i < 15; i++) {
-      let x, y, tries = 0
-      do {
-        x = randInt(2, MAP_W - 3)
-        y = randInt(2, MAP_H - 3)
-        tries++
-      }
-      while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-      if (tries >= 200) continue
-      groundItems.push({x, y, kind: 'potion'})
-    }
-    // scrolls of invisibility
-    for (let i = 0; i < 9; i++) {
-      let x, y, tries = 0
-      do {
-        x = randInt(2, MAP_W - 3)
-        y = randInt(2, MAP_H - 3)
-        tries++
-      }
-      while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-      if (tries >= 200) continue
-      groundItems.push({x, y, kind: 'scroll'})
-    }
-    // speed potions
-    for (let i = 0; i < 3; i++) {
-      let x, y, tries = 0
-      do {
-        x = randInt(2, MAP_W - 3)
-        y = randInt(2, MAP_H - 3)
-        tries++
-      }
-      while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-      if (tries >= 200) continue
-      groundItems.push({x, y, kind: 'speedpotion'})
-    }
-  }
-
-  function assignVillageHutNames() {
-    if (!villageHuts.length) return
-    const oddName = Object.values(cemeteryTombstones).find(t => t.odd)?.name
-    villageHuts.forEach(h => { h.name = null; h.mausoleum = false })
-
-    // The first generated hut is the stable mausoleum hut. Its name comes
-    // directly from the anomalous dwarven tombstone; no RNG is used for it.
-    const mausoleumHut = villageHuts[0]
-    if (oddName) {
-      mausoleumHut.name = oddName
-      mausoleumHut.mausoleum = true
-      mausoleumHutPos = {x: mausoleumHut.x, y: mausoleumHut.y}
-    }
-
-    // Every remaining hut gets a normal random human name.
-    for (let i = 1; i < villageHuts.length; i++) {
-      villageHuts[i].name = pick(HUMAN_NAMES)
-    }
-  }
-
-  function placeCemetery() {
-    let forest = null
-    for (let y = 3; y < MAP_H - 3 && !forest; y++) for (let x = 3; x < MAP_W - 3 && !forest; x++) if (map[y][x] === 'ancientForest') forest = {
-      x,
-      y
-    }
-    if (!forest) return
-    cemeteryTombstones = {}
-    let placed = 0, oddIndex = randInt(0, 5)
-    const shapes = [[[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]], [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]], [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]]
-    let shape = pick(shapes), origin = null
-    for (let attempt = 0; attempt < 100 && !origin; attempt++) {
-      const candidate = {x: forest.x + randInt(-8, 8), y: forest.y + randInt(-8, 8)}
-      if (shape.every(([sx, sy]) => {
-        const x = candidate.x + sx, y = candidate.y + sy
-        return x >= 2 && y >= 2 && x < MAP_W - 2 && y < MAP_H - 2 && isWalkable(x, y) && map[y][x] !== 'ancientForest' && map[y][x] !== 'temple' && map[y][x] !== 'belltower' && map[y][x] !== 'ruinedchapel' && map[y][x] !== 'village'
-      })) origin = candidate
-      else if (attempt === 99) {
-        for (const alt of shapes) {
-          for (let y = forest.y - 10; y <= forest.y + 15 && !origin; y++) for (let x = forest.x - 10; x <= forest.x + 15 && !origin; x++) if (alt.every(([sx, sy]) => isWalkable(x + sx, y + sy) && map[y + sy][x + sx] !== 'ancientForest' && map[y + sy][x + sx] !== 'village')) {
-            shape = alt
-            origin = {x, y}
-          }
-        }
-      }
-    }
-    if (!origin) return
-    for (const [sx, sy] of shape) {
-      const x = origin.x + sx, y = origin.y + sy
-      if (!isWalkable(x, y) || map[y][x] === 'ancientForest' || map[y][x] === 'temple' || map[y][x] === 'ruinedchapel' || map[y][x] === 'village') continue
-      const name = pick(ARTIFACT_NAMES_DWARF)
-      const n = typeof name === 'string' ? name : (name.name || 'Unknown Dwarf')
-      const death = placed === oddIndex ? randInt(701, 780) : randInt(520, 700)
-      const birth = placed === oddIndex ? death - 70 : Math.max(120, death - randInt(35, 80))
-      map[y][x] = 'grave'
-      tileUnderlays[keyXY(x, y)] = 'grass'
-      cemeteryTombstones[keyXY(x, y)] = {
-        name: n,
-        birth,
-        death,
-        odd: placed === oddIndex,
-        inscription: `The tombstone bears the name ${n}. Born ${birth}, died ${death}.`
-      }
-      placed++
-    }
-    const graveKeys = Object.keys(cemeteryTombstones)
-    if (graveKeys.length) {
-      const [gx, gy] = graveKeys[0].split(',').map(Number)
-      const chapelSpot = DIRS8.map(([dx, dy]) => ({
-        x: gx + dx,
-        y: gy + dy
-      })).find(p => isWalkable(p.x, p.y) && map[p.y][p.x] !== 'grave')
-      if (chapelSpot) map[chapelSpot.y][chapelSpot.x] = 'ruinedchapel'
-    }
-    const gh = ENEMY_TEMPLATES.find(t => t.name === 'Ghoul')
-  }
-
-  function spawnCemeteryGhouls() {
-    const gh = ENEMY_TEMPLATES.find(t => t.name === 'Ghoul')
-    if (!gh) return
-    const graves = Object.keys(cemeteryTombstones).map(k => k.split(',').map(Number))
-    if (!graves.length) return
-    for (let i = 0; i < 3; i++) {
-      const [gx, gy] = graves[i % graves.length]
-      const x = gx + 1, y = gy
-      if (!isWalkable(x, y) || occupied.has(keyXY(x, y))) continue
-      addEnemy({
-        name: 'Ghoul',
-        baseName: 'Ghoul',
-        tier: gh.tier,
-        hp: gh.hp,
-        maxHp: gh.hp,
-        atk: gh.atk,
-        def: gh.def,
-        spd: gh.spd,
-        aggro: gh.aggro ?? AGGRO_RANGE,
-        x,
-        y,
-        homeX: x,
-        homeY: y,
-        level: 0,
-        alive: true,
-        humanoid: true,
-        fly: false,
-        evades: false
-      })
-      occupied.add(keyXY(x, y))
-    }
-  }
-
   /* ============================== OLD HUNTER PROCEDURAL QUEST ============================== */
   let nextEnemyId = 1
 
@@ -2631,43 +2072,6 @@
 
   let npcs = []
 
-  function ensureGravediggerGrave() {
-    const digger = npcs.find(n => n.name === 'Gravedigger')
-    if (!digger || !surfaceMap) return
-    const sx = gravediggerGraveKey && +gravediggerGraveKey.split(',')[0],
-      sy = gravediggerGraveKey && +gravediggerGraveKey.split(',')[1]
-    if (gravediggerGraveKey && surfaceMap[sy]?.[sx] === 'grave') return
-    // gravediggerGraveKey isn't always known here (e.g. right after loading
-    // an older save that predates persisting this key) - before carving a
-    // brand new grave, check whether the restored map already has one next
-    // to the Gravedigger and adopt it. Without this, reloading a save would
-    // stamp a fresh grave near him every time.
-    for (let radius = 1; radius <= 20; radius++) for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
-      const gx = digger.x + dx, gy = digger.y + dy
-      if (surfaceMap[gy]?.[gx] === 'grave') {
-        gravediggerGraveKey = keyXY(gx, gy)
-        return
-      }
-    }
-    for (let radius = 1; radius <= 20; radius++) for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
-      const gx = digger.x + dx, gy = digger.y + dy, key = keyXY(gx, gy)
-      const walkable = TILE[surfaceMap[gy]?.[gx]]?.walk
-      if (!walkable || surfaceMap[gy][gx] === 'belltower' || surfaceMap[gy][gx] === 'grave' || surfaceMap[gy][gx] === 'village') continue
-      const blocker = enemies.find(e => e.alive && e.level === 0 && e.x === gx && e.y === gy)
-      if (blocker) {
-        blocker.alive = false
-        occupied.delete(key)
-        enemies = enemies.filter(e => e !== blocker)
-      }
-      tileUnderlays[key] = surfaceMap[gy][gx]
-      surfaceMap[gy][gx] = 'grave'
-      gravediggerGraveKey = key
-      return
-    }
-  }
-
   function completeTreasureMapBurial() {
     treasureMapUnearthed = true
     const removed = npcs.find(n => n.name === 'Gravedigger')
@@ -2676,51 +2080,6 @@
       occupied.delete(keyXY(removed.x, removed.y))
     }
     refreshDrunkLines()
-  }
-
-  function spawnNpcs() {
-    npcs = []
-    for (const tmpl of NPC_TEMPLATES) {
-      const origin = (tmpl.village && villageCenter) ? villageCenter : spawnPoint
-      const spread = (tmpl.village && villageCenter) ? 6 : 8
-      let x, y, tries = 0, dist = 0
-      do {
-        x = randInt(Math.max(2, origin.x - spread), Math.min(MAP_W - 3, origin.x + spread))
-        y = randInt(Math.max(2, origin.y - spread), Math.min(MAP_H - 3, origin.y + spread))
-        dist = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
-        tries++
-      } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < 2 || occupied.has(keyXY(x, y))) && tries < 300)
-      if (tries >= 300) continue // extremely unlikely on a cramped map - just skip this one
-      const npc = {
-        name: tmpl.name,
-        lines: linesForNpcTemplate(tmpl),
-        free: !!tmpl.free,
-        static: !!tmpl.static,
-        trades: !!tmpl.trades,
-        services: !!tmpl.services,
-        portrait: tmpl.portrait,
-        x,
-        y,
-        homeX: x,
-        homeY: y
-      }
-      npcs.push(npc)
-      occupied.add(keyXY(x, y))
-      if (tmpl.name === 'Gravedigger') {
-        // A lone grave kept right next to him - fitting company for his line
-        // of work (and a quiet nod to his own unanswered questions).
-        for (const [dx, dy] of DIRS8) {
-          const gx = x + dx, gy = y + dy
-          if (!isWalkable(gx, gy) || occupied.has(keyXY(gx, gy))) continue
-          if (map[gy][gx] === 'temple' || map[gy][gx] === 'belltower' || map[gy][gx] === 'village') continue
-          tileUnderlays[keyXY(gx, gy)] = map[gy][gx]
-          map[gy][gx] = 'grave'
-          gravediggerGraveKey = keyXY(gx, gy)
-          break
-        }
-      }
-    }
-    ensureGravediggerGrave()
   }
 
   // NPC wandering uses the same 20-square Chebyshev-radius eligibility
@@ -6882,7 +6241,6 @@
   }
 
   function startReplayRecording() {
-    restoreCaveEntrancesOnSurface()
     // replayRecording is still false here, so this snapshot has no nested
     // .replay field of its own.
     ensureReplayItemIds()
@@ -7439,7 +6797,6 @@
       villageHuts: villageHuts,
       mausoleumHutPos: mausoleumHutPos,
       mausoleumDiscovered: isMausoleumDiscovered,
-      mausoleumDiscoveredOnce: isMausoleumDiscoveredOnce,
       player: {
         x: player.x, y: player.y,
         name: player.name, race: player.race,
@@ -7507,7 +6864,6 @@
       return
     }
     try {
-      restoreCaveEntrancesOnSurface()
       const data = buildSaveObject()
       const blob = new Blob([JSON.stringify(data)], {type: 'application/json'})
       const url = URL.createObjectURL(blob)
@@ -7803,7 +7159,6 @@
     bellRung = !!data.bellRung
     ancientBellLichSpawned = !!data.ancientBellLichSpawned
     isMausoleumDiscovered = !!(data.mausoleumDiscovered ?? data.isMausoleumDiscovered)
-    isMausoleumDiscoveredOnce = !!(data.mausoleumDiscoveredOnce ?? data.isMausoleumDiscoveredOnce)
     mausoleumHutPos = data.mausoleumHutPos && Number.isFinite(data.mausoleumHutPos.x) && Number.isFinite(data.mausoleumHutPos.y)
       ? {x: data.mausoleumHutPos.x, y: data.mausoleumHutPos.y}
       : null
@@ -7813,17 +7168,11 @@
     villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts
     reconcileVillageHuts()
     syncMausoleumHutToOddTombstone()
-    // The mausoleum's tiles are stamped directly into undergroundMap at
-    // discovery time rather than persisted with the rest of the map, so a
-    // fresh load has to re-stamp them here whenever the mausoleum was ever
-    // found - otherwise the area (including a player who saved while
-    // standing inside it) reverts to whatever plain cave/blank tiles
-    // undergroundMap was rebuilt with above, and the player can end up
-    // spawning inside a wall. mausoleumMap is a deterministic layout keyed
-    // off mausoleumHutPos, so recomputing it here is always safe. Reset it
-    // first - it may already be set from an earlier session in this tab.
+    // The mausoleum is generated as part of the world. Rebuild its deterministic
+    // structure while reconstructing undergroundMap from the saved cave layers;
+    // entering it never creates terrain or loot.
     mausoleumMap = null
-    if (isMausoleumDiscovered) initializeMausoleum()
+    initializeMausoleum()
     // Reconcile progression for saves made before the explicit quest fields
     // existed, or saves where only one side of the event was serialized.
     if (!bellRung && Array.isArray(data.npcs) && data.npcs.some(n => n.name === 'Ancient Lich')) bellRung = true
