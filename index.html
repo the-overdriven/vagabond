@@ -12,7 +12,6 @@
 - !1 balance: temple should heal only until 50% HP, or 100% if lvl < 3
 - !1 feat: add turns next to steps taken
 - !1 feat: skip log typing animation in replays too?
-- !1 feat: on mobile it should be possible to drag and hold canvas down to get more canvas space and less message log
 - !1 feat: add Level Up! popup
 - !1 feat: add battle hammer (one-handed)
 - !1 feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
@@ -361,6 +360,9 @@
   </div>
   <div id="logpanel"></div>
   <div id="mobileInfoPanel">Tap an enemy or NPC to inspect it.</div>
+  <div id="mobilePortraitOverlay" aria-hidden="true">
+    <img alt="Expanded portrait">
+  </div>
   <div id="touchControls">
     <div id="touchMenu">
       <button id="touchMap" class="touch-map" aria-label="Map">🗺️ &#x20;</button>
@@ -4270,35 +4272,50 @@
 
   const canvas = document.getElementById('game')
   const ctx = canvas.getContext('2d')
-  let VIEW_W = 21, VIEW_H = 13
+  const DESKTOP_MIN_VIEW_W = 21, DESKTOP_MIN_VIEW_H = 13
+  const MOBILE_VIEW_W = 16
+  const MOBILE_DEFAULT_VIEW_H = 13
+  const MOBILE_MIN_VIEW_H = 10, MOBILE_MAX_VIEW_H = 19
+  let mobileViewH = MOBILE_DEFAULT_VIEW_H
+  let VIEW_W = DESKTOP_MIN_VIEW_W, VIEW_H = DESKTOP_MIN_VIEW_H
   const TILE_PX = 40
   canvas.width = VIEW_W * TILE_PX
   canvas.height = VIEW_H * TILE_PX
   ctx.textBaseline = 'top'
-  ctx.font = (TILE_PX - 4) + 'px Consolas, \'Courier New\', monospace'
+  ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
   ctx.textAlign = 'center'
+
+  function applyGameViewport(width, height) {
+    if (width === VIEW_W && height === VIEW_H) return false
+    VIEW_W = width
+    VIEW_H = height
+    canvas.width = VIEW_W * TILE_PX
+    canvas.height = VIEW_H * TILE_PX
+    ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
+    ctx.textBaseline = 'top'
+    ctx.textAlign = 'center'
+    document.documentElement.style.setProperty('--game-width', `${canvas.width}px`)
+    // During startup the viewport can be sized before the world is generated.
+    if (map.length) render()
+    return true
+  }
+
+  function resizeMobileViewport(height = mobileViewH) {
+    if (!window.matchMedia('(pointer:coarse)').matches) return
+    mobileViewH = Math.max(MOBILE_MIN_VIEW_H, Math.min(MOBILE_MAX_VIEW_H, Math.round(height)))
+    applyGameViewport(MOBILE_VIEW_W, mobileViewH)
+  }
 
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const sideOpen = !document.body.classList.contains('side-collapsed')
     const reserved = sideOpen ? 292 : 28
-    const nextWidth = Math.max(21, Math.floor((window.innerWidth - reserved - 28) / TILE_PX))
+    const nextWidth = Math.max(DESKTOP_MIN_VIEW_W, Math.floor((window.innerWidth - reserved - 28) / TILE_PX))
     const logPanel = document.getElementById('logpanel')
     const stageTop = document.getElementById('stage').getBoundingClientRect().top
     const availableHeight = window.innerHeight - stageTop - logPanel.getBoundingClientRect().height - 8
-    const nextHeight = Math.max(13, Math.floor((availableHeight - 4) / TILE_PX))
-    if (nextWidth === VIEW_W && nextHeight === VIEW_H) return
-    VIEW_W = nextWidth
-    VIEW_H = nextHeight
-    canvas.width = VIEW_W * TILE_PX
-    canvas.height = VIEW_H * TILE_PX
-    ctx.font = (TILE_PX - 4) + 'px Consolas, \'Courier New\', monospace'
-    ctx.textBaseline = 'top'
-    ctx.textAlign = 'center'
-    document.documentElement.style.setProperty('--game-width', `${canvas.width}px`)
-    // During startup the viewport is sized before the world is generated.
-    // Rendering here would index the still-empty map.
-    if (map.length) render()
+    const nextHeight = Math.max(DESKTOP_MIN_VIEW_H, Math.floor((availableHeight - 4) / TILE_PX))
+    applyGameViewport(nextWidth, nextHeight)
   }
 
   function tileBackground(x, y, tileKey) {
@@ -5103,15 +5120,50 @@
   canvas.addEventListener('click', (ev) => {
     handleCanvasTap(ev.clientX, ev.clientY)
   })
-  // Touch devices: react on touchstart directly rather than waiting for the
-  // synthesized click, and read the touch point instead of ev.clientX/Y
-  // (which are 0 on touch events).
+
+  // A short tap still inspects/moves. A deliberate vertical drag resizes the
+  // mobile camera: pulling down adds visible rows, while pushing up removes
+  // them. Because #logpanel is the flexible element below the stage, the extra
+  // canvas height is taken from the message log first.
+  let canvasTouchStartX = null, canvasTouchStartY = null
+  let canvasTouchStartViewH = MOBILE_DEFAULT_VIEW_H
+  let canvasTouchResizing = false
   canvas.addEventListener('touchstart', (ev) => {
-    if (!ev.touches || !ev.touches.length) return
+    if (!ev.touches || ev.touches.length !== 1) return
     ev.preventDefault()
     const t = ev.touches[0]
-    handleCanvasTap(t.clientX, t.clientY)
+    canvasTouchStartX = t.clientX
+    canvasTouchStartY = t.clientY
+    canvasTouchStartViewH = mobileViewH
+    canvasTouchResizing = false
   }, {passive: false})
+  canvas.addEventListener('touchmove', (ev) => {
+    if (canvasTouchStartY === null || !ev.touches || ev.touches.length !== 1) return
+    ev.preventDefault()
+    const t = ev.touches[0]
+    const dx = t.clientX - canvasTouchStartX
+    const dy = t.clientY - canvasTouchStartY
+    if (!canvasTouchResizing && Math.abs(dy) < 12) return
+    if (!canvasTouchResizing && Math.abs(dy) <= Math.abs(dx)) return
+    canvasTouchResizing = true
+    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / MOBILE_VIEW_W)
+    resizeMobileViewport(canvasTouchStartViewH + Math.round(dy / tileCssPx))
+    updateMobileSafeAreas()
+  }, {passive: false})
+  canvas.addEventListener('touchend', (ev) => {
+    if (canvasTouchStartY === null) return
+    ev.preventDefault()
+    const changedTouch = ev.changedTouches && ev.changedTouches[0]
+    if (!canvasTouchResizing && changedTouch) handleCanvasTap(changedTouch.clientX, changedTouch.clientY)
+    canvasTouchStartX = null
+    canvasTouchStartY = null
+    canvasTouchResizing = false
+  }, {passive: false})
+  canvas.addEventListener('touchcancel', () => {
+    canvasTouchStartX = null
+    canvasTouchStartY = null
+    canvasTouchResizing = false
+  })
   // Mobile has no floating cursor tooltip, so a tap on the canvas instead
   // fills the info panel that lives in the space freed up by the hidden
   // sidebar/hint (see #mobileInfoPanel, shown only under pointer:coarse).
@@ -5126,6 +5178,29 @@
     }
     mobileInfoPanel.innerHTML = info.html
   }
+
+  const mobilePortraitOverlay = document.getElementById('mobilePortraitOverlay')
+  const mobilePortraitImage = mobilePortraitOverlay?.querySelector('img')
+
+  function closeMobilePortrait() {
+    if (!mobilePortraitOverlay) return
+    mobilePortraitOverlay.classList.remove('show')
+    mobilePortraitOverlay.setAttribute('aria-hidden', 'true')
+    if (mobilePortraitImage) mobilePortraitImage.removeAttribute('src')
+  }
+
+  mobileInfoPanel?.addEventListener('click', (ev) => {
+    if (!window.matchMedia('(pointer:coarse)').matches) return
+    const img = ev.target.closest('img')
+    if (!img || !mobileInfoPanel.contains(img) || !mobilePortraitImage) return
+    ev.stopPropagation()
+    mobilePortraitImage.src = img.currentSrc || img.src
+    mobilePortraitOverlay.classList.add('show')
+    mobilePortraitOverlay.setAttribute('aria-hidden', 'false')
+  })
+  mobilePortraitOverlay?.addEventListener('click', (ev) => {
+    if (ev.target === mobilePortraitOverlay) closeMobilePortrait()
+  })
 
   /* ============================== MINIMAP ============================== */
   const mini = document.getElementById('minimap')
@@ -6411,6 +6486,7 @@
     document.getElementById('btnHintCollapse').title = hintLabel
   })
   window.addEventListener('resize', resizeDesktopViewport)
+  resizeMobileViewport()
   resizeDesktopViewport()
   updateMobileSafeAreas()
 
