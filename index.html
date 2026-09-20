@@ -597,31 +597,17 @@
   let FLAT_SELL_VALUE = {}
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
-  let MAP_W = 260, MAP_H = 180
-  let MAX_WORLD_ATTEMPTS = 50
-  let BELL_GUARD_EXCLUSION_RADIUS = 8
-  let BELL_PILLAR_MIN_DIST = 20
-  let ANCIENT_FOREST_SIZE = 10
-  let ANCIENT_FOREST_MIN_VILLAGE_DIST = 30
-  let EDGE_MARGIN = 2
-  let EDGE_XP = 100
-  let MIN_LICHES = 6
+  let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
+  let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
+  let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
+  let EDGE_MARGIN, EDGE_XP, MIN_LICHES
   let MERCHANT_STOCK_CONFIG = {}
-  let ATTACK_RANGE = 1
-  let AGGRO_RANGE = 3
-  let CRIT_CHANCE = 0.15
-  let CHASE_DETOUR = 6
-  let ENEMY_WANDER_ENABLED = true
-  let ENEMY_WANDER_LEASH = true
-  let ENEMY_WANDER_CHANCE = 0.3
-  let ENEMY_WANDER_RADIUS = 1
-  let NPC_TALK_FREEZE_TURNS = 6
-  let ENEMY_WANDER_ACTIVE_RADIUS = 20
-  let FLEE_DISTANCE = 15
-  let PREFIX_STATS = []
+  let ATTACK_RANGE, AGGRO_RANGE, CRIT_CHANCE, CHASE_DETOUR
+  let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
+  let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
   let cryptCaveIndex = -1
-  let CRYPT_INSCRIPTIONS = []
+  let CRYPT_INSCRIPTIONS
   // Crypt level 2 (z:-2): a single dedicated tighter/darker map beneath the
   // crypt, reached via cryptstairsdown/cryptstairsup. Crypt Level 2 uses
   // z:-2 just like the generic second underground level; currentLevelKind()
@@ -629,10 +615,10 @@
   let cryptLevel2 = null // {map, discovered, x, y, trapSprung, trapPos}
   let treasureMapSpot = null // {x,y} sand tile the treasure map points to
   let treasureMapUnearthed = false
-  let CRYPT2_EXPLORER_FLAVOR = ''
-  let CRYPT2_TRAP_DISCOVER = ''
-  let CRYPT2_TRAP_TRIGGER = ''
-  let CRYPT2_TRAP_SPENT = ''
+  let CRYPT2_EXPLORER_FLAVOR
+  let CRYPT2_TRAP_DISCOVER
+  let CRYPT2_TRAP_TRIGGER
+  let CRYPT2_TRAP_SPENT
   let cemeteryTombstones = {}
   let gravediggerGraveKey = null
   let oldHunterQuest = null
