@@ -239,6 +239,9 @@
   </div>
   <div id="stage">
     <canvas id="game"></canvas>
+    <div id="mobileCanvasResizeHandle" aria-label="Resize game view" role="separator" aria-orientation="horizontal">
+      <span>▲</span><span>▼</span>
+    </div>
     <div id="tooltip"></div>
     <div class="overlay" id="raceOverlay">
       <div class="panelbox">
@@ -5164,6 +5167,39 @@
     canvasTouchStartY = null
     canvasTouchResizing = false
   })
+
+  // Visible mobile resize handle: drag it vertically to make the game view
+  // taller/shorter. Keep the original canvas gesture too, but this makes the
+  // feature discoverable without consuming extra layout space.
+  const mobileCanvasResizeHandle = document.getElementById('mobileCanvasResizeHandle')
+  let resizeHandleStartY = null
+  let resizeHandleStartViewH = MOBILE_DEFAULT_VIEW_H
+  mobileCanvasResizeHandle?.addEventListener('touchstart', (ev) => {
+    if (!ev.touches || ev.touches.length !== 1) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    resizeHandleStartY = ev.touches[0].clientY
+    resizeHandleStartViewH = mobileViewH
+    mobileCanvasResizeHandle.classList.add('dragging')
+  }, {passive: false})
+  mobileCanvasResizeHandle?.addEventListener('touchmove', (ev) => {
+    if (resizeHandleStartY === null || !ev.touches || ev.touches.length !== 1) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    const dy = ev.touches[0].clientY - resizeHandleStartY
+    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / MOBILE_VIEW_W)
+    resizeMobileViewport(resizeHandleStartViewH + Math.round(dy / tileCssPx))
+    updateMobileSafeAreas()
+  }, {passive: false})
+  const finishResizeHandleDrag = (ev) => {
+    if (resizeHandleStartY === null) return
+    ev?.preventDefault?.()
+    ev?.stopPropagation?.()
+    resizeHandleStartY = null
+    mobileCanvasResizeHandle?.classList.remove('dragging')
+  }
+  mobileCanvasResizeHandle?.addEventListener('touchend', finishResizeHandleDrag, {passive: false})
+  mobileCanvasResizeHandle?.addEventListener('touchcancel', finishResizeHandleDrag, {passive: false})
   // Mobile has no floating cursor tooltip, so a tap on the canvas instead
   // fills the info panel that lives in the space freed up by the hidden
   // sidebar/hint (see #mobileInfoPanel, shown only under pointer:coarse).
