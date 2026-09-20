@@ -1358,6 +1358,16 @@ player delay = max(0.25, base delay - racial reduction)
 
 This makes racial GRACE provide almost no benefit with slow weapons and progressively more benefit with graceful weapons. A GRACE 5 or higher weapon receives the full racial reduction.
 
+For an Elf with **+2 racial GRACE**:
+
+| Weapon GRACE | Normal delay | Elf delay | Delay reduction |
+|---:|---:|---:|---:|
+| 1 | 6.00 | 5.98 | 0.02 |
+| 2 | 3.00 | 2.92 | 0.08 |
+| 3 | 2.00 | 1.82 | 0.18 |
+| 4 | 1.50 | 1.18 | 0.32 |
+| 5 | 1.20 | 0.70 | 0.50 |
+
 The player must wield a weapon to take part in a grace check. Every enemy has natural GRACE and can take part while unarmed; if the enemy wields a weapon, the weapon's GRACE overrides its natural GRACE.
 
 If both combatants have a valid combat delay and the attacker has lower delay, an extra attack can occur.
