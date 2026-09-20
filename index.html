@@ -14,6 +14,7 @@
 - balance: high tier monsters should be more lickely to wear and drop items from their tier
 - balance: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 
+- !1 feat: add hotkey to toggle ASCII/tiles
 - !1 feat: all items should have a base cost in .json
 - !1 feat: docs: document chest tiers
 - !1 feat: fungus (doesn't fight back)
@@ -4990,10 +4991,18 @@
 
   const SIDE_VIEW_W = 61, SIDE_VIEW_H = 41
   const MINI_SCALES = [MAP_SCALE, SIDE_SCALE]
-  mini.width = MAP_W * MAP_SCALE
-  mini.height = MAP_H * MAP_SCALE
+  // MAP_W / MAP_H are loaded asynchronously from content/map_config.json.
+  // Do not size the full-map canvas here: at script evaluation time those values
+  // are still undefined, which would collapse #minimap to a 0x0 canvas.
   sideMini.width = SIDE_VIEW_W * SIDE_SCALE
   sideMini.height = SIDE_VIEW_H * SIDE_SCALE
+
+  function ensureMinimapCanvasSize() {
+    const width = MAP_W * MAP_SCALE
+    const height = MAP_H * MAP_SCALE
+    if (mini.width !== width) mini.width = width
+    if (mini.height !== height) mini.height = height
+  }
   // The minimap terrain is expensive to rasterise (MAP_W*MAP_H fills per canvas),
   // so it lives on cached offscreen canvases that are only patched tile-by-tile as
   // fog of war lifts. Per-frame rendering is then just a blit plus two markers.
@@ -5239,6 +5248,7 @@
   }
 
   function renderMinimap() {
+    ensureMinimapCanvasSize()
     if (mapOpen) {
       renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)
       if (!mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
