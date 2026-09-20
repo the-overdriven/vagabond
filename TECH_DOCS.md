@@ -1930,9 +1930,16 @@ configured chances.
 Gear generated from a chest uses the chest tier (capped by the entry's
 `gearMaxTier`) and passes the player's Magic Find into the item generator.
 
-World generation also places five loose equipment objects directly on random
-surface sand tiles. These are persistent `gear` ground objects, are unrelated
-to the digging/foraging RNG, and are picked up by stepping onto them.
+World generation also buries five equipment objects beneath random surface
+sand tiles. These hidden `buriedgear` objects have their positions, item types,
+tiers, and modifiers fixed during world generation. They are not rendered and
+cannot be collected by walking over them. Digging the exact tile with a shovel
+uncovers the predetermined item before the ordinary 1–100 digging roll.
+
+Two additional random artifacts are buried on separate surface sand tiles as
+hidden `buriedartifact` objects. Each rolls a random artifact tier from 3–5
+during world generation. They follow the same shovel-only discovery rules and
+are also independent of the normal digging/foraging RNG.
 
 A chest marked `artifactGuaranteed` skips the normal 110-point loot roll and
 directly creates an artifact using the chest tier and the player's Magic Find.
@@ -2056,6 +2063,10 @@ already been dug.
 The treasure-map location is checked before the normal digging loot roll. At
 the marked location, digging produces the `Old Rotten Casket` instead of a
 normal digging result.
+
+After the treasure-map check, digging checks for a hidden world-generated
+`buriedgear` or `buriedartifact` object on that exact tile. If found, its
+predetermined item is recovered and the ordinary digging roll is skipped.
 
 For normal sand, digging uses a separate 1–100 roll. Current results are listed under "Normal digging loot" section.
 
@@ -3086,6 +3097,9 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
 - The tile is recorded in `dugSandTiles` and immediately redrawn so the darker sand becomes visible.
 - Digging the same treasure-map location does not create another casket if the casket is already present in the player's inventory or on the current level.
 - The treasure-map location takes priority over the normal digging loot table.
+- A world-generated `buriedgear` or `buriedartifact` object takes priority over
+  the normal digging loot table but not over the treasure-map location. It
+  remains completely hidden until that sand tile is dug.
 
 ## Treasure-map reward
 
