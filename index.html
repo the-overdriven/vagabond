@@ -1491,7 +1491,7 @@
     return d
   }
 
-  function playerSpd() {
+  function playerSpdRaw() {
     let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2)
     if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
     if (player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0)
@@ -1501,7 +1501,11 @@
     if (map[player.y]?.[player.x] === 'frozenriver' || (map[player.y]?.[player.x] === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')) s -= 1
     s += curseDebuffSum('spd')
     if (player.inventory.some(i => i.kind === 'bigbell')) s -= 5
-    return Math.max(1, s)
+    return s
+  }
+
+  function playerSpd() {
+    return Math.max(1, playerSpdRaw())
   }
 
   function playerGrace() {
@@ -1562,7 +1566,7 @@
   const TRACKED_STATS = [
     {key: 'ATK', get: () => playerAtk()},
     {key: 'DEF', get: () => playerDef()},
-    {key: 'SPD', get: () => playerSpd()},
+    {key: 'SPD', get: () => playerSpdRaw()},
     {key: 'GRACE', get: () => playerGrace()},
     {key: 'MF', get: () => playerMf()},
     {key: 'HP', get: () => playerMaxHp()},
