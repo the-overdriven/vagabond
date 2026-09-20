@@ -1168,6 +1168,9 @@ body.hint-collapsed #hint .panel-toggle {
      never shrinks below its own content (flex-shrink:0) - the log is
      the one that gives up space when the info panel needs to grow. */
   #logpanel {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
     height: auto;
     flex: 1 1 auto;
     min-height: 30px;

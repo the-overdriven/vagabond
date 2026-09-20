@@ -178,34 +178,34 @@
   <meta name="apple-mobile-web-app-title" content="Vagabond">
   <link rel="stylesheet" href="css/style.css?v=20260903-2">
   <style>
-      .invitem .item-icon {
-          flex: 0 0 auto;
-          width: 20px;
-          height: 20px;
-          margin-right: 6px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-      }
+    .invitem .item-icon {
+      flex: 0 0 auto;
+      width: 20px;
+      height: 20px;
+      margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-      .invitem .item-icon img {
-          width: 100%;
-          height: 100%;
-          display: block;
-      }
+    .invitem .item-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
 
-      .race-card img {
-          object-fit: contain;
-          image-rendering: auto;
-          background: transparent;
-      }
+    .race-card img {
+      object-fit: contain;
+      image-rendering: auto;
+      background: transparent;
+    }
 
-      /* Keep enemy stat separators visible in the tap-to-inspect panel on touch devices. */
-      @media (pointer: coarse) {
-          #mobileInfoPanel .statsep {
-              display: inline !important;
-          }
+    /* Keep enemy stat separators visible in the tap-to-inspect panel on touch devices. */
+    @media (pointer: coarse) {
+      #mobileInfoPanel .statsep {
+        display: inline !important;
       }
+    }
   </style>
 </head>
 <body>
@@ -5186,7 +5186,13 @@
     if (!mobilePortraitOverlay) return
     mobilePortraitOverlay.classList.remove('show')
     mobilePortraitOverlay.setAttribute('aria-hidden', 'true')
-    if (mobilePortraitImage) mobilePortraitImage.removeAttribute('src')
+    if (mobilePortraitImage) {
+      mobilePortraitImage.removeAttribute('src')
+      mobilePortraitImage.style.backgroundImage = ''
+      mobilePortraitImage.style.backgroundSize = ''
+      mobilePortraitImage.style.backgroundPosition = ''
+      mobilePortraitImage.style.backgroundRepeat = ''
+    }
   }
 
   mobileInfoPanel?.addEventListener('click', (ev) => {
@@ -5195,6 +5201,10 @@
     if (!img || !mobileInfoPanel.contains(img) || !mobilePortraitImage) return
     ev.stopPropagation()
     mobilePortraitImage.src = img.currentSrc || img.src
+    mobilePortraitImage.style.backgroundImage = img.style.backgroundImage
+    mobilePortraitImage.style.backgroundSize = img.style.backgroundSize
+    mobilePortraitImage.style.backgroundPosition = img.style.backgroundPosition
+    mobilePortraitImage.style.backgroundRepeat = img.style.backgroundRepeat
     mobilePortraitOverlay.classList.add('show')
     mobilePortraitOverlay.setAttribute('aria-hidden', 'false')
   })
