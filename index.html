@@ -3083,12 +3083,13 @@
     // A weapon's built-in GRACE is part of its combat value. This also ensures
     // equal-total-ATK weapons prefer the more graceful weapon before tier is
     // used as a later tiebreaker. Secondary modifiers matter for ranking too.
-    // XP uses a percentage-sized value (5-15), so scale it down to the same
-    // rough range as flat bonuses. GRACE affects combat only on weapons, so do
-    // not give shields/armor credit for an ineffective GRACE modifier.
+    // XP and HP use larger numeric ranges than other bonuses, so divide them
+    // by 3 for sorting. GRACE affects combat only on weapons, so do not give
+    // shields/armor credit for an ineffective GRACE modifier.
     let secondary = item.kind === 'weapon' ? (item.grace || 0) : 0
     if (item.mod && item.mod !== primaryStat) {
       if (item.mod === 'xp') secondary += Math.round((item.xpBonus || 0) / 3)
+      else if (item.mod === 'hp') secondary += (item.modAmt || 0) / 3
       else if (item.mod !== 'grace' || item.kind === 'weapon') secondary += item.modAmt || 0
     }
 
