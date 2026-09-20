@@ -3886,18 +3886,7 @@
     cryptLevel2.trapSprung = true
     map[player.y][player.x] = 'crypttrapsprung'
     log(CRYPT2_TRAP_TRIGGER, 'bad')
-    const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton') || {
-      name: 'Skeleton',
-      tier: 1,
-      hp: 12,
-      atk: 5,
-      def: 2,
-      spd: 4,
-      fly: false,
-      humanoid: true,
-      evades: false,
-      aggro: AGGRO_RANGE,
-    }
+    const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton')
     const open = []
     for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
       const x = player.x + dx, y = player.y + dy
