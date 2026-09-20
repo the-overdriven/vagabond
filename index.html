@@ -4014,26 +4014,29 @@
         )
 
         if (item) {
-          // TODO: wtf. refactor this. map kinds to names.
-          const label =
-            item.kind === 'chest' ? 'a chest' :
-              item.kind === 'potion' ? 'a potion' :
-                item.kind === 'speedpotion' ? 'a speed potion' :
-                  item.kind === 'scroll' ? 'a scroll' :
-                    item.kind === 'idscroll' ? 'a scroll' :
-                      item.kind === 'teleportscroll' ? 'a scroll' :
-                        item.kind === 'treasurecasket' ? 'an old casket' :
-                          item.kind === 'skeleton' ? 'skeletal remains' :
-                            item.kind === 'deadbody' ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.` :
-                              item.kind === 'campfire' ? 'a campfire' :
-                                item.kind === 'anvil' ? 'an anvil' :
-                                  item.kind === 'wheelbarrow' ? 'a wheelbarrow' :
-                                    item.kind === 'goldcoin' ? 'a giant gold coin' :
-                                      (item.kind === 'dwarvenremains' || item.kind === 'ruinprop') ? 'dwarven remains' :
-                                        item.kind === 'explorerremains' ? 'a long-dead explorer\'s remains' :
-                                          item.kind === 'oddTombstone' ? 'a tombstone' :
-                                            item.kind === 'shovel' ? 'a shovel' :
-                                              'something'
+          const itemLabels = {
+            chest: 'a chest',
+            potion: 'a potion',
+            speedpotion: 'a speed potion',
+            scroll: 'a scroll',
+            idscroll: 'a scroll',
+            teleportscroll: 'a scroll',
+            treasurecasket: 'an old casket',
+            skeleton: 'skeletal remains',
+            campfire: 'a campfire',
+            anvil: 'an anvil',
+            wheelbarrow: 'a wheelbarrow',
+            goldcoin: 'a giant gold coin',
+            dwarvenremains: 'dwarven remains',
+            ruinprop: 'dwarven remains',
+            explorerremains: "a long-dead explorer's remains",
+            oddTombstone: 'a tombstone',
+            shovel: 'a shovel'
+          }
+
+          const label = item.kind === 'deadbody'
+            ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
+            : itemLabels[item.kind] || 'something'
 
           addNote(label, direction)
           continue
