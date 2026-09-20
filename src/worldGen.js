@@ -1,3 +1,9 @@
+/**
+ * Whole logic in this file
+ * should run ONLY ONCE
+ * after new game is created
+ */
+
 'use strict'
 
 /* ============================== MAP GENERATION ============================== */
