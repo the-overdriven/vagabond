@@ -529,6 +529,7 @@
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
   let EDGE_MARGIN, EDGE_XP, MIN_LICHES
   let MERCHANT_STOCK_CONFIG = {}
+  let RENDER_STYLE = {}
   let ATTACK_RANGE, AGGRO_RANGE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
@@ -578,7 +579,8 @@
       tiles: 'tiles.json',
       lootTables: 'loot_tables.json',
       mapConfig: 'map_config.json',
-      merchantStockConfig: 'merchant_stock.json'
+      merchantStockConfig: 'merchant_stock.json',
+      rendering: 'rendering.json',
     }
     const content = {}
     for (const [key, file] of Object.entries(files)) {
@@ -650,6 +652,7 @@
     EDGE_XP = content.mapConfig.exploration.edgeRewardXp
     MIN_LICHES = content.mapConfig.spawning.minLiches
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
+    RENDER_STYLE = content.rendering
   }
 
   const preloadedImageUrls = new Map()
@@ -2329,14 +2332,14 @@
         e.y = destination.y
         occupied.add(keyXY(e.x, e.y))
         beginEnemyMoveAnim(e, fromX, fromY)
-        spawnDamageNumber(fromX, fromY, 'Miss!', '#d9d9a3')
+        spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
         log(`The ${e.name} evades your attack.`, 'bad')
         updateMobileInfoPanel(e.x, e.y)
         return
       }
     }
     if (chance(missChance(playerSpd(), enemySpd(e)))) {
-      spawnDamageNumber(e.x, e.y, 'Miss!', '#d9d9a3')
+      spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
       return
@@ -2346,7 +2349,7 @@
     let dmg = damageRoll(playerAtk(), enemyDef(e))
     if (glancing) dmg = Math.floor(dmg / 3)
     e.hp -= dmg
-    spawnDamageNumber(e.x, e.y, dmg, '#fff6d6')
+    spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit)
     if (glancing) {
       if (player.equip.weapon) {
         if (dmg === 0) {
@@ -2385,7 +2388,7 @@
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     beginEnemyAttackAnim(e)
     if (chance(missChance(enemySpd(e), playerSpd()))) {
-      spawnDamageNumber(player.x, player.y, 'Miss!', '#d9d9a3')
+      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
       return false
     }
@@ -2396,8 +2399,8 @@
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     player.hp -= dmg
-    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', '#f0b35a')
-    spawnDamageNumber(player.x, player.y, dmg, '#ff6b5d', critical ? 120 : 0)
+    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
+    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
     if (glancing) {
       if (enemyWeapon) {
         if (dmg === 0) {
@@ -4164,11 +4167,11 @@
   }
 
   function tileBackground(x, y, tileKey) {
-    if (tileKey === 'coffin') return '#171412'
+    if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
-    if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return '#9a8050'
-    return base ? base.bg : '#050403'
+    if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return RENDER_STYLE.specialTiles.dugSand.bg
+    return base ? base.bg : RENDER_STYLE.canvas.background
   }
 
   function drawTile(px, py, ch, color, bg) {
@@ -4189,7 +4192,7 @@
     ctx.lineWidth = CREATURE_OUTLINE_PX
     ctx.lineJoin = 'round'
     ctx.miterLimit = 2
-    ctx.strokeStyle = 'rgba(0,0,0,' + (0.85 * a) + ')'
+    ctx.strokeStyle = RENDER_STYLE.creature.outlineColor.replace('{alpha}', String(RENDER_STYLE.creature.outlineAlpha * a))
     ctx.strokeText(ch, px + TILE_PX / 2, py + 3)
     ctx.fillStyle = color
     ctx.fillText(ch, px + TILE_PX / 2, py + 3)
@@ -4211,26 +4214,25 @@
   let damageAnims = []
   const FX_ANIM_MS = 420
   const DAMAGE_ANIM_MS = 650
-  const ENEMY_COLORS = {1: '#b8b8b8', 2: '#d98a3a', 3: '#4aa3d1', 4: '#b565d6', 5: '#e0473f'}
-
   function enemyGlyph(e) {
     const ch = e.name.replace(/^[A-Za-z]+ /, '')[0]
-    return e.tier <= 2 ? ch.toLowerCase() : ch
+    return e.tier <= RENDER_STYLE.enemies.lowercaseThroughTier ? ch.toLowerCase() : ch
   }
 
+  function enemyColor(e) {
+    return RENDER_STYLE.enemies.tierColors[String(e.tier)] || RENDER_STYLE.enemies.defaultColor
+  }
+
+  // All world/entity presentation is data-driven. The renderer consumes semantic
+  // kinds here so a future tileset can add an `image` field to the same JSON
+  // descriptors without changing gameplay/world-generation code.
   function groundGlyph(g) {
-    if (g.kind === 'chest') return {ch: '$', color: '#e8c14a'}
-    if (g.kind === 'deadbody') return {ch: '☠', color: 'rgb(232, 162, 79)'}
-    if (g.kind === 'campfire') return {ch: '*', color: '#e8a24f'}
-    if (g.kind === 'skeleton') return {ch: '╶☠╴', color: g.looted ? '#777' : '#d0d0c0'}
-    if (g.kind === 'wheelbarrow') return {ch: '▱', color: '#b8b8b8'}
-    if (g.kind === 'goldcoin') return {ch: '●', color: '#f0c84b'}
-    if (g.kind === 'dwarvenremains') return {ch: '¤', color: '#d0c7b4'}
-    if (g.kind === 'anvil') return {ch: '⚙', color: '#9d9d9d'}
-    if (g.kind === 'potion') return {ch: '!', color: '#e0473f'}
-    if (g.kind === 'speedpotion') return {ch: '!', color: '#59b8ff'}
-    if (g.kind === 'scroll') return {ch: '?', color: '#b565d6'}
-    return null
+    const visual = RENDER_STYLE.groundItems[g.kind]
+    if (!visual) return null
+    return {
+      ch: visual.glyph,
+      color: g.looted && visual.lootedColor ? visual.lootedColor : visual.color
+    }
   }
 
   function spawnFxAnim(x, y, ch, color, dir) {
@@ -4245,7 +4247,7 @@
   }
 
   function spawnDeathAnim(e) {
-    spawnFxAnim(e.x, e.y, enemyGlyph(e), ENEMY_COLORS[e.tier], 1)
+    spawnFxAnim(e.x, e.y, enemyGlyph(e), enemyColor(e), 1)
   }
 
   function spawnDamageNumber(x, y, amount, color, delay) {
@@ -4452,7 +4454,7 @@
     }
     camX = targetCamX(viewPlayerX)
     camY = targetCamY(viewPlayerY)
-    ctx.fillStyle = '#050403'
+    ctx.fillStyle = RENDER_STYLE.canvas.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     for (let vy = 0; vy <= VIEW_H; vy++) {
@@ -4463,7 +4465,7 @@
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
-          drawTile(px, py, '~', TILE.water.color, TILE.water.bg)
+          drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
         const tileKey = map[my]?.[mx] || 'crypt2floor'
@@ -4472,9 +4474,9 @@
         const py = Math.round((my - camY) * TILE_PX)
         const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx, my))
         const foraged = map[my][mx] === 'forest' && foragedTiles.has(keyXY(mx, my))
-        const glyph = tileKey === 'coffin' ? '⚰' : t.ch
-        const color = tileKey === 'coffin' ? '#aaa39a' : (tree ? '#164c23' : (foraged ? '#554f2a' : t.color))
-        drawTile(px, py, tree ? '\u2663' : glyph, color, tileBackground(mx, my, tileKey))
+        const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
+        const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
+        drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, tileBackground(mx, my, tileKey))
         markDiscovered(mx, my) // anything drawn on the main screen counts as seen
       }
     }
@@ -4484,19 +4486,9 @@
       const vx = Math.round((g.x - camX) * TILE_PX)
       const vy = Math.round((g.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-      if (g.kind === 'chest' && !g.opened) drawTile(vx, vy, '$', '#e8c14a', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'deadbody') drawTile(vx, vy, '☠', g.looted ? '#777' : 'rgb(232, 162, 79)', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'potion') drawTile(vx, vy, '!', '#e0473f', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'speedpotion') drawTile(vx, vy, '!', '#59b8ff', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'scroll') drawTile(vx, vy, '?', '#b565d6', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'campfire') drawTile(vx, vy, '*', '#e8a24f', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'skeleton') drawTile(vx, vy, '╶☠╴', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'wheelbarrow') drawTile(vx, vy, '▱', '#b8b8b8', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'goldcoin') drawTile(vx, vy, '●', '#f0c84b', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'dwarvenremains') drawTile(vx, vy, '¤', '#d0c7b4', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'anvil') drawTile(vx, vy, '♠', '#9d9d9d', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'ruinprop') drawTile(vx, vy, '¤', '#a89270', tileBackground(g.x, g.y, map[g.y][g.x]))
-      else if (g.kind === 'explorerremains') drawTile(vx, vy, '☠', g.looted ? '#777' : '#d0d0c0', tileBackground(g.x, g.y, map[g.y][g.x]))
+      if (g.kind === 'chest' && g.opened) continue
+      const glyph = groundGlyph(g)
+      if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
     }
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {
@@ -4536,7 +4528,7 @@
       ctx.font = 'bold 18px Consolas, \'Courier New\', monospace'
       ctx.textAlign = 'center'
       ctx.fillStyle = p.color
-      ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+      ctx.strokeStyle = RENDER_STYLE.damage.outline
       ctx.lineWidth = 3
       ctx.strokeText(String(p.amount), vx + TILE_PX / 2, vy + 2)
       ctx.fillText(String(p.amount), vx + TILE_PX / 2, vy + 2)
@@ -4568,10 +4560,10 @@
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over
-      drawCreature(vx, vy, enemyGlyph(e), ENEMY_COLORS[e.tier])
+      drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
 
       if (e.aware) {
-        ctx.strokeStyle = 'rgba(255,106,93,0.95)'
+        ctx.strokeStyle = RENDER_STYLE.overlays.enemyAwareOutline
         ctx.lineWidth = 2
         ctx.strokeRect(vx + 2, vy + 2, TILE_PX - 4, TILE_PX - 4)
       }
@@ -4592,7 +4584,7 @@
       }
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-      drawCreature(vx, vy, n.name[0], '#ffffff')
+      drawCreature(vx, vy, RENDER_STYLE.npc.glyph === 'initial' ? n.name[0] : RENDER_STYLE.npc.glyph, RENDER_STYLE.npc.color)
     }
     // planned movement path, or the route a desktop click would use
     const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
@@ -4600,18 +4592,18 @@
       for (const step of previewPath) {
         const pvx = Math.round((step.x - camX) * TILE_PX)
         const pvy = Math.round((step.y - camY) * TILE_PX)
-        ctx.fillStyle = 'rgba(255,224,138,0.28)'
+        ctx.fillStyle = RENDER_STYLE.overlays.path
         ctx.fillRect(pvx + TILE_PX * 0.25, pvy + TILE_PX * 0.25, TILE_PX * 0.5, TILE_PX * 0.5)
       }
       const last = previewPath[previewPath.length - 1]
       const lx = Math.round((last.x - camX) * TILE_PX)
       const ly = Math.round((last.y - camY) * TILE_PX)
       ctx.save()
-      ctx.fillStyle = 'rgba(20,14,10,0.9)'
+      ctx.fillStyle = RENDER_STYLE.overlays.pathCounterBackground
       ctx.beginPath()
       ctx.arc(lx + TILE_PX * 0.78, ly + TILE_PX * 0.22, TILE_PX * 0.18, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = '#ffe08a'
+      ctx.fillStyle = RENDER_STYLE.overlays.pathCounterText
       ctx.font = 'bold 10px sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -4630,8 +4622,8 @@
       }
       const vx = Math.round((px - camX) * TILE_PX), vy = Math.round((py - camY) * TILE_PX)
       const faded = player.godMode || player.invisibleTurns > 0
-      const playerColor = faded ? 'rgba(255,246,214,0.45)' : '#fff6d6'
-      const playerAlpha = faded ? 0.45 : 1
+      const playerColor = faded ? RENDER_STYLE.player.fadedColor : RENDER_STYLE.player.color
+      const playerAlpha = faded ? RENDER_STYLE.player.fadedAlpha : 1
       const deathRotation = deathTransition &&
       (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
         ? Math.min(Math.PI / 2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI / 2)
@@ -4640,17 +4632,17 @@
         ctx.save()
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
         ctx.rotate(deathRotation)
-        drawCreature(-TILE_PX / 2, -TILE_PX / 2, '@', playerColor, playerAlpha)
+        drawCreature(-TILE_PX / 2, -TILE_PX / 2, RENDER_STYLE.player.glyph, playerColor, playerAlpha)
         ctx.restore()
       } else {
-        drawCreature(vx, vy, '@', playerColor, playerAlpha)
+        drawCreature(vx, vy, RENDER_STYLE.player.glyph, playerColor, playerAlpha)
       }
     }
     if (currentZ < 0) {
       ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,0.8)'
+      ctx.fillStyle = RENDER_STYLE.depthLabel.background
       ctx.fillRect(canvas.width - 86, 6, 78, 25)
-      ctx.fillStyle = '#e8a24f'
+      ctx.fillStyle = RENDER_STYLE.depthLabel.color
       ctx.font = 'bold 16px Consolas, \'Courier New\', monospace'
       ctx.fillText('Z ' + currentZ, canvas.width - 47, 10)
       ctx.restore()
@@ -4673,7 +4665,7 @@
       } else {
         alpha = Math.max(0, 1 - (elapsed / deathTransition.duration))
       }
-      ctx.fillStyle = 'rgba(0,0,0,' + alpha + ')'
+      ctx.fillStyle = RENDER_STYLE.transitions.deathFade.replace('{alpha}', String(alpha))
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
     if (mapOpen || minimapDirty || miniPlayerX !== player.x || miniPlayerY !== player.y) renderMinimap()
@@ -4692,14 +4684,14 @@
         const vx = Math.round((mx - camX) * TILE_PX), vy = Math.round((my - camY) * TILE_PX)
         if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
         const dist = Math.max(Math.abs(dx), Math.abs(dy))
-        ctx.fillStyle = dist <= ATTACK_RANGE ? 'rgba(224,71,63,0.40)' : 'rgba(224,71,63,0.16)'
+        ctx.fillStyle = dist <= ATTACK_RANGE ? RENDER_STYLE.overlays.attackRange : RENDER_STYLE.overlays.aggroRange
         ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
       }
     }
     // outline the enemy's own tile so it's clear which monster the range belongs to
     const evx = Math.round((e.x - camX) * TILE_PX), evy = Math.round((e.y - camY) * TILE_PX)
     if (evx > -TILE_PX && evy > -TILE_PX && evx < canvas.width && evy < canvas.height) {
-      ctx.strokeStyle = 'rgba(232,162,79,0.9)'
+      ctx.strokeStyle = RENDER_STYLE.overlays.rangeOwnerOutline
       ctx.lineWidth = 2
       ctx.strokeRect(evx + 1, evy + 1, TILE_PX - 2, TILE_PX - 2)
     }
@@ -5020,8 +5012,8 @@
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
     const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
-    c.fillStyle = visible ? (foraged ? '#554f2a' : (tileKey === 'coffin' ? '#aaa39a' : (tileKey === 'grave' || tileKey === 'taiga'
-      ? (under.mini || under.color) : (t.mini || t.color)))) : 'rgba(3,2,1,0.72)'
+    c.fillStyle = visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
+      ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
   }
 
@@ -5077,7 +5069,7 @@
       const ox = Math.max(0, Math.min(MAP_W - viewW, mapPanX - viewW / 2))
       const oy = Math.max(0, Math.min(MAP_H - viewH, mapPanY - viewH / 2))
       ctx.drawImage(miniBases[scale].canvas, ox * scale, oy * scale, viewW * scale, viewH * scale, 0, 0, w, h)
-      if (currentZ === 0) ctx.fillStyle = '#ff6b2e'
+      if (currentZ === 0) ctx.fillStyle = RENDER_STYLE.minimap.cave
       for (const cave of currentZ === 0 ? caves : []) {
         for (const entrance of cave.entrances || [{x: cave.x, y: cave.y}]) {
           if (!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue
@@ -5089,20 +5081,20 @@
       if (currentZ === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
         const tx = (dwarvenRuin.x - ox) * scale * zoom + scale * zoom / 2,
           ty = (dwarvenRuin.y - oy) * scale * zoom + scale * zoom / 2
-        ctx.fillStyle = '#e8b85b'
+        ctx.fillStyle = RENDER_STYLE.minimap.dwarvenFort.color
         ctx.font = `${Math.max(12, scale * 5) * zoom}px serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText('♜', tx, ty)
+        ctx.fillText(RENDER_STYLE.minimap.dwarvenFort.glyph, tx, ty)
       }
       if (currentZ === 0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]) {
         const tx = (spawnPoint.x - ox) * scale * zoom + scale * zoom / 2
         const ty = (spawnPoint.y - oy) * scale * zoom + scale * zoom / 2
-        ctx.fillStyle = 'purple'
+        ctx.fillStyle = RENDER_STYLE.minimap.temple.color
         ctx.font = `${Math.max(12, scale * 5) * zoom}px serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText('☦', tx, ty)
+        ctx.fillText(RENDER_STYLE.minimap.temple.glyph, tx, ty)
       }
       const px = (player.x - ox) * scale * zoom + scale * zoom / 2
       const py = (player.y - oy) * scale * zoom + scale * zoom / 2
@@ -5110,16 +5102,16 @@
       const radius = Math.max(5, scale * 1.8) * zoom * pulse
       ctx.beginPath()
       ctx.arc(px, py, radius, 0, Math.PI * 2)
-      ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#e0473f'
+      ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? RENDER_STYLE.minimap.playerOnTransition : RENDER_STYLE.minimap.player
       ctx.fill()
-      ctx.strokeStyle = '#000'
+      ctx.strokeStyle = RENDER_STYLE.minimap.playerOutline
       ctx.lineWidth = Math.max(1, 2 * zoom)
       ctx.stroke()
       return
     }
     const ox = originX || 0, oy = originY || 0
     ctx.drawImage(miniBases[scale].canvas, ox * scale, oy * scale, w, h, 0, 0, w, h)
-    ctx.fillStyle = '#ff6b2e'
+    ctx.fillStyle = RENDER_STYLE.minimap.cave
     for (const cave of currentZ === 0 ? caves : []) {
       for (const entrance of cave.entrances || [{x: cave.x, y: cave.y}]) {
         if (!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue
@@ -5130,18 +5122,18 @@
     }
     if (currentZ === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
       const tx = (dwarvenRuin.x - ox) * scale + scale / 2, ty = (dwarvenRuin.y - oy) * scale + scale / 2
-      ctx.fillStyle = '#e8b85b'
+      ctx.fillStyle = RENDER_STYLE.minimap.dwarvenFort.color
       ctx.font = `${Math.max(12, scale * 5)}px serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText('♜', tx, ty)
+      ctx.fillText(RENDER_STYLE.minimap.dwarvenFort.glyph, tx, ty)
     }
     const dot = Math.max(2, scale + 2)
     if (currentZ === 0) {
-      ctx.fillStyle = '#ffe08a'
+      ctx.fillStyle = RENDER_STYLE.minimap.spawnPoint
       ctx.fillRect((spawnPoint.x - ox) * scale - 1, (spawnPoint.y - oy) * scale - 1, dot, dot)
     }
-    ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? '#ff8c32' : '#ffffff'
+    ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? RENDER_STYLE.minimap.playerOnTransition : RENDER_STYLE.minimap.sidePlayer
     ctx.fillRect((player.x - ox) * scale - 1, (player.y - oy) * scale - 1, dot, dot)
   }
 
@@ -5173,16 +5165,16 @@
     if (!tmCtx) return
     treasureMapCanvas.width = MAP_W * TM_SCALE
     treasureMapCanvas.height = MAP_H * TM_SCALE
-    tmCtx.fillStyle = '#d8c9a3'
+    tmCtx.fillStyle = RENDER_STYLE.treasureMap.paper
     tmCtx.fillRect(0, 0, treasureMapCanvas.width, treasureMapCanvas.height)
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       const t = TILE[surfaceMap[y][x]]
-      tmCtx.fillStyle = t ? (t.mini || t.color) : '#000'
+      tmCtx.fillStyle = t ? (t.mini || t.color) : RENDER_STYLE.treasureMap.fallbackTerrain
       tmCtx.fillRect(x * TM_SCALE, y * TM_SCALE, TM_SCALE, TM_SCALE)
     }
     if (treasureMapSpot) {
       const cx = treasureMapSpot.x * TM_SCALE + TM_SCALE / 2, cy = treasureMapSpot.y * TM_SCALE + TM_SCALE / 2
-      tmCtx.strokeStyle = '#8a1c1c'
+      tmCtx.strokeStyle = RENDER_STYLE.treasureMap.mark
       tmCtx.lineWidth = 3
       tmCtx.beginPath()
       tmCtx.moveTo(cx - 6, cy - 6)

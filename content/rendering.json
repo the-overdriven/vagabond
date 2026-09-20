@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "background": "#050403"
+  },
+  "creature": {
+    "outlineColor": "rgba(0,0,0,{alpha})",
+    "outlineAlpha": 0.85
+  },
+  "specialTiles": {
+    "outOfBounds": {
+      "glyph": "~"
+    },
+    "coffin": {
+      "glyph": "⚰",
+      "color": "#aaa39a",
+      "bg": "#171412"
+    },
+    "grassTree": {
+      "glyph": "♣",
+      "color": "#164c23"
+    },
+    "foragedForest": {
+      "color": "#554f2a"
+    },
+    "dugSand": {
+      "bg": "#9a8050"
+    }
+  },
+  "groundItems": {
+    "chest": {
+      "glyph": "$",
+      "color": "#e8c14a"
+    },
+    "deadbody": {
+      "glyph": "☠",
+      "color": "rgb(232, 162, 79)",
+      "lootedColor": "#777"
+    },
+    "campfire": {
+      "glyph": "*",
+      "color": "#e8a24f"
+    },
+    "skeleton": {
+      "glyph": "╶☠╴",
+      "color": "#d0d0c0",
+      "lootedColor": "#777"
+    },
+    "wheelbarrow": {
+      "glyph": "▱",
+      "color": "#b8b8b8"
+    },
+    "goldcoin": {
+      "glyph": "●",
+      "color": "#f0c84b"
+    },
+    "dwarvenremains": {
+      "glyph": "¤",
+      "color": "#d0c7b4"
+    },
+    "anvil": {
+      "glyph": "♠",
+      "color": "#9d9d9d"
+    },
+    "potion": {
+      "glyph": "!",
+      "color": "#e0473f"
+    },
+    "speedpotion": {
+      "glyph": "!",
+      "color": "#59b8ff"
+    },
+    "scroll": {
+      "glyph": "?",
+      "color": "#b565d6"
+    },
+    "ruinprop": {
+      "glyph": "¤",
+      "color": "#a89270"
+    },
+    "explorerremains": {
+      "glyph": "☠",
+      "color": "#d0d0c0",
+      "lootedColor": "#777"
+    }
+  },
+  "enemies": {
+    "lowercaseThroughTier": 2,
+    "tierColors": {
+      "1": "#b8b8b8",
+      "2": "#d98a3a",
+      "3": "#4aa3d1",
+      "4": "#b565d6",
+      "5": "#e0473f"
+    },
+    "defaultColor": "#b8b8b8"
+  },
+  "npc": {
+    "glyph": "initial",
+    "color": "#ffffff"
+  },
+  "player": {
+    "glyph": "@",
+    "color": "#fff6d6",
+    "fadedColor": "rgba(255,246,214,0.45)",
+    "fadedAlpha": 0.45
+  },
+  "damage": {
+    "miss": "#d9d9a3",
+    "enemyHit": "#fff6d6",
+    "critical": "#f0b35a",
+    "playerHit": "#ff6b5d",
+    "outline": "rgba(0,0,0,0.9)"
+  },
+  "overlays": {
+    "enemyAwareOutline": "rgba(255,106,93,0.95)",
+    "path": "rgba(255,224,138,0.28)",
+    "pathCounterBackground": "rgba(20,14,10,0.9)",
+    "pathCounterText": "#ffe08a",
+    "attackRange": "rgba(224,71,63,0.40)",
+    "aggroRange": "rgba(224,71,63,0.16)",
+    "rangeOwnerOutline": "rgba(232,162,79,0.9)"
+  },
+  "depthLabel": {
+    "background": "rgba(0,0,0,0.8)",
+    "color": "#e8a24f"
+  },
+  "minimap": {
+    "fog": "rgba(3,2,1,0.72)",
+    "cave": "#ff6b2e",
+    "dwarvenFort": {
+      "glyph": "♜",
+      "color": "#e8b85b"
+    },
+    "temple": {
+      "glyph": "☦",
+      "color": "purple"
+    },
+    "player": "#e0473f",
+    "playerOnTransition": "#ff8c32",
+    "sidePlayer": "#ffffff",
+    "playerOutline": "#000",
+    "spawnPoint": "#ffe08a"
+  },
+  "transitions": {
+    "deathFade": "rgba(0,0,0,{alpha})"
+  },
+  "treasureMap": {
+    "paper": "#d8c9a3",
+    "fallbackTerrain": "#000",
+    "mark": "#8a1c1c"
+  }
+}
