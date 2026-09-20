@@ -504,10 +504,10 @@ function generateMap() {
       break
     }
     if (attempt === MAX_WORLD_ATTEMPTS) {
-      console.warn(`World generation failed to keep the crypt separate from random caves in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
+      console.warn(`World generation failed cave-placement validation in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
       break
     }
-    console.warn(`Discarding world ${attempt}: the crypt is connected to a random cave. Generating a new world.`)
+    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
   }
   placeTreasureMapSpot()
 }
@@ -694,15 +694,40 @@ function generateCaves() {
 // map, since overlapping cave templates can create a route even when the
 // cave descriptors themselves are far apart.
 function isMausoleumAdjacentToRandomCave() {
-  const hut = villageHuts.find(h => h.mausoleum)
-  if (!hut) return false
-  for (const cave of caves) {
+  const mausoleumHut = villageHuts.find(h => h.mausoleum)
+  if (!mausoleumHut) return false
+
+  // Surface rule: random cave mouths must not spawn right beside the village.
+  // A 4-tile Chebyshev clearance keeps entrances visibly outside the settlement
+  // instead of allowing cases such as an entrance only two tiles from a hut.
+  const VILLAGE_CAVE_CLEARANCE = 4
+
+  // Underground rule: the mausoleum is a 9x9 template whose walkable/stamped
+  // interior occupies x = hut.x-3..hut.x+3 and y = hut.y-6..hut.y.
+  // Keep one extra tile of breathing room around that footprint so a random
+  // cave cannot touch or bleed into the mausoleum when the maps are merged.
+  const mausoleumMinX = mausoleumHut.x - 4
+  const mausoleumMaxX = mausoleumHut.x + 4
+  const mausoleumMinY = mausoleumHut.y - 7
+  const mausoleumMaxY = mausoleumHut.y + 1
+
+  for (let i = 0; i < caves.length; i++) {
+    const cave = caves[i]
     if (cave.crypt) continue
+
     for (const e of (cave.entrances || [])) {
-      if (Math.max(Math.abs(e.x - hut.x), Math.abs(e.y - hut.y)) <= 1) return true
+      if (villageHuts.some(h =>
+        Math.max(Math.abs(e.x - h.x), Math.abs(e.y - h.y)) <= VILLAGE_CAVE_CLEARANCE
+      )) return true
     }
-    const cm = caveMaps[caves.indexOf(cave)]
-    if (cm?.[hut.y]?.[hut.x] === 'cavefloor') return true
+
+    const cm = caveMaps[i]
+    if (!cm) continue
+    for (let y = mausoleumMinY; y <= mausoleumMaxY; y++) {
+      for (let x = mausoleumMinX; x <= mausoleumMaxX; x++) {
+        if (cm[y]?.[x] === 'cavefloor' || cm[y]?.[x] === 'caveentrance') return true
+      }
+    }
   }
   return false
 }

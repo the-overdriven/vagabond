@@ -1,7 +1,7 @@
 # Vagabond - Current Game Specification
 
 **Document status:** Current implementation snapshot  
-**Source of truth:** `index.html` + `content/*.json` from the supplied project  
+**Source of truth:** `index.html` + `src/*.js` + `content/*.json` from the supplied project  
 **Purpose:** Cross-check future features against the existing game.
 
 ---
@@ -558,6 +558,13 @@ saves. On load, the coordinate is preferred when valid; otherwise the game
 recovers the relationship by matching a hut's name to the anomalous tombstone's
 name. The loader does not invent a mausoleum by centrality or connectivity.
 
+Random cave entrances are not allowed to spawn immediately beside the village.
+After z:-1 caves are generated, every non-crypt cave entrance is checked against
+every village hut using Chebyshev distance. If any entrance is within **4 tiles**
+of any hut, cave placement is considered invalid and the **entire world is
+discarded and regenerated**. This is a world-validation rule, not a cosmetic
+relocation of the offending entrance.
+
 </details>
 
 ## Black Pillar
@@ -721,7 +728,7 @@ so enemies and items cannot appear or act on the wrong z:-2 map.
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave.
 
-## Cave/crypt separation
+## Cave/crypt/mausoleum separation
 
 Random z:-1 cave generation reserves a rectangular exclusion zone around the
 ruined chapel/crypt footprint. The crypt footprint is approximately x +/-3 and
@@ -733,6 +740,17 @@ to or overlapping the crypt instead of relying on post-generation rerolls.
 The existing `cryptConnectedToRandomCave()` flood-fill remains as a final safety
 check because future cave/crypt geometry changes must not silently reconnect the
 two regions.
+
+The mausoleum has a separate defensive validation after the random z:-1 caves
+have been merged. Its 9x9 template is anchored on the mausoleum hut, with the
+actual stamped interior occupying approximately `x = hut.x-3..hut.x+3` and
+`y = hut.y-6..hut.y`. Random cave floor/entrance tiles are forbidden from the
+larger safety rectangle `x = hut.x-4..hut.x+4`,
+`y = hut.y-7..hut.y+1`, providing a one-tile buffer around that footprint.
+
+This mausoleum check is paired with the surface village rule: a non-crypt cave
+entrance within **4 Chebyshev tiles of any village hut** invalidates cave
+generation. Either violation causes the current world attempt to be rejected.
 
 Crypt Level 2 uses its own tighter map and contains dedicated crypt
 structures, including sarcophagi, burial niches, rubble, and the crypt trap.
@@ -757,6 +775,13 @@ checked against the crypt exclusion zone. Only accepted caves are stamped onto
 the surface and merged into the shared underground map. Entrance tiles are
 re-stamped after merging so overlapping caves do not destroy entrances.
 
+After the z:-1 caves are merged, cave placement receives an additional
+village/mausoleum validation. A random cave entrance within 4 Chebyshev tiles of
+any village hut is invalid. Random cave floor/entrance tiles are also forbidden
+from the mausoleum footprint plus its one-tile underground safety margin. A
+failure here makes `generateCaves()` fail, causing the current world attempt to
+be discarded and regenerated.
+
 After cave generation, the generated surface is copied back into the canonical
 `surfaceMap`. This preserves the stamped entrance tiles when the game returns
 to the surface or renders from the canonical surface state.
@@ -775,6 +800,18 @@ from being placed against the crypt, and after the crypt and caves are merged,
 generation flood-fills the shared underground map from the crypt entrance. If
 that traversal reaches any non-crypt cave floor or entrance, the entire world is
 discarded and regenerated.
+
+World validation also rejects random caves that are too close to the village or
+mausoleum. Specifically:
+
+- a non-crypt cave entrance within **4 Chebyshev tiles of any village hut**
+  invalidates the world attempt;
+- a random cave floor/entrance tile intersecting the mausoleum's 9x9 footprint
+  plus its one-tile safety margin invalidates the world attempt.
+
+These checks occur during cave generation. They do not move or delete only the
+offending cave; `generateCaves()` fails and `generateMap()` retries the **whole
+world**, subject to the same maximum-attempt limit.
 
 Maximum attempts:
 
