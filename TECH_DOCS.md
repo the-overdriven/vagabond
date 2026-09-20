@@ -958,7 +958,7 @@ Current examples include:
 
 ## Humanoid
 
-Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death. Fighting an armed humanoid creature involves weapon grace checks that reward faster weapons. This makes armed-versus-armed combat more varied, allowing faster weapons to strike twice.
+Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death. All enemies have natural GRACE and can take part in grace checks while unarmed; an equipped enemy weapon overrides natural GRACE. This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice. The player must still wield a weapon to take part in grace checks.
 
 ## Deadly
 
@@ -1340,17 +1340,27 @@ There is currently no general player critical-hit system.
 
 Weapons have a `GRACE` value.
 
-Combat delay:
+Base combat delay:
 
 ```text
-max(1, 6 - GRACE)
+6 / GRACE
 ```
 
-Higher GRACE means lower combat delay.
+Higher weapon or natural GRACE means lower base combat delay. Reciprocal scaling gives high GRACE diminishing returns without making any GRACE point useless.
 
-Race GRACE bonuses are included in the player's effective GRACE.
+Player racial GRACE acts as an affinity for graceful weapons rather than being added directly to weapon GRACE:
 
-If both combatants have weapons and the attacker has lower combat delay, an extra attack can occur.
+```text
+weapon affinity = min(1, weapon GRACE / 5)²
+racial reduction = racial GRACE × 0.25 × weapon affinity
+player delay = max(0.25, base delay - racial reduction)
+```
+
+This makes racial GRACE provide almost no benefit with slow weapons and progressively more benefit with graceful weapons. A GRACE 5 or higher weapon receives the full racial reduction.
+
+The player must wield a weapon to take part in a grace check. Every enemy has natural GRACE and can take part while unarmed; if the enemy wields a weapon, the weapon's GRACE overrides its natural GRACE.
+
+If both combatants have a valid combat delay and the attacker has lower delay, an extra attack can occur.
 
 Chance:
 

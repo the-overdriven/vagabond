@@ -1,8 +1,6 @@
 <!-- TODO:
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
-- balance: elf's grace does nothing when wielding dagger/rapier because the delay formula is max(1, 6 - GRACE)
-- balance: all monsters, including unarmed non-humanoids should have GRACE, so that elf's grace becomes more useful. in the log, when it says that your weapon outpaces enemy weapon, log just "enemy" if they happen to have no weapon. consequentially, enemies dont need weapons to use grace checks. but player still needs a weapon
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 - balance: leveling still too fast after lvl 4
 - balance: increase chance for digging a scarab, decrease chance for amber
@@ -2297,18 +2295,38 @@
     return equipment && equipment.kind === 'armor' ? equipment : null
   }
 
-  function weaponCombatDelay(weapon, isPlayer = false) {
-    if (!(weapon && weapon.kind === 'weapon')) return null
-    const grace = weaponGrace(weapon) + (isPlayer ? raceGrace() : 0)
-    return Math.max(1, 6 - grace)
+  function enemyGrace(e) {
+    if (!e) return null
+    const template = enemyTemplateForSavedEnemy(e)
+    const grace = e.grace ?? (template && template.grace)
+    return Number.isFinite(grace) && grace > 0 ? grace : null
   }
 
-  function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false) {
+  function combatDelay(weapon, isPlayer = false, enemy = null) {
+    // Players must wield a weapon to take part in GRACE checks. Monsters use
+    // their natural GRACE while unarmed; an equipped weapon overrides it.
+    let grace
+    if (weapon && weapon.kind === 'weapon') {
+      grace = weaponGrace(weapon)
+    } else if (!isPlayer) {
+      grace = enemyGrace(enemy)
+    }
+    if (!Number.isFinite(grace) || grace <= 0) return null
+    const baseDelay = 6 / grace
+    if (!isPlayer) return baseDelay
+    // Racial GRACE is weapon affinity, not a flat addition. Slow weapons use
+    // almost none of it, while GRACE 5+ weapons receive the full reduction.
+    const weaponAffinity = Math.min(1, grace / 5) ** 2
+    const racialReduction = raceGrace() * 0.25 * weaponAffinity
+    return Math.max(0.25, baseDelay - racialReduction)
+  }
+
+  function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false, attackerEnemy = null, defenderEnemy = null) {
     // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks in
     // either direction - it's not meant to be a fair, ongoing exchange of blows.
     if ((attackerIsPlayer || defenderIsPlayer) && (player.godMode || player.invisibleTurns > 0)) return false
-    const attackerDelay = weaponCombatDelay(attackerWeapon, attackerIsPlayer)
-    const defenderDelay = weaponCombatDelay(defenderWeapon, defenderIsPlayer)
+    const attackerDelay = combatDelay(attackerWeapon, attackerIsPlayer, attackerEnemy)
+    const defenderDelay = combatDelay(defenderWeapon, defenderIsPlayer, defenderEnemy)
     return attackerDelay !== null && defenderDelay !== null &&
       attackerDelay < defenderDelay && chance((defenderDelay - attackerDelay) * 0.10)
   }
@@ -2377,8 +2395,9 @@
       updateMobileInfoPanel(e.x, e.y)
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null
-      if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false)) {
-        log(`Your ${player.equip.weapon.name} outpaces the ${e.name}'s ${enemyWeapon.base}, striking again!`, 'good')
+      if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
+        const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` : 'the enemy'
+        log(`Your ${player.equip.weapon.name} outpaces ${enemyTimingText}, striking again!`, 'good')
         await playerAttackEnemy(e, true)
       }
     }
@@ -2426,8 +2445,9 @@
       die(e)
       return true
     }
-    if (!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true)) {
-      log(`${e.name}'s ${enemyWeapon.base} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
+    if (!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
+      const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : 'The enemy'
+      log(`${enemyTimingText} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
       return enemyAttackPlayer(e, true)
     }
     return false
