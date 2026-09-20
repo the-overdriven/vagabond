@@ -9,7 +9,7 @@
 // handler at the bottom), so they catch up on the next launch.
 // ---------------------------------------------------------------------------
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + 'v5'; // <-- bump me on every content/image release
+const CACHE_VERSION = CACHE_PREFIX + 'v6'; // <-- bump me on every content/image release
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 

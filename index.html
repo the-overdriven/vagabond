@@ -683,6 +683,48 @@
     wyrdling: 'img/race-select/wyrdling.png',
   })
 
+  const PLAYER_TERRAIN_BACKGROUNDS = Object.freeze({
+    grass: ['img/backgrounds/grassland.jpg', 'img/backgrounds/grassland2.jpg'],
+    forest: ['img/backgrounds/forest.jpg', 'img/backgrounds/forest2.jpg', 'img/backgrounds/forest3.jpg'],
+    ancientForest: ['img/backgrounds/ancient_forest.jpg', 'img/backgrounds/ancient_forest2.jpg'],
+    sand: ['img/backgrounds/sand.jpg', 'img/backgrounds/sand2.jpg', 'img/backgrounds/sand3.jpg', 'img/backgrounds/sand4.jpg'],
+    snow: ['img/backgrounds/snow.jpg'],
+    taiga: ['img/backgrounds/taiga.jpg'],
+    hill: ['img/backgrounds/hill.jpg'],
+    mountain: ['img/backgrounds/hill.jpg'],
+    river: ['img/backgrounds/river.jpg'],
+    frozenriver: ['img/backgrounds/river.jpg'],
+    water: ['img/backgrounds/river.jpg'],
+    village: ['img/backgrounds/grassland.jpg', 'img/backgrounds/grassland2.jpg'],
+    caveentrance: ['img/backgrounds/hill.jpg'],
+    dwarvengate: ['img/backgrounds/hill.jpg'],
+    temple: ['img/backgrounds/temple.jpg'],
+    belltower: ['img/backgrounds/bell_tower.jpg', 'img/backgrounds/bell_tower2.jpg', 'img/backgrounds/bell_tower3.jpg'],
+  })
+
+  const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
+  const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
+
+  function stableBackgroundVariant(paths, x, y) {
+    if (!paths?.length) return null
+    // Coordinate-based selection keeps variants stable without consuming game RNG.
+    const hash = Math.abs((((x + 1) * 73856093) ^ ((y + 1) * 19349663)) | 0)
+    return paths[hash % paths.length]
+  }
+
+  function playerTerrainBackgroundPath(x = player?.x, y = player?.y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+
+    if (currentZ < 0) return stableBackgroundVariant(PLAYER_CAVE_BACKGROUNDS, x, y)
+
+    const hut = villageHuts?.find?.(h => h.x === x && h.y === y)
+    if (hut) return stableBackgroundVariant(PLAYER_HUT_BACKGROUNDS, x, y)
+
+    const tile = map?.[y]?.[x]
+    const paths = PLAYER_TERRAIN_BACKGROUNDS[tile]
+    return stableBackgroundVariant(paths, x, y)
+  }
+
   function playerRaceImagePath(raceId = player?.race) {
     return PLAYER_RACE_IMAGES[raceId] || RENDER_STYLE?.player?.image
   }
@@ -707,6 +749,8 @@
       if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
+      for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
+      paths.push(...PLAYER_HUT_BACKGROUNDS, ...PLAYER_CAVE_BACKGROUNDS)
       for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
         if (visual?.image) paths.push(visual.image)
       }
@@ -4899,9 +4943,13 @@
     if (!map.length || !map[my]) return null // world not generated yet
     if (mx === player.x && my === player.y) {
       const race = raceDef()
+      const backgroundPath = playerTerrainBackgroundPath(mx, my)
+      const backgroundStyle = backgroundPath
+        ? `background-image:url('${imageSrc(backgroundPath)}');background-size:cover;background-position:center;background-repeat:no-repeat;`
+        : ''
       return {
         mini: false, enemy: null, html: `
-      <img src="${imageSrc(raceSelectionImagePath(race.id))}" onerror="this.style.display='none'">
+      <img src="${imageSrc(raceSelectionImagePath(race.id))}" style="${backgroundStyle}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${player.name}</div>
       <div style="color:var(--ember-bright);font-size:11px;">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
