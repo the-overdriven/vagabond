@@ -122,8 +122,10 @@ canvas{display:block;cursor:pointer}
 @media (pointer:fine){
   #root{padding-bottom:0;}
   #logpanel{margin-top:auto;}
-  #stage{width:calc(var(--game-width, 840px) + 4px); max-width:none; transform:translateX(-146px);}
-  body.side-collapsed #stage{transform:translateX(-14px);}
+  /* Relative positioning keeps the desktop offset without transform creating
+     a stacking context that traps tooltips beneath the fixed side panels. */
+  #stage{width:calc(var(--game-width, 840px) + 4px); max-width:none; left:-146px;}
+  body.side-collapsed #stage{left:-14px;}
   #logpanel{width:640px; max-width:92vw; margin-top:-8px;}
 }
 #hint{
@@ -281,11 +283,12 @@ body.hint-collapsed #hint .panel-toggle{
 .trade-col{flex:1; min-width:0;}
 .trade-col .invlist{max-height:280px;}
 #tooltip{
-  position:absolute; display:none; z-index:20; pointer-events:none;
+  position:absolute; display:none; z-index:30; pointer-events:none;
   background:linear-gradient(180deg,var(--panel2),var(--panel));
   border:1px solid var(--border); border-radius:4px;
   padding:8px 10px; font-size:12px; width:170px;
 }
+#tooltip .statrow{font-size:11px;}
 #tooltip .nm{font-weight:700; margin-bottom:4px;}
 #tooltip img{
   display:block; width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain;
