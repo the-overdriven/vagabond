@@ -1941,6 +1941,12 @@ hidden `buriedartifact` objects. Each rolls a random artifact tier from 3–5
 during world generation. They follow the same shovel-only discovery rules and
 are also independent of the normal digging/foraging RNG.
 
+Backward compatibility: saves created during the temporary visible-item
+implementation may contain ground objects with `kind: "gear"`. The game treats
+those legacy objects as buried gear everywhere: they are excluded from map
+tooltips, nearby-item inspection, and Old Hunter quest targeting, and can only
+be recovered by digging their exact tile with a shovel.
+
 A chest marked `artifactGuaranteed` skips the normal 110-point loot roll and
 directly creates an artifact using the chest tier and the player's Magic Find.
 

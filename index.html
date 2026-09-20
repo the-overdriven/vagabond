@@ -1778,7 +1778,7 @@
       })
     }
     for (const g of groundItems) {
-      if (g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' && (g.artifactGuaranteed || g.kind === 'artifact' || g.kind === 'gear' || g.item)) {
+      if (g.kind !== 'gear' && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' && (g.artifactGuaranteed || g.kind === 'artifact' || g.item)) {
         out.push({
           type: 'deliver_item',
           targetItemId: g.id,
@@ -3204,7 +3204,10 @@
       render()
       return
     }
-    const buriedItemIndex = groundItems.findIndex(g => onCurrentLevel(g) && (g.kind === 'buriedgear' || g.kind === 'buriedartifact') && g.x === player.x && g.y === player.y)
+    // `gear` is the legacy kind used by saves made during the short-lived
+    // visible-sand-item implementation. Treat it as buried so those saves do
+    // not expose or auto-award the locations.
+    const buriedItemIndex = groundItems.findIndex(g => onCurrentLevel(g) && (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') && g.x === player.x && g.y === player.y)
     if (buriedItemIndex >= 0) {
       const buried = groundItems[buriedItemIndex]
       const item = buried.item
@@ -4023,7 +4026,7 @@
     // interest - unlike a biome tile, they shouldn't also report on the
     // surrounding terrain/enemies/items.
     if (STANDALONE_LANDMARK_TILES.has(hereTile)) return
-    const currentGround = groundItems.find(g => onCurrentLevel(g) && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' && g.x === player.x && g.y === player.y)
+    const currentGround = groundItems.find(g => onCurrentLevel(g) && g.kind !== 'gear' && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' && g.x === player.x && g.y === player.y)
     let inspectedGround = false
     if (currentGround && currentGround.kind === 'skeleton') {
       log(`Skeletal Remains${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info')
@@ -4092,7 +4095,7 @@
 
         const item = groundItems.find(
           g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
-            g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' &&
+            g.kind !== 'gear' && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' &&
             !(g.kind === 'chest' && g.opened)
         )
 
@@ -4578,6 +4581,7 @@
     // ground items
     for (const g of groundItems) {
       if (!onCurrentLevel(g)) continue
+      if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
       const vx = Math.round((g.x - camX) * TILE_PX)
       const vy = Math.round((g.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
@@ -4895,7 +4899,7 @@
       </div>`
       }
     }
-    const g = groundItems.find(gi => onCurrentLevel(gi) && gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' && gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
+    const g = groundItems.find(gi => onCurrentLevel(gi) && gi.kind !== 'gear' && gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' && gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
     if (g) {
       if (g.kind === 'campfire') return {
         mini: true,
