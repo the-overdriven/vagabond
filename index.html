@@ -676,10 +676,9 @@
   // to its existing ASCII glyph. No turn is consumed and game state is unchanged.
   let USE_TILE_IMAGES = true
 
-  // Mobile/touch devices are much more sensitive to repeated full-canvas redraws.
-  // Cap gameplay animation redraw work to ~30 FPS on coarse-pointer devices.
-  // Desktop remains uncapped.
-  const MOBILE_RENDER_FRAME_MS = 1000 / 30
+  // Used for a few low-priority mobile rendering choices. Gameplay animation
+  // itself stays synced to requestAnimationFrame; deliberately capping it to
+  // 30 FPS made the short 140 ms walking pan visibly step between frames.
   const IS_COARSE_POINTER = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
 
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
@@ -4398,22 +4397,48 @@
     return null
   }
 
+  // Runtime-sized sprite cache. Most source tiles are 256x256 (and some are
+  // much larger) but the game draws them at 40px. Rescaling those source images
+  // hundreds of times during every walking frame is expensive on mobile. Build
+  // the 40px/scale-sized version once per decoded image and reuse it.
+  const scaledVisualCache = new WeakMap()
+
+  function scaledVisualCanvas(image, scale) {
+    let byScale = scaledVisualCache.get(image)
+    if (!byScale) {
+      byScale = new Map()
+      scaledVisualCache.set(image, byScale)
+    }
+    const key = String(scale)
+    if (byScale.has(key)) return byScale.get(key)
+
+    const size = Math.max(1, Math.round(TILE_PX * scale))
+    const cached = document.createElement('canvas')
+    cached.width = size
+    cached.height = size
+    const cctx = cached.getContext('2d')
+    cctx.imageSmoothingEnabled = false
+    cctx.drawImage(image, 0, 0, size, size)
+    byScale.set(key, cached)
+    return cached
+  }
+
   function drawImageVisual(px, py, visual, alpha) {
     const image = resolveVisualImage(visual)
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
-    const size = TILE_PX * scale
+    const cached = scaledVisualCanvas(image, scale)
+    const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
 
-    // Most tile draws are fully opaque. Avoid save/restore for every tile.
     if (a === 1) {
-      ctx.drawImage(image, x, y, size, size)
+      ctx.drawImage(cached, x, y)
     } else {
       ctx.save()
       ctx.globalAlpha = a
-      ctx.drawImage(image, x, y, size, size)
+      ctx.drawImage(cached, x, y)
       ctx.restore()
     }
     return true
@@ -4432,7 +4457,8 @@
     const key = String(scale)
     if (byScale.has(key)) return byScale.get(key)
 
-    const size = Math.max(1, Math.round(TILE_PX * scale))
+    const scaled = scaledVisualCanvas(image, scale)
+    const size = scaled.width
     const pad = 1
 
     const shadow = document.createElement('canvas')
@@ -4440,7 +4466,7 @@
     shadow.height = size
     const sctx = shadow.getContext('2d')
     sctx.imageSmoothingEnabled = false
-    sctx.drawImage(image, 0, 0, size, size)
+    sctx.drawImage(scaled, 0, 0)
     sctx.globalCompositeOperation = 'source-in'
     sctx.fillStyle = '#000'
     sctx.fillRect(0, 0, size, size)
@@ -4452,7 +4478,7 @@
     cctx.imageSmoothingEnabled = false
     const offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
     for (const [dx, dy] of offsets) cctx.drawImage(shadow, pad + dx, pad + dy)
-    cctx.drawImage(image, pad, pad, size, size)
+    cctx.drawImage(scaled, pad, pad)
 
     byScale.set(key, composed)
     return composed
@@ -4840,24 +4866,17 @@
   // avoids two independent loops both calling render() on the same frame.
   function runAnimationLoop() {
     if (animLoopFrame !== null) return
-    let lastRenderAt = 0
     const step = (now) => {
-      const shouldRender = !IS_COARSE_POINTER || lastRenderAt === 0 || now - lastRenderAt >= MOBILE_RENDER_FRAME_MS
-      if (shouldRender) {
-        render(now)
-        lastRenderAt = now
-      }
+      render(now)
       if (cameraAnimating && !moveAnim) {
         cameraAnimating = false
         animLoopFrame = null
-        if (!shouldRender) render(now) // always show the final snapped state
         flushPendingMove()            // may kick off the next turn (and a new loop)
         if (animLoopFrame !== null) return
       }
       if (animationsPending()) {
         animLoopFrame = requestAnimationFrame(step)
       } else {
-        if (!shouldRender) render(now)
         animLoopFrame = null
       }
     }
@@ -4951,16 +4970,10 @@
     render()
     return new Promise(resolve => {
       attackAnimResolve = resolve
-      let lastRenderAt = 0
       const step = (now) => {
-        const shouldRender = !IS_COARSE_POINTER || lastRenderAt === 0 || now - lastRenderAt >= MOBILE_RENDER_FRAME_MS
-        if (shouldRender) {
-          render(now)
-          lastRenderAt = now
-        }
+        render(now)
         if (!attackAnim) {
           if (attackAnimResolve === resolve) attackAnimResolve = null
-          if (!shouldRender) render(now)
           resolve()
           return
         }
@@ -5031,13 +5044,17 @@
     // column/row only on the axes that are currently between tiles. This keeps
     // the canvas fully covered without permanently rendering the old extra row
     // and column while the camera is stationary.
-    const renderCols = VIEW_W + (camX !== Math.floor(camX) ? 1 : 0)
-    const renderRows = VIEW_H + (camY !== Math.floor(camY) ? 1 : 0)
+    const baseMapX = Math.floor(camX)
+    const baseMapY = Math.floor(camY)
+    const fracX = Math.abs(camX - baseMapX) > 0.000001
+    const fracY = Math.abs(camY - baseMapY) > 0.000001
+    const renderCols = VIEW_W + (fracX ? 1 : 0)
+    const renderRows = VIEW_H + (fracY ? 1 : 0)
+    const mapW = map && map[0] ? map[0].length : MAP_W
+    const mapH = map ? map.length : MAP_H
     for (let vy = 0; vy < renderRows; vy++) {
       for (let vx = 0; vx < renderCols; vx++) {
-        const mx = Math.floor(camX) + vx, my = Math.floor(camY) + vy
-        const mapW = map && map[0] ? map[0].length : MAP_W
-        const mapH = map ? map.length : MAP_H
+        const mx = baseMapX + vx, my = baseMapY + vy
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
@@ -5048,8 +5065,8 @@
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
-        const tree = currentZ === 0 && map[my][mx] === 'grass' && grasslandTrees.has(keyXY(mx, my))
-        const foraged = map[my][mx] === 'forest' && foragedTiles.has(keyXY(mx, my))
+        const tree = currentZ === 0 && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
+        const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
         const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
         const bg = tileBackground(mx, my, tileKey)
