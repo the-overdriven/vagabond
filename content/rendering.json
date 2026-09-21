@@ -242,9 +242,9 @@
     "mountain": {
       "image": "img/tiles/mountain-middle.png",
       "singleImage": "img/tiles/mountain-middle.png",
-      "leftImage": "img/tiles/mountain-left.png",
-      "middleImage": "img/tiles/mountain-middle.png",
-      "rightImage": "img/tiles/mountain-right.png",
+      "leftImage": "img/tiles/mountain-left-tall.png",
+      "middleImage": "img/tiles/mountain-middle-tall.png",
+      "rightImage": "img/tiles/mountain-right-tall.png",
       "scale": 1
     },
     "boulder": {
