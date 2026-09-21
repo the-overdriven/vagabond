@@ -14,7 +14,9 @@
     "coffin": {
       "glyph": "⚰",
       "color": "#aaa39a",
-      "bg": "#171412"
+      "bg": "#171412",
+      "image": "img/tiles/coffin.png",
+      "scale": 1
     },
     "grassTree": {
       "glyph": "♣",
@@ -49,7 +51,9 @@
     },
     "campfire": {
       "glyph": "*",
-      "color": "#e8a24f"
+      "color": "#e8a24f",
+      "image": "img/tiles/cold-campfire.png",
+      "scale": 1
     },
     "skeleton": {
       "glyph": "╶☠╴",
@@ -60,21 +64,27 @@
     },
     "wheelbarrow": {
       "glyph": "▱",
-      "color": "#b8b8b8"
+      "color": "#b8b8b8",
+      "image": "img/tiles/wheelbarrow.png",
+      "scale": 1
     },
     "goldcoin": {
       "glyph": "●",
-      "color": "#f0c84b"
+      "color": "#f0c84b",
+      "image": "img/tiles/huge-gold-coin.png",
+      "scale": 1
     },
     "dwarvenremains": {
       "glyph": "¤",
       "color": "#d0c7b4",
-      "image": "img/tiles/skeleton-remains.png",
+      "image": "img/tiles/dwarven-remains.png",
       "scale": 1
     },
     "anvil": {
       "glyph": "♠",
-      "color": "#9d9d9d"
+      "color": "#9d9d9d",
+      "image": "img/tiles/anvil.png",
+      "scale": 1
     },
     "potion": {
       "glyph": "!",
@@ -106,7 +116,9 @@
     },
     "ruinprop": {
       "glyph": "¤",
-      "color": "#a89270"
+      "color": "#a89270",
+      "image": "img/tiles/dwarven-remains.png",
+      "scale": 1
     },
     "explorerremains": {
       "glyph": "☠",
@@ -184,5 +196,64 @@
     "paper": "#d8c9a3",
     "fallbackTerrain": "#000",
     "mark": "#8a1c1c"
+  },
+  "terrainTiles": {
+    "caveentrance": {
+      "image": "img/tiles/cave-entrance.png",
+      "undergroundImage": "img/tiles/cave-exit.png",
+      "scale": 1
+    },
+    "cavedown": {
+      "image": "img/tiles/cave-down.png",
+      "scale": 1
+    },
+    "caveup": {
+      "image": "img/tiles/cave-up.png",
+      "scale": 1
+    },
+    "volcano": {
+      "image": "img/tiles/volcano.png",
+      "scale": 1
+    },
+    "hill": {
+      "image": "img/tiles/hill.png",
+      "singleImage": "img/tiles/hill.png",
+      "leftImage": "img/tiles/hill-left.png",
+      "middleImage": "img/tiles/hill-middle.png",
+      "rightImage": "img/tiles/hill-right.png",
+      "scale": 1
+    },
+    "dwarvengate": {
+      "image": "img/tiles/dwarven-fort-entrance.png",
+      "scale": 1
+    },
+    "dwarvenstatue": {
+      "image": "img/tiles/ancient-stone-column.png",
+      "scale": 1
+    },
+    "blackpillar": {
+      "image": "img/tiles/black-pillar.png",
+      "scale": 1
+    },
+    "mountain": {
+      "image": "img/tiles/mountain-middle.png",
+      "singleImage": "img/tiles/mountain-middle.png",
+      "leftImage": "img/tiles/mountain-left.png",
+      "middleImage": "img/tiles/mountain-middle.png",
+      "rightImage": "img/tiles/mountain-right.png",
+      "scale": 1
+    },
+    "boulder": {
+      "image": "img/tiles/rock-middle.png",
+      "singleImage": "img/tiles/rock-middle.png",
+      "leftImage": "img/tiles/rock-left.png",
+      "middleImage": "img/tiles/rock-middle.png",
+      "rightImage": "img/tiles/rock-right.png",
+      "scale": 1
+    },
+    "bigbell": {
+      "image": "img/tiles/big-brass-bell.png",
+      "scale": 1
+    }
   }
 }

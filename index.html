@@ -3,6 +3,7 @@
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 
+- fix: some life potions dont stack, what's up with that?
 - fix: when dying, skeleton remains should appear *after* we are teleported to temple
 - !1 feat: add hotkey to toggle ASCII/tiles
 - !1 feat: add prefix "Light" to weapons (grace +1)
@@ -396,6 +397,7 @@
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
     <kbd>T</kbd> wait / skip turn &nbsp;<br>
+    <kbd>P</kbd> toggle tiles / ASCII &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
     <kbd id="kbdCaps">CAPS</kbd> toggle enemy ranges &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
@@ -670,6 +672,10 @@
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
 
+  // Purely visual toggle: false forces every image-backed visual to fall back
+  // to its existing ASCII glyph. No turn is consumed and game state is unchanged.
+  let USE_TILE_IMAGES = true
+
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
   const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
 
@@ -720,6 +726,17 @@
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
       paths.push(...PLAYER_HUT_BACKGROUNDS, ...PLAYER_CAVE_BACKGROUNDS)
       for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
+        if (visual?.image) paths.push(visual.image)
+      }
+      for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
+        if (visual?.image) paths.push(visual.image)
+        if (visual?.undergroundImage) paths.push(visual.undergroundImage)
+        if (visual?.singleImage) paths.push(visual.singleImage)
+        if (visual?.leftImage) paths.push(visual.leftImage)
+        if (visual?.middleImage) paths.push(visual.middleImage)
+        if (visual?.rightImage) paths.push(visual.rightImage)
+      }
+      for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
         if (visual?.image) paths.push(visual.image)
       }
     }
@@ -4354,6 +4371,7 @@
   }
 
   function drawImageVisual(px, py, visual, alpha) {
+    if (!USE_TILE_IMAGES) return false
     if (!visual?.image) return false
     const image = preloadedImages.get(visual.image)
     if (!image) return false
@@ -4368,6 +4386,27 @@
     ctx.drawImage(image, x, y, size, size)
     ctx.restore()
     return true
+  }
+
+  function terrainVisual(tileKey, x, y) {
+    if (tileKey === 'coffin') return RENDER_STYLE.specialTiles?.coffin
+    const visual = RENDER_STYLE.terrainTiles?.[tileKey]
+    if (!visual) return null
+
+    if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
+
+    const leftSame = map?.[y]?.[x - 1] === tileKey
+    const rightSame = map?.[y]?.[x + 1] === tileKey
+
+    let image = visual.image
+    if (visual.leftImage || visual.middleImage || visual.rightImage || visual.singleImage) {
+      if (leftSame && rightSame) image = visual.middleImage || visual.image
+      else if (!leftSame && rightSame) image = visual.leftImage || visual.middleImage || visual.image
+      else if (leftSame && !rightSame) image = visual.rightImage || visual.middleImage || visual.image
+      else image = visual.singleImage || visual.image || visual.middleImage || visual.leftImage || visual.rightImage
+    }
+
+    return image ? {...visual, image} : visual
   }
 
   function drawPlayerVisual(px, py, color, alpha) {
@@ -4657,7 +4696,17 @@
         const foraged = map[my][mx] === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
         const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
-        drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, tileBackground(mx, my, tileKey))
+        const bg = tileBackground(mx, my, tileKey)
+        const visual = tree ? null : terrainVisual(tileKey, mx, my)
+        if (visual?.image) {
+          if (bg !== 'transparent') {
+            ctx.fillStyle = bg
+            ctx.fillRect(px, py, TILE_PX, TILE_PX)
+          }
+          if (!drawImageVisual(px, py, visual)) drawTile(px, py, glyph, color, bg)
+        } else {
+          drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
+        }
         markDiscovered(mx, my) // anything drawn on the main screen counts as seen
       }
     }
@@ -6601,6 +6650,13 @@
       document.getElementById('fileLoad').click()
       return
     }
+    if (k === 'p' || k === 'P') {
+      ev.preventDefault()
+      USE_TILE_IMAGES = !USE_TILE_IMAGES
+      render()
+      log(USE_TILE_IMAGES ? 'Tile graphics enabled.' : 'ASCII graphics enabled.', 'info')
+      return
+    }
     if (k === 'g' || k === 'G') {
       // God mode also reveals every generated level, including the shared
       // cave layer and any deeper maps, so the minimap never hides content.
@@ -6881,6 +6937,17 @@
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
     initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
     for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+    }
+    for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+      if (visual?.undergroundImage) initialVisuals.push(visual.undergroundImage)
+      if (visual?.singleImage) initialVisuals.push(visual.singleImage)
+      if (visual?.leftImage) initialVisuals.push(visual.leftImage)
+      if (visual?.middleImage) initialVisuals.push(visual.middleImage)
+      if (visual?.rightImage) initialVisuals.push(visual.rightImage)
+    }
+    for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
