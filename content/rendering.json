@@ -254,6 +254,88 @@
     "bigbell": {
       "image": "img/tiles/big-brass-bell.png",
       "scale": 1
+    },
+    "grass": {
+      "image": "img/tiles/grassland.png",
+      "scale": 1
+    },
+    "sand": {
+      "image": "img/tiles/sand.png",
+      "scale": 1
+    },
+    "water": {
+      "image": "img/tiles/water.gif",
+      "scale": 1,
+      "shoreGrassNWImage": "img/tiles/water-grass-nw.png",
+      "shoreGrassNImage": "img/tiles/water-grass-n.png",
+      "shoreGrassNEImage": "img/tiles/water-grass-ne.png",
+      "shoreGrassWImage": "img/tiles/water-grass-w.png",
+      "shoreGrassCenterImage": "img/tiles/water-grass-center.png",
+      "shoreGrassEImage": "img/tiles/water-grass-e.png",
+      "shoreGrassSWImage": "img/tiles/water-grass-sw.png",
+      "shoreGrassSImage": "img/tiles/water-grass-s.png",
+      "shoreGrassSEImage": "img/tiles/water-grass-se.png",
+      "shoreSandNWImage": "img/tiles/water-sand-nw.png",
+      "shoreSandNImage": "img/tiles/water-sand-n.png",
+      "shoreSandNEImage": "img/tiles/water-sand-ne.png",
+      "shoreSandWImage": "img/tiles/water-sand-w.png",
+      "shoreSandCenterImage": "img/tiles/water-sand-center.png",
+      "shoreSandEImage": "img/tiles/water-sand-e.png",
+      "shoreSandSWImage": "img/tiles/water-sand-sw.png",
+      "shoreSandSImage": "img/tiles/water-sand-s.png",
+      "shoreSandSEImage": "img/tiles/water-sand-se.png",
+      "frames": [
+        "img/tiles/water-frame-0.png",
+        "img/tiles/water-frame-1.png",
+        "img/tiles/water-frame-2.png",
+        "img/tiles/water-frame-3.png",
+        "img/tiles/water-frame-4.png",
+        "img/tiles/water-frame-5.png",
+        "img/tiles/water-frame-6.png",
+        "img/tiles/water-frame-7.png"
+      ],
+      "frameDuration": 110
+    },
+    "river": {
+      "image": "img/tiles/river.gif",
+      "scale": 1,
+      "frames": [
+        "img/tiles/river-frame-0.png",
+        "img/tiles/river-frame-1.png",
+        "img/tiles/river-frame-2.png",
+        "img/tiles/river-frame-3.png",
+        "img/tiles/river-frame-4.png",
+        "img/tiles/river-frame-5.png"
+      ],
+      "frameDuration": 90
+    },
+    "frozenriver": {
+      "image": "img/tiles/frozenriver.gif",
+      "scale": 1,
+      "frames": [
+        "img/tiles/frozenriver-frame-0.png",
+        "img/tiles/frozenriver-frame-1.png",
+        "img/tiles/frozenriver-frame-2.png",
+        "img/tiles/frozenriver-frame-3.png"
+      ],
+      "frameDuration": 150
+    },
+    "lava": {
+      "image": "img/tiles/lava.gif",
+      "scale": 1,
+      "frames": [
+        "img/tiles/lava-frame-0.png",
+        "img/tiles/lava-frame-1.png",
+        "img/tiles/lava-frame-2.png",
+        "img/tiles/lava-frame-3.png",
+        "img/tiles/lava-frame-4.png",
+        "img/tiles/lava-frame-5.png"
+      ],
+      "frameDuration": 90
+    },
+    "snow": {
+      "image": "img/tiles/snow.png",
+      "scale": 1
     }
   }
 }

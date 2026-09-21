@@ -729,12 +729,10 @@
         if (visual?.image) paths.push(visual.image)
       }
       for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
-        if (visual?.image) paths.push(visual.image)
-        if (visual?.undergroundImage) paths.push(visual.undergroundImage)
-        if (visual?.singleImage) paths.push(visual.singleImage)
-        if (visual?.leftImage) paths.push(visual.leftImage)
-        if (visual?.middleImage) paths.push(visual.middleImage)
-        if (visual?.rightImage) paths.push(visual.rightImage)
+        for (const [k, v] of Object.entries(visual || {})) {
+          if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
+          if (Array.isArray(v) && k.toLowerCase().endsWith('frames')) paths.push(...v)
+        }
       }
       for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
         if (visual?.image) paths.push(visual.image)
@@ -4372,8 +4370,14 @@
 
   function drawImageVisual(px, py, visual, alpha) {
     if (!USE_TILE_IMAGES) return false
-    if (!visual?.image) return false
-    const image = preloadedImages.get(visual.image)
+    if (!visual) return false
+    let image = null
+    if (Array.isArray(visual.frames) && visual.frames.length) {
+      const frameDuration = visual.frameDuration || 120
+      const frameIndex = Math.floor(performance.now() / frameDuration) % visual.frames.length
+      image = preloadedImages.get(visual.frames[frameIndex]) || null
+    }
+    if (!image && visual?.image) image = preloadedImages.get(visual.image) || null
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
@@ -4388,12 +4392,61 @@
     return true
   }
 
+  function overlayBaseTileKey(tileKey, x, y) {
+    if (!USE_TILE_IMAGES) return null
+    if (!['hill', 'mountain', 'boulder'].includes(tileKey)) return null
+    const neighbors = [
+      map?.[y - 1]?.[x],
+      map?.[y + 1]?.[x],
+      map?.[y]?.[x - 1],
+      map?.[y]?.[x + 1],
+      map?.[y - 1]?.[x - 1],
+      map?.[y - 1]?.[x + 1],
+      map?.[y + 1]?.[x - 1],
+      map?.[y + 1]?.[x + 1]
+    ].filter(Boolean)
+    if (neighbors.includes('sand')) return 'sand'
+    if (neighbors.includes('snow')) return 'snow'
+    return 'grass'
+  }
+
   function terrainVisual(tileKey, x, y) {
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
 
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
+
+    const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
+    const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver'
+    const isSandTile = t => t === 'sand'
+
+    if (tileKey === 'water') {
+      const n = tileAt(x, y - 1)
+      const e = tileAt(x + 1, y)
+      const s = tileAt(x, y + 1)
+      const w = tileAt(x - 1, y)
+      const landN = n && !isWaterLike(n)
+      const landE = e && !isWaterLike(e)
+      const landS = s && !isWaterLike(s)
+      const landW = w && !isWaterLike(w)
+      const landCount = [landN, landE, landS, landW].filter(Boolean).length
+      if (landCount > 0) {
+        const sandScore = (landN && isSandTile(n) ? 1 : 0) + (landE && isSandTile(e) ? 1 : 0) + (landS && isSandTile(s) ? 1 : 0) + (landW && isSandTile(w) ? 1 : 0)
+        const useSand = sandScore > 0 && sandScore >= Math.ceil(landCount / 2)
+        const prefix = useSand ? 'shoreSand' : 'shoreGrass'
+        let image = null
+        if (landN && landW) image = visual[prefix + 'NWImage']
+        else if (landN && landE) image = visual[prefix + 'NEImage']
+        else if (landS && landW) image = visual[prefix + 'SWImage']
+        else if (landS && landE) image = visual[prefix + 'SEImage']
+        else if (landN) image = visual[prefix + 'NImage']
+        else if (landS) image = visual[prefix + 'SImage']
+        else if (landW) image = visual[prefix + 'WImage']
+        else if (landE) image = visual[prefix + 'EImage']
+        if (image) return {...visual, image, frames: null}
+      }
+    }
 
     const leftSame = map?.[y]?.[x - 1] === tileKey
     const rightSame = map?.[y]?.[x + 1] === tileKey
@@ -4657,6 +4710,33 @@
     })
   }
 
+  const AMBIENT_TILE_ANIM_MS = 120
+  const ANIMATED_TILE_KEYS = new Set(['water', 'river', 'frozenriver', 'lava'])
+
+  function visibleAnimatedTerrainPresent() {
+    if (!USE_TILE_IMAGES || document.hidden || !map?.length) return false
+    for (let vy = 0; vy <= VIEW_H; vy++) {
+      for (let vx = 0; vx <= VIEW_W; vx++) {
+        const mx = Math.floor(camX) + vx
+        const my = Math.floor(camY) + vy
+        const tileKey = map?.[my]?.[mx]
+        if (ANIMATED_TILE_KEYS.has(tileKey)) return true
+      }
+    }
+    return false
+  }
+
+  let ambientTileAnimIntervalStarted = false
+  function ensureAmbientTileAnimationLoop() {
+    if (ambientTileAnimIntervalStarted) return
+    ambientTileAnimIntervalStarted = true
+    setInterval(() => {
+      if (!visibleAnimatedTerrainPresent()) return
+      if (animationsPending() || moveAnim || attackAnim || deathTransition) return
+      render()
+    }, AMBIENT_TILE_ANIM_MS)
+  }
+
   function render(now) {
     now = now || performance.now()
     let viewPlayerX = player.x
@@ -4698,8 +4778,14 @@
         const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
         const bg = tileBackground(mx, my, tileKey)
         const visual = tree ? null : terrainVisual(tileKey, mx, my)
-        if (visual?.image) {
-          if (bg !== 'transparent') {
+        if (visual?.image || (Array.isArray(visual?.frames) && visual.frames.length)) {
+          let drewBase = false
+          const baseTileKey = overlayBaseTileKey(tileKey, mx, my)
+          if (baseTileKey) {
+            const baseVisual = terrainVisual(baseTileKey, mx, my)
+            if (baseVisual && drawImageVisual(px, py, baseVisual)) drewBase = true
+          }
+          if (!drewBase && bg !== 'transparent') {
             ctx.fillStyle = bg
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
@@ -6940,18 +7026,17 @@
       if (visual?.image) initialVisuals.push(visual.image)
     }
     for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
-      if (visual?.image) initialVisuals.push(visual.image)
-      if (visual?.undergroundImage) initialVisuals.push(visual.undergroundImage)
-      if (visual?.singleImage) initialVisuals.push(visual.singleImage)
-      if (visual?.leftImage) initialVisuals.push(visual.leftImage)
-      if (visual?.middleImage) initialVisuals.push(visual.middleImage)
-      if (visual?.rightImage) initialVisuals.push(visual.rightImage)
+      for (const [k, v] of Object.entries(visual || {})) {
+        if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
+        if (Array.isArray(v) && k.toLowerCase().endsWith('frames')) initialVisuals.push(...v)
+      }
     }
     for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
     render()
+    ensureAmbientTileAnimationLoop()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
     if (window.Cypress) {
