@@ -5026,8 +5026,15 @@
     ctx.fillStyle = RENDER_STYLE.canvas.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    for (let vy = 0; vy < VIEW_H; vy++) {
-      for (let vx = 0; vx < VIEW_W; vx++) {
+    // During camera movement camX/camY are fractional. The first terrain tile
+    // is then partially shifted off the left/top edge, so draw one additional
+    // column/row only on the axes that are currently between tiles. This keeps
+    // the canvas fully covered without permanently rendering the old extra row
+    // and column while the camera is stationary.
+    const renderCols = VIEW_W + (camX !== Math.floor(camX) ? 1 : 0)
+    const renderRows = VIEW_H + (camY !== Math.floor(camY) ? 1 : 0)
+    for (let vy = 0; vy < renderRows; vy++) {
+      for (let vx = 0; vx < renderCols; vx++) {
         const mx = Math.floor(camX) + vx, my = Math.floor(camY) + vy
         const mapW = map && map[0] ? map[0].length : MAP_W
         const mapH = map ? map.length : MAP_H
