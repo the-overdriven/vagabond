@@ -355,7 +355,15 @@
     },
     "snow": {
       "image": "img/tiles/snow.png",
-      "scale": 1
+      "scale": 1,
+      "edgeNImage": "img/tiles/snow-overlay-n.png",
+      "edgeSImage": "img/tiles/snow-overlay-s.png",
+      "edgeWImage": "img/tiles/snow-overlay-w.png",
+      "edgeEImage": "img/tiles/snow-overlay-e.png",
+      "edgeNWImage": "img/tiles/snow-overlay-nw.png",
+      "edgeNEImage": "img/tiles/snow-overlay-ne.png",
+      "edgeSWImage": "img/tiles/snow-overlay-sw.png",
+      "edgeSEImage": "img/tiles/snow-overlay-se.png"
     },
     "forest": {
       "image": "img/tiles/forest-tree.png",
@@ -367,6 +375,18 @@
     },
     "taiga": {
       "image": "img/tiles/taiga-tree.png",
+      "scale": 1
+    },
+    "darkforestground": {
+      "image": "img/tiles/dark-forest-ground.png",
+      "scale": 1
+    },
+    "snowmountain": {
+      "image": "img/tiles/snow-mountain-middle.png",
+      "singleImage": "img/tiles/snow-mountain-middle.png",
+      "leftImage": "img/tiles/snow-mountain-left.png",
+      "middleImage": "img/tiles/snow-mountain-middle.png",
+      "rightImage": "img/tiles/snow-mountain-right.png",
       "scale": 1
     }
   }
