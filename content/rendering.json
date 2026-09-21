@@ -388,6 +388,26 @@
       "middleImage": "img/tiles/snow-mountain-middle.png",
       "rightImage": "img/tiles/snow-mountain-right.png",
       "scale": 1
+    },
+    "grave": {
+      "image": "img/tiles/grave.png",
+      "scale": 1
+    },
+    "ruinedchapel": {
+      "image": "img/tiles/ruined-chapel.png",
+      "scale": 1
+    },
+    "belltower": {
+      "image": "img/tiles/bell-tower.png",
+      "scale": 1
+    },
+    "temple": {
+      "image": "img/tiles/village-temple.png",
+      "scale": 1
+    },
+    "village": {
+      "image": "img/tiles/thatched-hut.png",
+      "scale": 1
     }
   }
 }
