@@ -676,6 +676,12 @@
   // to its existing ASCII glyph. No turn is consumed and game state is unchanged.
   let USE_TILE_IMAGES = true
 
+  // Mobile/touch devices are much more sensitive to repeated full-canvas redraws.
+  // Cap gameplay animation redraw work to ~30 FPS on coarse-pointer devices.
+  // Desktop remains uncapped.
+  const MOBILE_RENDER_FRAME_MS = 1000 / 30
+  const IS_COARSE_POINTER = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
+
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
   const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
 
@@ -4308,6 +4314,7 @@
   const TILE_PX = 40
   canvas.width = VIEW_W * TILE_PX
   canvas.height = VIEW_H * TILE_PX
+  ctx.imageSmoothingEnabled = false
   ctx.textBaseline = 'top'
   ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
   ctx.textAlign = 'center'
@@ -4318,6 +4325,7 @@
     VIEW_H = height
     canvas.width = VIEW_W * TILE_PX
     canvas.height = VIEW_H * TILE_PX
+    ctx.imageSmoothingEnabled = false
     ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
     ctx.textBaseline = 'top'
     ctx.textAlign = 'center'
@@ -4398,12 +4406,56 @@
     const size = TILE_PX * scale
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
-    ctx.save()
-    ctx.globalAlpha = a
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(image, x, y, size, size)
-    ctx.restore()
+
+    // Most tile draws are fully opaque. Avoid save/restore for every tile.
+    if (a === 1) {
+      ctx.drawImage(image, x, y, size, size)
+    } else {
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.drawImage(image, x, y, size, size)
+      ctx.restore()
+    }
     return true
+  }
+
+  // Cache outlined item sprites. Previously every item used ctx.filter plus
+  // eight shadow draws on every render; now that work happens only once.
+  const outlinedVisualCache = new WeakMap()
+
+  function outlinedVisualCanvas(image, scale) {
+    let byScale = outlinedVisualCache.get(image)
+    if (!byScale) {
+      byScale = new Map()
+      outlinedVisualCache.set(image, byScale)
+    }
+    const key = String(scale)
+    if (byScale.has(key)) return byScale.get(key)
+
+    const size = Math.max(1, Math.round(TILE_PX * scale))
+    const pad = 1
+
+    const shadow = document.createElement('canvas')
+    shadow.width = size
+    shadow.height = size
+    const sctx = shadow.getContext('2d')
+    sctx.imageSmoothingEnabled = false
+    sctx.drawImage(image, 0, 0, size, size)
+    sctx.globalCompositeOperation = 'source-in'
+    sctx.fillStyle = '#000'
+    sctx.fillRect(0, 0, size, size)
+
+    const composed = document.createElement('canvas')
+    composed.width = size + pad * 2
+    composed.height = size + pad * 2
+    const cctx = composed.getContext('2d')
+    cctx.imageSmoothingEnabled = false
+    const offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+    for (const [dx, dy] of offsets) cctx.drawImage(shadow, pad + dx, pad + dy)
+    cctx.drawImage(image, pad, pad, size, size)
+
+    byScale.set(key, composed)
+    return composed
   }
 
   function drawImageVisualWithShadow(px, py, visual, alpha) {
@@ -4414,15 +4466,16 @@
     const size = TILE_PX * scale
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
-    const offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
-    ctx.save()
-    ctx.globalAlpha = a
-    ctx.imageSmoothingEnabled = false
-    ctx.filter = 'brightness(0)'
-    for (const [dx, dy] of offsets) ctx.drawImage(image, x + dx, y + dy, size, size)
-    ctx.filter = 'none'
-    ctx.drawImage(image, x, y, size, size)
-    ctx.restore()
+    const composed = outlinedVisualCanvas(image, scale)
+
+    if (a === 1) {
+      ctx.drawImage(composed, x - 1, y - 1)
+    } else {
+      ctx.save()
+      ctx.globalAlpha = a
+      ctx.drawImage(composed, x - 1, y - 1)
+      ctx.restore()
+    }
     return true
   }
 
@@ -4787,17 +4840,24 @@
   // avoids two independent loops both calling render() on the same frame.
   function runAnimationLoop() {
     if (animLoopFrame !== null) return
+    let lastRenderAt = 0
     const step = (now) => {
-      render(now)
+      const shouldRender = !IS_COARSE_POINTER || lastRenderAt === 0 || now - lastRenderAt >= MOBILE_RENDER_FRAME_MS
+      if (shouldRender) {
+        render(now)
+        lastRenderAt = now
+      }
       if (cameraAnimating && !moveAnim) {
         cameraAnimating = false
         animLoopFrame = null
+        if (!shouldRender) render(now) // always show the final snapped state
         flushPendingMove()            // may kick off the next turn (and a new loop)
         if (animLoopFrame !== null) return
       }
       if (animationsPending()) {
         animLoopFrame = requestAnimationFrame(step)
       } else {
+        if (!shouldRender) render(now)
         animLoopFrame = null
       }
     }
@@ -4891,10 +4951,16 @@
     render()
     return new Promise(resolve => {
       attackAnimResolve = resolve
+      let lastRenderAt = 0
       const step = (now) => {
-        render(now)
+        const shouldRender = !IS_COARSE_POINTER || lastRenderAt === 0 || now - lastRenderAt >= MOBILE_RENDER_FRAME_MS
+        if (shouldRender) {
+          render(now)
+          lastRenderAt = now
+        }
         if (!attackAnim) {
           if (attackAnimResolve === resolve) attackAnimResolve = null
+          if (!shouldRender) render(now)
           resolve()
           return
         }
@@ -4911,13 +4977,15 @@
     })
   }
 
-  const AMBIENT_TILE_ANIM_MS = 120
+  // Animated terrain still updates while idle, but mobile uses a slightly
+  // lower refresh rate to avoid repainting the entire canvas ~8 times/sec.
+  const AMBIENT_TILE_ANIM_MS = IS_COARSE_POINTER ? 160 : 120
   const ANIMATED_TILE_KEYS = new Set(['water', 'river', 'frozenriver', 'lava'])
 
   function visibleAnimatedTerrainPresent() {
     if (!USE_TILE_IMAGES || document.hidden || !map?.length) return false
-    for (let vy = 0; vy <= VIEW_H; vy++) {
-      for (let vx = 0; vx <= VIEW_W; vx++) {
+    for (let vy = 0; vy < VIEW_H; vy++) {
+      for (let vx = 0; vx < VIEW_W; vx++) {
         const mx = Math.floor(camX) + vx
         const my = Math.floor(camY) + vy
         const tileKey = map?.[my]?.[mx]
@@ -4958,8 +5026,8 @@
     ctx.fillStyle = RENDER_STYLE.canvas.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    for (let vy = 0; vy <= VIEW_H; vy++) {
-      for (let vx = 0; vx <= VIEW_W; vx++) {
+    for (let vy = 0; vy < VIEW_H; vy++) {
+      for (let vx = 0; vx < VIEW_W; vx++) {
         const mx = Math.floor(camX) + vx, my = Math.floor(camY) + vy
         const mapW = map && map[0] ? map[0].length : MAP_W
         const mapH = map ? map.length : MAP_H
