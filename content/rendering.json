@@ -257,6 +257,16 @@
     },
     "grass": {
       "image": "img/tiles/grassland.png",
+      "variants": [
+        "img/tiles/grassland-1.png",
+        "img/tiles/grassland-2.png",
+        "img/tiles/grassland-3.png",
+        "img/tiles/grassland-4.png",
+        "img/tiles/grassland-5.png",
+        "img/tiles/grassland-6.png",
+        "img/tiles/grassland-7.png",
+        "img/tiles/grassland-8.png"
+      ],
       "scale": 1
     },
     "sand": {

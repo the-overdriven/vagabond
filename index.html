@@ -686,6 +686,15 @@
     return paths[hash % paths.length]
   }
 
+  // Picks one of a terrain tile's image variants from its map coordinates: stable per tile,
+  // no game RNG used. Integer-mixed on purpose: `% n` over a plain linear hash repeats
+  // with period n when n is a power of two, which shows up as a visible pattern.
+  function tileVariantImage(paths, x, y) {
+    let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0
+    h = Math.imul(h ^ (h >>> 13), 1274126177)
+    return paths[((h ^ (h >>> 16)) >>> 0) % paths.length]
+  }
+
   function playerTerrainBackgroundPath(x = player?.x, y = player?.y) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null
 
@@ -731,7 +740,7 @@
       for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
         for (const [k, v] of Object.entries(visual || {})) {
           if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
-          if (Array.isArray(v) && k.toLowerCase().endsWith('frames')) paths.push(...v)
+          if (Array.isArray(v) && (k.toLowerCase().endsWith('frames') || k === 'variants')) paths.push(...v)
         }
       }
       for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
@@ -4451,7 +4460,7 @@
     const leftSame = map?.[y]?.[x - 1] === tileKey
     const rightSame = map?.[y]?.[x + 1] === tileKey
 
-    let image = visual.image
+    let image = visual.variants?.length ? tileVariantImage(visual.variants, x, y) : visual.image
     if (visual.leftImage || visual.middleImage || visual.rightImage || visual.singleImage) {
       if (leftSame && rightSame) image = visual.middleImage || visual.image
       else if (!leftSame && rightSame) image = visual.leftImage || visual.middleImage || visual.image
@@ -7028,7 +7037,7 @@
     for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
       for (const [k, v] of Object.entries(visual || {})) {
         if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
-        if (Array.isArray(v) && k.toLowerCase().endsWith('frames')) initialVisuals.push(...v)
+        if (Array.isArray(v) && (k.toLowerCase().endsWith('frames') || k === 'variants')) initialVisuals.push(...v)
       }
     }
     for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
