@@ -20,10 +20,14 @@
     },
     "grassTree": {
       "glyph": "♣",
-      "color": "#164c23"
+      "color": "#164c23",
+      "image": "img/tiles/grassland-tree.png",
+      "scale": 1
     },
     "foragedForest": {
-      "color": "#554f2a"
+      "color": "#554f2a",
+      "image": "img/tiles/forest-tree.png",
+      "scale": 1
     },
     "dugSand": {
       "bg": "#9a8050"
@@ -257,16 +261,6 @@
     },
     "grass": {
       "image": "img/tiles/grassland.png",
-      "variants": [
-        "img/tiles/grassland-1.png",
-        "img/tiles/grassland-2.png",
-        "img/tiles/grassland-3.png",
-        "img/tiles/grassland-4.png",
-        "img/tiles/grassland-5.png",
-        "img/tiles/grassland-6.png",
-        "img/tiles/grassland-7.png",
-        "img/tiles/grassland-8.png"
-      ],
       "scale": 1
     },
     "sand": {
@@ -345,6 +339,18 @@
     },
     "snow": {
       "image": "img/tiles/snow.png",
+      "scale": 1
+    },
+    "forest": {
+      "image": "img/tiles/forest-tree.png",
+      "scale": 1
+    },
+    "ancientForest": {
+      "image": "img/tiles/ancient-forest-tree.png",
+      "scale": 1
+    },
+    "taiga": {
+      "image": "img/tiles/taiga-tree.png",
       "scale": 1
     }
   }
