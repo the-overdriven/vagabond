@@ -4377,16 +4377,21 @@
     ctx.fillText(ch, px + TILE_PX / 2, py + 3)
   }
 
-  function drawImageVisual(px, py, visual, alpha) {
-    if (!USE_TILE_IMAGES) return false
-    if (!visual) return false
-    let image = null
+  function resolveVisualImage(visual) {
+    if (!USE_TILE_IMAGES) return null
+    if (!visual) return null
     if (Array.isArray(visual.frames) && visual.frames.length) {
       const frameDuration = visual.frameDuration || 120
       const frameIndex = Math.floor(performance.now() / frameDuration) % visual.frames.length
-      image = preloadedImages.get(visual.frames[frameIndex]) || null
+      const frameImage = preloadedImages.get(visual.frames[frameIndex]) || null
+      if (frameImage) return frameImage
     }
-    if (!image && visual?.image) image = preloadedImages.get(visual.image) || null
+    if (visual?.image) return preloadedImages.get(visual.image) || null
+    return null
+  }
+
+  function drawImageVisual(px, py, visual, alpha) {
+    const image = resolveVisualImage(visual)
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
@@ -4401,9 +4406,33 @@
     return true
   }
 
+  function drawImageVisualWithShadow(px, py, visual, alpha) {
+    const image = resolveVisualImage(visual)
+    if (!image) return false
+    const a = alpha === undefined ? 1 : alpha
+    const scale = visual.scale ?? 1
+    const size = TILE_PX * scale
+    const x = px + (TILE_PX - size) / 2
+    const y = py + (TILE_PX - size) / 2
+    const offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+    ctx.save()
+    ctx.globalAlpha = a
+    ctx.imageSmoothingEnabled = false
+    ctx.filter = 'brightness(0)'
+    for (const [dx, dy] of offsets) ctx.drawImage(image, x + dx, y + dy, size, size)
+    ctx.filter = 'none'
+    ctx.drawImage(image, x, y, size, size)
+    ctx.restore()
+    return true
+  }
+
   function overlayBaseTileKey(tileKey, x, y) {
     if (!USE_TILE_IMAGES) return null
-    if (!['hill', 'mountain', 'boulder'].includes(tileKey)) return null
+    // Forest and taiga tree sprites are transparent overlays. Ancient forest
+    // intentionally keeps its dark terrain background.
+    if (tileKey === 'forest') return 'grass'
+    if (tileKey === 'taiga') return 'snow'
+    if (!['hill', 'mountain', 'boulder', 'blackpillar'].includes(tileKey)) return null
     const neighbors = [
       map?.[y - 1]?.[x],
       map?.[y + 1]?.[x],
@@ -4429,6 +4458,8 @@
     const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
     const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver'
     const isSandTile = t => t === 'sand'
+    const isSnowTile = t => t === 'snow' || t === 'taiga'
+    const isGrassLikeTile = t => t === 'grass' || t === 'forest' || t === 'ancientForest'
 
     if (tileKey === 'water') {
       const n = tileAt(x, y - 1)
@@ -4442,19 +4473,44 @@
       const landCount = [landN, landE, landS, landW].filter(Boolean).length
       if (landCount > 0) {
         const sandScore = (landN && isSandTile(n) ? 1 : 0) + (landE && isSandTile(e) ? 1 : 0) + (landS && isSandTile(s) ? 1 : 0) + (landW && isSandTile(w) ? 1 : 0)
-        const useSand = sandScore > 0 && sandScore >= Math.ceil(landCount / 2)
-        const prefix = useSand ? 'shoreSand' : 'shoreGrass'
-        let image = null
-        if (landN && landW) image = visual[prefix + 'NWImage']
-        else if (landN && landE) image = visual[prefix + 'NEImage']
-        else if (landS && landW) image = visual[prefix + 'SWImage']
-        else if (landS && landE) image = visual[prefix + 'SEImage']
-        else if (landN) image = visual[prefix + 'NImage']
-        else if (landS) image = visual[prefix + 'SImage']
-        else if (landW) image = visual[prefix + 'WImage']
-        else if (landE) image = visual[prefix + 'EImage']
-        if (image) return {...visual, image, frames: null}
+        const snowScore = (landN && isSnowTile(n) ? 1 : 0) + (landE && isSnowTile(e) ? 1 : 0) + (landS && isSnowTile(s) ? 1 : 0) + (landW && isSnowTile(w) ? 1 : 0)
+        let prefix = 'shoreGrass'
+        if (snowScore > 0 && snowScore >= Math.ceil(landCount / 2)) prefix = 'shoreSnow'
+        else if (sandScore > 0 && sandScore >= Math.ceil(landCount / 2)) prefix = 'shoreSand'
+        let overlayImage = null
+        if (landN && landW) overlayImage = visual[prefix + 'NWImage']
+        else if (landN && landE) overlayImage = visual[prefix + 'NEImage']
+        else if (landS && landW) overlayImage = visual[prefix + 'SWImage']
+        else if (landS && landE) overlayImage = visual[prefix + 'SEImage']
+        else if (landN) overlayImage = visual[prefix + 'NImage']
+        else if (landS) overlayImage = visual[prefix + 'SImage']
+        else if (landW) overlayImage = visual[prefix + 'WImage']
+        else if (landE) overlayImage = visual[prefix + 'EImage']
+        // Keep the animated water frames as the base; the land shoreline is
+        // a transparent overlay rendered afterward.
+        if (overlayImage) return {...visual, overlayImage}
       }
+    }
+
+    if (tileKey === 'sand') {
+      const n = tileAt(x, y - 1)
+      const e = tileAt(x + 1, y)
+      const s = tileAt(x, y + 1)
+      const w = tileAt(x - 1, y)
+      const grassN = isGrassLikeTile(n)
+      const grassE = isGrassLikeTile(e)
+      const grassS = isGrassLikeTile(s)
+      const grassW = isGrassLikeTile(w)
+      let image = null
+      if (grassN && grassW) image = visual.blendGrassNWImage
+      else if (grassN && grassE) image = visual.blendGrassNEImage
+      else if (grassS && grassW) image = visual.blendGrassSWImage
+      else if (grassS && grassE) image = visual.blendGrassSEImage
+      else if (grassN) image = visual.blendGrassNImage
+      else if (grassS) image = visual.blendGrassSImage
+      else if (grassW) image = visual.blendGrassWImage
+      else if (grassE) image = visual.blendGrassEImage
+      if (image) return {...visual, image}
     }
 
     const leftSame = map?.[y]?.[x - 1] === tileKey
@@ -4469,6 +4525,23 @@
     }
 
     return image ? {...visual, image} : visual
+  }
+
+  function treeCanopyVisualAt(mx, my) {
+    if (currentZ !== 0 || !map?.[my]?.[mx]) return null
+    const tileKey = map[my][mx]
+    if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return RENDER_STYLE.specialTiles.grassTree
+    if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my)
+    return null
+  }
+
+  function drawTreeCanopyOverlayAt(mx, my) {
+    const visual = treeCanopyVisualAt(mx, my)
+    if (!visual) return false
+    const px = Math.round((mx - camX) * TILE_PX)
+    const py = Math.round((my - camY) * TILE_PX)
+    if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) return false
+    return drawImageVisual(px, py, visual)
   }
 
   function drawPlayerVisual(px, py, color, alpha) {
@@ -4786,19 +4859,34 @@
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
         const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
         const bg = tileBackground(mx, my, tileKey)
-        const visual = tree ? null : terrainVisual(tileKey, mx, my)
+        const terrainImgVisual = terrainVisual(tileKey, mx, my)
+        const overlayVisual = tree ? RENDER_STYLE.specialTiles.grassTree : null
+        const visual = overlayVisual || terrainImgVisual
         if (visual?.image || (Array.isArray(visual?.frames) && visual.frames.length)) {
           let drewBase = false
-          const baseTileKey = overlayBaseTileKey(tileKey, mx, my)
-          if (baseTileKey) {
-            const baseVisual = terrainVisual(baseTileKey, mx, my)
+          if (overlayVisual) {
+            // Grassland trees are transparent sprites over the grass tile.
+            const baseVisual = terrainVisual(tileKey, mx, my)
             if (baseVisual && drawImageVisual(px, py, baseVisual)) drewBase = true
+          } else {
+            const baseTileKey = overlayBaseTileKey(tileKey, mx, my)
+            if (baseTileKey) {
+              const baseVisual = terrainVisual(baseTileKey, mx, my)
+              if (baseVisual && drawImageVisual(px, py, baseVisual)) drewBase = true
+            }
           }
           if (!drewBase && bg !== 'transparent') {
             ctx.fillStyle = bg
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
-          if (!drawImageVisual(px, py, visual)) drawTile(px, py, glyph, color, bg)
+          const drewMain = drawImageVisual(px, py, visual)
+          if (drewMain && visual?.overlayImage) {
+            // Animated water remains the base; transparent grass/sand/snow land
+            // edge is composited above it.
+            drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
+          } else if (!drewMain) {
+            drawTile(px, py, glyph, color, bg)
+          }
         } else {
           drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
         }
@@ -4814,7 +4902,7 @@
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
-      if (drawImageVisual(vx, vy, visual)) continue
+      if (drawImageVisualWithShadow(vx, vy, visual)) continue
       const glyph = groundGlyph(g)
       if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
     }
@@ -4964,6 +5052,23 @@
         ctx.restore()
       } else {
         drawPlayerVisual(vx, vy, playerColor, playerAlpha)
+      }
+    }
+    // draw tree canopies over actors standing inside forested tiles so they
+    // appear behind the trees instead of on top of them.
+    {
+      const canopyTiles = new Set()
+      if (currentZ === 0) {
+        canopyTiles.add(keyXY(player.x, player.y))
+        for (const e of enemies) {
+          if (!onCurrentLevel(e) || !e.alive) continue
+          canopyTiles.add(keyXY(e.x, e.y))
+        }
+        for (const n of npcs) canopyTiles.add(keyXY(n.x, n.y))
+      }
+      for (const key of canopyTiles) {
+        const [mx, my] = key.split(',').map(Number)
+        drawTreeCanopyOverlayAt(mx, my)
       }
     }
     if (currentZ < 0) {
