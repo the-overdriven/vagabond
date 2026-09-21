@@ -399,7 +399,8 @@
     },
     "belltower": {
       "image": "img/tiles/bell-tower.png",
-      "scale": 1
+      "scale": 1,
+      "baseTileKey": "temple"
     },
     "temple": {
       "image": "img/tiles/village-temple.png",
