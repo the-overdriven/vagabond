@@ -1229,7 +1229,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
       if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
@@ -1322,7 +1322,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
             const x = wx + dx, y = wy + dy
             if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
-                !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
+              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
           }
           if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
           const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
@@ -1368,7 +1368,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     const open = []
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
-          !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
+        !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
     let spot = null, layout = null
     for (let tries = 0; tries < 18 && open.length; tries++) {
@@ -2068,6 +2068,17 @@ function spawnCaveScenarios() {
           evades: !!tmpl.evades, aggro: tmpl.aggro ?? AGGRO_RANGE,
           x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
           alive: true, prefix: null, equipment: null}
+        const prefixChance = level === -2 ? 0.11 : 0.05
+        if (chance(prefixChance)) {
+          const names = Object.keys(ENEMY_PREFIXES)
+          if (names.length) {
+            const pfx = pick(names)
+            e.prefix = pfx
+            e.prefixBase = prefixBaseStats(e)
+            applyEnemyPrefix(e, pfx)
+            e.name = pfx + ' ' + e.name
+          }
+        }
         addEnemy(e)
       }
     }
