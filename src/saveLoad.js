@@ -324,11 +324,11 @@ function loadGameFromObject(data, opts = {}) {
       }
     }
   }
-  // Generic chain levels (z:-2, z:-3). Rebuilt the same way z:-1 is above: decode each
-  // level's per-cave templates, re-stamp caveup at every declared
-  // entrance (mirrors the caveentrance re-stamp above), then merge into
-  // one shared map per level.
-  deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map(lvlData => {
+  // Re-stamp declared entrances after decoding, including old saves whose
+  // fort exit was encoded as a generic caveup tile.
+  deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map((lvlData, levelIndex) => {
+    const entranceTile = (x, y) => levelIndex === 1 && dwarvenRuin &&
+      x === dwarvenRuin.x && y === dwarvenRuin.y ? 'dwarvenfortexit' : 'caveup'
     const lvlCaveMaps = (lvlData.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
     let lvlCaves = Array.isArray(lvlData.caves) ? lvlData.caves : []
     lvlCaves = lvlCaves.map(c => ({
@@ -339,7 +339,7 @@ function loadGameFromObject(data, opts = {}) {
       const entrances = lvlCaves[i] ? lvlCaves[i].entrances : []
       for (const entrance of entrances) {
         if (lvlCaveMaps[i][entrance.y] && lvlCaveMaps[i][entrance.y][entrance.x] !== undefined) {
-          lvlCaveMaps[i][entrance.y][entrance.x] = 'caveup'
+          lvlCaveMaps[i][entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
         }
       }
     }
@@ -351,7 +351,7 @@ function loadGameFromObject(data, opts = {}) {
     }
     for (const cave of lvlCaves) {
       for (const entrance of cave.entrances || []) {
-        if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) lvlMap[entrance.y][entrance.x] = 'caveup'
+        if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) lvlMap[entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
       }
     }
     const lvlDiscovered = decodeBoolGrid(lvlData.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))

@@ -16,9 +16,6 @@
 🛡️ Every fifth level: +1 GRACE
 ⚔️ make use of crit. hit
 📚 fix: 37.04%% (docs)
-fix: ancient forest should never use snow as background tile
-idea: blinking health bar when low hp
-abandoned campfire: chance to find a potato, it's stackable. but u cannot do anything with it. not even equip it.
 
 - fix: some life potions dont stack, what's up with that?
 - fix: when dying, skeleton remains should appear *after* we are teleported to temple
@@ -210,6 +207,20 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       width: 100%;
       height: 100%;
       display: block;
+    }
+
+    #hpbarwrap.low-hp #hpbar {
+      background-color: #ed4138;
+      animation: lowHpPulse 0.85s ease-in-out infinite;
+    }
+
+    @keyframes lowHpPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 5px #ed4138; }
+      50% { opacity: 0.35; box-shadow: 0 0 13px #ff382d; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #hpbarwrap.low-hp #hpbar { animation: none; }
     }
 
     .race-card img {
@@ -871,10 +882,9 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
   // Tiles the player can "inspect" while standing on them to change z level.
   // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
   // every deeper transition in the generic chain (z:-1<->-3<->-4, skipping
-  // over z:-2 which is reserved for the crypt's own second level), so
-  // adding another generic level never means adding another transition
-  // tile type.
-  const CAVE_TRANSITION_TILES = new Set(['caveentrance', 'dwarvengate', 'cavedown', 'caveup', 'cryptstairsdown', 'cryptstairsup', 'mausoleumtrapdoor', 'mausoleumstairsup'])
+  // over z:-2 which is reserved for the crypt's own second level).
+  // dwarvenfortexit belongs only to the fort on z:-3 and leads to the surface.
+  const CAVE_TRANSITION_TILES = new Set(['caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup', 'cryptstairsdown', 'cryptstairsup', 'mausoleumtrapdoor', 'mausoleumstairsup'])
 
   function depthUndergroundMap(depth) {
     if (depth <= 0) return null
@@ -995,21 +1005,13 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       map = undergroundMap
       undergroundDiscovered = undergroundDiscoveredL1
       log('You climb back toward the light. The low ceiling forces you to stoop, and the old stone seems to press closer with every step.', 'info')
+    } else if (tile === 'dwarvenfortexit') {
+      if (currentZ !== -3 || !dwarvenRuin || player.x !== dwarvenRuin.x || player.y !== dwarvenRuin.y) return false
+      map = surfaceMap
+      currentZ = 0
+      currentCave = -1
+      log('You climb back through the dwarven gates into the mountain air.', 'info')
     } else if (tile === 'caveup') {
-      if (currentZ === -3 && dwarvenRuin) {
-        // The fort is a direct surface destination in both directions.
-        map = surfaceMap
-        currentZ = 0
-        currentCave = -1
-        if (surfaceMap[dwarvenRuin.y]) surfaceMap[dwarvenRuin.y][dwarvenRuin.x] = 'dwarvengate'
-        log('You climb back through the dwarven gates into the mountain air.', 'info')
-        stopCameraAnimation()
-        snapCameraToPlayer()
-        minimapDirty = true
-        render()
-        updateHud()
-        return true
-      }
       const depth = CHAIN_DEPTH_BY_Z[currentZ], prevDepth = depth - 1
       const prevMap = depthUndergroundMap(prevDepth)
       if (!prevMap) return false
@@ -3157,12 +3159,31 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
     else player.inventory.push({kind: 'berries', name: 'Handful of Berries', count: 1})
   }
 
+  function addPotato() {
+    const stack = player.inventory.find(i => i.kind === 'potato')
+    if (stack) stack.count = (stack.count || 1) + 1
+    else player.inventory.push({kind: 'potato', name: 'Potato', count: 1})
+  }
+
+  function searchAbandonedCampfire(campfire) {
+    if (campfire.searched) return false
+    campfire.searched = true
+    if (chance(0.3)) {
+      addPotato()
+      log('You search the ashes and find a potato. It is just a potato.', 'loot')
+      if (invOpen) renderInventory()
+    } else {
+      log('You search the ashes but find nothing.', 'info')
+    }
+    return true
+  }
+
   // Shared by inventory/trade rendering so every stackable consumable kind
   // (potions, scrolls, foraged food, ...) is recognised in one place.
   // Item icons live in img/icons so they can be cached and used offline.
   // Kinds not listed here simply render with no icon.
   const ITEM_ICON_KINDS = [
-    'herb', 'mushroom', 'ediblemushroom', 'berries', 'potion', 'speedpotion',
+    'herb', 'mushroom', 'ediblemushroom', 'berries', 'potato', 'potion', 'speedpotion',
     'scroll', 'idscroll', 'teleportscroll', 'weapon', 'armor', 'shield',
     'tombstone', 'oddTombstone', 'wheelbarrow', 'bigbell', 'blackkey',
     'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
@@ -3175,7 +3196,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
   }
 
   function isStackableKind(kind) {
-    return kind === 'potion' || kind === 'scroll' || kind === 'idscroll' || kind === 'speedpotion' || kind === 'teleportscroll' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'seashell' || kind === 'amber'
+    return kind === 'potion' || kind === 'scroll' || kind === 'idscroll' || kind === 'speedpotion' || kind === 'teleportscroll' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'seashell' || kind === 'amber'
   }
 
   function isConsumableKind(kind) {
@@ -3517,6 +3538,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       return
     }
     const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
+    const campfire = groundItems.find(g => onCurrentLevel(g) && g.kind === 'campfire' && g.x === player.x && g.y === player.y)
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
     if (playerRemains) {
@@ -3541,6 +3563,10 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       else if (deadBody.gold) log(`You retrieve ${deadBody.gold} gold.`, 'loot')
       else log('You retrieve nothing.', 'loot')
       updateHud()
+      return
+    }
+    if (campfire) {
+      if (!searchAbandonedCampfire(campfire)) log('You have already searched these ashes.', 'info')
       return
     }
     if (skeleton) {
@@ -3918,6 +3944,8 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
               : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
         } else if (onto === 'cavedown') {
           log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
+        } else if (onto === 'dwarvenfortexit') {
+          log('You stand at the Dwarven Fort exit. Press "inspect" to climb out through the gates.', 'info')
         } else if (onto === 'caveup') {
           log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
         } else if (onto === 'cryptstairsdown') {
@@ -4148,6 +4176,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'campfire') {
       log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info')
+      searchAbandonedCampfire(currentGround)
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'ruinprop') {
       log(`Abandoned dwarven remains. ${currentGround.description}`, 'info')
@@ -4376,6 +4405,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
 
   function tileBackground(x, y, tileKey) {
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
+    if (currentZ < 0 && (tileKey === 'dwarvengate' || tileKey === 'dwarvenfortexit')) return TILE.marble.bg
     const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
     if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return RENDER_STYLE.specialTiles.dugSand.bg
@@ -4538,8 +4568,10 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
 
     // Tree overlays.
     if (tileKey === 'forest') return 'grass'
+    if (tileKey === 'ancientForest') return 'darkforestground'
     if (tileKey === 'taiga') return 'snow'
     if (tileKey === 'snowmountain') return 'snow'
+    if (tileKey === 'darkforestground' || tileKey === 'marble') return null
 
     const neighbors = [
       map?.[y - 1]?.[x],
@@ -4553,10 +4585,11 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
     ].filter(Boolean)
 
     // Underground entrances/exits use dungeon floors, never a surface fallback.
+    if (tileKey === 'dwarvenfortexit' && currentZ < 0) return 'marble'
     if (tileKey === 'caveup' || tileKey === 'cavedown' || tileKey === 'caveentrance') {
       if (currentZ < 0) return 'cavefloor'
     }
-    if (tileKey === 'dwarvengate' && currentZ < 0) return 'marblefloor'
+    if (tileKey === 'dwarvengate' && currentZ < 0) return 'marble'
 
     // Surface transparent objects should prefer the visible neighbouring biome.
     const snowCount = neighbors.filter(t => t === 'snow' || t === 'taiga' || t === 'snowmountain').length
@@ -5125,7 +5158,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
         }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.73)'
+            ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
         } else markDiscovered(mx, my) // surface keeps its existing discovery rule
@@ -5495,7 +5528,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
       if (g.kind === 'campfire') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">An abandoned campfire.</div>`
+        html: `<div class="nm">An abandoned campfire${g.searched ? ' (searched)' : ''}.</div>`
       }
       if (g.kind === 'deadbody') return {
         mini: true,
@@ -6060,7 +6093,9 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
     document.getElementById('hLvl').textContent = player.lvl
     const maxHp = playerMaxHp()
     player.hp = Math.min(player.hp, maxHp)
-    document.getElementById('hpbar').style.width = Math.max(0, (player.hp / maxHp * 100)) + '%'
+    const hpRatio = maxHp > 0 ? player.hp / maxHp : 0
+    document.getElementById('hpbar').style.width = Math.max(0, hpRatio * 100) + '%'
+    document.getElementById('hpbarwrap').classList.toggle('low-hp', player.hp > 0 && hpRatio < 0.2)
     document.getElementById('hptext').textContent = player.hp + ' / ' + maxHp
     document.getElementById('xpbar').style.width = (player.xp / xpToNext(player.lvl) * 100) + '%'
     document.getElementById('hAtk').textContent = playerAtk()
@@ -6362,6 +6397,8 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
           readTombstone(idx)
         }
         row.appendChild(btn)
+      } else if (it.kind === 'potato') {
+        // Intentionally inert. It can be carried and stacked, but not used.
       } else {
         const btn = document.createElement('button')
         btn.textContent = 'Equip'
@@ -6463,6 +6500,7 @@ abandoned campfire: chance to find a potato, it's stackable. but u cannot do any
 
   // SELL_VALUE_BY_TIER / FLAT_SELL_VALUE now loaded from content/loot_tables.json.
   function itemSellValue(it) {
+    if (it.kind === 'potato') return 0
     if (it.tier) {
       let v = SELL_VALUE_BY_TIER[it.tier] || 0
       if (it.mod) v += (it.modAmt || 1) * 5

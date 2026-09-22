@@ -125,6 +125,13 @@
       "mini": "#ff6b2e",
       "walk": true
     },
+    "dwarvenfortexit": {
+      "ch": "^",
+      "color": "#e8b85b",
+      "bg": "#302d2a",
+      "mini": "#e8b85b",
+      "walk": true
+    },
     "marble": {
       "ch": "=",
       "color": "#c8c2b4",
@@ -312,6 +319,7 @@
     "cavefloor2": "2",
     "cavedown": "d",
     "caveup": "u",
+    "dwarvenfortexit": "U",
     "marble": "=",
     "dwarvengate": "G",
     "dwarvenstatue": "S",
@@ -347,6 +355,7 @@
     "cavefloor2": "the cold stone floor of a deeper cave",
     "cavedown": "a narrow crack descending further into the dark",
     "caveup": "a rough passage leading back up",
+    "dwarvenfortexit": "the Dwarven Fort exit, a stairway rising through the ruined gates",
     "temple": "the sacred ground of the Temple",
     "boulder": "a cluster of impassable boulders",
     "blackpillar": "a tall black stone pillar rising from the mountain\\'s peak",

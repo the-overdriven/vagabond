@@ -231,6 +231,11 @@
       "image": "img/tiles/cave-up.png",
       "scale": 1
     },
+    "dwarvenfortexit": {
+      "image": "img/tiles/cave-up.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
     "volcano": {
       "image": "img/tiles/volcano.png",
       "scale": 1

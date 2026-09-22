@@ -6,6 +6,7 @@
 
 const UndergroundFov = (() => {
   const RADIUS = 8
+  const EXPLORED_OVERLAY = 'rgba(0, 0, 0, 0.5)'
   const BLOCKS_SIGHT = new Set(['cavewall', 'dwarvenwall', 'mountain',
     'snowmountain', 'crypt2niche', 'boulder', 'blackpillar'])
   const key = (x, y) => x + ',' + y
@@ -40,5 +41,5 @@ const UndergroundFov = (() => {
     return visible
   }
 
-  return {RADIUS, compute}
+  return {RADIUS, EXPLORED_OVERLAY, compute}
 })()

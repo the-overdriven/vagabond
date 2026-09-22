@@ -217,6 +217,10 @@ Magic Find influences loot chances **and** loot quality:
 
 Max HP receives flat bonuses first, then artifact percentage modifiers.
 
+The HUD health bar pulses red when the living player is strictly below 20%
+of maximum HP. The pulse stops at 20% or above, and on death. It is disabled
+when the system requests reduced motion.
+
 ---
 
 # 5. Leveling
@@ -440,8 +444,22 @@ mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
 coffin images over the appropriate floor. The regular coffin already uses
 `specialTiles.coffin`. ASCII mode still displays the terrain glyphs.
 
-These are rendering replacements for existing terrain IDs. Cave scenarios add
-no terrain IDs or new glyphs, so save data and movement rules are unaffected.
+The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
+gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the
+generic ascent tile inside caves and retains its cave-floor background.
+The fort exit reuses the existing cave-up image with `baseTileKey: marble` and
+the marble ASCII background; no `marblefloor` terrain key or new image is
+needed. `content/tiles.json` defines its walkable `^` glyph, gold color,
+marble background, description, and unique save character `U`. Generation
+stamps the fort tile in both its local template and shared map. The loader
+restamps this tile at the fort gate on z:-3, including for older saves encoded
+with `caveup`; it leaves all other deep-cave `caveup` entrances unchanged.
+`darkforestground` and `marble` are terminal image bases, so neighboring
+surface tiles cannot replace them while composing overlays.
+
+The cave floor/wall images are rendering replacements for existing terrain
+IDs. Cave scenarios add no terrain IDs; the Dwarven Fort exit is a separate
+transition ID with its own save code and surface-ascent behavior.
 
 Normally impassable terrain includes mountains, snow mountains, volcanoes,
 lava, boulders, and water for non-Merlings.
@@ -593,6 +611,9 @@ A special forest biome associated with:
 
 Normal foraging is disabled there.
 
+In tile-image mode, every Ancient Forest tree uses `darkforestground` beneath
+it, including along snowy edges. Neighboring snow cannot replace that base.
+
 </details>
 
 ## Cemetery
@@ -735,6 +756,9 @@ so enemies and items cannot appear or act on the wrong z:-2 map.
 
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave.
+Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
+same coordinates. Generic `caveup` tiles still ascend to the preceding cave
+depth, including any encountered elsewhere on z:-3.
 
 ## Cave/crypt/mausoleum separation
 
@@ -2171,6 +2195,13 @@ include crypt coffins/sarcophagi, tombstones, special graves, village/landmark
 tiles, and special ground objects such as skeletons, campfires, dwarven props,
 explorer remains, and dead bodies.
 
+An abandoned campfire can be searched once by inspecting it or pressing F
+while standing on it. A seeded 30% roll grants one Potato; a failed search
+finds nothing. The `searched` flag is stored on its ground object and saved,
+preventing repeated rolls. Potatoes stack in the inventory and use
+`img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be
+used, equipped, or sold.
+
 Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object.
 
@@ -2688,6 +2719,10 @@ Examples include handling:
 - underground level renumbering from the older z-depth scheme
 - missing enemy `levelKind` metadata
 - transitional Dwarven Fort chest metadata / placement
+- older Dwarven Fort exits stored as `caveup`: when loading deep levels, the
+  fort gate at its surface coordinates on z:-3 is restamped as
+  `dwarvenfortexit` in the local template and merged map; other `caveup`
+  entrances keep their cave-ascent meaning
 
 For enemy levels specifically:
 
@@ -2736,7 +2771,9 @@ cardinal neighbors are walls. Surface visibility is unchanged.
 
 Only terrain in the current field of view becomes discovered. Never-seen tiles
 are black on the main canvas and fogged on both minimaps; previously seen tiles
-remain on the main canvas at reduced brightness and on the minimaps. Enemies,
+remain on the main canvas under a 50%-opaque black overlay, visibly lighter
+than unexplored tiles, and remain on the minimaps. The overlay color is defined
+in `src/fov.js` and applied by the terrain renderer in `index.html`. Enemies,
 ground items, damage effects, inspection tooltips, and enemy range overlays
 appear only inside the current field of view, even on explored tiles. Underground
 click-to-move paths can use only discovered tiles. Enemy movement and combat

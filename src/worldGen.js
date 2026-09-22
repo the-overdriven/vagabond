@@ -1004,7 +1004,7 @@ function buildDwarvenRuin(targetLevel) {
     }
   }
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
-  cm[y0][x0] = 'dwarvengate'
+  cm[y0][x0] = targetLevel ? 'dwarvenfortexit' : 'dwarvengate'
   for (let i = 0; i < 45; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > 8) cm[y][x] = chance(.65) ? 'dwarvenrubble' : 'dwarvenwall'
@@ -1014,7 +1014,7 @@ function buildDwarvenRuin(targetLevel) {
   // off a room even when its doorway was carved correctly.
   const fortWalkable = (x, y) => {
     const t = cm[y]?.[x]
-    return t === 'marble' || t === 'dwarvengate' || t === 'dwarvenrubble'
+    return t === 'marble' || t === 'dwarvenfortexit' || t === 'dwarvengate' || t === 'dwarvenrubble'
   }
   const reachableFromGate = () => {
     const seen = new Set(), queue = [{x: x0, y: y0}]
@@ -1061,7 +1061,7 @@ function buildDwarvenRuin(targetLevel) {
   ruinMaps.push(cm)
   ruinCaves.push(ruinCave)
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] !== 'cavewall' && ruinMap[y][x] === 'cavewall') ruinMap[y][x] = cm[y][x]
-  ruinMap[y0][x0] = targetLevel ? 'caveup' : 'dwarvengate'
+  ruinMap[y0][x0] = targetLevel ? 'dwarvenfortexit' : 'dwarvengate'
   dwarvenRuin = {x: x0, y: y0, caveIndex: ruinMaps.length - 1, level: targetLevel ? -3 : -1}
   if (targetLevel) {
     // Connect the surface gate to the reserved fort level through the
@@ -1229,7 +1229,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
       if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
@@ -1322,7 +1322,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
             const x = wx + dx, y = wy + dy
             if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
-              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
+                !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
           }
           if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
           const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
@@ -1368,7 +1368,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     const open = []
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
-        !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
+          !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
     let spot = null, layout = null
     for (let tries = 0; tries < 18 && open.length; tries++) {
