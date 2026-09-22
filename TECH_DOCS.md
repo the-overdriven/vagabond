@@ -431,6 +431,18 @@ Grassland tree decoration:
 
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 
+In tile-image mode, `content/rendering.json` maps ordinary cave floors
+(`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png` and cave walls
+(`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
+these textures; `marble` has a lighter stone-floor image, and walkable
+`cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt stairs,
+mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
+coffin images over the appropriate floor. The regular coffin already uses
+`specialTiles.coffin`. ASCII mode still displays the terrain glyphs.
+
+These are rendering replacements for existing terrain IDs. Cave scenarios add
+no terrain IDs or new glyphs, so save data and movement rules are unaffected.
+
 Normally impassable terrain includes mountains, snow mountains, volcanoes,
 lava, boulders, and water for non-Merlings.
 
@@ -694,8 +706,25 @@ mountain air.
 
 Some z:-1 caves receive a downward connection.
 
-Approximately half of parent caves receive a deeper level. Connections use
-matching `cavedown` / `caveup` tiles. These generic deep caves share z:-2.
+Each eligible parent cave has a 50% chance to receive a deeper level, subject
+to available space for a separate dungeon footprint. Connections use matching
+`cavedown` / `caveup` tiles. These generic deep caves share z:-2.
+
+Generic z:-2 caves are sprawling grottos, generated at world creation inside
+separate reserved footprints (up to 92×72 tiles; down to 66×54 when space is
+tight). Each has 22–28 irregular chambers with lobed walls and winding,
+varying-width connections. Twenty-plus chambers and at least 900 dry floor
+tiles are required before a layout is accepted. Chambers are linked into one
+reachable network, with five possible extra routes; disconnected edge
+fragments are removed. The staircase stays at the same coordinates on both
+floors. Space reservation keeps independent z:-2 caves from merging on their
+shared map; an unsuitable parent stair candidate is retried before any
+upstairs tile is changed.
+
+About 60% of these grottos attempt an irregular water pocket in a chamber.
+The pocket is kept only if the staircase can still reach every dry floor tile.
+Water retains its normal movement rule: impassable to most characters and
+walkable to Merlings. No new terrain ID or image asset is needed.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
@@ -741,13 +770,66 @@ structures, including sarcophagi, burial niches, rubble, and the crypt trap.
 
 Up to six initial caves are attempted.
 
+## Ordinary cave scenarios
+
+Ordinary z:-1 caves draw from **eight surface scenarios** during the initial
+population pass. Generic z:-2 caves draw from a separate, stronger pool of
+**five deep scenarios**. The story crypt, mausoleum, and Dwarven Fort retain
+their dedicated contents. Surface scenarios are:
+
+| Scenario | Encounter and distinguishing features |
+|---|---|
+| Abandoned camp | A few bats and rats, a campfire, chest, and Life Potion |
+| Bat roost | A larger group of bats placed deeper inside, plus a chest |
+| Rat warren | Many rats, chest, and searchable remains at z:-1 |
+| Goblin cache | Goblins guarding a chest; better chest at z:-2 |
+| Bone hollow | Skeletons near the chest and searchable remains at z:-1 |
+| Chitin nest | Giant Bugs deeper inside the cave |
+| Beast den | A pack of Wolves |
+| Smugglers' refuge | Goblins and another creature, a campfire, chest, and Scroll of Invisibility |
+
+The z:-2 scenarios retain **one Tier-2 species per cave**, chosen from
+Goblins, Skeletons, Kobolds, Skinks, or Ratlings. The larger grottos hold
+24–36 enemies, spread through chambers. Eight to twelve chests are distributed
+across chambers, alternating tier 3 and tier 2; there are also four loose
+supplies (two potions and two scrolls). No Giant Rats, Giant Bats,
+Wolves, Boars, or Giant Bugs are selected for new z:-2 caves.
+
+| Deep scenario | Enemy group | Distinctive contents |
+|---|---|---|
+| Goblin cache | Goblins | Chests spread through guarded rooms |
+| Bone hollow | Skeletons | Chests spread through guarded rooms |
+| Kobold outpost | Kobolds | Chests and campfire |
+| Skink den | Skinks | Chests and Potion of Speed |
+| Ratling burrow | Ratlings | Chests and Life Potion |
+
+Each depth shuffles its own scenario deck and avoids repeats within that depth
+until its pool is exhausted. Rewards use existing chest and consumable rules;
+the scenario controls placement, not the contents of a normal chest. There may
+be fewer eligible caves than scenario types in a world, so one world need not
+contain every scenario.
+
+The cave descriptor stores its scenario ID alongside its entrances. That
+descriptor is already persisted in saves. The entrance clue appears when the
+player steps onto a surface cave entrance or a downward passage, and the
+scenario introduction appears upon descent. Old saves without scenario IDs
+retain their original caves and generic entrance text; loading does not
+retroactively repopulate them. Scenario enemies and ground items are generated
+once, then persist through the existing enemy and ground-item save fields.
+Saves generated by the first scenario implementation may still contain weaker
+z:-2 populations; loading does not replace their enemies or rewards. Their
+existing scenario IDs and clues remain recognized. The z:-3 Dwarven Fort is
+excluded from ordinary scenario population.
+
 Cave entrances are selected from mountain edges.
 
 Primary cave locations must be sufficiently separated.
 
 The first cave may receive a second entrance.
 
-Cave interiors are produced using bounded random walks.
+Initial z:-1 cave interiors are produced using bounded random walks.
+Generic z:-2 caves use connected irregular chambers and passages as described
+above.
 
 Before a generated cave is committed to the world, its complete local map is
 checked against the crypt exclusion zone. Only accepted caves are stamped onto
@@ -2547,6 +2629,12 @@ Date.now() & 0xffffffff
 ```
 
 The mutable RNG state is saved.
+
+The Dwarven Fort's floor-position shuffle uses seeded Fisher-Yates through
+`randInt`. Ordinary cave scenario selection, placement, and initial contents
+also use the seeded RNG. These world-generation draws take place before replay
+recording starts; their generated caves, enemies, and items are part of the
+recorded initial state.
 
 Loading a save therefore continues the random sequence rather than resetting it.
 

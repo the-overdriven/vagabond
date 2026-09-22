@@ -671,10 +671,8 @@ function generateCaves() {
   buildCrypt()
   buildCryptLevel2()
   const cryptInvalid = isCryptConnectedToRandomCave()
-  // z:-2: about half of the z:-1 caves get a stairway down into their own
-  // small deeper cave, sharing one map with every other z:-2 cave (same
-  // pattern as z:-1 sharing undergroundMap). Written generically so a
-  // future generic level is just another generateDeepLevel() call.
+  // About half of the z:-1 caves can connect to a larger z:-2 room dungeon.
+  // Independent dungeons share the z:-2 map but have reserved footprints.
   deepLevels = [generateDeepLevel(caves, caveMaps, undergroundMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')]
   // z:-3 is reserved for the Dwarven Fort. It is the third level in the
   // generic chain and is not generated as a random cave blob.
@@ -1154,7 +1152,12 @@ function buildDwarvenRuin(targetLevel) {
   for (let yy = minY + 3; yy < maxY - 2; yy++) for (let xx = minX + 3; xx < maxX - 2; xx++) {
     if (cm[yy][xx] === 'marble') ruinFloorSpots.push({x: xx, y: yy})
   }
-  const shuffledRuinSpots = ruinFloorSpots.sort(() => Math.random() - 0.5)
+  // A seeded Fisher-Yates shuffle keeps fort layout reproducible in saves/replays.
+  const shuffledRuinSpots = ruinFloorSpots.slice()
+  for (let i = shuffledRuinSpots.length - 1; i > 0; i--) {
+    const j = randInt(0, i)
+    ;[shuffledRuinSpots[i], shuffledRuinSpots[j]] = [shuffledRuinSpots[j], shuffledRuinSpots[i]]
+  }
   const farFrom = (p, q, distance = 10) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) >= distance
   let artifactSpot = shuffledRuinSpots.find(p => farFrom(p, {x: x0, y: y0}, 18)) || shuffledRuinSpots[0]
   if (artifactSpot) groundItems.push({
@@ -1207,53 +1210,184 @@ function buildDwarvenRuin(targetLevel) {
   }
 }
 
-// Carves a random-walk blob of `floorTile` into a blank local cave map
-// `cm`, starting from `spot` - the same technique generateCaves() uses
-// to build z:-1 caves, reused for every deeper level.
-function carveCaveBlob(cm, spot, floorTile, steps = 180, radius = 8) {
-  let x = spot.x, y = spot.y
-  const minX = Math.max(2, spot.x - radius), maxX = Math.min(MAP_W - 3, spot.x + radius)
-  const minY = Math.max(2, spot.y - radius), maxY = Math.min(MAP_H - 3, spot.y + radius)
-  for (let step = 0; step < steps; step++) {
-    cm[y][x] = floorTile
-    const [dx, dy] = pick(DIRS8)
-    x = Math.max(minX, Math.min(maxX, x + dx))
-    y = Math.max(minY, Math.min(maxY, y + dy))
+// Organic grotto chambers and winding passages, using the world seed.
+function carveDeepDungeon(spot, floorTile, reserved) {
+  const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+  const sizes = [[92, 72], [82, 66], [74, 60], [66, 54]]
+  for (const [w, h] of sizes) {
+    const anchors = [[9, 9], [w - 10, 9], [9, h - 10], [w - 10, h - 10],
+      [Math.floor(w / 2), 9], [Math.floor(w / 2), h - 10],
+      [9, Math.floor(h / 2)], [w - 10, Math.floor(h / 2)],
+      [Math.floor(w / 2), Math.floor(h / 2)]]
+    for (let i = anchors.length - 1; i > 0; i--) {
+      const j = randInt(0, i)
+      ;[anchors[i], anchors[j]] = [anchors[j], anchors[i]]
+    }
+    for (const [ax, ay] of anchors) {
+      const bounds = {x1: spot.x - ax, y1: spot.y - ay}
+      bounds.x2 = bounds.x1 + w - 1
+      bounds.y2 = bounds.y1 + h - 1
+      if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
+      if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
+        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+
+      // Choose separated centers first. Chambers can meet at their ragged
+      // edges; this makes open caverns without square room boundaries.
+      const rooms = [{cx: spot.x, cy: spot.y}]
+      for (let tries = 0; tries < 1800 && rooms.length < 28; tries++) {
+        const cx = randInt(bounds.x1 + 6, bounds.x2 - 6)
+        const cy = randInt(bounds.y1 + 6, bounds.y2 - 6)
+        if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < 145)) continue
+        rooms.push({cx, cy})
+      }
+      if (rooms.length < 22) continue
+      const cm = blankCaveMap()
+      for (const room of rooms) {
+        const rx = randInt(5, 8), ry = randInt(4, 7)
+        room.x1 = Math.max(bounds.x1 + 1, room.cx - rx)
+        room.x2 = Math.min(bounds.x2 - 1, room.cx + rx)
+        room.y1 = Math.max(bounds.y1 + 1, room.cy - ry)
+        room.y2 = Math.min(bounds.y2 - 1, room.cy + ry)
+        // Angular radius changes every few tiles; the center always stays
+        // open, while the wall becomes lobed rather than rectangular.
+        const edge = Array.from({length: 12}, () => randInt(-22, 16) / 100)
+        for (let y = room.y1; y <= room.y2; y++) for (let x = room.x1; x <= room.x2; x++) {
+          const dx = (x - room.cx) / rx, dy = (y - room.cy) / ry
+          const angle = Math.floor((Math.atan2(dy, dx) + Math.PI) * 12 / (2 * Math.PI)) % 12
+          if (dx * dx + dy * dy <= (0.88 + edge[angle]) ** 2)
+            cm[y][x] = floorTile
+        }
+        cm[room.cy][room.cx] = floorTile
+      }
+      // Step toward an offset midpoint and then the target; varied passage
+      // widths and turns keep the links from reading as grid-aligned halls.
+      const passage = (from, to) => {
+        const mid = {x: Math.round((from.cx + to.cx) / 2) + randInt(-3, 3),
+          y: Math.round((from.cy + to.cy) / 2) + randInt(-3, 3)}
+        const brush = (x, y, width) => {
+          for (let yy = y - 1; yy <= y + width - 2; yy++)
+            for (let xx = x - 1; xx <= x + width - 2; xx++)
+              if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
+                cm[yy][xx] = floorTile
+        }
+        let x = from.cx, y = from.cy, step = 0
+        for (const goal of [mid, {x: to.cx, y: to.cy}]) {
+          while (x !== goal.x || y !== goal.y) {
+            const moveX = x !== goal.x && (y === goal.y || chance(0.5))
+            if (moveX) x += Math.sign(goal.x - x)
+            else y += Math.sign(goal.y - y)
+            brush(x, y, step++ % 9 < 3 ? 3 : 2)
+          }
+        }
+      }
+      const connected = [rooms[0]]
+      const remaining = rooms.slice(1)
+      while (remaining.length) {
+        let best = null, score = Infinity
+        for (const r of remaining) for (const parent of connected) {
+          const d = (r.cx - parent.cx) ** 2 + (r.cy - parent.cy) ** 2
+          if (d < score) { score = d; best = {r, parent} }
+        }
+        passage(best.parent, best.r)
+        connected.push(best.r)
+        remaining.splice(remaining.indexOf(best.r), 1)
+      }
+      for (let i = 0; i < 5; i++) {
+        const a = pick(rooms), b = pick(rooms)
+        if (a !== b) passage(a, b)
+      }
+      // Jagged chamber edges can leave tiny isolated floor fragments. Keep
+      // only the continuous grotto reached from the staircase.
+      const reachable = new Set([keyXY(spot.x, spot.y)]), flood = [spot]
+      for (let i = 0; i < flood.length; i++) for (const [dx, dy] of DIRS4) {
+        const x = flood[i].x + dx, y = flood[i].y + dy, key = keyXY(x, y)
+        if (cm[y]?.[x] !== floorTile || reachable.has(key)) continue
+        reachable.add(key)
+        flood.push({x, y})
+      }
+      for (let y = bounds.y1; y <= bounds.y2; y++)
+        for (let x = bounds.x1; x <= bounds.x2; x++)
+          if (cm[y][x] === floorTile && !reachable.has(keyXY(x, y))) cm[y][x] = 'cavewall'
+      // A water pocket is only accepted if all dry tiles remain reachable.
+      let hasWater = false
+      if (chance(0.6)) {
+        const candidates = rooms.slice(1)
+        for (let i = candidates.length - 1; i > 0; i--) {
+          const j = randInt(0, i)
+          ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+        }
+        for (const r of candidates) {
+          const wx = r.cx + randInt(-2, 2), wy = r.cy + randInt(-2, 2)
+          const cells = []
+          for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
+            const x = wx + dx, y = wy + dy
+            if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
+              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
+          }
+          if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
+          const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
+          for (let i = 0; i < queue.length; i++) {
+            const p = queue[i]
+            for (const [dx, dy] of DIRS4) {
+              const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+              if (cm[y]?.[x] !== floorTile || seen.has(key)) continue
+              seen.add(key)
+              queue.push({x, y})
+            }
+          }
+          let dryFloor = 0
+          for (let y = bounds.y1; y <= bounds.y2; y++)
+            for (let x = bounds.x1; x <= bounds.x2; x++)
+              if (cm[y][x] === floorTile) dryFloor++
+          if (seen.size === dryFloor) { hasWater = true; break }
+          for (const p of cells) cm[p.y][p.x] = floorTile
+        }
+      }
+      let dryFloor = 0
+      for (let y = bounds.y1; y <= bounds.y2; y++)
+        for (let x = bounds.x1; x <= bounds.x2; x++)
+          if (cm[y][x] === floorTile) dryFloor++
+      if (dryFloor < 900) continue
+      return {cm, rooms, bounds, hasWater}
+    }
   }
+  return null
 }
 
-// Builds one deeper level from the level above it. For each parent cave
-// (~50% chance), stamps a `downTile` stairway on a random open parent
-// floor tile, then carves a matching blob of `floorTile` into a brand
-// new local map with an `upTile` at the exact same x,y - so entrance and
-// exit always share coordinates. All the new local maps are merged into
-// one shared map for the level, same as generateCaves() does for z:-1.
-// Calling this again with the returned level's own caves/caveMaps/map as
-// the "parent" args is all that's needed to add another level further down.
+// Builds the generic z:-2 dungeon. Large footprints cannot touch one another:
+// the shared map must not silently join separate cave entrances.
 function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile) {
   const levelCaves = []
   const levelCaveMaps = []
+  const reserved = []
   for (let i = 0; i < parentCaves.length; i++) {
     if (!chance(0.5)) continue
+    if (parentCaves[i]?.crypt) continue
     const cm = parentCaveMaps[i]
     const entrances = parentCaves[i].entrances || []
     const open = []
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-      if (cm[y][x] === parentFloorTile && !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
+      if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
+        !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
-    const spot = pick(open)
-    if (!spot) continue
+    let spot = null, layout = null
+    for (let tries = 0; tries < 18 && open.length; tries++) {
+      const candidate = open.splice(randInt(0, open.length - 1), 1)[0]
+      const result = carveDeepDungeon(candidate, floorTile, reserved)
+      if (result) { spot = candidate; layout = result; break }
+    }
+    if (!layout) continue
     // Stamp the stairway into both the parent's per-cave template and its
     // already-merged shared map, so a save/reload re-stamp (see
     // loadGameFromObject) rebuilds it the same way.
     cm[spot.y][spot.x] = downTile
     if (parentMap[spot.y] && parentMap[spot.y][spot.x] !== undefined) parentMap[spot.y][spot.x] = downTile
 
-    const cm2 = blankCaveMap()
-    carveCaveBlob(cm2, spot, floorTile)
-    cm2[spot.y][spot.x] = upTile
-    levelCaveMaps.push(cm2)
-    levelCaves.push({x: spot.x, y: spot.y, entrances: [{x: spot.x, y: spot.y}]})
+    layout.cm[spot.y][spot.x] = upTile
+    reserved.push(layout.bounds)
+    levelCaveMaps.push(layout.cm)
+    levelCaves.push({x: spot.x, y: spot.y, entrances: [{x: spot.x, y: spot.y}],
+      rooms: layout.rooms, hasWater: layout.hasWater})
   }
   const levelMap = blankCaveMap()
   for (const cm of levelCaveMaps) {
@@ -1779,168 +1913,196 @@ function spawnEnemies() {
   }
 }
 
-function spawnCaveContents() {
-  const bat = ENEMY_TEMPLATES.find(t => t.name === 'Giant Bat')
-  const rat = ENEMY_TEMPLATES.find(t => t.name === 'Giant Rat')
-  for (let caveIndex = 0; caveIndex < caveMaps.length; caveIndex++) {
-    if (caves[caveIndex]?.crypt) continue
-    const cm = caveMaps[caveIndex], open = []
-    const caveEntrances = caves[caveIndex].entrances
-    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (cm[y][x] === 'cavefloor' && !caveEntrances.some(e => x === e.x && y === e.y)) open.push({
-      x,
-      y
-    })
-    for (let i = 0; i < 4 && open.length; i++) {
-      const tmpl = pick([bat, rat].filter(Boolean))
+// Shallow caves draw without replacement from eight encounters. The ID and clue
+// live on the cave descriptor, which is already saved with the generated world.
+// Named story maps (crypt, mausoleum, fort) keep their own populations and loot.
+const CAVE_SCENARIOS = [
+  {id: 'abandoned_camp', clue: 'Cold smoke and old footprints lead into the dark.',
+    intro: 'An abandoned camp lies just beyond the entrance. Something has moved into it.',
+    surface: {mobs: [['Giant Bat', 1], ['Giant Rat', 1]], tier: 1, camp: true, supply: 'potion'}},
+  {id: 'bat_roost', clue: 'A flurry of wings and the smell of guano drift from below.',
+    intro: 'Bats cling to every crack in the ceiling.',
+    surface: {mobs: [['Giant Bat', 5]], tier: 1, placement: 'far'}},
+  {id: 'rat_warren', clue: 'A chorus of squeaks echoes from the passage.',
+    intro: 'The stone is scored with narrow runs. Rats are everywhere.',
+    surface: {mobs: [['Giant Rat', 5]], tier: 1, remains: true}},
+  {id: 'goblin_cache', clue: 'Small bootprints and a glimmer of stolen metal mark the entrance.',
+    intro: 'Goblins have made a guarded cache among the rocks.',
+    surface: {mobs: [['Goblin', 3]], tier: 2, placement: 'guard'}},
+  {id: 'bone_hollow', clue: 'Dry bones are scattered across the threshold.',
+    intro: 'The dead have gathered around a hollow in the stone.',
+    surface: {mobs: [['Skeleton', 2]], tier: 2, remains: true, placement: 'guard'}},
+  {id: 'chitin_nest', clue: 'A brittle clicking rises from within.',
+    intro: 'An insect nest fills the cracks. Its keepers are close.',
+    surface: {mobs: [['Giant Bug', 3]], tier: 2, placement: 'far'}},
+  {id: 'beast_den', clue: 'Fresh tracks and a strong animal scent lead inside.',
+    intro: 'A pack has claimed this cave as its den.',
+    surface: {mobs: [['Wolf', 3]], tier: 1, placement: 'far'}},
+  {id: 'smugglers_refuge', clue: 'A ragged trail and a discarded torch suggest recent visitors.',
+    intro: 'Someone used this passage to hide supplies. Goblins found it first.',
+    surface: {mobs: [['Goblin', 2], ['Giant Rat', 1]], tier: 2, camp: true, supply: 'scroll'}}
+]
+
+// Preserve the stronger, single-species z:-2 cave population. The five
+// original deep-cave templates now each receive a distinct scenario.
+const DEEP_CAVE_SCENARIOS = [
+  {id: 'deep_goblin_cache', clue: 'Small armored footsteps echo below.',
+    intro: 'Goblins guard a stolen cache in this lower cavern.',
+    deep: {mobs: [['Goblin', 4]], tier: 3, placement: 'guard'}},
+  {id: 'deep_bone_hollow', clue: 'A dry rattle sounds beneath the stone.',
+    intro: 'The lower cavern is occupied by the dead.',
+    deep: {mobs: [['Skeleton', 4]], tier: 3, placement: 'guard'}},
+  {id: 'kobold_outpost', clue: 'Tiny tools clatter far below.',
+    intro: 'Kobolds have built a cramped outpost around their cache.',
+    deep: {mobs: [['Kobold', 4]], tier: 3, placement: 'guard', camp: true}},
+  {id: 'skink_den', clue: 'The passage smells of damp scales.',
+    intro: 'Skinks have made a den deep within the rock.',
+    deep: {mobs: [['Skink', 4]], tier: 3, placement: 'far', supply: 'speedpotion'}},
+  {id: 'ratling_burrow', clue: 'Small claws scrape against the stone below.',
+    intro: 'Ratlings scurry through the lower burrow.',
+    deep: {mobs: [['Ratling', 4]], tier: 3, placement: 'far', supply: 'potion'}}
+]
+
+function scenarioAt(z, x, y) {
+  const descriptors = z === -1 ? caves : z === -2 ? deepLevels[0]?.caves : null
+  const cave = descriptors?.find(c => !c.crypt && c.scenario && c.entrances?.some(e => e.x === x && e.y === y))
+  return [...CAVE_SCENARIOS, ...DEEP_CAVE_SCENARIOS].find(s => s.id === cave?.scenario)
+}
+
+function caveScenarioClue(z, x, y) {
+  return scenarioAt(z, x, y)?.clue || null
+}
+
+function caveScenarioIntro(z, x, y) {
+  return scenarioAt(z, x, y)?.intro || null
+}
+
+function spawnCaveScenarios() {
+  let surfaceDeck = [], deepDeck = []
+  function nextScenario(level) {
+    let deck = level === -1 ? surfaceDeck : deepDeck
+    if (!deck.length) {
+      deck = (level === -1 ? CAVE_SCENARIOS : DEEP_CAVE_SCENARIOS).slice()
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = randInt(0, i)
+        ;[deck[i], deck[j]] = [deck[j], deck[i]]
+      }
+      if (level === -1) surfaceDeck = deck
+      else deepDeck = deck
+    }
+    return deck.pop()
+  }
+
+  function populate(descriptor, cm, caveIndex, level, floorTile) {
+    if (descriptor.crypt || descriptor.scenario || !descriptor.entrances?.length) return
+    const open = []
+    const entries = descriptor.entrances
+    const sharedMap = level === -1 ? undergroundMap : deepLevels[0].map
+    const allEntrances = (level === -1 ? caves : deepLevels[0].caves)
+      .flatMap(c => c.entrances || [])
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+      if (cm[y][x] !== floorTile) continue
+      if (sharedMap[y]?.[x] !== floorTile) continue
+      if (allEntrances.some(e => e.x === x && e.y === y)) continue
+      if (enemies.some(e => e.alive && e.level === level && e.x === x && e.y === y)) continue
+      if (groundItems.some(g => g.level === level && g.x === x && g.y === y)) continue
+      open.push({x, y})
+    }
+    // A tiny or malformed cave must not consume a scenario without room for it.
+    if (open.length < 5) return
+    const scenario = nextScenario(level)
+    descriptor.scenario = scenario.id
+    const rules = level === -1 ? scenario.surface : scenario.deep
+    const entrance = entries[0]
+    const distance = p => Math.abs(p.x - entrance.x) + Math.abs(p.y - entrance.y)
+    function takeSpot(mode, target) {
+      if (!open.length) return null
+      let candidates = open
+      if (mode === 'guard' && target) {
+        const near = open.filter(p => Math.abs(p.x - target.x) + Math.abs(p.y - target.y) <= 3)
+        if (near.length) candidates = near
+      } else if (mode === 'room' && target) {
+        const inRoom = open.filter(p => p.x >= target.x1 && p.x <= target.x2 &&
+          p.y >= target.y1 && p.y <= target.y2 && distance(p) > 5)
+        if (inRoom.length) candidates = inRoom
+      } else if (mode === 'far') {
+        const max = Math.max(...open.map(distance))
+        candidates = open.filter(p => distance(p) >= max - 3)
+      } else if (mode === 'corner') {
+        const wallCount = p => DIRS8.filter(([dx, dy]) => cm[p.y + dy]?.[p.x + dx] === 'cavewall').length
+        const max = Math.max(...open.map(wallCount))
+        candidates = open.filter(p => wallCount(p) >= Math.max(2, max - 1))
+        if (!candidates.length) candidates = open
+      }
+      const spot = pick(candidates)
+      open.splice(open.indexOf(spot), 1)
+      return spot
+    }
+    const roomOrder = level === -2 && descriptor.rooms ? descriptor.rooms.slice(1) : []
+    if (roomOrder.length) for (let i = roomOrder.length - 1; i > 0; i--) {
+      const j = randInt(0, i)
+      ;[roomOrder[i], roomOrder[j]] = [roomOrder[j], roomOrder[i]]
+    }
+    const chestCount = level === -2 ? Math.min(12, Math.max(8, Math.ceil(roomOrder.length / 2))) : 1
+    let chest = null
+    for (let i = 0; i < chestCount; i++) {
+      const spot = level === -2 ? takeSpot('room', roomOrder[i] || null) : takeSpot('corner')
+      if (!spot) break
+      if (!chest) chest = spot
+      groundItems.push({x: spot.x, y: spot.y, kind: 'chest',
+        tier: level === -2 && i % 2 === 1 ? 2 : rules.tier,
+        opened: false, level, levelKind: 'chain', caveIndex})
+    }
+    for (const [name, count] of rules.mobs) {
+      const tmpl = ENEMY_TEMPLATES.find(t => t.name === name)
       if (!tmpl) continue
-      const p = pick(open)
-      addEnemy({
-        name: tmpl.name,
-        baseName: tmpl.name,
-        tier: tmpl.tier,
-        level: -1,
-        caveIndex,
-        hp: tmpl.hp,
-        maxHp: tmpl.hp,
-        atk: tmpl.atk,
-        def: tmpl.def,
-        spd: tmpl.spd,
-        fly: !!tmpl.fly,
-        humanoid: !!tmpl.humanoid,
-        evades: !!tmpl.evades,
-        aggro: tmpl.aggro ?? AGGRO_RANGE,
-        x: p.x,
-        y: p.y,
-        homeX: p.x,
-        homeY: p.y,
-        homeTileType: 'cavefloor',
-        alive: true,
-        prefix: null,
-        equipment: null
-      })
-      open.splice(open.indexOf(p), 1)
-    }
-    const chestSpot = pick(open), campSpot = pick(open), skeletonSpot = pick(open)
-    if (chestSpot) groundItems.push({
-      x: chestSpot.x,
-      y: chestSpot.y,
-      kind: 'chest',
-      tier: 1,
-      opened: false,
-      level: -1,
-      caveIndex
-    })
-    if (campSpot && chance(0.6)) groundItems.push({
-      x: campSpot.x,
-      y: campSpot.y,
-      kind: 'campfire',
-      description: pick(CAMPFIRE_INSPECTIONS),
-      level: -1,
-      caveIndex
-    })
-    if (skeletonSpot && chance(0.6)) groundItems.push({
-      x: skeletonSpot.x,
-      y: skeletonSpot.y,
-      kind: 'skeleton',
-      looted: false,
-      description: pick(SKELETON_INSPECTIONS),
-      level: -1,
-      caveIndex
-    })
-  }
-}
-
-// Ranks a deep-cave template's floor tiles by how many of their 8
-// neighbours are wall (or off the edge of the local map), so chests can
-// be dropped hugging the walls/corners instead of out in the open.
-function deepCaveCornerSpots(cm, floorTile, entrances) {
-  const scored = []
-  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-    if (cm[y][x] !== floorTile) continue
-    if (entrances.some(e => e.x === x && e.y === y)) continue
-    let wallNeighbors = 0
-    for (const [dx, dy] of DIRS8) {
-      const t = cm[y + dy] && cm[y + dy][x + dx]
-      if (!t || t === 'cavewall') wallNeighbors++
-    }
-    if (wallNeighbors >= 3) scored.push({x, y, wallNeighbors})
-  }
-  scored.sort((a, b) => b.wallNeighbors - a.wallNeighbors)
-  return scored
-}
-
-// Populates every generic chain cave (z:-2 and z:-3): one monster group per
-// cave, chosen from goblins, skeletons, skinks, ratlings, or kobolds, so
-// different monster types are always in separate caves and never spawn
-// next to each other. Also drops one generous, corner-hugging chest per
-// cave (tier 3+).
-function spawnDeepCaveContents() {
-  const goblinTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Goblin')
-  const skeletonTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skeleton')
-  const skinkTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Skink')
-  const ratlingTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Ratling')
-  const koboldTmpl = ENEMY_TEMPLATES.find(t => t.name === 'Kobold')
-  const groupTemplates = [goblinTmpl, skeletonTmpl, skinkTmpl, ratlingTmpl, koboldTmpl].filter(Boolean)
-  for (let levelIndex = 0; levelIndex < deepLevels.length; levelIndex++) {
-    const level = deepLevels[levelIndex]
-    const levelZ = CHAIN_Z_BY_DEPTH[levelIndex + 1]
-    for (let caveIndex = 0; caveIndex < level.caveMaps.length; caveIndex++) {
-      const cm = level.caveMaps[caveIndex]
-      const caveEntrances = level.caves[caveIndex].entrances
-      const open = []
-      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (cm[y][x] === 'cavefloor2' && !caveEntrances.some(e => x === e.x && y === e.y)) open.push({
-        x,
-        y
-      })
-      const tmpl = pick(groupTemplates)
-      for (let i = 0; i < 4 && open.length; i++) {
-        const p = pick(open)
-        addEnemy({
-          name: tmpl.name,
-          baseName: tmpl.name,
-          tier: tmpl.tier || 1,
-          level: levelZ,
-          levelKind: 'chain',
-          caveIndex,
-          hp: tmpl.hp,
-          maxHp: tmpl.hp,
-          atk: tmpl.atk,
-          def: tmpl.def,
-          spd: tmpl.spd,
-          fly: !!tmpl.fly,
-          humanoid: tmpl.humanoid !== false,
-          evades: !!tmpl.evades,
-          aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x: p.x,
-          y: p.y,
-          homeX: p.x,
-          homeY: p.y,
-          homeTileType: 'cavefloor2',
-          alive: true,
-          prefix: null,
-          equipment: null
-        })
-        open.splice(open.indexOf(p), 1)
+      const total = level === -2 ? Math.min(36, Math.max(24, Math.round(open.length / 75))) : count
+      for (let n = 0; n < total; n++) {
+        const spot = level === -2 && roomOrder.length
+          ? takeSpot('room', roomOrder[n % roomOrder.length])
+          : takeSpot(rules.placement || 'random', chest)
+        if (!spot) break
+        const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
+          levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
+          def: tmpl.def, spd: tmpl.spd, fly: !!tmpl.fly, humanoid: !!tmpl.humanoid,
+          evades: !!tmpl.evades, aggro: tmpl.aggro ?? AGGRO_RANGE,
+          x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
+          alive: true, prefix: null, equipment: null}
+        addEnemy(e)
       }
-      const cornerSpots = deepCaveCornerSpots(cm, 'cavefloor2', caveEntrances)
-      const chestSpot = cornerSpots.length
-        ? pick(cornerSpots.slice(0, Math.min(10, cornerSpots.length)))
-        : pick(open)
-
-      if (chestSpot) {
-        groundItems.push({
-          x: chestSpot.x,
-          y: chestSpot.y,
-          kind: 'chest',
-          tier: 3,
-          opened: false,
-          level: levelZ,
-          levelKind: 'chain',
-          caveIndex
-        })
+    }
+    if (rules.camp) {
+      const spot = takeSpot('far')
+      if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'campfire',
+        description: pick(CAMPFIRE_INSPECTIONS), level, levelKind: 'chain', caveIndex})
+    }
+    // Existing skeleton search creates a z:-1 chest, so place remains only there.
+    if (rules.remains && level === -1) {
+      const spot = takeSpot('far')
+      if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'skeleton', looted: false,
+        description: pick(SKELETON_INSPECTIONS), level, levelKind: 'chain', caveIndex})
+    }
+    if (rules.supply) {
+      const spot = takeSpot('far')
+      if (spot) groundItems.push({x: spot.x, y: spot.y, kind: rules.supply,
+        level, levelKind: 'chain', caveIndex})
+    }
+    if (level === -2) {
+      // Scattered provisions reward searching side rooms after the first chest.
+      for (let i = 0; i < 4; i++) {
+        const spot = takeSpot('room', roomOrder[(i + 2) % roomOrder.length] || null)
+        if (spot) groundItems.push({x: spot.x, y: spot.y,
+          kind: i % 2 === 0 ? 'potion' : 'scroll', level, levelKind: 'chain', caveIndex})
       }
     }
   }
+
+  for (let i = 0; i < caveMaps.length; i++)
+    populate(caves[i], caveMaps[i], i, -1, 'cavefloor')
+  // z:-2 has ordinary caves; z:-3 is the purpose-built Dwarven Fort.
+  const deep = deepLevels[0]
+  if (deep) for (let i = 0; i < deep.caveMaps.length; i++)
+    populate(deep.caves[i], deep.caveMaps[i], i, -2, 'cavefloor2')
 }
 
 function spawnRemoteHighTierChests() {

@@ -943,7 +943,7 @@
       undergroundDiscovered = depthUndergroundDiscovered(1)
       if (tile === 'dwarvengate') log(pick(DWARVEN_RUIN_ENTRANCES), 'info')
       else if (cave === cryptCaveIndex || caves[cave]?.crypt) log('You descend beneath the ruined chapel into the crypt.', 'info')
-      else log('You descend into the cave.', 'info')
+      else log(caveScenarioIntro(-1, player.x, player.y) || 'You descend into the cave.', 'info')
     } else if (tile === 'caveentrance' || tile === 'dwarvengate') {
       // Only the true top-level ascent (z:-1 -> surface) is "back to the
       // surface" - every deeper ascent uses 'caveup' below instead.
@@ -961,7 +961,7 @@
       currentZ = CHAIN_Z_BY_DEPTH[nextDepth - 1]
       map = nextMap
       undergroundDiscovered = depthUndergroundDiscovered(nextDepth)
-      log('You squeeze through the crack and descend deeper into the dark.', 'info')
+      log(caveScenarioIntro(currentZ, player.x, player.y) || 'You squeeze through the crack and descend deeper into the dark.', 'info')
     } else if (tile === 'cryptstairsdown') {
       if (!cryptLevel2) return false
       currentZ = -2
@@ -3890,12 +3890,12 @@
             (caves[cryptCaveIndex]?.entrances || []).some(e => e.x === nx && e.y === ny)
           )
           log(currentZ === 0
-            ? 'You\'re standing at the entrance to the cave. Press "inspect", if you dare to enter.'
+            ? `You're standing at the entrance to the cave. ${caveScenarioClue(-1, nx, ny) || ''} Press "inspect" to enter.`
             : cryptExit
               ? 'You\'re standing beneath the ruined chapel. Press "inspect" to climb back into it.'
               : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
         } else if (onto === 'cavedown') {
-          log('You\'re standing over a narrow crack descending further into the dark. Press "inspect" to climb down.', 'info')
+          log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
         } else if (onto === 'caveup') {
           log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
         } else if (onto === 'cryptstairsdown') {
@@ -7339,8 +7339,7 @@
     spawnBellGuardians()
     spawnRemoteHighTierChests()
     spawnGroundStuff()
-    spawnCaveContents()
-    spawnDeepCaveContents()
+    spawnCaveScenarios()
     spawnNpcs()
     ensureMerchantStock()
     stopDeathTransition()

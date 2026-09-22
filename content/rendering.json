@@ -202,6 +202,22 @@
     "mark": "#8a1c1c"
   },
   "terrainTiles": {
+    "cavefloor": {"image": "img/tiles/cave-floor.png", "scale": 1},
+    "cavefloor2": {"image": "img/tiles/cave-floor.png", "scale": 1},
+    "cavewall": {"image": "img/tiles/cave-wall.png", "scale": 1},
+    "cryptfloor": {"image": "img/tiles/cave-floor.png", "scale": 1},
+    "crypt2floor": {"image": "img/tiles/cave-floor.png", "scale": 1},
+    "crypt2niche": {"image": "img/tiles/cave-wall.png", "scale": 1},
+    "cryptrubble": {"image": "img/tiles/cave-rubble.png", "scale": 1},
+    "dwarvenrubble": {"image": "img/tiles/cave-rubble.png", "scale": 1},
+    "dwarvenwall": {"image": "img/tiles/cave-wall.png", "scale": 1},
+    "marble": {"image": "img/tiles/marble-floor.png", "scale": 1},
+    "cryptstairsdown": {"image": "img/tiles/cave-down.png", "baseTileKey": "cryptfloor", "scale": 1},
+    "cryptstairsup": {"image": "img/tiles/cave-up.png", "baseTileKey": "crypt2floor", "scale": 1},
+    "mausoleumstairsup": {"image": "img/tiles/cave-up.png", "baseTileKey": "crypt2floor", "scale": 1},
+    "crypttrap": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
+    "crypttrapsprung": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
+    "sarcophagus": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
     "caveentrance": {
       "image": "img/tiles/cave-entrance.png",
       "undergroundImage": "img/tiles/cave-exit.png",
@@ -261,17 +277,6 @@
     },
     "grass": {
       "image": "img/tiles/grassland.png",
-      "variants": [
-        "img/tiles/grassland.png",
-        "img/tiles/grassland-1.png",
-        "img/tiles/grassland-2.png",
-        "img/tiles/grassland-3.png",
-        "img/tiles/grassland-4.png",
-        "img/tiles/grassland-5.png",
-        "img/tiles/grassland-6.png",
-        "img/tiles/grassland-7.png",
-        "img/tiles/grassland-8.png"
-      ],
       "scale": 1
     },
     "sand": {
@@ -410,8 +415,7 @@
     },
     "belltower": {
       "image": "img/tiles/bell-tower.png",
-      "scale": 1,
-      "baseTileKey": "temple"
+      "scale": 1
     },
     "temple": {
       "image": "img/tiles/village-temple.png",
