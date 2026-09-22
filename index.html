@@ -3942,7 +3942,7 @@
             (caves[cryptCaveIndex]?.entrances || []).some(e => e.x === nx && e.y === ny)
           )
           log(currentZ === 0
-            ? `You're standing at the entrance to the cave. ${caveScenarioClue(-1, nx, ny) || ''} Press "inspect" to enter.`
+            ? `You're standing at the entrance to the cave. ${caveScenarioClue(-1, nx, ny) || ''} Press "inspect" to enter if you dare.`
             : cryptExit
               ? 'You\'re standing beneath the ruined chapel. Press "inspect" to climb back into it.'
               : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
