@@ -507,7 +507,7 @@ function generateMap() {
       console.warn(`World generation failed cave-placement validation in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
       break
     }
-    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
+    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum, crypt, or Dwarven Fort. Generating a new world.`)
   }
   placeTreasureMapSpot()
 }
@@ -683,9 +683,34 @@ function generateCaves() {
     discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   })
   buildDwarvenRuin(deepLevels[1])
+  if (isDwarvenGateTooCloseToRandomCave()) return false
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
+}
+
+// Keep the Dwarven Fort visually and spatially distinct from ordinary caves.
+// The fort uses the same world-space coordinates for its surface gate and its
+// underground link/exit chain, so a nearby surface cave mouth also creates a
+// confusing pair of underground exits. Reject the entire world attempt when
+// any ordinary cave entrance lies within a 15-tile Chebyshev radius of the gate.
+const DWARVEN_CAVE_CLEARANCE = 15
+function isDwarvenGateTooCloseToRandomCave() {
+  if (!dwarvenRuin) return false
+  const gateX = dwarvenRuin.x, gateY = dwarvenRuin.y
+  for (const cave of caves) {
+    if (cave.crypt) continue
+    for (const entrance of (cave.entrances || [])) {
+      // buildDwarvenRuin() adds its own link descriptor to `caves`; ignore it.
+      if (entrance.x === gateX && entrance.y === gateY) continue
+      const distance = Math.max(Math.abs(entrance.x - gateX), Math.abs(entrance.y - gateY))
+      if (distance <= DWARVEN_CAVE_CLEARANCE) {
+        console.warn(`Rejecting world: Dwarven Fort gate (${gateX},${gateY}) is only ${distance} tiles from cave entrance (${entrance.x},${entrance.y}); minimum clearance is ${DWARVEN_CAVE_CLEARANCE + 1}.`)
+        return true
+      }
+    }
+  }
+  return false
 }
 
 // The crypt must remain a separate z:-1 region. Check the actual merged
