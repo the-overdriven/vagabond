@@ -651,6 +651,15 @@ The fort is the dedicated generic-chain level at **z:-3**. Fort enemies and
 ground objects use `level: -3`, `levelKind: 'chain'`, and the fort's
 `caveIndex` so they remain associated with the correct map identity.
 
+The surface `dwarvengate` must remain spatially distinct from ordinary cave
+entrances. After the fort is generated, every non-crypt random cave entrance is
+compared with the fort gate using Chebyshev distance. If any entrance is within
+**15 tiles** (`max(abs(dx), abs(dy)) <= 15`), the current world attempt is
+invalidated and the **whole world is regenerated**. Because the fort's z:-3
+`dwarvenfortexit` uses the same world-space coordinate as the surface gate, this
+also prevents an ordinary cave ascent/exit from appearing confusingly close to
+the fort exit underground.
+
 Fort ghost placement is guaranteed from actual valid floor candidates rather
 than from a fixed number of blind coordinate attempts. During world generation,
 the game collects marble tiles inside the fort, excludes tiles too close to the
@@ -783,9 +792,15 @@ actual stamped interior occupying approximately `x = hut.x-3..hut.x+3` and
 larger safety rectangle `x = hut.x-4..hut.x+4`,
 `y = hut.y-7..hut.y+1`, providing a one-tile buffer around that footprint.
 
-This mausoleum check is paired with the surface village rule: a non-crypt cave
-entrance within **4 Chebyshev tiles of any village hut** invalidates cave
-generation. Either violation causes the current world attempt to be rejected.
+This mausoleum check is paired with two surface-spacing rules:
+
+- a non-crypt cave entrance within **4 Chebyshev tiles of any village hut**
+  invalidates cave generation;
+- a non-crypt cave entrance within **15 Chebyshev tiles of the Dwarven Fort
+  gate** invalidates cave generation.
+
+Any of these violations causes the current world attempt to be rejected rather
+than relocating only the offending entrance.
 
 Crypt Level 2 uses its own tighter map and contains dedicated crypt
 structures, including sarcophagi, burial niches, rubble, and the crypt trap.
@@ -863,12 +878,14 @@ checked against the crypt exclusion zone. Only accepted caves are stamped onto
 the surface and merged into the shared underground map. Entrance tiles are
 re-stamped after merging so overlapping caves do not destroy entrances.
 
-After the z:-1 caves are merged, cave placement receives an additional
-village/mausoleum validation. A random cave entrance within 4 Chebyshev tiles of
-any village hut is invalid. Random cave floor/entrance tiles are also forbidden
-from the mausoleum footprint plus its one-tile underground safety margin. A
-failure here makes `generateCaves()` fail, causing the current world attempt to
-be discarded and regenerated.
+After the z:-1 caves are merged, cave placement receives additional spatial
+validation. A random cave entrance within 4 Chebyshev tiles of any village hut
+is invalid. Random cave floor/entrance tiles are also forbidden from the
+mausoleum footprint plus its one-tile underground safety margin. After the
+Dwarven Fort has been generated, every ordinary cave entrance is also checked
+against the surface fort gate; a Chebyshev distance of **15 tiles or less** is
+invalid. Any failure makes `generateCaves()` fail, causing the current world
+attempt to be discarded and regenerated.
 
 After cave generation, the generated surface is copied back into the canonical
 `surfaceMap`. This preserves the stamped entrance tiles when the game returns
@@ -895,11 +912,18 @@ mausoleum. Specifically:
 - a non-crypt cave entrance within **4 Chebyshev tiles of any village hut**
   invalidates the world attempt;
 - a random cave floor/entrance tile intersecting the mausoleum's 9x9 footprint
-  plus its one-tile safety margin invalidates the world attempt.
+  plus its one-tile safety margin invalidates the world attempt;
+- a non-crypt cave entrance within **15 Chebyshev tiles of the Dwarven Fort
+  surface gate** invalidates the world attempt. The fort's underground exit is
+  aligned to that same coordinate, so the rule also keeps ordinary cave exits
+  visually separated from the fort exit on the underground chain.
 
 These checks occur during cave generation. They do not move or delete only the
 offending cave; `generateCaves()` fails and `generateMap()` retries the **whole
-world**, subject to the same maximum-attempt limit.
+world**, subject to the same maximum-attempt limit. At the beginning of every
+full retry, transient generated `enemies`, `groundItems`, and `occupied` state is
+cleared so content from a rejected cave/fort layout cannot leak into the next
+world attempt.
 
 Maximum attempts:
 
@@ -1056,7 +1080,11 @@ The Deadly enemy prefix grants critical-hit capability. Critical hit doubles the
 
 # 21. Enemy Prefixes
 
-Approximately **5% of normal enemy spawns** receive a prefix.
+Approximately **5% of normal enemy spawns** receive a prefix. Scenario-spawned
+z:-1 cave enemies use the same **5%** chance. Scenario-spawned generic z:-2 cave
+enemies use an increased **11%** prefix chance. Dedicated story/fort population
+keeps its own spawn rules unless explicitly routed through the normal prefix
+roll.
 
 Current prefixes:
 
