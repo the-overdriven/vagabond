@@ -209,18 +209,22 @@
       display: block;
     }
 
+    #hpbarwrap.low-hp {
+      animation: lowHpWarning 0.85s steps(1, end) infinite;
+    }
+
     #hpbarwrap.low-hp #hpbar {
-      background-color: #ed4138;
-      animation: lowHpPulse 0.85s ease-in-out infinite;
+      animation: lowHpFill 0.85s steps(1, end) infinite;
     }
 
-    @keyframes lowHpPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 5px #ed4138; }
-      50% { opacity: 0.35; box-shadow: 0 0 13px #ff382d; }
+    @keyframes lowHpWarning {
+      0%, 100% { background-color: #2a0f0d; border-color: #5a1f1a; box-shadow: none; }
+      50% { background-color: #a52b24; border-color: #ff8b7b; box-shadow: 0 0 12px 3px rgba(255, 65, 56, 0.8); }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      #hpbarwrap.low-hp #hpbar { animation: none; }
+    @keyframes lowHpFill {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
     }
 
     .race-card img {

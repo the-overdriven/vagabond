@@ -217,9 +217,12 @@ Magic Find influences loot chances **and** loot quality:
 
 Max HP receives flat bonuses first, then artifact percentage modifiers.
 
-The HUD health bar pulses red when the living player is strictly below 20%
-of maximum HP. The pulse stops at 20% or above, and on death. It is disabled
-when the system requests reduced motion.
+The HUD health bar blinks its entire frame and background red when the living
+player is strictly below 20% of maximum HP; the filled portion dims in sync.
+Discrete animation steps make the warning visible even when the filled portion
+is only a few pixels wide. It stops at 20% or above, and on death. The warning
+continues to blink with reduced-motion enabled; its earlier static-red fallback
+prevented the requested blink for those players.
 
 ---
 
