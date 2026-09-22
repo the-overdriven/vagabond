@@ -895,8 +895,10 @@
       map = undergroundMap
       currentZ = -1
       currentCave = -1
+      undergroundDiscovered = undergroundDiscoveredL1
       player.x = hut.x
       player.y = hut.y
+      minimapDirty = true
       log('The revealed trapdoor opens onto a narrow staircase descending into darkness.', 'info')
       render()
       updateHud()
@@ -1041,6 +1043,7 @@
 
 </script>
 <script src="src/worldGen.js"></script>
+<script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
 <script src="src/saveLoad.js"></script>
 <script>
@@ -3688,6 +3691,7 @@
 
   function findPlayerPath(targetX, targetY) {
     if (targetX < 0 || targetY < 0 || targetX >= MAP_W || targetY >= MAP_H) return null
+    if (currentZ < 0 && !undergroundDiscovered?.[targetY]?.[targetX]) return null
     if (!isWalkableForPlayer(targetX, targetY)) return null
     if (targetX === player.x && targetY === player.y) return []
     const queue = [{x: player.x, y: player.y}]
@@ -3703,6 +3707,7 @@
       for (const [dx, dy] of DIRS8) {
         const nx = cur.x + dx, ny = cur.y + dy
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
+        if (currentZ < 0 && !undergroundDiscovered?.[ny]?.[nx]) continue
         if (!isWalkableForPlayer(nx, ny)) continue
         const nk = keyXY(nx, ny)
         if (cameFrom.has(nk)) continue
@@ -5021,6 +5026,7 @@
 
   function render(now) {
     now = now || performance.now()
+    const undergroundVisible = currentUndergroundFov()
     let viewPlayerX = player.x
     let viewPlayerY = player.y
     if (moveAnim) {
@@ -5036,7 +5042,7 @@
     }
     camX = targetCamX(viewPlayerX)
     camY = targetCamY(viewPlayerY)
-    ctx.fillStyle = RENDER_STYLE.canvas.background
+    ctx.fillStyle = currentZ < 0 ? '#000' : RENDER_STYLE.canvas.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     // During camera movement camX/camY are fractional. The first terrain tile
@@ -5055,6 +5061,8 @@
     for (let vy = 0; vy < renderRows; vy++) {
       for (let vx = 0; vx < renderCols; vx++) {
         const mx = baseMapX + vx, my = baseMapY + vy
+        if (undergroundVisible && !undergroundVisible.has(keyXY(mx, my)) &&
+            !undergroundDiscovered?.[my]?.[mx]) continue
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
@@ -5098,12 +5106,18 @@
             drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
           }
         }
-        markDiscovered(mx, my) // anything drawn on the main screen counts as seen
+        if (undergroundVisible) {
+          if (!undergroundVisible.has(keyXY(mx, my))) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.73)'
+            ctx.fillRect(px, py, TILE_PX, TILE_PX)
+          }
+        } else markDiscovered(mx, my) // surface keeps its existing discovery rule
       }
     }
     // ground items
     for (const g of groundItems) {
       if (!onCurrentLevel(g)) continue
+      if (undergroundVisible && !undergroundVisible.has(keyXY(g.x, g.y))) continue
       if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
       const vx = Math.round((g.x - camX) * TILE_PX)
       const vy = Math.round((g.y - camY) * TILE_PX)
@@ -5123,6 +5137,7 @@
           fxAnims.splice(i, 1)
           continue
         }
+        if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
         const vx = Math.round((p.x - camX) * TILE_PX)
         const vy = Math.round((p.y - camY) * TILE_PX)
         const bump = p.dir * TILE_PX * 0.6 * Math.sin(t * Math.PI / 2) // ease-out bump, up for pickups, down for deaths
@@ -5145,6 +5160,7 @@
         damageAnims.splice(i, 1)
         continue
       }
+      if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
       const vx = Math.round((p.x - camX) * TILE_PX)
       const vy = Math.round((p.y - camY) * TILE_PX - TILE_PX * 0.85 * t)
       ctx.save()
@@ -5180,6 +5196,7 @@
         ey = e.y + (player.y - e.y) * lunge
         if (t >= 1) e.attackStart = undefined
       }
+      if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       // no tile background is painted, so a sliding enemy doesn't drag a solid
@@ -5214,6 +5231,7 @@
     const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
     if (previewPath && previewPath.length) {
       for (const step of previewPath) {
+        if (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x]) continue
         const pvx = Math.round((step.x - camX) * TILE_PX)
         const pvy = Math.round((step.y - camY) * TILE_PX)
         ctx.fillStyle = RENDER_STYLE.overlays.path
@@ -5301,7 +5319,7 @@
         if (!onCurrentLevel(e)) continue
         if (enemyIsVisibleOnMainView(e)) drawEnemyRangeOverlay(e)
       }
-    } else if (hoveredEnemy && hoveredEnemy.alive) {
+    } else if (hoveredEnemy && hoveredEnemy.alive && undergroundTileVisible(hoveredEnemy.x, hoveredEnemy.y)) {
       drawEnemyRangeOverlay(hoveredEnemy)
     }
     if (deathTransition && (deathTransition.phase === 'out' || deathTransition.phase === 'in')) {
@@ -5322,12 +5340,14 @@
   // its attack range (ATTACK_RANGE) and a dimmer outer field for its aggro/chase
   // range (AGGRO_RANGE) - mirrors the exact Chebyshev-distance checks in enemyTurn().
   function drawEnemyRangeOverlay(e) {
+    if (!undergroundTileVisible(e.x, e.y)) return
     const aggroRange = effectiveAggroRange(e)
     for (let dy = -aggroRange; dy <= aggroRange; dy++) {
       for (let dx = -aggroRange; dx <= aggroRange; dx++) {
         if (dx === 0 && dy === 0) continue // leave the enemy's own tile untinted
         const mx = e.x + dx, my = e.y + dy
         if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) continue
+        if (!undergroundTileVisible(mx, my)) continue
         const vx = Math.round((mx - camX) * TILE_PX), vy = Math.round((my - camY) * TILE_PX)
         if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
         const dist = Math.max(Math.abs(dx), Math.abs(dy))
@@ -5367,6 +5387,7 @@
 
   function enemyIsVisibleOnMainView(e) {
     if (!e || !e.alive) return false
+    if (!undergroundTileVisible(e.x, e.y)) return false
     const vx = e.x - camX, vy = e.y - camY
     return vx >= 0 && vy >= 0 && vx < VIEW_W && vy < VIEW_H
   }
@@ -5387,6 +5408,7 @@
   // occupies tile (mx,my), so both surfaces stay in sync automatically.
   function tileInspectInfo(mx, my) {
     if (!map.length || !map[my]) return null // world not generated yet
+    if (!undergroundTileVisible(mx, my)) return null
     if (mx === player.x && my === player.y) {
       const race = raceDef()
       const backgroundPath = playerTerrainBackgroundPath(mx, my)
@@ -5531,7 +5553,7 @@
     if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
-      const blocked = enemies.some(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my) ||
+      const blocked = enemies.some(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my && undergroundTileVisible(mx, my)) ||
         (currentZ === 0 && npcs.some(n => n.x === mx && n.y === my))
       const nextPath = blocked ? null : findPlayerPath(mx, my)
       const oldEnd = hoveredAutoPath?.at(-1), newEnd = nextPath?.at(-1)
@@ -5567,7 +5589,7 @@
       } else tryOpenTrade(n)
       return
     }
-    const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my)
+    const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
     if (e) {
       clearAutoPath()
       return
@@ -5806,6 +5828,27 @@
     ensureMiniBases()
     for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y)
     minimapDirty = true
+  }
+
+  let undergroundFovCache = null
+  function currentUndergroundFov() {
+    if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
+    if (!undergroundFovCache || undergroundFovCache.map !== map ||
+        undergroundFovCache.discovered !== undergroundDiscovered ||
+        undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
+      const visible = UndergroundFov.compute(map, player.x, player.y)
+      undergroundFovCache = {map, discovered: undergroundDiscovered,
+        x: player.x, y: player.y, visible}
+      for (const pos of visible) {
+        const [x, y] = pos.split(',').map(Number)
+        markDiscovered(x, y)
+      }
+    }
+    return undergroundFovCache.visible
+  }
+
+  function undergroundTileVisible(x, y) {
+    return currentZ >= 0 || !!currentUndergroundFov()?.has(keyXY(x, y))
   }
 
   // Reveals a (radius*2+1) square centered on (cx,cy) on the current level's

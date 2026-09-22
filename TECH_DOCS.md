@@ -2723,6 +2723,32 @@ There are separate discovery structures for:
 - z:-1
 - deeper levels
 
+## Underground field of view
+
+`src/fov.js` computes a circular eight-tile sight radius around the player on
+every underground map: ordinary caves, grottos, the crypt, mausoleum, and
+Dwarven Fort. The game has no facing direction, so sight extends in all
+directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
+crypt niches, boulders, and the Black Pillar. The blocking wall face itself
+remains visible. Water does not block sight. Diagonal sight follows tile
+centers: an adjacent open diagonal tile remains visible even if the two
+cardinal neighbors are walls. Surface visibility is unchanged.
+
+Only terrain in the current field of view becomes discovered. Never-seen tiles
+are black on the main canvas and fogged on both minimaps; previously seen tiles
+remain on the main canvas at reduced brightness and on the minimaps. Enemies,
+ground items, damage effects, inspection tooltips, and enemy range overlays
+appear only inside the current field of view, even on explored tiles. Underground
+click-to-move paths can use only discovered tiles. Enemy movement and combat
+mechanics are unchanged; this feature controls the player's information.
+
+The existing per-level discovery grids are saved and loaded as before. A
+cached field of view is recalculated when the player moves or the active map
+changes, rather than on every animation frame. This module uses no random
+numbers, so replay RNG consumption stays unchanged. The approach follows the
+wall-aware field-of-view concept in rot.js, implemented locally without a
+runtime dependency.
+
 Therefore:
 
 > Existing map data does not imply that the player has discovered that location.
