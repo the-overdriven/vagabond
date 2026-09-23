@@ -507,7 +507,7 @@ function generateMap() {
       console.warn(`World generation failed cave-placement validation in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
       break
     }
-    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum, crypt, or Dwarven Fort. Generating a new world.`)
+    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
   }
   placeTreasureMapSpot()
 }
@@ -683,34 +683,9 @@ function generateCaves() {
     discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   })
   buildDwarvenRuin(deepLevels[1])
-  if (isDwarvenGateTooCloseToRandomCave()) return false
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
-}
-
-// Keep the Dwarven Fort visually and spatially distinct from ordinary caves.
-// The fort uses the same world-space coordinates for its surface gate and its
-// underground link/exit chain, so a nearby surface cave mouth also creates a
-// confusing pair of underground exits. Reject the entire world attempt when
-// any ordinary cave entrance lies within a 15-tile Chebyshev radius of the gate.
-const DWARVEN_CAVE_CLEARANCE = 15
-function isDwarvenGateTooCloseToRandomCave() {
-  if (!dwarvenRuin) return false
-  const gateX = dwarvenRuin.x, gateY = dwarvenRuin.y
-  for (const cave of caves) {
-    if (cave.crypt) continue
-    for (const entrance of (cave.entrances || [])) {
-      // buildDwarvenRuin() adds its own link descriptor to `caves`; ignore it.
-      if (entrance.x === gateX && entrance.y === gateY) continue
-      const distance = Math.max(Math.abs(entrance.x - gateX), Math.abs(entrance.y - gateY))
-      if (distance <= DWARVEN_CAVE_CLEARANCE) {
-        console.warn(`Rejecting world: Dwarven Fort gate (${gateX},${gateY}) is only ${distance} tiles from cave entrance (${entrance.x},${entrance.y}); minimum clearance is ${DWARVEN_CAVE_CLEARANCE + 1}.`)
-        return true
-      }
-    }
-  }
-  return false
 }
 
 // The crypt must remain a separate z:-1 region. Check the actual merged
@@ -1254,7 +1229,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
       if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
@@ -1347,7 +1322,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
             const x = wx + dx, y = wy + dy
             if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
-              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
+                !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
           }
           if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
           const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
@@ -1393,7 +1368,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     const open = []
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
-        !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
+          !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
     let spot = null, layout = null
     for (let tries = 0; tries < 18 && open.length; tries++) {
@@ -2396,6 +2371,12 @@ function ensureGravediggerGrave() {
   }
 }
 
+function clearGroundItemsUnderMerchant() {
+  const merchant = npcs.find(n => n.name === 'Merchant')
+  if (!merchant) return
+  groundItems = groundItems.filter(g => !((g.level ?? 0) === 0 && g.x === merchant.x && g.y === merchant.y))
+}
+
 function spawnNpcs() {
   npcs = []
   for (const tmpl of NPC_TEMPLATES) {
@@ -2407,7 +2388,7 @@ function spawnNpcs() {
       y = randInt(Math.max(2, origin.y - spread), Math.min(MAP_H - 3, origin.y + spread))
       dist = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
       tries++
-    } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < 2 || occupied.has(keyXY(x, y))) && tries < 300)
+    } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < 2 || occupied.has(keyXY(x, y)) || (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === x && g.y === y))) && tries < 300)
     if (tries >= 300) continue // extremely unlikely on a cramped map - just skip this one
     const npc = {
       name: tmpl.name,

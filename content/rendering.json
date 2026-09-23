@@ -12,22 +12,29 @@
       "glyph": "~"
     },
     "coffin": {
-      "glyph": "⚰",
+      "glyph": "\u26b0",
       "color": "#aaa39a",
       "bg": "#171412",
       "image": "img/tiles/coffin.png",
       "scale": 1
     },
     "grassTree": {
-      "glyph": "♣",
+      "glyph": "\u2663",
       "color": "#164c23",
       "image": "img/tiles/grassland-tree.png",
-      "scale": 1
+      "scale": 1,
+      "mirrorX": true,
+      "scaleVariants": [
+        0.92,
+        0.96,
+        1.0
+      ]
     },
     "foragedForest": {
       "color": "#554f2a",
       "image": "img/tiles/forest-tree.png",
-      "scale": 1
+      "scale": 1,
+      "filter": "sepia(0.7) saturate(0.55) brightness(0.78) hue-rotate(-12deg)"
     },
     "dugSand": {
       "bg": "#9a8050"
@@ -41,14 +48,14 @@
       "scale": 1
     },
     "deadbody": {
-      "glyph": "☠",
+      "glyph": "\u2620",
       "color": "rgb(232, 162, 79)",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
     },
     "playerremains": {
-      "glyph": "╶☠╴",
+      "glyph": "\u2576\u2620\u2574",
       "color": "#e8a24f",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
@@ -60,32 +67,32 @@
       "scale": 1
     },
     "skeleton": {
-      "glyph": "╶☠╴",
+      "glyph": "\u2576\u2620\u2574",
       "color": "#d0d0c0",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
     },
     "wheelbarrow": {
-      "glyph": "▱",
+      "glyph": "\u25b1",
       "color": "#b8b8b8",
       "image": "img/tiles/wheelbarrow.png",
       "scale": 1
     },
     "goldcoin": {
-      "glyph": "●",
+      "glyph": "\u25cf",
       "color": "#f0c84b",
       "image": "img/tiles/huge-gold-coin.png",
       "scale": 1
     },
     "dwarvenremains": {
-      "glyph": "¤",
+      "glyph": "\u00a4",
       "color": "#d0c7b4",
       "image": "img/tiles/dwarven-remains.png",
       "scale": 1
     },
     "anvil": {
-      "glyph": "♠",
+      "glyph": "\u2660",
       "color": "#9d9d9d",
       "image": "img/tiles/anvil.png",
       "scale": 1
@@ -115,17 +122,17 @@
       "scale": 1.1
     },
     "gear": {
-      "glyph": "†",
+      "glyph": "\u2020",
       "color": "#c9b37a"
     },
     "ruinprop": {
-      "glyph": "¤",
+      "glyph": "\u00a4",
       "color": "#a89270",
       "image": "img/tiles/dwarven-remains.png",
       "scale": 1
     },
     "explorerremains": {
-      "glyph": "☠",
+      "glyph": "\u2620",
       "color": "#d0d0c0",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
@@ -180,11 +187,11 @@
     "fog": "rgba(3,2,1,0.72)",
     "cave": "#ff6b2e",
     "dwarvenFort": {
-      "glyph": "♜",
+      "glyph": "\u265c",
       "color": "#e8b85b"
     },
     "temple": {
-      "glyph": "☦",
+      "glyph": "\u2626",
       "color": "purple"
     },
     "player": "#e0473f",
@@ -202,22 +209,76 @@
     "mark": "#8a1c1c"
   },
   "terrainTiles": {
-    "cavefloor": {"image": "img/tiles/cave-floor.png", "scale": 1},
-    "cavefloor2": {"image": "img/tiles/cave-floor.png", "scale": 1},
-    "cavewall": {"image": "img/tiles/cave-wall.png", "scale": 1},
-    "cryptfloor": {"image": "img/tiles/cave-floor.png", "scale": 1},
-    "crypt2floor": {"image": "img/tiles/cave-floor.png", "scale": 1},
-    "crypt2niche": {"image": "img/tiles/cave-wall.png", "scale": 1},
-    "cryptrubble": {"image": "img/tiles/cave-rubble.png", "scale": 1},
-    "dwarvenrubble": {"image": "img/tiles/cave-rubble.png", "scale": 1},
-    "dwarvenwall": {"image": "img/tiles/cave-wall.png", "scale": 1},
-    "marble": {"image": "img/tiles/marble-floor.png", "scale": 1},
-    "cryptstairsdown": {"image": "img/tiles/cave-down.png", "baseTileKey": "cryptfloor", "scale": 1},
-    "cryptstairsup": {"image": "img/tiles/cave-up.png", "baseTileKey": "crypt2floor", "scale": 1},
-    "mausoleumstairsup": {"image": "img/tiles/cave-up.png", "baseTileKey": "crypt2floor", "scale": 1},
-    "crypttrap": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
-    "crypttrapsprung": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
-    "sarcophagus": {"image": "img/tiles/coffin.png", "baseTileKey": "crypt2floor", "scale": 1},
+    "cavefloor": {
+      "image": "img/tiles/cave-floor.png",
+      "scale": 1
+    },
+    "cavefloor2": {
+      "image": "img/tiles/cave-floor.png",
+      "scale": 1
+    },
+    "cavewall": {
+      "image": "img/tiles/cave-wall.png",
+      "scale": 1
+    },
+    "cryptfloor": {
+      "image": "img/tiles/cave-floor.png",
+      "scale": 1
+    },
+    "crypt2floor": {
+      "image": "img/tiles/cave-floor.png",
+      "scale": 1
+    },
+    "crypt2niche": {
+      "image": "img/tiles/cave-wall.png",
+      "scale": 1
+    },
+    "cryptrubble": {
+      "image": "img/tiles/cave-rubble.png",
+      "scale": 1
+    },
+    "dwarvenrubble": {
+      "image": "img/tiles/cave-rubble.png",
+      "scale": 1
+    },
+    "dwarvenwall": {
+      "image": "img/tiles/cave-wall.png",
+      "scale": 1
+    },
+    "marble": {
+      "image": "img/tiles/marble-floor.png",
+      "scale": 1
+    },
+    "cryptstairsdown": {
+      "image": "img/tiles/cave-down.png",
+      "baseTileKey": "cryptfloor",
+      "scale": 1
+    },
+    "cryptstairsup": {
+      "image": "img/tiles/cave-up.png",
+      "baseTileKey": "crypt2floor",
+      "scale": 1
+    },
+    "mausoleumstairsup": {
+      "image": "img/tiles/cave-up.png",
+      "baseTileKey": "crypt2floor",
+      "scale": 1
+    },
+    "crypttrap": {
+      "image": "img/tiles/coffin.png",
+      "baseTileKey": "crypt2floor",
+      "scale": 1
+    },
+    "crypttrapsprung": {
+      "image": "img/tiles/coffin.png",
+      "baseTileKey": "crypt2floor",
+      "scale": 1
+    },
+    "sarcophagus": {
+      "image": "img/tiles/coffin.png",
+      "baseTileKey": "crypt2floor",
+      "scale": 1
+    },
     "caveentrance": {
       "image": "img/tiles/cave-entrance.png",
       "undergroundImage": "img/tiles/cave-exit.png",
@@ -428,7 +489,8 @@
     },
     "village": {
       "image": "img/tiles/thatched-hut.png",
-      "scale": 1
+      "scale": 1,
+      "mirrorX": true
     }
   }
 }

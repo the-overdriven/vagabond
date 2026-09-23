@@ -418,6 +418,9 @@ function loadGameFromObject(data, opts = {}) {
     currentCave = -1
     undergroundDiscovered = undergroundDiscoveredL1
   }
+  // Foraged forest tiles affect minimap colors, so restore them before
+  // rebuilding the cached minimap bases.
+  foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : [])
   rebuildMinimapBases()
 
   spawnPoint = {x: data.spawnPoint.x, y: data.spawnPoint.y}
@@ -529,7 +532,6 @@ function loadGameFromObject(data, opts = {}) {
   // what the recorded buy/sell actions expect. Only genuine save-file
   // loads (pre-this-field saves) need this.
   if (!isReplayInit) ensureMerchantStock()
-  foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : [])
   dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : [])
 
   enemies = (data.enemies || []).map(e => {
@@ -640,6 +642,7 @@ function loadGameFromObject(data, opts = {}) {
     }
     return item
   })
+  clearGroundItemsUnderMerchant()
   if (dwarvenRuin && dwarvenRuin.caveIndex >= 0 && deepLevels[1]) {
     const fortMap = deepLevels[1].caveMaps[dwarvenRuin.caveIndex]
     // Repair saves made while the fort transition was being changed: locate

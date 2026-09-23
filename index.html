@@ -4,12 +4,7 @@
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 
 22.09.2026
-🌳 add more tree variants, rotate huts
-🖱️ feat: Mouse click could also attack (desktop only) and change cursor to sword
 🍖 balance: non-humanoids should drop food
-🌲 add foraged tree tiles (just different colours)
-🚫 nothing should spawn (no item, or buried) below merchant!
-🗺️ Foraged fields have a different colour assigned on the map, but it seems to be ignored when loading?
 👹 spawn rare monsters when u walk longer
 🔄 fix desync again....
 ⛏️ "we must dig deeper" written in dwarven ruins
@@ -730,6 +725,18 @@
     let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0
     h = Math.imul(h ^ (h >>> 13), 1274126177)
     return paths[((h ^ (h >>> 16)) >>> 0) % paths.length]
+  }
+
+  // Reuse one sprite in deterministic visual variants without consuming gameplay RNG.
+  function coordinateVisualVariant(visual, x, y, salt = 0) {
+    if (!visual || (!visual.mirrorX && !Array.isArray(visual.scaleVariants))) return visual
+    let h = (Math.imul((x + salt) | 0, 374761393) + Math.imul((y - salt) | 0, 668265263)) | 0
+    h = Math.imul(h ^ (h >>> 13), 1274126177)
+    h = (h ^ (h >>> 16)) >>> 0
+    const out = {...visual}
+    if (visual.mirrorX) out.flipX = (h & 1) === 1
+    if (Array.isArray(visual.scaleVariants) && visual.scaleVariants.length) out.scale = visual.scaleVariants[(h >>> 1) % visual.scaleVariants.length]
+    return out
   }
 
   function playerTerrainBackgroundPath(x = player?.x, y = player?.y) {
@@ -4488,15 +4495,17 @@
     const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
-
-    if (a === 1) {
-      ctx.drawImage(cached, x, y)
-    } else {
-      ctx.save()
-      ctx.globalAlpha = a
-      ctx.drawImage(cached, x, y)
-      ctx.restore()
-    }
+    const transformed = a !== 1 || visual.flipX || visual.filter
+    if (!transformed) { ctx.drawImage(cached, x, y); return true }
+    ctx.save()
+    ctx.globalAlpha = a
+    if (visual.filter) ctx.filter = visual.filter
+    if (visual.flipX) {
+      ctx.translate(x + size, y)
+      ctx.scale(-1, 1)
+      ctx.drawImage(cached, 0, 0)
+    } else ctx.drawImage(cached, x, y)
+    ctx.restore()
     return true
   }
 
@@ -4747,7 +4756,8 @@
       else image = visual.singleImage || visual.image || visual.middleImage || visual.leftImage || visual.rightImage
     }
 
-    return image ? {...visual, image} : visual
+    const resolved = image ? {...visual, image} : visual
+    return coordinateVisualVariant(resolved, x, y, tileKey === 'village' ? 97 : 0)
   }
 
   function terrainBaseBg(baseTileKey) {
@@ -4787,7 +4797,8 @@
   function treeCanopyVisualAt(mx, my) {
     if (currentZ !== 0 || !map?.[my]?.[mx]) return null
     const tileKey = map[my][mx]
-    if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return RENDER_STYLE.specialTiles.grassTree
+    if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree, mx, my, 41)
+    if (tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53)
     if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my)
     return null
   }
@@ -5137,8 +5148,10 @@
           // Preserve the original glyph + background renderer exactly.
           drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
         } else {
-          const terrainImgVisual = terrainVisual(tileKey, mx, my)
-          const overlayVisual = tree ? RENDER_STYLE.specialTiles.grassTree : null
+          const grassTreeVisual = tree ? coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree, mx, my, 41) : null
+          const foragedForestVisual = foraged ? {...coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53), baseTileKey: 'grass'} : null
+          const terrainImgVisual = foragedForestVisual || terrainVisual(tileKey, mx, my)
+          const overlayVisual = grassTreeVisual
           const visual = overlayVisual || terrainImgVisual
           if (visual?.image || (Array.isArray(visual?.frames) && visual.frames.length)) {
             let drew = false
@@ -5560,12 +5573,24 @@
     return null
   }
 
+  const DESKTOP_ENEMY_CURSOR = `url("img/cursors/red-sword.svg") 5 5, crosshair`
+
+  function enemyIsDesktopClickAttackable(e) {
+    return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1
+  }
+
+  function setDesktopCanvasCursor(e) {
+    if (window.matchMedia('(pointer: coarse)').matches) return
+    canvas.style.cursor = enemyIsDesktopClickAttackable(e) ? DESKTOP_ENEMY_CURSOR : ''
+  }
+
   function updateTooltip() {
     if (lastMousePx === null) return
     const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
     const info = tileInspectInfo(mx, my)
     const e = info ? info.enemy : null
+    setDesktopCanvasCursor(e)
     if (e !== hoveredEnemy) {
       hoveredEnemy = e
       render() // redraw so the range overlay appears/updates/clears immediately
@@ -5621,6 +5646,7 @@
     lastMousePx = null
     lastMousePy = null
     tooltip.style.display = 'none'
+    if (!window.matchMedia('(pointer: coarse)').matches) canvas.style.cursor = ''
     if (hoveredEnemy) {
       hoveredEnemy = null
       render()
@@ -5660,6 +5686,17 @@
   }
 
   canvas.addEventListener('click', (ev) => {
+    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim && !replayPlaying) {
+      const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
+      const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
+      const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+      const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
+      if (enemyIsDesktopClickAttackable(e)) {
+        clearAutoPath()
+        tryMove(e.x - player.x, e.y - player.y)
+        return
+      }
+    }
     handleCanvasTap(ev.clientX, ev.clientY)
   })
 
@@ -7443,6 +7480,7 @@
     spawnGroundStuff()
     spawnCaveScenarios()
     spawnNpcs()
+    clearGroundItemsUnderMerchant()
     ensureMerchantStock()
     stopDeathTransition()
     stopAttackAnimation()

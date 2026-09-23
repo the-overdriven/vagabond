@@ -313,6 +313,16 @@ A normal player move advances one grid tile.
 
 Walking into an adjacent enemy attacks instead of entering its tile.
 
+On desktop/fine-pointer devices, clicking an adjacent living enemy (including a
+diagonal neighbor) invokes the same `tryMove(dx, dy)` combat path as keyboard
+movement, so turn consumption, replay recording, combat rules, and animations
+remain shared rather than duplicated. Hovering such an attackable enemy changes
+the canvas cursor to a red diagonal sword whose hotspot is the sword tip. Outside
+an attackable enemy, the inline cursor override is cleared so the canvas keeps its
+existing stylesheet/default cursor. Non-adjacent clicks retain the normal click-to-move
+behavior, and coarse-pointer/mobile input does not use this cursor or desktop
+click-attack shortcut.
+
 Walking into an NPC triggers interaction instead of entering its tile.
 
 ---
@@ -435,6 +445,16 @@ Grassland tree decoration:
 - Trees are visual-only: the underlying grass remains walkable and retains its
   normal terrain effects.
 - Tree locations are persisted in save files.
+- In tile-image mode, grassland trees reuse `img/tiles/grassland-tree.png` with
+  deterministic coordinate-based visual variation: some instances are mirrored
+  horizontally and their scale is selected from 0.92, 0.96, or 1.0. These
+  cosmetic variants consume no gameplay RNG and require no extra save fields;
+  the same coordinate therefore renders the same way after loading.
+- A foraged ordinary-forest tile remains `forest` terrain and keeps all normal
+  forest mechanics, but tile-image mode reuses `img/tiles/forest-tree.png` with
+  a muted brown/olive filter. ASCII mode and both minimaps use the existing
+  `specialTiles.foragedForest.color`. The distinction comes from the persisted
+  `foragedTiles` set rather than from a new terrain ID.
 
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 
@@ -569,6 +589,12 @@ The exact mausoleum hut coordinate is also persisted as `mausoleumHutPos` in
 saves. On load, the coordinate is preferred when valid; otherwise the game
 recovers the relationship by matching a hut's name to the anomalous tombstone's
 name. The loader does not invent a mausoleum by centrality or connectivity.
+
+In tile-image mode, village huts continue to reuse the single
+`img/tiles/thatched-hut.png` sprite. A coordinate-derived visual hash mirrors
+some huts horizontally, producing two orientations without changing hut
+identity, world generation, collision, or save data. This is cosmetic only and
+does not consume the seeded gameplay RNG.
 
 Random cave entrances are not allowed to spawn immediately beside the village.
 After z:-1 caves are generated, every non-crypt cave entrance is checked against
@@ -2364,6 +2390,14 @@ The Merchant:
 - sells items
 - buys items
 - persists stock through saves
+- must not occupy the same surface coordinate as any `groundItems` entry,
+  including hidden `buriedgear` and `buriedartifact` objects
+
+During new-world NPC placement, Merchant candidate tiles are rejected if a
+surface ground item already occupies that coordinate. As a compatibility guard,
+loading a save removes any surface ground item found directly under the Merchant;
+this repairs older worlds that already contain such an impossible overlap. Other
+NPCs retain their existing placement rules.
 
 Stackable consumables are handled as stacks.
 
@@ -2729,6 +2763,13 @@ Saved state includes substantial world and player information, including:
 - tombstones
 - merchant inventory
 - foraged tiles
+
+`foragedTiles` must be restored before `rebuildMinimapBases()` runs during load.
+The cached minimap terrain bases paint foraged forest with
+`specialTiles.foragedForest.color`; rebuilding first would permanently cache the
+normal forest color for that load until another full rebuild. This ordering is a
+save/load rendering invariant and should be preserved when changing loader
+initialization order.
 
 Enemy save records now persist `levelKind` in addition to numeric `level` and
 `caveIndex`. This is required because a z value alone does not uniquely identify
