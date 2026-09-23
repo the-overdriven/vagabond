@@ -9,7 +9,7 @@
 // handler at the bottom), so they catch up on the next launch.
 // ---------------------------------------------------------------------------
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + 'v14'; // <-- bump me on every content/image release
+const CACHE_VERSION = CACHE_PREFIX + 'v16'; // <-- bump me on every content/image release
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -24,6 +24,10 @@ const PRECACHE_URLS = [
   './icon-192.png',
   './icon-512.png',
   './icon-512-maskable.png',
+  './src/worldGen.js',
+  './src/fov.js',
+  './src/replay.js',
+  './src/saveLoad.js',
   './content/gear_weapons.json',
   './content/gear_shields.json',
   './content/gear_armors.json',
