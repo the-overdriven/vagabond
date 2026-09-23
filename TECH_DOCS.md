@@ -2923,7 +2923,26 @@ Current desktop controls include:
 | Escape | Close overlays                                                 |
 | Control | Show enemy ranges                                              |
 | Caps Lock | Lock enemy ranges                                              |
+| + / - (including numpad) | Increase / decrease game tile size               |
+| Mouse wheel over game canvas | Increase / decrease game tile size           |
 | G | Debug/god mode                                                 |
+
+Tile size starts at 40 canvas pixels and changes in four-pixel steps from 20
+to 96. Desktop recomputes the camera's tile count from available stage width
+and height, keeping 7–50 tiles horizontally and sizing the canvas to complete
+tiles. A cramped window caps the effective tile size so the canvas fits. On
+coarse-pointer layouts the 16-column baseline scales with tile size (also
+bounded to 7–50 columns), while the existing vertical drag still controls
+visible rows. Pointer hit testing uses the canvas's actual displayed-to-buffer
+ratio. Zoom is presentation-only: it does not change world coordinates,
+gameplay RNG, save data, or the separate world-map zoom. Rasterized terrain
+and item image caches are rebuilt when tile size changes.
+
+Wheel zoom listens only on the game canvas: scrolling over the message log,
+inventory, trade panels, or other scrollable content keeps its usual behavior.
+The separate full-map wheel zoom still applies when the map is open. Ctrl/Meta
+wheel remains available for browser zoom. Small trackpad deltas accumulate
+before each tile-size step.
 
 ---
 

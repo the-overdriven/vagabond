@@ -436,6 +436,7 @@
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
     <kbd>T</kbd> wait / skip turn &nbsp;<br>
     <kbd>P</kbd> toggle tiles / ASCII &nbsp;<br>
+    <kbd>+</kbd><kbd>−</kbd> tile size &nbsp;<br>
     <kbd>CTRL</kbd> show enemy ranges &nbsp;<br>
     <kbd id="kbdCaps">CAPS</kbd> toggle enemy ranges &nbsp;<br>
     <kbd>TAB</kbd> gear &nbsp;
@@ -4420,13 +4421,14 @@
 
   const canvas = document.getElementById('game')
   const ctx = canvas.getContext('2d')
-  const DESKTOP_MIN_VIEW_W = 21, DESKTOP_MIN_VIEW_H = 13
+  const MIN_VIEW_TILES = 7, MAX_VIEW_TILES = 50
+  const TILE_ZOOM_MIN = 20, TILE_ZOOM_MAX = 96, TILE_ZOOM_STEP = 4
   const MOBILE_VIEW_W = 16
   const MOBILE_DEFAULT_VIEW_H = 13
   const MOBILE_MIN_VIEW_H = 10, MOBILE_MAX_VIEW_H = 19
   let mobileViewH = MOBILE_DEFAULT_VIEW_H
-  let VIEW_W = DESKTOP_MIN_VIEW_W, VIEW_H = DESKTOP_MIN_VIEW_H
-  const TILE_PX = 40
+  let VIEW_W = 21, VIEW_H = 13
+  let requestedTilePx = 40, TILE_PX = 40, renderedTilePx = 40
   canvas.width = VIEW_W * TILE_PX
   canvas.height = VIEW_H * TILE_PX
   ctx.imageSmoothingEnabled = false
@@ -4435,9 +4437,11 @@
   ctx.textAlign = 'center'
 
   function applyGameViewport(width, height) {
-    if (width === VIEW_W && height === VIEW_H) return false
+    if (width === VIEW_W && height === VIEW_H && TILE_PX === renderedTilePx) return false
+    const tileSizeChanged = TILE_PX !== renderedTilePx
     VIEW_W = width
     VIEW_H = height
+    renderedTilePx = TILE_PX
     canvas.width = VIEW_W * TILE_PX
     canvas.height = VIEW_H * TILE_PX
     ctx.imageSmoothingEnabled = false
@@ -4445,6 +4449,14 @@
     ctx.textBaseline = 'top'
     ctx.textAlign = 'center'
     document.documentElement.style.setProperty('--game-width', `${canvas.width}px`)
+    if (tileSizeChanged) {
+      // Both caches contain canvases already rasterized at the old tile size.
+      scaledVisualCache = new WeakMap()
+      outlinedVisualCache = new WeakMap()
+      lastMousePx = lastMousePy = null
+      hoveredEnemy = null
+      tooltip.style.display = 'none'
+    }
     // During startup the viewport can be sized before the world is generated.
     if (map.length) render()
     return true
@@ -4453,19 +4465,38 @@
   function resizeMobileViewport(height = mobileViewH) {
     if (!window.matchMedia('(pointer:coarse)').matches) return
     mobileViewH = Math.max(MOBILE_MIN_VIEW_H, Math.min(MOBILE_MAX_VIEW_H, Math.round(height)))
-    applyGameViewport(MOBILE_VIEW_W, mobileViewH)
+    TILE_PX = requestedTilePx
+    const columns = Math.max(MIN_VIEW_TILES, Math.min(MAX_VIEW_TILES,
+      Math.round(MOBILE_VIEW_W * 40 / requestedTilePx)))
+    applyGameViewport(columns, mobileViewH)
   }
 
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const sideOpen = !document.body.classList.contains('side-collapsed')
     const reserved = sideOpen ? 292 : 28
-    const nextWidth = Math.max(DESKTOP_MIN_VIEW_W, Math.floor((window.innerWidth - reserved - 28) / TILE_PX))
+    const availableWidth = Math.max(1, window.innerWidth - reserved - 28)
     const logPanel = document.getElementById('logpanel')
     const stageTop = document.getElementById('stage').getBoundingClientRect().top
-    const availableHeight = window.innerHeight - stageTop - logPanel.getBoundingClientRect().height - 8
-    const nextHeight = Math.max(DESKTOP_MIN_VIEW_H, Math.floor((availableHeight - 4) / TILE_PX))
+    const availableHeight = Math.max(1, window.innerHeight - stageTop - logPanel.getBoundingClientRect().height - 12)
+    // Fit the canvas into the stage while keeping seven to fifty columns.
+    // Extremely short windows may show fewer than seven rows.
+    const maxFittingTile = Math.floor(Math.min(availableWidth, availableHeight) / MIN_VIEW_TILES)
+    TILE_PX = Math.max(12, Math.min(requestedTilePx, maxFittingTile))
+    const nextWidth = Math.max(MIN_VIEW_TILES, Math.min(MAX_VIEW_TILES, Math.floor(availableWidth / TILE_PX)))
+    const nextHeight = Math.max(1, Math.min(MAX_VIEW_TILES, Math.floor(availableHeight / TILE_PX)))
     applyGameViewport(nextWidth, nextHeight)
+  }
+
+  function changeTileSize(direction) {
+    const next = Math.max(TILE_ZOOM_MIN, Math.min(TILE_ZOOM_MAX,
+      requestedTilePx + direction * TILE_ZOOM_STEP))
+    if (next === requestedTilePx) return
+    requestedTilePx = next
+    if (window.matchMedia('(pointer:coarse)').matches) {
+      resizeMobileViewport()
+      updateMobileSafeAreas()
+    } else resizeDesktopViewport()
   }
 
   function brownDeepCaveAt(x, y) {
@@ -4541,10 +4572,10 @@
   }
 
   // Runtime-sized sprite cache. Most source tiles are 256x256 (and some are
-  // much larger) but the game draws them at 40px. Rescaling those source images
+  // much larger) but the game draws them at the current tile size. Rescaling those source images
   // hundreds of times during every walking frame is expensive on mobile. Build
-  // the 40px/scale-sized version once per decoded image and reuse it.
-  const scaledVisualCache = new WeakMap()
+  // the tile-sized version once per decoded image and reuse it.
+  let scaledVisualCache = new WeakMap()
 
   function scaledVisualCanvas(image, scale, filter = '') {
     let byScale = scaledVisualCache.get(image)
@@ -4552,7 +4583,7 @@
       byScale = new Map()
       scaledVisualCache.set(image, byScale)
     }
-    const key = String(scale) + '|' + filter
+    const key = TILE_PX + '|' + scale + '|' + filter
     if (byScale.has(key)) return byScale.get(key)
 
     const size = Math.max(1, Math.round(TILE_PX * scale))
@@ -4591,7 +4622,7 @@
 
   // Cache outlined item sprites. Previously every item used ctx.filter plus
   // eight shadow draws on every render; now that work happens only once.
-  const outlinedVisualCache = new WeakMap()
+  let outlinedVisualCache = new WeakMap()
 
   function outlinedVisualCanvas(image, scale) {
     let byScale = outlinedVisualCache.get(image)
@@ -4599,7 +4630,7 @@
       byScale = new Map()
       outlinedVisualCache.set(image, byScale)
     }
-    const key = String(scale)
+    const key = TILE_PX + '|' + scale
     if (byScale.has(key)) return byScale.get(key)
 
     const scaled = scaledVisualCanvas(image, scale)
@@ -5743,6 +5774,23 @@
     clearHoveredAutoPath()
   })
 
+  // Wheel zoom belongs to the game canvas only. The log, inventory, trade
+  // lists, and map overlay retain their own scrolling/zoom behavior.
+  let wheelZoomAccum = 0, wheelZoomLast = 0
+  canvas.addEventListener('wheel', (ev) => {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || raceOpen || replayPlaying ||
+        mapOpen || invOpen || tradeOpen || treasureMapOpen || !ev.deltaY) return
+    ev.preventDefault()
+    const delta = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? canvas.clientHeight : 1)
+    if (ev.timeStamp - wheelZoomLast > 250 || (wheelZoomAccum && Math.sign(wheelZoomAccum) !== Math.sign(delta)))
+      wheelZoomAccum = 0
+    wheelZoomLast = ev.timeStamp
+    wheelZoomAccum += delta
+    if (Math.abs(wheelZoomAccum) < 80) return
+    changeTileSize(wheelZoomAccum < 0 ? 1 : -1)
+    wheelZoomAccum = 0
+  }, {passive: false})
+
   function handleCanvasTap(clientX, clientY) {
     if (mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
@@ -5814,7 +5862,7 @@
     if (!canvasTouchResizing && Math.abs(dy) < 12) return
     if (!canvasTouchResizing && Math.abs(dy) <= Math.abs(dx)) return
     canvasTouchResizing = true
-    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / MOBILE_VIEW_W)
+    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / VIEW_W)
     resizeMobileViewport(canvasTouchStartViewH + Math.round(dy / tileCssPx))
     updateMobileSafeAreas()
   }, {passive: false})
@@ -5852,7 +5900,7 @@
     ev.preventDefault()
     ev.stopPropagation()
     const dy = ev.touches[0].clientY - resizeHandleStartY
-    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / MOBILE_VIEW_W)
+    const tileCssPx = Math.max(1, canvas.getBoundingClientRect().width / VIEW_W)
     resizeMobileViewport(resizeHandleStartViewH + Math.round(dy / tileCssPx))
     updateMobileSafeAreas()
   }, {passive: false})
@@ -7331,6 +7379,12 @@
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen) return
+    if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
+        (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
+      ev.preventDefault()
+      changeTileSize(k === '+' || ev.code === 'NumpadAdd' ? 1 : -1)
+      return
+    }
     if (k === ' ' || k === 'Spacebar') {
       ev.preventDefault()
       inspect()
