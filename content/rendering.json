@@ -217,6 +217,10 @@
       "image": "img/tiles/cave-floor.png",
       "scale": 1
     },
+    "cavefloorBrown": {
+      "image": "img/tiles/cave-floor-brown-dark.png",
+      "scale": 1
+    },
     "cavewall": {
       "image": "img/tiles/cave-wall.png",
       "scale": 1

@@ -1,5 +1,6 @@
 <!-- TODO:
 
+- prefixed monsters should have their glyphs distinguished somehow
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 
@@ -1013,6 +1014,7 @@
       map = nextMap
       undergroundDiscovered = depthUndergroundDiscovered(nextDepth)
       log(caveScenarioIntro(currentZ, player.x, player.y) || 'You squeeze through the crack and descend deeper into the dark.', 'info')
+      if (brownDeepCaveAt(player.x, player.y)) log('The deeper cavern has a dark earthen floor.', 'info')
     } else if (tile === 'cryptstairsdown') {
       if (!cryptLevel2) return false
       currentZ = -2
@@ -2790,6 +2792,25 @@
     return Math.max(1, enemyAggroRange(e) + raceAggroMod())
   }
 
+  // Underground acquisition requires a clear ray through the map. Walls are
+  // opaque; an already alerted monster can pursue briefly around a corner.
+  function enemyHasSight(e) {
+    if (currentZ >= 0) return true
+    let x = e.x, y = e.y
+    const dx = Math.abs(player.x - x), dy = Math.abs(player.y - y)
+    const sx = x < player.x ? 1 : -1, sy = y < player.y ? 1 : -1
+    let error = dx - dy
+    while (x !== player.x || y !== player.y) {
+      const twice = 2 * error
+      if (twice > -dy) { error -= dy; x += sx }
+      if (twice < dx) { error += dx; y += sy }
+      if (x === player.x && y === player.y) return true
+      if (map[y]?.[x] === 'cavewall' || map[y]?.[x] === 'dwarvenwall' ||
+          map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
+    }
+    return true
+  }
+
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (isWalkable(x, y)) return true
@@ -3068,7 +3089,7 @@
       if (e.fleeingHoly) e.fleeingHoly = false
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
-      if (dist === ATTACK_RANGE) {
+      if (dist === ATTACK_RANGE && enemyHasSight(e)) {
         // An enemy that attacks is aggroed on the player, full stop - this
         // must be true even when its aggro range is so low (e.g. 1) that it
         // never went through the "spotted you" branch below.
@@ -3080,7 +3101,7 @@
         continue
       }
       const aggroRange = effectiveAggroRange(e)
-      if (dist <= aggroRange) {
+      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2))) {
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
@@ -3117,7 +3138,7 @@
         // straight away instead of leaving it oblivious until the next turn.
         if (enemyIsOnScreen(e) && enemyWander(e)) {
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
-          if (distAfter <= aggroRange) {
+          if (distAfter <= aggroRange && enemyHasSight(e)) {
             e.aware = true
             log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad')
           }
@@ -3127,6 +3148,18 @@
   }
 
   /* ============================== ITEM PICKUP ============================== */
+  function consolidateConsumableStacks() {
+    const first = new Map()
+    for (let i = 0; i < player.inventory.length; i++) {
+      const item = player.inventory[i]
+      if (!isStackableKind(item.kind)) continue
+      const prior = first.get(item.kind)
+      if (!prior) { first.set(item.kind, item); continue }
+      prior.count = (prior.count || 1) + (item.count || 1)
+      player.inventory.splice(i--, 1)
+    }
+  }
+
   function addPotion() {
     const stack = player.inventory.find(i => i.kind === 'potion')
     if (stack) stack.count = (stack.count || 1) + 1
@@ -4433,8 +4466,16 @@
     applyGameViewport(nextWidth, nextHeight)
   }
 
+  function brownDeepCaveAt(x, y) {
+    if (currentZ !== -2 || currentLevelKind() !== 'chain') return false
+    const deep = deepLevels[0]
+    return !!deep?.caves?.some((cave, i) => cave.brownFloor &&
+      deep.caveMaps[i]?.[y]?.[x] !== 'cavewall' && deep.caveMaps[i]?.[y]?.[x] !== undefined)
+  }
+
   function tileBackground(x, y, tileKey) {
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
+    if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
     if (currentZ < 0 && (tileKey === 'dwarvengate' || tileKey === 'dwarvenfortexit')) return TILE.marble.bg
     const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
@@ -4485,13 +4526,13 @@
   // the 40px/scale-sized version once per decoded image and reuse it.
   const scaledVisualCache = new WeakMap()
 
-  function scaledVisualCanvas(image, scale) {
+  function scaledVisualCanvas(image, scale, filter = '') {
     let byScale = scaledVisualCache.get(image)
     if (!byScale) {
       byScale = new Map()
       scaledVisualCache.set(image, byScale)
     }
-    const key = String(scale)
+    const key = String(scale) + '|' + filter
     if (byScale.has(key)) return byScale.get(key)
 
     const size = Math.max(1, Math.round(TILE_PX * scale))
@@ -4500,6 +4541,7 @@
     cached.height = size
     const cctx = cached.getContext('2d')
     cctx.imageSmoothingEnabled = false
+    if (filter) cctx.filter = filter
     cctx.drawImage(image, 0, 0, size, size)
     byScale.set(key, cached)
     return cached
@@ -4510,15 +4552,14 @@
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
-    const cached = scaledVisualCanvas(image, scale)
+    const cached = scaledVisualCanvas(image, scale, visual.filter || '')
     const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
-    const transformed = a !== 1 || visual.flipX || visual.filter
+    const transformed = a !== 1 || visual.flipX
     if (!transformed) { ctx.drawImage(cached, x, y); return true }
     ctx.save()
     ctx.globalAlpha = a
-    if (visual.filter) ctx.filter = visual.filter
     if (visual.flipX) {
       ctx.translate(x + size, y)
       ctx.scale(-1, 1)
@@ -4619,7 +4660,7 @@
     // Underground entrances/exits use dungeon floors, never a surface fallback.
     if (tileKey === 'dwarvenfortexit' && currentZ < 0) return 'marble'
     if (tileKey === 'caveup' || tileKey === 'cavedown' || tileKey === 'caveentrance') {
-      if (currentZ < 0) return 'cavefloor'
+      if (currentZ < 0) return currentZ === -1 ? 'cavefloor' : 'cavefloor2'
     }
     if (tileKey === 'dwarvengate' && currentZ < 0) return 'marble'
 
@@ -4645,6 +4686,8 @@
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
 
+    if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y))
+      return RENDER_STYLE.terrainTiles?.cavefloorBrown || visual
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
 
     const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
@@ -5913,7 +5956,8 @@
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
     const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
-    c.fillStyle = visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
+    const brownCave = (tileKey === 'cavefloor2' || tileKey === 'caveup') && brownDeepCaveAt(x, y)
+    c.fillStyle = visible && brownCave ? '#513629' : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
       ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
   }
@@ -6233,6 +6277,7 @@
   }
 
   function renderInventory() {
+    consolidateConsumableStacks()
     const race = raceDef()
     const charTitle = document.getElementById('charTitle')
     if (charTitle) charTitle.textContent = `${player.name} the ${race.name}`
@@ -6690,7 +6735,8 @@
     if (value <= 0 || player.gold < value) return
     const stackable = isStackableKind(it.kind)
     if (stackable) {
-      const existing = player.inventory.find(i => i.kind === it.kind && i.name === it.name)
+      consolidateConsumableStacks()
+      const existing = player.inventory.find(i => i.kind === it.kind)
       if (existing) existing.count = (existing.count || 1) + 1
       else player.inventory.push({...it, count: 1})
       it.count = (it.count || 1) - 1

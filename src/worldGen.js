@@ -478,13 +478,15 @@ function placeVolcanoes() {
 // world - the player could never reach the edges or most of the content. We
 // don't repair such a map, we throw it away and roll a fresh one.
 function generateMap() {
-  for (let attempt = 1; attempt <= MAX_WORLD_ATTEMPTS; attempt++) {
+  const worldAttempts = Math.max(MAX_WORLD_ATTEMPTS, 40)
+  for (let attempt = 1; attempt <= worldAttempts; attempt++) {
     generateSurface()
     if (!isTempleConnectedToEdge()) {
-      if (attempt === MAX_WORLD_ATTEMPTS) {
+      if (attempt === worldAttempts) {
         console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
         surfaceMap = map.map(row => row.slice())
-        generateCaves()
+        if (!generateCaves() || deepLevels[0]?.caves?.length < 2)
+          throw new Error('Could not generate two distinct second-level caves.')
         // Cave generation stamps entrances onto `map`; keep the canonical
         // surface copy in sync even when this is the final fallback world.
         surfaceMap = map.map(row => row.slice())
@@ -503,8 +505,10 @@ function generateMap() {
     if (cavesValid) {
       break
     }
-    if (attempt === MAX_WORLD_ATTEMPTS) {
-      console.warn(`World generation failed cave-placement validation in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
+    if (attempt === worldAttempts) {
+      if (deepLevels[0]?.caves?.length < 2)
+        throw new Error('Could not generate two distinct second-level caves.')
+      console.warn(`World generation failed cave-placement validation in ${worldAttempts} attempts; keeping the last world.`)
       break
     }
     console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
@@ -550,7 +554,8 @@ function blankCaveMap() {
 // buildCrypt() occupies roughly x +/-3 and y +/-12 around the ruined chapel;
 // this clearance also covers the maximum +/-8 tile random-walk radius, so a
 // generated cave blob cannot touch the crypt even if its primary spot is
-// outside the exclusion area. The final connectivity check remains as a
+// outside the exclusion area. Larger chambers may extend farther, so each
+// generated map is checked before acceptance. The final connectivity check remains as a
 // defensive fallback for any future geometry changes.
 const CRYPT_CAVE_CLEARANCE = 8
 let cryptCaveExclusionCenter = null
@@ -577,6 +582,47 @@ function isSegmentTouchingCryptExclusion(a, b) {
     if (isInsideCryptCaveExclusion(x, y)) return true
   }
   return false
+}
+
+// A compact winding cave or a broader chamber cave. Bounds and steps vary per
+// entrance; the latter uses several connected irregular rooms.
+function carveShallowCave(cm, spot, style) {
+  const radius = style === 'chambers' ? randInt(9, 15) : randInt(5, 11)
+  const minX = Math.max(2, spot.x - radius), maxX = Math.min(MAP_W - 3, spot.x + radius)
+  const minY = Math.max(2, spot.y - radius), maxY = Math.min(MAP_H - 3, spot.y + radius)
+  if (style === 'walk') {
+    let x = spot.x, y = spot.y
+    const steps = randInt(90, 300)
+    for (let step = 0; step < steps; step++) {
+      cm[y][x] = 'cavefloor'
+      // Cardinal moves keep the dug path connected, including narrow caves.
+      const [dx, dy] = pick([[0, -1], [0, 1], [-1, 0], [1, 0]])
+      x = Math.max(minX, Math.min(maxX, x + dx))
+      y = Math.max(minY, Math.min(maxY, y + dy))
+    }
+    return
+  }
+  const rooms = [{x: spot.x, y: spot.y}]
+  const count = randInt(3, 6)
+  for (let i = 1; i < count; i++) rooms.push({
+    x: randInt(minX + 2, maxX - 2), y: randInt(minY + 2, maxY - 2)})
+  for (const room of rooms) {
+    const rx = randInt(3, 6), ry = randInt(2, 5)
+    for (let y = Math.max(minY, room.y - ry); y <= Math.min(maxY, room.y + ry); y++)
+      for (let x = Math.max(minX, room.x - rx); x <= Math.min(maxX, room.x + rx); x++)
+        if (((x - room.x) / rx) ** 2 + ((y - room.y) / ry) ** 2 <= 1.05 && chance(0.94))
+          cm[y][x] = 'cavefloor'
+    cm[room.y][room.x] = 'cavefloor'
+  }
+  for (let i = 1; i < rooms.length; i++) {
+    let x = rooms[i - 1].x, y = rooms[i - 1].y
+    while (x !== rooms[i].x || y !== rooms[i].y) {
+      cm[y][x] = 'cavefloor'
+      if (x !== rooms[i].x && (y === rooms[i].y || chance(0.5))) x += Math.sign(rooms[i].x - x)
+      else y += Math.sign(rooms[i].y - y)
+    }
+    cm[y][x] = 'cavefloor'
+  }
 }
 
 function generateCaves() {
@@ -615,17 +661,11 @@ function generateCaves() {
         || candidates.find(c => c !== spot && !isSegmentTouchingCryptExclusion(spot, c))
       if (second) entrances.push(second)
     }
-    const cave = {x: spot.x, y: spot.y, entrances: entrances.map(p => ({x: p.x, y: p.y}))}
+    const style = chance(0.5) ? 'walk' : 'chambers'
+    const cave = {x: spot.x, y: spot.y, style,
+      entrances: entrances.map(p => ({x: p.x, y: p.y}))}
     const cm = blankCaveMap()
-    let x = spot.x, y = spot.y
-    const minX = Math.max(2, spot.x - 8), maxX = Math.min(MAP_W - 3, spot.x + 8)
-    const minY = Math.max(2, spot.y - 8), maxY = Math.min(MAP_H - 3, spot.y + 8)
-    for (let step = 0; step < 180; step++) {
-      cm[y][x] = 'cavefloor'
-      const [dx, dy] = pick(DIRS8)
-      x = Math.max(minX, Math.min(maxX, x + dx))
-      y = Math.max(minY, Math.min(maxY, y + dy))
-    }
+    carveShallowCave(cm, spot, style)
     for (const entrance of entrances) {
       for (let yy = entrance.y - 2; yy <= entrance.y; yy++) for (let xx = entrance.x - 1; xx <= entrance.x + 1; xx++) {
         if (xx >= 0 && yy >= 0 && xx < MAP_W && yy < MAP_H) cm[yy][xx] = 'cavefloor'
@@ -671,9 +711,21 @@ function generateCaves() {
   buildCrypt()
   buildCryptLevel2()
   const cryptInvalid = isCryptConnectedToRandomCave()
-  // About half of the z:-1 caves can connect to a larger z:-2 room dungeon.
-  // Independent dungeons share the z:-2 map but have reserved footprints.
-  deepLevels = [generateDeepLevel(caves, caveMaps, undergroundMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')]
+  // Try independent placement orders before rejecting the whole world.
+  // Work on copies so a failed trial cannot leave orphaned stair tiles behind.
+  let deep = null
+  for (let trial = 0; trial < 6; trial++) {
+    const trialMaps = caveMaps.map(cm => cm.map(row => row.slice()))
+    const trialMap = undergroundMap.map(row => row.slice())
+    const candidate = generateDeepLevel(caves, trialMaps, trialMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')
+    if (candidate.caves.length < 2) continue
+    caveMaps = trialMaps
+    undergroundMap = trialMap
+    deep = candidate
+    break
+  }
+  if (!deep) return false
+  deepLevels = [deep]
   // z:-3 is reserved for the Dwarven Fort. It is the third level in the
   // generic chain and is not generated as a random cave blob.
   deepLevels.push({
@@ -1063,20 +1115,6 @@ function buildDwarvenRuin(targetLevel) {
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] !== 'cavewall' && ruinMap[y][x] === 'cavewall') ruinMap[y][x] = cm[y][x]
   ruinMap[y0][x0] = targetLevel ? 'dwarvenfortexit' : 'dwarvengate'
   dwarvenRuin = {x: x0, y: y0, caveIndex: ruinMaps.length - 1, level: targetLevel ? -3 : -1}
-  if (targetLevel) {
-    // Connect the surface gate to the reserved fort level through the
-    // ordinary cave layers without generating any cave geometry there.
-    const link = blankCaveMap()
-    link[y0][x0] = 'caveentrance'
-    caveMaps.push(link)
-    caves.push({x: x0, y: y0, entrances: [{x: x0, y: y0}]})
-    undergroundMap[y0][x0] = 'caveentrance'
-    deepLevels[0].map[y0][x0] = 'cavedown'
-    const linkDeep = blankCaveMap()
-    linkDeep[y0][x0] = 'cavedown'
-    deepLevels[0].caveMaps.push(linkDeep)
-    deepLevels[0].caves.push({x: x0, y: y0, entrances: [{x: x0, y: y0}]})
-  }
   const ghost = ENEMY_TEMPLATES.find(t => t.name === 'Ghost')
   const ruinLevel = targetLevel ? -3 : -1
   if (ghost) {
@@ -1213,7 +1251,11 @@ function buildDwarvenRuin(targetLevel) {
 // Organic grotto chambers and winding passages, using the world seed.
 function carveDeepDungeon(spot, floorTile, reserved) {
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
-  const sizes = [[92, 72], [82, 66], [74, 60], [66, 54]]
+  const sizes = [[92, 72], [82, 66], [74, 60], [66, 54], [56, 46], [48, 40], [42, 36]]
+  for (let i = sizes.length - 1; i > 0; i--) {
+    const j = randInt(0, i)
+    ;[sizes[i], sizes[j]] = [sizes[j], sizes[i]]
+  }
   for (const [w, h] of sizes) {
     const anchors = [[9, 9], [w - 10, 9], [9, h - 10], [w - 10, h - 10],
       [Math.floor(w / 2), 9], [Math.floor(w / 2), h - 10],
@@ -1233,14 +1275,15 @@ function carveDeepDungeon(spot, floorTile, reserved) {
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
+      const targetRooms = Math.max(9, Math.round(w * h / 270) + 4)
       const rooms = [{cx: spot.x, cy: spot.y}]
-      for (let tries = 0; tries < 1800 && rooms.length < 28; tries++) {
+      for (let tries = 0; tries < 1800 && rooms.length < targetRooms; tries++) {
         const cx = randInt(bounds.x1 + 6, bounds.x2 - 6)
         const cy = randInt(bounds.y1 + 6, bounds.y2 - 6)
         if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < 145)) continue
         rooms.push({cx, cy})
       }
-      if (rooms.length < 22) continue
+      if (rooms.length < Math.max(8, targetRooms - 3)) continue
       const cm = blankCaveMap()
       for (const room of rooms) {
         const rx = randInt(5, 8), ry = randInt(4, 7)
@@ -1347,22 +1390,86 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       for (let y = bounds.y1; y <= bounds.y2; y++)
         for (let x = bounds.x1; x <= bounds.x2; x++)
           if (cm[y][x] === floorTile) dryFloor++
-      if (dryFloor < 900) continue
+      if (dryFloor < Math.round(w * h * 0.13)) continue
       return {cm, rooms, bounds, hasWater}
     }
   }
   return null
 }
 
-// Builds the generic z:-2 dungeon. Large footprints cannot touch one another:
-// the shared map must not silently join separate cave entrances.
+// A second z:-2 layout: branching, narrow dug passages and scattered pockets.
+// It can fit around crowded surface entrances where a broad grotto cannot.
+function carveBurrowDungeon(spot, floorTile, reserved) {
+  const sizes = [[68, 52], [58, 44], [48, 38], [40, 32], [34, 28], [28, 24]]
+  const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+  for (const [w, h] of sizes) {
+    const anchors = [[Math.floor(w / 2), Math.floor(h / 2)], [5, Math.floor(h / 2)],
+      [w - 6, Math.floor(h / 2)], [Math.floor(w / 2), 5],
+      [Math.floor(w / 2), h - 6], [5, 5], [w - 6, h - 6]]
+    for (let n = anchors.length - 1; n > 0; n--) {
+      const j = randInt(0, n)
+      ;[anchors[n], anchors[j]] = [anchors[j], anchors[n]]
+    }
+    for (const [ax, ay] of anchors) {
+      const bounds = {x1: spot.x - ax, y1: spot.y - ay}
+      bounds.x2 = bounds.x1 + w - 1
+      bounds.y2 = bounds.y1 + h - 1
+      if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
+      if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
+          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+      const cm = blankCaveMap(), rooms = []
+      const brush = (x, y, wide) => {
+        const radius = wide ? 2 : 1
+        for (let yy = y - radius; yy <= y + radius; yy++)
+          for (let xx = x - radius; xx <= x + radius; xx++)
+            if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
+              cm[yy][xx] = floorTile
+      }
+      brush(spot.x, spot.y, true)
+      const tips = [{x: spot.x, y: spot.y}]
+      const branches = Math.max(5, Math.round(w * h / 450))
+      for (let branch = 0; branch < branches; branch++) {
+        const origin = pick(tips)
+        let x = origin.x, y = origin.y
+        let [dx, dy] = pick(dirs)
+        const steps = randInt(Math.max(25, Math.round((w + h) / 2)), w + h + 40)
+        for (let step = 0; step < steps; step++) {
+          if (chance(0.19)) [dx, dy] = pick(dirs)
+          const nx = x + dx, ny = y + dy
+          if (nx <= bounds.x1 + 2 || nx >= bounds.x2 - 2 ||
+              ny <= bounds.y1 + 2 || ny >= bounds.y2 - 2) {
+            ;[dx, dy] = pick(dirs)
+            continue
+          }
+          x = nx; y = ny
+          brush(x, y, step % 17 < 3)
+        }
+        brush(x, y, true)
+        tips.push({x, y})
+        rooms.push({cx: x, cy: y, x1: x - 3, x2: x + 3, y1: y - 3, y2: y + 3})
+      }
+      let floor = 0
+      for (let y = bounds.y1; y <= bounds.y2; y++)
+        for (let x = bounds.x1; x <= bounds.x2; x++)
+          if (cm[y][x] === floorTile) floor++
+      if (floor < 120) continue
+      return {cm, rooms, bounds, hasWater: false, style: 'burrow'}
+    }
+  }
+  return null
+}
+
+// Each world needs a broad grotto and a compact burrow at z:-2. Other
+// branches are optional and use either generator, with reserved nonoverlap.
 function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile) {
-  const levelCaves = []
-  const levelCaveMaps = []
-  const reserved = []
-  for (let i = 0; i < parentCaves.length; i++) {
-    if (!chance(0.5)) continue
-    if (parentCaves[i]?.crypt) continue
+  const levelCaves = [], levelCaveMaps = [], reserved = []
+  const eligible = parentCaves.map((c, i) => i).filter(i => !parentCaves[i]?.crypt)
+  for (let n = eligible.length - 1; n > 0; n--) {
+    const j = randInt(0, n)
+    ;[eligible[n], eligible[j]] = [eligible[j], eligible[n]]
+  }
+  const used = new Set()
+  const addBranch = (i, style) => {
     const cm = parentCaveMaps[i]
     const entrances = parentCaves[i].entrances || []
     const open = []
@@ -1370,42 +1477,43 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
           !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
+    const carve = style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
     let spot = null, layout = null
-    for (let tries = 0; tries < 18 && open.length; tries++) {
+    for (let tries = 0; tries < 64 && open.length; tries++) {
       const candidate = open.splice(randInt(0, open.length - 1), 1)[0]
-      const result = carveDeepDungeon(candidate, floorTile, reserved)
+      const result = carve(candidate, floorTile, reserved)
       if (result) { spot = candidate; layout = result; break }
     }
-    if (!layout) continue
-    // Stamp the stairway into both the parent's per-cave template and its
-    // already-merged shared map, so a save/reload re-stamp (see
-    // loadGameFromObject) rebuilds it the same way.
+    if (!layout) return false
     cm[spot.y][spot.x] = downTile
-    if (parentMap[spot.y] && parentMap[spot.y][spot.x] !== undefined) parentMap[spot.y][spot.x] = downTile
-
+    parentMap[spot.y][spot.x] = downTile
     layout.cm[spot.y][spot.x] = upTile
     reserved.push(layout.bounds)
     levelCaveMaps.push(layout.cm)
     levelCaves.push({x: spot.x, y: spot.y, entrances: [{x: spot.x, y: spot.y}],
-      rooms: layout.rooms, hasWater: layout.hasWater})
+      rooms: layout.rooms, hasWater: layout.hasWater, style,
+      brownFloor: style === 'burrow' && !levelCaves.some(c => c.brownFloor)})
+    used.add(i)
+    return true
+  }
+  for (const style of ['grotto', 'burrow']) {
+    for (const i of eligible) {
+      if (!used.has(i) && addBranch(i, style)) break
+    }
+  }
+  if (levelCaves.length >= 2) for (const i of eligible) {
+    if (used.has(i) || !chance(0.5)) continue
+    addBranch(i, chance(0.5) ? 'grotto' : 'burrow')
   }
   const levelMap = blankCaveMap()
-  for (const cm of levelCaveMaps) {
-    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+  for (const cm of levelCaveMaps)
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++)
       if (cm[y][x] !== 'cavewall') levelMap[y][x] = cm[y][x]
-    }
-  }
-  for (const cave of levelCaves) {
-    for (const entrance of cave.entrances) {
-      if (levelMap[entrance.y] && levelMap[entrance.y][entrance.x] !== undefined) levelMap[entrance.y][entrance.x] = upTile
-    }
-  }
-  return {
-    map: levelMap,
-    caveMaps: levelCaveMaps,
-    caves: levelCaves,
-    discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false)),
-  }
+  for (const cave of levelCaves)
+    for (const entrance of cave.entrances)
+      levelMap[entrance.y][entrance.x] = upTile
+  return {map: levelMap, caveMaps: levelCaveMaps, caves: levelCaves,
+    discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))}
 }
 
 let bigBellPos = null
@@ -2053,6 +2161,48 @@ function spawnCaveScenarios() {
         tier: level === -2 && i % 2 === 1 ? 2 : rules.tier,
         opened: false, level, levelKind: 'chain', caveIndex})
     }
+    const makeEnemy = (tmpl, spot, prefix = null) => {
+      const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
+        levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
+        def: tmpl.def, spd: tmpl.spd, fly: !!tmpl.fly, humanoid: !!tmpl.humanoid,
+        evades: !!tmpl.evades, aggro: tmpl.aggro ?? AGGRO_RANGE,
+        x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
+        alive: true, prefix: null, equipment: null}
+      if (prefix) {
+        e.prefix = prefix
+        e.prefixBase = prefixBaseStats(e)
+        applyEnemyPrefix(e, prefix)
+        e.name = prefix + ' ' + e.name
+      }
+      addEnemy(e)
+    }
+    if (level === -2) {
+      const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
+      const threatPool = ENEMY_TEMPLATES.filter(t => t.tier === 3 || t.tier === 4)
+      // Choose an open pocket with four immediately adjacent guard positions.
+      // Reserve the group before ordinary mobs, so none can displace it.
+      const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
+      const groupSites = open.map(p => ({p, guards: DIRS8.map(([dx, dy]) =>
+        openByPosition.get(keyXY(p.x + dx, p.y + dy))).filter(Boolean)}))
+        .filter(site => site.guards.length >= 4)
+      if (championTemplate && ENEMY_PREFIXES.Champion && groupSites.length) {
+        const farthest = Math.max(...groupSites.map(site => distance(site.p)))
+        const remote = groupSites.filter(site => distance(site.p) >= Math.max(10, farthest - 8))
+        const site = pick(remote)
+        const guards = site.guards.slice()
+        for (let n = guards.length - 1; n > 0; n--) {
+          const j = randInt(0, n)
+          ;[guards[n], guards[j]] = [guards[j], guards[n]]
+        }
+        for (const pos of [site.p, ...guards.slice(0, 4)]) open.splice(open.indexOf(pos), 1)
+        makeEnemy(championTemplate, site.p, 'Champion')
+        for (const pos of guards.slice(0, 4)) makeEnemy(championTemplate, pos)
+      }
+      if (threatPool.length) {
+        const spot = takeSpot('far')
+        if (spot) makeEnemy(pick(threatPool), spot)
+      }
+    }
     for (const [name, count] of rules.mobs) {
       const tmpl = ENEMY_TEMPLATES.find(t => t.name === name)
       if (!tmpl) continue
@@ -2062,24 +2212,12 @@ function spawnCaveScenarios() {
           ? takeSpot('room', roomOrder[n % roomOrder.length])
           : takeSpot(rules.placement || 'random', chest)
         if (!spot) break
-        const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
-          levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
-          def: tmpl.def, spd: tmpl.spd, fly: !!tmpl.fly, humanoid: !!tmpl.humanoid,
-          evades: !!tmpl.evades, aggro: tmpl.aggro ?? AGGRO_RANGE,
-          x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
-          alive: true, prefix: null, equipment: null}
-        const prefixChance = level === -2 ? 0.11 : 0.05
-        if (chance(prefixChance)) {
+        let prefix = null
+        if (chance(level === -2 ? 0.11 : 0.05)) {
           const names = Object.keys(ENEMY_PREFIXES)
-          if (names.length) {
-            const pfx = pick(names)
-            e.prefix = pfx
-            e.prefixBase = prefixBaseStats(e)
-            applyEnemyPrefix(e, pfx)
-            e.name = pfx + ' ' + e.name
-          }
+          if (names.length) prefix = pick(names)
         }
-        addEnemy(e)
+        makeEnemy(tmpl, spot, prefix)
       }
     }
     if (rules.camp) {

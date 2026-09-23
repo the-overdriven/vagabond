@@ -459,7 +459,8 @@ Grassland tree decoration:
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 
 In tile-image mode, `content/rendering.json` maps ordinary cave floors
-(`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png` and cave walls
+(`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png`; one generic
+z:-2 burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave walls
 (`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
 these textures; `marble` has a lighter stone-floor image, and walkable
 `cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt stairs,
@@ -671,11 +672,16 @@ A large underground dwarven settlement/ruin containing:
 - a wheelbarrow
 - a giant gold coin
 - a guaranteed artifact chest
-- deeper-level connections
+- a direct surface gate
 
 The fort is the dedicated generic-chain level at **z:-3**. Fort enemies and
 ground objects use `level: -3`, `levelKind: 'chain'`, and the fort's
 `caveIndex` so they remain associated with the correct map identity.
+The surface `dwarvengate` enters z:-3 directly, and the fort's
+`dwarvenfortexit` returns directly to the same surface gate. Fort generation
+does not place intermediary entrances, stairs, cave templates, or cave
+descriptors on z:-1 or z:-2; the normal caves on those depths keep only their
+own passages.
 
 The surface `dwarvengate` must remain spatially distinct from ordinary cave
 entrances. After the fort is generated, every non-crypt random cave entrance is
@@ -765,25 +771,23 @@ mountain air.
 
 Some z:-1 caves receive a downward connection.
 
-Each eligible parent cave has a 50% chance to receive a deeper level, subject
-to available space for a separate dungeon footprint. Connections use matching
-`cavedown` / `caveup` tiles. These generic deep caves share z:-2.
+The generator requires **two separate generic z:-2 caves**. The first uses
+connected irregular chambers and winding passages (the grotto algorithm); the
+second uses branching random-walk tunnels and small pockets (the burrow
+algorithm). Their reserved footprints cannot overlap, and each staircase is
+stamped into both maps. Placement is retried on clean map copies; if both required layouts still
+cannot be placed, the world is regenerated. The final fallback never silently
+accepts a world with fewer than two generic z:-2 caves. Additional parent caves have a 50% chance of a branch using either
+algorithm.
 
-Generic z:-2 caves are sprawling grottos, generated at world creation inside
-separate reserved footprints (up to 92×72 tiles; down to 66×54 when space is
-tight). Each has 22–28 irregular chambers with lobed walls and winding,
-varying-width connections. Twenty-plus chambers and at least 900 dry floor
-tiles are required before a layout is accepted. Chambers are linked into one
-reachable network, with five possible extra routes; disconnected edge
-fragments are removed. The staircase stays at the same coordinates on both
-floors. Space reservation keeps independent z:-2 caves from merging on their
-shared map; an unsuitable parent stair candidate is retried before any
-upstairs tile is changed.
-
-About 60% of these grottos attempt an irregular water pocket in a chamber.
-The pocket is kept only if the staircase can still reach every dry floor tile.
-Water retains its normal movement rule: impassable to most characters and
-walkable to Merlings. No new terrain ID or image asset is needed.
+Grotto footprints vary from 92×72 down to 42×36 tiles, with an area-scaled
+chamber count, possible loops, and an optional water pocket. Burrows vary from
+68×52 down to 28×24 tiles; their narrow paths branch from earlier tunnels and
+end in scattered pockets. Both styles keep traversable floors connected to the
+staircase. The smaller burrow footprints let two independent caves fit even
+when the mountain entrances are clustered. One complete burrow cave on z:-2
+uses the darker brown floor asset; the other cave floors keep the normal tile.
+The crypt's separate second map and the Dwarven Fort remain independent.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
@@ -795,8 +799,9 @@ so enemies and items cannot appear or act on the wrong z:-2 map.
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave.
 Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
-same coordinates. Generic `caveup` tiles still ascend to the preceding cave
-depth, including any encountered elsewhere on z:-3.
+same coordinates. No fort-related transitions are stamped on z:-1 or z:-2.
+Generic `caveup` tiles still ascend to the preceding cave depth, including any
+encountered elsewhere on z:-3.
 
 ## Cave/crypt/mausoleum separation
 
@@ -861,7 +866,13 @@ Goblins, Skeletons, Kobolds, Skinks, or Ratlings. The larger grottos hold
 24–36 enemies, spread through chambers. Eight to twelve chests are distributed
 across chambers, alternating tier 3 and tier 2; there are also four loose
 supplies (two potions and two scrolls). No Giant Rats, Giant Bats,
-Wolves, Boars, or Giant Bugs are selected for new z:-2 caves.
+Wolves, Boars, or Giant Bugs are selected for new z:-2 cave scenario groups.
+Each populated generic z:-2 cave also gets one guaranteed Champion of its
+scenario species, surrounded by four unprefixed guards of the same type, and
+one randomly chosen tier-3 or tier-4 enemy. The group is reserved before normal
+spawns in a chamber far from the staircase; the stronger enemy is also placed
+away from it. These are in addition to the normal 11% prefix
+rolls and carry the same level and cave identity as the group.
 
 | Deep scenario | Enemy group | Distinctive contents |
 |---|---|---|
@@ -895,9 +906,15 @@ Primary cave locations must be sufficiently separated.
 
 The first cave may receive a second entrance.
 
-Initial z:-1 cave interiors are produced using bounded random walks.
-Generic z:-2 caves use connected irregular chambers and passages as described
-above.
+Initial z:-1 caves choose independently between a compact cardinal random walk
+(90–300 steps, radius 5–11) and three to six linked irregular chambers
+(radius 9–15). They all retain the ordinary cave floor. On generic z:-2, the
+burrow's descriptor stores `brownFloor`, and `terrainVisual()` selects the
+`cavefloorBrown` entry (`img/tiles/cave-floor-brown-dark.png`) for every floor tile
+in that cave, including the floor beneath its staircase. The visual is chosen
+by the z:-2 cave map coordinate, not by the active z:-1 cave index. Brown cave
+floors also appear brown on the underground minimap. No new gameplay terrain
+key is needed; the map still stores `cavefloor2`.
 
 Before a generated cave is committed to the world, its complete local map is
 checked against the crypt exclusion zone. Only accepted caves are stamped onto
@@ -1106,6 +1123,10 @@ The Deadly enemy prefix grants critical-hit capability. Critical hit doubles the
 
 # 21. Enemy Prefixes
 
+Underground enemies acquire the player only along an unobstructed ray through
+cave, mountain, and dwarven walls. Alerted enemies may pursue around a nearby
+corner for up to two tiles; surface detection remains distance based.
+
 Approximately **5% of normal enemy spawns** receive a prefix. Scenario-spawned
 z:-1 cave enemies use the same **5%** chance. Scenario-spawned generic z:-2 cave
 enemies use an increased **11%** prefix chance. Dedicated story/fort population
@@ -1254,7 +1275,7 @@ The default aggro range is:
 4
 ```
 
-Standing in enemy's aggro range, triggers the enemy to chase their victim.
+On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target also needs a clear line of sight through walls; an alerted enemy may keep chasing around a corner within two tiles.
 
 Any enemy that attacks the player becomes aggroed (shown as a red border
 around the enemy) in the same turn, even if the enemy's aggro range is very
@@ -2399,7 +2420,9 @@ loading a save removes any surface ground item found directly under the Merchant
 this repairs older worlds that already contain such an impossible overlap. Other
 NPCs retain their existing placement rules.
 
-Stackable consumables are handled as stacks.
+Stackable consumables are grouped by kind. Pickups and purchases add to an
+existing stack regardless of item name; opening the inventory merges duplicate
+stacks already present in older saves, keeping their total count.
 
 ## Item values and merchant prices
 
