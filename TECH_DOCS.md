@@ -2960,6 +2960,12 @@ Mobile supports:
 - map dragging
 - map zooming
 - pinch zoom
+- two-finger pinch on the game canvas to change tile size (20–96 canvas pixels)
+
+The game-canvas pinch uses the starting finger distance and snaps to the same
+four-pixel tile steps as `+`/`-`. Pinching out enlarges tiles; pinching in
+shrinks them. Lifting either finger suppresses a tap or one-finger row resize
+until the gesture ends. The full-map pinch continues to zoom the map only.
 
 The intent is to keep mobile gameplay rules equivalent to desktop rules.
 

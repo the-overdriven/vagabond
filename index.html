@@ -4488,15 +4488,18 @@
     applyGameViewport(nextWidth, nextHeight)
   }
 
-  function changeTileSize(direction) {
-    const next = Math.max(TILE_ZOOM_MIN, Math.min(TILE_ZOOM_MAX,
-      requestedTilePx + direction * TILE_ZOOM_STEP))
+  function setTileSize(size) {
+    const next = Math.max(TILE_ZOOM_MIN, Math.min(TILE_ZOOM_MAX, size))
     if (next === requestedTilePx) return
     requestedTilePx = next
     if (window.matchMedia('(pointer:coarse)').matches) {
       resizeMobileViewport()
       updateMobileSafeAreas()
     } else resizeDesktopViewport()
+  }
+
+  function changeTileSize(direction) {
+    setTileSize(requestedTilePx + direction * TILE_ZOOM_STEP)
   }
 
   function brownDeepCaveAt(x, y) {
@@ -5837,15 +5840,31 @@
     handleCanvasTap(ev.clientX, ev.clientY)
   })
 
-  // A short tap still inspects/moves. A deliberate vertical drag resizes the
-  // mobile camera: pulling down adds visible rows, while pushing up removes
-  // them. Because #logpanel is the flexible element below the stage, the extra
-  // canvas height is taken from the message log first.
+  // One finger still taps or changes visible rows with a vertical drag. A
+  // two-finger pinch changes tile size and never finishes as a single tap.
   let canvasTouchStartX = null, canvasTouchStartY = null
   let canvasTouchStartViewH = MOBILE_DEFAULT_VIEW_H
   let canvasTouchResizing = false
+  let canvasPinchActive = false, canvasPinchStartDist = 0, canvasPinchStartTilePx = 40
+  const canvasPinchDistance = touches => Math.hypot(
+    touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
   canvas.addEventListener('touchstart', (ev) => {
-    if (!ev.touches || ev.touches.length !== 1) return
+    if (!ev.touches) return
+    if (ev.touches.length === 2) {
+      ev.preventDefault()
+      canvasPinchActive = true
+      canvasPinchStartDist = canvasPinchDistance(ev.touches)
+      canvasPinchStartTilePx = requestedTilePx
+      canvasTouchStartX = canvasTouchStartY = null
+      canvasTouchResizing = false
+      return
+    }
+    if (canvasPinchActive) {
+      ev.preventDefault()
+      canvasPinchStartDist = 0
+      return
+    }
+    if (ev.touches.length !== 1) return
     ev.preventDefault()
     const t = ev.touches[0]
     canvasTouchStartX = t.clientX
@@ -5854,6 +5873,18 @@
     canvasTouchResizing = false
   }, {passive: false})
   canvas.addEventListener('touchmove', (ev) => {
+    if (canvasPinchActive) {
+      ev.preventDefault()
+      if (ev.touches?.length !== 2) { canvasPinchStartDist = 0; return }
+      if (!canvasPinchStartDist) {
+        canvasPinchStartDist = canvasPinchDistance(ev.touches)
+        canvasPinchStartTilePx = requestedTilePx
+        return
+      }
+      const scaled = canvasPinchStartTilePx * canvasPinchDistance(ev.touches) / canvasPinchStartDist
+      setTileSize(TILE_ZOOM_STEP * Math.round(scaled / TILE_ZOOM_STEP))
+      return
+    }
     if (canvasTouchStartY === null || !ev.touches || ev.touches.length !== 1) return
     ev.preventDefault()
     const t = ev.touches[0]
@@ -5867,6 +5898,15 @@
     updateMobileSafeAreas()
   }, {passive: false})
   canvas.addEventListener('touchend', (ev) => {
+    if (canvasPinchActive) {
+      ev.preventDefault()
+      if (ev.touches?.length !== 2) canvasPinchStartDist = 0
+      if (!ev.touches?.length) {
+        canvasPinchActive = false
+        canvasPinchStartDist = 0
+      }
+      return
+    }
     if (canvasTouchStartY === null) return
     ev.preventDefault()
     const changedTouch = ev.changedTouches && ev.changedTouches[0]
@@ -5876,6 +5916,8 @@
     canvasTouchResizing = false
   }, {passive: false})
   canvas.addEventListener('touchcancel', () => {
+    canvasPinchActive = false
+    canvasPinchStartDist = 0
     canvasTouchStartX = null
     canvasTouchStartY = null
     canvasTouchResizing = false
