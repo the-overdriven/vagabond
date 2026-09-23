@@ -141,6 +141,15 @@
   },
   "enemies": {
     "lowercaseThroughTier": 2,
+    "prefixArea": {
+      "other": {
+        "inner": "rgba(176,106,212,0.11)"
+      },
+      "champion": {
+        "inner": "rgba(235,177,69,0.25)",
+        "outer": "rgba(235,177,69,0.11)"
+      }
+    },
     "tierColors": {
       "1": "#b8b8b8",
       "2": "#d98a3a",
@@ -186,6 +195,7 @@
   "minimap": {
     "fog": "rgba(3,2,1,0.72)",
     "cave": "#ff6b2e",
+    "brownCave": "#805940",
     "dwarvenFort": {
       "glyph": "\u265c",
       "color": "#e8b85b"

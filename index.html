@@ -1,6 +1,5 @@
 <!-- TODO:
 
-- prefixed monsters should have their glyphs distinguished somehow
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 
@@ -4226,7 +4225,10 @@
       }
     }
     const hereTile = map[player.y][player.x]
-    const here = TILE_DESC[hereTile] || 'unfamiliar ground'
+    // Floor appearance is chosen per cave, not by the shared terrain key.
+    const here = (hereTile === 'cavefloor' || hereTile === 'cavefloor2')
+      ? (brownDeepCaveAt(player.x, player.y) ? 'the brown dirt floor of a cave' : 'the cold stone floor of a cave')
+      : (TILE_DESC[hereTile] || 'unfamiliar ground')
     log(`You are standing on ${here}.`, 'info')
     // Standalone lore-item tiles (bell, pillar) are themselves the point of
     // interest - unlike a biome tile, they shouldn't also report on the
@@ -4505,6 +4507,24 @@
     ctx.strokeText(ch, px + TILE_PX / 2, py + 3)
     ctx.fillStyle = color
     ctx.fillText(ch, px + TILE_PX / 2, py + 3)
+  }
+
+  // Tint nearby visible tiles below all enemy glyphs. The square follows the
+  // monster without altering the letter, terrain, or fog of war.
+  function drawEnemyPrefixArea(px, py, x, y, prefix, visibleTiles) {
+    if (!prefix) return
+    const champion = prefix === 'Champion'
+    const style = champion ? RENDER_STYLE.enemies.prefixArea.champion : RENDER_STYLE.enemies.prefixArea.other
+    const radius = champion ? 2 : 1
+    for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
+      const mx = x + dx, my = y + dy
+      if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) continue
+      if (visibleTiles && !visibleTiles.has(keyXY(mx, my))) continue
+      const vx = px + dx * TILE_PX, vy = py + dy * TILE_PX
+      if (vx <= -TILE_PX || vy <= -TILE_PX || vx >= canvas.width || vy >= canvas.height) continue
+      ctx.fillStyle = champion && Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outer : style.inner
+      ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
+    }
   }
 
   function resolveVisualImage(visual) {
@@ -5303,7 +5323,8 @@
       ctx.fillText(String(p.amount), vx + TILE_PX / 2, vy + 2)
       ctx.restore()
     }
-    // enemies
+    // Gather animated enemy positions, then tint before drawing any glyphs.
+    const visibleEnemies = []
     for (const e of enemies) {
       if (!onCurrentLevel(e)) continue
       if (!e.alive) continue
@@ -5328,6 +5349,12 @@
       if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
+      visibleEnemies.push({e, vx, vy})
+    }
+    for (const {e} of visibleEnemies) drawEnemyPrefixArea(
+      Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
+      e.x, e.y, e.prefix, undergroundVisible)
+    for (const {e, vx, vy} of visibleEnemies) {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over
       drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
@@ -5956,8 +5983,10 @@
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
     const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
-    const brownCave = (tileKey === 'cavefloor2' || tileKey === 'caveup') && brownDeepCaveAt(x, y)
-    c.fillStyle = visible && brownCave ? '#513629' : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
+    // Only ordinary floor pixels use the cave tint. The caveup exit keeps
+    // its dedicated bright minimap color so the way out stays visible.
+    const brownCave = tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)
+    c.fillStyle = visible && brownCave ? RENDER_STYLE.minimap.brownCave : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
       ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
   }

@@ -913,8 +913,12 @@ burrow's descriptor stores `brownFloor`, and `terrainVisual()` selects the
 `cavefloorBrown` entry (`img/tiles/cave-floor-brown-dark.png`) for every floor tile
 in that cave, including the floor beneath its staircase. The visual is chosen
 by the z:-2 cave map coordinate, not by the active z:-1 cave index. Brown cave
-floors also appear brown on the underground minimap. No new gameplay terrain
-key is needed; the map still stores `cavefloor2`.
+floors use `minimap.brownCave`, a slightly darker brown than ordinary stone
+floors on both underground maps. The `caveup` exit keeps its dedicated bright
+minimap color even inside the brown cave. Inspecting either generic cave floor reports
+stone or brown dirt according to the marked z:-2 cave at that coordinate,
+regardless of depth. No new gameplay terrain key is needed; the map still
+stores `cavefloor2`.
 
 Before a generated cave is committed to the world, its complete local map is
 checked against the crypt exclusion zone. Only accepted caves are stamped onto
@@ -1145,6 +1149,13 @@ Current prefixes:
 - Hardened
 - Rabid
 - Champion
+
+On the game canvas, a prefixed enemy keeps its original tier-colored letter.
+`content/rendering.json` supplies a translucent violet tile overlay in a
+one-tile radius (3×3 square), or a gold overlay in a two-tile radius (5×5
+square) for Champions. The outer Champion tiles are fainter. The overlay is
+drawn below all enemy glyphs, moves tile by tile with its owner, and does not reveal
+undiscovered underground tiles or change stats, terrain, or save data.
 
 Examples:
 
