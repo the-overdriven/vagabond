@@ -12,6 +12,17 @@
 ⚔️ make use of crit. hit
 📚 fix: 37.04%% (docs)
 
+23.09.2026
+- different cave gen variations and randomly pick one per cave. maybe write more than one algorithm for generating caves and use both? currently the caves are too similar in size
+- cave variety: one cave should be with brownish cave floor
+- every second level cave should have a guaranteed champion-prefixed monster and a random tier 3-4 monster
+- do monsters underground also have FoV? i think their aggro range ignores FoV and walls
+- potions sometimes do not stack - what's up with that?
+
+- digging grave can do sth
+- add light sources (like torches to increase pov, or light scrolls)
+- scroll of chaos (teleports everyone in 8 radius to random tiles)
+
 - fix: some life potions dont stack, what's up with that?
 - fix: when dying, skeleton remains should appear *after* we are teleported to temple
 - !1 feat: add hotkey to toggle ASCII/tiles
@@ -3298,6 +3309,14 @@
       return
     }
     foragedTiles.add(key)
+
+    // This tile was already discovered before foraging, so markDiscovered()
+    // would early-return and leave the cached minimap using normal forest colour.
+    // Patch this one minimap tile immediately when its forage state changes.
+    ensureMiniBases()
+    for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], player.x, player.y)
+    minimapDirty = true
+
     const roll = rng()
     let result = FORAGE_TABLE.elseResult || 'nothing'
     for (const entry of (FORAGE_TABLE.table || [])) {
@@ -5573,7 +5592,7 @@
     return null
   }
 
-  const DESKTOP_ENEMY_CURSOR = `url("img/cursors/red-sword.svg") 5 5, crosshair`
+  const DESKTOP_ENEMY_CURSOR = `url("img/cursors/red-sword.svg") 5 4, crosshair`
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1

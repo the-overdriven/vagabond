@@ -2771,6 +2771,12 @@ normal forest color for that load until another full rebuild. This ordering is a
 save/load rendering invariant and should be preserved when changing loader
 initialization order.
 
+Foraging a forest tile during live play must also repaint that coordinate in every
+cached minimap base immediately after adding it to `foragedTiles`. The tile is
+normally already discovered, so calling `markDiscovered()` is insufficient:
+`markDiscovered()` intentionally returns early for an already-seen tile and would
+leave the cached minimap showing ordinary forest until a later full rebuild.
+
 Enemy save records now persist `levelKind` in addition to numeric `level` and
 `caveIndex`. This is required because a z value alone does not uniquely identify
 a map: for example, generic deeper caves and Crypt Level 2 can both use z:-2.
