@@ -4204,8 +4204,15 @@
         const name = hut.startingWeapon
         const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true}
         hut.startingWeaponTaken = true
-        log(`This thatched hut belongs to a human peasant ${hut.name}. You found ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
+        log(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
         if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
+        updateHud()
+        return
+      }
+      if (hut?.goldLoot && !hut.goldLootTaken) {
+        hut.goldLootTaken = true
+        player.gold += hut.goldLoot
+        log(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found ${hut.goldLoot} gold.`, 'loot')
         updateHud()
         return
       }
@@ -7673,6 +7680,14 @@
     // leave the canvas rendered and interactive for seconds while `map` was
     // still empty, which crashed any hover/click in that window.
     generateMap()
+    const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
+    if (weaponHuts.length !== 1 || weaponHuts[0].mausoleum || !STARTING_WEAPONS.includes(weaponHuts[0].startingWeapon)) {
+      throw new Error('The world generator is out of date. Reload the game to get the starting weapon in a village hut.')
+    }
+    const guaranteedGoldHuts = villageHuts.filter(h => h.guaranteedGold && h.goldLoot >= 2 && h.goldLoot <= 9 && !h.goldLootTaken)
+    if (guaranteedGoldHuts.length !== 1 || guaranteedGoldHuts[0].mausoleum || guaranteedGoldHuts[0].startingWeapon) {
+      throw new Error('The world generator is out of date. Reload the game to get the guaranteed gold in a village hut.')
+    }
     initDiscovered()
     rebuildMinimapBases()
     player.x = spawnPoint.x

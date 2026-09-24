@@ -573,6 +573,17 @@ message, and the weapon is automatically equipped. Further inspections do not
 yield another weapon. The selected name and whether it has been claimed are
 stored with the hut in `villageHuts` in saves and replay starting states.
 
+### Hut gold
+
+A second, distinct ordinary hut is guaranteed to contain 2–9 gold. Each other
+ordinary hut apart from the weapon hut has an independent 20% chance of
+containing another 2–9 gold. The mausoleum and weapon huts receive no gold.
+The gold and its amount are rolled once during world generation, then saved in
+the hut metadata. Inspecting a gold hut grants its gold once, regardless of
+equipment, and logs `Inside, you found <amount> gold.` after the hut owner's
+introduction. New-game initialization verifies that the guaranteed gold hut
+exists.
+
 ### Hut generation
 <details>
   <summary>Details</summary>

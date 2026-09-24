@@ -2388,6 +2388,18 @@ function assignVillageHutNames() {
     hut.startingWeapon = pick(STARTING_WEAPONS)
     hut.startingWeaponTaken = false
   }
+  // Keep the guaranteed gold in a different hut from the starting weapon.
+  // Amounts and the other huts' 20% rolls are fixed at world creation.
+  const goldHuts = ordinaryHuts.filter(h => !h.startingWeapon)
+  if (goldHuts.length) {
+    const guaranteedHut = pick(goldHuts)
+    for (const hut of goldHuts) {
+      if (hut !== guaranteedHut && !chance(0.2)) continue
+      hut.goldLoot = randInt(2, 9)
+      hut.goldLootTaken = false
+      if (hut === guaranteedHut) hut.guaranteedGold = true
+    }
+  }
 }
 
 function placeCemetery() {
