@@ -547,16 +547,18 @@ The Temple:
 - is the destination after death
 - is a multi-tile structure
 
-Temple ground heals only if the player has earned XP since the last
-Temple heal. Earned XP is tracked cumulatively, so level-up and XP loss do not
-erase proof of progress. A successful blessing restores current HP only up to
-`min(70, current maximum HP)` and records the earned-XP total. If the player
-needs healing but has gained no XP since the last blessing, the log says:
+At level 1, Temple ground heals without requiring XP growth, even on repeated
+visits or while moving across Temple tiles. From level 2 onward, healing
+requires XP earned since the last Temple heal. Earned XP is tracked
+cumulatively, so level-up and XP loss do not erase proof of progress. A
+successful blessing restores current HP only up to `min(70, current maximum HP)`
+and records the earned-XP total. If a level 2+ player needs healing but has
+gained no XP since the last blessing, the log says:
 `The temple remains silent. Its blessing awaits proof of your growth.`
 The bell tower counts as Temple ground. A Scroll of Homecoming attempts the
 conditional blessing. Normal death returns the character at full current
 maximum HP and records the earned-XP total; the next Temple heal requires XP
-earned after that death recovery.
+earned after that death recovery once the player is above level 1.
 
 Enemies flee from the Temple.
 
@@ -1637,7 +1639,8 @@ When HP reaches zero in normal mode:
 - death animation occurs
 - player returns to Temple at full current maximum HP, including equipment bonuses,
   after the permanent maximum-HP loss has been applied
-- death recovery records earned XP, so any later Temple blessing requires new XP
+- death recovery records earned XP, so later Temple blessings require new XP
+  from level 2 onward; level 1 remains exempt
 - player returns to the surface
 - position becomes the Temple spawn point
 - the killer, if still alive, gains a persistent red skull and a victory level;
@@ -2086,6 +2089,9 @@ into the item generator. Therefore MF does **not**:
 - reroll the item when the humanoid dies
 
 The worn item is already stored on the enemy as `e.equipment`.
+Combat glancing-hit messages and enemy tooltips show only the equipment's base
+name, so they do not reveal a modifier prefix before the item drops. The drop
+message and recovered item retain the full prefixed name.
 
 The item type is selected independently:
 
@@ -2229,8 +2235,9 @@ While invisible, enemies do not chase or attack the player. Invisibility can be 
 
 ## Scroll of Homecoming
 
-Returns the player to the Temple. Temple healing follows the same XP and 70-HP
-rules. Its canonical item kind and replay action are `homecomingscroll`, and
+Returns the player to the Temple. Temple healing follows the same level 1
+exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
+and replay action are `homecomingscroll`, and
 its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 100g, with
 five in stock. The stock config key is `scrolls.homecomingScroll`.
 

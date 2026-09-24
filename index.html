@@ -2500,15 +2500,15 @@
     if (glancing) {
       if (player.equip.weapon) {
         if (dmg === 0) {
-          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.name}!`, 'good')
+          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.base}!`, 'good')
         } else {
-          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.name}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
+          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
         }
       } else {
         if (dmg === 0) {
-          log(`Your strike glances off the ${e.name}'s ${armor.name}!`, 'good')
+          log(`Your strike glances off the ${e.name}'s ${armor.base}!`, 'good')
         } else {
-          log(`Your strike glances off the ${e.name}'s ${armor.name}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
+          log(`Your strike glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
         }
       }
     } else {
@@ -2598,7 +2598,7 @@
   function tryTempleHeal() {
     const cap = Math.min(70, playerMaxHp())
     if (player.hp >= cap) return
-    if (player.totalXpEarned <= player.lastTempleHealXp) {
+    if (player.lvl > 1 && player.totalXpEarned <= player.lastTempleHealXp) {
       log('The temple remains silent. Its blessing awaits proof of your growth.', 'info')
       return
     }
@@ -4016,7 +4016,7 @@
         log('You slip into the water and swim with ease.', 'info')
       }
       if (isTempleGround(map[ny][nx])) {
-        const canHeal = player.totalXpEarned > player.lastTempleHealXp
+        const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
         if (canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
       }
       if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
