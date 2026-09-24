@@ -13,7 +13,7 @@
   "sturdy cane",
   "sturdy oar",
   "fire poker",
-  "hoe",
+  "rusty hoe",
   "door bar",
   "chamber pot",
   "bread peel",
@@ -38,7 +38,7 @@
   "milk stirrer",
   "hoof scraper",
   "flax breaker",
-  "Hurdle Stake",
+  "hurdle stake",
   "cask bung",
   "cauldron hanger",
   "churn dasher",
@@ -104,6 +104,7 @@
   "spoon auger",
   "heavy rasp",
   "heavy candlestick",
+  "heavy candelabrum",
   "reaping hook",
   "wooden peg leg",
   "garden knife",
@@ -117,7 +118,7 @@
   "giant woodcracker",
   "raw iron rod",
   "jagged stone",
-  "cudgel",
+  "primitive cudgel",
   "nail-studded plank",
   "meat cleaver",
   "thatch-needle",
@@ -162,5 +163,6 @@
   "iron brazier leg",
   "cracked scythe blade",
   "quern stone shard",
-  "notched tally-stick"
+  "notched tally-stick",
+  "sharp bone"
 ]
