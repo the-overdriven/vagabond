@@ -1114,7 +1114,7 @@
   function rollModifier(baseName, item, mf = 0) {
     // Magic Find increases the chance an item rolls a modifier at all -
     // this is the "quality" half of MF's effect on gear.
-    if (!chance(Math.min(0.6, 0.20 + mf * 0.01))) return item
+    if (!chance(Math.min(0.9, 0.40 + mf * 0.02))) return item
     const mod = pick(MODIFIERS)
     item.mod = mod.stat
     item.name = mod.name + ' ' + baseName
@@ -2763,7 +2763,7 @@
     clearAutoPath()
     let xpLoss = 0, maxHpLoss = 0
     if (!player.permadeath) {
-      xpLoss = Math.min(200, Math.ceil(player.xp * 0.1))
+      xpLoss = Math.min(200, Math.max(20, Math.ceil(Math.max(0, player.xp) * 0.1)))
       player.xp -= xpLoss
       maxHpLoss = Math.min(player.maxHp - 1, player.lvl <= 4 ? 1 : 2)
       player.maxHp -= maxHpLoss
@@ -6387,7 +6387,7 @@
     document.getElementById('hpbar').style.width = Math.max(0, hpRatio * 100) + '%'
     document.getElementById('hpbarwrap').classList.toggle('low-hp', player.hp > 0 && hpRatio < 0.2)
     document.getElementById('hptext').textContent = player.hp + ' / ' + maxHp
-    document.getElementById('xpbar').style.width = (player.xp / xpToNext(player.lvl) * 100) + '%'
+    document.getElementById('xpbar').style.width = Math.max(0, player.xp / xpToNext(player.lvl) * 100) + '%'
     document.getElementById('hAtk').textContent = playerAtk()
     document.getElementById('hDef').textContent = playerDef()
     document.getElementById('hSpd').textContent = playerSpd()

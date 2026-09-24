@@ -206,7 +206,7 @@ Magic Find influences loot chances **and** loot quality:
   humanoid fallback equipment roll and reduces its chance to roll one tier
   below the enemy (`35% - (tier - 1)*5% - MF*1%`, floor 5%).
 - Item "quality": MF increases the chance any weapon/armor/shield rolls a
-  stat modifier at all (`20% + MF*1%`, capped 60%), biases the rolled
+  stat modifier at all (`40% + MF*2%`, capped 90%), biases the rolled
   modifier amount upward, and reduces artifact curse chance
   (`10% - MF*0.5%`, floor 2%) while giving a chance to roll the artifact
   effect pool one tier higher (`MF*3%`, capped 50%).
@@ -1643,7 +1643,10 @@ When HP reaches zero in normal mode:
 - the killer, if still alive, gains a persistent red skull and a victory level;
   each victory adds 3 maximum HP and +1 each to ATK and DEF, leaves SPD unchanged,
   then heals 10% of its new maximum HP (rounded, at least 1)
-- the player loses 10% of current unspent XP (rounded up), capped at 200 XP
+- the player loses 10% of current unspent XP (rounded up), with a minimum loss
+  of 20 XP and a maximum loss of 200 XP. If fewer than 20 XP are available,
+  the unspent XP total becomes negative; future XP gains repay this debt before
+  the next level can be reached. The XP bar displays zero width during debt
 - the player's base maximum HP permanently drops by 1 at levels 1–4, or 2
   at level 5 and above, never below 1
 
