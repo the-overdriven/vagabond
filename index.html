@@ -4202,7 +4202,7 @@
     if (map[player.y]?.[player.x] === 'village' || hut) {
       if (hut?.startingWeapon && !hut.startingWeaponTaken && !player.equip.weapon) {
         const name = hut.startingWeapon
-        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false}
+        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true}
         hut.startingWeaponTaken = true
         log(`This thatched hut belongs to a human peasant ${hut.name}. You found ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
         if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
@@ -6739,6 +6739,7 @@
 
   // SELL_VALUE_BY_TIER / FLAT_SELL_VALUE now loaded from content/loot_tables.json.
   function itemSellValue(it) {
+    if (it.startingWeapon) return 2
     if (it.kind === 'potato') return 0
     if (it.tier) {
       let v = SELL_VALUE_BY_TIER[it.tier] || 0
