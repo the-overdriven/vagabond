@@ -378,7 +378,7 @@ async function runReplayAction(action) {
       const fn = {
         potion: usePotion,
         scroll: useScroll,
-        teleportscroll: useTeleportScroll,
+        homecomingscroll: useHomecomingScroll,
         speedpotion: useSpeedPotion,
         herb: useHerb,
         mushroom: useMushroom,

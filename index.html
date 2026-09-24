@@ -3213,12 +3213,10 @@
     else player.inventory.push({kind: 'scroll', name: 'Scroll of Invisibility', count: 1})
   }
 
-  function addTeleportScroll() {
-    const stack = player.inventory.find(i => i.kind === 'teleportscroll')
-    if (stack) {
-      stack.count = (stack.count || 1) + 1
-      stack.name = 'Scroll of Homecoming'
-    } else player.inventory.push({kind: 'teleportscroll', name: 'Scroll of Homecoming', count: 1})
+  function addHomecomingScroll() {
+    const stack = player.inventory.find(i => i.kind === 'homecomingscroll')
+    if (stack) stack.count = (stack.count || 1) + 1
+    else player.inventory.push({kind: 'homecomingscroll', name: 'Scroll of Homecoming', count: 1})
   }
 
   function addIdScroll() {
@@ -3282,7 +3280,7 @@
   // Kinds not listed here simply render with no icon.
   const ITEM_ICON_KINDS = [
     'herb', 'mushroom', 'ediblemushroom', 'berries', 'potato', 'potion', 'speedpotion',
-    'scroll', 'idscroll', 'teleportscroll', 'weapon', 'armor', 'shield',
+    'scroll', 'idscroll', 'homecomingscroll', 'weapon', 'armor', 'shield',
     'tombstone', 'oddTombstone', 'wheelbarrow', 'bigbell', 'blackkey',
     'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
   ]
@@ -3294,11 +3292,11 @@
   }
 
   function isStackableKind(kind) {
-    return kind === 'potion' || kind === 'scroll' || kind === 'idscroll' || kind === 'speedpotion' || kind === 'teleportscroll' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'seashell' || kind === 'amber'
+    return kind === 'potion' || kind === 'scroll' || kind === 'idscroll' || kind === 'speedpotion' || kind === 'homecomingscroll' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'seashell' || kind === 'amber'
   }
 
   function isConsumableKind(kind) {
-    return kind === 'potion' || kind === 'speedpotion' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'scroll' || kind === 'idscroll' || kind === 'teleportscroll'
+    return kind === 'potion' || kind === 'speedpotion' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'scroll' || kind === 'idscroll' || kind === 'homecomingscroll'
   }
 
   function equipmentSortValues(item) {
@@ -4373,7 +4371,7 @@
             speedpotion: 'a speed potion',
             scroll: 'a scroll',
             idscroll: 'a scroll',
-            teleportscroll: 'a scroll',
+            homecomingscroll: 'a scroll',
             treasurecasket: 'an old casket',
             skeleton: 'skeletal remains',
             playerremains: 'your remains',
@@ -6633,11 +6631,11 @@
           useScroll(idx)
         }
         row.appendChild(btn)
-      } else if (it.kind === 'teleportscroll') {
+      } else if (it.kind === 'homecomingscroll') {
         const btn = document.createElement('button')
         btn.textContent = 'Read'
         btn.onclick = () => {
-          useTeleportScroll(idx)
+          useHomecomingScroll(idx)
         }
         row.appendChild(btn)
       } else if (it.kind === 'idscroll') {
@@ -6780,13 +6778,13 @@
       idScrollStock.count = Math.max(idCfg.minCount, idScrollStock.count || 1)
       idScrollStock.merchantPrice = Math.max(idCfg.minPrice, idScrollStock.merchantPrice || 0)
     }
-    const tpCfg = MERCHANT_STOCK_CONFIG.scrolls.teleportScroll
-    if (!merchantStock.some(it => it.kind === tpCfg.kind)) {
+    const homecomingCfg = MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll
+    if (!merchantStock.some(it => it.kind === homecomingCfg.kind)) {
       merchantStock.push({
-        kind: tpCfg.kind,
-        name: tpCfg.name,
-        count: tpCfg.count,
-        merchantPrice: tpCfg.merchantPrice
+        kind: homecomingCfg.kind,
+        name: homecomingCfg.name,
+        count: homecomingCfg.count,
+        merchantPrice: homecomingCfg.merchantPrice
       })
     }
   }
@@ -7116,10 +7114,10 @@
     consumeItemTurn()
   }
 
-  function useTeleportScroll(idx) {
+  function useHomecomingScroll(idx) {
     const it = player.inventory[idx]
-    if (!it || it.kind !== 'teleportscroll') return
-    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'teleportscroll', idx, replayId:player.inventory[idx]?.replayId})
+    if (!it || it.kind !== 'homecomingscroll') return
+    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')

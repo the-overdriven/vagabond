@@ -9,7 +9,7 @@
 // handler at the bottom), so they catch up on the next launch.
 // ---------------------------------------------------------------------------
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + 'v19'; // <-- bump me on every content/image release
+const CACHE_VERSION = CACHE_PREFIX + 'v20'; // <-- bump me on every content/image release
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -98,10 +98,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Content JSON (game data that changes during development, like
-  // artifact_effects.json): network-first, so edits show up immediately.
-  // Falls back to the cached copy only when offline.
-  if (url.pathname.includes('/content/')) {
+  // Game scripts and content JSON must match the current index.html. Fetch
+  // them from the network first, then fall back to the cached copy offline.
+  if (url.pathname.includes('/src/') || url.pathname.includes('/content/')) {
     event.respondWith(
       fresh(req).then((res) => {
         if (res && res.ok) stash(event, RUNTIME, req, res.clone());

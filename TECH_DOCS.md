@@ -2227,7 +2227,9 @@ While invisible, enemies do not chase or attack the player. Invisibility can be 
 ## Scroll of Homecoming
 
 Returns the player to the Temple. Temple healing follows the same XP and 70-HP
-rules. Its merchant price remains 100g, with five in stock.
+rules. Its canonical item kind and replay action are `homecomingscroll`, and
+its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 100g, with
+five in stock. The stock config key is `scrolls.homecomingScroll`.
 
 ## Potion of Speed
 
