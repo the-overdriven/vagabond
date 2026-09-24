@@ -1573,6 +1573,7 @@
     x: 0, y: 0,
     name: 'Vagabond', race: DEFAULT_RACE,
     lvl: 1, xp: 0,
+    totalXpEarned: 0, lastTempleHealXp: 0,
     maxHp: 50, hp: 50,
     baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
@@ -1745,6 +1746,7 @@
   function gainXp(amount) {
     amount = Math.round(amount * xpMultiplier())
     player.xp += amount
+    player.totalXpEarned += Math.max(0, amount)
     log(`You gain ${amount} XP.`, 'good')
     let leveled = false
     while (player.xp >= xpToNext(player.lvl)) {
@@ -2592,15 +2594,31 @@
     updateHud()
   }
 
-  // Returns the player to the temple, shared by death recovery and teleportation.
+  // Temple blessings are separate from full-HP recovery after a normal death.
+  function tryTempleHeal() {
+    const cap = Math.min(70, playerMaxHp())
+    if (player.hp >= cap) return
+    if (player.totalXpEarned <= player.lastTempleHealXp) {
+      log('The temple remains silent. Its blessing awaits proof of your growth.', 'info')
+      return
+    }
+    player.hp = cap
+    player.lastTempleHealXp = player.totalXpEarned
+    log('The Temple restores your strength.', 'good')
+  }
+
   function returnPlayerToTemple() {
+    const wasDead = player.hp <= 0
     currentZ = 0
     currentCave = -1
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
     player.x = spawnPoint.x
     player.y = spawnPoint.y
-    player.hp = playerMaxHp()
+    if (wasDead) {
+      player.hp = playerMaxHp()
+      player.lastTempleHealXp = player.totalXpEarned
+    } else tryTempleHeal()
     pendingMove = null
     clearAutoPath()
     stopCameraAnimation()
@@ -2674,6 +2692,8 @@
       race: DEFAULT_RACE,
       lvl: 1,
       xp: 0,
+      totalXpEarned: 0,
+      lastTempleHealXp: 0,
       maxHp: 50,
       hp: 50,
       baseAtk: 2,
@@ -2741,13 +2761,28 @@
     player.deaths++
     pendingMove = null
     clearAutoPath()
+    let xpLoss = 0, maxHpLoss = 0
+    if (!player.permadeath) {
+      xpLoss = Math.min(200, Math.ceil(player.xp * 0.1))
+      player.xp -= xpLoss
+      maxHpLoss = Math.min(player.maxHp - 1, player.lvl <= 4 ? 1 : 2)
+      player.maxHp -= maxHpLoss
+      if (killer && killer.alive) {
+        killer.victoryLevel = (killer.victoryLevel || 0) + 1
+        killer.maxHp += 3
+        killer.atk += 1
+        killer.def += 1
+        killer.hp = Math.min(killer.maxHp, killer.hp + Math.max(1, Math.round(killer.maxHp * 0.1)))
+        log(`The ${killer.name} has tasted victory. It grows stronger.`, 'bad')
+      }
+    }
     let droppedItem = null
     if (player.permadeath) createPermadeathBody(killer)
     else droppedItem = createNormalDeathRemains()
     const deathLogId = log(
       player.permadeath
         ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
-        : `You have fallen... and awaken at the Temple.${droppedItem ? ` You dropped ${droppedItem.name} where you fell.` : ''}`,
+        : `You have fallen... and awaken at the Temple. You lose ${xpLoss} XP and ${maxHpLoss} max HP permanently.${droppedItem ? ` You dropped ${droppedItem.name} where you fell.` : ''}`,
       'bad'
     )
     stopCameraAnimation()
@@ -3180,8 +3215,10 @@
 
   function addTeleportScroll() {
     const stack = player.inventory.find(i => i.kind === 'teleportscroll')
-    if (stack) stack.count = (stack.count || 1) + 1
-    else player.inventory.push({kind: 'teleportscroll', name: 'Scroll of Teleportation', count: 1})
+    if (stack) {
+      stack.count = (stack.count || 1) + 1
+      stack.name = 'Scroll of Homecoming'
+    } else player.inventory.push({kind: 'teleportscroll', name: 'Scroll of Homecoming', count: 1})
   }
 
   function addIdScroll() {
@@ -3981,10 +4018,8 @@
         log('You slip into the water and swim with ease.', 'info')
       }
       if (isTempleGround(map[ny][nx])) {
-        if (player.hp < playerMaxHp()) {
-          player.hp = playerMaxHp()
-          log('The Temple restores your strength.', 'good')
-        }
+        const canHeal = player.totalXpEarned > player.lastTempleHealXp
+        if (canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
       }
       if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
         log('You enter a dense ancient forest.', 'info')
@@ -5414,6 +5449,18 @@
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over
       drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+      if (e.victoryLevel) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.42))}px serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.lineWidth = 2
+        ctx.strokeStyle = '#180907'
+        ctx.fillStyle = '#e0473f'
+        ctx.strokeText('☠︎', vx + TILE_PX * 0.78, vy + 1)
+        ctx.fillText('☠︎', vx + TILE_PX * 0.78, vy + 1)
+        ctx.restore()
+      }
 
       if (e.aware) {
         ctx.strokeStyle = RENDER_STYLE.overlays.enemyAwareOutline
@@ -5661,7 +5708,7 @@
         mini: false, enemy: e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${boostHtml}${critHtml}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
@@ -6757,7 +6804,7 @@
     // Foraged valuables carry their own sell value, so they remain sellable
     // even when the external loot-table config does not list their kind.
     if (it.kind === 'seashell' || it.kind === 'amber') return it.value || 0
-    // Anything the merchant himself stocks (Scroll of Teleportation, etc.)
+    // Anything the merchant himself stocks (Scroll of Homecoming, etc.)
     // is inherently worth something even if the external loot table has no
     // entry for it - he recognizes his own wares. Price it off whatever he
     // charges to buy that same kind, at the buy = 2x sell ratio used
@@ -7075,7 +7122,7 @@
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'teleportscroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    log('You read the Scroll of Teleportation. Darkness swallows you - and the temple takes you back.', 'good')
+    log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
     returnPlayerToTemple()
     toggleInv(false)
     consumeItemTurn()

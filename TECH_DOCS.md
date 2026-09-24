@@ -547,6 +547,17 @@ The Temple:
 - is the destination after death
 - is a multi-tile structure
 
+Temple ground heals only if the player has earned XP since the last
+Temple heal. Earned XP is tracked cumulatively, so level-up and XP loss do not
+erase proof of progress. A successful blessing restores current HP only up to
+`min(70, current maximum HP)` and records the earned-XP total. If the player
+needs healing but has gained no XP since the last blessing, the log says:
+`The temple remains silent. Its blessing awaits proof of your growth.`
+The bell tower counts as Temple ground. A Scroll of Homecoming attempts the
+conditional blessing. Normal death returns the character at full current
+maximum HP and records the earned-XP total; the next Temple heal requires XP
+earned after that death recovery.
+
 Enemies flee from the Temple.
 
 The bell tower tile (see "Missing Temple Bell") is carved out of the
@@ -1624,20 +1635,33 @@ When HP reaches zero in normal mode:
   skeletal-remains glyph without becoming a `skeleton` or permadeath `deadbody`
 - the forage/loot action restores the item and removes `playerremains` from the world
 - death animation occurs
-- player returns to Temple
-- HP is restored
+- player returns to Temple at full current maximum HP, including equipment bonuses,
+  after the permanent maximum-HP loss has been applied
+- death recovery records earned XP, so any later Temple blessing requires new XP
 - player returns to the surface
 - position becomes the Temple spawn point
+- the killer, if still alive, gains a persistent red skull and a victory level;
+  each victory adds 3 maximum HP and +1 each to ATK and DEF, leaves SPD unchanged,
+  then heals 10% of its new maximum HP (rounded, at least 1)
+- the player loses 10% of current unspent XP (rounded up), capped at 200 XP
+- the player's base maximum HP permanently drops by 1 at levels 1–4, or 2
+  at level 5 and above, never below 1
 
 The player's:
 
 - level
-- XP
 - equipment
 - inventory
 - gold
 
 are not wiped by death.
+
+The existing death log also states the exact XP and max-HP losses. A living
+monster killer additionally produces `The <killer> has tasted victory. It grows
+stronger.` Environmental deaths apply player penalties without empowering a
+monster. These penalties apply only outside permadeath mode; permadeath keeps
+its existing death and corpse behavior. Victory levels and the Temple's XP
+progress counters persist in saves and replay starting states.
 
 Normal-mode `playerremains` exist only in non-permadeath runs. Permadeath
 continues to use its separate persistent `deadbody` object and existing corpse
@@ -2200,9 +2224,10 @@ Wyrdling increases the duration by 25%. Example: 15 turns become 18.75 turns (ro
 
 While invisible, enemies do not chase or attack the player. Invisibility can be also used to kill stronger enemies, without being hit.
 
-## Scroll of Teleportation
+## Scroll of Homecoming
 
-Returns the player to the Temple.
+Returns the player to the Temple. Temple healing follows the same XP and 70-HP
+rules. Its merchant price remains 100g, with five in stock.
 
 ## Potion of Speed
 

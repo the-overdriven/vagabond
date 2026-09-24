@@ -127,6 +127,7 @@ function buildSaveObject() {
       name: player.name, race: player.race,
       permadeath: player.permadeath,
       lvl: player.lvl, xp: player.xp,
+      totalXpEarned: player.totalXpEarned, lastTempleHealXp: player.lastTempleHealXp,
       maxHp: player.maxHp, hp: player.hp,
       baseAtk: player.baseAtk, baseDef: player.baseDef, baseSpd: player.baseSpd, baseMf: player.baseMf,
       gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
@@ -148,6 +149,7 @@ function buildSaveObject() {
       caveIndex: e.caveIndex,
       hp: e.hp,
       maxHp: e.maxHp,
+      victoryLevel: e.victoryLevel || 0,
       atk: e.atk,
       def: e.def,
       spd: e.spd,
@@ -483,6 +485,8 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  player.totalXpEarned = Number.isFinite(data.player.totalXpEarned) ? data.player.totalXpEarned : 0
+  player.lastTempleHealXp = Number.isFinite(data.player.lastTempleHealXp) ? data.player.lastTempleHealXp : player.totalXpEarned
   bellReturnedToChapel = !!data.bellReturnedToChapel
   bellRung = !!data.bellRung
   ancientBellLichSpawned = !!data.ancientBellLichSpawned
@@ -510,6 +514,9 @@ function loadGameFromObject(data, opts = {}) {
   if (typeof player.name !== 'string' || !player.name.trim()) player.name = 'Vagabond'
   player.equip = (data.player && data.player.equip) || {weapon: null, shield: null, armor: null}
   player.inventory = (data.player && data.player.inventory) || []
+  for (const item of player.inventory) {
+    if (item.kind === 'teleportscroll') item.name = 'Scroll of Homecoming'
+  }
   // Migrate saves from the earlier Black Key implementation, which
   // removed the key from inventory when it was equipped.
   player.equip.blackkey = player.equip.blackkey || null
@@ -525,6 +532,9 @@ function loadGameFromObject(data, opts = {}) {
   tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length
   tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length === TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_, i) => i)
   merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : []
+  for (const item of merchantStock) {
+    if (item.kind === 'teleportscroll') item.name = 'Scroll of Homecoming'
+  }
   // Replay's initialState is a snapshot of an already-current-version live
   // game - it never needs backfilling, and doing so here would call rng()
   // outside the recorded action stream (replayPlaying/replayRecording are
@@ -560,7 +570,7 @@ function loadGameFromObject(data, opts = {}) {
     }
     return ({
       name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
-      hp: e.hp, maxHp: e.maxHp, atk: e.atk, def: e.def, spd: e.spd,
+      hp: e.hp, maxHp: e.maxHp, victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
       fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
       humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
