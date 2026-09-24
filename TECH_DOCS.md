@@ -1460,13 +1460,13 @@ Equivalently, the fraction of ATK that survives DEF is:
 Examples:
 
 |                 DEF | ATK retained before damage variance |
-|--------------------:|---:|
-|                   0 | 100% |
-|            1 (robe) | 90.91% |
-|            2 (cape) | 83.33% |
-| 5 (cloak + buckler) | 66.67% |
-|    10 (brass armor) | 50% |
-|  17 (ancient armor) | 37.04%% |
+|--------------------:|------------------------------------:|
+|                   0 |                                100% |
+|            1 (robe) |                              90.91% |
+|            2 (cape) |                              83.33% |
+| 5 (cloak + buckler) |                              66.67% |
+|    10 (brass armor) |                                 50% |
+|  17 (ancient armor) |                              37.04% |
 
 Final damage is then:
 
@@ -1772,18 +1772,19 @@ Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
 
 # 36. Equipment Modifiers
 
-Normal equipment has approximately a **20% chance** to receive a modifier.
+Normal equipment has a **40% chance** to receive a modifier at MF 0. Each point
+of Magic Find adds 2 percentage points, up to a **90% cap**.
 
 Current modifiers:
 
-| Modifier | Effect |
-|---|---|
-| Profound | XP |
-| Resilient | HP |
-| Mighty | ATK |
-| Sturdy | DEF |
-| Swift | SPD |
-| Lucky | MF |
+| Modifier  | Effect |
+|-----------|--------|
+| Profound  | XP     |
+| Resilient | HP     |
+| Mighty    | ATK    |
+| Sturdy    | DEF    |
+| Swift     | SPD    |
+| Lucky     | MF     |
 
 XP modifiers receive a percentage bonus in the approximate range:
 
