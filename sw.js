@@ -9,7 +9,7 @@
 // handler at the bottom), so they catch up on the next launch.
 // ---------------------------------------------------------------------------
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + 'v17'; // <-- bump me on every content/image release
+const CACHE_VERSION = CACHE_PREFIX + 'v19'; // <-- bump me on every content/image release
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -28,6 +28,7 @@ const PRECACHE_URLS = [
   './src/fov.js',
   './src/replay.js',
   './src/saveLoad.js',
+  './content/starting_weapons.json',
   './content/gear_weapons.json',
   './content/gear_shields.json',
   './content/gear_armors.json',

@@ -2380,6 +2380,14 @@ function assignVillageHutNames() {
   for (let i = 1; i < villageHuts.length; i++) {
     villageHuts[i].name = pick(HUMAN_NAMES)
   }
+  // Keep the Black Key hut's special inspection separate. The selected
+  // ordinary hut holds one fixed improvised weapon until it is claimed.
+  const ordinaryHuts = villageHuts.filter(h => !h.mausoleum)
+  if (ordinaryHuts.length) {
+    const hut = pick(ordinaryHuts)
+    hut.startingWeapon = pick(STARTING_WEAPONS)
+    hut.startingWeaponTaken = false
+  }
 }
 
 function placeCemetery() {

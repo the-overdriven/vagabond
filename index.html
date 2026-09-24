@@ -544,6 +544,7 @@
   let ARTIFACT_EPITHETS = []
   let ARTIFACT_NAMES_DWARF = []
   let HUMAN_NAMES = []
+  let STARTING_WEAPONS = []
   let ARTIFACT_VOCATIONS_DWARF = []
   let ARTIFACT_REPUTATIONS_DWARF = []
   let ARTIFACT_EFFECTS = []
@@ -618,6 +619,7 @@
       artifactEpithets: 'artifact_epithets.json',
       artifactNamesDwarf: 'random_names_dwarf.json',
       humanNames: 'random_names_human.json',
+      startingWeapons: 'starting_weapons.json',
       artifactVocationsDwarf: 'random_vocations_dwarf.json',
       artifactReputationsDwarf: 'random_reputations_dwarf.json',
       artifactEffects: 'artifact_effects.json',
@@ -665,6 +667,7 @@
     ARTIFACT_EPITHETS = content.artifactEpithets
     ARTIFACT_NAMES_DWARF = content.artifactNamesDwarf
     HUMAN_NAMES = content.humanNames
+    STARTING_WEAPONS = content.startingWeapons
     ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf
     ARTIFACT_REPUTATIONS_DWARF = content.artifactReputationsDwarf
     ARTIFACT_EFFECTS = content.artifactEffects
@@ -4197,6 +4200,15 @@
     }
     const hut = currentZ === 0 ? villageHuts.find(h => h.x === player.x && h.y === player.y) : null
     if (map[player.y]?.[player.x] === 'village' || hut) {
+      if (hut?.startingWeapon && !hut.startingWeaponTaken && !player.equip.weapon) {
+        const name = hut.startingWeapon
+        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false}
+        hut.startingWeaponTaken = true
+        log(`This thatched hut belongs to a human peasant ${hut.name}. You found ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
+        if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
+        updateHud()
+        return
+      }
       if (hut && player.equip.blackkey) {
         if (hut.mausoleum) {
           log('The Black Key grows heavier against your heart once you enter the hut. Beneath the carpet, you discover a marked trapdoor. You press the key against its black mark, and hear stone grinding beneath the hut. Press \"inspect\" again to descend.', 'info')

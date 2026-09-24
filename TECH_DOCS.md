@@ -561,6 +561,18 @@ A procedurally positioned settlement containing several huts.
 
 Five NPC spawn near the village.
 
+### Starting weapon
+
+One randomly selected ordinary hut in each newly generated village contains
+one improvised weapon. Its name is randomly picked from
+`content/starting_weapons.json`; its stats are always ATK 1, GRACE 1, and it is
+one-handed. Inspecting that hut yields the weapon only while the player has no
+weapon equipped. An armed player leaves it in place for a later visit. On
+discovery, the hut owner's usual introduction is followed by the weapon find
+message, and the weapon is automatically equipped. Further inspections do not
+yield another weapon. The selected name and whether it has been claimed are
+stored with the hut in `villageHuts` in saves and replay starting states.
+
 ### Hut generation
 <details>
   <summary>Details</summary>
