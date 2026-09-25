@@ -3923,7 +3923,7 @@ present, artifact effect ID when present, and the inventory-formatted
 their `stat_line`), `steps_taken`,
 `creatures_slain`, `turn_count` (turns in the current page session, reset on
 load), `world_seed` (original seed restored from saves), and `game_version`
-(the stable `v24` from `src/version.js`). `WORLD_SEED` is reassignable so
+(the current release version from `src/version.js`). `WORLD_SEED` is reassignable so
 loading a save restores its original seed instead of reporting the new page
 load's seed. The service worker imports that same version file for its cache
 name; bump `src/version.js` for each release. Registration bypasses the HTTP
@@ -3931,7 +3931,7 @@ cache for service-worker imports so a changed version file triggers an update
 even when `sw.js` itself has not changed. Playtime is not recorded:
 there is no reliable persisted playtime counter. Neither full saves nor
 replay/RNG histories are uploaded. The existing service worker precaches
-`src/graveyard.js`, `src/version.js`, and CSS under cache v24.
+`src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
 The cross-origin SDK is **not** precached or required for boot, 
 and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT. 
 Offline deaths are not queued or retried.

@@ -24,7 +24,7 @@ describe('Graveyard', () => {
   it('opens and closes the Graveyard without changing the live game', () => {
     configureTestGraveyard(false)
     beginNewGame()
-    cy.window().its('VAGABOND_GAME_VERSION').should('equal', 'v24')
+    cy.window().its('VAGABOND_GAME_VERSION').should('match', /^v\d+$/)
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardOverlay').should('have.class', 'show')
     cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable.')
@@ -70,7 +70,10 @@ describe('Graveyard', () => {
     beginNewGame('E2E Tester')
     const rows = []
     const queries = []
+    let expectedVersion
     cy.window().then(win => {
+      expectedVersion = win.VAGABOND_GAME_VERSION
+      expect(expectedVersion).to.match(/^v\d+$/)
       const remoteRow = {
         character_name: '<img src=x onerror=alert(1)>', race: 'human', level: 1,
         killer_name: '<script>alert(1)</script>', cause_of_death: 'enemy',
@@ -99,7 +102,7 @@ describe('Graveyard', () => {
     cy.wrap(rows).should(records => {
       expect(records).to.have.length(1)
       expect(records[0]).to.include({permadeath: false, death_number: 1, max_hp: 50,
-        killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: 'v24'})
+        killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: expectedVersion})
       expect(records[0].death_event_id).to.match(/^[0-9a-f-]{36}$/)
       expect(records[0].equipment.weapon).to.include({atk: 1, grace: 1, stat_line: 'ATK 1, GRACE 1'})
       expect(records[0].equipment.armor).to.include({def: 3, modAmt: 2, stat_line: 'DEF 3+2'})
