@@ -100,22 +100,24 @@ const Graveyard = (() => {
     return clientPromise
   }
 
-  function snapshotItem(item) {
+  function snapshotItem(item, statLine) {
     if (!item) return null
     const {kind, base, name, replayId, tier, mod, modAmt, effectId, identified,
-      bonuses, curse, artifactSlot, maxHpPct, twoHanded} = item
+      bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
+      speedPenalty, xpBonus} = item
     return {kind, base, name, replayId, tier, mod, modAmt, effectId, identified,
+      atk, def, spd, grace, speedPenalty, xpBonus, stat_line: statLine(item),
       bonuses: bonuses ? {...bonuses} : undefined,
       curse: curse ? {...curse, types: curse.types?.slice()} : curse,
       artifactSlot, maxHpPct, twoHanded}
   }
 
-  function snapshotEquipment(equip) {
-    return Object.fromEntries(['weapon', 'armor', 'shield'].map(slot => [slot, snapshotItem(equip[slot])]))
+  function snapshotEquipment(equip, statLine) {
+    return Object.fromEntries(['weapon', 'armor', 'shield'].map(slot => [slot, snapshotItem(equip[slot], statLine)]))
   }
 
-  function snapshotArtifacts(inventory) {
-    return inventory.filter(item => item.kind === 'artifact').map(snapshotItem)
+  function snapshotArtifacts(inventory, statLine) {
+    return inventory.filter(item => item.kind === 'artifact').map(item => snapshotItem(item, statLine))
   }
 
   function recordDeath(snapshot) {
@@ -140,6 +142,12 @@ const Graveyard = (() => {
     const line = document.createElement('div')
     line.textContent = `${label}: ${value ?? '-'}`
     return line
+  }
+
+  function gearLabel(item, fallback) {
+    if (!item) return fallback || '-'
+    const name = item.name || fallback || '-'
+    return name + (typeof item.stat_line === 'string' && item.stat_line ? ` (${item.stat_line})` : '')
   }
 
   function deathCause(row) {
@@ -175,9 +183,9 @@ const Graveyard = (() => {
       extras.className = 'graveyard-details'
       for (const [label, value] of [
         ['ATK', row.atk], ['DEF', row.def], ['SPD', row.spd], ['GRACE', row.grace],
-        ['Max HP', row.max_hp], ['Weapon', row.equipment?.weapon?.name || row.weapon],
-        ['Armor', row.equipment?.armor?.name || row.armor],
-        ['Shield', row.equipment?.shield?.name || row.shield],
+        ['Max HP', row.max_hp], ['Weapon', gearLabel(row.equipment?.weapon, row.weapon)],
+        ['Armor', gearLabel(row.equipment?.armor, row.armor)],
+        ['Shield', gearLabel(row.equipment?.shield, row.shield)],
         ['Artifacts', Array.isArray(row.artifacts) ? row.artifacts.map(item => item?.name).join(', ') : '-'],
         ['Gold', row.gold], ['Cumulated XP', row.cumulated_xp], ['Deaths', row.death_number],
         ['Steps', row.steps_taken], ['Creatures slain', row.creatures_slain]

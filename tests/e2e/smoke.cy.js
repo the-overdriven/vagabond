@@ -187,7 +187,7 @@ describe('Vagabond smoke test', () => {
   it('opens and closes the Graveyard without changing the live game', () => {
     configureTestGraveyard(false)
     beginNewGame()
-    cy.window().its('VAGABOND_GAME_VERSION').should('equal', 'v23')
+    cy.window().its('VAGABOND_GAME_VERSION').should('equal', 'v24')
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardOverlay').should('have.class', 'show')
     cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable.')
@@ -238,7 +238,7 @@ describe('Vagabond smoke test', () => {
         character_name: '<img src=x onerror=alert(1)>', race: 'human', level: 1,
         killer_name: '<script>alert(1)</script>', cause_of_death: 'enemy',
         permadeath: false, death_number: 1, killed_at: '2026-09-25T12:00:00Z',
-        equipment: {weapon: {name: '<svg onload=alert(1)>'}}, artifacts: []
+        equipment: {armor: {name: '<svg onload=alert(1)>', stat_line: 'DEF 2'}}, artifacts: []
       }
       win.supabase = {createClient: () => ({from: () => ({
         insert: record => { rows.push(record); return Promise.resolve({error: null}) },
@@ -246,19 +246,34 @@ describe('Vagabond smoke test', () => {
           order() { return this },
           limit(n) { queries.push(n); return this },
           eq(mode, value) { queries.push([mode, value]); return this },
-          then(resolve) { resolve({data: [remoteRow], error: null}) }
+          then(resolve) {
+            resolve({data: [{...remoteRow, equipment: {
+              ...remoteRow.equipment, weapon: rows[0].equipment.weapon,
+              shield: rows[0].equipment.shield
+            }}], error: null})
+          }
         })
       })})}
-      win.eval("die({name:'Minotaur', prefix:'Champion', alive:false})")
+      win.eval(`player.equip.weapon = {kind:'weapon', name:'Meat Cleaver', base:'Meat Cleaver', atk:1, grace:1, tier:1}
+        player.equip.armor = {kind:'armor', name:'Sturdy Mail', base:'Mail', def:3, mod:'def', modAmt:2}
+        player.equip.shield = {kind:'shield', name:'Buckler', base:'Buckler', def:1, mod:'spd', modAmt:2}
+        die({name:'Minotaur', prefix:'Champion', alive:false})`)
     })
     cy.wrap(rows).should(records => {
       expect(records).to.have.length(1)
       expect(records[0]).to.include({permadeath: false, death_number: 1, max_hp: 50,
-        killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: 'v23'})
+        killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: 'v24'})
       expect(records[0].death_event_id).to.match(/^[0-9a-f-]{36}$/)
+      expect(records[0].equipment.weapon).to.include({atk: 1, grace: 1, stat_line: 'ATK 1, GRACE 1'})
+      expect(records[0].equipment.armor).to.include({def: 3, modAmt: 2, stat_line: 'DEF 3+2'})
+      expect(records[0].equipment.shield).to.include({def: 1, modAmt: 2, stat_line: 'DEF 1, SPD +2'})
     })
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardList').should('contain.text', '<img src=x onerror=alert(1)>')
+    cy.get('#graveyardList .graveyard-record').first().click()
+    cy.get('#graveyardList').should('contain.text', 'Weapon: Meat Cleaver (ATK 1, GRACE 1)')
+    cy.get('#graveyardList').should('contain.text', 'Shield: Buckler (DEF 1, SPD +2)')
+    cy.get('#graveyardList').should('contain.text', 'Armor: <svg onload=alert(1)> (DEF 2)')
     cy.get('#graveyardList img, #graveyardList script, #graveyardList svg').should('not.exist')
     cy.get('#graveyardFilters [data-mode="true"]').click()
     cy.wrap(queries).should(q => {

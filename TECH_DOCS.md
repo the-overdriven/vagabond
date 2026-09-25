@@ -3817,7 +3817,10 @@ operation.
 The desktop HUD has a Graveyard button opening an in-game overlay with the 50
 most recent deaths (`created_at DESC LIMIT 50`). All, Permadeath, and
 Non-permadeath each use a separately limited query. A record can be expanded
-for equipment/stats. Red highlights permadeath; amber highlights normal deaths.
+for equipment/stats. Equipped gear shows the inventory stat line in brackets,
+for example `Meat Cleaver (ATK 1, GRACE 1)`; earlier records without the
+additional item stats still show their stored names. Red highlights permadeath;
+amber highlights normal deaths.
 Opening/closing never consumes a game turn or changes replay/save state. The
 overlay fills the viewport with one scrolling records list; its title and X
 close control remain visible.
@@ -3853,12 +3856,14 @@ Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
 or legacy/unknown `environment`), `max_hp`, `atk`,
 `def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
-names), `equipment` (compact JSONB equipped-item snapshots with base/name,
-replay ID if present, modifiers and artifact effect ID when present),
-`artifacts` (compact JSONB artifact inventory snapshots), `steps_taken`,
+names), `equipment` (JSONB equipped-item snapshots with base/name, actual
+ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if
+present, artifact effect ID when present, and the inventory-formatted
+`stat_line`), `artifacts` (compact JSONB artifact inventory snapshots with
+their `stat_line`), `steps_taken`,
 `creatures_slain`, `turn_count` (turns in the current page session, reset on
 load), `world_seed` (original seed restored from saves), and `game_version`
-(the stable `v23` from `src/version.js`). `WORLD_SEED` is reassignable so
+(the stable `v24` from `src/version.js`). `WORLD_SEED` is reassignable so
 loading a save restores its original seed instead of reporting the new page
 load's seed. The service worker imports that same version file for its cache
 name; bump `src/version.js` for each release. Registration bypasses the HTTP
@@ -3866,7 +3871,7 @@ cache for service-worker imports so a changed version file triggers an update
 even when `sw.js` itself has not changed. Playtime is not recorded:
 there is no reliable persisted playtime counter. Neither full saves nor
 replay/RNG histories are uploaded. The existing service worker precaches
-`src/graveyard.js`, `src/version.js`, and CSS under cache v23. 
+`src/graveyard.js`, `src/version.js`, and CSS under cache v24.
 The cross-origin SDK is **not** precached or required for boot, 
 and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT. 
 Offline deaths are not queued or retried.
