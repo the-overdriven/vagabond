@@ -1907,7 +1907,6 @@ function keyXY(x, y) {
 }
 
 function spawnEnemies() {
-  const total = 120
   const weights = [0.42, 0.26, 0.17, 0.10, 0.05] // tier 1..5
 
   // Index every legal spawn tile by terrain once. Rejection-sampling the whole map
@@ -1928,6 +1927,7 @@ function spawnEnemies() {
       allSpawnTiles.push(x, y)
     }
   }
+  const total = Math.round(allSpawnTiles.length / 2 / SURFACE_TILES_PER_ENEMY)
   const poolCache = {}
 
   function poolFor(tmpl) {

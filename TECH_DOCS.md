@@ -1022,11 +1022,19 @@ Maximum attempts:
 
 # 17. Enemy Population
 
-The initial surface world attempts to spawn:
+The initial surface world attempts to spawn about one random enemy per
+**260 eligible walkable tiles**, configured by
+`content/map_config.json` (`spawning.surfaceTilesPerEnemy`). Eligible tiles
+exclude water, other impassable terrain, the outer two-tile border, major
+landmarks, the Temple's safe area, and the bell guard's exclusion area.
+This preserves roughly the former density of:
 
 ```text
-120 enemies
+120 enemies across ~31,250 eligible tiles in a 260 × 180 world
 ```
+
+The target scales with actual eligible land on each generated world, not just
+its dimensions. Guaranteed Liches and other special spawns are additional.
 
 Tier distribution:
 

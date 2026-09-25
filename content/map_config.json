@@ -15,6 +15,7 @@
     "edgeRewardXp": 100
   },
   "spawning": {
-    "minLiches": 6
+    "minLiches": 6,
+    "surfaceTilesPerEnemy": 260
   }
 }
