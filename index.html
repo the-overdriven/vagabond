@@ -590,7 +590,7 @@
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
   let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
-  let EDGE_MARGIN, EDGE_XP, MIN_LICHES, SURFACE_TILES_PER_ENEMY
+  let EDGE_MARGIN, EDGE_XP, MIN_LICHES, SURFACE_TILES_PER_ENEMY, SURFACE_TILES_PER_CHEST
   let MERCHANT_STOCK_CONFIG = {}
   let RENDER_STYLE = {}
   let PLAYER_RACE_IMAGES = {}
@@ -724,6 +724,7 @@
     EDGE_XP = content.mapConfig.exploration.edgeRewardXp
     MIN_LICHES = content.mapConfig.spawning.minLiches
     SURFACE_TILES_PER_ENEMY = content.mapConfig.spawning.surfaceTilesPerEnemy
+    SURFACE_TILES_PER_CHEST = content.mapConfig.spawning.surfaceTilesPerChest
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
     RENDER_STYLE = content.rendering
     PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}

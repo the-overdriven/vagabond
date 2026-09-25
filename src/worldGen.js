@@ -2325,22 +2325,28 @@ function spawnEdgeHighTierChests() {
   placeNear(anyEdge, 12)
 }
 
-function spawnGroundStuff() {
-  // chests
+function spawnOrdinarySurfaceChests() {
   const usedChests = new Set(groundItems.filter(g => g.kind === 'chest' && (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
-  for (let i = 0; i < 45; i++) {
-    let x, y, tries = 0
-    do {
-      x = randInt(2, MAP_W - 3)
-      y = randInt(2, MAP_H - 3)
-      tries++
+  const spots = []
+  for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
+    const tile = map[y][x]
+    if (isWalkable(x, y) && tile !== 'temple' && tile !== 'belltower' && tile !== 'caveentrance' && !usedChests.has(keyXY(x, y))) {
+      spots.push({x, y})
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance' || usedChests.has(keyXY(x, y))) && tries < 200)
-    if (tries >= 200) continue
+  }
+  const total = Math.min(spots.length, Math.round(spots.length / SURFACE_TILES_PER_CHEST))
+  for (let i = 0; i < total; i++) {
+    const index = randInt(0, spots.length - 1)
+    const {x, y} = spots[index]
+    spots[index] = spots[spots.length - 1]
+    spots.pop()
     const distTier = Math.min(5, 1 + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / 45))
     groundItems.push({x, y, kind: 'chest', tier: distTier, opened: false})
-    usedChests.add(keyXY(x, y))
   }
+}
+
+function spawnGroundStuff() {
+  spawnOrdinarySurfaceChests()
   // loose potions
   for (let i = 0; i < 15; i++) {
     let x, y, tries = 0

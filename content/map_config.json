@@ -16,6 +16,7 @@
   },
   "spawning": {
     "minLiches": 6,
-    "surfaceTilesPerEnemy": 260
+    "surfaceTilesPerEnemy": 260,
+    "surfaceTilesPerChest": 720
   }
 }
