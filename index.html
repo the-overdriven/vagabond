@@ -5105,6 +5105,22 @@
     drawCreature(px, py, RENDER_STYLE.player.glyph, color, alpha)
   }
 
+  function drawSwimmingCreature(px, py, draw) {
+    const tileX = Math.floor((px + TILE_PX / 2) / TILE_PX + camX)
+    const tileY = Math.floor((py + TILE_PX / 2) / TILE_PX + camY)
+    const tile = currentZ === 0 && map[tileY]?.[tileX]
+    if (tile !== 'water' && tile !== 'river') {
+      draw()
+      return
+    }
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(px, py, TILE_PX, TILE_PX / 2)
+    ctx.clip()
+    draw()
+    ctx.restore()
+  }
+
   let camX = 0, camY = 0
   let animLoopFrame = null
   let cameraAnimating = false
@@ -5559,7 +5575,7 @@
     for (const {e, vx, vy} of visibleEnemies) {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over
-      drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+      drawSwimmingCreature(vx, vy, () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e)))
       if (e.victoryLevel) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.42))}px serif`
@@ -5595,7 +5611,7 @@
       }
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-      drawCreature(vx, vy, RENDER_STYLE.npc.glyph === 'initial' ? n.name[0] : RENDER_STYLE.npc.glyph, RENDER_STYLE.npc.color)
+      drawSwimmingCreature(vx, vy, () => drawCreature(vx, vy, RENDER_STYLE.npc.glyph === 'initial' ? n.name[0] : RENDER_STYLE.npc.glyph, RENDER_STYLE.npc.color))
     }
     // planned movement path, or the route a desktop click would use
     const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
@@ -5640,15 +5656,17 @@
       (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
         ? Math.min(Math.PI / 2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI / 2)
         : 0
-      if (deathRotation) {
-        ctx.save()
-        ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
-        ctx.rotate(deathRotation)
-        drawPlayerVisual(-TILE_PX / 2, -TILE_PX / 2, playerColor, playerAlpha)
-        ctx.restore()
-      } else {
-        drawPlayerVisual(vx, vy, playerColor, playerAlpha)
-      }
+      drawSwimmingCreature(vx, vy, () => {
+        if (deathRotation) {
+          ctx.save()
+          ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
+          ctx.rotate(deathRotation)
+          drawPlayerVisual(-TILE_PX / 2, -TILE_PX / 2, playerColor, playerAlpha)
+          ctx.restore()
+        } else {
+          drawPlayerVisual(vx, vy, playerColor, playerAlpha)
+        }
+      })
     }
     // draw tree canopies over anything standing on forested/tree tiles so it
     // appears behind the trees instead of on top of them.
@@ -5810,7 +5828,9 @@
         `<span class="${b.delta > 0 ? 'up' : 'down'}">${b.delta > 0 ? '+' : ''}${b.delta} ${b.label}</span>`
       ).join(', ')}</div>` : ''
       const critChance = enemyCriticalHitChance(e)
-      const critHtml = `<div class="crit">${Math.round(critChance * 100)}% chance to crit (double damage)</div>`
+      const critHtml = critChance > BASE_CRIT_CHANCE
+        ? `<div class="crit">${Math.round(critChance * 100)}% chance to crit</div>`
+        : ''
       const equipmentHtml = e.equipment
         ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
         : ''
@@ -6605,12 +6625,12 @@
     const sg = document.getElementById('statGrid')
     sg.innerHTML = ''
     const rows = [
-      ['🧬 Race', race.name + ' (' + race.bonus + ')'],
+      ['🧬 Race', race.name],
       // ['🎚️ Level', player.lvl],
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
       ['🤺 Grace', playerGrace()],
-      ['💥 Crit Chance', Math.round(CRIT_CHANCE * 100) + '%'],
+      ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],
       // ['🛡️ Defense', playerDef()],
       // ['⚡ Speed', playerSpd()],
@@ -7917,6 +7937,13 @@
             player: {x: player.x, y: player.y},
             spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
             playerTile: map[player.y]?.[player.x] || null
+          }
+        },
+        getWorldShape() {
+          return {
+            width: map[0]?.length,
+            height: map.length,
+            northEdgeHasWater: map.slice(0, 4).some(row => row.includes('water'))
           }
         },
         getLogState() {

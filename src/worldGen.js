@@ -150,14 +150,16 @@ function generateSurface() {
   }
   const cx = MAP_W / 2, cy = MAP_H / 2
   const maxD = Math.sqrt(cx * cx + cy * cy)
+  const northernFalloffDepth = MAP_H * 0.22
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       let e = combineWeightedNoise(elevationNoiseFunctions, elevationNoiseWeights, x, y, MAP_W, MAP_H)
       e += (roughnessNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * 0.16
       const d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxD
-      e -= Math.pow(d, 2.2) * 0.55 // island falloff
+      e -= Math.pow(d, 2.2) * 0.55 * Math.min(1, y / northernFalloffDepth) // island falloff fades out at the northern edge
       const lk = lakeNoiseFunction(x, y, MAP_W, MAP_H)
       if (lk > 0.72 && e > 0.28 && e < 0.6) e -= 0.4 // carve inland lakes
+      if (y < 4) e = Math.max(e, 0.3) // keep the cold northern boundary on land
       elev[y][x] = e
       moist[y][x] = combineWeightedNoise(moistureNoiseFunctions, moistureNoiseWeights, x, y, MAP_W, MAP_H) + (moistureDetailNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * 0.12
     }

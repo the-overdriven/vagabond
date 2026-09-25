@@ -385,10 +385,12 @@ Direct interaction cancels pathing.
 The surface map is:
 
 ```text
-260 × 180 tiles
+260 × 260 tiles
 ```
 
 The world is procedurally generated.
+New worlds have a land boundary to the north; inland lakes remain possible.
+Older saves retain their original map dimensions when loaded.
 
 Generation uses multiple layers of interpolated random noise for things such as:
 
@@ -3269,7 +3271,7 @@ These remain **PLANNED** unless implementation confirms otherwise.
 - [x] 8-direction movement
 - [x] Auto-pathing
 - [x] Procedural surface
-- [x] 260×180 world
+- [x] 260×260 world
 - [x] Multiple terrain types
 - [x] Rivers
 - [x] Volcanoes and lava fields

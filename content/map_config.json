@@ -1,7 +1,7 @@
 {
   "world": {
     "width": 260,
-    "height": 180,
+    "height": 260,
     "maxGenerationAttempts": 50
   },
   "landmarks": {

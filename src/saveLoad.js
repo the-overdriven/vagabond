@@ -89,6 +89,8 @@ function buildSaveObject() {
     savedAt: new Date().toISOString(),
     worldSeed: WORLD_SEED,
     rngState: rngState,
+    mapWidth: MAP_W,
+    mapHeight: MAP_H,
     map: encodeTileGrid(surfaceMap, 'g'),
     tileUnderlays: tileUnderlays,
     grasslandTrees: [...grasslandTrees],
@@ -218,7 +220,24 @@ function loadGameFromObject(data, opts = {}) {
   // always supersedes whatever playback might currently be running.
   stopReplayPlayback()
 
+  // Older saves predate dimension metadata; their worlds share the current
+  // width, while the encoded map length determines their original height.
+  const savedWidth = data.mapWidth ?? (Array.isArray(data.map) ? data.map[0]?.length : MAP_W)
+  const savedHeight = data.mapHeight ?? (Array.isArray(data.map)
+    ? data.map.length
+    : rleDecode(data.map).length / savedWidth)
+  if (!Number.isInteger(savedWidth) || !Number.isInteger(savedHeight) ||
+      savedWidth <= 0 || savedHeight <= 0) {
+    throw new Error('Save file map dimensions do not match.')
+  }
+  const configuredWidth = MAP_W, configuredHeight = MAP_H
+  MAP_W = savedWidth
+  MAP_H = savedHeight
   const decoded = decodeTileGrid(data.map, 'grass')
+  if (!decoded) {
+    MAP_W = configuredWidth
+    MAP_H = configuredHeight
+  }
   if (!decoded) throw new Error('Save file map dimensions do not match.')
   surfaceMap = decoded
   dwarvenRuin = null
