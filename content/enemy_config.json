@@ -3,7 +3,9 @@
     "attackRange": 1,
     "defaultAggroRange": 4,
     "outerAggroGiveUpChance": 0.3,
-    "criticalHitChance": 0.15
+    "criticalHitChance": 0.15,
+    "baseCriticalHitChance": 0.05,
+    "fierceCriticalHitChance": 0.1
   },
   "pathfinding": {
     "chaseDetour": 6

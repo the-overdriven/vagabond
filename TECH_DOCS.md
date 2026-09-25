@@ -271,9 +271,11 @@ On level-up:
 - XP is reduced by the threshold
 - maximum HP increases by 10
 - SPD increases by 1 on every second level, starting from lvl 2 (`floor(level / 2)`)
+- player GRACE bonus increases by 1 on every fifth level (`floor(level / 5)`)
 - derived stats are recalculated as needed
 
-Therefore, the level-based SPD gains occur at levels 2, 4, 6, 8, etc.
+Therefore, the level-based SPD gains occur at levels 2, 4, 6, 8, etc., while
+level-based GRACE gains occur at levels 5, 10, 15, 20, etc.
 
 XP is affected by the player's XP multiplier.
 
@@ -1413,7 +1415,7 @@ Combat includes:
 - damage mitigation
 - evasion
 - armor glancing
-- enemy critical hits
+- player and enemy critical hits
 - possible extra attacks (weapon vs weapon grace checks)
 
 ---
@@ -1533,13 +1535,20 @@ This applies to attacks against armored enemies and attacks against an armored p
 
 # 28. Critical Hits
 
-Critical hits are currently an enemy-side feature.
+Every successful player or monster attack has a chance to become a critical hit.
 
-Deadly enemies have:
+Current chances:
 
 ```text
-15% critical chance
+Player: 5%
+Normal monster: 5%
+Fierce monster: 10%
+Deadly monster: 15%
 ```
+
+`content/enemy_config.json` stores the three combat chances as
+`baseCriticalHitChance`, `fierceCriticalHitChance`, and `criticalHitChance`
+(the last remains the Deadly-specialist chance).
 
 Critical damage:
 
@@ -1547,7 +1556,14 @@ Critical damage:
 damage × 2
 ```
 
-There is currently no general player critical-hit system.
+The critical roll happens after the attack connects and after the normal damage
+roll. If armor then turns the hit into a glancing blow, the existing glancing
+reduction still applies after the critical multiplier. Critical rolls use the
+game's seeded `chance()`/`rng()` path, so replay recording/playback consumes the
+same RNG sequence.
+
+Fierce enemies therefore crit twice as often as ordinary monsters, while Deadly
+enemies remain the strongest critical-hit specialists.
 
 ---
 
@@ -1563,15 +1579,20 @@ Base combat delay:
 
 Higher weapon or natural GRACE means lower base combat delay. Reciprocal scaling gives high GRACE diminishing returns without making any GRACE point useless.
 
-Player racial GRACE acts as an affinity for graceful weapons rather than being added directly to weapon GRACE:
+Player bonus GRACE acts as an affinity for graceful weapons rather than being added directly to weapon GRACE. The bonus is the sum of racial GRACE and level GRACE:
 
 ```text
+level GRACE = floor(level / 5)
+player bonus GRACE = racial GRACE + level GRACE
 weapon affinity = min(1, weapon GRACE / 5)²
-racial reduction = racial GRACE × 0.25 × weapon affinity
-player delay = max(0.25, base delay - racial reduction)
+GRACE reduction = player bonus GRACE × 0.25 × weapon affinity
+player delay = max(0.25, base delay - GRACE reduction)
 ```
 
-This makes racial GRACE provide almost no benefit with slow weapons and progressively more benefit with graceful weapons. A GRACE 5 or higher weapon receives the full racial reduction.
+This makes both racial and level GRACE provide almost no benefit with slow
+weapons and progressively more benefit with graceful weapons. A GRACE 5 or
+higher weapon receives the full reduction. The player's displayed GRACE is
+weapon GRACE + racial GRACE + level GRACE.
 
 For an Elf with **+2 racial GRACE**:
 

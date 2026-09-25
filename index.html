@@ -8,8 +8,6 @@
 👹 spawn rare monsters when u walk longer
 🔄 fix desync again....
 ⛏️ "we must dig deeper" written in dwarven ruins
-🛡️ Every fifth level: +1 GRACE
-⚔️ make use of crit. hit
 
 - fix: add dug out sand tiles
 - fix: selecting peasant name should remove name from the random pull to prevent duplicates
@@ -582,7 +580,7 @@
   let PLAYER_RACE_IMAGES = {}
   let RACE_SELECTION_IMAGES = {}
   let PLAYER_TERRAIN_BACKGROUNDS = {}
-  let ATTACK_RANGE, AGGRO_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, CRIT_CHANCE, CHASE_DETOUR
+  let ATTACK_RANGE, AGGRO_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
@@ -652,6 +650,8 @@
     ATTACK_RANGE = content.enemyConfig.combat.attackRange
     AGGRO_RANGE = content.enemyConfig.combat.defaultAggroRange
     OUTER_AGGRO_GIVE_UP_CHANCE = content.enemyConfig.combat.outerAggroGiveUpChance ?? 0.3
+    BASE_CRIT_CHANCE = content.enemyConfig.combat.baseCriticalHitChance ?? 0.05
+    FIERCE_CRIT_CHANCE = content.enemyConfig.combat.fierceCriticalHitChance ?? 0.10
     CRIT_CHANCE = content.enemyConfig.combat.criticalHitChance
     CHASE_DETOUR = content.enemyConfig.pathfinding.chaseDetour
     ENEMY_WANDER_ENABLED = content.enemyConfig.wandering.enabled
@@ -1647,13 +1647,21 @@
     return Math.max(1, playerSpdRaw())
   }
 
-  function playerGrace() {
-    const weapon = player.equip.weapon
-    return weaponGrace(weapon) + raceGrace()
+  function levelGrace() {
+    return Math.floor(player.lvl / 5)
   }
 
-  // Elves add a flat bonus to every grace check they take part in - both when
-  // they try to outpace an enemy's weapon and when an enemy tries to outpace theirs.
+  function playerGraceBonus() {
+    return raceGrace() + levelGrace()
+  }
+
+  function playerGrace() {
+    const weapon = player.equip.weapon
+    return weaponGrace(weapon) + playerGraceBonus()
+  }
+
+  // Racial and level GRACE share the same weapon-affinity channel in combat:
+  // slow weapons receive little benefit, while graceful weapons use more of it.
   function raceGrace() {
     const race = raceDef()
     return (race && race.grace) || 0
@@ -1755,8 +1763,9 @@
       const hpGain = 10
       player.maxHp += hpGain
       const spdGain = player.lvl % 2 === 0 ? 1 : 0
+      const graceGain = player.lvl % 5 === 0 ? 1 : 0
       leveled = true
-      log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''})`, 'good')
+      log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''}${graceGain ? `, +${graceGain} GRACE` : ''})`, 'good')
     }
     if (leveled) updateHud()
   }
@@ -2421,6 +2430,12 @@
     return equipment && equipment.kind === 'armor' ? equipment : null
   }
 
+  function enemyCriticalHitChance(e) {
+    if (e?.crit) return CRIT_CHANCE
+    if (e?.prefix === 'Fierce') return FIERCE_CRIT_CHANCE
+    return BASE_CRIT_CHANCE
+  }
+
   function enemyGrace(e) {
     if (!e) return null
     const template = enemyTemplateForSavedEnemy(e)
@@ -2440,11 +2455,12 @@
     if (!Number.isFinite(grace) || grace <= 0) return null
     const baseDelay = 6 / grace
     if (!isPlayer) return baseDelay
-    // Racial GRACE is weapon affinity, not a flat addition. Slow weapons use
-    // almost none of it, while GRACE 5+ weapons receive the full reduction.
+    // Player GRACE bonuses (race + one point every five levels) act as weapon
+    // affinity, not a flat addition. Slow weapons use almost none of the bonus,
+    // while GRACE 5+ weapons receive the full reduction.
     const weaponAffinity = Math.min(1, grace / 5) ** 2
-    const racialReduction = raceGrace() * 0.25 * weaponAffinity
-    return Math.max(0.25, baseDelay - racialReduction)
+    const graceReduction = playerGraceBonus() * 0.25 * weaponAffinity
+    return Math.max(0.25, baseDelay - graceReduction)
   }
 
   function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false, attackerEnemy = null, defenderEnemy = null) {
@@ -2494,25 +2510,28 @@
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
     let dmg = damageRoll(playerAtk(), enemyDef(e))
+    const critical = chance(BASE_CRIT_CHANCE)
+    if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     e.hp -= dmg
-    spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit)
+    if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
+    spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
     if (glancing) {
       if (player.equip.weapon) {
         if (dmg === 0) {
           log(`Your ${weaponName} glances off the ${e.name}'s ${armor.base}!`, 'good')
         } else {
-          log(`Your ${weaponName} glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
+          log(`${critical ? 'Critical hit! ' : ''}Your ${weaponName} glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
         }
       } else {
         if (dmg === 0) {
           log(`Your strike glances off the ${e.name}'s ${armor.base}!`, 'good')
         } else {
-          log(`Your strike glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
+          log(`${critical ? 'Critical hit! ' : ''}Your strike glances off the ${e.name}'s ${armor.base}! You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
         }
       }
     } else {
-      log(`You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
+      log(`${critical ? 'Critical hit! ' : ''}You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
     }
     if (e.hp <= 0) {
       killEnemy(e)
@@ -2543,7 +2562,7 @@
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
     let dmg = damageRoll(e.atk, playerDef())
-    const critical = e.crit && chance(CRIT_CHANCE)
+    const critical = chance(enemyCriticalHitChance(e))
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     player.hp -= dmg
@@ -2564,7 +2583,7 @@
         }
       }
     } else {
-      log(`The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
+      log(`${critical ? 'Critical hit! ' : ''}The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
     }
     updateHud()
     if (player.hp <= 0) {
@@ -5698,9 +5717,8 @@
       const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b =>
         `<span class="${b.delta > 0 ? 'up' : 'down'}">${b.delta > 0 ? '+' : ''}${b.delta} ${b.label}</span>`
       ).join(', ')}</div>` : ''
-      const critHtml = e.crit
-        ? `<div class="crit">${Math.round(CRIT_CHANCE * 100)}% chance to crit (double damage)</div>`
-        : ''
+      const critChance = enemyCriticalHitChance(e)
+      const critHtml = `<div class="crit">${Math.round(critChance * 100)}% chance to crit (double damage)</div>`
       const equipmentHtml = e.equipment
         ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
         : ''
