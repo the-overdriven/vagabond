@@ -6959,13 +6959,13 @@
 
     const buyList = document.getElementById('tradeBuyList')
     buyList.innerHTML = ''
-    if (merchantStock.length === 0) {
+    if (!merchantStock.some(it => it.count !== 0)) {
       const d = document.createElement('div')
       d.className = 'invitem'
       d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">He has nothing to sell yet. Check back later.</span>'
       buyList.appendChild(d)
     } else {
-      merchantStock.forEach((it) => {
+      merchantStock.filter(it => it.count !== 0).forEach((it) => {
         const row = document.createElement('div')
         row.className = 'invitem'
         const cls = it.tier ? tierColorClass(it.tier) : ''
@@ -7048,7 +7048,7 @@
       if (existing) existing.count = (existing.count || 1) + 1
       else player.inventory.push({...it, count: 1})
       it.count = (it.count || 1) - 1
-      if (it.count <= 0) {
+      if (it.count <= 0 && it.kind !== MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind) {
         const idx = merchantStock.indexOf(it)
         if (idx >= 0) merchantStock.splice(idx, 1)
       }

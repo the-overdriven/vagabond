@@ -26,6 +26,27 @@ describe('Scroll of Invisibility', () => {
     })
   })
 
+  it('does not replenish sold-out merchant scrolls when stock is ensured again', () => {
+    beginGame()
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        const scroll = merchantStock.find(it => it.kind === 'scroll')
+        player.gold = 600
+        for (let i = 0; i < 3; i++) buyItem(scroll)
+        ensureMerchantStock()
+        renderTrade()
+        return {
+          stock: merchantStock.find(it => it.kind === 'scroll')?.count,
+          inventory: player.inventory.find(it => it.kind === 'scroll')?.count,
+          buyList: document.getElementById('tradeBuyList').textContent
+        }
+      })()`)
+      expect(result.stock).to.equal(0)
+      expect(result.inventory).to.equal(3)
+      expect(result.buyList).to.not.include('Scroll of Invisibility')
+    })
+  })
+
   it('reacts once to an invisible hit without chasing or wandering afterward', () => {
     beginGame()
     cy.window().then(win => win.eval(`(async () => {

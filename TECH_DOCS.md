@@ -2284,7 +2284,9 @@ No reaction grants lasting awareness or subsequent pursuit. God mode remains
 nonreactive. Invisibility is therefore not guaranteed protection when attacking.
 
 The merchant stocks three Scrolls of Invisibility at 200g each, configured
-under `scrolls.invisibilityScroll` in `content/merchant_stock.json`.
+under `scrolls.invisibilityScroll` in `content/merchant_stock.json`. The
+exhausted stock remains saved with count zero rather than replenishing on
+load; selling a scroll back to the merchant makes it available again.
 
 ## Scroll of Homecoming
 
