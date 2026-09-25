@@ -3721,17 +3721,23 @@ The replay payload is stored inside the normal save as:
 
 ```text
 save.replay = {
-  version: 1,
+  version: 2,
   initialState,
   actions: [],
-  rng: [],
-  _rngCallers: []
+  rng: []
 }
 ```
 
 The replay `version` is independent of the game's `SAVE_VERSION` (currently 13).
-The replay field is written only while replay recording is active for that
-character; saves made without recording do not gain an empty replay structure.
+The replay field is written for characters with a recording, including after
+watching it; characters without one do not gain an empty replay structure.
+RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
+`src/replay.js`). Loading an older save drops its optional `_rngCallers`
+diagnostics, so saving it again retains its actions and RNG values without
+the debug payload.
+Watching a replay temporarily rewinds the game; on completion (or desync) the
+live state from before playback is restored, including its RNG state and
+recording. Loading a recorded save resumes appending actions to that replay.
 
 `initialState` is captured when the run truly begins, immediately after
 character creation, after the world/spawn/enemies already exist. The snapshot is
@@ -3817,15 +3823,17 @@ procedural quest selection is included in the recorded RNG sequence.
 **Show Replay** (HUD, next to Save/Load) appears whenever replay data exists for
 the current save. Clicking it:
 
-1. keeps the pre-replay state in memory;
+1. snapshots the live state and turn counters for restoration;
 2. closes transient overlays and clears pathing/pending movement;
 3. loads the replay's deep-cloned `initialState` through the normal load path;
 4. disables recording while watching so playback cannot append new actions;
 5. resets `turnCount`, `consecutiveWaitTurns`, and `oldHunterQuestSerial` to their
    run-start values;
-6. executes the recorded actions in order through the normal gameplay functions.
+6. executes the recorded actions in order through the normal gameplay functions;
+7. restores the live state, RNG state, and recording when playback finishes or
+   desynchronizes. Loading another save during playback replaces that state.
 
-The current inter-action playback delay is **169 ms**. The delay is between
+The current inter-action playback delay is **12 ms**. The delay is between
 whole actions, not individual RNG calls: an action's movement/combat/loot and its
 enemy/NPC turn happen together before the next action is scheduled.
 

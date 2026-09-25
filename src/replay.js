@@ -1,14 +1,14 @@
 'use strict'
 
 // --- Temporary debug instrumentation for tracking down the replay desync ---
-// Every rng() call gets logged with which line called it and whether it
-// happened during live play, recording, or replay. After reproducing the
+// When enabled, every rng() call gets logged with which line called it and
+// whether it happened during live play, recording, or replay. After reproducing the
 // desync, call dumpRngLog() in the console (or click the on-screen link it
 // creates) to download rng-log.json, do it for both the recording run and
 // the replay of it, and diff them - the first index where "at" differs
 // between the two files is the exact function causing the drift. Safe to
 // strip out once the bug is found; adds no gameplay behavior.
-const RNG_DEBUG = true
+const RNG_DEBUG = false
 let rngLog = []
 
 function rngDebugCaller() {
@@ -131,7 +131,8 @@ let replayNpcDiagnostics = []
 // `lastReplayDiagnostic` or `window.lastReplayDiagnostic`.
 var lastReplayDiagnostic = null
 window.lastReplayDiagnostic = null
-let preReplaySnapshot = null // whatever save was on screen before "Show Replay" rewound it
+let preReplaySnapshot = null // live game to restore after replay playback
+let preReplayCounters = null
 
 // Replay item identity is independent of array position. Inventory order can
 // change after buying/selling/equipping, so recording only `idx` is fragile.
@@ -176,8 +177,10 @@ function recordReplayAction(action) {
   const previous = replayData.actions.at(-1)
   if (previous && previous._rngEnd === undefined) {
     previous._rngEnd = replayData.rng.length
-    if (!Array.isArray(replayData._rngCallers)) replayData._rngCallers = []
-    replayData._rngCallers[previous._recordedActionIndex] = replayRngCallers.slice()
+    if (RNG_DEBUG) {
+      if (!Array.isArray(replayData._rngCallers)) replayData._rngCallers = []
+      replayData._rngCallers[previous._recordedActionIndex] = replayRngCallers.slice()
+    }
   }
   replayRngCallers = []
   replayData.actions.push({
@@ -196,9 +199,17 @@ function startReplayRecording() {
   // starting state now; otherwise inventory/equipment/enemy objects mutate while
   // the recording continues and playback may start from a later-run state.
   const initialState = JSON.parse(JSON.stringify(snapshot))
-  replayData = {version: REPLAY_VERSION, initialState, actions: [], rng: [], _rngCallers: []}
+  replayData = {version: REPLAY_VERSION, initialState, actions: [], rng: []}
+  if (RNG_DEBUG) replayData._rngCallers = []
   replayRngCallers = []
   replayRecording = true
+}
+
+function replayForSave() {
+  if (!replayData) return undefined
+  if (RNG_DEBUG) return replayData
+  const {version, initialState, actions, rng} = replayData
+  return {version, initialState, actions, rng}
 }
 
 function updateReplayButton() {
@@ -217,6 +228,7 @@ function updateReplayButton() {
 function replayDesync(message) {
   log(message, 'bad')
   stopReplayPlayback()
+  if (!replayActionRunning) restoreLiveAfterReplay()
 }
 
 function stopReplayPlayback() {
@@ -234,6 +246,19 @@ function stopReplayPlayback() {
   replayRngIndex = 0
   replayCurrentActionIndex = null
   updateReplayButton()
+}
+
+function restoreLiveAfterReplay() {
+  const snapshot = preReplaySnapshot
+  const counters = preReplayCounters
+  preReplaySnapshot = null
+  preReplayCounters = null
+  stopReplayPlayback()
+  if (!snapshot) return
+  loadGameFromObject(snapshot, {isReplayRestore: true})
+  turnCount = counters.turnCount
+  consecutiveWaitTurns = counters.consecutiveWaitTurns
+  oldHunterQuestSerial = counters.oldHunterQuestSerial
 }
 
 function finishReplayPlayback() {
@@ -257,7 +282,7 @@ function finishReplayPlayback() {
   } else {
     log('Replay finished.', 'good')
   }
-  stopReplayPlayback()
+  restoreLiveAfterReplay()
 }
 
 async function runReplayAction(action) {
@@ -440,6 +465,11 @@ async function playNextReplayAction() {
       replaySimulationMode = false
       replayAnimationsDisabled = false
     }
+    if (!replayPlaying) {
+      replayActionRunning = false
+      restoreLiveAfterReplay()
+      return
+    }
 
     const rngAfter = replayRngIndex
     const expectedStart = Number.isInteger(action._rngStart) ? action._rngStart : null
@@ -476,9 +506,10 @@ async function playNextReplayAction() {
     }
     replayActionDiagnostics.push(boundaryDiagnostic)
     if (replayActionDiagnostics.length > 200) replayActionDiagnostics.shift()
-    console.debug('[Replay action boundary]', boundaryDiagnostic)
+    if (RNG_DEBUG) console.debug('[Replay action boundary]', boundaryDiagnostic)
     if (!replayPlaying) {
       replayActionRunning = false
+      restoreLiveAfterReplay()
       return
     }
     if (expectedRng !== null && actualRng !== expectedRng) {
@@ -536,6 +567,7 @@ async function playNextReplayAction() {
       replayCurrentActionIndex = null
       replayDesync(`Replay desynchronized on action #${actionIndex + 1}: expected ${expectedRng} RNG value(s), but this action consumed ${actualRng}. Check window.lastReplayDiagnostic.`)
       replayActionRunning = false
+      restoreLiveAfterReplay()
       return
     }
 
@@ -550,6 +582,7 @@ async function playNextReplayAction() {
 
   if (!replayPlaying || replayPaused) {
     replayActionRunning = false
+    if (!replayPlaying) restoreLiveAfterReplay()
     return
   }
   if (replayActionIndex >= activeReplay.actions.length) {
@@ -567,10 +600,8 @@ function startReplayPlayback() {
   if (!replayData || !replayData.actions || !replayData.actions.length) return
   stopReplayPlayback()
   const replayToPlay = replayData
-  // Requirement: preserve whatever was on screen before rewinding. Not
-  // restorable through the UI in this first version, but kept in memory
-  // rather than silently discarded.
-  preReplaySnapshot = buildSaveObject()
+  preReplaySnapshot = JSON.parse(JSON.stringify(buildSaveObject()))
+  preReplayCounters = {turnCount, consecutiveWaitTurns, oldHunterQuestSerial}
   toggleInv(false)
   toggleMap(false)
   toggleTrade(false)

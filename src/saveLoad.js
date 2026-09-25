@@ -181,10 +181,8 @@ function buildSaveObject() {
     dugSandTiles: [...dugSandTiles],
     gravediggerGraveKey: gravediggerGraveKey,
     cemeteryTombstones: cemeteryTombstones,
-    // Present only while a replay is actively being recorded for this
-    // character, so saves made with "Save replay" unchecked stay exactly
-    // as before (no empty replay structure tacked on).
-    replay: replayRecording ? replayData : undefined,
+    // Preserve recordings across playback; unrecorded characters have no replay.
+    replay: replayForSave(),
   }
 }
 
@@ -220,6 +218,10 @@ function loadGameFromObject(data, opts = {}) {
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
   stopReplayPlayback()
+  if (!isReplayInit && !opts.isReplayRestore) {
+    preReplaySnapshot = null
+    preReplayCounters = null
+  }
 
   // Older saves predate dimension metadata; their worlds share the current
   // width, while the encoded map length determines their original height.
@@ -717,12 +719,18 @@ function loadGameFromObject(data, opts = {}) {
   // correctly clears any replay from whatever was previously loaded.
   if (data.replay && typeof data.replay === 'object' && data.replay.initialState &&
     Array.isArray(data.replay.actions) && Array.isArray(data.replay.rng)) {
-    replayData = data.replay
+    replayData = RNG_DEBUG ? data.replay : {
+      version: data.replay.version,
+      initialState: data.replay.initialState,
+      actions: data.replay.actions,
+      rng: data.replay.rng
+    }
     replayRecording = true
   } else {
     replayData = null
     replayRecording = false
   }
+  replayRngCallers = []
   updateReplayButton()
 
   toggleInv(false)
