@@ -4925,7 +4925,7 @@
     // of carving a grass connector around it.
     const isSnowAt = (tx, ty) => {
       const t = tileAt(tx, ty)
-      if (isSnowLikeTile(t)) return true
+      if (isSnowLikeTile(surfaceBaseKeyAt(tx, ty))) return true
       if ([
         'mountain',
         'dwarvengate',

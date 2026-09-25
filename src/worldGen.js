@@ -2482,8 +2482,8 @@ function placeCemetery() {
     const n = typeof name === 'string' ? name : (name.name || 'Unknown Dwarf')
     const death = placed === oddIndex ? randInt(701, 780) : randInt(520, 700)
     const birth = placed === oddIndex ? death - 70 : Math.max(120, death - randInt(35, 80))
+    tileUnderlays[keyXY(x, y)] = tileUnderlays[keyXY(x, y)] || map[y][x]
     map[y][x] = 'grave'
-    tileUnderlays[keyXY(x, y)] = 'grass'
     cemeteryTombstones[keyXY(x, y)] = {
       name: n,
       birth,
@@ -2500,7 +2500,11 @@ function placeCemetery() {
       x: gx + dx,
       y: gy + dy
     })).find(p => isWalkable(p.x, p.y) && map[p.y][p.x] !== 'grave')
-    if (chapelSpot) map[chapelSpot.y][chapelSpot.x] = 'ruinedchapel'
+    if (chapelSpot) {
+      const key = keyXY(chapelSpot.x, chapelSpot.y)
+      tileUnderlays[key] = tileUnderlays[key] || map[chapelSpot.y][chapelSpot.x]
+      map[chapelSpot.y][chapelSpot.x] = 'ruinedchapel'
+    }
   }
   const gh = ENEMY_TEMPLATES.find(t => t.name === 'Ghoul')
 }
