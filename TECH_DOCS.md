@@ -3839,7 +3839,9 @@ enemy/NPC turn happen together before the next action is scheduled.
 
 The replay button becomes **Pause Replay** while playing and **Resume Replay**
 while paused. Normal keyboard, canvas-click, and touch gameplay input is inert
-while playback runs. Loading a save still works and cancels playback first.
+while playback runs. Log messages appear in full immediately, including a
+message that was already typing when playback started. Loading a save still
+works and cancels playback first.
 
 A replay is therefore a deterministic re-execution of the recorded player action
 stream against the recorded starting state and recorded RNG outcomes; it is not

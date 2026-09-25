@@ -624,6 +624,7 @@ function startReplayPlayback() {
   replayActionIndex = 0
   replayRngIndex = 0
   replayPlaying = true
+  skipLogTypingForReplay()
   replayPaused = false
   replaySimulationMode = false
   // The first action keeps the existing visual delay, but subsequent actions are

@@ -743,7 +743,7 @@ function loadGameFromObject(data, opts = {}) {
   snapCameraToPlayer()
   updateHud()
   render()
-  log('Game loaded.', 'good')
+  if (!isReplayInit && !opts.isReplayRestore) log('Game loaded.', 'good')
 }
 
 function loadGame(file) {

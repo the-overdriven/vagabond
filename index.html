@@ -2283,6 +2283,7 @@
   const logEl = document.getElementById('logpanel')
   const logQueue = []
   let isTyping = false
+  let skipCurrentLogTyping = false
   let nextLogId = 1
   let lastRenderedLogId = 0
   let logWaiters = []
@@ -2316,9 +2317,14 @@
 
   function log(msg, cls) {
     const id = nextLogId++
-    logQueue.push({id: id, msg: msg, cls: cls || 'info'})
+    logQueue.push({id: id, msg: msg, cls: cls || 'info', instant: replayPlaying})
     processLogQueue()
     return id
+  }
+
+  function skipLogTypingForReplay() {
+    if (isTyping) skipCurrentLogTyping = true
+    for (const entry of logQueue) entry.instant = true
   }
 
   async function processLogQueue() {
@@ -2326,7 +2332,7 @@
 
     isTyping = true
 
-    const {id, msg, cls} = logQueue.shift()
+    const {id, msg, cls, instant} = logQueue.shift()
 
     const div = document.createElement('div')
     div.className = cls
@@ -2342,12 +2348,18 @@
     // cosmetic effect and its duration scales with copy length, which makes
     // E2E waits for log-idle flaky/slow (long intro text alone took ~4-5s
     // of real setTimeout time, before any CI overhead on top of that).
-    if (logQueue.length > 2 || window.Cypress) {
+    if (logQueue.length > 2 || window.Cypress || replayPlaying || instant) {
       div.textContent = msg
       trimLog()
       logEl.scrollTop = logEl.scrollHeight
     } else {
       for (const char of msg) {
+        if (skipCurrentLogTyping || replayPlaying) {
+          div.textContent = msg
+          trimLog()
+          logEl.scrollTop = logEl.scrollHeight
+          break
+        }
         div.textContent += char
         trimLog()
         logEl.scrollTop = logEl.scrollHeight
@@ -2355,6 +2367,7 @@
       }
     }
 
+    skipCurrentLogTyping = false
     isTyping = false
     lastRenderedLogId = id
     notifyLogWaiters()
