@@ -187,9 +187,26 @@ describe('Vagabond smoke test', () => {
   it('opens and closes the Graveyard without changing the live game', () => {
     configureTestGraveyard(false)
     beginNewGame()
+    cy.window().its('VAGABOND_GAME_VERSION').should('equal', 'v23')
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardOverlay').should('have.class', 'show')
     cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable.')
+    cy.get('#graveyardOverlay .panelbox').should('have.css', 'overflow', 'hidden')
+    cy.get('#graveyardList').should('have.css', 'overflow-y', 'auto')
+    cy.get('#graveyardList').then($list => {
+      for (let i = 0; i < 80; i++) {
+        const row = $list[0].ownerDocument.createElement('div')
+        row.textContent = `Test record ${i}`
+        $list[0].appendChild(row)
+      }
+    })
+    cy.get('.graveyard-header').then($header => {
+      const top = $header[0].getBoundingClientRect().top
+      cy.get('#graveyardList').scrollTo('bottom').should($list => {
+        expect($list[0].scrollTop).to.be.greaterThan(0)
+        expect($header[0].getBoundingClientRect().top).to.equal(top)
+      })
+    })
     pressMove('down')
     cy.window().its('__VAGABOND_E2E__').invoke('getState').should(state => {
       expect(state.player.x).to.equal(state.spawnPoint.x)
@@ -208,7 +225,7 @@ describe('Vagabond smoke test', () => {
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable while offline.')
     cy.get('script[src*="supabase"]').should('not.exist')
-    cy.get('#btnGraveyardCloseBottom').click()
+    cy.get('#btnGraveyardClose').click()
   })
 
   it('submits the pre-penalty live death snapshot once and safely renders remote text', () => {
@@ -237,7 +254,7 @@ describe('Vagabond smoke test', () => {
     cy.wrap(rows).should(records => {
       expect(records).to.have.length(1)
       expect(records[0]).to.include({permadeath: false, death_number: 1, max_hp: 50,
-        killer_name: 'Minotaur', killer_prefix: 'Champion'})
+        killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: 'v23'})
       expect(records[0].death_event_id).to.match(/^[0-9a-f-]{36}$/)
     })
     cy.get('#btnGraveyard').click()

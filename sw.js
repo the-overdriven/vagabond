@@ -1,15 +1,17 @@
 // ---------------------------------------------------------------------------
 // HOW TO SHIP AN UPDATE
 //   1. Deploy your new files (images, JSON, index.html ...).
-//   2. Bump CACHE_VERSION below and deploy sw.js as well.
+//   2. Bump VAGABOND_GAME_VERSION in src/version.js and deploy it too.
 //
-// The phone notices that sw.js changed, installs the new worker, deletes every
-// old cache and re-downloads everything fresh. Even if you forget step 2,
+// The phone notices that sw.js or its imported version.js changed, installs
+// the new worker, deletes every old cache and re-downloads everything fresh.
+// Even if you forget step 2,
 // images are re-checked against the server on every use (see the image
 // handler at the bottom), so they catch up on the next launch.
 // ---------------------------------------------------------------------------
+importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + 'v22'; // <-- bump me on every content/image release
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -28,8 +30,9 @@ const PRECACHE_URLS = [
   './src/fov.js',
   './src/replay.js',
   './src/saveLoad.js',
+  './src/version.js',
   './src/graveyard.js',
-  './css/style.css?v=20260925-1',
+  './css/style.css?v=20260925-2',
   './content/starting_weapons.json',
   './content/gear_weapons.json',
   './content/gear_shields.json',

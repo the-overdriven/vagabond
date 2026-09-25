@@ -5,7 +5,6 @@ const SUPABASE_URL = 'https://xjpxokbcnbntddzhyixu.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_qpfz-3NXo6CUz8u91xrKHg_2VlTIR0b'
 
 const Graveyard = (() => {
-  const GAME_VERSION = 'v22' // Keep in sync with sw.js CACHE_VERSION.
   const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js'
   const TIMEOUT_MS = 6000
   const PLAYER_ID_KEY = 'vagabond_online_player_id'
@@ -126,7 +125,7 @@ const Graveyard = (() => {
     const player_id = playerId()
     if (!death_event_id || !player_id) return
     const record = {...snapshot, death_event_id, player_id,
-      killed_at: new Date().toISOString(), game_version: GAME_VERSION}
+      killed_at: new Date().toISOString(), game_version: self.VAGABOND_GAME_VERSION}
     // No await in the death path. Never retry or queue an offline death.
     getClient().then(client => client.from('death_records').insert(record))
       .then(({error}) => { if (error) console.warn('Graveyard submission unavailable') })
@@ -233,7 +232,6 @@ const Graveyard = (() => {
     visibilityChanged = options.onVisibilityChange
     document.getElementById('btnGraveyard').addEventListener('click', open)
     document.getElementById('btnGraveyardClose').addEventListener('click', close)
-    document.getElementById('btnGraveyardCloseBottom').addEventListener('click', close)
     document.getElementById('graveyardOverlay').addEventListener('click', event => {
       if (event.target.id === 'graveyardOverlay') close()
     })

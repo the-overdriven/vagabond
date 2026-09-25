@@ -198,7 +198,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20260925-1">
+  <link rel="stylesheet" href="css/style.css?v=20260925-2">
   <style>
     .invitem .item-icon {
       flex: 0 0 auto;
@@ -394,8 +394,10 @@
     </div>
     <div class="overlay" id="graveyardOverlay" role="dialog" aria-modal="true" aria-label="Graveyard">
       <div class="panelbox">
-        <h2>Graveyard</h2>
-        <button class="slbtn overlay-close" id="btnGraveyardClose" type="button" aria-label="Close Graveyard">✕</button>
+        <div class="graveyard-header">
+          <h2>Graveyard</h2>
+          <button class="slbtn overlay-close" id="btnGraveyardClose" type="button" aria-label="Close Graveyard">✕</button>
+        </div>
         <div class="trade-tabs" id="graveyardFilters">
           <button class="slbtn active" type="button" data-mode="all">All</button>
           <button class="slbtn" type="button" data-mode="true">Permadeath</button>
@@ -403,7 +405,6 @@
         </div>
         <p id="graveyardStatus" role="status"></p>
         <div id="graveyardList"></div>
-        <div class="closehint"><button class="slbtn" id="btnGraveyardCloseBottom" type="button">Close</button></div>
       </div>
     </div>
   </div>
@@ -1110,6 +1111,7 @@
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
 <script src="src/saveLoad.js"></script>
+<script src="src/version.js"></script>
 <script src="src/graveyard.js"></script>
 <script>
   'use strict'
@@ -7896,7 +7898,7 @@
   // display). Safe to no-op if unsupported or served over plain HTTP.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(err => {
+      navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).catch(err => {
         console.warn('Service worker registration failed:', err)
       })
     })
