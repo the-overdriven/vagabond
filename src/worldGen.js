@@ -1130,7 +1130,7 @@ function buildDwarvenRuin(targetLevel) {
     for (let i = 0; i < 8 && ghostSpots.length; i++) {
       const pickIndex = randInt(0, ghostSpots.length - 1)
       const {x: gx, y: gy} = ghostSpots.splice(pickIndex, 1)[0]
-      addEnemy({
+      const e = {
         name: 'Ghost',
         baseName: 'Ghost',
         tier: ghost.tier || 2,
@@ -1143,7 +1143,7 @@ function buildDwarvenRuin(targetLevel) {
         def: ghost.def,
         spd: ghost.spd,
         fly: true,
-        humanoid: false,
+        humanoid: true,
         evades: true,
         aggro: ghost.aggro ?? AGGRO_RANGE,
         x: gx,
@@ -1154,7 +1154,19 @@ function buildDwarvenRuin(targetLevel) {
         alive: true,
         prefix: null,
         equipment: null
-      })
+      }
+      prepareEnemyEquipment(e)
+      if (chance(0.05)) {
+        const names = Object.keys(ENEMY_PREFIXES)
+        if (names.length) {
+          const prefix = pick(names)
+          e.prefix = prefix
+          e.prefixBase = prefixBaseStats(e)
+          applyEnemyPrefix(e, prefix)
+          e.name = prefix + ' ' + e.name
+        }
+      }
+      addEnemy(e)
     }
   }
   for (let i = 0; i < 18; i++) {
