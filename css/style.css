@@ -469,6 +469,58 @@ body.hint-collapsed #hint .panel-toggle {
   text-align: center;
 }
 
+#graveyardOverlay .panelbox {
+  width: min(92vw, 610px);
+}
+
+#graveyardStatus {
+  color: var(--parchment-dim);
+  text-align: center;
+}
+
+#graveyardFilters .active {
+  color: var(--ember-bright);
+  border-color: var(--ember);
+}
+
+#graveyardList {
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.graveyard-record {
+  margin: 6px 0;
+  padding: 9px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--ember);
+  color: var(--parchment);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.graveyard-record.permadeath {
+  border-left-color: var(--blood);
+}
+
+.graveyard-record summary {
+  cursor: pointer;
+}
+
+.graveyard-record strong {
+  color: var(--ember-bright);
+}
+
+.graveyard-record.permadeath strong {
+  color: #e0655a;
+}
+
+.graveyard-details {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
 .panelbox h2 {
   font-family: Georgia, serif;
   font-variant: small-caps;
@@ -1023,6 +1075,10 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 @media (pointer: coarse) {
+  #btnGraveyard {
+    display: none;
+  }
+
   html, body {
     overflow: auto;
   }
@@ -1118,7 +1174,7 @@ body.hint-collapsed #hint .panel-toggle {
   }
 
   /* Mobile map/inventory use the whole viewport instead of being confined to the game canvas. */
-  #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay {
+  #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay, #graveyardOverlay {
     position: fixed;
     left: 0;
     right: 0;
@@ -1132,7 +1188,7 @@ body.hint-collapsed #hint .panel-toggle {
     z-index: 100;
   }
 
-  #invOverlay .panelbox, #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #tradeOverlay .panelbox, #raceOverlay .panelbox {
+  #invOverlay .panelbox, #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #tradeOverlay .panelbox, #raceOverlay .panelbox, #graveyardOverlay .panelbox {
     width: 100%;
     max-width: none;
     height: 100%;

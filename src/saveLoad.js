@@ -427,6 +427,7 @@ function loadGameFromObject(data, opts = {}) {
 
   spawnPoint = {x: data.spawnPoint.x, y: data.spawnPoint.y}
   rngState = data.rngState | 0
+  if (Number.isInteger(data.worldSeed)) WORLD_SEED = data.worldSeed
   Object.assign(worldEdgesReached, data.worldEdgesReached || {})
   oldHunterQuest = data.oldHunterQuest || null
   hunterEnsureIds()

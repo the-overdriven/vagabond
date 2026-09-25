@@ -198,7 +198,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20260903-2">
+  <link rel="stylesheet" href="css/style.css?v=20260925-1">
   <style>
     .invitem .item-icon {
       flex: 0 0 auto;
@@ -274,6 +274,7 @@
       <button class="slbtn" id="btnSave" title="Save game to a .json file">💾 Save</button>
       <button class="slbtn" id="btnLoad" title="Load game from a .json file">📂 Load</button>
       <button class="slbtn" id="btnReplay" title="Watch this run from the beginning" style="display:none">▶ Show Replay</button>
+      <button class="slbtn" id="btnGraveyard" type="button">💀 Graveyard</button>
       <input type="file" id="fileLoad" accept="application/json,.json" class="visually-hidden">
     </div>
   </div>
@@ -391,6 +392,20 @@
         </div>
       </div>
     </div>
+    <div class="overlay" id="graveyardOverlay" role="dialog" aria-modal="true" aria-label="Graveyard">
+      <div class="panelbox">
+        <h2>Graveyard</h2>
+        <button class="slbtn overlay-close" id="btnGraveyardClose" type="button" aria-label="Close Graveyard">✕</button>
+        <div class="trade-tabs" id="graveyardFilters">
+          <button class="slbtn active" type="button" data-mode="all">All</button>
+          <button class="slbtn" type="button" data-mode="true">Permadeath</button>
+          <button class="slbtn" type="button" data-mode="false">Non-permadeath</button>
+        </div>
+        <p id="graveyardStatus" role="status"></p>
+        <div id="graveyardList"></div>
+        <div class="closehint"><button class="slbtn" id="btnGraveyardCloseBottom" type="button">Close</button></div>
+      </div>
+    </div>
   </div>
   <div id="sidePanel" class="side-box">
     <button class="panel-toggle" id="btnSideCollapse" type="button" aria-label="Collapse map panel"
@@ -454,7 +469,7 @@
   // rngState is kept as a plain, reassignable variable (rather than hidden inside
   // a closure) so a save file can capture the exact RNG position and a loaded
   // game continues the same random sequence instead of restarting it.
-  const WORLD_SEED = Date.now() & 0xffffffff
+  let WORLD_SEED = Date.now() & 0xffffffff
   let rngState = WORLD_SEED
 
   // ---- Replay: RNG hook -----------------------------------------------
@@ -1095,6 +1110,7 @@
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
 <script src="src/saveLoad.js"></script>
+<script src="src/graveyard.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -2777,9 +2793,37 @@
     requestAnimationFrame(step)
   }
 
-  function die(killer = null) {
+  function die(killer = null, cause = 'environment') {
     if (deathTransition) return
     player.deaths++
+    Graveyard.recordDeath({
+      character_name: player.name,
+      race: player.race,
+      permadeath: player.permadeath,
+      level: player.lvl,
+      cumulated_xp: player.totalXpEarned,
+      death_number: player.deaths,
+      killer_name: killer?.name || null,
+      killer_prefix: killer?.prefix || null,
+      cause_of_death: killer ? 'enemy' : cause,
+      max_hp: playerMaxHp(),
+      atk: playerAtk(),
+      def: playerDef(),
+      spd: playerSpd(),
+      grace: playerGrace(),
+      gold: player.gold,
+      weapon: player.equip.weapon?.base || null,
+      armor: player.equip.armor?.base || null,
+      shield: player.equip.shield?.base || null,
+      equipment: Graveyard.snapshotEquipment(player.equip),
+      artifacts: Graveyard.snapshotArtifacts(player.inventory),
+      steps_taken: player.steps,
+      creatures_slain: player.kills,
+      turn_count: turnCount,
+      world_seed: WORLD_SEED,
+      last_position: {x: player.x, y: player.y, z: currentZ, level_kind: currentLevelKind(),
+        biome: map[player.y]?.[player.x] || null}
+    })
     pendingMove = null
     clearAutoPath()
     let xpLoss = 0, maxHpLoss = 0
@@ -3103,7 +3147,7 @@
       log('The freezing cold bites you for 1 HP.', 'bad')
       updateHud()
       if (player.hp <= 0) {
-        die()
+        die(null, 'freezing')
       }
     }
   }
@@ -3833,6 +3877,7 @@
   let hoveredAutoPath = null
 
   function flushPendingMove() {
+    if (Graveyard.isOpen()) return
     if (autoPath && autoPath.length) {
       const next = autoPath.shift()
       if (!next || Math.abs(next.x - player.x) > 1 || Math.abs(next.y - player.y) > 1 || (next.x === player.x && next.y === player.y)) {
@@ -3969,7 +4014,7 @@
   }
 
   async function tryMove(dx, dy) {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return
+    if (mapOpen || invOpen || tradeOpen || raceOpen || Graveyard.isOpen() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim)) {
       pendingMove = {dx: dx, dy: dy}
       return
@@ -4110,7 +4155,7 @@
   }
 
   function skipTurn() {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || deathTransition) return
+    if (mapOpen || invOpen || tradeOpen || raceOpen || Graveyard.isOpen() || deathTransition) return
     if (cameraAnimating || attackAnim) return
     recordReplayAction({type: 'skipTurn'})
     if (consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS) {
@@ -7187,7 +7232,7 @@
     } else {
       player.hp = Math.max(0, player.hp - amt)
       log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
-      if (player.hp <= 0) die()
+      if (player.hp <= 0) die(null, 'poisonous_mushroom')
     }
     consumeItemTurn()
   }
@@ -7369,7 +7414,7 @@
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen
+    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
     requestAnimationFrame(updateMobileSafeAreas)
@@ -7411,6 +7456,17 @@
   resizeMobileViewport()
   resizeDesktopViewport()
   updateMobileSafeAreas()
+  Graveyard.init({
+    isReplayPlaybackActive: () => replayPlaying || replaySimulationMode || replayAnimationsDisabled ||
+      replayActionRunning || replayCurrentActionIndex !== null,
+    onVisibilityChange: () => {
+      if (Graveyard.isOpen()) {
+        pendingMove = null
+        clearAutoPath()
+      }
+      updateTouchControlsVisibility()
+    }
+  })
 
   function toggleInv(force) {
     const next = (force !== undefined) ? force : !invOpen
@@ -7435,6 +7491,11 @@
   }
 
   window.addEventListener('keydown', (ev) => {
+    if (Graveyard.isOpen()) {
+      if (ev.key === 'Escape') Graveyard.close()
+      if (['Tab', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) ev.preventDefault()
+      return
+    }
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
     const k = ev.key
@@ -7510,7 +7571,7 @@
       log('God mode: every map revealed. SPD 50. MF 25.', 'good')
       return
     }
-    if (mapOpen || invOpen || tradeOpen || treasureMapOpen) return
+    if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
         (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()

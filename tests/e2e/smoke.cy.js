@@ -62,6 +62,20 @@ function pressToggleMap() {
   pressKey({ key: 'm', code: 'KeyM', which: 77, keyCode: 77 })
 }
 
+function configureTestGraveyard(enabled = true) {
+  cy.intercept('GET', '**/src/graveyard.js', request => {
+    request.continue(response => {
+      response.body = response.body
+        .replace(/^const SUPABASE_URL = .*$/m,
+          enabled ? "const SUPABASE_URL = 'https://test.supabase.co'" : "const SUPABASE_URL = ''")
+        .replace(/^const SUPABASE_PUBLISHABLE_KEY = .*$/m,
+          enabled
+            ? "const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_abcdefghijklmnopqrstuvwxyz1234567890'"
+            : "const SUPABASE_PUBLISHABLE_KEY = ''")
+    })
+  })
+}
+
 describe('Vagabond smoke test', () => {
   it('starts the game and inspects the Temple with Space', () => {
     const name = 'E2E Tester'
@@ -169,4 +183,129 @@ describe('Vagabond smoke test', () => {
     pressToggleMap()
     cy.get('#mapOverlay').should('not.have.class', 'show')
   })
+
+  it('opens and closes the Graveyard without changing the live game', () => {
+    configureTestGraveyard(false)
+    beginNewGame()
+    cy.get('#btnGraveyard').click()
+    cy.get('#graveyardOverlay').should('have.class', 'show')
+    cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable.')
+    pressMove('down')
+    cy.window().its('__VAGABOND_E2E__').invoke('getState').should(state => {
+      expect(state.player.x).to.equal(state.spawnPoint.x)
+      expect(state.player.y).to.equal(state.spawnPoint.y)
+    })
+    cy.get('#btnGraveyardClose').click()
+    cy.get('#graveyardOverlay').should('not.have.class', 'show')
+  })
+
+  it('does not load the online SDK or query while offline', () => {
+    configureTestGraveyard(false)
+    beginNewGame()
+    cy.window().then(win => {
+      Object.defineProperty(win.navigator, 'onLine', {configurable: true, value: false})
+    })
+    cy.get('#btnGraveyard').click()
+    cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable while offline.')
+    cy.get('script[src*="supabase"]').should('not.exist')
+    cy.get('#btnGraveyardCloseBottom').click()
+  })
+
+  it('submits the pre-penalty live death snapshot once and safely renders remote text', () => {
+    configureTestGraveyard()
+    beginNewGame('E2E Tester')
+    const rows = []
+    const queries = []
+    cy.window().then(win => {
+      const remoteRow = {
+        character_name: '<img src=x onerror=alert(1)>', race: 'human', level: 1,
+        killer_name: '<script>alert(1)</script>', cause_of_death: 'enemy',
+        permadeath: false, death_number: 1, killed_at: '2026-09-25T12:00:00Z',
+        equipment: {weapon: {name: '<svg onload=alert(1)>'}}, artifacts: []
+      }
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) },
+        select: () => ({
+          order() { return this },
+          limit(n) { queries.push(n); return this },
+          eq(mode, value) { queries.push([mode, value]); return this },
+          then(resolve) { resolve({data: [remoteRow], error: null}) }
+        })
+      })})}
+      win.eval("die({name:'Minotaur', prefix:'Champion', alive:false})")
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      expect(records[0]).to.include({permadeath: false, death_number: 1, max_hp: 50,
+        killer_name: 'Minotaur', killer_prefix: 'Champion'})
+      expect(records[0].death_event_id).to.match(/^[0-9a-f-]{36}$/)
+    })
+    cy.get('#btnGraveyard').click()
+    cy.get('#graveyardList').should('contain.text', '<img src=x onerror=alert(1)>')
+    cy.get('#graveyardList img, #graveyardList script, #graveyardList svg').should('not.exist')
+    cy.get('#graveyardFilters [data-mode="true"]').click()
+    cy.wrap(queries).should(q => {
+      expect(q).to.include(50)
+      expect(q).to.deep.include(['permadeath', true])
+    })
+  })
+
+  it('submits the final permadeath once before the character is replaced', () => {
+    configureTestGraveyard()
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Final Tester')
+    cy.get('#permadeathToggle').check()
+    cy.get('#btnBegin').click()
+    const rows = []
+    cy.window().then(win => {
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) }
+      })})}
+      win.eval('die()')
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      expect(records[0]).to.include({character_name: 'Final Tester', permadeath: true, death_number: 1})
+    })
+    cy.get('#raceOverlay', {timeout: 12000}).should('have.class', 'show')
+    cy.wrap(rows).should('have.length', 1)
+  })
+
+  it('skips all online death activity during replay execution', () => {
+    configureTestGraveyard()
+    beginNewGame()
+    const rows = []
+    cy.window().then(win => {
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) }
+      })})}
+      win.eval('replayPlaying = true; die(); replayPlaying = false')
+    })
+    cy.wrap(rows).should('have.length', 0)
+    cy.get('script[src*="supabase"]').should('not.exist')
+  })
+
+  for (const {cause, trigger} of [
+    {cause: 'poisonous_mushroom', trigger:
+      "player.hp = 1; player.inventory.push({kind:'mushroom', name:'Mushroom'}); chance = () => false; useMushroom(player.inventory.length - 1)"},
+    {cause: 'freezing', trigger:
+      "player.hp = 1; map[player.y][player.x] = 'snow'; player.freezing = {active:true, turns:4}; tickFreezing()"}
+  ]) {
+    it(`records ${cause} rather than a generic environmental cause`, () => {
+      configureTestGraveyard()
+      beginNewGame()
+      const rows = []
+      cy.window().then(win => {
+        expect(win.eval('SUPABASE_URL')).to.equal('https://test.supabase.co')
+        win.supabase = {createClient: () => ({from: () => ({
+          insert: record => { rows.push(record); return Promise.resolve({error: null}) }
+        })})}
+        win.eval(trigger)
+      })
+      cy.wrap(rows).should(records => {
+        expect(records).to.have.length(1)
+        expect(records[0]).to.include({cause_of_death: cause, killer_name: null, permadeath: false})
+      })
+    })
+  }
 })

@@ -3795,6 +3795,13 @@ A replay is therefore a deterministic re-execution of the recorded player action
 stream against the recorded starting state and recorded RNG outcomes; it is not
 a video recording or a sequence of pre-rendered frames.
 
+The optional online Graveyard is never called from replay execution. The central
+recording entry point checks `replayPlaying`, `replaySimulationMode`,
+`replayAnimationsDisabled`, `replayActionRunning`, and `replayCurrentActionIndex`
+before generating a UUID or touching storage/network. Opening the Graveyard
+while replaying makes no database query. Graveyard UI activity is not a recorded
+action and never draws from the gameplay RNG.
+
 ## Not implemented (by design, v1)
 
 Export/import, sharing, thumbnails, scrubbing, fast-forward, variable speed,
@@ -3802,3 +3809,83 @@ frame stepping, video/screenshots, a dedicated Stop button, and restoring the
 pre-replay state from the UI remain unimplemented. The pre-replay snapshot is
 kept in memory for the current playback session but is not exposed as a restore
 operation.
+
+---
+
+# 84. Online Graveyard / Records (optional)
+
+The desktop HUD has a Graveyard button opening an in-game overlay with the 50
+most recent deaths (`created_at DESC LIMIT 50`). All, Permadeath, and
+Non-permadeath each use a separately limited query. A record can be expanded
+for equipment/stats. Red highlights permadeath; amber highlights normal deaths.
+Opening/closing never consumes a game turn or changes replay/save state.
+
+Architecture: GitHub Pages -> lazily loaded, pinned Supabase browser JS SDK
+(`src/graveyard.js`) -> Supabase Data API -> PostgreSQL `death_records`. There
+is no backend, account, service key, build step, reward, or gameplay dependency.
+Edit `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of
+`src/graveyard.js`. Use the Project URL and browser publishable key (or legacy
+anon key), **never** a secret/service_role key. The schema, policies, indexes,
+validation and pre-request rate limit are in `supabase-graveyard.sql`: paste it
+into the Supabase SQL Editor of a new project. Keep the Data API enabled. No
+other dashboard configuration is required for a new default project. If the
+project already has a `pgrst.db_pre_request` hook, compose the checks rather
+than overwrite it.
+
+The browser's `vagabond_online_player_id` localStorage entry is a random UUID
+created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
+reused on this browser, not a verified identity. If storage or secure randomness
+is unavailable, submission is skipped. A fresh `death_event_id` is generated
+once on every real `die()` call; `deathTransition` prevents repeat callbacks,
+and the database UNIQUE constraint rejects duplicates. Death number is
+incremented before snapshot, but the snapshot is taken before XP/max-HP
+penalties, backpack drops, teleport, corpse transfer, or character reset.
+The mode is read from `player.permadeath` directly; non-permadeath deaths each
+produce a separate event and the same character continues; a permadeath
+produces exactly one final event. Requests are fire-and-forget.
+
+Exact uploaded columns (apart from server-generated `id` and `created_at`):
+`death_event_id`, `killed_at`, `last_position` (x/y/z, level kind, tile/biome),
+`player_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
+`cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
+`killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
+or legacy/unknown `environment`), `max_hp`, `atk`,
+`def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
+names), `equipment` (compact JSONB equipped-item snapshots with base/name,
+replay ID if present, modifiers and artifact effect ID when present),
+`artifacts` (compact JSONB artifact inventory snapshots), `steps_taken`,
+`creatures_slain`, `turn_count` (turns in the current page session, reset on
+load), `world_seed` (original seed restored from saves), and `game_version`
+(the stable `v22`, kept in sync with `sw.js`). Playtime is not recorded:
+there is no reliable persisted playtime counter. Neither full saves nor
+replay/RNG histories are uploaded. The existing service worker precaches
+`src/graveyard.js` and CSS under cache v22. The cross-origin SDK is **not**
+precached or required for boot, and `navigator.onLine === false` skips SDK
+loading and every SELECT/INSERT. Offline deaths are not queued or retried.
+SDK failures and network request timeouts display only a generic UI state or
+a console warning; gameplay never waits for them.
+
+Freezing and poisonous mushrooms pass their actual fatal cause to `die()`; an
+enemy death remains `enemy`. Older or otherwise unspecified environmental
+records remain `environment` and are displayed as unknown rather than guessed
+from location or inventory. Cursed artifacts currently clamp direct HP loss
+to at least 1 HP: they cannot be the direct fatal cause, so there is no
+`cursed_item` record and this feature does not change that gameplay rule.
+
+RLS permits only anonymous SELECT and INSERT; there are no UPDATE/DELETE
+grants or policies. SQL CHECK constraints validate game fields. A Supabase
+Data API pre-request hook counts at most 20 POST `/death_records` requests per
+gateway-reported source IP in each fixed UTC hour, with an atomic counter;
+a trigger rejects multi-row inserts. Only an HMAC of the IP, keyed by a secret
+in the unexposed `private` schema, and its hour bucket are retained; raw IPs
+are never stored in application tables. Old buckets are removed on later
+write requests. This hook relies on Supabase's `x-forwarded-for` forwarding:
+verify your gateway overwrites/normalizes it; a client-controlled forwarded
+header may weaken the per-IP quota. An IP limit also affects players sharing
+a NAT. The publishable key and page Origin/Referer cannot prove a request
+came from the genuine game. RLS and validation are abuse mitigation, **not
+cheat protection**: clients can modify JS/stats, impersonate names or browser
+IDs, forge plausible rows and modes, or send direct Data API requests.
+An authoritative server would be required to verify a run. Never treat the
+two death-mode populations as interchangeable in later balance analysis.
+Remote text is rendered with DOM `textContent`, never interpolated into HTML.
