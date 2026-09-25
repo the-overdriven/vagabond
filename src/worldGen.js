@@ -2256,6 +2256,19 @@ function spawnCaveScenarios() {
     populate(deep.caves[i], deep.caveMaps[i], i, -2, 'cavefloor2')
 }
 
+function guardedChestSpots(e, used, accept = () => true) {
+  const spots = []
+  const aggroRange = effectiveAggroRange(e)
+  for (let dy = -aggroRange; dy <= aggroRange; dy++) for (let dx = -aggroRange; dx <= aggroRange; dx++) {
+    const x = e.x + dx, y = e.y + dy
+    if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2 || !accept(x, y)) continue
+    if (!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') continue
+    if (occupied.has(keyXY(x, y)) || used.has(keyXY(x, y))) continue
+    spots.push({x, y})
+  }
+  return spots
+}
+
 function spawnRemoteHighTierChests() {
   // A few valuable tier-3 chests are deliberately placed in remote areas,
   // inside the aggro range of tier-3+ monsters so reaching them carries risk.
@@ -2272,15 +2285,7 @@ function spawnRemoteHighTierChests() {
     const aggroRange = effectiveAggroRange(e)
     const remote = villageCenter && Math.max(Math.abs(e.x - villageCenter.x), Math.abs(e.y - villageCenter.y)) >= 35
     if (!remote || aggroRange < 1) continue
-    const spots = []
-    for (let dy = -aggroRange; dy <= aggroRange; dy++) for (let dx = -aggroRange; dx <= aggroRange; dx++) {
-      const x = e.x + dx, y = e.y + dy
-      if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2) continue
-      if (Math.max(Math.abs(dx), Math.abs(dy)) > aggroRange) continue
-      if (!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') continue
-      if (occupied.has(keyXY(x, y)) || used.has(keyXY(x, y))) continue
-      spots.push({x, y})
-    }
+    const spots = guardedChestSpots(e, used)
     if (!spots.length) continue
     const spot = pick(spots)
     groundItems.push({x: spot.x, y: spot.y, kind: 'chest', tier: 3, opened: false})
@@ -2289,8 +2294,40 @@ function spawnRemoteHighTierChests() {
   }
 }
 
+function spawnEdgeHighTierChests() {
+  const edgeBand = Math.max(12, Math.round(Math.min(MAP_W, MAP_H) * 0.12))
+  const northEdge = (x, y) => y <= edgeBand
+  const anyEdge = (x, y) => northEdge(x, y) || x <= edgeBand || x >= MAP_W - 1 - edgeBand || y >= MAP_H - 1 - edgeBand
+  const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
+  for (const n of npcs) used.add(keyXY(n.x, n.y))
+  const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= 3)
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = randInt(0, i);
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  }
+  candidates.sort((a, b) => b.tier - a.tier)
+  const guarded = new Set()
+  let placed = 0
+  const placeNear = (accept, limit) => {
+    for (const e of candidates) {
+      if (placed >= limit) break
+      if (guarded.has(e)) continue
+      const spots = guardedChestSpots(e, used, accept)
+      if (!spots.length) continue
+      const spot = pick(spots)
+      groundItems.push({x: spot.x, y: spot.y, kind: 'chest', tier: e.tier, opened: false})
+      used.add(keyXY(spot.x, spot.y))
+      guarded.add(e)
+      placed++
+    }
+  }
+  placeNear(northEdge, 5)
+  placeNear(anyEdge, 12)
+}
+
 function spawnGroundStuff() {
   // chests
+  const usedChests = new Set(groundItems.filter(g => g.kind === 'chest' && (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   for (let i = 0; i < 45; i++) {
     let x, y, tries = 0
     do {
@@ -2298,10 +2335,11 @@ function spawnGroundStuff() {
       y = randInt(2, MAP_H - 3)
       tries++
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
+    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance' || usedChests.has(keyXY(x, y))) && tries < 200)
     if (tries >= 200) continue
     const distTier = Math.min(5, 1 + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / 45))
     groundItems.push({x, y, kind: 'chest', tier: distTier, opened: false})
+    usedChests.add(keyXY(x, y))
   }
   // loose potions
   for (let i = 0; i < 15; i++) {

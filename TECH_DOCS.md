@@ -2179,6 +2179,11 @@ Non-humanoid enemies do not wear or drop normal weapons, armor, or shields.
 # 45. Chests
 
 The surface and underground areas contain chests.
+The surface starts with up to four remote tier-3 chests guarded by tier-3+
+monsters, 45 ordinary chests, and up to twelve additional edge chests. Up to
+five of the edge chests are placed along the northern edge first; remaining
+ones can appear on any edge. Each edge chest is on walkable ground within a
+tier-3+ monster's aggro range, with tier matching that monster.
 
 Chest loot can include:
 
