@@ -198,7 +198,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20260925-2">
+  <link rel="stylesheet" href="css/style.css?v=20260925-3">
   <style>
     .invitem .item-icon {
       flex: 0 0 auto;
@@ -5810,8 +5810,8 @@
       <img src="${imageSrc(raceSelectionImagePath(race.id))}" style="${backgroundStyle}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${player.name}</div>
-      <div style="color:var(--ember-bright);font-size:11px;">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
-      <div style="color:var(--parchment-dim);font-size:10px;margin-top:2px;">${race.bonus}</div>
+      <div style="color:var(--ember-bright);font-size:calc(11px * var(--ui-font-scale));">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
+      <div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));margin-top:2px;">${race.bonus}</div>
       </div>`
       }
     }
@@ -5860,7 +5860,7 @@
       <img src="${imageSrc(`img/npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${n.name}</div>
-      ${n.trades ? '<div style="color:var(--parchment-dim);font-size:10px;">Click to trade</div>' : ''}
+      ${n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
       </div>`
       }
     }
@@ -5879,7 +5879,7 @@
       if (g.kind === 'playerremains') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">Your Remains</div><div style="color:var(--parchment-dim);font-size:10px;">Forage to recover the dropped item</div>`
+        html: `<div class="nm">Your Remains</div><div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Forage to recover the dropped item</div>`
       }
       if (g.kind === 'skeleton') return {
         mini: true,

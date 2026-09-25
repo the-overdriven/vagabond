@@ -1,4 +1,5 @@
 :root {
+  --ui-font-scale: 1;
   --void: #0b0906;
   --panel: #1a130e;
   --panel2: #231a12;
@@ -13,6 +14,16 @@
   --t3: #4aa3d1;
   --t4: #b565d6;
   --t5: #e0473f;
+}
+
+@media (pointer: fine) and (min-width: 721px) {
+  :root {
+    --ui-font-scale: 1.2;
+  }
+}
+
+html {
+  font-size: calc(1rem * var(--ui-font-scale));
 }
 
 .hud-status {
@@ -30,7 +41,7 @@
 }
 
 .field-label, .section-title {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   letter-spacing: 1px;
   color: var(--ember-bright);
 }
@@ -56,7 +67,7 @@
 
 .trade-gold {
   color: var(--parchment-dim);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   margin: -4px 0 10px;
 }
 
@@ -101,12 +112,12 @@ h1 {
   color: var(--ember-bright);
   text-shadow: 0 0 12px rgba(232, 162, 79, 0.35), 0 2px 0 #000;
   margin: 2px 0 0 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--ui-font-scale));
 }
 
 .subtitle {
   color: var(--parchment-dim);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 2px;
@@ -116,11 +127,14 @@ h1 {
   display: flex;
   gap: 14px;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   background: linear-gradient(180deg, var(--panel2), var(--panel));
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
@@ -154,7 +168,7 @@ h1 {
   right: 0;
   top: 0;
   text-align: center;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   line-height: 14px;
   color: #fff;
   text-shadow: 0 1px 2px #000;
@@ -230,7 +244,7 @@ canvas {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   overflow-y: auto;
   line-height: 1.5;
   white-space: pre-line;
@@ -285,7 +299,7 @@ canvas {
 }
 
 #hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   color: brown;
   letter-spacing: 1px;
   text-align: center;
@@ -297,7 +311,7 @@ canvas {
   border-radius: 3px;
   padding: 1px 5px;
   color: var(--ember-bright);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
 }
 
 #hint kbd.locked {
@@ -318,7 +332,7 @@ canvas {
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 0 18px rgba(0, 0, 0, 0.5);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   line-height: 1.8;
 }
 
@@ -334,7 +348,7 @@ canvas {
   border: 1px solid var(--border);
   border-right: 0;
   border-radius: 4px 0 0 4px;
-  font: 18px inherit;
+  font: calc(18px * var(--ui-font-scale)) inherit;
   cursor: pointer;
 }
 
@@ -464,7 +478,7 @@ body.hint-collapsed #hint .panel-toggle {
   width: 28px;
   height: 28px;
   padding: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--ui-font-scale));
   line-height: 26px;
   text-align: center;
 }
@@ -538,7 +552,7 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-left: 4px solid var(--ember);
   color: var(--parchment);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   line-height: 1.5;
 }
 
@@ -570,7 +584,7 @@ body.hint-collapsed #hint .panel-toggle {
   letter-spacing: 2px;
   color: var(--ember-bright);
   margin: 0 0 10px 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--ui-font-scale));
   border-bottom: 1px solid var(--border);
   padding-bottom: 6px;
 }
@@ -604,13 +618,13 @@ body.hint-collapsed #hint .panel-toggle {
   border-radius: 4px;
   padding: 8px;
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   min-height: 52px;
 }
 
 .slot .label {
   color: var(--parchment-dim);
-  font-size: 9px;
+  font-size: calc(9px * var(--ui-font-scale));
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -648,8 +662,8 @@ body.hint-collapsed #hint .panel-toggle {
   justify-content: center;
   appearance: none;
   -webkit-appearance: none;
-  width: 12px !important;
-  height: 12px !important;
+  width: calc(12px * var(--ui-font-scale)) !important;
+  height: calc(12px * var(--ui-font-scale)) !important;
   margin-left: 2px;
   padding: 0 !important;
   background: transparent !important;
@@ -659,8 +673,8 @@ body.hint-collapsed #hint .panel-toggle {
   border: 0 !important;
   border-radius: 0;
   font: inherit;
-  font-size: 12px;
-  line-height: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
+  line-height: calc(12px * var(--ui-font-scale));
   cursor: pointer;
 }
 
@@ -677,7 +691,7 @@ body.hint-collapsed #hint .panel-toggle {
   display: grid;
   grid-template-columns:1fr 1fr;
   gap: 4px 24px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-font-scale));
   margin-bottom: 14px;
 }
 
@@ -712,7 +726,7 @@ body.hint-collapsed #hint .panel-toggle {
 .stats-details summary {
   cursor: pointer;
   color: var(--ember-bright);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   letter-spacing: 1px;
   font-weight: 700;
 }
@@ -742,7 +756,7 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   cursor: pointer;
   font-family: inherit;
   letter-spacing: 0.7px;
@@ -760,7 +774,7 @@ body.hint-collapsed #hint .panel-toggle {
   justify-content: space-between;
   align-items: center;
   padding: 4px 2px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   border-bottom: 1px dashed #33261a;
 }
 
@@ -777,7 +791,7 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   cursor: pointer;
 }
 
@@ -813,7 +827,7 @@ body.hint-collapsed #hint .panel-toggle {
 .closehint {
   text-align: center;
   color: var(--parchment-dim);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   margin-top: 10px;
 }
 
@@ -823,7 +837,7 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   cursor: pointer;
   font-family: inherit;
   letter-spacing: 0.5px;
@@ -861,12 +875,12 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 8px 10px;
-  font-size: 12px;
-  width: 170px;
+  font-size: calc(12px * var(--ui-font-scale));
+  width: calc(170px * var(--ui-font-scale));
 }
 
 #tooltip .statrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
 }
 
 #tooltip .nm {
@@ -927,7 +941,7 @@ body.hint-collapsed #hint .panel-toggle {
 
 #tooltip .pfx {
   margin: 2px 0 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   letter-spacing: 0.5px;
 }
 
@@ -941,7 +955,7 @@ body.hint-collapsed #hint .panel-toggle {
 
 #tooltip .crit {
   margin: 0 0 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   letter-spacing: 0.5px;
   color: #e0473f;
 }
@@ -1001,7 +1015,7 @@ body.hint-collapsed #hint .panel-toggle {
   border-radius: 4px;
   color: var(--parchment);
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   padding: 6px 8px;
   width: 220px;
 }
@@ -1034,7 +1048,7 @@ body.hint-collapsed #hint .panel-toggle {
   text-align: center;
   color: var(--parchment);
   font-family: inherit;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   line-height: 1.35;
 }
 
@@ -1050,7 +1064,7 @@ body.hint-collapsed #hint .panel-toggle {
 .race-card .rname {
   color: var(--ember-bright);
   font-weight: 700;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   letter-spacing: 0.5px;
 }
 
@@ -1090,11 +1104,11 @@ body.hint-collapsed #hint .panel-toggle {
 
 #raceError {
   color: var(--blood);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
 }
 
 #btnBegin {
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   padding: 8px 18px;
 }
 
