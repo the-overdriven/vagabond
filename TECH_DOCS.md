@@ -3866,7 +3866,8 @@ operation.
 
 # 84. Online Graveyard / Records (optional)
 
-The desktop HUD has a Graveyard button opening an in-game overlay with the 50
+The desktop and mobile HUDs have a 💀 button (desktop tooltip: Graveyard)
+opening an in-game overlay with the 50
 most recent deaths (`created_at DESC LIMIT 50`). All, Permadeath, and
 Non-permadeath each use a separately limited query. A record can be expanded
 for equipment/stats. Equipped gear shows the inventory stat line in brackets,

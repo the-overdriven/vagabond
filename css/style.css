@@ -1132,10 +1132,6 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 @media (pointer: coarse) {
-  #btnGraveyard {
-    display: none;
-  }
-
   html, body {
     overflow: auto;
   }
