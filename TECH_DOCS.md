@@ -1557,10 +1557,11 @@ damage × 2
 ```
 
 The critical roll happens after the attack connects and after the normal damage
-roll. If armor then turns the hit into a glancing blow, the existing glancing
-reduction still applies after the critical multiplier. Critical rolls use the
-game's seeded `chance()`/`rng()` path, so replay recording/playback consumes the
-same RNG sequence.
+roll. Critical hits and armor glancing are mutually exclusive: if the armor
+glance check succeeds, that hit cannot become critical. The crit RNG roll is
+still consumed on the connected hit so the combat path keeps a stable seeded
+RNG/replay call pattern. Critical rolls use the game's seeded `chance()`/`rng()`
+path.
 
 Fierce enemies therefore crit twice as often as ordinary monsters, while Deadly
 enemies remain the strongest critical-hit specialists.

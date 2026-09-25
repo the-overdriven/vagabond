@@ -2510,7 +2510,8 @@
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
     let dmg = damageRoll(playerAtk(), enemyDef(e))
-    const critical = chance(BASE_CRIT_CHANCE)
+    const criticalRoll = chance(BASE_CRIT_CHANCE)
+    const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     e.hp -= dmg
@@ -2562,7 +2563,8 @@
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
     let dmg = damageRoll(e.atk, playerDef())
-    const critical = chance(enemyCriticalHitChance(e))
+    const criticalRoll = chance(enemyCriticalHitChance(e))
+    const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     player.hp -= dmg
