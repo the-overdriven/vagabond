@@ -8,6 +8,7 @@ const Graveyard = (() => {
   const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js'
   const TIMEOUT_MS = 6000
   const PLAYER_ID_KEY = 'vagabond_online_player_id'
+  const DEATH_COUNT_KEY = 'vagabond_death_count_'
   let sdkPromise = null
   let clientPromise = null
   let visible = false
@@ -52,6 +53,40 @@ const Graveyard = (() => {
     } catch {
       return null
     }
+  }
+
+  function newCharacterId() {
+    return newId() || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }
+
+  function reconcileDeathCount(player, worldSeed, died = false) {
+    if (replayActive()) {
+      if (died) player.deaths++
+      return player.deaths
+    }
+    if (typeof player.characterId !== 'string' || !player.characterId) {
+      player.characterId = `legacy-${JSON.stringify([worldSeed, player.name, player.race, player.permadeath])}`
+    }
+    const key = DEATH_COUNT_KEY + player.characterId
+    let savedCount = 0
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored !== null) {
+        const parsed = Number(stored)
+        if (Number.isSafeInteger(parsed) && parsed >= 0) savedCount = parsed
+        else console.warn('Invalid local Graveyard death count')
+      }
+    } catch (error) {
+      console.warn('Could not read local Graveyard death count', error)
+    }
+    const currentCount = Number.isSafeInteger(player.deaths) && player.deaths >= 0 ? player.deaths : 0
+    player.deaths = Math.max(currentCount, savedCount) + (died ? 1 : 0)
+    try {
+      localStorage.setItem(key, String(player.deaths))
+    } catch (error) {
+      console.warn('Could not save local Graveyard death count', error)
+    }
+    return player.deaths
   }
 
   function loadSdk() {
@@ -253,5 +288,6 @@ const Graveyard = (() => {
     window.addEventListener('offline', () => { if (visible) void refresh() })
   }
 
-  return {init, open, close, isOpen: () => visible, recordDeath, snapshotEquipment, snapshotArtifacts}
+  return {init, open, close, isOpen: () => visible, recordDeath, snapshotEquipment, snapshotArtifacts,
+    newCharacterId, reconcileDeathCount}
 })()

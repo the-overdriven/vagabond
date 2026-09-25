@@ -127,6 +127,7 @@ function buildSaveObject() {
     player: {
       x: player.x, y: player.y,
       name: player.name, race: player.race,
+      characterId: player.characterId,
       permadeath: player.permadeath,
       lvl: player.lvl, xp: player.xp,
       totalXpEarned: player.totalXpEarned, lastTempleHealXp: player.lastTempleHealXp,
@@ -505,6 +506,7 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  player.characterId = typeof data.player.characterId === 'string' ? data.player.characterId : null
   player.totalXpEarned = Number.isFinite(data.player.totalXpEarned) ? data.player.totalXpEarned : 0
   player.lastTempleHealXp = Number.isFinite(data.player.lastTempleHealXp) ? data.player.lastTempleHealXp : player.totalXpEarned
   bellReturnedToChapel = !!data.bellReturnedToChapel
@@ -532,6 +534,7 @@ function loadGameFromObject(data, opts = {}) {
   // pre-v7 saves have no race/name - those characters were all plain humans
   if (!RACES.some(r => r.id === player.race)) player.race = DEFAULT_RACE
   if (typeof player.name !== 'string' || !player.name.trim()) player.name = 'Vagabond'
+  if (!isReplayInit) Graveyard.reconcileDeathCount(player, WORLD_SEED)
   player.equip = (data.player && data.player.equip) || {weapon: null, shield: null, armor: null}
   player.inventory = (data.player && data.player.inventory) || []
   // Migrate saves from the earlier Black Key implementation, which

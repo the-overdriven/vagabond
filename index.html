@@ -1592,6 +1592,7 @@
   const player = {
     x: 0, y: 0,
     name: 'Vagabond', race: DEFAULT_RACE,
+    characterId: null,
     lvl: 1, xp: 0,
     totalXpEarned: 0, lastTempleHealXp: 0,
     maxHp: 50, hp: 50,
@@ -2731,6 +2732,7 @@
       y: spawnPoint.y,
       name: 'Vagabond',
       race: DEFAULT_RACE,
+      characterId: null,
       lvl: 1,
       xp: 0,
       totalXpEarned: 0,
@@ -2799,7 +2801,7 @@
 
   function die(killer = null, cause = 'environment') {
     if (deathTransition) return
-    player.deaths++
+    Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
     Graveyard.recordDeath({
       character_name: player.name,
       race: player.race,
@@ -7854,6 +7856,7 @@
     player.name = name
     player.race = selectedRaceId
     player.permadeath = document.getElementById('permadeathToggle').checked
+    player.characterId = Graveyard.newCharacterId()
     player.hp = playerMaxHp()
     // Replay is opt-in per character. Clear out whatever the previous
     // character (if any) left behind before deciding whether to record.

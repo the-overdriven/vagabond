@@ -3884,7 +3884,14 @@ created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
 reused on this browser, not a verified identity. If storage or secure randomness
 is unavailable, submission is skipped. A fresh `death_event_id` is generated
 once on every real `die()` call; `deathTransition` prevents repeat callbacks,
-and the database UNIQUE constraint rejects duplicates. Death number is
+and the database UNIQUE constraint rejects duplicates. Each new character
+gets a random ID saved with the character. A browser-local
+high-water death count for that ID is reconciled when a save is loaded and
+advanced on each live death. Thus loading an earlier save on the same browser
+does not reuse a death number; older saves without a character ID use their
+world seed, name, race, and mode as a legacy identity. This does not synchronize
+counts across browsers or recover records from a cleared browser store.
+Replay playback neither reads nor updates this count. Death number is
 incremented before snapshot, but the snapshot is taken before XP/max-HP
 penalties, backpack drops, teleport, corpse transfer, or character reset.
 The mode is read from `player.permadeath` directly; non-permadeath deaths each
