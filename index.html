@@ -2567,13 +2567,13 @@
     }
   }
 
-  function enemyAttackPlayer(e, isExtraAttack = false) {
+  function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1) {
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
       ? e.equipment : null
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     beginEnemyAttackAnim(e)
-    if (chance(missChance(enemySpd(e), playerSpd()))) {
+    if (chance(1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
       return false
@@ -2937,6 +2937,46 @@
     return enemyCanTraverse(e, x, y) && !occupied.has(keyXY(x, y)) && !(x === player.x && y === player.y)
   }
 
+  function reactToInvisibleAttack(e, damage) {
+    const roll = rng()
+    if (roll < 0.10) {
+      log(`The ${e.name} is confused at the unseen attack!`, 'info')
+      return
+    }
+    const fleeChance = Math.max(0.05, Math.min(0.90,
+      (30 - 2 * e.tier - enemyAggroRange(e) + damage / 2) / 100))
+    if (roll < 0.10 + fleeChance) {
+      const options = []
+      let bestDistance = -1
+      for (const [dx, dy] of DIRS8) {
+        const x = e.x + dx, y = e.y + dy
+        if (!isWalkable(x, y) || !enemyTileOpen(e, x, y) ||
+            (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+        const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+        if (distance > bestDistance) {
+          options.length = 0
+          bestDistance = distance
+        }
+        if (distance === bestDistance) options.push({x, y})
+      }
+      log(`The ${e.name} panics at the unseen attack and flees in terror!${options.length ? '' : ' But is cornered with no way to escape!'}`, 'info')
+      if (options.length) {
+        const fromX = e.x, fromY = e.y
+        const destination = pick(options)
+        occupied.delete(keyXY(fromX, fromY))
+        e.x = destination.x
+        e.y = destination.y
+        occupied.add(keyXY(e.x, e.y))
+        beginEnemyMoveAnim(e, fromX, fromY)
+      }
+      return
+    }
+    log(`The ${e.name} panics at the unseen attack and lashes out wildly into the empty air!`, 'bad')
+    if (Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ATTACK_RANGE) {
+      enemyAttackPlayer(e, false, 0.10)
+    }
+  }
+
   // Breadth-first search for the shortest route to a tile adjacent to the player,
   // returning only the first step of that route. The greedy "step diagonally, else
   // straight" approach used before would simply give up whenever the direct line was
@@ -3154,7 +3194,7 @@
     }
   }
 
-  function enemyTurn() {
+  function enemyTurn(reactedEnemy = null) {
     if (player.hp <= 0 || deathTransition) return
     turnCount++
     tickFreezing()
@@ -3178,10 +3218,10 @@
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e)) continue
       if (playerHidden) {
-        // Invisibility blocks awareness and combat, but does not freeze the
-        // world: monsters continue their ordinary wandering behavior.
+        // Invisible attackers provoke only their target's immediate reaction;
+        // other monsters still wander, but never pursue the hidden player.
         e.aware = false
-        if (enemyIsOnScreen(e)) enemyWander(e)
+        if (e !== reactedEnemy && enemyIsOnScreen(e)) enemyWander(e)
         continue
       }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
@@ -4028,8 +4068,11 @@
     if (target) {
       clearAutoPath()
       consecutiveWaitTurns = 0
+      const invisibleAttack = !player.godMode && player.invisibleTurns > 0
+      const targetHp = target.hp
       await playerAttackEnemy(target)
-      enemyTurn()
+      if (invisibleAttack && target.alive) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
+      enemyTurn(invisibleAttack ? target : null)
       npcTurn()
       render()
       runAnimationLoop()
@@ -6856,6 +6899,15 @@
         merchantPrice: homecomingCfg.merchantPrice
       })
     }
+    const invisibilityCfg = MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll
+    if (!merchantStock.some(it => it.kind === invisibilityCfg.kind)) {
+      merchantStock.push({
+        kind: invisibilityCfg.kind,
+        name: invisibilityCfg.name,
+        count: invisibilityCfg.count,
+        merchantPrice: invisibilityCfg.merchantPrice
+      })
+    }
   }
 
   // SELL_VALUE_BY_TIER / FLAT_SELL_VALUE now loaded from content/loot_tables.json.
@@ -7178,7 +7230,7 @@
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    player.invisibleTurns = consumablePower(15)
+    player.invisibleTurns = consumablePower(20)
     log('You read the Scroll of Invisibility. The shadows swallow you.', 'good')
     consumeItemTurn()
   }

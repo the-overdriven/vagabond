@@ -1352,6 +1352,10 @@ there is a 25% chance for an additional pursuit action (enemy gets closer to vic
 
 Idle enemies can wander.
 
+Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
+enemy attacked by an invisible player reacts once to that attack instead of
+wandering on the same turn (section 47); no awareness or chase persists.
+
 Current wandering settings:
 
 ```text
@@ -2202,8 +2206,8 @@ The current approximate shares are:
 | Gold | 41% |
 | Gear | 23% |
 | Life Potion | 14% |
-| Scroll of Invisibility | 5.5% |
-| Potion of Speed | 8% |
+| Scroll of Invisibility | 4.5% |
+| Potion of Speed | 9% |
 | Scroll of Identification | 9% |
 
 The **110-point roll chooses the result category**. If the result is gear, a
@@ -2258,12 +2262,29 @@ Fully restores HP.
 Grants approximately:
 
 ```text
-15 turns invisibility
+20 turns invisibility
 ```
 
-Wyrdling increases the duration by 25%. Example: 15 turns become 18.75 turns (rounded to 19 turns).
+Wyrdling increases the duration by 25%: 20 turns become 25 turns. Reading
+the scroll consumes the first turn, leaving 19 or 24 subsequent turns,
+respectively.
 
-While invisible, enemies do not chase or attack the player. Invisibility can be also used to kill stronger enemies, without being hit.
+While invisible, enemies never acquire or chase the player and continue to
+wander normally. Each attack on a surviving enemy (including a miss or evade)
+provokes exactly one immediate reaction instead of that enemy's wander action
+for the turn. An enemy killed by the attack cannot react. A single roll gives
+10% confusion (no action), then a flee chance of
+`clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
+On a flee result the enemy moves one tile to an open walkable neighbor,
+preferring maximum distance from the player; if no tile is available, it stays
+put and reports being cornered. The remaining probability is a wild lash-out:
+if still adjacent, the enemy makes one ordinary attack with one tenth of its
+normal hit chance (including normal damage, armor, and critical-hit rules).
+No reaction grants lasting awareness or subsequent pursuit. God mode remains
+nonreactive. Invisibility is therefore not guaranteed protection when attacking.
+
+The merchant stocks three Scrolls of Invisibility at 200g each, configured
+under `scrolls.invisibilityScroll` in `content/merchant_stock.json`.
 
 ## Scroll of Homecoming
 
@@ -3354,7 +3375,8 @@ Define whether its state:
 
 ### Does it interact with invisibility?
 
-Current invisibility suppresses normal enemy pursuit/attacks.
+Current invisibility suppresses normal enemy pursuit/attacks, but an
+invisible player's attack can provoke one immediate reaction (section 47).
 
 ### Does it interact with the Temple?
 

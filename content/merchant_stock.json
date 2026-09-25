@@ -15,6 +15,7 @@
   },
   "scrolls": {
     "idScroll": {"kind": "idscroll", "name": "Scroll of Identification", "minCount": 3, "minPrice": 100},
-    "homecomingScroll": {"kind": "homecomingscroll", "name": "Scroll of Homecoming", "count": 5, "merchantPrice": 100}
+    "homecomingScroll": {"kind": "homecomingscroll", "name": "Scroll of Homecoming", "count": 5, "merchantPrice": 100},
+    "invisibilityScroll": {"kind": "scroll", "name": "Scroll of Invisibility", "count": 3, "merchantPrice": 200}
   }
 }
