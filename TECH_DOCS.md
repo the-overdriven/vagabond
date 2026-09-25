@@ -1646,12 +1646,21 @@ When HP reaches zero in normal mode:
 - the killer, if still alive, gains a persistent red skull and a victory level;
   each victory adds 3 maximum HP and +1 each to ATK and DEF, leaves SPD unchanged,
   then heals 10% of its new maximum HP (rounded, at least 1)
-- the player loses 10% of current unspent XP (rounded up), with a minimum loss
-  of 20 XP and a maximum loss of 200 XP. If fewer than 20 XP are available,
-  the unspent XP total becomes negative; future XP gains repay this debt before
-  the next level can be reached. The XP bar displays zero width during debt
+- the XP penalty is calculated as 10% of all XP earned across levels (rounded
+  up), with a minimum of 20 XP and a maximum of 200 XP. It is subtracted from
+  the current level's unspent XP, without reducing the level. At level 1, the
+  actual loss is capped at available unspent XP, so death at 0 XP loses 0 and
+  never creates debt. From level 2 onward, XP may become negative; future XP
+  gains repay that debt before advancing toward the next level. The XP bar
+  displays zero width while XP is negative. Lifetime earned XP remains the
+  basis for later death penalties and the Temple's progress check
 - the player's base maximum HP permanently drops by 1 at levels 1–4, or 2
   at level 5 and above, never below 1
+
+For example, a level 2+ character with 1,000 lifetime XP earned and 5 XP toward
+the next level loses 100 XP on death (10% of 1,000). Their current XP becomes
+`5 - 100 = -95`; their level stays the same, and future gains first repay the
+95 XP debt.
 
 The player's:
 

@@ -2763,7 +2763,9 @@
     clearAutoPath()
     let xpLoss = 0, maxHpLoss = 0
     if (!player.permadeath) {
-      xpLoss = Math.min(200, Math.max(20, Math.ceil(Math.max(0, player.xp) * 0.1)))
+      const earnedXp = Math.max(0, player.totalXpEarned)
+      const calculatedLoss = Math.min(200, Math.max(20, Math.ceil(earnedXp * 0.1)))
+      xpLoss = player.lvl === 1 ? Math.min(Math.max(0, player.xp), calculatedLoss) : calculatedLoss
       player.xp -= xpLoss
       maxHpLoss = Math.min(player.maxHp - 1, player.lvl <= 4 ? 1 : 2)
       player.maxHp -= maxHpLoss
