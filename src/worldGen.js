@@ -2490,9 +2490,12 @@ function assignVillageHutNames() {
     mausoleumHutPos = {x: mausoleumHut.x, y: mausoleumHut.y}
   }
 
-  // Every remaining hut gets a normal random human name.
+  // Draw without replacement, so even duplicate entries in the name list
+  // cannot give two peasants the same name. Keep the odd tombstone name reserved.
+  const availableNames = [...new Set(HUMAN_NAMES)].filter(name => name !== oddName)
   for (let i = 1; i < villageHuts.length; i++) {
-    villageHuts[i].name = pick(HUMAN_NAMES)
+    if (!availableNames.length) throw new Error('Not enough unique human names for the village huts.')
+    villageHuts[i].name = availableNames.splice(randInt(0, availableNames.length - 1), 1)[0]
   }
   // Keep the Black Key hut's special inspection separate. The selected
   // ordinary hut holds one fixed improvised weapon until it is claimed.

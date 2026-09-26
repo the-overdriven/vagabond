@@ -625,8 +625,10 @@ one village hut gets the exact same name
 that hut is marked mausoleum=true
 ```
 
-The remaining huts receive random names from `HUMAN_NAMES`. The odd-name hut is
-not selected by a later random roll and must not be replaced by a guessed
+The remaining huts receive unique random names drawn without replacement from
+`HUMAN_NAMES` (duplicate entries in the source list count only once). The odd
+tombstone name is reserved and cannot be assigned to an ordinary hut. The
+odd-name hut is not selected by a later random roll and must not be replaced by a guessed
 central/nearest hut. This relationship is established during world creation
 and remains fixed for the lifetime of the world.
 
@@ -1391,8 +1393,8 @@ pathfinding, and chase rules still apply. A bystander newly Alarmed by the
 sound of a hit logs `<name> is alarmed by the sounds of the battle.` only when
 visible in the main view at activation. The struck monster and a monster that
 first spots the player do not log a separate Alarmed message. Monsters obscured
-by underground field of view or outside the viewport still become Alarmed silently; 
-revealing them later does not produce a delayed message. More hits do not stack the bonus
+by underground field of view or outside the viewport still become Alarmed silently; revealing
+them later does not produce a delayed message. More hits do not stack the bonus
 or repeat the line during the same activation. The tooltip shows a red
 `Alarmed (AGGRO +1)` label and the glyph has a white `!` in its top right corner. If a
 monster also has a victory skull, the `!` shifts left so both remain visible.
@@ -1835,6 +1837,7 @@ Armor
 A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
+Equipment swap messages name the previously equipped item before the new item in one log line; equipping a two-handed weapon also names the shield it removes.
 
 If the player has no weapon, looted weapons are automatically equipped.
 
@@ -2395,7 +2398,8 @@ wander normally. A hit on a surviving enemy, even a zero-damage glancing hit,
 provokes exactly one immediate reaction instead of that enemy's wander action
 for the turn. A miss causes no reaction; evasive enemies cannot use their
 special dodge against an invisible attacker. An enemy killed by the attack
-cannot react. A single roll gives 10% confusion (no action), then a flee chance of
+cannot react. A single roll gives
+10% confusion (no action), then a flee chance of
 `clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
 On a flee result the enemy moves one tile to an open walkable neighbor,
 preferring maximum distance from the player; if no tile is available, it stays
@@ -2590,6 +2594,7 @@ Other generated quest types include:
 Kill quests are restricted to eligible prefixed monsters, while item quests are generated from living eligible enemies or qualifying ground items. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
+The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer) and whenever his quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after completion. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
 
 </details>
 
