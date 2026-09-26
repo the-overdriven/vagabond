@@ -1836,12 +1836,15 @@ Armor
 
 Inventory and merchant gear icons are 24×24 transparent SVGs in `img/icons/`.
 Weapons, shields, and armor prefer a file named exactly after their base item
-(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Armor.svg`). Magic prefixes do
+(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do
 not affect the icon lookup because generated gear retains its unmodified
 `base` name. A missing or unknown specific SVG falls back to the existing
 `weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
-kind-based icons. The listed base gear icons are preloaded for offline use.
-This changes only presentation, not gear stats or loot odds.
+kind-based icons. Failed gear-specific icon paths are remembered for the current
+session, so repeated inventory/trade redraws use the generic fallback immediately
+instead of repeatedly retrying a missing SVG and visibly blinking. The listed
+base gear icons are preloaded for offline use. This changes only presentation,
+not gear stats or loot odds.
 
 A two-handed weapon prevents shield use.
 
@@ -1881,10 +1884,10 @@ Current base weapons include:
 | War Hammer | 4 | 11 | 1 | Yes |
 | Two-handed Axe | 4 | 12 | 1 | Yes |
 | Katana | 4 | 9 | 4 | Yes |
-| Chain-sickle | 5 | 9 | 2 | Yes |
-| Bone Cleaver | 5 | 11 | 1 | No |
-| Giant Sword | 5 | 14 | 2 | Yes |
-| Kanabo Club | 5 | 13 | 1 | Yes |
+| Chain-sickle | 5 | 9 | 3 | Yes |
+| Bone Cleaver | 5 | 11 | 2 | No |
+| Giant Sword | 5 | 14 | 1 | Yes |
+| Kanabo Club | 5 | 13 | 2 | Yes |
 | Crescent Blades | 5 | 11 | 5 | Yes |
 | Titan Warpick | 5 | 16 | 1 | Yes |
 
@@ -1900,7 +1903,7 @@ Bone Cleaver (one-handed) and Titan Warpick (two-handed) extend tier 5's
 heavy weapon choices. War Sickle is a two-handed tier-4 finesse weapon;
 Chain Whip is a one-handed tier-4 alternative. Chain-sickle represents a
 kusarigama wielded with both hands and is deliberately a weaker novelty
-in the tier-5 pool (9 ATK, 2 GRACE).
+in the tier-5 pool (9 ATK, 3 GRACE).
 All five use ordinary ATK/GRACE combat and existing tier-based selection.
 Their silhouettes and themes do not grant armour piercing, parry bypass,
 additional hits, reach, or new damage types. Higher GRACE only affects the
@@ -1922,8 +1925,8 @@ Current shields:
 | Kite Shield | 3 | 6 |
 | Spiked Shield | 3 | 7 |
 | Bone Shield | 4 | 8 |
-| Royal Shield | 5 | 9 |
 | Tower Shield | 4 | 10 |
+| Royal Shield | 5 | 9 |
 
 Shield SPD penalty:
 

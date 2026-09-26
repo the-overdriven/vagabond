@@ -741,6 +741,7 @@
 
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
+  const failedImagePaths = new Set()
 
   // Purely visual toggle: false forces every image-backed visual to fall back
   // to its existing ASCII glyph. No turn is consumed and game state is unchanged.
@@ -856,7 +857,9 @@
         await image.decode()
         preloadedImageUrls.set(path, url)
         preloadedImages.set(path, image)
+        failedImagePaths.delete(path)
       } catch (err) {
+        failedImagePaths.add(path)
         console.warn(err.message)
       }
     }))
@@ -3699,17 +3702,27 @@
     'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
   ]
 
+  function itemIconFallback(img, specificPath, fallbackPath) {
+    failedImagePaths.add(specificPath)
+    img.onerror = null
+    img.src = imageSrc(fallbackPath)
+  }
+
   function itemIconHTML(item) {
     const kind = item?.kind
     if (!ITEM_ICON_KINDS.includes(kind)) return ''
-    const fallback = imageSrc('img/icons/' + kind + '.svg')
+    const fallbackPath = 'img/icons/' + kind + '.svg'
+    const fallback = imageSrc(fallbackPath)
     const base = ['weapon', 'armor', 'shield'].includes(kind) ? (item.base || item.name) : null
     // Gear keeps its unmodified base name even when it has a magic prefix.
-    // An unknown base or a missing SVG falls back to the original kind icon.
-    const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
-      ? imageSrc('img/icons/' + base + '.svg') : null
+    // Remember missing specific SVGs so repeated inventory redraws use the
+    // generic kind icon immediately instead of flashing a broken image first.
+    const specificPath = base && /^[A-Za-z0-9 -]+$/.test(base)
+      ? 'img/icons/' + base + '.svg' : null
+    const specific = specificPath && !failedImagePaths.has(specificPath)
+      ? imageSrc(specificPath) : null
     return specific
-      ? `<img src="${specific}" onerror="this.onerror=null;this.src='${fallback}'" alt="" aria-hidden="true">`
+      ? `<img src="${specific}" onerror="itemIconFallback(this, '${specificPath}', '${fallbackPath}')" alt="" aria-hidden="true">`
       : `<img src="${fallback}" alt="" aria-hidden="true">`
   }
 
