@@ -12,14 +12,14 @@
       "glyph": "~"
     },
     "coffin": {
-      "glyph": "\u26b0",
+      "glyph": "⚰",
       "color": "#aaa39a",
       "bg": "#171412",
       "image": "img/tiles/coffin.png",
       "scale": 1
     },
     "grassTree": {
-      "glyph": "\u2663",
+      "glyph": "♣",
       "color": "#164c23",
       "image": "img/tiles/grassland-tree.png",
       "scale": 1,
@@ -28,6 +28,15 @@
         0.92,
         0.96,
         1.0
+      ],
+      "variants": [
+        "img/tiles/grassland-tree-acacia.png",
+        "img/tiles/grassland-tree-thorny-acacia.png",
+        "img/tiles/grassland-tree-banyan.png",
+        "img/tiles/grassland-tree-windblown.png",
+        "img/tiles/grassland-tree-dead-1.png",
+        "img/tiles/grassland-tree-dead-2.png",
+        "img/tiles/grassland-tree-dead-3.png"
       ]
     },
     "foragedForest": {
@@ -48,14 +57,14 @@
       "scale": 1
     },
     "deadbody": {
-      "glyph": "\u2620",
+      "glyph": "☠",
       "color": "rgb(232, 162, 79)",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
     },
     "playerremains": {
-      "glyph": "\u2576\u2620\u2574",
+      "glyph": "╶☠╴",
       "color": "#e8a24f",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
@@ -67,32 +76,32 @@
       "scale": 1
     },
     "skeleton": {
-      "glyph": "\u2576\u2620\u2574",
+      "glyph": "╶☠╴",
       "color": "#d0d0c0",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
     },
     "wheelbarrow": {
-      "glyph": "\u25b1",
+      "glyph": "▱",
       "color": "#b8b8b8",
       "image": "img/tiles/wheelbarrow.png",
       "scale": 1
     },
     "goldcoin": {
-      "glyph": "\u25cf",
+      "glyph": "●",
       "color": "#f0c84b",
       "image": "img/tiles/huge-gold-coin.png",
       "scale": 1
     },
     "dwarvenremains": {
-      "glyph": "\u00a4",
+      "glyph": "¤",
       "color": "#d0c7b4",
       "image": "img/tiles/dwarven-remains.png",
       "scale": 1
     },
     "anvil": {
-      "glyph": "\u2660",
+      "glyph": "♠",
       "color": "#9d9d9d",
       "image": "img/tiles/anvil.png",
       "scale": 1
@@ -122,17 +131,17 @@
       "scale": 1.1
     },
     "gear": {
-      "glyph": "\u2020",
+      "glyph": "†",
       "color": "#c9b37a"
     },
     "ruinprop": {
-      "glyph": "\u00a4",
+      "glyph": "¤",
       "color": "#a89270",
       "image": "img/tiles/dwarven-remains.png",
       "scale": 1
     },
     "explorerremains": {
-      "glyph": "\u2620",
+      "glyph": "☠",
       "color": "#d0d0c0",
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
@@ -197,11 +206,11 @@
     "cave": "#ff6b2e",
     "brownCave": "#805940",
     "dwarvenFort": {
-      "glyph": "\u265c",
+      "glyph": "♜",
       "color": "#e8b85b"
     },
     "temple": {
-      "glyph": "\u2626",
+      "glyph": "☦",
       "color": "purple"
     },
     "player": "#e0473f",
