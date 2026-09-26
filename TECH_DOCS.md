@@ -3153,6 +3153,13 @@ Therefore:
 
 # 69. UI Controls
 
+On desktop, the XP bar displays `<current> / <needed> XP` centered inside the bar.
+The character statistics show steps alongside elapsed turns and list how many
+of the four world edges have been discovered, with their compass directions.
+Touch layouts retain their previous compact XP bar and steps row and omit the
+world-edge row. These are display-only changes; the underlying XP, turn and
+edge-reward rules are unchanged.
+
 Current desktop controls include:
 
 | Key | Action                                                         |
@@ -3215,6 +3222,7 @@ shrinks them. Lifting either finger suppresses a tap or one-finger row resize
 until the gesture ends. The full-map pinch continues to zoom the map only.
 
 The intent is to keep mobile gameplay rules equivalent to desktop rules.
+Walking uses an uncapped `requestAnimationFrame` loop for a 140 ms camera pan. The renderer redraws the viewport each frame, including terrain, items, and creatures. Occupied tree-canopy overlays now consider only entities near the visible viewport; offscreen entities cannot contribute to the current frame. This reduces per-frame world scans without changing visibility or turn timing. Frame pacing and canvas scaling on a specific phone still require device measurements to diagnose any remaining glyph shimmer.
 
 There is currently no mobile button for waiting (skipping the turn).
 

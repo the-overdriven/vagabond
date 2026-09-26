@@ -23,13 +23,10 @@
 - !1 feat: add prefix "Light" to weapons (grace +1)
 - !1 feat: all items should have a base cost in .json
 - !1 balance: temple should heal only until 50% HP, or 100% if lvl < 3
-- !1 feat: add turns next to steps taken
 - !1 feat: add Level Up! popup
 - !1 feat: add battle hammer (one-handed)
 - !1 feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
-- !1 feat: xp bar should show numbers and "xp" (on the bar, not next to it), desktop only
 - !1 feat: treasure map should be in sepia
-- !1 feat: discovered world edges - add to stats
 - !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - !1 feat: add achievments to stats: strongest monster killed
 - !1 feat: generate icons for different weapons and armor, axes, spears, etc.
@@ -223,6 +220,24 @@
       50% { opacity: 0.35; }
     }
 
+    #xpbartext { display: none; }
+    @media (pointer: fine) {
+      #xpbarwrap { position: relative; min-width: 112px; }
+      #xpbartext {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f9ecd0;
+        font-size: 10px;
+        font-weight: bold;
+        white-space: nowrap;
+        text-shadow: 0 1px 2px #090807, 1px 0 2px #090807;
+        pointer-events: none;
+      }
+    }
+
     .race-card img {
       object-fit: contain;
       image-rendering: auto;
@@ -250,6 +265,7 @@
     <div class="stat">
       <div id="xpbarwrap">
         <div id="xpbar"></div>
+        <span id="xpbartext"></span>
       </div>
     </div>
     <div class="stat">⚔️ATK <b id="hAtk"></b></div>
@@ -6036,14 +6052,19 @@
     {
       const canopyTiles = new Set()
       if (currentZ === 0) {
-        canopyTiles.add(keyXY(player.x, player.y))
+        // Only nearby occupied trees can overlap the viewport. Culling before
+        // building keys avoids processing every world entity on each walking frame.
+        const inCanopyView = (x, y) => x >= Math.floor(camX) - 1 &&
+          x <= Math.ceil(camX) + VIEW_W && y >= Math.floor(camY) - 1 &&
+          y <= Math.ceil(camY) + VIEW_H
+        if (inCanopyView(player.x, player.y)) canopyTiles.add(keyXY(player.x, player.y))
         for (const e of enemies) {
-          if (!onCurrentLevel(e) || !e.alive) continue
+          if (!onCurrentLevel(e) || !e.alive || !inCanopyView(e.x, e.y)) continue
           canopyTiles.add(keyXY(e.x, e.y))
         }
-        for (const n of npcs) canopyTiles.add(keyXY(n.x, n.y))
+        for (const n of npcs) if (inCanopyView(n.x, n.y)) canopyTiles.add(keyXY(n.x, n.y))
         for (const g of groundItems) {
-          if (!onCurrentLevel(g)) continue
+          if (!onCurrentLevel(g) || !inCanopyView(g.x, g.y)) continue
           if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
           if (g.kind === 'chest' && g.opened) continue
           canopyTiles.add(keyXY(g.x, g.y))
@@ -6912,7 +6933,9 @@
     document.getElementById('hpbar').style.width = Math.max(0, hpRatio * 100) + '%'
     document.getElementById('hpbarwrap').classList.toggle('low-hp', player.hp > 0 && hpRatio < 0.2)
     document.getElementById('hptext').textContent = player.hp + ' / ' + maxHp
-    document.getElementById('xpbar').style.width = Math.max(0, player.xp / xpToNext(player.lvl) * 100) + '%'
+    const xpNeeded = xpToNext(player.lvl)
+    document.getElementById('xpbar').style.width = Math.max(0, player.xp / xpNeeded * 100) + '%'
+    document.getElementById('xpbartext').textContent = `${player.xp} / ${xpNeeded} XP`
     document.getElementById('hAtk').textContent = playerAtk()
     document.getElementById('hDef').textContent = playerDef()
     document.getElementById('hSpd').textContent = playerSpd()
@@ -7030,7 +7053,12 @@
       // ['🍀 Magic Find', playerMf()],
       // ['💰 Gold', player.gold],
       // ['💀 Deaths', player.deaths],
-      ['👣 Steps Taken', player.steps],
+      ['👣 Steps Taken', IS_COARSE_POINTER ? player.steps : `${player.steps} · ${turnCount} turns`],
+      ...(!IS_COARSE_POINTER ? [[
+        '🧭 World Edges',
+        `${Object.values(worldEdgesReached).filter(Boolean).length}/4` +
+        ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge).join(', ') || 'none'})`
+      ]] : []),
       ['☠️ Creatures Slain', player.kills],
       ['📍 Position', player.x + ', ' + player.y],
     ]
