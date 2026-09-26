@@ -1842,9 +1842,12 @@ not affect the icon lookup because generated gear retains its unmodified
 `weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
 kind-based icons. Failed gear-specific icon paths are remembered for the current
 session, so repeated inventory/trade redraws use the generic fallback immediately
-instead of repeatedly retrying a missing SVG and visibly blinking. The listed
-base gear icons are preloaded for offline use. This changes only presentation,
-not gear stats or loot odds.
+instead of repeatedly retrying a missing SVG and visibly blinking. The equipped
+Weapon, Shield, and Armor rows in the inventory paper doll use the same icon
+lookup: equipped gear shows its specific base-item icon when available, while an
+empty slot shows the corresponding generic `weapon.svg`, `shield.svg`, or
+`armor.svg` icon. The listed base gear icons are preloaded for offline use. This
+changes only presentation, not gear stats or loot odds.
 
 A two-handed weapon prevents shield use.
 

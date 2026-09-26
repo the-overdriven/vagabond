@@ -201,6 +201,22 @@
       display: block;
     }
 
+    .paperdoll .slot .item-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+
+    .paperdoll .slot .item-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
     #hpbarwrap.low-hp {
       animation: lowHpWarning 0.85s steps(1, end) infinite;
     }
@@ -6974,9 +6990,19 @@
     return it.name + (line ? ' \u2022 ' + line : '')
   }
 
-  function setSlotLabel(element, item, fallback = '-') {
+  function setSlotLabel(element, item, fallback = '-', slotKind = null) {
     element.className = 'val' + (item && item.tier ? ' ' + tierColorClass(item.tier) : '')
-    element.textContent = item ? slotLabel(item) : fallback
+    element.textContent = ''
+
+    const iconSvg = itemIconHTML(item || (slotKind ? {kind: slotKind} : null))
+    if (iconSvg) {
+      const iconEl = document.createElement('span')
+      iconEl.className = 'item-icon'
+      iconEl.innerHTML = iconSvg
+      element.appendChild(iconEl)
+    }
+
+    element.appendChild(document.createTextNode(item ? slotLabel(item) : fallback))
   }
 
   function bestSlotIndexes(kind) {
@@ -7037,13 +7063,14 @@
     const race = raceDef()
     const charTitle = document.getElementById('charTitle')
     if (charTitle) charTitle.textContent = `${player.name} the ${race.name}`
-    setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon)
+    setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon, '-', 'weapon')
     setSlotLabel(
       document.getElementById('slotShield').querySelector('.val'),
       player.equip.shield,
-      player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-'
+      player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-',
+      'shield'
     )
-    setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor);
+    setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor, '-', 'armor');
     ['weapon', 'shield', 'armor'].forEach(slot => {
       const slotEl = document.getElementById('slot' + slot[0].toUpperCase() + slot.slice(1))
       const valueEl = slotEl.querySelector('.val')
