@@ -1836,7 +1836,7 @@ Armor
 
 Inventory and merchant gear icons are 24×24 transparent SVGs in `img/icons/`.
 Weapons, shields, and armor prefer a file named exactly after their base item
-(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do
+(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Armor.svg`). Magic prefixes do
 not affect the icon lookup because generated gear retains its unmodified
 `base` name. A missing or unknown specific SVG falls back to the existing
 `weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
@@ -1956,7 +1956,7 @@ Current armor:
 | Scale Armor | 4 | 13 | 1 |
 | Half Plate | 4 | 13 | 2 |
 | Bone Armor | 4 | 14 | 2 |
-| Plate Mail | 4 | 15 | 3 |
+| Plate Armor | 4 | 15 | 3 |
 | Chitin Armor | 5 | 16 | 1 |
 | Royal Armor | 5 | 17 | 3 |
 | Ancient Armor | 5 | 18 | 3 |

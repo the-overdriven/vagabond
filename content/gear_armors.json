@@ -15,7 +15,7 @@
   {"name":"Scale Armor",     "def":13, "tier":4, "speedPenalty":1},
   {"name":"Half Plate",      "def":13, "tier":4, "speedPenalty":2},
   {"name":"Bone Armor",      "def":14, "tier":4, "speedPenalty":2},
-  {"name":"Plate Mail",      "def":15, "tier":4, "speedPenalty":3},
+  {"name":"Plate Armor",      "def":15, "tier":4, "speedPenalty":3},
   {"name":"Chitin Armor",    "def":16, "tier":5, "speedPenalty":1},
   {"name":"Ancient Armor",   "def":18, "tier":5, "speedPenalty":3},
   {"name":"Royal Armor",     "def":17, "tier":5, "speedPenalty":3}
