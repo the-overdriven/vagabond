@@ -2608,7 +2608,7 @@
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null
       if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
-        const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` : 'the enemy'
+        const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` :  e.name
         log(`Your ${player.equip.weapon.name} outpaces ${enemyTimingText}, striking again!`, 'good')
         await playerAttackEnemy(e, true)
       }
