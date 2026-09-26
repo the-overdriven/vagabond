@@ -1103,6 +1103,7 @@ chase, never retaliate after being hit (including invisible attacks), and
 data-driven, so any current or future enemy with AGGRO 0 receives the same
 passive behavior automatically. `Fungus` should use AGGRO 0 and `wander: false`
 so it remains both harmless and stationary.
+Passive AGGRO 0 enemies cannot become Alarmed.
 
 Spawned enemies receive approximately 95%–105% random variance from template stats.
 
@@ -1362,6 +1363,34 @@ entering the normal aggro-range check.
 
 All explicit enemy-template aggro values were also increased by 1. Halfling
 reduces effective enemy detection range by 1.
+
+### Alarmed
+
+When the player lands a hit on a monster, each *other* living, nonpassive
+monster on the same map within 10 tiles of the struck monster becomes Alarmed.
+This uses Chebyshev distance (diagonal squares count as one), measured from
+the monster that was hit, not from the player. A miss or evade does not trigger
+the status. Sound needs no line of sight; a glancing hit, including zero damage,
+still counts as a hit. The struck monster itself does not become Alarmed from
+this event.
+
+Alarmed temporarily adds 1 to the monster's effective AGGRO range without
+changing its saved base AGGRO. Existing visibility, invisibility, Temple,
+pathfinding, and chase rules still apply. On the transition into Alarmed, the
+log says `<name> is alarmed by the sounds of the battle.` only when that monster
+is visible in the main view at activation. Monsters obscured by underground
+field of view or outside the viewport still become Alarmed silently; revealing
+them later does not produce a delayed message. More hits do not stack the bonus
+or repeat the line during the same activation. The tooltip shows a red
+`Alarmed` label and the glyph has a white `!` in its top right corner. If a
+monster also has a victory skull, the `!` shifts left so both remain visible.
+
+Alarmed ends when the player changes z level or map identity, or when the
+monster is more than 20 tiles from the player (Chebyshev distance). It can
+activate again after ending. The hit radius and clear distance are configured
+as `combat.alarmTriggerRange` (10) and `combat.alarmClearRange` (20) in
+`content/enemy_config.json`. Save version 16 stores each enemy's temporary
+Alarmed state and its originating level; older saves load without the status.
 
 An already-aware enemy standing on the outermost tile of its effective aggro
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
@@ -2967,7 +2996,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-13
+16
 ```
 
 Saves are JSON files.
@@ -3785,7 +3814,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 13).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 16).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -3808,8 +3837,8 @@ The mausoleum fix added `mausoleumHutPos` to normal saves as an additive field
 alongside `villageHuts` and `cemeteryTombstones`. That change did not itself
 require a save-version bump because older saves can continue to load without the
 field; the loader falls back to the existing odd-name relationship when
-possible. The current game save version is 13 for later compatibility changes,
-including explicit enemy `levelKind` persistence.
+possible. The current game save version is 16; subsequent versions also added
+per-enemy wandering state and temporary Alarmed status.
 
 ## Recorded actions
 

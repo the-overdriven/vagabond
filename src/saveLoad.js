@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 15 // v15 adds split home wander modes and per-enemy homeRadius; v14 preserves wander mode/far destination
+const SAVE_VERSION = 16 // v16 saves temporary monster Alarmed status; v15 adds split home wander modes and per-enemy homeRadius
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -168,6 +168,9 @@ function buildSaveObject() {
       prefixBase: e.prefixBase || null,
       crit: !!e.crit,
       aware: !!e.aware,
+      alarmed: !!e.alarmed,
+      alarmedZ: e.alarmed ? e.alarmedZ : null,
+      alarmedLevelKind: e.alarmed ? e.alarmedLevelKind : null,
       homeX: e.homeX,
       homeY: e.homeY,
       wander: enemyWanderMode(e),
@@ -601,6 +604,9 @@ function loadGameFromObject(data, opts = {}) {
       equipment: e.equipment || null,
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
       prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,
+      alarmed: !!e.alarmed && (typeof e.aggro !== 'number' || e.aggro !== 0),
+      alarmedZ: Number.isInteger(e.alarmedZ) ? e.alarmedZ : null,
+      alarmedLevelKind: typeof e.alarmedLevelKind === 'string' ? e.alarmedLevelKind : null,
       homeX: e.homeX, homeY: e.homeY,
       wander: Object.prototype.hasOwnProperty.call(e, 'wander')
         ? (e.wander === 'home' ? 'homeReanchored' : e.wander)

@@ -666,6 +666,8 @@
     ENEMY_PREFIXES = content.enemyPrefixes
     ATTACK_RANGE = content.enemyConfig.combat.attackRange
     AGGRO_RANGE = content.enemyConfig.combat.defaultAggroRange
+    ALARM_TRIGGER_RANGE = content.enemyConfig.combat.alarmTriggerRange ?? 10
+    ALARM_CLEAR_RANGE = content.enemyConfig.combat.alarmClearRange ?? 20
     OUTER_AGGRO_GIVE_UP_CHANCE = content.enemyConfig.combat.outerAggroGiveUpChance ?? 0.3
     BASE_CRIT_CHANCE = content.enemyConfig.combat.baseCriticalHitChance ?? 0.05
     FIERCE_CRIT_CHANCE = content.enemyConfig.combat.fierceCriticalHitChance ?? 0.10
@@ -2579,6 +2581,7 @@
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     e.hp -= dmg
+    alarmEnemiesNearHit(e)
     if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
     if (glancing) {
@@ -2939,6 +2942,32 @@
     return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE
   }
 
+  function alarmEnemiesNearHit(target) {
+    for (const e of enemies) {
+      if (e === target || !e.alive || !onCurrentLevel(e) || enemyIsPassive(e) || e.alarmed) continue
+      if (Math.max(Math.abs(e.x - target.x), Math.abs(e.y - target.y)) > ALARM_TRIGGER_RANGE) continue
+      e.alarmed = true
+      e.alarmedZ = currentZ
+      e.alarmedLevelKind = currentLevelKind()
+      if (enemyIsVisibleOnMainView(e)) {
+        log(`${e.name} is alarmed by the sounds of the battle.`, 'bad')
+      }
+    }
+  }
+
+  function updateAlarmedEnemies() {
+    const levelKind = currentLevelKind()
+    for (const e of enemies) {
+      if (!e.alarmed) continue
+      if (e.alarmedZ !== currentZ || e.alarmedLevelKind !== levelKind ||
+        Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ALARM_CLEAR_RANGE) {
+        e.alarmed = false
+        e.alarmedZ = null
+        e.alarmedLevelKind = null
+      }
+    }
+  }
+
   // Halflings are overlooked: every enemy notices them one tile later. Kept
   // separate from enemyAggroRange() so the raw template value is what gets saved.
   function raceAggroMod() {
@@ -2947,7 +2976,7 @@
   }
 
   function effectiveAggroRange(e) {
-    return Math.max(1, enemyAggroRange(e) + raceAggroMod())
+    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 1 : 0) + raceAggroMod())
   }
 
   // Underground acquisition requires a clear ray through the map. Walls are
@@ -3431,6 +3460,7 @@
 
   function enemyTurn(reactedEnemy = null) {
     if (player.hp <= 0 || deathTransition) return
+    updateAlarmedEnemies()
     turnCount++
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
@@ -5649,6 +5679,7 @@
   }
 
   function render(now) {
+    updateAlarmedEnemies()
     now = now || performance.now()
     const undergroundVisible = currentUndergroundFov()
     let viewPlayerX = player.x
@@ -5848,6 +5879,19 @@
         ctx.fillStyle = '#e0473f'
         ctx.strokeText('☠︎', vx + TILE_PX * 0.78, vy + 1)
         ctx.fillText('☠︎', vx + TILE_PX * 0.78, vy + 1)
+        ctx.restore()
+      }
+
+      if (e.alarmed) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.lineWidth = 3
+        ctx.strokeStyle = '#180907'
+        ctx.fillStyle = '#ffffff'
+        ctx.strokeText('!', vx + TILE_PX * (e.victoryLevel ? 0.60 : 0.78), vy + 1)
+        ctx.fillText('!', vx + TILE_PX * (e.victoryLevel ? 0.60 : 0.78), vy + 1)
         ctx.restore()
       }
 
@@ -6139,7 +6183,7 @@
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
-      ${boostHtml}${critHtml}${equipmentHtml}
+      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>

@@ -2,6 +2,8 @@
   "combat": {
     "attackRange": 1,
     "defaultAggroRange": 4,
+    "alarmTriggerRange": 10,
+    "alarmClearRange": 20,
     "outerAggroGiveUpChance": 0.3,
     "criticalHitChance": 0.15,
     "baseCriticalHitChance": 0.05,
