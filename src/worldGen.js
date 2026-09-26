@@ -2101,6 +2101,8 @@ function caveScenarioIntro(z, x, y) {
 
 function spawnCaveScenarios() {
   let surfaceDeck = [], deepDeck = []
+  const fungusTopUpSites = []
+
   function nextScenario(level) {
     let deck = level === -1 ? surfaceDeck : deepDeck
     if (!deck.length) {
@@ -2181,15 +2183,14 @@ function spawnCaveScenarios() {
       addEnemy(e)
     }
 
-    // Ordinary caves always contain at least three passive Fungus. Two extra
-    // independent rolls make denser patches possible without making every cave
-    // identical. Reserve these tiles before chests and hostile mobs consume the
-    // remaining valid cave floor.
+    // Fungus can occur naturally in ordinary caves, but it is not guaranteed
+    // per cave. A world-wide minimum is enforced after all z:-1/z:-2 caves
+    // have been populated.
     const fungusTemplate = ENEMY_TEMPLATES.find(t => t.name === 'Fungus')
     if (fungusTemplate) {
-      let fungusCount = 3
-      if (chance(0.4)) fungusCount++
-      if (chance(0.4)) fungusCount++
+      let fungusCount = 0
+      if (chance(0.35)) fungusCount++
+      if (chance(0.15)) fungusCount++
       for (let i = 0; i < fungusCount; i++) {
         const spot = takeSpot('random')
         if (!spot) break
@@ -2275,6 +2276,13 @@ function spawnCaveScenarios() {
           kind: i % 2 === 0 ? 'potion' : 'scroll', level, levelKind: 'chain', caveIndex})
       }
     }
+
+    // Keep only leftover floor positions for the world-wide Fungus minimum.
+    // They are revalidated after every cave has populated because cave blobs can
+    // overlap in world coordinates.
+    for (const spot of open) fungusTopUpSites.push({
+      x: spot.x, y: spot.y, caveIndex, level, floorTile, cm
+    })
   }
 
   for (let i = 0; i < caveMaps.length; i++)
@@ -2283,6 +2291,37 @@ function spawnCaveScenarios() {
   const deep = deepLevels[0]
   if (deep) for (let i = 0; i < deep.caveMaps.length; i++)
     populate(deep.caves[i], deep.caveMaps[i], i, -2, 'cavefloor2')
+
+  // Guarantee at least three Fungus across the whole ordinary underground
+  // network, not three per cave. Natural cave rolls above may already satisfy
+  // the minimum; only top up the shortfall.
+  const fungusTemplate = ENEMY_TEMPLATES.find(t => t.name === 'Fungus')
+  if (fungusTemplate) {
+    let fungusCount = enemies.filter(e => e.alive && e.baseName === 'Fungus' &&
+      e.levelKind === 'chain' && (e.level === -1 || e.level === -2)).length
+
+    while (fungusCount < 3 && fungusTopUpSites.length) {
+      const siteIndex = randInt(0, fungusTopUpSites.length - 1)
+      const site = fungusTopUpSites.splice(siteIndex, 1)[0]
+      const sharedMap = site.level === -1 ? undergroundMap : deep?.map
+      if (!sharedMap || site.cm[site.y]?.[site.x] !== site.floorTile ||
+        sharedMap[site.y]?.[site.x] !== site.floorTile ||
+        enemies.some(e => e.alive && e.level === site.level && e.x === site.x && e.y === site.y) ||
+        groundItems.some(g => g.level === site.level && g.x === site.x && g.y === site.y)) continue
+
+      addEnemy({
+        name: fungusTemplate.name, baseName: fungusTemplate.name, tier: fungusTemplate.tier,
+        level: site.level, levelKind: 'chain', caveIndex: site.caveIndex,
+        hp: fungusTemplate.hp, maxHp: fungusTemplate.hp, atk: fungusTemplate.atk,
+        def: fungusTemplate.def, spd: fungusTemplate.spd, fly: !!fungusTemplate.fly,
+        humanoid: !!fungusTemplate.humanoid, evades: !!fungusTemplate.evades,
+        aggro: fungusTemplate.aggro ?? AGGRO_RANGE,
+        x: site.x, y: site.y, homeX: site.x, homeY: site.y,
+        homeTileType: site.floorTile, alive: true, prefix: null, equipment: null
+      })
+      fungusCount++
+    }
+  }
 }
 
 function guardedChestSpots(e, used, accept = () => true) {

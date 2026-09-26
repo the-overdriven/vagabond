@@ -914,13 +914,13 @@ spawns in a chamber far from the staircase; the stronger enemy is also placed
 away from it. These are in addition to the normal 11% prefix
 rolls and carry the same level and cave identity as the group.
 
-Every ordinary populated cave on **z:-1 and z:-2** also contains at least
-**3 Fungus** on valid cave floor. After the guaranteed three, two independent
-40% rolls may add one extra Fungus each, so a cave can begin with **3–5 Fungus**.
-Their positions are reserved before chests and hostile scenario mobs are placed,
-so normal population cannot consume the guaranteed Fungus spaces. Crypts,
-mausoleums, and the Dwarven Fort are not part of this generic cave population
-pass.
+Fungus can spawn naturally in ordinary caves on **z:-1 and z:-2**. Each
+populated cave gets an independent **35% chance for one Fungus** and a further
+**15% chance for a second**. After all ordinary caves are populated, the game
+counts underground Fungus across both levels and tops up random valid cave-floor
+positions until there are at least **3 Fungus total in the whole world's ordinary
+underground network**. This is a world-wide minimum, not a per-cave minimum.
+Crypts, mausoleums, and the Dwarven Fort are not used for this guarantee.
 
 | Deep scenario | Enemy group | Distinctive contents |
 |---|---|---|
