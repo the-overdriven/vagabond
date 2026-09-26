@@ -1842,12 +1842,19 @@ not affect the icon lookup because generated gear retains its unmodified
 `weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
 kind-based icons. Failed gear-specific icon paths are remembered for the current
 session, so repeated inventory/trade redraws use the generic fallback immediately
-instead of repeatedly retrying a missing SVG and visibly blinking. The equipped
-Weapon, Shield, and Armor rows in the inventory paper doll use the same icon
-lookup: equipped gear shows its specific base-item icon when available, while an
-empty slot shows the corresponding generic `weapon.svg`, `shield.svg`, or
-`armor.svg` icon. The listed base gear icons are preloaded for offline use. This
-changes only presentation, not gear stats or loot odds.
+instead of repeatedly retrying a missing SVG and visibly blinking. In the inventory
+paper doll, the icon immediately before each `WEAPON`, `SHIELD`, or `ARMOR`
+category label uses the same lookup: equipped gear shows its specific base-item
+icon when available, while an empty slot shows the corresponding generic
+`weapon.svg`, `shield.svg`, or `armor.svg`. The item-value row itself is text-only;
+gear icons are shown only before the category label, so the same icon is never
+displayed twice. The paper-doll equipment lookup uses optional/null-safe access
+for every slot so inventory rendering still works if the equipment object is
+absent or incomplete. Its weapon/shield/armor definitions are stored in an
+explicit local slot list before iteration; this avoids a leading-array expression
+after `setSlotLabel()` being parsed as property access through automatic semicolon
+insertion. The listed base gear icons are preloaded for offline use. This changes
+only presentation, not gear stats or loot odds.
 
 A two-handed weapon prevents shield use.
 

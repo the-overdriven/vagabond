@@ -331,15 +331,15 @@
         <button class="slbtn overlay-close" id="btnInvClose" type="button" aria-label="Close inventory">✕</button>
         <div class="paperdoll">
           <div class="slot" id="slotWeapon">
-            <div class="label">🗡️ Weapon</div>
+            <div class="label">Weapon</div>
             <div class="val">-</div>
           </div>
           <div class="slot" id="slotShield">
-            <div class="label">🛡️ Shield</div>
+            <div class="label">Shield</div>
             <div class="val">-</div>
           </div>
           <div class="slot" id="slotArmor">
-            <div class="label">🧥 Armor</div>
+            <div class="label">Armor</div>
             <div class="val">-</div>
           </div>
         </div>
@@ -6990,19 +6990,9 @@
     return it.name + (line ? ' \u2022 ' + line : '')
   }
 
-  function setSlotLabel(element, item, fallback = '-', slotKind = null) {
+  function setSlotLabel(element, item, fallback = '-') {
     element.className = 'val' + (item && item.tier ? ' ' + tierColorClass(item.tier) : '')
-    element.textContent = ''
-
-    const iconSvg = itemIconHTML(item || (slotKind ? {kind: slotKind} : null))
-    if (iconSvg) {
-      const iconEl = document.createElement('span')
-      iconEl.className = 'item-icon'
-      iconEl.innerHTML = iconSvg
-      element.appendChild(iconEl)
-    }
-
-    element.appendChild(document.createTextNode(item ? slotLabel(item) : fallback))
+    element.textContent = item ? slotLabel(item) : fallback
   }
 
   function bestSlotIndexes(kind) {
@@ -7018,7 +7008,7 @@
     const ranked = [...inventoryCandidates].sort((a, b) => compareEquipmentItems(a.it, b.it) || a.idx - b.idx)
     const winner = ranked[0]
     const winnerScore = equipmentSortValues(winner.it).sum
-    const equipped = player.equip[kind]
+    const equipped = player.equip?.[kind]
     if (equipped && winnerScore <= equipmentSortValues(equipped).sum) return new Set()
 
     // If multiple inventory items share the best score, don't let sorting
@@ -7063,17 +7053,38 @@
     const race = raceDef()
     const charTitle = document.getElementById('charTitle')
     if (charTitle) charTitle.textContent = `${player.name} the ${race.name}`
-    setSlotLabel(document.getElementById('slotWeapon').querySelector('.val'), player.equip.weapon, '-', 'weapon')
-    setSlotLabel(
-      document.getElementById('slotShield').querySelector('.val'),
-      player.equip.shield,
-      player.equip.weapon && player.equip.weapon.twoHanded ? '(wielding two-handed weapon)' : '-',
-      'shield'
-    )
-    setSlotLabel(document.getElementById('slotArmor').querySelector('.val'), player.equip.armor, '-', 'armor');
-    ['weapon', 'shield', 'armor'].forEach(slot => {
-      const slotEl = document.getElementById('slot' + slot[0].toUpperCase() + slot.slice(1))
+    const equipment = player?.equip ?? {}
+    const equippedItem = slot => equipment[slot] ?? null
+    const equippedWeapon = equippedItem('weapon')
+    const equippedShield = equippedItem('shield')
+    const equippedArmor = equippedItem('armor')
+
+    const equipmentSlots = [
+      {
+        slotId: 'slotWeapon', label: 'Weapon', kind: 'weapon', item: equippedWeapon, fallback: '-'
+      },
+      {
+        slotId: 'slotShield', label: 'Shield', kind: 'shield', item: equippedShield,
+        fallback: equippedWeapon?.twoHanded ? '(wielding two-handed weapon)' : '-'
+      },
+      {
+        slotId: 'slotArmor', label: 'Armor', kind: 'armor', item: equippedArmor, fallback: '-'
+      }
+    ]
+
+    equipmentSlots.forEach(({slotId, label, kind, item, fallback}) => {
+      const slotEl = document.getElementById(slotId)
+      if (!slotEl) return
+
+      const labelEl = slotEl.querySelector('.label')
+      if (labelEl) {
+        labelEl.innerHTML = `<span class="item-icon">${itemIconHTML(item ?? {kind})}</span>${label}`
+      }
+
       const valueEl = slotEl.querySelector('.val')
+      if (!valueEl) return
+      setSlotLabel(valueEl, item, fallback)
+
       let btn = valueEl.querySelector('.unequip-btn')
       if (!btn) {
         btn = document.createElement('button')
@@ -7081,10 +7092,10 @@
         btn.textContent = '✕'
         btn.title = 'Unequip'
         btn.setAttribute('aria-label', 'Unequip')
-        btn.onclick = () => unequipItem(slot)
+        btn.onclick = () => unequipItem(kind)
         valueEl.appendChild(btn)
       }
-      btn.hidden = !player.equip[slot]
+      btn.hidden = !item
     })
 
     const sg = document.getElementById('statGrid')
@@ -7261,7 +7272,7 @@
         row.appendChild(btn)
       } else if (it.kind === 'blackkey') {
         const btn = document.createElement('button')
-        btn.textContent = player.equip.blackkey ? 'Unequip' : 'Equip'
+        btn.textContent = equipment.blackkey ? 'Unequip' : 'Equip'
         btn.onclick = () => toggleBlackKey()
         row.appendChild(btn)
         const inspect = document.createElement('button')
