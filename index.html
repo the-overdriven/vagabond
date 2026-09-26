@@ -29,7 +29,6 @@
 - !1 feat: treasure map should be in sepia
 - !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - !1 feat: add achievments to stats: strongest monster killed
-- !1 feat: generate icons for different weapons and armor, axes, spears, etc.
 - !2 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - !2 feat: add friendly animals near the village (random)
 - !2 feat: add domesticated animals that protect against wild creatures, e.g. a cat attacking rats, bugs, and bats; a dog attacking wolves and goblins; a rare goat eating poisonous mushrooms; a sheep that can be sheared for wool to improve armor protection against cold
@@ -821,6 +820,8 @@
       for (const tmpl of ENEMY_TEMPLATES) paths.push('img/enemies/' + slug(tmpl.name) + '.jpg')
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
       for (const kind of ITEM_ICON_KINDS) paths.push('img/icons/' + kind + '.svg')
+      for (const gear of [...WEAPONS, ...SHIELDS, ...ARMORS])
+        paths.push('img/icons/' + gear.name + '.svg')
       if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
@@ -3698,10 +3699,18 @@
     'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
   ]
 
-  function itemIconHTML(kind) {
-    return ITEM_ICON_KINDS.includes(kind)
-      ? `<img src="${imageSrc('img/icons/' + kind + '.svg')}" alt="" aria-hidden="true">`
-      : ''
+  function itemIconHTML(item) {
+    const kind = item?.kind
+    if (!ITEM_ICON_KINDS.includes(kind)) return ''
+    const fallback = imageSrc('img/icons/' + kind + '.svg')
+    const base = ['weapon', 'armor', 'shield'].includes(kind) ? (item.base || item.name) : null
+    // Gear keeps its unmodified base name even when it has a magic prefix.
+    // An unknown base or a missing SVG falls back to the original kind icon.
+    const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
+      ? imageSrc('img/icons/' + base + '.svg') : null
+    return specific
+      ? `<img src="${specific}" onerror="this.onerror=null;this.src='${fallback}'" alt="" aria-hidden="true">`
+      : `<img src="${fallback}" alt="" aria-hidden="true">`
   }
 
   function isStackableKind(kind) {
@@ -7100,7 +7109,7 @@
       if (isBest) row.classList.add('best-slot')
       const cls = it.tier ? tierColorClass(it.tier) : ''
       const line = itemStatLine(it)
-      const iconSvg = itemIconHTML(it.kind)
+      const iconSvg = itemIconHTML(it)
       if (iconSvg) {
         const iconEl = document.createElement('span')
         iconEl.className = 'item-icon'
@@ -7413,7 +7422,7 @@
         const stackable = isStackableKind(it.kind)
         const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
         const line = itemStatLine(it)
-        const iconSvg = itemIconHTML(it.kind)
+        const iconSvg = itemIconHTML(it)
         if (iconSvg) {
           const iconEl = document.createElement('span')
           iconEl.className = 'item-icon'
@@ -7455,7 +7464,7 @@
       const stackable = isStackableKind(it.kind)
       const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
       const line = itemStatLine(it)
-      const iconSvg = itemIconHTML(it.kind)
+      const iconSvg = itemIconHTML(it)
       if (iconSvg) {
         const iconEl = document.createElement('span')
         iconEl.className = 'item-icon'

@@ -1834,6 +1834,15 @@ Shield
 Armor
 ```
 
+Inventory and merchant gear icons are 24×24 transparent SVGs in `img/icons/`.
+Weapons, shields, and armor prefer a file named exactly after their base item
+(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do
+not affect the icon lookup because generated gear retains its unmodified
+`base` name. A missing or unknown specific SVG falls back to the existing
+`weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
+kind-based icons. The listed base gear icons are preloaded for offline use.
+This changes only presentation, not gear stats or loot odds.
+
 A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
@@ -1851,23 +1860,52 @@ Current base weapons include:
 
 | Weapon | Tier | ATK | Grace | 2H |
 |---|---:|---:|---:|---|
-| Dagger | 1 | 1 | 5 | No |
-| Short Sword | 1 | 2 | 4 | No |
-| Club | 1 | 2 | 2 | No |
-| Rapier | 2 | 3 | 5 | No |
-| Staff | 2 | 4 | 2 | Yes |
-| Long Sword | 2 | 5 | 3 | No |
-| Scimitar | 2 | 5 | 4 | No |
-| Mace | 2 | 5 | 3 | No |
-| Scepter | 2 | 4 | 3 | No |
-| Spear | 2 | 5 | 2 | Yes |
-| Morning Star | 3 | 6 | 2 | No |
-| Lance | 3 | 7 | 2 | Yes |
-| Flail | 3 | 7 | 2 | No |
-| Two-handed Sword | 4 | 9 | 2 | Yes |
-| War Hammer | 4 | 10 | 1 | Yes |
-| Two-handed Axe | 4 | 11 | 1 | Yes |
-| Giant Sword | 5 | 13 | 1 | Yes |
+| Dagger | 1 | 2 | 5 | No |
+| Short Sword | 1 | 3 | 4 | No |
+| Club | 1 | 3 | 2 | No |
+| Rapier | 2 | 4 | 5 | No |
+| Staff | 2 | 5 | 2 | Yes |
+| Long Sword | 2 | 6 | 4 | No |
+| Scimitar | 2 | 6 | 4 | No |
+| Mace | 2 | 6 | 2 | No |
+| Scepter | 2 | 5 | 3 | No |
+| Spear | 2 | 6 | 2 | Yes |
+| One-handed Axe | 2 | 6 | 3 | No |
+| Sabre | 3 | 5 | 5 | No |
+| Morning Star | 3 | 7 | 2 | No |
+| Lance | 3 | 8 | 2 | Yes |
+| Flail | 3 | 8 | 2 | No |
+| Chain Whip | 4 | 7 | 4 | No |
+| War Sickle | 4 | 8 | 5 | Yes |
+| Two-handed Sword | 4 | 10 | 2 | Yes |
+| War Hammer | 4 | 11 | 1 | Yes |
+| Two-handed Axe | 4 | 12 | 1 | Yes |
+| Katana | 4 | 9 | 4 | Yes |
+| Chain-sickle | 5 | 9 | 3 | Yes |
+| Bone Cleaver | 5 | 11 | 2 | No |
+| Giant Sword | 5 | 14 | 1 | Yes |
+| Kanabo Club | 5 | 13 | 2 | Yes |
+| Crescent Blades | 5 | 11 | 5 | Yes |
+| Titan Warpick | 5 | 16 | 1 | Yes |
+
+Crescent Blades represent a matched pair equipped as one two-handed weapon:
+they occupy both hands and prevent shield use under the existing equipment rules.
+They do not add a separate dual-wield attack; extra attacks use the normal GRACE
+checks. Sabre is one-handed; Katana and Kanabo Club are two-handed.
+These four weapons use the existing tier-based gear selection and modifier rules.
+Their icons are named exactly after their base names in `img/icons/`, with
+the existing generic weapon icon fallback. No special weapon abilities are added.
+
+Bone Cleaver (one-handed) and Titan Warpick (two-handed) extend tier 5's
+heavy weapon choices. War Sickle is a two-handed tier-4 finesse weapon;
+Chain Whip is a one-handed tier-4 alternative. Chain-sickle represents a
+kusarigama wielded with both hands and is deliberately a weaker novelty
+in the tier-5 pool (9 ATK, 3 GRACE).
+All five use ordinary ATK/GRACE combat and existing tier-based selection.
+Their silhouettes and themes do not grant armour piercing, parry bypass,
+additional hits, reach, or new damage types. Higher GRACE only affects the
+existing combat timing and extra-attack rules. Each has a matching 24×24
+transparent SVG named exactly after its base name in `img/icons/`.
 
 ---
 
