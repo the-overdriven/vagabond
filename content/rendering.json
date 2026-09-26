@@ -195,7 +195,8 @@
     "attackRange": "rgba(224,71,63,0.40)",
     "aggroRange": "rgba(224,71,63,0.16)",
     "aggroRangeEdge": "rgba(224,71,63,0.08)",
-    "rangeOwnerOutline": "rgba(232,162,79,0.9)"
+    "rangeOwnerOutline": "rgba(232,162,79,0.9)",
+    "aggroRangeBoundary": "rgba(224,71,63,0.82)"
   },
   "depthLabel": {
     "background": "rgba(0,0,0,0.8)",
