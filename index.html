@@ -595,7 +595,7 @@
   let PLAYER_RACE_IMAGES = {}
   let RACE_SELECTION_IMAGES = {}
   let PLAYER_TERRAIN_BACKGROUNDS = {}
-  let ATTACK_RANGE, AGGRO_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
+  let ATTACK_RANGE, AGGRO_RANGE, ALARM_TRIGGER_RANGE, ALARM_CLEAR_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
@@ -768,7 +768,7 @@
   // Reuse one sprite in deterministic visual variants without consuming gameplay RNG.
   function coordinateVisualVariant(visual, x, y, salt = 0) {
     if (!visual || (!visual.mirrorX && !Array.isArray(visual.scaleVariants) &&
-        !Array.isArray(visual.variants))) return visual
+      !Array.isArray(visual.variants))) return visual
     let h = (Math.imul((x + salt) | 0, 374761393) + Math.imul((y - salt) | 0, 668265263)) | 0
     h = Math.imul(h ^ (h >>> 13), 1274126177)
     h = (h ^ (h >>> 16)) >>> 0
@@ -2992,7 +2992,7 @@
       if (twice < dx) { error += dx; y += sy }
       if (x === player.x && y === player.y) return true
       if (map[y]?.[x] === 'cavewall' || map[y]?.[x] === 'dwarvenwall' ||
-          map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
+        map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
     }
     return true
   }
@@ -3028,7 +3028,7 @@
       for (const [dx, dy] of DIRS8) {
         const x = e.x + dx, y = e.y + dy
         if (!isWalkable(x, y) || !enemyTileOpen(e, x, y) ||
-            (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
         const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
         if (distance > bestDistance) {
           options.length = 0
@@ -5716,7 +5716,7 @@
       for (let vx = 0; vx < renderCols; vx++) {
         const mx = baseMapX + vx, my = baseMapY + vy
         if (undergroundVisible && !undergroundVisible.has(keyXY(mx, my)) &&
-            !undergroundDiscovered?.[my]?.[mx]) continue
+          !undergroundDiscovered?.[my]?.[mx]) continue
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
@@ -6334,7 +6334,7 @@
   let wheelZoomAccum = 0, wheelZoomLast = 0
   canvas.addEventListener('wheel', (ev) => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey || raceOpen || replayPlaying ||
-        mapOpen || invOpen || tradeOpen || treasureMapOpen || !ev.deltaY) return
+      mapOpen || invOpen || tradeOpen || treasureMapOpen || !ev.deltaY) return
     ev.preventDefault()
     const delta = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? canvas.clientHeight : 1)
     if (ev.timeStamp - wheelZoomLast > 250 || (wheelZoomAccum && Math.sign(wheelZoomAccum) !== Math.sign(delta)))
@@ -6659,8 +6659,8 @@
   function currentUndergroundFov() {
     if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||
-        undergroundFovCache.discovered !== undergroundDiscovered ||
-        undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
+      undergroundFovCache.discovered !== undergroundDiscovered ||
+      undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
       const visible = UndergroundFov.compute(map, player.x, player.y)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
@@ -8000,7 +8000,7 @@
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
-        (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
+      (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()
       changeTileSize(k === '+' || ev.code === 'NumpadAdd' ? 1 : -1)
       return

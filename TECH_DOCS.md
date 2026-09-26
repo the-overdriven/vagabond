@@ -1398,6 +1398,8 @@ activate again after ending. The hit radius and clear distance are configured
 as `combat.alarmTriggerRange` (10) and `combat.alarmClearRange` (20) in
 `content/enemy_config.json`. Save version 16 stores each enemy's temporary
 Alarmed state and its originating level; older saves load without the status.
+Both alarm ranges have explicit runtime bindings initialized by `loadContent()`
+before gameplay starts; a missing binding prevents content loading in strict mode.
 
 An already-aware enemy standing on the outermost tile of its effective aggro
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
