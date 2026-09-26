@@ -14,9 +14,6 @@
 - monster ability: wrestler: swaps places with enemy. lifesteal: probably quickest to implement. coward: runs away at low HP.
 - fix: collapsing only both side popups enlarges the canvas, not only side map
 
-- fix: selecting peasant name should remove name from the random pull to prevent duplicates
-- fix: quest givers should be marked more clearly
-
 - mysteriando: digging grave can do sth
 - fov: add light sources (like torches to increase pov, or light scrolls)
 - items: scroll of chaos (teleports everyone in 8 radius to random tiles)
@@ -33,7 +30,6 @@
 - !1 feat: xp bar should show numbers and "xp" (on the bar, not next to it), desktop only
 - !1 feat: treasure map should be in sepia
 - !1 feat: discovered world edges - add to stats
-- !1 feat: You equip the... should also say what you UNEQUIP first (in same line)
 - !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - !1 feat: add achievments to stats: strongest monster killed
 - !1 feat: generate icons for different weapons and armor, axes, spears, etc.
@@ -2091,10 +2087,28 @@
     if (i >= 0) player.inventory.splice(i, 1)
   }
 
+  function hunterHasDeliveryItem(q) {
+    return player.inventory.some(item => item && (
+      (q.id && item.hunterQuestId === q.id) ||
+      (q.targetItem && item === q.targetItem) ||
+      item.name === q.targetItemName || item.base === q.targetItemName
+    ))
+  }
+
+  function hunterQuestReadyToTurnIn(q) {
+    if (!q || !['active', 'ready'].includes(q.state)) return false
+    if (q.type === 'recover_item' || q.type === 'deliver_item') return hunterHasDeliveryItem(q)
+    return q.state === 'ready'
+  }
+
+  function oldHunterHasNewDialogue() {
+    return !oldHunterQuest || hunterQuestReadyToTurnIn(oldHunterQuest)
+  }
+
   function interactOldHunter() {
     recordReplayAction({type:'talk', npc:'Old Hunter'})
     freezeNpcFromWandering(npcs.find(n => n.name === 'Old Hunter'))
-    if (oldHunterQuest?.state === 'ready') {
+    if (hunterQuestReadyToTurnIn(oldHunterQuest)) {
       const q = oldHunterQuest
       removeHunterQuestItem(q)
       log(hunterCompletionFlavor(q), 'info')
@@ -2107,7 +2121,7 @@
       log(`Old Hunter says: Thank you again for dealing with that matter.`, 'info')
       return true
     }
-    if (oldHunterQuest?.state === 'active') {
+    if (oldHunterQuest?.state === 'active' || oldHunterQuest?.state === 'ready') {
       log(hunterActiveFlavor(oldHunterQuest), 'info')
       return true
     }
@@ -5941,6 +5955,18 @@
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       drawSwimmingCreature(vx, vy, () => drawCreature(vx, vy, RENDER_STYLE.npc.glyph === 'initial' ? n.name[0] : RENDER_STYLE.npc.glyph, RENDER_STYLE.npc.color))
+      if (n.name === 'Old Hunter' && oldHunterHasNewDialogue()) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.lineWidth = 3
+        ctx.strokeStyle = '#180907'
+        ctx.fillStyle = '#ffffff'
+        ctx.strokeText('!', vx + TILE_PX * 0.78, vy + 1)
+        ctx.fillText('!', vx + TILE_PX * 0.78, vy + 1)
+        ctx.restore()
+      }
     }
     // planned movement path, or the route a desktop click would use
     const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
@@ -6225,7 +6251,7 @@
       <img src="${imageSrc(`img/npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${n.name}</div>
-      ${n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
+      ${n.name === 'Old Hunter' ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to talk</div>' : n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
       </div>`
       }
     }
@@ -7565,14 +7591,15 @@
     player.equip[slot] = it
     player.inventory.splice(idx, 1)
     if (old) player.inventory.push(old)
+    const equipLead = old ? `You unequip the ${old.name} and equip` : 'You equip'
 
     if (slot === 'weapon' && it.twoHanded && player.equip.shield) {
       const oldShield = player.equip.shield
       player.equip.shield = null
       player.inventory.push(oldShield)
-      log(`You equip the ${it.name} and remove the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, 'good')
+      log(`${equipLead} the ${it.name}, removing the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, 'good')
     } else {
-      log(`You equip the ${it.name}.${statDeltaText(before)}`, 'good')
+      log(`${equipLead} the ${it.name}.${statDeltaText(before)}`, 'good')
     }
     consumeItemTurn()
   }
