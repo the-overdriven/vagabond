@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<defs>
+<pattern id="quilting" width="4" height="4" patternUnits="userSpaceOnUse">
+<path d="m0 2 2-2 2 2-2 2Z" fill="none" stroke="#321e26" stroke-width=".55"/>
+<path d="m.5 2 1.5-1.5L3.5 2" fill="none" stroke="#99616a" stroke-width=".3"/>
+</pattern>
+</defs>
+<g stroke="#262326" stroke-width=".65" stroke-linejoin="round" stroke-linecap="round">
+<path d="M7 4 3 5 1 13l1 7h3l2-10h10l2 10h3l1-7-2-8-4-1Z" fill="#592b38"/>
+<path d="m3 7-1 6 3 1 2-6m10 0 2 6 3-1-1-6" fill="url(#quilting)" stroke="none"/>
+<path d="m8 3 4 2 4-2 3 5-2 7 3 6-7 2-1-4-1 4-7-2 3-6-2-7Z" fill="#783747"/>
+<path d="m12 5 4-2 3 5-2 7 3 6-7 2-1-4Z" fill="#562833" stroke="none"/>
+<path d="m8 3 4 2 4-2 3 5-2 7 3 6-7 2-1-4-1 4-7-2 3-6-2-7Z" fill="url(#quilting)" stroke="none"/>
+<path d="M12 5v14l1 4m-8-2 6 2m2 0 6-2" fill="none" stroke="#8e8070" stroke-width=".7"/>
+<path d="m9 1 3 1 3-1 1 4-4 2-4-2Z" fill="#45433d"/>
+<path d="M9 1q3 2 6 0l-1 3-2 1-2-1Z" fill="#211f20"/>
+<path d="m8 3-3 1-2 1-2 3 2-.5-.5 2 2-1 .5 1.5 1-2 1 1 1-3 1-1Zm8 0 3 1 2 1 2 3-2-.5.5 2-2-1-.5 1.5-1-2-1 1-1-3-1-1Z" fill="#666052"/>
+<path d="m3 6 2-1-1 2m2-2 1-.5-.5 2M21 6l-2-1 1 2m-2-2-1-.5.5 2" fill="none" stroke="#a19780" stroke-width=".5"/>
+<path d="m10 8-1 1 1 1h4l1-1-1-1Zm0 3-1 1 1 1h4l1-1-1-1Z" fill="#77776b"/>
+<path d="M11 8.5h2m-2 3h2" stroke="#bab49c" stroke-width=".45"/>
+<path d="M7 14h10v2H7Z" fill="#493a30"/>
+<path d="M10 14h3v2h-3Z" fill="none" stroke="#b4a17c" stroke-width=".7"/>
+<path d="m10 16 1 5 1-1-.5-4Z" fill="#493a30"/>
+<path d="m1.5 14 4 .5-.5 5.5H2Zm17 .5 4-.5-.5 6h-3Z" fill="#493a32"/>
+<path d="m2 15 3 .5M2 18h2.5m15-2.5 3-.5m-3 3h2.5" fill="none" stroke="#8c7963" stroke-width=".45"/>
+</g></svg>

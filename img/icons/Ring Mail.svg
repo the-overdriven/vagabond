@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<defs><pattern id="rings" width="3.5" height="3.5" patternUnits="userSpaceOnUse"><circle cx="1.75" cy="1.75" r="1.2" fill="none" stroke="#bac1bc" stroke-width=".65"/><path d="M1 2.5h1" stroke="#606a70" stroke-width=".4"/></pattern></defs>
+<path d="m8 3 2 2h4l2-2 4 3 3 6-4 2-2-4 1 12H6l1-12-2 4-4-2 3-6Z" fill="#5b4940" stroke="#302e2c" stroke-width=".7" stroke-linejoin="round"/>
+<path d="m8 3 2 2h4l2-2 4 3 3 6-4 2-2-4 1 12H6l1-12-2 4-4-2 3-6Z" fill="url(#rings)"/>
+<path d="m8 3 2 2h4l2-2M6 21h12" fill="none" stroke="#a68b68" stroke-width="1"/>
+<path d="M7 16h10v2H7Z" fill="#624532" stroke="#302e2c" stroke-width=".6"/><path d="M11 16h2v2h-2Z" fill="none" stroke="#c3ad76" stroke-width=".65"/>
+</svg>

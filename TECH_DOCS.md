@@ -1941,7 +1941,7 @@ Current armor:
 | Tunic | 1 | 4 | 0 |
 | Leather Armor | 2 | 6 | 0 |
 | Studded Leather | 2 | 7 | 0 |
-| Chain Mail | 3 | 9 | 0 |
+| Hauberk | 3 | 9 | 0 |
 | Brass Armor | 2 | 10 | 3 |
 | Splint Mail | 3 | 11 | 1 |
 | Scale Armor | 4 | 13 | 1 |

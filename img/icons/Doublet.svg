@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<g stroke="#65513b" stroke-width=".6" stroke-linejoin="round" stroke-linecap="round">
+<path d="M8 5 4 6Q0 8 2 15l1 5h3l1-8h10l1 8h3l1-5q2-7-2-9l-4-1Z" fill="#c8ad7c"/>
+<path d="M4 7q-2 4 0 8M6 7q-1 4 0 7M20 7q2 4 0 8M18 7q1 4 0 7M2 15l4 1M18 16l4-1" fill="none" stroke="#f0d9a7"/>
+<path d="m7 17-1 4 4 1 2-2 2 2 4-1-1-4Z" fill="#ac8b5b"/>
+<path d="M8 4h8l2 5-1 4q3 6-5 8-8-2-5-8L6 9Z" fill="#ddc391"/>
+<path d="M9 5 8 12m3-6-1 7m3-7 1 7m1-8 1 7M8 8l8 3M8 11l8-3M12 6v14" fill="none" stroke="#a88b5f" stroke-width=".45"/>
+<path d="m8 5-1-3 2-1 1 1 2-1 2 1 1-1 2 1-1 3-4 1Z" fill="#f5e4ba"/>
+<path d="m9 2 1 2m2-2v2m3-2-1 2M2 20l1-1 1 1 1-1 1 2H2Zm16 1 1-2 1 1 1-1 1 1v1Z" fill="#f5e4ba"/>
+<path d="M12 13q-4-3-3 0l3 1q4-4 3-1l-3 1m0 0-2 3m2-3 2 3" fill="none"/>
+<g fill="#886b40" stroke="none"><circle cx="12" cy="7" r=".5"/><circle cx="12" cy="9" r=".5"/><circle cx="12" cy="11" r=".5"/></g>
+<path d="M8 15q-1 3 2 4" fill="none" stroke="#f5e4ba"/>
+</g></svg>

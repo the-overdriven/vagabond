@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<defs><pattern id="plates" width="3" height="4" patternUnits="userSpaceOnUse"><path d="M.2.2h2.6v3l-1.3.6-1.3-.6Z" fill="#90988b" stroke="#38433e" stroke-width=".45"/><path d="m.8 1 1.4 1m0-1L.8 2" stroke="#dfc698" stroke-width=".5"/></pattern></defs>
+<g stroke="#393b33" stroke-width=".65" stroke-linejoin="round">
+<path d="m8 3 4 2 4-2 5 3 2 6-5 1-1-3 2 12-7 1-7-1 2-12-1 3-5-1 2-6Z" fill="#6f493b"/>
+<path d="M7 5h10v11H7Zm-3 1h3v6H2Zm13 0h3l2 6h-5ZM6 17h12l1 5H5Z" fill="url(#plates)"/>
+<path d="m8 2 4 2 4-2v3l-4 2-4-2Z" fill="#90988b"/>
+<path d="M6 15h12v2H6Z" fill="#8b4939"/><path d="M11 15h2v2h-2Z" fill="#cab37c"/>
+<path d="M12 18v4" fill="none"/>
+</g></svg>
