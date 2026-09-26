@@ -1370,7 +1370,7 @@ Enemy templates may define `wander` individually:
 | `"homeReanchored"` | Randomly wanders using the existing global leash/radius. If a chase carries it beyond the leash, its post-chase position becomes the new home anchor, preserving the original wandering behavior. |
 | `"homeReturn"` | Randomly wanders within its home radius, but keeps its original home anchor. If a chase carries it beyond that radius, idle behavior actively paths it back toward home until it is inside the leash again. |
 | `"roam"` | Uses the normal random-wander chance but ignores the home leash, so it may gradually travel anywhere its terrain movement allows. |
-| `"far"` | Picks a reachable random walkable tile on the opposite side of the current map and actively paths toward it every idle turn. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed until reached or invalidated, then another opposite-side destination is chosen. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
+| `"far"` | Picks a reachable random walkable tile on the opposite side of the current map and actively paths toward it while idle. Each idle turn has a **50% chance** to advance one step, so travelers remain catchable. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed until reached or invalidated, then another opposite-side destination is chosen. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
 | `false` | Never performs idle wandering. |
 
 A template value overrides the old global setting. Enemies without an explicit
@@ -1383,6 +1383,12 @@ Home-style enemies may also define `homeRadius` per template or per spawned enem
 If omitted, the global `wandering.radius` is used, currently **1 tile**. This
 override applies to both `"homeReanchored"` and `"homeReturn"`.
 
+Enemy template wandering properties are resolved from the loaded
+`content/enemy_templates.json` registry when an enemy instance is created, so
+normal, cave, special, and ambush spawn paths inherit the species' current
+`wander` / `homeRadius` values unless that individual spawn explicitly overrides
+them.
+
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy attacked by an invisible player reacts once to that attack instead of
 wandering on the same turn (section 47); no awareness or chase persists.
@@ -1392,6 +1398,7 @@ Current global wandering settings:
 ```text
 Enabled/default fallback: yes
 Chance per turn for homeReanchored/homeReturn/roam: 30%
+Chance per idle turn for far travel step: 50%
 Leash: yes
 Default home radius: 1 tile (overridable per enemy/template with `homeRadius`)
 Active range for home/roam: 20 tiles from the player (Chebyshev distance)

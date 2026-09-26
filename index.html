@@ -661,6 +661,7 @@
     ARMORS = content.armors
     MODIFIERS = content.modifiers
     ENEMY_TEMPLATES = content.enemyTemplates
+    ENEMY_TEMPLATE_BY_NAME = Object.fromEntries(ENEMY_TEMPLATES.map(t => [t.name, t]))
     ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes
     ENEMY_PREFIXES = content.enemyPrefixes
     ATTACK_RANGE = content.enemyConfig.combat.attackRange
@@ -907,7 +908,9 @@
     return out
   }
 
-  const ENEMY_TEMPLATE_BY_NAME = Object.fromEntries(ENEMY_TEMPLATES.map(t => [t.name, t]))
+  // Filled after loadContent() populates ENEMY_TEMPLATES. Building this registry
+  // at script-evaluation time would capture the initial empty template array.
+  let ENEMY_TEMPLATE_BY_NAME = {}
 
   function enemyTemplateForSavedEnemy(e) {
     if (e && e.baseName && ENEMY_TEMPLATE_BY_NAME[e.baseName]) return ENEMY_TEMPLATE_BY_NAME[e.baseName]
@@ -3212,6 +3215,8 @@
   }
 
   function enemyFarWander(e) {
+    if (!chance(0.5)) return false
+
     const targetValid = Number.isInteger(e.farTargetX) && Number.isInteger(e.farTargetY) &&
       enemyCanTraverse(e, e.farTargetX, e.farTargetY)
     if (!targetValid || (e.x === e.farTargetX && e.y === e.farTargetY)) {
