@@ -832,6 +832,9 @@
         if (visual?.image) paths.push(visual.image)
         if (Array.isArray(visual?.variants)) paths.push(...visual.variants)
       }
+      for (const [k, v] of Object.entries(RENDER_STYLE?.overlays || {})) {
+        if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
+      }
     }
     await Promise.all([...new Set(paths)].map(async path => {
       if (preloadedImageUrls.has(path)) return
@@ -4154,6 +4157,26 @@
   let autoPath = null
   let hoveredAutoPath = null
 
+  function drawPathFootstepMarker(cx, cy, tilePx, dx = 0, dy = 1) {
+    const pathImagePath = RENDER_STYLE?.overlays?.pathFootstepImage
+    const image = pathImagePath ? preloadedImages.get(pathImagePath) || null : null
+    if (!image) {
+      ctx.fillStyle = RENDER_STYLE?.overlays?.path || 'rgba(255,224,138,0.28)'
+      ctx.fillRect(cx - tilePx * 0.18, cy - tilePx * 0.18, tilePx * 0.36, tilePx * 0.36)
+      return
+    }
+    const angle = Math.atan2(dy, dx) + Math.PI / 2
+    const scale = RENDER_STYLE?.overlays?.pathFootstepScale ?? 0.56
+    const cached = scaledVisualCanvas(image, scale)
+    const size = cached.width
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(angle)
+    ctx.globalAlpha = RENDER_STYLE?.overlays?.pathFootstepAlpha ?? 0.88
+    ctx.drawImage(cached, -size / 2, -size / 2)
+    ctx.restore()
+  }
+
   function flushPendingMove() {
     if (Graveyard.isOpen()) return
     if (autoPath && autoPath.length) {
@@ -5855,12 +5878,20 @@
     // planned movement path, or the route a desktop click would use
     const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
     if (previewPath && previewPath.length) {
-      for (const step of previewPath) {
-        if (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x]) continue
+      let prevStep = {x: player.x, y: player.y}
+      for (let i = 0; i < previewPath.length; i++) {
+        const step = previewPath[i]
+        if (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x]) {
+          prevStep = step
+          continue
+        }
         const pvx = Math.round((step.x - camX) * TILE_PX)
         const pvy = Math.round((step.y - camY) * TILE_PX)
-        ctx.fillStyle = RENDER_STYLE.overlays.path
-        ctx.fillRect(pvx + TILE_PX * 0.25, pvy + TILE_PX * 0.25, TILE_PX * 0.5, TILE_PX * 0.5)
+        const nextStep = previewPath[i + 1] || null
+        const dirX = nextStep ? nextStep.x - step.x : step.x - prevStep.x
+        const dirY = nextStep ? nextStep.y - step.y : step.y - prevStep.y
+        drawPathFootstepMarker(pvx + TILE_PX * 0.5, pvy + TILE_PX * 0.5, TILE_PX, dirX, dirY)
+        prevStep = step
       }
       const last = previewPath[previewPath.length - 1]
       const lx = Math.round((last.x - camX) * TILE_PX)
@@ -8195,6 +8226,9 @@
     for (const visual of Object.values(RENDER_STYLE?.specialTiles || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
       if (Array.isArray(visual?.variants)) initialVisuals.push(...visual.variants)
+    }
+    for (const [k, v] of Object.entries(RENDER_STYLE?.overlays || {})) {
+      if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
     render()
