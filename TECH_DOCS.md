@@ -2833,7 +2833,8 @@ The Herbalist opens services while adjacent:
 
 The Herbalist's other purpose is to hint that forests can be foraged for
 remedies, while also warning that forests are dangerous (because forest tiles
-can trigger an ambush).
+can trigger an ambush). Forest ambush candidate selection excludes enemy
+templates with `aggro: 0`; passive creatures do not initiate ambushes.
 
 Planned Herbalist ideas in source comments are not treated as current mechanics.
 
