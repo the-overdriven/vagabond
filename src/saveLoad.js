@@ -180,7 +180,13 @@ function buildSaveObject() {
       fleeingHoly: !!e.fleeingHoly,
     })),
     groundItems: groundItems.map(g => ({...g})),
-    npcs: npcs.map(n => ({name: n.name, x: n.x, y: n.y, homeX: n.homeX, homeY: n.homeY})),
+    // NPC talkFreezeTurns affects whether npcTurn() consumes wander RNG, so it
+    // is part of deterministic gameplay state and must survive save/load and
+    // replay live-state restoration.
+    npcs: npcs.map(n => ({
+      name: n.name, x: n.x, y: n.y, homeX: n.homeX, homeY: n.homeY,
+      talkFreezeTurns: Number.isFinite(n.talkFreezeTurns) ? Math.max(0, n.talkFreezeTurns | 0) : 0
+    })),
     tombstonesRemaining: tombstonesRemaining,
     tombstoneOrder: tombstoneOrder,
     merchantStock: merchantStock,
@@ -630,7 +636,8 @@ function loadGameFromObject(data, opts = {}) {
         x: n.x,
         y: n.y,
         homeX: n.homeX ?? n.x,
-        homeY: n.homeY ?? n.y
+        homeY: n.homeY ?? n.y,
+        talkFreezeTurns: Number.isFinite(n.talkFreezeTurns) ? Math.max(0, n.talkFreezeTurns | 0) : 0
       }
       const tmpl = NPC_TEMPLATES.find(t => t.name === n.name)
       return {
@@ -645,6 +652,7 @@ function loadGameFromObject(data, opts = {}) {
         y: n.y,
         homeX: n.homeX ?? n.x,
         homeY: n.homeY ?? n.y,
+        talkFreezeTurns: Number.isFinite(n.talkFreezeTurns) ? Math.max(0, n.talkFreezeTurns | 0) : 0,
       }
     })
     for (const n of npcs) occupied.add(keyXY(n.x, n.y))

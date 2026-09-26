@@ -3926,6 +3926,13 @@ the debug payload.
 Watching a replay temporarily rewinds the game; on completion (or desync) the
 live state from before playback is restored, including its RNG state and
 recording. Loading a recorded save resumes appending actions to that replay.
+NPC save records include `talkFreezeTurns`. This counter is deterministic gameplay
+state, not presentation state: while it is positive, `npcTurn()` skips that NPC
+without consuming its wandering RNG. Persisting it is required when a recorded
+run is saved/loaded or when the pre-replay live snapshot is restored; otherwise
+continuing the recording after a replay can append actions from a different NPC
+RNG state than a full replay reconstructs. Older saves without the field load it
+as zero.
 
 `initialState` is captured when the run truly begins, immediately after
 character creation, after the world/spawn/enemies already exist. The snapshot is

@@ -100,7 +100,7 @@ let replayRngCallers = []
 // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
 // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
 const REPLAY_VERSION = 2
-const REPLAY_ACTION_DELAY_MS = 12
+const REPLAY_ACTION_DELAY_MS = 99
 // const REPLAY_ACTION_DELAY_MS = 169
 
 let replayRecording = false // true once "Save replay" was chosen for the current character
