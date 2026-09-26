@@ -9,7 +9,6 @@
 🔄 fix desync again....
 ⛏️ "we must dig deeper" written in dwarven ruins
 
-- fix: add dug out sand tiles
 - fix: selecting peasant name should remove name from the random pull to prevent duplicates
 - fix: quest givers should be marked more clearly
 
@@ -5761,6 +5760,16 @@
             if (!drew) drawTile(px, py, glyph, color, bg)
           } else {
             drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
+          }
+          if (tileKey === 'sand' && dugSandTiles.has(keyXY(mx, my))) {
+            // Keep the original sand/grass connector and the entire outer edge
+            // untouched; the dug hole is only a transparent central overlay.
+            ctx.save()
+            ctx.beginPath()
+            ctx.rect(px + TILE_PX * 0.25, py + TILE_PX * 0.25, TILE_PX * 0.5, TILE_PX * 0.5)
+            ctx.clip()
+            drawImageVisual(px, py, RENDER_STYLE.specialTiles.dugSand)
+            ctx.restore()
           }
         }
         if (undergroundVisible) {

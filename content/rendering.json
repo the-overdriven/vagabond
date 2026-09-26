@@ -46,7 +46,9 @@
       "filter": "sepia(0.7) saturate(0.55) brightness(0.78) hue-rotate(-12deg)"
     },
     "dugSand": {
-      "bg": "#9a8050"
+      "bg": "#9a8050",
+      "image": "img/tiles/sand-dug-overlay.png",
+      "scale": 1
     }
   },
   "groundItems": {

@@ -462,6 +462,13 @@ Grassland tree decoration:
   a muted brown/olive filter. ASCII mode and both minimaps use the existing
   `specialTiles.foragedForest.color`. The distinction comes from the persisted
   `foragedTiles` set rather than from a new terrain ID.
+- A dug sand tile remains `sand` terrain. In tile-image mode the normal sand
+  image or sand-to-grass connector is drawn first, then
+  `specialTiles.dugSand.image` (`img/tiles/sand-dug-overlay.png`) paints a small
+  central hole. The overlay is clipped to the inner half of the tile, so all
+  outer edges remain pixel-identical to the original sand/connector image.
+  ASCII mode retains the darker `specialTiles.dugSand.bg` background. The
+  existing `dugSandTiles` set persists the state across save/load.
 
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 
@@ -3618,7 +3625,8 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
   ```text
   You can only dig in sand.
   ```
-- The tile is recorded in `dugSandTiles` and immediately redrawn so the darker sand becomes visible.
+- The tile is recorded in `dugSandTiles` and immediately redrawn so its hole
+  becomes visible in tile-image mode (or its darker background in ASCII mode).
 - Digging the same treasure-map location does not create another casket if the casket is already present in the player's inventory or on the current level.
 - The treasure-map location takes priority over the normal digging loot table.
 - A world-generated `buriedgear` or `buriedartifact` object takes priority over
