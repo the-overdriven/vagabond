@@ -1179,7 +1179,9 @@ Flying enemies can traverse terrain that includes:
 
 ## Evading
 
-Enemies marked as evasive have a 30% chance to evade a player's attack.
+Enemies marked as evasive have a 30% chance to evade a visible player's attack.
+They cannot use this special dodge against an invisible player (or the unseen
+player in god mode); ordinary hit/miss and glancing-hit rolls still apply.
 
 If possible, they move to a nearby open tile after evading.
 
@@ -1373,23 +1375,26 @@ reduces effective enemy detection range by 1.
 
 ### Alarmed
 
-When the player lands a hit on a monster, each *other* living, nonpassive
-monster on the same map within 10 tiles of the struck monster becomes Alarmed.
+When the player lands a hit on a monster, the struck monster becomes Alarmed
+silently, along with each *other* living, nonpassive monster on the same map
+within 10 tiles of the struck monster.
 This uses Chebyshev distance (diagonal squares count as one), measured from
 the monster that was hit, not from the player. A miss or evade does not trigger
 the status. Sound needs no line of sight; a glancing hit, including zero damage,
-still counts as a hit. The struck monster itself does not become Alarmed from
-this event.
+still counts as a hit. Monsters also become Alarmed silently the first time
+they spot the player, including when they wander into detection range or first
+attack from an adjacent tile. Passive AGGRO 0 enemies remain unaffected.
 
 Alarmed temporarily adds 1 to the monster's effective AGGRO range without
 changing its saved base AGGRO. Existing visibility, invisibility, Temple,
-pathfinding, and chase rules still apply. On the transition into Alarmed, the
-log says `<name> is alarmed by the sounds of the battle.` only when that monster
-is visible in the main view at activation. Monsters obscured by underground
-field of view or outside the viewport still become Alarmed silently; revealing
-them later does not produce a delayed message. More hits do not stack the bonus
+pathfinding, and chase rules still apply. A bystander newly Alarmed by the
+sound of a hit logs `<name> is alarmed by the sounds of the battle.` only when
+visible in the main view at activation. The struck monster and a monster that
+first spots the player do not log a separate Alarmed message. Monsters obscured
+by underground field of view or outside the viewport still become Alarmed silently; 
+revealing them later does not produce a delayed message. More hits do not stack the bonus
 or repeat the line during the same activation. The tooltip shows a red
-`Alarmed` label and the glyph has a white `!` in its top right corner. If a
+`Alarmed (AGGRO +1)` label and the glyph has a white `!` in its top right corner. If a
 monster also has a victory skull, the `!` shifts left so both remain visible.
 
 Alarmed ends when the player changes z level or map identity, or when the
@@ -1446,8 +1451,9 @@ normal, cave, special, and ambush spawn paths inherit the species' current
 them.
 
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
-enemy attacked by an invisible player reacts once to that attack instead of
-wandering on the same turn (section 47); no awareness or chase persists.
+enemy hit by an invisible player reacts once instead of wandering on that turn
+(section 47). A missed attack causes no reaction, and the enemy can
+take its normal idle action; no awareness or chase persists.
 
 Current global wandering settings:
 
@@ -2365,6 +2371,13 @@ They are picked up by walking over them.
 
 Fully restores HP.
 
+HP restored by a Life Potion, Healing Herb, edible Mushroom, berry regeneration,
+Troll regeneration, or a living player's Temple blessing uses the existing
+floating damage-number animation with a green `+<actual HP>` label. The amount
+is capped by missing HP; no number appears at full HP. Death revival and
+character setup are separate from healing and do not show this animation.
+Herb and edible-Mushroom recovery messages also report the actual capped HP.
+
 ## Scroll of Invisibility
 
 Grants approximately:
@@ -2378,10 +2391,11 @@ the scroll consumes the first turn, leaving 19 or 24 subsequent turns,
 respectively.
 
 While invisible, enemies never acquire or chase the player and continue to
-wander normally. Each attack on a surviving enemy (including a miss or evade)
+wander normally. A hit on a surviving enemy, even a zero-damage glancing hit,
 provokes exactly one immediate reaction instead of that enemy's wander action
-for the turn. An enemy killed by the attack cannot react. A single roll gives
-10% confusion (no action), then a flee chance of
+for the turn. A miss causes no reaction; evasive enemies cannot use their
+special dodge against an invisible attacker. An enemy killed by the attack
+cannot react. A single roll gives 10% confusion (no action), then a flee chance of
 `clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
 On a flee result the enemy moves one tile to an open walkable neighbor,
 preferring maximum distance from the player; if no tile is available, it stays

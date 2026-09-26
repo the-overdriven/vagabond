@@ -2544,7 +2544,10 @@
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
     // document is hidden, because browsers throttle/suspend rAF in background tabs.
     if (!replayAnimationsDisabled) await animateAttackLunge(player.x, player.y, e.x, e.y)
-    if (e.evades && chance(0.30)) {
+    // Evasive movement requires seeing the attacker. Invisibility (and god
+    // mode's unseen-player behavior) suppresses only this special dodge;
+    // the ordinary hit/miss roll below still applies.
+    if (e.evades && !player.godMode && player.invisibleTurns <= 0 && chance(0.30)) {
       const fromX = e.x, fromY = e.y
       const options = []
       for (const [dx, dy] of DIRS8) {
@@ -2563,14 +2566,14 @@
         spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
         log(`The ${e.name} evades your attack.`, 'bad')
         updateMobileInfoPanel(e.x, e.y)
-        return
+        return false
       }
     }
     if (chance(missChance(playerSpd(), enemySpd(e)))) {
       spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
-      return
+      return false
     }
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
@@ -2580,6 +2583,7 @@
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     e.hp -= dmg
+    alarmEnemy(e)
     alarmEnemiesNearHit(e)
     if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
@@ -2608,11 +2612,12 @@
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null
       if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
-        const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` :  e.name
+        const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` : 'the enemy'
         log(`Your ${player.equip.weapon.name} outpaces ${enemyTimingText}, striking again!`, 'good')
         await playerAttackEnemy(e, true)
       }
     }
+    return true
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1) {
@@ -2690,7 +2695,7 @@
       log('The temple remains silent. Its blessing awaits proof of your growth.', 'info')
       return
     }
-    player.hp = cap
+    healPlayer(cap - player.hp)
     player.lastTempleHealXp = player.totalXpEarned
     log('The Temple restores your strength.', 'good')
   }
@@ -2941,16 +2946,20 @@
     return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE
   }
 
+  function alarmEnemy(e) {
+    if (!e.alive || enemyIsPassive(e) || e.alarmed) return false
+    e.alarmed = true
+    e.alarmedZ = currentZ
+    e.alarmedLevelKind = currentLevelKind()
+    return true
+  }
+
   function alarmEnemiesNearHit(target) {
     for (const e of enemies) {
-      if (e === target || !e.alive || !onCurrentLevel(e) || enemyIsPassive(e) || e.alarmed) continue
+      if (e === target || !e.alive || !onCurrentLevel(e)) continue
       if (Math.max(Math.abs(e.x - target.x), Math.abs(e.y - target.y)) > ALARM_TRIGGER_RANGE) continue
-      e.alarmed = true
-      e.alarmedZ = currentZ
-      e.alarmedLevelKind = currentLevelKind()
-      if (enemyIsVisibleOnMainView(e)) {
-        log(`${e.name} is alarmed by the sounds of the battle (AGGRO +1).`, 'bad')
-      }
+      if (alarmEnemy(e) && enemyIsVisibleOnMainView(e))
+        log(`${e.name} is alarmed by the sounds of the battle.`, 'bad')
     }
   }
 
@@ -3416,13 +3425,13 @@
     if (!race || !race.regenEvery) return
     if (player.hp <= 0 || player.hp >= playerMaxHp()) return
     if (turnCount % race.regenEvery !== 0) return
-    player.hp = Math.min(playerMaxHp(), player.hp + 1)
+    healPlayer(1)
   }
 
   function tickBerryRegen() {
     if (player.berryRegenTurns > 0) {
       player.berryRegenTurns--
-      if (turnCount % 5 === 0) player.hp = Math.min(playerMaxHp(), player.hp + consumablePower(1))
+      if (turnCount % 5 === 0) healPlayer(consumablePower(1))
     }
   }
 
@@ -3513,6 +3522,7 @@
         // never went through the "spotted you" branch below.
         if (!e.aware) {
           e.aware = true
+          alarmEnemy(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
         if (enemyAttackPlayer(e)) return
@@ -3535,6 +3545,7 @@
         }
         if (!e.aware) {
           e.aware = true
+          alarmEnemy(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
@@ -3558,6 +3569,7 @@
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
           if (distAfter <= aggroRange && enemyHasSight(e)) {
             e.aware = true
+            alarmEnemy(e)
             log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad')
           }
         }
@@ -4358,9 +4370,9 @@
       consecutiveWaitTurns = 0
       const invisibleAttack = !player.godMode && player.invisibleTurns > 0
       const targetHp = target.hp
-      await playerAttackEnemy(target)
-      if (invisibleAttack && target.alive) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
-      enemyTurn(invisibleAttack ? target : null)
+      const hit = await playerAttackEnemy(target)
+      if (invisibleAttack && target.alive && hit) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
+      enemyTurn(invisibleAttack && hit ? target : null)
       npcTurn()
       render()
       runAnimationLoop()
@@ -5466,6 +5478,14 @@
     runAnimationLoop()
   }
 
+  function healPlayer(amount) {
+    const before = player.hp
+    player.hp = Math.min(playerMaxHp(), player.hp + Math.max(0, amount))
+    const restored = Math.max(0, Math.round(player.hp - before))
+    if (restored > 0) spawnDamageNumber(player.x, player.y, `+${restored}`, '#8ee58e')
+    return restored
+  }
+
   function targetCamX(px) {
     const x = px === undefined ? player.x : px
     const width = map && map[0] ? map[0].length : MAP_W
@@ -6192,7 +6212,7 @@
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
-      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed</div>' : ''}${equipmentHtml}
+      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +1)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
@@ -7592,7 +7612,7 @@
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'potion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    player.hp = playerMaxHp()
+    healPlayer(playerMaxHp() - player.hp)
     log('You drink a Life Potion and feel fully restored.', 'good')
     consumeItemTurn()
   }
@@ -7640,8 +7660,8 @@
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     const heal = consumablePower(Math.max(1, Math.round(playerMaxHp() * 0.25)))
-    player.hp = Math.min(playerMaxHp(), player.hp + heal)
-    log(`You eat the Healing Herb and recover ${heal} HP.`, 'good')
+    const restored = healPlayer(heal)
+    log(`You eat the Healing Herb and recover ${restored} HP.`, 'good')
     consumeItemTurn()
   }
 
@@ -7654,8 +7674,8 @@
     const amt = Math.max(1, Math.round(playerMaxHp() * 0.25))
     if (chance(0.5)) {
       const healed = consumablePower(amt)
-      player.hp = Math.min(playerMaxHp(), player.hp + healed)
-      log(`You eat the Mushroom. It was edible! You recover ${healed} HP.`, 'good')
+      const restored = healPlayer(healed)
+      log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
       player.hp = Math.max(0, player.hp - amt)
       log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
@@ -7671,8 +7691,8 @@
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     const healed = consumablePower(Math.max(1, Math.round(playerMaxHp() * 0.25)))
-    player.hp = Math.min(playerMaxHp(), player.hp + healed)
-    log(`You eat the Edible Mushroom and recover ${healed} HP.`, 'good')
+    const restored = healPlayer(healed)
+    log(`You eat the Edible Mushroom and recover ${restored} HP.`, 'good')
     consumeItemTurn()
   }
 
