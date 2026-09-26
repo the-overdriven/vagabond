@@ -5810,8 +5810,11 @@
       e.x, e.y, e.prefix, undergroundVisible)
     for (const {e, vx, vy} of visibleEnemies) {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
-      // tile-coloured block across the terrain it is walking over
-      drawSwimmingCreature(vx, vy, () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e)))
+      // tile-coloured block across the terrain it is walking over. Flying enemies
+      // stay fully above water; only non-fliers use the submerged-water clipping.
+      const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+      if (e.fly) drawEnemyCreature()
+      else drawSwimmingCreature(vx, vy, drawEnemyCreature)
       if (e.victoryLevel) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.42))}px serif`
