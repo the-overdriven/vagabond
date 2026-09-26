@@ -1820,6 +1820,15 @@
       const m = String(enemy.id).match(/^enemy_(\d+)$/)
       if (m) nextEnemyId = Math.max(nextEnemyId, Number(m[1]) + 1)
     }
+    const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
+      enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
+        ? tmpl.wander
+        : defaultEnemyWanderMode()
+    }
+    if (!Object.prototype.hasOwnProperty.call(enemy, 'homeRadius') && Number.isFinite(tmpl?.homeRadius)) {
+      enemy.homeRadius = tmpl.homeRadius
+    }
     enemies.push(enemy)
     return enemy
   }
@@ -3080,34 +3089,214 @@
     if (n) n.talkFreezeTurns = NPC_TALK_FREEZE_TURNS
   }
 
-  // Idle enemies near the player shuffle around a little so the world doesn't
-  // look frozen. Only enemies within range wander, so distant creatures don't
-  // drift away from where they were placed.
-  // See the comment on npcIsOnScreen above: this must stay independent of
-  // the live rendering viewport so replay's rng() call count can never
-  // drift based on window size/device.
+  // Enemy templates may override wandering per species. Enemies without an
+  // explicit template value retain the old global behavior as their fallback.
+  function defaultEnemyWanderMode() {
+    if (!ENEMY_WANDER_ENABLED) return false
+    return ENEMY_WANDER_LEASH ? 'homeReanchored' : 'roam'
+  }
+
+  function enemyWanderMode(e) {
+    if (!e) return defaultEnemyWanderMode()
+    if (e.wander === 'home') return 'homeReanchored' // legacy save/template alias
+    if (e.wander === false || e.wander === 'homeReanchored' || e.wander === 'homeReturn' ||
+      e.wander === 'roam' || e.wander === 'far') return e.wander
+    return defaultEnemyWanderMode()
+  }
+
+  function enemyHomeRadius(e) {
+    if (Number.isFinite(e?.homeRadius)) return Math.max(0, e.homeRadius)
+    const tmpl = ENEMY_TEMPLATE_BY_NAME[e?.baseName || e?.name]
+    if (Number.isFinite(tmpl?.homeRadius)) return Math.max(0, tmpl.homeRadius)
+    return ENEMY_WANDER_RADIUS
+  }
+
+  // `home`/`roam` use the fixed player-distance activation radius so their RNG
+  // remains independent of the live viewport. `far` deliberately ignores this
+  // radius: its purpose is persistent cross-world travel.
   function enemyIsOnScreen(e) {
     return Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ENEMY_WANDER_ACTIVE_RADIUS
   }
 
+  function enemyFarTargetCandidates(e, side) {
+    const candidates = []
+    const addRegion = (fraction) => {
+      candidates.length = 0
+      const xCut = Math.max(1, Math.floor(MAP_W * fraction))
+      const yCut = Math.max(1, Math.floor(MAP_H * fraction))
+      const minX = side === 'east' ? MAP_W - xCut : 0
+      const maxX = side === 'west' ? xCut - 1 : MAP_W - 1
+      const minY = side === 'south' ? MAP_H - yCut : 0
+      const maxY = side === 'north' ? yCut - 1 : MAP_H - 1
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (side === 'east' && x < minX) continue
+          if (side === 'west' && x > maxX) continue
+          if (side === 'south' && y < minY) continue
+          if (side === 'north' && y > maxY) continue
+          if (x === e.x && y === e.y) continue
+          if (!enemyCanTraverse(e, x, y)) continue
+          if (occupied.has(keyXY(x, y))) continue
+          candidates.push({x, y})
+        }
+      }
+    }
+    addRegion(0.25)
+    if (!candidates.length) addRegion(0.5)
+    return candidates
+  }
+
+  function enemyBuildFarPath(e, targetX, targetY) {
+    const total = MAP_W * MAP_H
+    const start = e.y * MAP_W + e.x
+    const target = targetY * MAP_W + targetX
+    const prev = new Int32Array(total)
+    prev.fill(-1)
+    prev[start] = start
+    const queue = new Int32Array(total)
+    let head = 0, tail = 0
+    queue[tail++] = start
+
+    while (head < tail) {
+      const cur = queue[head++]
+      if (cur === target) break
+      const cx = cur % MAP_W, cy = Math.floor(cur / MAP_W)
+      for (const [dx, dy] of DIRS8) {
+        const nx = cx + dx, ny = cy + dy
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
+        const ni = ny * MAP_W + nx
+        if (prev[ni] !== -1) continue
+        if (!enemyCanTraverse(e, nx, ny)) continue
+        if ((nx !== targetX || ny !== targetY) && occupied.has(keyXY(nx, ny))) continue
+        if (nx === player.x && ny === player.y) continue
+        prev[ni] = cur
+        queue[tail++] = ni
+      }
+    }
+    if (prev[target] === -1) return null
+
+    const path = []
+    let cur = target
+    while (cur !== start) {
+      path.push({x: cur % MAP_W, y: Math.floor(cur / MAP_W)})
+      cur = prev[cur]
+    }
+    path.reverse()
+    return path
+  }
+
+  function enemyChooseFarTarget(e) {
+    const edgeDistances = [
+      {side: 'west', d: e.x},
+      {side: 'east', d: MAP_W - 1 - e.x},
+      {side: 'north', d: e.y},
+      {side: 'south', d: MAP_H - 1 - e.y},
+    ]
+    const farthest = Math.max(...edgeDistances.map(edge => edge.d))
+    const oppositeSides = edgeDistances.filter(edge => edge.d === farthest).map(edge => edge.side)
+    while (oppositeSides.length) {
+      const side = oppositeSides.splice(randInt(0, oppositeSides.length - 1), 1)[0]
+      const candidates = enemyFarTargetCandidates(e, side)
+      for (let attempt = 0; attempt < Math.min(12, candidates.length); attempt++) {
+        const idx = randInt(0, candidates.length - 1)
+        const target = candidates.splice(idx, 1)[0]
+        const path = enemyBuildFarPath(e, target.x, target.y)
+        if (!path) continue
+        e.farTargetX = target.x
+        e.farTargetY = target.y
+        e.farPath = path
+        return true
+      }
+    }
+    return false
+  }
+
+  function enemyFarWander(e) {
+    const targetValid = Number.isInteger(e.farTargetX) && Number.isInteger(e.farTargetY) &&
+      enemyCanTraverse(e, e.farTargetX, e.farTargetY)
+    if (!targetValid || (e.x === e.farTargetX && e.y === e.farTargetY)) {
+      e.farTargetX = null
+      e.farTargetY = null
+      e.farPath = null
+      if (!enemyChooseFarTarget(e)) return false
+    }
+
+    if (!Array.isArray(e.farPath) || !e.farPath.length) {
+      e.farPath = enemyBuildFarPath(e, e.farTargetX, e.farTargetY)
+      if (!e.farPath || !e.farPath.length) {
+        e.farTargetX = null
+        e.farTargetY = null
+        e.farPath = null
+        return false
+      }
+    }
+
+    let step = e.farPath[0]
+    if (!enemyTileOpen(e, step.x, step.y)) {
+      e.farPath = enemyBuildFarPath(e, e.farTargetX, e.farTargetY)
+      step = e.farPath && e.farPath[0]
+      if (!step || !enemyTileOpen(e, step.x, step.y)) return false
+    }
+
+    occupied.delete(keyXY(e.x, e.y))
+    const fromX = e.x, fromY = e.y
+    e.x = step.x
+    e.y = step.y
+    e.farPath.shift()
+    occupied.add(keyXY(e.x, e.y))
+    beginEnemyMoveAnim(e, fromX, fromY)
+    return true
+  }
+
   function enemyWander(e) {
-    if (!ENEMY_WANDER_ENABLED) return false
+    const mode = enemyWanderMode(e)
+    if (mode === false) return false
+    if (mode === 'far') return enemyFarWander(e)
     if (!chance(ENEMY_WANDER_CHANCE)) return false
-    // Anchor the home tile on first wander, and re-anchor whenever a chase has
-    // already carried the enemy beyond its leash - otherwise it could never move
-    // again after giving up a pursuit.
-    if (e.homeX === undefined || e.homeY === undefined ||
-      Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > ENEMY_WANDER_RADIUS) {
+
+    const isHomeReanchored = mode === 'homeReanchored'
+    const isHomeReturn = mode === 'homeReturn'
+    const leashed = (isHomeReanchored || isHomeReturn) && ENEMY_WANDER_LEASH
+    const homeRadius = enemyHomeRadius(e)
+
+    if (leashed && (e.homeX === undefined || e.homeY === undefined)) {
       e.homeX = e.x
       e.homeY = e.y
     }
+
+    // homeReanchored preserves the old behavior: after a chase carries the enemy
+    // beyond its leash, its current position becomes the new home anchor.
+    if (isHomeReanchored && leashed &&
+      Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > homeRadius) {
+      e.homeX = e.x
+      e.homeY = e.y
+    }
+
+    // homeReturn keeps its original home anchor. Once outside the leash it first
+    // tries to path one step back toward home instead of randomly wandering.
+    if (isHomeReturn && leashed &&
+      Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > homeRadius) {
+      const pathHome = enemyBuildFarPath(e, e.homeX, e.homeY)
+      const stepHome = pathHome && pathHome[0]
+      if (stepHome && enemyTileOpen(e, stepHome.x, stepHome.y)) {
+        occupied.delete(keyXY(e.x, e.y))
+        const fromX = e.x, fromY = e.y
+        e.x = stepHome.x
+        e.y = stepHome.y
+        occupied.add(keyXY(e.x, e.y))
+        beginEnemyMoveAnim(e, fromX, fromY)
+        return true
+      }
+      return false
+    }
+
     const options = []
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue
         const nx = e.x + dx, ny = e.y + dy
-        if (ENEMY_WANDER_LEASH &&
-          Math.max(Math.abs(nx - e.homeX), Math.abs(ny - e.homeY)) > ENEMY_WANDER_RADIUS) continue
+        if (leashed &&
+          Math.max(Math.abs(nx - e.homeX), Math.abs(ny - e.homeY)) > homeRadius) continue
         if (nx === player.x && ny === player.y) continue
         if (!enemyCanTraverse(e, nx, ny)) continue
         if (occupied.has(keyXY(nx, ny))) continue
@@ -3115,11 +3304,11 @@
       }
     }
     if (!options.length) return false
-    const pick = options[randInt(0, options.length - 1)]
+    const destination = options[randInt(0, options.length - 1)]
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
-    e.x = pick.x
-    e.y = pick.y
+    e.x = destination.x
+    e.y = destination.y
     occupied.add(keyXY(e.x, e.y))
     beginEnemyMoveAnim(e, fromX, fromY)
     return true
@@ -3238,7 +3427,7 @@
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
         e.aware = false
-        if (e !== reactedEnemy && enemyIsOnScreen(e)) enemyWander(e)
+        if (e !== reactedEnemy && (enemyWanderMode(e) === 'far' || enemyIsOnScreen(e))) enemyWander(e)
         continue
       }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
@@ -3303,7 +3492,7 @@
         e.aware = false
         // A wander step can carry the enemy into its own aggro range, so re-check
         // straight away instead of leaving it oblivious until the next turn.
-        if (enemyIsOnScreen(e) && enemyWander(e)) {
+        if ((enemyWanderMode(e) === 'far' || enemyIsOnScreen(e)) && enemyWander(e)) {
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
           if (distAfter <= aggroRange && enemyHasSight(e)) {
             e.aware = true

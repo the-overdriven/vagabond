@@ -1083,6 +1083,7 @@ Biomes
 Evade capability
 Humanoid status
 Flying status
+Wander mode (`"homeReanchored"`, `"homeReturn"`, `"roam"`, `"far"`, or `false`) and optional `homeRadius`
 ```
 
 Spawned enemies receive approximately 95%–105% random variance from template stats.
@@ -1362,29 +1363,55 @@ there is a 25% chance for an additional pursuit action (enemy gets closer to vic
 
 Idle enemies can wander.
 
+Enemy templates may define `wander` individually:
+
+| `wander` | Idle behavior |
+|---|---|
+| `"homeReanchored"` | Randomly wanders using the existing global leash/radius. If a chase carries it beyond the leash, its post-chase position becomes the new home anchor, preserving the original wandering behavior. |
+| `"homeReturn"` | Randomly wanders within its home radius, but keeps its original home anchor. If a chase carries it beyond that radius, idle behavior actively paths it back toward home until it is inside the leash again. |
+| `"roam"` | Uses the normal random-wander chance but ignores the home leash, so it may gradually travel anywhere its terrain movement allows. |
+| `"far"` | Picks a reachable random walkable tile on the opposite side of the current map and actively paths toward it every idle turn. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed until reached or invalidated, then another opposite-side destination is chosen. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
+| `false` | Never performs idle wandering. |
+
+A template value overrides the old global setting. Enemies without an explicit
+`wander` property retain the old global behavior as a compatibility fallback:
+`wandering.enabled: false` means no wandering; otherwise `wandering.leash:
+true` resolves to `"homeReanchored"` and `false` resolves to `"roam"`.
+Legacy saves/templates containing `"home"` are treated as `"homeReanchored"`.
+
+Home-style enemies may also define `homeRadius` per template or per spawned enemy.
+If omitted, the global `wandering.radius` is used, currently **1 tile**. This
+override applies to both `"homeReanchored"` and `"homeReturn"`.
+
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy attacked by an invisible player reacts once to that attack instead of
 wandering on the same turn (section 47); no awareness or chase persists.
 
-Current wandering settings:
+Current global wandering settings:
 
 ```text
-Enabled: yes
-Chance per turn: 30%
-Wander radius: 1 tile (how far from its home tile a wandering enemy/NPC may stray)
-Active range: 20 tiles from the player (Chebyshev distance)
+Enabled/default fallback: yes
+Chance per turn for homeReanchored/homeReturn/roam: 30%
+Leash: yes
+Default home radius: 1 tile (overridable per enemy/template with `homeRadius`)
+Active range for home/roam: 20 tiles from the player (Chebyshev distance)
 ```
 
-Wandering is limited to enemies/NPCs within the active range of the player,
-not to what the camera viewport happens to be showing. This is deliberate:
-the check used to be "is this enemy on screen", which depended on the live
-canvas viewport (window size, sidebar collapsed/expanded, desktop vs mobile).
-That made the number of `chance()`/`rng()` calls per turn depend on the
-player's window at the time, which silently desynced Replay System (section
-83) playback whenever a recording was watched in a differently-sized window
-    than it was made in. The fixed 20-tile radius depends only on player and
-    enemy/NPC position - both part of replayed state - so replay is unaffected
-    by window size, device, or sidebar state.
+NPC wandering is unchanged and continues to use the existing global settings.
+
+`"homeReanchored"`, `"homeReturn"`, and `"roam"` wandering are limited to enemies/NPCs within the active
+range of the player, not to what the camera viewport happens to be showing.
+`"far"` is the deliberate exception and remains active anywhere on the current
+map. This remains replay-safe because eligibility depends only on game state,
+never viewport dimensions. Far-wander target selection and pathing use the
+seeded game RNG; the chosen target coordinates are persisted in saves/replay
+snapshots so loading does not silently choose a different destination.
+
+The fixed 20-tile radius replaced the old "is this enemy on screen" check,
+which depended on the live canvas viewport (window size, sidebar
+collapsed/expanded, desktop vs mobile). That made the number of `chance()` /
+`rng()` calls per turn depend on the player's window and could desync Replay
+System (section 83).
 
 ---
 

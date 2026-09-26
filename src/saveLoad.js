@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 13 // v13 preserves enemy levelKind; v11 normalized underground z-depths and distinguished crypt2 from generic z:-2
+const SAVE_VERSION = 15 // v15 adds split home wander modes and per-enemy homeRadius; v14 preserves wander mode/far destination
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -170,6 +170,10 @@ function buildSaveObject() {
       aware: !!e.aware,
       homeX: e.homeX,
       homeY: e.homeY,
+      wander: enemyWanderMode(e),
+      homeRadius: Number.isFinite(e.homeRadius) ? e.homeRadius : null,
+      farTargetX: Number.isInteger(e.farTargetX) ? e.farTargetX : null,
+      farTargetY: Number.isInteger(e.farTargetY) ? e.farTargetY : null,
       fleeingHoly: !!e.fleeingHoly,
     })),
     groundItems: groundItems.map(g => ({...g})),
@@ -597,7 +601,17 @@ function loadGameFromObject(data, opts = {}) {
       equipment: e.equipment || null,
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
       prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,
-      homeX: e.homeX, homeY: e.homeY, fleeingHoly: !!e.fleeingHoly,
+      homeX: e.homeX, homeY: e.homeY,
+      wander: Object.prototype.hasOwnProperty.call(e, 'wander')
+        ? (e.wander === 'home' ? 'homeReanchored' : e.wander)
+        : (tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander') ? tmpl.wander : defaultEnemyWanderMode()),
+      homeRadius: Number.isFinite(e.homeRadius)
+        ? Math.max(0, e.homeRadius)
+        : (Number.isFinite(tmpl?.homeRadius) ? Math.max(0, tmpl.homeRadius) : null),
+      farTargetX: Number.isInteger(e.farTargetX) ? e.farTargetX : null,
+      farTargetY: Number.isInteger(e.farTargetY) ? e.farTargetY : null,
+      farPath: null,
+      fleeingHoly: !!e.fleeingHoly,
     })
   })
   occupied = new Set()
