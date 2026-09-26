@@ -914,6 +914,14 @@ spawns in a chamber far from the staircase; the stronger enemy is also placed
 away from it. These are in addition to the normal 11% prefix
 rolls and carry the same level and cave identity as the group.
 
+Every ordinary populated cave on **z:-1 and z:-2** also contains at least
+**3 Fungus** on valid cave floor. After the guaranteed three, two independent
+40% rolls may add one extra Fungus each, so a cave can begin with **3–5 Fungus**.
+Their positions are reserved before chests and hostile scenario mobs are placed,
+so normal population cannot consume the guaranteed Fungus spaces. Crypts,
+mausoleums, and the Dwarven Fort are not part of this generic cave population
+pass.
+
 | Deep scenario | Enemy group | Distinctive contents |
 |---|---|---|
 | Goblin cache | Goblins | Chests spread through guarded rooms |
@@ -1085,6 +1093,13 @@ Humanoid status
 Flying status
 Wander mode (`"homeReanchored"`, `"homeReturn"`, `"roam"`, `"far"`, or `false`) and optional `homeRadius`
 ```
+
+Enemies with **AGGRO 0** are passive. They never acquire the player, never
+chase, never retaliate after being hit (including invisible attacks), and
+`enemyAttackPlayer()` defensively refuses to let them attack. This is
+data-driven, so any current or future enemy with AGGRO 0 receives the same
+passive behavior automatically. `Fungus` should use AGGRO 0 and `wander: false`
+so it remains both harmless and stationary.
 
 Spawned enemies receive approximately 95%–105% random variance from template stats.
 
@@ -2389,6 +2404,11 @@ Wyrdling increases the duration by 25%. Example: 100 turns become 125 turns.
 Foraged item. There is a 50% chance of healing or damaging HP. Both outcomes
 use 25% of the player's maximum HP: healing is affected by consumable bonuses,
 while poison damage is not. Damage is rounded and cannot be lower than 1 HP.
+
+Killing a `Fungus` always grants **1–3 normal Mushrooms** (`randInt(1, 3)`), so
+one Mushroom is guaranteed on every kill. The drop uses the existing
+`mushroom` inventory kind and therefore stacks with foraged Mushrooms. It is
+separate from the normal enemy artifact/equipment loot path.
 
 Wyrdling increases the healing effect by 25%, but does not increase poison damage.
 Example: a healing result restores 25% HP normally or 31.25% HP for a Wyrdling.
@@ -3966,8 +3986,8 @@ even when `sw.js` itself has not changed. Playtime is not recorded:
 there is no reliable persisted playtime counter. Neither full saves nor
 replay/RNG histories are uploaded. The existing service worker precaches
 `src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
-The cross-origin SDK is **not** precached or required for boot, 
-and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT. 
+The cross-origin SDK is **not** precached or required for boot,
+and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT.
 Offline deaths are not queued or retried.
 SDK failures and network request timeouts display only a generic UI state or
 a console warning; gameplay never waits for them.

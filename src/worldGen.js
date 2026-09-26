@@ -1285,7 +1285,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
       if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
@@ -1379,7 +1379,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
             const x = wx + dx, y = wy + dy
             if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
-                !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
+              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
           }
           if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
           const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
@@ -1430,7 +1430,7 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
       if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-          bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
       const cm = blankCaveMap(), rooms = []
       const brush = (x, y, wide) => {
         const radius = wide ? 2 : 1
@@ -1451,7 +1451,7 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
           if (chance(0.19)) [dx, dy] = pick(dirs)
           const nx = x + dx, ny = y + dy
           if (nx <= bounds.x1 + 2 || nx >= bounds.x2 - 2 ||
-              ny <= bounds.y1 + 2 || ny >= bounds.y2 - 2) {
+            ny <= bounds.y1 + 2 || ny >= bounds.y2 - 2) {
             ;[dx, dy] = pick(dirs)
             continue
           }
@@ -1489,7 +1489,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     const open = []
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
-          !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
+        !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
     const carve = style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
     let spot = null, layout = null
@@ -2165,16 +2165,6 @@ function spawnCaveScenarios() {
       const j = randInt(0, i)
       ;[roomOrder[i], roomOrder[j]] = [roomOrder[j], roomOrder[i]]
     }
-    const chestCount = level === -2 ? Math.min(12, Math.max(8, Math.ceil(roomOrder.length / 2))) : 1
-    let chest = null
-    for (let i = 0; i < chestCount; i++) {
-      const spot = level === -2 ? takeSpot('room', roomOrder[i] || null) : takeSpot('corner')
-      if (!spot) break
-      if (!chest) chest = spot
-      groundItems.push({x: spot.x, y: spot.y, kind: 'chest',
-        tier: level === -2 && i % 2 === 1 ? 2 : rules.tier,
-        opened: false, level, levelKind: 'chain', caveIndex})
-    }
     const makeEnemy = (tmpl, spot, prefix = null) => {
       const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
         levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
@@ -2190,6 +2180,33 @@ function spawnCaveScenarios() {
       }
       addEnemy(e)
     }
+
+    // Ordinary caves always contain at least three passive Fungus. Two extra
+    // independent rolls make denser patches possible without making every cave
+    // identical. Reserve these tiles before chests and hostile mobs consume the
+    // remaining valid cave floor.
+    const fungusTemplate = ENEMY_TEMPLATES.find(t => t.name === 'Fungus')
+    if (fungusTemplate) {
+      let fungusCount = 3
+      if (chance(0.4)) fungusCount++
+      if (chance(0.4)) fungusCount++
+      for (let i = 0; i < fungusCount; i++) {
+        const spot = takeSpot('random')
+        if (!spot) break
+        makeEnemy(fungusTemplate, spot)
+      }
+    }
+
+    const chestCount = level === -2 ? Math.min(12, Math.max(8, Math.ceil(roomOrder.length / 2))) : 1
+    let chest = null
+    for (let i = 0; i < chestCount; i++) {
+      const spot = level === -2 ? takeSpot('room', roomOrder[i] || null) : takeSpot('corner')
+      if (!spot) break
+      if (!chest) chest = spot
+      groundItems.push({x: spot.x, y: spot.y, kind: 'chest',
+        tier: level === -2 && i % 2 === 1 ? 2 : rules.tier,
+        opened: false, level, levelKind: 'chain', caveIndex})
+    }
     if (level === -2) {
       const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
       const threatPool = ENEMY_TEMPLATES.filter(t => t.tier === 3 || t.tier === 4)
@@ -2197,7 +2214,7 @@ function spawnCaveScenarios() {
       // Reserve the group before ordinary mobs, so none can displace it.
       const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
       const groupSites = open.map(p => ({p, guards: DIRS8.map(([dx, dy]) =>
-        openByPosition.get(keyXY(p.x + dx, p.y + dy))).filter(Boolean)}))
+          openByPosition.get(keyXY(p.x + dx, p.y + dy))).filter(Boolean)}))
         .filter(site => site.guards.length >= 4)
       if (championTemplate && ENEMY_PREFIXES.Champion && groupSites.length) {
         const farthest = Math.max(...groupSites.map(site => distance(site.p)))

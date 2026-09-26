@@ -2428,6 +2428,16 @@
 
   function lootFromEnemy(e) {
     const mf = playerMf()
+
+    // Fungus always yields ordinary unidentified mushrooms. Keep this separate
+    // from normal humanoid/equipment loot so the guaranteed biological drop
+    // cannot be skipped by later return paths.
+    if ((e.baseName || e.name) === 'Fungus') {
+      const mushroomCount = randInt(1, 3)
+      for (let i = 0; i < mushroomCount; i++) addMushroom()
+      log(`The ${e.name} dropped ${mushroomCount} mushroom${mushroomCount === 1 ? '' : 's'}.`, 'loot')
+    }
+
     // Gold drops from enemies have been disabled (per design decision) -
     // code kept/commented for easy reinstatement rather than deleted.
     // player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
@@ -2596,6 +2606,7 @@
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1) {
+    if (enemyIsPassive(e)) return false
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
       ? e.equipment : null
@@ -2945,7 +2956,7 @@
       if (twice < dx) { error += dx; y += sy }
       if (x === player.x && y === player.y) return true
       if (map[y]?.[x] === 'cavewall' || map[y]?.[x] === 'dwarvenwall' ||
-          map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
+        map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
     }
     return true
   }
@@ -2967,6 +2978,7 @@
   }
 
   function reactToInvisibleAttack(e, damage) {
+    if (enemyIsPassive(e)) return
     const roll = rng()
     if (roll < 0.10) {
       log(`The ${e.name} is confused at the unseen attack!`, 'info')
@@ -2980,7 +2992,7 @@
       for (const [dx, dy] of DIRS8) {
         const x = e.x + dx, y = e.y + dy
         if (!isWalkable(x, y) || !enemyTileOpen(e, x, y) ||
-            (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
         const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
         if (distance > bestDistance) {
           options.length = 0
@@ -3105,6 +3117,10 @@
     if (e.wander === false || e.wander === 'homeReanchored' || e.wander === 'homeReturn' ||
       e.wander === 'roam' || e.wander === 'far') return e.wander
     return defaultEnemyWanderMode()
+  }
+
+  function enemyIsPassive(e) {
+    return enemyAggroRange(e) === 0
   }
 
   function enemyHomeRadius(e) {
@@ -3428,6 +3444,10 @@
     const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e)) continue
+      if (enemyIsPassive(e)) {
+        e.aware = false
+        continue
+      }
       if (playerHidden) {
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
@@ -5638,7 +5658,7 @@
       for (let vx = 0; vx < renderCols; vx++) {
         const mx = baseMapX + vx, my = baseMapY + vy
         if (undergroundVisible && !undergroundVisible.has(keyXY(mx, my)) &&
-            !undergroundDiscovered?.[my]?.[mx]) continue
+          !undergroundDiscovered?.[my]?.[mx]) continue
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
@@ -6192,7 +6212,7 @@
   let wheelZoomAccum = 0, wheelZoomLast = 0
   canvas.addEventListener('wheel', (ev) => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey || raceOpen || replayPlaying ||
-        mapOpen || invOpen || tradeOpen || treasureMapOpen || !ev.deltaY) return
+      mapOpen || invOpen || tradeOpen || treasureMapOpen || !ev.deltaY) return
     ev.preventDefault()
     const delta = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? canvas.clientHeight : 1)
     if (ev.timeStamp - wheelZoomLast > 250 || (wheelZoomAccum && Math.sign(wheelZoomAccum) !== Math.sign(delta)))
@@ -6517,8 +6537,8 @@
   function currentUndergroundFov() {
     if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||
-        undergroundFovCache.discovered !== undergroundDiscovered ||
-        undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
+      undergroundFovCache.discovered !== undergroundDiscovered ||
+      undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
       const visible = UndergroundFov.compute(map, player.x, player.y)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
@@ -7858,7 +7878,7 @@
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
-        (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
+      (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()
       changeTileSize(k === '+' || ev.code === 'NumpadAdd' ? 1 : -1)
       return
