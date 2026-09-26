@@ -449,11 +449,14 @@ Grassland tree decoration:
 - Trees are visual-only: the underlying grass remains walkable and retains its
   normal terrain effects.
 - Tree locations are persisted in save files.
-- In tile-image mode, grassland trees reuse `img/tiles/grassland-tree.png` with
-  deterministic coordinate-based visual variation: some instances are mirrored
-  horizontally and their scale is selected from 0.92, 0.96, or 1.0. These
-  cosmetic variants consume no gameplay RNG and require no extra save fields;
-  the same coordinate therefore renders the same way after loading.
+- In tile-image mode, grassland trees use `img/tiles/grassland-tree.png` plus
+  optional `specialTiles.grassTree.variants` from `content/rendering.json`.
+  The image choice is deterministic from map coordinates, and the selected
+  sprite can additionally be mirrored horizontally and scaled to 0.92, 0.96,
+  or 1.0. These cosmetic variants consume no gameplay RNG and require no extra
+  save fields; the same coordinate therefore renders the same way after loading.
+  Special-tile image variants are explicitly preloaded alongside their base
+  image so grassland-tree variants work offline and do not pop in late.
 - A foraged ordinary-forest tile remains `forest` terrain and keeps all normal
   forest mechanics, but tile-image mode reuses `img/tiles/forest-tree.png` with
   a muted brown/olive filter. ASCII mode and both minimaps use the existing

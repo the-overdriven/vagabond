@@ -5981,6 +5981,36 @@
             ? (RENDER_STYLE.overlays.aggroRangeEdge || RENDER_STYLE.overlays.aggroRange)
             : RENDER_STYLE.overlays.aggroRange
         ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
+
+        // Make the maximum aggro boundary readable without boxing every edge
+        // tile individually. Only outward-facing sides of the Chebyshev ring
+        // receive the dotted border, producing one clean perimeter.
+        if (dist === aggroRange) {
+          ctx.save()
+          ctx.strokeStyle = RENDER_STYLE.overlays.aggroRangeBoundary ||
+            RENDER_STYLE.overlays.rangeOwnerOutline
+          ctx.lineWidth = Math.max(1, Math.min(2, TILE_PX / 20))
+          ctx.setLineDash([Math.max(2, TILE_PX * 0.12), Math.max(2, TILE_PX * 0.10)])
+          ctx.beginPath()
+          if (dy === -aggroRange) {
+            ctx.moveTo(vx, vy + 0.5)
+            ctx.lineTo(vx + TILE_PX, vy + 0.5)
+          }
+          if (dy === aggroRange) {
+            ctx.moveTo(vx, vy + TILE_PX - 0.5)
+            ctx.lineTo(vx + TILE_PX, vy + TILE_PX - 0.5)
+          }
+          if (dx === -aggroRange) {
+            ctx.moveTo(vx + 0.5, vy)
+            ctx.lineTo(vx + 0.5, vy + TILE_PX)
+          }
+          if (dx === aggroRange) {
+            ctx.moveTo(vx + TILE_PX - 0.5, vy)
+            ctx.lineTo(vx + TILE_PX - 0.5, vy + TILE_PX)
+          }
+          ctx.stroke()
+          ctx.restore()
+        }
       }
     }
     // outline the enemy's own tile so it's clear which monster the range belongs to
