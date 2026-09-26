@@ -1881,10 +1881,10 @@ Current base weapons include:
 | War Hammer | 4 | 11 | 1 | Yes |
 | Two-handed Axe | 4 | 12 | 1 | Yes |
 | Katana | 4 | 9 | 4 | Yes |
-| Chain-sickle | 5 | 9 | 3 | Yes |
-| Bone Cleaver | 5 | 11 | 2 | No |
-| Giant Sword | 5 | 14 | 1 | Yes |
-| Kanabo Club | 5 | 13 | 2 | Yes |
+| Chain-sickle | 5 | 9 | 2 | Yes |
+| Bone Cleaver | 5 | 11 | 1 | No |
+| Giant Sword | 5 | 14 | 2 | Yes |
+| Kanabo Club | 5 | 13 | 1 | Yes |
 | Crescent Blades | 5 | 11 | 5 | Yes |
 | Titan Warpick | 5 | 16 | 1 | Yes |
 
@@ -1900,7 +1900,7 @@ Bone Cleaver (one-handed) and Titan Warpick (two-handed) extend tier 5's
 heavy weapon choices. War Sickle is a two-handed tier-4 finesse weapon;
 Chain Whip is a one-handed tier-4 alternative. Chain-sickle represents a
 kusarigama wielded with both hands and is deliberately a weaker novelty
-in the tier-5 pool (9 ATK, 3 GRACE).
+in the tier-5 pool (9 ATK, 2 GRACE).
 All five use ordinary ATK/GRACE combat and existing tier-based selection.
 Their silhouettes and themes do not grant armour piercing, parry bypass,
 additional hits, reach, or new damage types. Higher GRACE only affects the
@@ -1916,7 +1916,13 @@ Current shields:
 | Shield | Tier | DEF |
 |---|---:|---:|
 | Buckler | 1 | 2 |
+| Pelt Shield | 2 | 3 |
+| Chitin Shield | 2 | 4 |
 | Round Shield | 2 | 5 |
+| Kite Shield | 3 | 6 |
+| Spiked Shield | 3 | 7 |
+| Bone Shield | 4 | 8 |
+| Royal Shield | 5 | 9 |
 | Tower Shield | 4 | 10 |
 
 Shield SPD penalty:
@@ -1939,14 +1945,21 @@ Current armor:
 | Cape | 1 | 2 | 0 |
 | Cloak | 1 | 3 | 0 |
 | Tunic | 1 | 4 | 0 |
+| Doublet | 2 | 5 | 0 |
 | Leather Armor | 2 | 6 | 0 |
 | Studded Leather | 2 | 7 | 0 |
-| Hauberk | 3 | 9 | 0 |
+| Quilted Armor | 2 | 8 | 1 |
+| Hauberk | 3 | 9 | 2 |
 | Brass Armor | 2 | 10 | 3 |
 | Splint Mail | 3 | 11 | 1 |
+| Brigandine | 3 | 12 | 1 |
 | Scale Armor | 4 | 13 | 1 |
-| Plate Mail | 4 | 15 | 2 |
-| Ancient Armor | 5 | 17 | 2 |
+| Half Plate | 4 | 13 | 2 |
+| Bone Armor | 4 | 14 | 2 |
+| Plate Mail | 4 | 15 | 3 |
+| Chitin Armor | 5 | 16 | 1 |
+| Royal Armor | 5 | 17 | 3 |
+| Ancient Armor | 5 | 18 | 3 |
 
 Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
 
