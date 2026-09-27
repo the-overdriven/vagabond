@@ -2735,6 +2735,22 @@ Current named NPCs:
 
 NPCs generally provide dialogue/exploration interactions.
 
+NPC tile artwork is configured by exact NPC name in
+`content/rendering.json` under `npc.characters`, with `image` and `scale`
+per character. Drunk, Herbalist, Ancient Lich, Merchant and Old Hunter use
+transparent `img/tiles/npc-*.png` sprites at scale 1.0. These sources are
+larger than 40x40 and use chunky pixel shapes; the shared nearest-neighbor
+sprite cache renders them at the current tile size, including zoom.
+Both initial visual loading and background preloading include these paths.
+`drawNpcVisual()` uses the existing image renderer and falls back to the
+configured white initial if a mapping/image is absent or tile images are
+disabled with P. Gravedigger retains that fallback until his standalone
+sprite is supplied; the supplied composite preview is not used as a tile.
+Swimming clipping, movement interpolation and the Old Hunter's quest marker
+remain in the existing NPC draw pass. NPC dialogue portraits are separate
+and unchanged. These visuals consume no RNG and change no NPC behavior,
+quest state, balance, save format or replay state.
+
 The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent.
 
 ---

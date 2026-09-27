@@ -975,6 +975,9 @@
       for (const gear of [...WEAPONS, ...SHIELDS, ...ARMORS])
         paths.push('img/icons/' + gear.name + '.svg')
       if (RENDER_STYLE?.player?.image) paths.push(RENDER_STYLE.player.image)
+      for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
+        if (visual?.image) paths.push(visual.image)
+      }
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
@@ -5772,6 +5775,12 @@
     return drawImageVisual(px, py, visual, alpha)
   }
 
+  function drawNpcVisual(px, py, npc) {
+    const style = RENDER_STYLE.npc
+    if (drawImageVisual(px, py, style.characters?.[npc.name])) return
+    drawCreature(px, py, style.glyph === 'initial' ? npc.name[0] : style.glyph, style.color)
+  }
+
   function drawPlayerVisual(px, py, color, alpha) {
     const image = playerRaceImagePath()
     const visual = image === RENDER_STYLE.player.image
@@ -6339,7 +6348,7 @@
     for (const visibleEnemy of visibleEnemies) {
       if (!visibleEnemy.e.fly) drawVisibleEnemy(visibleEnemy)
     }
-    // npcs - drawn in white to stand out from the tier-coloured enemy glyphs
+    // NPC tiles retain white initials as the ASCII/missing-image fallback.
     for (const n of npcs) {
       if (currentZ !== 0) continue
       let nxp = n.x, nyp = n.y
@@ -6355,7 +6364,7 @@
       }
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-      drawSwimmingCreature(vx, vy, () => drawCreature(vx, vy, RENDER_STYLE.npc.glyph === 'initial' ? n.name[0] : RENDER_STYLE.npc.glyph, RENDER_STYLE.npc.color))
+      drawSwimmingCreature(vx, vy, () => drawNpcVisual(vx, vy, n))
       if (n.name === 'Old Hunter' && oldHunterHasNewDialogue()) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
@@ -8874,6 +8883,9 @@
   async function init() {
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
+    for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+    }
     initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE)
     initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
     for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
