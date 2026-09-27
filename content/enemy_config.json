@@ -17,7 +17,8 @@
     "leash": true,
     "chance": 0.3,
     "radius": 1,
-    "activeRadius": 20
+    "activeRadius": 20,
+    "farVillageAvoidRadius": 20
   },
   "npc": {
     "talkFreezeTurns": 6

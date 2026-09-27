@@ -1500,7 +1500,7 @@ Enemy templates may define `wander` individually:
 | `"homeReanchored"` | Randomly wanders using the existing global leash/radius. If a chase carries it beyond the leash, its post-chase position becomes the new home anchor, preserving the original wandering behavior. |
 | `"homeReturn"` | Randomly wanders within its home radius, but keeps its original home anchor. If a chase carries it beyond that radius, idle behavior actively paths it back toward home until it is inside the leash again. |
 | `"roam"` | Uses the normal random-wander chance but ignores the home leash, so it may gradually travel anywhere its terrain movement allows. |
-| `"far"` | On the surface, picks a reachable random walkable tile on the opposite side of the map. Each idle turn has a **40% chance to stay**, **20% chance to move one open tile in a random direction other than the previous tile**, and **40% chance to take one step along the path to its destination**. An obstructed chosen move may still leave it in place. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed after random detours and until reached or invalidated; a detour rejoins the cached path when possible or rebuilds it on the next destination step. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
+| `"far"` | On the surface, picks a reachable random walkable tile on the opposite side of the map. Each idle turn has a **40% chance to stay**, **20% chance to move one open tile in a random direction other than the previous tile**, and **40% chance to take one step along the path to its destination**. An obstructed chosen move may still leave it in place. It is not limited by the player's 20-tile wander activation radius. When it reaches the village Temple's **20-tile Chebyshev avoidance radius**, it drops any cross-village destination and retargets toward an edge on its current side of the Temple; while inside that radius, random steps and cached path steps may not move closer to the Temple, so `far` travelers turn away instead of crossing the village. The destination remains fixed after random detours and until reached or invalidated; a detour rejoins the cached path when possible or rebuilds it on the next destination step. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
 | `false` | Never performs idle wandering. |
 
 A template value overrides the old global setting. Enemies without an explicit
@@ -1536,6 +1536,7 @@ Current global wandering settings:
 Enabled/default fallback: yes
 Chance per turn for homeReanchored/homeReturn/roam: 30%
 Far idle turn: 40% stay / 20% random open step except previous tile / 40% destination step
+Far village/Temple avoidance radius: 20 tiles (Chebyshev; surface `far` travelers only)
 Leash: yes
 Default home radius: 1 tile (overridable per enemy/template with `homeRadius`)
 Active range for home/roam: 20 tiles from the player (Chebyshev distance)
@@ -1549,7 +1550,9 @@ range of the player, not to what the camera viewport happens to be showing.
 map. This remains replay-safe because eligibility depends only on game state,
 never viewport dimensions. Far-wander target selection and pathing use the
 seeded game RNG; the chosen target coordinates are persisted in saves/replay
-snapshots so loading does not silently choose a different destination.
+snapshots so loading does not silently choose a different destination. The village-avoidance
+radius is configured by `content/enemy_config.json -> wandering.farVillageAvoidRadius`;
+it defaults to 20 if omitted.
 
 The fixed 20-tile radius replaced the old "is this enemy on screen" check,
 which depended on the live canvas viewport (window size, sidebar
