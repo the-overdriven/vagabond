@@ -5477,10 +5477,10 @@
 
     // Tree overlays.
     if (tileKey === 'forest') return 'grass'
-    if (tileKey === 'ancientForest') return 'darkforestground'
+    if (tileKey === 'ancientForest') return 'grass'
     if (tileKey === 'taiga') return 'snow'
     if (tileKey === 'snowmountain') return 'snow'
-    if (tileKey === 'darkforestground' || tileKey === 'marble') return null
+    if (tileKey === 'marble') return null
 
     const neighbors = [
       map?.[y - 1]?.[x],
@@ -5622,12 +5622,8 @@
 
       if (landCount > 0) {
         const sandScore = (landN && n === 'sand' ? 1 : 0) + (landE && e === 'sand' ? 1 : 0) + (landS && s === 'sand' ? 1 : 0) + (landW && w === 'sand' ? 1 : 0)
-        // Only ancient forest uses the dark forest helper background.
-        const ancientScore = (landN && n === 'ancientForest' ? 1 : 0) + (landE && e === 'ancientForest' ? 1 : 0) + (landS && s === 'ancientForest' ? 1 : 0) + (landW && w === 'ancientForest' ? 1 : 0)
-
         let baseTileKey = 'grass'
         if (sandScore > 0 && sandScore >= Math.ceil(landCount / 2)) baseTileKey = 'sand'
-        else if (ancientScore > 0 && ancientScore >= Math.ceil(landCount / 2)) baseTileKey = 'darkforestground'
 
         let image = null
         if (landN && landW) image = visual.edgeNWImage
@@ -5701,13 +5697,13 @@
     return null
   }
 
-  function drawTreeCanopyOverlayAt(mx, my) {
+  function drawTreeCanopyOverlayAt(mx, my, alpha = 1) {
     const visual = treeCanopyVisualAt(mx, my)
     if (!visual) return false
     const px = Math.round((mx - camX) * TILE_PX)
     const py = Math.round((my - camY) * TILE_PX)
     if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) return false
-    return drawImageVisual(px, py, visual)
+    return drawImageVisual(px, py, visual, alpha)
   }
 
   function drawPlayerVisual(px, py, color, alpha) {
@@ -6098,7 +6094,21 @@
               }
               drawImageVisual(px, py, overlayVisual)
             } else {
-              drew = drawTerrainVisualStack(px, py, tileKey, mx, my, visual, bg)
+              const playerBehindAncientTree = tileKey === 'ancientForest' &&
+                Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
+              if (playerBehindAncientTree && resolveVisualImage(visual)) {
+                // Draw the tree only once, at half opacity in the canopy pass.
+                // Draw the same grass ground as on unoccupied forest tiles;
+                // using the ancient tile's dark fallback would leave a square.
+                const groundVisual = terrainVisual('grass', mx, my)
+                if (!groundVisual || !drawTerrainVisualStack(px, py, 'grass', mx, my, groundVisual, TILE.grass.bg)) {
+                  ctx.fillStyle = TILE.grass.bg
+                  ctx.fillRect(px, py, TILE_PX, TILE_PX)
+                }
+                drew = true
+              } else {
+                drew = drawTerrainVisualStack(px, py, tileKey, mx, my, visual, bg)
+              }
             }
             if (!drew) drawTile(px, py, glyph, color, bg)
           } else {
@@ -6214,7 +6224,7 @@
     for (const {e} of visibleEnemies) drawEnemyPrefixArea(
       Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
       e.x, e.y, e.prefix, undergroundVisible)
-    for (const {e, vx, vy} of visibleEnemies) {
+    const drawVisibleEnemy = ({e, vx, vy}) => {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over. Flying enemies
       // stay fully above water; only non-fliers use the submerged-water clipping.
@@ -6252,6 +6262,9 @@
         ctx.lineWidth = 2
         ctx.strokeRect(vx + 2, vy + 2, TILE_PX - 4, TILE_PX - 4)
       }
+    }
+    for (const visibleEnemy of visibleEnemies) {
+      if (!visibleEnemy.e.fly) drawVisibleEnemy(visibleEnemy)
     }
     // npcs - drawn in white to stand out from the tier-coloured enemy glyphs
     for (const n of npcs) {
@@ -6346,8 +6359,8 @@
         }
       })
     }
-    // draw tree canopies over anything standing on forested/tree tiles so it
-    // appears behind the trees instead of on top of them.
+    // Ground creatures appear behind tree canopies; flying enemies are drawn
+    // afterward so the trees cannot cover them.
     {
       const canopyTiles = new Set()
       if (currentZ === 0) {
@@ -6357,6 +6370,8 @@
           x <= Math.ceil(camX) + VIEW_W && y >= Math.floor(camY) - 1 &&
           y <= Math.ceil(camY) + VIEW_H
         if (inCanopyView(player.x, player.y)) canopyTiles.add(keyXY(player.x, player.y))
+        if (moveAnim && inCanopyView(moveAnim.fromX, moveAnim.fromY))
+          canopyTiles.add(keyXY(moveAnim.fromX, moveAnim.fromY))
         for (const e of enemies) {
           if (!onCurrentLevel(e) || !e.alive || !inCanopyView(e.x, e.y)) continue
           canopyTiles.add(keyXY(e.x, e.y))
@@ -6371,8 +6386,13 @@
       }
       for (const key of canopyTiles) {
         const [mx, my] = key.split(',').map(Number)
-        drawTreeCanopyOverlayAt(mx, my)
+        const playerBehindAncientTree = map[my]?.[mx] === 'ancientForest' &&
+          Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
+        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.8 : 1)
       }
+    }
+    for (const visibleEnemy of visibleEnemies) {
+      if (visibleEnemy.e.fly) drawVisibleEnemy(visibleEnemy)
     }
     if (currentZ < 0) {
       ctx.save()
@@ -6608,7 +6628,7 @@
     return null
   }
 
-  const DESKTOP_ENEMY_CURSOR = `url("img/cursors/red-sword.svg") 5 4, crosshair`
+  const DESKTOP_ENEMY_CURSOR_IMAGE = 'img/cursors/red-sword.svg'
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1
@@ -6616,7 +6636,8 @@
 
   function setDesktopCanvasCursor(e) {
     if (window.matchMedia('(pointer: coarse)').matches) return
-    canvas.style.cursor = enemyIsDesktopClickAttackable(e) ? DESKTOP_ENEMY_CURSOR : ''
+    canvas.style.cursor = enemyIsDesktopClickAttackable(e)
+      ? `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair` : ''
   }
 
   function updateTooltip() {
@@ -8674,6 +8695,7 @@
   async function init() {
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
+    initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE)
     initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
     for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
       if (visual?.image) initialVisuals.push(visual.image)

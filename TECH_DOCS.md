@@ -334,7 +334,8 @@ the canvas cursor to a red diagonal sword whose hotspot is the sword tip. Outsid
 an attackable enemy, the inline cursor override is cleared so the canvas keeps its
 existing stylesheet/default cursor. Non-adjacent clicks retain the normal click-to-move
 behavior, and coarse-pointer/mobile input does not use this cursor or desktop
-click-attack shortcut.
+click-attack shortcut. The sword SVG is decoded with the essential startup
+images, before character selection opens, and the cursor uses that preloaded URL.
 
 Walking into an NPC triggers interaction instead of entering its tile.
 
@@ -500,8 +501,9 @@ marble background, description, and unique save character `U`. Generation
 stamps the fort tile in both its local template and shared map. The loader
 restamps this tile at the fort gate on z:-3, including for older saves encoded
 with `caveup`; it leaves all other deep-cave `caveup` entrances unchanged.
-`darkforestground` and `marble` are terminal image bases, so neighboring
-surface tiles cannot replace them while composing overlays.
+`marble` is a terminal image base, so neighboring surface tiles cannot replace
+it while composing overlays. Ancient Forest trees use the same grass ground
+as ordinary forest; no separate dark-ground image tile is used.
 
 The cave floor/wall images are rendering replacements for existing terrain
 IDs. Cave scenarios add no terrain IDs; the Dwarven Fort exit is a separate
@@ -701,8 +703,11 @@ A special forest biome associated with:
 
 Normal foraging is disabled there.
 
-In tile-image mode, every Ancient Forest tree uses `darkforestground` beneath
-it, including along snowy edges. Neighboring snow cannot replace that base.
+In tile-image mode, Ancient Forest trees use grass ground beneath their image,
+without a separate dark-ground image or the tile's dark fallback color. When
+the player is behind an Ancient Forest tree, its opaque terrain draw is skipped
+and the foreground canopy is drawn once at 50% opacity over that grass ground.
+Other trees retain their normal opacity.
 
 </details>
 
@@ -3379,7 +3384,7 @@ shrinks them. Lifting either finger suppresses a tap or one-finger row resize
 until the gesture ends. The full-map pinch continues to zoom the map only.
 
 The intent is to keep mobile gameplay rules equivalent to desktop rules.
-Walking uses an uncapped `requestAnimationFrame` loop for a 140 ms camera pan. The renderer redraws the viewport each frame, including terrain, items, and creatures. Occupied tree-canopy overlays now consider only entities near the visible viewport; offscreen entities cannot contribute to the current frame. This reduces per-frame world scans without changing visibility or turn timing. Frame pacing and canvas scaling on a specific phone still require device measurements to diagnose any remaining glyph shimmer.
+Walking uses an uncapped `requestAnimationFrame` loop for a 140 ms camera pan. The renderer redraws the viewport each frame, including terrain, items, and creatures. Occupied tree-canopy overlays now consider only entities near the visible viewport; offscreen entities cannot contribute to the current frame. Ground creatures remain behind the canopy; flying enemies and their status markers are drawn after it and remain visible above trees. This reduces per-frame world scans without changing visibility or turn timing. Frame pacing and canvas scaling on a specific phone still require device measurements to diagnose any remaining glyph shimmer.
 
 There is currently no mobile button for waiting (skipping the turn).
 

@@ -498,10 +498,6 @@
       "image": "img/tiles/taiga-tree.png",
       "scale": 1
     },
-    "darkforestground": {
-      "image": "img/tiles/dark-forest-ground.png",
-      "scale": 1
-    },
     "snowmountain": {
       "image": "img/tiles/snow-mountain-middle.png",
       "singleImage": "img/tiles/snow-mountain-middle.png",
