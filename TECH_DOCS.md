@@ -97,7 +97,8 @@ There are currently **10 races**.
 
 ## Halfling
 
-**-1 enemy aggro range**
+**-1 AGGRO range from all enemies; +5 percentage points to forest concealment,
+including against unaware Alarmed enemies.**
 
 ## Catling
 
@@ -1197,8 +1198,8 @@ player in god mode); ordinary hit/miss and glancing-hit rolls still apply.
 If possible, they move to a nearby open tile after evading.
 If that dodge is followed by the existing slow-enemy loss-of-interest roll
 in the same enemy response, the log says `The <enemy> hesitates after its
-dodge, giving you a moment to act.` instead of the generic chase line.
-The game forgets the dodge after the enemy’s response.
+dodge, giving you a moment to act.` instead of the generic chase line. The
+evasion marker is consumed in that response whether or not the roll succeeds;
 it is not a persistent status or a new chance to hesitate.
 
 Current examples include:
@@ -1397,11 +1398,16 @@ reduces effective enemy detection range by 1.
 ### Forest concealment
 
 On the surface, standing on ordinary or ancient forest gives the player a
-chance to avoid an unaware enemy's first spotting attempt within its normal
+chance to avoid an unaware, unalarmed enemy's first spotting attempt within its normal
 AGGRO range. The chance is `min(100%, 33% + 5% × distance in tiles)`, using
 Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
 uses seeded game RNG. A successful check logs `The trees conceal you from the
 <enemy>.` only if that enemy is visible in the main view.
+
+Halflings gain another 5 percentage points and may roll against Alarmed enemies
+that have not yet spotted them. For other races, becoming Alarmed cancels a
+successful concealment immediately. An enemy already aware of the player
+cannot be concealed from, even for a Halfling.
 
 A successful check protects the player's current tile from that enemy's
 further spotting checks, including after the enemy wanders or moves closer.
@@ -1409,9 +1415,9 @@ Moving the player to another forest tile permits a new check; waiting or an
 enemy's movement does not. Moving out of the forest ends this concealment.
 An enemy leaving and returning to range cannot force another roll while the
 player stays on the same tile.
-At adjacent distance, the enemy spots or attacks normally. Forest concealment
-does not affect enemies already aware of the player, including newly spawned
-forest ambushers, and it does not shorten AGGRO range. Successful per-enemy
+At adjacent distance, the enemy spots or attacks normally. Newly spawned
+forest ambushers begin aware, so neither race can conceal from them. Forest
+concealment does not shorten AGGRO range. Successful per-enemy
 concealment coordinates are saved and restored in replay starting states so
 loading does not reroll a stationary player's cover; older saves default to
 no concealment state.

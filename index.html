@@ -3152,6 +3152,10 @@
     e.alarmed = true
     e.alarmedZ = currentZ
     e.alarmedLevelKind = currentLevelKind()
+    if (raceDef()?.id !== 'halfling') {
+      e.forestConcealX = null
+      e.forestConcealY = null
+    }
     return true
   }
 
@@ -3192,10 +3196,12 @@
   // can try again by moving; an enemy moving closer cannot reroll it until
   // reaching the adjacent tile. The saved coordinates preserve this across loads.
   function forestConcealsPlayer(e, dist) {
+    const halfling = raceDef()?.id === 'halfling'
     if (e.aware || dist <= ATTACK_RANGE || currentZ !== 0 ||
+        (e.alarmed && !halfling) ||
         (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest')) return false
     if (e.forestConcealX === player.x && e.forestConcealY === player.y) return true
-    if (!chance(Math.min(1, 0.33 + 0.05 * dist))) return false
+    if (!chance(Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.05 : 0)))) return false
     e.forestConcealX = player.x
     e.forestConcealY = player.y
     if (enemyIsVisibleOnMainView(e)) log(`The trees conceal you from the ${e.name}.`, 'info')
