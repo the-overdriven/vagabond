@@ -128,20 +128,21 @@ function initDiscovered() {
 }
 
 function generateSurface() {
+  const cfg = WORLD_GEN_CONFIG.surface
   shuffleTombstoneOrder()
   mausoleumMap = null
   mausoleumHutPos = null
   tileUnderlays = {}
   grasslandTrees = new Set()
   map.length = 0 // a retried world must not append onto the discarded one
-  const elevationNoiseFunctions = [makeNoise(6, 4), makeNoise(14, 10), makeNoise(30, 22)]
-  const elevationNoiseWeights = [0.55, 0.3, 0.15]
-  const moistureNoiseFunctions = [makeNoise(5, 5), makeNoise(16, 16)]
-  const moistureNoiseWeights = [0.6, 0.4]
-  const roughnessNoiseFunction = makeNoise(52, 38)
-  const moistureDetailNoiseFunction = makeNoise(44, 32)
-  const lakeNoiseFunction = makeNoise(9, 7)
-  const boulderNoiseFunction = makeNoise(40, 30)
+  const elevationNoiseFunctions = cfg.elevationNoise.layers.map(([x, y]) => makeNoise(x, y))
+  const elevationNoiseWeights = cfg.elevationNoise.weights
+  const moistureNoiseFunctions = cfg.moistureNoise.layers.map(([x, y]) => makeNoise(x, y))
+  const moistureNoiseWeights = cfg.moistureNoise.weights
+  const roughnessNoiseFunction = makeNoise(...cfg.elevationNoise.roughnessCells)
+  const moistureDetailNoiseFunction = makeNoise(...cfg.moistureNoise.detailCells)
+  const lakeNoiseFunction = makeNoise(...cfg.lakes.noiseCells)
+  const boulderNoiseFunction = makeNoise(...cfg.boulders.noiseCells)
 
   const elev = [], moist = []
   for (let y = 0; y < MAP_H; y++) {
@@ -150,18 +151,18 @@ function generateSurface() {
   }
   const cx = MAP_W / 2, cy = MAP_H / 2
   const maxD = Math.sqrt(cx * cx + cy * cy)
-  const northernFalloffDepth = MAP_H * 0.22
+  const northernFalloffDepth = MAP_H * cfg.islandFalloff.northernDepthFraction
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       let e = combineWeightedNoise(elevationNoiseFunctions, elevationNoiseWeights, x, y, MAP_W, MAP_H)
-      e += (roughnessNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * 0.16
+      e += (roughnessNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * cfg.elevationNoise.roughnessAmplitude
       const d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxD
-      e -= Math.pow(d, 2.2) * 0.55 * Math.min(1, y / northernFalloffDepth) // island falloff fades out at the northern edge
+      e -= Math.pow(d, cfg.islandFalloff.distancePower) * cfg.islandFalloff.strength * Math.min(1, y / northernFalloffDepth) // island falloff fades out at the northern edge
       const lk = lakeNoiseFunction(x, y, MAP_W, MAP_H)
-      if (lk > 0.72 && e > 0.28 && e < 0.6) e -= 0.4 // carve inland lakes
-      if (y < 4) e = Math.max(e, 0.3) // keep the cold northern boundary on land
+      if (lk > cfg.lakes.noiseThreshold && e > cfg.lakes.minElevation && e < cfg.lakes.maxElevation) e -= cfg.lakes.carveAmount // carve inland lakes
+      if (y < cfg.northBoundary.rows) e = Math.max(e, cfg.northBoundary.minElevation) // keep the cold northern boundary on land
       elev[y][x] = e
-      moist[y][x] = combineWeightedNoise(moistureNoiseFunctions, moistureNoiseWeights, x, y, MAP_W, MAP_H) + (moistureDetailNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * 0.12
+      moist[y][x] = combineWeightedNoise(moistureNoiseFunctions, moistureNoiseWeights, x, y, MAP_W, MAP_H) + (moistureDetailNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * cfg.moistureNoise.detailAmplitude
     }
   }
 
@@ -170,14 +171,14 @@ function generateSurface() {
     for (let x = 0; x < MAP_W; x++) {
       const e = elev[y][x], m = moist[y][x]
       let t
-      if (e < 0.24) t = 'water'
-      else if (e < 0.29) t = 'sand'
-      else if (e < 0.58) {
-        if (m > 0.55) t = 'forest'
+      if (e < cfg.terrainThresholds.waterMaxElevation) t = 'water'
+      else if (e < cfg.terrainThresholds.sandMaxElevation) t = 'sand'
+      else if (e < cfg.terrainThresholds.lowlandMaxElevation) {
+        if (m > cfg.terrainThresholds.forestMinMoisture) t = 'forest'
         else t = 'grass'
-      } else if (e < 0.68) t = 'hill'
-      else if (e < 0.82) t = 'mountain'
-      else t = (m > 0.5) ? 'snow' : 'mountain'
+      } else if (e < cfg.terrainThresholds.hillMaxElevation) t = 'hill'
+      else if (e < cfg.terrainThresholds.mountainMaxElevation) t = 'mountain'
+      else t = (m > cfg.terrainThresholds.highElevationSnowMinMoisture) ? 'snow' : 'mountain'
       row.push(t)
     }
     map.push(row)
@@ -186,14 +187,14 @@ function generateSurface() {
   // Arctic north: freeze the top of the world into a ragged snow band. Snow used to
   // require elevation > 0.86 AND moisture > 0.5, which the island falloff made
   // almost unreachable, so the biome effectively never generated.
-  const SNOW_BAND = Math.round(MAP_H * 0.22)
-  const snowEdgeFn = makeNoise(30, 8)
+  const SNOW_BAND = Math.round(MAP_H * cfg.snow.bandFraction)
+  const snowEdgeFn = makeNoise(...cfg.snow.edgeNoiseCells)
   for (let y = 0; y < SNOW_BAND; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const t = map[y][x]
       if (t !== 'grass' && t !== 'forest' && t !== 'hill' && t !== 'sand') continue
-      const coldness = (SNOW_BAND - y) / SNOW_BAND + (snowEdgeFn(x, y, MAP_W, MAP_H) - 0.5) * 0.55
-      if (coldness > 0.32) map[y][x] = 'snow'
+      const coldness = (SNOW_BAND - y) / SNOW_BAND + (snowEdgeFn(x, y, MAP_W, MAP_H) - 0.5) * cfg.snow.edgeNoiseAmplitude
+      if (coldness > cfg.snow.coldnessThreshold) map[y][x] = 'snow'
     }
   }
   // Snowy north: exposed mountains get a snow cap, with a few more peaks
@@ -201,13 +202,13 @@ function generateSurface() {
   // snow biome; taiga is the only normal tree cover there.
   for (let y = 0; y < SNOW_BAND; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      if (map[y][x] === 'mountain' && chance(0.85)) map[y][x] = 'snowmountain'
+      if (map[y][x] === 'mountain' && chance(cfg.snow.mountainSnowChance)) map[y][x] = 'snowmountain'
     }
   }
 
   for (let y = 0; y < SNOW_BAND; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      if (map[y][x] === 'snow' && chance(0.035)) map[y][x] = 'snowmountain'
+      if (map[y][x] === 'snow' && chance(cfg.snow.extraPeakChance)) map[y][x] = 'snowmountain'
     }
   }
   // Dense taiga in the northern snow biome: trees grow in broad, irregular
@@ -218,7 +219,7 @@ function generateSurface() {
   const taigaSeeds = []
   for (let y = 0; y < SNOW_BAND; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      if (map[y][x] === 'snow' && chance(0.10)) taigaSeeds.push({x, y})
+      if (map[y][x] === 'snow' && chance(cfg.taiga.seedChance)) taigaSeeds.push({x, y})
     }
   }
   for (const seed of taigaSeeds) {
@@ -228,7 +229,7 @@ function generateSurface() {
   }
   // Several growth passes make taiga noticeably denser, while retaining
   // holes and ragged edges instead of turning the whole snow band into forest.
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < cfg.taiga.growthPasses; pass++) {
     const additions = []
     for (let y = 0; y < SNOW_BAND; y++) {
       for (let x = 0; x < MAP_W; x++) {
@@ -240,7 +241,7 @@ function generateSurface() {
           if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= SNOW_BAND) continue
           if (map[ny][nx] === 'taiga') nearbyTaiga++
         }
-        const growChance = nearbyTaiga >= 3 ? 0.58 : nearbyTaiga >= 1 ? 0.28 : 0.04
+        const growChance = nearbyTaiga >= 3 ? cfg.taiga.growthChanceThreePlusNeighbors : nearbyTaiga >= 1 ? cfg.taiga.growthChanceOnePlusNeighbors : cfg.taiga.growthChanceNoNeighbors
         if (chance(growChance)) additions.push({x, y})
       }
     }
@@ -257,23 +258,25 @@ function generateSurface() {
       const t = map[y][x]
       if (t === 'grass' || t === 'forest' || t === 'hill' || t === 'sand') {
         const b = boulderNoiseFunction(x, y, MAP_W, MAP_H)
-        if (b > 0.80) map[y][x] = 'boulder'
+        if (b > cfg.boulders.noiseThreshold) map[y][x] = 'boulder'
       }
     }
   }
 
   // Lone trees in broad grassland: scattered visual features with enough
   // density to make large open fields feel naturally wooded.
-  for (let y = 4; y < MAP_H - 4; y++) for (let x = 4; x < MAP_W - 4; x++) {
-    if (map[y][x] !== 'grass' || chance(0.955)) continue
+  const treeEdge = cfg.grasslandTrees.edgeMargin
+  const treeRadius = cfg.grasslandTrees.densityRadius
+  for (let y = treeEdge; y < MAP_H - treeEdge; y++) for (let x = treeEdge; x < MAP_W - treeEdge; x++) {
+    if (map[y][x] !== 'grass' || chance(cfg.grasslandTrees.candidateSkipChance)) continue
     let grassCount = 0
-    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++)
+    for (let dy = -treeRadius; dy <= treeRadius; dy++) for (let dx = -treeRadius; dx <= treeRadius; dx++)
       if (map[y + dy][x + dx] === 'grass') grassCount++
-    if (grassCount < 57) continue
+    if (grassCount < cfg.grasslandTrees.minGrassTiles) continue
     let tooClose = false
     for (const key of grasslandTrees) {
       const [tx, ty] = key.split(',').map(Number)
-      if (Math.max(Math.abs(tx - x), Math.abs(ty - y)) < 6) {
+      if (Math.max(Math.abs(tx - x), Math.abs(ty - y)) < cfg.grasslandTrees.minSpacing) {
         tooClose = true
         break
       }
@@ -285,19 +288,20 @@ function generateSurface() {
   // Rivers begin in the highlands. Pick actual mountain cells so every
   // headwater visibly emerges from a mountain range.
   const mountainSources = []
-  for (let y = 4; y < MAP_H - 4; y++) for (let x = 4; x < MAP_W - 4; x++) {
+  const riverEdge = cfg.rivers.sourceEdgeMargin
+  for (let y = riverEdge; y < MAP_H - riverEdge; y++) for (let x = riverEdge; x < MAP_W - riverEdge; x++) {
     if (map[y][x] === 'mountain' || map[y][x] === 'snowmountain') mountainSources.push({x, y})
   }
   const riverSources = []
-  for (let i = 0; i < Math.min(14, mountainSources.length); i++) {
+  for (let i = 0; i < Math.min(cfg.rivers.maxSources, mountainSources.length); i++) {
     const idx = randInt(0, mountainSources.length - 1)
     riverSources.push(mountainSources.splice(idx, 1)[0])
   }
   for (const src of riverSources) {
     let x = src.x, y = src.y
     let previousX = -1, previousY = -1
-    if (elev[y][x] < 0.44) continue
-    for (let step = 0; step < 350; step++) {
+    if (elev[y][x] < cfg.rivers.minSourceElevation) continue
+    for (let step = 0; step < cfg.rivers.maxSteps; step++) {
       if (map[y][x] === 'water') break
       // Keep channels one tile wide. A river may continue through its
       // own previous tile, but must not merge with or run alongside an
@@ -341,10 +345,11 @@ function generateSurface() {
   let frozenRiverCount = 0
   for (let yy = 0; yy < SNOW_BAND; yy++) for (let xx = 0; xx < MAP_W; xx++)
     if (map[yy][xx] === 'frozenriver') frozenRiverCount++
-  if (frozenRiverCount === 0) {
-    const fx = Math.max(3, Math.min(MAP_W - 4, randInt(6, MAP_W - 7)))
-    const fy = Math.max(3, Math.floor(SNOW_BAND * 0.45))
-    const length = Math.max(5, Math.min(12, SNOW_BAND - fy - 2))
+  if (cfg.rivers.guaranteeFrozenRiver && frozenRiverCount === 0) {
+    const margin = cfg.rivers.frozenFallbackXMargin
+    const fx = Math.max(3, Math.min(MAP_W - 4, randInt(margin, MAP_W - margin - 1)))
+    const fy = Math.max(3, Math.floor(SNOW_BAND * cfg.rivers.frozenFallbackYFraction))
+    const length = Math.max(cfg.rivers.frozenFallbackMinLength, Math.min(cfg.rivers.frozenFallbackMaxLength, SNOW_BAND - fy - 2))
     for (let i = 0; i < length; i++) {
       const yy = fy + i
       if (yy >= SNOW_BAND || yy >= MAP_H - 2) break
@@ -362,11 +367,11 @@ function generateSurface() {
   // Spawn point: near center, on grass/hill
   let sx = Math.floor(MAP_W / 2), sy = Math.floor(MAP_H / 2)
   let found = false
-  for (let r = 0; r < 40 && !found; r++) {
+  for (let r = 0; r < cfg.spawn.searchRadius && !found; r++) {
     for (let dy = -r; dy <= r && !found; dy++) {
       for (let dx = -r; dx <= r && !found; dx++) {
         const nx = sx + dx, ny = sy + dy
-        if (nx < 2 || ny < 2 || nx >= MAP_W - 2 || ny >= MAP_H - 2) continue
+        if (nx < cfg.spawn.edgeMargin || ny < cfg.spawn.edgeMargin || nx >= MAP_W - cfg.spawn.edgeMargin || ny >= MAP_H - cfg.spawn.edgeMargin) continue
         if (map[ny][nx] === 'grass' || map[ny][nx] === 'hill') {
           sx = nx
           sy = ny
@@ -380,7 +385,7 @@ function generateSurface() {
   // random 2x2 / 3x2 / 2x3 footprint of temple ground anchored at the
   // spawn point (skipping any tile that would land on water/mountain,
   // which stay impassable).
-  const templeShapes = [[2, 2], [3, 2], [2, 3]]
+  const templeShapes = cfg.temple.shapes
   const [tw, th] = pick(templeShapes)
   const templeTiles = []
   for (let dy = 0; dy < th; dy++) {
@@ -403,7 +408,7 @@ function generateSurface() {
     // other non-water/mountain tile next to the spawn point and fold it
     // into the temple complex so the bell tower always has somewhere to go.
     outer:
-      for (let r = 1; r <= 6; r++) {
+      for (let r = 1; r <= cfg.temple.bellTowerFallbackRadius; r++) {
         for (let dy = -r; dy <= r; dy++) {
           for (let dx = -r; dx <= r; dx++) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
@@ -453,22 +458,23 @@ function generateSurface() {
 }
 
 function placeVolcanoes() {
+  const cfg = WORLD_GEN_CONFIG.surface.volcanoes
   const candidates = []
-  for (let y = 3; y < MAP_H - 3; y++) for (let x = 3; x < MAP_W - 3; x++) {
+  for (let y = cfg.candidateEdgeMargin; y < MAP_H - cfg.candidateEdgeMargin; y++) for (let x = cfg.candidateEdgeMargin; x < MAP_W - cfg.candidateEdgeMargin; x++) {
     if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
-    if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < 25) continue
+    if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < cfg.minTempleDistance) continue
     candidates.push({x, y})
   }
   if (!candidates.length) return // practically impossible on the island generator
-  const count = rng() < 0.35 ? 2 : 1
+  const count = chance(cfg.secondVolcanoChance) ? 2 : 1
   const chosen = []
   while (chosen.length < count && candidates.length) {
     const spot = candidates.splice(randInt(0, candidates.length - 1), 1)[0]
-    if (chosen.every(other => Math.max(Math.abs(spot.x - other.x), Math.abs(spot.y - other.y)) >= 20)) {
+    if (chosen.every(other => Math.max(Math.abs(spot.x - other.x), Math.abs(spot.y - other.y)) >= cfg.minSeparation)) {
       chosen.push(spot)
       map[spot.y][spot.x] = 'volcano'
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
-        if (dx === 0 && dy === 0 || Math.max(Math.abs(dx), Math.abs(dy)) > 2) continue
+      for (let dy = -cfg.lavaScanRadius; dy <= cfg.lavaScanRadius; dy++) for (let dx = -cfg.lavaScanRadius; dx <= cfg.lavaScanRadius; dx++) {
+        if (dx === 0 && dy === 0 || Math.max(Math.abs(dx), Math.abs(dy)) > cfg.lavaRadius) continue
         const x = spot.x + dx, y = spot.y + dy
         if (map[y] && (map[y][x] === 'mountain' || map[y][x] === 'snowmountain')) map[y][x] = 'lava'
       }
@@ -480,14 +486,14 @@ function placeVolcanoes() {
 // world - the player could never reach the edges or most of the content. We
 // don't repair such a map, we throw it away and roll a fresh one.
 function generateMap() {
-  const worldAttempts = Math.max(MAX_WORLD_ATTEMPTS, 40)
+  const worldAttempts = MAX_WORLD_ATTEMPTS
   for (let attempt = 1; attempt <= worldAttempts; attempt++) {
     generateSurface()
     if (!isTempleConnectedToEdge()) {
       if (attempt === worldAttempts) {
         console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
         surfaceMap = map.map(row => row.slice())
-        if (!generateCaves() || deepLevels[0]?.caves?.length < 2)
+        if (!generateCaves() || deepLevels[0]?.caves?.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves)
           throw new Error('Could not generate two distinct second-level caves.')
         // Cave generation stamps entrances onto `map`; keep the canonical
         // surface copy in sync even when this is the final fallback world.
@@ -508,7 +514,7 @@ function generateMap() {
       break
     }
     if (attempt === worldAttempts) {
-      if (deepLevels[0]?.caves?.length < 2)
+      if (deepLevels[0]?.caves?.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves)
         throw new Error('Could not generate two distinct second-level caves.')
       console.warn(`World generation failed cave-placement validation in ${worldAttempts} attempts; keeping the last world.`)
       break
@@ -559,13 +565,12 @@ function blankCaveMap() {
 // outside the exclusion area. Larger chambers may extend farther, so each
 // generated map is checked before acceptance. The final connectivity check remains as a
 // defensive fallback for any future geometry changes.
-const CRYPT_CAVE_CLEARANCE = 8
 let cryptCaveExclusionCenter = null
 
 function isInsideCryptCaveExclusion(x, y) {
   const c = cryptCaveExclusionCenter
   if (!c) return false
-  return Math.max(Math.abs(x - c.x) - 3, Math.abs(y - c.y) - 12) <= CRYPT_CAVE_CLEARANCE
+  return Math.max(Math.abs(x - c.x) - 3, Math.abs(y - c.y) - 12) <= WORLD_GEN_CONFIG.caves.cryptClearance
 }
 
 function isCaveMapTouchingCryptExclusion(cm) {
@@ -589,12 +594,14 @@ function isSegmentTouchingCryptExclusion(a, b) {
 // A compact winding cave or a broader chamber cave. Bounds and steps vary per
 // entrance; the latter uses several connected irregular rooms.
 function carveShallowCave(cm, spot, style) {
-  const radius = style === 'chambers' ? randInt(9, 15) : randInt(5, 11)
+  const cfg = WORLD_GEN_CONFIG.caves.shallow
+  const radiusRange = style === 'chambers' ? cfg.chamberRadiusRange : cfg.walkRadiusRange
+  const radius = randInt(radiusRange[0], radiusRange[1])
   const minX = Math.max(2, spot.x - radius), maxX = Math.min(MAP_W - 3, spot.x + radius)
   const minY = Math.max(2, spot.y - radius), maxY = Math.min(MAP_H - 3, spot.y + radius)
   if (style === 'walk') {
     let x = spot.x, y = spot.y
-    const steps = randInt(90, 300)
+    const steps = randInt(cfg.walkStepsRange[0], cfg.walkStepsRange[1])
     for (let step = 0; step < steps; step++) {
       cm[y][x] = 'cavefloor'
       // Cardinal moves keep the dug path connected, including narrow caves.
@@ -605,14 +612,14 @@ function carveShallowCave(cm, spot, style) {
     return
   }
   const rooms = [{x: spot.x, y: spot.y}]
-  const count = randInt(3, 6)
+  const count = randInt(cfg.chamberCountRange[0], cfg.chamberCountRange[1])
   for (let i = 1; i < count; i++) rooms.push({
     x: randInt(minX + 2, maxX - 2), y: randInt(minY + 2, maxY - 2)})
   for (const room of rooms) {
-    const rx = randInt(3, 6), ry = randInt(2, 5)
+    const rx = randInt(cfg.chamberRadiusXRange[0], cfg.chamberRadiusXRange[1]), ry = randInt(cfg.chamberRadiusYRange[0], cfg.chamberRadiusYRange[1])
     for (let y = Math.max(minY, room.y - ry); y <= Math.min(maxY, room.y + ry); y++)
       for (let x = Math.max(minX, room.x - rx); x <= Math.min(maxX, room.x + rx); x++)
-        if (((x - room.x) / rx) ** 2 + ((y - room.y) / ry) ** 2 <= 1.05 && chance(0.94))
+        if (((x - room.x) / rx) ** 2 + ((y - room.y) / ry) ** 2 <= cfg.chamberFillThreshold && chance(cfg.chamberFillChance))
           cm[y][x] = 'cavefloor'
     cm[room.y][room.x] = 'cavefloor'
   }
@@ -620,7 +627,7 @@ function carveShallowCave(cm, spot, style) {
     let x = rooms[i - 1].x, y = rooms[i - 1].y
     while (x !== rooms[i].x || y !== rooms[i].y) {
       cm[y][x] = 'cavefloor'
-      if (x !== rooms[i].x && (y === rooms[i].y || chance(0.5))) x += Math.sign(rooms[i].x - x)
+      if (x !== rooms[i].x && (y === rooms[i].y || chance(cfg.corridorHorizontalBias))) x += Math.sign(rooms[i].x - x)
       else y += Math.sign(rooms[i].y - y)
     }
     cm[y][x] = 'cavefloor'
@@ -628,6 +635,7 @@ function carveShallowCave(cm, spot, style) {
 }
 
 function generateCaves() {
+  const cfg = WORLD_GEN_CONFIG.caves.shallow
   cryptCaveExclusionCenter = null
   for (let y = 1; y < MAP_H - 1 && !cryptCaveExclusionCenter; y++) for (let x = 1; x < MAP_W - 1; x++) {
     if (surfaceMap?.[y]?.[x] === 'ruinedchapel') {
@@ -647,29 +655,29 @@ function generateCaves() {
     })
     if (edge && !isInsideCryptCaveExclusion(x, y)) candidates.push({x, y})
   }
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < cfg.attemptedCaves; i++) {
     let spot = null
-    for (let tries = 0; tries < 500 && !spot; tries++) {
+    for (let tries = 0; tries < cfg.placementTries && !spot; tries++) {
       const c = pick(candidates)
-      if (c && caves.every(v => Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) > 10)) spot = c
+      if (c && caves.every(v => Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) > cfg.minPrimarySeparation)) spot = c
     }
     if (!spot) continue
     const entrances = [spot]
     if (i === 0) {
       const second = candidates.find(c => c !== spot &&
-          Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) >= 8 &&
-          Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) <= 18 &&
+          Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) >= cfg.secondEntranceMinDistance &&
+          Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) <= cfg.secondEntranceMaxDistance &&
           !isSegmentTouchingCryptExclusion(spot, c))
         || candidates.find(c => c !== spot && !isSegmentTouchingCryptExclusion(spot, c))
       if (second) entrances.push(second)
     }
-    const style = chance(0.5) ? 'walk' : 'chambers'
+    const style = chance(cfg.walkStyleChance) ? 'walk' : 'chambers'
     const cave = {x: spot.x, y: spot.y, style,
       entrances: entrances.map(p => ({x: p.x, y: p.y}))}
     const cm = blankCaveMap()
     carveShallowCave(cm, spot, style)
     for (const entrance of entrances) {
-      for (let yy = entrance.y - 2; yy <= entrance.y; yy++) for (let xx = entrance.x - 1; xx <= entrance.x + 1; xx++) {
+      for (let yy = entrance.y - cfg.entranceCarveDepth; yy <= entrance.y; yy++) for (let xx = entrance.x - cfg.entranceCarveWidth; xx <= entrance.x + cfg.entranceCarveWidth; xx++) {
         if (xx >= 0 && yy >= 0 && xx < MAP_W && yy < MAP_H) cm[yy][xx] = 'cavefloor'
       }
       cm[entrance.y][entrance.x] = 'caveentrance'
@@ -716,7 +724,7 @@ function generateCaves() {
   // Try independent placement orders before rejecting the whole world.
   // Work on copies so a failed trial cannot leave orphaned stair tiles behind.
   let deep = null
-  for (let trial = 0; trial < 6; trial++) {
+  for (let trial = 0; trial < WORLD_GEN_CONFIG.caves.deep.generationTrials; trial++) {
     const trialMaps = caveMaps.map(cm => cm.map(row => row.slice()))
     const trialMap = undergroundMap.map(row => row.slice())
     const candidate = generateDeepLevel(caves, trialMaps, trialMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')
@@ -752,7 +760,7 @@ function isMausoleumAdjacentToRandomCave() {
   // Surface rule: random cave mouths must not spawn right beside the village.
   // A 4-tile Chebyshev clearance keeps entrances visibly outside the settlement
   // instead of allowing cases such as an entrance only two tiles from a hut.
-  const VILLAGE_CAVE_CLEARANCE = 4
+  const VILLAGE_CAVE_CLEARANCE = WORLD_GEN_CONFIG.caves.villageEntranceClearance
 
   // Underground rule: the mausoleum is a 9x9 template whose walkable/stamped
   // interior occupies x = hut.x-3..hut.x+3 and y = hut.y-6..hut.y.
@@ -945,10 +953,11 @@ function buildCryptLevel2() {
 let dwarvenRuin = null
 
 function buildDwarvenRuin(targetLevel) {
+  const cfg = WORLD_GEN_CONFIG.dwarvenFort
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
   const candidates = []
-  for (let y = 8; y < MAP_H - 8; y++) for (let x = 8; x < MAP_W - 8; x++) {
+  for (let y = cfg.candidateEdgeMargin; y < MAP_H - cfg.candidateEdgeMargin; y++) for (let x = cfg.candidateEdgeMargin; x < MAP_W - cfg.candidateEdgeMargin; x++) {
     if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
     if (DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) candidates.push({x, y})
   }
@@ -957,17 +966,17 @@ function buildDwarvenRuin(targetLevel) {
   // snowy mountain outcrop in the north and place the gate there.
   if (!candidates.length) {
     const fallback = []
-    const northLimit = Math.max(12, Math.floor(MAP_H * 0.28))
-    for (let y = 8; y < northLimit; y++) for (let x = 8; x < MAP_W - 8; x++) {
+    const northLimit = Math.max(cfg.fallbackNorthMinRows, Math.floor(MAP_H * cfg.fallbackNorthFraction))
+    for (let y = cfg.candidateEdgeMargin; y < northLimit; y++) for (let x = cfg.candidateEdgeMargin; x < MAP_W - cfg.candidateEdgeMargin; x++) {
       if (!TILE[map[y]?.[x]]?.walk) continue
       if (!DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) continue
       fallback.push({x, y})
     }
-    const gate = fallback.length ? pick(fallback) : {x: Math.floor(MAP_W / 2), y: 10}
+    const gate = fallback.length ? pick(fallback) : {x: Math.floor(MAP_W / 2), y: cfg.fallbackCenterY}
     const {x: fx, y: fy} = gate
-    for (let yy = fy - 3; yy <= fy + 3; yy++) for (let xx = fx - 3; xx <= fx + 3; xx++) {
+    for (let yy = fy - cfg.fallbackOutcropRadius; yy <= fy + cfg.fallbackOutcropRadius; yy++) for (let xx = fx - cfg.fallbackOutcropRadius; xx <= fx + cfg.fallbackOutcropRadius; xx++) {
       if (yy < 1 || yy >= MAP_H - 1 || xx < 1 || xx >= MAP_W - 1) continue
-      if (Math.abs(xx - fx) <= 1 && Math.abs(yy - fy) <= 1) continue
+      if (Math.abs(xx - fx) <= cfg.fallbackOutcropCoreRadius && Math.abs(yy - fy) <= cfg.fallbackOutcropCoreRadius) continue
       map[yy][xx] = 'snowmountain'
     }
     candidates.push({x: fx, y: fy})
@@ -981,8 +990,8 @@ function buildDwarvenRuin(targetLevel) {
     if (x0 > 0) surfaceMap[y0][x0 - 1] = 'dwarvenstatue'
     if (x0 < MAP_W - 1) surfaceMap[y0][x0 + 1] = 'dwarvenstatue'
   }
-  const cm = blankCaveMap(), minX = Math.max(2, x0 - 34), maxX = Math.min(MAP_W - 3, x0 + 34),
-    minY = Math.max(2, y0 - 24), maxY = Math.min(MAP_H - 3, y0 + 24)
+  const cm = blankCaveMap(), minX = Math.max(2, x0 - cfg.boundsX), maxX = Math.min(MAP_W - 3, x0 + cfg.boundsX),
+    minY = Math.max(2, y0 - cfg.boundsY), maxY = Math.min(MAP_H - 3, y0 + cfg.boundsY)
   // Generate a larger, irregular fort: sealed rooms with single entrances,
   // connected by deliberately non-intersecting 2-3 tile-wide corridors.
   const carve = (x, y) => {
@@ -993,14 +1002,15 @@ function buildDwarvenRuin(targetLevel) {
     for (let dy = 0; dy < span; dy++) for (let dx = 0; dx < span; dx++) carve(x + dx - Math.floor(span / 2), y + dy - Math.floor(span / 2))
   }
   const rooms = []
-  const roomCount = randInt(7, 11)
-  for (let attempt = 0; rooms.length < roomCount && attempt < 300; attempt++) {
-    const w = randInt(7, 14), h = randInt(6, 11)
-    const rx = randInt(minX + 4, maxX - w - 4), ry = randInt(minY + 4, maxY - h - 4)
+  const roomCount = randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
+  for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts; attempt++) {
+    const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1]), h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
+    const rx = randInt(minX + cfg.roomBoundsMargin, maxX - w - cfg.roomBoundsMargin), ry = randInt(minY + cfg.roomBoundsMargin, maxY - h - cfg.roomBoundsMargin)
     const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
-    if (rooms.every(r => candidate.x > r.x + r.w + 3 || candidate.x + candidate.w + 3 < r.x || candidate.y > r.y + r.h + 3 || candidate.y + candidate.h + 3 < r.y)) rooms.push(candidate)
+    if (rooms.every(r => candidate.x > r.x + r.w + cfg.roomSeparation || candidate.x + candidate.w + cfg.roomSeparation < r.x || candidate.y > r.y + r.h + cfg.roomSeparation || candidate.y + candidate.h + cfg.roomSeparation < r.y)) rooms.push(candidate)
   }
-  const entranceRoom = {x: x0 - 4, y: y0 - 4, w: 9, h: 9, cx: x0, cy: y0}
+  const [entranceW, entranceH] = cfg.entranceRoomSize
+  const entranceRoom = {x: x0 - Math.floor(entranceW / 2), y: y0 - Math.floor(entranceH / 2), w: entranceW, h: entranceH, cx: x0, cy: y0}
   rooms.unshift(entranceRoom)
   for (const r of rooms) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) carve(x, y)
   const connected = [rooms[0]]
@@ -1011,11 +1021,11 @@ function buildDwarvenRuin(targetLevel) {
       if (!best || d < best.d) best = {r, c, d}
     }
     const {r, c} = best
-    const horizontalFirst = chance(.5)
+    const horizontalFirst = chance(cfg.corridorHorizontalFirstChance)
     const corridor = (x1, y1, x2, y2) => {
       const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
-      while (x1 !== x2) { carveWide(x1, y1, chance(.35) ? 3 : 2); x1 += sx }
-      while (y1 !== y2) { carveWide(x1, y1, chance(.35) ? 3 : 2); y1 += sy }
+      while (x1 !== x2) { carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2); x1 += sx }
+      while (y1 !== y2) { carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2); y1 += sy }
       carveWide(x2, y2, 2)
     }
     if (horizontalFirst) { corridor(c.cx, c.cy, r.cx, c.cy); corridor(r.cx, c.cy, r.cx, r.cy) }
@@ -1059,9 +1069,9 @@ function buildDwarvenRuin(targetLevel) {
   }
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
   cm[y0][x0] = targetLevel ? 'dwarvenfortexit' : 'dwarvengate'
-  for (let i = 0; i < 45; i++) {
+  for (let i = 0; i < cfg.collapseAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
-    if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > 8) cm[y][x] = chance(.65) ? 'dwarvenrubble' : 'dwarvenwall'
+    if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > cfg.collapseMinGateDistance) cm[y][x] = chance(cfg.rubbleChance) ? 'dwarvenrubble' : 'dwarvenwall'
   }
   // Final connectivity repair: every outermost walkable fort tile must
   // have a path to the gate.  Room walls and rubble can otherwise seal
@@ -1124,10 +1134,10 @@ function buildDwarvenRuin(targetLevel) {
     const ghostSpots = []
     for (let gy = minY + 1; gy < maxY; gy++) for (let gx = minX + 1; gx < maxX; gx++) {
       if (cm[gy]?.[gx] !== 'marble') continue
-      if (Math.abs(gx - x0) + Math.abs(gy - y0) < 8) continue
+      if (Math.abs(gx - x0) + Math.abs(gy - y0) < cfg.ghostMinGateDistance) continue
       ghostSpots.push({x: gx, y: gy})
     }
-    for (let i = 0; i < 8 && ghostSpots.length; i++) {
+    for (let i = 0; i < cfg.ghostCount && ghostSpots.length; i++) {
       const pickIndex = randInt(0, ghostSpots.length - 1)
       const {x: gx, y: gy} = ghostSpots.splice(pickIndex, 1)[0]
       const e = {
@@ -1156,7 +1166,7 @@ function buildDwarvenRuin(targetLevel) {
         equipment: null
       }
       prepareEnemyEquipment(e)
-      if (chance(0.05)) {
+      if (chance(cfg.ghostPrefixChance)) {
         const names = Object.keys(ENEMY_PREFIXES)
         if (names.length) {
           const prefix = pick(names)
@@ -1169,7 +1179,7 @@ function buildDwarvenRuin(targetLevel) {
       addEnemy(e)
     }
   }
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < cfg.ruinPropAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] === 'marble') groundItems.push({
       x,
@@ -1186,7 +1196,7 @@ function buildDwarvenRuin(targetLevel) {
   const anvilCandidates = []
   for (let y = minY + 1; y < maxY; y++) for (let x = minX + 1; x < maxX; x++) {
     if (cm[y]?.[x] !== 'marble') continue
-    if (Math.abs(x - x0) + Math.abs(y - y0) < 8) continue
+    if (Math.abs(x - x0) + Math.abs(y - y0) < cfg.anvilMinGateDistance) continue
     if (groundItems.some(i => i.level === ruinLevel && i.caveIndex === dwarvenRuin.caveIndex && i.x === x && i.y === y)) continue
     anvilCandidates.push({x, y})
   }
@@ -1211,20 +1221,20 @@ function buildDwarvenRuin(targetLevel) {
     ;[shuffledRuinSpots[i], shuffledRuinSpots[j]] = [shuffledRuinSpots[j], shuffledRuinSpots[i]]
   }
   const farFrom = (p, q, distance = 10) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) >= distance
-  let artifactSpot = shuffledRuinSpots.find(p => farFrom(p, {x: x0, y: y0}, 18)) || shuffledRuinSpots[0]
+  let artifactSpot = shuffledRuinSpots.find(p => farFrom(p, {x: x0, y: y0}, cfg.artifactChestMinGateDistance)) || shuffledRuinSpots[0]
   if (artifactSpot) groundItems.push({
     x: artifactSpot.x,
     y: artifactSpot.y,
     kind: 'chest',
-    tier: 5,
+    tier: cfg.artifactChestTier,
     artifactGuaranteed: true,
     opened: false,
     level: ruinLevel,
     levelKind: 'chain',
     caveIndex: dwarvenRuin.caveIndex
   })
-  let deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, 16) && farFrom(p, {x: x0, y: y0}, 18))
-  if (!deepSpot) deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, 8))
+  let deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, cfg.wheelbarrowMinArtifactDistance) && farFrom(p, {x: x0, y: y0}, cfg.wheelbarrowMinGateDistance))
+  if (!deepSpot) deepSpot = shuffledRuinSpots.find(p => farFrom(p, artifactSpot || {x: x0, y: y0}, cfg.wheelbarrowFallbackArtifactDistance))
   if (deepSpot) {
     groundItems.push({
       x: deepSpot.x,
@@ -1247,7 +1257,7 @@ function buildDwarvenRuin(targetLevel) {
       description: 'You see a single, enormous gold coin. A skeleton lies crushed beneath it, its bones flattened under the weight. Poor greedy soul.'
     })
   }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < cfg.remainsAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] === 'dwarvenrubble') groundItems.push({
       x,
@@ -1264,8 +1274,9 @@ function buildDwarvenRuin(targetLevel) {
 
 // Organic grotto chambers and winding passages, using the world seed.
 function carveDeepDungeon(spot, floorTile, reserved) {
+  const cfg = WORLD_GEN_CONFIG.caves.deep.grotto
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
-  const sizes = [[92, 72], [82, 66], [74, 60], [66, 54], [56, 46], [48, 40], [42, 36]]
+  const sizes = cfg.sizes.map(size => size.slice())
   for (let i = sizes.length - 1; i > 0; i--) {
     const j = randInt(0, i)
     ;[sizes[i], sizes[j]] = [sizes[j], sizes[i]]
@@ -1284,34 +1295,34 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       bounds.x2 = bounds.x1 + w - 1
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
-      if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+      if (reserved.some(r => bounds.x1 <= r.x2 + cfg.reservedPadding && bounds.x2 >= r.x1 - cfg.reservedPadding &&
+        bounds.y1 <= r.y2 + cfg.reservedPadding && bounds.y2 >= r.y1 - cfg.reservedPadding)) continue
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
-      const targetRooms = Math.max(9, Math.round(w * h / 270) + 4)
+      const targetRooms = Math.max(cfg.minRooms, Math.round(w * h / cfg.roomDensityDivisor) + cfg.roomCountBonus)
       const rooms = [{cx: spot.x, cy: spot.y}]
-      for (let tries = 0; tries < 1800 && rooms.length < targetRooms; tries++) {
-        const cx = randInt(bounds.x1 + 6, bounds.x2 - 6)
-        const cy = randInt(bounds.y1 + 6, bounds.y2 - 6)
-        if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < 145)) continue
+      for (let tries = 0; tries < cfg.roomPlacementTries && rooms.length < targetRooms; tries++) {
+        const cx = randInt(bounds.x1 + cfg.roomCenterMargin, bounds.x2 - cfg.roomCenterMargin)
+        const cy = randInt(bounds.y1 + cfg.roomCenterMargin, bounds.y2 - cfg.roomCenterMargin)
+        if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < cfg.minCenterDistanceSquared)) continue
         rooms.push({cx, cy})
       }
-      if (rooms.length < Math.max(8, targetRooms - 3)) continue
+      if (rooms.length < Math.max(cfg.minAcceptedRooms, targetRooms - cfg.acceptedRoomShortfall)) continue
       const cm = blankCaveMap()
       for (const room of rooms) {
-        const rx = randInt(5, 8), ry = randInt(4, 7)
+        const rx = randInt(cfg.roomRadiusXRange[0], cfg.roomRadiusXRange[1]), ry = randInt(cfg.roomRadiusYRange[0], cfg.roomRadiusYRange[1])
         room.x1 = Math.max(bounds.x1 + 1, room.cx - rx)
         room.x2 = Math.min(bounds.x2 - 1, room.cx + rx)
         room.y1 = Math.max(bounds.y1 + 1, room.cy - ry)
         room.y2 = Math.min(bounds.y2 - 1, room.cy + ry)
         // Angular radius changes every few tiles; the center always stays
         // open, while the wall becomes lobed rather than rectangular.
-        const edge = Array.from({length: 12}, () => randInt(-22, 16) / 100)
+        const edge = Array.from({length: cfg.edgeSamples}, () => randInt(cfg.edgeVariancePercentRange[0], cfg.edgeVariancePercentRange[1]) / 100)
         for (let y = room.y1; y <= room.y2; y++) for (let x = room.x1; x <= room.x2; x++) {
           const dx = (x - room.cx) / rx, dy = (y - room.cy) / ry
-          const angle = Math.floor((Math.atan2(dy, dx) + Math.PI) * 12 / (2 * Math.PI)) % 12
-          if (dx * dx + dy * dy <= (0.88 + edge[angle]) ** 2)
+          const angle = Math.floor((Math.atan2(dy, dx) + Math.PI) * cfg.edgeSamples / (2 * Math.PI)) % cfg.edgeSamples
+          if (dx * dx + dy * dy <= (cfg.baseRadius + edge[angle]) ** 2)
             cm[y][x] = floorTile
         }
         cm[room.cy][room.cx] = floorTile
@@ -1319,8 +1330,8 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       // Step toward an offset midpoint and then the target; varied passage
       // widths and turns keep the links from reading as grid-aligned halls.
       const passage = (from, to) => {
-        const mid = {x: Math.round((from.cx + to.cx) / 2) + randInt(-3, 3),
-          y: Math.round((from.cy + to.cy) / 2) + randInt(-3, 3)}
+        const mid = {x: Math.round((from.cx + to.cx) / 2) + randInt(-cfg.passageMidpointJitter, cfg.passageMidpointJitter),
+          y: Math.round((from.cy + to.cy) / 2) + randInt(-cfg.passageMidpointJitter, cfg.passageMidpointJitter)}
         const brush = (x, y, width) => {
           for (let yy = y - 1; yy <= y + width - 2; yy++)
             for (let xx = x - 1; xx <= x + width - 2; xx++)
@@ -1330,10 +1341,10 @@ function carveDeepDungeon(spot, floorTile, reserved) {
         let x = from.cx, y = from.cy, step = 0
         for (const goal of [mid, {x: to.cx, y: to.cy}]) {
           while (x !== goal.x || y !== goal.y) {
-            const moveX = x !== goal.x && (y === goal.y || chance(0.5))
+            const moveX = x !== goal.x && (y === goal.y || chance(cfg.passageHorizontalChance))
             if (moveX) x += Math.sign(goal.x - x)
             else y += Math.sign(goal.y - y)
-            brush(x, y, step++ % 9 < 3 ? 3 : 2)
+            brush(x, y, step++ % cfg.passageWideCycle < cfg.passageWideSteps ? 3 : 2)
           }
         }
       }
@@ -1349,7 +1360,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
         connected.push(best.r)
         remaining.splice(remaining.indexOf(best.r), 1)
       }
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < cfg.extraConnections; i++) {
         const a = pick(rooms), b = pick(rooms)
         if (a !== b) passage(a, b)
       }
@@ -1367,21 +1378,21 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           if (cm[y][x] === floorTile && !reachable.has(keyXY(x, y))) cm[y][x] = 'cavewall'
       // A water pocket is only accepted if all dry tiles remain reachable.
       let hasWater = false
-      if (chance(0.6)) {
+      if (chance(cfg.waterChance)) {
         const candidates = rooms.slice(1)
         for (let i = candidates.length - 1; i > 0; i--) {
           const j = randInt(0, i)
           ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
         }
         for (const r of candidates) {
-          const wx = r.cx + randInt(-2, 2), wy = r.cy + randInt(-2, 2)
+          const wx = r.cx + randInt(-cfg.waterCenterJitter, cfg.waterCenterJitter), wy = r.cy + randInt(-cfg.waterCenterJitter, cfg.waterCenterJitter)
           const cells = []
-          for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 4; dx++) {
+          for (let dy = -cfg.waterRadiusY; dy <= cfg.waterRadiusY; dy++) for (let dx = -cfg.waterRadiusX; dx <= cfg.waterRadiusX; dx++) {
             const x = wx + dx, y = wy + dy
-            if (cm[y]?.[x] === floorTile && dx * dx / 16 + dy * dy / 9 < 0.88 &&
+            if (cm[y]?.[x] === floorTile && dx * dx / (cfg.waterRadiusX ** 2) + dy * dy / (cfg.waterRadiusY ** 2) < cfg.waterEllipseThreshold &&
               !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
           }
-          if (cells.length < 8) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
+          if (cells.length < cfg.minWaterCells) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
           const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
           for (let i = 0; i < queue.length; i++) {
             const p = queue[i]
@@ -1404,7 +1415,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       for (let y = bounds.y1; y <= bounds.y2; y++)
         for (let x = bounds.x1; x <= bounds.x2; x++)
           if (cm[y][x] === floorTile) dryFloor++
-      if (dryFloor < Math.round(w * h * 0.13)) continue
+      if (dryFloor < Math.round(w * h * cfg.minDryFloorFraction)) continue
       return {cm, rooms, bounds, hasWater}
     }
   }
@@ -1414,12 +1425,14 @@ function carveDeepDungeon(spot, floorTile, reserved) {
 // A second z:-2 layout: branching, narrow dug passages and scattered pockets.
 // It can fit around crowded surface entrances where a broad grotto cannot.
 function carveBurrowDungeon(spot, floorTile, reserved) {
-  const sizes = [[68, 52], [58, 44], [48, 38], [40, 32], [34, 28], [28, 24]]
+  const cfg = WORLD_GEN_CONFIG.caves.deep.burrow
+  const sizes = cfg.sizes
   const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   for (const [w, h] of sizes) {
-    const anchors = [[Math.floor(w / 2), Math.floor(h / 2)], [5, Math.floor(h / 2)],
-      [w - 6, Math.floor(h / 2)], [Math.floor(w / 2), 5],
-      [Math.floor(w / 2), h - 6], [5, 5], [w - 6, h - 6]]
+    const edge = cfg.anchorEdgeOffset
+    const anchors = [[Math.floor(w / 2), Math.floor(h / 2)], [edge, Math.floor(h / 2)],
+      [w - edge - 1, Math.floor(h / 2)], [Math.floor(w / 2), edge],
+      [Math.floor(w / 2), h - edge - 1], [edge, edge], [w - edge - 1, h - edge - 1]]
     for (let n = anchors.length - 1; n > 0; n--) {
       const j = randInt(0, n)
       ;[anchors[n], anchors[j]] = [anchors[j], anchors[n]]
@@ -1429,11 +1442,11 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
       bounds.x2 = bounds.x1 + w - 1
       bounds.y2 = bounds.y1 + h - 1
       if (bounds.x1 < 2 || bounds.y1 < 2 || bounds.x2 >= MAP_W - 2 || bounds.y2 >= MAP_H - 2) continue
-      if (reserved.some(r => bounds.x1 <= r.x2 + 2 && bounds.x2 >= r.x1 - 2 &&
-        bounds.y1 <= r.y2 + 2 && bounds.y2 >= r.y1 - 2)) continue
+      if (reserved.some(r => bounds.x1 <= r.x2 + cfg.reservedPadding && bounds.x2 >= r.x1 - cfg.reservedPadding &&
+        bounds.y1 <= r.y2 + cfg.reservedPadding && bounds.y2 >= r.y1 - cfg.reservedPadding)) continue
       const cm = blankCaveMap(), rooms = []
       const brush = (x, y, wide) => {
-        const radius = wide ? 2 : 1
+        const radius = wide ? cfg.wideBrushRadius : cfg.brushRadius
         for (let yy = y - radius; yy <= y + radius; yy++)
           for (let xx = x - radius; xx <= x + radius; xx++)
             if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
@@ -1441,32 +1454,32 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
       }
       brush(spot.x, spot.y, true)
       const tips = [{x: spot.x, y: spot.y}]
-      const branches = Math.max(5, Math.round(w * h / 450))
+      const branches = Math.max(cfg.minBranches, Math.round(w * h / cfg.branchDensityDivisor))
       for (let branch = 0; branch < branches; branch++) {
         const origin = pick(tips)
         let x = origin.x, y = origin.y
         let [dx, dy] = pick(dirs)
-        const steps = randInt(Math.max(25, Math.round((w + h) / 2)), w + h + 40)
+        const steps = randInt(Math.max(cfg.minSteps, Math.round((w + h) / 2)), w + h + cfg.stepLengthBonus)
         for (let step = 0; step < steps; step++) {
-          if (chance(0.19)) [dx, dy] = pick(dirs)
+          if (chance(cfg.turnChance)) [dx, dy] = pick(dirs)
           const nx = x + dx, ny = y + dy
-          if (nx <= bounds.x1 + 2 || nx >= bounds.x2 - 2 ||
-            ny <= bounds.y1 + 2 || ny >= bounds.y2 - 2) {
+          if (nx <= bounds.x1 + cfg.boundsMargin || nx >= bounds.x2 - cfg.boundsMargin ||
+            ny <= bounds.y1 + cfg.boundsMargin || ny >= bounds.y2 - cfg.boundsMargin) {
             ;[dx, dy] = pick(dirs)
             continue
           }
           x = nx; y = ny
-          brush(x, y, step % 17 < 3)
+          brush(x, y, step % cfg.wideCycle < cfg.wideSteps)
         }
         brush(x, y, true)
         tips.push({x, y})
-        rooms.push({cx: x, cy: y, x1: x - 3, x2: x + 3, y1: y - 3, y2: y + 3})
+        rooms.push({cx: x, cy: y, x1: x - cfg.roomHalfSize, x2: x + cfg.roomHalfSize, y1: y - cfg.roomHalfSize, y2: y + cfg.roomHalfSize})
       }
       let floor = 0
       for (let y = bounds.y1; y <= bounds.y2; y++)
         for (let x = bounds.x1; x <= bounds.x2; x++)
           if (cm[y][x] === floorTile) floor++
-      if (floor < 120) continue
+      if (floor < cfg.minFloorTiles) continue
       return {cm, rooms, bounds, hasWater: false, style: 'burrow'}
     }
   }
@@ -1476,6 +1489,7 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
 // Each world needs a broad grotto and a compact burrow at z:-2. Other
 // branches are optional and use either generator, with reserved nonoverlap.
 function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile) {
+  const cfg = WORLD_GEN_CONFIG.caves.deep
   const levelCaves = [], levelCaveMaps = [], reserved = []
   const eligible = parentCaves.map((c, i) => i).filter(i => !parentCaves[i]?.crypt)
   for (let n = eligible.length - 1; n > 0; n--) {
@@ -1493,7 +1507,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     }
     const carve = style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
     let spot = null, layout = null
-    for (let tries = 0; tries < 64 && open.length; tries++) {
+    for (let tries = 0; tries < cfg.placementTriesPerBranch && open.length; tries++) {
       const candidate = open.splice(randInt(0, open.length - 1), 1)[0]
       const result = carve(candidate, floorTile, reserved)
       if (result) { spot = candidate; layout = result; break }
@@ -1516,8 +1530,8 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     }
   }
   if (levelCaves.length >= 2) for (const i of eligible) {
-    if (used.has(i) || !chance(0.5)) continue
-    addBranch(i, chance(0.5) ? 'grotto' : 'burrow')
+    if (used.has(i) || !chance(cfg.optionalBranchChance)) continue
+    addBranch(i, chance(cfg.optionalGrottoChance) ? 'grotto' : 'burrow')
   }
   const levelMap = blankCaveMap()
   for (const cm of levelCaveMaps)
@@ -1533,6 +1547,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
 let bigBellPos = null
 
 function placeBigBell() {
+  const cfg = WORLD_GEN_CONFIG.landmarks
   // Preferred: a mountain tile near the temple, right on the mountain's
   // edge (bordering walkable ground) so the guards have room to stand.
   function search(minR, maxR, requireEdge) {
@@ -1541,7 +1556,7 @@ function placeBigBell() {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
           const x = spawnPoint.x + dx, y = spawnPoint.y + dy
-          if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2) continue
+          if (x < cfg.placementEdgeMargin || y < cfg.placementEdgeMargin || x >= MAP_W - cfg.placementEdgeMargin || y >= MAP_H - cfg.placementEdgeMargin) continue
           if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
           // Keep well clear of the black pillar - the two landmarks
           // shouldn't spawn side by side.
@@ -1567,7 +1582,10 @@ function placeBigBell() {
   // At least 20 tiles from the temple, but still "not too far from the
   // center of the map" overall - widening/dropping the edge requirement
   // only if the terrain nearby doesn't offer a clean mountain edge.
-  const spot = search(20, 40, true) || search(20, 60, true) || search(20, Math.max(MAP_W, MAP_H), false)
+  const searches = cfg.bigBellSearches
+  const spot = search(searches[0][0], searches[0][1], searches[0][2]) ||
+    search(searches[1][0], searches[1][1], searches[1][2]) ||
+    search(searches[2][0], searches[2][1] ?? Math.max(MAP_W, MAP_H), searches[2][2])
   if (!spot) return
   map[spot.y][spot.x] = 'bigbell'
   bigBellPos = spot
@@ -1594,6 +1612,7 @@ function placeBigBell() {
 }
 
 function spawnBellGuardians() {
+  const cfg = WORLD_GEN_CONFIG.landmarks
   if (!bigBellPos) return
   const guardName = pick(['Ogre', 'Cyclops'])
   const tmpl = ENEMY_TEMPLATES.find(t => t.name === guardName)
@@ -1609,10 +1628,10 @@ function spawnBellGuardians() {
       candidates.push({x, y})
     }
   }
-  for (let i = 0; i < 2 && candidates.length; i++) {
+  for (let i = 0; i < cfg.bellGuardianCount && candidates.length; i++) {
     const idx = randInt(0, candidates.length - 1)
     const p = candidates.splice(idx, 1)[0]
-    const variance = 0.95 + rng() * 0.10
+    const variance = cfg.enemyStatVarianceMin + rng() * cfg.enemyStatVarianceSpan
     const e = {
       name: tmpl.name, tier: tmpl.tier,
       hp: Math.max(1, Math.round(tmpl.hp * variance)),
@@ -1636,6 +1655,7 @@ function spawnBellGuardians() {
 let blackPillarPos = null
 
 function placeBlackPillar() {
+  const cfg = WORLD_GEN_CONFIG.landmarks
   // Preferred: a mountain tile 15-45 tiles from the temple, right on the
   // mountain's edge (bordering walkable ground) so it's easy to reach.
   function search(minR, maxR, requireEdge) {
@@ -1644,7 +1664,7 @@ function placeBlackPillar() {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
           const x = spawnPoint.x + dx, y = spawnPoint.y + dy
-          if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2) continue
+          if (x < cfg.placementEdgeMargin || y < cfg.placementEdgeMargin || x >= MAP_W - cfg.placementEdgeMargin || y >= MAP_H - cfg.placementEdgeMargin) continue
           if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
           if (requireEdge) {
             let onEdge = false
@@ -1666,7 +1686,10 @@ function placeBlackPillar() {
 
   // Widen the search and drop the edge requirement if the terrain around
   // the temple doesn't happen to offer a nearby mountain edge.
-  const spot = search(15, 45, true) || search(10, 80, true) || search(5, Math.max(MAP_W, MAP_H), false)
+  const searches = cfg.blackPillarSearches
+  const spot = search(searches[0][0], searches[0][1], searches[0][2]) ||
+    search(searches[1][0], searches[1][1], searches[1][2]) ||
+    search(searches[2][0], searches[2][1] ?? Math.max(MAP_W, MAP_H), searches[2][2])
   if (spot) {
     map[spot.y][spot.x] = 'blackpillar'
     blackPillarPos = spot
@@ -1725,6 +1748,7 @@ function reconcileVillageHuts() {
 }
 
 function placeVillage() {
+  const cfg = WORLD_GEN_CONFIG.village
   // Find a clearing just outside the temple grounds, then grow a small
   // blob of hut tiles outward from it so it reads as a loose little
   // settlement right next door. Forest counts as isBuildable ground too -
@@ -1736,12 +1760,13 @@ function placeVillage() {
   }
 
   function findCenter() {
-    for (let r = 3; r <= 15; r += 2) {
-      for (let tries = 0; tries < 20; tries++) {
+    const primary = cfg.primarySearch
+    for (let r = primary.minRadius; r <= primary.maxRadius; r += primary.radiusStep) {
+      for (let tries = 0; tries < primary.triesPerRadius; tries++) {
         const ang = rng() * Math.PI * 2
         const x = Math.round(spawnPoint.x + Math.cos(ang) * r)
         const y = Math.round(spawnPoint.y + Math.sin(ang) * r)
-        if (x < 4 || y < 4 || x >= MAP_W - 4 || y >= MAP_H - 4) continue
+        if (x < cfg.edgeMargin || y < cfg.edgeMargin || x >= MAP_W - cfg.edgeMargin || y >= MAP_H - cfg.edgeMargin) continue
         if (!isBuildable(x, y)) continue
         return {x, y}
       }
@@ -1749,12 +1774,13 @@ function placeVillage() {
 
     // Fallback: widen the search a lot further out so a village always
     // finds somewhere to stand, even in heavily forested/mountainous seeds.
-    for (let r = 17; r <= 60; r += 3) {
-      for (let tries = 0; tries < 30; tries++) {
+    const fallback = cfg.fallbackSearch
+    for (let r = fallback.minRadius; r <= fallback.maxRadius; r += fallback.radiusStep) {
+      for (let tries = 0; tries < fallback.triesPerRadius; tries++) {
         const ang = rng() * Math.PI * 2
         const x = Math.round(spawnPoint.x + Math.cos(ang) * r)
         const y = Math.round(spawnPoint.y + Math.sin(ang) * r)
-        if (x < 4 || y < 4 || x >= MAP_W - 4 || y >= MAP_H - 4) continue
+        if (x < cfg.edgeMargin || y < cfg.edgeMargin || x >= MAP_W - cfg.edgeMargin || y >= MAP_H - cfg.edgeMargin) continue
         if (!isBuildable(x, y)) continue
         return {x, y}
       }
@@ -1766,15 +1792,15 @@ function placeVillage() {
   if (!center) return
   villageCenter = center
   const huts = [{x: center.x, y: center.y}]
-  const targetHuts = 11 + Math.floor(rng() * 4) // 11-14 huts
+  const targetHuts = cfg.minHuts + Math.floor(rng() * (cfg.maxHuts - cfg.minHuts + 1))
   let guard = 0
-  while (huts.length < targetHuts && guard < 400) {
+  while (huts.length < targetHuts && guard < cfg.growthAttempts) {
     guard++
     const base = huts[randInt(0, huts.length - 1)]
-    const dx = randInt(-2, 2), dy = randInt(-2, 2)
+    const dx = randInt(-cfg.growthStepRange, cfg.growthStepRange), dy = randInt(-cfg.growthStepRange, cfg.growthStepRange)
     if (dx === 0 && dy === 0) continue
     const x = base.x + dx, y = base.y + dy
-    if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2) continue
+    if (x < cfg.placementEdgeMargin || y < cfg.placementEdgeMargin || x >= MAP_W - cfg.placementEdgeMargin || y >= MAP_H - cfg.placementEdgeMargin) continue
     if (!isBuildable(x, y)) continue
     if (huts.some(h => h.x === x && h.y === y)) continue
     huts.push({x, y})
@@ -1787,7 +1813,7 @@ function placeVillage() {
   // Keep the woods from crowding right up against the settlement - clear
   // a buffer ring around the huts so no forest tile sits directly next
   // to (or inside) the village.
-  const clearRadius = 2
+  const clearRadius = cfg.forestClearRadius
   for (const h of huts) {
     for (let dy = -clearRadius; dy <= clearRadius; dy++) {
       for (let dx = -clearRadius; dx <= clearRadius; dx++) {
@@ -1800,6 +1826,7 @@ function placeVillage() {
 }
 
 function placeAncientForest() {
+  const cfg = WORLD_GEN_CONFIG.ancientForest
   const size = ANCIENT_FOREST_SIZE
   let best = null
   let bestScore = -1
@@ -1827,7 +1854,7 @@ function placeAncientForest() {
   // function silently fail and left Old Hunter with no dialogue.
   // Require a modest forest presence, then let the ancient wood reclaim the
   // remaining suitable temperate ground in the footprint.
-  const minForest = Math.max(18, Math.floor(size * size * 0.22))
+  const minForest = Math.max(cfg.minForestTiles, Math.floor(size * size * cfg.minForestFraction))
   if (!best || bestScore < minForest) return
   for (let dy = 0; dy < size; dy++) {
     for (let dx = 0; dx < size; dx++) {
@@ -1859,14 +1886,14 @@ function placeAncientForest() {
     queueForest(x, best.y + size)
   }
   let grown = 0
-  while (frontier.length && grown < 180) {
+  while (frontier.length && grown < cfg.maxGrowthTiles) {
     const index = randInt(0, frontier.length - 1)
     const tile = frontier.splice(index, 1)[0]
-    if (rng() > 0.72) continue
+    if (rng() > cfg.growthChance) continue
     map[tile.y][tile.x] = 'ancientForest'
     grown++
     for (const [dx, dy] of DIRS8) {
-      if (rng() < 0.82) queueForest(tile.x + dx, tile.y + dy)
+      if (chance(cfg.neighborQueueChance)) queueForest(tile.x + dx, tile.y + dy)
     }
   }
 
@@ -1919,18 +1946,19 @@ function keyXY(x, y) {
 }
 
 function spawnEnemies() {
-  const weights = [0.42, 0.26, 0.17, 0.10, 0.05] // tier 1..5
+  const cfg = WORLD_GEN_CONFIG.surfaceEnemies
+  const weights = cfg.tierWeights // tier 1..5
 
   // Index every legal spawn tile by terrain once. Rejection-sampling the whole map
   // would almost never land a Mummy on sand or a Lich on snow, so restricted
   // creatures would silently fail to spawn.
   const tilesByBiome = {}
   const allSpawnTiles = []
-  for (let y = 2; y < MAP_H - 2; y++) {
-    for (let x = 2; x < MAP_W - 2; x++) {
+  for (let y = cfg.spawnEdgeMargin; y < MAP_H - cfg.spawnEdgeMargin; y++) {
+    for (let x = cfg.spawnEdgeMargin; x < MAP_W - cfg.spawnEdgeMargin; x++) {
       const tile = map[y][x]
       if (tile === 'temple' || tile === 'belltower' || tile === 'ancientForest' || tile === 'caveentrance' || !isWalkable(x, y)) continue
-      if (Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y) < 20) continue
+      if (Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y) < cfg.minTempleManhattanDistance) continue
       // Keep the bell's vicinity free of random spawns - the guard pair
       // should be the only threat there.
       if (bigBellPos && Math.max(Math.abs(x - bigBellPos.x), Math.abs(y - bigBellPos.y)) < BELL_GUARD_EXCLUSION_RADIUS) continue
@@ -1951,11 +1979,11 @@ function spawnEnemies() {
     // If this world happens to contain none of the creature's biomes, fall back to
     // anywhere walkable rather than dropping it from the world entirely.
     if (!pool.length) pool = allSpawnTiles
-    if (tmpl.tier >= 3) {
+    if (tmpl.tier >= cfg.highTierMinTier) {
       const distantPool = []
       for (let i = 0; i < pool.length; i += 2) {
         const x = pool[i], y = pool[i + 1]
-        if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) >= 50) {
+        if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) >= cfg.highTierMinTempleDistance) {
           distantPool.push(x, y)
         }
       }
@@ -1969,7 +1997,7 @@ function spawnEnemies() {
     const pool = poolFor(tmpl)
     if (!pool.length) return false
     let x = 0, y = 0, tries = 0, placed = false
-    while (tries < 200) {
+    while (tries < cfg.placementTries) {
       tries++
       const p = randInt(0, (pool.length >> 1) - 1) * 2
       x = pool[p]
@@ -1979,7 +2007,7 @@ function spawnEnemies() {
       break
     }
     if (!placed) return false
-    const variance = 0.95 + rng() * 0.10
+    const variance = cfg.statVarianceMin + rng() * cfg.statVarianceSpan
     const e = {
       name: tmpl.name, tier: tmpl.tier, level: 0,
       hp: Math.max(1, Math.round(tmpl.hp * variance)),
@@ -1995,7 +2023,7 @@ function spawnEnemies() {
     e.maxHp = e.hp
     e.baseName = tmpl.name // keep clean name for image lookup, separate from display name
     prepareEnemyEquipment(e)
-    if (chance(0.05)) {
+    if (chance(cfg.prefixChance)) {
       const names = Object.keys(ENEMY_PREFIXES)
       const pfx = pick(names)
       e.prefix = pfx
@@ -2010,7 +2038,7 @@ function spawnEnemies() {
 
   for (let i = 0; i < total; i++) {
     let r = rng(), tier = 1, acc = 0
-    for (let t = 0; t < 5; t++) {
+    for (let t = 0; t < weights.length; t++) {
       acc += weights[t]
       if (r <= acc) {
         tier = t + 1
@@ -2028,7 +2056,7 @@ function spawnEnemies() {
   if (lichTmpl) {
     let lichCount = enemies.filter(e => e.baseName === 'Lich').length
     let guard = 0
-    while (lichCount < MIN_LICHES && guard < 200) {
+    while (lichCount < MIN_LICHES && guard < cfg.lichTopUpAttempts) {
       guard++
       if (spawnOneFromTemplate(lichTmpl)) lichCount++
     }
@@ -2100,6 +2128,7 @@ function caveScenarioIntro(z, x, y) {
 }
 
 function spawnCaveScenarios() {
+  const cfg = WORLD_GEN_CONFIG.cavePopulation
   let surfaceDeck = [], deepDeck = []
   const fungusTopUpSites = []
 
@@ -2133,7 +2162,7 @@ function spawnCaveScenarios() {
       open.push({x, y})
     }
     // A tiny or malformed cave must not consume a scenario without room for it.
-    if (open.length < 5) return
+    if (open.length < cfg.minOpenTilesForScenario) return
     const scenario = nextScenario(level)
     descriptor.scenario = scenario.id
     const rules = level === -1 ? scenario.surface : scenario.deep
@@ -2143,19 +2172,19 @@ function spawnCaveScenarios() {
       if (!open.length) return null
       let candidates = open
       if (mode === 'guard' && target) {
-        const near = open.filter(p => Math.abs(p.x - target.x) + Math.abs(p.y - target.y) <= 3)
+        const near = open.filter(p => Math.abs(p.x - target.x) + Math.abs(p.y - target.y) <= cfg.guardRadius)
         if (near.length) candidates = near
       } else if (mode === 'room' && target) {
         const inRoom = open.filter(p => p.x >= target.x1 && p.x <= target.x2 &&
-          p.y >= target.y1 && p.y <= target.y2 && distance(p) > 5)
+          p.y >= target.y1 && p.y <= target.y2 && distance(p) > cfg.roomMinEntranceDistance)
         if (inRoom.length) candidates = inRoom
       } else if (mode === 'far') {
         const max = Math.max(...open.map(distance))
-        candidates = open.filter(p => distance(p) >= max - 3)
+        candidates = open.filter(p => distance(p) >= max - cfg.farDistanceSlack)
       } else if (mode === 'corner') {
         const wallCount = p => DIRS8.filter(([dx, dy]) => cm[p.y + dy]?.[p.x + dx] === 'cavewall').length
         const max = Math.max(...open.map(wallCount))
-        candidates = open.filter(p => wallCount(p) >= Math.max(2, max - 1))
+        candidates = open.filter(p => wallCount(p) >= Math.max(cfg.cornerMinWalls, max - 1))
         if (!candidates.length) candidates = open
       }
       const spot = pick(candidates)
@@ -2189,8 +2218,8 @@ function spawnCaveScenarios() {
     const fungusTemplate = ENEMY_TEMPLATES.find(t => t.name === 'Fungus')
     if (fungusTemplate) {
       let fungusCount = 0
-      if (chance(0.35)) fungusCount++
-      if (chance(0.15)) fungusCount++
+      if (chance(cfg.fungusFirstChance)) fungusCount++
+      if (chance(cfg.fungusSecondChance)) fungusCount++
       for (let i = 0; i < fungusCount; i++) {
         const spot = takeSpot('random')
         if (!spot) break
@@ -2198,7 +2227,7 @@ function spawnCaveScenarios() {
       }
     }
 
-    const chestCount = level === -2 ? Math.min(12, Math.max(8, Math.ceil(roomOrder.length / 2))) : 1
+    const chestCount = level === -2 ? Math.min(cfg.deepChestMax, Math.max(cfg.deepChestMin, Math.ceil(roomOrder.length / 2))) : 1
     let chest = null
     for (let i = 0; i < chestCount; i++) {
       const spot = level === -2 ? takeSpot('room', roomOrder[i] || null) : takeSpot('corner')
@@ -2210,25 +2239,25 @@ function spawnCaveScenarios() {
     }
     if (level === -2) {
       const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
-      const threatPool = ENEMY_TEMPLATES.filter(t => t.tier === 3 || t.tier === 4)
+      const threatPool = ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier))
       // Choose an open pocket with four immediately adjacent guard positions.
       // Reserve the group before ordinary mobs, so none can displace it.
       const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
       const groupSites = open.map(p => ({p, guards: DIRS8.map(([dx, dy]) =>
           openByPosition.get(keyXY(p.x + dx, p.y + dy))).filter(Boolean)}))
-        .filter(site => site.guards.length >= 4)
+        .filter(site => site.guards.length >= cfg.deepChampionGuardCount)
       if (championTemplate && ENEMY_PREFIXES.Champion && groupSites.length) {
         const farthest = Math.max(...groupSites.map(site => distance(site.p)))
-        const remote = groupSites.filter(site => distance(site.p) >= Math.max(10, farthest - 8))
+        const remote = groupSites.filter(site => distance(site.p) >= Math.max(cfg.deepChampionMinDistance, farthest - cfg.deepChampionDistanceSlack))
         const site = pick(remote)
         const guards = site.guards.slice()
         for (let n = guards.length - 1; n > 0; n--) {
           const j = randInt(0, n)
           ;[guards[n], guards[j]] = [guards[j], guards[n]]
         }
-        for (const pos of [site.p, ...guards.slice(0, 4)]) open.splice(open.indexOf(pos), 1)
+        for (const pos of [site.p, ...guards.slice(0, cfg.deepChampionGuardCount)]) open.splice(open.indexOf(pos), 1)
         makeEnemy(championTemplate, site.p, 'Champion')
-        for (const pos of guards.slice(0, 4)) makeEnemy(championTemplate, pos)
+        for (const pos of guards.slice(0, cfg.deepChampionGuardCount)) makeEnemy(championTemplate, pos)
       }
       if (threatPool.length) {
         const spot = takeSpot('far')
@@ -2238,14 +2267,14 @@ function spawnCaveScenarios() {
     for (const [name, count] of rules.mobs) {
       const tmpl = ENEMY_TEMPLATES.find(t => t.name === name)
       if (!tmpl) continue
-      const total = level === -2 ? Math.min(36, Math.max(24, Math.round(open.length / 75))) : count
+      const total = level === -2 ? Math.min(cfg.deepMonsterMax, Math.max(cfg.deepMonsterMin, Math.round(open.length / cfg.deepMonsterTilesPerEnemy))) : count
       for (let n = 0; n < total; n++) {
         const spot = level === -2 && roomOrder.length
           ? takeSpot('room', roomOrder[n % roomOrder.length])
           : takeSpot(rules.placement || 'random', chest)
         if (!spot) break
         let prefix = null
-        if (chance(level === -2 ? 0.11 : 0.05)) {
+        if (chance(level === -2 ? cfg.deepPrefixChance : cfg.shallowPrefixChance)) {
           const names = Object.keys(ENEMY_PREFIXES)
           if (names.length) prefix = pick(names)
         }
@@ -2270,7 +2299,7 @@ function spawnCaveScenarios() {
     }
     if (level === -2) {
       // Scattered provisions reward searching side rooms after the first chest.
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < cfg.deepProvisionCount; i++) {
         const spot = takeSpot('room', roomOrder[(i + 2) % roomOrder.length] || null)
         if (spot) groundItems.push({x: spot.x, y: spot.y,
           kind: i % 2 === 0 ? 'potion' : 'scroll', level, levelKind: 'chain', caveIndex})
@@ -2300,7 +2329,7 @@ function spawnCaveScenarios() {
     let fungusCount = enemies.filter(e => e.alive && e.baseName === 'Fungus' &&
       e.levelKind === 'chain' && (e.level === -1 || e.level === -2)).length
 
-    while (fungusCount < 3 && fungusTopUpSites.length) {
+    while (fungusCount < cfg.minimumFungus && fungusTopUpSites.length) {
       const siteIndex = randInt(0, fungusTopUpSites.length - 1)
       const site = fungusTopUpSites.splice(siteIndex, 1)[0]
       const sharedMap = site.level === -1 ? undergroundMap : deep?.map
@@ -2325,11 +2354,12 @@ function spawnCaveScenarios() {
 }
 
 function guardedChestSpots(e, used, accept = () => true) {
+  const edgeMargin = WORLD_GEN_CONFIG.surfaceLoot.placementEdgeMargin
   const spots = []
   const aggroRange = effectiveAggroRange(e)
   for (let dy = -aggroRange; dy <= aggroRange; dy++) for (let dx = -aggroRange; dx <= aggroRange; dx++) {
     const x = e.x + dx, y = e.y + dy
-    if (x < 2 || y < 2 || x >= MAP_W - 2 || y >= MAP_H - 2 || !accept(x, y)) continue
+    if (x < edgeMargin || y < edgeMargin || x >= MAP_W - edgeMargin || y >= MAP_H - edgeMargin || !accept(x, y)) continue
     if (!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') continue
     if (occupied.has(keyXY(x, y)) || used.has(keyXY(x, y))) continue
     spots.push({x, y})
@@ -2338,9 +2368,10 @@ function guardedChestSpots(e, used, accept = () => true) {
 }
 
 function spawnRemoteHighTierChests() {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot
   // A few valuable tier-3 chests are deliberately placed in remote areas,
   // inside the aggro range of tier-3+ monsters so reaching them carries risk.
-  const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= 3 && e.x >= 0 && e.y >= 0)
+  const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= cfg.guardedChestMinEnemyTier && e.x >= 0 && e.y >= 0)
   let placed = 0
   const used = new Set(groundItems.filter(g => g.kind === 'chest' && onCurrentLevel(g)).map(g => keyXY(g.x, g.y)))
   const shuffled = candidates.slice()
@@ -2349,26 +2380,27 @@ function spawnRemoteHighTierChests() {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   for (const e of shuffled) {
-    if (placed >= 4) break
+    if (placed >= cfg.remoteHighTierChestCount) break
     const aggroRange = effectiveAggroRange(e)
-    const remote = villageCenter && Math.max(Math.abs(e.x - villageCenter.x), Math.abs(e.y - villageCenter.y)) >= 35
+    const remote = villageCenter && Math.max(Math.abs(e.x - villageCenter.x), Math.abs(e.y - villageCenter.y)) >= cfg.remoteChestMinVillageDistance
     if (!remote || aggroRange < 1) continue
     const spots = guardedChestSpots(e, used)
     if (!spots.length) continue
     const spot = pick(spots)
-    groundItems.push({x: spot.x, y: spot.y, kind: 'chest', tier: 3, opened: false})
+    groundItems.push({x: spot.x, y: spot.y, kind: 'chest', tier: cfg.remoteHighTierChestTier, opened: false})
     used.add(keyXY(spot.x, spot.y))
     placed++
   }
 }
 
 function spawnEdgeHighTierChests() {
-  const edgeBand = Math.max(12, Math.round(Math.min(MAP_W, MAP_H) * 0.12))
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot
+  const edgeBand = Math.max(cfg.edgeBandMin, Math.round(Math.min(MAP_W, MAP_H) * cfg.edgeBandFraction))
   const northEdge = (x, y) => y <= edgeBand
   const anyEdge = (x, y) => northEdge(x, y) || x <= edgeBand || x >= MAP_W - 1 - edgeBand || y >= MAP_H - 1 - edgeBand
   const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   for (const n of npcs) used.add(keyXY(n.x, n.y))
-  const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= 3)
+  const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= cfg.guardedChestMinEnemyTier)
   for (let i = candidates.length - 1; i > 0; i--) {
     const j = randInt(0, i);
     [candidates[i], candidates[j]] = [candidates[j], candidates[i]]
@@ -2389,14 +2421,15 @@ function spawnEdgeHighTierChests() {
       placed++
     }
   }
-  placeNear(northEdge, 5)
-  placeNear(anyEdge, 12)
+  placeNear(northEdge, cfg.northEdgeChestLimit)
+  placeNear(anyEdge, cfg.allEdgeChestLimit)
 }
 
 function spawnOrdinarySurfaceChests() {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot
   const usedChests = new Set(groundItems.filter(g => g.kind === 'chest' && (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const spots = []
-  for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
+  for (let y = cfg.placementEdgeMargin; y < MAP_H - cfg.placementEdgeMargin; y++) for (let x = cfg.placementEdgeMargin; x < MAP_W - cfg.placementEdgeMargin; x++) {
     const tile = map[y][x]
     if (isWalkable(x, y) && tile !== 'temple' && tile !== 'belltower' && tile !== 'caveentrance' && !usedChests.has(keyXY(x, y))) {
       spots.push({x, y})
@@ -2408,47 +2441,48 @@ function spawnOrdinarySurfaceChests() {
     const {x, y} = spots[index]
     spots[index] = spots[spots.length - 1]
     spots.pop()
-    const distTier = Math.min(5, 1 + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / 45))
+    const distTier = Math.min(cfg.ordinaryChestMaxTier, cfg.ordinaryChestBaseTier + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / cfg.chestDistancePerTier))
     groundItems.push({x, y, kind: 'chest', tier: distTier, opened: false})
   }
 }
 
 function spawnGroundStuff() {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot
   spawnOrdinarySurfaceChests()
   // loose potions
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < cfg.loosePotions; i++) {
     let x, y, tries = 0
     do {
-      x = randInt(2, MAP_W - 3)
-      y = randInt(2, MAP_H - 3)
+      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
+      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
       tries++
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-    if (tries >= 200) continue
+    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
+    if (tries >= cfg.looseItemPlacementTries) continue
     groundItems.push({x, y, kind: 'potion'})
   }
   // scrolls of invisibility
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < cfg.looseScrolls; i++) {
     let x, y, tries = 0
     do {
-      x = randInt(2, MAP_W - 3)
-      y = randInt(2, MAP_H - 3)
+      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
+      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
       tries++
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-    if (tries >= 200) continue
+    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
+    if (tries >= cfg.looseItemPlacementTries) continue
     groundItems.push({x, y, kind: 'scroll'})
   }
   // speed potions
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < cfg.looseSpeedPotions; i++) {
     let x, y, tries = 0
     do {
-      x = randInt(2, MAP_W - 3)
-      y = randInt(2, MAP_H - 3)
+      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
+      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
       tries++
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < 200)
-    if (tries >= 200) continue
+    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
+    if (tries >= cfg.looseItemPlacementTries) continue
     groundItems.push({x, y, kind: 'speedpotion'})
   }
   // A handful of equipment pieces are buried beneath surface sand. Their
@@ -2456,22 +2490,22 @@ function spawnGroundStuff() {
   // reveals the predetermined object rather than rolling forage loot.
   const occupiedGround = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const sandSpots = []
-  for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
+  for (let y = cfg.placementEdgeMargin; y < MAP_H - cfg.placementEdgeMargin; y++) for (let x = cfg.placementEdgeMargin; x < MAP_W - cfg.placementEdgeMargin; x++) {
     if (map[y][x] !== 'sand' || occupiedGround.has(keyXY(x, y)) || occupied.has(keyXY(x, y))) continue
     sandSpots.push({x, y})
   }
-  for (let i = 0; i < 5 && sandSpots.length; i++) {
+  for (let i = 0; i < cfg.buriedGearCount && sandSpots.length; i++) {
     const spot = sandSpots.splice(randInt(0, sandSpots.length - 1), 1)[0]
-    const tier = Math.min(4, 1 + Math.floor((Math.abs(spot.x - spawnPoint.x) + Math.abs(spot.y - spawnPoint.y)) / 45))
+    const tier = Math.min(cfg.buriedGearMaxTier, 1 + Math.floor((Math.abs(spot.x - spawnPoint.x) + Math.abs(spot.y - spawnPoint.y)) / cfg.chestDistancePerTier))
     const gearRoll = rng()
-    const item = gearRoll < 0.5 ? makeWeaponItem(tier) : gearRoll < 0.75 ? makeArmorItem(tier) : makeShieldItem(tier)
+    const item = gearRoll < cfg.buriedWeaponChance ? makeWeaponItem(tier) : gearRoll < cfg.buriedWeaponChance + cfg.buriedArmorChance ? makeArmorItem(tier) : makeShieldItem(tier)
     groundItems.push({x: spot.x, y: spot.y, kind: 'buriedgear', item})
   }
   // Two rarer buried finds are full artifacts. Their artifact tier is rolled
   // independently during world generation, and they remain hidden until dug up.
-  for (let i = 0; i < 2 && sandSpots.length; i++) {
+  for (let i = 0; i < cfg.buriedArtifactCount && sandSpots.length; i++) {
     const spot = sandSpots.splice(randInt(0, sandSpots.length - 1), 1)[0]
-    const item = makeArtifactItem(randInt(3, 5))
+    const item = makeArtifactItem(randInt(cfg.buriedArtifactTierRange[0], cfg.buriedArtifactTierRange[1]))
     groundItems.push({x: spot.x, y: spot.y, kind: 'buriedartifact', item})
   }
 }
@@ -2511,8 +2545,8 @@ function assignVillageHutNames() {
   if (goldHuts.length) {
     const guaranteedHut = pick(goldHuts)
     for (const hut of goldHuts) {
-      if (hut !== guaranteedHut && !chance(0.2)) continue
-      hut.goldLoot = randInt(2, 9)
+      if (hut !== guaranteedHut && !chance(WORLD_GEN_CONFIG.village.optionalGoldChance)) continue
+      hut.goldLoot = randInt(WORLD_GEN_CONFIG.village.goldRange[0], WORLD_GEN_CONFIG.village.goldRange[1])
       hut.goldLootTaken = false
       if (hut === guaranteedHut) hut.guaranteedGold = true
     }
@@ -2657,18 +2691,19 @@ function clearGroundItemsUnderMerchant() {
 }
 
 function spawnNpcs() {
+  const cfg = WORLD_GEN_CONFIG.npcs
   npcs = []
   for (const tmpl of NPC_TEMPLATES) {
     const origin = (tmpl.village && villageCenter) ? villageCenter : spawnPoint
-    const spread = (tmpl.village && villageCenter) ? 6 : 8
+    const spread = (tmpl.village && villageCenter) ? cfg.villageSpread : cfg.templeSpread
     let x, y, tries = 0, dist = 0
     do {
-      x = randInt(Math.max(2, origin.x - spread), Math.min(MAP_W - 3, origin.x + spread))
-      y = randInt(Math.max(2, origin.y - spread), Math.min(MAP_H - 3, origin.y + spread))
+      x = randInt(Math.max(cfg.edgeMargin, origin.x - spread), Math.min(MAP_W - cfg.edgeMargin - 1, origin.x + spread))
+      y = randInt(Math.max(cfg.edgeMargin, origin.y - spread), Math.min(MAP_H - cfg.edgeMargin - 1, origin.y + spread))
       dist = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
       tries++
-    } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < 2 || occupied.has(keyXY(x, y)) || (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === x && g.y === y))) && tries < 300)
-    if (tries >= 300) continue // extremely unlikely on a cramped map - just skip this one
+    } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < cfg.minOriginDistance || occupied.has(keyXY(x, y)) || (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === x && g.y === y))) && tries < cfg.placementTries)
+    if (tries >= cfg.placementTries) continue // extremely unlikely on a cramped map - just skip this one
     const npc = {
       name: tmpl.name,
       lines: linesForNpcTemplate(tmpl),

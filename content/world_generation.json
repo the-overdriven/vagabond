@@ -1,0 +1,525 @@
+{
+  "surface": {
+    "elevationNoise": {
+      "layers": [
+        [
+          6,
+          4
+        ],
+        [
+          14,
+          10
+        ],
+        [
+          30,
+          22
+        ]
+      ],
+      "weights": [
+        0.55,
+        0.3,
+        0.15
+      ],
+      "roughnessCells": [
+        52,
+        38
+      ],
+      "roughnessAmplitude": 0.16
+    },
+    "moistureNoise": {
+      "layers": [
+        [
+          5,
+          5
+        ],
+        [
+          16,
+          16
+        ]
+      ],
+      "weights": [
+        0.6,
+        0.4
+      ],
+      "detailCells": [
+        44,
+        32
+      ],
+      "detailAmplitude": 0.12
+    },
+    "islandFalloff": {
+      "northernDepthFraction": 0.22,
+      "distancePower": 2.2,
+      "strength": 0.55
+    },
+    "lakes": {
+      "noiseCells": [
+        9,
+        7
+      ],
+      "noiseThreshold": 0.72,
+      "minElevation": 0.28,
+      "maxElevation": 0.6,
+      "carveAmount": 0.4
+    },
+    "northBoundary": {
+      "rows": 4,
+      "minElevation": 0.3
+    },
+    "terrainThresholds": {
+      "waterMaxElevation": 0.24,
+      "sandMaxElevation": 0.29,
+      "lowlandMaxElevation": 0.58,
+      "forestMinMoisture": 0.55,
+      "hillMaxElevation": 0.68,
+      "mountainMaxElevation": 0.82,
+      "highElevationSnowMinMoisture": 0.5
+    },
+    "snow": {
+      "bandFraction": 0.22,
+      "edgeNoiseCells": [
+        30,
+        8
+      ],
+      "edgeNoiseAmplitude": 0.55,
+      "coldnessThreshold": 0.32,
+      "mountainSnowChance": 0.85,
+      "extraPeakChance": 0.035
+    },
+    "taiga": {
+      "seedChance": 0.1,
+      "growthPasses": 3,
+      "growthChanceThreePlusNeighbors": 0.58,
+      "growthChanceOnePlusNeighbors": 0.28,
+      "growthChanceNoNeighbors": 0.04
+    },
+    "boulders": {
+      "noiseCells": [
+        40,
+        30
+      ],
+      "noiseThreshold": 0.8
+    },
+    "grasslandTrees": {
+      "edgeMargin": 4,
+      "densityRadius": 4,
+      "minGrassTiles": 57,
+      "minSpacing": 6,
+      "candidateSkipChance": 0.955
+    },
+    "rivers": {
+      "maxSources": 14,
+      "sourceEdgeMargin": 4,
+      "minSourceElevation": 0.44,
+      "maxSteps": 350,
+      "guaranteeFrozenRiver": true,
+      "frozenFallbackXMargin": 6,
+      "frozenFallbackYFraction": 0.45,
+      "frozenFallbackMinLength": 5,
+      "frozenFallbackMaxLength": 12
+    },
+    "spawn": {
+      "searchRadius": 40,
+      "edgeMargin": 2
+    },
+    "temple": {
+      "shapes": [
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "bellTowerFallbackRadius": 6
+    },
+    "volcanoes": {
+      "minTempleDistance": 25,
+      "secondVolcanoChance": 0.35,
+      "minSeparation": 20,
+      "candidateEdgeMargin": 3,
+      "lavaScanRadius": 3,
+      "lavaRadius": 2
+    }
+  },
+  "caves": {
+    "cryptClearance": 8,
+    "villageEntranceClearance": 4,
+    "shallow": {
+      "attemptedCaves": 6,
+      "placementTries": 500,
+      "minPrimarySeparation": 10,
+      "secondEntranceMinDistance": 8,
+      "secondEntranceMaxDistance": 18,
+      "walkStyleChance": 0.5,
+      "walkRadiusRange": [
+        5,
+        11
+      ],
+      "chamberRadiusRange": [
+        9,
+        15
+      ],
+      "walkStepsRange": [
+        90,
+        300
+      ],
+      "chamberCountRange": [
+        3,
+        6
+      ],
+      "chamberRadiusXRange": [
+        3,
+        6
+      ],
+      "chamberRadiusYRange": [
+        2,
+        5
+      ],
+      "chamberFillThreshold": 1.05,
+      "chamberFillChance": 0.94,
+      "corridorHorizontalBias": 0.5,
+      "entranceCarveWidth": 1,
+      "entranceCarveDepth": 2
+    },
+    "deep": {
+      "generationTrials": 6,
+      "placementTriesPerBranch": 64,
+      "optionalBranchChance": 0.5,
+      "optionalGrottoChance": 0.5,
+      "grotto": {
+        "sizes": [
+          [
+            92,
+            72
+          ],
+          [
+            82,
+            66
+          ],
+          [
+            74,
+            60
+          ],
+          [
+            66,
+            54
+          ],
+          [
+            56,
+            46
+          ],
+          [
+            48,
+            40
+          ],
+          [
+            42,
+            36
+          ]
+        ],
+        "reservedPadding": 2,
+        "roomDensityDivisor": 270,
+        "roomCountBonus": 4,
+        "minRooms": 9,
+        "roomPlacementTries": 1800,
+        "roomCenterMargin": 6,
+        "minCenterDistanceSquared": 145,
+        "acceptedRoomShortfall": 3,
+        "minAcceptedRooms": 8,
+        "roomRadiusXRange": [
+          5,
+          8
+        ],
+        "roomRadiusYRange": [
+          4,
+          7
+        ],
+        "edgeSamples": 12,
+        "edgeVariancePercentRange": [
+          -22,
+          16
+        ],
+        "baseRadius": 0.88,
+        "passageMidpointJitter": 3,
+        "passageWideCycle": 9,
+        "passageWideSteps": 3,
+        "extraConnections": 5,
+        "waterChance": 0.6,
+        "waterCenterJitter": 2,
+        "waterRadiusX": 4,
+        "waterRadiusY": 3,
+        "waterEllipseThreshold": 0.88,
+        "minWaterCells": 8,
+        "minDryFloorFraction": 0.13,
+        "passageHorizontalChance": 0.5
+      },
+      "burrow": {
+        "sizes": [
+          [
+            68,
+            52
+          ],
+          [
+            58,
+            44
+          ],
+          [
+            48,
+            38
+          ],
+          [
+            40,
+            32
+          ],
+          [
+            34,
+            28
+          ],
+          [
+            28,
+            24
+          ]
+        ],
+        "reservedPadding": 2,
+        "anchorEdgeOffset": 5,
+        "brushRadius": 1,
+        "wideBrushRadius": 2,
+        "branchDensityDivisor": 450,
+        "minBranches": 5,
+        "minSteps": 25,
+        "stepLengthBonus": 40,
+        "turnChance": 0.19,
+        "boundsMargin": 2,
+        "wideCycle": 17,
+        "wideSteps": 3,
+        "roomHalfSize": 3,
+        "minFloorTiles": 120
+      },
+      "minimumCaves": 2
+    }
+  },
+  "dwarvenFort": {
+    "candidateEdgeMargin": 8,
+    "fallbackNorthFraction": 0.28,
+    "fallbackNorthMinRows": 12,
+    "fallbackCenterY": 10,
+    "fallbackOutcropRadius": 3,
+    "fallbackOutcropCoreRadius": 1,
+    "boundsX": 34,
+    "boundsY": 24,
+    "roomCountRange": [
+      7,
+      11
+    ],
+    "roomPlacementAttempts": 300,
+    "roomWidthRange": [
+      7,
+      14
+    ],
+    "roomHeightRange": [
+      6,
+      11
+    ],
+    "roomBoundsMargin": 4,
+    "roomSeparation": 3,
+    "entranceRoomSize": [
+      9,
+      9
+    ],
+    "corridorWideChance": 0.35,
+    "collapseAttempts": 45,
+    "collapseMinGateDistance": 8,
+    "rubbleChance": 0.65,
+    "ghostCount": 8,
+    "ghostMinGateDistance": 8,
+    "ghostPrefixChance": 0.05,
+    "ruinPropAttempts": 18,
+    "anvilMinGateDistance": 8,
+    "artifactChestTier": 5,
+    "artifactChestMinGateDistance": 18,
+    "wheelbarrowMinArtifactDistance": 16,
+    "wheelbarrowFallbackArtifactDistance": 8,
+    "wheelbarrowMinGateDistance": 18,
+    "remainsAttempts": 9,
+    "corridorHorizontalFirstChance": 0.5
+  },
+  "landmarks": {
+    "blackPillarSearches": [
+      [
+        15,
+        45,
+        true
+      ],
+      [
+        10,
+        80,
+        true
+      ],
+      [
+        5,
+        null,
+        false
+      ]
+    ],
+    "bigBellSearches": [
+      [
+        20,
+        40,
+        true
+      ],
+      [
+        20,
+        60,
+        true
+      ],
+      [
+        20,
+        null,
+        false
+      ]
+    ],
+    "bellGuardianCount": 2,
+    "enemyStatVarianceMin": 0.95,
+    "enemyStatVarianceSpan": 0.1,
+    "placementEdgeMargin": 2
+  },
+  "village": {
+    "primarySearch": {
+      "minRadius": 3,
+      "maxRadius": 15,
+      "radiusStep": 2,
+      "triesPerRadius": 20
+    },
+    "fallbackSearch": {
+      "minRadius": 17,
+      "maxRadius": 60,
+      "radiusStep": 3,
+      "triesPerRadius": 30
+    },
+    "edgeMargin": 4,
+    "minHuts": 11,
+    "maxHuts": 14,
+    "growthAttempts": 400,
+    "growthStepRange": 2,
+    "placementEdgeMargin": 2,
+    "forestClearRadius": 2,
+    "optionalGoldChance": 0.2,
+    "goldRange": [
+      2,
+      9
+    ]
+  },
+  "ancientForest": {
+    "minForestTiles": 18,
+    "minForestFraction": 0.22,
+    "maxGrowthTiles": 180,
+    "growthChance": 0.72,
+    "neighborQueueChance": 0.82
+  },
+  "surfaceEnemies": {
+    "tierWeights": [
+      0.42,
+      0.26,
+      0.17,
+      0.1,
+      0.05
+    ],
+    "spawnEdgeMargin": 2,
+    "minTempleManhattanDistance": 20,
+    "highTierMinTempleDistance": 50,
+    "placementTries": 200,
+    "statVarianceMin": 0.95,
+    "prefixChance": 0.05,
+    "lichTopUpAttempts": 200,
+    "statVarianceSpan": 0.1,
+    "forestAmbushChance": 0.05,
+    "highTierMinTier": 3
+  },
+  "cavePopulation": {
+    "minOpenTilesForScenario": 5,
+    "guardRadius": 3,
+    "roomMinEntranceDistance": 5,
+    "farDistanceSlack": 3,
+    "cornerMinWalls": 2,
+    "fungusFirstChance": 0.35,
+    "fungusSecondChance": 0.15,
+    "deepChestMin": 8,
+    "deepChestMax": 12,
+    "deepChampionMinDistance": 10,
+    "deepChampionDistanceSlack": 8,
+    "deepChampionGuardCount": 4,
+    "deepThreatTiers": [
+      3,
+      4
+    ],
+    "deepMonsterMin": 24,
+    "deepMonsterMax": 36,
+    "deepMonsterTilesPerEnemy": 75,
+    "deepPrefixChance": 0.11,
+    "shallowPrefixChance": 0.05,
+    "deepProvisionCount": 4,
+    "minimumFungus": 3
+  },
+  "surfaceLoot": {
+    "remoteHighTierChestCount": 4,
+    "remoteChestMinVillageDistance": 35,
+    "edgeBandMin": 12,
+    "edgeBandFraction": 0.12,
+    "northEdgeChestLimit": 5,
+    "allEdgeChestLimit": 12,
+    "chestDistancePerTier": 45,
+    "loosePotions": 15,
+    "looseScrolls": 9,
+    "looseSpeedPotions": 3,
+    "looseItemPlacementTries": 200,
+    "buriedGearCount": 5,
+    "buriedGearMaxTier": 4,
+    "buriedWeaponChance": 0.5,
+    "buriedArmorChance": 0.25,
+    "buriedArtifactCount": 2,
+    "buriedArtifactTierRange": [
+      3,
+      5
+    ],
+    "placementEdgeMargin": 2,
+    "guardedChestMinEnemyTier": 3,
+    "remoteHighTierChestTier": 3,
+    "ordinaryChestBaseTier": 1,
+    "ordinaryChestMaxTier": 5
+  },
+  "npcs": {
+    "villageSpread": 6,
+    "templeSpread": 8,
+    "minOriginDistance": 2,
+    "placementTries": 300,
+    "edgeMargin": 2
+  },
+  "lootRules": {
+    "modifierChanceBase": 0.4,
+    "modifierChancePerMagicFind": 0.02,
+    "modifierChanceCap": 0.9,
+    "artifactTierBoostChancePerMagicFind": 0.03,
+    "artifactTierBoostChanceCap": 0.5,
+    "emptyArtifactEffectChance": 0.04,
+    "artifactCurseBaseChance": 0.1,
+    "artifactCurseMinChance": 0.02,
+    "artifactCurseMagicFindReductionPerPoint": 0.005,
+    "enemyArtifactDropRateMultiplier": 0.4,
+    "enemyArtifactBaseChance": 0.01,
+    "enemyArtifactTierChanceStep": 0.0075,
+    "enemyArtifactMagicFindMultiplierPerPoint": 0.05,
+    "enemyArtifactChanceCapBeforeRate": 0.12
+  },
+  "environment": {
+    "freezingDamageIntervalTurns": 5,
+    "freezingDamage": 1,
+    "undergroundFovRadius": 8
+  }
+}

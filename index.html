@@ -608,6 +608,7 @@
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
+  let WORLD_GEN_CONFIG = {}
   let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
   let EDGE_MARGIN, EDGE_XP, MIN_LICHES, SURFACE_TILES_PER_ENEMY, SURFACE_TILES_PER_CHEST
@@ -666,6 +667,7 @@
       tiles: 'tiles.json',
       lootTables: 'loot_tables.json',
       mapConfig: 'map_config.json',
+      worldGeneration: 'world_generation.json',
       merchantStockConfig: 'merchant_stock.json',
       rendering: 'rendering.json',
       playerVisuals: 'player_visuals.json'
@@ -748,6 +750,7 @@
     MIN_LICHES = content.mapConfig.spawning.minLiches
     SURFACE_TILES_PER_ENEMY = content.mapConfig.spawning.surfaceTilesPerEnemy
     SURFACE_TILES_PER_CHEST = content.mapConfig.spawning.surfaceTilesPerChest
+    WORLD_GEN_CONFIG = content.worldGeneration
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
     RENDER_STYLE = content.rendering
     PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}
@@ -1172,7 +1175,7 @@
   function rollModifier(baseName, item, mf = 0) {
     // Magic Find increases the chance an item rolls a modifier at all -
     // this is the "quality" half of MF's effect on gear.
-    if (!chance(Math.min(0.9, 0.40 + mf * 0.02))) return item
+    if (!chance(Math.min(WORLD_GEN_CONFIG.lootRules.modifierChanceCap, WORLD_GEN_CONFIG.lootRules.modifierChanceBase + mf * WORLD_GEN_CONFIG.lootRules.modifierChancePerMagicFind))) return item
     const mod = pick(MODIFIERS)
     item.mod = mod.stat
     item.name = mod.name + ' ' + baseName
@@ -1316,19 +1319,19 @@
     // Magic Find's "quality" effect on artifacts: a chance to roll the
     // effect pool as if the source were one tier higher, and a reduced
     // chance of the artifact turning out cursed.
-    if (mf > 0 && chance(Math.min(0.5, mf * 0.03))) tier += 1
+    if (mf > 0 && chance(Math.min(WORLD_GEN_CONFIG.lootRules.artifactTierBoostChanceCap, mf * WORLD_GEN_CONFIG.lootRules.artifactTierBoostChancePerMagicFind))) tier += 1
     let pool = ARTIFACT_EFFECTS.filter(fx => fx.tier <= tier)
     if (!pool.length) pool = ARTIFACT_EFFECTS.filter(fx => fx.tier === Math.min(...ARTIFACT_EFFECTS.map(f => f.tier)))
     // Keep truly effect-less lore artifacts rare: 4% of artifact drops.
     // When no empty effect is available for the current tier, use a normal effect.
     const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0)
     const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0)
-    const effect = emptyEffects.length && chance(0.04)
+    const effect = emptyEffects.length && chance(WORLD_GEN_CONFIG.lootRules.emptyArtifactEffectChance)
       ? pick(emptyEffects)
       : pick(normalEffects.length ? normalEffects : pool)
     const noun = pick(ARTIFACT_NOUNS)
     const slot = artifactEquipSlot(null, noun)
-    const isCursed = chance(Math.max(0.02, 0.10 - mf * 0.005))
+    const isCursed = chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
 
     // Every non-cursed artifact gets a named owner. Cursed artifacts use
     // the cursed prefix instead and do not get an "of <dwarf>" name.
@@ -2497,10 +2500,11 @@
     maybeDropTombstone(e)
     // Artifact drops are reduced to 40% of their former chance (60% rarer).
     // Guaranteed artifact chests are intentionally unaffected.
-    const artifactDropRate = 0.4
+    const artifactDropRate = WORLD_GEN_CONFIG.lootRules.enemyArtifactDropRateMultiplier
     const artifactChance = artifactDropRate *
-      (0.01 + (e.tier - 1) * 0.0075) * (1 + mf * 0.05)
-    if (chance(Math.min(0.12 * artifactDropRate, artifactChance))) {
+      (WORLD_GEN_CONFIG.lootRules.enemyArtifactBaseChance + (e.tier - 1) * WORLD_GEN_CONFIG.lootRules.enemyArtifactTierChanceStep) *
+      (1 + mf * WORLD_GEN_CONFIG.lootRules.enemyArtifactMagicFindMultiplierPerPoint)
+    if (chance(Math.min(WORLD_GEN_CONFIG.lootRules.enemyArtifactChanceCapBeforeRate * artifactDropRate, artifactChance))) {
       const art = makeArtifactItem(e.tier, mf)
       if (art) {
         log(`The ${e.name} dropped ${artifactDisplayName(art)}.`, 'loot')
@@ -3499,10 +3503,11 @@
       log('You are freezing. The cold is biting through your clothes.', 'bad')
     }
     player.freezing.turns++
-    if (player.freezing.turns >= 5) {
+    if (player.freezing.turns >= WORLD_GEN_CONFIG.environment.freezingDamageIntervalTurns) {
       player.freezing.turns = 0
-      player.hp = Math.max(0, player.hp - 1)
-      log('The freezing cold bites you for 1 HP.', 'bad')
+      const freezingDamage = WORLD_GEN_CONFIG.environment.freezingDamage
+      player.hp = Math.max(0, player.hp - freezingDamage)
+      log(`The freezing cold bites you for ${freezingDamage} HP.`, 'bad')
       updateHud()
       if (player.hp <= 0) {
         die(null, 'freezing')
@@ -4372,7 +4377,7 @@
     if (raceHas('noForestAmbush')) return // elves move through woodland unseen
     const ancient = map[y][x] === 'ancientForest'
     if (map[y][x] !== 'forest' && !ancient) return
-    if (!chance(0.05)) return
+    if (!chance(WORLD_GEN_CONFIG.surfaceEnemies.forestAmbushChance)) return
     const candidates = []
     for (const [dx, dy] of DIRS8) {
       const nx = x + dx, ny = y + dy
@@ -4387,7 +4392,7 @@
     if (!templates.length) return
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
     const spot = pick(candidates)
-    const variance = 0.95 + rng() * 0.10
+    const variance = WORLD_GEN_CONFIG.surfaceEnemies.statVarianceMin + rng() * WORLD_GEN_CONFIG.surfaceEnemies.statVarianceSpan
     const e = {
       name: tmpl.name,
       tier: tmpl.tier,

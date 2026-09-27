@@ -5,13 +5,16 @@
 'use strict'
 
 const UndergroundFov = (() => {
-  const RADIUS = 8
+  const DEFAULT_RADIUS = 8
+  const configuredRadius = () => typeof WORLD_GEN_CONFIG !== 'undefined'
+    ? (WORLD_GEN_CONFIG.environment?.undergroundFovRadius ?? DEFAULT_RADIUS)
+    : DEFAULT_RADIUS
   const EXPLORED_OVERLAY = 'rgba(0, 0, 0, 0.5)'
   const BLOCKS_SIGHT = new Set(['cavewall', 'dwarvenwall', 'mountain',
     'snowmountain', 'crypt2niche', 'boulder', 'blackpillar'])
   const key = (x, y) => x + ',' + y
 
-  function compute(terrain, px, py, radius = RADIUS) {
+  function compute(terrain, px, py, radius = configuredRadius()) {
     const visible = new Set()
     if (!terrain?.[py]?.[px]) return visible
     const opaque = (x, y) => !terrain[y]?.[x] || BLOCKS_SIGHT.has(terrain[y][x])
@@ -41,5 +44,5 @@ const UndergroundFov = (() => {
     return visible
   }
 
-  return {RADIUS, EXPLORED_OVERLAY, compute}
+  return {get RADIUS() { return configuredRadius() }, EXPLORED_OVERLAY, compute}
 })()
