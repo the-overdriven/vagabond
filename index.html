@@ -185,6 +185,12 @@
   <meta name="apple-mobile-web-app-title" content="Vagabond">
   <link rel="stylesheet" href="css/style.css?v=20260925-4">
   <style>
+    #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
+    #loadingOverlay[hidden] { display: none; }
+    .loading-skull { display: inline-block; font-size: 58px; line-height: 1.3; filter: drop-shadow(0 0 14px #a9895960); animation: loading-spin 2.4s linear infinite; will-change: transform; }
+    @keyframes loading-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .loading-skull { animation: none; } }
+
     .invitem .item-icon {
       flex: 0 0 auto;
       width: 20px;
@@ -268,6 +274,10 @@
   </style>
 </head>
 <body>
+<div id="loadingOverlay" role="status" aria-live="polite" aria-busy="true">
+  <span class="loading-skull" aria-hidden="true">💀</span>
+  <span id="loadingText">Loading...</span>
+</div>
 <div id="root">
   <div id="hud">
     <div class="stat">LVL <b id="hLvl">1</b></div>
@@ -4257,7 +4267,25 @@
 
   /* ============================== MOVEMENT ============================== */
   let mapOpen = false, invOpen = false, tradeOpen = false
-  let raceOpen = false // the race/name selection screen blocks all play input
+  let raceOpen = true // block play input from startup through character creation
+  let worldGenerating = false
+  function setLoading(message) {
+    const overlay = document.getElementById('loadingOverlay')
+    overlay.hidden = !message
+    overlay.setAttribute('aria-busy', String(!!message))
+    if (message) document.getElementById('loadingText').textContent = message
+  }
+  // Capture keyboard/touch input too, including shortcuts outside the canvas.
+  for (const type of ['click', 'keydown', 'pointerdown', 'touchstart', 'wheel']) {
+    window.addEventListener(type, event => {
+      if (document.getElementById('loadingOverlay').hidden) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    }, {capture: true, passive: false})
+  }
+  function paintLoading() {
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)))
+  }
   // Buffering one move while the step animation plays keeps held-key walking
   // continuous - without it every input during the 140ms pan is dropped, which
   // reads as stuttering.
@@ -5765,6 +5793,7 @@
   }
 
   function render(now) {
+    if (!map.length || worldGenerating) return
     updateAlarmedEnemies()
     now = now || performance.now()
     const undergroundVisible = currentUndergroundFov()
@@ -8271,8 +8300,8 @@
 
 
   /* ============================== RACE SELECTION SCREEN ==============================
-       Shown once, before the first turn. The world is already generated behind it, so
-       picking a race only decides which perks the (already placed) character carries.
+       Shown before world generation. Begin commits the character choices, then
+       builds the world under the loading overlay before recording any replay.
        Loading a save file skips/dismisses this screen entirely. */
   let selectedRaceId = DEFAULT_RACE
 
@@ -8328,7 +8357,8 @@
     document.getElementById('raceOverlay').classList.remove('show')
   }
 
-  function confirmRaceSelect() {
+  async function confirmRaceSelect() {
+    if (worldGenerating || !raceOpen) return
     const nameInput = document.getElementById('raceName')
     const name = (nameInput.value || '').trim()
     if (!name) {
@@ -8336,23 +8366,37 @@
       nameInput.focus()
       return
     }
-    player.name = name
-    player.race = selectedRaceId
-    player.permadeath = document.getElementById('permadeathToggle').checked
-    player.characterId = Graveyard.newCharacterId()
-    player.hp = playerMaxHp()
-    // Replay is opt-in per character. Clear out whatever the previous
-    // character (if any) left behind before deciding whether to record.
-    replayData = null
-    replayRecording = false
-    if (document.getElementById('replayToggle').checked) startReplayRecording()
-    updateReplayButton()
-    closeRaceSelect()
-    const race = raceDef()
-    log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good')
-    log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info')
-    updateHud()
-    render()
+    worldGenerating = true
+    document.getElementById('btnBegin').disabled = true
+    setLoading('Generating world...')
+    try {
+      await paintLoading()
+      player.name = name
+      player.race = selectedRaceId
+      player.permadeath = document.getElementById('permadeathToggle').checked
+      player.characterId = Graveyard.newCharacterId()
+      await generateNewWorld()
+      worldGenerating = false
+      player.hp = playerMaxHp()
+      // Replay is opt-in per character. Clear out whatever the previous
+      // character (if any) left behind before deciding whether to record.
+      replayData = null
+      replayRecording = false
+      if (document.getElementById('replayToggle').checked) startReplayRecording()
+      updateReplayButton()
+      closeRaceSelect()
+      const race = raceDef()
+      log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good')
+      log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info')
+      updateHud()
+      render()
+      ensureAmbientTileAnimationLoop()
+      setLoading(null)
+    } catch (err) {
+      console.error(err)
+      // Keep input blocked over any partially generated world. Reload starts clean.
+      setLoading('World generation failed. Please reload to try again.')
+    }
   }
 
   document.getElementById('btnBegin').addEventListener('click', confirmRaceSelect)
@@ -8364,11 +8408,7 @@
   })
 
   /* ============================== INIT ============================== */
-  async function init() {
-    // The world is built first and image preloading is kicked off without
-    // blocking on it. Awaiting ~30 portraits over a cold network cache used to
-    // leave the canvas rendered and interactive for seconds while `map` was
-    // still empty, which crashed any hover/click in that window.
+  async function generateNewWorld() {
     generateMap()
     const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
     if (weaponHuts.length !== 1 || weaponHuts[0].mausoleum || !STARTING_WEAPONS.includes(weaponHuts[0].startingWeapon)) {
@@ -8398,6 +8438,9 @@
     stopAttackAnimation()
     snapCameraToPlayer()
     updateHud()
+  }
+
+  async function init() {
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
     initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
@@ -8418,8 +8461,6 @@
       if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
-    render()
-    ensureAmbientTileAnimationLoop()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
     if (window.Cypress) {
@@ -8447,19 +8488,19 @@
         }
       }
     }
-    // The overlay opens immediately, with cards showing at once so the player
-    // can never hit "Begin" before seeing the choices, and play input is
-    // blocked from the very first frame. Race sprites are then re-pointed at
-    // cached blob URLs so they survive going offline; everything else streams
-    // in behind the race screen while the player is choosing.
-    openRaceSelect()
+    // Essential visuals load under the startup overlay. Remaining images
+    // warm in the background while character creation waits for Begin.
     await preloadImages(RACES.map(race => raceSelectionImagePath(race.id)))
+    openRaceSelect()
     refreshRaceAvatars()
+    ensureAmbientTileAnimationLoop()
+    setLoading(null)
     preloadImages().catch(err => console.warn(err))
   }
 
   loadContent().then(() => init()).catch(err => {
     console.error(err)
+    setLoading('Loading failed. Please reload to try again.')
     alert('Failed to load game content: ' + (err?.message || err) + '\n\nIf this is a file:// page, run the game through a local web server so the content JSON files can be loaded.')
   })
 

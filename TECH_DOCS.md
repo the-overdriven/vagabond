@@ -79,7 +79,27 @@ The player chooses:
 1. Name
 2. Race
 
-The world is generated before the race screen appears.
+The world is generated **only after Begin confirms a valid name and race**.
+Startup loads content and essential images under a full-screen rotating skull
+with `Loading...`, then shows character creation with no generated map.
+After confirmation, the same overlay says `Generating world...`. Character
+race and Permadeath are applied before `generateNewWorld()` builds the map,
+initializes discovery/minimap, places the player, and performs all population
+and merchant setup in the existing order. Begin is guarded against duplicate
+submissions; invalid names do not generate a world. No Cursed World checkbox
+or world traits are added yet.
+
+The loading overlay is present in the initial HTML, blocks pointer/touch and
+keyboard input, and yields a painted frame before synchronous generation.
+Its transform animation uses a composited layer; reduced-motion preferences
+show a stationary skull. Rendering ignores empty or in-progress worlds.
+Content/generation errors keep the overlay visible with a reload instruction.
+Background image warming continues after the race screen appears.
+
+Replay recording starts only after generation and character setup finish,
+so the initial snapshot contains the completed world and generation RNG is
+not included in the gameplay recording. Loading saves retains the existing
+character-creation bypass and does not call the new-world generator.
 
 Loading a save bypasses character creation.
 
