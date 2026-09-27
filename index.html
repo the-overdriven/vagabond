@@ -1980,7 +1980,7 @@
     gainXp(EDGE_XP)
   }
 
-  /* ============================== OLD HUNTER PROCEDURAL QUEST ============================== */
+  /* ============================== ENEMY CREATION ============================== */
   let nextEnemyId = 1
 
   function addEnemy(enemy) {
@@ -1995,6 +1995,7 @@
         ? tmpl.wander
         : defaultEnemyWanderMode()
     }
+    enemy.wander = enemyWanderForLevel(enemy.wander, enemy.level ?? 0)
     if (!Object.prototype.hasOwnProperty.call(enemy, 'homeRadius') && Number.isFinite(tmpl?.homeRadius)) {
       enemy.homeRadius = tmpl.homeRadius
     }
@@ -2002,6 +2003,7 @@
     return enemy
   }
 
+  /* ============================== OLD HUNTER PROCEDURAL QUEST ============================== */
   function hunterEnsureIds() {
     let nextItem = 1
     for (const e of enemies) {
@@ -2738,7 +2740,7 @@
         e.x = destination.x
         e.y = destination.y
         occupied.add(keyXY(e.x, e.y))
-        beginEnemyMoveAnim(e, fromX, fromY)
+        finishEnemyMove(e, fromX, fromY)
         spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
         log(`The ${e.name} evades your attack.`, 'bad')
         updateMobileInfoPanel(e.x, e.y)
@@ -3229,7 +3231,7 @@
         e.x = destination.x
         e.y = destination.y
         occupied.add(keyXY(e.x, e.y))
-        beginEnemyMoveAnim(e, fromX, fromY)
+        finishEnemyMove(e, fromX, fromY)
       }
       return
     }
@@ -3314,7 +3316,7 @@
     e.x = step.x
     e.y = step.y
     occupied.add(keyXY(e.x, e.y))
-    beginEnemyMoveAnim(e, fromX, fromY)
+    finishEnemyMove(e, fromX, fromY)
     return true
   }
 
@@ -3327,6 +3329,10 @@
 
   // Enemy templates may override wandering per species. Enemies without an
   // explicit template value retain the old global behavior as their fallback.
+  function enemyWanderForLevel(mode, level) {
+    return level < 0 && mode === 'far' ? 'roam' : mode
+  }
+
   function defaultEnemyWanderMode() {
     if (!ENEMY_WANDER_ENABLED) return false
     return ENEMY_WANDER_LEASH ? 'homeReanchored' : 'roam'
@@ -3452,7 +3458,30 @@
   }
 
   function enemyFarWander(e) {
-    if (!chance(0.5)) return false
+    const roll = rng()
+    if (roll < 0.40) return false
+    if (roll < 0.60) {
+      const options = []
+      for (const [dx, dy] of DIRS8) {
+        const x = e.x + dx, y = e.y + dy
+        if (x === e.farPrevX && y === e.farPrevY) continue
+        if (enemyTileOpen(e, x, y)) options.push({x, y})
+      }
+      if (!options.length) return false
+      const destination = options[randInt(0, options.length - 1)]
+      occupied.delete(keyXY(e.x, e.y))
+      const fromX = e.x, fromY = e.y
+      e.x = destination.x
+      e.y = destination.y
+      occupied.add(keyXY(e.x, e.y))
+      // Rejoin the cached route where possible; a full-map path search after
+      // every random detour would be expensive for off-screen travelers.
+      const join = e.farPath?.findIndex(step =>
+        Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) === 1) ?? -1
+      e.farPath = join >= 0 ? e.farPath.slice(join) : null
+      finishEnemyMove(e, fromX, fromY)
+      return true
+    }
 
     const targetValid = Number.isInteger(e.farTargetX) && Number.isInteger(e.farTargetY) &&
       enemyCanTraverse(e, e.farTargetX, e.farTargetY)
@@ -3486,7 +3515,7 @@
     e.y = step.y
     e.farPath.shift()
     occupied.add(keyXY(e.x, e.y))
-    beginEnemyMoveAnim(e, fromX, fromY)
+    finishEnemyMove(e, fromX, fromY)
     return true
   }
 
@@ -3526,7 +3555,7 @@
         e.x = stepHome.x
         e.y = stepHome.y
         occupied.add(keyXY(e.x, e.y))
-        beginEnemyMoveAnim(e, fromX, fromY)
+        finishEnemyMove(e, fromX, fromY)
         return true
       }
       return false
@@ -3552,7 +3581,7 @@
     e.x = destination.x
     e.y = destination.y
     occupied.add(keyXY(e.x, e.y))
-    beginEnemyMoveAnim(e, fromX, fromY)
+    finishEnemyMove(e, fromX, fromY)
     return true
   }
 
@@ -3579,7 +3608,7 @@
     e.x = best.x
     e.y = best.y
     occupied.add(keyXY(e.x, e.y))
-    beginEnemyMoveAnim(e, fromX, fromY)
+    finishEnemyMove(e, fromX, fromY)
     return true
   }
 
@@ -5723,6 +5752,14 @@
 
   // Enemies slide between tiles using the same easing/duration as the player's
   // camera pan, so a turn reads as one continuous motion rather than a snap.
+  function finishEnemyMove(e, fromX, fromY) {
+    if (enemyWanderMode(e) === 'far') {
+      e.farPrevX = fromX
+      e.farPrevY = fromY
+    }
+    beginEnemyMoveAnim(e, fromX, fromY)
+  }
+
   function beginEnemyMoveAnim(e, fromX, fromY) {
     e.animFromX = fromX
     e.animFromY = fromY

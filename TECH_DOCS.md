@@ -1442,7 +1442,7 @@ Enemy templates may define `wander` individually:
 | `"homeReanchored"` | Randomly wanders using the existing global leash/radius. If a chase carries it beyond the leash, its post-chase position becomes the new home anchor, preserving the original wandering behavior. |
 | `"homeReturn"` | Randomly wanders within its home radius, but keeps its original home anchor. If a chase carries it beyond that radius, idle behavior actively paths it back toward home until it is inside the leash again. |
 | `"roam"` | Uses the normal random-wander chance but ignores the home leash, so it may gradually travel anywhere its terrain movement allows. |
-| `"far"` | Picks a reachable random walkable tile on the opposite side of the current map and actively paths toward it while idle. Each idle turn has a **50% chance** to advance one step, so travelers remain catchable. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed until reached or invalidated, then another opposite-side destination is chosen. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
+| `"far"` | On the surface, picks a reachable random walkable tile on the opposite side of the map. Each idle turn has a **40% chance to stay**, **20% chance to move one open tile in a random direction other than the previous tile**, and **40% chance to take one step along the path to its destination**. An obstructed chosen move may still leave it in place. It is not limited by the player's 20-tile wander activation radius. The destination remains fixed after random detours and until reached or invalidated; a detour rejoins the cached path when possible or rebuilds it on the next destination step. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
 | `false` | Never performs idle wandering. |
 
 A template value overrides the old global setting. Enemies without an explicit
@@ -1450,6 +1450,12 @@ A template value overrides the old global setting. Enemies without an explicit
 `wandering.enabled: false` means no wandering; otherwise `wandering.leash:
 true` resolves to `"homeReanchored"` and `false` resolves to `"roam"`.
 Legacy saves/templates containing `"home"` are treated as `"homeReanchored"`.
+When a monster with `"far"` is spawned underground, its instance uses `"roam"`
+instead; the surface template remains unchanged. Loading an older save also
+converts underground `"far"` instances to `"roam"` through the shared
+`enemyWanderForLevel()` helper in the Enemy AI wandering section. A surface traveler's
+previous tile is saved so its random branch cannot immediately reverse after
+loading; destination coordinates remain saved as before.
 
 Home-style enemies may also define `homeRadius` per template or per spawned enemy.
 If omitted, the global `wandering.radius` is used, currently **1 tile**. This
@@ -1471,7 +1477,7 @@ Current global wandering settings:
 ```text
 Enabled/default fallback: yes
 Chance per turn for homeReanchored/homeReturn/roam: 30%
-Chance per idle turn for far travel step: 50%
+Far idle turn: 40% stay / 20% random open step except previous tile / 40% destination step
 Leash: yes
 Default home radius: 1 tile (overridable per enemy/template with `homeRadius`)
 Active range for home/roam: 20 tiles from the player (Chebyshev distance)

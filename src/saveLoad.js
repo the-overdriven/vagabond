@@ -178,6 +178,8 @@ function buildSaveObject() {
       homeRadius: Number.isFinite(e.homeRadius) ? e.homeRadius : null,
       farTargetX: Number.isInteger(e.farTargetX) ? e.farTargetX : null,
       farTargetY: Number.isInteger(e.farTargetY) ? e.farTargetY : null,
+      farPrevX: Number.isInteger(e.farPrevX) ? e.farPrevX : null,
+      farPrevY: Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       fleeingHoly: !!e.fleeingHoly,
     })),
     groundItems: groundItems.map(g => ({...g})),
@@ -616,14 +618,16 @@ function loadGameFromObject(data, opts = {}) {
       alarmedZ: Number.isInteger(e.alarmedZ) ? e.alarmedZ : null,
       alarmedLevelKind: typeof e.alarmedLevelKind === 'string' ? e.alarmedLevelKind : null,
       homeX: e.homeX, homeY: e.homeY,
-      wander: Object.prototype.hasOwnProperty.call(e, 'wander')
+      wander: enemyWanderForLevel(Object.prototype.hasOwnProperty.call(e, 'wander')
         ? (e.wander === 'home' ? 'homeReanchored' : e.wander)
-        : (tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander') ? tmpl.wander : defaultEnemyWanderMode()),
+        : (tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander') ? tmpl.wander : defaultEnemyWanderMode()), level),
       homeRadius: Number.isFinite(e.homeRadius)
         ? Math.max(0, e.homeRadius)
         : (Number.isFinite(tmpl?.homeRadius) ? Math.max(0, tmpl.homeRadius) : null),
-      farTargetX: Number.isInteger(e.farTargetX) ? e.farTargetX : null,
-      farTargetY: Number.isInteger(e.farTargetY) ? e.farTargetY : null,
+      farTargetX: level >= 0 && Number.isInteger(e.farTargetX) ? e.farTargetX : null,
+      farTargetY: level >= 0 && Number.isInteger(e.farTargetY) ? e.farTargetY : null,
+      farPrevX: level >= 0 && Number.isInteger(e.farPrevX) ? e.farPrevX : null,
+      farPrevY: level >= 0 && Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       farPath: null,
       fleeingHoly: !!e.fleeingHoly,
     })
