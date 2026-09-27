@@ -6395,7 +6395,7 @@
         const [mx, my] = key.split(',').map(Number)
         const playerBehindAncientTree = map[my]?.[mx] === 'ancientForest' &&
           Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
-        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.5 : 1)
+        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.7 : 1)
       }
     }
     for (const visibleEnemy of visibleEnemies) {

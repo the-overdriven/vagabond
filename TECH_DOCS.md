@@ -705,9 +705,10 @@ Normal foraging is disabled there.
 
 In tile-image mode, Ancient Forest trees use grass ground beneath their image,
 without a separate dark-ground image or the tile's dark fallback color. When
-the player is behind an Ancient Forest tree, its opaque terrain draw is skipped
-and the foreground canopy is drawn once at 50% opacity over that grass ground.
-Other trees retain their normal opacity.
+the player is behind an Ancient Forest tree, its opaque terrain draw is skipped.
+The character is drawn at its normal opacity, then the foreground tree is drawn
+once at 70% opacity, letting the character show through it. Other trees retain
+their normal opacity.
 
 </details>
 
