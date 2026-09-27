@@ -3341,7 +3341,7 @@ Current desktop controls include:
 | Caps Lock | Lock enemy ranges                                              |
 | + / - (including numpad) | Increase / decrease game tile size               |
 | Mouse wheel over game canvas | Increase / decrease game tile size           |
-| G | Debug/god mode                                                 |
+| G | Enable god mode; afterward toggle god mode invisibility        |
 
 Tile size starts at 40 canvas pixels and changes in four-pixel steps from 20
 to 96. Desktop recomputes the camera's tile count from available stage width
@@ -3392,7 +3392,13 @@ There is currently no mobile button for waiting (skipping the turn).
 
 # 71. Debug Mode
 
-`G` activates a developer/debug mode.
+`G` activates a developer/debug mode. The first press also makes the player
+invisible. Further presses toggle invisibility while keeping god mode's stats,
+gold, and revealed maps. With invisibility off, enemies can detect, pursue,
+ambush, and attack the player; the player no longer looks faded, and visible
+combat rules such as evasion and extra weapon attacks apply. Holding the key
+does not trigger repeated toggles. The key press is a replay action, and the
+visibility flag is saved; older god mode saves load with invisibility on.
 
 It:
 

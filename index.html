@@ -1753,6 +1753,10 @@
     return !!(race && race[flag])
   }
 
+  function playerIsInvisible() {
+    return player.godMode ? player.godInvisible !== false : player.invisibleTurns > 0
+  }
+
   // Wyrdlings squeeze more out of every potion, herb and scroll.
   function consumablePower(amount) {
     const race = raceDef()
@@ -1771,6 +1775,7 @@
     gold: 0, deaths: 0, steps: 0, kills: 0,
     invisibleTurns: 0,
     godMode: false,
+    godInvisible: false,
     speedPotionTurns: 0,
     speedPotionBonus: 0,
     berryRegenTurns: 0,
@@ -2730,7 +2735,7 @@
   function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false, attackerEnemy = null, defenderEnemy = null) {
     // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks in
     // either direction - it's not meant to be a fair, ongoing exchange of blows.
-    if ((attackerIsPlayer || defenderIsPlayer) && (player.godMode || player.invisibleTurns > 0)) return false
+    if ((attackerIsPlayer || defenderIsPlayer) && playerIsInvisible()) return false
     const attackerDelay = combatDelay(attackerWeapon, attackerIsPlayer, attackerEnemy)
     const defenderDelay = combatDelay(defenderWeapon, defenderIsPlayer, defenderEnemy)
     return attackerDelay !== null && defenderDelay !== null &&
@@ -2746,7 +2751,7 @@
     // Evasive movement requires seeing the attacker. Invisibility (and god
     // mode's unseen-player behavior) suppresses only this special dodge;
     // the ordinary hit/miss roll below still applies.
-    if (e.evades && !player.godMode && player.invisibleTurns <= 0 && chance(0.30)) {
+    if (e.evades && !playerIsInvisible() && chance(0.30)) {
       const fromX = e.x, fromY = e.y
       const options = []
       for (const [dx, dy] of DIRS8) {
@@ -2998,6 +3003,8 @@
       deaths: 0,
       steps: 0,
       invisibleTurns: 0,
+      godMode: false,
+      godInvisible: false,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       freezing: {active: false, turns: 0},
@@ -3735,7 +3742,7 @@
         log('The speed boost wears off.', 'info')
       }
     }
-    const playerHidden = player.godMode || player.invisibleTurns > 0
+    const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
       if (!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info')
@@ -4617,8 +4624,8 @@
   // when the player enters the ancient forest.
   function maybeSpawnForestAmbush(x, y) {
     // Ambushes are surprise attacks; a hidden player cannot trigger one,
-    // including the permanent invisibility granted by god mode.
-    if (player.godMode || player.invisibleTurns > 0) return
+    // including god mode while its invisibility is enabled.
+    if (playerIsInvisible()) return
     if (raceHas('noForestAmbush')) return // elves move through woodland unseen
     const ancient = map[y][x] === 'ancientForest'
     if (map[y][x] !== 'forest' && !ancient) return
@@ -4681,7 +4688,7 @@
     if (target) {
       clearAutoPath()
       consecutiveWaitTurns = 0
-      const invisibleAttack = !player.godMode && player.invisibleTurns > 0
+      const invisibleAttack = !player.godMode && playerIsInvisible()
       const targetHp = target.hp
       const hit = await playerAttackEnemy(target)
       if (invisibleAttack && target.alive && hit) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
@@ -6340,7 +6347,7 @@
         py = attackAnim.fromY + (attackAnim.targetY - attackAnim.fromY) * lunge
       }
       const vx = Math.round((px - camX) * TILE_PX), vy = Math.round((py - camY) * TILE_PX)
-      const faded = player.godMode || player.invisibleTurns > 0
+      const faded = playerIsInvisible()
       const playerColor = faded ? RENDER_STYLE.player.fadedColor : RENDER_STYLE.player.color
       const playerAlpha = faded ? RENDER_STYLE.player.fadedAlpha : 1
       const deathRotation = deathTransition &&
@@ -6388,7 +6395,7 @@
         const [mx, my] = key.split(',').map(Number)
         const playerBehindAncientTree = map[my]?.[mx] === 'ancientForest' &&
           Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
-        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.8 : 1)
+        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.5 : 1)
       }
     }
     for (const visibleEnemy of visibleEnemies) {
@@ -8328,6 +8335,42 @@
     updateTouchControlsVisibility()
   }
 
+  function useGodModeKey() {
+    recordReplayAction({type: 'godMode'})
+    if (player.godMode) {
+      player.godInvisible = !player.godInvisible
+      render()
+      log(player.godInvisible
+        ? 'God mode invisibility enabled.'
+        : 'God mode invisibility disabled. Enemies can see you.', 'info')
+      return
+    }
+    // God mode reveals every generated level, including the shared cave
+    // layer and any deeper maps, so the minimap never hides content.
+    const reveal = grid => {
+      if (grid) for (const row of grid) row.fill(true)
+    }
+    reveal(discovered)
+    reveal(undergroundDiscoveredL1)
+    for (const level of deepLevels) reveal(level.discovered)
+    if (cryptLevel2) reveal(cryptLevel2.discovered)
+    player.hp = 500
+    player.maxHp = 500
+    player.baseAtk = 50
+    player.baseDef = 50
+    player.baseSpd = 50
+    player.baseMf = 25
+    player.godMode = true
+    player.godInvisible = true
+    player.gold = 500
+    // The minimap is cached for performance; filling the discovery grids
+    // alone leaves the old fog-painted pixels in those canvases.
+    rebuildMinimapBases()
+    updateHud()
+    render()
+    log('God mode: every map revealed. SPD 50. MF 25.', 'good')
+  }
+
   window.addEventListener('keydown', (ev) => {
     if (Graveyard.isOpen()) {
       if (ev.key === 'Escape') Graveyard.close()
@@ -8384,29 +8427,8 @@
       return
     }
     if (k === 'g' || k === 'G') {
-      // God mode also reveals every generated level, including the shared
-      // cave layer and any deeper maps, so the minimap never hides content.
-      const reveal = grid => {
-        if (grid) for (const row of grid) row.fill(true)
-      }
-      reveal(discovered)
-      reveal(undergroundDiscoveredL1)
-      for (const level of deepLevels) reveal(level.discovered)
-      if (cryptLevel2) reveal(cryptLevel2.discovered)
-      player.hp = 500
-      player.maxHp = 500
-      player.baseAtk = 50
-      player.baseDef = 50
-      player.baseSpd = 50
-      player.baseMf = 25
-      player.godMode = true
-      player.gold = 500
-      // The minimap is cached for performance; filling the discovery grids
-      // alone leaves the old fog-painted pixels in those canvases.
-      rebuildMinimapBases()
-      updateHud()
-      render()
-      log('God mode: every map revealed. SPD 50. MF 25.', 'good')
+      ev.preventDefault()
+      if (!ev.repeat) useGodModeKey()
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return

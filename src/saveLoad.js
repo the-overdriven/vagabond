@@ -137,6 +137,7 @@ function buildSaveObject() {
       gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
       invisibleTurns: player.invisibleTurns,
       godMode: player.godMode,
+      godInvisible: player.godMode ? player.godInvisible !== false : false,
       speedPotionTurns: player.speedPotionTurns,
       berryRegenTurns: player.berryRegenTurns,
       freezing: player.freezing,
@@ -565,7 +566,9 @@ function loadGameFromObject(data, opts = {}) {
     player.inventory.push({kind: 'blackkey', name: 'Black Key'})
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
-  player.godMode = !!player.godMode
+  player.godMode = !!data.player.godMode
+  player.godInvisible = player.godMode && (typeof data.player.godInvisible === 'boolean'
+    ? data.player.godInvisible : true)
   player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns | 0) : 0
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []

@@ -287,6 +287,9 @@ function finishReplayPlayback() {
 
 async function runReplayAction(action) {
   switch (action.type) {
+    case 'godMode':
+      useGodModeKey()
+      break
     case 'move':
       await tryMove(action.dx, action.dy)
       break
