@@ -287,7 +287,7 @@ canvas {
     left: -146px;
   }
 
-  body.side-collapsed #stage {
+  body.side-collapsed.hint-collapsed #stage {
     left: -14px;
   }
 
@@ -591,6 +591,20 @@ body.hint-collapsed #hint .panel-toggle {
 
 #mapOverlay .panelbox, #treasureMapOverlay .panelbox {
   width: min(72vw, 520px);
+}
+
+.map-level-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+#mapLevelLabel {
+  min-width: 125px;
+  text-align: center;
+  color: var(--parchment-dim);
 }
 
 #minimap, #treasureMapCanvas {

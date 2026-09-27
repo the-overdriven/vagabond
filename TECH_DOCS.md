@@ -1939,6 +1939,11 @@ after `setSlotLabel()` being parsed as property access through automatic semicol
 insertion. The listed base gear icons are preloaded for offline use. This changes
 only presentation, not gear stats or loot odds.
 
+Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
+Supplies lists consumable food, herbs, mushrooms, potions, and scrolls,
+including potatoes. Other excludes equipment and supplies; All keeps its
+existing consumables-first ordering. Tabs only filter displayed inventory.
+
 A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
@@ -3327,6 +3332,17 @@ numbers, so replay RNG consumption stays unchanged. The approach follows the
 wall-aware field-of-view concept in rot.js, implemented locally without a
 runtime dependency.
 
+The full-map overlay has up/down controls for browsing the surface and each
+underground map whose discovery grid contains at least one revealed tile.
+Generic z:-2 caves and the separate Crypt Level 2 have distinct entries,
+despite sharing a depth. Historical views paint only their saved discovered
+tiles; undiscovered terrain stays fogged. The full-map player marker pulses
+only on the currently occupied map. Browsing does not change the active game
+map, field of view, side minimap, save state, or replay RNG. Reopening the map
+starts on the current level.
+The active minimap cache also checks the map and discovery-grid identities,
+because generic and Crypt z:-2 maps can have the same depth and cave index.
+
 Therefore:
 
 > Existing map data does not imply that the player has discovered that location.
@@ -3367,7 +3383,10 @@ Current desktop controls include:
 Tile size starts at 40 canvas pixels and changes in four-pixel steps from 20
 to 96. Desktop recomputes the camera's tile count from available stage width
 and height, keeping 7–50 tiles horizontally and sizing the canvas to complete
-tiles. A cramped window caps the effective tile size so the canvas fits. On
+tiles. A cramped window caps the effective tile size so the canvas fits.
+On desktop, collapsing both the side map and keyboard hints releases their shared
+right-side reservation and expands the canvas; collapsing either panel alone
+keeps that reservation. Both toggles recalculate the viewport. On
 coarse-pointer layouts the 16-column baseline scales with tile size (also
 bounded to 7–50 columns), while the existing vertical drag still controls
 visible rows. Pointer hit testing uses the canvas's actual displayed-to-buffer

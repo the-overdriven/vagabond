@@ -365,6 +365,7 @@
           <button class="inv-tab" data-tab="weapon" type="button">Weapons</button>
           <button class="inv-tab" data-tab="shield" type="button">Shields</button>
           <button class="inv-tab" data-tab="armor" type="button">Armors</button>
+          <button class="inv-tab" data-tab="supplies" type="button">Supplies</button>
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
@@ -386,6 +387,11 @@
           <button class="slbtn" id="btnMapZoomOut" type="button" aria-label="Zoom out">−</button>
           <button class="slbtn" id="btnMapZoomReset" type="button">Reset Zoom</button>
           <button class="slbtn" id="btnMapZoomIn" type="button" aria-label="Zoom in">+</button>
+        </div>
+        <div class="map-level-controls">
+          <button class="slbtn" id="btnMapLevelUp" type="button" aria-label="View higher explored level">▲</button>
+          <span id="mapLevelLabel" aria-live="polite"></span>
+          <button class="slbtn" id="btnMapLevelDown" type="button" aria-label="View lower explored level">▼</button>
         </div>
         <canvas id="minimap"></canvas>
         <div class="closehint">
@@ -3983,7 +3989,7 @@
   }
 
   function isConsumableKind(kind) {
-    return kind === 'potion' || kind === 'speedpotion' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'scroll' || kind === 'idscroll' || kind === 'homecomingscroll'
+    return kind === 'potion' || kind === 'speedpotion' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'scroll' || kind === 'idscroll' || kind === 'homecomingscroll'
   }
 
   function equipmentSortValues(item) {
@@ -5264,7 +5270,8 @@
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const sideOpen = !document.body.classList.contains('side-collapsed')
-    const reserved = sideOpen ? 292 : 28
+    const hintOpen = !document.body.classList.contains('hint-collapsed')
+    const reserved = sideOpen || hintOpen ? 292 : 28
     const availableWidth = Math.max(1, window.innerWidth - reserved - 28)
     const logPanel = document.getElementById('logpanel')
     const stageTop = document.getElementById('stage').getBoundingClientRect().top
@@ -6965,6 +6972,58 @@
   const MAP_ZOOMS = [1, 1.5, 2, 3, 4]
   let mapZoomIndex = 0
   let mapPanX = null, mapPanY = null
+  let mapViewKey = 'surface'
+  let mapPreviewBase = null
+
+  function currentMapViewKey() {
+    if (currentZ === 0) return 'surface'
+    if (currentLevelKind() === 'crypt2') return 'crypt2'
+    return `chain:${CHAIN_DEPTH_BY_Z[currentZ]}`
+  }
+
+  function exploredMapLevels() {
+    const levels = [
+      {key: 'surface', label: 'Surface (0)', z: 0, terrain: surfaceMap, seen: discovered},
+      {key: 'chain:1', label: 'Underground (−1)', z: -1, terrain: undergroundMap, seen: undergroundDiscoveredL1}
+    ]
+    for (let i = 0; i < deepLevels.length; i++) {
+      const z = CHAIN_Z_BY_DEPTH[i + 1]
+      if (z === undefined) continue
+      levels.push({key: `chain:${i + 2}`, label: `Underground (${z})`, z,
+        terrain: deepLevels[i].map, seen: deepLevels[i].discovered})
+      if (z === -2 && cryptLevel2) levels.push({key: 'crypt2', label: 'Crypt (−2)', z: -2,
+        terrain: cryptLevel2.map, seen: cryptLevel2.discovered})
+    }
+    return levels.filter(level => level.terrain && level.seen?.some(row => row?.some(Boolean)))
+  }
+
+  function selectedMapLevel() {
+    const levels = exploredMapLevels()
+    return levels.find(level => level.key === mapViewKey) || levels.find(level => level.key === currentMapViewKey())
+  }
+
+  function updateMapLevelControls() {
+    const levels = exploredMapLevels()
+    const index = levels.findIndex(level => level.key === mapViewKey)
+    document.getElementById('mapLevelLabel').textContent = levels[index]?.label || 'World Map'
+    document.getElementById('btnMapLevelUp').disabled = index <= 0
+    document.getElementById('btnMapLevelDown').disabled = index < 0 || index >= levels.length - 1
+  }
+
+  function changeMapLevel(direction) {
+    const levels = exploredMapLevels()
+    const index = levels.findIndex(level => level.key === mapViewKey)
+    const next = levels[index + direction]
+    if (!next) return
+    mapViewKey = next.key
+    mapPreviewBase = null
+    // Center the first view on a known part of the selected level.
+    const row = next.seen.findIndex(cells => cells?.some(Boolean))
+    mapPanY = row >= 0 ? row : player.y
+    mapPanX = row >= 0 ? next.seen[row].findIndex(Boolean) : player.x
+    updateMapLevelControls()
+    renderMinimap()
+  }
 
   const SIDE_VIEW_W = 61, SIDE_VIEW_H = 41
   const MINI_SCALES = [MAP_SCALE, SIDE_SCALE]
@@ -6984,7 +7043,7 @@
   // so it lives on cached offscreen canvases that are only patched tile-by-tile as
   // fog of war lifts. Per-frame rendering is then just a blit plus two markers.
   const miniBases = {}
-  let miniBaseLevel = null, miniBaseCave = null
+  let miniBaseLevel = null, miniBaseCave = null, miniBaseMap = null, miniBaseSeen = null
 
   function makeMiniBase(scale) {
     const c = document.createElement('canvas')
@@ -6995,10 +7054,13 @@
 
   function ensureMiniBases() {
     let changed = false
-    if (miniBaseLevel !== currentZ || miniBaseCave !== currentCave) {
+    if (miniBaseLevel !== currentZ || miniBaseCave !== currentCave ||
+      miniBaseMap !== map || miniBaseSeen !== (currentZ === 0 ? discovered : undergroundDiscovered)) {
       for (const key of Object.keys(miniBases)) delete miniBases[key]
       miniBaseLevel = currentZ
       miniBaseCave = currentCave
+      miniBaseMap = map
+      miniBaseSeen = currentZ === 0 ? discovered : undergroundDiscovered
       changed = true
     }
     for (const scale of MINI_SCALES) {
@@ -7012,26 +7074,30 @@
     }
   }
 
-  function paintMiniTile(base, x, y) {
+  function paintMiniTile(base, x, y, view = null) {
     const s = base.scale
     const c = base.ctx
     c.clearRect(x * s, y * s, s, s)
-    const terrainMap = currentZ === 0 ? (surfaceMap || map) : map
+    const terrainMap = view ? view.terrain : currentZ === 0 ? (surfaceMap || map) : map
     const tileKey = terrainMap[y][x]
     const t = TILE[tileKey] || TILE.cavewall || TILE.grass
     const underKey = tileUnderlays[keyXY(x, y)] || tileKey
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
-    const visible = currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
+    const visible = view ? view.seen[y]?.[x] : currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
-    const brownCave = tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)
+    const brownCave = tileKey === 'cavefloor2' && (view
+      ? view.key === 'chain:2' && deepLevels[0]?.caves?.some((cave, i) => cave.brownFloor &&
+        deepLevels[0].caveMaps[i]?.[y]?.[x] !== 'cavewall' && deepLevels[0].caveMaps[i]?.[y]?.[x] !== undefined)
+      : brownDeepCaveAt(x, y))
     c.fillStyle = visible && brownCave ? RENDER_STYLE.minimap.brownCave : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
       ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
   }
 
   function rebuildMinimapBases() {
+    mapPreviewBase = null
     ensureMiniBases()
     for (const scale of MINI_SCALES) {
       const base = miniBases[scale]
@@ -7088,12 +7154,25 @@
 
   // originX/originY are the top-left tile of the visible window (0,0 for the full
   // world map, a player-centred clamped offset for the zoomed side minimap).
+  function fullMapBase(view) {
+    if (view.key === currentMapViewKey()) return miniBases[MAP_SCALE].canvas
+    if (!mapPreviewBase || mapPreviewBase.view !== view.terrain || mapPreviewBase.seen !== view.seen) {
+      const base = makeMiniBase(MAP_SCALE)
+      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) paintMiniTile(base, x, y, view)
+      mapPreviewBase = {view: view.terrain, seen: view.seen, canvas: base.canvas}
+    }
+    return mapPreviewBase.canvas
+  }
+
   function renderMinimapCanvas(ctx, scale, originX, originY, showMapPlayer) {
     ensureMiniBases()
     const w = ctx.canvas.width, h = ctx.canvas.height
     ctx.clearRect(0, 0, w, h)
     ctx.imageSmoothingEnabled = false
     if (showMapPlayer) {
+      const view = selectedMapLevel()
+      if (!view) return
+      const onPlayerLevel = view.key === currentMapViewKey()
       const zoom = MAP_ZOOMS[mapZoomIndex]
       const viewW = w / (scale * zoom)
       const viewH = h / (scale * zoom)
@@ -7103,9 +7182,9 @@
       }
       const ox = Math.max(0, Math.min(MAP_W - viewW, mapPanX - viewW / 2))
       const oy = Math.max(0, Math.min(MAP_H - viewH, mapPanY - viewH / 2))
-      ctx.drawImage(miniBases[scale].canvas, ox * scale, oy * scale, viewW * scale, viewH * scale, 0, 0, w, h)
-      if (currentZ === 0) ctx.fillStyle = RENDER_STYLE.minimap.cave
-      for (const cave of currentZ === 0 ? caves : []) {
+      ctx.drawImage(fullMapBase(view), ox * scale, oy * scale, viewW * scale, viewH * scale, 0, 0, w, h)
+      if (view.z === 0) ctx.fillStyle = RENDER_STYLE.minimap.cave
+      for (const cave of view.z === 0 ? caves : []) {
         for (const entrance of cave.entrances || [{x: cave.x, y: cave.y}]) {
           if (!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue
           const cx = (entrance.x - ox) * scale * zoom + scale * zoom / 2
@@ -7113,7 +7192,7 @@
           if (cx >= 0 && cy >= 0 && cx < w && cy < h) ctx.fillRect(cx - 2 * zoom, cy - 2 * zoom, 4 * zoom, 4 * zoom)
         }
       }
-      if (currentZ === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
+      if (view.z === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
         const tx = (dwarvenRuin.x - ox) * scale * zoom + scale * zoom / 2,
           ty = (dwarvenRuin.y - oy) * scale * zoom + scale * zoom / 2
         ctx.fillStyle = RENDER_STYLE.minimap.dwarvenFort.color
@@ -7122,7 +7201,7 @@
         ctx.textBaseline = 'middle'
         ctx.fillText(RENDER_STYLE.minimap.dwarvenFort.glyph, tx, ty)
       }
-      if (currentZ === 0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]) {
+      if (view.z === 0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]) {
         const tx = (spawnPoint.x - ox) * scale * zoom + scale * zoom / 2
         const ty = (spawnPoint.y - oy) * scale * zoom + scale * zoom / 2
         ctx.fillStyle = RENDER_STYLE.minimap.temple.color
@@ -7131,6 +7210,7 @@
         ctx.textBaseline = 'middle'
         ctx.fillText(RENDER_STYLE.minimap.temple.glyph, tx, ty)
       }
+      if (!onPlayerLevel) return
       const px = (player.x - ox) * scale * zoom + scale * zoom / 2
       const py = (player.y - oy) * scale * zoom + scale * zoom / 2
       const pulse = 1 + Math.sin(performance.now() / 180) * 0.18
@@ -7240,7 +7320,7 @@
   let mapPulseFrame = null
 
   function animateMapPlayer() {
-    if (!mapOpen) {
+    if (!mapOpen || mapViewKey !== currentMapViewKey()) {
       mapPulseFrame = null
       return
     }
@@ -7252,7 +7332,7 @@
     ensureMinimapCanvasSize()
     if (mapOpen) {
       renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)
-      if (!mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
+      if (mapViewKey === currentMapViewKey() && !mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
     }
     const o = sideMiniOrigin()
     renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y, false)
@@ -7333,7 +7413,8 @@
       if (invTab === 'weapon') matches = it.kind === 'weapon'
       else if (invTab === 'armor') matches = it.kind === 'armor'
       else if (invTab === 'shield') matches = it.kind === 'shield'
-      else if (invTab === 'other') matches = it.kind !== 'weapon' && it.kind !== 'armor' && it.kind !== 'shield'
+      else if (invTab === 'supplies') matches = isConsumableKind(it.kind)
+      else if (invTab === 'other') matches = it.kind !== 'weapon' && it.kind !== 'armor' && it.kind !== 'shield' && !isConsumableKind(it.kind)
       if (matches) visible.push({it, idx})
     })
     if (invTab === 'all') {
@@ -8178,10 +8259,14 @@
   })
   document.getElementById('btnMapZoomReset').addEventListener('click', () => {
     mapZoomIndex = 0
-    mapPanX = player.x
-    mapPanY = player.y
+    if (mapViewKey === currentMapViewKey()) {
+      mapPanX = player.x
+      mapPanY = player.y
+    }
     renderMinimap()
   })
+  document.getElementById('btnMapLevelUp').addEventListener('click', () => changeMapLevel(-1))
+  document.getElementById('btnMapLevelDown').addEventListener('click', () => changeMapLevel(1))
   mini.style.touchAction = 'none'
   mini.addEventListener('wheel', (ev) => {
     if (!mapOpen) return
@@ -8315,6 +8400,7 @@
     const hintLabel = collapsed ? 'Expand keyboard hints' : 'Collapse keyboard hints'
     document.getElementById('btnHintCollapse').setAttribute('aria-label', hintLabel)
     document.getElementById('btnHintCollapse').title = hintLabel
+    resizeDesktopViewport()
   })
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()
@@ -8347,8 +8433,11 @@
     mapOpen = next
     document.getElementById('mapOverlay').classList.toggle('show', mapOpen)
     if (mapOpen) {
+      mapViewKey = currentMapViewKey()
+      mapPreviewBase = null
       mapPanX = player.x
       mapPanY = player.y
+      updateMapLevelControls()
       renderMinimap()
     }
     updateTouchControlsVisibility()
