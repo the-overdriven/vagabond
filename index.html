@@ -2763,6 +2763,7 @@
         e.y = destination.y
         occupied.add(keyXY(e.x, e.y))
         finishEnemyMove(e, fromX, fromY)
+        e.justEvaded = true // consumed by this enemy's immediate response
         spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
         log(`The ${e.name} evades your attack.`, 'bad')
         updateMobileInfoPanel(e.x, e.y)
@@ -3718,6 +3719,8 @@
     const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e)) continue
+      const justEvaded = e.justEvaded === true
+      e.justEvaded = false
       if (enemyIsPassive(e)) {
         e.aware = false
         continue
@@ -3768,7 +3771,9 @@
         }
         if (e.aware && slowEnough && chance(0.25)) {
           e.aware = false
-          log(`The ${e.name} loses interest in the chase.`, 'info')
+          log(justEvaded
+            ? `The ${e.name} hesitates after its dodge, giving you a moment to act.`
+            : `The ${e.name} loses interest in the chase.`, 'info')
           continue
         }
         if (!e.aware) {

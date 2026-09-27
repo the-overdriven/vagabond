@@ -1195,6 +1195,11 @@ They cannot use this special dodge against an invisible player (or the unseen
 player in god mode); ordinary hit/miss and glancing-hit rolls still apply.
 
 If possible, they move to a nearby open tile after evading.
+If that dodge is followed by the existing slow-enemy loss-of-interest roll
+in the same enemy response, the log says `The <enemy> hesitates after its
+dodge, giving you a moment to act.` instead of the generic chase line.
+The game forgets the dodge after the enemy’s response.
+it is not a persistent status or a new chance to hesitate.
 
 Current examples include:
 
@@ -1426,7 +1431,11 @@ An already-aware enemy standing on the outermost tile of its effective aggro
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
 with a more transparent red than the rest of the aggro overlay.
 
-Enemies can also lose interest in the chase if the player's speed is at least twice as high.
+Enemies can also lose interest in the chase with a 25% chance per eligible
+response if the player's speed is at least twice as high. A successful dodge
+immediately before that roll changes only the log text, not the 25% chance or
+the existing awareness and turn behavior. Other losses of interest retain
+`The <enemy> loses interest in the chase.`
 
 Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
 
