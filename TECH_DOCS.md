@@ -4025,6 +4025,13 @@ differences from changing RNG consumption during playback.
 Old Hunter quest generation also uses the seeded RNG path (`chance()`), so its
 procedural quest selection is included in the recorded RNG sequence.
 
+The replay save/load E2E test starts a character through Begin and waits for
+world generation to finish before arranging its deterministic Temple fixture.
+It then restarts recording so the fixture is captured in `initialState`, walks
+and talks to the Old Hunter, saves and loads, replays, continues the run, and
+repeats the save/load and playback checks. Fixture changes made after the
+recording snapshot would not be represented by the replay actions.
+
 ## Playback
 
 **Show Replay** (HUD, next to Save/Load) appears whenever replay data exists for

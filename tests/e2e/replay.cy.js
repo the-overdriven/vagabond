@@ -2,9 +2,14 @@ function beginDeterministicReplayGame(name = 'Replay E2E Tester') {
   cy.visit('/')
   cy.get('#raceOverlay .panelbox').should('be.visible')
 
-  // Make the immediate Temple area deterministic before replay recording starts.
-  // The replay snapshot is captured only after Begin is clicked, so all of this
-  // becomes legitimate initial replay state rather than an unrecorded mutation.
+  cy.get('#raceName').clear().type(name)
+  cy.get('#replayToggle').check()
+  cy.get('#btnBegin').click()
+  cy.get('#raceOverlay').should('not.have.class', 'show')
+
+  // World generation runs after Begin. Set up the deterministic Temple area
+  // only once generation finishes, then replace the just-started recording's
+  // snapshot so the fixture is part of the replay's initial state.
   cy.window().then(win => {
     win.eval(`(() => {
       const cx = spawnPoint.x
@@ -57,13 +62,12 @@ function beginDeterministicReplayGame(name = 'Replay E2E Tester') {
       consecutiveWaitTurns = 0
       snapCameraToPlayer()
       render()
+
+      replayRecording = false
+      replayData = null
+      startReplayRecording()
     })()`)
   })
-
-  cy.get('#raceName').clear().type(name)
-  cy.get('#replayToggle').check()
-  cy.get('#btnBegin').click()
-  cy.get('#raceOverlay').should('not.have.class', 'show')
 
   cy.window().then(win => {
     expect(win.eval('replayRecording')).to.equal(true)
