@@ -86,50 +86,8 @@ The overlay blocks input and allows a paint before synchronous generation.
 Character race and Permadeath are set before world generation. Invalid names
 and duplicate Begin clicks cannot start a second world.
 
-The **Cursed world** checkbox is off by default. Its tooltip shares the brown
-canvas item tooltip palette and reads “Even more random world. Highly
-experimental and potentially unbalanced. Careful!” On confirmation the game
-chooses **exactly one** entry uniformly from `content/world_traits.json` and
-rolls its effect ranges with the seeded game RNG, before generating the map.
-Without the checkbox the base `content/world_generation.json` is applied.
-Each effect names a numeric path in that file (for example,
-`surface.snow.bandFraction`), uses `type: "additive"`, and has either a fixed
-number or `[min, max]` range. The selected trait's rolled values
-are added to a fresh copy of the base configuration. The snow band fraction
-is clamped to 0.08–0.55 so extreme values still leave both snowy and warmer
-regions. The selected trait flavor is logged on a new line after the opening
-story text. No effect changes the world midway through play.
-
-Initial traits:
-
-| Trait | Snow band change | Gameplay effect |
-| --- | --- | --- |
-| `cold_world` | +0.28 to +0.32 | Snow and freezing terrain extend near the center of the map. The snow threshold drops by 0.22 and edge noise amplitude drops by 0.30. |
-| `wild_weather` | −0.10 to +0.10 | The snow band may expand or recede. |
-
-The base snow band fraction is 0.22, making `cold_world` roll 0.50–0.54
-(130–140 rows of the 260-row map) and `wild_weather` roll 0.12–0.32.
-The visible snow edge is normally **north of the band boundary** because
-`coldness > coldnessThreshold` must still pass. The cold trait changes the
-threshold from 0.32 to 0.10 and the edge-noise amplitude from 0.55 to 0.25;
-near the map center, the expected snow edge is roughly row 117–126 before
-noise and terrain exclusions. The Temple spawn starts searching around row 130.
-Thus snow can appear within a few to a couple dozen northbound tiles, but
-this is not guaranteed at every longitude or in every seed. The spawn search
-continues to require grass or hill, and the existing world validation and
-regeneration rules remain in effect.
-`surface.snow.bandFraction` is the actual worldgen control for how far south
-snow extends; `freezeChance` and `snowNoiseWeight` are not parameters in this
-project. Cold worlds raise freezing exposure, expand taiga and frozen rivers,
-and can restrict foraging over a much larger part of the world. This is a
-strong, experimental change to early survival and travel.
-
-Saves and replay initial snapshots include `worldTrait` with its name, flavor,
-and **resolved numeric effect values**. Loading reapplies it to a fresh base
-configuration without rerolling RNG; older saves with no trait revert to the
-base configuration. Replay recording begins after world generation, so the
-snapshot contains the full generated world. Loading a save continues to
-bypass character creation.
+The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
+Loading a save bypasses character creation.
 
 There are currently **10 races**.
 
@@ -4205,3 +4163,122 @@ IDs, forge plausible rows and modes, or send direct Data API requests.
 An authoritative server would be required to verify a run. Never treat the
 two death-mode populations as interchangeable in later balance analysis.
 Remote text is rendered with DOM `textContent`, never interpolated into HTML.
+
+---
+
+# 85. Cursed World
+
+## Selection and timing
+
+The **Cursed world** checkbox appears alongside Permadeath and Save replay in
+character creation. It starts unchecked and has a brown item-style tooltip:
+“Even more random world. Highly experimental and potentially unbalanced.
+Careful!” When the player confirms a valid name, race, and mode, the game
+selects **exactly one** entry uniformly from `content/world_traits.json` if
+Cursed world is checked. Unchecked runs use the unchanged values in
+`content/world_generation.json`; no trait is selected or logged.
+
+The trait and its effect values are rolled with the seeded gameplay RNG before
+`generateNewWorld()`. The rolled values are applied to a fresh copy of the
+base world-generation configuration. Consequently, all generation attempts
+for that world use the same trait and rolled values; a failed attempt does not
+choose another trait. After the opening story text, its `flavor_text` is
+logged on a separate line. A trait is a **world-wide setting**, not a status
+that activates again each turn.
+
+## JSON format
+
+`content/world_traits.json` is an array of trait objects. Each entry has a
+unique `name` (identifier), a `flavor_text` string shown to the player, and
+an `effects` array. The current engine recognizes the following effect fields:
+
+| Field | Current meaning |
+| --- | --- |
+| `param` | Dot-separated path to an existing **numeric** value in `content/world_generation.json`, such as `surface.snow.bandFraction`. |
+| `type` | Only `"additive"` is implemented; the rolled `value` is added to the base parameter. |
+| `value` | A fixed number or a two-number range `[minimum, maximum]`. Each range consumes one seeded RNG draw and rolls independently. |
+
+One RNG draw chooses the trait, followed by one draw per ranged effect in the
+order written. A fixed effect uses no additional draw. The implementation
+rejects unsupported effect types, nonnumeric resolved values, nonexistent
+numeric parameter paths, and unsafe object keys. Keep paths aligned with the
+current configuration; names like `freezeChance` and `snowNoiseWeight` are not
+world-generation parameters. A numeric path outside snow can also be targeted
+when another trait is designed, but its effects and safe bounds must be
+reviewed against the code that consumes it.
+
+For example, a one-way trait that **only increases** snow coverage could use:
+
+```json
+{
+  "name": "long_winter_example",
+  "flavor_text": "Winter lingered too long.",
+  "effects": [
+    { "param": "surface.snow.bandFraction", "type": "additive", "value": [0.05, 0.10] }
+  ]
+}
+```
+
+This is an **illustrative, unconfigured** trait. A negative-only range always
+reduces a parameter; a fixed number always changes it by the same amount.
+A two-way range spanning zero can increase or decrease the parameter:
+
+```json
+{
+  "name": "wild_weather",
+  "flavor_text": "The seasons here forgot their pattern.",
+  "effects": [
+    { "param": "surface.snow.bandFraction", "type": "additive", "value": [-0.10, 0.10] }
+  ]
+}
+```
+
+This is the **current** `wild_weather` definition. Values near zero can make a
+run look nearly normal. If a trait has several ranged effects, they roll
+**independently**. Combining positive and negative ranges for the snow band,
+coldness threshold, and edge noise can make complex weather, but it does not
+force those effects to agree in direction; they may cancel visually. A trait
+with linked warm/cold direction would require additional selection logic.
+Changing `surface.snow.coldnessThreshold` upward makes snow harder to form,
+whereas increasing `surface.snow.bandFraction` extends the potential snow band
+south. `surface.snow.edgeNoiseAmplitude` changes the boundary's raggedness.
+
+## Current traits and snow behavior
+
+| Trait | Current effects | Expected result |
+| --- | --- | --- |
+| `cold_world` | Snow band fraction +0.28–0.32; coldness threshold −0.22; edge noise amplitude −0.30. | Larger and less ragged northern snow biome, reaching closer to the Temple. |
+| `wild_weather` | Snow band fraction −0.10–+0.10. | Snow biome may expand or recede; threshold and edge noise currently stay at their base values. |
+
+The base `surface.snow.bandFraction` is 0.22. `cold_world` rolls 0.50–0.54
+(130–140 rows of the 260-row map) and `wild_weather` rolls 0.12–0.32.
+The band is only a *candidate region*: a tile within it becomes snow when
+`coldness > coldnessThreshold`, and only eligible grass, forest, hill, or sand
+tiles are replaced by snow. Coldness includes a noisy edge. For `cold_world`,
+the threshold changes from 0.32 to 0.10 and edge-noise amplitude from 0.55 to
+0.25. At an average noise value, its visible snow edge falls around rows
+117–126, while the Temple spawn search begins around row 130. Terrain, noise,
+and the spawn search change the actual walking distance, so snow a fixed
+number of tiles north is **not guaranteed**. The snow-band fraction is clamped
+to 0.08–0.55 by the current trait application code; other parameters do not
+receive a generic clamp. Normal Temple connectivity and cave validation still
+run, including world regeneration attempts.
+
+A larger snow region also grows more taiga and frozen river terrain. More of
+the accessible world can cause freezing and offer poorer forage. Raising the
+snow range further can leave fewer grass or hill sites near the center for the
+Temple and other landmarks, and may increase failed world-generation attempts.
+The Cursed world tooltip describes this mode as experimental for that reason.
+
+## Saves and replay
+
+`buildSaveObject()` stores `worldTrait` with the selected name, flavor, and
+**rolled numeric effect offsets**. It does not store the entire modified
+configuration. `loadGameFromObject()` starts with a fresh copy of the base
+configuration and reapplies those offsets without another RNG draw. This
+also restores the setting when a replay loads its recorded initial snapshot.
+Older saves without `worldTrait` use the base configuration. The generated
+map itself is saved, so loading does not regenerate it. If the *base* world
+configuration is changed in a later version, an old saved offset is applied
+to that new base; do not assume the same final parameter value across such a
+change. World-generation RNG draws occur before replay recording starts.
