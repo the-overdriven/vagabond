@@ -4184,8 +4184,10 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 ## Selection
 
 The **Cursed world** checkbox in character creation is off by default. Its
-brown tooltip warns that this experimental mode can be unbalanced. With the
-checkbox off, generation uses the base configuration and logs no trait line.
+brown desktop tooltip warns that this experimental mode can be unbalanced. On
+mobile-sized or touch screens, the same warning appears as inline text below
+the three character-creation checkboxes. With the checkbox off, generation
+uses the base configuration and logs no trait line.
 After a valid name/race is confirmed, a cursed world draws the requested
 number of traits before world generation. All generation retries use the
 same resolved effects. Each nonempty `flavor_text` is logged on a new line
@@ -4202,6 +4204,7 @@ world rather than revealing the changed parameter.
     {
       "name": "example_trait",
       "flavor_text": "The paths seem different each morning.",
+      "_note": "Attempts 8 shallow caves instead of the default 6.",
       "direction": "one_way",
       "exclusiveGroup": "example_group",
       "effects": [
@@ -4212,8 +4215,12 @@ world rather than revealing the changed parameter.
 }
 ```
 
-This example is illustrative and is not an active trait. `count` may be an
-integer **1–5**, or `"random"` to draw an integer inclusively from `min` to
+This example is illustrative and is not an active trait. Every active trait
+has a human-readable `_note` explaining its mechanical changes relative to
+the base values in
+`world_generation.json` (or `map_config.json` for world size). `_note` is
+metadata for developers and is not an effect or a player-facing flavor line.
+`count` may be an integer **1–5**, or `"random"` to draw an integer inclusively from `min` to
 `max` (default **1–5**). The chosen count is fixed for this world. Candidates
 are drawn without replacement using the seeded gameplay RNG. The optional
 positive `weight` defaults to `1`; `the_bell_is_guarded` uses `0.25` so it is

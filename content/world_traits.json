@@ -8,6 +8,7 @@
     {
       "name": "cold_world",
       "flavor_text": "The cold has come farther south than it should this year.",
+      "_note": "Snow band expands from 0.22 to 0.50-0.54; the snow threshold falls from 0.32 to 0.10 and edge noise from 0.55 to 0.25, pushing a smoother frozen region farther south.",
       "exclusiveGroup": "climate",
       "direction": "one_way",
       "effects": [
@@ -34,6 +35,7 @@
     {
       "name": "wild_weather",
       "flavor_text": "The seasons here forgot their pattern.",
+      "_note": "Independently varies the snow band by -0.10 to +0.10, the coldness threshold by -0.08 to +0.08, and snow edge noise by -0.15 to +0.15 relative to 0.22, 0.32, and 0.55; outcomes may partly cancel.",
       "exclusiveGroup": "climate",
       "direction": "two_way",
       "effects": [
@@ -65,6 +67,7 @@
     },
     {
       "name": "world_size",
+      "_note": "Scales surface area to 50-125% of the default 260 x 260 tiles (roughly 184 x 184 to 291 x 291). Both dimensions share one area roll; ordinary population scales with eligible walkable area.",
       "direction": "two_way",
       "effects": [
         {
@@ -80,6 +83,7 @@
     {
       "name": "hollow_world",
       "flavor_text": "Sometimes the ground answers your footsteps with a distant echo.",
+      "_note": "Enlarges deep grotto and burrow dimensions, raises optional deep grotto chance from 50% to 70%, and adds two grotto rooms (bonus 4 to 6).",
       "exclusiveGroup": "cave_scale",
       "direction": "one_way",
       "excludes": [
@@ -233,6 +237,7 @@
     {
       "name": "shallow_earth",
       "flavor_text": "The hills are honeycombed with short, branching passages.",
+      "_note": "Attempts 8 shallow caves instead of 6, gives optional extra entrances a 55% chance instead of 0%, shortens shallow walk/chamber maxima, and modestly shrinks deep cave layouts.",
       "exclusiveGroup": "cave_scale",
       "direction": "one_way",
       "effects": [
@@ -291,6 +296,7 @@
     {
       "name": "ancient_wilderness",
       "flavor_text": "The oldest trees seem to have reclaimed much of the land.",
+      "_note": "Raises ancient-forest growth cap from 180 to 270 tiles and growth chance from 72% to 82%; lowers forest moisture threshold from 0.55 to 0.52, allowing more forest.",
       "exclusiveGroup": "forest",
       "direction": "one_way",
       "effects": [
@@ -314,6 +320,7 @@
     {
       "name": "migration_season",
       "flavor_text": "Tracks cross the roads in every direction, many of them still fresh.",
+      "_note": "Gives eligible surface enemies a 28% chance to be promoted to far wandering instead of the default 0%; this changes movement, not the number spawned.",
       "exclusiveGroup": "migration",
       "direction": "one_way",
       "effects": [
@@ -327,6 +334,7 @@
     {
       "name": "restless_wilds",
       "flavor_text": "Beasts have become restless as of late.",
+      "_note": "Gives eligible surface enemies a 32% chance to roam and an 8% chance to wander far, up from 0% for both promotions; far promotion is checked first.",
       "exclusiveGroup": "migration",
       "direction": "one_way",
       "effects": [
@@ -345,6 +353,7 @@
     {
       "name": "great_migration",
       "flavor_text": "Something has set the creatures of the wilds in motion.",
+      "_note": "Adds three surface migration groups (default 0) and increases each group size from 3 to 7, adding grouped enemies to the world.",
       "exclusiveGroup": "migration",
       "direction": "one_way",
       "effects": [
@@ -363,6 +372,7 @@
     {
       "name": "champions_age",
       "flavor_text": "Travellers speak of unusually fearsome creatures roaming the land.",
+      "_note": "Raises random prefix odds from 5% to 13% on the surface, 5% to 11% in shallow caves, and 11% to 18% in deep caves; guaranteed champions are unchanged.",
       "exclusiveGroup": "elite_age",
       "direction": "one_way",
       "effects": [
@@ -386,6 +396,7 @@
     {
       "name": "mundane_age",
       "flavor_text": "There are many tracks in the mud, but few belong to anything remarkable.",
+      "_note": "Lowers random prefix odds from 5% to 1.5% on the surface and in shallow caves and from 11% to 3.5% in deep caves; raises surface population density by 16%.",
       "exclusiveGroup": "elite_age",
       "direction": "one_way",
       "effects": [
@@ -414,6 +425,7 @@
     {
       "name": "watchful_world",
       "flavor_text": "You have the uncomfortable feeling that the wilderness notices movement quickly.",
+      "_note": "Adds one tile to the enemy aggro range (bonus 0 to +1); wall-based sight checks still apply.",
       "exclusiveGroup": "vigilance",
       "direction": "one_way",
       "effects": [
@@ -427,6 +439,7 @@
     {
       "name": "treasure_age",
       "flavor_text": "Old things have been turning up lately - usually in places best left undisturbed.",
+      "_note": "Raises base gear-modifier chance from 40% to 53% and its per-Magic-Find increment from 2% to 2.5%; surface prefix chance rises from 5% to 8.5%.",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -450,6 +463,7 @@
     {
       "name": "age_of_rust",
       "flavor_text": "The finest blade in the village is a butter knife with pretensions.",
+      "_note": "Lowers base gear-modifier chance from 40% to 22% and adds starting weapons to ordinary tier-one weapon drops (default off).",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -468,6 +482,7 @@
     {
       "name": "relic_world",
       "flavor_text": "Stories of forgotten weapons and strange heirlooms have become common around campfires.",
+      "_note": "Raises the enemy artifact-drop multiplier from 0.40 to 0.75 and the surface random prefix chance from 5% to 8.5%.",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -486,6 +501,7 @@
     {
       "name": "cursed_riches",
       "flavor_text": "There is no shortage of fine things here. Few ask why their previous owners abandoned them.",
+      "_note": "Raises base modifier chance from 40% to 55%, artifact curse base chance from 10% to 30%, buried gear maximum tier from 4 to 5, buried artifacts from 2 to 3, and surface prefix chance from 5% to 7.5%.",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -519,6 +535,7 @@
     {
       "name": "poor_kingdom",
       "flavor_text": "Coins have grown scarce. People count even the smallest ones twice.",
+      "_note": "Multiplies generated world gold by 0.65 instead of 1.0 and reduces optional village-gold chance from 20% to 10%; merchant prices are unchanged.",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -537,6 +554,7 @@
     {
       "name": "herbal_bloom",
       "flavor_text": "The roadside growth is unusually thick this season, fragrant even beneath your boots.",
+      "_note": "Adds 8 loose herbs and 6 loose mushrooms (both default 0), reduces loose potions from 15 to 10, multiplies herb/mushroom forage weights by 1.55, and raises cave Fungus spawn chances and minimum.",
       "exclusiveGroup": "harvest",
       "direction": "one_way",
       "effects": [
@@ -585,6 +603,7 @@
     {
       "name": "blighted_harvest",
       "flavor_text": "The woods are full of growth, though much of it looks better left untouched.",
+      "_note": "Multiplies berry, herb, and mushroom forage weights by 0.55 instead of 1.0; raises mushroom poison chance from 50% to 70%.",
       "exclusiveGroup": "harvest",
       "direction": "one_way",
       "effects": [
@@ -613,6 +632,7 @@
     {
       "name": "underkings_legacy",
       "flavor_text": "Old dwarven stonework can still be seen in the hills, more intact than the stories suggest.",
+      "_note": "Expands fort bounds from 34 x 24 to 38 x 27 and room range from 7-11 to 9-14; wider corridors are more likely (35% to 55%), with fewer collapse attempts and less rubble.",
       "exclusiveGroup": "hold",
       "direction": "one_way",
       "effects": [
@@ -656,6 +676,7 @@
     {
       "name": "things_below",
       "flavor_text": "The surface is strangely quiet. From beneath it, sometimes, comes another sound.",
+      "_note": "Reduces surface enemy density multiplier from 1.0 to 0.78, raises deep cave monster range from 24-36 to 30-44, and deep random prefix chance from 11% to 15.5%.",
       "exclusiveGroup": "population",
       "direction": "one_way",
       "effects": [
@@ -684,6 +705,7 @@
     {
       "name": "great_caverns",
       "flavor_text": "Some claim there are places below where a man can no longer see the ceiling.",
+      "_note": "Increases shallow walk/chamber radii and deep grotto room radii, adds two grotto rooms (bonus 4 to 6), and modestly enlarges the first three deep grotto size options.",
       "exclusiveGroup": "cave_scale",
       "direction": "one_way",
       "excludes": [
@@ -750,6 +772,7 @@
     {
       "name": "wormways",
       "flavor_text": "The ground beneath these lands is riddled with narrow passages.",
+      "_note": "Reduces optional deep grotto chance from 50% to 18%, favoring burrows; adds two burrow branches, raises turn chance from 19% to 27%, and lengthens their minimum/bonus steps.",
       "exclusiveGroup": "deep_style",
       "direction": "one_way",
       "effects": [
@@ -783,6 +806,7 @@
     {
       "name": "halls_below",
       "flavor_text": "Travellers tell of enormous chambers beneath the hills, though few agree where they lie.",
+      "_note": "Raises optional deep grotto chance from 50% to 82%; adds two minimum grotto rooms, two bonus rooms, three extra connections, and slightly larger room radii.",
       "exclusiveGroup": "deep_style",
       "direction": "one_way",
       "effects": [
@@ -821,6 +845,7 @@
     {
       "name": "flooded_depths",
       "flavor_text": "The caves breathe cold, damp air even from their mouths.",
+      "_note": "Raises deep grotto water chance from 60% to 85%, water radii from 4 x 3 to 6 x 5, and minimum water cells from 8 to 14.",
       "exclusiveGroup": "deep_water",
       "direction": "one_way",
       "effects": [
@@ -849,6 +874,7 @@
     {
       "name": "fungal_bloom",
       "flavor_text": "Strange caps have begun appearing even near the mouths of caves.",
+      "_note": "Raises cave Fungus spawn chances from 35%/15% to 65%/40% and minimum Fungus count from 3 to 11.",
       "exclusiveGroup": "harvest",
       "direction": "one_way",
       "effects": [
@@ -872,6 +898,7 @@
     {
       "name": "deep_bounty",
       "flavor_text": "Those who return from beneath the hills often return carrying something.",
+      "_note": "Raises deep cave chest range from 8-12 to 11-16 and provisions from 4 to 6, but also raises deep monster range from 24-36 to 29-43.",
       "exclusiveGroup": "population",
       "direction": "one_way",
       "effects": [
@@ -905,6 +932,7 @@
     {
       "name": "haunted_hold",
       "flavor_text": "The mountains are quiet. Too quiet, some say.",
+      "_note": "Doubles dwarven fort ghost count from 8 to 16, raises ghost prefix chance from 5% to 17%, and increases remains attempts from 9 to 16.",
       "exclusiveGroup": "hold",
       "direction": "one_way",
       "effects": [
@@ -928,6 +956,7 @@
     {
       "name": "grand_delving",
       "flavor_text": "Old tales claim the dwarves once hollowed whole mountains rather than merely mining them.",
+      "_note": "Expands dwarven fort bounds from 34 x 24 to 40 x 29, room maximum from 11 to 14, room-size maxima by two tiles each, and ruin prop attempts from 18 to 26.",
       "exclusiveGroup": "hold",
       "direction": "one_way",
       "effects": [
@@ -966,6 +995,7 @@
     {
       "name": "wild_blood",
       "flavor_text": "There are beasts here that even hunters refuse to name.",
+      "_note": "Raises random prefix odds from 5% to 10.5% on surface/shallow enemies, 11% to 18% in deep caves, and 5% to 12% for fort ghosts.",
       "exclusiveGroup": "elite_age",
       "direction": "one_way",
       "effects": [
@@ -994,6 +1024,7 @@
     {
       "name": "eyes_in_the_trees",
       "flavor_text": "The woods have a way of becoming quiet just before something moves.",
+      "_note": "Raises forest ambush chance from 5% to 14%, ancient-forest growth cap from 180 to 230 and growth chance from 72% to 79%, and slightly lowers forest moisture threshold.",
       "exclusiveGroup": "forest",
       "direction": "one_way",
       "effects": [
@@ -1022,6 +1053,7 @@
     {
       "name": "the_bell_is_guarded",
       "flavor_text": "Somewhere far away, metal answers metal once, then falls silent.",
+      "_note": "Raises bell guardian count from 2 to 4 and guardian stat variance range from 0.95-1.05 to 0.98-1.16; this trait has one-quarter of the ordinary selection weight.",
       "direction": "one_way",
       "weight": 0.25,
       "effects": [
@@ -1045,6 +1077,7 @@
     {
       "name": "uncertain_blood",
       "flavor_text": "No two creatures here seem quite alike, even when they should.",
+      "_note": "Widens surface enemy stat multiplier range from 0.95-1.05 to 0.80-1.20 and landmark enemy range from 0.95-1.05 to 0.85-1.15.",
       "exclusiveGroup": "variance",
       "direction": "one_way",
       "effects": [
@@ -1073,6 +1106,7 @@
     {
       "name": "buried_age",
       "flavor_text": "People here seem to have hidden more beneath the earth than they left above it.",
+      "_note": "Raises buried gear count from 5 to 10 and buried artifacts from 2 to 4, permits artifact tier up to 6 instead of 5, and reduces loose potions from 15 to 11 and scrolls from 9 to 7.",
       "exclusiveGroup": "loot_route",
       "direction": "one_way",
       "effects": [
@@ -1106,6 +1140,7 @@
     {
       "name": "treasure_at_the_edges",
       "flavor_text": "Old travellers warned that the richest roads were also the longest.",
+      "_note": "Widens the eligible edge band (minimum 12 to 15 tiles; fractional width 0.12 to 0.16), raises north/all-edge chest limits from 5/12 to 7/15, and remote high-tier chests from 4 to 5.",
       "exclusiveGroup": "loot_route",
       "direction": "one_way",
       "effects": [
@@ -1139,6 +1174,7 @@
     {
       "name": "far_fortune",
       "flavor_text": "Those seeking wealth tend not to find it near home.",
+      "_note": "Raises remote chest minimum village distance from 35 to 53 tiles; increases chest distance per tier from 45 to 57, so a given high chest tier requires greater distance.",
       "exclusiveGroup": "loot_route",
       "direction": "one_way",
       "effects": [
@@ -1157,6 +1193,7 @@
     {
       "name": "strange_fortune",
       "flavor_text": "Useful things are plentiful, though rarely the things one went looking for.",
+      "_note": "Raises loose potions from 15 to 20 but lowers loose scrolls from 9 to 6 and loose speed potions from 3 to 1.",
       "exclusiveGroup": "loot_route",
       "direction": "one_way",
       "effects": [
@@ -1180,6 +1217,7 @@
     {
       "name": "wild_frontier",
       "flavor_text": "Beyond the temple, there is little evidence that anyone controls these lands.",
+      "_note": "Lowers boulder noise threshold from 0.80 to 0.74, raises ancient-forest growth cap from 180 to 235, allows high-tier surface enemies 12 tiles closer to the Temple (50 to 38), and raises forest ambush chance from 5% to 9%.",
       "exclusiveGroup": "forest",
       "direction": "one_way",
       "effects": [
@@ -1208,6 +1246,7 @@
     {
       "name": "world_beneath_the_world",
       "flavor_text": "Every hill seems to have a hollow sound beneath it.",
+      "_note": "Attempts 8 rather than 6 shallow caves, raises optional deep branch chance from 50% to 72%, lengthens grotto/burrow layouts, and raises deep monster and chest ranges from 24-36/8-12 to 29-43/10-15.",
       "exclusiveGroup": "cave_scale",
       "direction": "one_way",
       "effects": [
@@ -1256,6 +1295,7 @@
     {
       "name": "drought",
       "flavor_text": "Cracked riverbeds cross the plains. Old fungus beds lie bare, and the few figures on the road keep their blades close.",
+      "_note": "Reduces lake and river formation, expands sand, cuts berry/herb/mushroom forage weights to 0.45/0.50/0.45, and reduces cave Fungus. Forest ambush chance rises 5% to 12%; nonhumanoid spawn weight falls to 0.40, humanoid HP falls to 0.85, and enemy equipment and weapon share rise.",
       "direction": "one_way",
       "excludes": [
         "herbal_bloom",

@@ -1092,6 +1092,14 @@ body.hint-collapsed #hint .panel-toggle {
   flex-wrap: wrap;
 }
 
+.race-options {
+  display: flex;
+  position: relative;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .permadeath-option {
   color: rgb(232, 162, 79);
   cursor: pointer;
@@ -1102,8 +1110,7 @@ body.hint-collapsed #hint .panel-toggle {
   cursor: pointer;
 }
 
-/* Match the canvas item tooltip, while keeping the hint inside the race dialog. */
-.cursed-world-option { position: relative; }
+/* Desktop hint stays inside the race dialog; mobile shows it in the form. */
 .cursed-world-tip {
   display: none;
   position: absolute;
@@ -1121,8 +1128,8 @@ body.hint-collapsed #hint .panel-toggle {
   pointer-events: none;
   white-space: normal;
 }
-.cursed-world-option:hover .cursed-world-tip,
-.cursed-world-option:focus-within .cursed-world-tip { display: block; }
+.cursed-world-option:hover ~ .cursed-world-tip,
+.cursed-world-option:focus-within ~ .cursed-world-tip { display: block; }
 
 #raceError {
   color: var(--blood);
@@ -1137,6 +1144,19 @@ body.hint-collapsed #hint .panel-toggle {
 @media (max-width: 720px), (pointer: coarse) {
   .race-grid {
     grid-template-columns:repeat(2, 1fr);
+  }
+
+  .race-options { width: 100%; }
+  .cursed-world-tip,
+  .cursed-world-option:hover ~ .cursed-world-tip,
+  .cursed-world-option:focus-within ~ .cursed-world-tip {
+    display: block;
+    position: static;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--parchment-dim);
   }
 }
 

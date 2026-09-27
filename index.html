@@ -323,12 +323,15 @@
         </div>
         <div class="race-grid" id="raceGrid"></div>
         <div class="race-foot">
-          <label class="permadeath-option" for="permadeathToggle"><input type="checkbox" id="permadeathToggle">
-            Permadeath</label>
-          <label class="permadeath-option cursed-world-option" for="cursedWorldToggle"><input type="checkbox" id="cursedWorldToggle" aria-describedby="cursedWorldTip">
-            Cursed world<span id="cursedWorldTip" class="cursed-world-tip" role="tooltip">Even more random world. Highly experimental and potentially unbalanced. Careful!</span></label>
-          <label class="permadeath-option" for="replayToggle"><input type="checkbox" id="replayToggle">
-            Save replay</label>
+          <div class="race-options">
+            <label class="permadeath-option" for="permadeathToggle"><input type="checkbox" id="permadeathToggle">
+              Permadeath</label>
+            <label class="permadeath-option cursed-world-option" for="cursedWorldToggle"><input type="checkbox" id="cursedWorldToggle" aria-describedby="cursedWorldTip">
+              Cursed world</label>
+            <label class="permadeath-option" for="replayToggle"><input type="checkbox" id="replayToggle">
+              Save replay</label>
+            <span id="cursedWorldTip" class="cursed-world-tip" role="note">Even more random world. Highly experimental and potentially unbalanced. Careful!</span>
+          </div>
           <span id="raceError"></span>
           <span class="inline-actions">
             <button class="slbtn" id="btnRaceLoad" type="button" title="Load an existing character from a .json save">📂 Load save</button>
