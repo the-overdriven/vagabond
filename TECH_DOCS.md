@@ -97,8 +97,8 @@ There are currently **10 races**.
 
 ## Halfling
 
-**-1 AGGRO range from all enemies; +5 percentage points to forest concealment,
-including against unaware Alarmed enemies.**
+**-1 AGGRO range from all enemies; +5 percentage points to forest concealment (spotting checks),
+including against alarmed unaware enemies (alarmed but not chasing the player).**
 
 ## Catling
 
