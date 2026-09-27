@@ -3334,6 +3334,8 @@ runtime dependency.
 
 The full-map overlay has up/down controls for browsing the surface and each
 underground map whose discovery grid contains at least one revealed tile.
+The zoom controls sit on the left of a single toolbar, with the compact
+level label and up/down controls on the right.
 Generic z:-2 caves and the separate Crypt Level 2 have distinct entries,
 despite sharing a depth. Historical views paint only their saved discovered
 tiles; undiscovered terrain stays fogged. The full-map player marker pulses

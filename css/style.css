@@ -593,18 +593,42 @@ body.hint-collapsed #hint .panel-toggle {
   width: min(72vw, 520px);
 }
 
-.map-level-controls {
+.map-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px;
   margin: 0 0 8px;
 }
 
+.map-zoom-controls, .map-level-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.map-zoom-controls { flex: none; }
+.map-level-controls { min-width: 0; }
+
+.map-toolbar .slbtn {
+  padding: 4px 7px;
+}
+
 #mapLevelLabel {
-  min-width: 125px;
+  font-size: calc(12px * var(--ui-font-scale));
   text-align: center;
   color: var(--parchment-dim);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 430px) {
+  .map-toolbar { gap: 4px; }
+  .map-zoom-controls, .map-level-controls { gap: 3px; }
+  .map-toolbar .slbtn { padding: 5px 4px; font-size: 12px; min-width: 28px; }
+  #mapLevelLabel { font-size: 12px; }
 }
 
 #minimap, #treasureMapCanvas {
