@@ -104,15 +104,25 @@ Initial traits:
 
 | Trait | Snow band change | Gameplay effect |
 | --- | --- | --- |
-| `cold_world` | +0.08 to +0.14 | Snow and freezing terrain extend farther south. |
+| `cold_world` | +0.28 to +0.32 | Snow and freezing terrain extend near the center of the map. The snow threshold drops by 0.22 and edge noise amplitude drops by 0.30. |
 | `wild_weather` | −0.10 to +0.10 | The snow band may expand or recede. |
 
-The base snow band fraction is 0.22, making these ranges approximately
-0.30–0.36 and 0.12–0.32 respectively before rounding to map rows.
+The base snow band fraction is 0.22, making `cold_world` roll 0.50–0.54
+(130–140 rows of the 260-row map) and `wild_weather` roll 0.12–0.32.
+The visible snow edge is normally **north of the band boundary** because
+`coldness > coldnessThreshold` must still pass. The cold trait changes the
+threshold from 0.32 to 0.10 and the edge-noise amplitude from 0.55 to 0.25;
+near the map center, the expected snow edge is roughly row 117–126 before
+noise and terrain exclusions. The Temple spawn starts searching around row 130.
+Thus snow can appear within a few to a couple dozen northbound tiles, but
+this is not guaranteed at every longitude or in every seed. The spawn search
+continues to require grass or hill, and the existing world validation and
+regeneration rules remain in effect.
 `surface.snow.bandFraction` is the actual worldgen control for how far south
 snow extends; `freezeChance` and `snowNoiseWeight` are not parameters in this
-project. Cold worlds raise freezing exposure and can alter access to food
-in taiga, so the mode is deliberately marked experimental.
+project. Cold worlds raise freezing exposure, expand taiga and frozen rivers,
+and can restrict foraging over a much larger part of the world. This is a
+strong, experimental change to early survival and travel.
 
 Saves and replay initial snapshots include `worldTrait` with its name, flavor,
 and **resolved numeric effect values**. Loading reapplies it to a fresh base
