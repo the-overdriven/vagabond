@@ -74,6 +74,7 @@
     "campfire": {
       "glyph": "*",
       "color": "#e8a24f",
+      "searchedColor": "#777",
       "image": "img/tiles/cold-campfire.png",
       "scale": 1
     },

@@ -5758,7 +5758,7 @@
   const FX_ANIM_MS = 420
   const DAMAGE_ANIM_MS = 650
   function enemyGlyph(e) {
-    const ch = e.name.replace(/^[A-Za-z]+ /, '')[0]
+    const ch = (e.baseName || e.name).trim().split(/\s+/).pop()[0]
     return e.tier <= RENDER_STYLE.enemies.lowercaseThroughTier ? ch.toLowerCase() : ch
   }
 
@@ -5774,7 +5774,8 @@
     if (!visual) return null
     return {
       ch: visual.glyph,
-      color: g.looted && visual.lootedColor ? visual.lootedColor : visual.color
+      color: g.searched && visual.searchedColor ? visual.searchedColor :
+        (g.looted && visual.lootedColor ? visual.lootedColor : visual.color)
     }
   }
 
@@ -6153,7 +6154,13 @@
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
-      if (drawImageVisualWithShadow(vx, vy, visual)) continue
+      if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
+        ctx.save()
+        ctx.filter = 'grayscale(0.7) brightness(0.8)'
+        const drawn = drawImageVisualWithShadow(vx, vy, visual)
+        ctx.restore()
+        if (drawn) continue
+      } else if (drawImageVisualWithShadow(vx, vy, visual)) continue
       const glyph = groundGlyph(g)
       if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
     }
@@ -7910,16 +7917,24 @@
 
   function purifyMushrooms() {
     const mushrooms = player.inventory.filter(i => i.kind === 'mushroom')
-    const count = mushrooms.reduce((sum, i) => sum + (i.count || 1), 0)
+    const total = mushrooms.reduce((sum, i) => sum + (i.count || 1), 0)
+    const count = Math.min(total, Math.floor(player.gold / 2))
 
-    if (!count || player.gold < count * 2)
+    if (!count)
       return log('You need mushrooms and 2g per mushroom.', 'info')
 
     recordReplayAction({type:'herbalist', action:'purifyMushrooms'})
     player.gold -= count * 2
 
-    // Remove all mushroom stacks, including unidentified ones.
-    player.inventory = player.inventory.filter(i => i.kind !== 'mushroom')
+    // Consume only the affordable portion, preserving the remaining stacks.
+    let remaining = count
+    for (const stack of mushrooms) {
+      const taken = Math.min(remaining, stack.count || 1)
+      stack.count = (stack.count || 1) - taken
+      remaining -= taken
+      if (!remaining) break
+    }
+    player.inventory = player.inventory.filter(i => i.kind !== 'mushroom' || i.count > 0)
 
     let edible = 0
     for (let i = 0; i < count; i++) if (chance(0.5)) edible++
@@ -7928,6 +7943,7 @@
 
     const removed = count - edible
     log(`The Herbalist purifies ${edible} mushroom${edible === 1 ? '' : 's'} and removes ${removed} poisonous mushroom${removed === 1 ? '' : 's'} for ${count * 2}g.`, 'good')
+    if (count < total) log("You didn't have enough gold to check all mushrooms.", 'info')
     updateHud()
     renderTrade()
     renderInventory()

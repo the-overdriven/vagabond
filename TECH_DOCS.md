@@ -1262,6 +1262,9 @@ Current prefixes:
 - Champion
 
 On the game canvas, a prefixed enemy keeps its original tier-colored letter.
+The letter comes from the final word of `baseName` (or the display name for
+legacy enemies without one), so multiword monster names retain the right
+initial after a prefix (for example, Tough Giant Rat uses `r`).
 `content/rendering.json` supplies a translucent violet tile overlay in a
 one-tile radius (3×3 square), or a gold overlay in a two-tile radius (5×5
 square) for Champions. The outer Champion tiles are fainter. The overlay is
@@ -2694,6 +2697,8 @@ finds nothing. The `searched` flag is stored on its ground object and saved,
 preventing repeated rolls. Potatoes stack in the inventory and use
 `img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be
 used, equipped, or sold.
+Searched campfires have a gray ASCII glyph and a slightly dimmed, desaturated
+tile image.
 
 Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object.
@@ -2703,6 +2708,8 @@ inspection has handled the current tile/object.
 # 49. Skeletons
 
 Skeleton ground objects (dead bodies) occur mostly in caves and can be searched.
+Once searched, their `looted` state gives their tile image the same dimmed,
+desaturated treatment as campfires; the ASCII glyph remains gray.
 
 Searching one technically generates a temporary tier-1 chest at its location and immediately opens it. The word "chest" is not mentioned in the logs.
 
@@ -2933,6 +2940,10 @@ The Herbalist opens services while adjacent:
 
 - Mushrooms cost 2g each to purify. The attempt has a 50% chance of poison
   and removal (per each mushroom); successful results become Edible Mushrooms.
+  The Herbalist processes up to `floor(gold / 2)` mushrooms per visit in
+  inventory order, leaving any unaffordable mushrooms in their stacks and
+  reporting that not all could be checked. With fewer than 2g, no purification
+  or RNG roll occurs.
 - Three Healing Herbs plus 10g become a Life Potion.
 
 The Herbalist's other purpose is to hint that forests can be foraged for
