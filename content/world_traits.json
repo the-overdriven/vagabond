@@ -1024,7 +1024,7 @@
     {
       "name": "eyes_in_the_trees",
       "flavor_text": "The woods have a way of becoming quiet just before something moves.",
-      "_note": "Raises forest ambush chance from 5% to 14%, ancient-forest growth cap from 180 to 230 and growth chance from 72% to 79%, and slightly lowers forest moisture threshold.",
+      "_note": "Raises forest ambush chance from 4% to 13%, ancient-forest growth cap from 180 to 230 and growth chance from 72% to 79%, and slightly lowers forest moisture threshold.",
       "exclusiveGroup": "forest",
       "direction": "one_way",
       "effects": [
@@ -1217,7 +1217,7 @@
     {
       "name": "wild_frontier",
       "flavor_text": "Beyond the temple, there is little evidence that anyone controls these lands.",
-      "_note": "Lowers boulder noise threshold from 0.80 to 0.74, raises ancient-forest growth cap from 180 to 235, allows high-tier surface enemies 12 tiles closer to the Temple (50 to 38), and raises forest ambush chance from 5% to 9%.",
+      "_note": "Lowers boulder noise threshold from 0.80 to 0.74, raises ancient-forest growth cap from 180 to 235, allows high-tier surface enemies 12 tiles closer to the Temple (50 to 38), and raises forest ambush chance from 4% to 8%.",
       "exclusiveGroup": "forest",
       "direction": "one_way",
       "effects": [
@@ -1295,7 +1295,7 @@
     {
       "name": "drought",
       "flavor_text": "Cracked riverbeds cross the plains. Old fungus beds lie bare, and the few figures on the road keep their blades close.",
-      "_note": "Reduces lake and river formation, expands sand, cuts berry/herb/mushroom forage weights to 0.45/0.50/0.45, and reduces cave Fungus. Forest ambush chance rises 5% to 12%; nonhumanoid spawn weight falls to 0.40, humanoid HP falls to 0.85, and enemy equipment and weapon share rise.",
+      "_note": "Reduces lake and river formation, expands sand, cuts berry/herb/mushroom forage weights to 0.45/0.50/0.45, and reduces cave Fungus. Forest ambush chance rises 4% to 11%; nonhumanoid spawn weight falls to 0.40, humanoid HP falls to 0.85, and enemy equipment and weapon share rise.",
       "direction": "one_way",
       "excludes": [
         "herbal_bloom",

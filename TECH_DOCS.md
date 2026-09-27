@@ -2887,6 +2887,15 @@ The Herbalist's other purpose is to hint that forests can be foraged for
 remedies, while also warning that forests are dangerous (because forest tiles
 can trigger an ambush). Forest ambush candidate selection excludes enemy
 templates with `aggro: 0`; passive creatures do not initiate ambushes.
+Each step onto a forest or ancient-forest tile rolls the base
+`surfaceEnemies.forestAmbushChance` of **4%**. A spawn still requires an open
+adjacent tile of the same forest type and an eligible enemy template; the roll
+alone does not guarantee an encounter. Ancient-forest ambushes use tier 3+
+templates, ordinary forest ambushes tier 1–2. Elves, invisible players, and god
+mode do not trigger forest ambushes. A spawned ambusher begins aware and
+Alarmed immediately, gaining the usual **+2 effective AGGRO** and its marker;
+the separate bystander sound message does not appear. Its Alarmed level
+identity is stored through the normal enemy save fields.
 
 Planned Herbalist ideas in source comments are not treated as current mechanics.
 
@@ -4338,6 +4347,11 @@ density, far/roam promotion, and migrant group count/size use
 tier are also configured there. Only mobile home/roam templates are promoted;
 immobile enemies stay still. Migrants select legal surface edge sites and use
 the existing opposite-edge `far` path logic.
+Forest ambush odds are additive: `eyes_in_the_trees` raises 4% to 13%,
+`wild_frontier` raises 4% to 8%, and `drought` raises 4% to 11%.
+The first two conflict as forest traits, but either can stack with Drought,
+giving 20% or 15%, respectively. These are roll chances before checking for
+an available adjacent spawn tile.
 `surfaceLoot.looseHerbs/looseMushrooms` control additional loose supplies.
 `cavePopulation.deepMobEntranceClearance` and `deepMobMinSpacing` govern the
 ordinary deep-cave placement preference described under Ordinary cave

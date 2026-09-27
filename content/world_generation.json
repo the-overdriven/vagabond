@@ -440,7 +440,7 @@
     "prefixChance": 0.05,
     "lichTopUpAttempts": 200,
     "statVarianceSpan": 0.1,
-    "forestAmbushChance": 0.05,
+    "forestAmbushChance": 0.04,
     "highTierMinTier": 3,
     "farPromotionChance": 0,
     "roamPromotionChance": 0,

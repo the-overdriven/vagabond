@@ -4619,6 +4619,7 @@
     e.baseName = tmpl.name
     prepareEnemyEquipment(e)
     addEnemy(e)
+    alarmEnemy(e)
     occupied.add(keyXY(spot.x, spot.y))
     log(`Ambush! A sneaky ${e.name} rustles out from the trees nearby!`, 'bad')
   }
