@@ -97,7 +97,7 @@ There are currently **10 races**.
 
 ## Halfling
 
-**-1 AGGRO range from all enemies; +5 percentage points to forest concealment (spotting checks),
+**-1 AGGRO range from all enemies; +20 percentage points to forest concealment (spotting checks),
 including against alarmed unaware enemies (alarmed but not chasing the player).**
 
 ## Catling
@@ -1414,7 +1414,8 @@ Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
 uses seeded game RNG. A successful check logs `The trees conceal you from the
 <enemy>.` only if that enemy is visible in the main view.
 
-Halflings gain another 5 percentage points and may roll against Alarmed enemies
+Halflings gain another 20 percentage points (63% at distance 2; 73% at distance
+4) and may roll against Alarmed enemies
 that have not yet spotted them. For other races, becoming Alarmed cancels a
 successful concealment immediately. An enemy already aware of the player
 cannot be concealed from, even for a Halfling.

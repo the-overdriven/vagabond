@@ -10,7 +10,7 @@
     "id": "halfling",
     "name": "Halfling",
     "avatar": "halfling.jpg",
-    "bonus": "-1 AGGRO range from all enemies, +5% bonus to hiding",
+    "bonus": "-1 AGGRO range from all enemies, +20% forest hiding chance",
     "aggro": -1
   },
   {
