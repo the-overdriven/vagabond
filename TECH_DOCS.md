@@ -1394,6 +1394,28 @@ entering the normal aggro-range check.
 All explicit enemy-template aggro values were also increased by 1. Halfling
 reduces effective enemy detection range by 1.
 
+### Forest concealment
+
+On the surface, standing on ordinary or ancient forest gives the player a
+chance to avoid an unaware enemy's first spotting attempt within its normal
+AGGRO range. The chance is `min(100%, 33% + 5% × distance in tiles)`, using
+Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
+uses seeded game RNG. A successful check logs `The trees conceal you from the
+<enemy>.` only if that enemy is visible in the main view.
+
+A successful check protects the player's current tile from that enemy's
+further spotting checks, including after the enemy wanders or moves closer.
+Moving the player to another forest tile permits a new check; waiting or an
+enemy's movement does not. Moving out of the forest ends this concealment.
+An enemy leaving and returning to range cannot force another roll while the
+player stays on the same tile.
+At adjacent distance, the enemy spots or attacks normally. Forest concealment
+does not affect enemies already aware of the player, including newly spawned
+forest ambushers, and it does not shorten AGGRO range. Successful per-enemy
+concealment coordinates are saved and restored in replay starting states so
+loading does not reroll a stationary player's cover; older saves default to
+no concealment state.
+
 ### Alarmed
 
 When the player lands a hit on a monster, the struck monster becomes Alarmed

@@ -56,7 +56,7 @@
 - !4 feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
 - !3 feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
 - !4 feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
-- !3 feat: More terrain effects. forest grants cover (−1 enemy aggro range), in forest there is 33% chance that you sneak through the trees and monster does not aggro you
+- !3 feat: More terrain effects beyond forest concealment
 - !3 feat: add limited ability to rest (may be interrupted), might require setting up camp. abandoned campfire could be reused
 - !5 feat: bestiary
 - !3 feat: individual monster loot table, outside of tier logic
@@ -3188,6 +3188,20 @@
     return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
   }
 
+  // A successful forest hiding roll lasts at this player position. The player
+  // can try again by moving; an enemy moving closer cannot reroll it until
+  // reaching the adjacent tile. The saved coordinates preserve this across loads.
+  function forestConcealsPlayer(e, dist) {
+    if (e.aware || dist <= ATTACK_RANGE || currentZ !== 0 ||
+        (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest')) return false
+    if (e.forestConcealX === player.x && e.forestConcealY === player.y) return true
+    if (!chance(Math.min(1, 0.33 + 0.05 * dist))) return false
+    e.forestConcealX = player.x
+    e.forestConcealY = player.y
+    if (enemyIsVisibleOnMainView(e)) log(`The trees conceal you from the ${e.name}.`, 'info')
+    return true
+  }
+
   // Underground acquisition requires a clear ray through the map. Walls are
   // opaque; an already alerted monster can pursue briefly around a corner.
   function enemyHasSight(e) {
@@ -3729,6 +3743,8 @@
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
         e.aware = false
+        e.forestConcealX = null
+        e.forestConcealY = null
         if (e !== reactedEnemy && (enemyWanderMode(e) === 'far' || enemyIsOnScreen(e))) enemyWander(e)
         continue
       }
@@ -3747,20 +3763,29 @@
       if (e.fleeingHoly) e.fleeingHoly = false
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      const aggroRange = effectiveAggroRange(e)
+      if (currentZ !== 0 ||
+          (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest') ||
+          (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {
+        e.forestConcealX = null
+        e.forestConcealY = null
+      }
       if (dist === ATTACK_RANGE && enemyHasSight(e)) {
         // An enemy that attacks is aggroed on the player, full stop - this
         // must be true even when its aggro range is so low (e.g. 1) that it
         // never went through the "spotted you" branch below.
         if (!e.aware) {
           e.aware = true
+          e.forestConcealX = null
+          e.forestConcealY = null
           alarmEnemy(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
         if (enemyAttackPlayer(e)) return
         continue
       }
-      const aggroRange = effectiveAggroRange(e)
-      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2))) {
+      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2)) &&
+          !forestConcealsPlayer(e, dist)) {
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
@@ -3778,6 +3803,8 @@
         }
         if (!e.aware) {
           e.aware = true
+          e.forestConcealX = null
+          e.forestConcealY = null
           alarmEnemy(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
@@ -3800,8 +3827,10 @@
         // straight away instead of leaving it oblivious until the next turn.
         if ((enemyWanderMode(e) === 'far' || enemyIsOnScreen(e)) && enemyWander(e)) {
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
-          if (distAfter <= aggroRange && enemyHasSight(e)) {
+          if (distAfter <= aggroRange && enemyHasSight(e) && !forestConcealsPlayer(e, distAfter)) {
             e.aware = true
+            e.forestConcealX = null
+            e.forestConcealY = null
             alarmEnemy(e)
             log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad')
           }
