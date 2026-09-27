@@ -1,7 +1,7 @@
 [
   {"name": "Fungus",        "rarity": 0.6, "hp":20,  "atk":0,  "def":0, "spd":0, "grace":0, "tier":1, "aggro":0, "biomes":["grass","forest","hill","cave"], "evades": false, "humanoid": false, "fly": null, "wander": false},
   {"name": "Giant Rat",     "rarity": 1.0, "hp":6,   "atk":1,  "def":1, "spd":2, "grace":2, "tier":1, "aggro":3, "biomes":["grass","forest","hill"], "evades": false, "humanoid": false, "fly": null, "wander": "homeReanchored"},
-  {"name": "Giant Bat",     "rarity": 1.0, "hp":8,   "atk":2,  "def":1, "spd":3, "grace":3, "tier":1, "aggro":3, "biomes":["hill","forest"],         "evades": true,  "humanoid": false, "fly": null, "wander": "roam"},
+  {"name": "Giant Bat",     "rarity": 1.0, "hp":8,   "atk":2,  "def":1, "spd":3, "grace":3, "tier":1, "aggro":3, "biomes":["hill","forest"],         "evades": true,  "humanoid": false, "fly": true, "wander": "roam"},
   {"name": "Snake",         "rarity": 1.0, "hp":5,   "atk":3,  "def":1, "spd":2, "grace":2, "tier":1, "aggro":2, "biomes":["grass","forest"],        "evades": false, "humanoid": false, "fly": null, "wander": "homeReanchored"},
   {"name": "Scarab",        "rarity": 1.0, "hp":12,  "atk":2,  "def":4, "spd":2, "grace":2, "tier":1, "aggro":3, "biomes":["sand"],                  "evades": false, "humanoid": false, "fly": null, "wander": "homeReanchored"},
   {"name": "Monkey",        "rarity": 1.0, "hp":14,  "atk":3,  "def":1, "spd":3, "grace":3, "tier":1, "aggro":3, "biomes":["forest"],                "evades": true,  "humanoid": true,  "fly": null, "wander": "homeReturn"},
