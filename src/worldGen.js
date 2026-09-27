@@ -2057,29 +2057,29 @@ function spawnEnemies() {
       }
     }
     const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier)
-    const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
+    const tmpl = pickWeighted(templates, t => (t.rarity ?? 1) * (t.humanoid ? 1 : cfg.nonHumanoidRarityMultiplier))
     spawnOneFromTemplate(tmpl)
   }
 
   // Migrant groups start on a world edge. Their far pathfinding targets the
   // opposite edge through the existing wander=far behavior.
   if (cfg.migrationGroups > 0) {
-    const edgeWidth = 10
+    const edgeWidth = cfg.migrationEdgeWidth
     const edgeSpots = []
     for (let i = 0; i < allSpawnTiles.length; i += 2) {
       const x = allSpawnTiles[i], y = allSpawnTiles[i + 1]
       if (Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) <= edgeWidth) edgeSpots.push({x, y})
     }
-    const migrants = ENEMY_TEMPLATES.filter(t => t.tier <= 2 && t.wander !== false)
+    const migrants = ENEMY_TEMPLATES.filter(t => t.tier <= cfg.migrationMaxTier && t.wander !== false)
     for (let group = 0; group < cfg.migrationGroups && edgeSpots.length && migrants.length; group++) {
       const anchor = pick(edgeSpots)
       const matching = migrants.filter(t => enemyBiomes(t).includes(map[anchor.y][anchor.x]))
       const tmpl = pick(matching.length ? matching : migrants)
       const local = []
-      for (const site of edgeSpots) if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= 3 &&
+      for (const site of edgeSpots) if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= cfg.migrationLocalRadius &&
         enemyBiomes(tmpl).includes(map[site.y][site.x])) local.push(site.x, site.y)
       if (!local.length) for (const site of edgeSpots)
-        if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= 3) local.push(site.x, site.y)
+        if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= cfg.migrationLocalRadius) local.push(site.x, site.y)
       if (!local.length) continue
       for (let i = 0; i < cfg.migrationGroupSize; i++) {
         if (!spawnOneFromTemplate(tmpl, local)) break
@@ -2087,7 +2087,7 @@ function spawnEnemies() {
         e.wander = 'far'
       }
       for (let i = edgeSpots.length - 1; i >= 0; i--)
-        if (Math.max(Math.abs(edgeSpots[i].x - anchor.x), Math.abs(edgeSpots[i].y - anchor.y)) < 8) edgeSpots.splice(i, 1)
+        if (Math.max(Math.abs(edgeSpots[i].x - anchor.x), Math.abs(edgeSpots[i].y - anchor.y)) < cfg.migrationGroupSpacing) edgeSpots.splice(i, 1)
     }
   }
 
@@ -2526,8 +2526,7 @@ function spawnGroundStuff() {
     if (tries >= cfg.looseItemPlacementTries) continue
     groundItems.push({x, y, kind: 'speedpotion'})
   }
-  // Trait-only surface herbs and mushrooms use the same legal placement rules
-  // as other loose supplies. The base configuration has zero of each.
+  // Additional loose supplies use the same legal placement rules as other items.
   for (const [kind, count] of [['herb', cfg.looseHerbs], ['mushroom', cfg.looseMushrooms]]) {
     for (let i = 0; i < count; i++) {
       let x, y, tries = 0

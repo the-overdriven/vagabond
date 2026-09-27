@@ -634,6 +634,22 @@
     for (const trait of traits) {
       if (!Array.isArray(trait.effects)) throw new Error('Invalid world trait effects.')
       for (const effect of trait.effects) {
+        // Older cursed saves stored the extra-find/spoil rolls. Translate their
+        // resolved odds into the current single-roll forage distribution.
+        if (effect.param === 'environment.forageExtraFindChance' || effect.param === 'environment.forageSpoilChance') {
+          if (!Number.isFinite(effect.value) || effect.value < 0 || effect.value > 1) throw new Error('Invalid legacy forage effect.')
+          const weights = WORLD_GEN_CONFIG.environment.forageResultMultipliers
+          if (effect.param === 'environment.forageExtraFindChance') {
+            const table = FORAGE_TABLE.table
+            const empty = 1 - table.at(-1).upTo
+            for (const result of ['herb', 'mushroom']) {
+              const index = table.findIndex(entry => entry.result === result)
+              const width = table[index].upTo - (table[index - 1]?.upTo ?? 0)
+              weights[result] += empty * effect.value / 2 / width
+            }
+          } else for (const result of ['berries', 'herb', 'mushroom']) weights[result] *= 1 - effect.value
+          continue
+        }
         if (effect.type === 'scale_area') {
           if (!Number.isFinite(effect.value) || effect.value < 0.5 || effect.value > 1.25)
             throw new Error('Invalid world area scale.')
@@ -1615,11 +1631,12 @@
 
   function rollEnemyEquipment(e) {
     if (!e || !e.humanoid) return null
-    const dropChance = 0.45 + e.tier * 0.03
-    if (!chance(Math.min(0.9, dropChance))) return null
+    const cfg = WORLD_GEN_CONFIG.lootRules
+    const dropChance = cfg.enemyEquipmentChanceBase + e.tier * cfg.enemyEquipmentChancePerTier
+    if (!chance(Math.min(cfg.enemyEquipmentChanceCap, dropChance))) return null
     const roll = rng()
-    if (roll < 0.5) return makeWeaponItem(e.tier)
-    if (roll < 0.75) return makeArmorItem(e.tier)
+    if (roll < cfg.enemyEquipmentWeaponShare) return makeWeaponItem(e.tier)
+    if (roll < cfg.enemyEquipmentWeaponShare + cfg.enemyEquipmentArmorShare) return makeArmorItem(e.tier)
     return makeShieldItem(e.tier)
   }
 
@@ -1639,6 +1656,9 @@
 
   function prepareEnemyEquipment(e) {
     if (!e || !e.humanoid) return
+    const hpMultiplier = WORLD_GEN_CONFIG.environment.humanoidHpMultiplier
+    e.hp = Math.max(1, Math.round(e.hp * hpMultiplier))
+    e.maxHp = e.hp
     applyEnemyEquipment(e, rollEnemyEquipment(e) || rollEnemyDropEquipment(e))
   }
 
@@ -3954,17 +3974,16 @@
 
     const roll = rng()
     let result = FORAGE_TABLE.elseResult || 'nothing'
+    let previous = 0, cumulative = 0
+    const multipliers = WORLD_GEN_CONFIG.environment.forageResultMultipliers
     for (const entry of (FORAGE_TABLE.table || [])) {
-      if (roll < entry.upTo) {
+      cumulative += (entry.upTo - previous) * (multipliers[entry.result] ?? 1)
+      previous = entry.upTo
+      if (roll < cumulative) {
         result = entry.result
         break
       }
     }
-    const forageRules = WORLD_GEN_CONFIG.environment
-    if (result === 'nothing' && forageRules.forageExtraFindChance > 0 && chance(forageRules.forageExtraFindChance))
-      result = chance(0.5) ? 'herb' : 'mushroom'
-    if (result !== 'nothing' && forageRules.forageSpoilChance > 0 && chance(forageRules.forageSpoilChance))
-      result = 'nothing'
     (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
     enemyTurn()
     npcTurn()

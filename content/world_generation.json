@@ -446,7 +446,12 @@
     "roamPromotionChance": 0,
     "migrationGroups": 0,
     "migrationGroupSize": 3,
-    "populationDensityMultiplier": 1
+    "populationDensityMultiplier": 1,
+    "migrationEdgeWidth": 10,
+    "migrationLocalRadius": 3,
+    "migrationGroupSpacing": 8,
+    "migrationMaxTier": 2,
+    "nonHumanoidRarityMultiplier": 1
   },
   "cavePopulation": {
     "minOpenTilesForScenario": 5,
@@ -525,7 +530,12 @@
     "enemyArtifactMagicFindMultiplierPerPoint": 0.05,
     "enemyArtifactChanceCapBeforeRate": 0.12,
     "commonStartingWeapons": 0,
-    "worldGoldMultiplier": 1
+    "worldGoldMultiplier": 1,
+    "enemyEquipmentChanceBase": 0.45,
+    "enemyEquipmentChancePerTier": 0.03,
+    "enemyEquipmentChanceCap": 0.9,
+    "enemyEquipmentWeaponShare": 0.5,
+    "enemyEquipmentArmorShare": 0.25
   },
   "environment": {
     "freezingDamageIntervalTurns": 5,
@@ -533,7 +543,11 @@
     "undergroundFovRadius": 8,
     "enemyAggroBonus": 0,
     "mushroomPoisonChance": 0.5,
-    "forageExtraFindChance": 0,
-    "forageSpoilChance": 0
+    "forageResultMultipliers": {
+      "berries": 1,
+      "herb": 1,
+      "mushroom": 1
+    },
+    "humanoidHpMultiplier": 1
   }
 }

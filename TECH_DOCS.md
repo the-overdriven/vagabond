@@ -2561,9 +2561,10 @@ Results:
 75% → Nothing
 ```
 
-Taiga and Ancient Forest cannot be foraged. Cursed world traits may grant a
-second chance after a normal "nothing" roll or spoil a normal forage find;
-see [§85. Cursed World](#85-cursed-world).
+Taiga and Ancient Forest cannot be foraged. Cursed world traits can change
+the three result probabilities; the remaining chance yields nothing. The
+table above is the normal-world distribution; see
+[§85. Cursed World](#85-cursed-world).
 
 ## Digging
 
@@ -4210,7 +4211,7 @@ less likely to be drawn.
 trait IDs. If a conflicting pair appears in the initial draw, a trait marked
 `direction: "one_way"` wins against `"two_way"`, independent of draw order.
 The other candidate is dropped; the selection fills the empty slot with the
-next nonconflicting candidate, if available. The current 39-entry pool has
+next nonconflicting candidate, if available. The current 40-entry pool has
 ample room to reach the configured 1–5 active traits. Group conflicts do not
 make every modifier to a shared parameter exclusive: compatible traits can
 stack, and their numerical effects are applied in selected order.
@@ -4257,13 +4258,13 @@ are the current behavior, not future proposals.
 
 | Family | Traits | Behavior and notable constraints |
 | --- | --- | --- |
-| Climate and size | `cold_world`, `wild_weather`, `world_size` | Snow expands near the Temple, snow parameters vary both ways, or total map area rolls silently. The two climates conflict; specific cold wins. |
+| Climate and size | `cold_world`, `wild_weather`, `world_size`, `drought` | Snow expands near the Temple, snow parameters vary both ways, total map area rolls silently, or water and forage become scarce. The two snow climates conflict; specific cold wins. |
 | Cave extent | `hollow_world`, `shallow_earth`, `great_caverns`, `world_beneath_the_world` | Deep layouts enlarge; shallow passages contract with more caves and additional entrances; all caves open up; or more branches, threats and chests appear. These share a cave scale exclusion group. The guaranteed grotto/burrow pair still uses different algorithms. |
 | Deep cave character | `wormways`, `halls_below`, `flooded_depths`, `fungal_bloom`, `deep_bounty` | Optional branches favor burrows or grottos, more grotto water forms, Fungus is more common, or supplies and threats increase together. Wormways and Halls Below conflict; guaranteed distinct z:-2 caves remain. |
 | Forest and wildlife | `ancient_wilderness`, `eyes_in_the_trees`, `wild_frontier`, `migration_season`, `restless_wilds`, `great_migration`, `watchful_world` | Ancient forest/ambush/rough terrain vary; mobile enemies promote to roam/far; grouped migrants start near edges; enemy aggro reach grows by one. Existing underground wall sight checks still apply. Forest and migration themes each have a conflict group. |
 | Enemy quality | `champions_age`, `mundane_age`, `wild_blood`, `uncertain_blood`, `things_below` | Random prefixes rise or fall; Mundane Age raises ordinary surface density; variance broadens; Things Below shifts density underground. The guaranteed deep champion and guards are never removed by lower random prefix odds. Elite ages conflict. |
 | Equipment and money | `treasure_age`, `age_of_rust`, `relic_world`, `cursed_riches`, `poor_kingdom` | Better modifier rolls carry more elite enemies, common tier-one junk weapons offset weaker modifiers, artifacts rise alongside danger, richer gear brings more curses, or chest gold shrinks. Merchant prices do not change. These five share a wealth conflict group. |
-| Supplies and digging | `herbal_bloom`, `blighted_harvest`, `buried_age`, `treasure_at_the_edges`, `far_fortune`, `strange_fortune` | Herbs/mushrooms and Fungus rise while loose life potions fall; forage spoils and mushrooms poison more often; loot moves underground, toward edges, or farther from the village; supply composition changes. Herbal/Blighted/Fungal themes conflict as harvest traits. |
+| Supplies and digging | `herbal_bloom`, `blighted_harvest`, `buried_age`, `treasure_at_the_edges`, `far_fortune`, `strange_fortune` | Herbs/mushrooms and Fungus rise while loose life potions fall; forage yields less and mushrooms poison more often; loot moves underground, toward edges, or farther from the village; supply composition changes. Herbal/Blighted/Fungal themes conflict as harvest traits. Drought excludes all three to avoid contradictory or near-empty forage. |
 | Dwarven fort | `underkings_legacy`, `haunted_hold`, `grand_delving` | A larger intact fort, a ghost-heavy fort, or a wider mountain excavation. They conflict as fort variants. |
 | Story hazard | `the_bell_is_guarded` | Additional and stronger bell guardians; this specific quest hazard is less likely to roll. |
 
@@ -4274,22 +4275,53 @@ reduces extreme combinations. The unrelated `surfaceEnemies.prefixChance`
 and cave prefix chances remain separate; `champions_age` and `wild_blood`
 affect the random rolls, not the mandatory deep cave champion.
 
-New generation hooks are additive to the existing JSON controls:
-`caves.shallow.extraEntranceChance` (the first cave keeps its guaranteed
-second entrance), `surfaceEnemies.populationDensityMultiplier`,
-`farPromotionChance`, `roamPromotionChance`, `migrationGroups`, and
-`migrationGroupSize`, plus `surfaceLoot.looseHerbs/looseMushrooms`.
-Only existing mobile home/roam templates are promoted; immobile enemies stay
-still. Migrant groups select low-tier template species at legal surface edge
-sites, override wandering to `far`, and use the existing opposite-edge path
-logic. `environment.enemyAggroBonus` acts through `effectiveAggroRange()`;
-wall-based underground sight remains unchanged. `environment.forageExtraFindChance`
-and `forageSpoilChance` affect only ordinary forest rolls, with extra RNG
-draws only if active; `mushroomPoisonChance` replaces the base 50% poisonous
-outcome. `lootRules.worldGoldMultiplier` scales chest gold but leaves merchant
-prices untouched. `lootRules.commonStartingWeapons` adds the hut's improvised
-weapons as tier-one ordinary weapon drops and marks the hut copy tier one in
-Age of Rust. The base values of these hooks reproduce normal world behavior.
+The generation code reads neutral values from `world_generation.json` on every
+world. `caves.shallow.extraEntranceChance` controls optional second entrances
+(the first cave still gets its guaranteed second entrance). Surface enemy
+density, far/roam promotion, and migrant group count/size use
+`surfaceEnemies.*`; migrant edge width, local radius, spacing, and maximum
+tier are also configured there. Only mobile home/roam templates are promoted;
+immobile enemies stay still. Migrants select legal surface edge sites and use
+the existing opposite-edge `far` path logic.
+`surfaceLoot.looseHerbs/looseMushrooms` control additional loose supplies.
+
+Foraging uses the cumulative base thresholds in `loot_tables.json`.
+`environment.forageResultMultipliers` scales the separate berries, herb, and
+mushroom probability widths; the remainder yields nothing. At the default
+multipliers of 1, this consumes the same single roll and preserves the
+original 9%/8%/8% yields. Herbal Bloom raises herb/mushroom widths; Blighted
+Harvest and Drought lower them. `environment.mushroomPoisonChance` controls
+whether an unidentified mushroom is poisonous (base 50%). Saved older
+forage-extra/spoil effects are translated to the new probabilities on load;
+their old stored effect paths remain readable.
+
+`environment.enemyAggroBonus` acts through `effectiveAggroRange()`; cave walls
+still block sight. `environment.humanoidHpMultiplier` applies while preparing
+ordinary humanoid equipment, before any prefix or item bonus. Story spawns
+without that preparation are unaffected. `surfaceEnemies.nonHumanoidRarityMultiplier`
+multiplies template `rarity` weights only when selecting ordinary surface
+enemies, using each template's `humanoid` flag. It changes species composition
+while keeping the same surface population count, cave scenarios, and
+guaranteed Liches. `lootRules.enemyEquipmentChanceBase/PerTier/Cap` and
+`enemyEquipmentWeaponShare/ArmorShare` configure what ordinary humanoids
+carry; the remaining share is shields. The fallback equipment drop roll is
+unchanged. `lootRules.worldGoldMultiplier` scales chest gold but leaves
+merchant prices untouched. The Age of Rust `commonStartingWeapons` switch
+still adds the hut's improvised weapons as tier-one ordinary drops and marks
+the hut copy tier one. A special `map.world.area` effect scales both map
+dimensions because their base values reside in `map_config.json`; it is
+separate from terrain-generation parameters. Neutral values reproduce the
+normal world's probabilities and counts.
+
+Drought lowers lake carving and river sources, reduces the water elevation
+threshold, widens the sand band, cuts forest forage and cave Fungus, and
+raises forest ambush chance. It leaves the frozen-river guarantee active. Its
+non-humanoid rarity multiplier is 0.4 and prepared humanoid HP multiplier is
+0.85; the equipment roll rises from `0.45 + 0.03 × tier` to
+`0.61 + 0.03 × tier`, with weapon share rising from 50% to 70%. It excludes
+Herbal Bloom, Blighted Harvest, Fungal Bloom, and Flooded Depths. Ordinary
+population is unchanged, so humanoids replace some beasts rather than making
+the world empty.
 
 ## Persistence and balance
 
@@ -4310,4 +4342,6 @@ caves may impede routes; extra `far` wanderers can add pathfinding work. Age
 of Rust makes weak tier-one weapons common without lowering merchant prices.
 The cave and fort generation checks still run, but unusual combinations and
 small maps should be exercised across many seeds before treating balance or
-generation success as stable.
+generation success as stable. Drought can remove safe forage while arming a
+larger share of humanoids; its exclusions prevent the strongest resource
+contradictions, but other dangerous combinations remain possible.

@@ -426,7 +426,7 @@
     },
     {
       "name": "treasure_age",
-      "flavor_text": "Old things have been turning up lately—usually in places best left undisturbed.",
+      "flavor_text": "Old things have been turning up lately - usually in places best left undisturbed.",
       "exclusiveGroup": "wealth",
       "direction": "one_way",
       "effects": [
@@ -556,9 +556,9 @@
           "value": -5
         },
         {
-          "param": "environment.forageExtraFindChance",
+          "param": "environment.forageResultMultipliers.herb",
           "type": "additive",
-          "value": 0.2
+          "value": 0.55
         },
         {
           "param": "cavePopulation.fungusFirstChance",
@@ -574,6 +574,11 @@
           "param": "cavePopulation.minimumFungus",
           "type": "additive",
           "value": 4
+        },
+        {
+          "param": "environment.forageResultMultipliers.mushroom",
+          "type": "additive",
+          "value": 0.55
         }
       ]
     },
@@ -584,14 +589,24 @@
       "direction": "one_way",
       "effects": [
         {
-          "param": "environment.forageSpoilChance",
+          "param": "environment.forageResultMultipliers.berries",
           "type": "additive",
-          "value": 0.25
+          "value": -0.45
         },
         {
           "param": "environment.mushroomPoisonChance",
           "type": "additive",
           "value": 0.2
+        },
+        {
+          "param": "environment.forageResultMultipliers.herb",
+          "type": "additive",
+          "value": -0.45
+        },
+        {
+          "param": "environment.forageResultMultipliers.mushroom",
+          "type": "additive",
+          "value": -0.45
         }
       ]
     },
@@ -1235,6 +1250,94 @@
           "param": "cavePopulation.deepChestMax",
           "type": "additive",
           "value": 3
+        }
+      ]
+    },
+    {
+      "name": "drought",
+      "flavor_text": "Cracked riverbeds cross the plains. Old fungus beds lie bare, and the few figures on the road keep their blades close.",
+      "direction": "one_way",
+      "excludes": [
+        "herbal_bloom",
+        "fungal_bloom",
+        "flooded_depths",
+        "blighted_harvest"
+      ],
+      "effects": [
+        {
+          "param": "surface.lakes.noiseThreshold",
+          "type": "additive",
+          "value": 0.08
+        },
+        {
+          "param": "surface.terrainThresholds.waterMaxElevation",
+          "type": "additive",
+          "value": -0.035
+        },
+        {
+          "param": "surface.terrainThresholds.sandMaxElevation",
+          "type": "additive",
+          "value": 0.045
+        },
+        {
+          "param": "surface.rivers.maxSources",
+          "type": "additive",
+          "value": -10
+        },
+        {
+          "param": "environment.forageResultMultipliers.berries",
+          "type": "additive",
+          "value": -0.55
+        },
+        {
+          "param": "environment.forageResultMultipliers.herb",
+          "type": "additive",
+          "value": -0.5
+        },
+        {
+          "param": "environment.forageResultMultipliers.mushroom",
+          "type": "additive",
+          "value": -0.55
+        },
+        {
+          "param": "cavePopulation.fungusFirstChance",
+          "type": "additive",
+          "value": -0.2
+        },
+        {
+          "param": "cavePopulation.fungusSecondChance",
+          "type": "additive",
+          "value": -0.1
+        },
+        {
+          "param": "cavePopulation.minimumFungus",
+          "type": "additive",
+          "value": -2
+        },
+        {
+          "param": "surfaceEnemies.forestAmbushChance",
+          "type": "additive",
+          "value": 0.07
+        },
+        {
+          "param": "surfaceEnemies.nonHumanoidRarityMultiplier",
+          "type": "additive",
+          "value": -0.6
+        },
+        {
+          "param": "environment.humanoidHpMultiplier",
+          "type": "additive",
+          "value": -0.15
+        },
+        {
+          "param": "lootRules.enemyEquipmentChanceBase",
+          "type": "additive",
+          "value": 0.16
+        },
+        {
+          "param": "lootRules.enemyEquipmentWeaponShare",
+          "type": "additive",
+          "value": 0.2
         }
       ]
     }
