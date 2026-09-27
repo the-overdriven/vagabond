@@ -135,6 +135,10 @@ function generateSurface() {
   tileUnderlays = {}
   grasslandTrees = new Set()
   map.length = 0 // a retried world must not append onto the discarded one
+  // A rejected cave/fort layout may already have spawned story loot and ghosts.
+  enemies = []
+  groundItems = []
+  occupied = new Set()
   const elevationNoiseFunctions = cfg.elevationNoise.layers.map(([x, y]) => makeNoise(x, y))
   const elevationNoiseWeights = cfg.elevationNoise.weights
   const moistureNoiseFunctions = cfg.moistureNoise.layers.map(([x, y]) => makeNoise(x, y))
@@ -514,10 +518,7 @@ function generateMap() {
       break
     }
     if (attempt === worldAttempts) {
-      if (deepLevels[0]?.caves?.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves)
-        throw new Error('Could not generate two distinct second-level caves.')
-      console.warn(`World generation failed cave-placement validation in ${worldAttempts} attempts; keeping the last world.`)
-      break
+      throw new Error(`World generation failed cave/fort clearance validation in ${worldAttempts} attempts.`)
     }
     console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
   }
@@ -663,7 +664,7 @@ function generateCaves() {
     }
     if (!spot) continue
     const entrances = [spot]
-    if (i === 0) {
+    if (i === 0 || (cfg.extraEntranceChance > 0 && chance(cfg.extraEntranceChance))) {
       const second = candidates.find(c => c !== spot &&
           Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) >= cfg.secondEntranceMinDistance &&
           Math.max(Math.abs(c.x - spot.x), Math.abs(c.y - spot.y)) <= cfg.secondEntranceMaxDistance &&
@@ -745,6 +746,10 @@ function generateCaves() {
     discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   })
   buildDwarvenRuin(deepLevels[1])
+  // More cave entrances must never put a random cave mouth next to the gate.
+  const fortTooClose = dwarvenRuin && caves.some(c => !c.crypt && (c.entrances || []).some(e =>
+    Math.max(Math.abs(e.x - dwarvenRuin.x), Math.abs(e.y - dwarvenRuin.y)) <= 15))
+  if (fortTooClose) return false
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
@@ -1967,7 +1972,7 @@ function spawnEnemies() {
       allSpawnTiles.push(x, y)
     }
   }
-  const total = Math.round(allSpawnTiles.length / 2 / SURFACE_TILES_PER_ENEMY)
+  const total = Math.round(allSpawnTiles.length / 2 / SURFACE_TILES_PER_ENEMY * cfg.populationDensityMultiplier)
   const poolCache = {}
 
   function poolFor(tmpl) {
@@ -1993,8 +1998,8 @@ function spawnEnemies() {
     return pool
   }
 
-  function spawnOneFromTemplate(tmpl) {
-    const pool = poolFor(tmpl)
+  function spawnOneFromTemplate(tmpl, preferredPool = null) {
+    const pool = preferredPool || poolFor(tmpl)
     if (!pool.length) return false
     let x = 0, y = 0, tries = 0, placed = false
     while (tries < cfg.placementTries) {
@@ -2032,6 +2037,12 @@ function spawnEnemies() {
       e.name = pfx + ' ' + e.name
     }
     addEnemy(e)
+    // Template wandering stays authoritative unless this world explicitly
+    // promotes a mobile surface monster. Stationary monsters remain stationary.
+    if (e.wander === 'home' || e.wander === 'homeReanchored' || e.wander === 'roam') {
+      if (cfg.farPromotionChance > 0 && chance(cfg.farPromotionChance)) e.wander = 'far'
+      else if ((e.wander === 'home' || e.wander === 'homeReanchored') && cfg.roamPromotionChance > 0 && chance(cfg.roamPromotionChance)) e.wander = 'roam'
+    }
     occupied.add(keyXY(x, y))
     return true
   }
@@ -2048,6 +2059,36 @@ function spawnEnemies() {
     const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier)
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
     spawnOneFromTemplate(tmpl)
+  }
+
+  // Migrant groups start on a world edge. Their far pathfinding targets the
+  // opposite edge through the existing wander=far behavior.
+  if (cfg.migrationGroups > 0) {
+    const edgeWidth = 10
+    const edgeSpots = []
+    for (let i = 0; i < allSpawnTiles.length; i += 2) {
+      const x = allSpawnTiles[i], y = allSpawnTiles[i + 1]
+      if (Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) <= edgeWidth) edgeSpots.push({x, y})
+    }
+    const migrants = ENEMY_TEMPLATES.filter(t => t.tier <= 2 && t.wander !== false)
+    for (let group = 0; group < cfg.migrationGroups && edgeSpots.length && migrants.length; group++) {
+      const anchor = pick(edgeSpots)
+      const matching = migrants.filter(t => enemyBiomes(t).includes(map[anchor.y][anchor.x]))
+      const tmpl = pick(matching.length ? matching : migrants)
+      const local = []
+      for (const site of edgeSpots) if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= 3 &&
+        enemyBiomes(tmpl).includes(map[site.y][site.x])) local.push(site.x, site.y)
+      if (!local.length) for (const site of edgeSpots)
+        if (Math.max(Math.abs(site.x - anchor.x), Math.abs(site.y - anchor.y)) <= 3) local.push(site.x, site.y)
+      if (!local.length) continue
+      for (let i = 0; i < cfg.migrationGroupSize; i++) {
+        if (!spawnOneFromTemplate(tmpl, local)) break
+        const e = enemies[enemies.length - 1]
+        e.wander = 'far'
+      }
+      for (let i = edgeSpots.length - 1; i >= 0; i--)
+        if (Math.max(Math.abs(edgeSpots[i].x - anchor.x), Math.abs(edgeSpots[i].y - anchor.y)) < 8) edgeSpots.splice(i, 1)
+    }
   }
 
   // The Lich is the sole source of the rare tombstones, so make sure the world
@@ -2484,6 +2525,19 @@ function spawnGroundStuff() {
     while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
     if (tries >= cfg.looseItemPlacementTries) continue
     groundItems.push({x, y, kind: 'speedpotion'})
+  }
+  // Trait-only surface herbs and mushrooms use the same legal placement rules
+  // as other loose supplies. The base configuration has zero of each.
+  for (const [kind, count] of [['herb', cfg.looseHerbs], ['mushroom', cfg.looseMushrooms]]) {
+    for (let i = 0; i < count; i++) {
+      let x, y, tries = 0
+      do {
+        x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
+        y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
+        tries++
+      } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
+      if (tries < cfg.looseItemPlacementTries) groundItems.push({x, y, kind})
+    }
   }
   // A handful of equipment pieces are buried beneath surface sand. Their
   // positions and items are fixed during world generation; digging merely

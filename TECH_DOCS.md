@@ -388,11 +388,8 @@ Direct interaction cancels pathing.
 
 # 9. World
 
-The surface map is:
-
-```text
-260 × 260 tiles
-```
+The default surface map is **260 × 260 tiles**. Cursed world can roll
+a different area; see [§85. Cursed World](#85-cursed-world).
 
 The world is procedurally generated.
 New worlds have a land boundary to the north; inland lakes remain possible.
@@ -1049,7 +1046,7 @@ Maximum attempts:
 # 17. Enemy Population
 
 The initial surface world attempts to spawn about one random enemy per
-**260 eligible walkable tiles**, configured by
+**260 eligible walkable tiles** (before any Cursed world density multiplier), configured by
 `content/map_config.json` (`spawning.surfaceTilesPerEnemy`). Eligible tiles
 exclude water, other impassable terrain, the outer two-tile border, major
 landmarks, the Temple's safe area, and the bell guard's exclusion area.
@@ -2564,7 +2561,9 @@ Results:
 75% → Nothing
 ```
 
-Taiga and Ancient Forest cannot be foraged.
+Taiga and Ancient Forest cannot be foraged. Cursed world traits may grant a
+second chance after a normal "nothing" roll or spoil a normal forage find;
+see [§85. Cursed World](#85-cursed-world).
 
 ## Digging
 
@@ -3480,7 +3479,7 @@ These remain **PLANNED** unless implementation confirms otherwise.
 - [x] 8-direction movement
 - [x] Auto-pathing
 - [x] Procedural surface
-- [x] 260×260 world
+- [x] 260×260 default world (variable area under Cursed world)
 - [x] Multiple terrain types
 - [x] Rivers
 - [x] Volcanoes and lava fields
@@ -4168,117 +4167,147 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 
 # 85. Cursed World
 
-## Selection and timing
+## Selection
 
-The **Cursed world** checkbox appears alongside Permadeath and Save replay in
-character creation. It starts unchecked and has a brown item-style tooltip:
-“Even more random world. Highly experimental and potentially unbalanced.
-Careful!” When the player confirms a valid name, race, and mode, the game
-selects **exactly one** entry uniformly from `content/world_traits.json` if
-Cursed world is checked. Unchecked runs use the unchanged values in
-`content/world_generation.json`; no trait is selected or logged.
+The **Cursed world** checkbox in character creation is off by default. Its
+brown tooltip warns that this experimental mode can be unbalanced. With the
+checkbox off, generation uses the base configuration and logs no trait line.
+After a valid name/race is confirmed, a cursed world draws the requested
+number of traits before world generation. All generation retries use the
+same resolved effects. Each nonempty `flavor_text` is logged on a new line
+after the introductory story text, in selected order. A trait without
+`flavor_text` is silent but fully active. The flavor describes evidence in the
+world rather than revealing the changed parameter.
 
-The trait and its effect values are rolled with the seeded gameplay RNG before
-`generateNewWorld()`. The rolled values are applied to a fresh copy of the
-base world-generation configuration. Consequently, all generation attempts
-for that world use the same trait and rolled values; a failed attempt does not
-choose another trait. After the opening story text, its `flavor_text` is
-logged on a separate line. A trait is a **world-wide setting**, not a status
-that activates again each turn.
-
-## JSON format
-
-`content/world_traits.json` is an array of trait objects. Each entry has a
-unique `name` (identifier), a `flavor_text` string shown to the player, and
-an `effects` array. The current engine recognizes the following effect fields:
-
-| Field | Current meaning |
-| --- | --- |
-| `param` | Dot-separated path to an existing **numeric** value in `content/world_generation.json`, such as `surface.snow.bandFraction`. |
-| `type` | Only `"additive"` is implemented; the rolled `value` is added to the base parameter. |
-| `value` | A fixed number or a two-number range `[minimum, maximum]`. Each range consumes one seeded RNG draw and rolls independently. |
-
-One RNG draw chooses the trait, followed by one draw per ranged effect in the
-order written. A fixed effect uses no additional draw. The implementation
-rejects unsupported effect types, nonnumeric resolved values, nonexistent
-numeric parameter paths, and unsafe object keys. Keep paths aligned with the
-current configuration; names like `freezeChance` and `snowNoiseWeight` are not
-world-generation parameters. A numeric path outside snow can also be targeted
-when another trait is designed, but its effects and safe bounds must be
-reviewed against the code that consumes it.
-
-For example, a one-way trait that **only increases** snow coverage could use:
+`content/world_traits.json` is an object:
 
 ```json
 {
-  "name": "long_winter_example",
-  "flavor_text": "Winter lingered too long.",
-  "effects": [
-    { "param": "surface.snow.bandFraction", "type": "additive", "value": [0.05, 0.10] }
+  "traits_per_world": {"count": "random", "min": 1, "max": 5},
+  "traits": [
+    {
+      "name": "example_trait",
+      "flavor_text": "The paths seem different each morning.",
+      "direction": "one_way",
+      "exclusiveGroup": "example_group",
+      "effects": [
+        {"param": "caves.shallow.attemptedCaves", "type": "additive", "value": 2}
+      ]
+    }
   ]
 }
 ```
 
-This is an **illustrative, unconfigured** trait. A negative-only range always
-reduces a parameter; a fixed number always changes it by the same amount.
-A two-way range spanning zero can increase or decrease the parameter:
+This example is illustrative and is not an active trait. `count` may be an
+integer **1–5**, or `"random"` to draw an integer inclusively from `min` to
+`max` (default **1–5**). The chosen count is fixed for this world. Candidates
+are drawn without replacement using the seeded gameplay RNG. The optional
+positive `weight` defaults to `1`; `the_bell_is_guarded` uses `0.25` so it is
+less likely to be drawn.
 
-```json
-{
-  "name": "wild_weather",
-  "flavor_text": "The seasons here forgot their pattern.",
-  "effects": [
-    { "param": "surface.snow.bandFraction", "type": "additive", "value": [-0.10, 0.10] }
-  ]
-}
-```
+`exclusiveGroup` prevents two entries in the same group from being active
+(e.g. two competing snow climates). `excludes` can name further incompatible
+trait IDs. If a conflicting pair appears in the initial draw, a trait marked
+`direction: "one_way"` wins against `"two_way"`, independent of draw order.
+The other candidate is dropped; the selection fills the empty slot with the
+next nonconflicting candidate, if available. The current 39-entry pool has
+ample room to reach the configured 1–5 active traits. Group conflicts do not
+make every modifier to a shared parameter exclusive: compatible traits can
+stack, and their numerical effects are applied in selected order.
 
-This is the **current** `wild_weather` definition. Values near zero can make a
-run look nearly normal. If a trait has several ranged effects, they roll
-**independently**. Combining positive and negative ranges for the snow band,
-coldness threshold, and edge noise can make complex weather, but it does not
-force those effects to agree in direction; they may cancel visually. A trait
-with linked warm/cold direction would require additional selection logic.
-Changing `surface.snow.coldnessThreshold` upward makes snow harder to form,
-whereas increasing `surface.snow.bandFraction` extends the potential snow band
-south. `surface.snow.edgeNoiseAmplitude` changes the boundary's raggedness.
+## Effect format and bounds
 
-## Current traits and snow behavior
+`name` is the stable ID; `effects` is an array of operations. The standard
+`param` is a dot-separated path to a numeric leaf in
+`content/world_generation.json`, including numeric array indices such as
+`dwarvenFort.roomCountRange.1`. Only `type: "additive"` is supported for these
+paths. `value` is a fixed number or a `[minimum, maximum]` range. Each ranged
+effect rolls independently using the seeded game RNG, after selection.
+Positive-only ranges always raise that parameter; negative-only ranges always
+lower it; a range spanning zero can do either. A trait's several ranges are
+**not** linked into a single warm/cold direction: they can partly cancel.
+Unknown numeric paths, unsupported types, and nonfinite resolved effects fail
+world generation visibly rather than silently doing nothing.
 
-| Trait | Current effects | Expected result |
+The special effect `{"param":"map.world.area","type":"scale_area",
+"value":[0.5,1.25]}` changes *surface area*. It scales both default world
+dimensions by the square root of one shared area roll and rounds to tile
+counts. Thus a 260×260 default becomes about **184×184 to 291×291**, not
+130×130 to 325×325. This interpretation preserves the promised 50–125% tile
+area and leaves more room for the guaranteed two distinct z:-2 caves. The
+`world_size` trait has no `flavor_text`, so it logs nothing. The surface
+population and ordinary chests already scale by eligible walkable tiles;
+special guaranteed spawns do not scale by area.
+
+Only `surface.snow.bandFraction` has a dedicated clamp (0.08–0.55). Other
+probabilities and nonnegative sizes are controlled by the configured values
+and their conflict groups. Do not add large offsets without checking
+endpoints **and** combinations. `surface.snow.bandFraction` extends the
+candidate snow band; decreasing `surface.snow.coldnessThreshold` lets more
+eligible land tiles become snow; `surface.snow.edgeNoiseAmplitude` changes the
+raggedness. `cold_world` uses all three. `wild_weather` now independently
+rolls −0.10–+0.10 band fraction, −0.08–+0.08 threshold, and −0.15–+0.15 edge
+noise amplitude. It can look nearly normal or produce contradictory cues.
+
+## Trait families
+
+The table groups implemented traits by their main effect. Exact numbers and
+all parameter paths live in `content/world_traits.json`; the following entries
+are the current behavior, not future proposals.
+
+| Family | Traits | Behavior and notable constraints |
 | --- | --- | --- |
-| `cold_world` | Snow band fraction +0.28–0.32; coldness threshold −0.22; edge noise amplitude −0.30. | Larger and less ragged northern snow biome, reaching closer to the Temple. |
-| `wild_weather` | Snow band fraction −0.10–+0.10. | Snow biome may expand or recede; threshold and edge noise currently stay at their base values. |
+| Climate and size | `cold_world`, `wild_weather`, `world_size` | Snow expands near the Temple, snow parameters vary both ways, or total map area rolls silently. The two climates conflict; specific cold wins. |
+| Cave extent | `hollow_world`, `shallow_earth`, `great_caverns`, `world_beneath_the_world` | Deep layouts enlarge; shallow passages contract with more caves and additional entrances; all caves open up; or more branches, threats and chests appear. These share a cave scale exclusion group. The guaranteed grotto/burrow pair still uses different algorithms. |
+| Deep cave character | `wormways`, `halls_below`, `flooded_depths`, `fungal_bloom`, `deep_bounty` | Optional branches favor burrows or grottos, more grotto water forms, Fungus is more common, or supplies and threats increase together. Wormways and Halls Below conflict; guaranteed distinct z:-2 caves remain. |
+| Forest and wildlife | `ancient_wilderness`, `eyes_in_the_trees`, `wild_frontier`, `migration_season`, `restless_wilds`, `great_migration`, `watchful_world` | Ancient forest/ambush/rough terrain vary; mobile enemies promote to roam/far; grouped migrants start near edges; enemy aggro reach grows by one. Existing underground wall sight checks still apply. Forest and migration themes each have a conflict group. |
+| Enemy quality | `champions_age`, `mundane_age`, `wild_blood`, `uncertain_blood`, `things_below` | Random prefixes rise or fall; Mundane Age raises ordinary surface density; variance broadens; Things Below shifts density underground. The guaranteed deep champion and guards are never removed by lower random prefix odds. Elite ages conflict. |
+| Equipment and money | `treasure_age`, `age_of_rust`, `relic_world`, `cursed_riches`, `poor_kingdom` | Better modifier rolls carry more elite enemies, common tier-one junk weapons offset weaker modifiers, artifacts rise alongside danger, richer gear brings more curses, or chest gold shrinks. Merchant prices do not change. These five share a wealth conflict group. |
+| Supplies and digging | `herbal_bloom`, `blighted_harvest`, `buried_age`, `treasure_at_the_edges`, `far_fortune`, `strange_fortune` | Herbs/mushrooms and Fungus rise while loose life potions fall; forage spoils and mushrooms poison more often; loot moves underground, toward edges, or farther from the village; supply composition changes. Herbal/Blighted/Fungal themes conflict as harvest traits. |
+| Dwarven fort | `underkings_legacy`, `haunted_hold`, `grand_delving` | A larger intact fort, a ghost-heavy fort, or a wider mountain excavation. They conflict as fort variants. |
+| Story hazard | `the_bell_is_guarded` | Additional and stronger bell guardians; this specific quest hazard is less likely to roll. |
 
-The base `surface.snow.bandFraction` is 0.22. `cold_world` rolls 0.50–0.54
-(130–140 rows of the 260-row map) and `wild_weather` rolls 0.12–0.32.
-The band is only a *candidate region*: a tile within it becomes snow when
-`coldness > coldnessThreshold`, and only eligible grass, forest, hill, or sand
-tiles are replaced by snow. Coldness includes a noisy edge. For `cold_world`,
-the threshold changes from 0.32 to 0.10 and edge-noise amplitude from 0.55 to
-0.25. At an average noise value, its visible snow edge falls around rows
-117–126, while the Temple spawn search begins around row 130. Terrain, noise,
-and the spawn search change the actual walking distance, so snow a fixed
-number of tiles north is **not guaranteed**. The snow-band fraction is clamped
-to 0.08–0.55 by the current trait application code; other parameters do not
-receive a generic clamp. Normal Temple connectivity and cave validation still
-run, including world regeneration attempts.
+The legacy names *The Unfallen Hold* and *Underking's Legacy* are represented
+by `underkings_legacy`. *No Safe Woods* is folded into `eyes_in_the_trees`;
+*Rich and Cruel* into `cursed_riches`. This avoids duplicate effects and
+reduces extreme combinations. The unrelated `surfaceEnemies.prefixChance`
+and cave prefix chances remain separate; `champions_age` and `wild_blood`
+affect the random rolls, not the mandatory deep cave champion.
 
-A larger snow region also grows more taiga and frozen river terrain. More of
-the accessible world can cause freezing and offer poorer forage. Raising the
-snow range further can leave fewer grass or hill sites near the center for the
-Temple and other landmarks, and may increase failed world-generation attempts.
-The Cursed world tooltip describes this mode as experimental for that reason.
+New generation hooks are additive to the existing JSON controls:
+`caves.shallow.extraEntranceChance` (the first cave keeps its guaranteed
+second entrance), `surfaceEnemies.populationDensityMultiplier`,
+`farPromotionChance`, `roamPromotionChance`, `migrationGroups`, and
+`migrationGroupSize`, plus `surfaceLoot.looseHerbs/looseMushrooms`.
+Only existing mobile home/roam templates are promoted; immobile enemies stay
+still. Migrant groups select low-tier template species at legal surface edge
+sites, override wandering to `far`, and use the existing opposite-edge path
+logic. `environment.enemyAggroBonus` acts through `effectiveAggroRange()`;
+wall-based underground sight remains unchanged. `environment.forageExtraFindChance`
+and `forageSpoilChance` affect only ordinary forest rolls, with extra RNG
+draws only if active; `mushroomPoisonChance` replaces the base 50% poisonous
+outcome. `lootRules.worldGoldMultiplier` scales chest gold but leaves merchant
+prices untouched. `lootRules.commonStartingWeapons` adds the hut's improvised
+weapons as tier-one ordinary weapon drops and marks the hut copy tier one in
+Age of Rust. The base values of these hooks reproduce normal world behavior.
 
-## Saves and replay
+## Persistence and balance
 
-`buildSaveObject()` stores `worldTrait` with the selected name, flavor, and
-**rolled numeric effect offsets**. It does not store the entire modified
-configuration. `loadGameFromObject()` starts with a fresh copy of the base
-configuration and reapplies those offsets without another RNG draw. This
-also restores the setting when a replay loads its recorded initial snapshot.
-Older saves without `worldTrait` use the base configuration. The generated
-map itself is saved, so loading does not regenerate it. If the *base* world
-configuration is changed in a later version, an old saved offset is applied
-to that new base; do not assume the same final parameter value across such a
-change. World-generation RNG draws occur before replay recording starts.
+`buildSaveObject()` stores the full **resolved** `worldTraits` array, including
+numeric rolled offsets, names, and optional flavor. `loadGameFromObject()`
+reapplies these offsets to a fresh base config without drawing RNG again.
+Older saves with a single `worldTrait` object are accepted as a one-element
+array, and older saves with neither trait field use the base config. A replay
+initial snapshot is taken after world generation and includes the same array.
+Saved map dimensions and terrain are restored from the save; the map is not
+regenerated on load. Updating base JSON later can change how a saved offset
+is interpreted, though the saved map itself remains intact.
+
+These traits are deliberately high variance. At five traits, stacked increases
+to deep monsters and loot may overwhelm a new character or skew progression.
+`cold_world` puts freezing near the Temple and reduces safe forage; flooded
+caves may impede routes; extra `far` wanderers can add pathfinding work. Age
+of Rust makes weak tier-one weapons common without lowering merchant prices.
+The cave and fort generation checks still run, but unusual combinations and
+small maps should be exercised across many seeds before treating balance or
+generation success as stable.

@@ -1,47 +1,1242 @@
-[
-  {
-    "name": "cold_world",
-    "flavor_text": "The cold has come farther south than it should this year.",
-    "effects": [
-      {
-        "param": "surface.snow.bandFraction",
-        "type": "additive",
-        "value": [
-          0.28,
-          0.32
-        ]
-      },
-      {
-        "param": "surface.snow.coldnessThreshold",
-        "type": "additive",
-        "value": -0.22
-      },
-      {
-        "param": "surface.snow.edgeNoiseAmplitude",
-        "type": "additive",
-        "value": -0.3
-      }
-    ]
+{
+  "traits_per_world": {
+    "count": "random",
+    "min": 1,
+    "max": 5
   },
-  {
-    "name": "wild_weather",
-    "flavor_text": "The seasons here forgot their pattern.",
-    "effects": [
-      {
-        "param": "surface.snow.bandFraction",
-        "type": "additive",
-        "value": [-0.10, 0.10]
-      },
-      {
-        "param": "surface.snow.coldnessThreshold",
-        "type": "additive",
-        "value": [-0.08, 0.08]
-      },
-      {
-        "param": "surface.snow.edgeNoiseAmplitude",
-        "type": "additive",
-        "value": [-0.15, 0.15]
-      }
-    ]
-  }
-]
+  "traits": [
+    {
+      "name": "cold_world",
+      "flavor_text": "The cold has come farther south than it should this year.",
+      "exclusiveGroup": "climate",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surface.snow.bandFraction",
+          "type": "additive",
+          "value": [
+            0.28,
+            0.32
+          ]
+        },
+        {
+          "param": "surface.snow.coldnessThreshold",
+          "type": "additive",
+          "value": -0.22
+        },
+        {
+          "param": "surface.snow.edgeNoiseAmplitude",
+          "type": "additive",
+          "value": -0.3
+        }
+      ]
+    },
+    {
+      "name": "wild_weather",
+      "flavor_text": "The seasons here forgot their pattern.",
+      "exclusiveGroup": "climate",
+      "direction": "two_way",
+      "effects": [
+        {
+          "param": "surface.snow.bandFraction",
+          "type": "additive",
+          "value": [
+            -0.1,
+            0.1
+          ]
+        },
+        {
+          "param": "surface.snow.coldnessThreshold",
+          "type": "additive",
+          "value": [
+            -0.08,
+            0.08
+          ]
+        },
+        {
+          "param": "surface.snow.edgeNoiseAmplitude",
+          "type": "additive",
+          "value": [
+            -0.15,
+            0.15
+          ]
+        }
+      ]
+    },
+    {
+      "name": "world_size",
+      "direction": "two_way",
+      "effects": [
+        {
+          "param": "map.world.area",
+          "type": "scale_area",
+          "value": [
+            0.5,
+            1.25
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hollow_world",
+      "flavor_text": "Sometimes the ground answers your footsteps with a distant echo.",
+      "exclusiveGroup": "cave_scale",
+      "direction": "one_way",
+      "excludes": [
+        "shallow_earth",
+        "grand_delving",
+        "halls_below"
+      ],
+      "effects": [
+        {
+          "param": "caves.deep.grotto.sizes.0.0",
+          "type": "additive",
+          "value": 10
+        },
+        {
+          "param": "caves.deep.grotto.sizes.0.1",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "caves.deep.grotto.sizes.1.0",
+          "type": "additive",
+          "value": 10
+        },
+        {
+          "param": "caves.deep.grotto.sizes.1.1",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "caves.deep.burrow.sizes.0.0",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "caves.deep.burrow.sizes.0.1",
+          "type": "additive",
+          "value": 6
+        },
+        {
+          "param": "caves.deep.optionalGrottoChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "caves.deep.grotto.roomCountBonus",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.sizes.2.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.2.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.3.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.3.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.4.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.4.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.5.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.5.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.6.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.6.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.1.0",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.1.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.burrow.sizes.2.0",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.2.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.burrow.sizes.3.0",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.3.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.burrow.sizes.4.0",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.4.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.burrow.sizes.5.0",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.5.1",
+          "type": "additive",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "name": "shallow_earth",
+      "flavor_text": "The hills are honeycombed with short, branching passages.",
+      "exclusiveGroup": "cave_scale",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "caves.shallow.attemptedCaves",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.shallow.extraEntranceChance",
+          "type": "additive",
+          "value": 0.55
+        },
+        {
+          "param": "caves.shallow.walkStepsRange.1",
+          "type": "additive",
+          "value": -45
+        },
+        {
+          "param": "caves.shallow.chamberRadiusRange.1",
+          "type": "additive",
+          "value": -2
+        },
+        {
+          "param": "caves.deep.grotto.roomCountBonus",
+          "type": "additive",
+          "value": -2
+        },
+        {
+          "param": "caves.deep.burrow.stepLengthBonus",
+          "type": "additive",
+          "value": -10
+        },
+        {
+          "param": "caves.deep.grotto.sizes.0.0",
+          "type": "additive",
+          "value": -5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.0.1",
+          "type": "additive",
+          "value": -4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.0.0",
+          "type": "additive",
+          "value": -4
+        },
+        {
+          "param": "caves.deep.burrow.sizes.0.1",
+          "type": "additive",
+          "value": -3
+        }
+      ]
+    },
+    {
+      "name": "ancient_wilderness",
+      "flavor_text": "The oldest trees seem to have reclaimed much of the land.",
+      "exclusiveGroup": "forest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "ancientForest.maxGrowthTiles",
+          "type": "additive",
+          "value": 90
+        },
+        {
+          "param": "ancientForest.growthChance",
+          "type": "additive",
+          "value": 0.1
+        },
+        {
+          "param": "surface.terrainThresholds.forestMinMoisture",
+          "type": "additive",
+          "value": -0.03
+        }
+      ]
+    },
+    {
+      "name": "migration_season",
+      "flavor_text": "Tracks cross the roads in every direction, many of them still fresh.",
+      "exclusiveGroup": "migration",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.farPromotionChance",
+          "type": "additive",
+          "value": 0.28
+        }
+      ]
+    },
+    {
+      "name": "restless_wilds",
+      "flavor_text": "Beasts have become restless as of late.",
+      "exclusiveGroup": "migration",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.roamPromotionChance",
+          "type": "additive",
+          "value": 0.32
+        },
+        {
+          "param": "surfaceEnemies.farPromotionChance",
+          "type": "additive",
+          "value": 0.08
+        }
+      ]
+    },
+    {
+      "name": "great_migration",
+      "flavor_text": "Something has set the creatures of the wilds in motion.",
+      "exclusiveGroup": "migration",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.migrationGroups",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "surfaceEnemies.migrationGroupSize",
+          "type": "additive",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "name": "champions_age",
+      "flavor_text": "Travellers speak of unusually fearsome creatures roaming the land.",
+      "exclusiveGroup": "elite_age",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": 0.08
+        },
+        {
+          "param": "cavePopulation.shallowPrefixChance",
+          "type": "additive",
+          "value": 0.06
+        },
+        {
+          "param": "cavePopulation.deepPrefixChance",
+          "type": "additive",
+          "value": 0.07
+        }
+      ]
+    },
+    {
+      "name": "mundane_age",
+      "flavor_text": "There are many tracks in the mud, but few belong to anything remarkable.",
+      "exclusiveGroup": "elite_age",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": -0.035
+        },
+        {
+          "param": "cavePopulation.shallowPrefixChance",
+          "type": "additive",
+          "value": -0.035
+        },
+        {
+          "param": "cavePopulation.deepPrefixChance",
+          "type": "additive",
+          "value": -0.075
+        },
+        {
+          "param": "surfaceEnemies.populationDensityMultiplier",
+          "type": "additive",
+          "value": 0.16
+        }
+      ]
+    },
+    {
+      "name": "watchful_world",
+      "flavor_text": "You have the uncomfortable feeling that the wilderness notices movement quickly.",
+      "exclusiveGroup": "vigilance",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "environment.enemyAggroBonus",
+          "type": "additive",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "treasure_age",
+      "flavor_text": "Old things have been turning up lately—usually in places best left undisturbed.",
+      "exclusiveGroup": "wealth",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "lootRules.modifierChanceBase",
+          "type": "additive",
+          "value": 0.13
+        },
+        {
+          "param": "lootRules.modifierChancePerMagicFind",
+          "type": "additive",
+          "value": 0.005
+        },
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": 0.035
+        }
+      ]
+    },
+    {
+      "name": "age_of_rust",
+      "flavor_text": "The finest blade in the village is a butter knife with pretensions.",
+      "exclusiveGroup": "wealth",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "lootRules.modifierChanceBase",
+          "type": "additive",
+          "value": -0.18
+        },
+        {
+          "param": "lootRules.commonStartingWeapons",
+          "type": "additive",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "relic_world",
+      "flavor_text": "Stories of forgotten weapons and strange heirlooms have become common around campfires.",
+      "exclusiveGroup": "wealth",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "lootRules.enemyArtifactDropRateMultiplier",
+          "type": "additive",
+          "value": 0.35
+        },
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": 0.035
+        }
+      ]
+    },
+    {
+      "name": "cursed_riches",
+      "flavor_text": "There is no shortage of fine things here. Few ask why their previous owners abandoned them.",
+      "exclusiveGroup": "wealth",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "lootRules.modifierChanceBase",
+          "type": "additive",
+          "value": 0.15
+        },
+        {
+          "param": "lootRules.artifactCurseBaseChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "surfaceLoot.buriedGearMaxTier",
+          "type": "additive",
+          "value": 1
+        },
+        {
+          "param": "surfaceLoot.buriedArtifactCount",
+          "type": "additive",
+          "value": 1
+        },
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": 0.025
+        }
+      ]
+    },
+    {
+      "name": "poor_kingdom",
+      "flavor_text": "Coins have grown scarce. People count even the smallest ones twice.",
+      "exclusiveGroup": "wealth",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "lootRules.worldGoldMultiplier",
+          "type": "additive",
+          "value": -0.35
+        },
+        {
+          "param": "village.optionalGoldChance",
+          "type": "additive",
+          "value": -0.1
+        }
+      ]
+    },
+    {
+      "name": "herbal_bloom",
+      "flavor_text": "The roadside growth is unusually thick this season, fragrant even beneath your boots.",
+      "exclusiveGroup": "harvest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceLoot.looseHerbs",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "surfaceLoot.looseMushrooms",
+          "type": "additive",
+          "value": 6
+        },
+        {
+          "param": "surfaceLoot.loosePotions",
+          "type": "additive",
+          "value": -5
+        },
+        {
+          "param": "environment.forageExtraFindChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "cavePopulation.fungusFirstChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "cavePopulation.fungusSecondChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "cavePopulation.minimumFungus",
+          "type": "additive",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "name": "blighted_harvest",
+      "flavor_text": "The woods are full of growth, though much of it looks better left untouched.",
+      "exclusiveGroup": "harvest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "environment.forageSpoilChance",
+          "type": "additive",
+          "value": 0.25
+        },
+        {
+          "param": "environment.mushroomPoisonChance",
+          "type": "additive",
+          "value": 0.2
+        }
+      ]
+    },
+    {
+      "name": "underkings_legacy",
+      "flavor_text": "Old dwarven stonework can still be seen in the hills, more intact than the stories suggest.",
+      "exclusiveGroup": "hold",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "dwarvenFort.roomCountRange.0",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "dwarvenFort.roomCountRange.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "dwarvenFort.corridorWideChance",
+          "type": "additive",
+          "value": 0.2
+        },
+        {
+          "param": "dwarvenFort.collapseAttempts",
+          "type": "additive",
+          "value": -22
+        },
+        {
+          "param": "dwarvenFort.rubbleChance",
+          "type": "additive",
+          "value": -0.22
+        },
+        {
+          "param": "dwarvenFort.boundsX",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "dwarvenFort.boundsY",
+          "type": "additive",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "name": "things_below",
+      "flavor_text": "The surface is strangely quiet. From beneath it, sometimes, comes another sound.",
+      "exclusiveGroup": "population",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.populationDensityMultiplier",
+          "type": "additive",
+          "value": -0.22
+        },
+        {
+          "param": "cavePopulation.deepMonsterMin",
+          "type": "additive",
+          "value": 6
+        },
+        {
+          "param": "cavePopulation.deepMonsterMax",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "cavePopulation.deepPrefixChance",
+          "type": "additive",
+          "value": 0.045
+        }
+      ]
+    },
+    {
+      "name": "great_caverns",
+      "flavor_text": "Some claim there are places below where a man can no longer see the ceiling.",
+      "exclusiveGroup": "cave_scale",
+      "direction": "one_way",
+      "excludes": [
+        "shallow_earth"
+      ],
+      "effects": [
+        {
+          "param": "caves.shallow.walkRadiusRange.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.shallow.chamberRadiusRange.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.grotto.roomRadiusXRange.1",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.roomRadiusYRange.1",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.roomCountBonus",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.sizes.0.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.0.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.1.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.1.1",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "caves.deep.grotto.sizes.2.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "caves.deep.grotto.sizes.2.1",
+          "type": "additive",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "name": "wormways",
+      "flavor_text": "The ground beneath these lands is riddled with narrow passages.",
+      "exclusiveGroup": "deep_style",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "caves.deep.optionalGrottoChance",
+          "type": "additive",
+          "value": -0.32
+        },
+        {
+          "param": "caves.deep.burrow.minBranches",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.burrow.turnChance",
+          "type": "additive",
+          "value": 0.08
+        },
+        {
+          "param": "caves.deep.burrow.minSteps",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "caves.deep.burrow.stepLengthBonus",
+          "type": "additive",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "name": "halls_below",
+      "flavor_text": "Travellers tell of enormous chambers beneath the hills, though few agree where they lie.",
+      "exclusiveGroup": "deep_style",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "caves.deep.optionalGrottoChance",
+          "type": "additive",
+          "value": 0.32
+        },
+        {
+          "param": "caves.deep.grotto.minRooms",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.roomCountBonus",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.extraConnections",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "caves.deep.grotto.roomRadiusXRange.1",
+          "type": "additive",
+          "value": 1
+        },
+        {
+          "param": "caves.deep.grotto.roomRadiusYRange.1",
+          "type": "additive",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "flooded_depths",
+      "flavor_text": "The caves breathe cold, damp air even from their mouths.",
+      "exclusiveGroup": "deep_water",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "caves.deep.grotto.waterChance",
+          "type": "additive",
+          "value": 0.25
+        },
+        {
+          "param": "caves.deep.grotto.waterRadiusX",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.waterRadiusY",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.grotto.minWaterCells",
+          "type": "additive",
+          "value": 6
+        }
+      ]
+    },
+    {
+      "name": "fungal_bloom",
+      "flavor_text": "Strange caps have begun appearing even near the mouths of caves.",
+      "exclusiveGroup": "harvest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "cavePopulation.fungusFirstChance",
+          "type": "additive",
+          "value": 0.3
+        },
+        {
+          "param": "cavePopulation.fungusSecondChance",
+          "type": "additive",
+          "value": 0.25
+        },
+        {
+          "param": "cavePopulation.minimumFungus",
+          "type": "additive",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "name": "deep_bounty",
+      "flavor_text": "Those who return from beneath the hills often return carrying something.",
+      "exclusiveGroup": "population",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "cavePopulation.deepChestMin",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "cavePopulation.deepChestMax",
+          "type": "additive",
+          "value": 4
+        },
+        {
+          "param": "cavePopulation.deepProvisionCount",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "cavePopulation.deepMonsterMin",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "cavePopulation.deepMonsterMax",
+          "type": "additive",
+          "value": 7
+        }
+      ]
+    },
+    {
+      "name": "haunted_hold",
+      "flavor_text": "The mountains are quiet. Too quiet, some say.",
+      "exclusiveGroup": "hold",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "dwarvenFort.ghostCount",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "dwarvenFort.ghostPrefixChance",
+          "type": "additive",
+          "value": 0.12
+        },
+        {
+          "param": "dwarvenFort.remainsAttempts",
+          "type": "additive",
+          "value": 7
+        }
+      ]
+    },
+    {
+      "name": "grand_delving",
+      "flavor_text": "Old tales claim the dwarves once hollowed whole mountains rather than merely mining them.",
+      "exclusiveGroup": "hold",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "dwarvenFort.boundsX",
+          "type": "additive",
+          "value": 6
+        },
+        {
+          "param": "dwarvenFort.boundsY",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "dwarvenFort.roomCountRange.1",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "dwarvenFort.roomWidthRange.1",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "dwarvenFort.roomHeightRange.1",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "dwarvenFort.ruinPropAttempts",
+          "type": "additive",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "name": "wild_blood",
+      "flavor_text": "There are beasts here that even hunters refuse to name.",
+      "exclusiveGroup": "elite_age",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.prefixChance",
+          "type": "additive",
+          "value": 0.055
+        },
+        {
+          "param": "cavePopulation.shallowPrefixChance",
+          "type": "additive",
+          "value": 0.055
+        },
+        {
+          "param": "cavePopulation.deepPrefixChance",
+          "type": "additive",
+          "value": 0.07
+        },
+        {
+          "param": "dwarvenFort.ghostPrefixChance",
+          "type": "additive",
+          "value": 0.07
+        }
+      ]
+    },
+    {
+      "name": "eyes_in_the_trees",
+      "flavor_text": "The woods have a way of becoming quiet just before something moves.",
+      "exclusiveGroup": "forest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.forestAmbushChance",
+          "type": "additive",
+          "value": 0.09
+        },
+        {
+          "param": "ancientForest.maxGrowthTiles",
+          "type": "additive",
+          "value": 50
+        },
+        {
+          "param": "ancientForest.growthChance",
+          "type": "additive",
+          "value": 0.07
+        },
+        {
+          "param": "surface.terrainThresholds.forestMinMoisture",
+          "type": "additive",
+          "value": -0.025
+        }
+      ]
+    },
+    {
+      "name": "the_bell_is_guarded",
+      "flavor_text": "Somewhere far away, metal answers metal once, then falls silent.",
+      "direction": "one_way",
+      "weight": 0.25,
+      "effects": [
+        {
+          "param": "landmarks.bellGuardianCount",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "landmarks.enemyStatVarianceMin",
+          "type": "additive",
+          "value": 0.03
+        },
+        {
+          "param": "landmarks.enemyStatVarianceSpan",
+          "type": "additive",
+          "value": 0.08
+        }
+      ]
+    },
+    {
+      "name": "uncertain_blood",
+      "flavor_text": "No two creatures here seem quite alike, even when they should.",
+      "exclusiveGroup": "variance",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceEnemies.statVarianceMin",
+          "type": "additive",
+          "value": -0.15
+        },
+        {
+          "param": "surfaceEnemies.statVarianceSpan",
+          "type": "additive",
+          "value": 0.3
+        },
+        {
+          "param": "landmarks.enemyStatVarianceMin",
+          "type": "additive",
+          "value": -0.1
+        },
+        {
+          "param": "landmarks.enemyStatVarianceSpan",
+          "type": "additive",
+          "value": 0.2
+        }
+      ]
+    },
+    {
+      "name": "buried_age",
+      "flavor_text": "People here seem to have hidden more beneath the earth than they left above it.",
+      "exclusiveGroup": "loot_route",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceLoot.buriedGearCount",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "surfaceLoot.buriedArtifactCount",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "surfaceLoot.buriedArtifactTierRange.1",
+          "type": "additive",
+          "value": 1
+        },
+        {
+          "param": "surfaceLoot.loosePotions",
+          "type": "additive",
+          "value": -4
+        },
+        {
+          "param": "surfaceLoot.looseScrolls",
+          "type": "additive",
+          "value": -2
+        }
+      ]
+    },
+    {
+      "name": "treasure_at_the_edges",
+      "flavor_text": "Old travellers warned that the richest roads were also the longest.",
+      "exclusiveGroup": "loot_route",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceLoot.edgeBandMin",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "surfaceLoot.edgeBandFraction",
+          "type": "additive",
+          "value": 0.04
+        },
+        {
+          "param": "surfaceLoot.northEdgeChestLimit",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "surfaceLoot.allEdgeChestLimit",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "surfaceLoot.remoteHighTierChestCount",
+          "type": "additive",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "far_fortune",
+      "flavor_text": "Those seeking wealth tend not to find it near home.",
+      "exclusiveGroup": "loot_route",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceLoot.remoteChestMinVillageDistance",
+          "type": "additive",
+          "value": 18
+        },
+        {
+          "param": "surfaceLoot.chestDistancePerTier",
+          "type": "additive",
+          "value": 12
+        }
+      ]
+    },
+    {
+      "name": "strange_fortune",
+      "flavor_text": "Useful things are plentiful, though rarely the things one went looking for.",
+      "exclusiveGroup": "loot_route",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surfaceLoot.loosePotions",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "surfaceLoot.looseScrolls",
+          "type": "additive",
+          "value": -3
+        },
+        {
+          "param": "surfaceLoot.looseSpeedPotions",
+          "type": "additive",
+          "value": -2
+        }
+      ]
+    },
+    {
+      "name": "wild_frontier",
+      "flavor_text": "Beyond the temple, there is little evidence that anyone controls these lands.",
+      "exclusiveGroup": "forest",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "surface.boulders.noiseThreshold",
+          "type": "additive",
+          "value": -0.06
+        },
+        {
+          "param": "ancientForest.maxGrowthTiles",
+          "type": "additive",
+          "value": 55
+        },
+        {
+          "param": "surfaceEnemies.highTierMinTempleDistance",
+          "type": "additive",
+          "value": -12
+        },
+        {
+          "param": "surfaceEnemies.forestAmbushChance",
+          "type": "additive",
+          "value": 0.04
+        }
+      ]
+    },
+    {
+      "name": "world_beneath_the_world",
+      "flavor_text": "Every hill seems to have a hollow sound beneath it.",
+      "exclusiveGroup": "cave_scale",
+      "direction": "one_way",
+      "effects": [
+        {
+          "param": "caves.shallow.attemptedCaves",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.optionalBranchChance",
+          "type": "additive",
+          "value": 0.22
+        },
+        {
+          "param": "caves.deep.grotto.roomCountBonus",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "caves.deep.burrow.stepLengthBonus",
+          "type": "additive",
+          "value": 12
+        },
+        {
+          "param": "cavePopulation.deepMonsterMin",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "cavePopulation.deepMonsterMax",
+          "type": "additive",
+          "value": 7
+        },
+        {
+          "param": "cavePopulation.deepChestMin",
+          "type": "additive",
+          "value": 2
+        },
+        {
+          "param": "cavePopulation.deepChestMax",
+          "type": "additive",
+          "value": 3
+        }
+      ]
+    }
+  ]
+}

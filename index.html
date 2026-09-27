@@ -623,43 +623,90 @@
   let WORLD_GEN_CONFIG = {}
   let BASE_WORLD_GEN_CONFIG = {}
   let WORLD_TRAITS = []
-  let activeWorldTrait = null // resolved effects, stored with saves and replay snapshots
+  let TRAITS_PER_WORLD = {count: 'random', min: 1, max: 5}
+  let BASE_MAP_CONFIG = {}
+  let BASE_WEAPONS = []
+  let activeWorldTraits = [] // resolved effect values, stored in saves and replay snapshots
 
-  function applyWorldTrait(trait) {
+  function applyWorldTraits(traits) {
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
-    if (!trait) { activeWorldTrait = null; return }
-    if (!Array.isArray(trait.effects)) throw new Error('Invalid world trait effects.')
-    for (const effect of trait.effects) {
-      const path = effect.param?.split('.')
-      if (effect.type !== 'additive' || !Array.isArray(path) || path.some(key => !key || key === '__proto__' || key === 'constructor' || key === 'prototype') || !Number.isFinite(effect.value))
-        throw new Error('Invalid world trait effect.')
-      let target = WORLD_GEN_CONFIG
-      for (const key of path.slice(0, -1)) {
-        if (!Object.hasOwn(target, key) || !target[key] || typeof target[key] !== 'object') throw new Error('Unknown world trait parameter: ' + effect.param)
-        target = target[key]
+    const mapConfig = structuredClone(BASE_MAP_CONFIG)
+    for (const trait of traits) {
+      if (!Array.isArray(trait.effects)) throw new Error('Invalid world trait effects.')
+      for (const effect of trait.effects) {
+        if (effect.type === 'scale_area') {
+          if (!Number.isFinite(effect.value) || effect.value < 0.5 || effect.value > 1.25)
+            throw new Error('Invalid world area scale.')
+          const scale = Math.sqrt(effect.value)
+          mapConfig.world.width = Math.round(BASE_MAP_CONFIG.world.width * scale)
+          mapConfig.world.height = Math.round(BASE_MAP_CONFIG.world.height * scale)
+          continue
+        }
+        const path = effect.param?.split('.')
+        if (effect.type !== 'additive' || !Array.isArray(path) || path.some(key => !key || key === '__proto__' || key === 'constructor' || key === 'prototype') || !Number.isFinite(effect.value))
+          throw new Error('Invalid world trait effect.')
+        let target = WORLD_GEN_CONFIG
+        for (const key of path.slice(0, -1)) {
+          if (!Object.hasOwn(target, key) || !target[key] || typeof target[key] !== 'object') throw new Error('Unknown world trait parameter: ' + effect.param)
+          target = target[key]
+        }
+        const key = path.at(-1)
+        if (!Object.hasOwn(target, key) || !Number.isFinite(target[key])) throw new Error('Unknown world trait parameter: ' + effect.param)
+        target[key] += effect.value
+        if (effect.param === 'surface.snow.bandFraction') target[key] = Math.max(0.08, Math.min(0.55, target[key]))
       }
-      const key = path.at(-1)
-      if (!Object.hasOwn(target, key) || !Number.isFinite(target[key])) throw new Error('Unknown world trait parameter: ' + effect.param)
-      target[key] += effect.value
-      // A snow band must remain on the map, and must not consume the entire map.
-      if (effect.param === 'surface.snow.bandFraction') target[key] = Math.max(0.08, Math.min(0.55, target[key]))
     }
-    activeWorldTrait = structuredClone(trait)
+    MAP_W = mapConfig.world.width
+    MAP_H = mapConfig.world.height
+    // The density divisor is per walkable tile, so it scales with either world area.
+    WEAPONS = WORLD_GEN_CONFIG.lootRules.commonStartingWeapons
+      ? BASE_WEAPONS.concat(STARTING_WEAPONS.filter(name => !BASE_WEAPONS.some(w => w.name === name))
+        .map(name => ({name, atk: 1, grace: 1, tier: 1})))
+      : BASE_WEAPONS
+    activeWorldTraits = structuredClone(traits)
   }
 
-  function chooseWorldTrait() {
+  function traitsConflict(a, b) {
+    return (a.exclusiveGroup && a.exclusiveGroup === b.exclusiveGroup) ||
+      a.excludes?.includes(b.name) || b.excludes?.includes(a.name)
+  }
+
+  function chooseWorldTraits() {
     if (!WORLD_TRAITS.length) throw new Error('No world traits are configured.')
-    const trait = WORLD_TRAITS[Math.floor(rng() * WORLD_TRAITS.length)]
-    const rolled = {
-      name: trait.name, flavor_text: trait.flavor_text,
+    const {count, min, max} = TRAITS_PER_WORLD
+    const requested = count === 'random' ? randInt(min, max) : count
+    if (!Number.isInteger(requested) || requested < 1 || requested > 5) throw new Error('Invalid traits_per_world count.')
+    const pool = WORLD_TRAITS.slice()
+    const ordered = []
+    // Weighted draws without replacement keep rare story traits genuinely rare.
+    while (pool.length) {
+      const totalWeight = pool.reduce((sum, trait) => sum + (trait.weight ?? 1), 0)
+      let roll = rng() * totalWeight, index = pool.length - 1
+      for (let i = 0; i < pool.length; i++) {
+        roll -= pool[i].weight ?? 1
+        if (roll < 0) { index = i; break }
+      }
+      ordered.push(pool.splice(index, 1)[0])
+    }
+    // Resolve conflicts in the initial draw before filling empty slots. A
+    // specific one-way trait wins over a two-way trait even if drawn second.
+    const initial = ordered.slice(0, requested).sort((a, b) =>
+      Number(b.direction === 'one_way') - Number(a.direction === 'one_way'))
+    const selected = []
+    for (const trait of [...initial, ...ordered.slice(requested)]) {
+      if (selected.length >= requested) break
+      if (!selected.some(chosen => traitsConflict(trait, chosen))) selected.push(trait)
+    }
+    const resolved = selected.map(trait => ({
+      name: trait.name, flavor_text: trait.flavor_text || null,
       effects: trait.effects.map(effect => ({
         param: effect.param, type: effect.type,
         value: Array.isArray(effect.value)
           ? effect.value[0] + rng() * (effect.value[1] - effect.value[0])
           : effect.value
       }))
-    }
-    applyWorldTrait(rolled)
+    }))
+    applyWorldTraits(resolved)
   }
   let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
@@ -732,6 +779,7 @@
       content[key] = await response.json()
     }
     WEAPONS = content.weapons
+    BASE_WEAPONS = content.weapons
     SHIELDS = content.shields
     ARMORS = content.armors
     MODIFIERS = content.modifiers
@@ -791,6 +839,7 @@
     FLAT_SELL_VALUE = content.lootTables.sellValues.flat
     FORAGE_TABLE = content.lootTables.forage
     CHEST_LOOT_TABLE = content.lootTables.chestLoot
+    BASE_MAP_CONFIG = content.mapConfig
     MAP_W = content.mapConfig.world.width
     MAP_H = content.mapConfig.world.height
     MAX_WORLD_ATTEMPTS = content.mapConfig.world.maxGenerationAttempts
@@ -805,7 +854,8 @@
     SURFACE_TILES_PER_CHEST = content.mapConfig.spawning.surfaceTilesPerChest
     BASE_WORLD_GEN_CONFIG = content.worldGeneration
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
-    WORLD_TRAITS = content.worldTraits
+    WORLD_TRAITS = content.worldTraits.traits
+    TRAITS_PER_WORLD = content.worldTraits.traits_per_world
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
     RENDER_STYLE = content.rendering
     PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}
@@ -3087,7 +3137,7 @@
   }
 
   function effectiveAggroRange(e) {
-    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 1 : 0) + raceAggroMod())
+    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 1 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
   }
 
   // Underground acquisition requires a clear ray through the map. Walls are
@@ -3910,6 +3960,11 @@
         break
       }
     }
+    const forageRules = WORLD_GEN_CONFIG.environment
+    if (result === 'nothing' && forageRules.forageExtraFindChance > 0 && chance(forageRules.forageExtraFindChance))
+      result = chance(0.5) ? 'herb' : 'mushroom'
+    if (result !== 'nothing' && forageRules.forageSpoilChance > 0 && chance(forageRules.forageSpoilChance))
+      result = 'nothing'
     (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
     enemyTurn()
     npcTurn()
@@ -4213,7 +4268,7 @@
   // (CHEST_LOOT_TABLE); these handlers apply whichever outcome was rolled.
   const CHEST_LOOT_HANDLERS = {
     gold: (chestTier, mf, entry) => {
-      const gold = randInt(entry.goldMin, entry.goldMax) * (entry.goldPerTier ? chestTier : 1) + Math.round(mf * (entry.mfGoldMultiplier || 0))
+      const gold = Math.max(1, Math.round((randInt(entry.goldMin, entry.goldMax) * (entry.goldPerTier ? chestTier : 1) + Math.round(mf * (entry.mfGoldMultiplier || 0))) * WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
       player.gold += gold
       lastLootResult = `${gold} gold.`
       if (!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot')
@@ -4788,7 +4843,8 @@
     if (map[player.y]?.[player.x] === 'village' || hut) {
       if (hut?.startingWeapon && !hut.startingWeaponTaken && !player.equip.weapon) {
         const name = hut.startingWeapon
-        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true}
+        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true,
+          ...(WORLD_GEN_CONFIG.lootRules.commonStartingWeapons ? {tier: 1} : {})}
         hut.startingWeaponTaken = true
         log(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
         if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
@@ -7860,7 +7916,7 @@
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     const amt = Math.max(1, Math.round(playerMaxHp() * 0.25))
-    if (chance(0.5)) {
+    if (chance(1 - WORLD_GEN_CONFIG.environment.mushroomPoisonChance)) {
       const healed = consumablePower(amt)
       const restored = healPlayer(healed)
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
@@ -8421,8 +8477,8 @@
       player.race = selectedRaceId
       player.permadeath = document.getElementById('permadeathToggle').checked
       player.characterId = Graveyard.newCharacterId()
-      if (document.getElementById('cursedWorldToggle').checked) chooseWorldTrait()
-      else applyWorldTrait(null)
+      if (document.getElementById('cursedWorldToggle').checked) chooseWorldTraits()
+      else applyWorldTraits([])
       await generateNewWorld()
       worldGenerating = false
       player.hp = playerMaxHp()
@@ -8436,7 +8492,7 @@
       const race = raceDef()
       log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good')
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info')
-      if (activeWorldTrait) log('\n' + activeWorldTrait.flavor_text, 'info')
+      for (const trait of activeWorldTraits) if (trait.flavor_text) log('\n' + trait.flavor_text, 'info')
       updateHud()
       render()
       ensureAmbientTileAnimationLoop()

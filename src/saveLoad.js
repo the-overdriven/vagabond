@@ -88,7 +88,7 @@ function buildSaveObject() {
     version: SAVE_VERSION,
     savedAt: new Date().toISOString(),
     worldSeed: WORLD_SEED,
-    worldTrait: activeWorldTrait,
+    worldTraits: activeWorldTraits,
     rngState: rngState,
     mapWidth: MAP_W,
     mapHeight: MAP_H,
@@ -232,7 +232,7 @@ function loadGameFromObject(data, opts = {}) {
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
   stopReplayPlayback()
-  applyWorldTrait(data.worldTrait || null)
+  applyWorldTraits(Array.isArray(data.worldTraits) ? data.worldTraits : data.worldTrait ? [data.worldTrait] : [])
   if (!isReplayInit && !opts.isReplayRestore) {
     preReplaySnapshot = null
     preReplayCounters = null

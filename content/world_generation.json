@@ -186,7 +186,8 @@
       "chamberFillChance": 0.94,
       "corridorHorizontalBias": 0.5,
       "entranceCarveWidth": 1,
-      "entranceCarveDepth": 2
+      "entranceCarveDepth": 2,
+      "extraEntranceChance": 0
     },
     "deep": {
       "generationTrials": 6,
@@ -440,7 +441,12 @@
     "lichTopUpAttempts": 200,
     "statVarianceSpan": 0.1,
     "forestAmbushChance": 0.05,
-    "highTierMinTier": 3
+    "highTierMinTier": 3,
+    "farPromotionChance": 0,
+    "roamPromotionChance": 0,
+    "migrationGroups": 0,
+    "migrationGroupSize": 3,
+    "populationDensityMultiplier": 1
   },
   "cavePopulation": {
     "minOpenTilesForScenario": 5,
@@ -492,7 +498,9 @@
     "guardedChestMinEnemyTier": 3,
     "remoteHighTierChestTier": 3,
     "ordinaryChestBaseTier": 1,
-    "ordinaryChestMaxTier": 5
+    "ordinaryChestMaxTier": 5,
+    "looseHerbs": 0,
+    "looseMushrooms": 0
   },
   "npcs": {
     "villageSpread": 6,
@@ -515,11 +523,17 @@
     "enemyArtifactBaseChance": 0.01,
     "enemyArtifactTierChanceStep": 0.0075,
     "enemyArtifactMagicFindMultiplierPerPoint": 0.05,
-    "enemyArtifactChanceCapBeforeRate": 0.12
+    "enemyArtifactChanceCapBeforeRate": 0.12,
+    "commonStartingWeapons": 0,
+    "worldGoldMultiplier": 1
   },
   "environment": {
     "freezingDamageIntervalTurns": 5,
     "freezingDamage": 1,
-    "undergroundFovRadius": 8
+    "undergroundFovRadius": 8,
+    "enemyAggroBonus": 0,
+    "mushroomPoisonChance": 0.5,
+    "forageExtraFindChance": 0,
+    "forageSpoilChance": 0
   }
 }
