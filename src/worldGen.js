@@ -2209,10 +2209,23 @@ function spawnCaveScenarios() {
     const rules = level === -1 ? scenario.surface : scenario.deep
     const entrance = entries[0]
     const distance = p => Math.abs(p.x - entrance.x) + Math.abs(p.y - entrance.y)
+    const ordinaryMobSpots = []
     function takeSpot(mode, target) {
       if (!open.length) return null
       let candidates = open
-      if (mode === 'guard' && target) {
+      if (mode === 'deepMob') {
+        const away = open.filter(p => entries.every(e =>
+          Math.abs(p.x - e.x) + Math.abs(p.y - e.y) > cfg.deepMobEntranceClearance))
+        if (away.length) candidates = away
+        const spaced = candidates.filter(p => ordinaryMobSpots.every(m =>
+          Math.max(Math.abs(p.x - m.x), Math.abs(p.y - m.y)) >= cfg.deepMobMinSpacing))
+        if (spaced.length) candidates = spaced
+        if (target) {
+          const inRoom = candidates.filter(p => p.x >= target.x1 && p.x <= target.x2 &&
+            p.y >= target.y1 && p.y <= target.y2)
+          if (inRoom.length) candidates = inRoom
+        }
+      } else if (mode === 'guard' && target) {
         const near = open.filter(p => Math.abs(p.x - target.x) + Math.abs(p.y - target.y) <= cfg.guardRadius)
         if (near.length) candidates = near
       } else if (mode === 'room' && target) {
@@ -2310,10 +2323,11 @@ function spawnCaveScenarios() {
       if (!tmpl) continue
       const total = level === -2 ? Math.min(cfg.deepMonsterMax, Math.max(cfg.deepMonsterMin, Math.round(open.length / cfg.deepMonsterTilesPerEnemy))) : count
       for (let n = 0; n < total; n++) {
-        const spot = level === -2 && roomOrder.length
-          ? takeSpot('room', roomOrder[n % roomOrder.length])
+        const spot = level === -2
+          ? takeSpot('deepMob', roomOrder.length ? roomOrder[n % roomOrder.length] : null)
           : takeSpot(rules.placement || 'random', chest)
         if (!spot) break
+        if (level === -2) ordinaryMobSpots.push(spot)
         let prefix = null
         if (chance(level === -2 ? cfg.deepPrefixChance : cfg.shallowPrefixChance)) {
           const names = Object.keys(ENEMY_PREFIXES)

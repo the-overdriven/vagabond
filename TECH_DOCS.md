@@ -917,9 +917,15 @@ their dedicated contents. Surface scenarios are:
 | Smugglers' refuge | Goblins and another creature, a campfire, chest, and Scroll of Invisibility |
 
 The z:-2 scenarios retain **one Tier-2 species per cave**, chosen from
-Goblins, Skeletons, Kobolds, Skinks, or Ratlings. The larger grottos hold
-24–36 enemies, spread through chambers. Eight to twelve chests are distributed
-across chambers, alternating tier 3 and tier 2; there are also four loose
+Goblins, Skeletons, Kobolds, Skinks, or Ratlings. Their ordinary population is
+24–36 enemies before other cave spawns. The **Things Below** trait raises this
+range to 30–44. Ordinary enemies prefer positions beyond an eight-tile
+Manhattan clearance from every staircase and at least three tiles apart
+(Chebyshev distance), using other open positions only when space runs out.
+Grottos spread them among side rooms; burrows use the same clearance and
+spacing on open passages rather than the scenario's chest-guard placement.
+Eight to twelve chests are distributed
+through the cave, alternating tier 3 and tier 2; there are also four loose
 supplies (two potions and two scrolls). No Giant Rats, Giant Bats,
 Wolves, Boars, or Giant Bugs are selected for new z:-2 cave scenario groups.
 Each populated generic z:-2 cave also gets one guaranteed Champion of its
@@ -4284,6 +4290,10 @@ tier are also configured there. Only mobile home/roam templates are promoted;
 immobile enemies stay still. Migrants select legal surface edge sites and use
 the existing opposite-edge `far` path logic.
 `surfaceLoot.looseHerbs/looseMushrooms` control additional loose supplies.
+`cavePopulation.deepMobEntranceClearance` and `deepMobMinSpacing` govern the
+ordinary deep-cave placement preference described under Ordinary cave
+scenarios. The guaranteed Champion, its four adjacent guards, and the extra
+high-tier threat retain their dedicated positions.
 
 Foraging uses the cumulative base thresholds in `loot_tables.json`.
 `environment.forageResultMultipliers` scales the separate berries, herb, and

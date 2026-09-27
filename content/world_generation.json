@@ -476,7 +476,9 @@
     "deepPrefixChance": 0.11,
     "shallowPrefixChance": 0.05,
     "deepProvisionCount": 4,
-    "minimumFungus": 3
+    "minimumFungus": 3,
+    "deepMobEntranceClearance": 8,
+    "deepMobMinSpacing": 3
   },
   "surfaceLoot": {
     "remoteHighTierChestCount": 4,
