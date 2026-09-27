@@ -1,0 +1,30 @@
+[
+  {
+    "name": "cold_world",
+    "flavor_text": "The cold has come farther south than it should this year.",
+    "effects": [
+      {
+        "param": "surface.snow.bandFraction",
+        "type": "additive",
+        "value": [
+          0.08,
+          0.14
+        ]
+      }
+    ]
+  },
+  {
+    "name": "wild_weather",
+    "flavor_text": "The seasons here forgot their pattern.",
+    "effects": [
+      {
+        "param": "surface.snow.bandFraction",
+        "type": "additive",
+        "value": [
+          -0.5,
+          0.5
+        ]
+      }
+    ]
+  }
+]

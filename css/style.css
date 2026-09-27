@@ -1102,6 +1102,28 @@ body.hint-collapsed #hint .panel-toggle {
   cursor: pointer;
 }
 
+/* Match the canvas item tooltip, while keeping the hint inside the race dialog. */
+.cursed-world-option { position: relative; }
+.cursed-world-tip {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 2;
+  width: min(230px, 72vw);
+  padding: 8px 10px;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--parchment);
+  font-size: calc(12px * var(--ui-font-scale));
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: normal;
+}
+.cursed-world-option:hover .cursed-world-tip,
+.cursed-world-option:focus-within .cursed-world-tip { display: block; }
+
 #raceError {
   color: var(--blood);
   font-size: calc(11px * var(--ui-font-scale));

@@ -80,28 +80,46 @@ The player chooses:
 2. Race
 
 The world is generated **only after Begin confirms a valid name and race**.
-Startup loads content and essential images under a full-screen rotating skull
-with `Loading...`, then shows character creation with no generated map.
-After confirmation, the same overlay says `Generating world...`. Character
-race and Permadeath are applied before `generateNewWorld()` builds the map,
-initializes discovery/minimap, places the player, and performs all population
-and merchant setup in the existing order. Begin is guarded against duplicate
-submissions; invalid names do not generate a world. No Cursed World checkbox
-or world traits are added yet.
+Startup loads content and essential images under a rotating skull with
+`Loading...`; after confirmation, the overlay says `Generating world...`.
+The overlay blocks input and allows a paint before synchronous generation.
+Character race and Permadeath are set before world generation. Invalid names
+and duplicate Begin clicks cannot start a second world.
 
-The loading overlay is present in the initial HTML, blocks pointer/touch and
-keyboard input, and yields a painted frame before synchronous generation.
-Its transform animation uses a composited layer; reduced-motion preferences
-show a stationary skull. Rendering ignores empty or in-progress worlds.
-Content/generation errors keep the overlay visible with a reload instruction.
-Background image warming continues after the race screen appears.
+The **Cursed world** checkbox is off by default. Its tooltip shares the brown
+canvas item tooltip palette and reads “Even more random world. Highly
+experimental and potentially unbalanced. Careful!” On confirmation the game
+chooses **exactly one** entry uniformly from `content/world_traits.json` and
+rolls its effect ranges with the seeded game RNG, before generating the map.
+Without the checkbox the base `content/world_generation.json` is applied.
+Each effect names a numeric path in that file (for example,
+`surface.snow.bandFraction`), uses `type: "additive"`, and has either a fixed
+number or `[min, max]` range. The selected trait's rolled values
+are added to a fresh copy of the base configuration. The snow band fraction
+is clamped to 0.08–0.55 so extreme values still leave both snowy and warmer
+regions. The selected trait flavor is logged on a new line after the opening
+story text. No effect changes the world midway through play.
 
-Replay recording starts only after generation and character setup finish,
-so the initial snapshot contains the completed world and generation RNG is
-not included in the gameplay recording. Loading saves retains the existing
-character-creation bypass and does not call the new-world generator.
+Initial traits:
 
-Loading a save bypasses character creation.
+| Trait | Snow band change | Gameplay effect |
+| --- | --- | --- |
+| `cold_world` | +0.08 to +0.14 | Snow and freezing terrain extend farther south. |
+| `wild_weather` | −0.10 to +0.10 | The snow band may expand or recede. |
+
+The base snow band fraction is 0.22, making these ranges approximately
+0.30–0.36 and 0.12–0.32 respectively before rounding to map rows.
+`surface.snow.bandFraction` is the actual worldgen control for how far south
+snow extends; `freezeChance` and `snowNoiseWeight` are not parameters in this
+project. Cold worlds raise freezing exposure and can alter access to food
+in taiga, so the mode is deliberately marked experimental.
+
+Saves and replay initial snapshots include `worldTrait` with its name, flavor,
+and **resolved numeric effect values**. Loading reapplies it to a fresh base
+configuration without rerolling RNG; older saves with no trait revert to the
+base configuration. Replay recording begins after world generation, so the
+snapshot contains the full generated world. Loading a save continues to
+bypass character creation.
 
 There are currently **10 races**.
 

@@ -183,7 +183,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20260925-4">
+  <link rel="stylesheet" href="css/style.css?v=20260927-1">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -325,6 +325,8 @@
         <div class="race-foot">
           <label class="permadeath-option" for="permadeathToggle"><input type="checkbox" id="permadeathToggle">
             Permadeath</label>
+          <label class="permadeath-option cursed-world-option" for="cursedWorldToggle"><input type="checkbox" id="cursedWorldToggle" aria-describedby="cursedWorldTip">
+            Cursed world<span id="cursedWorldTip" class="cursed-world-tip" role="tooltip">Even more random world. Highly experimental and potentially unbalanced. Careful!</span></label>
           <label class="permadeath-option" for="replayToggle"><input type="checkbox" id="replayToggle">
             Save replay</label>
           <span id="raceError"></span>
@@ -619,6 +621,46 @@
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
   let WORLD_GEN_CONFIG = {}
+  let BASE_WORLD_GEN_CONFIG = {}
+  let WORLD_TRAITS = []
+  let activeWorldTrait = null // resolved effects, stored with saves and replay snapshots
+
+  function applyWorldTrait(trait) {
+    WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
+    if (!trait) { activeWorldTrait = null; return }
+    if (!Array.isArray(trait.effects)) throw new Error('Invalid world trait effects.')
+    for (const effect of trait.effects) {
+      const path = effect.param?.split('.')
+      if (effect.type !== 'additive' || !Array.isArray(path) || path.some(key => !key || key === '__proto__' || key === 'constructor' || key === 'prototype') || !Number.isFinite(effect.value))
+        throw new Error('Invalid world trait effect.')
+      let target = WORLD_GEN_CONFIG
+      for (const key of path.slice(0, -1)) {
+        if (!Object.hasOwn(target, key) || !target[key] || typeof target[key] !== 'object') throw new Error('Unknown world trait parameter: ' + effect.param)
+        target = target[key]
+      }
+      const key = path.at(-1)
+      if (!Object.hasOwn(target, key) || !Number.isFinite(target[key])) throw new Error('Unknown world trait parameter: ' + effect.param)
+      target[key] += effect.value
+      // A snow band must remain on the map, and must not consume the entire map.
+      if (effect.param === 'surface.snow.bandFraction') target[key] = Math.max(0.08, Math.min(0.55, target[key]))
+    }
+    activeWorldTrait = structuredClone(trait)
+  }
+
+  function chooseWorldTrait() {
+    if (!WORLD_TRAITS.length) throw new Error('No world traits are configured.')
+    const trait = WORLD_TRAITS[Math.floor(rng() * WORLD_TRAITS.length)]
+    const rolled = {
+      name: trait.name, flavor_text: trait.flavor_text,
+      effects: trait.effects.map(effect => ({
+        param: effect.param, type: effect.type,
+        value: Array.isArray(effect.value)
+          ? effect.value[0] + rng() * (effect.value[1] - effect.value[0])
+          : effect.value
+      }))
+    }
+    applyWorldTrait(rolled)
+  }
   let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
   let EDGE_MARGIN, EDGE_XP, MIN_LICHES, SURFACE_TILES_PER_ENEMY, SURFACE_TILES_PER_CHEST
@@ -678,6 +720,7 @@
       lootTables: 'loot_tables.json',
       mapConfig: 'map_config.json',
       worldGeneration: 'world_generation.json',
+      worldTraits: 'world_traits.json',
       merchantStockConfig: 'merchant_stock.json',
       rendering: 'rendering.json',
       playerVisuals: 'player_visuals.json'
@@ -760,7 +803,9 @@
     MIN_LICHES = content.mapConfig.spawning.minLiches
     SURFACE_TILES_PER_ENEMY = content.mapConfig.spawning.surfaceTilesPerEnemy
     SURFACE_TILES_PER_CHEST = content.mapConfig.spawning.surfaceTilesPerChest
-    WORLD_GEN_CONFIG = content.worldGeneration
+    BASE_WORLD_GEN_CONFIG = content.worldGeneration
+    WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
+    WORLD_TRAITS = content.worldTraits
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
     RENDER_STYLE = content.rendering
     PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}
@@ -8346,6 +8391,7 @@
     buildRaceGrid()
     document.getElementById('raceOverlay').classList.add('show')
     document.getElementById('permadeathToggle').checked = false
+    document.getElementById('cursedWorldToggle').checked = false
     document.getElementById('replayToggle').checked = false
     const nameInput = document.getElementById('raceName')
     nameInput.value = ''
@@ -8375,6 +8421,8 @@
       player.race = selectedRaceId
       player.permadeath = document.getElementById('permadeathToggle').checked
       player.characterId = Graveyard.newCharacterId()
+      if (document.getElementById('cursedWorldToggle').checked) chooseWorldTrait()
+      else applyWorldTrait(null)
       await generateNewWorld()
       worldGenerating = false
       player.hp = playerMaxHp()
@@ -8388,6 +8436,7 @@
       const race = raceDef()
       log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good')
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info')
+      if (activeWorldTrait) log('\n' + activeWorldTrait.flavor_text, 'info')
       updateHud()
       render()
       ensureAmbientTileAnimationLoop()
