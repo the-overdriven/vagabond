@@ -17,7 +17,6 @@
 - mysteriando: digging grave can do sth
 - fov: add light sources (like torches to increase pov, or light scrolls)
 - items: scroll of chaos (teleports everyone in 8 radius to random tiles)
-- balance: Troll rebalancing: Regenerates HP (improves at higher lvl). lvl 5: every 4 turns. lvl 10: every 3 turns.
 
 - fix: when dying, skeleton remains should appear *after* we are teleported to temple
 - !1 feat: add prefix "Light" to weapons (grace +1)
@@ -3672,7 +3671,12 @@
     const race = raceDef()
     if (!race || !race.regenEvery) return
     if (player.hp <= 0 || player.hp >= playerMaxHp()) return
-    if (turnCount % race.regenEvery !== 0) return
+    let regenEvery = race.regenEvery
+    if (race.regenLevelStep) {
+      regenEvery = Math.max(race.regenMinEvery ?? 1,
+        regenEvery - Math.floor(player.lvl / race.regenLevelStep))
+    }
+    if (turnCount % regenEvery !== 0) return
     healPlayer(1)
   }
 

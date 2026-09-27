@@ -75,7 +75,9 @@
     "id": "troll",
     "name": "Troll",
     "avatar": "troll.jpg",
-    "bonus": "Regenerates 1 HP every 5 turns",
-    "regenEvery": 5
+    "bonus": "Regenerates HP, improves at lvl 5/10",
+    "regenEvery": 5,
+    "regenLevelStep": 5,
+    "regenMinEvery": 3
   }
 ]

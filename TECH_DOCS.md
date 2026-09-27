@@ -138,7 +138,11 @@ Open water is therefore walkable for the player.
 
 Regenerates:
 
-**1 HP every 5 turns**
+**1 HP every 5 turns at levels 1–4, every 4 turns at levels 5–9, and every
+3 turns from level 10 onward.** The rate stays at 3 turns at higher levels.
+The interval uses the global turn count, and regeneration stops at full HP.
+The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
+`regenMinEvery: 3` in `content/races.json`.
 
 ---
 
@@ -355,7 +359,7 @@ An attempted move into a non-walkable tile does not consume a turn. Waiting is
 limited to 10 consecutive turns; after that, another wait is refused. Moving,
 attacking, or interacting resets the consecutive-wait counter. This prevents
 indefinitely waiting to repeatedly trigger regeneration (notably the Troll's
-1 HP every 5 turns).
+level-dependent healing).
 
 During enemy turns, relevant temporary systems tick, including:
 
