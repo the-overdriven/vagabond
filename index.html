@@ -2076,7 +2076,7 @@
 
   function hunterLivingEnemies() {
     hunterEnsureIds()
-    return enemies.filter(e => e.alive && e.baseName && Number(e.tier || 0) >= 3)
+    return enemies.filter(e => e.alive && e.baseName && Number(e.tier || 0) >= 3 && Number(e.tier) < 5)
   }
 
   function hunterPrefixedEnemies() {
@@ -2088,24 +2088,25 @@
   }
 
   function hunterInvestigationCandidate() {
-    // Investigation quests point to recognizable landmarks, never arbitrary
-    // walkable tiles. Cave entrances and the dwarven gate are the primary
-    // targets because the player can identify them immediately on the map.
-    const landmarkTiles = new Set(['caveentrance', 'dwarvengate'])
-    const candidates = []
+    // Always send the player to the cave entrance closest to the village.
+    const origin = villageCenter || spawnPoint
+    let target = null
+    let nearestDistance = Infinity
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
-      const tile = map[y]?.[x]
-      if (landmarkTiles.has(tile) && Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) >= 8)
-        candidates.push({x, y, tile})
+      if (map[y]?.[x] !== 'caveentrance') continue
+      const distance = (x - origin.x) ** 2 + (y - origin.y) ** 2
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        target = {x, y}
+      }
     }
-    if (!candidates.length) return null
-    const target = candidates[randInt(0, candidates.length - 1)]
+    if (!target) return null
     return {
       type: 'investigate_area',
       targetX: target.x,
       targetY: target.y,
-      targetTile: target.tile,
-      targetLabel: target.tile === 'dwarvengate' ? 'the dwarven fort entrance' : 'a cave entrance',
+      targetTile: 'caveentrance',
+      targetLabel: 'a cave entrance',
       radius: 2,
       rewardXp: 100
     }
@@ -2185,8 +2186,8 @@
       render()
       return oldHunterQuest
     }
-    // Give a 50% chance to receive a killing quest, but only from
-    // prefixed tier 3+ monsters. Item quests remain eligible otherwise.
+    // Give a 50% chance to receive a killing quest from prefixed tier 3-4
+    // monsters. Item quests remain eligible otherwise.
     const killOptions = options.filter(q => q.type === 'kill_specific' || q.type === 'kill_group')
     const itemOptions = options.filter(q => q.type === 'recover_item' || q.type === 'deliver_item')
     let pool = options
@@ -5525,7 +5526,9 @@
   }
 
   function terrainVisual(tileKey, x, y) {
-    if (tileKey === 'coffin') return RENDER_STYLE.specialTiles?.coffin
+    if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
+      ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
+      : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
 
@@ -7406,7 +7409,7 @@
       ...(!IS_COARSE_POINTER ? [[
         '🧭 World Edges',
         `${Object.values(worldEdgesReached).filter(Boolean).length}/4` +
-        ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge).join(', ') || 'none'})`
+        ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge[0].toUpperCase()).join(', ') || 'none'})`
       ]] : []),
       ['☠️ Creatures Slain', player.kills],
       ['📍 Position', player.x + ', ' + player.y],
@@ -7576,7 +7579,7 @@
       } else if (it.kind === 'oddTombstone') {
         const btn = document.createElement('button')
         btn.textContent = '?'
-        btn.onclick = () => log('Odd tombstone found in the ruined cemetery.', 'info')
+        btn.onclick = () => log(it.inscription || `The tombstone bears the name ${it.tombName}. Born ${it.tombBirth}, died ${it.tombDeath}.`, 'info')
         row.appendChild(btn)
       } else if (it.kind === 'shovel') {
         const btn = document.createElement('button')
