@@ -1340,6 +1340,7 @@
       def: base.def,
       tier: base.tier,
       speedPenalty: base.speedPenalty || 0,
+      ...(base.gracePenalty ? {gracePenalty: base.gracePenalty} : {}),
       name: base.name
     }
     return rollModifier(base.name, item, mf)
@@ -1709,6 +1710,8 @@
       const graceBonus = it.mod === 'grace' ? it.modAmt : 0
       parts.push('GRACE ' + baseGrace + (graceBonus ? (graceBonus > 0 ? '+' : '') + graceBonus : ''))
     }
+    if (it.kind === 'shield' && it.base !== 'Buckler') parts.push('GRACE -1')
+    if (it.kind === 'armor' && armorGracePenalty(it)) parts.push('GRACE -' + armorGracePenalty(it))
     if (it.kind !== 'weapon' && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
 
     if (it.mod === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
@@ -1845,9 +1848,26 @@
     return raceGrace() + levelGrace()
   }
 
+  function armorGracePenalty(armor) {
+    if (!armor) return 0
+    // Existing saves predate the item field; recover it from the base armor.
+    return armor.gracePenalty ?? ARMORS.find(base => base.name === armor.base)?.gracePenalty ?? 0
+  }
+
+  function gearGracePenalty(item) {
+    if (!item) return 0
+    if (item.kind === 'shield') return item.base === 'Buckler' ? 0 : 1
+    return item.kind === 'armor' ? armorGracePenalty(item) : 0
+  }
+
+  function playerGracePenalty() {
+    return gearGracePenalty(player.equip.shield) + gearGracePenalty(player.equip.armor)
+  }
+
   function playerGrace() {
     const weapon = player.equip.weapon
-    return weaponGrace(weapon) + playerGraceBonus()
+    const grace = weaponGrace(weapon) + playerGraceBonus() - playerGracePenalty()
+    return Math.max(0, grace)
   }
 
   // Racial and level GRACE share the same weapon-affinity channel in combat:
@@ -2692,10 +2712,12 @@
     let grace
     if (weapon && weapon.kind === 'weapon') {
       grace = weaponGrace(weapon)
+      if (isPlayer) grace = Math.max(1, grace - playerGracePenalty())
     } else if (!isPlayer) {
       grace = enemyGrace(enemy)
     }
     if (!Number.isFinite(grace) || grace <= 0) return null
+    if (!isPlayer) grace = Math.max(1, grace - gearGracePenalty(enemy?.equipment))
     const baseDelay = 6 / grace
     if (!isPlayer) return baseDelay
     // Player GRACE bonuses (race + one point every five levels) act as weapon

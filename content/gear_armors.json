@@ -8,15 +8,15 @@
   {"name":"Leather Armor",   "def":6,  "tier":2},
   {"name":"Studded Leather", "def":7,  "tier":2},
   {"name":"Quilted Armor",   "def":8,  "tier":2, "speedPenalty":1},
-  {"name":"Hauberk",         "def":9,  "tier":3, "speedPenalty":2},
-  {"name":"Brass Armor",     "def":10, "tier":2, "speedPenalty":3},
+  {"name":"Hauberk",         "def":9,  "tier":3, "speedPenalty":2, "gracePenalty":1},
+  {"name":"Brass Armor",     "def":10, "tier":2, "speedPenalty":3, "gracePenalty":1},
   {"name":"Splint Mail",     "def":11, "tier":3, "speedPenalty":1},
   {"name":"Brigandine",      "def":12, "tier":3, "speedPenalty":1},
   {"name":"Scale Armor",     "def":13, "tier":4, "speedPenalty":1},
-  {"name":"Half Plate",      "def":13, "tier":4, "speedPenalty":2},
-  {"name":"Bone Armor",      "def":14, "tier":4, "speedPenalty":2},
-  {"name":"Plate Armor",     "def":15, "tier":4, "speedPenalty":3},
+  {"name":"Half Plate",      "def":13, "tier":4, "speedPenalty":2, "gracePenalty":1},
+  {"name":"Bone Armor",      "def":14, "tier":4, "speedPenalty":2, "gracePenalty":1},
+  {"name":"Plate Armor",     "def":15, "tier":4, "speedPenalty":3, "gracePenalty":1},
   {"name":"Chitin Armor",    "def":16, "tier":5, "speedPenalty":1},
-  {"name":"Ancient Armor",   "def":18, "tier":5, "speedPenalty":3},
-  {"name":"Royal Armor",     "def":17, "tier":5, "speedPenalty":3}
+  {"name":"Ancient Armor",   "def":18, "tier":5, "speedPenalty":3, "gracePenalty":1},
+  {"name":"Royal Armor",     "def":17, "tier":5, "speedPenalty":3, "gracePenalty":1}
 ]

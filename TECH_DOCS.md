@@ -1205,7 +1205,12 @@ Current examples include:
 
 ## Humanoid
 
-Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death. All enemies have natural GRACE and can take part in grace checks while unarmed; an equipped enemy weapon overrides natural GRACE. This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice. The player must still wield a weapon to take part in grace checks.
+Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death. 
+All enemies have natural GRACE and can take part in grace checks while unarmed; 
+an equipped enemy weapon overrides natural GRACE. A non-Buckler shield or an armor with `gracePenalty: 1` 
+lowers an equipped enemy's natural GRACE by 1 for combat timing (minimum 1). 
+This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice. 
+The player must still wield a weapon to take part in grace checks.
 
 ## Deadly
 
@@ -1712,7 +1717,10 @@ Player bonus GRACE acts as an affinity for graceful weapons rather than being ad
 ```text
 level GRACE = floor(level / 5)
 player bonus GRACE = racial GRACE + level GRACE
-weapon affinity = min(1, weapon GRACE / 5)²
+gear GRACE penalty = 1 for a non-Buckler shield + armor.gracePenalty (if any)
+effective player weapon GRACE = max(1, weapon GRACE - gear GRACE penalty)
+base player delay = 6 / effective player weapon GRACE
+weapon affinity = min(1, effective player weapon GRACE / 5)²
 GRACE reduction = player bonus GRACE × 0.25 × weapon affinity
 player delay = max(0.25, base delay - GRACE reduction)
 ```
@@ -1720,7 +1728,14 @@ player delay = max(0.25, base delay - GRACE reduction)
 This makes both racial and level GRACE provide almost no benefit with slow
 weapons and progressively more benefit with graceful weapons. A GRACE 5 or
 higher weapon receives the full reduction. The player's displayed GRACE is
-weapon GRACE + racial GRACE + level GRACE.
+weapon GRACE + racial GRACE + level GRACE - gear GRACE penalty, with a minimum
+of 0. Combat timing separately floors effective weapon GRACE at 1, so heavy
+gear cannot disable the enemy's extra-attack checks by reducing the player's
+displayed GRACE to zero. Bucklers and armors without `gracePenalty` leave GRACE
+unchanged. Humanoid enemies with a non-Buckler shield or selected armor also
+lose 1 from natural GRACE in combat timing (floored at 1); enemy weapons still
+override natural GRACE and have no gear penalty because an enemy carries one
+equipment item.
 
 For an Elf with **+2 racial GRACE**:
 
@@ -1960,36 +1975,45 @@ Buckler: -1
 Other shields: -2
 ```
 
+Every shield except the Buckler also applies **−1 GRACE** while equipped.
+The inventory stat line shows this penalty. It stacks with an armor GRACE
+penalty and reduces the player's extra-attack timing through effective weapon
+GRACE; it does not change the shield's DEF or SPD penalty.
+
 ---
 
 # 35. Armor
 
 Current armor:
 
-| Armor | Tier | DEF | Additional SPD penalty |
-|---|---:|---:|---:|
-| Robe | 1 | 1 | 0 |
-| Jacket | 1 | 1 | 0 |
-| Cape | 1 | 2 | 0 |
-| Cloak | 1 | 3 | 0 |
-| Tunic | 1 | 4 | 0 |
-| Doublet | 2 | 5 | 0 |
-| Leather Armor | 2 | 6 | 0 |
-| Studded Leather | 2 | 7 | 0 |
-| Quilted Armor | 2 | 8 | 1 |
-| Hauberk | 3 | 9 | 2 |
-| Brass Armor | 2 | 10 | 3 |
-| Splint Mail | 3 | 11 | 1 |
-| Brigandine | 3 | 12 | 1 |
-| Scale Armor | 4 | 13 | 1 |
-| Half Plate | 4 | 13 | 2 |
-| Bone Armor | 4 | 14 | 2 |
-| Plate Armor | 4 | 15 | 3 |
-| Chitin Armor | 5 | 16 | 1 |
-| Royal Armor | 5 | 17 | 3 |
-| Ancient Armor | 5 | 18 | 3 |
+| Armor | Tier | DEF | Additional SPD penalty | GRACE penalty |
+|---|---:|---:|---:|---:|
+| Robe | 1 | 1 | 0 | 0 |
+| Jacket | 1 | 1 | 0 | 0 |
+| Cape | 1 | 2 | 0 | 0 |
+| Cloak | 1 | 3 | 0 | 0 |
+| Tunic | 1 | 4 | 0 | 0 |
+| Doublet | 2 | 5 | 0 | 0 |
+| Leather Armor | 2 | 6 | 0 | 0 |
+| Studded Leather | 2 | 7 | 0 | 0 |
+| Quilted Armor | 2 | 8 | 1 | 0 |
+| Hauberk | 3 | 9 | 2 | 1 |
+| Brass Armor | 2 | 10 | 3 | 1 |
+| Splint Mail | 3 | 11 | 1 | 0 |
+| Brigandine | 3 | 12 | 1 | 0 |
+| Scale Armor | 4 | 13 | 1 | 0 |
+| Half Plate | 4 | 13 | 2 | 1 |
+| Bone Armor | 4 | 14 | 2 | 1 |
+| Plate Armor | 4 | 15 | 3 | 1 |
+| Chitin Armor | 5 | 16 | 1 | 0 |
+| Royal Armor | 5 | 17 | 3 | 1 |
+| Ancient Armor | 5 | 18 | 3 | 1 |
 
 Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
+Only the seven armor bases with additional SPD penalty 2 or greater have
+`gracePenalty: 1`; new items copy that field from `gear_armors.json`, while
+equipped armor from older saves recovers it by base name. Armor with no such
+field has no GRACE penalty. The armor stat line shows `GRACE -1` where applicable.
 
 ---
 
