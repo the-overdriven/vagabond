@@ -2555,8 +2555,10 @@ preferring maximum distance from the player; if no tile is available, it stays
 put and reports being cornered. The remaining probability is a wild lash-out:
 if still adjacent, the enemy makes one ordinary attack with one tenth of its
 normal hit chance (including normal damage, armor, and critical-hit rules).
-No reaction grants lasting awareness or subsequent pursuit. God mode remains
-nonreactive. Invisibility is therefore not guaranteed protection when attacking.
+No reaction grants lasting awareness or subsequent pursuit. God mode
+invisibility uses the same hit reaction; with its invisibility toggled off,
+ordinary visible combat applies. Invisibility is therefore not guaranteed
+protection when attacking.
 
 The merchant stocks three Scrolls of Invisibility at 200g each, configured
 under `scrolls.invisibilityScroll` in `content/merchant_stock.json`. The

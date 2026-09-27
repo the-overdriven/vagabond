@@ -4688,7 +4688,7 @@
     if (target) {
       clearAutoPath()
       consecutiveWaitTurns = 0
-      const invisibleAttack = !player.godMode && playerIsInvisible()
+      const invisibleAttack = playerIsInvisible()
       const targetHp = target.hp
       const hit = await playerAttackEnemy(target)
       if (invisibleAttack && target.alive && hit) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
