@@ -1388,7 +1388,7 @@ reduces effective enemy detection range by 1.
 
 When the player lands a hit on a monster, the struck monster becomes Alarmed
 silently, along with each *other* living, nonpassive monster on the same map
-within 10 tiles of the struck monster.
+within 5 tiles of the struck monster.
 This uses Chebyshev distance (diagonal squares count as one), measured from
 the monster that was hit, not from the player. A miss or evade does not trigger
 the status. Sound needs no line of sight; a glancing hit, including zero damage,
@@ -1396,7 +1396,7 @@ still counts as a hit. Monsters also become Alarmed silently the first time
 they spot the player, including when they wander into detection range or first
 attack from an adjacent tile. Passive AGGRO 0 enemies remain unaffected.
 
-Alarmed temporarily adds 1 to the monster's effective AGGRO range without
+Alarmed temporarily adds 2 to the monster's effective AGGRO range without
 changing its saved base AGGRO. Existing visibility, invisibility, Temple,
 pathfinding, and chase rules still apply. A bystander newly Alarmed by the
 sound of a hit logs `<name> is alarmed by the sounds of the battle.` only when
@@ -1405,13 +1405,13 @@ first spots the player do not log a separate Alarmed message. Monsters obscured
 by underground field of view or outside the viewport still become Alarmed silently; revealing
 them later does not produce a delayed message. More hits do not stack the bonus
 or repeat the line during the same activation. The tooltip shows a red
-`Alarmed (AGGRO +1)` label and the glyph has a white `!` in its top right corner. If a
+`Alarmed (AGGRO +2)` label and the glyph has a white `!` in its top right corner. If a
 monster also has a victory skull, the `!` shifts left so both remain visible.
 
 Alarmed ends when the player changes z level or map identity, or when the
 monster is more than 20 tiles from the player (Chebyshev distance). It can
 activate again after ending. The hit radius and clear distance are configured
-as `combat.alarmTriggerRange` (10) and `combat.alarmClearRange` (20) in
+as `combat.alarmTriggerRange` (5) and `combat.alarmClearRange` (20) in
 `content/enemy_config.json`. Save version 16 stores each enemy's temporary
 Alarmed state and its originating level; older saves load without the status.
 Both alarm ranges have explicit runtime bindings initialized by `loadContent()`

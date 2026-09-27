@@ -808,7 +808,7 @@
     ENEMY_PREFIXES = content.enemyPrefixes
     ATTACK_RANGE = content.enemyConfig.combat.attackRange
     AGGRO_RANGE = content.enemyConfig.combat.defaultAggroRange
-    ALARM_TRIGGER_RANGE = content.enemyConfig.combat.alarmTriggerRange ?? 10
+    ALARM_TRIGGER_RANGE = content.enemyConfig.combat.alarmTriggerRange ?? 5
     ALARM_CLEAR_RANGE = content.enemyConfig.combat.alarmClearRange ?? 20
     OUTER_AGGRO_GIVE_UP_CHANCE = content.enemyConfig.combat.outerAggroGiveUpChance ?? 0.3
     BASE_CRIT_CHANCE = content.enemyConfig.combat.baseCriticalHitChance ?? 0.05
@@ -3160,7 +3160,7 @@
   }
 
   function effectiveAggroRange(e) {
-    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 1 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
+    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
   }
 
   // Underground acquisition requires a clear ray through the map. Walls are
@@ -6448,7 +6448,7 @@
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
-      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +1)</div>' : ''}${equipmentHtml}
+      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
