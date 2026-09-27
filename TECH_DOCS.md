@@ -4185,9 +4185,14 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 
 The **Cursed world** checkbox in character creation is off by default. Its
 brown desktop tooltip warns that this experimental mode can be unbalanced. On
-mobile-sized or touch screens, the same warning appears as inline text below
-the three character-creation checkboxes. With the checkbox off, generation
+mobile-sized or touch screens, the three checkboxes form separate full-width
+rows, and the warning appears below them only while Cursed world is checked.
+The desktop tooltip is anchored to
+the Cursed world label; each checkbox sits beside its text with a small fixed
+gap. With the checkbox off, generation
 uses the base configuration and logs no trait line.
+The mobile checkbox layout and the warning's checked/unchecked visibility
+are covered by `tests/e2e/race-options.cy.js`.
 After a valid name/race is confirmed, a cursed world draws the requested
 number of traits before world generation. All generation retries use the
 same resolved effects. Each nonempty `flavor_text` is logged on a new line

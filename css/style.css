@@ -1094,23 +1094,27 @@ body.hint-collapsed #hint .panel-toggle {
 
 .race-options {
   display: flex;
-  position: relative;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
 }
 
 .permadeath-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: rgb(232, 162, 79);
   cursor: pointer;
   user-select: none;
 }
 
 .permadeath-option input {
+  margin: 0;
   cursor: pointer;
 }
 
 /* Desktop hint stays inside the race dialog; mobile shows it in the form. */
+.cursed-world-option { position: relative; }
 .cursed-world-tip {
   display: none;
   position: absolute;
@@ -1128,8 +1132,10 @@ body.hint-collapsed #hint .panel-toggle {
   pointer-events: none;
   white-space: normal;
 }
-.cursed-world-option:hover ~ .cursed-world-tip,
-.cursed-world-option:focus-within ~ .cursed-world-tip { display: block; }
+.cursed-world-option:hover .cursed-world-tip,
+.cursed-world-option:focus-within .cursed-world-tip { display: block; }
+
+.cursed-world-mobile-note { display: none; }
 
 #raceError {
   color: var(--blood);
@@ -1146,18 +1152,22 @@ body.hint-collapsed #hint .panel-toggle {
     grid-template-columns:repeat(2, 1fr);
   }
 
-  .race-options { width: 100%; }
-  .cursed-world-tip,
-  .cursed-world-option:hover ~ .cursed-world-tip,
-  .cursed-world-option:focus-within ~ .cursed-world-tip {
-    display: block;
-    position: static;
+  .race-options {
     width: 100%;
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--parchment-dim);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
+  .race-options > .permadeath-option { width: 100%; }
+  .cursed-world-option:hover .cursed-world-tip,
+  .cursed-world-option:focus-within .cursed-world-tip { display: none; }
+  .cursed-world-mobile-note {
+    width: 100%;
+    color: var(--parchment-dim);
+    font-size: calc(12px * var(--ui-font-scale));
+    line-height: 1.4;
+  }
+  .cursed-world-option:has(#cursedWorldToggle:checked) ~ .cursed-world-mobile-note { display: block; }
 }
 
 /* ============================== MOBILE / TOUCH CONTROLS ==============================
