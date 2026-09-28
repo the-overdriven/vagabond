@@ -1,5 +1,5 @@
 // Starts a fresh game with the given character name and waits for the race
-// overlay to close. Callers add their own assertions after this.
+// overlay to close after world generation. Callers add their own assertions.
 function beginNewGame(name = 'E2E Tester') {
   cy.visit('/')
 
@@ -11,6 +11,14 @@ function beginNewGame(name = 'E2E Tester') {
     .type(name)
 
   cy.get('#btnBegin').click()
+
+  // Begin now generates the world asynchronously. Give only this expensive
+  // startup phase extra time, and retain the failure message in diagnostics.
+  cy.get('#loadingOverlay', { timeout: 60000 }).should(($overlay) => {
+    expect($overlay.text(), 'world generation status').not.to.include('failed')
+    expect($overlay, 'world generation finished').not.to.be.visible
+  })
+  cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
 
   cy.get('#raceOverlay')
     .should('not.have.class', 'show')
