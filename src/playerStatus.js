@@ -7,7 +7,7 @@ function activePlayerStatuses() {
   const turns = n => `${n} turn${n === 1 ? '' : 's'}`
   if (player.freezing?.active) {
     const left = WORLD_GEN_CONFIG.environment.freezingDamageIntervalTurns - player.freezing.turns
-    statuses.push({id: 'freezing', icon: '❄', label: 'Freezing', counter: `hit in ${left}t`,
+    statuses.push({id: 'freezing', icon: '❄', label: 'Freezing', counter: `${left}t`,
       detail: `Freezing: −${WORLD_GEN_CONFIG.environment.freezingDamage} HP in ${turns(left)}. Ends when you leave cold terrain.`})
   }
   // Combine penalties only when both their stat and expiry match. Different

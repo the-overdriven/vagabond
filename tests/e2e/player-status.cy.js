@@ -19,7 +19,7 @@ describe('Active player statuses', () => {
       player.curseDebuffs = [{stat:'atk',amt:-1,turnsLeft:3}, {stat:'atk',amt:-2,turnsLeft:3}, {stat:'atk',amt:-1,turnsLeft:5}]
       updateHud()
     `))
-    cy.get('[data-status="freezing"]').should('contain.text', 'hit in 3t')
+    cy.get('[data-status="freezing"]').should('contain.text', '3t').and('not.contain.text', 'hit')
     cy.get('[data-status="regen"]').should('contain.text', '67t')
     cy.get('[data-status="invisible"]').should('contain.text', '12t')
     cy.get('[data-status="speed"]').should('contain.text', '8t')
@@ -45,7 +45,7 @@ describe('Active player statuses', () => {
       tickFreezing()
       updateHud()
     `))
-    cy.get('[data-status="freezing"]').should('contain.text', 'hit in 5t')
+    cy.get('[data-status="freezing"]').should('contain.text', '5t').and('not.contain.text', 'hit')
     cy.window().then(win => win.eval(`
       map[player.y][player.x] = 'grass'
       tickFreezing()

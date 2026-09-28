@@ -5,7 +5,9 @@ function beginDeterministicReplayGame(name = 'Replay E2E Tester') {
   cy.get('#raceName').clear().type(name)
   cy.get('#replayToggle').check()
   cy.get('#btnBegin').click()
+  cy.get('#loadingOverlay').should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
+  cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
 
   // World generation runs after Begin. Set up the deterministic Temple area
   // only once generation finishes, then replace the just-started recording's
@@ -76,19 +78,27 @@ function beginDeterministicReplayGame(name = 'Replay E2E Tester') {
 }
 
 function walkPattern(pattern) {
-  cy.window().then(win => {
-    const serialized = JSON.stringify(pattern)
-    return win.eval(`(async () => {
-      const steps = ${serialized}
-      for (const [dx, dy] of steps) {
-        await tryMove(dx, dy)
-        // tryMove queues input during animations rather than awaiting the turn.
-        // Wait for both presentation and the deferred pending-move task.
-        while (cameraAnimating || attackAnim || pendingMoveTask !== null)
-          await new Promise(resolve => setTimeout(resolve, 10))
-      }
-    })()`)
-  })
+  const assertIdle = win => {
+    expect(win.eval('!!(cameraAnimating || attackAnim || pendingMoveTask !== null || pendingMove)'),
+      'movement and deferred input settled').to.equal(false)
+  }
+  for (const [dx, dy] of pattern) {
+    let before
+    cy.window().should(assertIdle)
+    cy.window().then(win => {
+      before = win.eval('({x: player.x, y: player.y, turn: turnCount, actions: replayData.actions.length})')
+      return win.eval(`tryMove(${dx}, ${dy})`)
+    })
+    // An idle animation alone does not prove an input consumed a turn.
+    // Retry observations, never the movement itself, and verify each move.
+    cy.window().should(win => {
+      assertIdle(win)
+      expect(win.eval('turnCount'), 'one turn per move').to.equal(before.turn + 1)
+      expect(win.eval('player.x'), 'destination x').to.equal(before.x + dx)
+      expect(win.eval('player.y'), 'destination y').to.equal(before.y + dy)
+      expect(win.eval('replayData.actions.length'), 'one recorded action per move').to.equal(before.actions + 1)
+    })
+  }
 }
 
 function talkToOldHunter() {
@@ -206,6 +216,11 @@ describe('Status counters through save and replay', () => {
       updateHud()
     `))
     walkPattern([[1,0], [-1,0]])
+    cy.window().then(win => {
+      expect(win.eval('turnCount'), 'two completed turns before saving').to.equal(2)
+      expect(win.eval('[player.berryRegenTurns, player.invisibleTurns, player.speedPotionTurns]'))
+        .to.deep.equal([98, 18, 13])
+    })
     let expected
     cy.window().then(win => { expected = win.eval('JSON.stringify(activePlayerStatuses())') })
     saveToDiskAndReload('status-counters')
