@@ -1864,6 +1864,44 @@ existing equipment regardless of tier; replaced equipment is discarded, not
 dropped. Nonhumanoids take nothing. Bodies are saved as world
 ground objects, so this state survives save/load.
 
+## Permedeath corpse loot
+
+**Killer equipment selection and ties.** Monsters have one equipment slot,
+not separate weapon, shield, and armor slots. The killer considers only the
+dead player's equipped weapon: it does not compare matching armor slots or
+randomly choose among the player's three equipment types. Corpse selection
+happens first. If the weapon was reserved for the corpse, the killer takes
+nothing; otherwise, the weapon is compared with whatever the killer currently
+has, including armor or a shield. A winning weapon replaces that item entirely.
+
+A **tie** means equal weighted scores, even if names, tiers, or individual
+bonuses differ. The killer keeps its existing item on a tie. This comparison
+uses only `equipmentSortValues().sum`, not the inventory sort's subsequent
+tier and primary-stat tiebreakers.
+
+The score is **3 times the primary stat, plus weighted secondary bonuses**.
+The primary stat is ATK for weapons and DEF for armor/shields, including a
+modifier to that primary stat. Weapons also count their built-in GRACE.
+A secondary modifier contributes its amount, except HP contributes one third,
+XP contributes `Math.round(xpBonus / 3)`, and GRACE modifiers count only for
+weapons.
+
+These illustrative stat combinations assume the player's weapon was **not**
+reserved for the corpse. Unlisted bonuses, including weapon GRACE, are zero.
+They illustrate the selection score, not a claim that the winner is better in
+every combat situation.
+
+| Enemy's current item           |        Current score | Player's available weapon |     Weapon score | Winner and outcome                                  |
+|--------------------------------|---------------------:|---------------------------|-----------------:|-----------------------------------------------------|
+| Armor: DEF 4                   |         `3 * 4 = 12` | ATK 5                     |     `3 * 5 = 15` | Weapon; armor discarded                             |
+| Armor: DEF 5                   |         `3 * 5 = 15` | ATK 4, GRACE 1            | `3 * 4 + 1 = 13` | Armor retained                                      |
+| Shield: DEF 3                  |          `3 * 3 = 9` | ATK 3                     |      `3 * 3 = 9` | Tie; shield retained, even if weapon tier is higher |
+| Shield: DEF 3, SPD modifier +2 |     `3 * 3 + 2 = 11` | ATK 3, GRACE 3            | `3 * 3 + 3 = 12` | Weapon; shield discarded                            |
+| Armor: DEF 4, HP modifier +9   | `3 * 4 + 9 / 3 = 15` | ATK 5                     |     `3 * 5 = 15` | Tie; armor retained despite different stats         |
+| Shield: DEF 2, DEF modifier +2 |   `3 * (2 + 2) = 12` | ATK 3, SPD modifier +2    | `3 * 3 + 2 = 11` | Shield retained                                     |
+
+## Non-permadeath
+
 When HP reaches zero in normal mode:
 
 - death counter increases
