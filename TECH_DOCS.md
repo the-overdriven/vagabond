@@ -1856,8 +1856,12 @@ itself only says `dead <race>`.
 After looting, the corpse skull is rendered gray.
 The body can be looted once for 10% of the dead character’s carried gold and
 one randomly selected item from the highest-tier equipped weapon, shield, or
-armor. If the killer is an unarmed humanoid and another equipped item remains,
-that humanoid takes one such item and wields it. Bodies are saved as world
+armor. The corpse's selected item is excluded from the killer's loot. If the
+killer is a humanoid and an equipped weapon remains, it takes that weapon when
+unarmed, or replaces its equipment only when the weapon has a strictly higher
+weighted inventory score (`equipmentSortValues().sum`). Equal scores keep the
+existing equipment regardless of tier; replaced equipment is discarded, not
+dropped. Nonhumanoids take nothing. Bodies are saved as world
 ground objects, so this state survives save/load.
 
 When HP reaches zero in normal mode:

@@ -2971,11 +2971,14 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     const gear = ['weapon', 'shield', 'armor'].map(slot => player.equip[slot]).filter(Boolean)
     const bestTier = gear.length ? Math.max(...gear.map(i => i.tier || 0)) : -1
     const best = gear.filter(i => (i.tier || 0) === bestTier)
-    const bodyGear = best.length ? {...pick(best)} : null
+    const bodyGear = best.length ? pick(best) : null
     const remainingWeapons = gear.filter(i => !bodyGear || i !== bodyGear).filter(i => i.kind === 'weapon')
-    if (killer && killer.humanoid && !killer.equipment && remainingWeapons.length) {
-      killer.equipment = {...pick(remainingWeapons)}
-      log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad')
+    if (killer && killer.humanoid && remainingWeapons.length) {
+      const candidate = pick(remainingWeapons)
+      if (!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) {
+        killer.equipment = {...candidate}
+        log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad')
+      }
     }
     groundItems.push({
       x: player.x,
@@ -2985,7 +2988,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       name: player.name,
       race: raceDef().name,
       killer: killer && killer.name ? killer.name : '???',
-      gear: bodyGear,
+      gear: bodyGear ? {...bodyGear} : null,
       gold: Math.floor(player.gold * 0.1),
       looted: false
     })
