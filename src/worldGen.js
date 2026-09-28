@@ -2757,20 +2757,61 @@ function clearGroundItemsUnderMerchant() {
   groundItems = groundItems.filter(g => !((g.level ?? 0) === 0 && g.x === merchant.x && g.y === merchant.y))
 }
 
+function npcCanTraverseSurface(x, y) {
+  if (!isWalkable(x, y)) return false
+  const tile = map[y][x]
+  return tile !== 'river' && tile !== 'water' && tile !== 'forest'
+}
+
+function templeNpcCandidates(maxDistance) {
+  const distances = new Map([[keyXY(spawnPoint.x, spawnPoint.y), 0]])
+  const queue = [{x: spawnPoint.x, y: spawnPoint.y}]
+  const candidates = []
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head]
+    const distance = distances.get(keyXY(cur.x, cur.y))
+    if (distance >= maxDistance) continue
+    for (const [dx, dy] of DIRS8) {
+      const x = cur.x + dx, y = cur.y + dy
+      const key = keyXY(x, y)
+      if (distances.has(key) || !npcCanTraverseSurface(x, y)) continue
+      const nextDistance = distance + 1
+      distances.set(key, nextDistance)
+      queue.push({x, y})
+      if (nextDistance >= WORLD_GEN_CONFIG.npcs.minOriginDistance && nextDistance <= maxDistance)
+        candidates.push({x, y, distance: nextDistance})
+    }
+  }
+  return candidates
+}
+
 function spawnNpcs() {
   const cfg = WORLD_GEN_CONFIG.npcs
   npcs = []
+  const nearTemple = templeNpcCandidates(cfg.templeMaxWalkDistance)
   for (const tmpl of NPC_TEMPLATES) {
-    const origin = (tmpl.village && villageCenter) ? villageCenter : spawnPoint
-    const spread = (tmpl.village && villageCenter) ? cfg.villageSpread : cfg.templeSpread
-    let x, y, tries = 0, dist = 0
-    do {
-      x = randInt(Math.max(cfg.edgeMargin, origin.x - spread), Math.min(MAP_W - cfg.edgeMargin - 1, origin.x + spread))
-      y = randInt(Math.max(cfg.edgeMargin, origin.y - spread), Math.min(MAP_H - cfg.edgeMargin - 1, origin.y + spread))
-      dist = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
-      tries++
-    } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'forest' || map[y][x] === 'village' || dist < cfg.minOriginDistance || occupied.has(keyXY(x, y)) || (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === x && g.y === y))) && tries < cfg.placementTries)
-    if (tries >= cfg.placementTries) continue // extremely unlikely on a cramped map - just skip this one
+    let x, y
+    if (tmpl.name === 'Drunk') {
+      let tries = 0
+      do {
+        x = randInt(Math.max(cfg.edgeMargin, spawnPoint.x - cfg.drunkSpread), Math.min(MAP_W - cfg.edgeMargin - 1, spawnPoint.x + cfg.drunkSpread))
+        y = randInt(Math.max(cfg.edgeMargin, spawnPoint.y - cfg.drunkSpread), Math.min(MAP_H - cfg.edgeMargin - 1, spawnPoint.y + cfg.drunkSpread))
+        tries++
+      } while ((!npcCanTraverseSurface(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'village' || occupied.has(keyXY(x, y))) && tries < cfg.placementTries)
+      if (tries >= cfg.placementTries) continue
+    } else {
+      const available = nearTemple.filter(pos => {
+        const tile = map[pos.y][pos.x]
+        if (tile === 'temple' || tile === 'belltower' || tile === 'village') return false
+        if (occupied.has(keyXY(pos.x, pos.y))) return false
+        if (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === pos.x && g.y === pos.y)) return false
+        return true
+      })
+      if (!available.length) continue
+      const chosen = available[randInt(0, available.length - 1)]
+      x = chosen.x
+      y = chosen.y
+    }
     const npc = {
       name: tmpl.name,
       lines: linesForNpcTemplate(tmpl),

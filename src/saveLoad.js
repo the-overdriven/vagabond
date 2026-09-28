@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 16 // v16 saves temporary monster Alarmed status; v15 adds split home wander modes and per-enemy homeRadius
+const SAVE_VERSION = 17 // v17 saves the Herbalist first-gift state; v16 saves temporary monster Alarmed status
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -196,6 +196,7 @@ function buildSaveObject() {
     tombstonesRemaining: tombstonesRemaining,
     tombstoneOrder: tombstoneOrder,
     merchantStock: merchantStock,
+    herbalistGiftGiven: herbalistGiftGiven,
     foragedTiles: [...foragedTiles],
     dugSandTiles: [...dugSandTiles],
     gravediggerGraveKey: gravediggerGraveKey,
@@ -576,6 +577,7 @@ function loadGameFromObject(data, opts = {}) {
   tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length
   tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length === TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_, i) => i)
   merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : []
+  herbalistGiftGiven = !!data.herbalistGiftGiven
   // Replay's initialState is a snapshot of an already-current-version live
   // game - it never needs backfilling, and doing so here would call rng()
   // outside the recorded action stream (replayPlaying/replayRecording are

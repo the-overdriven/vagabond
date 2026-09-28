@@ -510,8 +510,8 @@
     "looseMushrooms": 0
   },
   "npcs": {
-    "villageSpread": 6,
-    "templeSpread": 8,
+    "templeMaxWalkDistance": 5,
+    "drunkSpread": 8,
     "minOriginDistance": 2,
     "placementTries": 300,
     "edgeMargin": 2

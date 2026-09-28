@@ -8,31 +8,21 @@ Failed to preload img/icons/Hauberk.svg (404)
 monster fight each other (only when player near? they leave bodies?)
 skull spins on mobile only
 when foraging animate "found!"
-NPCs should not spawn in river or wander into water
-NPCs should spawn a bit closer to temple (except drunk)
 monster ability: cry for help (on low hp?)
-two-handed sword should cost way more, 600g?
-UI: "x" in menus is not centered
-merchant: add more scrolls, especially homecoming
 some weapons (only two-handed weapons?) should deal AoE dmg, think of name
 bestiary... how many each creatures slain
-herbalist should give you one healing herb after talking to her for the first time
 dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
 tooltips on desktop should appear on the left side above canvas and also when fighting
 fleeing mechanic: either on very strong hit, or % of life
 something weird happens when wandering monster flee from temple - when I leave the temple, on next turn the wandering monster seem to teleport back to where they were before starting fleeing! - still a thing?
 wandering monsters that dont have snow biome dont go to snow tiles
-are prefixed mobs recorded as killers? in graveyard
 add weapon prefix to increase crit? deadly?
 how come turn count is lower than steps taken on supabase?
 being invisible should increase crit. chance hit
 when your HP drops below 20%: You feel sick. similar for monsters
-ancient lich addresses us by our race
 Men call it holy, yet the beasts sense what men do not.
 add Chaos Scroll of Teleportation - teleports (everyone) to random walkable tile
 fov: add light sources (like torches to increase pov, or light scrolls)
-distinct map tile for dugout sand - was it implemented?
-tooltips when hovering over ATK, DEF, SPD, MF
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
@@ -326,10 +316,10 @@ tooltips when hovering over ATK, DEF, SPD, MF
         <span id="xpbartext"></span>
       </div>
     </div>
-    <div class="stat">⚔️ATK <b id="hAtk"></b></div>
-    <div class="stat">🛡️DEF <b id="hDef"></b></div>
-    <div class="stat">⚡SPD <b id="hSpd"></b></div>
-    <div class="stat">🍀MF <b id="hMf"></b></div>
+    <div class="stat" title="Attack — increases the damage you deal.">⚔️ATK <b id="hAtk"></b></div>
+    <div class="stat" title="Defense — reduces incoming damage.">🛡️DEF <b id="hDef"></b></div>
+    <div class="stat" title="Speed — affects how often you act and combat hit/evasion chances.">⚡SPD <b id="hSpd"></b></div>
+    <div class="stat" title="Magic Find — improves the chance and quality of magical loot.">🍀MF <b id="hMf"></b></div>
     <div class="stat">💰Gold <b id="hGold">0</b></div>
     <div class="stat">💀Deaths <b id="hDeaths">0</b></div>
     <div class="stat stat-actions">
@@ -792,6 +782,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
   let cryptLevel2 = null // {map, discovered, x, y, trapSprung, trapPos}
   let treasureMapSpot = null // {x,y} sand tile the treasure map points to
   let treasureMapUnearthed = false
+  let herbalistGiftGiven = false
   let CRYPT2_EXPLORER_FLAVOR
   let CRYPT2_TRAP_DISCOVER
   let CRYPT2_TRAP_TRIGGER
@@ -2519,7 +2510,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
           if (leash && Math.max(Math.abs(nx - n.homeX), Math.abs(ny - n.homeY)) > ENEMY_WANDER_RADIUS) continue
           if (nx === player.x && ny === player.y) continue
           if (!isWalkable(nx, ny)) continue
-          if (map[ny][nx] === 'forest') continue
+          if (map[ny][nx] === 'forest' || map[ny][nx] === 'river' || map[ny][nx] === 'water') continue
           if (occupied.has(keyXY(nx, ny))) continue
           options.push({x: nx, y: ny})
         }
@@ -4037,6 +4028,14 @@ tooltips when hovering over ATK, DEF, SPD, MF
     else player.inventory.push({kind: 'herb', name: 'Healing Herb', count: 1})
   }
 
+  function grantHerbalistFirstGift(npc) {
+    if (!npc || npc.name !== 'Herbalist' || herbalistGiftGiven) return false
+    herbalistGiftGiven = true
+    addHerb()
+    log('Herbalist says: Take this healing herb. The wilds are less forgiving than they look.', 'good')
+    return true
+  }
+
   function addMushroom() {
     const stack = player.inventory.find(i => i.kind === 'mushroom')
     if (stack) stack.count = (stack.count || 1) + 1
@@ -4838,6 +4837,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
       clearAutoPath()
       consecutiveWaitTurns = 0
       freezeNpcFromWandering(npcTarget)
+      grantHerbalistFirstGift(npcTarget)
       if (npcTarget.name === 'Gravedigger' && player.inventory.some(i => i.kind === 'oddTombstone')) {
         const odd = player.inventory.find(i => i.kind === 'oddTombstone')
         player.inventory.splice(player.inventory.indexOf(odd), 1)
@@ -4851,13 +4851,13 @@ tooltips when hovering over ATK, DEF, SPD, MF
         }
         log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info')
       } else if (npcTarget.name === 'Ancient Lich' && player.equip.blackkey)
-        log('Ancient Lich says: A key such as this is not meant for pockets. It must be close to the heart. No, I don\'t want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.', 'info')
+        log(`Ancient Lich says: ${raceDef().name}... A key such as this is not meant for pockets. It must be close to the heart. No, I don't want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.`, 'info')
       else {
         const drunkGravediggerLine = 'Gravedigger? What gravedigger? I don\'t remember us having one.'
         const dialogue = npcTarget.name === 'Drunk' && bellRung && treasureMapUnearthed && chance(0.5)
           ? drunkGravediggerLine
           : pick(npcTarget.lines)
-        log(`${npcTarget.name} says: ${dialogue}`, 'info')
+        log(`${npcTarget.name} says: ${npcTarget.name === 'Ancient Lich' ? `${raceDef().name}... ${dialogue}` : dialogue}`, 'info')
       }
       enemyTurn()
       npcTurn()
@@ -8210,6 +8210,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
     // Record that interaction or replay will let a non-static Herbalist wander,
     // consuming RNG values that the live run never consumed.
     recordReplayAction({type:'openTrade', npc:npc.name})
+    grantHerbalistFirstGift(npc)
     freezeNpcFromWandering(npc)
     serviceNpc = npc
     toggleTrade(true)

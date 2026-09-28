@@ -235,6 +235,10 @@ is only a few pixels wide. It stops at 20% or above, and on death. The warning
 continues to blink with reduced-motion enabled; its earlier static-red fallback
 prevented the requested blink for those players.
 
+On desktop, the HUD labels **ATK**, **DEF**, **SPD**, and **MF** expose short hover
+tooltips explaining their gameplay role. These are presentation-only and do not
+change stat calculations.
+
 ---
 
 # 5. Leveling
@@ -2594,7 +2598,7 @@ Returns the player to the Temple. Temple healing follows the same level 1
 exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
 and replay action are `homecomingscroll`, and
 its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 100g, with
-five in stock. The stock config key is `scrolls.homecomingScroll`.
+nine in stock at world creation. The stock config key is `scrolls.homecomingScroll`.
 
 ## Potion of Speed
 
@@ -2618,7 +2622,7 @@ after the 25% bonus is rounded, for 19 turns.
 
 ## Scroll of Identification
 
-Identifies an artifact.
+Identifies an artifact. The Merchant starts with six at 100g each.
 
 ## Healing Herb
 
@@ -2743,6 +2747,14 @@ Current named NPCs:
 
 NPCs generally provide dialogue/exploration interactions.
 
+At new-world generation, every named village NPC except the Drunk spawns within
+**5 NPC-walkable steps of the Temple**. Distance is measured with an 8-direction
+breadth-first search, so walls and other blocked terrain count properly rather
+than using straight-line distance. NPC path distance also treats forest and
+river/water tiles as unavailable, matching their wandering restrictions. The
+Drunk keeps the wider random Temple-area placement. NPC wandering never enters
+forest, river, or water tiles.
+
 NPC tile artwork is configured by exact NPC name in
 `content/rendering.json` under `npc.characters`, with `image` and `scale`
 per character. Drunk, Herbalist, Ancient Lich, Merchant and Old Hunter use
@@ -2759,7 +2771,9 @@ remain in the existing NPC draw pass. NPC dialogue portraits are separate
 and unchanged. These visuals consume no RNG and change no NPC behavior,
 quest state, balance, save format or replay state.
 
-The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent.
+The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent. On the first interaction with the Herbalist, she gives exactly one **Healing Herb**; the one-time gift flag is saved, restored, and replayed so repeated conversations never duplicate it.
+
+The Ancient Lich addresses the player by their selected race in its dialogue. This is flavor only and does not branch quests or rewards.
 
 ---
 
@@ -2869,11 +2883,13 @@ The Merchant:
 - must not occupy the same surface coordinate as any `groundItems` entry,
   including hidden `buriedgear` and `buriedartifact` objects
 
+Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
+world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
+
 During new-world NPC placement, Merchant candidate tiles are rejected if a
 surface ground item already occupies that coordinate. As a compatibility guard,
 loading a save removes any surface ground item found directly under the Merchant;
-this repairs older worlds that already contain such an impossible overlap. Other
-NPCs retain their existing placement rules.
+this repairs older worlds that already contain such an impossible overlap. All non-Drunk named NPCs use the Temple walk-distance placement rule described in section 50.
 
 Stackable consumables are grouped by kind. Pickups and purchases add to an
 existing stack regardless of item name; opening the inventory merges duplicate
@@ -4125,7 +4141,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 16).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 17).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -4140,8 +4156,11 @@ state, not presentation state: while it is positive, `npcTurn()` skips that NPC
 without consuming its wandering RNG. Persisting it is required when a recorded
 run is saved/loaded or when the pre-replay live snapshot is restored; otherwise
 continuing the recording after a replay can append actions from a different NPC
-RNG state than a full replay reconstructs. Older saves without the field load it
-as zero.
+RNG state than a full replay reconstructs.
+
+The save also stores `herbalistGiftGiven`. Opening the Herbalist service window is
+a recorded non-turn replay action, so replay applies the first-gift transition at
+the same interaction boundary as the live run.
 
 `initialState` is captured when the run truly begins, immediately after
 character creation, after the world/spawn/enemies already exist. The snapshot is

@@ -311,6 +311,7 @@ async function runReplayAction(action) {
       // Mirror only the gameplay state changed by clicking the NPC. Do not
       // open the visual trade overlay during replay; UI timing must not affect
       // deterministic simulation.
+      grantHerbalistFirstGift(npc)
       freezeNpcFromWandering(npc)
       serviceNpc = npc
       break

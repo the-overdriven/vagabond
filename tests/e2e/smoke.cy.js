@@ -194,4 +194,72 @@ describe('Vagabond smoke test', () => {
     pressToggleMap()
     cy.get('#mapOverlay').should('not.have.class', 'show')
   })
+  it('applies the NPC placement, merchant stock, Herbalist gift, and HUD polish rules', () => {
+    beginNewGame('NPC Polish Tester')
+
+    cy.get('#hAtk').parent().should('have.attr', 'title').and('contain', 'Attack')
+    cy.get('#hDef').parent().should('have.attr', 'title').and('contain', 'Defense')
+    cy.get('#hSpd').parent().should('have.attr', 'title').and('contain', 'Speed')
+    cy.get('#hMf').parent().should('have.attr', 'title').and('contain', 'Magic Find')
+
+    cy.window().then(win => {
+      const state = win.eval(`(() => {
+        const key = (x, y) => x + ',' + y
+        const dirs = [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]]
+        const dist = new Map([[key(spawnPoint.x, spawnPoint.y), 0]])
+        const queue = [{x: spawnPoint.x, y: spawnPoint.y}]
+        for (let head = 0; head < queue.length; head++) {
+          const cur = queue[head]
+          const d = dist.get(key(cur.x, cur.y))
+          if (d >= 5) continue
+          for (const [dx, dy] of dirs) {
+            const x = cur.x + dx, y = cur.y + dy
+            const k = key(x, y)
+            if (dist.has(k) || !isWalkable(x, y)) continue
+            const tile = surfaceMap[y][x]
+            if (tile === 'river' || tile === 'water' || tile === 'forest') continue
+            dist.set(k, d + 1)
+            queue.push({x, y})
+          }
+        }
+        const npcDistances = npcs
+          .filter(n => n.name !== 'Drunk' && n.name !== 'Ancient Lich')
+          .map(n => ({name:n.name, tile:surfaceMap[n.y][n.x], distance:dist.get(key(n.x,n.y)) ?? null}))
+        const stock = Object.fromEntries(merchantStock
+          .filter(i => ['homecomingscroll','idscroll','scroll'].includes(i.kind))
+          .map(i => [i.kind, i.count]))
+        const sword = merchantStock.find(i => i.kind === 'weapon' && i.base === 'Two-handed Sword')
+        return {npcDistances, stock, swordPrice:sword?.merchantPrice}
+      })()`)
+      for (const npc of state.npcDistances) {
+        expect(npc.tile, npc.name + ' terrain').not.to.be.oneOf(['river', 'water'])
+        expect(npc.distance, npc.name + ' walk distance').to.be.at.most(5)
+      }
+      expect(state.stock.homecomingscroll).to.equal(9)
+      expect(state.stock.idscroll).to.equal(6)
+      expect(state.stock.scroll).to.equal(3)
+      expect(state.swordPrice).to.equal(600)
+    })
+
+    cy.window().then(win => {
+      const gift = win.eval(`(() => {
+        const herbalist = npcs.find(n => n.name === 'Herbalist')
+        player.x = herbalist.x - 1
+        player.y = herbalist.y
+        const before = player.inventory.filter(i => i.kind === 'herb').reduce((n, i) => n + (i.count || 1), 0)
+        tryOpenTrade(herbalist)
+        toggleTrade(false)
+        const afterFirst = player.inventory.filter(i => i.kind === 'herb').reduce((n, i) => n + (i.count || 1), 0)
+        tryOpenTrade(herbalist)
+        toggleTrade(false)
+        const afterSecond = player.inventory.filter(i => i.kind === 'herb').reduce((n, i) => n + (i.count || 1), 0)
+        const saved = buildSaveObject()
+        return {before, afterFirst, afterSecond, savedFlag:saved.herbalistGiftGiven}
+      })()`)
+      expect(gift.afterFirst).to.equal(gift.before + 1)
+      expect(gift.afterSecond).to.equal(gift.afterFirst)
+      expect(gift.savedFlag).to.equal(true)
+    })
+  })
+
 })
