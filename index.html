@@ -5338,6 +5338,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
       // Both caches contain canvases already rasterized at the old tile size.
       scaledVisualCache = new WeakMap()
       outlinedVisualCache = new WeakMap()
+      prepareAnimatedVisuals()
       lastMousePx = lastMousePy = null
       hoveredEnemy = null
       tooltip.style.display = 'none'
@@ -5447,12 +5448,16 @@ tooltips when hovering over ATK, DEF, SPD, MF
     }
   }
 
+  // Every tile in a repaint must sample the same animation time, even when
+  // drawing the scene crosses a terrain-frame boundary on a slower device.
+  let visualFrameTime = null
+
   function resolveVisualImage(visual) {
     if (!USE_TILE_IMAGES) return null
     if (!visual) return null
     if (Array.isArray(visual.frames) && visual.frames.length) {
       const frameDuration = visual.frameDuration || 120
-      const frameIndex = Math.floor(performance.now() / frameDuration) % visual.frames.length
+      const frameIndex = Math.floor((visualFrameTime ?? performance.now()) / frameDuration) % visual.frames.length
       const frameImage = preloadedImages.get(visual.frames[frameIndex]) || null
       if (frameImage) return frameImage
     }
@@ -5465,6 +5470,16 @@ tooltips when hovering over ATK, DEF, SPD, MF
   // hundreds of times during every walking frame is expensive on mobile. Build
   // the tile-sized version once per decoded image and reuse it.
   let scaledVisualCache = new WeakMap()
+
+  function prepareAnimatedVisuals() {
+    for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
+      if (!Array.isArray(visual.frames)) continue
+      for (const path of visual.frames) {
+        const image = preloadedImages.get(path)
+        if (image) scaledVisualCanvas(image, visual.scale ?? 1, visual.filter || '')
+      }
+    }
+  }
 
   function scaledVisualCanvas(image, scale, filter = '') {
     let byScale = scaledVisualCache.get(image)
@@ -6129,9 +6144,18 @@ tooltips when hovering over ATK, DEF, SPD, MF
   }
 
   function render(now) {
+    const previousFrameTime = visualFrameTime
+    visualFrameTime = now ?? performance.now()
+    try {
+      renderScene(visualFrameTime)
+    } finally {
+      visualFrameTime = previousFrameTime
+    }
+  }
+
+  function renderScene(now) {
     if (!map.length || worldGenerating) return
     updateAlarmedEnemies()
-    now = now || performance.now()
     const undergroundVisible = currentUndergroundFov()
     let viewPlayerX = player.x
     let viewPlayerY = player.y
@@ -8942,6 +8966,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
       if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
+    prepareAnimatedVisuals()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
     if (window.Cypress) {
