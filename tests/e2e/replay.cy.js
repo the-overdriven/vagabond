@@ -80,7 +80,13 @@ function walkPattern(pattern) {
     const serialized = JSON.stringify(pattern)
     return win.eval(`(async () => {
       const steps = ${serialized}
-      for (const [dx, dy] of steps) await tryMove(dx, dy)
+      for (const [dx, dy] of steps) {
+        await tryMove(dx, dy)
+        // tryMove queues input during animations rather than awaiting the turn.
+        // Wait for both presentation and the deferred pending-move task.
+        while (cameraAnimating || attackAnim || pendingMoveTask !== null)
+          await new Promise(resolve => setTimeout(resolve, 10))
+      }
     })()`)
   })
 }

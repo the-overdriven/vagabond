@@ -1554,6 +1554,14 @@ snapshots so loading does not silently choose a different destination. The villa
 radius is configured by `content/enemy_config.json -> wandering.farVillageAvoidRadius`;
 it defaults to 20 if omitted.
 
+Far-path BFS reuses typed scratch buffers and a numeric occupancy snapshot.
+Traversal results are cached only within one synchronous search/target selection,
+so terrain changes and earlier creatures' moves are reflected in the next search.
+After an unreachable candidate exhausts the search, the same predecessor tree
+answers the remaining unoccupied candidates. Candidate sampling, RNG consumption,
+eight-direction visitation order and shortest-path tie breaks remain unchanged;
+scratch data is never saved.
+
 The fixed 20-tile radius replaced the old "is this enemy on screen" check,
 which depended on the live canvas viewport (window size, sidebar
 collapsed/expanded, desktop vs mobile). That made the number of `chance()` /
@@ -3363,6 +3371,21 @@ map, field of view, side minimap, save state, or replay RNG. Reopening the map
 starts on the current level.
 The active minimap cache also checks the map and discovery-grid identities,
 because generic and Crypt z:-2 maps can have the same depth and cave index.
+
+The hidden desktop side minimap is not repainted on mobile. Its dirty flag and
+player coordinates remain pending until it is visible again; opening the world
+map still renders independently. Idle surface terrain animation uses clipped
+damage regions around animated tiles, redrawing overlapping terrain and all
+upper layers in their normal order without a persistent scene cache. Underground
+views and unsettled cameras retain full rendering. Movement, effects, visibility
+changes and zoom continue through the full renderer with a shared frame timestamp.
+
+At the end of a movement animation, buffered movement/automatic-path processing
+is scheduled as a timer task after the animation frame, rather than running the
+next world simulation inside that frame. The camera input lock remains held until
+that task executes, and stopping the camera cancels the task. Scripted tests must
+wait for this lock to clear: awaiting `tryMove()` alone does not await animation
+or a buffered turn.
 
 Therefore:
 

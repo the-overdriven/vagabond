@@ -3465,7 +3465,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
     return Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ENEMY_WANDER_ACTIVE_RADIUS
   }
 
-  function enemyFarTargetCandidates(e, side) {
+  function enemyFarTargetCandidates(e, side, search = enemyFarSearch()) {
     const candidates = []
     const addRegion = (fraction) => {
       candidates.length = 0
@@ -3482,8 +3482,8 @@ tooltips when hovering over ATK, DEF, SPD, MF
           if (side === 'south' && y < minY) continue
           if (side === 'north' && y > maxY) continue
           if (x === e.x && y === e.y) continue
-          if (!enemyCanTraverse(e, x, y)) continue
-          if (occupied.has(keyXY(x, y))) continue
+          if (!enemyFarCanTraverse(e, x, y, search)) continue
+          if (search.blocked[y * MAP_W + x]) continue
           candidates.push({x, y})
         }
       }
@@ -3517,18 +3517,47 @@ tooltips when hovering over ATK, DEF, SPD, MF
       .map(choice => choice.side)
   }
 
-  function enemyBuildFarPath(e, targetX, targetY, avoidVillage = false) {
+  let enemyFarBuffers = null
+
+  // These scratch buffers never survive a synchronous search/target selection.
+  // Rebuild occupancy each time: earlier enemies in this turn may have moved.
+  function enemyFarSearch() {
     const total = MAP_W * MAP_H
+    if (!enemyFarBuffers || enemyFarBuffers.prev.length !== total) {
+      enemyFarBuffers = {
+        prev: new Int32Array(total), queue: new Int32Array(total),
+        traversable: new Uint8Array(total), blocked: new Uint8Array(total)
+      }
+    }
+    const search = {...enemyFarBuffers, exhausted: false}
+    search.prev.fill(-1)
+    search.traversable.fill(0)
+    search.blocked.fill(0)
+    for (const key of occupied) {
+      const comma = key.indexOf(',')
+      const x = Number(key.slice(0, comma)), y = Number(key.slice(comma + 1))
+      if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H)
+        search.blocked[y * MAP_W + x] = 1
+    }
+    return search
+  }
+
+  function enemyFarCanTraverse(e, x, y, search) {
+    const i = y * MAP_W + x
+    if (!search.traversable[i])
+      search.traversable[i] = enemyCanTraverse(e, x, y) ? 1 : 2
+    return search.traversable[i] === 1
+  }
+
+  function enemyBuildFarPath(e, targetX, targetY, avoidVillage = false, search = enemyFarSearch()) {
     const start = e.y * MAP_W + e.x
     const target = targetY * MAP_W + targetX
-    const prev = new Int32Array(total)
-    prev.fill(-1)
+    const {prev, queue, blocked} = search
     prev[start] = start
-    const queue = new Int32Array(total)
     let head = 0, tail = 0
     queue[tail++] = start
 
-    while (head < tail) {
+    while (!search.exhausted && head < tail) {
       const cur = queue[head++]
       if (cur === target) break
       const cx = cur % MAP_W, cy = Math.floor(cur / MAP_W)
@@ -3537,20 +3566,25 @@ tooltips when hovering over ATK, DEF, SPD, MF
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
         const ni = ny * MAP_W + nx
         if (prev[ni] !== -1) continue
-        if (!enemyCanTraverse(e, nx, ny)) continue
+        if (!enemyFarCanTraverse(e, nx, ny, search)) continue
         if (avoidVillage) {
           const curVillageDist = enemyFarVillageDistance(cx, cy)
           const nextVillageDist = enemyFarVillageDistance(nx, ny)
           if (nextVillageDist <= ENEMY_FAR_VILLAGE_AVOID_RADIUS &&
             (curVillageDist > ENEMY_FAR_VILLAGE_AVOID_RADIUS || nextVillageDist < curVillageDist)) continue
         }
-        if ((nx !== targetX || ny !== targetY) && occupied.has(keyXY(nx, ny))) continue
+        if (ni !== target && blocked[ni]) continue
         if (nx === player.x && ny === player.y) continue
         prev[ni] = cur
         queue[tail++] = ni
       }
     }
-    if (prev[target] === -1) return null
+    if (prev[target] === -1) {
+      // Candidates are unoccupied, so a failed search has visited the exact
+      // same reachable component for every subsequent candidate, in order.
+      search.exhausted = true
+      return null
+    }
 
     const path = []
     let cur = target
@@ -3563,6 +3597,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
   }
 
   function enemyChooseFarTarget(e, avoidVillage = false) {
+    const search = enemyFarSearch()
     let candidateSides
     if (avoidVillage) {
       candidateSides = enemyFarEscapeSides(e)
@@ -3578,11 +3613,11 @@ tooltips when hovering over ATK, DEF, SPD, MF
     }
     while (candidateSides.length) {
       const side = avoidVillage ? candidateSides.shift() : candidateSides.splice(randInt(0, candidateSides.length - 1), 1)[0]
-      const candidates = enemyFarTargetCandidates(e, side)
+      const candidates = enemyFarTargetCandidates(e, side, search)
       for (let attempt = 0; attempt < Math.min(12, candidates.length); attempt++) {
         const idx = randInt(0, candidates.length - 1)
         const target = candidates.splice(idx, 1)[0]
-        const path = enemyBuildFarPath(e, target.x, target.y, avoidVillage)
+        const path = enemyBuildFarPath(e, target.x, target.y, avoidVillage, search)
         if (!path) continue
         e.farTargetX = target.x
         e.farTargetY = target.y
@@ -5990,15 +6025,21 @@ tooltips when hovering over ATK, DEF, SPD, MF
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
   // avoids two independent loops both calling render() on the same frame.
+  let pendingMoveTask = null
+
   function runAnimationLoop() {
     if (animLoopFrame !== null) return
     const step = (now) => {
       render(now)
       if (cameraAnimating && !moveAnim) {
-        cameraAnimating = false
-        animLoopFrame = null
-        flushPendingMove()            // may kick off the next turn (and a new loop)
-        if (animLoopFrame !== null) return
+        // Keep the input lock until the completed frame has had a chance to
+        // paint. Never run the next turn's world simulation inside this rAF.
+        if (pendingMoveTask === null) pendingMoveTask = setTimeout(() => {
+          pendingMoveTask = null
+          if (!cameraAnimating || moveAnim) return
+          cameraAnimating = false
+          flushPendingMove()
+        }, 0)
       }
       if (animationsPending()) {
         animLoopFrame = requestAnimationFrame(step)
@@ -6010,6 +6051,8 @@ tooltips when hovering over ATK, DEF, SPD, MF
   }
 
   function stopCameraAnimation() {
+    if (pendingMoveTask !== null) clearTimeout(pendingMoveTask)
+    pendingMoveTask = null
     moveAnim = null
     cameraAnimating = false
   }
@@ -6135,27 +6178,78 @@ tooltips when hovering over ATK, DEF, SPD, MF
   }
 
   let ambientTileAnimIntervalStarted = false
+  function renderAmbientTerrain(now = performance.now()) {
+    if (!visibleAnimatedTerrainPresent()) return
+    if (animationsPending() || cameraAnimating || attackAnim || deathTransition || worldGenerating) return
+    // Only the settled surface uses damage repainting. Full renders remain the
+    // authority after movement, visibility changes, zoom and all state changes.
+    if (currentZ < 0 || !Number.isInteger(camX) || !Number.isInteger(camY)) {
+      render(now)
+      return
+    }
+    let maxScale = 1
+    const visit = value => {
+      if (!value || typeof value !== 'object') return
+      if (Number.isFinite(value.scale)) maxScale = Math.max(maxScale, value.scale)
+      for (const scale of value.scaleVariants || [])
+        if (Number.isFinite(scale)) maxScale = Math.max(maxScale, scale)
+      for (const child of Object.values(value)) if (typeof child === 'object') visit(child)
+    }
+    visit(RENDER_STYLE.terrainTiles)
+    visit(RENDER_STYLE.specialTiles)
+    const padding = Math.ceil(Math.max(0, maxScale - 1) / 2) + 1
+    const dirty = new Set(), terrain = new Set()
+    const addAround = (set, x, y, radius) => {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const vx = x + dx, vy = y + dy
+          if (vx >= 0 && vy >= 0 && vx < VIEW_W && vy < VIEW_H)
+            set.add(vy * VIEW_W + vx)
+        }
+      }
+    }
+    for (let y = 0; y < VIEW_H; y++) {
+      for (let x = 0; x < VIEW_W; x++) {
+        if (ANIMATED_TILE_KEYS.has(map[camY + y]?.[camX + x]))
+          addAround(dirty, x, y, padding)
+      }
+    }
+    ctx.save()
+    ctx.beginPath()
+    for (const i of dirty) {
+      const x = i % VIEW_W, y = Math.floor(i / VIEW_W)
+      ctx.rect(x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX)
+      addAround(terrain, x, y, padding)
+    }
+    ctx.clip()
+    try {
+      // Replay every upper layer in its normal order under the damage clip.
+      // Include neighbouring terrain whose oversized sprites overlap the clip.
+      render(now, terrain)
+    } finally {
+      ctx.restore()
+    }
+  }
+
   function ensureAmbientTileAnimationLoop() {
     if (ambientTileAnimIntervalStarted) return
     ambientTileAnimIntervalStarted = true
     setInterval(() => {
-      if (!visibleAnimatedTerrainPresent()) return
-      if (animationsPending() || moveAnim || attackAnim || deathTransition) return
-      render()
+      renderAmbientTerrain()
     }, AMBIENT_TILE_ANIM_MS)
   }
 
-  function render(now) {
+  function render(now, terrainCells = null) {
     const previousFrameTime = visualFrameTime
     visualFrameTime = now ?? performance.now()
     try {
-      renderScene(visualFrameTime)
+      renderScene(visualFrameTime, terrainCells)
     } finally {
       visualFrameTime = previousFrameTime
     }
   }
 
-  function renderScene(now) {
+  function renderScene(now, terrainCells = null) {
     if (!map.length || worldGenerating) return
     updatePlayerStatuses()
     updateAlarmedEnemies()
@@ -6193,6 +6287,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
     const mapH = map ? map.length : MAP_H
     for (let vy = 0; vy < renderRows; vy++) {
       for (let vx = 0; vx < renderCols; vx++) {
+        if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
         if (undergroundVisible && !undergroundVisible.has(keyXY(mx, my)) &&
           !undergroundDiscovered?.[my]?.[mx]) continue
@@ -7451,16 +7546,20 @@ tooltips when hovering over ATK, DEF, SPD, MF
   }
 
   function renderMinimap() {
+    const sideVisible = sideMini.getClientRects().length > 0
+    if (!mapOpen && !sideVisible) return
     ensureMinimapCanvasSize()
     if (mapOpen) {
       renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)
       if (mapViewKey === currentMapViewKey() && !mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
     }
-    const o = sideMiniOrigin()
-    renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y, false)
-    minimapDirty = false
-    miniPlayerX = player.x
-    miniPlayerY = player.y
+    if (sideVisible) {
+      const o = sideMiniOrigin()
+      renderMinimapCanvas(sideCtx, SIDE_SCALE, o.x, o.y, false)
+      minimapDirty = false
+      miniPlayerX = player.x
+      miniPlayerY = player.y
+    }
   }
 
   /* ============================== HUD / OVERLAYS ============================== */
