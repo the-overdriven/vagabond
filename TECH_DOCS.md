@@ -3380,6 +3380,28 @@ Touch layouts retain their previous compact XP bar and steps row and omit the
 world-edge row. These are display-only changes; the underlying XP, turn and
 edge-reward rules are unchanged.
 
+### Active player statuses
+
+Compact badges sit inside the bottom-left of the canvas in both tile and ASCII
+modes. Only active effects appear; the strip disappears when empty. Backgrounds
+are 70% opaque (90% when hovered, focused, or inspected); text and icons remain
+fully opaque. Badges wrap upward on narrow screens without resizing the canvas.
+Hover, keyboard focus, or tap reveals details above the row. Tap again, tap
+outside, or press Escape to dismiss. Inspecting a badge does not spend a turn.
+
+| Effect | Counter |
+|---|---|
+| Freezing | `hit in Nt`: cold turns until the next damage tick, calculated as the configured damage interval minus the current cold counter. This is not an expiry timer. |
+| Temporary ATK / DEF / SPD penalty | Remaining turns; penalties with the same stat and expiry share a badge showing their combined amount. Different expiries stay separate. No artifact identity is revealed. |
+| Berry regeneration | Remaining duration, including duration added by further berries. |
+| Invisibility | Remaining duration; god-mode invisibility shows `∞` while enabled. |
+| Speed potion | Remaining duration. |
+
+Instant healing and permanent racial traits do not create timed badges. The UI
+reads the existing resolved gameplay counters, so activation actions and all
+other turn costs retain their current behavior. Save loading and replay redraw
+these same counters; no additional persistent state or RNG calls are introduced.
+
 Current desktop controls include:
 
 | Key | Action                                                         |

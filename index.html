@@ -2,7 +2,6 @@
 
 highest prio:
 performance issues on mobile, especially when water is on screen
-UI: active status (status should show turns left), invis, healing, freezing
 Failed to preload img/icons/Hauberk.svg (404)
 distinct monster abilities. start with lifesteal, poison, ...? enrage, knockback
 but first move monster evasion field to abilities
@@ -63,7 +62,6 @@ tooltips when hovering over ATK, DEF, SPD, MF
 - !1 feat: add battle hammer (one-handed)
 - !1 feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
 - !1 feat: treasure map should be in sepia
-- !1 feat: show current active status in separate place (bottom bar?). freezing, regen, invis, etc.
 - !1 feat: add achievments to stats: strongest monster killed
 - !2 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - !2 feat: add friendly animals near the village (random)
@@ -335,7 +333,6 @@ tooltips when hovering over ATK, DEF, SPD, MF
     <div class="stat">🍀MF <b id="hMf"></b></div>
     <div class="stat">💰Gold <b id="hGold">0</b></div>
     <div class="stat">💀Deaths <b id="hDeaths">0</b></div>
-    <div class="stat hud-status" id="hStatus"></div>
     <div class="stat stat-actions">
       <button class="slbtn" id="btnSave" title="Save game to a .json file">💾 Save</button>
       <button class="slbtn" id="btnLoad" title="Load game from a .json file">📂 Load</button>
@@ -346,6 +343,10 @@ tooltips when hovering over ATK, DEF, SPD, MF
   </div>
   <div id="stage">
     <canvas id="game"></canvas>
+    <div id="playerStatuses" aria-label="Active player statuses" hidden>
+      <div id="playerStatusDetail" hidden></div>
+      <div id="playerStatusList"></div>
+    </div>
     <div id="mobileCanvasResizeHandle" aria-label="Resize game view" role="separator" aria-orientation="horizontal">
       <span>▲</span><span>▼</span>
     </div>
@@ -1328,6 +1329,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
 <script src="src/saveLoad.js"></script>
 <script src="src/version.js"></script>
 <script src="src/graveyard.js"></script>
+<script src="src/playerStatus.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -6155,6 +6157,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
 
   function renderScene(now) {
     if (!map.length || worldGenerating) return
+    updatePlayerStatuses()
     updateAlarmedEnemies()
     const undergroundVisible = currentUndergroundFov()
     let viewPlayerX = player.x
@@ -7478,8 +7481,7 @@ tooltips when hovering over ATK, DEF, SPD, MF
     document.getElementById('hMf').textContent = playerMf()
     document.getElementById('hGold').textContent = player.gold
     document.getElementById('hDeaths').textContent = player.deaths
-    const statusEl = document.getElementById('hStatus')
-    statusEl.textContent = player.freezing && player.freezing.active ? '❄️Freezing' : ''
+    updatePlayerStatuses()
   }
 
   function slotLabel(it) {

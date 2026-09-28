@@ -24,6 +24,7 @@ describe('Scroll of Invisibility', () => {
       expect(result.humanTurns).to.equal(19)
       expect(result.wyrdlingTurns).to.equal(24)
     })
+    cy.get('[data-status="invisible"]').should('contain.text', '24t')
   })
 
   it('does not replenish sold-out merchant scrolls when stock is ensured again', () => {

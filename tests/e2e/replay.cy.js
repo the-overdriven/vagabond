@@ -184,3 +184,30 @@ describe('Replay save/load determinism', () => {
     cy.get('#logpanel').should('not.contain.text', 'Replay desynchronized on action')
   })
 })
+
+
+describe('Status counters through save and replay', () => {
+  it('restores active effects and reproduces their counters without desync', () => {
+    beginDeterministicReplayGame('Status Replay Tester')
+    cy.window().then(win => win.eval(`
+      player.berryRegenTurns = 100
+      player.invisibleTurns = 20
+      player.speedPotionTurns = 15
+      player.curseDebuffs = [{stat:'def',amt:-1,turnsLeft:8}]
+      replayRecording = false
+      replayData = null
+      startReplayRecording()
+      updateHud()
+    `))
+    walkPattern([[1,0], [-1,0]])
+    let expected
+    cy.window().then(win => { expected = win.eval('JSON.stringify(activePlayerStatuses())') })
+    saveToDiskAndReload('status-counters')
+    cy.window().then(win => expect(win.eval('JSON.stringify(activePlayerStatuses())')).to.equal(expected))
+    cy.get('[data-status="regen"]').should('contain.text', '98t')
+    playReplayAndAssertClean()
+    cy.window().then(win => expect(win.eval('JSON.stringify(activePlayerStatuses())')).to.equal(expected))
+    cy.get('[data-status="invisible"]').should('contain.text', '18t')
+    cy.get('[data-status="speed"]').should('contain.text', '13t')
+  })
+})
