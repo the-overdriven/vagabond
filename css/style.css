@@ -1168,8 +1168,7 @@ body.hint-collapsed #hint .panel-toggle {
   pointer-events: none;
   white-space: normal;
 }
-.cursed-world-option:hover .cursed-world-tip,
-.cursed-world-option:focus-within .cursed-world-tip { display: block; }
+.cursed-world-option:hover .cursed-world-tip { display: block; }
 
 .cursed-world-mobile-note { display: none; }
 
@@ -1195,8 +1194,7 @@ body.hint-collapsed #hint .panel-toggle {
     gap: 8px;
   }
   .race-options > .permadeath-option { width: 100%; }
-  .cursed-world-option:hover .cursed-world-tip,
-  .cursed-world-option:focus-within .cursed-world-tip { display: none; }
+  .cursed-world-option:hover .cursed-world-tip { display: none; }
   .cursed-world-mobile-note {
     width: 100%;
     color: var(--parchment-dim);

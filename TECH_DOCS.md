@@ -1864,7 +1864,7 @@ existing equipment regardless of tier; replaced equipment is discarded, not
 dropped. Nonhumanoids take nothing. Bodies are saved as world
 ground objects, so this state survives save/load.
 
-## Permedeath corpse loot
+## Permadeath corpse loot
 
 **Killer equipment selection and ties.** Monsters have one equipment slot,
 not separate weapon, shield, and armor slots. The killer considers only the
