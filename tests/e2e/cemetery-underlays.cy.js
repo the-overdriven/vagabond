@@ -13,6 +13,10 @@ describe('Cemetery terrain underlays', () => {
           map[40][40] = 'ancientForest'
           tileUnderlays = {}
           placeCemetery()
+          // The Ancient Forest tile is only an anchor for cemetery placement. Restore it
+          // before checking snow edges so this test isolates cemetery overlays instead
+          // of depending on whether RNG happened to place the cemetery beside the anchor.
+          map[40][40] = terrain
           const graves = Object.keys(cemeteryTombstones).map(key => key.split(',').map(Number))
           const chapel = graves.flatMap(([x, y]) => DIRS8.map(([dx, dy]) => [x + dx, y + dy]))
             .find(([x, y]) => map[y]?.[x] === 'ruinedchapel')
