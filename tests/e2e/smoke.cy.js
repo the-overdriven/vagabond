@@ -222,8 +222,11 @@ describe('Vagabond smoke test', () => {
             queue.push({x, y})
           }
         }
+        const villageNpcNames = new Set(NPC_TEMPLATES
+          .filter(t => t.name !== 'Drunk' && !t.placement)
+          .map(t => t.name))
         const npcDistances = npcs
-          .filter(n => n.name !== 'Drunk' && n.name !== 'Ancient Lich')
+          .filter(n => villageNpcNames.has(n.name))
           .map(n => ({name:n.name, tile:surfaceMap[n.y][n.x], distance:dist.get(key(n.x,n.y)) ?? null}))
         const stock = Object.fromEntries(merchantStock
           .filter(i => ['homecomingscroll','idscroll','scroll'].includes(i.kind))
