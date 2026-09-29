@@ -4,6 +4,12 @@ function deepSwimmingWater(x, y) {
   return map[y]?.[x] === 'water'
 }
 
+function canUseItemsWhileSwimming() {
+  if (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) return true
+  log('You cannot use items while swimming.', 'info')
+  return false
+}
+
 function resetSwimming() {
   player.swimTurns = 0
   player.drowning = false
@@ -62,6 +68,7 @@ function advanceSwimming(moved, from = null) {
   player.hp = Math.max(0, player.hp - damage)
   spawnDamageNumber(player.x, player.y, damage, RENDER_STYLE.damage.playerHit)
   if (player.hp <= 0) {
+    log('You have drown.', 'bad')
     die(null, 'drowning')
     return false
   }

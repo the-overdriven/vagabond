@@ -363,11 +363,15 @@ Waiting, failed movement, teleports, level changes and rendering earn no practic
 
 Entry, first drowning and reaching shore have transition messages, not per-step
 spam. Landing, homecoming, death and level transitions clear the current swim
-session but preserve learned skill/practice. Drowning deaths use the ordinary
-death/remains system after moving the death location to the nearest available
-walkable shore along the connected water; breadth-first search and fixed
-direction order settle ties deterministically. The condition-based Drowning
-badge has no countdown and disappears whenever the danger no longer applies.
+session but preserve learned skill/practice. Non-Merlings cannot use inventory
+items in deep water, including consumables, equipment, and readable items;
+blocked actions spend neither items nor turns. Drowning obscures the lower two
+thirds of the player sprite (ordinary swimming obscures half), and a fatal step
+logs **You have drown.** Drowning records the death in water, then places any
+remains on the nearest available walkable shore **after** the Temple respawn;
+breadth-first search and fixed direction order settle ties deterministically.
+The condition-based Drowning badge has no countdown and disappears whenever
+the danger no longer applies.
 
 God mode bypasses movement/swimming restrictions only while enabled. **Shift+G**
 disables it (G retains its existing enable/invisibility behavior), resets the

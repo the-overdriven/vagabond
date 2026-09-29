@@ -182,6 +182,7 @@ describe('Graveyard', () => {
       expect(win.eval('player.y')).to.equal(win.eval('spawnPoint.y'))
       expect(win.eval("groundItems.filter(item => item.kind === 'playerremains' && item.x === 50 && item.y === 49)")).to.have.length(1)
     })
+    cy.get('#logpanel').should('contain.text', 'You have drown.')
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardList').should('contain.text', 'Cause: Drown')
   })

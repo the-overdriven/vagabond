@@ -1559,6 +1559,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function identifyArtifact(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'artifact' || it.identified) return
+    if (!canUseItemsWhileSwimming()) return
     const scroll = player.inventory.find(i => i.kind === 'idscroll')
     if (!scroll) {
       log(`The moment you take it in your hands, you can tell this isn't an ordinary ${it.noun.toLowerCase()}. It feels different somehow, but you can't tell why. You'll need a Scroll of Identification to make sense of this.`, 'info')
@@ -1601,6 +1602,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function inspectArtifact(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'artifact' || !it.identified) return
+    if (!canUseItemsWhileSwimming()) return
     ensureArtifactOwnerLore(it)
     log(it.description, 'info')
   }
@@ -3439,6 +3441,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function enemyStepTowardPlayer(e) {
     const step = enemyFindStep(e)
     if (!step) return false // genuinely boxed in
+    if (enemyWanderMode(e) === 'far') e.farPath = null
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
     e.x = step.x
@@ -3701,6 +3704,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
 
     if (!Array.isArray(e.farPath) || !e.farPath.length ||
+      Math.max(Math.abs(e.farPath[0].x - e.x), Math.abs(e.farPath[0].y - e.y)) !== 1 ||
       (avoidingVillage && enemyFarVillageDistance(e.farPath[0].x, e.farPath[0].y) < enemyFarVillageDistance(e.x, e.y))) {
       e.farPath = enemyBuildFarPath(e, e.farTargetX, e.farTargetY, avoidingVillage)
       if (!e.farPath || !e.farPath.length) {
@@ -3717,6 +3721,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       step = e.farPath && e.farPath[0]
       if (!step || !enemyTileOpen(e, step.x, step.y)) return false
     }
+    if (Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) !== 1) return false
 
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
@@ -4397,6 +4402,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   // equipping it must never remove it from the inventory or use the regular
   // weapon/shield/armor equip flow.
   function toggleBlackKey() {
+    if (!canUseItemsWhileSwimming()) return
     const it = player.inventory.find(i => i.kind === 'blackkey')
     if (player.equip.blackkey) {
       recordReplayAction({type:'blackKey', equipped:false})
@@ -4420,6 +4426,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       log('You do not have a casket to open.', 'info')
       return
     }
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds()
     recordReplayAction({type:'openCasket', replayId:player.inventory[idx]?.replayId, idx})
     const gold = randInt(30, 100)
@@ -5925,7 +5932,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     drawCreature(px, py, RENDER_STYLE.player.glyph, color, alpha)
   }
 
-  function drawSwimmingCreature(px, py, draw) {
+  function drawSwimmingCreature(px, py, draw, visibleFraction = 1 / 2) {
     const tileX = Math.floor((px + TILE_PX / 2) / TILE_PX + camX)
     const tileY = Math.floor((py + TILE_PX / 2) / TILE_PX + camY)
     const tile = currentZ === 0 && map[tileY]?.[tileX]
@@ -5935,7 +5942,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     ctx.save()
     ctx.beginPath()
-    ctx.rect(px, py, TILE_PX, TILE_PX / 2)
+    ctx.rect(px, py, TILE_PX, TILE_PX * visibleFraction)
     ctx.clip()
     draw()
     ctx.restore()
@@ -6645,7 +6652,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         } else {
           drawPlayerVisual(vx, vy, playerColor, playerAlpha)
         }
-      })
+      }, isDrowning() ? 1 / 3.8 : 1 / 2.5)
     }
     // Ground creatures appear behind tree canopies; flying enemies are drawn
     // afterward so the trees cannot cover them.
@@ -7533,6 +7540,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function inspectTreasureMap() {
+    if (!canUseItemsWhileSwimming()) return
     log('You unfold the old map. Faded ink traces the shape of the coastline, and a single X is marked beside a patch of sand.', 'info')
     log(treasureMapClueText(), 'info')
     toggleTreasureMap(true)
@@ -7909,12 +7917,16 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         const btn = document.createElement('button')
         btn.textContent = '?'
         btn.title = 'Inspect wheelbarrow'
-        btn.onclick = () => log('Small wheelbarrow made of an unknown alloy. Surprisingly light and durable.', 'info')
+        btn.onclick = () => {
+          if (canUseItemsWhileSwimming()) log('Small wheelbarrow made of an unknown alloy. Surprisingly light and durable.', 'info')
+        }
         row.appendChild(btn)
       } else if (it.kind === 'bigbell') {
         const btn = document.createElement('button')
         btn.textContent = '?'
-        btn.onclick = () => log('An enormous brass bell, impossibly heavy.', 'info')
+        btn.onclick = () => {
+          if (canUseItemsWhileSwimming()) log('An enormous brass bell, impossibly heavy.', 'info')
+        }
         row.appendChild(btn)
       } else if (it.kind === 'treasurecasket') {
         const btn = document.createElement('button')
@@ -7928,7 +7940,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         row.appendChild(btn)
         const inspect = document.createElement('button')
         inspect.textContent = '?'
-        inspect.onclick = () => log('A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth.', 'info')
+        inspect.onclick = () => {
+          if (canUseItemsWhileSwimming()) log('A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth.', 'info')
+        }
         row.appendChild(inspect)
       } else if (it.kind === 'treasuremap') {
         const btn = document.createElement('button')
@@ -7938,7 +7952,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       } else if (it.kind === 'oddTombstone') {
         const btn = document.createElement('button')
         btn.textContent = '?'
-        btn.onclick = () => log(it.inscription || `The tombstone bears the name ${it.tombName}. Born ${it.tombBirth}, died ${it.tombDeath}.`, 'info')
+        btn.onclick = () => {
+          if (canUseItemsWhileSwimming()) log(it.inscription || `The tombstone bears the name ${it.tombName}. Born ${it.tombBirth}, died ${it.tombDeath}.`, 'info')
+        }
         row.appendChild(btn)
       } else if (it.kind === 'shovel') {
         const btn = document.createElement('button')
@@ -8323,6 +8339,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function equipItem(idx) {
     const it = player.inventory[idx]
     if (!it) return
+    if (!canUseItemsWhileSwimming()) return
 
     // Artifacts that are physical gear use the normal equipment slots.
     // Trinkets stay passive in the backpack and are not equipable.
@@ -8361,6 +8378,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (!['weapon', 'shield', 'armor'].includes(slot)) return
     const item = player.equip[slot]
     if (!item) return
+    if (!canUseItemsWhileSwimming()) return
     recordReplayAction({type:'unequip', slot})
     const before = statSnapshot()
     player.equip[slot] = null
@@ -8383,6 +8401,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function usePotion(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'potion') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'potion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8394,6 +8413,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useScroll(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'scroll') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8405,6 +8425,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useHomecomingScroll(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'homecomingscroll') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8417,6 +8438,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useSpeedPotion(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'speedpotion') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'speedpotion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8430,6 +8452,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useHerb(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'herb') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'herb', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8442,6 +8465,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useMushroom(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'mushroom') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'mushroom', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8461,6 +8485,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useEdibleMushroom(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'ediblemushroom') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'ediblemushroom', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8473,6 +8498,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useBerries(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'berries') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'berries', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8492,6 +8518,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function useFish(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'fish') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'fish', idx, replayId:it.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
@@ -8502,6 +8529,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   function readTombstone(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'tombstone') return
+    if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'tombstone', idx, replayId:player.inventory[idx]?.replayId})
     log(`You read the inscription on the tombstone, it says "${it.inscription}"`, 'info')
     consumeItemTurn()
