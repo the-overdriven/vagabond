@@ -58,6 +58,40 @@ function fishermanTileFree(p) {
     !npcs.some(n => n.x === p.x && n.y === p.y)
 }
 
+function fishermanBlockedTiles() {
+  const blocked = new Set(occupied)
+  if (currentZ === 0) blocked.add(keyXY(player.x, player.y))
+  for (const e of enemies) if (e.alive && (e.level || 0) === 0) blocked.add(keyXY(e.x, e.y))
+  for (const g of groundItems) if ((g.level || 0) === 0) blocked.add(keyXY(g.x, g.y))
+  for (const n of npcs) blocked.add(keyXY(n.x, n.y))
+  return blocked
+}
+
+function fishermanEligibleTargets(banks, blocked) {
+  return banks.filter(p => FISHERMAN_LAND.has(surfaceMap[p.y]?.[p.x]) &&
+    !blocked.has(keyXY(p.x, p.y)) &&
+    bankDistance(p, villageCenter || spawnPoint) > 20 && bankDistance(p, spawnPoint) > 20)
+}
+
+function fishermanBestTarget(site, eligible, water) {
+  const homeRegions = new Set(DIRS8.map(([dx, dy]) =>
+    water.regions.get(keyXY(site.x + dx, site.y + dy))))
+  let best = null, bestSame = false, bestDistance = Infinity
+  for (const p of eligible) {
+    const distance = bankDistance(p, site)
+    if (distance < 25) continue
+    const same = p.regions.some(id => homeRegions.has(id))
+    if (!best || Number(same) > Number(bestSame) ||
+      (same === bestSame && (distance < bestDistance ||
+        (distance === bestDistance && (p.y < best.y || (p.y === best.y && p.x < best.x)))))) {
+      best = p
+      bestSame = same
+      bestDistance = distance
+    }
+  }
+  return best
+}
+
 function fishermanTargetCandidates(site, banks, water) {
   const homeRegions = new Set(DIRS8.map(([dx, dy]) =>
     water.regions.get(keyXY(site.x + dx, site.y + dy))))
@@ -102,21 +136,24 @@ function placeFisherman() {
   const banks = fishermanBanks(reachable, water)
   const origin = villageCenter || spawnPoint
   const preferred = [40, 80, 140][Math.abs(WORLD_SEED | 0) % 3]
+  // No world objects move until a complete placement plan has been accepted.
+  const blocked = fishermanBlockedTiles()
+  const eligible = fishermanEligibleTargets(banks, blocked)
+  if (!eligible.length) return false
   const threats = enemies.filter(e => e.alive && (e.level || 0) === 0)
   const threatened = (e, p) => bankDistance(e, p) <= Math.max(8, (e.aggro || 0) + 3)
-  const sites = banks.filter(p => bankDistance(p, origin) >= 25 && fishermanTileFree(p) &&
-    !threats.some(e => !e.ordinarySurface && threatened(e, p)) &&
-    fishermanTargetCandidates(p, banks, water).length > 0)
+  const sites = banks.filter(p => bankDistance(p, origin) >= 25 && !blocked.has(keyXY(p.x, p.y)) &&
+    !threats.some(e => !e.ordinarySurface && threatened(e, p)))
   sites.sort((a, b) => Math.abs(bankDistance(a, origin) - preferred) -
     Math.abs(bankDistance(b, origin) - preferred) || a.y - b.y || a.x - b.x)
   // Try every naturally safe footprint before planning any ordinary-enemy moves.
   for (const relocate of [false, true]) for (const p of sites) {
     if (!relocate && threats.some(e => threatened(e, p))) continue
     const hut = DIRS8.map(([dx, dy]) => ({x: p.x + dx, y: p.y + dy}))
-      .find(h => FISHERMAN_LAND.has(surfaceMap[h.y]?.[h.x]) && fishermanTileFree(h) &&
+      .find(h => FISHERMAN_LAND.has(surfaceMap[h.y]?.[h.x]) && !blocked.has(keyXY(h.x, h.y)) &&
         !threats.some(e => (!relocate || !e.ordinarySurface) && threatened(e, h)))
     if (!hut) continue
-    const target = fishermanTargetCandidates(p, banks, water)[0]
+    const target = fishermanBestTarget(p, eligible, water)
     if (!target) continue
     const moves = [], reserved = new Set([keyXY(target.x, target.y)])
     const nearby = threats.filter(e => threatened(e, p) || threatened(e, hut))
@@ -172,8 +209,8 @@ function completeFishermanLesson(from) {
 function activateFishermanQuest(npc) {
   const water = fishermanWaterRegions()
   const banks = fishermanBanks(fishermanFootReachable(), water)
-  const candidates = fishermanTargetCandidates(npc, banks, water)
-  const p = candidates[0]
+  const p = fishermanBestTarget(npc,
+    fishermanEligibleTargets(banks, fishermanBlockedTiles()), water)
   if (!p) return false
   const t = ENEMY_TEMPLATE_BY_NAME.Slurper
   const target = addEnemy({...t, name: 'Fat Slurper', baseName: 'Slurper', prefix: 'fat',
