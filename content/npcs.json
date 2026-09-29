@@ -6,7 +6,6 @@
         "The nets have been coming up empty. Something greedy moved into the water."
       ],
       "free": false,
-      "static": true,
       "portrait": "fisherman",
       "placement": "shoreline"
     },

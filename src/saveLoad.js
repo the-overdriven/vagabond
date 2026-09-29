@@ -145,6 +145,7 @@ function buildSaveObject() {
       berryRegenTurns: player.berryRegenTurns,
       swimming: player.swimming,
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
+      fishermanLessonPending: !!player.fishermanLessonPending,
       swimmingPractice: player.swimmingPractice,
       swimTurns: player.swimTurns,
       drowning: player.drowning,
@@ -546,6 +547,7 @@ function loadGameFromObject(data, opts = {}) {
   // Older completed saves awarded this character before reward tracking existed.
   player.fishermanRewardClaimed = data.player.fishermanRewardClaimed ??
     (fishermanQuest?.state === 'completed' && (player.swimming > 0 || raceHas('swims')))
+  player.fishermanLessonPending = !!data.player.fishermanLessonPending && !player.fishermanRewardClaimed
   player.swimmingPractice = data.player.swimmingPractice || 0
   player.swimTurns = data.player.swimTurns || 0
   player.drowning = !!data.player.drowning

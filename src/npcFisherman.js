@@ -148,7 +148,25 @@ function placeFisherman() {
 
 function fishermanHasNewDialogue() {
   return !fishermanQuest || fishermanQuest.state === 'ready' ||
-    (fishermanQuest.state === 'completed' && !player.fishermanRewardClaimed)
+    (fishermanQuest.state === 'completed' && !player.fishermanRewardClaimed && !player.fishermanLessonPending)
+}
+
+function fishermanSupervisedEntry(x, y, from = player) {
+  const npc = npcs.find(n => n.name === FISHERMAN_NAME)
+  return !!(player.fishermanLessonPending && !player.fishermanRewardClaimed &&
+    fishermanQuest?.state === 'completed' && !player.godMode && !raceHas('swims') &&
+    currentZ === 0 && npc && bankDistance(from, {x, y}) === 1 &&
+    bankDistance(from, npc) <= 1 && bankDistance({x, y}, npc) <= 1 &&
+    TILE[map[from.y]?.[from.x]]?.walk && !deepSwimmingWater(from.x, from.y) &&
+    deepSwimmingWater(x, y))
+}
+
+function completeFishermanLesson(from) {
+  if (!fishermanSupervisedEntry(player.x, player.y, from)) return
+  player.fishermanLessonPending = false
+  player.fishermanRewardClaimed = true
+  player.swimming = Math.max(5, player.swimming || 0)
+  log('You learned Swimming.', 'good')
 }
 
 function activateFishermanQuest(npc) {
@@ -178,14 +196,14 @@ function interactFisherman(record = true) {
   } else if ((fishermanQuest.state === 'ready' || fishermanQuest.state === 'completed') &&
     !player.fishermanRewardClaimed) {
     fishermanQuest.state = 'completed'
-    player.fishermanRewardClaimed = true
     if (raceHas('swims')) {
+      player.fishermanRewardClaimed = true
+      player.fishermanLessonPending = false
       log('Fisherman Hermit says: The fish are back, and the nets are filling again. You need no swimming lesson, but I can show you how to read a current and spot a good fishing ground. A useful trade for your help.', 'info')
       gainXp(100)
     } else {
-      player.swimming = Math.max(5, player.swimming || 0)
+      player.fishermanLessonPending = true
       log('Fisherman Hermit says: The fish are back, and the nets are filling again. I noticed you avoid the water like it\'s fire. Come, let me show you how to enter the water safely.', 'info')
-      log('You learned Swimming.', 'good')
     }
     reconcileSwimming()
   } else if (fishermanQuest.state === 'completed') {

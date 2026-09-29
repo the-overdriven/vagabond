@@ -371,8 +371,13 @@ badge has no countdown and disappears whenever the danger no longer applies.
 
 God mode bypasses movement/swimming restrictions only while enabled. **Shift+G**
 disables it (G retains its existing enable/invisibility behavior), resets the
-current swim session and preserves legitimately earned Swimming. As before,
+current swim session, unlearns Swimming and clears practice and any pending lesson.
+Non-Merlings can ask the Hermit for another lesson on an already completed quest,
+without respawning its predator. Merling reward entitlement is preserved. As before,
 god-mode stat grants and revealed exploration are not rolled back.
+
+The character sheet displays Swimming as **Unknown**, its numeric value, or
+**Natural** for Merlings, refreshing when skill or race state changes.
 
 ---
 
@@ -2876,12 +2881,18 @@ conversation. Activation chooses a free, foot-reachable land bank at least 25
 tiles away, preferring the same connected water region, and creates one
 non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
 Only that stored enemy ID's death, through the shared kill hook, makes the
-quest ready. The `!` is shown before activation and when ready, never during an
-unfinished/completed quest. Bumping or adjacent clicking gives short, gruff,
+quest ready. The `!` is shown before activation, when ready, and on completed
+quests with an unclaimed reward and no pending lesson. Bumping or adjacent clicking gives short, gruff,
 one-way dialogue, with no player choices.
 
-Turn-in teaches non-Merlings Swimming 5 through a lesson entering water beside
-the bank and an explicit learned message. Merlings instead receive natural-
+Turn-in completes the quest but only offers non-Merlings a persistent pending
+lesson (`player.fishermanLessonPending`). The reward is claimed and Swimming 5
+learned only on a successful step from a walkable bank into deep water, with both
+tiles adjacent to the Hermit on the surface. Waiting, teleporting, distant water
+and god-mode travel cannot complete it. The lesson completes before entry practice
+and drowning checks; pending lessons survive saves and deterministic replay.
+The dialogue marker clears while a lesson is pending and returns if god-mode
+disable restores reward entitlement. Merlings instead receive natural-
 swimmer dialogue and 100 XP, without numeric Swimming or practice. State changes
 before granting the reward prevent repeated rewards/restarts. After completion,
 the Hermit provides Fresh Fish. Fish uses the **same regeneration helper as

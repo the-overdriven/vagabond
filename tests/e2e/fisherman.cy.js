@@ -7,6 +7,79 @@ function begin() {
 }
 
 describe('Fisherman and swimming', () => {
+  it('requires supervised movement, persists and replays the pending lesson, and relearns after god mode', () => {
+    begin()
+    cy.window().then(async win => {
+      const result = await win.eval(`(async () => {
+        replayAnimationsDisabled=true
+        const n=npcs.find(n=>n.name===FISHERMAN_NAME)
+        n.x=40;n.y=40;n.homeX=40;n.homeY=40;n.talkFreezeTurns=1000
+        npcs=[n];enemies=[];groundItems=[];occupied=new Set([keyXY(40,40)])
+        currentZ=0;map=surfaceMap
+        for(let y=38;y<45;y++) for(let x=38;x<46;x++) map[y][x]='grass'
+        map[41][41]='water';map[41][42]='water';map[41][44]='water'
+        player.x=41;player.y=40;player.race='human';player.godMode=false
+        player.swimming=0;player.swimmingPractice=0;resetSwimming()
+        fishermanQuest={type:'fish_predator',state:'ready',targetId:'dead'}
+        interactFisherman()
+        const pending=player.fishermanLessonPending && !player.fishermanRewardClaimed && player.swimming===0
+        skipTurn()
+        const waited=player.swimming===0
+        player.x=44;player.y=40
+        await tryMove(0,1)
+        const remote=player.y===40 && player.swimming===0
+        player.x=42;player.y=40
+        await tryMove(0,1)
+        const outsideSupervision=player.y===40 && player.swimming===0
+        player.x=41;player.y=41;resetSwimming();render();updateHud()
+        skipTurn()
+        const teleported=player.swimming===0 && player.fishermanLessonPending
+        player.x=41;player.y=40;resetSwimming();player.godMode=true
+        await tryMove(0,1)
+        const godTravel=player.y===41 && player.swimming===0 && player.fishermanLessonPending
+        player.godMode=false;player.x=41;player.y=40;resetSwimming()
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true});replayAnimationsDisabled=true
+        const restored=player.fishermanLessonPending && !player.fishermanRewardClaimed
+        await tryMove(0,1)
+        const snapshot=()=>JSON.stringify({skill:player.swimming,practice:player.swimmingPractice,
+          turns:player.swimTurns,pending:player.fishermanLessonPending,claimed:player.fishermanRewardClaimed})
+        const expected=snapshot()
+        const learned=player.swimming===5 && player.swimmingPractice===1 && player.swimTurns===1 &&
+          player.fishermanRewardClaimed && !player.fishermanLessonPending
+        loadGameFromObject(saved,{isReplayInit:true});replayAnimationsDisabled=true
+        await runReplayAction({type:'move',dx:0,dy:1})
+        const replay=expected===snapshot()
+        const count=enemies.length
+        player.godMode=true;useGodModeKey(true)
+        const unlearned=player.swimming===0 && player.swimmingPractice===0 && player.swimTurns===0 &&
+          !player.drowning && !player.fishermanLessonPending && !player.fishermanRewardClaimed &&
+          fishermanHasNewDialogue()
+        player.x=41;player.y=40
+        interactFisherman()
+        await tryMove(0,1)
+        const relearned=player.swimming===5 && player.fishermanRewardClaimed &&
+          enemies.length===count && fishermanQuest.targetId==='dead'
+        player.race='merling';player.godMode=true
+        const xp=player.totalXpEarned
+        useGodModeKey(true);interactFisherman()
+        const merlingOnce=player.fishermanRewardClaimed && player.totalXpEarned===xp
+        player.race='human';toggleInv(true)
+        return {pending,waited,remote,outsideSupervision,teleported,godTravel,restored,learned,replay,
+          unlearned,relearned,merlingOnce}
+      })()`)
+      for (const [key,value] of Object.entries(result)) expect(value,key).to.equal(true)
+    })
+    cy.contains('#invOverlay summary', 'CHARACTER STATS').click()
+    cy.contains('#statGrid .row', 'Swimming').should('be.visible').and('contain', 'Unknown')
+    cy.window().then(win => win.eval(`player.swimming=5;updateHud()`))
+    cy.contains('#statGrid .row', 'Swimming').should('be.visible').and('contain', '5')
+    cy.window().then(win => win.eval(`player.godMode=true;useGodModeKey(true)`))
+    cy.contains('#statGrid .row', 'Swimming').should('be.visible').and('contain', 'Unknown')
+    cy.window().then(win => win.eval(`player.race='merling';updateHud()`))
+    cy.contains('#statGrid .row', 'Swimming').should('be.visible').and('contain', 'Natural')
+  })
+
   it('uses the shared NPC template and PNG artwork before and after loading', () => {
     begin()
     cy.window().then(async win => {
@@ -15,7 +88,7 @@ describe('Fisherman and swimming', () => {
         const matches = () => {
           const found = npcs.filter(n => n.name === FISHERMAN_NAME)
           return found.length === 1 && found[0].portrait === template.portrait &&
-            found[0].static === template.static && found[0].free === template.free &&
+            !!found[0].static === !!template.static && !!found[0].free === !!template.free &&
             JSON.stringify(found[0].lines) === JSON.stringify(linesForNpcTemplate(template))
         }
         const generated = matches()
@@ -68,13 +141,21 @@ describe('Fisherman and swimming', () => {
 
   it('offers completed-world lessons and Merling thanks once per character across resets and saves', () => {
     begin()
-    cy.window().then(win => {
-      const result=win.eval(`(() => {
+    cy.window().then(async win => {
+      const result=await win.eval(`(async () => {
         replayAnimationsDisabled=true
         const approach=()=>{const n=npcs.find(n=>n.name===FISHERMAN_NAME);player.x=n.x;player.y=n.y+1}
+        const learn=async()=>{
+          const n=npcs.find(n=>n.name===FISHERMAN_NAME)
+          player.x=n.x+1;player.y=n.y
+          map[n.y][n.x+1]='grass';map[n.y+1][n.x+1]='water'
+          await tryMove(0,1)
+        }
         approach();player.race='human'
         fishermanQuest={type:'fish_predator',state:'ready',targetId:'already-dead'}
         interactFisherman()
+        const deferred=player.swimming===0 && player.fishermanLessonPending && !player.fishermanRewardClaimed
+        await learn()
         const first=player.swimming===5 && player.fishermanRewardClaimed && !fishermanHasNewDialogue()
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
@@ -84,6 +165,7 @@ describe('Fisherman and swimming', () => {
         const marker=fishermanHasNewDialogue() && player.swimming===0
         const count=enemies.length
         interactFisherman()
+        await learn()
         const fresh=player.swimming===5 && player.fishermanRewardClaimed && !fishermanHasNewDialogue()
         resetForNewCharacter();player.race='merling';approach()
         const merlingMarker=fishermanHasNewDialogue()
@@ -93,7 +175,7 @@ describe('Fisherman and swimming', () => {
         loadGameFromObject(merlingSave,{isReplayInit:true})
         interactFisherman()
         const once=xp===100 && player.totalXpEarned===100 && player.swimming===0 && !fishermanHasNewDialogue()
-        return {first,persisted,marker,fresh,merlingMarker,once,
+        return {deferred,first,persisted,marker,fresh,merlingMarker,once,
           completed:fishermanQuest.state==='completed' && fishermanQuest.targetId==='already-dead',
           noRespawn:enemies.length===count}
       })()`)
@@ -108,6 +190,7 @@ describe('Fisherman and swimming', () => {
         enemies=[];npcs=[];groundItems=[];occupied=new Set()
         const reachable=new Set()
         const site={x:60,y:60},hut={x:61,y:60}
+        map=surfaceMap
         for(let y=40;y<=80;y++) for(let x=40;x<=80;x++) {
           map[y][x]='grass';reachable.add(keyXY(x,y))
         }
@@ -151,8 +234,9 @@ describe('Fisherman and swimming', () => {
 
   it('places a safe reachable fisherman, activates one identified predator, and rewards only once', () => {
     begin()
-    cy.window().then(win => {
-      const result = win.eval(`(() => {
+    cy.window().then(async win => {
+      const result = await win.eval(`(async () => {
+        replayAnimationsDisabled=true
         const npc = npcs.find(n => n.name === FISHERMAN_NAME)
         if (!npc) throw new Error('Missing fisherman')
         const placement = {
@@ -183,6 +267,10 @@ describe('Fisherman and swimming', () => {
         killEnemy(target)
         const ready=fishermanHasNewDialogue()
         interactFisherman()
+        if(player.swimming!==0 || !player.fishermanLessonPending) throw new Error('Lesson awarded before entering water')
+        player.x=npc.x+1;player.y=npc.y
+        map[npc.y][npc.x+1]='grass';map[npc.y+1][npc.x+1]='water'
+        await tryMove(0,1)
         const skill=player.swimming
         interactFisherman()
         return {placement,active,unique,unrelated,ready,skill,
@@ -285,7 +373,8 @@ describe('Fisherman and swimming', () => {
           loadGameFromObject(saved,{isReplayInit:true})
           const identity=enemies.filter(e=>e.id===id).length===1 && fishermanQuest.targetId===id
           const persisted=player.swimming===5 && player.swimmingPractice===37 && player.swimTurns===7 && isDrowning()
-          const staticNpc=npcs.find(n=>n.name===FISHERMAN_NAME).static
+          const staticNpc=!!npcs.find(n=>n.name===FISHERMAN_NAME).static ===
+            !!NPC_TEMPLATES.find(n=>n.name===FISHERMAN_NAME).static
           enemies=[];npcs=[];occupied=new Set()
           for(let y=48;y<53;y++) for(let x=48;x<53;x++) map[y][x]='water'
           map[49][50]='grass'
@@ -299,7 +388,8 @@ describe('Fisherman and swimming', () => {
           const reset=player.swimTurns===0 && !player.drowning && player.swimmingPractice===37
           player.swimming=5;player.godMode=true
           useGodModeKey(true)
-          const toggle=!player.godMode && player.swimming===5
+          const toggle=!player.godMode && player.swimming===0 && player.swimmingPractice===0 &&
+            !player.fishermanRewardClaimed && !player.fishermanLessonPending && !player.drowning
           return {identity,persisted,staticNpc,closest,lethal,reset,toggle}
         })()`)
         for(const [key,value] of Object.entries(result)) expect(value,key).to.equal(true)

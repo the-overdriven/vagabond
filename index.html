@@ -1311,7 +1311,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (!map[y]) return false // world not generated yet
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
-    return (raceHas('swims') || player.swimming > 0) && deepSwimmingWater(x, y)
+    return (raceHas('swims') || player.swimming > 0 || fishermanSupervisedEntry(x, y)) && deepSwimmingWater(x, y)
   }
 
 </script>
@@ -1826,6 +1826,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     berryRegenTurns: 0,
     swimming: 0,
     fishermanRewardClaimed: false,
+    fishermanLessonPending: false,
     swimmingPractice: 0,
     swimTurns: 0,
     drowning: false,
@@ -3069,6 +3070,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       berryRegenTurns: 0,
       swimming: 0,
       fishermanRewardClaimed: false,
+      fishermanLessonPending: false,
       swimmingPractice: 0,
       swimTurns: 0,
       drowning: false,
@@ -4907,6 +4909,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (isWalkableForPlayer(nx, ny)) {
       player.x = nx
       player.y = ny
+      completeFishermanLesson(fromPos)
       advanceSwimming(true, fromPos)
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       checkOldHunterInvestigation()
@@ -7621,6 +7624,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     document.getElementById('hGold').textContent = player.gold
     document.getElementById('hDeaths').textContent = player.deaths
     updatePlayerStatuses()
+    if (invOpen) renderInventory()
   }
 
   function slotLabel(it) {
@@ -7746,6 +7750,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
       ['🤺 Grace', playerGrace()],
+      ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
       ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],
       // ['🛡️ Defense', playerDef()],
@@ -8722,10 +8727,14 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (disable) {
       player.godMode = false
       player.godInvisible = false
+      player.swimming = 0
+      player.swimmingPractice = 0
+      player.fishermanLessonPending = false
+      if (!raceHas('swims')) player.fishermanRewardClaimed = false
       resetSwimming()
       updateHud()
       render()
-      log('God mode disabled. Normal terrain and swimming restrictions restored.', 'info')
+      log('God mode disabled. Swimming unlearned. Normal terrain restrictions restored.', 'info')
       return
     }
     if (player.godMode) {
