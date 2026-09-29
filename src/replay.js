@@ -288,7 +288,7 @@ function finishReplayPlayback() {
 async function runReplayAction(action) {
   switch (action.type) {
     case 'godMode':
-      useGodModeKey()
+      useGodModeKey(!!action.disable)
       break
     case 'move':
       await tryMove(action.dx, action.dy)
@@ -304,6 +304,7 @@ async function runReplayAction(action) {
       break
     case 'talk':
       if (action.npc === 'Old Hunter') interactOldHunter()
+      else if (action.npc === FISHERMAN_NAME) interactFisherman()
       break
     case 'openTrade': {
       const npc = npcs.find(n => n.name === action.npc)
@@ -413,6 +414,7 @@ async function runReplayAction(action) {
         mushroom: useMushroom,
         ediblemushroom: useEdibleMushroom,
         berries: useBerries,
+        fish: useFish,
         tombstone: readTombstone,
         identifyArtifact
       }[action.action]

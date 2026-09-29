@@ -27,6 +27,8 @@ const PRECACHE_URLS = [
   './icon-512.png',
   './icon-512-maskable.png',
   './src/worldGen.js',
+  './src/swimming.js',
+  './src/npcFisherman.js',
   './src/fov.js',
   './src/replay.js',
   './src/saveLoad.js',

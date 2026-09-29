@@ -1,0 +1,200 @@
+'use strict'
+
+let fishermanQuest = null
+let fishermanHut = null
+const FISHERMAN_NAME = 'Fisherman Hermit'
+const FISHERMAN_LAND = new Set(['grass', 'sand', 'hill'])
+const bankDistance = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+
+function fishermanFootReachable() {
+  const seen = new Set([keyXY(spawnPoint.x, spawnPoint.y)])
+  const queue = [{...spawnPoint}]
+  for (let head = 0; head < queue.length; head++) {
+    const p = queue[head]
+    for (const [dx, dy] of DIRS8) {
+      const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+      if (seen.has(key) || !TILE[surfaceMap[y]?.[x]]?.walk) continue
+      seen.add(key)
+      queue.push({x, y})
+    }
+  }
+  return seen
+}
+
+function fishermanWaterRegions() {
+  const regions = new Map(), sizes = []
+  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+    const key = keyXY(x, y)
+    if (surfaceMap[y][x] !== 'water' || regions.has(key)) continue
+    const id = sizes.length, queue = [{x, y}]
+    regions.set(key, id)
+    for (let head = 0; head < queue.length; head++) for (const [dx, dy] of DIRS8) {
+      const nx = queue[head].x + dx, ny = queue[head].y + dy, nk = keyXY(nx, ny)
+      if (surfaceMap[ny]?.[nx] !== 'water' || regions.has(nk)) continue
+      regions.set(nk, id)
+      queue.push({x: nx, y: ny})
+    }
+    sizes.push(queue.length)
+  }
+  return {regions, sizes}
+}
+
+function fishermanBanks(reachable, water) {
+  const banks = []
+  for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+    if (!FISHERMAN_LAND.has(surfaceMap[y][x]) || !reachable.has(keyXY(x, y))) continue
+    const ids = [...new Set(DIRS8.map(([dx, dy]) => water.regions.get(keyXY(x + dx, y + dy)))
+      .filter(id => id !== undefined && water.sizes[id] >= 25))]
+    if (ids.length) banks.push({x, y, regions: ids})
+  }
+  return banks
+}
+
+function fishermanTileFree(p) {
+  return !occupied.has(keyXY(p.x, p.y)) &&
+    !(currentZ === 0 && player.x === p.x && player.y === p.y) &&
+    !enemies.some(e => e.alive && (e.level || 0) === 0 && e.x === p.x && e.y === p.y) &&
+    !groundItems.some(g => (g.level || 0) === 0 && g.x === p.x && g.y === p.y) &&
+    !npcs.some(n => n.x === p.x && n.y === p.y)
+}
+
+function fishermanTargetCandidates(site, banks, water) {
+  const homeRegions = new Set(DIRS8.map(([dx, dy]) =>
+    water.regions.get(keyXY(site.x + dx, site.y + dy))))
+  const same = p => p.regions.some(id => homeRegions.has(id))
+  return banks.filter(p => FISHERMAN_LAND.has(surfaceMap[p.y]?.[p.x]) &&
+    bankDistance(p, site) >= 25 && fishermanTileFree(p) &&
+    bankDistance(p, villageCenter || spawnPoint) > 20 && bankDistance(p, spawnPoint) > 20)
+    .sort((a, b) => Number(same(b)) - Number(same(a)) ||
+      bankDistance(a, site) - bankDistance(b, site) || a.y - b.y || a.x - b.x)
+}
+
+function fishermanRelocation(enemy, site, hut, reachable, reserved) {
+  if (!enemy.ordinarySurface) return null
+  const biomes = enemyBiomes(ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name])
+  const queue = [{x: enemy.x, y: enemy.y}], seen = new Set([keyXY(enemy.x, enemy.y)])
+  for (let head = 0; head < queue.length; head++) {
+    const p = queue[head], key = keyXY(p.x, p.y)
+    const tile = surfaceMap[p.y]?.[p.x]
+    if (reachable.has(key) && biomes.includes(tile) &&
+      ['grass', 'sand', 'hill', 'forest', 'snow', 'taiga'].includes(tile) &&
+      bankDistance(p, site) > Math.max(12, (enemy.aggro || 0) + 5) &&
+      bankDistance(p, hut) > Math.max(12, (enemy.aggro || 0) + 5) &&
+      bankDistance(p, spawnPoint) > 20 && bankDistance(p, villageCenter || spawnPoint) > 20 &&
+      fishermanTileFree(p) && !reserved.has(key)) return p
+    for (const [dx, dy] of DIRS8) {
+      const x = p.x + dx, y = p.y + dy, next = keyXY(x, y)
+      const nextTile = surfaceMap[y]?.[x]
+      if (seen.has(next) || !(TILE[nextTile]?.walk ||
+        (enemy.fly && (nextTile === 'water' || nextTile === 'boulder')))) continue
+      seen.add(next)
+      queue.push({x, y})
+    }
+  }
+  return null
+}
+
+function placeFisherman() {
+  const tmpl = NPC_TEMPLATES.find(t => t.name === FISHERMAN_NAME)
+  fishermanQuest = null
+  fishermanHut = null
+  const reachable = fishermanFootReachable(), water = fishermanWaterRegions()
+  const banks = fishermanBanks(reachable, water)
+  const origin = villageCenter || spawnPoint
+  const preferred = [40, 80, 140][Math.abs(WORLD_SEED | 0) % 3]
+  const threats = enemies.filter(e => e.alive && (e.level || 0) === 0)
+  const threatened = (e, p) => bankDistance(e, p) <= Math.max(8, (e.aggro || 0) + 3)
+  const sites = banks.filter(p => bankDistance(p, origin) >= 25 && fishermanTileFree(p) &&
+    !threats.some(e => !e.ordinarySurface && threatened(e, p)) &&
+    fishermanTargetCandidates(p, banks, water).length > 0)
+  sites.sort((a, b) => Math.abs(bankDistance(a, origin) - preferred) -
+    Math.abs(bankDistance(b, origin) - preferred) || a.y - b.y || a.x - b.x)
+  // Try every naturally safe footprint before planning any ordinary-enemy moves.
+  for (const relocate of [false, true]) for (const p of sites) {
+    if (!relocate && threats.some(e => threatened(e, p))) continue
+    const hut = DIRS8.map(([dx, dy]) => ({x: p.x + dx, y: p.y + dy}))
+      .find(h => FISHERMAN_LAND.has(surfaceMap[h.y]?.[h.x]) && fishermanTileFree(h) &&
+        !threats.some(e => (!relocate || !e.ordinarySurface) && threatened(e, h)))
+    if (!hut) continue
+    const target = fishermanTargetCandidates(p, banks, water)[0]
+    if (!target) continue
+    const moves = [], reserved = new Set([keyXY(target.x, target.y)])
+    const nearby = threats.filter(e => threatened(e, p) || threatened(e, hut))
+    for (const e of nearby) {
+      const destination = fishermanRelocation(e, p, hut, reachable, reserved)
+      if (!destination) break
+      moves.push({e, destination})
+      reserved.add(keyXY(destination.x, destination.y))
+    }
+    if (moves.length !== nearby.length) continue
+    for (const {e, destination} of moves) {
+      occupied.delete(keyXY(e.x, e.y))
+      e.x = e.homeX = destination.x
+      e.y = e.homeY = destination.y
+      e.homeTileType = surfaceMap[e.y][e.x]
+      occupied.add(keyXY(e.x, e.y))
+    }
+    fishermanHut = hut
+    tileUnderlays[keyXY(hut.x, hut.y)] = surfaceMap[hut.y][hut.x]
+    surfaceMap[hut.y][hut.x] = 'fishermanhut'
+    if (currentZ === 0) map[hut.y][hut.x] = 'fishermanhut'
+    npcs.push({...tmpl, lines: linesForNpcTemplate(tmpl),
+      x: p.x, y: p.y, homeX: p.x, homeY: p.y})
+    occupied.add(keyXY(p.x, p.y))
+    return true
+  }
+  return false
+}
+
+function fishermanHasNewDialogue() {
+  return !fishermanQuest || fishermanQuest.state === 'ready' ||
+    (fishermanQuest.state === 'completed' && !player.fishermanRewardClaimed)
+}
+
+function activateFishermanQuest(npc) {
+  const water = fishermanWaterRegions()
+  const banks = fishermanBanks(fishermanFootReachable(), water)
+  const candidates = fishermanTargetCandidates(npc, banks, water)
+  const p = candidates[0]
+  if (!p) return false
+  const t = ENEMY_TEMPLATE_BY_NAME.Slurper
+  const target = addEnemy({...t, name: 'Fat Slurper', baseName: 'Slurper', prefix: 'fat',
+    hp: t.hp * 2, maxHp: t.hp * 2, level: 0, x: p.x, y: p.y,
+    homeX: p.x, homeY: p.y, homeTileType: surfaceMap[p.y][p.x], alive: true,
+    fly: false, wander: false, equipment: null})
+  occupied.add(keyXY(p.x, p.y))
+  fishermanQuest = {type: 'fish_predator', title: 'Empty Nets', state: 'active',
+    targetId: target.id, targetX: p.x, targetY: p.y}
+  return true
+}
+
+function interactFisherman(record = true) {
+  const npc = npcs.find(n => n.name === FISHERMAN_NAME)
+  if (!npc || currentZ !== 0 || bankDistance(player, npc) > 1) return false
+  if (record) recordReplayAction({type: 'talk', npc: FISHERMAN_NAME})
+  if (!fishermanQuest) {
+    if (activateFishermanQuest(npc)) log('Fisherman Hermit says: My nets have come up empty for days. The fish are disappearing, and something heavy has been dragging itself along the bank. Follow the shore, find it, and deal with it.', 'info')
+    else log('Fisherman Hermit says: Quiet water today. Come back later.', 'info')
+  } else if ((fishermanQuest.state === 'ready' || fishermanQuest.state === 'completed') &&
+    !player.fishermanRewardClaimed) {
+    fishermanQuest.state = 'completed'
+    player.fishermanRewardClaimed = true
+    if (raceHas('swims')) {
+      log('Fisherman Hermit says: The fish are back, and the nets are filling again. You need no swimming lesson, but I can show you how to read a current and spot a good fishing ground. A useful trade for your help.', 'info')
+      gainXp(100)
+    } else {
+      player.swimming = Math.max(5, player.swimming || 0)
+      log('Fisherman Hermit says: The fish are back, and the nets are filling again. Let me show you how to enter the water safely. Stay beside the bank, breathe steadily, and keep kicking. Five strokes, then rest ashore.', 'info')
+      log('You learned Swimming 5.', 'good')
+    }
+    reconcileSwimming()
+  } else if (fishermanQuest.state === 'completed') {
+    const fish = player.inventory.find(i => i.kind === 'fish')
+    if (fish) fish.count = (fish.count || 1) + 1
+    else player.inventory.push({kind: 'fish', name: 'Fresh Fish', count: 1})
+    log('Fisherman Hermit says: Nets are full. Take a fish.', 'info')
+  } else log('Fisherman Hermit says: The nets are still empty. Someone or something is meddling with the waters. Follow the shore and keep your feet dry.', 'info')
+  updateHud()
+  render()
+  return true
+}

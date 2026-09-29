@@ -1,6 +1,16 @@
 {
   "templates": [
     {
+      "name": "Fisherman Hermit",
+      "lines": [
+        "Nets are empty. Something eats before I do."
+      ],
+      "free": false,
+      "static": true,
+      "portrait": "fisherman",
+      "placement": "shoreline"
+    },
+    {
       "name": "Old Hunter",
       "lines": [],
       "free": false,

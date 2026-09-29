@@ -343,6 +343,37 @@ images, before character selection opens, and the cursor uses that preloaded URL
 
 Walking into an NPC triggers interaction instead of entering its tile.
 
+## Swimming
+
+`src/swimming.js` owns the separate persistent `swimming` skill,
+`swimmingPractice`, consecutive `swimTurns`, position anchor and drowning flag.
+Ordinary characters start with Swimming unknown (zero); trying to enter deep
+`water` logs **You don't know how to swim.** without advancing time. Merlings
+swim naturally without skill levels, practice or a time limit. Rivers are
+explicitly **not** swimming terrain; their existing player/enemy half-submerged
+rendering remains unchanged. Ice and frozen rivers are also excluded.
+
+Learning Swimming 5 allows five safe consecutive deep-water movements/waits;
+the entry step counts as the first. Each subsequent movement/wait costs
+`max(1, round(playerMaxHp() * 0.05))` HP and can kill. Only genuine successful
+deep-water movement earns practice: every 100 points increases Swimming by one
+with rollover and an improvement message. Practice is applied **before** testing
+the drowning threshold, so an improvement can prevent that step's damage.
+Waiting, failed movement, teleports, level changes and rendering earn no practice.
+
+Entry, first drowning and reaching shore have transition messages, not per-step
+spam. Landing, homecoming, death and level transitions clear the current swim
+session but preserve learned skill/practice. Drowning deaths use the ordinary
+death/remains system after moving the death location to the nearest available
+walkable shore along the connected water; breadth-first search and fixed
+direction order settle ties deterministically. The condition-based Drowning
+badge has no countdown and disappears whenever the danger no longer applies.
+
+God mode bypasses movement/swimming restrictions only while enabled. **Shift+G**
+disables it (G retains its existing enable/invisibility behavior), resets the
+current swim session and preserves legitimately earned Swimming. As before,
+god-mode stat grants and revealed exploration are not rolled back.
+
 ---
 
 # 7. Turn Structure
@@ -2786,6 +2817,7 @@ Current named NPCs:
 - Drunk
 - Merchant
 - Herbalist
+- Fisherman Hermit
 
 NPCs generally provide dialogue/exploration interactions.
 
@@ -2799,7 +2831,7 @@ forest, river, or water tiles.
 
 NPC tile artwork is configured by exact NPC name in
 `content/rendering.json` under `npc.characters`, with `image` and `scale`
-per character. Drunk, Herbalist, Ancient Lich, Merchant and Old Hunter use
+per character. Drunk, Herbalist, Ancient Lich, Merchant, Old Hunter and Fisherman use
 transparent `img/tiles/npc-*.png` sprites at scale 1.0. These sources are
 larger than 40x40 and use chunky pixel shapes; the shared nearest-neighbor
 sprite cache renders them at the current tile size, including zoom.
@@ -2816,6 +2848,45 @@ quest state, balance, save format or replay state.
 The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent. On the first interaction with the Herbalist, she gives exactly one **Healing Herb**; the one-time gift flag is saved, restored, and replayed so repeated conversations never duplicate it.
 
 The Ancient Lich addresses the player by their selected race in its dialogue. This is flavor only and does not branch quests or rewards.
+
+## Fisherman Hermit / Empty Nets
+
+The static, invulnerable Hermit is a separate surface NPC, not a village NPC.
+His template lives in `content/npcs.json`, using shoreline placement rather than
+the village placement pass. `src/npcFisherman.js` owns his placement and quest;
+portrait preloading and save restoration use the shared NPC templates.
+His original dark-haired, bearded, teal-clad pixel PNG is configured by NPC name
+in `content/rendering.json`; the supplied reference is his separate portrait.
+He uses the ordinary sprite cache, preloading, tooltip and `!` marker draw pass.
+
+After surface population/structures are complete, deterministic placement finds
+a Temple-foot-reachable grass/sand/hill bank beside an unfrozen connected water
+region of at least 25 tiles, with an adjacent small `fishermanhut`. No structures
+are overwritten. Seed-selected preferred village distances of 40, 80 and 140
+tiles diversify proximity; suitable terrain and safety take precedence.
+Naturally safe footprints are tried first. If necessary, only explicitly marked
+ordinary surface spawns may be relocated; special encounters remain untouched.
+Relocations are planned atomically using reachable, unoccupied species terrain,
+outside the Hermit's safe area and the Temple/village exclusion zones. No
+world-generation or dialogue decision depends on animation or unseeded randomness.
+
+`fishermanQuest` is an extensible `{type, state, targetId, ...}` record. The current
+`fish_predator` variant is **Empty Nets**. No predator exists before the first
+conversation. Activation chooses a free, foot-reachable land bank at least 25
+tiles away, preferring the same connected water region, and creates one
+non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
+Only that stored enemy ID's death, through the shared kill hook, makes the
+quest ready. The `!` is shown before activation and when ready, never during an
+unfinished/completed quest. Bumping or adjacent clicking gives short, gruff,
+one-way dialogue, with no player choices.
+
+Turn-in teaches non-Merlings Swimming 5 through a lesson entering water beside
+the bank and an explicit learned message. Merlings instead receive natural-
+swimmer dialogue and 100 XP, without numeric Swimming or practice. State changes
+before granting the reward prevent repeated rewards/restarts. After completion,
+the Hermit provides Fresh Fish. Fish uses the **same regeneration helper as
+berries** (+100 regeneration turns), including Troll immunity and normal item
+turn consumption.
 
 ---
 
@@ -3296,10 +3367,17 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-16
+18
 ```
 
 Saves are JSON files.
+
+Version 18 persists Fisherman hut/quest state, exact enemy IDs and the next-ID
+counter, and all Swimming skill/practice/session fields. Loading does not spawn
+another target, infer completion from its name or re-grant a lesson. Fisherman
+talk, fish consumption and god-mode disabling use the shared replay action
+handlers; movement/waits run the same deterministic swimming mechanics during
+playback. No Fisherman retro-generation is performed for older worlds.
 
 Saved state includes substantial world and player information, including:
 
@@ -3477,6 +3555,7 @@ outside, or press Escape to dismiss. Inspecting a badge does not spend a turn.
 | Berry regeneration | Remaining duration, including duration added by further berries. |
 | Invisibility | Remaining duration; god-mode invisibility shows `∞` while enabled. |
 | Speed potion | Remaining duration. |
+| Drowning | Condition only, no countdown. Active while consecutive deep-water time exceeds the learned safe limit; each movement/wait costs 5% max HP, minimum 1. |
 
 Instant healing and permanent racial traits do not create timed badges. The UI
 reads the existing resolved gameplay counters, so activation actions and all

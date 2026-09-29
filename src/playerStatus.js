@@ -4,6 +4,8 @@
 function activePlayerStatuses() {
   if (player.hp <= 0) return []
   const statuses = []
+  if (isDrowning()) statuses.push({id: 'drowning', icon: '≈', label: 'Drowning', counter: '',
+    detail: 'Drowning: lose 5% of maximum HP (at least 1) each swimming step or wait. Reach shore to recover.'})
   const turns = n => `${n} turn${n === 1 ? '' : 's'}`
   if (player.freezing?.active) {
     const left = WORLD_GEN_CONFIG.environment.freezingDamageIntervalTurns - player.freezing.turns
@@ -82,7 +84,7 @@ function updatePlayerStatuses() {
       button.append(icon, label)
     }
     button.children[0].textContent = status.icon
-    const text = `${status.label} · ${status.counter}`
+    const text = status.counter ? `${status.label} · ${status.counter}` : status.label
     if (button.children[1].textContent !== text) button.children[1].textContent = text
     button.dataset.detail = status.detail
     button.setAttribute('aria-label', status.detail)

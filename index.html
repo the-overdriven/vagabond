@@ -1174,6 +1174,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       undergroundDiscovered = undergroundDiscoveredL1
       player.x = hut.x
       player.y = hut.y
+      resetSwimming()
       minimapDirty = true
       log('The revealed trapdoor opens onto a narrow staircase descending into darkness.', 'info')
       render()
@@ -1185,6 +1186,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       currentZ = 0
       player.x = hut?.x ?? player.x
       player.y = hut?.y ?? player.y
+      resetSwimming()
       log('You climb back into the hut. The trapdoor closes behind you.', 'info')
       render()
       updateHud()
@@ -1206,6 +1208,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         undergroundDiscovered = depthUndergroundDiscovered(3)
         if (!map) return false
         log(pick(DWARVEN_RUIN_ENTRANCES), 'info')
+        resetSwimming()
         stopCameraAnimation()
         snapCameraToPlayer()
         minimapDirty = true
@@ -1272,6 +1275,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     } else {
       return false
     }
+    resetSwimming()
     stopCameraAnimation()
     snapCameraToPlayer()
     minimapDirty = true
@@ -1307,11 +1311,13 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (!map[y]) return false // world not generated yet
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
-    return raceHas('swims') && map[y] && map[y][x] === 'water'
+    return (raceHas('swims') || player.swimming > 0) && deepSwimmingWater(x, y)
   }
 
 </script>
 <script src="src/worldGen.js"></script>
+<script src="src/swimming.js"></script>
+<script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
 <script src="src/saveLoad.js"></script>
@@ -1818,6 +1824,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     speedPotionTurns: 0,
     speedPotionBonus: 0,
     berryRegenTurns: 0,
+    swimming: 0,
+    fishermanRewardClaimed: false,
+    swimmingPractice: 0,
+    swimTurns: 0,
+    drowning: false,
+    swimPosition: null,
     freezing: {active: false, turns: 0},
     permadeath: false,
     curseDebuffs: [],
@@ -2918,6 +2930,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function killEnemy(e) {
+    if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
     log(`You have slain the ${e.name}!`, 'good')
     // Notify quest logic before removing the corpse. Recover-item quests
     // must inspect the weapon/equipment the monster was carrying.
@@ -2946,6 +2959,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function returnPlayerToTemple() {
+    resetSwimming()
     const wasDead = player.hp <= 0
     currentZ = 0
     currentCave = -1
@@ -3053,6 +3067,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       berryRegenTurns: 0,
+      swimming: 0,
+      fishermanRewardClaimed: false,
+      swimmingPractice: 0,
+      swimTurns: 0,
+      drowning: false,
+      swimPosition: null,
       freezing: {active: false, turns: 0},
       curseDebuffs: [],
       equip: {weapon: null, shield: null, armor: null, blackkey: null},
@@ -3105,6 +3125,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
 
   function die(killer = null, cause = 'environment') {
     if (deathTransition) return
+    if (cause === 'drowning') {
+      const shore = drowningShore()
+      if (shore) { player.x = shore.x; player.y = shore.y }
+    }
+    resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
     Graveyard.recordDeath({
       character_name: player.name,
@@ -4082,7 +4107,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   // Item icons live in img/icons so they can be cached and used offline.
   // Kinds not listed here simply render with no icon.
   const ITEM_ICON_KINDS = [
-    'herb', 'mushroom', 'ediblemushroom', 'berries', 'potato', 'potion', 'speedpotion',
+    'herb', 'mushroom', 'ediblemushroom', 'berries', 'fish', 'potato', 'potion', 'speedpotion',
     'scroll', 'idscroll', 'homecomingscroll', 'weapon', 'armor', 'shield',
     'tombstone', 'oddTombstone', 'wheelbarrow', 'bigbell', 'blackkey',
     'artifact', 'treasuremap', 'treasurecasket', 'amber', 'seashell', 'shovel'
@@ -4113,10 +4138,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function isStackableKind(kind) {
+    if (kind === 'fish') return true
     return kind === 'potion' || kind === 'scroll' || kind === 'idscroll' || kind === 'speedpotion' || kind === 'homecomingscroll' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'seashell' || kind === 'amber'
   }
 
   function isConsumableKind(kind) {
+    if (kind === 'fish') return true
     return kind === 'potion' || kind === 'speedpotion' || kind === 'herb' || kind === 'mushroom' || kind === 'ediblemushroom' || kind === 'berries' || kind === 'potato' || kind === 'scroll' || kind === 'idscroll' || kind === 'homecomingscroll'
   }
 
@@ -4843,7 +4870,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       consecutiveWaitTurns = 0
       freezeNpcFromWandering(npcTarget)
       grantHerbalistFirstGift(npcTarget)
-      if (npcTarget.name === 'Gravedigger' && player.inventory.some(i => i.kind === 'oddTombstone')) {
+      if (npcTarget.name === FISHERMAN_NAME) {
+        interactFisherman(false)
+      } else if (npcTarget.name === 'Gravedigger' && player.inventory.some(i => i.kind === 'oddTombstone')) {
         const odd = player.inventory.find(i => i.kind === 'oddTombstone')
         player.inventory.splice(player.inventory.indexOf(odd), 1)
         player.inventory.push({kind: 'shovel', name: 'Shovel'})
@@ -4878,13 +4907,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (isWalkableForPlayer(nx, ny)) {
       player.x = nx
       player.y = ny
+      advanceSwimming(true, fromPos)
+      if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       checkOldHunterInvestigation()
       player.steps++
       checkGroundAt(nx, ny)
       checkWorldEdge()
-      if (map[ny][nx] === 'water' && map[fromPos.y][fromPos.x] !== 'water') {
-        log('You slip into the water and swim with ease.', 'info')
-      }
       if (isTempleGround(map[ny][nx])) {
         const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
         if (canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
@@ -4938,6 +4966,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     // A blocked movement attempt is not an action and must not advance time.
     if (!moved) {
+      if (deepSwimmingWater(nx, ny) && !raceHas('swims') && !player.swimming && !player.godMode)
+        log("You don't know how to swim.", 'info')
       if (autoPath) clearAutoPath()
       render()
       runAnimationLoop()
@@ -4967,6 +4997,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     clearAutoPath()
     consecutiveWaitTurns++
     log('You wait.', 'info')
+    if (advanceSwimming(false) === false) return
+    if (player.hp <= 0 || deathTransition) return
     enemyTurn()
     npcTurn()
     render()
@@ -5072,6 +5104,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         map = undergroundMap
         undergroundDiscovered = undergroundDiscoveredL1
         log('You descend into the crypt.', 'info')
+        resetSwimming()
         stopCameraAnimation()
         snapCameraToPlayer()
         minimapDirty = true
@@ -6528,7 +6561,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       drawSwimmingCreature(vx, vy, () => drawNpcVisual(vx, vy, n))
-      if (n.name === 'Old Hunter' && oldHunterHasNewDialogue()) {
+      if ((n.name === 'Old Hunter' && oldHunterHasNewDialogue()) ||
+        (n.name === FISHERMAN_NAME && fishermanHasNewDialogue())) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
         ctx.textAlign = 'center'
@@ -6836,7 +6870,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       <img src="${imageSrc(`img/npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${n.name}</div>
-      ${n.name === 'Old Hunter' ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to talk</div>' : n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
+      ${n.name === 'Old Hunter' || n.name === FISHERMAN_NAME ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to talk</div>' : n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
       </div>`
       }
     }
@@ -6981,7 +7015,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     const n = currentZ === 0 && npcs.find(np => np.x === mx && np.y === my)
     if (n) {
       clearAutoPath()
-      if (n.name === 'Old Hunter') {
+      if (n.name === FISHERMAN_NAME) {
+        interactFisherman()
+      } else if (n.name === 'Old Hunter') {
         const adjacent = Math.max(Math.abs(n.x - player.x), Math.abs(n.y - player.y)) <= 1
         if (adjacent) interactOldHunter()
       } else tryOpenTrade(n)
@@ -7834,11 +7870,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
           useMushroom(idx)
         }
         row.appendChild(btn)
-      } else if (it.kind === 'ediblemushroom' || it.kind === 'berries') {
+      } else if (it.kind === 'ediblemushroom' || it.kind === 'berries' || it.kind === 'fish') {
         const btn = document.createElement('button')
         btn.textContent = 'Eat'
         btn.onclick = () => {
-          it.kind === 'berries' ? useBerries(idx) : useEdibleMushroom(idx)
+          it.kind === 'fish' ? useFish(idx) : it.kind === 'berries' ? useBerries(idx) : useEdibleMushroom(idx)
         }
         row.appendChild(btn)
       } else if (it.kind === 'scroll') {
@@ -8425,13 +8461,26 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'berries', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    applyBerryRegeneration('berries')
+    consumeItemTurn()
+  }
+
+  function applyBerryRegeneration(food) {
     if (raceDef()?.id === 'troll') {
-      log('You eat the berries, but they have no effect on you.', 'info')
-      consumeItemTurn()
+      log(`You eat the ${food}, but they have no effect on you.`, 'info')
       return
     }
     player.berryRegenTurns = (player.berryRegenTurns || 0) + 100
-    log('You eat the berries. A gentle regeneration takes hold.', 'good')
+    log(`You eat the ${food}. A gentle regeneration takes hold.`, 'good')
+  }
+
+  function useFish(idx) {
+    const it = player.inventory[idx]
+    if (!it || it.kind !== 'fish') return
+    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'fish', idx, replayId:it.replayId})
+    it.count = (it.count || 1) - 1
+    if (it.count <= 0) player.inventory.splice(idx, 1)
+    applyBerryRegeneration('fish')
     consumeItemTurn()
   }
 
@@ -8668,8 +8717,17 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     updateTouchControlsVisibility()
   }
 
-  function useGodModeKey() {
-    recordReplayAction({type: 'godMode'})
+  function useGodModeKey(disable = false) {
+    recordReplayAction({type: 'godMode', disable})
+    if (disable) {
+      player.godMode = false
+      player.godInvisible = false
+      resetSwimming()
+      updateHud()
+      render()
+      log('God mode disabled. Normal terrain and swimming restrictions restored.', 'info')
+      return
+    }
     if (player.godMode) {
       player.godInvisible = !player.godInvisible
       render()
@@ -8694,6 +8752,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     player.baseSpd = 50
     player.baseMf = 25
     player.godMode = true
+    resetSwimming()
     player.godInvisible = true
     player.gold = 500
     // The minimap is cached for performance; filling the discovery grids
@@ -8761,7 +8820,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     if (k === 'g' || k === 'G') {
       ev.preventDefault()
-      if (!ev.repeat) useGodModeKey()
+      if (!ev.repeat) useGodModeKey(ev.shiftKey)
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return
@@ -9047,6 +9106,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     spawnNpcs()
     clearGroundItemsUnderMerchant()
     spawnEdgeHighTierChests()
+    placeFisherman()
+    rebuildMinimapBases()
     ensureMerchantStock()
     stopDeathTransition()
     stopAttackAnimation()

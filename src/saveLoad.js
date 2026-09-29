@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 17 // v17 saves the Herbalist first-gift state; v16 saves temporary monster Alarmed status
+const SAVE_VERSION = 18 // Fisherman quest, stable enemy identity, and Swimming progression/session state
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -90,6 +90,7 @@ function buildSaveObject() {
     worldSeed: WORLD_SEED,
     worldTraits: activeWorldTraits,
     rngState: rngState,
+    nextEnemyId,
     mapWidth: MAP_W,
     mapHeight: MAP_H,
     map: encodeTileGrid(surfaceMap, 'g'),
@@ -119,6 +120,8 @@ function buildSaveObject() {
     spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
     worldEdgesReached: Object.assign({}, worldEdgesReached),
     oldHunterQuest: oldHunterQuest,
+    fishermanQuest,
+    fishermanHut,
     bellReturnedToChapel: bellReturnedToChapel,
     bellRung: bellRung,
     ancientBellLichSpawned: ancientBellLichSpawned,
@@ -140,12 +143,20 @@ function buildSaveObject() {
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       speedPotionTurns: player.speedPotionTurns,
       berryRegenTurns: player.berryRegenTurns,
+      swimming: player.swimming,
+      fishermanRewardClaimed: !!player.fishermanRewardClaimed,
+      swimmingPractice: player.swimmingPractice,
+      swimTurns: player.swimTurns,
+      drowning: player.drowning,
+      swimPosition: player.swimPosition,
       freezing: player.freezing,
       curseDebuffs: player.curseDebuffs,
       equip: player.equip,
       inventory: player.inventory,
     },
     enemies: enemies.filter(e => e.alive).map(e => ({
+      id: e.id,
+      ordinarySurface: !!e.ordinarySurface,
       name: e.name,
       baseName: e.baseName,
       tier: e.tier,
@@ -473,6 +484,8 @@ function loadGameFromObject(data, opts = {}) {
   if (Number.isInteger(data.worldSeed)) WORLD_SEED = data.worldSeed
   Object.assign(worldEdgesReached, data.worldEdgesReached || {})
   oldHunterQuest = data.oldHunterQuest || null
+  fishermanQuest = data.fishermanQuest || null
+  fishermanHut = data.fishermanHut || null
   hunterEnsureIds()
   // Recover-item quests can survive older saves where enemy IDs were not persisted.
   // Repair legacy specific-kill quests whose target ID was lost or changed.
@@ -529,6 +542,14 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  player.swimming = data.player.swimming || 0
+  // Older completed saves awarded this character before reward tracking existed.
+  player.fishermanRewardClaimed = data.player.fishermanRewardClaimed ??
+    (fishermanQuest?.state === 'completed' && (player.swimming > 0 || raceHas('swims')))
+  player.swimmingPractice = data.player.swimmingPractice || 0
+  player.swimTurns = data.player.swimTurns || 0
+  player.drowning = !!data.player.drowning
+  player.swimPosition = data.player.swimPosition || null
   player.characterId = typeof data.player.characterId === 'string' ? data.player.characterId : null
   player.totalXpEarned = Number.isFinite(data.player.totalXpEarned) ? data.player.totalXpEarned : 0
   player.lastTempleHealXp = Number.isFinite(data.player.lastTempleHealXp) ? data.player.lastTempleHealXp : player.totalXpEarned
@@ -612,6 +633,8 @@ function loadGameFromObject(data, opts = {}) {
       }
     }
     return ({
+      id: e.id,
+      ordinarySurface: !!e.ordinarySurface,
       name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
       hp: e.hp, maxHp: e.maxHp, victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
@@ -642,6 +665,9 @@ function loadGameFromObject(data, opts = {}) {
     })
   })
   occupied = new Set()
+  nextEnemyId = 1
+  hunterEnsureIds()
+  nextEnemyId = Math.max(nextEnemyId, data.nextEnemyId || 1)
   for (const e of enemies) occupied.add(keyXY(e.x, e.y))
 
   if (Array.isArray(data.npcs) && data.npcs.length) {
@@ -785,6 +811,7 @@ function loadGameFromObject(data, opts = {}) {
   stopAttackAnimation()
   stopDeathTransition()
   snapCameraToPlayer()
+  reconcileSwimming()
   updateHud()
   render()
   if (!isReplayInit && !opts.isReplayRestore) log('Game loaded.', 'good')

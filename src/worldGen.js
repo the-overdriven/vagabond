@@ -2014,7 +2014,7 @@ function spawnEnemies() {
     if (!placed) return false
     const variance = cfg.statVarianceMin + rng() * cfg.statVarianceSpan
     const e = {
-      name: tmpl.name, tier: tmpl.tier, level: 0,
+      name: tmpl.name, tier: tmpl.tier, level: 0, ordinarySurface: true,
       hp: Math.max(1, Math.round(tmpl.hp * variance)),
       atk: Math.max(1, Math.round(tmpl.atk * variance)),
       def: Math.max(0, Math.round(tmpl.def * variance)),
@@ -2790,6 +2790,7 @@ function spawnNpcs() {
   npcs = []
   const nearTemple = templeNpcCandidates(cfg.templeMaxWalkDistance)
   for (const tmpl of NPC_TEMPLATES) {
+    if (tmpl.placement === 'shoreline') continue
     let x, y
     if (tmpl.name === 'Drunk') {
       let tries = 0

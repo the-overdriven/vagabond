@@ -180,6 +180,7 @@
       "Ancient Lich": {"image": "img/tiles/npc-ancient-lich.png", "scale": 1.0},
       "Merchant": {"image": "img/tiles/npc-merchant.png", "scale": 1.0},
       "Old Hunter": {"image": "img/tiles/npc-old-hunter.png", "scale": 1.0},
+      "Fisherman Hermit": {"image": "img/tiles/npc-fisherman.png", "scale": 1.0},
       "Gravedigger": {"image": "img/tiles/npc-gravedigger.png", "scale": 1.0}
     }
   },
@@ -531,6 +532,10 @@
     "temple": {
       "image": "img/tiles/village-temple.png",
       "scale": 1
+    },
+    "fishermanhut": {
+      "image": "img/tiles/thatched-hut.png",
+      "scale": 0.85
     },
     "village": {
       "image": "img/tiles/thatched-hut.png",
