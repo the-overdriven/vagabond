@@ -15,6 +15,10 @@ describe('Permadeath restart', () => {
       win.eval('die()')
     })
     cy.get('#raceOverlay', {timeout: 12000}).should('have.class', 'show')
+    cy.get('script[src*="supabase"]').should('not.exist')
+    cy.window().then(win => {
+      expect(win.localStorage.getItem('vagabond_online_player_id')).to.equal(null)
+    })
     cy.get('#cursedWorldToggle').should('be.disabled')
     cy.get('#permadeathToggle').should('not.be.checked')
     cy.get('#raceName').type('Second Wanderer')
@@ -43,6 +47,7 @@ describe('Permadeath restart', () => {
       win.eval('die()')
     })
     cy.window().should(win => expect(win.eval('deathTransition')).to.equal(null))
+    cy.get('script[src*="supabase"]').should('not.exist')
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => {
       expect(win.eval('player.characterId')).to.equal(characterId)

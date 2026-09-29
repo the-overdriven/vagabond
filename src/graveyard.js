@@ -18,6 +18,7 @@ const Graveyard = (() => {
   let filter = 'all'
 
   function configured() {
+    if (window.Cypress && !window.__VAGABOND_TEST_GRAVEYARD__) return false
     try {
       const url = new URL(SUPABASE_URL)
       return url.protocol === 'https:' && !!url.hostname && !/placeholder|example|your[-_]/i.test(url.hostname) &&

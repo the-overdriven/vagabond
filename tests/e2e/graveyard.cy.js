@@ -74,6 +74,7 @@ describe('Graveyard', () => {
     cy.window().then(win => {
       expectedVersion = win.VAGABOND_GAME_VERSION
       expect(expectedVersion).to.match(/^v\d+$/)
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
       const remoteRow = {
         character_name: '<img src=x onerror=alert(1)>', race: 'human', level: 1,
         killer_name: '<script>alert(1)</script>', cause_of_death: 'enemy',
@@ -130,6 +131,7 @@ describe('Graveyard', () => {
     cy.get('#btnBegin').click()
     const rows = []
     cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
       win.supabase = {createClient: () => ({from: () => ({
         insert: record => { rows.push(record); return Promise.resolve({error: null}) }
       })})}
@@ -148,6 +150,7 @@ describe('Graveyard', () => {
     beginNewGame()
     const rows = []
     cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
       win.supabase = {createClient: () => ({from: () => ({
         insert: record => { rows.push(record); return Promise.resolve({error: null}) }
       })})}
@@ -169,6 +172,7 @@ describe('Graveyard', () => {
       const rows = []
       cy.window().then(win => {
         expect(win.eval('SUPABASE_URL')).to.equal('https://test.supabase.co')
+        win.__VAGABOND_TEST_GRAVEYARD__ = true
         win.supabase = {createClient: () => ({from: () => ({
           insert: record => { rows.push(record); return Promise.resolve({error: null}) }
         })})}

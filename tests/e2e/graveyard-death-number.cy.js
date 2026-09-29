@@ -15,6 +15,7 @@ describe('Graveyard death numbers after loading', () => {
 
     const rows = []
     cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
       win.supabase = {createClient: () => ({from: () => ({
         insert: record => { rows.push(record); return Promise.resolve({error: null}) }
       })})}
