@@ -1827,6 +1827,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     swimming: 0,
     fishermanRewardClaimed: false,
     fishermanLessonPending: false,
+    fishermanFishGiftGiven: false,
     swimmingPractice: 0,
     swimTurns: 0,
     drowning: false,
@@ -3071,6 +3072,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       swimming: 0,
       fishermanRewardClaimed: false,
       fishermanLessonPending: false,
+      fishermanFishGiftGiven: false,
       swimmingPractice: 0,
       swimTurns: 0,
       drowning: false,
@@ -8082,8 +8084,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
 
   function renderTrade() {
     const herbalist = serviceNpc && serviceNpc.name === 'Herbalist'
-    document.getElementById('tradeTitle').textContent = herbalist ? 'Services of the Herbalist' : 'Trade with the Merchant'
-    if (herbalist) {
+    const fisherman = serviceNpc && serviceNpc.name === FISHERMAN_NAME
+    document.getElementById('tradeTitle').textContent = fisherman ? 'Services of the Fisherman Hermit' : herbalist ? 'Services of the Herbalist' : 'Trade with the Merchant'
+    if (herbalist || fisherman) {
       const buyList = document.getElementById('tradeBuyList')
       buyList.innerHTML = ''
       const addService = (label, action) => {
@@ -8095,9 +8098,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         row.appendChild(b)
         buyList.appendChild(row)
       }
-      addService('Purify mushrooms (2g each)', purifyMushrooms)
-      addService('Make Life Potion (3 herbs + 10g)', makeHerbalistPotion)
-      document.getElementById('tradeSellList').innerHTML = '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
+      if (fisherman) addService('Buy fish (5g)', buyFishermanFish)
+      else {
+        addService('Purify mushrooms (2g each)', purifyMushrooms)
+        addService('Make Life Potion (3 herbs + 10g)', makeHerbalistPotion)
+      }
+      document.getElementById('tradeSellList').innerHTML = fisherman ? '' : '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
       document.getElementById('tradeGold').textContent = player.gold
       return
     }

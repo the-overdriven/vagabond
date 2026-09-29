@@ -333,6 +333,9 @@ async function runReplayAction(action) {
       sellItem(idx)
       break
     }
+    case 'fisherman':
+      if (action.action === 'buyFish') buyFishermanFish()
+      break
     case 'herbalist':
       if (action.action === 'purifyMushrooms') purifyMushrooms()
       else if (action.action === 'makePotion') makeHerbalistPotion()

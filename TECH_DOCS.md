@@ -2888,14 +2888,23 @@ one-way dialogue, with no player choices.
 Turn-in completes the quest but only offers non-Merlings a persistent pending
 lesson (`player.fishermanLessonPending`). The reward is claimed and Swimming 5
 learned only on a successful step from a walkable bank into deep water, with both
-tiles adjacent to the Hermit on the surface. Waiting, teleporting, distant water
+tiles within three tiles (Chebyshev distance) of the Hermit on the surface;
+the move itself must still be exactly one tile. Waiting, teleporting, distant water
 and god-mode travel cannot complete it. The lesson completes before entry practice
 and drowning checks; pending lessons survive saves and deterministic replay.
 The dialogue marker clears while a lesson is pending and returns if god-mode
 disable restores reward entitlement. Merlings instead receive natural-
 swimmer dialogue and 100 XP, without numeric Swimming or practice. State changes
 before granting the reward prevent repeated rewards/restarts. After completion,
-the Hermit provides Fresh Fish. Fish uses the **same regeneration helper as
+the Hermit gives exactly one Fresh Fish per character at first turn-in, including
+Merlings. The persisted `fishermanFishGiftGiven` flag is not cleared by debug
+lesson resets, only by creating a new character. Subsequent interactions open
+the shared services interface, including while the lesson is pending, with only
+**Buy fish (5g)**. Purchases stack fish and record a `fisherman` / `buyFish` replay
+action. The Hermit retains normal one-tile home-radius wandering.
+His discovered hut (not his current position) is a deep-blue (`#003366`) square
+exactly one map tile in both map views, using the shared fog-aware terrain cache.
+Fish uses the **same regeneration helper as
 berries** (+100 regeneration turns), including Troll immunity and normal item
 turn consumption.
 

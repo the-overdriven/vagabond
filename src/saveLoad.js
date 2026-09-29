@@ -146,6 +146,7 @@ function buildSaveObject() {
       swimming: player.swimming,
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
       fishermanLessonPending: !!player.fishermanLessonPending,
+      fishermanFishGiftGiven: !!player.fishermanFishGiftGiven,
       swimmingPractice: player.swimmingPractice,
       swimTurns: player.swimTurns,
       drowning: player.drowning,
@@ -548,6 +549,8 @@ function loadGameFromObject(data, opts = {}) {
   player.fishermanRewardClaimed = data.player.fishermanRewardClaimed ??
     (fishermanQuest?.state === 'completed' && (player.swimming > 0 || raceHas('swims')))
   player.fishermanLessonPending = !!data.player.fishermanLessonPending && !player.fishermanRewardClaimed
+  player.fishermanFishGiftGiven = data.player.fishermanFishGiftGiven ??
+    (player.fishermanRewardClaimed || player.fishermanLessonPending)
   player.swimmingPractice = data.player.swimmingPractice || 0
   player.swimTurns = data.player.swimTurns || 0
   player.drowning = !!data.player.drowning

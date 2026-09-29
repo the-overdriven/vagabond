@@ -156,7 +156,7 @@ function fishermanSupervisedEntry(x, y, from = player) {
   return !!(player.fishermanLessonPending && !player.fishermanRewardClaimed &&
     fishermanQuest?.state === 'completed' && !player.godMode && !raceHas('swims') &&
     currentZ === 0 && npc && bankDistance(from, {x, y}) === 1 &&
-    bankDistance(from, npc) <= 1 && bankDistance({x, y}, npc) <= 1 &&
+    bankDistance(from, npc) <= 3 && bankDistance({x, y}, npc) <= 3 &&
     TILE[map[from.y]?.[from.x]]?.walk && !deepSwimmingWater(from.x, from.y) &&
     deepSwimmingWater(x, y))
 }
@@ -194,8 +194,12 @@ function interactFisherman(record = true) {
     if (activateFishermanQuest(npc)) log('Fisherman Hermit says: My nets have come up empty for days. The fish are disappearing, and something heavy has been dragging itself along the bank. Follow the shore, find it, and deal with it.', 'info')
     else log('Fisherman Hermit says: Quiet water today. Come back later.', 'info')
   } else if ((fishermanQuest.state === 'ready' || fishermanQuest.state === 'completed') &&
-    !player.fishermanRewardClaimed) {
+    !player.fishermanRewardClaimed && !player.fishermanLessonPending) {
     fishermanQuest.state = 'completed'
+    if (!player.fishermanFishGiftGiven) {
+      player.fishermanFishGiftGiven = true
+      addFishermanFish()
+    }
     if (raceHas('swims')) {
       player.fishermanRewardClaimed = true
       player.fishermanLessonPending = false
@@ -207,12 +211,32 @@ function interactFisherman(record = true) {
     }
     reconcileSwimming()
   } else if (fishermanQuest.state === 'completed') {
-    const fish = player.inventory.find(i => i.kind === 'fish')
-    if (fish) fish.count = (fish.count || 1) + 1
-    else player.inventory.push({kind: 'fish', name: 'Fresh Fish', count: 1})
-    log('Fisherman Hermit says: Nets are full. Take a fish.', 'info')
+    freezeNpcFromWandering(npc)
+    serviceNpc = npc
+    if (!replayPlaying) toggleTrade(true)
   } else log('Fisherman Hermit says: The nets are still empty. Someone or something is meddling with the waters. Follow the shore and keep your feet dry.', 'info')
   updateHud()
   render()
   return true
+}
+
+function addFishermanFish() {
+  consolidateConsumableStacks()
+  const fish = player.inventory.find(i => i.kind === 'fish')
+  if (fish) fish.count = (fish.count || 1) + 1
+  else player.inventory.push({kind: 'fish', name: 'Fresh Fish', count: 1})
+}
+
+function buyFishermanFish() {
+  const npc = npcs.find(n => n.name === FISHERMAN_NAME)
+  if (!npc || serviceNpc !== npc || currentZ !== 0 ||
+    bankDistance(player, npc) > 1 || fishermanQuest?.state !== 'completed') return
+  if (player.gold < 5) return log('You need 5g to buy a fish.', 'info')
+  recordReplayAction({type: 'fisherman', action: 'buyFish'})
+  player.gold -= 5
+  addFishermanFish()
+  log('You buy a Fresh Fish for 5g.', 'good')
+  updateHud()
+  renderTrade()
+  renderInventory()
 }

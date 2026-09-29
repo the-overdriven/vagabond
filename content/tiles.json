@@ -183,6 +183,7 @@
     "fishermanhut": {
       "ch": "⌂",
       "color": "#a6beb4",
+      "mini": "#003366",
       "bg": "#241a10",
       "walk": true
     },

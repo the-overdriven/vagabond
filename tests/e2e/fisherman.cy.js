@@ -7,6 +7,82 @@ function begin() {
 }
 
 describe('Fisherman and swimming', () => {
+  it('gives one lifetime fish, sells for 5g through shared services, and replays purchases', () => {
+    begin()
+    cy.window().then(async win => {
+      const results = await win.eval(`(async () => {
+        const n=npcs.find(n=>n.name===FISHERMAN_NAME)
+        player.x=n.x+1;player.y=n.y;player.race='human';player.gold=10
+        player.inventory=[];fishermanQuest={state:'ready'}
+        interactFisherman()
+        const count=()=>player.inventory.filter(i=>i.kind==='fish').reduce((s,i)=>s+i.count,0)
+        const first=count()===1 && player.fishermanFishGiftGiven && player.fishermanLessonPending
+        interactFisherman();interactFisherman()
+        const pending=count()===1 && serviceNpc.name===FISHERMAN_NAME && tradeOpen
+        toggleTrade(false)
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(JSON.parse(JSON.stringify(saved)),{isReplayInit:true})
+        interactFisherman();buyFishermanFish()
+        const purchased=count()===2 && player.gold===5
+        loadGameFromObject(JSON.parse(JSON.stringify(saved)),{isReplayInit:true})
+        await runReplayAction({type:'talk',npc:FISHERMAN_NAME})
+        await runReplayAction({type:'fisherman',action:'buyFish'})
+        const replay=count()===2 && player.gold===5
+        player.gold=4;buyFishermanFish()
+        const insufficient=count()===2 && player.gold===4
+        player.godMode=true;useGodModeKey(true);interactFisherman()
+        const debug=count()===2 && player.fishermanFishGiftGiven
+        resetForNewCharacter();player.race='merling'
+        const npc=npcs.find(n=>n.name===FISHERMAN_NAME)
+        player.x=npc.x+1;player.y=npc.y
+        const reset=!player.fishermanFishGiftGiven
+        interactFisherman();interactFisherman()
+        const merling=count()===1 && player.totalXpEarned===100
+        player.gold=5
+        return {first,pending,purchased,replay,insufficient,debug,reset,merling}
+      })()`)
+      for (const [key,value] of Object.entries(results)) expect(value,key).to.equal(true)
+    })
+    cy.get('#tradeTitle').should('contain', 'Fisherman')
+    cy.get('#tradeBuyList button').should('have.length', 1).and('have.text', 'Buy fish (5g)').click()
+    cy.get('#tradeGold').should('have.text', '0')
+    cy.get('#tradeBuyList button').click()
+    cy.get('#tradeGold').should('have.text', '0')
+  })
+
+  it('accepts a single land-to-water step at range three and paints only the discovered hut tile', () => {
+    begin()
+    cy.window().then(win => {
+      const results=win.eval(`(() => {
+        const n=npcs.find(n=>n.name===FISHERMAN_NAME)
+        n.x=40;n.y=40;player.race='human';player.godMode=false
+        fishermanQuest={state:'completed'};player.fishermanLessonPending=true
+        player.fishermanRewardClaimed=false
+        map[40][43]='grass';map[41][43]='water'
+        map[40][44]='grass';map[41][44]='water'
+        const three=fishermanSupervisedEntry(43,41,{x:43,y:40})
+        const four=!fishermanSupervisedEntry(44,41,{x:43,y:40}) &&
+          !fishermanSupervisedEntry(43,41,{x:44,y:40})
+        const leap=!fishermanSupervisedEntry(43,41,{x:41,y:40})
+        const h=fishermanHut, base=makeMiniBase(3)
+        const pixel=(x,y)=>Array.from(base.ctx.getImageData(x,y,1,1).data).slice(0,3).join(',')
+        discovered[h.y][h.x]=false;paintMiniTile(base,h.x,h.y)
+        const hidden=pixel(h.x*3,h.y*3)!=='0,51,102'
+        markDiscovered(h.x,h.y);paintMiniTile(base,h.x,h.y)
+        const blue=pixel(h.x*3,h.y*3)==='0,51,102' &&
+          pixel(h.x*3+2,h.y*3+2)==='0,51,102'
+        const exact=base.ctx.getImageData(h.x*3+3,h.y*3,1,1).data[3]===0
+        const active=Array.from(miniBases[MAP_SCALE].ctx.getImageData(h.x*MAP_SCALE,h.y*MAP_SCALE,1,1).data).slice(0,3).join(',')==='0,51,102'
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        const loaded=Array.from(miniBases[MAP_SCALE].ctx.getImageData(h.x*MAP_SCALE,h.y*MAP_SCALE,1,1).data).slice(0,3).join(',')==='0,51,102'
+        return {three,four,leap,hidden,blue,exact,active,loaded,
+          wandering:!n.static && !n.free && ENEMY_WANDER_RADIUS===1}
+      })()`)
+      for(const [key,value] of Object.entries(results)) expect(value,key).to.equal(true)
+    })
+  })
+
   it('requires supervised movement, persists and replays the pending lesson, and relearns after god mode', () => {
     begin()
     cy.window().then(async win => {
@@ -28,8 +104,9 @@ describe('Fisherman and swimming', () => {
         player.x=44;player.y=40
         await tryMove(0,1)
         const remote=player.y===40 && player.swimming===0
-        player.x=42;player.y=40
-        await tryMove(0,1)
+        map[41][43]='water'
+        player.x=44;player.y=40
+        await tryMove(-1,1)
         const outsideSupervision=player.y===40 && player.swimming===0
         player.x=41;player.y=41;resetSwimming();render();updateHud()
         skipTurn()
@@ -37,7 +114,7 @@ describe('Fisherman and swimming', () => {
         player.x=41;player.y=40;resetSwimming();player.godMode=true
         await tryMove(0,1)
         const godTravel=player.y===41 && player.swimming===0 && player.fishermanLessonPending
-        player.godMode=false;player.x=41;player.y=40;resetSwimming()
+        player.godMode=false;player.x=43;player.y=40;resetSwimming()
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true});replayAnimationsDisabled=true
         const restored=player.fishermanLessonPending && !player.fishermanRewardClaimed
@@ -64,7 +141,7 @@ describe('Fisherman and swimming', () => {
         const xp=player.totalXpEarned
         useGodModeKey(true);interactFisherman()
         const merlingOnce=player.fishermanRewardClaimed && player.totalXpEarned===xp
-        player.race='human';toggleInv(true)
+        player.race='human';toggleTrade(false);toggleInv(true)
         return {pending,waited,remote,outsideSupervision,teleported,godTravel,restored,learned,replay,
           unlearned,relearned,merlingOnce}
       })()`)
@@ -161,7 +238,7 @@ describe('Fisherman and swimming', () => {
         loadGameFromObject(saved,{isReplayInit:true})
         player.swimming=8;interactFisherman()
         const persisted=player.fishermanRewardClaimed && player.swimming===8 && !fishermanHasNewDialogue()
-        resetForNewCharacter();player.race='human';approach()
+        toggleTrade(false);resetForNewCharacter();player.race='human';approach()
         const marker=fishermanHasNewDialogue() && player.swimming===0
         const count=enemies.length
         interactFisherman()
