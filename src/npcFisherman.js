@@ -184,8 +184,8 @@ function interactFisherman(record = true) {
       gainXp(100)
     } else {
       player.swimming = Math.max(5, player.swimming || 0)
-      log('Fisherman Hermit says: The fish are back, and the nets are filling again. Let me show you how to enter the water safely. Stay beside the bank, breathe steadily, and keep kicking. Five strokes, then rest ashore.', 'info')
-      log('You learned Swimming 5.', 'good')
+      log('Fisherman Hermit says: The fish are back, and the nets are filling again. I noticed you avoid the water like it\'s fire. Come, let me show you how to enter the water safely.', 'info')
+      log('You learned Swimming.', 'good')
     }
     reconcileSwimming()
   } else if (fishermanQuest.state === 'completed') {
