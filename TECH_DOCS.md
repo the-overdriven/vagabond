@@ -360,6 +360,10 @@ deep-water movement earns practice: every 100 points increases Swimming by one
 with rollover and an improvement message. Practice is applied **before** testing
 the drowning threshold, so an improvement can prevent that step's damage.
 Waiting, failed movement, teleports, level changes and rendering earn no practice.
+Disabling god mode while already in deep water keeps adjacent water traversable
+until reaching shore or dying, but blocks entering water from land again without
+Swimming. The consecutive-wait cap does not trap a non-Merling in deep water;
+they can wait until drowning even with god mode's boosted HP.
 
 Entry, first drowning and reaching shore have transition messages, not per-step
 spam. Landing, homecoming, death and level transitions clear the current swim
@@ -373,8 +377,8 @@ breadth-first search and fixed direction order settle ties deterministically.
 The condition-based Drowning badge has no countdown and disappears whenever
 the danger no longer applies.
 
-God mode bypasses movement/swimming restrictions only while enabled. **Shift+G**
-disables it (G retains its existing enable/invisibility behavior), resets the
+God mode bypasses movement/swimming restrictions only while enabled. Pressing
+**G** again disables it, resets the
 current swim session, unlearns Swimming and clears practice and any pending lesson.
 Non-Merlings can ask the Hermit for another lesson on an already completed quest,
 without respawning its predator. Merling reward entitlement is preserved. As before,
@@ -1946,11 +1950,14 @@ When HP reaches zero in normal mode:
 
 - death counter increases
 - one random unequipped backpack item is dropped at the death position, if one
-  is available; one unit is removed when the selected item is a stack
+  is available; one unit is removed when the selected item is a stack, but
+  remains appear only after the Temple teleport
 - a distinct `playerremains` ground object holds that item and uses the
   skeletal-remains glyph without becoming a `skeleton` or permadeath `deadbody`
 - the forage/loot action restores the item and removes `playerremains` from the world
 - death animation occurs
+- temporary effects (regeneration, invisibility, speed, freezing and curse
+  penalties) end on death; an ordinary living Temple return preserves them
 - player returns to Temple at full current maximum HP, including equipment bonuses,
   after the permanent maximum-HP loss has been applied
 - death recovery records earned XP, so later Temple blessings require new XP
@@ -3605,7 +3612,7 @@ Current desktop controls include:
 | Caps Lock | Lock enemy ranges                                              |
 | + / - (including numpad) | Increase / decrease game tile size               |
 | Mouse wheel over game canvas | Increase / decrease game tile size           |
-| G | Enable god mode; afterward toggle god mode invisibility        |
+| G | Toggle god mode on or off                                       |
 
 Tile size starts at 40 canvas pixels and changes in four-pixel steps from 20
 to 96. Desktop recomputes the camera's tile count from available stage width
@@ -3659,13 +3666,13 @@ There is currently no mobile button for waiting (skipping the turn).
 
 # 71. Debug Mode
 
-`G` activates a developer/debug mode. The first press also makes the player
-invisible. Further presses toggle invisibility while keeping god mode's stats,
-gold, and revealed maps. With invisibility off, enemies can detect, pursue,
-ambush, and attack the player; the player no longer looks faded, and visible
-combat rules such as evasion and extra weapon attacks apply. Holding the key
-does not trigger repeated toggles. The key press is a replay action, and the
-visibility flag is saved; older god mode saves load with invisibility on.
+`G` activates a developer/debug mode and makes the player invisible. Pressing
+`G` again turns god mode and its invisibility off, restoring normal movement
+restrictions and drowning. Revealed maps and granted stats/gold remain.
+Holding the key does not trigger repeated toggles. The key press is a replay
+action; older recordings that toggled only god-mode invisibility still replay
+with their original behavior. The visibility flag is saved; older god mode
+saves load with invisibility on.
 
 It:
 

@@ -402,8 +402,10 @@ describe('Fisherman and swimming', () => {
         player.race='human'; player.godMode=true
         const god=isWalkableForPlayer(player.x+1,40)
         player.godMode=false
+        const submerged=isWalkableForPlayer(player.x+1,40)
+        map[player.y][player.x]='grass'
         const normal=!isWalkableForPlayer(player.x+1,40)
-        return {blocked,safe,damage,wait,improve,persisted,ashore,excluded,merling,god,normal}
+        return {blocked,safe,damage,wait,improve,persisted,ashore,excluded,merling,god,submerged,normal}
       })()`)
       for (const [key,value] of Object.entries(result)) expect(value,key).to.equal(true)
     })

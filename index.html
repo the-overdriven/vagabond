@@ -1311,7 +1311,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (!map[y]) return false // world not generated yet
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
-    return (raceHas('swims') || player.swimming > 0 || fishermanSupervisedEntry(x, y)) && deepSwimmingWater(x, y)
+    return (raceHas('swims') || player.swimming > 0 || deepSwimmingWater(player.x, player.y) ||
+      fishermanSupervisedEntry(x, y)) && deepSwimmingWater(x, y)
   }
 
 </script>
@@ -3167,6 +3168,13 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       last_position: {x: player.x, y: player.y, z: currentZ, level_kind: currentLevelKind(),
         biome: map[player.y]?.[player.x] || null}
     })
+    player.invisibleTurns = 0
+    player.godInvisible = false
+    player.speedPotionTurns = 0
+    player.speedPotionBonus = 0
+    player.berryRegenTurns = 0
+    player.freezing = {active: false, turns: 0}
+    player.curseDebuffs = []
     pendingMove = null
     clearAutoPath()
     let xpLoss = 0, maxHpLoss = 0
@@ -5006,7 +5014,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (mapOpen || invOpen || tradeOpen || raceOpen || Graveyard.isOpen() || deathTransition) return
     if (cameraAnimating || attackAnim) return
     recordReplayAction({type: 'skipTurn'})
-    if (consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS) {
+    if (consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS &&
+      !(deepSwimmingWater(player.x, player.y) && !player.godMode && !raceHas('swims'))) {
       log(`You cannot wait more than ${MAX_CONSECUTIVE_WAIT_TURNS} turns in a row.`, 'info')
       return
     }
@@ -8761,8 +8770,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function useGodModeKey(disable = false) {
-    recordReplayAction({type: 'godMode', disable})
-    if (disable) {
+    const turningOff = disable || player.godMode
+    recordReplayAction({type: 'godMode', disable: turningOff})
+    if (turningOff) {
       player.godMode = false
       player.godInvisible = false
       player.swimming = 0
@@ -8773,14 +8783,6 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       updateHud()
       render()
       log('God mode disabled. Swimming unlearned. Normal terrain restrictions restored.', 'info')
-      return
-    }
-    if (player.godMode) {
-      player.godInvisible = !player.godInvisible
-      render()
-      log(player.godInvisible
-        ? 'God mode invisibility enabled.'
-        : 'God mode invisibility disabled. Enemies can see you.', 'info')
       return
     }
     // God mode reveals every generated level, including the shared cave
@@ -8867,7 +8869,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     if (k === 'g' || k === 'G') {
       ev.preventDefault()
-      if (!ev.repeat) useGodModeKey(ev.shiftKey)
+      if (!ev.repeat && !ev.shiftKey) useGodModeKey()
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || Graveyard.isOpen()) return

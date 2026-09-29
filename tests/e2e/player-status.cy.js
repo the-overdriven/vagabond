@@ -8,6 +8,35 @@ function beginStatusGame() {
 }
 
 describe('Active player statuses', () => {
+  it('clears temporary effects on death without clearing them on a living Temple return', () => {
+    beginStatusGame()
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        replayAnimationsDisabled = true
+        player.berryRegenTurns = 67
+        returnPlayerToTemple()
+        const livingReturnPreservesRegen = player.berryRegenTurns === 67
+        player.invisibleTurns = 12
+        player.speedPotionTurns = 8
+        player.speedPotionBonus = 5
+        player.freezing = {active: true, turns: 2}
+        player.curseDebuffs = [{stat: 'atk', amt: -1, turnsLeft: 3}]
+        player.hp = 0
+        die()
+        return {livingReturnPreservesRegen, berryRegenTurns: player.berryRegenTurns,
+          invisibleTurns: player.invisibleTurns, speedPotionTurns: player.speedPotionTurns,
+          speedPotionBonus: player.speedPotionBonus, freezing: player.freezing,
+          curseDebuffs: player.curseDebuffs, statuses: activePlayerStatuses()}
+      })()`)
+      expect(result).to.deep.equal({
+        livingReturnPreservesRegen: true, berryRegenTurns: 0, invisibleTurns: 0,
+        speedPotionTurns: 0, speedPotionBonus: 0, freezing: {active: false, turns: 0},
+        curseDebuffs: [], statuses: []
+      })
+    })
+    cy.get('#playerStatuses').should('not.be.visible')
+  })
+
   it('shows resolved counters, handles freezing cycles and expiry, and consumes no gameplay state', () => {
     beginStatusGame()
     cy.get('#playerStatuses').should('not.be.visible')

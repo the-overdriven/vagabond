@@ -288,7 +288,13 @@ function finishReplayPlayback() {
 async function runReplayAction(action) {
   switch (action.type) {
     case 'godMode':
-      useGodModeKey(!!action.disable)
+      if (!action.disable && player.godMode) {
+        player.godInvisible = !player.godInvisible
+        render()
+        log(player.godInvisible
+          ? 'God mode invisibility enabled.'
+          : 'God mode invisibility disabled. Enemies can see you.', 'info')
+      } else useGodModeKey(!!action.disable)
       break
     case 'move':
       await tryMove(action.dx, action.dy)
