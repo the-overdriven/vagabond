@@ -779,6 +779,7 @@ function loadGameFromObject(data, opts = {}) {
   toggleInv(false)
   toggleMap(false)
   closeRaceSelect() // a loaded character already has a name and a race
+  reusingWorldAfterPermadeath = false
 
   stopCameraAnimation()
   stopAttackAnimation()

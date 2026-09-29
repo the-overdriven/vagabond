@@ -3025,6 +3025,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     currentCave = -1
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
+    reusingWorldAfterPermadeath = true
 
     Object.assign(player, {
       x: spawnPoint.x,
@@ -3045,14 +3046,16 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       gold: 0,
       deaths: 0,
       steps: 0,
+      kills: 0,
       invisibleTurns: 0,
       godMode: false,
       godInvisible: false,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
+      berryRegenTurns: 0,
       freezing: {active: false, turns: 0},
       curseDebuffs: [],
-      equip: {weapon: null, shield: null, armor: null},
+      equip: {weapon: null, shield: null, armor: null, blackkey: null},
       inventory: [],
       permadeath: false
     })
@@ -4625,6 +4628,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   let mapOpen = false, invOpen = false, tradeOpen = false
   let raceOpen = true // block play input from startup through character creation
   let worldGenerating = false
+  let reusingWorldAfterPermadeath = false
   function setLoading(message) {
     const overlay = document.getElementById('loadingOverlay')
     overlay.hidden = !message
@@ -8944,8 +8948,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     raceOpen = true
     buildRaceGrid()
     document.getElementById('raceOverlay').classList.add('show')
+    document.getElementById('btnBegin').disabled = false
     document.getElementById('permadeathToggle').checked = false
-    document.getElementById('cursedWorldToggle').checked = false
+    const cursedWorldToggle = document.getElementById('cursedWorldToggle')
+    cursedWorldToggle.checked = reusingWorldAfterPermadeath && activeWorldTraits.length > 0
+    cursedWorldToggle.disabled = reusingWorldAfterPermadeath
     document.getElementById('replayToggle').checked = false
     const nameInput = document.getElementById('raceName')
     nameInput.value = ''
@@ -8968,16 +8975,19 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     worldGenerating = true
     document.getElementById('btnBegin').disabled = true
-    setLoading('Generating world...')
+    setLoading(reusingWorldAfterPermadeath ? 'Starting journey...' : 'Generating world...')
     try {
       await paintLoading()
       player.name = name
       player.race = selectedRaceId
       player.permadeath = document.getElementById('permadeathToggle').checked
       player.characterId = Graveyard.newCharacterId()
-      if (document.getElementById('cursedWorldToggle').checked) chooseWorldTraits()
-      else applyWorldTraits([])
-      await generateNewWorld()
+      if (reusingWorldAfterPermadeath) snapCameraToPlayer()
+      else {
+        if (document.getElementById('cursedWorldToggle').checked) chooseWorldTraits()
+        else applyWorldTraits([])
+        await generateNewWorld()
+      }
       worldGenerating = false
       player.hp = playerMaxHp()
       // Replay is opt-in per character. Clear out whatever the previous
@@ -8987,6 +8997,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       if (document.getElementById('replayToggle').checked) startReplayRecording()
       updateReplayButton()
       closeRaceSelect()
+      reusingWorldAfterPermadeath = false
       const race = raceDef()
       log(`${player.name} the ${race.name}. ${race.bonus}.`, 'good')
       log('You awaken at the Temple, mysterious wilds stretch before you.\nIn this strange world, danger lurks around every corner.\nChoose your battles wisely. You have to be careful where you step, as some creatures you might not outrun. Above all, beware the winged wyverns.\nMake good use of your gear and supplies, for cunning and preparation may prove as valuable as steel. Great treasures await those who dare venture beyond.', 'info')
