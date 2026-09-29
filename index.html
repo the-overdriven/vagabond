@@ -2981,7 +2981,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     snapCameraToPlayer()
   }
 
-  function createPermadeathBody(killer) {
+  function createPermadeathBody(killer, place = true) {
     const gear = ['weapon', 'shield', 'armor'].map(slot => player.equip[slot]).filter(Boolean)
     const bestTier = gear.length ? Math.max(...gear.map(i => i.tier || 0)) : -1
     const best = gear.filter(i => (i.tier || 0) === bestTier)
@@ -2994,7 +2994,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad')
       }
     }
-    groundItems.push({
+    const body = {
       x: player.x,
       y: player.y,
       level: currentZ,
@@ -3005,10 +3005,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       gear: bodyGear ? {...bodyGear} : null,
       gold: Math.floor(player.gold * 0.1),
       looted: false
-    })
+    }
+    if (place) groundItems.push(body)
+    return body
   }
 
-  function createNormalDeathRemains() {
+  function createNormalDeathRemains(place = true) {
     const equipped = new Set(Object.values(player.equip).filter(Boolean))
     const candidates = player.inventory
       .map((item, index) => ({item, index}))
@@ -3022,7 +3024,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     } else {
       player.inventory.splice(dropped.index, 1)
     }
-    groundItems.push({
+    const remains = {
       x: player.x,
       y: player.y,
       level: currentZ,
@@ -3030,8 +3032,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       caveIndex: currentCave,
       kind: 'playerremains',
       item
-    })
-    return item
+    }
+    if (place) groundItems.push(remains)
+    return remains
   }
 
   function resetForNewCharacter() {
@@ -3086,7 +3089,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     selectedRaceId = DEFAULT_RACE
   }
 
-  function startDeathFade() {
+  function startDeathFade(remains) {
     if (!deathTransition || deathTransition.phase !== 'pending') return
     deathTransition = {
       phase: 'out',
@@ -3106,10 +3109,12 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         else {
           stopDeathTransition()
           resetForNewCharacter()
+          if (remains) groundItems.push(remains)
           openRaceSelect()
           render(now)
           return
         }
+        if (remains) groundItems.push(remains)
         updateHud()
         deathTransition = {phase: 'in', start: now, duration: 900, rotation: 0}
         render(now)
@@ -3129,10 +3134,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
 
   function die(killer = null, cause = 'environment') {
     if (deathTransition) return
-    if (cause === 'drowning') {
-      const shore = drowningShore()
-      if (shore) { player.x = shore.x; player.y = shore.y }
-    }
+    const shore = cause === 'drowning' ? drowningShore() : null
     resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
     Graveyard.recordDeath({
@@ -3182,9 +3184,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         log(`The ${killer.name} has tasted victory. It grows stronger.`, 'bad')
       }
     }
-    let droppedItem = null
-    if (player.permadeath) createPermadeathBody(killer)
-    else droppedItem = createNormalDeathRemains()
+    const remains = player.permadeath ? createPermadeathBody(killer, false) : createNormalDeathRemains(false)
+    if (remains && shore) { remains.x = shore.x; remains.y = shore.y }
+    const droppedItem = player.permadeath ? null : remains?.item
     const deathLogId = log(
       player.permadeath
         ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
@@ -3200,11 +3202,13 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       deathTransition = null
       if (!player.permadeath) {
         returnPlayerToTemple()
+        if (remains) groundItems.push(remains)
         updateHud()
         updateTooltip()
         render()
       } else {
         resetForNewCharacter()
+        if (remains) groundItems.push(remains)
         openRaceSelect()
         render()
       }
@@ -3219,7 +3223,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       permadeath: player.permadeath
     }
     startDeathRotationAnimation()
-    waitForLogId(deathLogId).then(waitForLogIdle).then(startDeathFade)
+    waitForLogId(deathLogId).then(waitForLogIdle).then(() => startDeathFade(remains))
   }
 
   /* ============================== ENEMY AI TURN ============================== */

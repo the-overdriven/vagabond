@@ -13,6 +13,7 @@ describe('Permadeath restart', () => {
       seed = win.eval('WORLD_SEED')
       characterId = win.eval('player.characterId')
       win.eval('die()')
+      expect(win.eval("groundItems.some(item => item.kind === 'deadbody' && item.name === 'First Wanderer')")).to.equal(false)
     })
     cy.get('#raceOverlay', {timeout: 12000}).should('have.class', 'show')
     cy.get('script[src*="supabase"]').should('not.exist')

@@ -145,6 +145,59 @@ describe('Graveyard', () => {
     cy.wrap(rows).should('have.length', 1)
   })
 
+  it('records drowning in deep water and places the remains on shore only after respawn', () => {
+    configureTestGraveyard()
+    beginNewGame('Drowning Tester')
+    const rows = []
+    cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) },
+        select: () => ({
+          order() { return this },
+          limit() { return this },
+          then(resolve) { resolve({data: rows, error: null}) }
+        })
+      })})}
+      win.eval(`enemies = []; npcs = []
+        for (let y = 48; y <= 52; y++) for (let x = 48; x <= 52; x++) map[y][x] = 'water'
+        map[49][50] = 'grass'
+        player.x = 50; player.y = 50; player.hp = 1
+        player.swimming = 0; player.swimTurns = 1
+        player.swimPosition = {x: 50, y: 50, z: 0}
+        player.inventory = [{kind: 'fish', name: 'Fish'}]
+        advanceSwimming(false)`)
+      expect(win.eval('player.x')).to.equal(50)
+      expect(win.eval('player.y')).to.equal(50)
+      expect(win.eval("groundItems.some(item => item.kind === 'playerremains' && item.x === 50 && item.y === 49)")).to.equal(false)
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      expect(records[0]).to.include({cause_of_death: 'drowning', killer_name: null})
+      expect(records[0].last_position).to.include({x: 50, y: 50, biome: 'water'})
+    })
+    cy.window().should(win => {
+      expect(win.eval('deathTransition')).to.equal(null)
+      expect(win.eval('player.x')).to.equal(win.eval('spawnPoint.x'))
+      expect(win.eval('player.y')).to.equal(win.eval('spawnPoint.y'))
+      expect(win.eval("groundItems.filter(item => item.kind === 'playerremains' && item.x === 50 && item.y === 49)")).to.have.length(1)
+    })
+    cy.get('#btnGraveyard').click()
+    cy.get('#graveyardList').should('contain.text', 'Cause: Drown')
+  })
+
+  it('keeps ordinary death remains hidden until the player returns to the Temple', () => {
+    beginNewGame()
+    cy.window().then(win => {
+      win.eval(`player.inventory = [{kind: 'fish', name: 'Fish'}]; die()`)
+      expect(win.eval("groundItems.some(item => item.kind === 'playerremains')")).to.equal(false)
+    })
+    cy.window().should(win => {
+      expect(win.eval('deathTransition')).to.equal(null)
+      expect(win.eval("groundItems.some(item => item.kind === 'playerremains')")).to.equal(true)
+    })
+  })
+
   it('skips all online death activity during replay execution', () => {
     configureTestGraveyard()
     beginNewGame()

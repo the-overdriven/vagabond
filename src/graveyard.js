@@ -189,6 +189,7 @@ const Graveyard = (() => {
   function deathCause(row) {
     if (row.killer_name) return row.killer_name
     return {
+      drowning: 'Drown',
       poisonous_mushroom: 'Ate poisonous mushroom',
       freezing: 'Frozen to death',
       environment: 'Unknown environmental cause'

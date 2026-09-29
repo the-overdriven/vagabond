@@ -4460,6 +4460,8 @@ into the Supabase SQL Editor of a new project. Keep the Data API enabled. No
 other dashboard configuration is required for a new default project. If the
 project already has a `pgrst.db_pre_request` hook, compose the checks rather
 than overwrite it.
+For an existing Graveyard database, apply `supabase-graveyard-drowning.sql`
+before deploying the client so its cause constraint accepts drowning deaths.
 
 The browser's `vagabond_online_player_id` localStorage entry is a random UUID
 created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
@@ -4485,7 +4487,7 @@ Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `player_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
 `cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
 `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
-or legacy/unknown `environment`), `max_hp`, `atk`,
+`drowning` (shown as Drown), or legacy/unknown `environment`), `max_hp`, `atk`,
 `def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
 names), `equipment` (JSONB equipped-item snapshots with base/name, actual
 ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if
