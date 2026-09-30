@@ -197,6 +197,7 @@ describe('Vagabond smoke test', () => {
     pressToggleMap()
     cy.get('#mapOverlay').should('not.have.class', 'show')
   })
+
   it('applies the NPC placement, merchant stock, Herbalist gift, and HUD polish rules', () => {
     beginNewGame('NPC Polish Tester')
 
@@ -267,9 +268,7 @@ describe('Vagabond smoke test', () => {
       expect(gift.savedFlag).to.equal(true)
     })
   })
-
 })
-
 
 describe('Non-gear item catalog', () => {
   it('preserves chest boundaries and forage chances on percentage scales', () => {
@@ -429,7 +428,6 @@ describe('Non-gear item catalog', () => {
       })
     })
   }
-})
 
   it('brews only affordable whole potions across herb stacks without turns or RNG', () => {
     beginNewGame('Brewing Tester')
