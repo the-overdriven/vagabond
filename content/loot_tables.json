@@ -8,17 +8,7 @@
       90,
       140
     ],
-    "_byTierNote": "indexed by item tier 1-5 (index 0 unused)",
-    "flat": {
-      "potion": 8,
-      "speedpotion": 12,
-      "scroll": 15,
-      "idscroll": 20,
-      "herb": 4,
-      "mushroom": 3,
-      "ediblemushroom": 5,
-      "berries": 2
-    }
+    "_byTierNote": "indexed by item tier 1-5 (index 0 unused)"
   },
   "forage": {
     "_note": "Rolled on forest tiles via tryForage(); each tile can only be foraged once. Thresholds are cumulative on a 0-1 roll.",
@@ -65,13 +55,13 @@
       },
       {
         "upTo": 90,
-        "result": "scrollOfInvisibility"
+        "result": "scroll"
       },
       {
         "upTo": 100,
-        "result": "speedPotion"
+        "result": "speedpotion"
       }
     ],
-    "elseResult": "idScroll"
+    "elseResult": "idscroll"
   }
 }

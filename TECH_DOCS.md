@@ -2070,6 +2070,42 @@ Supplies lists consumable food, herbs, mushrooms, potions, and scrolls,
 including potatoes. Other excludes equipment and supplies; All keeps its
 existing consumables-first ordering. Tabs only filter displayed inventory.
 
+## Non-gear item catalog
+
+`content/items.json` defines all 21 non-gear inventory kinds. Weapons, shields,
+armor, and procedural artifacts retain their existing configuration systems.
+The dictionary keys are the canonical `kind` identifiers used by inventory,
+loot, merchant references, saves, and replay actions.
+
+Each definition contains a default `name`, inventory `category` (`supplies` or
+`other`), `stackable`, base `sellValue`, and ordered `actions`. Optional
+`description`, `effect`, `carryStats`, and `icon` fields describe inspection
+text, behavior parameters, carrying modifiers, and an inventory-icon override.
+Without an override the icon is `img/icons/<kind>.svg`.
+
+Actions name approved JavaScript handlers; JSON contains no executable rules.
+Inventory buttons and replay item-use actions share that handler registry.
+Handlers retain turn costs, swimming restrictions, quest consequences, and
+replay recording. An empty actions list means no inventory button: potatoes
+are inert Supplies, valuables are Other, and Identification scrolls are used
+through an artifact's identification button. The Black Key remains in inventory
+when equipped and uses its special Equip/Unequip action.
+
+Item creation uses the catalog's defaults. Instances retain their counts,
+replay IDs, and unique data such as generated tombstone inscriptions; actions
+and effect definitions are not copied into saves. Stackable kinds merge by kind,
+while tombstones and other non-stackable objects retain separate identities.
+Catalog loading and item creation consume no gameplay RNG. Carried modifiers
+apply once per present kind; carrying the bell gives SPD −5.
+
+Drop locations and probabilities stay in `loot_tables.json` and world-generation
+configuration. Merchant quantities and purchase prices stay in
+`merchant_stock.json`, which references item kinds without duplicating names.
+World-dependent mushroom poison chance stays in world-generation configuration.
+Chests, corpses, campfires, and other environmental objects are outside this
+inventory catalog.
+
+
 A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
@@ -2743,9 +2779,14 @@ Wyrdling increases the healing effect by 25%. Example: 25% HP becomes 31.25% HP 
 
 ## Handful of Berries
 
-Foraged item. Grants stacking Troll-like regeneration for 100 turns.
+Foraged item. Shares its regeneration effect with Fresh Fish: each serving adds
+100 turns, or 125 for a Wyrdling, to the existing regeneration duration.
+Eating spends one turn, leaving 99 or 124 turns after the first serving.
+Trolls consume either food without gaining additional regeneration.
 
-Wyrdling increases the duration by 25%. Example: 100 turns become 125 turns.
+Wyrdling increases each serving's duration by 25% before it is added to the
+existing counter. Both foods use the same five-turn regeneration tick.
+Effect durations are configured per item in `content/items.json`.
 
 ## Mushroom
 
@@ -3109,7 +3150,7 @@ surface ground item already occupies that coordinate. As a compatibility guard,
 loading a save removes any surface ground item found directly under the Merchant;
 this repairs older worlds that already contain such an impossible overlap. All non-Drunk named NPCs use the Temple walk-distance placement rule described in section 50.
 
-Stackable consumables are grouped by kind. Pickups and purchases add to an
+Stackable items are grouped by kind. Pickups and purchases add to an
 existing stack regardless of item name; opening the inventory merges duplicate
 stacks already present in older saves, keeping their total count.
 
@@ -3143,24 +3184,26 @@ The modifier's name/stat does not change this formula; only `modAmt` matters.
 
 ### Non-tiered items
 
-If the item has no tier, the game first checks:
+Non-gear inventory items use their `sellValue` from `content/items.json`.
+Values are independent of merchant stock and saved `merchantPrice` fields.
 
-```text
-FLAT_SELL_VALUE[item.kind]
-```
+| Item | Sell value |
+|---|---:|
+| Life Potion | 8g |
+| Potion of Speed | 12g |
+| Scroll of Invisibility | 15g |
+| Scroll of Identification | 20g |
+| Scroll of Homecoming | 50g |
+| Healing Herb | 4g |
+| Mushroom | 3g |
+| Edible Mushroom | 5g |
+| Handful of Berries | 2g |
+| Amber | 20g |
+| Seashell | 10g |
 
-Those flat values are also loaded from `content/loot_tables.json`.
-
-Amber and Seashell are a special fallback: they use the `value` stored on the
-item itself. In the current digging implementation:
-
-```text
-Amber    = 20g
-Seashell = 10g
-```
-
-Items with neither a tier nor a configured flat value are worth 0g and cannot
-be sold (for example, lore-only tombstone items).
+Fresh Fish, Potato, tools, and quest/readable objects have a sell value of 0g
+and cannot be sold. Homecoming costs 100g to buy; its nine-scroll initial stock
+and purchase price remain configured in `merchant_stock.json`.
 
 ### Buying from the Merchant
 
@@ -3179,8 +3222,8 @@ fixed prices are configuration data, not hard-coded in `itemSellValue()`.
 Fixed merchant weapons use `base` as a reference into
 `content/gear_weapons.json`; combat stats are not duplicated in merchant
 configuration. The guaranteed Two-handed Sword therefore inherits the
-canonical tier-4 definition (9 ATK, 2 GRACE, two-handed), while
-`merchant_stock.json` supplies only its fixed 200g purchase price. If a
+canonical tier-4 definition (10 ATK, 2 GRACE, two-handed), while
+`merchant_stock.json` supplies only its fixed 600g purchase price. If a
 configured weapon name cannot be resolved, the item is skipped and a warning
 is written to the console. `ensureMerchantStock()` also reapplies the canonical
 weapon fields to a matching item already present in saved merchant stock, which

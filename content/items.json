@@ -1,0 +1,280 @@
+{
+  "potion": {
+    "name": "Life Potion",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 8,
+    "actions": [
+      {
+        "label": "Drink",
+        "handler": "potion"
+      }
+    ],
+    "effect": {
+      "fullHeal": true
+    }
+  },
+  "speedpotion": {
+    "name": "Potion of Speed",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 12,
+    "actions": [
+      {
+        "label": "Drink",
+        "handler": "speedpotion"
+      }
+    ],
+    "effect": {
+      "baseBonus": 3,
+      "speedDivisor": 3,
+      "durationTurns": 15,
+      "consumableBonus": true
+    }
+  },
+  "herb": {
+    "name": "Healing Herb",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 4,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "herb"
+      }
+    ],
+    "effect": {
+      "maxHpFraction": 0.25,
+      "consumableBonus": true
+    }
+  },
+  "mushroom": {
+    "name": "Mushroom",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 3,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "mushroom"
+      }
+    ],
+    "effect": {
+      "maxHpFraction": 0.25,
+      "consumableBonus": true
+    }
+  },
+  "ediblemushroom": {
+    "name": "Edible Mushroom",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 5,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "ediblemushroom"
+      }
+    ],
+    "effect": {
+      "maxHpFraction": 0.25,
+      "consumableBonus": true
+    }
+  },
+  "berries": {
+    "name": "Handful of Berries",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 2,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "berries"
+      }
+    ],
+    "effect": {
+      "durationTurns": 100,
+      "consumableBonus": true
+    }
+  },
+  "fish": {
+    "name": "Fresh Fish",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "fish"
+      }
+    ],
+    "effect": {
+      "durationTurns": 100,
+      "consumableBonus": true
+    }
+  },
+  "potato": {
+    "name": "Potato",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 0,
+    "actions": []
+  },
+  "scroll": {
+    "name": "Scroll of Invisibility",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 15,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "scroll"
+      }
+    ],
+    "effect": {
+      "durationTurns": 20,
+      "consumableBonus": true
+    }
+  },
+  "homecomingscroll": {
+    "name": "Scroll of Homecoming",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 50,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "homecomingscroll"
+      }
+    ]
+  },
+  "idscroll": {
+    "name": "Scroll of Identification",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 20,
+    "actions": []
+  },
+  "amber": {
+    "name": "Amber",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 20,
+    "actions": []
+  },
+  "seashell": {
+    "name": "Seashell",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 10,
+    "actions": []
+  },
+  "shovel": {
+    "name": "Shovel",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Dig",
+        "handler": "dig"
+      }
+    ]
+  },
+  "wheelbarrow": {
+    "name": "Unknown-Alloy Wheelbarrow",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect wheelbarrow"
+      }
+    ],
+    "description": "Small wheelbarrow made of an unknown alloy. Surprisingly light and durable."
+  },
+  "bigbell": {
+    "name": "Enormous Brass Bell",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "?",
+        "handler": "inspect"
+      }
+    ],
+    "description": "An enormous brass bell, impossibly heavy.",
+    "carryStats": {
+      "spd": -5
+    }
+  },
+  "blackkey": {
+    "name": "Black Key",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Equip",
+        "handler": "blackKey",
+        "activeLabel": "Unequip"
+      },
+      {
+        "label": "?",
+        "handler": "inspect"
+      }
+    ],
+    "description": "A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth."
+  },
+  "treasuremap": {
+    "name": "Old Treasure Map",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Inspect",
+        "handler": "treasuremap"
+      }
+    ]
+  },
+  "treasurecasket": {
+    "name": "Old Rotten Casket",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Open",
+        "handler": "openCasket"
+      }
+    ],
+    "description": "An old rotten casket, half-swallowed by the sand."
+  },
+  "tombstone": {
+    "name": "Mysterious Tombstone",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "tombstone"
+      }
+    ]
+  },
+  "oddTombstone": {
+    "name": "Odd Tombstone",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "?",
+        "handler": "inscription"
+      }
+    ]
+  }
+}

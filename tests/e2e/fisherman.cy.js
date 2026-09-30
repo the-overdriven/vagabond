@@ -411,7 +411,7 @@ describe('Fisherman and swimming', () => {
     })
   })
 
-  it('gives Merlings XP instead of lessons and shares berry effects with fish including Troll immunity', () => {
+  it('gives Merlings XP instead of lessons and scales shared food effects for Wyrdlings, with Troll immunity', () => {
     begin()
     cy.window().then(win => {
       const result=win.eval(`(() => {
@@ -430,9 +430,15 @@ describe('Fisherman and swimming', () => {
         const berries=player.berryRegenTurns
         player.race='troll'
         applyBerryRegeneration('fish')
-        return {reward,once,skill:player.swimming,practice:player.swimmingPractice,fish,berries,troll:player.berryRegenTurns}
+        const troll=player.berryRegenTurns
+        player.race='wyrdling'; player.berryRegenTurns=0
+        applyBerryRegeneration('fish')
+        const wyrdlingFish=player.berryRegenTurns
+        applyBerryRegeneration('berries')
+        const wyrdlingBerries=player.berryRegenTurns
+        return {reward,once,skill:player.swimming,practice:player.swimmingPractice,fish,berries,troll,wyrdlingFish,wyrdlingBerries}
       })()`)
-      expect(result).to.deep.equal({reward:100,once:100,skill:0,practice:0,fish:100,berries:200,troll:200})
+      expect(result).to.deep.equal({reward:100,once:100,skill:0,practice:0,fish:100,berries:200,troll:200,wyrdlingFish:125,wyrdlingBerries:250})
     })
   })
 

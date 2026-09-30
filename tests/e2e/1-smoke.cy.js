@@ -269,3 +269,101 @@ describe('Vagabond smoke test', () => {
   })
 
 })
+
+
+describe('Non-gear item catalog', () => {
+  it('keeps ground pickups and all consumable chest outcomes on the catalog path', () => {
+    beginNewGame('Catalog Loot Tester')
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        const previous = {inventory: player.inventory, groundItems, rng}
+        let draws = 0
+        try {
+          player.inventory = []
+          const chestKinds = []
+          for (const roll of [80, 87, 95, 105]) {
+            rng = () => { draws++; return roll / 110 }
+            groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
+            checkGroundAt(player.x, player.y)
+            chestKinds.push(player.inventory.at(-1).kind)
+          }
+          player.inventory = []
+          groundItems = ['potion', 'scroll', 'speedpotion'].map(kind =>
+            ({kind, x: player.x, y: player.y, level: currentZ}))
+          checkGroundAt(player.x, player.y)
+          return {chestKinds, draws, groundKinds: player.inventory.map(it => it.kind).sort(),
+            names: player.inventory.map(it => it.name).sort(), remainingGround: groundItems.length}
+        } finally {
+          player.inventory = previous.inventory; groundItems = previous.groundItems; rng = previous.rng
+        }
+      })()`)
+      expect(result).to.deep.equal({chestKinds: ['potion', 'scroll', 'speedpotion', 'idscroll'], draws: 4,
+        groundKinds: ['potion', 'scroll', 'speedpotion'],
+        names: ['Life Potion', 'Potion of Speed', 'Scroll of Invisibility'], remainingGround: 0})
+    })
+  })
+
+  it('creates stacks and distinct inscriptions and keeps Homecoming at 100g', () => {
+    beginNewGame('Catalog Tester')
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        player.inventory = []
+        addHerb(); addHerb(); addFishermanFish(); addPotato()
+        addInventoryItem('tombstone', {inscription: 'First'})
+        addInventoryItem('tombstone', {inscription: 'Second'})
+        const herbs = player.inventory.find(it => it.kind === 'herb')
+        const home = merchantStock.find(it => it.kind === 'homecomingscroll')
+        const before = player.gold
+        player.gold = 100
+        buyItem(home)
+        const bought = player.inventory.find(it => it.kind === 'homecomingscroll')
+        const result = {herbs: herbs.count, fishName: player.inventory.find(it => it.kind === 'fish').name,
+          inscriptions: player.inventory.filter(it => it.kind === 'tombstone').map(it => it.inscription),
+          homePrice: home.merchantPrice, homeSell: itemSellValue(bought), gold: player.gold,
+          homeCount: home.count, potatoValue: itemSellValue(player.inventory.find(it => it.kind === 'potato')),
+          amberValue: itemSellValue(createItem('amber')), shellValue: itemSellValue(createItem('seashell'))}
+        player.gold = before
+        return result
+      })()`)
+      expect(result).to.deep.equal({herbs: 2, fishName: 'Fresh Fish', inscriptions: ['First', 'Second'],
+        homePrice: 100, homeSell: 50, gold: 0, homeCount: 8, potatoValue: 0, amberValue: 20, shellValue: 10})
+    })
+  })
+
+  for (const width of [1440, 390]) {
+    it(`keeps supply and quest buttons working at ${width}px`, () => {
+      cy.viewport(width, 900)
+      beginNewGame('Catalog UI Tester')
+      cy.window().then(win => win.eval(`
+        player.inventory = []
+        addHerb(); addPotato(); addIdScroll(); addInventoryItem('amber')
+        addInventoryItem('blackkey'); addInventoryItem('treasurecasket'); addInventoryItem('shovel')
+        player.hp = playerMaxHp() - 50
+        invTab = 'all'; toggleInv(true)
+      `))
+      cy.get('#invList .invitem').contains('Potato').parent().find('button').should('not.exist')
+      cy.get('#invList .invitem').contains('Scroll of Identification').parent().find('button').should('not.exist')
+      cy.get('#invList .invitem').contains('Amber').parent().find('button').should('not.exist')
+      cy.get('#invList .invitem').contains('Shovel').parent().find('button').should('have.text', 'Dig')
+      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().find('button').should('have.text', 'Open')
+      let turn
+      cy.window().then(win => { turn = win.eval('turnCount') })
+      cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Equip').click()
+      cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Unequip').should('be.visible')
+      cy.window().then(win => {
+        expect(win.eval("player.inventory.some(it => it.kind === 'blackkey')")).to.equal(true)
+        expect(win.eval('turnCount')).to.equal(turn)
+      })
+      cy.get('#invList .invitem').contains('Healing Herb').parent().contains('button', 'Eat').click()
+      cy.window().then(win => {
+        expect(win.eval("player.inventory.some(it => it.kind === 'herb')")).to.equal(false)
+        expect(win.eval('turnCount')).to.equal(turn + 1)
+      })
+      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').click()
+      cy.window().then(win => {
+        expect(win.eval("player.inventory.some(it => it.kind === 'treasurecasket')")).to.equal(false)
+        expect(win.eval("player.inventory.filter(it => it.kind === 'blackkey').length")).to.equal(2)
+      })
+    })
+  }
+})

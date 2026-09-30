@@ -259,9 +259,7 @@ function interactFisherman(record = true) {
 
 function addFishermanFish() {
   consolidateConsumableStacks()
-  const fish = player.inventory.find(i => i.kind === 'fish')
-  if (fish) fish.count = (fish.count || 1) + 1
-  else player.inventory.push({kind: 'fish', name: 'Fresh Fish', count: 1})
+  addInventoryItem('fish')
 }
 
 function buyFishermanFish() {

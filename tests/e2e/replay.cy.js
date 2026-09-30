@@ -232,3 +232,37 @@ describe('Status counters through save and replay', () => {
     cy.get('[data-status="speed"]').should('contain.text', '13t')
   })
 })
+
+
+describe('Catalog food through save and replay', () => {
+  it('preserves stacked Wyrdling food duration, unique items, and depleted scroll stock', () => {
+    beginDeterministicReplayGame('Catalog Replay Tester')
+    cy.window().then(win => win.eval(`
+      player.race = 'wyrdling'
+      player.berryRegenTurns = 0
+      player.inventory = []
+      addBerries(); addFishermanFish()
+      addInventoryItem('oddTombstone', {inscription: 'A unique inscription', tombName: 'Test', tombBirth: 600, tombDeath: 650})
+      merchantStock.find(it => it.kind === 'scroll').count = 0
+      replayRecording = false; replayData = null; startReplayRecording()
+      useBerries(player.inventory.findIndex(it => it.kind === 'berries'))
+      useFish(player.inventory.findIndex(it => it.kind === 'fish'))
+    `))
+    let expected
+    cy.window().then(win => {
+      expect(win.eval('player.berryRegenTurns')).to.equal(248)
+      expect(win.eval('replayData.actions.map(a => a.action)')).to.deep.equal(['berries', 'fish'])
+      expected = win.eval('JSON.stringify({inventory: player.inventory, regen: player.berryRegenTurns, turns: turnCount})')
+    })
+    saveToDiskAndReload('catalog-food')
+    cy.window().then(win => {
+      expect(win.eval('JSON.stringify({inventory: player.inventory, regen: player.berryRegenTurns, turns: turnCount})')).to.equal(expected)
+      expect(win.eval("merchantStock.find(it => it.kind === 'scroll').count")).to.equal(0)
+    })
+    playReplayAndAssertClean()
+    cy.window().then(win => {
+      expect(win.eval('JSON.stringify({inventory: player.inventory, regen: player.berryRegenTurns, turns: turnCount})')).to.equal(expected)
+      expect(win.eval("merchantStock.find(it => it.kind === 'scroll').count")).to.equal(0)
+    })
+  })
+})

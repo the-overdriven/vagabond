@@ -604,7 +604,7 @@ function loadGameFromObject(data, opts = {}) {
   // removed the key from inventory when it was equipped.
   player.equip.blackkey = player.equip.blackkey || null
   if (player.equip.blackkey && !player.inventory.some(i => i.kind === 'blackkey')) {
-    player.inventory.push({kind: 'blackkey', name: 'Black Key'})
+    addInventoryItem('blackkey')
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
   player.godMode = !!data.player.godMode

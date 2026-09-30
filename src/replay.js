@@ -414,19 +414,8 @@ async function runReplayAction(action) {
         })
         return replayDesync(`Replay desynchronized: could not find inventory item ${action.replayId || ''}.`)
       }
-      const fn = {
-        potion: usePotion,
-        scroll: useScroll,
-        homecomingscroll: useHomecomingScroll,
-        speedpotion: useSpeedPotion,
-        herb: useHerb,
-        mushroom: useMushroom,
-        ediblemushroom: useEdibleMushroom,
-        berries: useBerries,
-        fish: useFish,
-        tombstone: readTombstone,
-        identifyArtifact
-      }[action.action]
+      const fn = action.action === 'identifyArtifact' ? identifyArtifact
+        : Object.hasOwn(ITEM_ACTION_HANDLERS, action.action) ? ITEM_ACTION_HANDLERS[action.action] : null
       if (!fn) return replayDesync(`Replay desynchronized: unknown item action ${action.action}.`)
       fn(idx)
       break
