@@ -125,7 +125,7 @@
       "image": "img/tiles/speed-potion.png",
       "scale": 1.5
     },
-    "scroll": {
+    "scrollOfInvisibility": {
       "glyph": "?",
       "color": "#b565d6",
       "image": "img/tiles/scroll-invisibility.png",

@@ -243,7 +243,7 @@ describe('Catalog food through save and replay', () => {
       player.inventory = []
       addBerries(); addFishermanFish()
       addInventoryItem('oddTombstone', {inscription: 'A unique inscription', tombName: 'Test', tombBirth: 600, tombDeath: 650})
-      merchantStock.find(it => it.kind === 'scroll').count = 0
+      merchantStock.find(it => it.kind === 'scrollOfInvisibility').count = 0
       replayRecording = false; replayData = null; startReplayRecording()
       useBerries(player.inventory.findIndex(it => it.kind === 'berries'))
       useFish(player.inventory.findIndex(it => it.kind === 'fish'))
@@ -257,12 +257,12 @@ describe('Catalog food through save and replay', () => {
     saveToDiskAndReload('catalog-food')
     cy.window().then(win => {
       expect(win.eval('JSON.stringify({inventory: player.inventory, regen: player.berryRegenTurns, turns: turnCount})')).to.equal(expected)
-      expect(win.eval("merchantStock.find(it => it.kind === 'scroll').count")).to.equal(0)
+      expect(win.eval("merchantStock.find(it => it.kind === 'scrollOfInvisibility').count")).to.equal(0)
     })
     playReplayAndAssertClean()
     cy.window().then(win => {
       expect(win.eval('JSON.stringify({inventory: player.inventory, regen: player.berryRegenTurns, turns: turnCount})')).to.equal(expected)
-      expect(win.eval("merchantStock.find(it => it.kind === 'scroll').count")).to.equal(0)
+      expect(win.eval("merchantStock.find(it => it.kind === 'scrollOfInvisibility').count")).to.equal(0)
     })
   })
 })

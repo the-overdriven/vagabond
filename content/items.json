@@ -119,15 +119,16 @@
     "sellValue": 0,
     "actions": []
   },
-  "scroll": {
+  "scrollOfInvisibility": {
     "name": "Scroll of Invisibility",
+    "icon": "img/icons/scroll.svg",
     "category": "supplies",
     "stackable": true,
     "sellValue": 15,
     "actions": [
       {
         "label": "Read",
-        "handler": "scroll"
+        "handler": "scrollOfInvisibility"
       }
     ],
     "effect": {

@@ -2656,9 +2656,8 @@ the stored thresholds retain floating-point precision.
 | Scroll of Identification (`elseResult`) | 100 | 9.090909% |
 
 For example, a roll of 79 gives an Invisibility scroll, 86 gives a Speed
-potion, and 95 reaches the Identification-scroll fallback. The descriptive
-loot-result key `scrollOfInvisibility` is mapped by its handler to the existing
-inventory item kind `scroll`; it is a specific outcome, not a scroll category.
+potion, and 95 reaches the Identification-scroll fallback. The specific item ID `scrollOfInvisibility` is shared by the catalog, loot
+results, ground pickups, merchant stock, and recorded replay actions.
 
 The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's

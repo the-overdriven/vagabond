@@ -2131,7 +2131,7 @@ const CAVE_SCENARIOS = [
     surface: {mobs: [['Wolf', 3]], tier: 1, placement: 'far'}},
   {id: 'smugglers_refuge', clue: 'A ragged trail and a discarded torch suggest recent visitors.',
     intro: 'Someone used this passage to hide supplies. Goblins found it first.',
-    surface: {mobs: [['Goblin', 2], ['Giant Rat', 1]], tier: 2, camp: true, supply: 'scroll'}}
+    surface: {mobs: [['Goblin', 2], ['Giant Rat', 1]], tier: 2, camp: true, supply: 'scrollOfInvisibility'}}
 ]
 
 // Preserve the stronger, single-species z:-2 cave population. The five
@@ -2357,7 +2357,7 @@ function spawnCaveScenarios() {
       for (let i = 0; i < cfg.deepProvisionCount; i++) {
         const spot = takeSpot('room', roomOrder[(i + 2) % roomOrder.length] || null)
         if (spot) groundItems.push({x: spot.x, y: spot.y,
-          kind: i % 2 === 0 ? 'potion' : 'scroll', level, levelKind: 'chain', caveIndex})
+          kind: i % 2 === 0 ? 'potion' : 'scrollOfInvisibility', level, levelKind: 'chain', caveIndex})
       }
     }
 
@@ -2526,7 +2526,7 @@ function spawnGroundStuff() {
     }
     while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
     if (tries >= cfg.looseItemPlacementTries) continue
-    groundItems.push({x, y, kind: 'scroll'})
+    groundItems.push({x, y, kind: 'scrollOfInvisibility'})
   }
   // speed potions
   for (let i = 0; i < cfg.looseSpeedPotions; i++) {

@@ -232,7 +232,7 @@ describe('Vagabond smoke test', () => {
           .filter(n => villageNpcNames.has(n.name))
           .map(n => ({name:n.name, tile:surfaceMap[n.y][n.x], distance:dist.get(key(n.x,n.y)) ?? null}))
         const stock = Object.fromEntries(merchantStock
-          .filter(i => ['homecomingscroll','idscroll','scroll'].includes(i.kind))
+          .filter(i => ['homecomingscroll','idscroll','scrollOfInvisibility'].includes(i.kind))
           .map(i => [i.kind, i.count]))
         const sword = merchantStock.find(i => i.kind === 'weapon' && i.base === 'Two-handed Sword')
         return {npcDistances, stock, swordPrice:sword?.merchantPrice}
@@ -243,7 +243,7 @@ describe('Vagabond smoke test', () => {
       }
       expect(state.stock.homecomingscroll).to.equal(9)
       expect(state.stock.idscroll).to.equal(6)
-      expect(state.stock.scroll).to.equal(3)
+      expect(state.stock.scrollOfInvisibility).to.equal(3)
       expect(state.swordPrice).to.equal(600)
     })
 
@@ -281,7 +281,7 @@ describe('Non-gear item catalog', () => {
           multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers}
         const chest = []
         const forage = []
-        const cases = [[85-1e-7,'potion'],[85,'scroll'],[90-1e-7,'scroll'],
+        const cases = [[85-1e-7,'potion'],[85,'scrollOfInvisibility'],[90-1e-7,'scrollOfInvisibility'],
           [90,'speedpotion'],[100-1e-7,'speedpotion'],[100,'idscroll'],[110-1e-7,'idscroll']]
         try {
           for (const [oldRoll, expected] of cases) {
@@ -348,7 +348,7 @@ describe('Non-gear item catalog', () => {
             chestKinds.push(player.inventory.at(-1).kind)
           }
           player.inventory = []
-          groundItems = ['potion', 'scroll', 'speedpotion'].map(kind =>
+          groundItems = ['potion', 'scrollOfInvisibility', 'speedpotion'].map(kind =>
             ({kind, x: player.x, y: player.y, level: currentZ}))
           checkGroundAt(player.x, player.y)
           return {chestKinds, draws, groundKinds: player.inventory.map(it => it.kind).sort(),
@@ -357,8 +357,8 @@ describe('Non-gear item catalog', () => {
           player.inventory = previous.inventory; groundItems = previous.groundItems; rng = previous.rng
         }
       })()`)
-      expect(result).to.deep.equal({chestKinds: ['potion', 'scroll', 'speedpotion', 'idscroll'], draws: 4,
-        groundKinds: ['potion', 'scroll', 'speedpotion'],
+      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 4,
+        groundKinds: ['potion', 'scrollOfInvisibility', 'speedpotion'],
         names: ['Life Potion', 'Potion of Speed', 'Scroll of Invisibility'], remainingGround: 0})
     })
   })
@@ -392,8 +392,11 @@ describe('Non-gear item catalog', () => {
 
   for (const width of [1440, 390]) {
     it(`keeps supply and quest buttons working at ${width}px`, () => {
-      cy.viewport(width, 900)
+      // This test covers inventory controls after character creation. Use a
+      // desktop viewport for setup, then apply the width under test.
+      cy.viewport(1440, 900)
       beginNewGame('Catalog UI Tester')
+      cy.viewport(width, 900)
       cy.window().then(win => win.eval(`
         player.inventory = []
         addHerb(); addPotato(); addIdScroll(); addInventoryItem('amber')

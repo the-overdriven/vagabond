@@ -4069,7 +4069,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     ediblemushroom: idx => useEdibleMushroom(idx),
     berries: idx => useBerries(idx),
     fish: idx => useFish(idx),
-    scroll: idx => useScroll(idx),
+    scrollOfInvisibility: idx => useInvisibilityScroll(idx),
     homecomingscroll: idx => useHomecomingScroll(idx),
     tombstone: idx => readTombstone(idx),
     blackKey: () => toggleBlackKey(),
@@ -4183,8 +4183,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     addInventoryItem('potion')
   }
 
-  function addScroll() {
-    addInventoryItem('scroll')
+  function addInvisibilityScroll() {
+    addInventoryItem('scrollOfInvisibility')
   }
 
   function addHomecomingScroll() {
@@ -4682,7 +4682,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       if (!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot')
     },
     scrollOfInvisibility: () => {
-      addScroll()
+      addInvisibilityScroll()
       lastLootResult = 'a Scroll of Invisibility.'
       if (!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot')
     },
@@ -4746,8 +4746,8 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         log(`You pick up a Potion of Speed.`, 'loot')
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
-      } else if (g.kind === 'scroll') {
-        addScroll()
+      } else if (g.kind === 'scrollOfInvisibility') {
+        addInvisibilityScroll()
         log(`You pick up a Scroll of Invisibility.`, 'loot')
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
@@ -5384,7 +5384,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
             chest: 'a chest',
             potion: 'a potion',
             speedpotion: 'a speed potion',
-            scroll: 'a scroll',
+            scrollOfInvisibility: 'a scroll',
             idscroll: 'a scroll',
             homecomingscroll: 'a scroll',
             treasurecasket: 'an old casket',
@@ -8385,14 +8385,14 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     consumeItemTurn()
   }
 
-  function useScroll(idx) {
+  function useInvisibilityScroll(idx) {
     const it = player.inventory[idx]
-    if (!it || it.kind !== 'scroll') return
+    if (!it || it.kind !== 'scrollOfInvisibility') return
     if (!canUseItemsWhileSwimming()) return
-    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scroll', idx, replayId:player.inventory[idx]?.replayId})
+    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scrollOfInvisibility', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    player.invisibleTurns = itemEffectPower('scroll', itemDefinition('scroll').effect.durationTurns)
+    player.invisibleTurns = itemEffectPower('scrollOfInvisibility', itemDefinition('scrollOfInvisibility').effect.durationTurns)
     log('You read the Scroll of Invisibility. The shadows swallow you.', 'good')
     consumeItemTurn()
   }

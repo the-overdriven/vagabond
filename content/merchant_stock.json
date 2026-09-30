@@ -42,7 +42,7 @@
       "merchantPrice": 100
     },
     "invisibilityScroll": {
-      "kind": "scroll",
+      "kind": "scrollOfInvisibility",
       "count": 3,
       "merchantPrice": 200
     }

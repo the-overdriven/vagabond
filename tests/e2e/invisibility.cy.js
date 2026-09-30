@@ -11,16 +11,21 @@ describe('Scroll of Invisibility', () => {
     beginGame()
     cy.window().then(win => {
       const result = win.eval(`(() => {
-        const stock = merchantStock.find(it => it.kind === 'scroll')
-        player.inventory.push({kind: 'scroll', name: 'Scroll of Invisibility', count: 1})
-        useScroll(player.inventory.length - 1)
+        const stock = merchantStock.find(it => it.kind === 'scrollOfInvisibility')
+        addInvisibilityScroll()
+        ITEM_ACTION_HANDLERS.scrollOfInvisibility(player.inventory.length - 1)
         const humanTurns = player.invisibleTurns
         player.race = 'wyrdling'
-        player.inventory.push({kind: 'scroll', name: 'Scroll of Invisibility', count: 1})
-        useScroll(player.inventory.length - 1)
-        return {stock: {count: stock.count, price: stock.merchantPrice}, humanTurns, wyrdlingTurns: player.invisibleTurns}
+        addInvisibilityScroll()
+        ITEM_ACTION_HANDLERS.scrollOfInvisibility(player.inventory.length - 1)
+        return {stock: {count: stock.count, price: stock.merchantPrice}, humanTurns, wyrdlingTurns: player.invisibleTurns,
+          catalog: {oldKindExists: Object.hasOwn(ITEM_DEFINITIONS, 'scroll'),
+            handler: itemDefinition('scrollOfInvisibility').actions[0].handler,
+            icon: itemIconPath('scrollOfInvisibility')}}
       })()`)
       expect(result.stock).to.deep.equal({count: 3, price: 200})
+      expect(result.catalog).to.deep.equal({oldKindExists: false,
+        handler: 'scrollOfInvisibility', icon: 'img/icons/scroll.svg'})
       expect(result.humanTurns).to.equal(19)
       expect(result.wyrdlingTurns).to.equal(24)
     })
@@ -31,14 +36,14 @@ describe('Scroll of Invisibility', () => {
     beginGame()
     cy.window().then(win => {
       const result = win.eval(`(() => {
-        const scroll = merchantStock.find(it => it.kind === 'scroll')
+        const scroll = merchantStock.find(it => it.kind === 'scrollOfInvisibility')
         player.gold = 600
         for (let i = 0; i < 3; i++) buyItem(scroll)
         ensureMerchantStock()
         renderTrade()
         return {
-          stock: merchantStock.find(it => it.kind === 'scroll')?.count,
-          inventory: player.inventory.find(it => it.kind === 'scroll')?.count,
+          stock: merchantStock.find(it => it.kind === 'scrollOfInvisibility')?.count,
+          inventory: player.inventory.find(it => it.kind === 'scrollOfInvisibility')?.count,
           buyList: document.getElementById('tradeBuyList').textContent
         }
       })()`)

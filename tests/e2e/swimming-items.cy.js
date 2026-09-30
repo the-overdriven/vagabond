@@ -13,7 +13,7 @@ describe('Swimming restrictions and visibility', () => {
         player.race = 'human'
         player.inventory = [
           {kind: 'potion', name: 'Life Potion'},
-          {kind: 'scroll', name: 'Scroll of Invisibility'},
+          {kind: 'scrollOfInvisibility', name: 'Scroll of Invisibility'},
           {kind: 'homecomingscroll', name: 'Scroll of Homecoming'},
           {kind: 'speedpotion', name: 'Potion of Speed'},
           {kind: 'herb', name: 'Healing Herb'},
@@ -30,7 +30,7 @@ describe('Swimming restrictions and visibility', () => {
         ]
         const before = JSON.stringify(player.inventory)
         const turns = turnCount
-        const actions = [usePotion, useScroll, useHomecomingScroll, useSpeedPotion,
+        const actions = [usePotion, useInvisibilityScroll, useHomecomingScroll, useSpeedPotion,
           useHerb, useMushroom, useEdibleMushroom, useBerries, useFish, readTombstone]
         actions.forEach((action, index) => action(index))
         equipItem(10); identifyArtifact(11); openTreasureCasket(); toggleBlackKey()
@@ -41,7 +41,7 @@ describe('Swimming restrictions and visibility', () => {
           player.equip.weapon.name === 'Equipped sword' && !player.equip.blackkey
         player.race = 'merling'; player.hp = playerMaxHp() - 10
         usePotion(0)
-        return {blocked, merling: player.inventory[0].kind === 'scroll' &&
+        return {blocked, merling: player.inventory[0].kind === 'scrollOfInvisibility' &&
           player.hp === playerMaxHp() && turnCount === turns + 1}
       })()`)
       expect(result).to.deep.equal({blocked: true, merling: true})
