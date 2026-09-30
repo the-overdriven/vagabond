@@ -436,7 +436,48 @@ body.hint-collapsed #hint .panel-toggle {
 .mini-actions {
   display: flex;
   justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
   margin-top: 8px;
+}
+
+#btnSideBestiary {
+  padding-left: 7px;
+  padding-right: 7px;
+  font-size: calc(10px * var(--ui-font-scale));
+}
+
+.bestiary-intro {
+  color: var(--parchment-dim);
+  margin: 0 0 12px;
+}
+
+.bestiary-list {
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.bestiary-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 4px;
+  border-bottom: 1px solid rgba(126, 92, 57, .35);
+}
+
+.bestiary-entry:hover, .bestiary-entry:focus-visible {
+  background: rgba(255, 220, 168, .06);
+}
+.bestiary-entry:focus-visible { outline: 1px solid var(--ember-bright); }
+.bestiary-species { color: var(--parchment); }
+.bestiary-count { color: var(--ember-bright); white-space: nowrap; }
+.bestiary-empty { color: var(--parchment-dim); padding: 12px 4px; }
+
+#bestiaryOverlay .closehint {
+  justify-content: center;
+  margin-top: 12px;
 }
 
 .overlay {
@@ -1327,7 +1368,7 @@ body.hint-collapsed #hint .panel-toggle {
     z-index: 100;
   }
 
-  #invOverlay .panelbox, #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #tradeOverlay .panelbox, #raceOverlay .panelbox {
+  #invOverlay .panelbox, #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #tradeOverlay .panelbox, #bestiaryOverlay .panelbox, #raceOverlay .panelbox {
     width: 100%;
     max-width: none;
     height: 100%;
@@ -1368,7 +1409,7 @@ body.hint-collapsed #hint .panel-toggle {
     margin: 0;
   }
 
-  #mapOverlay .panelbox, #treasureMapOverlay .panelbox {
+  #mapOverlay .panelbox, #treasureMapOverlay .panelbox, #bestiaryOverlay .panelbox {
     width: 100%;
   }
 
@@ -1377,7 +1418,7 @@ body.hint-collapsed #hint .panel-toggle {
     max-width: none;
   }
 
-  #invOverlay .closehint, #mapOverlay .closehint, #treasureMapOverlay .closehint {
+  #invOverlay .closehint, #mapOverlay .closehint, #treasureMapOverlay .closehint, #bestiaryOverlay .closehint {
     display: flex;
     justify-content: center;
     gap: 10px;

@@ -148,6 +148,16 @@ The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 
 # 4. Player Stats
 
+## Bestiary
+
+The Bestiary is opened with **B**, from the map sidebar, or from the Character
+inventory panel. It lists each base species the current character has killed
+at least once and shows its total slain count. Hovering or keyboard-focusing an
+entry shows the existing species portrait. Prefix variants share their
+base-species entry; unencountered species are hidden. The list reads the saved
+per-species kill counters and refreshes when opened. It does not affect gameplay,
+RNG or replay actions. A new permadeath character begins with an empty Bestiary.
+
 ## ATK
 
 Calculated from base ATK plus applicable:
@@ -317,6 +327,10 @@ NW
 SE
 SW
 ```
+
+`B` opens or closes the Bestiary. On touch layouts, use the Bestiary button in
+the Character inventory panel; desktop players can also open it from the map
+sidebar.
 
 Keyboard movement includes:
 
@@ -3460,9 +3474,9 @@ Current save version:
 Saves are JSON files.
 
 Version 19 adds Tracking knowledge, per-species kill counts, surface track records
-and their ages, plus each far traveler’s remaining route. Turn count, consecutive waits 
-and the Old Hunter quest serial are saved too; replay restores their actual starting 
-values rather than assuming zero. No migration for older saves is added for these new fields.
+and their ages, plus each far traveler’s remaining route. Turn count, consecutive waits and the Old Hunter quest serial
+are saved too; replay restores their actual starting values rather than assuming
+zero. No migration for older saves is added for these new fields.
 
 Version 18 persists Fisherman hut/quest state, exact enemy IDs and the next-ID
 counter, and all Swimming skill/practice/session fields. Loading does not spawn
