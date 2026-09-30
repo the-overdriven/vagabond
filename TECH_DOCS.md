@@ -3685,6 +3685,7 @@ before each tile-size step.
 # 70. Mobile
 
 Touch controls reuse the same gameplay functions as keyboard controls.
+The backpack opens the inventory, the magnifier runs the normal inspect action (including village huts), and the hand button uses the normal forage/loot action. Each button handles touch and click input while suppressing the duplicate click browsers emit after a touch.
 
 Mobile supports:
 

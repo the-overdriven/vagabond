@@ -9092,6 +9092,45 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   const touchForageBtn = document.getElementById('touchForage')
   const touchInventoryBtn = document.getElementById('touchInventory')
   const touchMapBtn = document.getElementById('touchMap')
+  if (touchSpaceBtn) {
+    const fn = (ev) => {
+      ev.preventDefault()
+      if (ev.type === 'touchstart') touchSpaceBtn.dataset.touchHandled = '1'
+      else if (touchSpaceBtn.dataset.touchHandled) {
+        delete touchSpaceBtn.dataset.touchHandled
+        return
+      }
+      if (!mapOpen && !invOpen && !tradeOpen && !raceOpen && !replayPlaying) inspect()
+    }
+    touchSpaceBtn.addEventListener('touchstart', fn)
+    touchSpaceBtn.addEventListener('click', fn)
+  }
+  if (touchForageBtn) {
+    const fn = (ev) => {
+      ev.preventDefault()
+      if (ev.type === 'touchstart') touchForageBtn.dataset.touchHandled = '1'
+      else if (touchForageBtn.dataset.touchHandled) {
+        delete touchForageBtn.dataset.touchHandled
+        return
+      }
+      if (!mapOpen && !invOpen && !tradeOpen && !raceOpen && !replayPlaying) lootSkeletonOrForage()
+    }
+    touchForageBtn.addEventListener('touchstart', fn)
+    touchForageBtn.addEventListener('click', fn)
+  }
+  if (touchInventoryBtn) {
+    const fn = (ev) => {
+      ev.preventDefault()
+      if (ev.type === 'touchstart') touchInventoryBtn.dataset.touchHandled = '1'
+      else if (touchInventoryBtn.dataset.touchHandled) {
+        delete touchInventoryBtn.dataset.touchHandled
+        return
+      }
+      if (!mapOpen && !tradeOpen && !raceOpen) toggleInv()
+    }
+    touchInventoryBtn.addEventListener('touchstart', fn)
+    touchInventoryBtn.addEventListener('click', fn)
+  }
   if (touchMapBtn) {
     const fn = (ev) => {
       ev.preventDefault()
@@ -9105,7 +9144,6 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     touchMapBtn.addEventListener('touchstart', fn)
     touchMapBtn.addEventListener('click', fn)
   }
-
 
   /* ============================== RACE SELECTION SCREEN ==============================
        Shown before world generation. Begin commits the character choices, then
