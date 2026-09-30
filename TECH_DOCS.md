@@ -2072,11 +2072,12 @@ Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
 Supplies lists consumable food, herbs, mushrooms, potions, and scrolls,
 including potatoes. Other excludes equipment and supplies; All keeps its
 existing consumables-first ordering. Tabs only filter displayed inventory.
-In mouse windows at most 720px wide, inventory, map, treasure map, trade,
+In windows at most 720px wide, inventory, map, treasure map, trade,
 and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
-sidebars are open. Inventory actions remain reachable without horizontal
-scrolling. Touch devices retain their existing full-screen dialog layout.
+sidebars are open. This applies even when the browser reports no pointer. 
+Inventory actions remain reachable without horizontal scrolling. 
+Touch devices retain their existing full-screen dialog layout.
 
 ## Non-gear item catalog
 

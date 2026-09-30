@@ -155,8 +155,10 @@ describe('Non-gear item catalog', () => {
 
   for (const width of [1440, 390]) {
     it(`keeps supply and quest buttons working at ${width}px`, () => {
-      cy.viewport(width, 900)
+      // Character creation is setup; the width under test applies to inventory.
+      cy.viewport(1440, 900)
       beginNewGame('Catalog UI Tester')
+      cy.viewport(width, 900)
       cy.window().then(win => win.eval(`
         player.inventory = []
         addHerb(); addPotato(); addIdScroll(); addInventoryItem('amber')

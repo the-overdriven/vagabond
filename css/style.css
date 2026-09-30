@@ -1327,8 +1327,8 @@ body.hint-collapsed #hint .panel-toggle {
   .cursed-world-option:has(#cursedWorldToggle:checked) ~ .cursed-world-mobile-note { display: block; }
 }
 
-/* Narrow mouse windows still need usable dialogs when sidebars shrink the canvas. */
-@media (max-width: 720px) and (pointer: fine) {
+/* Narrow windows need usable dialogs regardless of the browser pointer mode. */
+@media (max-width: 720px) {
   #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay {
     position: fixed;
     z-index: 100;
