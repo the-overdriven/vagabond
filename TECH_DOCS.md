@@ -152,7 +152,10 @@ The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 
 The Bestiary is opened with **B**, from the map sidebar, or from the Character
 inventory panel. It lists each base species the current character has killed
-at least once and shows its total count. On desktop, hovering or keyboard-
+at least once and shows its total count. Entries run from weakest to strongest
+by base `ATK + DEF + SPD + GRACE`, with alphabetical ties. Prefixes and
+random equipment do not affect the order; records without a species template
+follow the known species. On desktop, hovering or keyboard-
 focusing an entry shows its portrait above the Bestiary overlay; on touch
 screens, tapping a row expands a small portrait below the name and count. The
 touch layout keeps the title and close control visible while entries scroll.
@@ -3262,7 +3265,16 @@ The Herbalist opens services while adjacent:
   inventory order, leaving any unaffordable mushrooms in their stacks and
   reporting that not all could be checked. With fewer than 2g, no purification
   or RNG roll occurs.
-- Three Healing Herbs plus 10g become a Life Potion.
+- Brew Life Potion consumes three Healing Herbs and 10g for one Life Potion.
+- Brew Life Potions (use all herbs) makes the maximum affordable batch:
+  `potions = min(floor(herbs / 3), floor(gold / 10))`. Six herbs and at least
+  20g yield two potions; seven herbs leave one herb. With six herbs and 10g,
+  only one potion is brewed and three herbs remain. Herbs are consumed in
+  inventory order across stacks. Both options retain the same per-potion cost,
+  consume no turn, and use no RNG. An unsuccessful attempt consumes nothing.
+  Batch brewing is recorded as one replay action and follows the same rule
+  during playback. Service menu buttons use mushroom, potion, and fish emojis
+  to make the available actions easier to scan.
 
 The Herbalist's other purpose is to hint that forests can be foraged for
 remedies, while also warning that forests are dangerous (because forest tiles

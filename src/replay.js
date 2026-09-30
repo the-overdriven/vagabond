@@ -345,6 +345,7 @@ async function runReplayAction(action) {
     case 'herbalist':
       if (action.action === 'purifyMushrooms') purifyMushrooms()
       else if (action.action === 'makePotion') makeHerbalistPotion()
+      else if (action.action === 'makeAllPotions') makeHerbalistPotion(true)
       break
     case 'dig':
       tryDig({recordReplay: false})

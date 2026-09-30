@@ -8093,10 +8093,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         row.appendChild(b)
         buyList.appendChild(row)
       }
-      if (fisherman) addService('Buy fish (5g)', buyFishermanFish)
+      if (fisherman) addService('🐟 Buy Fish (5g)', buyFishermanFish)
       else {
-        addService('Purify mushrooms (2g each)', purifyMushrooms)
-        addService('Make Life Potion (3 herbs + 10g)', makeHerbalistPotion)
+        addService('🍄 Purify mushrooms (2g each)', purifyMushrooms)
+        addService('🧪 Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion())
+        addService('🧪 Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true))
       }
       document.getElementById('tradeSellList').innerHTML = fisherman ? '' : '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
       document.getElementById('tradeGold').textContent = player.gold
@@ -8297,15 +8298,26 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     renderInventory()
   }
 
-  function makeHerbalistPotion() {
-    const it = player.inventory.find(i => i.kind === 'herb')
-    if (!it || (it.count || 1) < 3 || player.gold < 10) return log('You need 3 Healing Herbs and 10g.', 'info')
-    recordReplayAction({type:'herbalist', action:'makePotion'})
-    it.count -= 3
-    if (it.count <= 0) player.inventory.splice(player.inventory.indexOf(it), 1)
-    player.gold -= 10
-    addPotion()
-    log('The Herbalist brews a Life Potion for you for 10g.', 'good')
+  function makeHerbalistPotion(useAll = false) {
+    const herbs = player.inventory.filter(i => i.kind === 'herb')
+    const total = herbs.reduce((sum, i) => sum + (i.count || 1), 0)
+    const available = Math.floor(total / 3)
+    const count = Math.min(useAll ? available : 1, available, Math.floor(player.gold / 10))
+    if (!count) return log('You need 3 Healing Herbs and 10g.', 'info')
+    recordReplayAction({type:'herbalist', action:useAll ? 'makeAllPotions' : 'makePotion'})
+    let remaining = count * 3
+    for (const stack of herbs) {
+      const taken = Math.min(remaining, stack.count || 1)
+      stack.count = (stack.count || 1) - taken
+      remaining -= taken
+      if (!remaining) break
+    }
+    player.inventory = player.inventory.filter(i => i.kind !== 'herb' || i.count > 0)
+    player.gold -= count * 10
+    for (let i = 0; i < count; i++) addPotion()
+    log(count === 1 ? 'The Herbalist brews a Life Potion for you for 10g.' :
+      `The Herbalist brews ${count} Life Potions for you for ${count * 10}g.`, 'good')
+    if (useAll && count < available) log("You didn't have enough gold to brew all your herbs.", 'info')
     updateHud()
     renderTrade()
     renderInventory()
@@ -8753,9 +8765,13 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     const list = document.getElementById('bestiaryList')
     if (!list) return
     list.replaceChildren()
+    const strength = species => {
+      const template = ENEMY_TEMPLATE_BY_NAME[species]
+      return template ? template.atk + template.def + template.spd + template.grace : Infinity
+    }
     const known = Object.entries(player.killsBySpecies || {})
       .filter(([, count]) => Number.isFinite(count) && count > 0)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => (strength(a) - strength(b)) || a.localeCompare(b))
     if (!known.length) {
       const empty = document.createElement('p')
       empty.className = 'bestiary-empty'

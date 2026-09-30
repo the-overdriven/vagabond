@@ -430,3 +430,30 @@ describe('Non-gear item catalog', () => {
     })
   }
 })
+
+  it('brews only affordable whole potions across herb stacks without turns or RNG', () => {
+    beginNewGame('Brewing Tester')
+    cy.window().then(win => {
+      const results = win.eval(`(() => {
+        const cases = [
+          {stacks:[7], gold:30, all:true, potions:2, herbs:1, leftGold:10},
+          {stacks:[8], gold:10, all:true, potions:1, herbs:5, leftGold:0},
+          {stacks:[2], gold:100, all:true, potions:0, herbs:2, leftGold:100},
+          {stacks:[3], gold:9, all:true, potions:0, herbs:3, leftGold:9},
+          {stacks:[2,4,1], gold:20, all:true, potions:2, herbs:1, leftGold:0},
+          {stacks:[6], gold:20, all:false, potions:1, herbs:3, leftGold:10}
+        ]
+        const count = kind => player.inventory.filter(i => i.kind === kind).reduce((s,i) => s+(i.count || 1),0)
+        return cases.map(c => {
+          player.inventory = c.stacks.map(count => createItem('herb', {count}))
+          player.gold = c.gold
+          const turns = turnCount, state = rngState
+          makeHerbalistPotion(c.all)
+          return count('potion') === c.potions && count('herb') === c.herbs &&
+            player.gold === c.leftGold && turns === turnCount && state === rngState
+        })
+      })()`)
+      expect(results).to.deep.equal([true,true,true,true,true,true])
+    })
+  })
+})

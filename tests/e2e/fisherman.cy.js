@@ -44,7 +44,7 @@ describe('Fisherman and swimming', () => {
       for (const [key,value] of Object.entries(results)) expect(value,key).to.equal(true)
     })
     cy.get('#tradeTitle').should('contain', 'Fisherman')
-    cy.get('#tradeBuyList button').should('have.length', 1).and('have.text', 'Buy fish (5g)').click()
+    cy.get('#tradeBuyList button').should('have.length', 1).and('have.text', '🐟 Buy Fish (5g)').click()
     cy.get('#tradeGold').should('have.text', '0')
     cy.get('#tradeBuyList button').click()
     cy.get('#tradeGold').should('have.text', '0')

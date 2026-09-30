@@ -266,3 +266,37 @@ describe('Catalog food through save and replay', () => {
     })
   })
 })
+
+describe('Batch brewing through save and replay', () => {
+  it('records one batch action and reproduces its ingredients, potions, and gold', () => {
+    let expected
+    beginDeterministicReplayGame('Brewing Replay Tester')
+    cy.window().then(win => win.eval(`
+      player.inventory = []; addInventoryItem('herb', {count: 7}); player.gold = 30
+      replayRecording = false; replayData = null; startReplayRecording()
+      makeHerbalistPotion(true)
+      window.brewState = () => JSON.stringify({inventory: player.inventory.map(i => ({kind:i.kind,count:i.count})), gold:player.gold, turns:turnCount})
+      window.expectedBrewState = brewState()
+    `))
+    cy.window().then(win => {
+      expect(win.eval('replayData.actions.map(a => a.action)')).to.deep.equal(['makeAllPotions'])
+      expect(win.eval('replayData.rng.length')).to.equal(0)
+      expected = win.expectedBrewState
+    })
+    saveToDiskAndReload('batch-brewing')
+    cy.window().then(win => {
+      expect(win.eval("JSON.stringify({inventory: player.inventory.map(i => ({kind:i.kind,count:i.count})), gold:player.gold, turns:turnCount})")).to.equal(expected)
+      return win.eval(`
+      window.brewState = () => JSON.stringify({inventory: player.inventory.map(i => ({kind:i.kind,count:i.count})), gold:player.gold, turns:turnCount})
+      window.expectedBrewState = brewState()
+      window.restoreAfterBrewingReplay = restoreLiveAfterReplay
+      restoreLiveAfterReplay = () => { window.reconstructedBrewState = brewState(); restoreAfterBrewingReplay() }
+    `)
+    })
+    playReplayAndAssertClean()
+    cy.window().then(win => {
+      expect(win.reconstructedBrewState).to.equal(win.expectedBrewState)
+      expect(win.eval('brewState()')).to.equal(win.expectedBrewState)
+    })
+  })
+})
