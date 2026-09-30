@@ -440,8 +440,10 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     </div>
     <div class="overlay" id="bestiaryOverlay" role="dialog" aria-modal="true" aria-labelledby="bestiaryTitle">
       <div class="panelbox">
-        <h2 id="bestiaryTitle">Bestiary</h2>
-        <button class="slbtn overlay-close" id="btnBestiaryClose" type="button" aria-label="Close bestiary">✕</button>
+        <div class="bestiary-header">
+          <h2 id="bestiaryTitle">Bestiary</h2>
+          <button class="slbtn overlay-close" id="btnBestiaryClose" type="button" aria-label="Close bestiary">✕</button>
+        </div>
         <p class="bestiary-intro">Creatures you have slain.</p>
         <div id="bestiaryList" class="bestiary-list" aria-live="polite"></div>
         <div class="closehint"><button class="slbtn" id="btnBestiaryCloseBottom" type="button">Close</button></div>
@@ -6850,6 +6852,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   const tooltip = document.getElementById('tooltip')
+  const defaultTooltipParent = tooltip.parentElement
 
   function slug(name) {
     return name.toLowerCase().replace(/\s+/g, '_')
@@ -8836,25 +8839,57 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       const row = document.createElement('div')
       row.className = 'bestiary-entry'
       row.tabIndex = 0
-      row.setAttribute('aria-label', `${species}, ${count} slain`)
-      const showPortrait = () => showBestiaryPortrait(species, row)
-      const hidePortrait = () => { tooltip.style.display = 'none' }
+      row.setAttribute('role', 'button')
+      row.setAttribute('aria-expanded', 'false')
+      row.setAttribute('aria-label', `${species}, ${count}`)
+      const showPortrait = () => {
+        if (!window.matchMedia('(pointer: coarse)').matches) showBestiaryPortrait(species, row)
+      }
+      const hidePortrait = hideBestiaryPortrait
       row.addEventListener('mouseenter', showPortrait)
       row.addEventListener('focus', showPortrait)
       row.addEventListener('mouseleave', hidePortrait)
       row.addEventListener('blur', hidePortrait)
+      row.addEventListener('click', () => {
+        if (!window.matchMedia('(pointer: coarse)').matches) return
+        const expanded = row.classList.toggle('portrait-open')
+        row.setAttribute('aria-expanded', String(expanded))
+        if (expanded && !portrait.src) portrait.src = imageSrc(`img/enemies/${slug(species)}.jpg`)
+      })
+      row.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return
+        ev.preventDefault()
+        if (window.matchMedia('(pointer: coarse)').matches) row.click()
+      })
+      const heading = document.createElement('span')
+      heading.className = 'bestiary-entry-heading'
       const name = document.createElement('span')
       name.className = 'bestiary-species'
       name.textContent = names[species] || species
       const slain = document.createElement('span')
       slain.className = 'bestiary-count'
       slain.textContent = String(count)
-      row.append(name, slain)
+      heading.append(name, slain)
+      const portrait = document.createElement('img')
+      portrait.className = 'bestiary-inline-portrait'
+      portrait.alt = `${species} portrait`
+      portrait.onerror = () => { portrait.hidden = true }
+      row.append(heading, portrait)
       list.appendChild(row)
     }
   }
 
+  function hideBestiaryPortrait() {
+    tooltip.style.display = 'none'
+    tooltip.style.zIndex = ''
+    if (tooltip.parentElement !== defaultTooltipParent) defaultTooltipParent.appendChild(tooltip)
+  }
+
   function showBestiaryPortrait(species, row) {
+    const overlay = document.getElementById('bestiaryOverlay')
+    if (tooltip.parentElement !== overlay) overlay.appendChild(tooltip)
+    tooltip.style.zIndex = '30'
+
     const image = document.createElement('img')
     image.src = imageSrc(`img/enemies/${slug(species)}.jpg`)
     image.alt = species
@@ -8869,7 +8904,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     tooltip.style.display = 'block'
 
     const rowRect = row.getBoundingClientRect()
-    const bounds = (tooltip.offsetParent || document.getElementById('root')).getBoundingClientRect()
+    const bounds = overlay.getBoundingClientRect()
     const gap = 4
     const width = tooltip.offsetWidth
     const height = tooltip.offsetHeight
@@ -8893,6 +8928,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (next && invOpen) toggleInv(false)
     if (next && mapOpen) toggleMap(false)
     if (next && tradeOpen) toggleTrade(false)
+    if (!next) hideBestiaryPortrait()
     bestiaryOpen = next
     document.getElementById('bestiaryOverlay').classList.toggle('show', bestiaryOpen)
     if (bestiaryOpen) renderBestiary()

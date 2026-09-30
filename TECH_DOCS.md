@@ -152,8 +152,12 @@ The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 
 The Bestiary is opened with **B**, from the map sidebar, or from the Character
 inventory panel. It lists each base species the current character has killed
-at least once and shows its total slain count. Hovering or keyboard-focusing an
-entry shows the existing species portrait. Prefix variants share their
+at least once and shows its total count. On desktop, hovering or keyboard-
+focusing an entry shows its portrait above the Bestiary overlay; on touch
+screens, tapping a row expands a small portrait below the name and count. The
+touch layout keeps the title and close control visible while entries scroll.
+Desktop retains the compact modal and hover portrait. This character-specific
+record is separate from the online Graveyard. Prefix variants share their
 base-species entry; unencountered species are hidden. The list reads the saved
 per-species kill counters and refreshes when opened. It does not affect gameplay,
 RNG or replay actions. A new permadeath character begins with an empty Bestiary.
@@ -3685,6 +3689,7 @@ before each tile-size step.
 # 70. Mobile
 
 Touch controls reuse the same gameplay functions as keyboard controls.
+The inspection prompt and touch controls are hidden while a modal overlay is open. The Bestiary keeps its own full-screen scrolling list and close control on touch layouts.
 The backpack opens the inventory, the magnifier runs the normal inspect action (including village huts), and the hand button uses the normal forage/loot action. Each button handles touch and click input while suppressing the duplicate click browsers emit after a touch.
 
 Mobile supports:
