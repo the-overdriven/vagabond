@@ -11,30 +11,31 @@
     "_byTierNote": "indexed by item tier 1-5 (index 0 unused)"
   },
   "forage": {
-    "_note": "Rolled on forest tiles via tryForage(); each tile can only be foraged once. Thresholds are cumulative on a 0-1 roll.",
+    "_note": "Rolls once from 0 up to (excluding) 100 on forest tiles; each tile can only be foraged once. upTo is a cumulative percentage threshold. World traits multiply each outcome's percentage width; the remainder yields elseResult.",
     "terrain": "forest",
     "table": [
       {
-        "upTo": 0.09,
+        "upTo": 9,
         "result": "berries"
       },
       {
-        "upTo": 0.17,
+        "upTo": 17,
         "result": "herb"
       },
       {
-        "upTo": 0.25,
+        "upTo": 25,
         "result": "mushroom"
       }
     ],
-    "elseResult": "nothing"
+    "elseResult": "nothing",
+    "scale": 100
   },
   "chestLoot": {
-    "_note": "Rolled on a 0-scale roll in checkGroundAt() when a chest is opened; guaranteed-artifact chests skip this roll entirely. First matching entry (roll < upTo) wins; elseResult covers anything above the last entry.",
-    "scale": 110,
+    "_note": "Rolls once from 0 up to (excluding) 100. upTo is a cumulative percentage threshold: the first entry with roll < upTo wins. An outcome's chance is its upTo minus the previous upTo; elseResult has the remaining percentage. Guaranteed-artifact chests skip this roll.",
+    "scale": 100,
     "table": [
       {
-        "upTo": 45,
+        "upTo": 41,
         "result": "gold",
         "goldMin": 5,
         "goldMax": 15,
@@ -42,7 +43,7 @@
         "mfGoldMultiplier": 2
       },
       {
-        "upTo": 70,
+        "upTo": 63.6,
         "result": "gear",
         "gearMaxTier": 4,
         "weaponChance": 0.33,
@@ -50,15 +51,15 @@
         "shieldChance": 0.34
       },
       {
-        "upTo": 85,
+        "upTo": 77.3,
         "result": "potion"
       },
       {
-        "upTo": 90,
-        "result": "scroll"
+        "upTo": 82,
+        "result": "scrollOfInvisibility"
       },
       {
-        "upTo": 100,
+        "upTo": 91,
         "result": "speedpotion"
       }
     ],

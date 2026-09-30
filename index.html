@@ -689,7 +689,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
           const weights = WORLD_GEN_CONFIG.environment.forageResultMultipliers
           if (effect.param === 'environment.forageExtraFindChance') {
             const table = FORAGE_TABLE.table
-            const empty = 1 - table.at(-1).upTo
+            const empty = FORAGE_TABLE.scale - table.at(-1).upTo
             for (const result of ['herb', 'mushroom']) {
               const index = table.findIndex(entry => entry.result === result)
               const width = table[index].upTo - (table[index - 1]?.upTo ?? 0)
@@ -4369,7 +4369,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], player.x, player.y)
     minimapDirty = true
 
-    const roll = rng()
+    const roll = rng() * FORAGE_TABLE.scale
     let result = FORAGE_TABLE.elseResult || 'nothing'
     let previous = 0, cumulative = 0
     const multipliers = WORLD_GEN_CONFIG.environment.forageResultMultipliers
@@ -4681,7 +4681,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       lastLootResult = 'a Life Potion.'
       if (!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot')
     },
-    scroll: () => {
+    scrollOfInvisibility: () => {
       addScroll()
       lastLootResult = 'a Scroll of Invisibility.'
       if (!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot')
@@ -4719,7 +4719,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
           groundItems.splice(i, 1)
           continue
         }
-        const roll = rng() * (CHEST_LOOT_TABLE.scale || 110)
+        const roll = rng() * CHEST_LOOT_TABLE.scale
         let chestEntry = null
         for (const entry of (CHEST_LOOT_TABLE.table || [])) {
           if (roll < entry.upTo) {

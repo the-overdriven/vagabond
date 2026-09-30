@@ -272,6 +272,66 @@ describe('Vagabond smoke test', () => {
 
 
 describe('Non-gear item catalog', () => {
+  it('preserves chest boundaries and forage chances on percentage scales', () => {
+    beginNewGame('Percentage Loot Tester')
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        const previous = {inventory: player.inventory, groundItems, rng, enemyTurn, npcTurn,
+          tile: map[player.y][player.x], foragedTiles,
+          multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers}
+        const chest = []
+        const forage = []
+        const cases = [[85-1e-7,'potion'],[85,'scroll'],[90-1e-7,'scroll'],
+          [90,'speedpotion'],[100-1e-7,'speedpotion'],[100,'idscroll'],[110-1e-7,'idscroll']]
+        try {
+          for (const [oldRoll, expected] of cases) {
+            player.inventory = []
+            rng = () => oldRoll / 110
+            groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
+            checkGroundAt(player.x, player.y)
+            chest.push(player.inventory[0]?.kind === expected)
+          }
+          enemyTurn = () => {}; npcTurn = () => {}
+          map[player.y][player.x] = 'forest'
+          groundItems = []
+          const variants = [
+            {berries:1,herb:1,mushroom:1},
+            {berries:1,herb:2,mushroom:1.5},
+            {berries:0.5,herb:0.6,mushroom:0.4}
+          ]
+          for (const weights of variants) {
+            WORLD_GEN_CONFIG.environment.forageResultMultipliers = weights
+            for (const oldRoll of [0,0.089999,0.09,0.169999,0.17,0.249999,0.25,0.999999]) {
+              player.inventory = []; foragedTiles = new Set()
+              let previousThreshold = 0, cumulative = 0, expected = 'nothing'
+              for (const entry of [{upTo:0.09,result:'berries'},{upTo:0.17,result:'herb'},{upTo:0.25,result:'mushroom'}]) {
+                cumulative += (entry.upTo-previousThreshold)*weights[entry.result]
+                previousThreshold=entry.upTo
+                if (oldRoll<cumulative) {expected=entry.result;break}
+              }
+              let draws = 0
+              rng = () => {draws++;return oldRoll}
+              tryForage()
+              forage.push((player.inventory[0]?.kind || 'nothing') === expected && draws === 1)
+            }
+          }
+          return {chest,forage,chestScale:CHEST_LOOT_TABLE.scale,forageScale:FORAGE_TABLE.scale,
+            scrollResult:CHEST_LOOT_TABLE.table.find(e=>e.result==='scrollOfInvisibility')?.result}
+        } finally {
+          player.inventory=previous.inventory;groundItems=previous.groundItems;rng=previous.rng
+          enemyTurn=previous.enemyTurn;npcTurn=previous.npcTurn
+          map[player.y][player.x]=previous.tile;foragedTiles=previous.foragedTiles
+          WORLD_GEN_CONFIG.environment.forageResultMultipliers=previous.multipliers
+        }
+      })()`)
+      expect(result.chestScale).to.equal(100)
+      expect(result.forageScale).to.equal(100)
+      expect(result.scrollResult).to.equal('scrollOfInvisibility')
+      expect(result.chest.every(Boolean), 'old chest boundaries preserved').to.equal(true)
+      expect(result.forage.every(Boolean), 'normal and trait-adjusted forage preserved').to.equal(true)
+    })
+  })
+
   it('keeps ground pickups and all consumable chest outcomes on the catalog path', () => {
     beginNewGame('Catalog Loot Tester')
     cy.window().then(win => {
@@ -281,8 +341,8 @@ describe('Non-gear item catalog', () => {
         try {
           player.inventory = []
           const chestKinds = []
-          for (const roll of [80, 87, 95, 105]) {
-            rng = () => { draws++; return roll / 110 }
+          for (const roll of [73, 79, 86, 95]) {
+            rng = () => { draws++; return roll / 100 }
             groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
             checkGroundAt(player.x, player.y)
             chestKinds.push(player.inventory.at(-1).kind)

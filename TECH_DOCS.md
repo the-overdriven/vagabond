@@ -2075,7 +2075,8 @@ existing consumables-first ordering. Tabs only filter displayed inventory.
 `content/items.json` defines all 21 non-gear inventory kinds. Weapons, shields,
 armor, and procedural artifacts retain their existing configuration systems.
 The dictionary keys are the canonical `kind` identifiers used by inventory,
-loot, merchant references, saves, and replay actions.
+merchant references, saves, and replay actions. Descriptive loot-outcome names
+can map to these item kinds through their handlers.
 
 Each definition contains a default `name`, inventory `category` (`supplies` or
 `other`), `stackable`, base `sellValue`, and ordered `actions`. Optional
@@ -2628,10 +2629,10 @@ Some special chests guarantee artifacts (i.e. one chest in dwarven fort ruins).
 ## Chest loot selection
 
 For ordinary chests, the loot outcome is selected with **one RNG roll on a
-scale of 110**:
+0–100 scale**:
 
 ```text
-roll = rng() × 110
+roll = rng() × 100
 ```
 
 The roll is compared against the ordered `CHEST_LOOT_TABLE.table` entries
@@ -2639,18 +2640,27 @@ loaded from `content/loot_tables.json`. The first entry whose `upTo` threshold
 exceeds the roll determines the result. If no entry matches, the configured
 `elseResult` is used.
 
-The current approximate shares are:
+The roll is at least 0 and strictly below 100. Thresholds are cumulative:
+each result's percentage chance is its upper threshold minus the previous
+threshold (starting at 0). `elseResult` gets the remaining percentage above
+the last threshold. Rescaling from 110 preserves the original probabilities;
+the stored thresholds retain floating-point precision.
 
-| Result | Approx. share |
-|---|---:|
-| Gold | 41% |
-| Gear | 23% |
-| Life Potion | 14% |
-| Scroll of Invisibility | 4.5% |
-| Potion of Speed | 9% |
-| Scroll of Identification | 9% |
+| Result | Cumulative upper threshold (rounded) | Chance (rounded) |
+|---|---:|---:|
+| Gold | 40.909091 | 40.909091% |
+| Gear | 63.636364 | 22.727273% |
+| Life Potion | 77.272727 | 13.636364% |
+| Scroll of Invisibility (`scrollOfInvisibility`) | 81.818182 | 4.545455% |
+| Potion of Speed | 90.909091 | 9.090909% |
+| Scroll of Identification (`elseResult`) | 100 | 9.090909% |
 
-The **110-point roll chooses the result category**. If the result is gear, a
+For example, a roll of 79 gives an Invisibility scroll, 86 gives a Speed
+potion, and 95 reaches the Identification-scroll fallback. The descriptive
+loot-result key `scrollOfInvisibility` is mapped by its handler to the existing
+inventory item kind `scroll`; it is a specific outcome, not a scroll category.
+
+The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
 configured chances.
 
@@ -2674,7 +2684,7 @@ those legacy objects as buried gear everywhere: they are excluded from map
 tooltips, nearby-item inspection, and Old Hunter quest targeting, and can only
 be recovered by digging their exact tile with a shovel.
 
-A chest marked `artifactGuaranteed` skips the normal 110-point loot roll and
+A chest marked `artifactGuaranteed` skips the normal 100-point loot roll and
 directly creates an artifact using the chest tier and the player's Magic Find.
 
 ---
@@ -4784,7 +4794,9 @@ ordinary deep-cave placement preference described under Ordinary cave
 scenarios. The guaranteed Champion, its four adjacent guards, and the extra
 high-tier threat retain their dedicated positions.
 
-Foraging uses the cumulative base thresholds in `loot_tables.json`.
+Foraging uses a single `rng() × 100` roll and cumulative percentage thresholds
+in `loot_tables.json`: 9 for berries, 17 for herbs, and 25 for mushrooms.
+These represent 9%, 8%, and 8% respectively; the remaining 75% yields nothing.
 `environment.forageResultMultipliers` scales the separate berries, herb, and
 mushroom probability widths; the remainder yields nothing. At the default
 multipliers of 1, this consumes the same single roll and preserves the
