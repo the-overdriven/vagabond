@@ -1329,8 +1329,13 @@ body.hint-collapsed #hint .panel-toggle {
 
 /* Narrow windows need usable dialogs regardless of the browser pointer mode. */
 @media (max-width: 720px) {
+  #hud {
+    position: relative;
+    z-index: 110;
+  }
   #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay {
     position: fixed;
+    top: var(--mobile-hud-height, 56px);
     z-index: 100;
   }
 }

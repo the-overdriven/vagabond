@@ -4,6 +4,7 @@
   "scripts": {
     "test:e2e": "cypress run",
     "test:e2e:headed": "cypress run --headed --browser edge",
+    "test:e2e:only": "npx cypress run --spec \"tests/e2e/graveyard-button.cy.js\"",
     "start": "http-server . -p 8080 -c-1"
   },
   "devDependencies": {

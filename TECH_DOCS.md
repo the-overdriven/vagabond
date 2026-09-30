@@ -4578,6 +4578,8 @@ for equipment/stats. Equipped gear shows the inventory stat line in brackets,
 for example `Meat Cleaver (ATK 1, GRACE 1)`; earlier records without the
 additional item stats still show their stored names. Red highlights permadeath;
 amber highlights normal deaths.
+The HUD button remains reachable during character selection and other narrow-
+window dialogs. These dialogs reserve the measured HUD area above their content.
 Opening/closing never consumes a game turn or changes replay/save state. The
 overlay fills the viewport with one scrolling records list; its title and X
 close control remain visible.

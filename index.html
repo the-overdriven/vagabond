@@ -8685,12 +8685,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     requestAnimationFrame(updateMobileSafeAreas)
   }
 
-  // Mobile HUD/log heights vary with viewport width and text wrapping. Feed
-  // their measured sizes back into CSS so overlays never sit underneath them.
+  // Reserve the HUD's visible area above touch and narrow-window dialogs.
   function updateMobileSafeAreas() {
-    if (!window.matchMedia('(pointer:coarse)').matches) return
+    if (!window.matchMedia('(pointer:coarse)').matches && window.innerWidth > 720) return
     const hud = document.getElementById('hud'), logPanel = document.getElementById('logpanel')
-    document.documentElement.style.setProperty('--mobile-hud-height', `${hud.getBoundingClientRect().height}px`)
+    document.documentElement.style.setProperty('--mobile-hud-height', `${hud.getBoundingClientRect().bottom}px`)
     document.documentElement.style.setProperty('--mobile-log-height', `${logPanel.getBoundingClientRect().height}px`)
   }
 
