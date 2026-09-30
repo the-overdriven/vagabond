@@ -124,7 +124,10 @@ describe('Vagabond smoke test', () => {
     cy.get('#fileLoad').selectFile('tests/saves/Tester_start.json', { force: true })
 
     cy.get('#raceOverlay')
-      .should('not.have.class', 'show')
+      .should(($overlay) => {
+        expect(Cypress.$('#logpanel .bad').text(), 'save load errors').not.to.include('Failed to load save file')
+        expect($overlay).not.to.have.class('show')
+      })
 
     cy.window().its('__VAGABOND_E2E__').invoke('getWorldShape').should(shape => {
       expect(shape.width).to.equal(260)
