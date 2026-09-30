@@ -271,6 +271,27 @@ describe('Vagabond smoke test', () => {
 })
 
 
+// Scroll nested inventory panels with the browser, then preserve that position
+// during Cypress's actionability checks. Re-query after scrolling to avoid a
+// stale element if the inventory was rendered again.
+function clickInventoryAction(itemName, actionLabel) {
+  const button = () => cy.get('#invList .invitem')
+    .contains('.nm', itemName).parent().contains('button', actionLabel)
+
+  button().then($button => {
+    $button[0].scrollIntoView({behavior: 'instant', block: 'center', inline: 'nearest'})
+  })
+  button().should($button => {
+    const element = $button[0]
+    const rect = element.getBoundingClientRect()
+    const hit = element.ownerDocument.elementFromPoint(
+      rect.left + rect.width / 2, rect.top + rect.height / 2)
+    expect(hit === element || element.contains(hit),
+      itemName + ' ' + actionLabel + ' is unobstructed; hit ' +
+      (hit ? hit.tagName + '#' + hit.id : 'outside viewport')).to.equal(true)
+  }).click({scrollBehavior: false})
+}
+
 describe('Non-gear item catalog', () => {
   it('respects configured chest boundaries and forage chances on percentage scales', () => {
     beginNewGame('Percentage Loot Tester')
@@ -421,18 +442,18 @@ describe('Non-gear item catalog', () => {
       cy.get('#invList .invitem').contains('Old Rotten Casket').parent().find('button').should('have.text', 'Open')
       let turn
       cy.window().then(win => { turn = win.eval('turnCount') })
-      cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Equip').click({scrollBehavior: 'center'})
+      clickInventoryAction('Black Key', 'Equip')
       cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Unequip').should('be.visible')
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'blackkey')")).to.equal(true)
         expect(win.eval('turnCount')).to.equal(turn)
       })
-      cy.get('#invList .invitem').contains('Healing Herb').parent().contains('button', 'Eat').click({scrollBehavior: 'center'})
+      clickInventoryAction('Healing Herb', 'Eat')
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'herb')")).to.equal(false)
         expect(win.eval('turnCount')).to.equal(turn + 1)
       })
-      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').click({scrollBehavior: 'center'})
+      clickInventoryAction('Old Rotten Casket', 'Open')
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'treasurecasket')")).to.equal(false)
         expect(win.eval("player.inventory.filter(it => it.kind === 'blackkey').length")).to.equal(2)
