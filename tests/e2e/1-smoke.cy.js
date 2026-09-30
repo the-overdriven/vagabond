@@ -197,7 +197,6 @@ describe('Vagabond smoke test', () => {
     pressToggleMap()
     cy.get('#mapOverlay').should('not.have.class', 'show')
   })
-
   it('applies the NPC placement, merchant stock, Herbalist gift, and HUD polish rules', () => {
     beginNewGame('NPC Polish Tester')
 
@@ -268,10 +267,12 @@ describe('Vagabond smoke test', () => {
       expect(gift.savedFlag).to.equal(true)
     })
   })
+
 })
 
+
 describe('Non-gear item catalog', () => {
-  it('preserves chest boundaries and forage chances on percentage scales', () => {
+  it('respects configured chest boundaries and forage chances on percentage scales', () => {
     beginNewGame('Percentage Loot Tester')
     cy.window().then(win => {
       const result = win.eval(`(() => {
@@ -280,15 +281,22 @@ describe('Non-gear item catalog', () => {
           multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers}
         const chest = []
         const forage = []
-        const cases = [[85-1e-7,'potion'],[85,'scrollOfInvisibility'],[90-1e-7,'scrollOfInvisibility'],
-          [90,'speedpotion'],[100-1e-7,'speedpotion'],[100,'idscroll'],[110-1e-7,'idscroll']]
+        const cases = []
+        const consumables = CHEST_LOOT_TABLE.table.filter(entry =>
+          ['potion', 'scrollOfInvisibility', 'speedpotion'].includes(entry.result))
+        for (const entry of consumables) {
+          const index = CHEST_LOOT_TABLE.table.indexOf(entry)
+          const next = CHEST_LOOT_TABLE.table[index + 1]?.result || CHEST_LOOT_TABLE.elseResult
+          cases.push([entry.upTo - 1e-7, entry.result], [entry.upTo, next], [entry.upTo + 1e-7, next])
+        }
+        cases.push([100 - 1e-7, CHEST_LOOT_TABLE.elseResult])
         try {
-          for (const [oldRoll, expected] of cases) {
+          for (const [roll, expected] of cases) {
             player.inventory = []
-            rng = () => oldRoll / 110
+            rng = () => roll / CHEST_LOOT_TABLE.scale
             groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
             checkGroundAt(player.x, player.y)
-            chest.push(player.inventory[0]?.kind === expected)
+            chest.push({roll, expected, actual:player.inventory[0]?.kind})
           }
           enemyTurn = () => {}; npcTurn = () => {}
           map[player.y][player.x] = 'forest'
@@ -326,7 +334,10 @@ describe('Non-gear item catalog', () => {
       expect(result.chestScale).to.equal(100)
       expect(result.forageScale).to.equal(100)
       expect(result.scrollResult).to.equal('scrollOfInvisibility')
-      expect(result.chest.every(Boolean), 'old chest boundaries preserved').to.equal(true)
+      expect(result.chest, 'configured chest boundaries').to.have.length(10)
+      for (const {roll, expected, actual} of result.chest) {
+        expect(actual, 'chest roll ' + roll).to.equal(expected)
+      }
       expect(result.forage.every(Boolean), 'normal and trait-adjusted forage preserved').to.equal(true)
     })
   })
@@ -410,18 +421,18 @@ describe('Non-gear item catalog', () => {
       cy.get('#invList .invitem').contains('Old Rotten Casket').parent().find('button').should('have.text', 'Open')
       let turn
       cy.window().then(win => { turn = win.eval('turnCount') })
-      cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Equip').click()
+      cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Equip').click({scrollBehavior: 'center'})
       cy.get('#invList .invitem').contains('Black Key').parent().contains('button', 'Unequip').should('be.visible')
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'blackkey')")).to.equal(true)
         expect(win.eval('turnCount')).to.equal(turn)
       })
-      cy.get('#invList .invitem').contains('Healing Herb').parent().contains('button', 'Eat').click()
+      cy.get('#invList .invitem').contains('Healing Herb').parent().contains('button', 'Eat').click({scrollBehavior: 'center'})
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'herb')")).to.equal(false)
         expect(win.eval('turnCount')).to.equal(turn + 1)
       })
-      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').click()
+      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').click({scrollBehavior: 'center'})
       cy.window().then(win => {
         expect(win.eval("player.inventory.some(it => it.kind === 'treasurecasket')")).to.equal(false)
         expect(win.eval("player.inventory.filter(it => it.kind === 'blackkey').length")).to.equal(2)
