@@ -47,5 +47,11 @@
       "key": "aggro",
       "label": "AGGRO"
     }
-  ]
+  ],
+  "tracking": {
+    "chance": 0.03,
+    "lifetimeTurns": 200,
+    "freshTurns": 50,
+    "fadingFromTurns": 150
+  }
 }

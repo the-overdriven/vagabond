@@ -629,12 +629,7 @@ function startReplayPlayback() {
   loadGameFromObject(JSON.parse(JSON.stringify(replayToPlay.initialState)), {isReplayInit: true})
   replayData = replayToPlay
   replayRecording = false // watching freezes this replay; it is not extended by further play
-  // These turn-driven counters aren't part of the save format at all
-  // (a normal load doesn't reset them either), but the true value at the
-  // moment a run starts is always zero/blank.
-  turnCount = 0
-  consecutiveWaitTurns = 0
-  oldHunterQuestSerial = 0
+  // Turn counters and quest serial are restored from the starting snapshot.
   activeReplay = replayToPlay
   replayActionIndex = 0
   replayRngIndex = 0

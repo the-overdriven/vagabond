@@ -17,6 +17,7 @@ describe('Far wandering after a chase', () => {
         enemies = [e]; npcs = []; occupied = new Set([keyXY(e.x, e.y)])
         const originalRng = rng
         try {
+          beastTracks.clear()
           rng = () => 0.9
           enemyTurn()
           const chased = {x: e.x, y: e.y, routeCleared: e.farPath === null}
@@ -30,11 +31,12 @@ describe('Far wandering after a chase', () => {
               distance: Math.max(Math.abs(e.x - before.x), Math.abs(e.y - before.y)),
               occupied: occupied.has(keyXY(e.x, e.y))})
           }
-          return {chased, positions}
+          return {chased, positions, trackCount: beastTracks.size}
         } finally {
           rng = originalRng
         }
       })()`)
+      expect(result.trackCount).to.equal(0) // rolls of 0.9 never pass the 3% track chance
       expect(result.chased.x).to.be.lessThan(45)
       expect(result.chased.routeCleared).to.equal(true)
       expect(result.positions.every(position => position.distance <= 1 && position.occupied)).to.equal(true)

@@ -856,6 +856,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     ENEMY_FAR_VILLAGE_AVOID_RADIUS = content.enemyConfig.wandering.farVillageAvoidRadius ?? 20
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
+    TRACK_CONFIG = content.enemyConfig.tracking
     PREFIX_STATS = content.enemyConfig.prefixStats
     ARTIFACT_NOUNS = content.artifactNouns
     ARTIFACT_PREFIXES = content.artifactPrefixes
@@ -1325,6 +1326,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
 <script src="src/version.js"></script>
 <script src="src/graveyard.js"></script>
 <script src="src/playerStatus.js"></script>
+<script src="src/tracking.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -1821,6 +1823,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     maxHp: 50, hp: 50,
     baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
+    trackingLearned: false, killsBySpecies: {},
     invisibleTurns: 0,
     godMode: false,
     godInvisible: false,
@@ -2361,7 +2364,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (hunterQuestReadyToTurnIn(oldHunterQuest)) {
       const q = oldHunterQuest
       removeHunterQuestItem(q)
-      log(hunterCompletionFlavor(q), 'info')
+      if (!player.trackingLearned) {
+        log("Old Hunter says: Slaying what stands before you is a simple matter. Tracking its shadow is the true hunt. Keep your eyes to the earth. Bent grass, broken mud, scattered leaves. The wilds speak to those who know how to listen. You aided my cause. In return, I'll teach you my craft.", 'info')
+        player.trackingLearned = true
+        log('You learned Tracking.', 'good')
+      }
       gainXp(100)
       oldHunterQuest = {...q, state: 'completed'}
       updateHud()
@@ -2935,6 +2942,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
   }
 
   function killEnemy(e) {
+    if (!e.alive) return
+    const species = trackSpecies(e)
+    player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
     if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
     log(`You have slain the ${e.name}!`, 'good')
     // Notify quest logic before removing the corpse. Recover-item quests
@@ -3048,6 +3058,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
     reusingWorldAfterPermadeath = true
+    oldHunterQuest = null
 
     Object.assign(player, {
       x: spawnPoint.x,
@@ -3069,6 +3080,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       deaths: 0,
       steps: 0,
       kills: 0,
+      trackingLearned: false, killsBySpecies: {},
       invisibleTurns: 0,
       godMode: false,
       godInvisible: false,
@@ -3698,6 +3710,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       const join = e.farPath?.findIndex(step =>
         Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) === 1) ?? -1
       e.farPath = join >= 0 ? e.farPath.slice(join) : null
+      leaveBeastTrack(e, fromX, fromY)
       finishEnemyMove(e, fromX, fromY)
       return true
     }
@@ -3737,6 +3750,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     e.y = step.y
     e.farPath.shift()
     occupied.add(keyXY(e.x, e.y))
+    leaveBeastTrack(e, fromX, fromY)
     finishEnemyMove(e, fromX, fromY)
     return true
   }
@@ -3903,6 +3917,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    ageBeastTracks()
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
     tickRaceRegen()
@@ -5249,6 +5264,11 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       inspectedGround = true
     }
     if (inspectedGround) return
+    const track = beastTrackAt(player.x, player.y)
+    if (track) {
+      log(inspectBeastTrack(track), 'info')
+      return
+    }
 
     const notes = {}
     let pillarDirection = null
@@ -6430,6 +6450,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
         } else markDiscovered(mx, my) // surface keeps its existing discovery rule
       }
     }
+    drawBeastTracks()
     // ground items
     for (const g of groundItems) {
       if (!onCurrentLevel(g)) continue
@@ -6928,6 +6949,9 @@ fov: add light sources (like torches to increase pov, or light scrolls)
     }
     if (mx >= 0 && my >= 0 && mx < MAP_W && my < MAP_H && map[my][mx] === 'bigbell') {
       return {mini: true, enemy: null, html: `<div class="nm">Big Bell</div>`}
+    }
+    if (beastTrackAt(mx, my) && discovered[my]?.[mx]) {
+      return {mini: true, enemy: null, html: '<div class="nm">foot tracks?</div>'}
     }
     return null
   }
@@ -7774,6 +7798,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
       ['🤺 Grace', playerGrace()],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
+      ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
       ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],
       // ['🛡️ Defense', playerDef()],
@@ -9131,6 +9156,7 @@ fov: add light sources (like torches to increase pov, or light scrolls)
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    beastTracks.clear()
     generateMap()
     const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
     if (weaponHuts.length !== 1 || weaponHuts[0].mausoleum || !STARTING_WEAPONS.includes(weaponHuts[0].startingWeapon)) {

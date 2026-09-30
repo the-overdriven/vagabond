@@ -49,6 +49,10 @@
       "bg": "#9a8050",
       "image": "img/tiles/sand-dug-overlay.png",
       "scale": 1
+    },
+    "beastTracks": {
+      "image": "img/overlays/beast-tracks.png",
+      "scale": 1
     }
   },
   "groundItems": {
@@ -175,13 +179,34 @@
     "glyph": "initial",
     "color": "#ffffff",
     "characters": {
-      "Drunk": {"image": "img/tiles/npc-drunk.png", "scale": 1.0},
-      "Herbalist": {"image": "img/tiles/npc-herbalist.png", "scale": 1.0},
-      "Ancient Lich": {"image": "img/tiles/npc-ancient-lich.png", "scale": 1.0},
-      "Merchant": {"image": "img/tiles/npc-merchant.png", "scale": 1.0},
-      "Old Hunter": {"image": "img/tiles/npc-old-hunter.png", "scale": 1.0},
-      "Fisherman Hermit": {"image": "img/tiles/npc-fisherman.png", "scale": 1.0},
-      "Gravedigger": {"image": "img/tiles/npc-gravedigger.png", "scale": 1.0}
+      "Drunk": {
+        "image": "img/tiles/npc-drunk.png",
+        "scale": 1.0
+      },
+      "Herbalist": {
+        "image": "img/tiles/npc-herbalist.png",
+        "scale": 1.0
+      },
+      "Ancient Lich": {
+        "image": "img/tiles/npc-ancient-lich.png",
+        "scale": 1.0
+      },
+      "Merchant": {
+        "image": "img/tiles/npc-merchant.png",
+        "scale": 1.0
+      },
+      "Old Hunter": {
+        "image": "img/tiles/npc-old-hunter.png",
+        "scale": 1.0
+      },
+      "Fisherman Hermit": {
+        "image": "img/tiles/npc-fisherman.png",
+        "scale": 1.0
+      },
+      "Gravedigger": {
+        "image": "img/tiles/npc-gravedigger.png",
+        "scale": 1.0
+      }
     }
   },
   "player": {

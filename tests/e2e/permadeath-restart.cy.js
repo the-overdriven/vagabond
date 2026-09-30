@@ -12,7 +12,7 @@ describe('Permadeath restart', () => {
       world = win.eval('surfaceMap')
       seed = win.eval('WORLD_SEED')
       characterId = win.eval('player.characterId')
-      win.eval('die()')
+      win.eval("player.trackingLearned = true; player.killsBySpecies = {Wolf: 2}; oldHunterQuest = {state: 'completed'}; die()")
       expect(win.eval("groundItems.some(item => item.kind === 'deadbody' && item.name === 'First Wanderer')")).to.equal(false)
     })
     cy.get('#raceOverlay', {timeout: 12000}).should('have.class', 'show')
@@ -35,6 +35,9 @@ describe('Permadeath restart', () => {
       expect(win.eval('player.name')).to.equal('Second Wanderer')
       expect(win.eval('player.race')).not.to.equal('human')
       expect(win.eval('player.deaths')).to.equal(0)
+      expect(win.eval('player.trackingLearned')).to.equal(false)
+      expect(win.eval('Object.keys(player.killsBySpecies).length')).to.equal(0)
+      expect(win.eval('oldHunterQuest')).to.equal(null)
       expect(win.eval("groundItems.some(item => item.kind === 'deadbody' && item.name === 'First Wanderer')")).to.equal(true)
     })
     cy.window().its('__VAGABOND_E2E__').invoke('getState').should(state => {

@@ -1561,7 +1561,11 @@ instead; the surface template remains unchanged. Loading an older save also
 converts underground `"far"` instances to `"roam"` through the shared
 `enemyWanderForLevel()` helper in the Enemy AI wandering section. A surface traveler's
 previous tile is saved so its random branch cannot immediately reverse after
-loading; destination coordinates remain saved as before.
+loading; destination coordinates and the remaining cached route are saved too.
+The route is gameplay state: rebuilding it after a load can choose a different
+path around other creatures, changing future movement and track creation even
+when RNG consumption initially matches. Save/load and replay restore the exact
+remaining route; normal blocked-step checks still rebuild it when required.
 
 Home-style enemies may also define `homeRadius` per template or per spawned enemy.
 If omitted, the global `wandering.radius` is used, currently **1 tile**. This
@@ -2949,6 +2953,58 @@ Other generated quest types include:
 Kill quests are restricted to eligible prefixed tier-3-or-4 monsters, while item quests are generated from living eligible tier-3-or-4 enemies or qualifying ground items. Tier-5 monsters are excluded from kill, group-kill, and carried-item recovery targets. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
+Completing the quest also teaches **Tracking**, once per character, using the
+Hunter's craft-teaching dialogue. The character sheet then shows `Tracking: Learned`;
+before learning, the skill is hidden. The existing XP reward is unchanged.
+Normal death preserves the lesson and quest. A new permadeath character starts
+with no Tracking knowledge, no species kill counts and no Old Hunter quest,
+so the Hunter can offer a fresh quest in the surviving world.
+
+## Tracking beast trails
+
+Only surface, non-flying, non-humanoid `far` wanderers leave tracks. Each successful
+idle travel step (including a random detour) with a valid stored destination has
+one seeded **3%** roll. Waiting, blocked movement, attacks, pursuit, teleports and
+other wander modes produce no tracks and consume no track RNG. Tracks occupy the
+vacated tile; a new impression replaces any existing track on that tile.
+
+The bearing is the nearest of eight compass directions from the track tile to the
+beast's stored **final destination**, captured when the track is made. It does not
+follow the latest step, even on an obstacle detour, and does not change if the
+beast later retargets or dies. North points up; northeast rotates 45° clockwise;
+south rotates 180°. The approved transparent paw SVG and its PNG export live in
+`img/overlays/`. Tile mode rotates the PNG; ASCII mode uses a directional arrow.
+Tracks appear above terrain, below ground objects and actors, only on discovered
+surface tiles in the viewport. Tracks do not affect movement, collision or loot.
+
+Hover shows only `foot tracks?`, regardless of knowledge. Existing actor, NPC and
+ground-object tooltips take priority. Inspecting the tile uses the usual inspect
+key; special terrain and ground-object interactions retain priority. Without
+Tracking it logs exactly: “You notice something that looks like foot tracks, but
+cannot make sense of them.” With Tracking, it reports bearing and freshness:
+
+| Age in turns | Example for a recognized species |
+|---|---|
+| 0–49 | Fresh wolf tracks lead northeast. |
+| 50–149 | The wolf tracks lead northeast. |
+| 150–199 | Fading wolf tracks lead northeast. |
+| 200 | Track removed |
+
+Species recognition requires at least one player kill of that **base species**;
+prefixes share one counter. Every enemy killed through the normal kill handler
+increments that species' count once. Unrecognized tracks omit the species and
+append “You've never seen paw prints like these before.” Knowledge is checked
+at inspection time, so killing a species also makes its surviving older tracks
+recognizable. These counters are player knowledge, not a new visible bestiary.
+
+`content/enemy_config.json → tracking` configures the chance, lifetime and freshness
+thresholds. Age advances once per game turn across all levels, independently of
+rendering, animation or inspection. Save/load and replay preserve track coordinates,
+bearing, species and age, learned Tracking, and per-species kill counts. Tracks
+remain environmental evidence across a permadeath character change; only the new
+character's knowledge resets. Tracks are clues to an earlier destination, not a
+guarantee that a living beast still occupies or is heading toward that location.
+
 The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer) and whenever his quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after completion. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
 
 </details>
@@ -3398,10 +3454,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-18
+19
 ```
 
 Saves are JSON files.
+
+Version 19 adds Tracking knowledge, per-species kill counts, surface track records
+and their ages, plus each far traveler’s remaining route. Turn count, consecutive waits 
+and the Old Hunter quest serial are saved too; replay restores their actual starting 
+values rather than assuming zero. No migration for older saves is added for these new fields.
 
 Version 18 persists Fisherman hut/quest state, exact enemy IDs and the next-ID
 counter, and all Swimming skill/practice/session fields. Loading does not spawn
@@ -3448,43 +3509,14 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-The loader contains compatibility handling for older saves.
+Tracking requires current **version 19** saves. Other versions are rejected
+before world state is changed; begin a new world when upgrading. No migration
+or inferred Tracking progress is provided for older saves or replay snapshots.
 
-Examples include handling:
-
-- missing race data
-- missing NPC data
-- older terrain-underlay information
-- older cave entrance representations
-- underground level renumbering from the older z-depth scheme
-- missing enemy `levelKind` metadata
-- transitional Dwarven Fort chest metadata / placement
-- older Dwarven Fort exits stored as `caveup`: when loading deep levels, the
-  fort gate at its surface coordinates on z:-3 is restamped as
-  `dwarvenfortexit` in the local template and merged map; other `caveup`
-  entrances keep their cave-ascent meaning
-
-For enemy levels specifically:
-
-- **v13+** saves persist `levelKind` directly.
-- **v11-v12** already use the current z:-1 / z:-2 / z:-3 chain numbering but
-  accidentally omitted enemy `levelKind`. Their numeric z values are therefore
-  kept unchanged; the loader reconstructs map identity, including recognizing
-  Crypt Level 2 at z:-2 from its saved home-tile information.
-- **pre-v11** saves can still require the old depth migration
-  (`z:-3 -> z:-2`, `z:-4 -> z:-3`) before assigning the appropriate level kind.
-
-This version-aware migration is important for the Dwarven Fort: a current
-z:-3 Ghost must not be mistaken for an old-format z:-3 deeper-cave enemy and
-moved to z:-2 during load.
-- older discovery data
-
-Any persistent feature should therefore be evaluated for:
-
-1. save serialization
-2. load restoration
-3. save-version compatibility
-4. derived-state reconstruction
+Every persistent feature must cover initialization, current-save serialization
+and restoration, replay starting state, and character-reset behavior. Existing
+map identity remains authoritative: `levelKind` distinguishes the Crypt from
+chain maps sharing a numeric depth, and current z:-3 fort enemies stay on z:-3.
 
 ---
 
@@ -4293,7 +4325,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 17).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 19).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -4326,8 +4358,8 @@ The mausoleum fix added `mausoleumHutPos` to normal saves as an additive field
 alongside `villageHuts` and `cemeteryTombstones`. That change did not itself
 require a save-version bump because older saves can continue to load without the
 field; the loader falls back to the existing odd-name relationship when
-possible. The current game save version is 16; subsequent versions also added
-per-enemy wandering state and temporary Alarmed status.
+possible. Subsequent save versions added per-enemy wandering state, temporary Alarmed
+status and the current persistent skill/evidence fields (see section 66).
 
 ## Recorded actions
 

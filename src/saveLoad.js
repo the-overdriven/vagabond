@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 18 // Fisherman quest, stable enemy identity, and Swimming progression/session state
+const SAVE_VERSION = 19 // Tracking, species kills, ground tracks and deterministic counters
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -120,6 +120,9 @@ function buildSaveObject() {
     spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
     worldEdgesReached: Object.assign({}, worldEdgesReached),
     oldHunterQuest: oldHunterQuest,
+    oldHunterQuestSerial,
+    turnCount, consecutiveWaitTurns,
+    beastTracks: [...beastTracks.values()].map(track => ({...track})),
     fishermanQuest,
     fishermanHut,
     bellReturnedToChapel: bellReturnedToChapel,
@@ -138,6 +141,8 @@ function buildSaveObject() {
       maxHp: player.maxHp, hp: player.hp,
       baseAtk: player.baseAtk, baseDef: player.baseDef, baseSpd: player.baseSpd, baseMf: player.baseMf,
       gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
+      trackingLearned: player.trackingLearned,
+      killsBySpecies: {...player.killsBySpecies},
       invisibleTurns: player.invisibleTurns,
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
@@ -192,6 +197,7 @@ function buildSaveObject() {
       homeY: e.homeY,
       wander: enemyWanderMode(e),
       homeRadius: Number.isFinite(e.homeRadius) ? e.homeRadius : null,
+      farPath: e.farPath ? e.farPath.map(step => ({...step})) : null,
       farTargetX: Number.isInteger(e.farTargetX) ? e.farTargetX : null,
       farTargetY: Number.isInteger(e.farTargetY) ? e.farTargetY : null,
       farPrevX: Number.isInteger(e.farPrevX) ? e.farPrevX : null,
@@ -247,6 +253,9 @@ function loadGameFromObject(data, opts = {}) {
   const isReplayInit = !!opts.isReplayInit
   if (!data || typeof data !== 'object' || (!Array.isArray(data.map) && typeof data.map !== 'string')) {
     throw new Error('That does not look like a Vagabond save file.')
+  }
+  if (data.version !== SAVE_VERSION) {
+    throw new Error('This save uses a different game format. Please start a new world for Tracking.')
   }
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
@@ -485,6 +494,10 @@ function loadGameFromObject(data, opts = {}) {
   rngState = data.rngState | 0
   if (Number.isInteger(data.worldSeed)) WORLD_SEED = data.worldSeed
   Object.assign(worldEdgesReached, data.worldEdgesReached || {})
+  beastTracks = new Map(data.beastTracks.map(track => [keyXY(track.x, track.y), {...track}]))
+  turnCount = data.turnCount
+  consecutiveWaitTurns = data.consecutiveWaitTurns
+  oldHunterQuestSerial = data.oldHunterQuestSerial
   oldHunterQuest = data.oldHunterQuest || null
   fishermanQuest = data.fishermanQuest || null
   fishermanHut = data.fishermanHut || null
@@ -544,6 +557,7 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  player.killsBySpecies = {...data.player.killsBySpecies}
   player.swimming = data.player.swimming || 0
   // Older completed saves awarded this character before reward tracking existed.
   player.fishermanRewardClaimed = data.player.fishermanRewardClaimed ??
@@ -665,7 +679,7 @@ function loadGameFromObject(data, opts = {}) {
       farTargetY: level >= 0 && Number.isInteger(e.farTargetY) ? e.farTargetY : null,
       farPrevX: level >= 0 && Number.isInteger(e.farPrevX) ? e.farPrevX : null,
       farPrevY: level >= 0 && Number.isInteger(e.farPrevY) ? e.farPrevY : null,
-      farPath: null,
+      farPath: e.farPath ? e.farPath.map(step => ({...step})) : null,
       fleeingHoly: !!e.fleeingHoly,
     })
   })
