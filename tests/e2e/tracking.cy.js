@@ -1,9 +1,17 @@
 describe('Tracking and beast evidence', () => {
   beforeEach(() => {
+    cy.viewport(1440, 900)
     cy.visit('/')
-    cy.get('#raceName').type('Tracking Tester')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    // Tracking uses its own scenario below; keep startup independent of the clock.
+    cy.window().then(win => win.eval('WORLD_SEED = 123456789; rngState = WORLD_SEED'))
+    cy.get('#raceName').clear().type('Tracking Tester')
     cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.get('#loadingOverlay', {timeout: 60000}).should($overlay => {
+      expect($overlay.text(), 'startup status for seed 123456789').not.to.include('failed')
+      expect($overlay, 'world generation finished').not.to.be.visible
+    })
+    cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => win.eval(`(() => {
       replayAnimationsDisabled = true
