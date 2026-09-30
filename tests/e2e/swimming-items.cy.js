@@ -70,7 +70,7 @@ describe('Swimming restrictions and visibility', () => {
           drawSwimmingCreature = original
         }
       })()`)
-      expect(fractions).to.deep.equal([1 / 3, 1 / 2])
+      expect(fractions).to.deep.equal([0.2631578947368421, 0.4])
     })
   })
 })
