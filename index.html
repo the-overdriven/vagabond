@@ -8,7 +8,6 @@ monster fight each other (only when player near? they leave bodies?)
 when foraging animate "found!"
 monster ability: cry for help (on low hp?)
 some weapons (only two-handed weapons?) should deal AoE dmg, think of name
-bestiary... how many each creatures slain
 dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
 tooltips on desktop should appear on the left side above canvas and also when fighting
 fleeing mechanic: either on very strong hit, or % of life
@@ -21,6 +20,61 @@ when your HP drops below 20%: You feel sick. similar for monsters
 Men call it holy, yet the beasts sense what men do not.
 add Chaos Scroll of Teleportation - teleports (everyone) to random walkable tile
 fov: add light sources (like torches to increase pov, or light scrolls)
+Creatures you have slain. -> You have slain <amount> different creatures.
+guarantee some islands with treasure chests?
+simplify speedPenalty on armors, use only their prop, not base -1
+dying on permadeath should wait for player input before showing race selection for new char
+move log to side and expand canvas?
+prettier brown vertical scrolls (desktop only)
+immersive monster sounds (you hear...)
+tracking is not useful enough? i.e. add where the stronger mobs are, where the weaker ones are, and where there's no one around + add deers
+procedurally generated NPC ?
+humanoids should have less def? or items should give them only 0.7x of what they normally give
+the brown cave floor is not exactly seamless
+picking up wheelbarrow should remove it instantly (redraw/refresh canvas instantly)
+default zoom should be slightly bigger
+inspecting columns (when standing on a dwarven column tile), should not inspect surroundings
+small health bars above enemies?
+enemy tooltips on desktop should appear automatically
+font size scale should be 1.1, not 1.2
+old hunter: "the lost item" fallback - wtf?
+monsters should run away from temple, even if player is not inside
+"I saw the wretch carrying it west of here, near the ruined fort" there are no forts
+old hunter shouldnt give quests that involve dealing with far wandering monsters
+herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards.
+(or cousin instead of brother)
+witch is a crazy niece of hunter
+fix: autopath should ignore swimming, unless already in water
+NPC shouldnt spawn behind trees (grassland trees)
+healing herb should heal min. 20 hp but max. 50 hp
+dying should close inv
+add random button next to name?
+bank -> shore
+stalagmites in caves
+skill: butchering
+water in the north should turn to ice. but not all
+how is xp for killing monsters calculated? maybe the formula should use enemy base xp + sum of HP/DEF/ATK/SPD/GRACE stats
+starting a second game on permadeath world should respawn enemies underground?
+optimize: set up far wandering enemy destination on world gen before player makes a move?
+new monster affixes: scrawny - atk, - def, clumsy/graceful - grace modifiers, sleepy, vigilant
+balance: orc/dwarf/catling + 1 ATK every 5 levels
+Gaudy item: aggro +1
+freezing not severe enough: -1hp every 4 turns, not 5
+odd tombstone should log the previous msg too! (it comes from ruined cemetary)
+shields dont need to show grace -1 in inventory, armors dont
+supabase/graveyard death record: add dropped item + world traits
+balance: herbalist should sell life potions
+add torches on the wall
+refactor index.html (extract more files: render.js, combat.js, enemyAI.js, trade.js, mapView.js, hunterQuests.js)
+prosperity: clearing monsters in the vicinity of the village adds some items to merchant
+when logging (un)equip msgs colorize negative changes
+msg log: slightly gray out older messages?
+move evasion field to abilities
+when foraging animate "found!"
+
+You automatically equip the Dagger. (+2 ATK, +5 GRACE)
+You search the skeletal remains and take what you can find: Dagger.
+the logging order is wrong (lower message is newer)
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
