@@ -1864,3 +1864,9 @@ body.hint-collapsed #hint .panel-toggle {
   color: var(--parchment);
   font: 12px/1.4 monospace;
 }
+
+#tooltip .shooter-marker,
+#mobileInfoPanel .shooter-marker {
+  color: #e0473f;
+  font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif;
+}

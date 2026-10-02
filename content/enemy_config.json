@@ -53,5 +53,25 @@
     "lifetimeTurns": 200,
     "freshTurns": 50,
     "fadingFromTurns": 150
+  },
+  "ranged": {
+    "shooterChance": 0.999,
+    "startingShots": 10,
+    "dodgeMultiplier": 2,
+    "projectileAnimationMs": 220,
+    "abilities": {
+      "shooterStones": {
+        "projectile": "stone",
+        "atk": 3,
+        "verb": "hurls",
+        "article": "a"
+      },
+      "shooterArrows": {
+        "projectile": "arrow",
+        "atk": 5,
+        "verb": "shoots",
+        "article": "an"
+      }
+    }
   }
 }

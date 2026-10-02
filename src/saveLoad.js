@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 19 // Tracking, species kills, ground tracks and deterministic counters
+const SAVE_VERSION = 20 // Ranged shooter variants and ammunition state
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -203,6 +203,8 @@ function buildSaveObject() {
       farPrevX: Number.isInteger(e.farPrevX) ? e.farPrevX : null,
       farPrevY: Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       fleeingHoly: !!e.fleeingHoly,
+      shooterAbility: e.shooterAbility || null,
+      shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
     })),
     groundItems: groundItems.map(g => ({...g})),
     // NPC talkFreezeTurns affects whether npcTurn() consumes wander RNG, so it
@@ -255,7 +257,7 @@ function loadGameFromObject(data, opts = {}) {
     throw new Error('That does not look like a Vagabond save file.')
   }
   if (data.version !== SAVE_VERSION) {
-    throw new Error('This save uses a different game format. Please start a new world for Tracking.')
+    throw new Error('This save uses a different game format. Please start a new world.')
   }
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
@@ -681,6 +683,8 @@ function loadGameFromObject(data, opts = {}) {
       farPrevY: level >= 0 && Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       farPath: e.farPath ? e.farPath.map(step => ({...step})) : null,
       fleeingHoly: !!e.fleeingHoly,
+      shooterAbility: typeof e.shooterAbility === 'string' ? e.shooterAbility : null,
+      shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
     })
   })
   occupied = new Set()

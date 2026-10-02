@@ -29,43 +29,50 @@
       "ch": "♣",
       "color": "#2f7a3a",
       "bg": "#0b160b",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "taiga": {
       "ch": "♣",
       "color": "#49664f",
       "bg": "transparent",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "ancientForest": {
       "ch": "♣",
       "color": "#1d5227",
       "bg": "#071007",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "hill": {
       "ch": "∩",
       "color": "#6f6959",
       "bg": "#1a160c",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "mountain": {
       "ch": "▲",
       "color": "#8d8d8d",
       "bg": "#141414",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "snowmountain": {
       "ch": "▲",
       "color": "#ffffff",
       "bg": "#dfeaf2",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "volcano": {
       "ch": "▲",
       "color": "#ff6b35",
       "bg": "#24100d",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "lava": {
       "ch": "≈",
@@ -96,7 +103,8 @@
       "ch": "#",
       "color": "#493022",
       "bg": "#0d0805",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "caveentrance": {
       "ch": "∩",
@@ -142,19 +150,22 @@
       "ch": "Ω",
       "color": "#e8b85b",
       "bg": "#241b12",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "dwarvenstatue": {
       "ch": "♜",
       "color": "#817769",
       "bg": "#171514",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "dwarvenwall": {
       "ch": "▓",
       "color": "#756b60",
       "bg": "#151311",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "dwarvenrubble": {
       "ch": "░",
@@ -166,44 +177,51 @@
       "ch": "☦",
       "color": "#d9b3ff",
       "bg": "#1c0f2e",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "boulder": {
       "ch": "●",
       "color": "#7a7a7a",
       "bg": "#141414",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "blackpillar": {
       "ch": "▮",
       "color": "#2a2a35",
       "bg": "#0a0a0a",
-      "walk": false
+      "walk": false,
+      "projectileBlock": true
     },
     "fishermanhut": {
       "ch": "⌂",
       "color": "#a6beb4",
       "mini": "#003366",
       "bg": "#241a10",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "village": {
       "ch": "⌂",
       "color": "#e0b080",
       "bg": "#241a10",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "belltower": {
       "ch": "⛪",
       "color": "#d9b3ff",
       "bg": "#1c0f2e",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "ruinedchapel": {
       "ch": "†",
       "color": "#8b8175",
       "bg": "#211d1a",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "grave": {
       "ch": "†",
@@ -216,13 +234,15 @@
       "color": "#aaa39a",
       "bg": "#171412",
       "mini": "#aaa39a",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "bigbell": {
       "ch": "⍾",
       "color": "#d9a441",
       "bg": "#141414",
-      "walk": true
+      "walk": true,
+      "projectileBlock": true
     },
     "frozenriver": {
       "walk": true,
@@ -271,14 +291,16 @@
       "ch": "n",
       "color": "#2a261e",
       "bg": "#050403",
-      "mini": "#161310"
+      "mini": "#161310",
+      "projectileBlock": true
     },
     "sarcophagus": {
       "walk": true,
       "ch": "⚰",
       "color": "#6a6255",
       "bg": "#050403",
-      "mini": "#332f27"
+      "mini": "#332f27",
+      "projectileBlock": true
     },
     "crypttrap": {
       "walk": true,

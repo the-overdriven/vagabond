@@ -838,6 +838,7 @@ the logging order is wrong (lower message is newer)
   let ATTACK_RANGE, AGGRO_RANGE, ALARM_TRIGGER_RANGE, ALARM_CLEAR_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
+  let RANGED_CONFIG = {}
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
   let cryptCaveIndex = -1
   let CRYPT_INSCRIPTIONS
@@ -926,6 +927,7 @@ the logging order is wrong (lower message is newer)
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
     TRACK_CONFIG = content.enemyConfig.tracking
+    RANGED_CONFIG = content.enemyConfig.ranged || {}
     PREFIX_STATS = content.enemyConfig.prefixStats
     ARTIFACT_NOUNS = content.artifactNouns
     ARTIFACT_PREFIXES = content.artifactPrefixes
@@ -1094,6 +1096,9 @@ the logging order is wrong (lower message is newer)
       }
       for (const [k, v] of Object.entries(RENDER_STYLE?.overlays || {})) {
         if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
+      }
+      for (const visual of Object.values(RENDER_STYLE?.projectiles || {})) {
+        if (visual?.image) paths.push(visual.image)
       }
     }
     await Promise.all([...new Set(paths)].map(async path => {
@@ -2136,6 +2141,34 @@ the logging order is wrong (lower message is newer)
   /* ============================== ENEMY CREATION ============================== */
   let nextEnemyId = 1
 
+  function shooterAbilityForTemplate(tmpl) {
+    if (!tmpl || !Array.isArray(tmpl.abilities) || !RANGED_CONFIG?.abilities) return null
+    return tmpl.abilities.find(ability => Object.hasOwn(RANGED_CONFIG.abilities, ability)) || null
+  }
+
+  function initializeEnemyShooter(enemy, tmpl = null) {
+    if (!enemy) return enemy
+    if (Object.prototype.hasOwnProperty.call(enemy, 'shooterAbility') ||
+        Object.prototype.hasOwnProperty.call(enemy, 'shotsRemaining')) return enemy
+    const ability = shooterAbilityForTemplate(tmpl || ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name])
+    enemy.shooterAbility = null
+    enemy.shotsRemaining = 0
+    if (ability && chance(RANGED_CONFIG.shooterChance)) {
+      enemy.shooterAbility = ability
+      enemy.shotsRemaining = RANGED_CONFIG.startingShots
+    }
+    return enemy
+  }
+
+  function shooterDefinition(e) {
+    if (!e?.shooterAbility || !RANGED_CONFIG?.abilities) return null
+    return RANGED_CONFIG.abilities[e.shooterAbility] || null
+  }
+
+  function enemyIsShooter(e) {
+    return !!shooterDefinition(e) && Number.isFinite(e.shotsRemaining) && e.shotsRemaining > 0
+  }
+
   function addEnemy(enemy) {
     if (!enemy.id) enemy.id = `enemy_${nextEnemyId++}`
     else {
@@ -2152,6 +2185,7 @@ the logging order is wrong (lower message is newer)
     if (!Object.prototype.hasOwnProperty.call(enemy, 'homeRadius') && Number.isFinite(tmpl?.homeRadius)) {
       enemy.homeRadius = tmpl.homeRadius
     }
+    initializeEnemyShooter(enemy, tmpl)
     enemies.push(enemy)
     return enemy
   }
@@ -3007,6 +3041,88 @@ the logging order is wrong (lower message is newer)
       const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : 'The enemy'
       log(`${enemyTimingText} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
       return enemyAttackPlayer(e, true)
+    }
+    return false
+  }
+
+  function projectilePathBetween(fromX, fromY, toX, toY) {
+    return UndergroundFov.traceLine(fromX, fromY, toX, toY)
+  }
+
+  function projectileTerrainBlocks(e, x, y) {
+    const tile = map[y]?.[x]
+    if (!tile) return true
+    if (currentZ === 0 && tile === 'grass' && grasslandTrees.has(keyXY(x, y))) return true
+    if (tile === 'hill' && map[e.y]?.[e.x] === 'hill') return false
+    return TILE[tile]?.projectileBlock === true
+  }
+
+  function projectileCreatureBlocks(e, x, y) {
+    for (const other of enemies) {
+      if (other === e || !other.alive || !onCurrentLevel(other) || other.fly) continue
+      if (other.x === x && other.y === y) return true
+    }
+    if (currentZ === 0 && npcs.some(n => n.x === x && n.y === y)) return true
+    return false
+  }
+
+  function clearProjectilePath(e) {
+    const path = projectilePathBetween(e.x, e.y, player.x, player.y)
+    for (let i = 1; i < path.length - 1; i++) {
+      const {x, y} = path[i]
+      if (projectileTerrainBlocks(e, x, y) || projectileCreatureBlocks(e, x, y)) return null
+    }
+    return path
+  }
+
+  function shooterCanSeePlayer(e) {
+    return !playerIsInvisible() && UndergroundFov.canSee(map, e.x, e.y, player.x, player.y)
+  }
+
+  function rangedDodgeChance(e) {
+    return Math.min(1, missChance(enemySpd(e), playerSpd()) * RANGED_CONFIG.dodgeMultiplier)
+  }
+
+  function enemyRangedAttackPlayer(e, path = null) {
+    const shot = shooterDefinition(e)
+    if (playerIsInvisible() || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
+    clearAutoPath()
+    e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
+    const projectilePath = path || projectilePathBetween(e.x, e.y, player.x, player.y)
+    const projectile = shot.projectile
+    const possessive = `${e.name}'s ${projectile}`
+    const animationDelay = RANGED_CONFIG.projectileAnimationMs
+
+    if (chance(rangedDodgeChance(e))) {
+      spawnProjectileAnim(projectilePath, projectile)
+      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, animationDelay)
+      log(`You dodge the ${possessive}.`, 'good')
+      return false
+    }
+
+    const armor = equippedArmor(player.equip.armor)
+    const glancing = !!armor && chance(missChance(enemySpd(e), playerSpd()))
+    let dmg = damageRoll(shot.atk, playerDef())
+    const criticalRoll = chance(enemyCriticalHitChance(e))
+    const critical = !glancing && criticalRoll
+    if (critical) dmg = Math.round(dmg * 2)
+    if (glancing) dmg = Math.floor(dmg / 3)
+    else dmg = Math.max(1, dmg)
+    player.hp -= dmg
+
+    spawnProjectileAnim(projectilePath, projectile)
+    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
+    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, animationDelay + (critical ? 120 : 0))
+    if (glancing) {
+      if (dmg === 0) log(`The ${possessive} glances off your ${armor.name}!`, 'bad')
+      else log(`The ${possessive} glances off your ${armor.name} and deals only ${dmg} damage.`, 'bad')
+    } else {
+      log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${projectile} at you for ${dmg} damage.`, 'bad')
+    }
+    updateHud()
+    if (player.hp <= 0) {
+      die(e)
+      return true
     }
     return false
   }
@@ -4038,7 +4154,7 @@ the logging order is wrong (lower message is newer)
       if (e.fleeingHoly) e.fleeingHoly = false
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
-      const aggroRange = effectiveAggroRange(e)
+      let aggroRange = effectiveAggroRange(e)
       if (currentZ !== 0 ||
           (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest') ||
           (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {
@@ -4081,6 +4197,7 @@ the logging order is wrong (lower message is newer)
           e.forestConcealX = null
           e.forestConcealY = null
           alarmEnemy(e)
+          aggroRange = effectiveAggroRange(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
@@ -4091,6 +4208,13 @@ the logging order is wrong (lower message is newer)
           if (distNow <= ATTACK_RANGE) {
             if (enemyAttackPlayer(e)) return
             break
+          }
+          if (enemyIsShooter(e) && distNow < aggroRange && shooterCanSeePlayer(e)) {
+            const projectilePath = clearProjectilePath(e)
+            if (projectilePath) {
+              if (enemyRangedAttackPlayer(e, projectilePath)) return
+              break
+            }
           }
           if (!enemyStepTowardPlayer(e)) break
           if (player.hp <= 0 || deathTransition) return
@@ -6112,6 +6236,7 @@ the logging order is wrong (lower message is newer)
   // (moves down).
   let fxAnims = []
   let damageAnims = []
+  let projectileAnims = []
   const FX_ANIM_MS = 420
   const DAMAGE_ANIM_MS = 650
   function enemyGlyph(e) {
@@ -6153,6 +6278,17 @@ the logging order is wrong (lower message is newer)
 
   function spawnDamageNumber(x, y, amount, color, delay) {
     damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0})
+    runAnimationLoop()
+  }
+
+  function spawnProjectileAnim(path, projectile) {
+    if (replayAnimationsDisabled || !Array.isArray(path) || path.length < 2) return
+    projectileAnims.push({
+      path: path.map(point => ({x: point.x, y: point.y})),
+      projectile,
+      start: performance.now(),
+      duration: RANGED_CONFIG.projectileAnimationMs
+    })
     runAnimationLoop()
   }
 
@@ -6223,7 +6359,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || damageAnims.length > 0
+    return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -6775,6 +6911,62 @@ the logging order is wrong (lower message is newer)
       ctx.fillText(String(previewPath.length), lx + TILE_PX * 0.78, ly + TILE_PX * 0.22)
       ctx.restore()
     }
+    // Ranged projectiles are presentation-only. Gameplay, RNG, damage and
+    // ammunition are already resolved before an entry is added here.
+    for (let i = projectileAnims.length - 1; i >= 0; i--) {
+      const anim = projectileAnims[i]
+      if (!Array.isArray(anim?.path) || anim.path.length < 2 ||
+          !Number.isFinite(anim.start) || !Number.isFinite(anim.duration) || anim.duration <= 0) {
+        projectileAnims.splice(i, 1)
+        continue
+      }
+      // A projectile can be queued after the current rAF frame timestamp was
+      // captured. Clamp that pre-start frame to zero progress; otherwise the
+      // computed segment becomes -1 and the presentation layer can crash.
+      const t = Math.max(0, Math.min(1, (now - anim.start) / anim.duration))
+      if (t >= 1) {
+        projectileAnims.splice(i, 1)
+        continue
+      }
+      const segments = anim.path.length - 1
+      const progress = t * segments
+      const segment = Math.min(segments - 1, Math.floor(progress))
+      const local = progress - segment
+      const from = anim.path[segment]
+      const to = anim.path[segment + 1]
+      if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(from.y) ||
+          !Number.isFinite(to.x) || !Number.isFinite(to.y)) {
+        projectileAnims.splice(i, 1)
+        continue
+      }
+      const x = from.x + (to.x - from.x) * local
+      const y = from.y + (to.y - from.y) * local
+      const visibleX = Math.round(x), visibleY = Math.round(y)
+      if (undergroundVisible && !undergroundVisible.has(keyXY(visibleX, visibleY))) continue
+      const visual = RENDER_STYLE.projectiles?.[anim.projectile]
+      if (!visual) continue
+      const first = anim.path[0]
+      const last = anim.path[anim.path.length - 1]
+      const projectileAngle = anim.projectile === 'arrow' && first && last
+        ? Math.atan2(last.y - first.y, last.x - first.x)
+        : null
+      ctx.save()
+      ctx.translate((x - camX + 0.5) * TILE_PX, (y - camY + 0.5) * TILE_PX)
+      if (Number.isFinite(projectileAngle)) ctx.rotate(projectileAngle)
+      const projectileImage = resolveVisualImage(visual)
+      if (projectileImage) {
+        const cached = scaledVisualCanvas(projectileImage, visual.scale ?? 1, visual.filter || '')
+        const size = cached.width
+        ctx.drawImage(cached, -size / 2, -size / 2)
+      } else {
+        ctx.font = `bold ${TILE_PX}px Consolas, 'Courier New', monospace`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = visual.color
+        ctx.fillText(visual.glyph, 0, 0)
+      }
+      ctx.restore()
+    }
     // player
     {
       let px = viewPlayerX
@@ -7018,7 +7210,7 @@ the logging order is wrong (lower message is newer)
         mini: false, enemy: e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
@@ -9358,6 +9550,9 @@ the logging order is wrong (lower message is newer)
     }
     for (const [k, v] of Object.entries(RENDER_STYLE?.overlays || {})) {
       if (typeof v === 'string' && k.toLowerCase().endsWith('image')) initialVisuals.push(v)
+    }
+    for (const visual of Object.values(RENDER_STYLE?.projectiles || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
     prepareAnimatedVisuals()

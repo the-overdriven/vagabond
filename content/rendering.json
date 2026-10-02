@@ -567,5 +567,19 @@
       "scale": 1,
       "mirrorX": true
     }
+  },
+  "projectiles": {
+    "arrow": {
+      "glyph": "➤",
+      "color": "#d7c7a5",
+      "image": "img/projectiles/arrow.png",
+      "scale": 1
+    },
+    "stone": {
+      "glyph": "●",
+      "color": "#9a9184",
+      "image": "img/projectiles/stone.png",
+      "scale": 1
+    }
   }
 }

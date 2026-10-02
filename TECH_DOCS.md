@@ -1299,6 +1299,39 @@ lowers an equipped enemy's natural GRACE by 1 for combat timing (minimum 1).
 This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice. 
 The player must still wield a weapon to take part in grace checks.
 
+## Ranged shooter variants
+
+Selected species can roll a ranged combat role when the enemy instance is created.
+The role is instance state, not a separate species and not an inherent attack used by
+every member of that template. Eligible templates declare either `shooterStones` or
+`shooterArrows` in their `abilities` array; the shared chance and projectile tuning
+live in `content/enemy_config.json`.
+
+| Eligible species | Projectile | Projectile ATK |
+|---|---|---:|
+| Monkey, Goblin | Stone | 3 |
+| Kobold, Lizard Man, Nymph, Centaur, Skeleton | Arrow | 5 |
+
+Each eligible spawn has a **20%** seeded-RNG chance to become a shooter and starts
+with **10 shots**. Shooter role and exact remaining ammunition persist with the
+enemy. A fired projectile always consumes one shot, including dodges and glancing
+hits. A blocked line consumes no ammunition. At zero shots the bow indicator
+disappears and the enemy immediately uses its ordinary species AI on later turns.
+
+Ranged attacks ignore the monster's ordinary/equipment/prefix-modified ATK and use
+only projectile ATK. GRACE does not participate. DEF mitigation, monster critical
+chance/multiplier and armor glancing use the normal combat rules. Ranged dodge is:
+
+```text
+min(100%, normal melee dodge chance × 2)
+```
+
+A genuine non-glancing ranged hit deals at least 1 damage after ordinary mitigation;
+a glancing hit may remain at 0. Critical and glancing outcomes are mutually exclusive.
+Shooter prefixes still modify their normal stats and melee behavior, but do not change
+the fixed projectile ATK. While ammunition remains, desktop/mobile inspection appends
+a red bow marker (`🏹`) to the existing species name; the marker disappears at zero shots.
+
 ## Deadly
 
 The Deadly enemy prefix grants critical-hit capability. Critical hit doubles the damage.
@@ -1478,6 +1511,37 @@ entering the normal aggro-range check.
 
 All explicit enemy-template aggro values were also increased by 1. Halfling
 reduces effective enemy detection range by 1.
+
+### Shooter combat decisions
+
+Shooting is part of the normal awareness/chase lifecycle rather than a separate AI
+mode. Special/forced behavior (passive monsters, invisibility handling, Temple
+fleeing, etc.) remains higher priority. Once normal pursuit is valid, a shooter with
+ammunition uses this order with the monster's **current effective AGGRO**, including
+Alarmed and racial/world modifiers:
+
+```text
+adjacent -> normal melee
+exactly on outermost AGGRO line -> normal chase
+inside outer AGGRO line + shooter FOV + clear shot -> fire
+inside range but blocked/no shooter FOV -> normal chase
+zero ammunition -> completely normal monster behavior
+```
+
+A shooter never fires at an invisible player and never kites/backpedals. Existing
+extra pursuit behavior may still produce the same move-then-attack style sequence the
+normal AI already permits, but a ranged attack itself does not grant another action.
+
+Shooter visibility uses the deterministic sight-line geometry in `src/fov.js`; normal
+AGGRO still supplies the distance boundary. A clear projectile line is an additional,
+separate requirement. The same deterministic tile line is used for collision and the
+visual projectile. Intermediate projectile blockers include forest/ancient forest/
+taiga, grassland trees, hills (unless the shooter stands on a hill), walls, mountains,
+boulders, columns/statues and other solid structures. The attacker's own tile and the
+player's target tile are not rejected merely for being forest/hill. Living ground
+monsters and NPCs between attacker and target block the shot; flying creatures do not.
+Blocked shots cause ordinary chase/pathfinding, with no friendly fire and no ammunition
+loss.
 
 ### Forest concealment
 
@@ -1686,6 +1750,15 @@ Combat includes:
 - armor glancing
 - player and enemy critical hits
 - possible extra attacks (weapon vs weapon grace checks)
+
+Monster ranged attacks reuse the same mitigation, glancing and critical systems, with
+the shooter-specific fixed projectile ATK and doubled dodge chance documented in
+§20. They do not run melee GRACE timing or melee lunge/contact behavior. Projectile
+animation is presentation-only: dodge, critical/glancing, damage, HP and ammunition are
+resolved first from deterministic gameplay state, then the visual effect is queued. Visual
+frame timing is clamped to the projectile effect lifetime, so a late-queued effect cannot
+interrupt input or combat resolution. The projectile uses a readable glyph in both
+tile-image and ASCII rendering modes.
 
 ---
 
@@ -3542,10 +3615,16 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-19
+20
 ```
 
 Saves are JSON files.
+
+Version 20 adds per-enemy ranged shooter role and exact remaining ammunition.
+The save stores the rolled shooter ability plus `shotsRemaining`; projectile type is
+derived from the current configured ability. Replay starting snapshots therefore keep
+the same shooter assignment and partial ammunition (for example, 7/10 remains 7/10)
+without rerolling on load, z-level changes or replay. No older-save migration is added.
 
 Version 19 adds Tracking knowledge, per-species kill counts, surface track records
 and their ages, plus each far traveler’s remaining route. Turn count, consecutive waits and the Old Hunter quest serial
@@ -3597,9 +3676,8 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Tracking requires current **version 19** saves. Other versions are rejected
-before world state is changed; begin a new world when upgrading. No migration
-or inferred Tracking progress is provided for older saves or replay snapshots.
+Ranged shooter state requires current **version 20** saves. Other versions are rejected
+before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
 and restoration, replay starting state, and character-reset behavior. Existing
@@ -3627,7 +3705,11 @@ directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
 crypt niches, boulders, and the Black Pillar. The blocking wall face itself
 remains visible. Water does not block sight. Diagonal sight follows tile
 centers: an adjacent open diagonal tile remains visible even if the two
-cardinal neighbors are walls. Surface visibility is unchanged.
+cardinal neighbors are walls. Surface visibility is unchanged. The same module also
+exposes its deterministic tile-center line trace for shooter sight/projectile checks;
+using that geometry for combat does not alter the player's surface discovery/FOV rules.
+Projectile collision then applies its own blocker rules on top because visibility and a
+physically clear shot are intentionally different concepts.
 
 Only terrain in the current field of view becomes discovered. Never-seen tiles
 are black on the main canvas and fogged on both minimaps; previously seen tiles
@@ -4415,7 +4497,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 19).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 20).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
