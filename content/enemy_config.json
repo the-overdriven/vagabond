@@ -55,7 +55,7 @@
     "fadingFromTurns": 150
   },
   "ranged": {
-    "shooterChance": 0.999,
+    "shooterChance": 0.5,
     "startingShots": 10,
     "dodgeMultiplier": 2,
     "projectileAnimationMs": 220,

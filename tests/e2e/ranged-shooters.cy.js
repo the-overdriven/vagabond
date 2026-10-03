@@ -61,12 +61,12 @@ describe('Ranged shooter monster variants', () => {
         rangedAssert(shooterAbilityForTemplate(ENEMY_TEMPLATE_BY_NAME[name]) === ability, name+' ability')
       }
       rangedAssert(shooterAbilityForTemplate(ENEMY_TEMPLATE_BY_NAME.Wolf) === null, 'Wolf must not be eligible')
-      rangedAssert(RANGED_CONFIG.shooterChance === 0.20 && RANGED_CONFIG.startingShots === 10, 'configured chance/ammo')
+      rangedAssert(RANGED_CONFIG.shooterChance === 0.5 && RANGED_CONFIG.startingShots === 10, 'configured chance/ammo')
       rangedAssert(RANGED_CONFIG.abilities.shooterStones.atk === 3 && RANGED_CONFIG.abilities.shooterArrows.atk === 5, 'projectile ATK config')
 
       const original = rng; let calls = 0
       try {
-        rng = () => { calls++; return 0.19 }
+        rng = () => { calls++; return 0.499999 }
         const e = {name:'Skeleton',baseName:'Skeleton'}
         initializeEnemyShooter(e, ENEMY_TEMPLATE_BY_NAME.Skeleton)
         rangedAssert(e.shooterAbility === 'shooterArrows' && e.shotsRemaining === 10, 'eligible spawn becomes shooter')
@@ -75,12 +75,19 @@ describe('Ranged shooter monster variants', () => {
         const wolf = {name:'Wolf',baseName:'Wolf'}
         initializeEnemyShooter(wolf, ENEMY_TEMPLATE_BY_NAME.Wolf)
         rangedAssert(calls === 1 && !wolf.shooterAbility && wolf.shotsRemaining === 0, 'noneligible consumes no shooter roll')
+        rng = () => { calls++; return 0.5 }
+        const melee = {name:'Skeleton',baseName:'Skeleton'}
+        initializeEnemyShooter(melee, ENEMY_TEMPLATE_BY_NAME.Skeleton)
+        rangedAssert(calls === 2 && !melee.shooterAbility && melee.shotsRemaining === 0, 'roll at 50% boundary stays melee')
+        rng = () => { calls++; return 0 }
+        initializeEnemyShooter(melee, ENEMY_TEMPLATE_BY_NAME.Skeleton)
+        rangedAssert(calls === 2 && !melee.shooterAbility && melee.shotsRemaining === 0, 'failed shooter roll is never retried')
       } finally { rng = original }
 
       resetRangedArena()
       const shooter = makeShooter('Skeleton', 3, {id:'persist-shooter',shotsRemaining:7})
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
-      rangedAssert(save.version === 20, 'save version')
+      rangedAssert(save.version === 21, 'save version')
       rangedAssert(save.enemies.find(e=>e.id==='persist-shooter').shotsRemaining === 7, 'save exact ammo')
       shooter.shotsRemaining = 1
       loadGameFromObject(save)

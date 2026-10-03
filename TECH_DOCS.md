@@ -1369,7 +1369,7 @@ live in `content/enemy_config.json`.
 | Monkey, Goblin | Stone | 3 |
 | Kobold, Lizard Man, Nymph, Centaur, Skeleton | Arrow | 5 |
 
-Each eligible spawn has a **20%** seeded-RNG chance to become a shooter and starts
+Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and starts
 with **10 shots**. Shooter role and exact remaining ammunition persist with the
 enemy. A fired projectile always consumes one shot, including dodges and glancing
 hits. A blocked line consumes no ammunition. At zero shots the bow indicator

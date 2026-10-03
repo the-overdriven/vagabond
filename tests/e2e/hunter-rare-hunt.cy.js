@@ -25,15 +25,20 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         oldHunterQuest = {id:'hunter_40', type:'investigate_area', state:'completed'}
         oldHunterQuestSerial = 40
         const markerBefore = oldHunterHasNewDialogue()
+        // Capture valid sites before the quest adds its quarry to the occupied tiles.
+        const reachable = hunterReachableSurfaceTiles()
+        const sitesByName = new Map(hunterRareTemplates().map(tmpl =>
+          [tmpl.name, hunterRareSpawnSites(tmpl, reachable)]))
+        const enemyIdsBefore = new Set(enemies.map(e => e.id))
         interactOldHunter()
         const q = oldHunterQuest
+        const newEnemyIds = enemies.filter(e => !enemyIdsBefore.has(e.id)).map(e => e.id)
         const target = enemies.find(e => e.id === q.targetEnemyId)
         const tmpl = ENEMY_TEMPLATE_BY_NAME[target.baseName]
         const edgeDistance = Math.min(target.x, target.y, MAP_W - 1 - target.x, MAP_H - 1 - target.y)
         const village = villageCenter || spawnPoint
         const villageDistance = Math.max(Math.abs(target.x - village.x), Math.abs(target.y - village.y))
-        const reachable = hunterReachableSurfaceTiles()
-        const preferredSites = hunterRareSpawnSites(tmpl, reachable)
+        const preferredSites = sitesByName.get(tmpl.name)
         const minPreferredEdge = Math.min(...preferredSites.map(site => site.edgeDistance))
         const decoy = addEnemy({id:'rare-decoy', name:target.baseName, baseName:target.baseName,
           tier:target.tier, level:0, hp:1, maxHp:1, atk:1, def:0, spd:1, aggro:0,
@@ -53,6 +58,8 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         const horn = player.inventory.find(it => it.kind === 'echoBlightHorn')
         return {
           markerBefore,
+          newEnemyIds,
+          targetId:q.targetEnemyId,
           type:q.type,
           qualifies: tmpl.wander === 'far' && tmpl.humanoid === false && Number(tmpl.rarity ?? 1) <= 0.1,
           targetName:target.baseName,
@@ -71,6 +78,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       })()`)
       expect(result.markerBefore, 'Hunter ! before receiving rare hunt').to.equal(true)
       expect(result.type).to.equal('rare_hunt')
+      expect(result.newEnemyIds, 'hunt adds exactly its designated quarry').to.deep.equal([result.targetId])
       expect(result.qualifies).to.equal(true)
       expect(result.targetMatches).to.equal(true)
       expect(result.initialDirectionFrozen).to.equal(true)
@@ -182,10 +190,29 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       cy.viewport(width, 900)
       cy.window().then(win => win.eval(`player.inventory=[createItem('echoBlightHorn')]; invTab='all'; toggleInv(true)`))
       cy.get('#invList .invitem').contains('Echo-Blight Horn').parent().as('hornRow')
-      cy.get('@hornRow').find('button').should('have.text', 'Use')
-      cy.get('@hornRow').find('img').should('have.attr', 'src').and('include', 'echo-blight-horn.svg')
+      cy.get('@hornRow').find('button').should('have.text', 'Use').and('be.visible').and('be.enabled')
+      cy.window().then(win => {
+        // Preloading replaces asset paths with blob URLs. Check the resolved
+        // horn asset and successful decoding, rather than the URL's filename.
+        const hornSrc = win.eval("imageSrc(itemIconPath('echoBlightHorn'))")
+        cy.get('@hornRow').find('img').should('be.visible').and($image => {
+          expect($image.attr('src'), 'resolved horn asset').to.equal(hornSrc)
+          expect($image[0].complete, 'horn image loaded').to.equal(true)
+          expect($image[0].naturalWidth, 'horn image decoded').to.be.greaterThan(0)
+        })
+      })
       cy.get('#invList').should($list => {
         expect($list[0].scrollWidth, 'horn row needs no horizontal scrolling').to.be.at.most($list[0].clientWidth)
+      })
+      cy.window().then(win => {
+        const beforeTurn = win.eval('turnCount')
+        cy.get('@hornRow').find('button').click()
+        cy.window().should(win => {
+          expect(win.eval('turnCount'), 'Use consumes one turn').to.equal(beforeTurn + 1)
+          expect(win.eval("player.inventory.find(it => it.kind === 'echoBlightHorn').lastUseTotalXp"),
+            'Use records the XP cooldown').to.be.a('number')
+        })
+        cy.get('#logpanel').should('contain.text', 'You blow the Echo-Blight Horn.')
       })
     })
   }
