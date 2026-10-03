@@ -3128,6 +3128,21 @@ the logging order is wrong (lower message is newer)
       attackerDelay < defenderDelay && chance((defenderDelay - attackerDelay) * 0.10)
   }
 
+  function enemyIsEnraged(e) {
+    return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.30 && enemyHasAbility(e, 'enrage')
+  }
+
+  function enemyAtk(e) {
+    return e.atk * (enemyIsEnraged(e) ? 1.25 : 1)
+  }
+
+  function logEnemyEnrageTransition(e, wasEnraged) {
+    const enraged = enemyIsEnraged(e)
+    if (enraged && !wasEnraged) log(`Pain drives ${e.name} into a rage!`, 'bad')
+    else if (wasEnraged && !enraged && e.hp > 0 && e.alive !== false)
+      log(`${e.name}'s rage subsides.`, 'info')
+  }
+
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
@@ -3178,6 +3193,7 @@ the logging order is wrong (lower message is newer)
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
+    const wasEnraged = enemyIsEnraged(e)
     e.hp -= dmg
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
@@ -3200,6 +3216,7 @@ the logging order is wrong (lower message is newer)
     } else {
       log(`${critical ? 'Critical hit! ' : ''}You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
     }
+    logEnemyEnrageTransition(e, wasEnraged)
     if (e.hp <= 0) {
       killEnemy(e)
       updateMobileInfoPanel(e.x, e.y)
@@ -3232,7 +3249,7 @@ the logging order is wrong (lower message is newer)
     }
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
-    let dmg = damageRoll(e.atk * (charge?.atkMultiplier ?? 1), playerDef())
+    let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef())
     const criticalRoll = chance(enemyCriticalHitChance(e))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
@@ -4290,7 +4307,9 @@ the logging order is wrong (lower message is newer)
     if (!(effectiveDamage > 0) || !enemyHasAbility(enemy, 'lifesteal') || !chance(0.30)) return
     const heal = Math.min(Math.max(0, enemy.maxHp - enemy.hp), Math.floor(effectiveDamage / 3))
     if (heal <= 0) return
+    const wasEnraged = enemyIsEnraged(enemy)
     enemy.hp += heal
+    logEnemyEnrageTransition(enemy, wasEnraged)
     log(`The ${enemy.name} steals your life and recovers ${heal} HP!`, 'bad')
     spawnDamageNumber(enemy.x, enemy.y, `+${heal}`, '#78c878')
     updateMobileInfoPanel(enemy.x, enemy.y)
@@ -7219,6 +7238,13 @@ the logging order is wrong (lower message is newer)
         ctx.lineWidth = 2
         ctx.strokeRect(vx + 2, vy + 2, TILE_PX - 4, TILE_PX - 4)
       }
+      if (enemyIsEnraged(e)) {
+        ctx.save()
+        ctx.strokeStyle = '#e0473f'
+        ctx.lineWidth = 3
+        ctx.strokeRect(vx + 3, vy + 3, TILE_PX - 6, TILE_PX - 6)
+        ctx.restore()
+      }
     }
     for (const visibleEnemy of visibleEnemies) {
       if (!enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
@@ -7563,7 +7589,8 @@ the logging order is wrong (lower message is newer)
       const hpPct = Math.max(0, e.hp / e.maxHp * 100)
       const aggroRange = effectiveAggroRange(e)
       const boosts = enemyPrefixBoosts(e)
-      const atkColor = e.atk < playerAtk() ? 'var(--parchment-dim)' : 'white'
+      const effectiveEnemyAtk = enemyAtk(e)
+      const atkColor = effectiveEnemyAtk < playerAtk() ? 'var(--parchment-dim)' : 'white'
       const effectiveEnemyDef = enemyDef(e)
       const effectiveEnemySpeed = enemySpd(e)
       const defColor = effectiveEnemyDef < playerDef() ? 'var(--parchment-dim)' : 'white'
@@ -7585,13 +7612,13 @@ the logging order is wrong (lower message is newer)
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
-      ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
+      ${boostHtml}${critHtml}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
       </div>
       <div class="statrow">
-      <span style="color:${atkColor}">ATK ${Math.round(e.atk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
+      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
       <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>`

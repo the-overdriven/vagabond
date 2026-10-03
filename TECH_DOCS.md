@@ -1432,6 +1432,26 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Enrage
+
+Orc, Minotaur, Owlbear, Lion, and GAUR have `enrage`. While alive and strictly
+below 30% of maximum HP, their melee ATK is multiplied by 1.25 before defense.
+At exactly 30%, the bonus does not apply. Healing to the threshold or higher
+ends enrage; entering the low-HP range again can trigger it again.
+The bonus combines multiplicatively with Charge and normal critical damage;
+an enraged Minotaur charging across one gap tile uses `base ATK * 1.25 * 1.25`.
+Ranged projectile ATK and XP rewards remain unchanged.
+
+Crossing the threshold after an attack logs "Pain drives <name> into a rage!".
+Healing out of enrage logs that its rage subsides. Fatal hits do not trigger
+an enrage message, and subsequent hits below the threshold do not repeat it.
+Enraged creatures have a red outline in tile and ASCII modes. Inspection shows
+Enraged (ATK +25%) and their current effective ATK on desktop and mobile.
+
+Enrage is derived from current HP, maximum HP, and the saved abilities array;
+base ATK is never mutated. Save/load and replay therefore restore it directly,
+without an additional persistent flag, extra RNG, or save-format change.
+
 ## Critical knockback
 
 Ogre and Cyclops have `knockback`. A damaging critical melee strike pushes a
