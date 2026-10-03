@@ -3128,6 +3128,36 @@ the logging order is wrong (lower message is newer)
       attackerDelay < defenderDelay && chance((defenderDelay - attackerDelay) * 0.10)
   }
 
+  function enemyIsFleeing(e) {
+    return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')
+  }
+
+  function tryWoundedEnemyFlee(e) {
+    if (!enemyIsFleeing(e)) return false
+    const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    let destination = null, bestDistance = distance
+    for (const [dx, dy] of DIRS8) {
+      const x = e.x + dx, y = e.y + dy
+      const nextDistance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+      if (nextDistance <= bestDistance || !enemyTileOpen(e, x, y) ||
+          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+      destination = {x, y}
+      bestDistance = nextDistance
+    }
+    // No escape tile: let normal combat handle a cornered monster.
+    if (!destination) return false
+    e.aware = true
+    if (chance(0.10)) return true // Hesitation consumes the whole action.
+    const fromX = e.x, fromY = e.y
+    occupied.delete(keyXY(e.x, e.y))
+    e.x = destination.x; e.y = destination.y
+    occupied.add(keyXY(e.x, e.y))
+    e.farPath = null
+    leaveBeastTrack(e, fromX, fromY)
+    finishEnemyMove(e, fromX, fromY)
+    return true
+  }
+
   function enemyIsEnraged(e) {
     return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.30 && enemyHasAbility(e, 'enrage')
   }
@@ -3194,6 +3224,7 @@ the logging order is wrong (lower message is newer)
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     const wasEnraged = enemyIsEnraged(e)
+    const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
@@ -3217,6 +3248,7 @@ the logging order is wrong (lower message is newer)
       log(`${critical ? 'Critical hit! ' : ''}You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
     }
     logEnemyEnrageTransition(e, wasEnraged)
+    if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
     if (e.hp <= 0) {
       killEnemy(e)
       updateMobileInfoPanel(e.x, e.y)
@@ -4480,12 +4512,14 @@ the logging order is wrong (lower message is newer)
           alarmEnemy(e)
           logEnemySpotting(e)
         }
+        if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
         if (enemyAttackPlayer(e)) return
         continue
       }
       if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2)) &&
           !forestConcealsPlayer(e, dist)) {
+        if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
         if (tryEnemyRush(e)) {
           if (player.hp <= 0 || deathTransition) return
@@ -7612,7 +7646,7 @@ the logging order is wrong (lower message is newer)
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
-      ${boostHtml}${critHtml}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
+      ${boostHtml}${critHtml}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>

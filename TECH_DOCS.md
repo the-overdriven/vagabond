@@ -1432,6 +1432,26 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Wounded fleeing
+
+Grivkin, Goblin, and Monkey have `flee`. When alive and strictly below 10% of
+maximum HP, they retreat instead of melee, shooting, or pursuit while the player
+is detected within active aggro range. They attempt one step per turn onto a
+free tile allowed by their usual movement rules that increases tile distance
+from the player. A fixed direction order resolves equally distant choices.
+Each valid escape attempt has a 10% seeded chance to hesitate and stay put;
+this still consumes their action, without attacking. No speed bonus or extra
+pursuit action applies. With no distance-increasing escape tile, normal combat
+resumes, so an adjacent cornered monster fights back. Once outside aggro range,
+normal wandering rules apply. Invisible players retain ordinary detection rules.
+
+Crossing below the threshold on a surviving hit logs "Wounded <name> retreats!"
+once per crossing. Subsequent hits below the threshold do not repeat the message;
+fatal hits do not log retreat. Inspection shows Fleeing while the condition holds.
+Healing to 10% or higher ends it. The condition is derived from saved HP, maximum
+HP, and abilities, adding no persistent flag or save-version change. This is
+separate from rare-beast sighting flight and does not alter its rules.
+
 ## Enrage
 
 Orc, Minotaur, Owlbear, Lion, and GAUR have `enrage`. While alive and strictly
