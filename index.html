@@ -1385,6 +1385,7 @@ the logging order is wrong (lower message is newer)
 </script>
 <script src="src/worldGen.js"></script>
 <script src="src/swimming.js"></script>
+<script src="src/charge.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
@@ -3215,7 +3216,7 @@ the logging order is wrong (lower message is newer)
     return true
   }
 
-  function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1) {
+  function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null) {
     if (e.summonedTurn === turnCount) return false
     if (enemyIsPassive(e)) return false
     clearAutoPath()
@@ -3223,14 +3224,15 @@ the logging order is wrong (lower message is newer)
       ? e.equipment : null
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     beginEnemyAttackAnim(e)
-    if (chance(1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
+    if (chance(charge ? missChance(enemySpd(e), playerSpd()) / 2
+      : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
       return false
     }
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
-    let dmg = damageRoll(e.atk, playerDef())
+    let dmg = damageRoll(e.atk * (charge?.atkMultiplier ?? 1), playerDef())
     const criticalRoll = chance(enemyCriticalHitChance(e))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
@@ -3262,6 +3264,10 @@ the logging order is wrong (lower message is newer)
     if (player.hp <= 0) {
       die(e)
       return true
+    }
+    if (charge && effectiveDamage > 0) {
+      chargeKnockback(e, charge.line)
+      if (player.hp <= 0 || deathTransition) return true
     }
     if (!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
       const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : 'The enemy'
@@ -4394,7 +4400,6 @@ the logging order is wrong (lower message is newer)
       if (!player.godMode) player.invisibleTurns--
       if (!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info')
     }
-    const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       const hiddenFromEnemy = playerHidden && !enemyHasAbility(e, 'trueSight')
@@ -4422,7 +4427,7 @@ the logging order is wrong (lower message is newer)
         continue
       }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      const shouldFlee = playerOnTemple && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE
+      const shouldFlee = isTempleGround(map[player.y][player.x]) && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE
       if (shouldFlee) {
         e.fleeingHoly = true
         if (e.aware) {
@@ -4461,6 +4466,10 @@ the logging order is wrong (lower message is newer)
       if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2)) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryEnemySummon(e)) continue
+        if (tryEnemyRush(e)) {
+          if (player.hp <= 0 || deathTransition) return
+          continue
+        }
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed

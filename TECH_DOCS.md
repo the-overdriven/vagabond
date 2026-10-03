@@ -1432,6 +1432,36 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Charge and Pull
+
+Boar and Minotaur have `charge`; Giant Spider has `pull`. While the player is
+visible and within current aggro range, an aligned target at distance two or
+more can trigger a rush. Alignment is horizontal, vertical, or an exact diagonal.
+Both endpoints and every intervening tile must be walkable grass without trees,
+other creatures, or NPCs. Diagonal routes cannot cut blocked corners. There is
+no additional distance cap beyond aggro range. Invalid routes use no RNG.
+
+Charge has a 60% chance per eligible turn. The monster crosses the gap and stops
+adjacent, then makes one melee attack with half the usual dodge chance. Before
+defense, ATK is multiplied by `1 + 0.25 * (distance - 1)`, where distance counts
+orthogonal or diagonal tile steps. Distance two gives +25%; three gives +50%.
+Normal armor, glancing, and critical rules still apply. A surviving player hit
+for positive damage is pushed one tile directly away, if traversable and free.
+Water is eligible even without Swimming; blocked destinations prevent knockback.
+
+Pull has a 70% chance to connect. The web drags the player onto the grass tile
+adjacent to the spider, followed by one ordinary melee attack. The attack can
+miss normally and gains no damage bonus. Both abilities replace normal movement
+and allow no extra weapon-timing attacks or speed pursuit actions that turn.
+There is no cooldown or use limit; fleeing along a clear grass line remains risky.
+
+Forced player movement refreshes visibility and camera position, grants no steps,
+swimming practice, or voluntary-movement quest progress, and does not collect
+items or trigger transitions. Forced water entry consumes water endurance and
+can immediately cause normal drowning damage. Combat and relocation resolve
+synchronously; animations never determine rules or RNG. Existing abilities and
+swimming state are saved and replayed normally, with no new persistent flag.
+
 ## Summoning
 
 Templates with `summon` in `abilities` specify `summonSpecies` and `summonAmount`,
