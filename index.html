@@ -3162,8 +3162,17 @@ the logging order is wrong (lower message is newer)
     return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.30 && enemyHasAbility(e, 'enrage')
   }
 
+  function enemyGangPower(e) {
+    if (!e.alive || e.hp <= 0 || !onCurrentLevel(e) || !enemyHasAbility(e, 'gangPower')) return 0
+    const species = e.baseName || e.name
+    const range = effectiveAggroRange(e)
+    return enemies.filter(other => other !== e && other.alive && other.hp > 0 &&
+      onCurrentLevel(other) && (other.baseName || other.name) === species &&
+      Math.max(Math.abs(other.x - e.x), Math.abs(other.y - e.y)) <= range).length
+  }
+
   function enemyAtk(e) {
-    return e.atk * (enemyIsEnraged(e) ? 1.25 : 1)
+    return (e.atk + enemyGangPower(e)) * (enemyIsEnraged(e) ? 1.25 : 1)
   }
 
   function logEnemyEnrageTransition(e, wasEnraged) {
@@ -7623,6 +7632,7 @@ the logging order is wrong (lower message is newer)
       const hpPct = Math.max(0, e.hp / e.maxHp * 100)
       const aggroRange = effectiveAggroRange(e)
       const boosts = enemyPrefixBoosts(e)
+      const gangPower = enemyGangPower(e)
       const effectiveEnemyAtk = enemyAtk(e)
       const atkColor = effectiveEnemyAtk < playerAtk() ? 'var(--parchment-dim)' : 'white'
       const effectiveEnemyDef = enemyDef(e)
@@ -7646,7 +7656,7 @@ the logging order is wrong (lower message is newer)
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
-      ${boostHtml}${critHtml}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
+      ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>

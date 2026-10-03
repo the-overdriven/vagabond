@@ -1432,6 +1432,27 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Gang power
+
+Goblin, Skink, and Kobold have `gangPower`. Each gains +1 melee ATK per other
+living member of its own species within its current effective aggro range,
+measured from that monster using maximum horizontal/vertical tile distance.
+The range includes normal Alarmed, race, and world modifiers. Other species,
+dead creatures, and creatures on other levels or level kinds do not count.
+Prefixes do not change species. Allies need not be aware or have gangPower
+itself, and proximity does not require line of sight.
+
+The bonus is added to base ATK before defense and any Enrage or Charge
+multipliers. Projectile ATK and XP remain unchanged. Ally movement, flight,
+death, and changes to aggro range immediately change the bonus, including
+between attacks in the same turn. Inspection on desktop and mobile shows
+"gang power (+N ATK)" when N is positive and includes it in effective ATK.
+There are no additional log messages.
+
+The bonus is derived from current creatures and their saved abilities,
+positions, HP, and aggro state. Base ATK is never changed; loading or replaying
+cannot stack bonuses. No new persistent flag, RNG roll, or save version is added.
+
 ## Wounded fleeing
 
 Grivkin, Goblin, and Monkey have `flee`. When alive and strictly below 10% of
