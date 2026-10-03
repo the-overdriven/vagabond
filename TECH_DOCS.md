@@ -1157,6 +1157,12 @@ Tier distribution:
 | 4 | 10% |
 | 5 | 5% |
 
+After the tier is chosen, the species inside that tier is selected by its
+`rarity` weight. `rarity` is a **relative weight**, not an absolute spawn
+percentage: a template with `rarity: 0.02` receives one fiftieth of the weight
+of a same-tier `rarity: 1.0` template. Surface world traits may further adjust
+non-humanoid weighting.
+
 Higher-tier enemies are placed farther from the Temple during normal surface
 enemy spawning.
 
@@ -1188,7 +1194,9 @@ HP
 ATK
 DEF
 SPD
+GRACE
 Tier
+Rarity weight
 Aggro
 Biomes
 Evade capability
@@ -1211,10 +1219,13 @@ Spawned enemies receive approximately 95%–105% random variance from template s
 
 # 19. Enemy Roster
 
-Current templates contain 30 enemies.
+Current templates contain **75 enemies**. The all-uppercase species are the
+ultra-rare additions; each uses `rarity: 0.02` and otherwise participates in
+the normal tier, biome, distance, prefix, wandering, and stat-variance rules.
 
 ### Tier 1
 
+- Fungus
 - Giant Rat
 - Giant Bat
 - Snake
@@ -1222,41 +1233,91 @@ Current templates contain 30 enemies.
 - Monkey
 - Boar
 - Wolf
+- Hogwyrm
 - Giant Bug
 - Wasp
+- Jackal
+- Hyena
+- Vulture
+- Witherpod
+- GIANT TOAD
 
 ### Tier 2
 
+- Wretchling
+- Skink
+- Kobold
+- Ratling
 - Goblin
 - Skeleton
 - Cobra
 - Giant Crab
 - Scorpion
+- Dreadling
+- Slurper
 - Lizard Man
-- Lion
+- Nymph
+- Centaur
+- TOKKA
+- GRIVKIN
+- DRUSK
+- NULK
+- MURKSPAWN
 
 ### Tier 3
 
+- Owlbear
+- Serpent
+- Lion
+- Chupacabra
+- Harpy
 - Ghoul
 - Ghost
 - Orc
 - Imp
+- Gargoyle
+- Sasquatch
+- Yeti
 - Mummy
+- Gravehound
 - Giant Spider
 - White Tiger
 - Minotaur
 - Ogre
+- MYRKA
+- SKERVA
+- KVELD
+- TULLA
+- GRIVEL
+- GAUR
+- BOG SPITTER
+- THORNMAW
+- MIREHOWL
+- ASHFANG
 
 ### Tier 4
 
 - Cyclops
 - Banshee
-- Beholder
+- Oculus
 - Wyvern
+- Manticore
+- VAMPIRE
+- SKELD
+- SPINEBACK
+- NHALUUN
 
 ### Tier 5
 
+- Gorgon
+- Serpent Queen
 - Lich
+
+The new rare species are distributed by theme rather than by rarity alone:
+river/mire creatures favor river and forest, cave creatures favor hill/cave,
+and the strongest rare predators sit in Tier 4. `BOG SPITTER` currently uses
+ordinary melee combat; no acid/spit projectile rule exists yet, so its name
+does not silently grant a ranged attack.
 
 ---
 
@@ -1283,12 +1344,8 @@ dodge, giving you a moment to act.` instead of the generic chase line. The
 evasion marker is consumed in that response whether or not the roll succeeds;
 it is not a persistent status or a new chance to hesitate.
 
-Current examples include:
-
-- Giant Bat
-- Monkey
-- Wasp
-- Ghost
+Current evasive species include Giant Bat, Monkey, Wasp, Vulture, Harpy,
+GIANT TOAD, GRIVKIN, SKERVA, VAMPIRE, and NHALUUN.
 
 ## Humanoid
 
