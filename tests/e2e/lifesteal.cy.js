@@ -2,6 +2,7 @@ describe('Vampire lifesteal and underground guarantee', () => {
   beforeEach(() => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Vampire Tester')
+    cy.get('#replayToggle').check()
     cy.get('#btnBegin').click()
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })

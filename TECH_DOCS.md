@@ -88,6 +88,8 @@ and duplicate Begin clicks cannot start a second world.
 
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
+On narrow windows, the character form scrolls within the space below the HUD
+so its fields remain accessible without covering the Load button.
 
 There are currently **10 races**.
 

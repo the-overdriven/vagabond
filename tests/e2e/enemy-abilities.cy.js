@@ -2,6 +2,7 @@ describe('Enemy abilities data model', () => {
   it('keeps abilities independent and preserves them through saves and replay initial state', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Abilities Tester')
+    cy.get('#replayToggle').check()
     cy.get('#btnBegin').click()
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => {

@@ -1359,6 +1359,11 @@ body.hint-collapsed #hint .panel-toggle {
     top: var(--mobile-hud-height, 56px);
     z-index: 100;
   }
+  #raceOverlay .panelbox {
+    /* Keep the centered form inside the space below the HUD. */
+    max-height: 100%;
+    box-sizing: border-box;
+  }
 }
 
 /* ============================== MOBILE / TOUCH CONTROLS ==============================

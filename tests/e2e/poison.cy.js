@@ -24,6 +24,14 @@ describe('Monster poison', () => {
       check(player.poisonTurns === save.player.poisonTurns, 'restored poison')
       tickPlayerPoison()
       check(player.hp === hp-1 && player.poisonTurns === save.player.poisonTurns-1, 'one damage and one tick')
+      player.lvl = 2; player.totalXpEarned = player.lastTempleHealXp
+      player.hp = playerMaxHp(); player.poisonTurns = 5
+      const earned = player.lastTempleHealXp
+      tryTempleHeal()
+      check(player.poisonTurns === 0 && player.lastTempleHealXp === earned, 'temple cures at full HP without spending blessing')
+      player.hp = 1; player.poisonTurns = 5
+      tryTempleHeal()
+      check(player.poisonTurns === 0 && player.hp === 1, 'temple cures without XP but keeps HP restriction')
       for (const kind of ['herb','potion']) {
         player.hp = playerMaxHp(); player.poisonTurns = 5
         player.inventory.push({kind,count:1})
@@ -38,6 +46,15 @@ describe('Monster poison', () => {
     it('shows poison in the active-status strip at '+width+'px', () => {
       cy.viewport(width, 900)
       cy.visit('/')
+      cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+      cy.get('#raceOverlay').should('be.visible')
+      if (width <= 720) {
+        cy.get('#raceOverlay .panelbox').should($panel => {
+          const panelTop = $panel[0].getBoundingClientRect().top
+          const hudBottom = $panel[0].ownerDocument.getElementById('hud').getBoundingClientRect().bottom
+          expect(panelTop, 'character form below HUD').to.be.at.least(hudBottom)
+        })
+      }
       cy.get('#raceName').clear().type('Poison UI')
       cy.get('#btnBegin').click()
       cy.get('#raceOverlay').should('not.have.class','show')
