@@ -34,7 +34,7 @@ function activePlayerStatuses() {
   if (playerIsInvisible()) {
     statuses.push({id: 'invisible', icon: '◇', label: 'Invisible', counter: player.godMode ? '∞' : `${player.invisibleTurns}t`,
       detail: player.godMode ? 'Invisibility: active until god-mode invisibility is toggled off.'
-        : `Invisibility: ${turns(player.invisibleTurns)} remaining. Enemies cannot normally detect you, but an enemy you hit can retaliate.`})
+        : `Invisibility: ${turns(player.invisibleTurns)} remaining. Enemies cannot normally detect you, but an enemy you hit might retaliate.`})
   }
   if (player.speedPotionTurns > 0) {
     statuses.push({id: 'speed', icon: 'ϟ', label: 'Speed', counter: `${player.speedPotionTurns}t`,

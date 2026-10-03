@@ -3396,11 +3396,15 @@ The player can give the odd tombstone to the Gravedigger and gets a shovel in re
 
 After interaction, the delivered tombstone is inserted beneath the grave next to the gravedigger.
 
-The grave tile next to the Gravedigger is persisted across save/load: the
-game records which tile it occupies and restores that reference on load
-(falling back to scanning the restored map for an existing grave tile if an
-older save lacks the reference). Loading a save must never place an
-additional grave near the Gravedigger.
+New worlds place a separate unfinished grave beside the Gravedigger, preserving
+its terrain underlay on both the active and stored surface maps. If adjacent
+placement is blocked, a deterministic search finds the nearest eligible land
+tile around his home, avoiding NPCs, water, the temple, bell tower, huts, and
+existing graves. Cemetery graves are never adopted as his unfinished grave.
+
+The grave reference is reset for each new world and included in current saves
+and the replay initial state. Loading preserves the referenced grave, regardless
+of the Gravedigger's current wandering position, without placing another one.
 
 When the player digs up the Old Rotten Casket at the treasure map's marked
 location, the cemetery mystery reaches its closing state:

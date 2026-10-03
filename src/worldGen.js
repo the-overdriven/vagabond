@@ -2720,24 +2720,14 @@ function ensureGravediggerGrave() {
   const sx = gravediggerGraveKey && +gravediggerGraveKey.split(',')[0],
     sy = gravediggerGraveKey && +gravediggerGraveKey.split(',')[1]
   if (gravediggerGraveKey && surfaceMap[sy]?.[sx] === 'grave') return
-  // gravediggerGraveKey isn't always known here (e.g. right after loading
-  // an older save that predates persisting this key) - before carving a
-  // brand new grave, check whether the restored map already has one next
-  // to the Gravedigger and adopt it. Without this, reloading a save would
-  // stamp a fresh grave near him every time.
+  // Only the saved reference identifies this grave; cemetery graves are unrelated.
+  // Use his home so NPC wandering never moves the landmark.
+  const homeX = digger.homeX ?? digger.x, homeY = digger.homeY ?? digger.y
   for (let radius = 1; radius <= 20; radius++) for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
-    const gx = digger.x + dx, gy = digger.y + dy
-    if (surfaceMap[gy]?.[gx] === 'grave') {
-      gravediggerGraveKey = keyXY(gx, gy)
-      return
-    }
-  }
-  for (let radius = 1; radius <= 20; radius++) for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
-    if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
-    const gx = digger.x + dx, gy = digger.y + dy, key = keyXY(gx, gy)
+    const gx = homeX + dx, gy = homeY + dy, key = keyXY(gx, gy)
     const walkable = TILE[surfaceMap[gy]?.[gx]]?.walk
-    if (!walkable || surfaceMap[gy][gx] === 'belltower' || surfaceMap[gy][gx] === 'grave' || surfaceMap[gy][gx] === 'village') continue
+    if (!walkable || npcs.some(n => n.x === gx && n.y === gy) || surfaceMap[gy][gx] === 'temple' || surfaceMap[gy][gx] === 'river' || surfaceMap[gy][gx] === 'water' || surfaceMap[gy][gx] === 'belltower' || surfaceMap[gy][gx] === 'grave' || surfaceMap[gy][gx] === 'village') continue
     const blocker = enemies.find(e => e.alive && e.level === 0 && e.x === gx && e.y === gy)
     if (blocker) {
       blocker.alive = false
@@ -2746,6 +2736,7 @@ function ensureGravediggerGrave() {
     }
     tileUnderlays[key] = surfaceMap[gy][gx]
     surfaceMap[gy][gx] = 'grave'
+    if (currentZ === 0) map[gy][gx] = 'grave'
     gravediggerGraveKey = key
     return
   }
@@ -2788,6 +2779,7 @@ function templeNpcCandidates(maxDistance) {
 function spawnNpcs() {
   const cfg = WORLD_GEN_CONFIG.npcs
   npcs = []
+  gravediggerGraveKey = null
   const nearTemple = templeNpcCandidates(cfg.templeMaxWalkDistance)
   for (const tmpl of NPC_TEMPLATES) {
     if (tmpl.placement === 'shoreline') continue
@@ -2834,9 +2826,10 @@ function spawnNpcs() {
       for (const [dx, dy] of DIRS8) {
         const gx = x + dx, gy = y + dy
         if (!isWalkable(gx, gy) || occupied.has(keyXY(gx, gy))) continue
-        if (map[gy][gx] === 'temple' || map[gy][gx] === 'belltower' || map[gy][gx] === 'village') continue
+        if (map[gy][gx] === 'grave' || map[gy][gx] === 'river' || map[gy][gx] === 'water' || map[gy][gx] === 'temple' || map[gy][gx] === 'belltower' || map[gy][gx] === 'village') continue
         tileUnderlays[keyXY(gx, gy)] = map[gy][gx]
         map[gy][gx] = 'grave'
+        surfaceMap[gy][gx] = 'grave'
         gravediggerGraveKey = keyXY(gx, gy)
         break
       }
