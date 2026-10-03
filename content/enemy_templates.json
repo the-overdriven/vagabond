@@ -68,11 +68,11 @@
   {"name": "Serpent Queen", "rarity": 0.4, "hp":160, "atk":18, "def":7, "spd":2, "grace":2, "tier":5, "aggro":3, "biomes":["forest"],                "evades": false, "humanoid": true,  "fly": null, "wander": "homeReturn"},
   {"name": "Lich",          "rarity": 1.0, "hp":180, "atk":23, "def":6, "spd":3, "grace":3, "tier":5, "aggro":4, "biomes":["snow","hill"],           "evades": false, "humanoid": true,  "fly": null, "wander": "homeReturn"},
 
-  {"name": "NULK",          "rarity": 0.02, "hp":24,  "atk":6,  "def":2, "spd":3, "grace":3, "tier":2, "aggro":3, "biomes":["hill","cave"],                 "evades": false, "humanoid": false, "fly": null, "wander": "roam"},
-  {"name": "SKELD",         "rarity": 0.02, "hp":95,  "atk":13, "def":5, "spd":4, "grace":3, "tier":4, "aggro":4, "biomes":["forest","hill","snow"],        "evades": false, "humanoid": false, "fly": null, "wander": "far"},
-  {"name": "DRUSK",         "rarity": 0.02, "hp":32,  "atk":5,  "def":4, "spd":2, "grace":2, "tier":2, "aggro":2, "biomes":["river","forest","cave"],       "evades": false, "humanoid": false, "fly": null, "wander": "far"},
-  {"name": "GAUR",          "rarity": 0.02, "hp":75,  "atk":9,  "def":4, "spd":4, "grace":3, "tier":3, "aggro":2, "biomes":["grass","forest","hill"],        "evades": false, "humanoid": false, "fly": null, "wander": "far"},
-  {"name": "ASHFANG",       "rarity": 0.02, "hp":60,  "atk":10, "def":3, "spd":4, "grace":4, "tier":3, "aggro":4, "biomes":["sand","hill","cave","lava"],          "evades": false, "humanoid": false, "fly": null, "wander": "far"},
-  {"name": "MIREHOWL",      "rarity": 0.02, "hp":50,  "atk":9,  "def":2, "spd":5, "grace":4, "tier":3, "aggro":4, "biomes":["river","forest"],              "evades": false, "humanoid": false, "fly": null, "wander": "far"},
-  {"name": "NHALUUN",       "rarity": 0.02, "hp":85,  "atk":15, "def":3, "spd":4, "grace":4, "tier":4, "aggro":3, "biomes":["snow","cave"],                "evades": true,  "humanoid": false, "fly": null, "wander": "far"}
+  {"name": "NULK",          "rarity": 0.02, "hp":124,  "atk":6,  "def":2, "spd":3, "grace":3, "tier":4, "aggro":3, "biomes":["hill","cave"],                 "evades": false, "humanoid": false, "fly": null, "wander": "roam"},
+  {"name": "SKELD",         "rarity": 0.02, "hp":105,  "atk":13, "def":5, "spd":4, "grace":3, "tier":4, "aggro":4, "biomes":["forest","hill","snow"],        "evades": false, "humanoid": false, "fly": null, "wander": "far"},
+  {"name": "DRUSK",         "rarity": 0.02, "hp":132,  "atk":5,  "def":4, "spd":2, "grace":2, "tier":4, "aggro":2, "biomes":["river","forest","cave"],       "evades": false, "humanoid": false, "fly": null, "wander": "far"},
+  {"name": "GAUR",          "rarity": 0.02, "hp":175,  "atk":9,  "def":4, "spd":4, "grace":3, "tier":4, "aggro":2, "biomes":["grass","forest","hill"],        "evades": false, "humanoid": false, "fly": null, "wander": "far"},
+  {"name": "ASHFANG",       "rarity": 0.02, "hp":160,  "atk":10, "def":3, "spd":4, "grace":4, "tier":4, "aggro":4, "biomes":["sand","hill","cave","lava"],          "evades": false, "humanoid": false, "fly": null, "wander": "far"},
+  {"name": "MIREHOWL",      "rarity": 0.02, "hp":150,  "atk":9,  "def":2, "spd":5, "grace":4, "tier":4, "aggro":4, "biomes":["river","forest"],              "evades": false, "humanoid": false, "fly": null, "wander": "far"},
+  {"name": "NHALUUN",       "rarity": 0.02, "hp":185,  "atk":15, "def":3, "spd":4, "grace":4, "tier":4, "aggro":3, "biomes":["snow","cave"],                "evades": true,  "humanoid": false, "fly": null, "wander": "far"}
 ]
