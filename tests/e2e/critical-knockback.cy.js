@@ -19,6 +19,7 @@ describe('Critical melee knockback', () => {
       player.swimming=0; player.swimmingPractice=0
       window.rushEnemy=(name,x=38,y=40)=>{
         const t=ENEMY_TEMPLATE_BY_NAME[name]
+        rushCheck(!!t, 'missing test enemy template: '+name)
         const e=addEnemy({...t,baseName:name,x,y,hp:t.hp,maxHp:t.hp,alive:true,
           level:0,homeX:x,homeY:y,homeTileType:'grass',prefix:null,equipment:null})
         occupied.add(keyXY(x,y)); return e
@@ -66,7 +67,7 @@ describe('Critical melee knockback', () => {
         }
         map[40][41]='grass';npcs=[{x:41,y:40}];calls=0;enemyAttackPlayer(e,true)
         rushCheck(player.x===40,'NPC blocks push');npcs=[]
-        const blocker=rushEnemy('Rat',41,40);calls=0;enemyAttackPlayer(e,true)
+        const blocker=rushEnemy('Giant Rat',41,40);calls=0;enemyAttackPlayer(e,true)
         rushCheck(player.x===40,'enemy blocks push');blocker.alive=false
         grasslandTrees.add('41,40');calls=0;enemyAttackPlayer(e,true)
         rushCheck(player.x===40,'tree blocks push');grasslandTrees.delete('41,40')

@@ -19,6 +19,7 @@ describe('Grass Charge and Pull', () => {
       player.swimming=0; player.swimmingPractice=0
       window.rushEnemy=(name,x=38,y=40)=>{
         const t=ENEMY_TEMPLATE_BY_NAME[name]
+        rushCheck(!!t, 'missing test enemy template: '+name)
         const e=addEnemy({...t,baseName:name,x,y,hp:t.hp,maxHp:t.hp,alive:true,
           level:0,homeX:x,homeY:y,homeTileType:'grass',prefix:null,equipment:null})
         occupied.add(keyXY(x,y)); return e
@@ -36,7 +37,7 @@ describe('Grass Charge and Pull', () => {
         map[40][39]='forest'; rushCheck(!tryEnemyRush(e),'non-grass blocked')
         map[40][39]='grass'; grasslandTrees.add('39,40'); rushCheck(!tryEnemyRush(e),'tree blocked')
         grasslandTrees.delete('39,40'); npcs=[{x:39,y:40}]; rushCheck(!tryEnemyRush(e),'NPC blocked')
-        npcs=[]; const blocker=rushEnemy('Rat',39,40); rushCheck(!tryEnemyRush(e),'enemy blocked')
+        npcs=[]; const blocker=rushEnemy('Giant Rat',39,40); rushCheck(!tryEnemyRush(e),'enemy blocked')
         blocker.alive=false; player.invisibleTurns=5; rushCheck(!tryEnemyRush(e),'invisibility blocked')
         player.invisibleTurns=0; player.x=41;player.y=42; rushCheck(!tryEnemyRush(e),'off line blocked')
         player.x=49;player.y=40; rushCheck(!tryEnemyRush(e),'outside aggro blocked')
