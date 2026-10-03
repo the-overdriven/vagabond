@@ -254,7 +254,28 @@ canvas {
 }
 
 #logpanel div.loot {
-  color: var(--ember-bright);
+  color: white;
+}
+
+/* Keep recent events easiest to read while letting older history recede. */
+#logpanel > div {
+  opacity: 0.72;
+  filter: saturate(0.65);
+}
+
+#logpanel > div:nth-last-child(3) {
+  opacity: 0.86;
+  filter: saturate(0.86);
+}
+
+#logpanel > div:nth-last-child(2) {
+  opacity: 0.93;
+  filter: saturate(0.93);
+}
+
+#logpanel > div:last-child {
+  opacity: 1;
+  filter: none;
 }
 
 #logpanel div.info {

@@ -1814,10 +1814,12 @@ Monster ranged attacks reuse the same mitigation, glancing and critical systems,
 the shooter-specific fixed projectile ATK and doubled dodge chance documented in
 §20. They do not run melee GRACE timing or melee lunge/contact behavior. Projectile
 animation is presentation-only: dodge, critical/glancing, damage, HP and ammunition are
-resolved first from deterministic gameplay state, then the visual effect is queued. Visual
-frame timing is clamped to the projectile effect lifetime, so a late-queued effect cannot
-interrupt input or combat resolution. The projectile uses a readable glyph in both
-tile-image and ASCII rendering modes.
+resolved first from deterministic gameplay state, then the visual effect is queued. The
+clear-shot check still uses the deterministic tile trace, but the queued projectile is drawn
+along the direct straight line from shooter center to target center rather than visibly
+stepping through each traced grid cell. Visual frame timing is clamped to the projectile
+effect lifetime, so a late-queued effect cannot interrupt input or combat resolution. The
+projectile uses a readable glyph in both tile-image and ASCII rendering modes.
 
 ---
 
@@ -2924,9 +2926,17 @@ Identifies an artifact. The Merchant starts with six at 100g each.
 
 ## Healing Herb
 
-Foraged item. When eaten, always heals 25% HP.
+Foraged item. Its ordinary healing amount is calculated from maximum HP, then bounded before
+racial consumable bonuses:
 
-Wyrdling increases the healing effect by 25%. Example: 25% HP becomes 31.25% HP (rounds to nearest whole number, on level 1: 31 HP instead of 25 HP).
+```text
+base heal = clamp(round(25% of max HP), 20, 50)
+final heal = round(base heal × consumable multiplier)
+```
+
+Wyrdling therefore increases the already-bounded base heal by 25%. For example, a 40-max-HP
+character heals 20 HP normally or 25 HP as a Wyrdling; a 400-max-HP character heals 50 HP
+normally or 63 HP as a Wyrdling. Actual recovery is still capped by missing HP.
 
 ## Handful of Berries
 
@@ -3015,8 +3025,8 @@ surroundings**.
 
 This is implemented as an early return in the inspection logic. Examples
 include crypt coffins/sarcophagi, tombstones, special graves, village/landmark
-tiles, and special ground objects such as skeletons, campfires, dwarven props,
-explorer remains, and dead bodies.
+tiles, dwarven columns (`dwarvenstatue`), and special ground objects such as skeletons,
+campfires, dwarven props, explorer remains, and dead bodies.
 
 An abandoned campfire can be searched once by inspecting it or pressing F
 while standing on it. A seeded 30% roll grants one Potato; a failed search
@@ -4071,6 +4081,12 @@ inventory, trade panels, or other scrollable content keeps its usual behavior.
 The separate full-map wheel zoom still applies when the map is open. Ctrl/Meta
 wheel remains available for browser zoom. Small trackpad deltas accumulate
 before each tile-size step.
+
+The message log keeps the newest entry fully bright and gives the second- and third-newest
+entries slightly lower brightness. Older history is further dimmed and mildly desaturated so
+recent consequences remain visually prominent without hiding previous messages. Loot messages
+use white as their base text color; when the looted object has an item tier, the item name uses
+the same tier color as inventory/equipment UI.
 
 ---
 

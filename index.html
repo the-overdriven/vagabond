@@ -2823,11 +2823,43 @@ the logging order is wrong (lower message is newer)
     })
   }
 
-  function log(msg, cls) {
+  function log(msg, cls, highlights = []) {
     const id = nextLogId++
-    logQueue.push({id: id, msg: msg, cls: cls || 'info', instant: replayPlaying})
+    logQueue.push({id: id, msg: msg, cls: cls || 'info', highlights, instant: replayPlaying})
     processLogQueue()
     return id
+  }
+
+  function decorateLogMessage(div, msg, highlights) {
+    if (!Array.isArray(highlights) || highlights.length === 0) return
+    const matches = highlights
+      .filter(h => h && typeof h.text === 'string' && h.text.length)
+      .map(h => ({...h, index:msg.indexOf(h.text)}))
+      .filter(h => h.index >= 0)
+      .sort((a, b) => a.index - b.index)
+    if (!matches.length) return
+    div.textContent = ''
+    let cursor = 0
+    for (const h of matches) {
+      if (h.index < cursor) continue
+      if (h.index > cursor) div.appendChild(document.createTextNode(msg.slice(cursor, h.index)))
+      const span = document.createElement('span')
+      span.textContent = h.text
+      if (Number.isFinite(h.tier)) span.classList.add(tierColorClass(h.tier))
+      div.appendChild(span)
+      cursor = h.index + h.text.length
+    }
+    if (cursor < msg.length) div.appendChild(document.createTextNode(msg.slice(cursor)))
+  }
+
+  function itemLogHighlight(item, displayName) {
+    if (!item) return []
+    const text = displayName || (item.kind === 'artifact' ? artifactDisplayName(item) : item.name)
+    return text ? [{text, tier:Number.isFinite(item.tier) ? item.tier : null}] : []
+  }
+
+  function lootLog(msg, item = null, displayName = null) {
+    return log(msg, 'loot', itemLogHighlight(item, displayName))
   }
 
   function skipLogTypingForReplay() {
@@ -2840,7 +2872,7 @@ the logging order is wrong (lower message is newer)
 
     isTyping = true
 
-    const {id, msg, cls, instant} = logQueue.shift()
+    const {id, msg, cls, highlights, instant} = logQueue.shift()
 
     const div = document.createElement('div')
     div.className = cls
@@ -2875,6 +2907,7 @@ the logging order is wrong (lower message is newer)
       }
     }
 
+    decorateLogMessage(div, msg, highlights)
     skipCurrentLogTyping = false
     isTyping = false
     lastRenderedLogId = id
@@ -2947,13 +2980,13 @@ the logging order is wrong (lower message is newer)
     if (chance(Math.min(WORLD_GEN_CONFIG.lootRules.enemyArtifactChanceCapBeforeRate * artifactDropRate, artifactChance))) {
       const art = makeArtifactItem(e.tier, mf)
       if (art) {
-        log(`The ${e.name} dropped ${artifactDisplayName(art)}.`, 'loot')
+        lootLog(`The ${e.name} dropped ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
         player.inventory.push(art)
       }
     }
     if (e.humanoid && e.equipment) {
       const item = e.equipment
-      log(`The ${e.name} dropped a ${item.name}.`, 'loot')
+      lootLog(`The ${e.name} dropped a ${item.name}.`, item)
       if (item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return
       player.inventory.push(item)
       return
@@ -4462,6 +4495,11 @@ the logging order is wrong (lower message is newer)
     return Math.max(1, Math.round(playerMaxHp() * itemDefinition(kind).effect.maxHpFraction))
   }
 
+  function healingHerbAmount() {
+    const baseHeal = Math.max(20, Math.min(50, itemHpAmount('herb')))
+    return itemEffectPower('herb', baseHeal)
+  }
+
   // A carried kind applies once, matching the bell's existing presence rule.
   function carriedItemStat(stat) {
     return [...new Set(player.inventory.map(item => item.kind))]
@@ -4626,6 +4664,7 @@ the logging order is wrong (lower message is newer)
   let dugSandTiles = new Set()
   let suppressLootLog = false
   let lastLootResult = ''
+  let lastLootHighlights = []
   // Forage odds/results come from content/loot_tables.json's `forage` table.
   const FORAGE_RESULT_HANDLERS = {
     berries: () => {
@@ -4743,7 +4782,7 @@ the logging order is wrong (lower message is newer)
       groundItems.splice(buriedItemIndex, 1)
       if (item) {
         const displayName = item.kind === 'artifact' ? artifactDisplayName(item) : item.name
-        log(`Your shovel strikes something buried. You unearth ${displayName}.`, 'loot')
+        lootLog(`Your shovel strikes something buried. You unearth ${displayName}.`, item, displayName)
         if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) player.inventory.push(item)
       } else {
         log('Your shovel finds the outline of something long since ruined.', 'loot')
@@ -4918,7 +4957,8 @@ the logging order is wrong (lower message is newer)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
     if (playerRemains) {
       if (playerRemains.item) player.inventory.push(playerRemains.item)
-      log(playerRemains.item ? `You recover ${playerRemains.item.name} from your remains.` : 'Nothing remains to recover.', 'loot')
+      if (playerRemains.item) lootLog(`You recover ${playerRemains.item.name} from your remains.`, playerRemains.item)
+      else log('Nothing remains to recover.', 'loot')
       spawnPickupAnim(playerRemains)
       groundItems.splice(groundItems.indexOf(playerRemains), 1)
       updateHud()
@@ -4933,8 +4973,8 @@ the logging order is wrong (lower message is newer)
       deadBody.looted = true
       if (deadBody.gear) player.inventory.push(deadBody.gear)
       if (deadBody.gold) player.gold += deadBody.gold
-      if (deadBody.gear && deadBody.gold) log(`You retrieve ${deadBody.gear.name} and ${deadBody.gold} gold.`, 'loot')
-      else if (deadBody.gear) log(`You retrieve ${deadBody.gear.name}.`, 'loot')
+      if (deadBody.gear && deadBody.gold) lootLog(`You retrieve ${deadBody.gear.name} and ${deadBody.gold} gold.`, deadBody.gear)
+      else if (deadBody.gear) lootLog(`You retrieve ${deadBody.gear.name}.`, deadBody.gear)
       else if (deadBody.gold) log(`You retrieve ${deadBody.gold} gold.`, 'loot')
       else log('You retrieve nothing.', 'loot')
       updateHud()
@@ -4963,7 +5003,7 @@ the logging order is wrong (lower message is newer)
       suppressLootLog = true
       checkGroundAt(player.x, player.y)
       suppressLootLog = false
-      log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot')
+      log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot', lastLootHighlights)
       return
     }
     tryForage()
@@ -4976,6 +5016,7 @@ the logging order is wrong (lower message is newer)
       const gold = Math.max(1, Math.round((randInt(entry.goldMin, entry.goldMax) * (entry.goldPerTier ? chestTier : 1) + Math.round(mf * (entry.mfGoldMultiplier || 0))) * WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
       player.gold += gold
       lastLootResult = `${gold} gold.`
+      lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot')
     },
     gear: (chestTier, mf, entry) => {
@@ -4986,7 +5027,8 @@ the logging order is wrong (lower message is newer)
       else if (pickRoll < entry.weaponChance + entry.armorChance) item = makeArmorItem(itemTier, mf)
       else item = makeShieldItem(itemTier, mf)
       lastLootResult = `${item.name}.`
-      if (!suppressLootLog) log(`You open a chest and find ${item.name}.`, 'loot')
+      lastLootHighlights = itemLogHighlight(item)
+      if (!suppressLootLog) lootLog(`You open a chest and find ${item.name}.`, item)
       if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) {
         player.inventory.push(item)
       }
@@ -4994,21 +5036,25 @@ the logging order is wrong (lower message is newer)
     potion: () => {
       addPotion()
       lastLootResult = 'a Life Potion.'
+      lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find a Life Potion!`, 'loot')
     },
     scrollOfInvisibility: () => {
       addInvisibilityScroll()
       lastLootResult = 'a Scroll of Invisibility.'
+      lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find a Scroll of Invisibility!`, 'loot')
     },
     speedpotion: () => {
       addSpeedPotion()
       lastLootResult = 'a Potion of Speed.'
+      lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find a Potion of Speed!`, 'loot')
     },
     idscroll: () => {
       addIdScroll()
       lastLootResult = 'a Scroll of Identification.'
+      lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find a Scroll of Identification!`, 'loot')
     },
   }
@@ -5029,7 +5075,8 @@ the logging order is wrong (lower message is newer)
           const art = makeArtifactItem(chestTier, mf)
           player.inventory.push(art)
           lastLootResult = `${artifactDisplayName(art)}.`
-          if (!suppressLootLog) log(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, 'loot')
+          lastLootHighlights = itemLogHighlight(art, artifactDisplayName(art))
+          if (!suppressLootLog) lootLog(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
           spawnPickupAnim(g)
           groundItems.splice(i, 1)
           continue
@@ -5447,7 +5494,7 @@ the logging order is wrong (lower message is newer)
 
   // Map tiles that are themselves a unique lore item (not a biome), so
   // standing on one shouldn't also print notes about nearby terrain.
-  const STANDALONE_LANDMARK_TILES = new Set(['bigbell', 'blackpillar'])
+  const STANDALONE_LANDMARK_TILES = new Set(['bigbell', 'blackpillar', 'dwarvenstatue'])
 
   // Springs the crypt-level-2 sarcophagus trap: marks it sprung, swaps the
   // tile, and rises a few skeletons nearby. Triggered by looting (F) the
@@ -5562,7 +5609,7 @@ the logging order is wrong (lower message is newer)
         const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true,
           ...(WORLD_GEN_CONFIG.lootRules.commonStartingWeapons ? {tier: 1} : {})}
         hut.startingWeaponTaken = true
-        log(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, 'loot')
+        lootLog(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, item, name)
         if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
         updateHud()
         return
@@ -6444,6 +6491,19 @@ the logging order is wrong (lower message is newer)
     runAnimationLoop()
   }
 
+  function projectileVisualPosition(anim, t) {
+    if (!Array.isArray(anim?.path) || anim.path.length < 2) return null
+    const from = anim.path[0]
+    const to = anim.path[anim.path.length - 1]
+    if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(from.y) ||
+        !Number.isFinite(to.x) || !Number.isFinite(to.y)) return null
+    const progress = Math.max(0, Math.min(1, t))
+    return {
+      x: from.x + (to.x - from.x) * progress,
+      y: from.y + (to.y - from.y) * progress
+    }
+  }
+
   function healPlayer(amount) {
     const before = player.hp
     player.hp = Math.min(playerMaxHp(), player.hp + Math.max(0, amount))
@@ -7112,19 +7172,16 @@ the logging order is wrong (lower message is newer)
         projectileAnims.splice(i, 1)
         continue
       }
-      const segments = anim.path.length - 1
-      const progress = t * segments
-      const segment = Math.min(segments - 1, Math.floor(progress))
-      const local = progress - segment
-      const from = anim.path[segment]
-      const to = anim.path[segment + 1]
-      if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(from.y) ||
-          !Number.isFinite(to.x) || !Number.isFinite(to.y)) {
+      // Clear-shot legality still uses the deterministic tile trace, but the
+      // presentation travels along the true shortest line between endpoints.
+      // This avoids visible stair-stepping when a shot is not horizontal,
+      // vertical, or perfectly diagonal.
+      const position = projectileVisualPosition(anim, t)
+      if (!position) {
         projectileAnims.splice(i, 1)
         continue
       }
-      const x = from.x + (to.x - from.x) * local
-      const y = from.y + (to.y - from.y) * local
+      const {x, y} = position
       const visibleX = Math.round(x), visibleY = Math.round(y)
       if (undergroundVisible && !undergroundVisible.has(keyXY(visibleX, visibleY))) continue
       const visual = RENDER_STYLE.projectiles?.[anim.projectile]
@@ -8894,7 +8951,7 @@ the logging order is wrong (lower message is newer)
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'herb', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    const heal = itemEffectPower(it.kind, itemHpAmount(it.kind))
+    const heal = healingHerbAmount()
     const restored = healPlayer(heal)
     log(`You eat the Healing Herb and recover ${restored} HP.`, 'good')
     consumeItemTurn()

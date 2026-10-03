@@ -204,6 +204,9 @@ describe('Ranged shooter monster variants', () => {
           path:[{x:44,y:42},{x:43,y:41},{x:42,y:41},{x:41,y:40},{x:40,y:40}],
           projectile:'arrow', start:1000, duration:1000
         }]
+        const quarter = projectileVisualPosition(projectileAnims[0], 0.25)
+        rangedAssert(Math.abs(quarter.x-43)<1e-9 && Math.abs(quarter.y-41.5)<1e-9,
+          'projectile visuals interpolate directly between shooter and aim instead of stepping through traced cells')
         const originalRotate = ctx.rotate, angles = []
         ctx.rotate = angle => { angles.push(angle); return originalRotate.call(ctx, angle) }
         try {

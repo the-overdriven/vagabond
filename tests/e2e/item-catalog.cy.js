@@ -200,6 +200,23 @@ describe('Non-gear item catalog', () => {
     })
   }
 
+  it('clamps Healing Herb healing to 20-50 HP before the Wyrdling bonus', () => {
+    beginNewGame('Herb Bounds Tester')
+    cy.window().then(win => {
+      const results = win.eval(`(() => {
+        const originalRace=player.race, originalMaxHp=player.maxHp
+        const run = (race,maxHp) => { player.race=race; player.maxHp=maxHp; return healingHerbAmount() }
+        try {
+          return {
+            low:run('human',40), high:run('human',400),
+            wyrdLow:run('wyrdling',40), wyrdHigh:run('wyrdling',400)
+          }
+        } finally { player.race=originalRace; player.maxHp=originalMaxHp }
+      })()`)
+      expect(results).to.deep.equal({low:20, high:50, wyrdLow:25, wyrdHigh:63})
+    })
+  })
+
   it('brews only affordable whole potions across herb stacks without turns or RNG', () => {
     beginNewGame('Brewing Tester')
     cy.window().then(win => {
