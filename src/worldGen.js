@@ -2165,6 +2165,95 @@ function caveScenarioIntro(z, x, y) {
   return scenarioAt(z, x, y)?.intro || null
 }
 
+// One distant underground Vampire, in a crypt or an ordinary cave with bats.
+// This runs after cave population so eligibility reflects actual spawned bats.
+function undergroundVampireAreas() {
+  const areas = []
+  const crypt = caves[cryptCaveIndex]
+  if (crypt && caveMaps[cryptCaveIndex]) areas.push({
+    cm: caveMaps[cryptCaveIndex], shared: undergroundMap, level: -1,
+    levelKind: 'chain', caveIndex: cryptCaveIndex, entries: crypt.entrances,
+    floor: 'cryptfloor'
+  })
+  if (cryptLevel2) areas.push({
+    cm: cryptLevel2.map, shared: cryptLevel2.map, level: -2, levelKind: 'crypt2',
+    entries: [{x: cryptLevel2.x, y: cryptLevel2.y}], floor: 'crypt2floor'
+  })
+  const layers = [{caves, caveMaps, map: undergroundMap, level: -1},
+    ...deepLevels.map((layer, i) => ({...layer, level: -2 - i}))]
+  for (const layer of layers) for (let i = 0; i < layer.caveMaps.length; i++) {
+    const descriptor = layer.caves[i], cm = layer.caveMaps[i]
+    if (!descriptor || descriptor.crypt || !descriptor.scenario) continue
+    const area = {cm, shared: layer.map, level: layer.level, levelKind: 'chain',
+      caveIndex: i, entries: descriptor.entrances, floor: layer.level === -1 ? 'cavefloor' : 'cavefloor2'}
+    if (enemies.some(e => e.alive && (e.baseName || e.name) === 'Giant Bat' && vampireEnemyInArea(e, area))) areas.push(area)
+  }
+  return areas
+}
+
+function vampireEnemyInArea(enemy, area) {
+  return enemy.level === area.level && (enemy.levelKind || 'chain') === area.levelKind &&
+    (area.caveIndex === undefined || enemy.caveIndex === area.caveIndex) &&
+    TILE[area.cm[enemy.y]?.[enemy.x]]?.walk
+}
+
+function undergroundVampireSites(area) {
+  const entries = [...(area.entries || [])]
+  // Every staircase/exit matters for safety, including the crypt's down stairs.
+  const transitions = new Set(['caveentrance', 'cavedown', 'caveup', 'cryptstairsdown', 'cryptstairsup'])
+  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++)
+    if (transitions.has(area.cm[y][x])) entries.push({x, y})
+  const distances = new Map(), queue = []
+  const canWalk = (x, y) => !!TILE[area.cm[y]?.[x]]?.walk && !!TILE[area.shared[y]?.[x]]?.walk
+  for (const entry of entries) if (canWalk(entry.x, entry.y)) {
+    const key = keyXY(entry.x, entry.y)
+    if (!distances.has(key)) {distances.set(key, 0); queue.push(entry)}
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const p = queue[head], nextDistance = distances.get(keyXY(p.x, p.y)) + 1
+    for (const [dx, dy] of DIRS8) {
+      const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+      if (!canWalk(x, y) || distances.has(key)) continue
+      distances.set(key, nextDistance); queue.push({x, y})
+    }
+  }
+  const sites = []
+  const blocked = new Set()
+  for (const e of enemies) if (e.alive && vampireEnemyInArea(e, area)) blocked.add(keyXY(e.x, e.y))
+  for (const g of groundItems) if (g.level === area.level && (g.levelKind || 'chain') === area.levelKind)
+    blocked.add(keyXY(g.x, g.y))
+  for (const p of queue) {
+    const key = keyXY(p.x, p.y), distance = distances.get(key)
+    if (area.cm[p.y][p.x] !== area.floor || area.shared[p.y][p.x] !== area.floor || blocked.has(key)) continue
+    if (distance < 8 || entries.some(e => Math.max(Math.abs(p.x - e.x), Math.abs(p.y - e.y)) < 8)) continue
+    const walls = DIRS8.filter(([dx, dy]) => area.cm[p.y + dy]?.[p.x + dx] === 'cavewall').length
+    sites.push({...p, distance, walls})
+  }
+  if (!sites.length) return []
+  const farthest = Math.max(...sites.map(p => p.distance))
+  const far = sites.filter(p => p.distance >= farthest * 0.75)
+  const mostWalls = Math.max(...far.map(p => p.walls))
+  return far.filter(p => p.walls === mostWalls)
+}
+
+function ensureUndergroundVampire() {
+  const areas = undergroundVampireAreas()
+  if (enemies.some(e => e.alive && (e.baseName || e.name) === 'Vampire' &&
+      areas.some(area => vampireEnemyInArea(e, area)))) return
+  const eligible = areas.map(area => ({area, sites: undergroundVampireSites(area)})).filter(entry => entry.sites.length)
+  if (!eligible.length) throw new Error('No safe distant underground site for the guaranteed Vampire.')
+  const {area, sites} = pick(eligible), spot = pick(sites)
+  const tmpl = ENEMY_TEMPLATE_BY_NAME.Vampire
+  const enemy = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier,
+    level: area.level, levelKind: area.levelKind, caveIndex: area.caveIndex,
+    hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk, def: tmpl.def, spd: tmpl.spd,
+    abilities: [...tmpl.abilities], humanoid: !!tmpl.humanoid, aggro: tmpl.aggro ?? AGGRO_RANGE,
+    x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: area.floor,
+    alive: true, prefix: null, equipment: null}
+  prepareEnemyEquipment(enemy)
+  addEnemy(enemy)
+}
+
 function spawnCaveScenarios() {
   const cfg = WORLD_GEN_CONFIG.cavePopulation
   let surfaceDeck = [], deepDeck = []

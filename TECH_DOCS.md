@@ -655,6 +655,10 @@ conditional blessing. Normal death returns the character at full current
 maximum HP and records the earned-XP total; the next Temple heal requires XP
 earned after that death recovery once the player is above level 1.
 
+Visiting Temple ground (including the bell tower) cures poison before the
+turn's poison tick, even at full HP or without new XP. Homecoming also cures
+poison. Curing alone does not consume eligibility for a later HP blessing.
+
 Enemies flee from the Temple.
 
 The bell tower tile (see "Missing Temple Bell") is carved out of the
@@ -981,6 +985,26 @@ structures, including sarcophagi, burial niches, rubble, and the crypt trap.
 # 15. Cave Generation
 
 Up to six initial caves are attempted.
+
+## Guaranteed underground Vampire
+
+New worlds contain at least one Vampire in either crypt level or an ordinary
+cave that actually contains living Giant Bats after population. Bat caves may
+qualify at any depth; the mausoleum and Dwarven Fort do not qualify. An existing
+Vampire in an eligible area satisfies the guarantee; a surface Vampire does not.
+Otherwise seeded RNG chooses uniformly among areas with safe sites and then
+among their best corner sites. The Vampire uses its normal template stats,
+abilities, humanoid equipment, and level-appropriate wandering rules.
+
+Sites must be reachable within that area's stored and playable maps, on ordinary
+floor, and free of monsters and ground items. They must be at least eight tiles
+from every entrance, exit, or staircase by both walking distance and Chebyshev
+distance. Among eligible tiles, keep those in the furthest quarter of walking
+distance, then prefer the greatest number of neighboring cave-wall tiles.
+"Dark corner" means this secluded geometry; it adds no lighting mechanic.
+The generator reports an error rather than silently omitting the guarantee if
+no safe site exists. This is a one-time new-world population pass; loading or
+replaying a saved world restores its Vampire without spawning a replacement.
 
 ## Ordinary cave scenarios
 
@@ -1384,12 +1408,12 @@ recalculate existing poison.
 
 Poison deals 1 HP at the start of each subsequent enemy turn, before freezing
 and regeneration. It remains active while waiting, invisible, on temple ground,
-or after changing levels. It can kill; death is recorded as poison and clears
+or after changing levels. Entering Temple ground cures it. It can kill; death is recorded as poison and clears
 the status without crediting a monster victory. The application itself causes
 no immediate poison damage.
 
 Eating a Healing Herb or drinking a Life Potion clears poison before consuming
-the item's turn, including at full HP. Other healing does not cure poison.
+the item's turn, including at full HP. Temple ground and Homecoming also cure poison; other healing does not.
 Enemies may poison the player again during that turn's response. Application,
 refresh, damage, cure, and natural expiry have message logs. The active-status
 strip shows Poisoned with turns remaining and explains its cure.
@@ -4984,6 +5008,10 @@ project already has a `pgrst.db_pre_request` hook, compose the checks rather
 than overwrite it.
 For an existing Graveyard database, apply `supabase-graveyard-drowning.sql`
 before deploying the client so its cause constraint accepts drowning deaths.
+For poison support, apply `supabase-graveyard-poison.sql` to the existing
+database before deploying the poison client. It replaces `death_cause_check`
+with the existing causes plus `drowning` and `poison`, without changing records.
+New-project setup SQL must include both causes in that constraint as well.
 
 The browser's `vagabond_online_player_id` localStorage entry is a random UUID
 created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
@@ -5009,7 +5037,8 @@ Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `player_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
 `cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
 `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
-`drowning` (shown as Drown), or legacy/unknown `environment`), `max_hp`, `atk`,
+`drowning` (shown as Drown), `poison` (shown as Poisoned to death),
+or legacy/unknown `environment`), `max_hp`, `atk`,
 `def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
 names), `equipment` (JSONB equipped-item snapshots with base/name, actual
 ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if

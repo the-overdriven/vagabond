@@ -3169,6 +3169,7 @@ the logging order is wrong (lower message is newer)
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
+    const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
@@ -3189,6 +3190,7 @@ the logging order is wrong (lower message is newer)
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
     }
+    applyEnemyLifesteal(e, effectiveDamage)
     if (dmg > 0 && player.hp > 0) applyEnemyPoison(e)
     updateHud()
     if (player.hp <= 0) {
@@ -3306,6 +3308,7 @@ the logging order is wrong (lower message is newer)
 
   // Temple blessings are separate from full-HP recovery after a normal death.
   function tryTempleHeal() {
+    curePlayerPoison()
     const cap = Math.min(70, playerMaxHp())
     if (player.hp >= cap) return
     if (player.lvl > 1 && player.totalXpEarned <= player.lastTempleHealXp) {
@@ -4206,8 +4209,16 @@ the logging order is wrong (lower message is newer)
   let turnCount = 0
   let consecutiveWaitTurns = 0
   const MAX_CONSECUTIVE_WAIT_TURNS = 10
-  // Trolls knit their flesh back together on their own - a slow trickle that
-  // ticks once per elapsed turn regardless of what the player did with it.
+  function applyEnemyLifesteal(enemy, effectiveDamage) {
+    if (!(effectiveDamage > 0) || !enemyHasAbility(enemy, 'lifesteal') || !chance(0.30)) return
+    const heal = Math.min(Math.max(0, enemy.maxHp - enemy.hp), Math.floor(effectiveDamage / 3))
+    if (heal <= 0) return
+    enemy.hp += heal
+    log(`The ${enemy.name} steals your life and recovers ${heal} HP!`, 'bad')
+    spawnDamageNumber(enemy.x, enemy.y, `+${heal}`, '#78c878')
+    updateMobileInfoPanel(enemy.x, enemy.y)
+  }
+
   function applyEnemyPoison(enemy) {
     if (!enemyHasAbility(enemy, 'poison') || !chance(0.30)) return
     const baseTurns = Math.min(40, Math.floor(playerMaxHp() * 0.20))
@@ -4237,6 +4248,7 @@ the logging order is wrong (lower message is newer)
     if (player.poisonTurns === 0) log('The poison wears off.', 'good')
   }
 
+  // Troll regeneration advances once per elapsed turn.
   function tickRaceRegen() {
     const race = raceDef()
     if (!race || !race.regenEvery) return
@@ -5419,7 +5431,7 @@ the logging order is wrong (lower message is newer)
       checkWorldEdge()
       if (isTempleGround(map[ny][nx])) {
         const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
-        if (canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
+        if (player.poisonTurns > 0 || canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
       }
       if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
         log('You enter a dense ancient forest.', 'info')
@@ -9853,6 +9865,7 @@ the logging order is wrong (lower message is newer)
     spawnRemoteHighTierChests()
     spawnGroundStuff()
     spawnCaveScenarios()
+    ensureUndergroundVampire()
     spawnNpcs()
     clearGroundItemsUnderMerchant()
     spawnEdgeHighTierChests()
