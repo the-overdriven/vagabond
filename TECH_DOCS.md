@@ -2211,7 +2211,7 @@ Touch devices retain their existing full-screen dialog layout.
 
 ## Non-gear item catalog
 
-`content/items.json` defines all 21 non-gear inventory kinds. Weapons, shields,
+`content/items.json` defines all 22 non-gear inventory kinds. Weapons, shields,
 armor, and procedural artifacts retain their existing configuration systems.
 The dictionary keys are the canonical `kind` identifiers used by inventory,
 merchant references, saves, and replay actions. Descriptive loot-outcome names
@@ -3160,9 +3160,42 @@ Other generated quest types include:
 Kill quests are restricted to eligible prefixed tier-3-or-4 monsters, while item quests are generated from living eligible tier-3-or-4 enemies or qualifying ground items. Tier-5 monsters are excluded from kill, group-kill, and carried-item recovery targets. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
-Completing the quest also teaches **Tracking**, once per character, using the
+Completing the first quest also teaches **Tracking**, once per character, using the
 Hunter's craft-teaching dialogue. The character sheet then shows `Tracking: Learned`;
-before learning, the skill is hidden. The existing XP reward is unchanged.
+before learning, the skill is hidden. The first quest's existing XP reward is unchanged.
+
+After Tracking is learned and the first quest is completed, the Hunter has one final
+**rare hunt** to offer. The quarry is selected at quest creation from enemy templates
+that satisfy all three rules:
+
+- `wander: "far"`
+- `humanoid: false`
+- `rarity <= 0.1`
+
+The selection remains data-driven: adding or changing an enemy template automatically
+changes the eligible pool. A candidate must also have at least one valid surface spawn
+tile in one of its configured biomes. The spawn tile must be walkable, reachable from
+the village/Hunter over ordinary surface terrain, unoccupied, and preferably very far
+from the village. The desired minimum Chebyshev distance is:
+
+`max(20, floor(min(world width, world height) × 0.35))`
+
+Among qualifying distant tiles, the hunt uses the closest available world-edge band
+and allows tiles up to 3 squares farther inward. A species with no valid tile beyond
+the minimum village distance is skipped; if no qualifying species can be placed that
+far away, the rare hunt is not generated rather than moving the quarry closer.
+
+The Hunter emphasizes that the creature is exceptionally rare and gives the direction
+of the **initial sign** he found. That bearing is frozen when the quest starts; it does
+not update as the far-wandering quarry moves. The quest never reveals the quarry on the
+map and only the exact spawned enemy ID can complete it, so killing another monster of
+the same species does not count. This is intentionally a practical Tracking test rather
+than a live-direction hunt.
+
+Returning after killing that exact quarry grants **400 base XP** through the normal XP
+pipeline and one non-stackable **Echo-Blight Horn**. The rare hunt is then permanently
+completed for that character.
+
 Normal death preserves the lesson and quest. A new permadeath character starts
 with no Tracking knowledge, no species kill counts and no Old Hunter quest,
 so the Hunter can offer a fresh quest in the surviving world.
@@ -3212,7 +3245,32 @@ remain environmental evidence across a permadeath character change; only the new
 character's knowledge resets. Tracks are clues to an earlier destination, not a
 guarantee that a living beast still occupies or is heading toward that location.
 
-The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer) and whenever his quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after completion. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
+The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer), after the first quest is completed and Tracking has been learned (when the rare hunt can be received), and whenever either quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after the rare hunt is completed. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
+
+## Echo-Blight Horn
+
+The Echo-Blight Horn is the reward for the post-Tracking rare hunt. Its inventory action
+is **Use**. A successful use consumes one game turn and emits a brief cosmetic `♪`
+sound-wave effect around the player; this animation has no gameplay RNG and is disabled
+for replay simulation.
+
+When used, every living **non-humanoid** enemy on the player's current level within
+**80 tiles Chebyshev distance** answers, regardless of line of sight, darkness, forest,
+walls, or other intervening terrain. Each answering enemy produces its own deliberately
+imprecise log message:
+
+`You hear something answering from <direction>.`
+
+`<direction>` is one of the same eight compass bearings used by Tracking. The horn does
+not reveal species, exact distance, or map position. If no valid enemy answers, the log
+says `Nothing answers.`
+
+The horn is reusable, but only after the character has **earned more XP** since its last
+successful use. This uses `player.totalXpEarned`, the same proof-of-growth concept used
+by Temple healing, rather than current spendable XP. A blocked reuse consumes no turn.
+The horn stores the earned-XP total of its last successful use on that individual item;
+the value is serialized with inventory state and therefore restored by saves and replay
+starting snapshots.
 
 </details>
 
@@ -3672,10 +3730,16 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-20
+21
 ```
 
 Saves are JSON files.
+
+Version 21 adds the post-Tracking rare-hunt state and the Echo-Blight Horn's per-item
+XP-gated reuse state. The rare hunt continues to use the existing serialized Old Hunter
+quest object and exact enemy IDs; the horn's `lastUseTotalXp` travels with its inventory
+instance. Replay initial snapshots preserve the same state. No older-save migration is
+added.
 
 Version 20 adds per-enemy ranged shooter role and exact remaining ammunition.
 The save stores the rolled shooter ability plus `shotsRemaining`; projectile type is

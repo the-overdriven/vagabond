@@ -2204,10 +2204,12 @@ the logging order is wrong (lower message is newer)
   }
 
   function hunterTargetEnemy(q) {
-    if (!q || !['kill_specific', 'recover_item'].includes(q.type)) return null
+    if (!q || !['kill_specific', 'recover_item', 'rare_hunt'].includes(q.type)) return null
     hunterEnsureIds()
     let e = enemies.find(x => x.id === q.targetEnemyId && x.alive)
-    if (!e && q.targetName) {
+    // The rare hunt always points at the one spawned quarry. Never silently
+    // retarget another member of the same species if that individual is gone.
+    if (!e && q.type !== 'rare_hunt' && q.targetName) {
       e = enemies.find(x => x.alive && (x.name === q.targetName || x.baseName === q.targetName) && (!q.targetItemName || (x.equipment && (x.equipment.name === q.targetItemName || x.equipment.base === q.targetItemName))))
       if (e) q.targetEnemyId = e.id
     }
@@ -2223,6 +2225,11 @@ the logging order is wrong (lower message is newer)
       if (Math.abs(dx) < 3) return dy > 0 ? 'south' : 'north'
       if (Math.abs(dy) < 3) return dx > 0 ? 'east' : 'west'
       return `${dy > 0 ? 'south' : 'north'}-${dx > 0 ? 'east' : 'west'}`
+    }
+    // The rare hunt is a Tracking quest, not a live GPS marker. Preserve the
+    // bearing of the sign the Hunter originally found even after the quarry moves.
+    if (q?.type === 'rare_hunt' && Number.isInteger(q.targetDirection)) {
+      return TRACK_DIRECTIONS[q.targetDirection] || 'somewhere in the wilds'
     }
     const e = hunterTargetEnemy(q)
     if (!e) return 'somewhere in the wilds'
@@ -2248,6 +2255,96 @@ the logging order is wrong (lower message is newer)
 
   function hunterReward() {
     return 100
+  }
+
+  function hunterRareTemplates() {
+    return ENEMY_TEMPLATES.filter(t => t && t.wander === 'far' && t.humanoid === false && Number(t.rarity ?? 1) <= 0.1)
+  }
+
+  function hunterReachableSurfaceTiles() {
+    const start = npcs.find(n => n.name === 'Old Hunter') || villageCenter || spawnPoint
+    const seen = new Uint8Array(MAP_W * MAP_H)
+    const queue = new Int32Array(MAP_W * MAP_H)
+    const startIndex = start.y * MAP_W + start.x
+    if (!surfaceMap[start.y]?.[start.x] || !TILE[surfaceMap[start.y][start.x]]?.walk) return seen
+    let head = 0, tail = 0
+    seen[startIndex] = 1
+    queue[tail++] = startIndex
+    while (head < tail) {
+      const cur = queue[head++]
+      const x = cur % MAP_W, y = Math.floor(cur / MAP_W)
+      for (const [dx, dy] of DIRS8) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
+        const ni = ny * MAP_W + nx
+        if (seen[ni] || !TILE[surfaceMap[ny]?.[nx]]?.walk) continue
+        seen[ni] = 1
+        queue[tail++] = ni
+      }
+    }
+    return seen
+  }
+
+  function hunterRareSpawnSites(tmpl, reachable) {
+    const allowed = new Set(enemyBiomes(tmpl))
+    const origin = villageCenter || spawnPoint
+    const minVillageDistance = Math.max(20, Math.floor(Math.min(MAP_W, MAP_H) * 0.35))
+    const blocked = new Set()
+    for (const e of enemies) if (e.alive && (e.level || 0) === 0) blocked.add(keyXY(e.x, e.y))
+    for (const n of npcs) blocked.add(keyXY(n.x, n.y))
+    const candidates = []
+    for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+      const tile = surfaceMap[y]?.[x]
+      if (!allowed.has(tile) || !TILE[tile]?.walk || !reachable[y * MAP_W + x] || blocked.has(keyXY(x, y))) continue
+      const villageDistance = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y))
+      const edgeDistance = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y)
+      candidates.push({x, y, villageDistance, edgeDistance})
+    }
+    if (!candidates.length) return []
+    const distant = candidates.filter(site => site.villageDistance >= minVillageDistance)
+    if (!distant.length) return []
+    const closestEdge = Math.min(...distant.map(site => site.edgeDistance))
+    return distant.filter(site => site.edgeDistance <= closestEdge + 3)
+  }
+
+  function generateOldHunterRareQuest() {
+    if (!player.trackingLearned) return null
+    const reachable = hunterReachableSurfaceTiles()
+    const spawnable = []
+    for (const tmpl of hunterRareTemplates()) {
+      const sites = hunterRareSpawnSites(tmpl, reachable)
+      if (sites.length) spawnable.push({tmpl, sites})
+    }
+    if (!spawnable.length) return null
+    const chosen = pick(spawnable)
+    const spot = pick(chosen.sites)
+    const tmpl = chosen.tmpl
+    const variance = WORLD_GEN_CONFIG.surfaceEnemies.statVarianceMin + rng() * WORLD_GEN_CONFIG.surfaceEnemies.statVarianceSpan
+    const e = {
+      name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level: 0, ordinarySurface: false,
+      hp: Math.max(1, Math.round(tmpl.hp * variance)),
+      atk: Math.max(1, Math.round(tmpl.atk * variance)),
+      def: Math.max(0, Math.round(tmpl.def * variance)),
+      spd: Math.max(1, Math.round(tmpl.spd * variance)),
+      fly: !!tmpl.fly, humanoid: !!tmpl.humanoid, evades: !!tmpl.evades,
+      aggro: tmpl.aggro ?? AGGRO_RANGE,
+      x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: surfaceMap[spot.y][spot.x],
+      alive: true, prefix: null, equipment: null
+    }
+    e.maxHp = e.hp
+    prepareEnemyEquipment(e)
+    addEnemy(e)
+    occupied.add(keyXY(e.x, e.y))
+    const hunter = npcs.find(n => n.name === 'Old Hunter') || villageCenter || spawnPoint
+    const direction = trackDirection(e.x - hunter.x, e.y - hunter.y)
+    oldHunterQuest = {
+      id: `hunter_${++oldHunterQuestSerial}`,
+      state: 'active', giver: 'Old Hunter', type: 'rare_hunt', progress: 0,
+      createdAtTurn: turnCount, targetEnemyId: e.id, targetName: tmpl.name,
+      targetBaseName: tmpl.name, targetDirection: direction, spawnX: e.x, spawnY: e.y,
+      rewardXp: 400
+    }
+    return oldHunterQuest
   }
 
   function hunterInvestigationCandidate() {
@@ -2382,6 +2479,7 @@ the logging order is wrong (lower message is newer)
     const place = pick(['the old road', 'the ruined fort', 'the edge of the forest', 'the abandoned cemetery', 'the mountain pass', 'the dark country beyond the chapel'])
     const reason = pick(['something has been feeding there', 'the tracks stop where the dead begin to walk', 'travellers have gone missing along that path', 'I found fresh blood where no living thing should have been', 'the silence has become too deep, even for these hills'])
     if (q.type === 'investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterDirection(q)} of here. Go there and investigate the place, then report back to me. I'll mark the location on your map.`, `Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterDirection(q)} of here. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`])
+    if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. A ${q.targetName}. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
     if (q.type === 'kill_specific') return pick([
       `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
       `Old Hunter says: I know the trail of a ${q.targetName}. It has crossed ${place}, ${hunterDirection(q)} of here, three nights in a row. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
@@ -2406,7 +2504,8 @@ the logging order is wrong (lower message is newer)
 
   function onOldHunterEnemyKilled(e) {
     if (!oldHunterQuest || oldHunterQuest.state !== 'active') return
-    if (oldHunterQuest.type === 'kill_specific' && (e.id === oldHunterQuest.targetEnemyId || (e.baseName === oldHunterQuest.targetName || e.name === oldHunterQuest.targetName))) oldHunterQuest.progress = 1
+    if (oldHunterQuest.type === 'rare_hunt' && e.id === oldHunterQuest.targetEnemyId) oldHunterQuest.progress = 1
+    else if (oldHunterQuest.type === 'kill_specific' && (e.id === oldHunterQuest.targetEnemyId || (e.baseName === oldHunterQuest.targetName || e.name === oldHunterQuest.targetName))) oldHunterQuest.progress = 1
     else if (oldHunterQuest.type === 'kill_group' && (oldHunterQuest.targetEnemyIds?.includes(e.id) || (!Array.isArray(oldHunterQuest.targetEnemyIds) && e.baseName === oldHunterQuest.targetBaseName))) oldHunterQuest.progress++
     else if (oldHunterQuest.type === 'recover_item' && (e.id === oldHunterQuest.targetEnemyId || (e.baseName === oldHunterQuest.targetName && e.equipment && (e.equipment.name === oldHunterQuest.targetItemName || e.equipment.base === oldHunterQuest.targetItemName)))) oldHunterQuest.progress = 1
     if ((oldHunterQuest.type === 'kill_group' && oldHunterQuest.progress >= oldHunterQuest.required) || oldHunterQuest.progress >= 1) oldHunterQuest.state = 'ready'
@@ -2414,6 +2513,7 @@ the logging order is wrong (lower message is newer)
 
   function hunterActiveFlavor(q) {
     if (q.type === 'investigate_area') return `Old Hunter says: Have you investigated the area in the ${hunterDirection(q)} yet? I am still waiting to hear what you found.`
+    if (q.type === 'rare_hunt') return `Old Hunter says: Its first sign was toward the ${hunterDirection(q)} edge, but a beast like that will not stay put. Trust the tracks, not where I last saw them.`
     if (q.type === 'kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterDirection(q)} of here.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterDirection(q)} of here.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterDirection(q)} of here, and do not mistake another beast for it.`])
     if (q.type === 'kill_group') return pick([`Old Hunter says: The trouble ${hunterDirection(q)} of here has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterDirection(q)} of here.`, `Old Hunter says: The hills ${hunterDirection(q)} of here are not quiet yet. Do what you went out there to do.`])
     if (q.type === 'recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`])
@@ -2422,6 +2522,7 @@ the logging order is wrong (lower message is newer)
 
   function hunterCompletionFlavor(q) {
     if (q.type === 'investigate_area') return `Old Hunter says: You investigated the area. Good. I can put that worry to rest.`
+    if (q.type === 'rare_hunt') return `Old Hunter says: So it truly was a ${q.targetName}. Few hunters could have found that trail, fewer still could have followed it to the end.`
     if (q.type === 'kill_specific') return `Old Hunter says: You dealt with that particular beast. Good. I can finally sleep easier.`
     if (q.type === 'kill_group') return `Old Hunter says: You thinned their numbers. The roads should be quieter now. Thank you.`
     if (q.type === 'recover_item') return `Old Hunter says: You brought my ${q.targetItemName} back. I thought I would never see it again. Thank you.`
@@ -2459,7 +2560,9 @@ the logging order is wrong (lower message is newer)
   }
 
   function oldHunterHasNewDialogue() {
-    return !oldHunterQuest || hunterQuestReadyToTurnIn(oldHunterQuest)
+    if (!oldHunterQuest) return true
+    if (hunterQuestReadyToTurnIn(oldHunterQuest)) return true
+    return oldHunterQuest.state === 'completed' && player.trackingLearned && oldHunterQuest.type !== 'rare_hunt'
   }
 
   function interactOldHunter() {
@@ -2468,17 +2571,31 @@ the logging order is wrong (lower message is newer)
     if (hunterQuestReadyToTurnIn(oldHunterQuest)) {
       const q = oldHunterQuest
       removeHunterQuestItem(q)
-      if (!player.trackingLearned) {
-        log("Old Hunter says: Slaying what stands before you is a simple matter. Tracking its shadow is the true hunt. Keep your eyes to the earth. Bent grass, broken mud, scattered leaves. The wilds speak to those who know how to listen. You aided my cause. In return, I'll teach you my craft.", 'info')
-        player.trackingLearned = true
-        log('You learned Tracking.', 'good')
+      if (q.type === 'rare_hunt') {
+        log(hunterCompletionFlavor(q), 'info')
+        gainXp(q.rewardXp || 400)
+        addInventoryItem('echoBlightHorn')
+        log('The Old Hunter gives you the Echo-Blight Horn.', 'loot')
+      } else {
+        if (!player.trackingLearned) {
+          log("Old Hunter says: Slaying what stands before you is a simple matter. Tracking its shadow is the true hunt. Keep your eyes to the earth. Bent grass, broken mud, scattered leaves. The wilds speak to those who know how to listen. You aided my cause. In return, I'll teach you my craft.", 'info')
+          player.trackingLearned = true
+          log('You learned Tracking.', 'good')
+        }
+        gainXp(q.rewardXp || 100)
       }
-      gainXp(100)
       oldHunterQuest = {...q, state: 'completed'}
       updateHud()
+      render()
       return true
     }
     if (oldHunterQuest?.state === 'completed') {
+      if (player.trackingLearned && oldHunterQuest.type !== 'rare_hunt') {
+        const q = generateOldHunterRareQuest()
+        log(q ? hunterFlavor(q) : `Old Hunter says: I have no trail rare enough to test what I taught you. Not yet.`, 'info')
+        render()
+        return true
+      }
       log(`Old Hunter says: Thank you again for dealing with that matter.`, 'info')
       return true
     }
@@ -2486,8 +2603,9 @@ the logging order is wrong (lower message is newer)
       log(hunterActiveFlavor(oldHunterQuest), 'info')
       return true
     }
-    const q = generateOldHunterQuest()
+    const q = player.trackingLearned ? generateOldHunterRareQuest() : generateOldHunterQuest()
     log(q ? hunterFlavor(q) : `Old Hunter says: Nothing out there needs my attention right now.`, 'info')
+    render()
     return true
   }
 
@@ -4251,6 +4369,7 @@ the logging order is wrong (lower message is newer)
     scrollOfInvisibility: idx => useInvisibilityScroll(idx),
     homecomingscroll: idx => useHomecomingScroll(idx),
     tombstone: idx => readTombstone(idx),
+    echoBlightHorn: idx => useEchoBlightHorn(idx),
     blackKey: () => toggleBlackKey(),
     openCasket: () => openTreasureCasket(),
     treasuremap: () => inspectTreasureMap(),
@@ -6235,9 +6354,11 @@ the logging order is wrong (lower message is newer)
   // just vanishing. Used for item/chest pickups (moves up) and enemy deaths
   // (moves down).
   let fxAnims = []
+  let soundAnims = []
   let damageAnims = []
   let projectileAnims = []
   const FX_ANIM_MS = 420
+  const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
   function enemyGlyph(e) {
     const ch = (e.baseName || e.name).trim().split(/\s+/).pop()[0]
@@ -6274,6 +6395,12 @@ the logging order is wrong (lower message is newer)
 
   function spawnDeathAnim(e) {
     spawnFxAnim(e.x, e.y, enemyGlyph(e), enemyColor(e), 1)
+  }
+
+  function spawnHornSoundAnim() {
+    if (replayAnimationsDisabled) return
+    soundAnims.push({x: player.x, y: player.y, start: performance.now(), duration: SOUND_ANIM_MS})
+    runAnimationLoop()
   }
 
   function spawnDamageNumber(x, y, amount, color, delay) {
@@ -6359,7 +6486,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
+    return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -6748,6 +6875,31 @@ the logging order is wrong (lower message is newer)
         ctx.scale(scale, scale)
         ctx.fillStyle = p.color
         ctx.fillText(p.ch, 0, 3 - TILE_PX / 2)
+        ctx.restore()
+      }
+    }
+    if (soundAnims.length) {
+      const notes = [[-0.65, -0.15], [0.6, -0.45], [-0.25, -0.75], [0.7, 0.05]]
+      for (let i = soundAnims.length - 1; i >= 0; i--) {
+        const p = soundAnims[i]
+        const t = Math.min(1, (now - p.start) / p.duration)
+        if (t >= 1) {
+          soundAnims.splice(i, 1)
+          continue
+        }
+        const vx = Math.round((p.x - camX) * TILE_PX + TILE_PX / 2)
+        const vy = Math.round((p.y - camY) * TILE_PX + TILE_PX / 2)
+        ctx.save()
+        ctx.globalAlpha = 1 - t
+        ctx.fillStyle = '#e8d9a8'
+        ctx.font = `${Math.max(14, Math.round(TILE_PX * (0.42 + 0.12 * (1 - t))))}px serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        for (let n = 0; n < notes.length; n++) {
+          const [dx, dy] = notes[n]
+          const spread = TILE_PX * (0.35 + 0.9 * t)
+          ctx.fillText('♪', vx + dx * spread, vy + dy * spread - TILE_PX * 0.25 * t)
+        }
         ctx.restore()
       }
     }
@@ -8759,6 +8911,34 @@ the logging order is wrong (lower message is newer)
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     applyBerryRegeneration('fish')
+    consumeItemTurn()
+  }
+
+  function useEchoBlightHorn(idx) {
+    const it = player.inventory[idx]
+    if (!it || it.kind !== 'echoBlightHorn') return
+    if (!canUseItemsWhileSwimming()) return
+    const lastUseXp = Number.isFinite(it.lastUseTotalXp) ? it.lastUseTotalXp : null
+    if (lastUseXp !== null && player.totalXpEarned <= lastUseXp) {
+      log('The Echo-Blight Horn will not answer your breath again until you have earned more experience.', 'info')
+      return
+    }
+    ensureReplayItemIds()
+    recordReplayAction({type:'useItem', action:'echoBlightHorn', idx, replayId:it.replayId})
+    it.lastUseTotalXp = player.totalXpEarned
+    spawnHornSoundAnim()
+    log('You blow the Echo-Blight Horn. Its note rolls across the wilds.', 'info')
+    let answers = 0
+    for (const e of enemies) {
+      if (!e.alive || e.humanoid || !onCurrentLevel(e)) continue
+      const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+      if (distance > 80) continue
+      const direction = trackDirection(e.x - player.x, e.y - player.y)
+      if (direction === null) continue
+      log(`You hear something answering from ${TRACK_DIRECTIONS[direction]}.`, 'info')
+      answers++
+    }
+    if (!answers) log('Nothing answers.', 'info')
     consumeItemTurn()
   }
 

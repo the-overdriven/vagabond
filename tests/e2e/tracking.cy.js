@@ -117,8 +117,11 @@ describe('Tracking and beast evidence', () => {
       trackAssert(player.kills === 1 && player.killsBySpecies.Wolf === 1 && !player.killsBySpecies['Tough Wolf'], 'base-species counter')
       oldHunterQuest = {id:'hunter_9',type:'investigate',state:'ready'}
       const before = player.totalXpEarned
-      interactOldHunter(); const rewarded = player.totalXpEarned; interactOldHunter()
+      interactOldHunter(); const rewarded = player.totalXpEarned
       trackAssert(player.trackingLearned && oldHunterQuest.state === 'completed', 'lesson completion')
+      trackAssert(oldHunterHasNewDialogue(), 'rare hunt offer marker after Tracking lesson')
+      interactOldHunter()
+      trackAssert(oldHunterQuest.type === 'rare_hunt' && oldHunterQuest.state === 'active', 'post-Tracking rare hunt starts')
       trackAssert(rewarded > before && player.totalXpEarned === rewarded, 'single existing reward')
       player.permadeath = false; die()
       trackAssert(player.trackingLearned && player.killsBySpecies.Wolf === 1, 'normal death preserves knowledge')
@@ -141,7 +144,8 @@ describe('Tracking and beast evidence', () => {
       trackAssert(player.trackingLearned && player.killsBySpecies.Wolf === 3 && oldHunterQuestSerial === 12 && turnCount === 17, 'saved progression and counters')
       trackAssert(JSON.stringify([...beastTracks.values()]) === JSON.stringify(after.beastTracks), 'saved evidence')
       const xp = player.totalXpEarned; interactOldHunter()
-      trackAssert(player.totalXpEarned === xp, 'load cannot repeat reward')
+      trackAssert(player.totalXpEarned === xp, 'load cannot repeat first quest reward')
+      trackAssert(oldHunterQuest.type === 'rare_hunt' && oldHunterQuest.state === 'active', 'loaded completed quest exposes rare hunt')
       currentZ = -1
       for (let i=0;i<50;i++) ageBeastTracks()
       trackAssert([...beastTracks.values()][0].age === 199, 'age while underground')

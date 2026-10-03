@@ -229,6 +229,20 @@
     ],
     "description": "A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth."
   },
+  "echoBlightHorn": {
+    "name": "Echo-Blight Horn",
+    "icon": "img/icons/echo-blight-horn.svg",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Use",
+        "handler": "echoBlightHorn"
+      }
+    ],
+    "description": "A warped hunting horn whose note provokes beasts into answering across great distances."
+  },
   "treasuremap": {
     "name": "Old Treasure Map",
     "category": "other",

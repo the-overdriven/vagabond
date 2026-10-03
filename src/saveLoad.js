@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 20 // Ranged shooter variants and ammunition state
+const SAVE_VERSION = 21 // Post-Tracking rare hunt and Echo-Blight Horn state
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
