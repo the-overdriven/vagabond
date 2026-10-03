@@ -47,6 +47,34 @@ describe('Ultra-rare enemy templates', () => {
     })
   })
 
+  it('gives ordinary and prefixed surface rares two sightings regardless of wander mode or humanoid type', () => {
+    cy.visit('/')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.window().then(win => win.eval('WORLD_SEED=246813579; rngState=WORLD_SEED'))
+    cy.get('#raceName').clear().type('Rare Scope Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,message)=>{if(!ok)throw new Error(message)}
+      replayRecording=false; replayAnimationsDisabled=true
+      currentZ=0; map=surfaceMap; player.invisibleTurns=0; player.godMode=false
+      map[player.y][player.x]='grass'
+      const names=['Myrka','Vampire','NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
+      check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>Number(t.rarity??1)<=RARE_FLEE.maxRarity).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
+      for(const name of names) for(const wander of ['far','homeReturn','homeReanchored','roam',false]) {
+        const t=ENEMY_TEMPLATE_BY_NAME[name]
+        const e={...t,...rareFleeDefaults({}),name:'Fierce '+name,baseName:name,prefix:{name:'Fierce'},
+          alive:true,level:0,x:player.x+4,y:player.y,aware:false,alarmed:false,wander}
+        check(rareStartFlee(e,4), name+' '+wander+' starts without a quest')
+        check(e.rareSightings===1 && e.rareFleeTurns===RARE_FLEE.fleeTurns[0] && !e.aware && !e.alarmed, 'cinematic flags')
+        check(!rareStartFlee(e,4), 'ongoing flight cannot retrigger')
+        e.rareFleeTurns=0; e.rareSightings=2; e.rareArmed=true
+        check(!rareStartFlee(e,4), 'two sightings only')
+      }
+      check(!rareFleeTemplate({baseName:'Kveld'}), 'ordinary control remains unchanged')
+    })()`))
+  })
+
   it('serves the supplied portraits using the normal enemy slug paths', () => {
     const portraits = [
       'tokka', 'myrka', 'skerva', 'kveld', 'tulla',

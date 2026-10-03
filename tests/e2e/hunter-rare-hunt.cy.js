@@ -15,6 +15,30 @@ function beginRareHuntGame(name = 'Rare Hunt Tester') {
 describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
   beforeEach(() => beginRareHuntGame())
 
+  it('excludes rare and far-traveling targets from new ordinary quests while preserving an active quest', () => {
+    cy.window().then(win => win.eval(`(() => {
+      replayRecording=false; currentZ=0; map=surfaceMap
+      const make=(id,baseName,wander,extra={})=>({id,baseName,name:'Fierce '+baseName,
+        tier:3,level:0,alive:true,wander,prefix:{name:'Fierce'},equipment:{name:'Axe'},...extra})
+      enemies=[make('ordinary','Kveld','roam'),make('promoted','Kveld','far'),
+        make('rare','Vampire','homeReturn',{alarmed:true,level:-1}),
+        make('quarry','GAUR','far',{isRareQuarry:true}),make('far','Chupacabra','far')]
+      groundItems=[]
+      oldHunterQuest={id:'existing-quest',type:'kill_specific',state:'active',targetEnemyId:'rare'}
+      const before=JSON.stringify(oldHunterQuest)
+      for(const z of [0,-1]) {
+        currentZ=z
+        const ids=hunterLivingEnemies().map(e=>e.id)
+        if(JSON.stringify(ids)!==JSON.stringify(['ordinary'])) throw new Error('target exclusions independent of level/alarm')
+        const candidates=hunterCandidates()
+        if(!candidates.length || candidates.some(q=>q.targetEnemyId!=='ordinary' || q.targetEnemyIds)) throw new Error('only ordinary quest targets')
+        generateOldHunterQuest()
+        if(JSON.stringify(oldHunterQuest)!==before) throw new Error('existing active quest altered')
+      }
+      currentZ=0
+    })()`))
+  })
+
   it('offers the post-Tracking hunt, spawns one qualifying quarry near an edge, and requires that exact beast', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {

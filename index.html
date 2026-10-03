@@ -916,6 +916,7 @@ the logging order is wrong (lower message is newer)
     ENEMY_FAR_VILLAGE_AVOID_RADIUS = content.enemyConfig.wandering.farVillageAvoidRadius ?? 20
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
+    RARE_FLEE = content.enemyConfig.rareFlee
     TRACK_CONFIG = content.enemyConfig.tracking
     RANGED_CONFIG = content.enemyConfig.ranged || {}
     PREFIX_STATS = content.enemyConfig.prefixStats
@@ -1392,6 +1393,7 @@ the logging order is wrong (lower message is newer)
 <script src="src/graveyard.js"></script>
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
+<script src="src/rareFlee.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -2024,7 +2026,8 @@ the logging order is wrong (lower message is newer)
   }
 
   function enemySpd(e) {
-    return Math.max(1, e.spd + enemyTileEffects(e).speed)
+    const ordinary = Math.max(1, e.spd + enemyTileEffects(e).speed)
+    return ordinary + rareStartledBonus(e, ordinary)
   }
 
   function playerMf() {
@@ -2173,6 +2176,7 @@ the logging order is wrong (lower message is newer)
     if (!Object.prototype.hasOwnProperty.call(enemy, 'homeRadius') && Number.isFinite(tmpl?.homeRadius)) {
       enemy.homeRadius = tmpl.homeRadius
     }
+    Object.assign(enemy, rareFleeDefaults(enemy))
     initializeEnemyShooter(enemy, tmpl)
     enemies.push(enemy)
     return enemy
@@ -2236,7 +2240,8 @@ the logging order is wrong (lower message is newer)
 
   function hunterLivingEnemies() {
     hunterEnsureIds()
-    return enemies.filter(e => e.alive && e.baseName && Number(e.tier || 0) >= 3 && Number(e.tier) < 5)
+    return enemies.filter(e => e.alive && e.baseName && Number(e.tier || 0) >= 3 && Number(e.tier) < 5 &&
+      enemyWanderMode(e) !== 'far' && !rareFleeTemplate(e))
   }
 
   function hunterPrefixedEnemies() {
@@ -3024,6 +3029,7 @@ the logging order is wrong (lower message is newer)
   }
 
   async function playerAttackEnemy(e, isExtraAttack = false) {
+    if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
     updateMobileInfoPanel(e.x, e.y)
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
@@ -3554,6 +3560,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function alarmEnemy(e) {
+    if (e.rareFleeTurns > 0 && rareFleeEligible(e)) return false
     if (!e.alive || enemyIsPassive(e) || e.alarmed) return false
     e.alarmed = true
     e.alarmedZ = currentZ
@@ -4237,6 +4244,14 @@ the logging order is wrong (lower message is newer)
     const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e)) continue
+      const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+      if (!(e.rareFleeTurns > 0) && e.rareArmed === false &&
+          rareDistance >= RARE_FLEE.rearmDistance && rareFleeEligible(e)) e.rareArmed = true
+      if (e.rareFleeTurns > 0 && rareFleeEligible(e)) {
+        if (rareFlee(e, rareDistance, playerHidden)) continue
+      } else if (!playerHidden && rareStartFlee(e, rareDistance)) {
+        if (rareFlee(e, rareDistance, playerHidden)) continue
+      }
       const justEvaded = e.justEvaded === true
       e.justEvaded = false
       if (enemyIsPassive(e)) {
@@ -4339,6 +4354,10 @@ the logging order is wrong (lower message is newer)
         // straight away instead of leaving it oblivious until the next turn.
         if ((enemyWanderMode(e) === 'far' || enemyIsOnScreen(e)) && enemyWander(e)) {
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
+          if (rareStartFlee(e, distAfter)) {
+            if (!rareFlee(e, distAfter) && distAfter <= ATTACK_RANGE && enemyAttackPlayer(e)) return
+            continue
+          }
           if (distAfter <= aggroRange && enemyHasSight(e) && !forestConcealsPlayer(e, distAfter)) {
             e.aware = true
             e.forestConcealX = null
@@ -7376,6 +7395,7 @@ the logging order is wrong (lower message is newer)
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${boostHtml}${critHtml}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>

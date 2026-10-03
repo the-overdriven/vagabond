@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 21 // Post-Tracking rare hunt and Echo-Blight Horn state
+const SAVE_VERSION = 22 // Rare monster sightings and in-progress flight
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -203,6 +203,7 @@ function buildSaveObject() {
       farPrevX: Number.isInteger(e.farPrevX) ? e.farPrevX : null,
       farPrevY: Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       fleeingHoly: !!e.fleeingHoly,
+      ...rareFleeSaveState(e),
       shooterAbility: e.shooterAbility || null,
       shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
     })),
@@ -683,6 +684,7 @@ function loadGameFromObject(data, opts = {}) {
       farPrevY: level >= 0 && Number.isInteger(e.farPrevY) ? e.farPrevY : null,
       farPath: e.farPath ? e.farPath.map(step => ({...step})) : null,
       fleeingHoly: !!e.fleeingHoly,
+      ...rareFleeDefaults(e),
       shooterAbility: typeof e.shooterAbility === 'string' ? e.shooterAbility : null,
       shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
     })

@@ -3170,7 +3170,7 @@ Other generated quest types include:
 - **Kill a specific monster:** kill a particular eligible, prefixed tier-3-or-4 monster.
 - **Recover an item:** retrieve an item carried by a particular tier-3-or-4 monster.
 
-Kill quests are restricted to eligible prefixed tier-3-or-4 monsters, while item quests are generated from living eligible tier-3-or-4 enemies or qualifying ground items. Tier-5 monsters are excluded from kill, group-kill, and carried-item recovery targets. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
+Kill quests are restricted to eligible prefixed tier-3-or-4 monsters, while item quests are generated from living eligible tier-3-or-4 enemies or qualifying ground items. Tier-5 monsters, all far-wanderers (including world-generation promotions), and every base template with rarity <= 0.02 are excluded from new kill, group-kill, and carried-item recovery targets. The template exclusion applies regardless of level, Alarmed status, prefix, or quest-quarry status. Existing active quests are preserved. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
 Completing the first quest also teaches **Tracking**, once per character, using the
@@ -3212,6 +3212,88 @@ completed for that character.
 Normal death preserves the lesson and quest. A new permadeath character starts
 with no Tracking knowledge, no species kill counts and no Old Hunter quest,
 so the Hunter can offer a fresh quest in the surviving world.
+
+## Rare monster sightings and flight
+
+`src/rareFlee.js` applies to living, unalarmed surface enemies whose **base template**
+has `rarity <= 0.02`, independent of quest membership, prefix, humanoid type, and
+wander mode. Current species: Myrka, Vampire, NULK, SKELD, DRUSK, GAUR, ASHFANG,
+MIREHOWL, NHALUUN. Kveld and other more common templates retain normal AI.
+Underground encounters use normal AI; an off-level flight pauses until returning.
+
+Two sightings precede ordinary combat. An unaware, armed beast notices a visible,
+unconcealed player within 8 tiles. The first sighting cannot be hit or cornered;
+the second can be caught by reaching adjacency or blocking every outward step.
+Caught beasts become aware and Alarmed; a third approach uses ordinary combat.
+An attack can start the flight before damage or evasion, including an invisible
+attack. An invisible attacker triggers flight during either sighting, without
+catching or damaging the beast. Invisibility and forest concealment alone never
+start a sighting. Active flight takes priority over temple flight and idle AI.
+
+The first steps occur immediately, including when a wander step enters sighting
+range. Flight itself deals no damage, sets no alarm or spotted message, and leaves
+no tracks. It uses the deterministic temple-retreat neighbor selection. Far paths
+are cleared when flight starts; normal far targeting and tracks resume afterward.
+
+Configuration in `content/enemy_config.json`:
+
+```json
+"rareFlee": {
+  "maxRarity": 0.02,
+  "sightings": 2,
+  "sightRange": 8,
+  "rearmDistance": 14,
+  "fleeTurns": [8, 10],
+  "paceFloorFirst": 1.5,
+  "paceMin": 0.35,
+  "paceMax": 1.5,
+  "slipMinDistance": 12,
+  "startledMinSpd": 5
+}
+```
+
+Each turn adds `clamp(enemySpd / playerSpd, paceMin, paceMax)` to a fractional
+accumulator and takes its whole-number steps. Sighting one has a minimum pace of
+1.5 regardless of player speed. **Startled** temporarily raises effective enemy
+SPD to at least 5 during either flight, including terrain modifiers; base template
+stats are unchanged. The bonus ends immediately on catch or escape and is shown
+with `Fleeing (sighting/2)` in the enemy tooltip. Normal terrain bonuses still apply.
+
+Potion of Speed works through ordinary effective player SPD, costs its usual turn,
+and should be drunk before approaching. Open-ground tuning across all nine templates,
+starting gaps 3–8 and effective player SPD 3/5/8 found no catches at unboosted SPD
+3 or 5. With a potion, 25/36 SPD-3 and 36/36 SPD-5 scenarios at gaps <= 6 caught
+the beast; naturally fast SPD-8 characters can also catch it. Terrain and obstacles
+change the outcome. Neither natural speed nor a potion defeats the first escape.
+
+At the end of either uncaught flee timer, or when boxed in during the first flight,
+the beast slips away. A BFS starts at the beast's own tile over walkable surface
+terrain. Seeded selection uses vacant walkable tiles in the template's native
+biomes, at least `max(slipMinDistance, rearmDistance)` from the player, without
+shrinking the current gap. Home-return/reanchored beasts prefer the closest valid
+tile to their home and re-anchor there. Occupancy is updated and move animations
+are cleared so the beast never slides across the map.
+
+If an enclosed component offers no valid tile, selection falls back to valid tiles
+outside that component. A boxed escape logs: "The enclosed <name> stampedes through
+you! You dodge aside, but it escapes!" It causes no damage, moves no player, and
+changes no terrain. If the entire map has no valid destination, the protected
+flight remains active and retries next turn. Relocation establishes the 14-tile
+separation and re-arms the next sighting immediately; simply lingering nearby never
+burns the next sighting.
+
+| Enemy state | Default | Meaning |
+|---|---|---|
+| `rareSightings` | 0 | Number of sightings started, including current flight |
+| `rareFleeTurns` | 0 | Turns remaining in current flight |
+| `rareFleeAcc` | 0 | Fractional movement carried to the next turn |
+| `rareArmed` | true | Another sighting may start after separation |
+
+Save version 22 and replay initial snapshots preserve non-default fields only;
+loading supplies finite numeric defaults and treats missing `rareArmed` as true.
+Eligibility gates trigger, continuation, immunity and the temporary speed bonus.
+Old recordings can diverge when they encounter a rare under these new AI rules.
+Slips and new far routes use seeded RNG; animation timing never drives gameplay.
 
 ## Tracking beast trails
 
@@ -3754,10 +3836,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-21
+22
 ```
 
 Saves are JSON files.
+
+Version 22 adds sparse rare-sighting count, remaining flee turns, fractional pace and
+re-arm state to enemy saves and replay initial snapshots. Default values are omitted;
+loading restores them without rerolling or restarting a sighting. No migration for
+older save versions is added. Older replay recordings can diverge on rare encounters.
 
 Version 21 adds the post-Tracking rare-hunt state and the Echo-Blight Horn's per-item
 XP-gated reuse state. The rare hunt continues to use the existing serialized Old Hunter
@@ -3821,7 +3908,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Ranged shooter state requires current **version 20** saves. Other versions are rejected
+Rare-sighting and ranged shooter state require current **version 22** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -4646,7 +4733,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 20).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 22).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
