@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 24 // Persistent poison status
+const SAVE_VERSION = 25 // Once-only summons and their first-turn delay
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -179,6 +179,9 @@ function buildSaveObject() {
       spd: e.spd,
       aggro: enemyAggroRange(e),
       abilities: [...e.abilities],
+      summonUsed: e.summonUsed === true,
+      summonedTurn: e.summonedTurn,
+      grace: e.grace ?? null,
       humanoid: !!e.humanoid,
       equipment: e.equipment || null,
       x: e.x,
@@ -662,6 +665,9 @@ function loadGameFromObject(data, opts = {}) {
       hp: e.hp, maxHp: e.maxHp, victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
       abilities: [...e.abilities],
+      summonUsed: e.summonUsed === true,
+      summonedTurn: e.summonedTurn,
+      grace: e.grace ?? null,
       humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
       equipment: e.equipment || null,
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,

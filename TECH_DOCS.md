@@ -1360,7 +1360,7 @@ Movement, evasion, track generation, projectile obstruction, and flying render
 order check this array. This refactor does not change combat chances, terrain
 rules, shooter assignment, or consume additional RNG calls.
 
-Save format **24** stores each monster's abilities and restores them exactly,
+Save format **25** stores each monster's abilities and restores them exactly,
 including an explicitly empty array. Replay initial states use the same save
 format; shooter role and remaining ammo continue to be separate instance state.
 Saves from previous formats are rejected; no old boolean conversion is added.
@@ -1390,6 +1390,63 @@ Evasive species are those whose templates include `evades`: Giant Bat, Monkey,
 Wasp, Vulture, Grivkin, Harpy, Skerva, Vampire, and NHALUUN.
 Scripted flying Ghosts in the dwarven ruins also receive `evades`.
 
+## Summoning
+
+Templates with `summon` in `abilities` specify `summonSpecies` and `summonAmount`,
+with optional `summonStrength` (defaults to 1) and `summonMsg`. On each active
+aggro turn, the monster has one 10% seeded chance to summon instead of its
+normal attack, shot, or chase. It can succeed only once in its lifetime.
+Being out of melee range does not prevent a roll. Losing sight/concealment,
+invisibility, passive behavior, and sacred-ground or rare-beast fleeing use
+their normal non-combat paths without summon rolls. Extra attacks or pursuit
+actions do not create additional summon rolls that turn.
+
+| Summoner | Summoned species | Count roll | HP/ATK/DEF multiplier |
+|---|---|---|---|
+| Lich | Skeleton | 1–3 | 1 |
+| Serpent Queen | Serpent | 1–2 | 1 |
+| Wolf | Wolf | 1–3 | 1/3 |
+
+Spawns use free adjacent tiles, excluding the player, living monsters on the
+same level, and surface NPCs. The summoned species' normal traversal rules
+apply. Roll the count uniformly, then reduce it to available space. If no tile
+fits, the summoner keeps its ability and performs its normal action instead.
+Successful placement consumes the summon and the summoner's action.
+
+All summoned stats come directly from the named species template, independent
+of the summoner's prefix, gear, damage, or victory bonuses. Only HP, ATK, and DEF
+scale with `summonStrength`, rounded to the nearest integer; HP and ATK have a
+minimum of 1, DEF a minimum of 0. SPD and GRACE are unchanged. Summons have no
+gear or prefixes. They copy template abilities except `summon`, preventing
+recursive Wolf packs. Skeletons retain their normal shooter assignment chance.
+
+Summons inherit level, level kind, and cave identity. They cannot attack in
+the creation turn, including through immediate retaliation or ranged attacks;
+they may act on the next enemy turn. Placement and rules resolve before visual
+effects. A floating Summoned! marker and a log show the actual spawned count.
+Lich and Serpent Queen use the default hand-wave message; Wolf uses its custom
+hungry-howl message. Messages support `<name>`, `<amount>`, and `<species>`.
+
+Summons use normal XP and species loot rules. With the existing stat-based XP
+formula, an unprefixed summoned Wolf yields 12 XP versus 17 for a normal Wolf.
+The summoner's
+`summonUsed` flag and each summoned creature's `summonedTurn` initialize explicitly,
+persist in format 25 saves and replay initial states, and restore exactly.
+Re-entering levels and loading never reset the once-only summon. Saves also
+preserve an explicit GRACE value when present. Older save formats are rejected.
+
+## Lifesteal
+
+Vampire has the `lifesteal` ability. Each damaging melee hit independently has
+a 30% seeded chance to heal it for `floor(effectiveDamage / 3)`, capped by its
+missing HP. Effective damage is HP actually removed: 30 damage heals 10 HP,
+but a 30-damage hit against a player with only 6 HP heals 2 HP. Hits for 1–2
+effective damage heal nothing. Extra attacks roll independently; misses,
+zero-damage hits, and ranged attacks do not roll. Lethal hits resolve lifesteal
+before the normal killer victory bonus. Healing logs its actual amount,
+shows a green +HP number, and updates the Vampire's HP display. Existing enemy
+HP and abilities serialization preserve it without an additional status.
+
 ## Poison
 
 Scorpion, Manticore, and Wyvern have the `poison` ability. Each melee hit
@@ -1418,7 +1475,7 @@ Enemies may poison the player again during that turn's response. Application,
 refresh, damage, cure, and natural expiry have message logs. The active-status
 strip shows Poisoned with turns remaining and explains its cure.
 
-Remaining turns initialize to zero, persist in format 24 saves and replay initial
+Remaining turns initialize to zero, persist in format 25 saves and replay initial
 states, restore exactly, and reset for death and new characters. All rolls and
 ticks resolve in game rules, independently of animation timing.
 
@@ -4826,7 +4883,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 24).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 25).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

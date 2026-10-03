@@ -2137,6 +2137,55 @@ the logging order is wrong (lower message is newer)
     return !!enemy?.abilities?.includes(ability)
   }
 
+  const DEFAULT_SUMMON_MSG = 'The <name> waves a hand and mutters incomprehensible words. Moments later, <amount> <species> appear!'
+
+  function tryEnemySummon(enemy) {
+    if (!enemyHasAbility(enemy, 'summon') || enemy.summonUsed || !chance(0.10)) return false
+    const casterTemplate = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    const summonTemplate = ENEMY_TEMPLATE_BY_NAME[casterTemplate.summonSpecies]
+    const spots = DIRS8.map(([dx, dy]) => ({x: enemy.x + dx, y: enemy.y + dy}))
+      .filter(p => enemyCanTraverse(summonTemplate, p.x, p.y) &&
+        !(p.x === player.x && p.y === player.y) &&
+        !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === p.x && e.y === p.y) &&
+        !npcs.some(n => currentZ === 0 && n.x === p.x && n.y === p.y))
+    if (!spots.length) return false
+    const amount = Math.min(spots.length, randInt(1, casterTemplate.summonAmount))
+    const strength = casterTemplate.summonStrength ?? 1
+    for (let i = 0; i < amount; i++) {
+      const index = randInt(0, spots.length - 1), spot = spots.splice(index, 1)[0]
+      const hp = Math.max(1, Math.round(summonTemplate.hp * strength))
+      const summoned = {
+        name: summonTemplate.name, baseName: summonTemplate.name, tier: summonTemplate.tier,
+        hp, maxHp: hp, atk: Math.max(1, Math.round(summonTemplate.atk * strength)),
+        def: Math.max(0, Math.round(summonTemplate.def * strength)),
+        spd: summonTemplate.spd, grace: summonTemplate.grace, aggro: summonTemplate.aggro,
+        abilities: summonTemplate.abilities.filter(ability => ability !== 'summon'),
+        humanoid: summonTemplate.humanoid, x: spot.x, y: spot.y,
+        homeX: spot.x, homeY: spot.y, homeTileType: map[spot.y][spot.x],
+        level: enemy.level, levelKind: enemy.levelKind, caveIndex: enemy.caveIndex,
+        alive: true, aware: true, prefix: null, equipment: null,
+        summonUsed: false, summonedTurn: turnCount
+      }
+      addEnemy(summoned)
+      occupied.add(keyXY(spot.x, spot.y))
+      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df')
+    }
+    enemy.summonUsed = true
+    if (!enemy.aware) {
+      enemy.aware = true
+      enemy.forestConcealX = null
+      enemy.forestConcealY = null
+      alarmEnemy(enemy)
+    }
+    const species = summonTemplate.name === 'Wolf' ? (amount === 1 ? 'wolf' : 'wolves')
+      : summonTemplate.name.toLowerCase() + (amount === 1 ? '' : 's')
+    const message = (casterTemplate.summonMsg ?? DEFAULT_SUMMON_MSG)
+      .replace(/\bappear\b/g, amount === 1 ? 'appears' : 'appear')
+      .replace(/<name>/g, enemy.name).replace(/<amount>/g, String(amount)).replace(/<species>/g, species)
+    log(message, 'bad')
+    return true
+  }
+
   function shooterAbilityForTemplate(tmpl) {
     if (!tmpl || !Array.isArray(tmpl.abilities) || !RANGED_CONFIG?.abilities) return null
     return tmpl.abilities.find(ability => Object.hasOwn(RANGED_CONFIG.abilities, ability)) || null
@@ -2173,6 +2222,8 @@ the logging order is wrong (lower message is newer)
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
+    enemy.summonUsed = enemy.summonUsed === true
+    enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
         ? tmpl.wander
@@ -3151,6 +3202,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1) {
+    if (e.summonedTurn === turnCount) return false
     if (enemyIsPassive(e)) return false
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
@@ -3244,6 +3296,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function enemyRangedAttackPlayer(e, path = null) {
+    if (e.summonedTurn === turnCount) return false
     const shot = shooterDefinition(e)
     if (playerIsInvisible() || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
     clearAutoPath()
@@ -4327,7 +4380,7 @@ the logging order is wrong (lower message is newer)
     }
     const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
-      if (!e.alive || !onCurrentLevel(e)) continue
+      if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (!(e.rareFleeTurns > 0) && e.rareArmed === false &&
           rareDistance >= RARE_FLEE.rearmDistance && rareFleeEligible(e)) e.rareArmed = true
@@ -4384,11 +4437,13 @@ the logging order is wrong (lower message is newer)
           alarmEnemy(e)
           log(`The ${e.name} has spotted you!`, 'bad')
         }
+        if (tryEnemySummon(e)) continue
         if (enemyAttackPlayer(e)) return
         continue
       }
       if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2)) &&
           !forestConcealsPlayer(e, dist)) {
+        if (tryEnemySummon(e)) continue
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
@@ -4448,6 +4503,7 @@ the logging order is wrong (lower message is newer)
             e.forestConcealY = null
             alarmEnemy(e)
             log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad')
+            if (tryEnemySummon(e)) continue
           }
         }
       }
