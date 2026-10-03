@@ -60,8 +60,7 @@ describe('Scroll of Invisibility', () => {
       const e = {
         name: 'Goblin', baseName: 'Goblin', tier: 2, aggro: 3, hp: 100, maxHp: 100,
         atk: 1, def: 0, spd: 2, x: player.x + 1, y: player.y,
-        level: currentZ, alive: true, evades: false
-      }
+        level: currentZ, alive: true, }
       map[e.y][e.x] = 'grass'
       enemies.push(e)
       occupied.add(keyXY(e.x, e.y))

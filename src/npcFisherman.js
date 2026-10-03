@@ -120,7 +120,7 @@ function fishermanRelocation(enemy, site, hut, reachable, reserved) {
       const x = p.x + dx, y = p.y + dy, next = keyXY(x, y)
       const nextTile = surfaceMap[y]?.[x]
       if (seen.has(next) || !(TILE[nextTile]?.walk ||
-        (enemy.fly && (nextTile === 'water' || nextTile === 'boulder')))) continue
+        (enemyHasAbility(enemy, 'fly') && (nextTile === 'water' || nextTile === 'boulder')))) continue
       seen.add(next)
       queue.push({x, y})
     }
@@ -216,7 +216,7 @@ function activateFishermanQuest(npc) {
   const target = addEnemy({...t, name: 'Fat Slurper', baseName: 'Slurper', prefix: 'fat',
     hp: t.hp * 2, maxHp: t.hp * 2, level: 0, x: p.x, y: p.y,
     homeX: p.x, homeY: p.y, homeTileType: surfaceMap[p.y][p.x], alive: true,
-    fly: false, wander: false, equipment: null})
+    abilities: [], wander: false, equipment: null})
   occupied.add(keyXY(p.x, p.y))
   fishermanQuest = {type: 'fish_predator', title: 'Empty Nets', state: 'active',
     targetId: target.id, targetX: p.x, targetY: p.y}

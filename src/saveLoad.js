@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 22 // Rare monster sightings and in-progress flight
+const SAVE_VERSION = 23 // Enemy abilities arrays
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -177,9 +177,8 @@ function buildSaveObject() {
       def: e.def,
       spd: e.spd,
       aggro: enemyAggroRange(e),
-      fly: !!e.fly,
+      abilities: [...e.abilities],
       humanoid: !!e.humanoid,
-      evades: !!e.evades,
       equipment: e.equipment || null,
       x: e.x,
       y: e.y,
@@ -660,9 +659,8 @@ function loadGameFromObject(data, opts = {}) {
       name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
       hp: e.hp, maxHp: e.maxHp, victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
-      fly: typeof e.fly === 'boolean' ? e.fly : !!(tmpl && tmpl.fly),
+      abilities: [...e.abilities],
       humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
-      evades: typeof e.evades === 'boolean' ? e.evades : !!(tmpl && tmpl.evades),
       equipment: e.equipment || null,
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
       prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,

@@ -17,7 +17,7 @@ function trackDirection(dx, dy) {
 }
 
 function leaveBeastTrack(enemy, fromX, fromY) {
-  if (currentZ !== 0 || enemyWanderMode(enemy) !== 'far' || enemy.fly || enemy.humanoid) return
+  if (currentZ !== 0 || enemyWanderMode(enemy) !== 'far' || enemyHasAbility(enemy, 'fly') || enemy.humanoid) return
   if (Math.max(Math.abs(enemy.x - fromX), Math.abs(enemy.y - fromY)) !== 1) return
   if (!Number.isInteger(enemy.farTargetX) || !Number.isInteger(enemy.farTargetY) ||
       !enemyCanTraverse(enemy, enemy.farTargetX, enemy.farTargetY)) return

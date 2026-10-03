@@ -2132,6 +2132,10 @@ the logging order is wrong (lower message is newer)
   /* ============================== ENEMY CREATION ============================== */
   let nextEnemyId = 1
 
+  function enemyHasAbility(enemy, ability) {
+    return !!enemy?.abilities?.includes(ability)
+  }
+
   function shooterAbilityForTemplate(tmpl) {
     if (!tmpl || !Array.isArray(tmpl.abilities) || !RANGED_CONFIG?.abilities) return null
     return tmpl.abilities.find(ability => Object.hasOwn(RANGED_CONFIG.abilities, ability)) || null
@@ -2167,6 +2171,7 @@ the logging order is wrong (lower message is newer)
       if (m) nextEnemyId = Math.max(nextEnemyId, Number(m[1]) + 1)
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
         ? tmpl.wander
@@ -2321,8 +2326,7 @@ the logging order is wrong (lower message is newer)
       atk: Math.max(1, Math.round(tmpl.atk * variance)),
       def: Math.max(0, Math.round(tmpl.def * variance)),
       spd: Math.max(1, Math.round(tmpl.spd * variance)),
-      fly: !!tmpl.fly, humanoid: !!tmpl.humanoid, evades: !!tmpl.evades,
-      aggro: tmpl.aggro ?? AGGRO_RANGE,
+      abilities: [...tmpl.abilities], humanoid: !!tmpl.humanoid, aggro: tmpl.aggro ?? AGGRO_RANGE,
       x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: surfaceMap[spot.y][spot.x],
       alive: true, prefix: null, equipment: null
     }
@@ -3071,7 +3075,7 @@ the logging order is wrong (lower message is newer)
     // Evasive movement requires seeing the attacker. Invisibility (and god
     // mode's unseen-player behavior) suppresses only this special dodge;
     // the ordinary hit/miss roll below still applies.
-    if (e.evades && !playerIsInvisible() && chance(0.30)) {
+    if (enemyHasAbility(e, 'evades') && !playerIsInvisible() && chance(0.30)) {
       const fromX = e.x, fromY = e.y
       const options = []
       for (const [dx, dy] of DIRS8) {
@@ -3211,7 +3215,7 @@ the logging order is wrong (lower message is newer)
 
   function projectileCreatureBlocks(e, x, y) {
     for (const other of enemies) {
-      if (other === e || !other.alive || !onCurrentLevel(other) || other.fly) continue
+      if (other === e || !other.alive || !onCurrentLevel(other) || enemyHasAbility(other, 'fly')) continue
       if (other.x === x && other.y === y) return true
     }
     if (currentZ === 0 && npcs.some(n => n.x === x && n.y === y)) return true
@@ -3676,7 +3680,7 @@ the logging order is wrong (lower message is newer)
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (isWalkable(x, y)) return true
-    if (!(e && e.fly)) return false
+    if (!(e && enemyHasAbility(e, 'fly'))) return false
     const tile = map[y][x]
     return tile === 'boulder' || tile === 'water'
   }
@@ -4829,9 +4833,8 @@ the logging order is wrong (lower message is newer)
           atk: tmpl.atk,
           def: tmpl.def,
           spd: tmpl.spd,
-          fly: !!tmpl.fly,
+          abilities: [...tmpl.abilities],
           humanoid: false,
-          evades: !!tmpl.evades,
           aggro: tmpl.aggro ?? AGGRO_RANGE,
           x: pos.x,
           y: pos.y,
@@ -5281,9 +5284,8 @@ the logging order is wrong (lower message is newer)
       atk: Math.max(1, Math.round(tmpl.atk * variance)),
       def: Math.max(0, Math.round(tmpl.def * variance)),
       spd: Math.max(1, Math.round(tmpl.spd * variance)),
-      fly: !!tmpl.fly,
+      abilities: [...tmpl.abilities],
       humanoid: !!tmpl.humanoid,
-      evades: !!tmpl.evades,
       aggro: tmpl.aggro ?? AGGRO_RANGE,
       x: spot.x,
       y: spot.y,
@@ -5523,9 +5525,8 @@ the logging order is wrong (lower message is newer)
         atk: skeletonTmpl.atk,
         def: skeletonTmpl.def,
         spd: skeletonTmpl.spd,
-        fly: !!skeletonTmpl.fly,
+        abilities: [...skeletonTmpl.abilities],
         humanoid: skeletonTmpl.humanoid !== false,
-        evades: !!skeletonTmpl.evades,
         aggro: skeletonTmpl.aggro ?? AGGRO_RANGE,
         x: p.x,
         y: p.y,
@@ -7054,7 +7055,7 @@ the logging order is wrong (lower message is newer)
       // tile-coloured block across the terrain it is walking over. Flying enemies
       // stay fully above water; only non-fliers use the submerged-water clipping.
       const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
-      if (e.fly) drawEnemyCreature()
+      if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
       if (e.victoryLevel) {
         ctx.save()
@@ -7089,7 +7090,7 @@ the logging order is wrong (lower message is newer)
       }
     }
     for (const visibleEnemy of visibleEnemies) {
-      if (!visibleEnemy.e.fly) drawVisibleEnemy(visibleEnemy)
+      if (!enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
     // NPC tiles retain white initials as the ASCII/missing-image fallback.
     for (const n of npcs) {
@@ -7271,7 +7272,7 @@ the logging order is wrong (lower message is newer)
       }
     }
     for (const visibleEnemy of visibleEnemies) {
-      if (visibleEnemy.e.fly) drawVisibleEnemy(visibleEnemy)
+      if (enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
     if (currentZ < 0) {
       ctx.save()

@@ -1157,9 +1157,8 @@ function buildDwarvenRuin(targetLevel) {
         atk: ghost.atk,
         def: ghost.def,
         spd: ghost.spd,
-        fly: true,
+        abilities: ['fly', 'evades'],
         humanoid: true,
-        evades: true,
         aggro: ghost.aggro ?? AGGRO_RANGE,
         x: gx,
         y: gy,
@@ -1643,9 +1642,8 @@ function spawnBellGuardians() {
       atk: Math.max(1, Math.round(tmpl.atk * variance)),
       def: Math.max(0, Math.round(tmpl.def * variance)),
       spd: Math.max(1, Math.round(tmpl.spd * variance)),
-      fly: !!tmpl.fly,
+      abilities: [...tmpl.abilities],
       humanoid: !!tmpl.humanoid,
-      evades: !!tmpl.evades,
       aggro: tmpl.aggro ?? AGGRO_RANGE,
       x: p.x, y: p.y, homeX: p.x, homeY: p.y, alive: true, prefix: null, equipment: null,
     }
@@ -2019,9 +2017,8 @@ function spawnEnemies() {
       atk: Math.max(1, Math.round(tmpl.atk * variance)),
       def: Math.max(0, Math.round(tmpl.def * variance)),
       spd: Math.max(1, Math.round(tmpl.spd * variance)),
-      fly: !!tmpl.fly,
+      abilities: [...tmpl.abilities],
       humanoid: !!tmpl.humanoid,
-      evades: !!tmpl.evades,
       aggro: tmpl.aggro ?? AGGRO_RANGE,
       x, y, homeX: x, homeY: y, homeTileType: map[y][x], alive: true, prefix: null, equipment: null,
     }
@@ -2253,8 +2250,8 @@ function spawnCaveScenarios() {
     const makeEnemy = (tmpl, spot, prefix = null) => {
       const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
         levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
-        def: tmpl.def, spd: tmpl.spd, fly: !!tmpl.fly, humanoid: !!tmpl.humanoid,
-        evades: !!tmpl.evades, aggro: tmpl.aggro ?? AGGRO_RANGE,
+        def: tmpl.def, spd: tmpl.spd, abilities: [...tmpl.abilities], humanoid: !!tmpl.humanoid,
+        aggro: tmpl.aggro ?? AGGRO_RANGE,
         x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
         alive: true, prefix: null, equipment: null}
       if (prefix) {
@@ -2397,9 +2394,8 @@ function spawnCaveScenarios() {
         name: fungusTemplate.name, baseName: fungusTemplate.name, tier: fungusTemplate.tier,
         level: site.level, levelKind: 'chain', caveIndex: site.caveIndex,
         hp: fungusTemplate.hp, maxHp: fungusTemplate.hp, atk: fungusTemplate.atk,
-        def: fungusTemplate.def, spd: fungusTemplate.spd, fly: !!fungusTemplate.fly,
-        humanoid: !!fungusTemplate.humanoid, evades: !!fungusTemplate.evades,
-        aggro: fungusTemplate.aggro ?? AGGRO_RANGE,
+        def: fungusTemplate.def, spd: fungusTemplate.spd, abilities: [...fungusTemplate.abilities],
+        humanoid: !!fungusTemplate.humanoid, aggro: fungusTemplate.aggro ?? AGGRO_RANGE,
         x: site.x, y: site.y, homeX: site.x, homeY: site.y,
         homeTileType: site.floorTile, alive: true, prefix: null, equipment: null
       })
@@ -2707,8 +2703,7 @@ function spawnCemeteryGhouls() {
       level: 0,
       alive: true,
       humanoid: true,
-      fly: false,
-      evades: false
+      abilities: []
     })
     occupied.add(keyXY(x, y))
   }

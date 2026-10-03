@@ -66,7 +66,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         const minPreferredEdge = Math.min(...preferredSites.map(site => site.edgeDistance))
         const decoy = addEnemy({id:'rare-decoy', name:target.baseName, baseName:target.baseName,
           tier:target.tier, level:0, hp:1, maxHp:1, atk:1, def:0, spd:1, aggro:0,
-          fly:false, humanoid:false, evades:false, x:hunter.x+5, y:hunter.y+5,
+          abilities: [], humanoid:false, x:hunter.x+5, y:hunter.y+5,
           homeX:hunter.x+5, homeY:hunter.y+5, homeTileType:'grass', alive:true,
           wander:'far', prefix:null, equipment:null})
         occupied.add(keyXY(decoy.x, decoy.y))
@@ -129,8 +129,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       player.freezing = {active:false, turns:0}; player.curseDebuffs = []
       player.inventory = [createItem('echoBlightHorn')]
       const mk = (id,x,y,humanoid=false,level=0) => ({id,name:id,baseName:id,tier:1,level,alive:true,
-        hp:10,maxHp:10,atk:1,def:0,spd:1,aggro:0,fly:false,humanoid,evades:false,
-        x,y,homeX:x,homeY:y,homeTileType:'grass',wander:false,prefix:null,equipment:null})
+        hp:10,maxHp:10,atk:1,def:0,spd:1,aggro:0,abilities: [],humanoid,x,y,homeX:x,homeY:y,homeTileType:'grass',wander:false,prefix:null,equipment:null})
       enemies = [
         mk('east-near', player.x+5, player.y),
         mk('east-far', player.x+20, player.y),

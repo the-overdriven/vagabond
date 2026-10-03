@@ -33,7 +33,7 @@ function beginFleeGame() {
       const t=ENEMY_TEMPLATE_BY_NAME[name], x=player.x+distance, y=player.y
       const e=addEnemy({...t,id:'flee-'+enemies.length,name,baseName:name,x,y,homeX:x,homeY:y,
         homeTileType:'grass',level:0,alive:true,hp:200,maxHp:200,aware:false,alarmed:false,
-        prefix:null,equipment:null,evades:false,...extra})
+        prefix:null,equipment:null,...extra})
       occupied.add(keyXY(e.x,e.y)); return e
     }
     window.fleeChase = (e,limit=12) => {
@@ -158,7 +158,7 @@ describe('Rare monster sightings and flight', () => {
       fleeAssert(!Object.keys(untouched).some(k=>k.startsWith('rare')), 'defaults omitted')
       enemyTurn()
       const save=JSON.parse(JSON.stringify(buildSaveObject())), id=e.id
-      fleeAssert(save.version===22, 'current save version')
+      fleeAssert(save.version===23, 'current save version')
       const saved=save.enemies.find(v=>v.id===id)
       fleeAssert(saved.rareSightings===1 && saved.rareFleeTurns===7 && saved.rareFleeAcc===0.5 && saved.rareArmed===false, 'exact mid-flight fields')
       loadGameFromObject(save,{isReplayInit:true}); replayAnimationsDisabled=true

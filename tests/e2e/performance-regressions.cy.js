@@ -51,7 +51,7 @@ describe('Turn and idle rendering performance regressions', () => {
           spawnPoint = {x: 12, y: 12}
           const results = []
           for (const fly of [false, true]) for (const avoid of [false, true]) {
-            const e = {x: 14, y: 14, fly}
+            const e = {x: 14, y: 14, abilities: fly ? ['fly'] : []}
             for (const target of [[24,24], [15,15], [14,14], [35,35]])
               results.push(JSON.stringify(enemyBuildFarPath(e, ...target, avoid)) ===
                 JSON.stringify(referencePath(e, ...target, avoid)))

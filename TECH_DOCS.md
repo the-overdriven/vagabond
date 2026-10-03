@@ -1325,6 +1325,22 @@ does not silently grant a ranged attack.
 
 # 20. Enemy Special Properties
 
+Every monster template and live monster has an `abilities` array. `fly` and
+`evades` are ability IDs rather than separate boolean fields. For example,
+Giant Bat has `["fly", "evades"]`; Wolf has `[]`. Existing shooter eligibility
+IDs (`shooterStones`, `shooterArrows`) remain in the same array. An enemy with
+none of these abilities has an empty array. Each spawned instance owns a copy,
+so changing one monster cannot alter its template or other monsters.
+
+Movement, evasion, track generation, projectile obstruction, and flying render
+order check this array. This refactor does not change combat chances, terrain
+rules, shooter assignment, or consume additional RNG calls.
+
+Save format **23** stores each monster's abilities and restores them exactly,
+including an explicitly empty array. Replay initial states use the same save
+format; shooter role and remaining ammo continue to be separate instance state.
+Saves from previous formats are rejected; no old boolean conversion is added.
+
 ## Flying
 
 Flying enemies can traverse terrain that includes:
@@ -1346,8 +1362,9 @@ dodge, giving you a moment to act.` instead of the generic chase line. The
 evasion marker is consumed in that response whether or not the roll succeeds;
 it is not a persistent status or a new chance to hesitate.
 
-Current evasive species include Giant Bat, Monkey, Wasp, Vulture, Harpy,
-GIANT TOAD, GRIVKIN, SKERVA, VAMPIRE, and NHALUUN.
+Evasive species are those whose templates include `evades`: Giant Bat, Monkey,
+Wasp, Vulture, Grivkin, Harpy, Skerva, Vampire, and NHALUUN.
+Scripted flying Ghosts in the dwarven ruins also receive `evades`.
 
 ## Humanoid
 
@@ -4753,7 +4770,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 22).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 23).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

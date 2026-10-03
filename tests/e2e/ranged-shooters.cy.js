@@ -32,8 +32,7 @@ function beginShooterGame() {
       const e = {
         id: extra.id || 'ranged-test', name, baseName:name, tier:tmpl.tier, level:0,
         hp:200, maxHp:200, atk:tmpl.atk, def:tmpl.def, spd:tmpl.spd,
-        aggro:extra.aggro ?? 4, fly:!!tmpl.fly, humanoid:!!tmpl.humanoid, evades:false,
-        x:player.x + dx, y:player.y, homeX:player.x + dx, homeY:player.y,
+        aggro:extra.aggro ?? 4, abilities: tmpl.abilities.filter(a => a !== 'evades'), humanoid:!!tmpl.humanoid, x:player.x + dx, y:player.y, homeX:player.x + dx, homeY:player.y,
         homeTileType:'grass', alive:true, wander:false, aware:extra.aware ?? true,
         alarmed:!!extra.alarmed, alarmedZ:extra.alarmed ? 0 : null,
         alarmedLevelKind:extra.alarmed ? currentLevelKind() : null,
@@ -87,7 +86,7 @@ describe('Ranged shooter monster variants', () => {
       resetRangedArena()
       const shooter = makeShooter('Skeleton', 3, {id:'persist-shooter',shotsRemaining:7})
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
-      rangedAssert(save.version === 22, 'save version')
+      rangedAssert(save.version === 23, 'save version')
       rangedAssert(save.enemies.find(e=>e.id==='persist-shooter').shotsRemaining === 7, 'save exact ammo')
       shooter.shotsRemaining = 1
       loadGameFromObject(save)
@@ -123,9 +122,9 @@ describe('Ranged shooter monster variants', () => {
       map[e.y][e.x] = 'hill'; rangedAssert(clear(), 'shooter standing on hill shoots over intermediate hill')
       map[e.y][e.x] = 'grass'; map[player.y][player.x+2] = 'grass'
 
-      const blocker = {id:'blocker',name:'Wolf',baseName:'Wolf',x:player.x+2,y:player.y,level:0,alive:true,fly:false}
+      const blocker = {id:'blocker',name:'Wolf',baseName:'Wolf',x:player.x+2,y:player.y,level:0,alive:true,abilities: [],}
       enemies.push(blocker); occupied.add(keyXY(blocker.x,blocker.y)); rangedAssert(!clear(), 'ground monster blocks')
-      blocker.fly = true; rangedAssert(clear(), 'flying monster does not block')
+      blocker.abilities = ['fly']; rangedAssert(clear(), 'flying monster does not block')
       enemies.splice(enemies.indexOf(blocker),1); occupied.delete(keyXY(blocker.x,blocker.y))
       npcs.push({name:'Old Hunter',x:player.x+2,y:player.y}); rangedAssert(!clear(), 'NPC blocks')
       npcs = []

@@ -31,7 +31,7 @@ describe('Tracking and beast evidence', () => {
       oldHunterQuest = null; turnCount = 17; consecutiveWaitTurns = 0
       window.trackAssert = (condition, message) => { if (!condition) throw new Error(message) }
       window.trackEnemy = (extra = {}) => ({id: 'track-test', name: 'Wolf', baseName: 'Wolf',
-        x: 40, y: 40, level: 0, alive: true, wander: 'far', fly: false, humanoid: false,
+        x: 40, y: 40, level: 0, alive: true, wander: 'far', abilities: [], humanoid: false,
         hp: 20, maxHp: 20, atk: 1, def: 0, spd: 1, tier: 1, aggro: 1,
         farTargetX: 40, farTargetY: 25, ...extra})
     })()`))
@@ -69,7 +69,7 @@ describe('Tracking and beast evidence', () => {
       const original = rng; let calls = 0
       try {
         rng = () => { calls++; return 0 }
-        for (const extra of [{humanoid:true},{fly:true},{wander:'roam'},{wander:'homeReturn'},
+        for (const extra of [{humanoid:true},{abilities:['fly']},{wander:'roam'},{wander:'homeReturn'},
           {wander:'homeReanchored'},{wander:false},{farTargetX:null},{farTargetX:9999}]) {
           leaveBeastTrack(trackEnemy({x:41,...extra}),40,40)
         }
@@ -159,7 +159,7 @@ describe('Tracking and beast evidence', () => {
       // Fixed seed and several travelers provide reliable track rolls without changing the 3% rule.
       enemies = Array.from({length:12}, (_,i) => trackEnemy({id:'tracking-'+i,x:40+i,y:40+i,
         farTargetX:40+i,farTargetY:25,farPath:null}))
-      enemies.push(trackEnemy({id:'tracking-combat',x:26,y:25,hp:1,maxHp:1,spd:0,evades:false,wander:false}))
+      enemies.push(trackEnemy({id:'tracking-combat',x:26,y:25,hp:1,maxHp:1,spd:0,wander:false}))
       player.baseAtk = 100; player.baseSpd = 100
       occupied = new Set(enemies.map(e=>keyXY(e.x,e.y)))
       oldHunterQuest = {id:'hunter_20',type:'investigate',state:'ready'}; oldHunterQuestSerial=20
