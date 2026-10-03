@@ -44,7 +44,7 @@ function rareFleePace(e) {
 function rareStartFlee(e, dist, attacked = false) {
   if (dist > RARE_FLEE.sightRange || e.rareFleeTurns > 0 || e.aware ||
       (e.rareSightings || 0) >= RARE_FLEE.sightings || e.rareArmed === false || !rareFleeEligible(e)) return false
-  if (!attacked && (playerIsInvisible() || forestConcealsPlayer(e, dist))) return false
+  if (!attacked && (playerHiddenFromEnemy(e) || forestConcealsPlayer(e, dist))) return false
   e.rareSightings = (e.rareSightings || 0) + 1
   e.rareArmed = false
   e.rareFleeTurns = RARE_FLEE.fleeTurns[Math.min(e.rareSightings - 1, RARE_FLEE.fleeTurns.length - 1)]
@@ -79,7 +79,7 @@ function rareFleeBlocksAttack(e) {
   const dist = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
   rareStartFlee(e, dist, true)
   if (!(e.rareFleeTurns > 0)) return false
-  if (e.rareSightings === 1 || playerIsInvisible()) {
+  if (e.rareSightings === 1 || playerHiddenFromEnemy(e)) {
     log(`The ${e.name} slips past your blow.`, 'good')
     return true
   }
@@ -153,7 +153,7 @@ function rareSlipAway(e, minDistance, stampede = false) {
 
 // True spends this enemy's turn fleeing. False permits ordinary combat after a
 // second-sighting catch. Invisible players can cause flight but are not chased.
-function rareFlee(e, dist, hidden = playerIsInvisible()) {
+function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
   if (!(e.rareFleeTurns > 0) || !rareFleeEligible(e)) return false
   if (e.rareSightings > 1 && !hidden && dist <= ATTACK_RANGE) {
     rareCatch(e)

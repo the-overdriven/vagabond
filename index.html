@@ -2186,6 +2186,17 @@ the logging order is wrong (lower message is newer)
     return true
   }
 
+  function playerHiddenFromEnemy(enemy) {
+    return playerIsInvisible() && !enemyHasAbility(enemy, 'trueSight')
+  }
+
+  function logEnemySpotting(enemy, wandered = false) {
+    if (!undergroundTileVisible(enemy.x, enemy.y)) return
+    log(wandered
+      ? `The ${enemy.name} wanders right into you and spots you! It's not too late to retreat!`
+      : `The ${enemy.name} has spotted you!`, 'bad')
+  }
+
   function shooterAbilityForTemplate(tmpl) {
     if (!tmpl || !Array.isArray(tmpl.abilities) || !RANGED_CONFIG?.abilities) return null
     return tmpl.abilities.find(ability => Object.hasOwn(RANGED_CONFIG.abilities, ability)) || null
@@ -3108,9 +3119,8 @@ the logging order is wrong (lower message is newer)
   }
 
   function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false, attackerEnemy = null, defenderEnemy = null) {
-    // Sneaking (invisible) shouldn't get chained "outpaces" grace attacks in
-    // either direction - it's not meant to be a fair, ongoing exchange of blows.
-    if ((attackerIsPlayer || defenderIsPlayer) && playerIsInvisible()) return false
+    // Unseen combat suppresses extra timing attacks; true sight restores normal timing.
+    if ((attackerIsPlayer || defenderIsPlayer) && playerHiddenFromEnemy(attackerEnemy || defenderEnemy)) return false
     const attackerDelay = combatDelay(attackerWeapon, attackerIsPlayer, attackerEnemy)
     const defenderDelay = combatDelay(defenderWeapon, defenderIsPlayer, defenderEnemy)
     return attackerDelay !== null && defenderDelay !== null &&
@@ -3124,15 +3134,19 @@ the logging order is wrong (lower message is newer)
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
     // document is hidden, because browsers throttle/suspend rAF in background tabs.
     if (!replayAnimationsDisabled) await animateAttackLunge(player.x, player.y, e.x, e.y)
-    // Evasive movement requires seeing the attacker. Invisibility (and god
-    // mode's unseen-player behavior) suppresses only this special dodge;
-    // the ordinary hit/miss roll below still applies.
-    if (enemyHasAbility(e, 'evades') && !playerIsInvisible() && chance(0.30)) {
+    // Ethereal immunity resolves before combat rolls.
+    // Evasion requires seeing the attacker, including through true sight.
+    if (enemyHasAbility(e, 'ethereal') && !player.equip.weapon?.mod) {
+      log(`Your attack passes harmlessly through the ${e.name}. Only a magical weapon can harm it.`, 'info')
+      spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
+      return false
+    }
+    if (enemyHasAbility(e, 'evades') && !playerHiddenFromEnemy(e) && chance(0.30)) {
       const fromX = e.x, fromY = e.y
       const options = []
       for (const [dx, dy] of DIRS8) {
         const nx = e.x + dx, ny = e.y + dy
-        if (!isWalkable(nx, ny) || (nx === player.x && ny === player.y)) continue
+        if (!enemyCanTraverse(e, nx, ny) || (nx === player.x && ny === player.y)) continue
         if (occupied.has(keyXY(nx, ny)) || npcs.some(n => n.x === nx && n.y === ny)) continue
         options.push({x: nx, y: ny})
       }
@@ -3288,7 +3302,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function shooterCanSeePlayer(e) {
-    return !playerIsInvisible() && UndergroundFov.canSee(map, e.x, e.y, player.x, player.y)
+    return !playerHiddenFromEnemy(e) && UndergroundFov.canSee(map, e.x, e.y, player.x, player.y)
   }
 
   function rangedDodgeChance(e) {
@@ -3298,7 +3312,7 @@ the logging order is wrong (lower message is newer)
   function enemyRangedAttackPlayer(e, path = null) {
     if (e.summonedTurn === turnCount) return false
     const shot = shooterDefinition(e)
-    if (playerIsInvisible() || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
+    if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
     clearAutoPath()
     e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
     const projectilePath = path || projectilePathBetween(e.x, e.y, player.x, player.y)
@@ -3739,6 +3753,7 @@ the logging order is wrong (lower message is newer)
 
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
+    if (enemyHasAbility(e, 'ethereal')) return true
     if (isWalkable(x, y)) return true
     if (!(e && enemyHasAbility(e, 'fly'))) return false
     const tile = map[y][x]
@@ -3754,6 +3769,7 @@ the logging order is wrong (lower message is newer)
   }
 
   function reactToInvisibleAttack(e, damage) {
+    if (enemyHasAbility(e, 'trueSight')) return
     if (enemyIsPassive(e)) return
     const roll = rng()
     if (roll < 0.10) {
@@ -3767,7 +3783,7 @@ the logging order is wrong (lower message is newer)
       let bestDistance = -1
       for (const [dx, dy] of DIRS8) {
         const x = e.x + dx, y = e.y + dy
-        if (!isWalkable(x, y) || !enemyTileOpen(e, x, y) ||
+        if (!enemyTileOpen(e, x, y) ||
           (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
         const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
         if (distance > bestDistance) {
@@ -4381,13 +4397,14 @@ the logging order is wrong (lower message is newer)
     const playerOnTemple = isTempleGround(map[player.y][player.x])
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      const hiddenFromEnemy = playerHidden && !enemyHasAbility(e, 'trueSight')
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (!(e.rareFleeTurns > 0) && e.rareArmed === false &&
           rareDistance >= RARE_FLEE.rearmDistance && rareFleeEligible(e)) e.rareArmed = true
       if (e.rareFleeTurns > 0 && rareFleeEligible(e)) {
-        if (rareFlee(e, rareDistance, playerHidden)) continue
-      } else if (!playerHidden && rareStartFlee(e, rareDistance)) {
-        if (rareFlee(e, rareDistance, playerHidden)) continue
+        if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
+      } else if (!hiddenFromEnemy && rareStartFlee(e, rareDistance)) {
+        if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
       }
       const justEvaded = e.justEvaded === true
       e.justEvaded = false
@@ -4395,7 +4412,7 @@ the logging order is wrong (lower message is newer)
         e.aware = false
         continue
       }
-      if (playerHidden) {
+      if (hiddenFromEnemy) {
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
         e.aware = false
@@ -4435,7 +4452,7 @@ the logging order is wrong (lower message is newer)
           e.forestConcealX = null
           e.forestConcealY = null
           alarmEnemy(e)
-          log(`The ${e.name} has spotted you!`, 'bad')
+          logEnemySpotting(e)
         }
         if (tryEnemySummon(e)) continue
         if (enemyAttackPlayer(e)) return
@@ -4465,7 +4482,7 @@ the logging order is wrong (lower message is newer)
           e.forestConcealY = null
           alarmEnemy(e)
           aggroRange = effectiveAggroRange(e)
-          log(`The ${e.name} has spotted you!`, 'bad')
+          logEnemySpotting(e)
         }
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
         if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
@@ -4502,7 +4519,7 @@ the logging order is wrong (lower message is newer)
             e.forestConcealX = null
             e.forestConcealY = null
             alarmEnemy(e)
-            log(`The ${e.name} wanders right into you and spots you! It's not too late to retreat!`, 'bad')
+            logEnemySpotting(e, true)
             if (tryEnemySummon(e)) continue
           }
         }
@@ -5422,7 +5439,7 @@ the logging order is wrong (lower message is newer)
     if (target) {
       clearAutoPath()
       consecutiveWaitTurns = 0
-      const invisibleAttack = playerIsInvisible()
+      const invisibleAttack = playerHiddenFromEnemy(target)
       const targetHp = target.hp
       const hit = await playerAttackEnemy(target)
       if (invisibleAttack && target.alive && hit) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))

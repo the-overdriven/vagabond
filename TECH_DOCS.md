@@ -1376,8 +1376,9 @@ Flying enemies can traverse terrain that includes:
 ## Evading
 
 Enemies marked as evasive have a 30% chance to evade a visible player's attack.
-They cannot use this special dodge against an invisible player (or the unseen
-player in god mode); ordinary hit/miss and glancing-hit rolls still apply.
+Without `trueSight`, they cannot use this special dodge against an invisible
+player (or the unseen player in god mode); ordinary hit/miss and glancing-hit
+rolls still apply.
 
 If possible, they move to a nearby open tile after evading.
 If that dodge is followed by the existing slow-enemy loss-of-interest roll
@@ -1389,6 +1390,45 @@ it is not a persistent status or a new chance to hesitate.
 Evasive species are those whose templates include `evades`: Giant Bat, Monkey,
 Wasp, Vulture, Grivkin, Harpy, Skerva, Vampire, and NHALUUN.
 Scripted flying Ghosts in the dwarven ruins also receive `evades`.
+
+## Ethereal
+
+Ghost has `ethereal` ability. All Ghost spawn
+paths, including scripted dwarven-ruin Ghosts, receive it. Ethereal creatures
+can traverse any in-bounds terrain, including walls, mountains, water, and lava.
+Actor collision and map boundaries still apply. Chasing, wandering, evasion,
+and invisible-attack retreat use the same terrain permission. Walls retain
+their normal sight-blocking behavior.
+
+Only an equipped weapon with a modifier prefix (`weapon.mod`) can damage an
+ethereal creature. Any weapon modifier qualifies, including non-damage modifiers;
+weapon tier, name, and unprefixed ATK alone do not. Unarmed and mundane attacks
+consume their normal player action but deal no damage, use no combat RNG, and
+show an immunity marker with an explanatory message. They do not trigger an
+extra strike or an invisible-attack reaction. Magical attacks use normal combat
+rules, including evasion, misses, armor, critical hits, and timing.
+
+An adjacent Ghost remains attackable even while standing inside a wall: player
+movement checks for a creature target before checking destination walkability.
+It may attack from that position, so no special floor-only attack restriction is
+needed. Spotting messages (including wandering acquisition) are logged only when
+the enemy's tile is visible in the player's current underground FOV. Surface
+spotting messages retain their normal behavior.
+
+## True sight
+
+Oculus has `trueSight`. It treats an invisible player as visible for detection,
+chasing, attacks, evasion, and combat timing, including god-mode invisibility.
+It does not use unseen-attacker panic or the reduced-accuracy wild retaliation
+when struck by an invisible player. Ordinary sight, aggro range, forest
+concealment, and sacred-ground behavior continue to apply. True sight alone
+does not reveal the player through walls or disable invisibility for other
+enemies. No special true-sight log is added.
+
+Both abilities use the existing copied and serialized enemy `abilities` arrays.
+No new persistent flags or save-format change is required; the current format
+remains 25. New worlds receive the updated template abilities, while saved
+instances restore their recorded arrays exactly.
 
 ## Summoning
 
@@ -1717,7 +1757,7 @@ inside range but blocked/no shooter FOV -> normal chase
 zero ammunition -> completely normal monster behavior
 ```
 
-A shooter never fires at an invisible player and never kites/backpedals. Existing
+A shooter without `trueSight` never fires at an invisible player and never kites/backpedals. Existing
 extra pursuit behavior may still produce the same move-then-attack style sequence the
 normal AI already permits, but a ranged attack itself does not grant another action.
 
@@ -2999,8 +3039,9 @@ Wyrdling increases the duration by 25%: 20 turns become 25 turns. Reading
 the scroll consumes the first turn, leaving 19 or 24 subsequent turns,
 respectively.
 
-While invisible, enemies never acquire or chase the player and continue to
-wander normally. A hit on a surviving enemy, even a zero-damage glancing hit,
+While invisible, enemies without `trueSight` never acquire or chase the player and continue to
+wander normally. The following hit reactions apply to those enemies; Oculus
+uses ordinary combat. A hit on a surviving enemy, even a zero-damage glancing hit,
 provokes exactly one immediate reaction instead of that enemy's wander action
 for the turn. A miss causes no reaction; evasive enemies cannot use their
 special dodge against an invisible attacker. An enemy killed by the attack

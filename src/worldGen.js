@@ -1157,7 +1157,7 @@ function buildDwarvenRuin(targetLevel) {
         atk: ghost.atk,
         def: ghost.def,
         spd: ghost.spd,
-        abilities: ['fly', 'evades'],
+        abilities: [...ghost.abilities, 'evades'],
         humanoid: true,
         aggro: ghost.aggro ?? AGGRO_RANGE,
         x: gx,
