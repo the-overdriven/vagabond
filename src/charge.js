@@ -33,7 +33,7 @@ function forcePlayerPosition(x, y) {
   updateTooltip()
 }
 
-function chargeKnockback(e, line) {
+function enemyKnockback(e, line, charge = false) {
   const x = player.x + line.sx, y = player.y + line.sy
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H ||
       !(isWalkable(x, y) || deepSwimmingWater(x, y)) ||
@@ -43,7 +43,7 @@ function chargeKnockback(e, line) {
   if (line.sx && line.sy &&
       (!(isWalkable(player.x + line.sx, player.y) || deepSwimmingWater(player.x + line.sx, player.y)) ||
        !(isWalkable(player.x, player.y + line.sy) || deepSwimmingWater(player.x, player.y + line.sy)))) return
-  log(`The ${e.name}'s charge knocks you back!`, 'bad')
+  log(`The ${e.name}'s ${charge ? 'charge' : 'critical strike'} knocks you back!`, 'bad')
   forcePlayerPosition(x, y)
 }
 

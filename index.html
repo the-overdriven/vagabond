@@ -3265,11 +3265,13 @@ the logging order is wrong (lower message is newer)
       die(e)
       return true
     }
-    if (charge && effectiveDamage > 0) {
-      chargeKnockback(e, charge.line)
+    if (effectiveDamage > 0 && (charge || (critical && enemyHasAbility(e, 'knockback')))) {
+      const line = charge?.line ?? {sx: Math.sign(player.x - e.x), sy: Math.sign(player.y - e.y)}
+      enemyKnockback(e, line, !!charge)
       if (player.hp <= 0 || deathTransition) return true
     }
-    if (!isExtraAttack && canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
+    if (!isExtraAttack && Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y)) <= ATTACK_RANGE &&
+        canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
       const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : 'The enemy'
       log(`${enemyTimingText} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
       return enemyAttackPlayer(e, true)

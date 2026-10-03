@@ -1432,6 +1432,23 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Critical knockback
+
+Ogre and Cyclops have `knockback`. A damaging critical melee strike pushes a
+surviving player one tile directly away from the attacker, following Charge's
+knockback rules. Any free walkable destination is eligible, including deep water
+without Swimming. Walls, blocked diagonal corners, trees, occupied destinations,
+and map edges prevent the push; no alternate destination is chosen.
+Ordinary hits, misses, glancing hits, and ranged criticals do not push. There is
+no extra proc roll or damage bonus beyond the normal critical damage. Once a
+push moves the player out of melee range, weapon-timing extra attacks cannot
+follow. A blocked push leaves normal melee timing unchanged.
+
+Forced water entry applies normal drowning immediately and grants no swimming
+practice or walking progress. Visibility and camera position refresh immediately.
+The ability uses existing enemy ability serialization and replay, with no new
+persistent flag or save-version change.
+
 ## Charge and Pull
 
 Boar and Minotaur have `charge`; Giant Spider has `pull`. While the player is
