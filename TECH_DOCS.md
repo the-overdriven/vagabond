@@ -152,7 +152,9 @@ The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 
 The Bestiary is opened with **B**, from the map sidebar, or from the Character
 inventory panel. It lists each base species the current character has killed
-at least once and shows its total count. Entries run from weakest to strongest
+at least once and shows its total count. Its introduction reports how many
+different species have been slain (zero for an empty list), rather than the
+total number of kills. Entries run from weakest to strongest
 by base `ATK + DEF + SPD + GRACE`, with alphabetical ties. Prefixes and
 random equipment do not affect the order; records without a species template
 follow the known species. On desktop, hovering or keyboard-
@@ -387,7 +389,7 @@ Swimming. The consecutive-wait cap does not trap a non-Merling in deep water;
 they can wait until drowning even with god mode's boosted HP.
 
 Entry, first drowning and reaching shore have transition messages, not per-step
-spam. Landing, homecoming, death and level transitions clear the current swim
+spam. Leaving deep water says "You reach the shore and catch your breath." Landing, homecoming, death and level transitions clear the current swim
 session but preserve learned skill/practice. Non-Merlings cannot use inventory
 items in deep water, including consumables, equipment, and readable items;
 blocked actions spend neither items nor turns. Drowning obscures the lower two
@@ -2336,7 +2338,8 @@ Other shields: -2
 ```
 
 Every shield except the Buckler also applies **−1 GRACE** while equipped.
-The inventory stat line shows this penalty. It stacks with an armor GRACE
+Inventory and trade item stat lines omit built-in shield and armor GRACE
+penalties to keep gear rows compact. The shield penalty still stacks with an armor GRACE
 penalty and reduces the player's extra-attack timing through effective weapon
 GRACE; it does not change the shield's DEF or SPD penalty.
 
@@ -2373,7 +2376,7 @@ Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
 Only the seven armor bases with additional SPD penalty 2 or greater have
 `gracePenalty: 1`; new items copy that field from `gear_armors.json`, while
 equipped armor from older saves recovers it by base name. Armor with no such
-field has no GRACE penalty. The armor stat line shows `GRACE -1` where applicable.
+field has no GRACE penalty. Its built-in GRACE penalty is omitted from inventory and trade stat lines.
 
 ---
 
@@ -2961,7 +2964,11 @@ a shovel.
 
 Ordinary forest tiles can be foraged.
 
-Each forest tile can only be foraged once.
+Each forest tile can only be foraged once. Finding berries, a herb, or a
+mushroom displays a short rising, fading **found!** label above the searched
+tile in both tile and ASCII modes. Empty searches and repeat searches show no
+label. This feedback is cosmetic: the item and turn resolve immediately,
+without animation timing or extra RNG; simulation-only replay skips the effect.
 
 Results:
 
@@ -3151,6 +3158,12 @@ There is a 30% chance to receive an investigation quest when a cave entrance exi
 The quest dialogue names the landmark and gives its direction relative to the Old Hunter, and ends with "I'll mark the location on your map." The player completes the investigation simply by getting near the target tile within 2 squares; no additional interaction or hidden object search is required. The quest then becomes ready to turn in at the Old Hunter.
 
 As soon as the quest is generated, the Old Hunter also marks the location for real: a 5x5 area (the target tile plus 2 tiles in every direction - the same radius used for quest completion) is immediately revealed on the discovery grid, whether or not the player has actually been there.
+
+Hunter dialogue uses the target's actual direction and avoids unverified
+landmark names such as roads, forts, mountain passes, or a nearby cemetery.
+Group quests use a living designated target; ground-item quests use the
+identified item's position. Nearby or unknown locations are phrased without
+adding "of here" to them.
 
 Other generated quest types include:
 
@@ -3462,6 +3475,12 @@ The Herbalist opens services while adjacent:
   inventory order, leaving any unaffordable mushrooms in their stacks and
   reporting that not all could be checked. With fewer than 2g, no purification
   or RNG roll occurs.
+- **🧪 Buy Life Potion (100g)** supplies one Life Potion per purchase, with
+  unlimited stock. Buying requires adjacency to the surface Herbalist and
+  enough gold. It adds to the normal potion stack, uses no turn or RNG, and
+  records a Herbalist purchase action for replay. Existing gold/inventory
+  save fields hold the result; no separate stock or cooldown is needed.
+  The normal resale value remains 8g, so buying and reselling cannot produce gold.
 - Brew Life Potion consumes three Healing Herbs and 10g for one Life Potion.
 - Brew Life Potions (use all herbs) makes the maximum affordable batch:
   `potions = min(floor(herbs / 3), floor(gold / 10))`. Six herbs and at least
@@ -3645,6 +3664,8 @@ The dwarven ruin contains environmental story objects such as:
 Some are currently lore/inspection objects.
 
 The wheelbarrow is mechanically significant because it enables moving the Big Bell.
+Picking it up removes the ground object and refreshes the canvas and HUD
+immediately, without waiting for another movement or animation frame.
 
 </details>
 
@@ -3888,6 +3909,9 @@ Therefore:
 
 # 69. UI Controls
 
+Wide, fine-pointer desktop layouts use a UI font scale of **1.1**; narrow
+or touch layouts retain **1.0**.
+
 On desktop, the XP bar displays `<current> / <needed> XP` centered inside the bar.
 The character statistics show steps alongside elapsed turns and list how many
 of the four world edges have been discovered, with their compass directions.
@@ -3940,8 +3964,9 @@ Current desktop controls include:
 | Mouse wheel over game canvas | Increase / decrease game tile size           |
 | G | Toggle god mode on or off                                       |
 
-Tile size starts at 40 canvas pixels and changes in four-pixel steps from 20
-to 96. Desktop recomputes the camera's tile count from available stage width
+Tile size starts at **40** canvas pixels on desktop and **56** on
+coarse-pointer mobile devices (four additional zoom steps). It changes in
+four-pixel steps from 20 to 96. Desktop recomputes the camera's tile count from available stage width
 and height, keeping 7–50 tiles horizontally and sizing the canvas to complete
 tiles. A cramped window caps the effective tile size so the canvas fits.
 On desktop, collapsing both the side map and keyboard hints releases their shared
@@ -4670,7 +4695,7 @@ not raw keyboard events. Current action types are:
 - `skipTurn` - wait action;
 - `talk` - currently Old Hunter direct interaction;
 - `buy` / `sell` - Merchant transactions;
-- `herbalist` - mushroom purification or potion creation;
+- `herbalist` - mushroom purification, potion brewing, or potion purchases;
 - `equip` / `unequip` - equipment changes;
 - `blackKey` - Black Key equip/unequip state change;
 - `openCasket` - opening the Old Rotten Casket;

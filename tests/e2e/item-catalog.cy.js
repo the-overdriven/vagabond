@@ -31,7 +31,7 @@ describe('Non-gear item catalog', () => {
       const result = win.eval(`(() => {
         const previous = {inventory: player.inventory, groundItems, rng, enemyTurn, npcTurn,
           tile: map[player.y][player.x], foragedTiles,
-          multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers}
+          multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers, fxAnims, replayAnimationsDisabled}
         const chest = []
         const forage = []
         const cases = []
@@ -62,7 +62,7 @@ describe('Non-gear item catalog', () => {
           for (const weights of variants) {
             WORLD_GEN_CONFIG.environment.forageResultMultipliers = weights
             for (const oldRoll of [0,0.089999,0.09,0.169999,0.17,0.249999,0.25,0.999999]) {
-              player.inventory = []; foragedTiles = new Set()
+              player.inventory = []; foragedTiles = new Set(); fxAnims = []; replayAnimationsDisabled = false
               let previousThreshold = 0, cumulative = 0, expected = 'nothing'
               for (const entry of [{upTo:0.09,result:'berries'},{upTo:0.17,result:'herb'},{upTo:0.25,result:'mushroom'}]) {
                 cumulative += (entry.upTo-previousThreshold)*weights[entry.result]
@@ -72,7 +72,8 @@ describe('Non-gear item catalog', () => {
               let draws = 0
               rng = () => {draws++;return oldRoll}
               tryForage()
-              forage.push((player.inventory[0]?.kind || 'nothing') === expected && draws === 1)
+              forage.push((player.inventory[0]?.kind || 'nothing') === expected && draws === 1 &&
+                fxAnims.filter(effect => effect.ch === 'found!').length === (expected === 'nothing' ? 0 : 1))
             }
           }
           return {chest,forage,chestScale:CHEST_LOOT_TABLE.scale,forageScale:FORAGE_TABLE.scale,
@@ -82,6 +83,7 @@ describe('Non-gear item catalog', () => {
           enemyTurn=previous.enemyTurn;npcTurn=previous.npcTurn
           map[player.y][player.x]=previous.tile;foragedTiles=previous.foragedTiles
           WORLD_GEN_CONFIG.environment.forageResultMultipliers=previous.multipliers
+          fxAnims=previous.fxAnims; replayAnimationsDisabled=previous.replayAnimationsDisabled
         }
       })()`)
       expect(result.chestScale).to.equal(100)
@@ -91,7 +93,7 @@ describe('Non-gear item catalog', () => {
       for (const {roll, expected, actual} of result.chest) {
         expect(actual, 'chest roll ' + roll).to.equal(expected)
       }
-      expect(result.forage.every(Boolean), 'normal and trait-adjusted forage preserved').to.equal(true)
+      expect(result.forage.every(Boolean), 'normal and trait-adjusted forage results and found feedback preserved').to.equal(true)
     })
   })
 

@@ -6,26 +6,16 @@ but first move monster evasion field to abilities
 balance cleanup
 
 !1 [lore] add tombstone: Men call it holy, yet the beasts sense what men do not.
-!1 [ui] default zoom should be slightly bigger
-!1 [ui] font size scale should be 1.1, not 1.2
-!1 [quests] "I saw the wretch carrying it west of here, near the ruined fort" there are no forts
 !1 [ui] dying should close inv
-!1 [text] bank -> shore
-!1 [trade] balance: herbalist should sell life potions
-!2 [foraging] when foraging animate "found!"
 !2 [combat] being invisible should increase crit. chance hit
-!2 [graveyard] Creatures you have slain. -> You have slain <amount> different creatures.
 !2 [ui] prettier brown vertical scrolls (desktop only)
 !2 [rendering] the brown cave floor is not exactly seamless
-!2 [rendering] picking up wheelbarrow should remove it instantly (redraw/refresh canvas instantly)
 !2 [inspection] inspecting columns (when standing on a dwarven column tile), should not inspect surroundings
 !2 [balance] healing herb should heal min. 20 hp but max. 50 hp
 !2 [character creation] add random button next to name?
 !2 [balance] freezing not severe enough: -1hp every 4 turns, not 5
 !2 [logging] odd tombstone should log the previous msg too! (it comes from ruined cemetary)
-!2 [inventory] shields dont need to show grace -1 in inventory, armors dont
 !2 [logging] msg log: slightly gray out older messages?
-!2 [foraging] when foraging animate "found!"
 
 !3 [worldgen] dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
 !3 [ui] tooltips on desktop should appear on the left side above canvas and also when fighting
@@ -259,7 +249,7 @@ the logging order is wrong (lower message is newer)
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20260930-2">
+  <link rel="stylesheet" href="css/style.css?v=20261003-1">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -499,7 +489,7 @@ the logging order is wrong (lower message is newer)
           <h2 id="bestiaryTitle">Bestiary</h2>
           <button class="slbtn overlay-close" id="btnBestiaryClose" type="button" aria-label="Close bestiary">✕</button>
         </div>
-        <p class="bestiary-intro">Creatures you have slain.</p>
+        <p class="bestiary-intro">You have slain 0 different creatures.</p>
         <div id="bestiaryList" class="bestiary-list" aria-live="polite"></div>
         <div class="closehint"><button class="slbtn" id="btnBestiaryCloseBottom" type="button">Close</button></div>
       </div>
@@ -1834,8 +1824,6 @@ the logging order is wrong (lower message is newer)
       const graceBonus = it.mod === 'grace' ? it.modAmt : 0
       parts.push('GRACE ' + baseGrace + (graceBonus ? (graceBonus > 0 ? '+' : '') + graceBonus : ''))
     }
-    if (it.kind === 'shield' && it.base !== 'Buckler') parts.push('GRACE -1')
-    if (it.kind === 'armor' && armorGracePenalty(it)) parts.push('GRACE -' + armorGracePenalty(it))
     if (it.kind !== 'weapon' && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
 
     if (it.mod === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
@@ -2231,7 +2219,9 @@ the logging order is wrong (lower message is newer)
     if (q?.type === 'rare_hunt' && Number.isInteger(q.targetDirection)) {
       return TRACK_DIRECTIONS[q.targetDirection] || 'somewhere in the wilds'
     }
-    const e = hunterTargetEnemy(q)
+    const e = hunterTargetEnemy(q) ||
+      (q?.type === 'kill_group' && enemies.find(e => e.alive && q.targetEnemyIds?.includes(e.id))) ||
+      (q?.type === 'deliver_item' && groundItems.find(g => g.id === q.targetItemId))
     if (!e) return 'somewhere in the wilds'
     const h = npcs.find(n => n.name === 'Old Hunter')
     if (!h) return 'somewhere in the wilds'
@@ -2475,30 +2465,35 @@ the logging order is wrong (lower message is newer)
     return /s$/i.test(name) ? name : `${name}s`
   }
 
+  function hunterLocationPhrase(q) {
+    const direction = hunterDirection(q)
+    return direction === 'nearby' || direction === 'somewhere in the wilds'
+      ? direction : `${direction} of here`
+  }
+
   function hunterFlavor(q) {
-    const place = pick(['the old road', 'the ruined fort', 'the edge of the forest', 'the abandoned cemetery', 'the mountain pass', 'the dark country beyond the chapel'])
-    const reason = pick(['something has been feeding there', 'the tracks stop where the dead begin to walk', 'travellers have gone missing along that path', 'I found fresh blood where no living thing should have been', 'the silence has become too deep, even for these hills'])
-    if (q.type === 'investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterDirection(q)} of here. Go there and investigate the place, then report back to me. I'll mark the location on your map.`, `Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterDirection(q)} of here. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`])
+    const reason = pick(['something has been feeding there', 'the tracks stop where the dead begin to walk', 'travellers have gone missing', 'I found fresh blood where no living thing should have been', 'the silence has become too deep'])
+    if (q.type === 'investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterLocationPhrase(q)}. Go there and investigate the place, then report back to me. I'll mark the location on your map.`, `Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterLocationPhrase(q)}. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`])
     if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. A ${q.targetName}. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
     if (q.type === 'kill_specific') return pick([
-      `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It has been haunting ${place}, ${hunterDirection(q)} of here, and ${reason}. Find it. Make sure it does not come back.`,
-      `Old Hunter says: I know the trail of a ${q.targetName}. It has crossed ${place}, ${hunterDirection(q)} of here, three nights in a row. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
-      `Old Hunter says: A ${q.targetName} has made ${place}, ${hunterDirection(q)} of here, unsafe. I have seen what it leaves behind. Track the individual one, not some other beast wearing the same face.`
+      `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It is ${hunterLocationPhrase(q)}, and ${reason}. Find it. Make sure it does not come back.`,
+      `Old Hunter says: I know the trail of a ${q.targetName}. I last saw it ${hunterLocationPhrase(q)}. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
+      `Old Hunter says: A ${q.targetName} is making trouble ${hunterLocationPhrase(q)}. I have seen what it leaves behind. Track the individual one, not some other beast wearing the same face.`
     ])
     if (q.type === 'kill_group') return pick([
-      `Old Hunter says: ${hunterPlural(q.targetBaseName)} have gathered around ${place}, ${hunterDirection(q)} of here. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
-      `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} near ${place}, ${hunterDirection(q)} of here. They are not merely passing through - they are settling in. Thin their numbers before someone else pays for it.`,
-      `Old Hunter says: The ${hunterPlural(q.targetBaseName)} have been disturbing the dead and frightening the living around ${place}, ${hunterDirection(q)} of here. Bring down ${q.required} of them. That should quiet things for a while.`
+      `Old Hunter says: ${hunterPlural(q.targetBaseName)} have gathered ${hunterLocationPhrase(q)}. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
+      `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} ${hunterLocationPhrase(q)}. They are not merely passing through - they are settling in. Thin their numbers before someone else pays for it.`,
+      `Old Hunter says: The ${hunterPlural(q.targetBaseName)} have been disturbing the dead and frightening the living ${hunterLocationPhrase(q)}. Bring down ${q.required} of them. That should quiet things for a while.`
     ])
     if (q.type === 'recover_item') return pick([
-      `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterDirection(q)} of here, near ${place}. Bring the old thing back - it has more history than that thief deserves.`,
-      `Old Hunter says: A ${q.targetName} carries my ${q.targetItemName}, ${hunterDirection(q)} of here. I want the item, not excuses. Track the creature, take it back, and try not to damage it.`,
-      `Old Hunter says: That ${q.targetName} has something of mine: ${q.targetItemName}. It was stolen, and I would like to see it returned before the trail goes cold. The thief is currently ${hunterDirection(q)} of here.`
+      `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterLocationPhrase(q)}. Bring the old thing back - it has more history than that thief deserves.`,
+      `Old Hunter says: A ${q.targetName} carries my ${q.targetItemName}, ${hunterLocationPhrase(q)}. I want the item, not excuses. Track the creature, take it back, and try not to damage it.`,
+      `Old Hunter says: That ${q.targetName} has something of mine: ${q.targetItemName}. It was stolen, and I would like to see it returned before the trail goes cold. The thief is currently ${hunterLocationPhrase(q)}.`
     ])
     return pick([
-      `Old Hunter says: I need ${q.targetItemName}. It was left somewhere around ${place}, ${hunterDirection(q)} of here, and I have reason to believe it is still there. Find it and bring it to me.`,
-      `Old Hunter says: A useful piece of gear - ${q.targetItemName} - has gone missing near ${place}, ${hunterDirection(q)} of here. I do not care who finds it first. I care that it comes back.`,
-      `Old Hunter says: I lost track of ${q.targetItemName} out in ${place}, ${hunterDirection(q)} of here. ${reason}. Search the area and return it to me if you find it.`
+      `Old Hunter says: I need ${q.targetItemName}. It was left ${hunterLocationPhrase(q)}, and I have reason to believe it is still there. Find it and bring it to me.`,
+      `Old Hunter says: A useful piece of gear - ${q.targetItemName} - has gone missing ${hunterLocationPhrase(q)}. I do not care who finds it first. I care that it comes back.`,
+      `Old Hunter says: I lost track of ${q.targetItemName} ${hunterLocationPhrase(q)}. ${reason}. Search the area and return it to me if you find it.`
     ])
   }
 
@@ -2514,9 +2509,9 @@ the logging order is wrong (lower message is newer)
   function hunterActiveFlavor(q) {
     if (q.type === 'investigate_area') return `Old Hunter says: Have you investigated the area in the ${hunterDirection(q)} yet? I am still waiting to hear what you found.`
     if (q.type === 'rare_hunt') return `Old Hunter says: Its first sign was toward the ${hunterDirection(q)} edge, but a beast like that will not stay put. Trust the tracks, not where I last saw them.`
-    if (q.type === 'kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterDirection(q)} of here.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterDirection(q)} of here.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterDirection(q)} of here, and do not mistake another beast for it.`])
-    if (q.type === 'kill_group') return pick([`Old Hunter says: The trouble ${hunterDirection(q)} of here has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterDirection(q)} of here.`, `Old Hunter says: The hills ${hunterDirection(q)} of here are not quiet yet. Do what you went out there to do.`])
-    if (q.type === 'recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterDirection(q)} of here, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterDirection(q)} of here; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterDirection(q)} of here.`])
+    if (q.type === 'kill_specific') return pick([`Old Hunter says: The trail is still warm. That particular ${q.targetName} is still ${hunterLocationPhrase(q)}.`, `Old Hunter says: I have not forgotten the creature I sent you after. Keep your eyes open ${hunterLocationPhrase(q)}.`, `Old Hunter says: The ${q.targetName} has not been dealt with yet. Follow the signs ${hunterLocationPhrase(q)}, and do not mistake another beast for it.`])
+    if (q.type === 'kill_group') return pick([`Old Hunter says: The trouble ${hunterLocationPhrase(q)} has not settled yet. Keep hunting until the signs grow quiet.`, `Old Hunter says: I can still feel them out there, moving where they should not. Finish the work ${hunterLocationPhrase(q)}.`, `Old Hunter says: The country ${hunterLocationPhrase(q)} is not quiet yet. Do what you went out there to do.`])
+    if (q.type === 'recover_item') return pick([`Old Hunter says: The stolen ${q.targetItemName} is still ${hunterLocationPhrase(q)}, with its thief. Bring it back when you find the trail.`, `Old Hunter says: I am still waiting for that old ${q.targetItemName}. Search carefully ${hunterLocationPhrase(q)}; the creature carrying it will not surrender it willingly.`, `Old Hunter says: The matter of my ${q.targetItemName} is not settled. Find the one who took it ${hunterLocationPhrase(q)}.`])
     return pick([`Old Hunter says: The missing ${q.targetItemName} has not found its way back yet. Keep searching.`, `Old Hunter says: I still need that ${q.targetItemName}. Somewhere, it is waiting to be found.`, `Old Hunter says: The trail to the lost ${q.targetItemName} has not gone cold. Not yet.`])
   }
 
@@ -2524,7 +2519,7 @@ the logging order is wrong (lower message is newer)
     if (q.type === 'investigate_area') return `Old Hunter says: You investigated the area. Good. I can put that worry to rest.`
     if (q.type === 'rare_hunt') return `Old Hunter says: So it truly was a ${q.targetName}. Few hunters could have found that trail, fewer still could have followed it to the end.`
     if (q.type === 'kill_specific') return `Old Hunter says: You dealt with that particular beast. Good. I can finally sleep easier.`
-    if (q.type === 'kill_group') return `Old Hunter says: You thinned their numbers. The roads should be quieter now. Thank you.`
+    if (q.type === 'kill_group') return `Old Hunter says: You thinned their numbers. The wilds should be quieter now. Thank you.`
     if (q.type === 'recover_item') return `Old Hunter says: You brought my ${q.targetItemName} back. I thought I would never see it again. Thank you.`
     return `Old Hunter says: You returned the lost ${q.targetItemName}. I am grateful. Thank you.`
   }
@@ -4680,6 +4675,7 @@ the logging order is wrong (lower message is newer)
       }
     }
     (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
+    if (['berries', 'herb', 'mushroom'].includes(result)) spawnForageFoundAnim()
     enemyTurn()
     npcTurn()
     updateHud()
@@ -4882,6 +4878,8 @@ the logging order is wrong (lower message is newer)
       addInventoryItem('wheelbarrow', {description: wheelbarrow.description})
       groundItems.splice(groundItems.indexOf(wheelbarrow), 1)
       log('You pick up the surprisingly light wheelbarrow.', 'loot')
+      updateHud()
+      render()
       return
     }
     const explorer = groundItems.find(g => onCurrentLevel(g) && g.kind === 'explorerremains' && g.x === player.x && g.y === player.y)
@@ -5796,7 +5794,8 @@ the logging order is wrong (lower message is newer)
   const MOBILE_MIN_VIEW_H = 10, MOBILE_MAX_VIEW_H = 19
   let mobileViewH = MOBILE_DEFAULT_VIEW_H
   let VIEW_W = 21, VIEW_H = 13
-  let requestedTilePx = 40, TILE_PX = 40, renderedTilePx = 40
+  const INITIAL_TILE_PX = window.matchMedia('(pointer:coarse)').matches ? 56 : 40
+  let requestedTilePx = INITIAL_TILE_PX, TILE_PX = INITIAL_TILE_PX, renderedTilePx = INITIAL_TILE_PX
   canvas.width = VIEW_W * TILE_PX
   canvas.height = VIEW_H * TILE_PX
   ctx.imageSmoothingEnabled = false
@@ -6387,6 +6386,13 @@ the logging order is wrong (lower message is newer)
     runAnimationLoop()
   }
 
+  function spawnForageFoundAnim() {
+    if (replayAnimationsDisabled || replaySimulationMode) return
+    fxAnims.push({x: player.x, y: player.y, ch: 'found!', color: '#ddc9a3',
+      label: true, dir: -1, start: performance.now(), duration: 650})
+    runAnimationLoop()
+  }
+
   function spawnPickupAnim(g) {
     const glyph = groundGlyph(g)
     if (!glyph) return
@@ -6874,7 +6880,14 @@ the logging order is wrong (lower message is newer)
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2 + bump)
         ctx.scale(scale, scale)
         ctx.fillStyle = p.color
-        ctx.fillText(p.ch, 0, 3 - TILE_PX / 2)
+        const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
+        if (p.label) {
+          ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
+          ctx.lineWidth = 3
+          ctx.strokeStyle = '#0b0906'
+          ctx.strokeText(p.ch, 0, textY)
+        }
+        ctx.fillText(p.ch, 0, textY)
         ctx.restore()
       }
     }
@@ -8495,6 +8508,7 @@ the logging order is wrong (lower message is newer)
       if (fisherman) addService('🐟 Buy Fish (5g)', buyFishermanFish)
       else {
         addService('🍄 Purify mushrooms (2g each)', purifyMushrooms)
+        addService(`🧪 Buy Life Potion (${HERBALIST_POTION_PRICE}g)`, buyHerbalistPotion)
         addService('🧪 Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion())
         addService('🧪 Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true))
       }
@@ -8692,6 +8706,23 @@ the logging order is wrong (lower message is newer)
     const removed = count - edible
     log(`The Herbalist purifies ${edible} mushroom${edible === 1 ? '' : 's'} and removes ${removed} poisonous mushroom${removed === 1 ? '' : 's'} for ${count * 2}g.`, 'good')
     if (count < total) log("You didn't have enough gold to check all mushrooms.", 'info')
+    updateHud()
+    renderTrade()
+    renderInventory()
+  }
+
+  const HERBALIST_POTION_PRICE = 100
+
+  function buyHerbalistPotion() {
+    const npc = npcs.find(n => n.name === 'Herbalist')
+    if (!npc || serviceNpc !== npc || currentZ !== 0 ||
+      Math.max(Math.abs(player.x - npc.x), Math.abs(player.y - npc.y)) > 1) return
+    if (player.gold < HERBALIST_POTION_PRICE) return log(`You need ${HERBALIST_POTION_PRICE}g to buy a Life Potion.`, 'info')
+    recordReplayAction({type:'herbalist', action:'buyPotion'})
+    player.gold -= HERBALIST_POTION_PRICE
+    consolidateConsumableStacks()
+    addPotion()
+    log(`You buy a Life Potion for ${HERBALIST_POTION_PRICE}g.`, 'good')
     updateHud()
     renderTrade()
     renderInventory()
@@ -9208,6 +9239,8 @@ the logging order is wrong (lower message is newer)
     const known = Object.entries(player.killsBySpecies || {})
       .filter(([, count]) => Number.isFinite(count) && count > 0)
       .sort(([a], [b]) => (strength(a) - strength(b)) || a.localeCompare(b))
+    document.querySelector('#bestiaryOverlay .bestiary-intro').textContent =
+      `You have slain ${known.length} different creature${known.length === 1 ? '' : 's'}.`
     if (!known.length) {
       const empty = document.createElement('p')
       empty.className = 'bestiary-empty'

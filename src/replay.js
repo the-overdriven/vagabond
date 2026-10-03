@@ -344,6 +344,7 @@ async function runReplayAction(action) {
       break
     case 'herbalist':
       if (action.action === 'purifyMushrooms') purifyMushrooms()
+      else if (action.action === 'buyPotion') buyHerbalistPotion()
       else if (action.action === 'makePotion') makeHerbalistPotion()
       else if (action.action === 'makeAllPotions') makeHerbalistPotion(true)
       break

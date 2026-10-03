@@ -34,7 +34,7 @@ function advanceSwimming(moved, from = null) {
     ? prior.x !== from.x || prior.y !== from.y
     : prior.x !== here.x || prior.y !== here.y))) resetSwimming()
   if (!deepSwimmingWater(here.x, here.y)) {
-    if (player.swimPosition || player.swimTurns > 0) log('You reach the bank and catch your breath.', 'info')
+    if (player.swimPosition || player.swimTurns > 0) log('You reach the shore and catch your breath.', 'info')
     resetSwimming()
     return
   }

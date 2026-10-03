@@ -18,7 +18,7 @@
 
 @media (pointer: fine) and (min-width: 721px) {
   :root {
-    --ui-font-scale: 1.2;
+    --ui-font-scale: 1.1;
   }
 }
 
