@@ -27,6 +27,10 @@ function activePlayerStatuses() {
     statuses.push({id: `penalty-${key}`, icon: '↓', label, counter: `${debuff.turnsLeft}t`,
       detail: `${label}: temporary penalty, ${turns(debuff.turnsLeft)} remaining.`})
   }
+  if (player.poisonTurns > 0) {
+    statuses.push({id: 'poison', icon: '☠', label: 'Poisoned', counter: `${player.poisonTurns}t`,
+      detail: `Poison: ${turns(player.poisonTurns)} remaining. Lose 1 HP each turn. A Healing Herb or Life Potion cures it.`})
+  }
   if (player.berryRegenTurns > 0) {
     statuses.push({id: 'regen', icon: '✚', label: 'Regen', counter: `${player.berryRegenTurns}t`,
       detail: `Regeneration: ${turns(player.berryRegenTurns)} remaining. Berries restore ${consumablePower(1)} HP every 5 turns; eating more extends the duration.`})

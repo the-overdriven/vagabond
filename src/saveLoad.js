@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 23 // Enemy abilities arrays
+const SAVE_VERSION = 24 // Persistent poison status
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -148,6 +148,7 @@ function buildSaveObject() {
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       speedPotionTurns: player.speedPotionTurns,
       berryRegenTurns: player.berryRegenTurns,
+      poisonTurns: player.poisonTurns,
       swimming: player.swimming,
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
       fishermanLessonPending: !!player.fishermanLessonPending,
@@ -613,6 +614,7 @@ function loadGameFromObject(data, opts = {}) {
   player.godInvisible = player.godMode && (typeof data.player.godInvisible === 'boolean'
     ? data.player.godInvisible : true)
   player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns | 0) : 0
+  player.poisonTurns = Math.max(0, Math.floor(player.poisonTurns))
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
   player.permadeath = !!player.permadeath

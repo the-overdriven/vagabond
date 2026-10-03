@@ -1895,6 +1895,7 @@ the logging order is wrong (lower message is newer)
     speedPotionTurns: 0,
     speedPotionBonus: 0,
     berryRegenTurns: 0,
+    poisonTurns: 0,
     swimming: 0,
     fishermanRewardClaimed: false,
     fishermanLessonPending: false,
@@ -3188,6 +3189,7 @@ the logging order is wrong (lower message is newer)
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
     }
+    if (dmg > 0 && player.hp > 0) applyEnemyPoison(e)
     updateHud()
     if (player.hp <= 0) {
       die(e)
@@ -3429,6 +3431,7 @@ the logging order is wrong (lower message is newer)
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       berryRegenTurns: 0,
+      poisonTurns: 0,
       swimming: 0,
       fishermanRewardClaimed: false,
       fishermanLessonPending: false,
@@ -3526,6 +3529,7 @@ the logging order is wrong (lower message is newer)
     player.godInvisible = false
     player.speedPotionTurns = 0
     player.speedPotionBonus = 0
+    player.poisonTurns = 0
     player.berryRegenTurns = 0
     player.freezing = {active: false, turns: 0}
     player.curseDebuffs = []
@@ -4204,6 +4208,35 @@ the logging order is wrong (lower message is newer)
   const MAX_CONSECUTIVE_WAIT_TURNS = 10
   // Trolls knit their flesh back together on their own - a slow trickle that
   // ticks once per elapsed turn regardless of what the player did with it.
+  function applyEnemyPoison(enemy) {
+    if (!enemyHasAbility(enemy, 'poison') || !chance(0.30)) return
+    const baseTurns = Math.min(40, Math.floor(playerMaxHp() * 0.20))
+    const duration = Math.max(1, Math.round(baseTurns * (0.90 + rng() * 0.20)))
+    const refreshed = player.poisonTurns > 0
+    player.poisonTurns = duration
+    log(refreshed ? `The ${enemy.name}'s venom renews your poison for ${duration} turns.`
+      : `The ${enemy.name} poisons you for ${duration} turns!`, 'bad')
+  }
+
+  function curePlayerPoison() {
+    if (!(player.poisonTurns > 0)) return
+    player.poisonTurns = 0
+    log('The poison leaves your body.', 'good')
+  }
+
+  function tickPlayerPoison() {
+    if (!(player.poisonTurns > 0)) return
+    player.poisonTurns--
+    player.hp = Math.max(0, player.hp - 1)
+    log('Poison deals 1 HP damage.', 'bad')
+    spawnDamageNumber(player.x, player.y, 1, RENDER_STYLE.damage.playerHit)
+    if (player.hp <= 0) {
+      die(null, 'poison')
+      return
+    }
+    if (player.poisonTurns === 0) log('The poison wears off.', 'good')
+  }
+
   function tickRaceRegen() {
     const race = raceDef()
     if (!race || !race.regenEvery) return
@@ -4261,6 +4294,8 @@ the logging order is wrong (lower message is newer)
     updateAlarmedEnemies()
     turnCount++
     ageBeastTracks()
+    tickPlayerPoison()
+    if (player.hp <= 0 || deathTransition) return
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
     tickRaceRegen()
@@ -8901,6 +8936,7 @@ the logging order is wrong (lower message is newer)
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     if (itemDefinition(it.kind).effect.fullHeal) healPlayer(playerMaxHp() - player.hp)
+    curePlayerPoison()
     log('You drink a Life Potion and feel fully restored.', 'good')
     consumeItemTurn()
   }
@@ -8952,6 +8988,7 @@ the logging order is wrong (lower message is newer)
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'herb', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    curePlayerPoison()
     const heal = healingHerbAmount()
     const restored = healPlayer(heal)
     log(`You eat the Healing Herb and recover ${restored} HP.`, 'good')

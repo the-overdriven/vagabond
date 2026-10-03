@@ -1336,7 +1336,7 @@ Movement, evasion, track generation, projectile obstruction, and flying render
 order check this array. This refactor does not change combat chances, terrain
 rules, shooter assignment, or consume additional RNG calls.
 
-Save format **23** stores each monster's abilities and restores them exactly,
+Save format **24** stores each monster's abilities and restores them exactly,
 including an explicitly empty array. Replay initial states use the same save
 format; shooter role and remaining ammo continue to be separate instance state.
 Saves from previous formats are rejected; no old boolean conversion is added.
@@ -1365,6 +1365,38 @@ it is not a persistent status or a new chance to hesitate.
 Evasive species are those whose templates include `evades`: Giant Bat, Monkey,
 Wasp, Vulture, Grivkin, Harpy, Skerva, Vampire, and NHALUUN.
 Scripted flying Ghosts in the dwarven ruins also receive `evades`.
+
+## Poison
+
+Scorpion, Manticore, and Wyvern have the `poison` ability. Each melee hit
+dealing positive damage has a 30% seeded chance to poison a surviving player,
+including damaging glancing hits and extra attacks. Misses, zero-damage hits,
+and ranged attacks do not apply poison. No poison RNG is used for other enemies.
+
+Duration is calculated at application from current effective maximum HP:
+
+`max(1, round(min(40, floor(maxHP × 0.20)) × (0.90 + RNG × 0.20)))`
+
+For 100 maximum HP this gives 18–22 turns; at 200+ HP it gives 36–44 turns.
+The variation applies after the base cap. A new application replaces the remaining
+duration with a fresh roll, without stacking damage. Later max-HP changes do not
+recalculate existing poison.
+
+Poison deals 1 HP at the start of each subsequent enemy turn, before freezing
+and regeneration. It remains active while waiting, invisible, on temple ground,
+or after changing levels. It can kill; death is recorded as poison and clears
+the status without crediting a monster victory. The application itself causes
+no immediate poison damage.
+
+Eating a Healing Herb or drinking a Life Potion clears poison before consuming
+the item's turn, including at full HP. Other healing does not cure poison.
+Enemies may poison the player again during that turn's response. Application,
+refresh, damage, cure, and natural expiry have message logs. The active-status
+strip shows Poisoned with turns remaining and explains its cure.
+
+Remaining turns initialize to zero, persist in format 24 saves and replay initial
+states, restore exactly, and reset for death and new characters. All rolls and
+ticks resolve in game rules, independently of animation timing.
 
 ## Humanoid
 
@@ -4770,7 +4802,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 23).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 24).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
