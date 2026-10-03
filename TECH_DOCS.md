@@ -3254,16 +3254,19 @@ is **Use**. A successful use consumes one game turn and emits a brief cosmetic `
 sound-wave effect around the player; this animation has no gameplay RNG and is disabled
 for replay simulation.
 
-When used, every living **non-humanoid** enemy on the player's current level within
-**80 tiles Chebyshev distance** answers, regardless of line of sight, darkness, forest,
-walls, or other intervening terrain. Each answering enemy produces its own deliberately
-imprecise log message:
+When used, living **non-humanoid** enemies on the player's current level within
+**80 tiles Chebyshev distance** can answer, regardless of line of sight, darkness, forest,
+walls, or other intervening terrain. To keep the signal readable, the horn reports at most
+**3 distinct directions**. For each of the eight compass directions, only the nearest
+qualifying monster is considered; the horn then reports the three closest of those
+directional candidates. Equal-distance ties are resolved deterministically. Each reported
+direction produces one deliberately imprecise log message:
 
 `You hear something answering from <direction>.`
 
-`<direction>` is one of the same eight compass bearings used by Tracking. The horn does
-not reveal species, exact distance, or map position. If no valid enemy answers, the log
-says `Nothing answers.`
+`<direction>` is one of the same eight compass bearings used by Tracking. Multiple beasts
+in the same direction therefore produce only one answer. The horn does not reveal species,
+exact distance, or map position. If no valid enemy answers, the log says `Nothing answers.`
 
 The horn is reusable, but only after the character has **earned more XP** since its last
 successful use. This uses `player.totalXpEarned`, the same proof-of-growth concept used

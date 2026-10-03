@@ -89,7 +89,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
     })
   })
 
-  it('sounds every nearby non-humanoid, enforces XP-gated reuse, persists cooldown, and replays deterministically', () => {
+  it('sounds the 3 closest distinct beast directions, enforces XP-gated reuse, persists cooldown, and replays deterministically', () => {
     cy.window().then(win => win.eval(`(async () => {
       replayRecording = false; replayPlaying = false; replayAnimationsDisabled = false
       currentZ = 0; map = surfaceMap
@@ -100,9 +100,12 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         hp:10,maxHp:10,atk:1,def:0,spd:1,aggro:0,fly:false,humanoid,evades:false,
         x,y,homeX:x,homeY:y,homeTileType:'grass',wander:false,prefix:null,equipment:null})
       enemies = [
-        mk('east-beast', player.x+20, player.y),
+        mk('east-near', player.x+5, player.y),
+        mk('east-far', player.x+20, player.y),
         mk('northwest-beast', player.x-10, player.y-10),
-        mk('south-humanoid', player.x, player.y+10, true),
+        mk('southwest-beast', player.x-15, player.y+15),
+        mk('south-beast', player.x, player.y+25),
+        mk('south-humanoid', player.x, player.y+3, true),
         mk('outside-beast', player.x+81, player.y),
         mk('underground-beast', player.x+2, player.y, false, -1)
       ]
@@ -159,6 +162,12 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       expect(result.first.soundQueued, 'horn creates immediate visual sound effect').to.equal(true)
       expect(result.first.log).to.include('You hear something answering from east.')
       expect(result.first.log).to.include('You hear something answering from northwest.')
+      expect(result.first.log).to.include('You hear something answering from southwest.')
+      expect(result.first.log).not.to.include('You hear something answering from south.')
+      expect((result.first.log.match(/You hear something answering from east\./g) || []).length,
+        'same direction is reported only once').to.equal(1)
+      expect((result.first.log.match(/You hear something answering from /g) || []).length,
+        'horn reports at most 3 distinct directions').to.equal(3)
       expect(result.first.log).not.to.include('south-humanoid')
       expect(result.blockedTurn, 'reuse without new XP costs no turn').to.equal(result.afterFirstTurn)
       expect(result.afterXpTurn, 'new earned XP unlocks horn again').to.equal(result.afterFirstTurn + 1)

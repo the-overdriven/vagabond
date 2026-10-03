@@ -8928,17 +8928,27 @@ the logging order is wrong (lower message is newer)
     it.lastUseTotalXp = player.totalXpEarned
     spawnHornSoundAnim()
     log('You blow the Echo-Blight Horn. Its note rolls across the wilds.', 'info')
-    let answers = 0
+    const nearestByDirection = new Map()
     for (const e of enemies) {
       if (!e.alive || e.humanoid || !onCurrentLevel(e)) continue
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (distance > 80) continue
       const direction = trackDirection(e.x - player.x, e.y - player.y)
       if (direction === null) continue
-      log(`You hear something answering from ${TRACK_DIRECTIONS[direction]}.`, 'info')
-      answers++
+      const current = nearestByDirection.get(direction)
+      const enemyKey = String(e.id ?? e.baseName ?? e.name ?? '')
+      const currentKey = current ? String(current.enemy.id ?? current.enemy.baseName ?? current.enemy.name ?? '') : ''
+      if (!current || distance < current.distance || (distance === current.distance && enemyKey < currentKey)) {
+        nearestByDirection.set(direction, {direction, distance, enemy:e})
+      }
     }
-    if (!answers) log('Nothing answers.', 'info')
+    const answers = [...nearestByDirection.values()]
+      .sort((a,b) => a.distance - b.distance || a.direction - b.direction)
+      .slice(0, 3)
+    for (const answer of answers) {
+      log(`You hear something answering from ${TRACK_DIRECTIONS[answer.direction]}.`, 'info')
+    }
+    if (!answers.length) log('Nothing answers.', 'info')
     consumeItemTurn()
   }
 
