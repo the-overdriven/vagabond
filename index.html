@@ -1,43 +1,35 @@
 <!-- TODO:
 
-highest prio:
-distinct monster abilities. start with lifesteal, poison, ...? enrage, knockback
-but first move monster evasion field to abilities
-balance cleanup
-
-!1 [lore] add tombstone: Men call it holy, yet the beasts sense what men do not.
+!3 [logging] when logging (un)equip msgs colorize negative changes (i.e. -1 GRACE should be in red, +1 GRACE should stay green)
+!1 [lore] add lich tombstone: Men call it holy, yet the beasts sense what men do not.
 !1 [ui] dying should close inv
-!2 [combat] being invisible should increase crit. chance hit
+!2 [combat] being invisible should increase crit. chance hit by 20% but only if enemy isn't alerted
+!2 [logging] odd tombstone should log the previous msg too! (prefix existing message with: Odd tombstone found in the ruined cemetery.)
+!3 [worldgen] dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
+!3 [worldgen] NPC shouldnt spawn behind trees (grassland trees)
+!3 [quests] old hunter shouldnt give quests that involve dealing with far wandering monsters - check if it was fixed already
+!3 [status] when your HP drops below 20%: You're hurt badly. (in black font.)
+!4 [armor] simplify speedPenalty on armors, move current uniform -1 to table and use only their prop
+
 !2 [ui] prettier brown vertical scrolls (desktop only)
 !2 [rendering] the brown cave floor is not exactly seamless
-!2 [inspection] inspecting columns (when standing on a dwarven column tile), should not inspect surroundings
-!2 [balance] healing herb should heal min. 20 hp but max. 50 hp
 !2 [character creation] add random button next to name?
 !2 [balance] freezing not severe enough: -1hp every 4 turns, not 5
-!2 [logging] odd tombstone should log the previous msg too! (it comes from ruined cemetary)
-!2 [logging] msg log: slightly gray out older messages?
-
-!3 [worldgen] dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
 !3 [ui] tooltips on desktop should appear on the left side above canvas and also when fighting
 !3 [items] add weapon prefix to increase crit? deadly?
-!3 [status] when your HP drops below 20%: You feel sick. similar for monsters
 !3 [permadeath] dying on permadeath should wait for player input before showing race selection for new char
 !3 [ui] enemy tooltips on desktop should appear automatically
 !3 [quests] old hunter: "the lost item" fallback - wtf?
 !3 [enemy AI] monsters should run away from temple, even if player is not inside
-!3 [quests] old hunter shouldnt give quests that involve dealing with far wandering monsters
 !3 [npc] herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards.
   (or cousin instead of brother), !1 [npc] witch is a crazy niece of hunter
-!3 [worldgen] NPC shouldnt spawn behind trees (grassland trees)
 !3 [worldgen] water in the north should turn to ice. but not all
-!3 [balance] balance: orc/dwarf/catling + 1 ATK every 5 levels
+!3 [balance] balance: orc/dwarf/catling + 1 ATK/DEF/SPD every 5 levels
 !3 [items] Gaudy item: aggro +1
 !3 [worldgen] add torches on the wall
-!3 [logging] when logging (un)equip msgs colorize negative changes
 !4 [enemy abilities] monster ability: cry for help (on low hp?)
 !4 [enemy AI] wandering monsters that dont have snow biome dont go to snow tiles
 !4 [supabase] how come turn count is lower than steps taken on supabase?
-!4 [armor] simplify speedPenalty on armors, use only their prop, not base -1
 !4 [balance] humanoids should have less def? or items should give them only 0.7x of what they normally give
 !4 [rendering] small health bars above enemies?
 !4 [pathfinding] fix: autopath should ignore swimming, unless already in water
