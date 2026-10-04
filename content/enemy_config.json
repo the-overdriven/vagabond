@@ -1,4 +1,7 @@
 {
+  "thief": {
+    "chance": 0.1
+  },
   "combat": {
     "attackRange": 1,
     "defaultAggroRange": 4,

@@ -1490,6 +1490,34 @@ Healing to 10% or higher ends it. The condition is derived from saved HP, maximu
 HP, and abilities, adding no persistent flag or save-version change. This is
 separate from rare-beast sighting flight and does not alter its rules.
 
+## Thief
+
+Some humanoid monsters have "thief" ability.
+On each adjacent enemy turn (including diagonal adjacency), a visible player with an eligible backpack item
+has a **10%** chance to lose one randomly selected backpack entry. Equipped
+items are excluded; quest items are eligible. A selected stack loses exactly
+one unit. Entries have equal selection probability, regardless of stack size.
+A monster with no legal neighboring step that increases its Chebyshev distance
+from the player is cornered and cannot attempt theft. Empty packs, invisibility,
+and corners consume no theft roll. Failed rolls permit normal combat and can
+retry next eligible turn; each monster can succeed only once.
+
+Success replaces the attack, logs “<name> has snatched <item> from you and runs
+away!”, and immediately grants one guaranteed escape step. Thereafter the thief
+reuses wounded retreat movement: one step per enemy turn, with a **10%** chance
+to hesitate. Carrying a stolen item keeps it fleeing regardless of HP, aggro
+range, or player invisibility; it does not wander home or shoot while it can
+escape. A cornered thief resumes ordinary combat and tries retreating again
+when an escape tile opens. Off-level thieves remain paused like other enemies.
+Sacred-ground protection still prevents new thefts.
+
+A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
+and mobile inspection. Victory skull and Alarmed markers shift to avoid overlap.
+Killing it drops a bag at its exact map location; forage recovers the original
+item, preserving quest IDs and all other properties. Other monster loot is
+unchanged. Theft, random selection, hesitation, and movement resolve through
+seeded game rules before animation, so saves and replay preserve the outcome.
+
 ## Enrage
 
 Orc, Minotaur, Owlbear, Lion, and GAUR have `enrage`. While alive and strictly
@@ -4176,10 +4204,16 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-26
+27
 ```
 
 Saves are JSON files.
+
+Version 27 stores each enemy’s `theftUsed` flag and exact `stolenItem` object,
+including stack count, quest identity, affixes and artifact properties. Both are
+initialized on spawn and restored directly for saves and replay snapshots. A
+stolen item dropped on death uses the existing serialized ground-item list.
+No compatibility for older saves is added.
 
 Version 26 stores the low-HP warning latch and generated fort skeleton loot
 eligibility. Armor items store their complete SPD penalty. Current saves and
@@ -4253,7 +4287,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Rare-sighting and ranged shooter state require current **version 22** saves. Other versions are rejected
+Current gameplay state requires **version 27** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -5091,7 +5125,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 26).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 27).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

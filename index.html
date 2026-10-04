@@ -824,6 +824,7 @@ more difficult:
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let RANGED_CONFIG = {}
+  let THIEF_CONFIG
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
   let cryptCaveIndex = -1
   let CRYPT_INSCRIPTIONS
@@ -911,6 +912,7 @@ more difficult:
     ENEMY_FAR_VILLAGE_AVOID_RADIUS = content.enemyConfig.wandering.farVillageAvoidRadius ?? 20
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
+    THIEF_CONFIG = content.enemyConfig.thief
     RARE_FLEE = content.enemyConfig.rareFlee
     TRACK_CONFIG = content.enemyConfig.tracking
     RANGED_CONFIG = content.enemyConfig.ranged || {}
@@ -2240,6 +2242,8 @@ more difficult:
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
+    enemy.theftUsed = enemy.theftUsed === true
+    enemy.stolenItem = enemy.stolenItem || null
     enemy.summonUsed = enemy.summonUsed === true
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
@@ -3155,11 +3159,11 @@ more difficult:
   }
 
   function enemyIsFleeing(e) {
-    return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')
+    return e.alive !== false && e.hp > 0 && (!!e.stolenItem ||
+      (e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')))
   }
 
-  function tryWoundedEnemyFlee(e) {
-    if (!enemyIsFleeing(e)) return false
+  function enemyEscapeDestination(e) {
     const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
     let destination = null, bestDistance = distance
     for (const [dx, dy] of DIRS8) {
@@ -3170,10 +3174,16 @@ more difficult:
       destination = {x, y}
       bestDistance = nextDistance
     }
+    return destination
+  }
+
+  function tryWoundedEnemyFlee(e, immediate = false) {
+    if (!enemyIsFleeing(e)) return false
+    const destination = enemyEscapeDestination(e)
     // No escape tile: let normal combat handle a cornered monster.
     if (!destination) return false
-    e.aware = true
-    if (chance(0.10)) return true // Hesitation consumes the whole action.
+    e.aware = !playerHiddenFromEnemy(e)
+    if (!immediate && chance(0.10)) return true // Hesitation consumes the whole action.
     const fromX = e.x, fromY = e.y
     occupied.delete(keyXY(e.x, e.y))
     e.x = destination.x; e.y = destination.y
@@ -3181,6 +3191,31 @@ more difficult:
     e.farPath = null
     leaveBeastTrack(e, fromX, fromY)
     finishEnemyMove(e, fromX, fromY)
+    return true
+  }
+
+  function tryEnemyTheft(e) {
+    if (!enemyHasAbility(e, 'thief') || e.theftUsed || !e.alive || e.hp <= 0 ||
+        playerHiddenFromEnemy(e) || enemyIsPassive(e) ||
+        Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) !== ATTACK_RANGE ||
+        !enemyHasSight(e) || !enemyEscapeDestination(e)) return false
+    const equipped = new Set(Object.values(player.equip).filter(Boolean))
+    const candidates = player.inventory.map((item, index) => ({item, index}))
+      .filter(entry => !equipped.has(entry.item) && (entry.item.count ?? 1) > 0)
+    // Ineligible turns consume no theft RNG, including empty packs and corners.
+    if (!candidates.length || !chance(THIEF_CONFIG.chance)) return false
+    const stolen = pick(candidates)
+    e.stolenItem = structuredClone(stolen.item)
+    if ((stolen.item.count || 1) > 1) {
+      stolen.item.count--
+      e.stolenItem.count = 1
+    } else player.inventory.splice(stolen.index, 1)
+    e.theftUsed = true
+    e.attackStart = undefined
+    log(`${e.name} has snatched ${artifactDisplayName(e.stolenItem)} from you and runs away!`, 'bad')
+    tryWoundedEnemyFlee(e, true)
+    updateHud()
+    if (invOpen) renderInventory()
     return true
   }
 
@@ -3467,6 +3502,12 @@ more difficult:
     occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
     gainXp(xpForEnemy(e))
+    if (e.stolenItem) {
+      groundItems.push({x: e.x, y: e.y, level: e.level ?? currentZ,
+        levelKind: e.levelKind || currentLevelKind(), caveIndex: e.caveIndex ?? currentCave,
+        kind: 'stolenloot', item: e.stolenItem})
+      e.stolenItem = null
+    }
     lootFromEnemy(e)
     updateHud()
   }
@@ -4510,6 +4551,7 @@ more difficult:
       } else if (!hiddenFromEnemy && rareStartFlee(e, rareDistance)) {
         if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
       }
+      if (e.stolenItem && tryWoundedEnemyFlee(e)) continue
       const justEvaded = e.justEvaded === true
       e.justEvaded = false
       if (enemyIsPassive(e)) {
@@ -4558,6 +4600,7 @@ more difficult:
           alarmEnemy(e)
           logEnemySpotting(e)
         }
+        if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
         if (enemyAttackPlayer(e)) return
@@ -5189,6 +5232,16 @@ more difficult:
     const campfire = groundItems.find(g => onCurrentLevel(g) && g.kind === 'campfire' && g.x === player.x && g.y === player.y)
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
+    const stolenLoot = groundItems.find(g => onCurrentLevel(g) && g.kind === 'stolenloot' && g.x === player.x && g.y === player.y)
+    if (stolenLoot) {
+      player.inventory.push(stolenLoot.item)
+      lootLog(`You recover ${artifactDisplayName(stolenLoot.item)} from the thief's bag.`, stolenLoot.item, artifactDisplayName(stolenLoot.item))
+      spawnPickupAnim(stolenLoot)
+      groundItems.splice(groundItems.indexOf(stolenLoot), 1)
+      updateHud()
+      render()
+      return
+    }
     if (playerRemains) {
       if (playerRemains.item) player.inventory.push(playerRemains.item)
       if (playerRemains.item) lootLog(`You recover ${playerRemains.item.name} from your remains.`, playerRemains.item)
@@ -5339,7 +5392,7 @@ more difficult:
 
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
-      } else if (g.kind === 'deadbody' || g.kind === 'playerremains') {
+      } else if (g.kind === 'deadbody' || g.kind === 'playerremains' || g.kind === 'stolenloot') {
         continue
       } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || g.kind === 'campfire' || g.kind === 'explorerremains') {
         continue
@@ -5930,6 +5983,9 @@ more difficult:
     } else if (currentGround && currentGround.kind === 'deadbody') {
       log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
       inspectedGround = true
+    } else if (currentGround && currentGround.kind === 'stolenloot') {
+      log('A thief\'s abandoned bag. Press the forage key to recover your stolen item.', 'info')
+      inspectedGround = true
     } else if (currentGround && currentGround.kind === 'playerremains') {
       log('These are the remains of your last defeat. Press the forage key to recover the item you dropped.', 'info')
       inspectedGround = true
@@ -5994,6 +6050,7 @@ more difficult:
             homecomingscroll: 'a scroll',
             treasurecasket: 'an old casket',
             skeleton: 'skeletal remains',
+            stolenloot: 'a thief\'s bag',
             playerremains: 'your remains',
             campfire: 'a campfire',
             anvil: 'an anvil',
@@ -6668,6 +6725,22 @@ more difficult:
   const FX_ANIM_MS = 420
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
+  function drawThiefBag(x, y, size) {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.scale(size, size)
+    ctx.lineWidth = 0.10
+    ctx.strokeStyle = '#180907'
+    ctx.fillStyle = '#e0473f'
+    ctx.beginPath()
+    ctx.moveTo(-0.22, 0.08); ctx.lineTo(0.22, 0.08)
+    ctx.lineTo(0.12, 0.30); ctx.bezierCurveTo(0.65, 0.95, 0.45, 1, 0, 1)
+    ctx.bezierCurveTo(-0.45, 1, -0.65, 0.95, -0.12, 0.30)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(-0.18, 0.30); ctx.lineTo(0.18, 0.30); ctx.stroke()
+    ctx.restore()
+  }
+
   function enemyGlyph(e) {
     const ch = (e.baseName || e.name).trim().split(/\s+/).pop()[0]
     return e.tier <= RENDER_STYLE.enemies.lowercaseThroughTier ? ch.toLowerCase() : ch
@@ -7174,6 +7247,10 @@ more difficult:
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
+      if (g.kind === 'stolenloot') {
+        drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65)
+        continue
+      }
       if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
         ctx.save()
         ctx.filter = 'grayscale(0.7) brightness(0.8)'
@@ -7300,6 +7377,7 @@ more difficult:
       const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
       if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
+      if (e.stolenItem) drawThiefBag(vx + TILE_PX * 0.78, vy + 1, TILE_PX * 0.42)
       if (e.victoryLevel) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.42))}px serif`
@@ -7308,8 +7386,8 @@ more difficult:
         ctx.lineWidth = 2
         ctx.strokeStyle = '#180907'
         ctx.fillStyle = '#e0473f'
-        ctx.strokeText('☠︎', vx + TILE_PX * 0.78, vy + 1)
-        ctx.fillText('☠︎', vx + TILE_PX * 0.78, vy + 1)
+        ctx.strokeText('☠︎', vx + TILE_PX * (e.stolenItem ? 0.43 : 0.78), vy + 1)
+        ctx.fillText('☠︎', vx + TILE_PX * (e.stolenItem ? 0.43 : 0.78), vy + 1)
         ctx.restore()
       }
 
@@ -7321,8 +7399,8 @@ more difficult:
         ctx.lineWidth = 3
         ctx.strokeStyle = '#180907'
         ctx.fillStyle = '#ffffff'
-        ctx.strokeText('!', vx + TILE_PX * (e.victoryLevel ? 0.60 : 0.78), vy + 1)
-        ctx.fillText('!', vx + TILE_PX * (e.victoryLevel ? 0.60 : 0.78), vy + 1)
+        ctx.strokeText('!', vx + TILE_PX * (e.stolenItem ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
+        ctx.fillText('!', vx + TILE_PX * (e.stolenItem ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
         ctx.restore()
       }
 
@@ -7651,7 +7729,7 @@ more difficult:
   }
 
   function groundItemLabel(g) {
-    return g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
+    return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
   }
 
   let lastMousePx = null, lastMousePy = null
@@ -7704,7 +7782,7 @@ more difficult:
         mini: false, enemy: e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' <span class="thief-marker" aria-label="carrying stolen item"></span>' : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
@@ -7740,6 +7818,10 @@ more difficult:
         mini: true,
         enemy: null,
         html: `<div class="nm">dead ${g.race || '???'}</div>`
+      }
+      if (g.kind === 'stolenloot') return {
+        mini: true, enemy: null,
+        html: '<div class="nm">Thief’s Bag</div><div>Forage to recover your stolen item</div>'
       }
       if (g.kind === 'playerremains') return {
         mini: true,

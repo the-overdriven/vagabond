@@ -86,7 +86,7 @@ describe('Ranged shooter monster variants', () => {
       resetRangedArena()
       const shooter = makeShooter('Skeleton', 3, {id:'persist-shooter',shotsRemaining:7})
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
-      rangedAssert(save.version === 26, 'save version')
+      rangedAssert(save.version === 27, 'save version')
       rangedAssert(save.enemies.find(e=>e.id==='persist-shooter').shotsRemaining === 7, 'save exact ammo')
       shooter.shotsRemaining = 1
       loadGameFromObject(save)
