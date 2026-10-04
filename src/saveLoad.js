@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 27 // One-time theft and exact stolen item state
+const SAVE_VERSION = 28 // Stolen gear ownership and equipment state
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -180,6 +180,7 @@ function buildSaveObject() {
       spd: e.spd,
       aggro: enemyAggroRange(e),
       abilities: [...e.abilities],
+      stolenItemEquipped: e.stolenItemEquipped === true,
       theftUsed: e.theftUsed === true,
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
       summonUsed: e.summonUsed === true,
@@ -668,6 +669,7 @@ function loadGameFromObject(data, opts = {}) {
       hp: e.hp, maxHp: e.maxHp, victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
       abilities: [...e.abilities],
+      stolenItemEquipped: e.stolenItemEquipped === true,
       theftUsed: e.theftUsed === true,
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
       summonUsed: e.summonUsed === true,

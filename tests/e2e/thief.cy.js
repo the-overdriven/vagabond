@@ -43,7 +43,7 @@ describe('One-time monster theft', () => {
         chance=()=>true;log=m=>messages.push(m)
         for(const name of ['Imp','Nymph','Tokka','Wretchling']) {
           resetTheftArena();const e=makeThief(name)
-          theftCheck(e.abilities.includes('thief') && !e.theftUsed && !e.stolenItem,'spawn defaults '+name)
+          theftCheck(e.abilities.includes('thief') && !e.theftUsed && !e.stolenItem && !e.stolenItemEquipped,'spawn defaults '+name)
           const equipped={kind:'weapon',name:'Equipped Blade',atk:3};player.equip.weapon=equipped
           player.inventory=[equipped,createItem('potion',{count:3,hunterQuestId:'quest-theft'})]
           const hp=player.hp,shots=e.shotsRemaining;enemyTurn()
@@ -67,6 +67,84 @@ describe('One-time monster theft', () => {
         item.modifiers[0].value=99
         theftCheck(e.stolenItem.modifiers[0].value===2,'independent item snapshot')
       } finally {chance=oldChance;log=oldLog}
+    })()`))
+  })
+
+  it('equips stolen weapons, shields and armor once, preserves bonuses on load, and returns one copy', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const oldChance=chance,oldLog=log;const messages=[]
+      try {
+        chance=()=>true;log=m=>messages.push(m)
+        for(const kind of ['weapon','shield','armor']) {
+          resetTheftArena();const e=makeThief()
+          const item={kind,name:'Stolen '+kind,base:'Test '+kind,tier:2,grace:5,
+            ...(kind==='weapon'?{atk:7,mod:'atk',modAmt:2}:{def:8,mod:'hp',modAmt:4}),
+            hunterQuestId:'gear-'+kind,identified:true}
+          player.inventory=[item]
+          const before={atk:e.atk,def:e.def,spd:e.spd,hp:e.hp,maxHp:e.maxHp},id=e.id
+          theftCheck(tryEnemyTheft(e),'steal gear '+kind)
+          theftCheck(e.stolenItemEquipped && e.equipment===e.stolenItem,'equip ownership '+kind)
+          theftCheck(messages.includes('Imp has equipped '+item.name+'.'),'equipment log '+kind)
+          if(kind==='weapon') {
+            theftCheck(e.atk===before.atk+9 && combatDelay(e.equipment,false,e)===6/5,'weapon attack and grace')
+          } else {
+            theftCheck(e.def===before.def+8 && e.spd===Math.max(1,before.spd-1) &&
+              e.hp===before.hp+4 && e.maxHp===before.maxHp+4,'defensive gear bonuses and penalty')
+          }
+          const stats={atk:e.atk,def:e.def,spd:e.spd,hp:e.hp,maxHp:e.maxHp}
+          const save=JSON.parse(JSON.stringify(buildSaveObject()))
+          theftCheck(save.version===28,'gear save version')
+          loadGameFromObject(save,{isReplayInit:true})
+          const loaded=enemies.find(v=>v.id===id)
+          theftCheck(loaded.stolenItemEquipped && loaded.equipment.kind===kind,'equipped state restored')
+          theftCheck(JSON.stringify({atk:loaded.atk,def:loaded.def,spd:loaded.spd,hp:loaded.hp,maxHp:loaded.maxHp})===JSON.stringify(stats),'no repeated stat bonuses on load')
+          chance=()=>false;killEnemy(loaded)
+          const bags=groundItems.filter(g=>g.kind==='stolenloot')
+          theftCheck(bags.length===1 && JSON.stringify(bags[0].item)===JSON.stringify(item),'one exact stolen gear drop')
+          theftCheck(!player.inventory.some(i=>i.hunterQuestId===item.hunterQuestId),'no extra normal equipment drop')
+          player.x=bags[0].x;player.y=bags[0].y;lootSkeletonOrForage()
+          theftCheck(player.inventory.filter(i=>i.hunterQuestId===item.hunterQuestId).length===1,'one recovered gear copy')
+          chance=()=>true
+        }
+        resetTheftArena();const e=makeThief(),original={kind:'shield',name:'Existing shield',def:3}
+        applyEnemyEquipment(e,original);const atk=e.atk
+        player.inventory=[{kind:'weapon',name:'New blade',atk:9,grace:4}];tryEnemyTheft(e)
+        theftCheck(e.equipment===original && !e.stolenItemEquipped && e.atk===atk,'existing gear kept')
+        theftCheck(!messages.includes('Imp has equipped New blade.'),'no false equipment log')
+        chance=()=>false;killEnemy(e)
+        theftCheck(player.inventory.includes(original) && groundItems.some(g=>g.kind==='stolenloot' && g.item.name==='New blade'),'existing gear and stolen loot separate')
+        resetTheftArena();chance=()=>true;const killer=makeThief()
+        player.inventory=[{kind:'shield',name:'Stolen shield',base:'Shield',def:2,tier:1}]
+        tryEnemyTheft(killer)
+        player.equip.weapon={kind:'weapon',name:'Death blade',base:'Club',atk:100,grace:4,tier:1}
+        player.equip.armor={kind:'armor',name:'Corpse armor',base:'Robe',def:1,tier:4}
+        createPermadeathBody(killer)
+        theftCheck(!killer.stolenItemEquipped && killer.equipment.name==='Death blade','permadeath replacement relinquishes stolen gear')
+        chance=()=>false;killEnemy(killer)
+        theftCheck(player.inventory.some(i=>i.name==='Death blade') &&
+          groundItems.some(g=>g.kind==='stolenloot' && g.item.name==='Stolen shield'),'replacement drops normally while stolen shield remains recoverable')
+
+      } finally {chance=oldChance;log=oldLog}
+    })()`))
+  })
+
+  it('replays auto-equipped stolen gear without applying its bonuses twice', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const e=makeThief();player.inventory=[{kind:'weapon',name:'Replay Blade',base:'Club',atk:7,grace:4,tier:1}]
+      const baseAtk=e.atk;let seed=1
+      while(true) {rngState=seed;if(rng()<0.1) break;seed++}
+      rngState=seed;startReplayRecording();skipTurn()
+      theftCheck(e.stolenItemEquipped && e.atk===baseAtk+7,'recorded gear equipped')
+      for(let i=0;i<4;i++) skipTurn()
+      const state=()=>({hp:player.hp,turn:turnCount,inventory:player.inventory,enemies:buildSaveObject().enemies})
+      const expected=JSON.stringify(state()),recorded=JSON.parse(JSON.stringify(replayData))
+      loadGameFromObject(recorded.initialState,{isReplayInit:true})
+      replayAnimationsDisabled=true;replaySimulationMode=true;activeReplay=recorded
+      replayPlaying=true;replayRecording=false;replayRngIndex=0
+      try {
+        for(const action of recorded.actions) await runReplayAction(action)
+        theftCheck(replayRngIndex===recorded.rng.length && JSON.stringify(state())===expected,'identical equipped theft replay')
+      } finally {replayPlaying=false;replaySimulationMode=false;activeReplay=null}
     })()`))
   })
 

@@ -19,7 +19,7 @@ describe('Enemy abilities data model', () => {
         check(!ENEMY_TEMPLATE_BY_NAME['Giant Bat'].abilities.includes('testOnly'), 'instance independence')
         check(rngBefore === rngState, 'non-shooter creation adds no RNG calls')
         const save = buildSaveObject()
-        check(save.version === 27 && save.enemies.every(e => Array.isArray(e.abilities) && !('fly' in e) && !('evades' in e)), 'save schema')
+        check(save.version === 28 && save.enemies.every(e => Array.isArray(e.abilities) && !('fly' in e) && !('evades' in e)), 'save schema')
         check(save.replay.initialState.enemies.every(e => Array.isArray(e.abilities)), 'replay initial schema')
         loadGameFromObject(save)
         check(enemies.find(e => e.id === a.id).abilities.includes('testOnly'), 'abilities restored exactly')

@@ -1784,6 +1784,7 @@ more difficult:
   function applyEnemyEquipment(e, item) {
     if (!e || !item) return
     e.equipment = item
+    e.stolenItemEquipped = item === e.stolenItem
     if (item.kind === 'weapon') {
       if (item.atk) e.atk += item.atk
       if (item.mod === 'atk') e.atk += item.modAmt
@@ -2243,6 +2244,7 @@ more difficult:
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
+    enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
@@ -3212,6 +3214,10 @@ more difficult:
     e.theftUsed = true
     e.attackStart = undefined
     log(`${e.name} has snatched ${artifactDisplayName(e.stolenItem)} from you and runs away!`, 'bad')
+    if (!e.equipment && ['weapon', 'shield', 'armor'].includes(e.stolenItem.kind)) {
+      applyEnemyEquipment(e, e.stolenItem)
+      log(`${e.name} has equipped ${artifactDisplayName(e.stolenItem)}.`, 'bad')
+    }
     tryWoundedEnemyFlee(e, true)
     updateHud()
     if (invOpen) renderInventory()
@@ -3505,6 +3511,9 @@ more difficult:
       groundItems.push({x: e.x, y: e.y, level: e.level ?? currentZ,
         levelKind: e.levelKind || currentLevelKind(), caveIndex: e.caveIndex ?? currentCave,
         kind: 'stolenloot', item: e.stolenItem})
+      // The stolen item belongs to the bag, never both bag and normal gear loot.
+      if (e.stolenItemEquipped) e.equipment = null
+      e.stolenItemEquipped = false
       e.stolenItem = null
     }
     lootFromEnemy(e)
@@ -3557,6 +3566,7 @@ more difficult:
       const candidate = pick(remainingWeapons)
       if (!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) {
         killer.equipment = {...candidate}
+        killer.stolenItemEquipped = false
         log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad')
       }
     }

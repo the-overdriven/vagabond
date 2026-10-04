@@ -158,7 +158,7 @@ describe('Rare monster sightings and flight', () => {
       fleeAssert(!Object.keys(untouched).some(k=>k.startsWith('rare')), 'defaults omitted')
       enemyTurn()
       const save=JSON.parse(JSON.stringify(buildSaveObject())), id=e.id
-      fleeAssert(save.version===27, 'current save version')
+      fleeAssert(save.version===28, 'current save version')
       const saved=save.enemies.find(v=>v.id===id)
       fleeAssert(saved.rareSightings===1 && saved.rareFleeTurns===7 && saved.rareFleeAcc===0.5 && saved.rareArmed===false, 'exact mid-flight fields')
       loadGameFromObject(save,{isReplayInit:true}); replayAnimationsDisabled=true

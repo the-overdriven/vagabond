@@ -1511,6 +1511,15 @@ escape. A cornered thief resumes ordinary combat and tries retreating again
 when an escape tile opens. Off-level thieves remain paused like other enemies.
 Sacred-ground protection still prevents new thefts.
 
+A thief with an empty equipment slot immediately equips stolen weapons, shields,
+or armor and logs "<name> has equipped <item>." Monsters have one equipment slot;
+existing gear is never replaced by theft. Consumables and artifacts are carried
+without equipping. This uses the normal enemy equipment rules, including weapon
+ATK/GRACE, armor or shield DEF, and their usual speed penalty. Bonuses apply once,
+so a cornered thief can fight with the stolen gear. Death returns it through the
+bag only, without an additional equipment drop. Replacing that gear later through
+existing permadeath loot rules leaves the stolen item recoverable in its bag.
+
 A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
 and mobile inspection. Victory skull and Alarmed markers shift to avoid overlap.
 Killing it drops a bag at its exact map location; forage recovers the original
@@ -4204,10 +4213,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-27
+28
 ```
 
 Saves are JSON files.
+
+Version 28 adds `stolenItemEquipped`, initialized false and preserved in saves
+and replay snapshots. Enemy stats are saved after gear bonuses are applied;
+restoration does not apply them again. The flag distinguishes stolen gear from
+ordinary equipment so death cannot duplicate the stolen item.
 
 Version 27 stores each enemy’s `theftUsed` flag and exact `stolenItem` object,
 including stack count, quest identity, affixes and artifact properties. Both are
@@ -4287,7 +4301,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 27** saves. Other versions are rejected
+Current gameplay state requires **version 28** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -5125,7 +5139,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 27).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 28).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
