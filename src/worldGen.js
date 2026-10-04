@@ -2406,7 +2406,10 @@ function spawnCaveScenarios() {
     }
     if (level === -2) {
       const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
-      const threatPool = ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier))
+      // Rare creatures (rarity <= deepThreatMaxExcludedRarity) never appear as the
+      // lone z:-2 threat; the rest are drawn in proportion to their rarity.
+      const threatPool = ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier) &&
+        (t.rarity ?? 1) > cfg.deepThreatMaxExcludedRarity)
       // Choose an open pocket with four immediately adjacent guard positions.
       // Reserve the group before ordinary mobs, so none can displace it.
       const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
@@ -2428,7 +2431,7 @@ function spawnCaveScenarios() {
       }
       if (threatPool.length) {
         const spot = takeSpot('far')
-        if (spot) makeEnemy(pick(threatPool), spot)
+        if (spot) makeEnemy(pickWeighted(threatPool, t => t.rarity ?? 1), spot)
       }
     }
     for (const [name, count] of rules.mobs) {

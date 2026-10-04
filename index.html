@@ -4,12 +4,6 @@ highest prio: deeper dungeons for endgame
 
 but first:
 
-!1 [ui] 🖥️ herbalist services: buy life potions should use life potion svg instead of the emoji
-!1 [ui] 🖥️ Fleeing (1/2) - what is this 1/2? why does player needs it? remove 1/2
-!1 [ui] 🖥️ feat: add Level Up! popup
-!1 [ui] 🖥️ add char sheet to mobile? show fullscreen from inventory view
-!2 [caves] 🕸️ cave: add webs randomly sprinkled in cave corners (generate tiles)
-!2 [caves] 🕸️ tier 4 cave monster (level 2) should take rarity into account, goblins/skeletons/skinks/kobolds shouldn't have rare monsters there
 !2 [combat] ⚔️ vulture and hyena and jackal and chupacabra: add ability carrionInstinct: adds 25% ATK if player has less than 20% HP
 !2 [monsters] 👹 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller... sleeping = opposite of alarmed, there is a small chance they wake up. zzz
 !2 [quests] 📜 old hunter: "the lost item" fallback - wtf is that fallback?
@@ -237,7 +231,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261004-2">
+  <link rel="stylesheet" href="css/style.css?v=20261005-1">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -433,6 +427,7 @@ more difficult:
         </details>
         <div class="closehint">
           <button class="slbtn" id="btnInvToMap" type="button">View Map</button>
+          <button class="slbtn" id="btnInvCharSheet" type="button">Char Sheet</button>
           <button class="slbtn" id="btnInvBestiary" type="button">Bestiary</button>
           <button class="slbtn" id="btnInvCloseBottom" type="button">Close</button>
         </div>
@@ -480,6 +475,19 @@ more difficult:
         <p class="bestiary-intro">You have slain 0 different creatures.</p>
         <div id="bestiaryList" class="bestiary-list" aria-live="polite"></div>
         <div class="closehint"><button class="slbtn" id="btnBestiaryCloseBottom" type="button">Close</button></div>
+      </div>
+    </div>
+    <div class="overlay" id="charSheetOverlay" role="dialog" aria-modal="true" aria-labelledby="charSheetTitle">
+      <div class="panelbox">
+        <div class="charsheet-header">
+          <h2 id="charSheetTitle">Character Sheet</h2>
+          <button class="slbtn overlay-close" id="btnCharSheetClose" type="button" aria-label="Close character sheet">✕</button>
+        </div>
+        <div class="statgrid" id="charSheetGrid"></div>
+        <div class="closehint">
+          <button class="slbtn" id="btnCharSheetToInv" type="button">Inventory</button>
+          <button class="slbtn" id="btnCharSheetCloseBottom" type="button">Close</button>
+        </div>
       </div>
     </div>
     <div class="overlay" id="tradeOverlay">
@@ -991,6 +999,7 @@ more difficult:
   const IS_COARSE_POINTER = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
 
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
+  const LIFE_POTION_ICON = 'img/icons/life-potion.png'
   const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
 
   function stableBackgroundVariant(paths, x, y) {
@@ -1065,6 +1074,7 @@ more difficult:
       for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
         if (visual?.image) paths.push(visual.image)
       }
+      paths.push(LIFE_POTION_ICON, itemIconPath('herb'))
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
@@ -1086,6 +1096,9 @@ more difficult:
         if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
       }
       for (const visual of Object.values(RENDER_STYLE?.projectiles || {})) {
+        if (visual?.image) paths.push(visual.image)
+      }
+      for (const visual of Object.values(RENDER_STYLE?.caveDecor || {})) {
         if (visual?.image) paths.push(visual.image)
       }
     }
@@ -2118,7 +2131,23 @@ more difficult:
       leveled = true
       log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''}${graceGain ? `, +${graceGain} GRACE` : ''})`, 'good')
     }
-    if (leveled) updateHud()
+    if (leveled) {
+      updateHud()
+      showLevelUpPopup(player.lvl)
+    }
+  }
+
+  // Purely cosmetic DOM overlay: no RNG, no game state, safe during replays.
+  function showLevelUpPopup(lvl) {
+    const stage = document.getElementById('stage')
+    if (!stage) return
+    stage.querySelector('.levelup-popup')?.remove()
+    const el = document.createElement('div')
+    el.className = 'levelup-popup'
+    el.setAttribute('aria-hidden', 'true')
+    el.innerHTML = `<span class="levelup-title">Level Up!</span><span class="levelup-sub">Level ${lvl}</span>`
+    el.addEventListener('animationend', e => { if (e.target === el) el.remove() })
+    stage.appendChild(el)
   }
 
   /* ============================== EXPLORATION ============================== */
@@ -5475,7 +5504,7 @@ more difficult:
   }
 
   /* ============================== MOVEMENT ============================== */
-  let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false
+  let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false, charSheetOpen = false
   let raceOpen = true // block play input from startup through character creation
   let worldGenerating = false
   let reusingWorldAfterPermadeath = false
@@ -6471,6 +6500,62 @@ more difficult:
     return composed
   }
 
+  // Cosmetic cave dressing (webs in corners, stalagmites, small mushrooms).
+  // Purely a function of coordinates: no game RNG, nothing saved, no gameplay
+  // effect, so worlds, replays and saves are unaffected.
+  function caveDecorRoll(x, y, salt) {
+    let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(currentZ | 0, 2246822519) + Math.imul(salt, 3266489917)) | 0
+    h = Math.imul(h ^ (h >>> 13), 1274126177)
+    h ^= h >>> 16
+    return (h >>> 0) / 4294967296
+  }
+
+  function drawCaveDecorSprite(px, py, visual, flipX, flipY) {
+    const image = resolveVisualImage(visual)
+    if (!image) return
+    const cached = scaledVisualCanvas(image, visual.scale ?? 1)
+    if (!flipX && !flipY) {
+      ctx.drawImage(cached, px + (TILE_PX - cached.width) / 2, py + (TILE_PX - cached.height) / 2)
+      return
+    }
+    ctx.save()
+    ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2)
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1)
+    ctx.drawImage(cached, -cached.width / 2, -cached.height / 2)
+    ctx.restore()
+  }
+
+  function drawCaveDecor(px, py, mx, my, tileKey, itemTiles) {
+    const decor = RENDER_STYLE.caveDecor
+    if (!decor || (tileKey !== 'cavefloor' && tileKey !== 'cavefloor2')) return
+    if (itemTiles.has(keyXY(mx, my))) return
+    // Only dress plain cave: any stairs, entrance, crypt or fort tile nearby
+    // means the spot stays clear.
+    const at = (dx, dy) => map[my + dy]?.[mx + dx]
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue
+      const t = at(dx, dy)
+      if (t !== undefined && t !== 'cavefloor' && t !== 'cavefloor2' && t !== 'cavewall') return
+    }
+    const wallN = at(0, -1) === 'cavewall', wallS = at(0, 1) === 'cavewall'
+    const wallW = at(-1, 0) === 'cavewall', wallE = at(1, 0) === 'cavewall'
+    if ((wallN || wallS) && (wallW || wallE) && decor.web && caveDecorRoll(mx, my, 1) < decor.web.chance) {
+      // The web sprite hangs from its top-left corner; mirror it into the
+      // corner this tile actually has (ties between two corners are hashed).
+      const flipX = wallW && wallE ? caveDecorRoll(mx, my, 2) < 0.5 : !wallW
+      const flipY = wallN && wallS ? caveDecorRoll(mx, my, 3) < 0.5 : !wallN
+      drawCaveDecorSprite(px, py, decor.web, flipX, flipY)
+      return
+    }
+    if (!(wallN || wallS || wallW || wallE)) return
+    const r = caveDecorRoll(mx, my, 4)
+    const stalChance = decor.stalagmite?.chance ?? 0
+    if (decor.stalagmite && r < stalChance)
+      drawCaveDecorSprite(px, py, decor.stalagmite, caveDecorRoll(mx, my, 5) < 0.5, false)
+    else if (decor.mushrooms && r < stalChance + decor.mushrooms.chance)
+      drawCaveDecorSprite(px, py, decor.mushrooms, caveDecorRoll(mx, my, 6) < 0.5, false)
+  }
+
   function drawImageVisualWithShadow(px, py, visual, alpha) {
     const image = resolveVisualImage(visual)
     if (!image) return false
@@ -7212,6 +7297,11 @@ more difficult:
     const renderRows = VIEW_H + (fracY ? 1 : 0)
     const mapW = map && map[0] ? map[0].length : MAP_W
     const mapH = map ? map.length : MAP_H
+    let caveDecorItemTiles = null
+    if (currentZ < 0 && USE_TILE_IMAGES && RENDER_STYLE.caveDecor) {
+      caveDecorItemTiles = new Set()
+      for (const g of groundItems) if (onCurrentLevel(g)) caveDecorItemTiles.add(keyXY(g.x, g.y))
+    }
     for (let vy = 0; vy < renderRows; vy++) {
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
@@ -7286,6 +7376,7 @@ more difficult:
             drawImageVisual(px, py, RENDER_STYLE.specialTiles.dugSand)
             ctx.restore()
           }
+          if (caveDecorItemTiles) drawCaveDecor(px, py, mx, my, tileKey, caveDecorItemTiles)
         }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
@@ -7842,7 +7933,7 @@ more difficult:
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' <span class="thief-marker" aria-label="carrying stolen item"></span>' : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
-      ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing (${e.rareSightings}/${RARE_FLEE.sightings})${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
@@ -8983,11 +9074,18 @@ more difficult:
     if (herbalist || fisherman) {
       const buyList = document.getElementById('tradeBuyList')
       buyList.innerHTML = ''
-      const addService = (label, action) => {
+      const addService = (label, action, icon) => {
         const row = document.createElement('div')
         row.className = 'invitem'
         const b = document.createElement('button')
-        b.textContent = label
+        if (icon) {
+          const img = document.createElement('img')
+          img.src = imageSrc(icon)
+          img.className = 'svc-icon'
+          img.alt = ''
+          img.setAttribute('aria-hidden', 'true')
+          b.append(img, label)
+        } else b.textContent = label
         b.onclick = action
         row.appendChild(b)
         buyList.appendChild(row)
@@ -8995,9 +9093,9 @@ more difficult:
       if (fisherman) addService('🐟 Buy Fish (5g)', buyFishermanFish)
       else {
         addService('🍄 Purify mushrooms (2g each)', purifyMushrooms)
-        addService(`🧪 Buy Life Potion (${HERBALIST_POTION_PRICE}g)`, buyHerbalistPotion)
-        addService('🧪 Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion())
-        addService('🧪 Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true))
+        addService(`Buy Life Potion (${HERBALIST_POTION_PRICE}g)`, buyHerbalistPotion, LIFE_POTION_ICON)
+        addService('Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion(), itemIconPath('herb'))
+        addService('Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true), itemIconPath('herb'))
       }
       document.getElementById('tradeSellList').innerHTML = fisherman ? '' : '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
       document.getElementById('tradeGold').textContent = player.gold
@@ -9489,6 +9587,16 @@ more difficult:
     toggleInv(false)
     toggleBestiary(true)
   })
+  document.getElementById('btnInvCharSheet').addEventListener('click', () => {
+    toggleInv(false)
+    toggleCharSheet(true)
+  })
+  document.getElementById('btnCharSheetToInv').addEventListener('click', () => {
+    toggleCharSheet(false)
+    toggleInv(true)
+  })
+  document.getElementById('btnCharSheetClose').addEventListener('click', () => toggleCharSheet(false))
+  document.getElementById('btnCharSheetCloseBottom').addEventListener('click', () => toggleCharSheet(false))
   document.getElementById('btnInvToMap').addEventListener('click', () => {
     toggleInv(false)
     toggleMap(true)
@@ -9637,7 +9745,7 @@ more difficult:
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()
+    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || bestiaryOpen || charSheetOpen || Graveyard.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
     requestAnimationFrame(updateMobileSafeAreas)
@@ -9695,9 +9803,28 @@ more difficult:
     const next = (force !== undefined) ? force : !invOpen
     if (next && mapOpen) toggleMap(false)
     if (next && bestiaryOpen) toggleBestiary(false)
+    if (next && charSheetOpen) toggleCharSheet(false)
     invOpen = next
     document.getElementById('invOverlay').classList.toggle('show', invOpen)
     if (invOpen) renderInventory()
+    updateTouchControlsVisibility()
+  }
+
+  // Fullscreen character sheet for touch devices, reached from the inventory.
+  // It mirrors the stat grid the inventory builds, so both stay in sync.
+  function toggleCharSheet(force) {
+    const next = force !== undefined ? force : !charSheetOpen
+    if (next && invOpen) toggleInv(false)
+    if (next && mapOpen) toggleMap(false)
+    if (next && bestiaryOpen) toggleBestiary(false)
+    if (next && tradeOpen) toggleTrade(false)
+    charSheetOpen = next
+    document.getElementById('charSheetOverlay').classList.toggle('show', charSheetOpen)
+    if (charSheetOpen) {
+      renderInventory()
+      document.getElementById('charSheetGrid').replaceChildren(
+        ...[...document.getElementById('statGrid').children].map(row => row.cloneNode(true)))
+    }
     updateTouchControlsVisibility()
   }
 
@@ -9925,6 +10052,7 @@ more difficult:
       toggleTrade(false)
       toggleTreasureMap(false)
       toggleBestiary(false)
+      toggleCharSheet(false)
       return
     }
     if (k === 'k' || k === 'K') {
@@ -9949,7 +10077,7 @@ more difficult:
       if (!ev.repeat && !ev.shiftKey) useGodModeKey()
       return
     }
-    if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()) return
+    if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || charSheetOpen || Graveyard.isOpen()) return
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
       (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()

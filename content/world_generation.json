@@ -470,6 +470,7 @@
       3,
       4
     ],
+    "deepThreatMaxExcludedRarity": 0.1,
     "deepMonsterMin": 24,
     "deepMonsterMax": 36,
     "deepMonsterTilesPerEnemy": 75,
