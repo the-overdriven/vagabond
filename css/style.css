@@ -897,6 +897,10 @@ body.hint-collapsed #hint .panel-toggle {
   font-weight: 700;
 }
 
+.statgrid .achievement-row {
+  grid-column: 1 / -1;
+}
+
 .stats-details {
   margin-top: 12px;
   border-top: 1px solid var(--border);

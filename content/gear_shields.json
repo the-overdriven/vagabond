@@ -1,11 +1,11 @@
 [
-  {"name":"Buckler",          "def":2,  "tier":1},
-  {"name":"Pelt Shield",      "def":3,  "tier":2},
-  {"name":"Chitin Shield",    "def":4,  "tier":2},
-  {"name":"Round Shield",     "def":5,  "tier":2},
-  {"name":"Kite Shield",      "def":6,  "tier":3},
-  {"name":"Spiked Shield",    "def":7,  "tier":3},
-  {"name":"Bone Shield",      "def":8,  "tier":4},
-  {"name":"Tower Shield",     "def":10, "tier":4},
-  {"name":"Royal Shield",     "def":9,  "tier":5}
+  {"name":"Buckler",          "def":2,  "tier":1, "baseValue": 30},
+  {"name":"Pelt Shield",      "def":3,  "tier":2, "baseValue": 60},
+  {"name":"Chitin Shield",    "def":4,  "tier":2, "baseValue": 60},
+  {"name":"Round Shield",     "def":5,  "tier":2, "baseValue": 60},
+  {"name":"Kite Shield",      "def":6,  "tier":3, "baseValue": 110},
+  {"name":"Spiked Shield",    "def":7,  "tier":3, "baseValue": 110},
+  {"name":"Bone Shield",      "def":8,  "tier":4, "baseValue": 180},
+  {"name":"Tower Shield",     "def":10, "tier":4, "baseValue": 180},
+  {"name":"Royal Shield",     "def":9,  "tier":5, "baseValue": 280}
 ]

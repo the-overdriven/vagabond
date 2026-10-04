@@ -93,7 +93,7 @@ describe('One-time monster theft', () => {
           }
           const stats={atk:e.atk,def:e.def,spd:e.spd,hp:e.hp,maxHp:e.maxHp}
           const save=JSON.parse(JSON.stringify(buildSaveObject()))
-          theftCheck(save.version===28,'gear save version')
+          theftCheck(save.version===29,'gear save version')
           loadGameFromObject(save,{isReplayInit:true})
           const loaded=enemies.find(v=>v.id===id)
           theftCheck(loaded.stolenItemEquipped && loaded.equipment.kind===kind,'equipped state restored')

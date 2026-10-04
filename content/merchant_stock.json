@@ -16,7 +16,7 @@
     "priceMultiplier": 2
   },
   "guaranteedGear": {
-    "_note": "One guaranteed item of each kind/tier below is kept in stock; price = itemSellValue() * priceMultiplier.",
+    "_note": "One guaranteed item of each kind/tier below is kept in stock; price = itemBaseValue() * priceMultiplier / 2. Existing multiplier 2 uses the normal base purchase value.",
     "shield": {
       "tier": 1,
       "priceMultiplier": 2

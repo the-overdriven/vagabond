@@ -127,7 +127,7 @@
       "glyph": "!",
       "color": "#e0b030",
       "image": "img/tiles/speed-potion.png",
-      "scale": 1.5
+      "scale": 0.9
     },
     "scrollOfInvisibility": {
       "glyph": "?",

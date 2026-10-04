@@ -19,7 +19,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
     cy.window().then(win => win.eval(`(() => {
       replayRecording=false; currentZ=0; map=surfaceMap
       const make=(id,baseName,wander,extra={})=>({id,baseName,name:'Fierce '+baseName,
-        tier:3,level:0,alive:true,wander,prefix:{name:'Fierce'},equipment:{name:'Axe'},...extra})
+        tier:3,level:0,alive:true,x:spawnPoint.x,y:spawnPoint.y,wander,prefix:{name:'Fierce'},equipment:{name:'Axe'},...extra})
       enemies=[make('ordinary','Kveld','roam'),make('promoted','Kveld','far'),
         make('rare','Vampire','homeReturn',{alarmed:true,level:-1}),
         make('quarry','GAUR','far',{isRareQuarry:true}),make('far','Chupacabra','far')]

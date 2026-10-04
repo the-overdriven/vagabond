@@ -64,5 +64,10 @@
       }
     ],
     "elseResult": "idscroll"
+  },
+  "baseValues": {
+    "startingWeapon": 4,
+    "modifierPerPoint": 10,
+    "commonStartingWeapon": 30
   }
 }

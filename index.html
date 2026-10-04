@@ -4,12 +4,6 @@ highest prio: deeper dungeons for endgame
 
 but first:
 
-!1 [items] add +1% chance to dig up a silver spoon, msg log should say "someone threw away a good spoon" (it's not a real item, just digging message)
-!1 improve (regenerate) speed potion tile, should look like current life potion but yellow
-!1 [sheet/graveyard] 🏆 feat: add achievments to char sheet stats: strongest enemy killed, also send it to supabase on death
-!1 [balance] ⚖️ balance: old hunter's monster target should be closer to village and not so strong (prefer tier 3 than 4)
-!1 [dialogue] 💬 a <monster name>, they call it.
-!1 [items] 🎒 feat: all items should have a base value in .json (not only sellValue)
 !1 [ui] 🖥️ herbalist services: buy life potions should use life potion svg instead of the emoji
 !1 [ui] 🖥️ Fleeing (1/2) - what is this 1/2? why does player needs it? remove 1/2
 !1 [ui] 🖥️ feat: add Level Up! popup
@@ -703,6 +697,7 @@ more difficult:
   let TERRAIN_SPEED = {}
   let TERRAIN_DEFENSE = {}
   let SELL_VALUE_BY_TIER = []
+  let ITEM_BASE_VALUES
   let ITEM_DEFINITIONS = {}
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
@@ -764,7 +759,7 @@ more difficult:
     // The density divisor is per walkable tile, so it scales with either world area.
     WEAPONS = WORLD_GEN_CONFIG.lootRules.commonStartingWeapons
       ? BASE_WEAPONS.concat(STARTING_WEAPONS.filter(name => !BASE_WEAPONS.some(w => w.name === name))
-        .map(name => ({name, atk: 1, grace: 1, tier: 1})))
+        .map(name => ({name, atk: 1, grace: 1, tier: 1, baseValue: ITEM_BASE_VALUES.commonStartingWeapon})))
       : BASE_WEAPONS
     activeWorldTraits = structuredClone(traits)
   }
@@ -948,6 +943,12 @@ more difficult:
     TERRAIN_SPEED = content.tiles.terrainSpeed
     TERRAIN_DEFENSE = content.tiles.terrainDefense
     SELL_VALUE_BY_TIER = content.lootTables.sellValues.byTier
+    ITEM_BASE_VALUES = content.lootTables.baseValues
+    if (!ITEM_BASE_VALUES || Object.values(ITEM_BASE_VALUES).some(v => !Number.isFinite(v) || v < 0) ||
+        [ITEM_BASE_VALUES.startingWeapon, ITEM_BASE_VALUES.commonStartingWeapon, ITEM_BASE_VALUES.modifierPerPoint].some(v => !Number.isFinite(v)))
+      throw new Error('Invalid shared item base values.')
+    if ([...WEAPONS, ...SHIELDS, ...ARMORS, ...ARTIFACT_EFFECTS].some(item => !Number.isFinite(item.baseValue) || item.baseValue < 0))
+      throw new Error('Every gear and artifact template needs a baseValue.')
     validateItemDefinitions(content.items)
     ITEM_DEFINITIONS = content.items
     FORAGE_TABLE = content.lootTables.forage
@@ -1429,6 +1430,7 @@ more difficult:
       atk: base.atk,
       grace: base.grace,
       tier: base.tier,
+      baseValue: base.baseValue,
       twoHanded: !!base.twoHanded,
       name: base.name
     }
@@ -1438,7 +1440,7 @@ more difficult:
   function makeShieldItem(tier, mf = 0) {
     const pool = SHIELDS.filter(s => s.tier <= tier)
     const base = pick(pool.length ? pool : SHIELDS.filter(s => s.tier === 1))
-    const item = {kind: 'shield', base: base.name, def: base.def, tier: base.tier, name: base.name}
+    const item = {kind: 'shield', base: base.name, def: base.def, tier: base.tier, baseValue: base.baseValue, name: base.name}
     return rollModifier(base.name, item, mf)
   }
 
@@ -1450,6 +1452,7 @@ more difficult:
       base: base.name,
       def: base.def,
       tier: base.tier,
+      baseValue: base.baseValue,
       speedPenalty: base.speedPenalty || 0,
       ...(base.gracePenalty ? {gracePenalty: base.gracePenalty} : {}),
       name: base.name
@@ -1604,7 +1607,7 @@ more difficult:
     }
 
     const item = {
-      kind: 'artifact', name, noun, tier: effect.tier, effectId: effect.id,
+      kind: 'artifact', name, noun, tier: effect.tier, effectId: effect.id, baseValue: effect.baseValue,
       artifactSlot: slot,
       speedPenalty: slot === 'armor' ? 1 : 0,
       identified: false,
@@ -1888,7 +1891,7 @@ more difficult:
     maxHp: 50, hp: 50,
     baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
-    trackingLearned: false, killsBySpecies: {},
+    trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
     invisibleTurns: 0,
     godMode: false,
     godInvisible: false,
@@ -2456,11 +2459,39 @@ more difficult:
     }
   }
 
+  function hunterFirstQuestEnemies() {
+    const origin = villageCenter || spawnPoint
+    const distance = new Int32Array(MAP_W * MAP_H).fill(-1)
+    const queue = new Int32Array(MAP_W * MAP_H)
+    const start = origin.y * MAP_W + origin.x
+    if (!TILE[surfaceMap[origin.y]?.[origin.x]]?.walk) return []
+    let head = 0, tail = 0
+    distance[start] = 0; queue[tail++] = start
+    while (head < tail) {
+      const cell = queue[head++], x = cell % MAP_W, y = Math.floor(cell / MAP_W)
+      for (const [dx, dy] of DIRS8) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
+        const next = ny * MAP_W + nx
+        if (distance[next] >= 0 || !TILE[surfaceMap[ny]?.[nx]]?.walk) continue
+        distance[next] = distance[cell] + 1; queue[tail++] = next
+      }
+    }
+    const reachable = hunterLivingEnemies().filter(e => (e.level || 0) === 0 &&
+      Number.isInteger(e.x) && Number.isInteger(e.y) && e.x >= 0 && e.x < MAP_W && e.y >= 0 && e.y < MAP_H &&
+      distance[e.y * MAP_W + e.x] >= 0)
+    const tier3 = reachable.filter(e => e.tier === 3)
+    const pool = tier3.length ? tier3 : reachable.filter(e => e.tier === 4)
+    if (!pool.length) return []
+    const nearest = Math.min(...pool.map(e => distance[e.y * MAP_W + e.x]))
+    return pool.filter(e => distance[e.y * MAP_W + e.x] === nearest)
+  }
+
   function hunterCandidates() {
     hunterEnsureIds()
     const out = []
-    const living = hunterLivingEnemies()
-    const marked = hunterPrefixedEnemies()
+    const living = hunterFirstQuestEnemies()
+    const marked = living
     for (const e of marked) out.push({
       type: 'kill_specific',
       targetEnemyId: e.id,
@@ -2520,8 +2551,8 @@ more difficult:
       render()
       return oldHunterQuest
     }
-    // Give a 50% chance to receive a killing quest from prefixed tier 3-4
-    // monsters. Item quests remain eligible otherwise.
+    // Give a 50% chance to receive a killing quest from the nearest reachable
+    // preferred-tier monsters. Item quests remain eligible otherwise.
     const killOptions = options.filter(q => q.type === 'kill_specific' || q.type === 'kill_group')
     const itemOptions = options.filter(q => q.type === 'recover_item' || q.type === 'deliver_item')
     let pool = options
@@ -2558,7 +2589,7 @@ more difficult:
   function hunterFlavor(q) {
     const reason = pick(['something has been feeding there', 'the tracks stop where the dead begin to walk', 'travellers have gone missing', 'I found fresh blood where no living thing should have been', 'the silence has become too deep'])
     if (q.type === 'investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterLocationPhrase(q)}. Go there and investigate the place, then report back to me. I'll mark the location on your map.`, `Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterLocationPhrase(q)}. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`])
-    if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. A ${q.targetName}. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
+    if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. A ${q.targetName}, they call it. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
     if (q.type === 'kill_specific') return pick([
       `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It is ${hunterLocationPhrase(q)}, and ${reason}. Find it. Make sure it does not come back.`,
       `Old Hunter says: I know the trail of a ${q.targetName}. I last saw it ${hunterLocationPhrase(q)}. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
@@ -3492,8 +3523,24 @@ more difficult:
     return false
   }
 
+  function monsterStrength(stats) {
+    return ['atk', 'def', 'spd', 'grace'].reduce((sum, stat) => sum + (Number.isFinite(stats?.[stat]) ? stats[stat] : 0), 0)
+  }
+
+  function recordStrongestEnemyKill(e) {
+    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
+    const naturalGrace = enemyGrace(e) || 0
+    const grace = weapon ? weaponGrace(weapon) : naturalGrace
+    const stats = {atk: e.atk, def: e.def, spd: e.spd,
+      grace: grace > 0 ? Math.max(1, grace - gearGracePenalty(e.equipment)) : 0}
+    const strength = monsterStrength(stats)
+    if (player.strongestEnemyKilled && strength <= player.strongestEnemyKilled.strength) return
+    player.strongestEnemyKilled = {name: e.name, species: trackSpecies(e), tier: e.tier, strength, stats}
+  }
+
   function killEnemy(e) {
     if (!e.alive) return
+    recordStrongestEnemyKill(e)
     const species = trackSpecies(e)
     player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
     if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
@@ -3643,7 +3690,7 @@ more difficult:
       deaths: 0,
       steps: 0,
       kills: 0,
-      trackingLearned: false, killsBySpecies: {},
+      trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
       invisibleTurns: 0,
       godMode: false,
       godInvisible: false,
@@ -3741,6 +3788,7 @@ more difficult:
       artifacts: Graveyard.snapshotArtifacts(player.inventory, itemStatLine),
       steps_taken: player.steps,
       creatures_slain: player.kills,
+      strongest_enemy_killed: player.strongestEnemyKilled ? structuredClone(player.strongestEnemyKilled) : null,
       turn_count: turnCount,
       world_seed: WORLD_SEED,
       last_position: {x: player.x, y: player.y, z: currentZ, level_kind: currentLevelKind(),
@@ -4725,7 +4773,8 @@ more difficult:
     for (const [kind, item] of Object.entries(definitions)) {
       if (!item || typeof item.name !== 'string' || !item.name.trim() ||
           !['supplies', 'other'].includes(item.category) || typeof item.stackable !== 'boolean' ||
-          !Number.isFinite(item.sellValue) || item.sellValue < 0 || !Array.isArray(item.actions))
+          !Number.isFinite(item.sellValue) || item.sellValue < 0 ||
+          !Number.isFinite(item.baseValue) || item.baseValue < 0 || !Array.isArray(item.actions))
         throw new Error('Invalid item definition: ' + kind)
       if (item.icon !== undefined && (typeof item.icon !== 'string' || !/^img\/icons\/[A-Za-z0-9 _-]+\.svg$/.test(item.icon)))
         throw new Error('Invalid item icon: ' + kind)
@@ -5130,7 +5179,8 @@ more difficult:
         })
         log('Something bursts from the sand beside you - a scarab!', 'bad')
       } else log('You hear something moving beneath the sand, but nothing emerges.', 'info')
-    } else log('You dig carefully, but find nothing.', 'info')
+    } else if (roll === 17) log('You dig up a silver spoon. Someone threw away a good spoon.', 'loot')
+    else log('You dig carefully, but find nothing.', 'info')
     render()
     updateHud()
   }
@@ -5911,7 +5961,7 @@ more difficult:
     if (map[player.y]?.[player.x] === 'village' || hut) {
       if (hut?.startingWeapon && !hut.startingWeaponTaken && !player.equip.weapon) {
         const name = hut.startingWeapon
-        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true,
+        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true, baseValue: ITEM_BASE_VALUES.startingWeapon,
           ...(WORLD_GEN_CONFIG.lootRules.commonStartingWeapons ? {tier: 1} : {})}
         hut.startingWeaponTaken = true
         lootLog(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, item, name)
@@ -8718,11 +8768,13 @@ more difficult:
         ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge[0].toUpperCase()).join(', ') || 'none'})`
       ]] : []),
       ['☠️ Creatures Slain', player.kills],
+      ['🏆 Strongest Slain Enemy', player.strongestEnemyKilled
+        ? `${player.strongestEnemyKilled.name} (strength ${player.strongestEnemyKilled.strength})` : 'None'],
       ['📍 Position', player.x + ', ' + player.y],
     ]
     for (const [k, v] of rows) {
       const d = document.createElement('div')
-      d.className = 'row'
+      d.className = k === '🏆 Strongest Slain Enemy' ? 'row achievement-row' : 'row'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k
@@ -8822,7 +8874,8 @@ more difficult:
     const base = pick(WEAPONS.filter(w => cfg.basePool.includes(w.name)))
     const item = {
       kind: 'weapon', base: base.name, atk: base.atk, grace: base.grace,
-      tier: base.tier, twoHanded: !!base.twoHanded, name: base.name
+      tier: base.tier,
+      baseValue: base.baseValue, twoHanded: !!base.twoHanded, name: base.name
     }
     const mod = pick(MODIFIERS)
     item.mod = mod.stat
@@ -8830,7 +8883,7 @@ more difficult:
     item.modAmt = rollModifierAmount(mod.stat)
     if (mod.stat === 'xp') item.xpBonus = randInt(5, 15)
     item.merchantMagicLowTier = true
-    item.merchantPrice = itemSellValue(item) * cfg.priceMultiplier
+    item.merchantPrice = itemBaseValue(item) * cfg.priceMultiplier / 2
     return item
   }
 
@@ -8849,6 +8902,7 @@ more difficult:
           atk: base.atk,
           grace: base.grace,
           tier: base.tier,
+          baseValue: base.baseValue,
           twoHanded: !!base.twoHanded,
           name: base.name,
           merchantPrice: fixedItem.merchantPrice
@@ -8865,18 +8919,18 @@ more difficult:
     const gear = MERCHANT_STOCK_CONFIG.guaranteedGear
     if (!merchantStock.some(it => it.kind === 'shield' && it.tier === gear.shield.tier)) {
       const shield = makeShieldItem(gear.shield.tier)
-      shield.merchantPrice = itemSellValue(shield) * gear.shield.priceMultiplier
+      shield.merchantPrice = itemBaseValue(shield) * gear.shield.priceMultiplier / 2
       merchantStock.push(shield)
     }
     if (!merchantStock.some(it => it.kind === 'armor' && it.tier === gear.armor.tier)) {
       const armor = makeArmorItem(gear.armor.tier)
-      armor.merchantPrice = itemSellValue(armor) * gear.armor.priceMultiplier
+      armor.merchantPrice = itemBaseValue(armor) * gear.armor.priceMultiplier / 2
       merchantStock.push(armor)
     }
     if (!merchantStock.some(it => it.kind === 'artifact')) {
       const art = makeArtifactItem(gear.artifact.tier)
       if (art) {
-        art.merchantPrice = SELL_VALUE_BY_TIER[art.tier] * gear.artifact.priceMultiplier
+        art.merchantPrice = itemBaseValue(art) * gear.artifact.priceMultiplier / 2
         merchantStock.push(art)
       }
     }
@@ -8913,6 +8967,13 @@ more difficult:
       return v
     }
     return 0
+  }
+
+  function itemBaseValue(it) {
+    const definition = itemDefinition(it.kind)
+    if (definition) return definition.baseValue
+    const base = it.startingWeapon ? ITEM_BASE_VALUES.startingWeapon : it.baseValue
+    return (base || 0) + (it.mod ? (it.modAmt || 1) * ITEM_BASE_VALUES.modifierPerPoint : 0)
   }
 
   function renderTrade() {
@@ -8971,7 +9032,7 @@ more difficult:
         nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + (it.tier !== undefined ? ' [T' + it.tier + ']' : '')
         row.appendChild(nm)
         const btn = document.createElement('button')
-        const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2
+        const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
         btn.textContent = 'Buy for ' + buyValue + 'g'
         btn.onclick = () => {
           buyItem(it)
@@ -9026,7 +9087,7 @@ more difficult:
     if (!it) return
     ensureReplayItemIds()
     const replayId = it.replayId
-    const value = it.merchantPrice !== undefined ? it.merchantPrice : itemSellValue(it) * 2
+    const value = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
     if (value <= 0 || player.gold < value) return
     const stackable = isStackableKind(it.kind)
     if (stackable) {
@@ -9663,7 +9724,7 @@ more difficult:
     list.replaceChildren()
     const strength = species => {
       const template = ENEMY_TEMPLATE_BY_NAME[species]
-      return template ? template.atk + template.def + template.spd + template.grace : Infinity
+      return template ? monsterStrength(template) : Infinity
     }
     const known = Object.entries(player.killsBySpecies || {})
       .filter(([, count]) => Number.isFinite(count) && count > 0)

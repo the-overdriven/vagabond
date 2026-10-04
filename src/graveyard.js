@@ -226,7 +226,9 @@ const Graveyard = (() => {
         ['Shield', gearLabel(row.equipment?.shield, row.shield)],
         ['Artifacts', Array.isArray(row.artifacts) ? row.artifacts.map(item => item?.name).join(', ') : '-'],
         ['Gold', row.gold], ['Cumulated XP', row.cumulated_xp], ['Deaths', row.death_number],
-        ['Steps', row.steps_taken], ['Creatures slain', row.creatures_slain]
+        ['Steps', row.steps_taken], ['Creatures slain', row.creatures_slain],
+        ['Strongest enemy killed', row.strongest_enemy_killed
+          ? `${row.strongest_enemy_killed.name} (strength ${row.strongest_enemy_killed.strength})` : 'None']
       ]) extras.appendChild(detail(label, value))
       card.append(extras)
       list.append(card)
@@ -244,7 +246,7 @@ const Graveyard = (() => {
       const client = await getClient()
       if (request !== requestNumber || !visible || !online() || replayActive()) return
       let query = client.from('death_records')
-        .select('character_name,race,level,killer_name,cause_of_death,permadeath,death_number,killed_at,atk,def,spd,grace,max_hp,weapon,armor,shield,equipment,artifacts,gold,cumulated_xp,steps_taken,creatures_slain')
+        .select('character_name,race,level,killer_name,cause_of_death,permadeath,death_number,killed_at,atk,def,spd,grace,max_hp,weapon,armor,shield,equipment,artifacts,gold,cumulated_xp,steps_taken,creatures_slain,strongest_enemy_killed')
         .order('created_at', {ascending: false}).limit(50)
       if (filter !== 'all') query = query.eq('permadeath', filter === 'true')
       const {data, error} = await query

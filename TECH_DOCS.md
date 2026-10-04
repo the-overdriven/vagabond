@@ -169,6 +169,22 @@ base-species entry; unencountered species are hidden. The list reads the saved
 per-species kill counters and refreshes when opened. It does not affect gameplay,
 RNG or replay actions. A new permadeath character begins with an empty Bestiary.
 
+## Strongest kill achievement
+
+The Character sheet records the strongest individual enemy killed by this
+character, showing its actual name and strength. It uses the same
+`ATK + DEF + SPD + GRACE` formula as Bestiary sorting, evaluated on that enemy’s
+permanent spawned stats, including prefixes and equipped gear. Equipped weapon
+GRACE replaces natural GRACE; defensive gear GRACE penalties apply. Terrain,
+Alarmed, Enrage, Charge and temporary flight bonuses do not inflate the record.
+HP, rarity and abilities are outside this ranking. Equal scores retain the first
+kill. No kills displays "None".
+
+The record survives normal deaths, current saves and replay; a new character
+starts without it. Every actual death snapshots it before penalties or character
+reset and sends it as `strongest_enemy_killed` to the Graveyard. Expanded online
+records show the same achievement. This trophy grants no gameplay bonus.
+
 ## ATK
 
 Calculated from base ATK plus applicable:
@@ -3249,6 +3265,10 @@ nine in stock at world creation. The stock config key is `scrolls.homecomingScro
 
 ## Potion of Speed
 
+The Potion of Speed ground tile uses `img/tiles/speed-potion.png`: a transparent
+yellow-liquid variant of the Life Potion bottle. Both potions use scale 0.9;
+the speed potion’s previous oversized scale was 1.5. ASCII colors are unchanged.
+
 Grants:
 
 ```text
@@ -3526,10 +3546,23 @@ adding "of here" to them.
 
 Other generated quest types include:
 
-- **Kill a specific monster:** kill a particular eligible, prefixed tier-3-or-4 monster.
+- **Kill a specific monster:** kill a particular nearest eligible monster, preferring tier 3 over tier 4.
 - **Recover an item:** retrieve an item carried by a particular tier-3-or-4 monster.
 
-Kill quests are restricted to eligible prefixed tier-3-or-4 monsters, while item quests are generated from living eligible tier-3-or-4 enemies or qualifying ground items. Tier-5 monsters, all far-wanderers (including world-generation promotions), and every base template with rarity <= 0.02 are excluded from new kill, group-kill, and carried-item recovery targets. The template exclusion applies regardless of level, Alarmed status, prefix, or quest-quarry status. Existing active quests are preserved. When both killing and item quests are available, the system gives killing quests a 50% chance; investigation quests are checked separately first and therefore have their own 30% chance.
+The first quest's monster objectives use reachable surface enemies. Eight-direction
+walking distance from the village determines proximity; water and impassable
+terrain cannot shorten a route. If any eligible tier-3 enemies are reachable,
+tier 4 is excluded. Otherwise reachable tier-4 enemies are the fallback. Only
+the closest targets in that preferred tier remain eligible; equally close
+targets retain seeded quest variety. A kill target need not have a prefix.
+Group kills use equally close members of the same species. Ground-item delivery
+candidates retain their existing rules.
+
+Tier-5 monsters, all far-wanderers (including world-generation promotions), and
+every base template with rarity <= 0.02 are excluded from new kill, group-kill,
+and carried-item recovery targets. Existing active quests are preserved. When
+both killing and item quests are available, killing quests retain their 50%
+chance; investigation quests retain their separate 30% chance.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
 Completing the first quest also teaches **Tracking**, once per character, using the
@@ -3882,12 +3915,28 @@ Fresh Fish, Potato, tools, and quest/readable objects have a sell value of 0g
 and cannot be sold. Homecoming costs 100g to buy; its nine-scroll initial stock
 and purchase price remain configured in `merchant_stock.json`.
 
+### Base purchase values
+
+Every non-gear definition in `content/items.json` and every weapon, shield and
+armor template has a non-negative `baseValue`, representing the normal per-unit
+purchase value. Generated artifacts take their `baseValue` from their selected
+entry in `artifact_effects.json`. The common household starting-weapon value
+and modifier purchase increment are configured in `loot_tables.json`.
+
+Initial values preserve the prior pricing: ordinary base purchase values are
+twice the existing sell value; gear modifiers add 10g per modifier point to
+purchase value while continuing to add 5g per point to sell value. Starting
+household weapons cost 4g and sell for 2g; household weapons generated as
+ordinary tier-1 loot under the relevant world trait retain their 30g base value.
+Base values and sell values can now be edited independently. Generated gear/artifact instances retain their chosen
+base value through inventory, trading, theft, saves and replay.
+
 ### Buying from the Merchant
 
 The normal default merchant buy price is:
 
 ```text
-2 × itemSellValue(item)
+itemBaseValue(item)
 ```
 
 However, an item with an explicit `merchantPrice` uses that price instead.
@@ -3913,7 +3962,7 @@ sell price = itemSellValue(item)
 
 buy price = explicit merchantPrice
             OR
-            2 × itemSellValue(item)
+            itemBaseValue(item)
 ```
 
 Selling a stackable item sells one unit at its per-item sell value.
@@ -4213,10 +4262,16 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-28
+29
 ```
 
 Saves are JSON files.
+
+Version 29 adds the character’s strongest-kill snapshot and generated
+gear/artifact base purchase values. Player initialization and new-character
+reset clear the achievement; current saves and replay starting snapshots
+restore it directly. No older-save migration or historical-kill reconstruction
+is added. Price metadata never adds RNG calls.
 
 Version 28 adds `stolenItemEquipped`, initialized false and preserved in saves
 and replay snapshots. Enemy stats are saved after gear bonuses are applied;
@@ -4301,7 +4356,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 28** saves. Other versions are rejected
+Current gameplay state requires **version 29** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -4981,12 +5036,13 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 | 6–8 | Find 1 gold coin |
 | 9 | Find Amber |
 | 10 | Find a Seashell |
-| 11 | Find a rusted spoon |
+| 11 | Find a rusted fork |
 | 12 | Find a pair of old, worn boots, which are discarded |
 | 13 | Find a bone |
 | 14 | Find a broken shovel handle |
 | 15–16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
-| 17–100 | Find nothing |
+| 17 | Find a silver spoon |
+| 18–100 | Find nothing |
 
 </details>
 
@@ -5139,7 +5195,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 28).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 29).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -5319,6 +5375,14 @@ into the Supabase SQL Editor of a new project. Keep the Data API enabled. No
 other dashboard configuration is required for a new default project. If the
 project already has a `pgrst.db_pre_request` hook, compose the checks rather
 than overwrite it.
+Before deploying the achievement-enabled client, apply
+`supabase-graveyard-achievements.sql` to the existing database (or after the
+initial schema for a new database). It adds nullable JSONB `strongest_enemy_killed`
+with bounded name, species, tier, strength and stat snapshot validation. Older
+online records display “None”. The frontend includes the column in both death
+submission and Graveyard queries. This migration is supplied separately; it
+does not change access policies or rate limits.
+
 For an existing Graveyard database, apply `supabase-graveyard-drowning.sql`
 before deploying the client so its cause constraint accepts drowning deaths.
 For poison support, apply `supabase-graveyard-poison.sql` to the existing
@@ -5358,7 +5422,8 @@ ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if
 present, artifact effect ID when present, and the inventory-formatted
 `stat_line`), `artifacts` (compact JSONB artifact inventory snapshots with
 their `stat_line`), `steps_taken`,
-`creatures_slain`, `turn_count` (turns in the current page session, reset on
+`creatures_slain`, `strongest_enemy_killed` (name, species, tier, strength and
+permanent ATK/DEF/SPD/GRACE), `turn_count` (turns in the current page session, reset on
 load), `world_seed` (original seed restored from saves), and `game_version`
 (the current release version from `src/version.js`). `WORLD_SEED` is reassignable so
 loading a save restores its original seed instead of reporting the new page

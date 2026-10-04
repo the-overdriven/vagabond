@@ -12,7 +12,8 @@
     ],
     "effect": {
       "fullHeal": true
-    }
+    },
+    "baseValue": 16
   },
   "speedpotion": {
     "name": "Potion of Speed",
@@ -30,7 +31,8 @@
       "speedDivisor": 3,
       "durationTurns": 15,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 24
   },
   "herb": {
     "name": "Healing Herb",
@@ -46,7 +48,8 @@
     "effect": {
       "maxHpFraction": 0.25,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 8
   },
   "mushroom": {
     "name": "Mushroom",
@@ -62,7 +65,8 @@
     "effect": {
       "maxHpFraction": 0.25,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 6
   },
   "ediblemushroom": {
     "name": "Edible Mushroom",
@@ -78,7 +82,8 @@
     "effect": {
       "maxHpFraction": 0.25,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 10
   },
   "berries": {
     "name": "Handful of Berries",
@@ -94,7 +99,8 @@
     "effect": {
       "durationTurns": 100,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 4
   },
   "fish": {
     "name": "Fresh Fish",
@@ -110,14 +116,16 @@
     "effect": {
       "durationTurns": 100,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 0
   },
   "potato": {
     "name": "Potato",
     "category": "supplies",
     "stackable": true,
     "sellValue": 0,
-    "actions": []
+    "actions": [],
+    "baseValue": 0
   },
   "scrollOfInvisibility": {
     "name": "Scroll of Invisibility",
@@ -134,7 +142,8 @@
     "effect": {
       "durationTurns": 20,
       "consumableBonus": true
-    }
+    },
+    "baseValue": 30
   },
   "homecomingscroll": {
     "name": "Scroll of Homecoming",
@@ -146,28 +155,32 @@
         "label": "Read",
         "handler": "homecomingscroll"
       }
-    ]
+    ],
+    "baseValue": 100
   },
   "idscroll": {
     "name": "Scroll of Identification",
     "category": "supplies",
     "stackable": true,
     "sellValue": 20,
-    "actions": []
+    "actions": [],
+    "baseValue": 40
   },
   "amber": {
     "name": "Amber",
     "category": "other",
     "stackable": true,
     "sellValue": 20,
-    "actions": []
+    "actions": [],
+    "baseValue": 40
   },
   "seashell": {
     "name": "Seashell",
     "category": "other",
     "stackable": true,
     "sellValue": 10,
-    "actions": []
+    "actions": [],
+    "baseValue": 20
   },
   "shovel": {
     "name": "Shovel",
@@ -179,7 +192,8 @@
         "label": "Dig",
         "handler": "dig"
       }
-    ]
+    ],
+    "baseValue": 0
   },
   "wheelbarrow": {
     "name": "Unknown-Alloy Wheelbarrow",
@@ -193,7 +207,8 @@
         "title": "Inspect wheelbarrow"
       }
     ],
-    "description": "Small wheelbarrow made of an unknown alloy. Surprisingly light and durable."
+    "description": "Small wheelbarrow made of an unknown alloy. Surprisingly light and durable.",
+    "baseValue": 0
   },
   "bigbell": {
     "name": "Enormous Brass Bell",
@@ -209,7 +224,8 @@
     "description": "An enormous brass bell, impossibly heavy.",
     "carryStats": {
       "spd": -5
-    }
+    },
+    "baseValue": 0
   },
   "blackkey": {
     "name": "Black Key",
@@ -227,7 +243,8 @@
         "handler": "inspect"
       }
     ],
-    "description": "A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth."
+    "description": "A dark stone key bound to a worn cord, untouched by the passage of time. It feels heavier than it should, as though it remembers something beneath the earth.",
+    "baseValue": 0
   },
   "echoBlightHorn": {
     "name": "Echo-Blight Horn",
@@ -241,7 +258,8 @@
         "handler": "echoBlightHorn"
       }
     ],
-    "description": "A warped hunting horn whose note provokes beasts into answering across great distances."
+    "description": "A warped hunting horn whose note provokes beasts into answering across great distances.",
+    "baseValue": 0
   },
   "treasuremap": {
     "name": "Old Treasure Map",
@@ -253,7 +271,8 @@
         "label": "Inspect",
         "handler": "treasuremap"
       }
-    ]
+    ],
+    "baseValue": 0
   },
   "treasurecasket": {
     "name": "Old Rotten Casket",
@@ -266,7 +285,8 @@
         "handler": "openCasket"
       }
     ],
-    "description": "An old rotten casket, half-swallowed by the sand."
+    "description": "An old rotten casket, half-swallowed by the sand.",
+    "baseValue": 0
   },
   "tombstone": {
     "name": "Mysterious Tombstone",
@@ -278,7 +298,8 @@
         "label": "Read",
         "handler": "tombstone"
       }
-    ]
+    ],
+    "baseValue": 0
   },
   "oddTombstone": {
     "name": "Odd Tombstone",
@@ -290,6 +311,7 @@
         "label": "?",
         "handler": "inscription"
       }
-    ]
+    ],
+    "baseValue": 0
   }
 }

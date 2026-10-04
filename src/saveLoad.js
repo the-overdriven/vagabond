@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 28 // Stolen gear ownership and equipment state
+const SAVE_VERSION = 29 // Strongest-kill achievement and data-backed item base values
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -143,6 +143,7 @@ function buildSaveObject() {
       gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
       trackingLearned: player.trackingLearned,
       killsBySpecies: {...player.killsBySpecies},
+      strongestEnemyKilled: player.strongestEnemyKilled ? structuredClone(player.strongestEnemyKilled) : null,
       invisibleTurns: player.invisibleTurns,
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
@@ -568,6 +569,7 @@ function loadGameFromObject(data, opts = {}) {
 
   Object.assign(player, data.player)
   player.killsBySpecies = {...data.player.killsBySpecies}
+  player.strongestEnemyKilled = data.player.strongestEnemyKilled ? structuredClone(data.player.strongestEnemyKilled) : null
   player.swimming = data.player.swimming || 0
   // Older completed saves awarded this character before reward tracking existed.
   player.fishermanRewardClaimed = data.player.fishermanRewardClaimed ??
