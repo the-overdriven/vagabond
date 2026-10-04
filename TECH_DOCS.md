@@ -256,6 +256,12 @@ is only a few pixels wide. It stops at 20% or above, and on death. The warning
 continues to blink with reduced-motion enabled; its earlier static-red fallback
 prevented the requested blink for those players.
 
+Crossing strictly below 20% HP while alive logs `You're hurt badly.` in red
+once. Recovering to 20% or above rearms it; exactly 20% is not low HP. Fatal
+hits do not emit this warning. Damage and healing resolve the warning state
+immediately, and its latch is saved/restored in current saves and replay
+snapshots. Death closes inventory for both ordinary and permadeath characters.
+
 On desktop, the HUD labels **ATK**, **DEF**, **SPD**, and **MF** expose short hover
 tooltips explaining their gameplay role. These are presentation-only and do not
 change stat calculations.
@@ -834,6 +840,15 @@ invalidated and the **whole world is regenerated**. Because the fort's z:-3
 `dwarvenfortexit` uses the same world-space coordinate as the surface gate, this
 also prevents an ordinary cave ascent/exit from appearing confusingly close to
 the fort exit underground.
+
+The fort contains **5–9 searchable skeletal remains**, spread over its marble
+floor without overlapping existing props. These are separate from decorative
+dwarven remains on rubble. Each skeleton has an independent **10%** chance of
+containing the usual skeletal-remains loot, decided during world generation:
+there is no guaranteed reward (5–9 skeletons yield 0.5–0.9 rewards on average).
+The other 90% can be searched once but are empty. Searching never rerolls loot
+eligibility. Skeletons, their loot flags, and searched state persist in saves
+and replay; loot stays on the skeleton's own level and map identity.
 
 Fort ghost placement is guaranteed from actual valid floor candidates rather
 than from a fixed number of blind coordinate attempts. During world generation,
@@ -2223,7 +2238,7 @@ Every successful player or monster attack has a chance to become a critical hit.
 Current chances:
 
 ```text
-Player: 5%
+Player: 5% normally; 25% when invisible against a non-Alarmed enemy without trueSight
 Normal monster: 5%
 Fierce monster: 10%
 Deadly monster: 15%
@@ -2232,6 +2247,11 @@ Deadly monster: 15%
 `content/enemy_config.json` stores the three combat chances as
 `baseCriticalHitChance`, `fierceCriticalHitChance`, and `criticalHitChance`
 (the last remains the Deadly-specialist chance).
+
+The invisibility bonus is **+20 percentage points**, assessed before the hit alarms
+the target. TrueSight enemies are immune. After Alarmed resets, an invisible
+attacker can gain the bonus again. Misses and glancing blows retain their usual
+rules; successful criticals use the existing feedback.
 
 Critical damage:
 
@@ -2533,6 +2553,7 @@ inventory catalog.
 A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
+Equipment stat changes in equip/unequip logs use green for increases and red for decreases, including GRACE.
 Equipment swap messages name the previously equipped item before the new item in one log line; equipping a two-handed weapon also names the shield it removes.
 
 If the player has no weapon, looted weapons are automatically equipped.
@@ -2631,34 +2652,35 @@ GRACE; it does not change the shield's DEF or SPD penalty.
 
 Current armor:
 
-| Armor | Tier | DEF | Additional SPD penalty | GRACE penalty |
+| Armor | Tier | DEF | Total SPD penalty | GRACE penalty |
 |---|---:|---:|---:|---:|
-| Robe | 1 | 1 | 0 | 0 |
-| Jacket | 1 | 1 | 0 | 0 |
-| Cape | 1 | 2 | 0 | 0 |
-| Cloak | 1 | 3 | 0 | 0 |
-| Tunic | 1 | 4 | 0 | 0 |
-| Doublet | 2 | 5 | 0 | 0 |
-| Leather Armor | 2 | 6 | 0 | 0 |
-| Studded Leather | 2 | 7 | 0 | 0 |
-| Quilted Armor | 2 | 8 | 1 | 0 |
-| Hauberk | 3 | 9 | 2 | 1 |
-| Brass Armor | 2 | 10 | 3 | 1 |
-| Splint Mail | 3 | 11 | 1 | 0 |
-| Brigandine | 3 | 12 | 1 | 0 |
-| Scale Armor | 4 | 13 | 1 | 0 |
-| Half Plate | 4 | 13 | 2 | 1 |
-| Bone Armor | 4 | 14 | 2 | 1 |
-| Plate Armor | 4 | 15 | 3 | 1 |
-| Chitin Armor | 5 | 16 | 1 | 0 |
-| Royal Armor | 5 | 17 | 3 | 1 |
-| Ancient Armor | 5 | 18 | 3 | 1 |
+| Robe | 1 | 1 | 1 | 0 |
+| Jacket | 1 | 1 | 1 | 0 |
+| Cape | 1 | 2 | 1 | 0 |
+| Cloak | 1 | 3 | 1 | 0 |
+| Tunic | 1 | 4 | 1 | 0 |
+| Doublet | 2 | 5 | 1 | 0 |
+| Leather Armor | 2 | 6 | 1 | 0 |
+| Studded Leather | 2 | 7 | 1 | 0 |
+| Quilted Armor | 2 | 8 | 2 | 0 |
+| Hauberk | 3 | 9 | 3 | 1 |
+| Brass Armor | 2 | 10 | 4 | 1 |
+| Splint Mail | 3 | 11 | 2 | 0 |
+| Brigandine | 3 | 12 | 2 | 0 |
+| Scale Armor | 4 | 13 | 2 | 0 |
+| Half Plate | 4 | 13 | 3 | 1 |
+| Bone Armor | 4 | 14 | 3 | 1 |
+| Plate Armor | 4 | 15 | 4 | 1 |
+| Chitin Armor | 5 | 16 | 2 | 0 |
+| Royal Armor | 5 | 17 | 4 | 1 |
+| Ancient Armor | 5 | 18 | 4 | 1 |
 
-Wearing all armors decreases 1 SPD, and additional SPD penalty on top of it.
-Only the seven armor bases with additional SPD penalty 2 or greater have
-`gracePenalty: 1`; new items copy that field from `gear_armors.json`, while
-equipped armor from older saves recovers it by base name. Armor with no such
-field has no GRACE penalty. Its built-in GRACE penalty is omitted from inventory and trade stat lines.
+Armor subtracts only its stored `speedPenalty`; there is no additional flat SPD
+penalty. The totals above preserve the previous balance (old additional penalty
+plus 1). Armor artifacts retain their previous 1 SPD cost as an explicit item
+property. The same seven ordinary armor bases retain `gracePenalty: 1`; this is
+independent of their new total SPD penalties. Built-in GRACE penalties are
+omitted from inventory and trade stat lines.
 
 ---
 
@@ -3351,7 +3373,9 @@ At new-world generation, every named village NPC except the Drunk spawns within
 breadth-first search, so walls and other blocked terrain count properly rather
 than using straight-line distance. NPC path distance also treats forest and
 river/water tiles as unavailable, matching their wandering restrictions. The
-Drunk keeps the wider random Temple-area placement. NPC wandering never enters
+Drunk keeps the wider random Temple-area placement. Village NPCs and the
+Fisherman Hermit never spawn on grassland-tree tiles; neighboring tree artwork
+does not exclude other tiles. NPC wandering never enters
 forest, river, or water tiles.
 
 NPC tile artwork is configured by exact NPC name in
@@ -3630,6 +3654,10 @@ bearing, species and age, learned Tracking, and per-species kill counts. Tracks
 remain environmental evidence across a permadeath character change; only the new
 character's knowledge resets. Tracks are clues to an earlier destination, not a
 guarantee that a living beast still occupies or is heading toward that location.
+
+The first Old Hunter quest excludes enemies whose current wandering mode is
+`far`, including trait-promoted wanderers. The later rare hunt deliberately
+retains its far-wandering quarry.
 
 The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer), after the first quest is completed and Tracking has been learned (when the rare hunt can be received), and whenever either quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after the rare hunt is completed. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
 
@@ -3970,7 +3998,7 @@ No broad mechanical effect should be assumed unless implementation confirms one.
 There are:
 
 ```text
-6
+7
 ```
 
 mysterious tombstone inscriptions.
@@ -3979,7 +4007,7 @@ They are dropped by Liches.
 
 Each Lich kill has an 80% chance to produce one while any remain.
 
-The six inscriptions form a fragmented story.
+The seven inscriptions form a fragmented story.
 
 Their order is randomized per world.
 
@@ -4006,7 +4034,9 @@ Each tombstone's name/dates/inscription is persisted across save/load
 alongside the grave tiles themselves, so reloading a save does not blank out
 cemetery inscriptions back to generic "unfinished grave" text.
 
-The odd tombstone has a future death date.
+The odd tombstone has a future death date. Reading it in inventory preserves
+its inscription/name and dates, prefaced with
+`Odd tombstone found in the ruined cemetery.`
 
 It can be picked up as:
 
@@ -4131,10 +4161,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-22
+26
 ```
 
 Saves are JSON files.
+
+Version 26 stores the low-HP warning latch and generated fort skeleton loot
+eligibility. Armor items store their complete SPD penalty. Current saves and
+replay starting snapshots restore these values directly; no older-save
+compatibility is added.
 
 Version 22 adds sparse rare-sighting count, remaining flee turns, fractional pace and
 re-arm state to enemy saves and replay initial snapshots. Default values are omitted;
@@ -5034,7 +5069,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 25).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 26).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

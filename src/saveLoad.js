@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 25 // Once-only summons and their first-turn delay
+const SAVE_VERSION = 26 // Health warning state and fort skeleton loot eligibility
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -149,6 +149,7 @@ function buildSaveObject() {
       speedPotionTurns: player.speedPotionTurns,
       berryRegenTurns: player.berryRegenTurns,
       poisonTurns: player.poisonTurns,
+      lowHpWarningActive: player.lowHpWarningActive,
       swimming: player.swimming,
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
       fishermanLessonPending: !!player.fishermanLessonPending,

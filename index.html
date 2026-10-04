@@ -1,15 +1,5 @@
 <!-- TODO:
 
-!3 [logging] when logging (un)equip msgs colorize negative changes (i.e. -1 GRACE should be in red, +1 GRACE should stay green)
-!1 [lore] add lich tombstone: Men call it holy, yet the beasts sense what men do not.
-!1 [ui] dying should close inv
-!2 [combat] being invisible should increase crit. chance hit by 20% but only if enemy isn't alerted
-!2 [logging] odd tombstone should log the previous msg too! (prefix existing message with: Odd tombstone found in the ruined cemetery.)
-!3 [worldgen] dwarven fort should have more skeletal remains but only 10% of them should have skeletal remain loot
-!3 [worldgen] NPC shouldnt spawn behind trees (grassland trees)
-!3 [quests] old hunter shouldnt give quests that involve dealing with far wandering monsters - check if it was fixed already
-!3 [status] when your HP drops below 20%: You're hurt badly. (in black font.)
-!4 [armor] simplify speedPenalty on armors, move current uniform -1 to table and use only their prop
 
 !2 [ui] prettier brown vertical scrolls (desktop only)
 !2 [rendering] the brown cave floor is not exactly seamless
@@ -1602,6 +1592,7 @@ the logging order is wrong (lower message is newer)
     const item = {
       kind: 'artifact', name, noun, tier: effect.tier, effectId: effect.id,
       artifactSlot: slot,
+      speedPenalty: slot === 'armor' ? 1 : 0,
       identified: false,
       bonuses: rollArtifactBonuses(effect.bonuses),
       maxHpPct: effect.maxHpPct || 0,
@@ -1708,6 +1699,7 @@ the logging order is wrong (lower message is newer)
     if (type === 'hp') {
       const amt = randInt(1, 3)
       player.hp = Math.max(1, player.hp - amt)
+      checkPlayerHealthWarning()
       log(curseLine('hp', it, amt), 'bad')
     } else if (type === 'gold') {
       const amt = Math.min(player.gold, randInt(1, 5))
@@ -1889,6 +1881,7 @@ the logging order is wrong (lower message is newer)
     speedPotionBonus: 0,
     berryRegenTurns: 0,
     poisonTurns: 0,
+    lowHpWarningActive: false,
     swimming: 0,
     fishermanRewardClaimed: false,
     fishermanLessonPending: false,
@@ -1903,6 +1896,13 @@ the logging order is wrong (lower message is newer)
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
+  // Observe health changes at rule resolution, never from animation callbacks.
+  function checkPlayerHealthWarning() {
+    const low = player.hp > 0 && player.hp < playerMaxHp() * 0.20
+    if (low && !player.lowHpWarningActive) log("You're hurt badly.", 'bad')
+    player.lowHpWarningActive = low
+  }
+
   const XP_TO_NEXT = [60, 120, 144, 250, 360, 504, 720, 936, 1800, 2160, 3600, 4320, 6480, 8640]
 
   function xpToNext(lvl) {
@@ -1948,7 +1948,7 @@ the logging order is wrong (lower message is newer)
   function playerSpdRaw() {
     let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2)
     if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
-    if (player.equip.armor) s -= 1 + (player.equip.armor.speedPenalty || 0)
+    if (player.equip.armor) s -= (player.equip.armor.speedPenalty || 0)
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
     if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
     s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0
@@ -2884,6 +2884,9 @@ the logging order is wrong (lower message is newer)
   }
 
   function log(msg, cls, highlights = []) {
+    const statChanges = [...msg.matchAll(/[+-]\d+(?:% XP BONUS| (?:ATK|DEF|SPD|GRACE|MF|HP))/g)]
+      .map(match => ({text: match[0], statDelta: Number.parseInt(match[0], 10)}))
+    highlights = [...highlights, ...statChanges]
     const id = nextLogId++
     logQueue.push({id: id, msg: msg, cls: cls || 'info', highlights, instant: replayPlaying})
     processLogQueue()
@@ -2906,6 +2909,7 @@ the logging order is wrong (lower message is newer)
       const span = document.createElement('span')
       span.textContent = h.text
       if (Number.isFinite(h.tier)) span.classList.add(tierColorClass(h.tier))
+      if (h.statDelta) span.style.color = h.statDelta > 0 ? '#7bd389' : '#e0473f'
       div.appendChild(span)
       cursor = h.index + h.text.length
     }
@@ -2988,10 +2992,10 @@ the logging order is wrong (lower message is newer)
     return true
   }
 
-  // Only six Mysterious Tombstones exist in the entire world - each bears a
+  // Each Mysterious Tombstone inscription appears once per world, bearing a
   // single line of the same fractured inscription, revealed in a random order
   // per world so the story can't be inferred from drop order alone.
-  let tombstonesRemaining = 6
+  let tombstonesRemaining = TOMBSTONE_INSCRIPTIONS.length
   let tombstoneOrder = TOMBSTONE_INSCRIPTIONS.map((_, i) => i)
 
   function shuffleTombstoneOrder() {
@@ -3174,6 +3178,10 @@ the logging order is wrong (lower message is newer)
       log(`${e.name}'s rage subsides.`, 'info')
   }
 
+  function playerCriticalHitChance(e) {
+    return BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed && !enemyHasAbility(e, 'trueSight') ? 0.20 : 0)
+  }
+
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
@@ -3220,7 +3228,7 @@ the logging order is wrong (lower message is newer)
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
     let dmg = damageRoll(playerAtk(), enemyDef(e))
-    const criticalRoll = chance(BASE_CRIT_CHANCE)
+    const criticalRoll = chance(playerCriticalHitChance(e))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
@@ -3289,6 +3297,7 @@ the logging order is wrong (lower message is newer)
     if (glancing) dmg = Math.floor(dmg / 3)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
+    checkPlayerHealthWarning()
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
     if (glancing) {
@@ -3394,6 +3403,7 @@ the logging order is wrong (lower message is newer)
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
+    checkPlayerHealthWarning()
 
     spawnProjectileAnim(projectilePath, projectile)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
@@ -3456,6 +3466,7 @@ the logging order is wrong (lower message is newer)
     player.y = spawnPoint.y
     if (wasDead) {
       player.hp = playerMaxHp()
+      checkPlayerHealthWarning()
       player.lastTempleHealXp = player.totalXpEarned
     } else tryTempleHeal()
     pendingMove = null
@@ -3560,6 +3571,7 @@ the logging order is wrong (lower message is newer)
       speedPotionBonus: 0,
       berryRegenTurns: 0,
       poisonTurns: 0,
+      lowHpWarningActive: false,
       swimming: 0,
       fishermanRewardClaimed: false,
       fishermanLessonPending: false,
@@ -3622,6 +3634,7 @@ the logging order is wrong (lower message is newer)
 
   function die(killer = null, cause = 'environment') {
     if (deathTransition) return
+    toggleInv(false)
     const shore = cause === 'drowning' ? drowningShore() : null
     resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
@@ -4368,6 +4381,7 @@ the logging order is wrong (lower message is newer)
     if (!(player.poisonTurns > 0)) return
     player.poisonTurns--
     player.hp = Math.max(0, player.hp - 1)
+    checkPlayerHealthWarning()
     log('Poison deals 1 HP damage.', 'bad')
     spawnDamageNumber(player.x, player.y, 1, RENDER_STYLE.damage.playerHit)
     if (player.hp <= 0) {
@@ -4422,6 +4436,7 @@ the logging order is wrong (lower message is newer)
       player.freezing.turns = 0
       const freezingDamage = WORLD_GEN_CONFIG.environment.freezingDamage
       player.hp = Math.max(0, player.hp - freezingDamage)
+      checkPlayerHealthWarning()
       log(`The freezing cold bites you for ${freezingDamage} HP.`, 'bad')
       updateHud()
       if (player.hp <= 0) {
@@ -4618,7 +4633,7 @@ the logging order is wrong (lower message is newer)
     inscription: idx => {
       if (!canUseItemsWhileSwimming()) return
       const item = player.inventory[idx]
-      log(item.inscription || `The tombstone bears the name ${item.tombName}. Born ${item.tombBirth}, died ${item.tombDeath}.`, 'info')
+      log((item.kind === 'oddTombstone' ? 'Odd tombstone found in the ruined cemetery. ' : '') + (item.inscription || `The tombstone bears the name ${item.tombName}. Born ${item.tombBirth}, died ${item.tombDeath}.`), 'info')
     }
   }
 
@@ -5178,13 +5193,18 @@ the logging order is wrong (lower message is newer)
         return
       }
       skeleton.looted = true
+      if (skeleton.hasLoot === false) {
+        log('You search the skeletal remains, but find nothing.', 'info')
+        return
+      }
       const chest = {
         x: skeleton.x,
         y: skeleton.y,
         kind: 'chest',
         tier: 1,
         opened: false,
-        level: -1,
+        level: skeleton.level ?? 0,
+        levelKind: skeleton.levelKind,
         caveIndex: skeleton.caveIndex
       }
       groundItems.push(chest)
@@ -6693,6 +6713,7 @@ the logging order is wrong (lower message is newer)
   function healPlayer(amount) {
     const before = player.hp
     player.hp = Math.min(playerMaxHp(), player.hp + Math.max(0, amount))
+    checkPlayerHealthWarning()
     const restored = Math.max(0, Math.round(player.hp - before))
     if (restored > 0) spawnDamageNumber(player.x, player.y, `+${restored}`, '#8ee58e')
     return restored
@@ -8408,6 +8429,7 @@ the logging order is wrong (lower message is newer)
     document.getElementById('hLvl').textContent = player.lvl
     const maxHp = playerMaxHp()
     player.hp = Math.min(player.hp, maxHp)
+    checkPlayerHealthWarning()
     const hpRatio = maxHp > 0 ? player.hp / maxHp : 0
     document.getElementById('hpbar').style.width = Math.max(0, hpRatio * 100) + '%'
     document.getElementById('hpbarwrap').classList.toggle('low-hp', player.hp > 0 && hpRatio < 0.2)
@@ -9168,6 +9190,7 @@ the logging order is wrong (lower message is newer)
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
       player.hp = Math.max(0, player.hp - amt)
+      checkPlayerHealthWarning()
       log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
       if (player.hp <= 0) die(null, 'poisonous_mushroom')
     }
@@ -9649,6 +9672,7 @@ the logging order is wrong (lower message is newer)
     for (const level of deepLevels) reveal(level.discovered)
     if (cryptLevel2) reveal(cryptLevel2.discovered)
     player.hp = 500
+    checkPlayerHealthWarning()
     player.maxHp = 500
     player.baseAtk = 50
     player.baseDef = 50
@@ -9957,6 +9981,7 @@ the logging order is wrong (lower message is newer)
       }
       worldGenerating = false
       player.hp = playerMaxHp()
+      checkPlayerHealthWarning()
       // Replay is opt-in per character. Clear out whatever the previous
       // character (if any) left behind before deciding whether to record.
       replayData = null
@@ -10005,6 +10030,7 @@ the logging order is wrong (lower message is newer)
     player.x = spawnPoint.x
     player.y = spawnPoint.y
     player.hp = playerMaxHp()
+    checkPlayerHealthWarning()
     foragedTiles = new Set()
     spawnEnemies()
     spawnCemeteryGhouls()

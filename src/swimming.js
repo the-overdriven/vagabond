@@ -66,6 +66,7 @@ function advanceSwimming(moved, from = null) {
   player.drowning = true
   const damage = Math.max(1, Math.round(playerMaxHp() * 0.05))
   player.hp = Math.max(0, player.hp - damage)
+  checkPlayerHealthWarning()
   spawnDamageNumber(player.x, player.y, damage, RENDER_STYLE.damage.playerHit)
   if (player.hp <= 0) {
     log('You have drown.', 'bad')

@@ -1261,6 +1261,33 @@ function buildDwarvenRuin(targetLevel) {
       description: 'You see a single, enormous gold coin. A skeleton lies crushed beneath it, its bones flattened under the weight. Poor greedy soul.'
     })
   }
+  // Choose spread-out floor sites from a seeded shuffle; these are searchable
+  // skeletons, separate from the decorative dwarven rubble remains.
+  const skeletonSites = []
+  for (let y = minY + 1; y < maxY; y++) for (let x = minX + 1; x < maxX; x++) {
+    if (cm[y]?.[x] !== 'marble') continue
+    if (groundItems.some(g => g.level === ruinLevel && g.caveIndex === dwarvenRuin.caveIndex && g.x === x && g.y === y)) continue
+    skeletonSites.push({x, y})
+  }
+  for (let i = skeletonSites.length - 1; i > 0; i--) {
+    const j = randInt(0, i)
+    ;[skeletonSites[i], skeletonSites[j]] = [skeletonSites[j], skeletonSites[i]]
+  }
+  const chosenSkeletons = []
+  const skeletonCount = randInt(5, 9)
+  for (let i = 0; i < skeletonCount && skeletonSites.length; i++) {
+    let best = 0, bestDistance = -1
+    for (let j = 0; j < skeletonSites.length; j++) {
+      const site = skeletonSites[j]
+      const distance = chosenSkeletons.length ? Math.min(...chosenSkeletons.map(p =>
+        Math.max(Math.abs(p.x - site.x), Math.abs(p.y - site.y)))) : 0
+      if (distance > bestDistance) { best = j; bestDistance = distance }
+    }
+    const site = skeletonSites.splice(best, 1)[0]
+    chosenSkeletons.push(site)
+    groundItems.push({...site, kind: 'skeleton', looted: false, description: pick(SKELETON_INSPECTIONS), hasLoot: chance(0.10),
+      level: ruinLevel, levelKind: 'chain', caveIndex: dwarvenRuin.caveIndex})
+  }
   for (let i = 0; i < cfg.remainsAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] === 'dwarvenrubble') groundItems.push({
@@ -2874,13 +2901,13 @@ function spawnNpcs() {
         x = randInt(Math.max(cfg.edgeMargin, spawnPoint.x - cfg.drunkSpread), Math.min(MAP_W - cfg.edgeMargin - 1, spawnPoint.x + cfg.drunkSpread))
         y = randInt(Math.max(cfg.edgeMargin, spawnPoint.y - cfg.drunkSpread), Math.min(MAP_H - cfg.edgeMargin - 1, spawnPoint.y + cfg.drunkSpread))
         tries++
-      } while ((!npcCanTraverseSurface(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'village' || occupied.has(keyXY(x, y))) && tries < cfg.placementTries)
+      } while ((!npcCanTraverseSurface(x, y) || grasslandTrees.has(keyXY(x, y)) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'village' || occupied.has(keyXY(x, y))) && tries < cfg.placementTries)
       if (tries >= cfg.placementTries) continue
     } else {
       const available = nearTemple.filter(pos => {
         const tile = map[pos.y][pos.x]
         if (tile === 'temple' || tile === 'belltower' || tile === 'village') return false
-        if (occupied.has(keyXY(pos.x, pos.y))) return false
+        if (occupied.has(keyXY(pos.x, pos.y)) || grasslandTrees.has(keyXY(pos.x, pos.y))) return false
         if (tmpl.name === 'Merchant' && groundItems.some(g => (g.level ?? 0) === 0 && g.x === pos.x && g.y === pos.y)) return false
         return true
       })

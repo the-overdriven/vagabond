@@ -142,7 +142,7 @@ function placeFisherman() {
   if (!eligible.length) return false
   const threats = enemies.filter(e => e.alive && (e.level || 0) === 0)
   const threatened = (e, p) => bankDistance(e, p) <= Math.max(8, (e.aggro || 0) + 3)
-  const sites = banks.filter(p => bankDistance(p, origin) >= 25 && !blocked.has(keyXY(p.x, p.y)) &&
+  const sites = banks.filter(p => !grasslandTrees.has(keyXY(p.x, p.y)) && bankDistance(p, origin) >= 25 && !blocked.has(keyXY(p.x, p.y)) &&
     !threats.some(e => !e.ordinarySurface && threatened(e, p)))
   sites.sort((a, b) => Math.abs(bankDistance(a, origin) - preferred) -
     Math.abs(bankDistance(b, origin) - preferred) || a.y - b.y || a.x - b.x)
