@@ -1699,8 +1699,8 @@ the logging order is wrong (lower message is newer)
     if (type === 'hp') {
       const amt = randInt(1, 3)
       player.hp = Math.max(1, player.hp - amt)
-      checkPlayerHealthWarning()
       log(curseLine('hp', it, amt), 'bad')
+      checkPlayerHealthWarning()
     } else if (type === 'gold') {
       const amt = Math.min(player.gold, randInt(1, 5))
       player.gold -= amt
@@ -2160,6 +2160,7 @@ the logging order is wrong (lower message is newer)
         summonUsed: false, summonedTurn: turnCount
       }
       addEnemy(summoned)
+      alarmEnemy(summoned)
       occupied.add(keyXY(spot.x, spot.y))
       spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df')
     }
@@ -2628,6 +2629,18 @@ the logging order is wrong (lower message is newer)
   function interactOldHunter() {
     recordReplayAction({type:'talk', npc:'Old Hunter'})
     freezeNpcFromWandering(npcs.find(n => n.name === 'Old Hunter'))
+    const deliveryQuest = oldHunterQuest
+    const deliveryActive = deliveryQuest && ['active', 'ready'].includes(deliveryQuest.state) && ['recover_item', 'deliver_item'].includes(deliveryQuest.type)
+    const ownedItems = [...player.inventory, ...Object.values(player.equip)].filter(Boolean)
+    const tagged = deliveryActive && deliveryQuest.id && ownedItems.some(item => item.hunterQuestId === deliveryQuest.id)
+    const exact = deliveryActive && deliveryQuest.targetItem && ownedItems.includes(deliveryQuest.targetItem)
+    const equippedQuestItem = deliveryActive && Object.values(player.equip).find(item => item && (
+      tagged ? item.hunterQuestId === deliveryQuest.id : exact ? item === deliveryQuest.targetItem :
+        item.name === deliveryQuest.targetItemName || item.base === deliveryQuest.targetItemName))
+    if (equippedQuestItem) {
+      log(`Old Hunter says: I see that you have retrieved my ${oldHunterQuest.targetItemName}. You aren't trying to claim it as your own now, are you? Will you give it back?`, 'info')
+      return true
+    }
     if (hunterQuestReadyToTurnIn(oldHunterQuest)) {
       const q = oldHunterQuest
       removeHunterQuestItem(q)
@@ -3297,7 +3310,6 @@ the logging order is wrong (lower message is newer)
     if (glancing) dmg = Math.floor(dmg / 3)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
-    checkPlayerHealthWarning()
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
     if (glancing) {
@@ -3317,6 +3329,7 @@ the logging order is wrong (lower message is newer)
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
     }
+    checkPlayerHealthWarning()
     applyEnemyLifesteal(e, effectiveDamage)
     if (dmg > 0 && player.hp > 0) applyEnemyPoison(e)
     updateHud()
@@ -3403,7 +3416,6 @@ the logging order is wrong (lower message is newer)
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
-    checkPlayerHealthWarning()
 
     spawnProjectileAnim(projectilePath, projectile)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
@@ -3414,6 +3426,7 @@ the logging order is wrong (lower message is newer)
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${projectile} at you for ${dmg} damage.`, 'bad')
     }
+    checkPlayerHealthWarning()
     updateHud()
     if (player.hp <= 0) {
       die(e)
@@ -4367,8 +4380,8 @@ the logging order is wrong (lower message is newer)
     const duration = Math.max(1, Math.round(baseTurns * (0.90 + rng() * 0.20)))
     const refreshed = player.poisonTurns > 0
     player.poisonTurns = duration
-    log(refreshed ? `The ${enemy.name}'s venom renews your poison for ${duration} turns.`
-      : `The ${enemy.name} poisons you for ${duration} turns!`, 'bad')
+    log(refreshed ? `The ${enemy.name}'s venom renews your poison.`
+      : `The ${enemy.name} poisons you!`, 'bad')
   }
 
   function curePlayerPoison() {
@@ -4381,8 +4394,8 @@ the logging order is wrong (lower message is newer)
     if (!(player.poisonTurns > 0)) return
     player.poisonTurns--
     player.hp = Math.max(0, player.hp - 1)
-    checkPlayerHealthWarning()
     log('Poison deals 1 HP damage.', 'bad')
+    checkPlayerHealthWarning()
     spawnDamageNumber(player.x, player.y, 1, RENDER_STYLE.damage.playerHit)
     if (player.hp <= 0) {
       die(null, 'poison')
@@ -4436,8 +4449,8 @@ the logging order is wrong (lower message is newer)
       player.freezing.turns = 0
       const freezingDamage = WORLD_GEN_CONFIG.environment.freezingDamage
       player.hp = Math.max(0, player.hp - freezingDamage)
-      checkPlayerHealthWarning()
       log(`The freezing cold bites you for ${freezingDamage} HP.`, 'bad')
+      checkPlayerHealthWarning()
       updateHud()
       if (player.hp <= 0) {
         die(null, 'freezing')
@@ -9117,8 +9130,8 @@ the logging order is wrong (lower message is newer)
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     if (itemDefinition(it.kind).effect.fullHeal) healPlayer(playerMaxHp() - player.hp)
-    curePlayerPoison()
     log('You drink a Life Potion and feel fully restored.', 'good')
+    curePlayerPoison()
     consumeItemTurn()
   }
 
@@ -9169,10 +9182,10 @@ the logging order is wrong (lower message is newer)
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'herb', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
-    curePlayerPoison()
     const heal = healingHerbAmount()
     const restored = healPlayer(heal)
     log(`You eat the Healing Herb and recover ${restored} HP.`, 'good')
+    curePlayerPoison()
     consumeItemTurn()
   }
 
@@ -9190,8 +9203,8 @@ the logging order is wrong (lower message is newer)
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
       player.hp = Math.max(0, player.hp - amt)
-      checkPlayerHealthWarning()
       log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
+      checkPlayerHealthWarning()
       if (player.hp <= 0) die(null, 'poisonous_mushroom')
     }
     consumeItemTurn()

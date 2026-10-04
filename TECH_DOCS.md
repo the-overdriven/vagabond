@@ -257,7 +257,7 @@ continues to blink with reduced-motion enabled; its earlier static-red fallback
 prevented the requested blink for those players.
 
 Crossing strictly below 20% HP while alive logs `You're hurt badly.` in red
-once. Recovering to 20% or above rearms it; exactly 20% is not low HP. Fatal
+once, immediately after the damage-source message. Recovering to 20% or above rearms it; exactly 20% is not low HP. Fatal
 hits do not emit this warning. Damage and healing resolve the warning state
 immediately, and its latch is saved/restored in current saves and replay
 snapshots. Death closes inventory for both ordinary and permadeath characters.
@@ -1585,7 +1585,9 @@ minimum of 1, DEF a minimum of 0. SPD and GRACE are unchanged. Summons have no
 gear or prefixes. They copy template abilities except `summon`, preventing
 recursive Wolf packs. Skeletons retain their normal shooter assignment chance.
 
-Summons inherit level, level kind, and cave identity. They cannot attack in
+Summons inherit level, level kind, and cave identity. They become Alarmed
+immediately on creation, using the normal Alarmed lifetime and AGGRO bonus;
+this also prevents invisible opening-critical bonuses against them. They cannot attack in
 the creation turn, including through immediate retaliation or ranged attacks;
 they may act on the next enemy turn. Placement and rules resolve before visual
 effects. A floating Summoned! marker and a log show the actual spawned count.
@@ -1596,7 +1598,7 @@ Summons use normal XP and species loot rules. With the existing stat-based XP
 formula, an unprefixed summoned Wolf yields 12 XP versus 17 for a normal Wolf.
 The summoner's
 `summonUsed` flag and each summoned creature's `summonedTurn` initialize explicitly,
-persist in format 25 saves and replay initial states, and restore exactly.
+persist in current saves and replay initial states, and restore exactly.
 Re-entering levels and loading never reset the once-only summon. Saves also
 preserve an explicit GRACE value when present. Older save formats are rejected.
 
@@ -1634,6 +1636,9 @@ or after changing levels. Entering Temple ground cures it. It can kill; death is
 the status without crediting a monster victory. The application itself causes
 no immediate poison damage.
 
+Healing Herb and Life Potion logs describe the consumed item and healing first,
+then confirm that poison leaves the body. Poison application and refresh logs
+omit duration; the active-status counter still shows remaining turns.
 Eating a Healing Herb or drinking a Life Potion clears poison before consuming
 the item's turn, including at full HP. Temple ground and Homecoming also cure poison; other healing does not.
 Enemies may poison the player again during that turn's response. Application,
@@ -3661,6 +3666,12 @@ retains its far-wandering quarry.
 
 The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer), after the first quest is completed and Tracking has been learned (when the rare hunt can be received), and whenever either quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after the rare hunt is completed. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
 
+When the requested delivery item is equipped, the Hunter acknowledges its
+recovery: `I see that you have retrieved my <item>. You aren't trying to claim
+it as your own now, are you? Will you give it back?` The quest remains open and
+the equipment stays equipped. Unequipping the item permits the existing normal
+backpack hand-in.
+
 ## Echo-Blight Horn
 
 The Echo-Blight Horn is the reward for the post-Tracking rare hunt. Its inventory action
@@ -4007,7 +4018,9 @@ They are dropped by Liches.
 
 Each Lich kill has an 80% chance to produce one while any remain.
 
-The seven inscriptions form a fragmented story.
+The seven inscriptions form a fragmented story, including:
+
+`Men call it holy, yet the beasts sense what men do not.`
 
 Their order is randomized per world.
 
@@ -5534,3 +5547,4 @@ small maps should be exercised across many seeds before treating balance or
 generation success as stable. Drought can remove safe forage while arming a
 larger share of humanoids; its exclusions prevent the strongest resource
 contradictions, but other dangerous combinations remain possible.
+

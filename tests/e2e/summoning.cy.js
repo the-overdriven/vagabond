@@ -54,6 +54,7 @@ describe('Once-only monster summoning', () => {
             summonCheck(e.spd===t.spd && e.grace===t.grace,'unchanged speed/grace')
             summonCheck(e.prefix===null && e.equipment===null,'no prefix or gear')
             summonCheck(!e.abilities.includes('summon'),'no recursive summons')
+            summonCheck(e.alarmed && e.alarmedZ===currentZ && e.alarmedLevelKind===currentLevelKind(),'summons immediately Alarmed')
             const hp=player.hp
             enemyAttackPlayer(e)
             enemyRangedAttackPlayer(e)
@@ -93,7 +94,7 @@ describe('Once-only monster summoning', () => {
       summonCheck(player.hp===hp,'summoning turn gives player a reaction window')
       const midway=JSON.parse(JSON.stringify(buildSaveObject()))
       const savedCaster=midway.enemies.find(e=>e.id===caster.id)
-      summonCheck(savedCaster.summonUsed && midway.enemies.filter(e=>e.id!==caster.id).every(e=>e.summonedTurn===turnCount),'save exact flags')
+      summonCheck(savedCaster.summonUsed && midway.enemies.filter(e=>e.id!==caster.id).every(e=>e.summonedTurn===turnCount&&e.alarmed&&e.alarmedZ===currentZ),'save exact flags')
       const initial=replayData.initialState
       summonCheck(!initial.enemies[0].summonUsed && initial.enemies[0].summonedTurn===null,'replay initial flags')
       for(let i=0;i<3;i++) skipTurn()
@@ -109,7 +110,7 @@ describe('Once-only monster summoning', () => {
       loadGameFromObject(midway,{isReplayInit:true})
       const restored=enemies.find(e=>e.id===caster.id)
       summonCheck(restored.summonUsed && enemies.length===midway.enemies.length,'restore without repeat summons')
-      summonCheck(enemies.filter(e=>e.id!==caster.id).every(e=>e.summonedTurn===midway.turnCount),'restore creation-turn delay')
+      summonCheck(enemies.filter(e=>e.id!==caster.id).every(e=>e.summonedTurn===midway.turnCount&&e.alarmed&&e.alarmedZ===currentZ),'restore creation-turn delay and Alarmed')
     })()`))
   })
 })
