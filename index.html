@@ -4,12 +4,8 @@ highest prio: deeper dungeons for endgame
 
 but first:
 
-!1 [balance] ⚖️ nerf ghosts, oculus (manual)
-!1 [balance] ⚖️ boost vampire. spd!!! (manual)
-!1 [balance] ⚖️ nerf wolf (manual)
-!1 [items] 🎒 Add "someone threw away a good spoon" to the description, silver spoon (manual)
-
 !4 [monster abilities] 👹 imps and nymphs (and also tokka and wretchling) steal items and flee (ability: thief), reuse flee ability, when they have stolen something -> add red bag symbol (same place as bow or skull)
+!1 [items] add +1% chance to dig up a silver spoon, msg log should say "someone threw away a good spoon" (it's not a real item, just digging message)
 !1 improve (regenerate) speed potion tile, should look like current life potion but yellow
 !1 [sheet/graveyard] 🏆 feat: add achievments to char sheet stats: strongest monster killed, also send it to supabase
 !1 [balance] ⚖️ balance: old hunter's monster target should be closer to village and not so strong (prefer tier 3 than 4)
@@ -21,7 +17,7 @@ but first:
 !1 [ui] 🖥️ add char sheet to mobile? show fullscreen from inventory view
 !2 [caves] 🕸️ cave: add webs randomly sprinkled in caves (generate tiles)
 !2 [caves] 🕸️ tier 4 cave monster (level 2) should take rarity into account, goblins/skeletons/skinks/kobolds shouldn't have rare monsters there
-!2 [combat] ⚔️ vulture and hyena: add ability carrionInstinct: adds 25% ATK if player has less than 20% HP
+!2 [combat] ⚔️ vulture and hyena and jackal and chupacabra: add ability carrionInstinct: adds 25% ATK if player has less than 20% HP
 !2 [monsters] 👹 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller... sleeping = opposite of alarmed, there is a small chance they wake up. zzz
 !2 [quests] 📜 old hunter: "the lost item" fallback - wtf is that fallback?
 !2 [rendering] 🎨 swimming underground doesnt crop the character as it does on surface
@@ -33,8 +29,9 @@ but first:
 !3 [balance] ⚖️ humanoids should have less def? or better: items should give them only 0.5-0.7x of what they normally give (it should be a range to make it harder to identify if they wear magical item or not)
 !3 [balance] ⚖️ balance: orc/dwarf/catling + 1 ATK/DEF/SPD every 5 levels
 !3 [combat] ⚔️ add one-time ability: deathShield (fatal hit leaves it at 1hp), for now add it to gargoyle and add appropriate msg log
-!3 [enemy AI] 🤖 monsters should run away from temple, even if player is not inside
+!3 [enemy AI] 🤖 monsters should run away from temple, even if player is not standing/moving on temple ground
 
+need to refine:
 !3 [combat] ⚔️ add bulgy fungus monster: similar to fungus but nearby creatures receive dmg when it dies
 !2 [ui] 🖥️ enemy tooltips on desktop should appear automatically (add HP bars to symbols/glyphs, can be toggable, only on desktop)
 !2 [rendering] 🎨 hole in sand should be smaller (manual)
@@ -106,7 +103,7 @@ more difficult:
 !4 [status effects] 🌀 blindness (reduced fov)
 !4 [status effects] 🌀 feat: add stun (enemy doesn't do anything for x turns - can use it to escape)
 !4 [supabase] 🗄️ how come turn count is lower than steps taken on supabase?
-!4 [tracking] 🐾 tracking is not useful enough?
+!4 [tracking] 🐾 tracking is not useful enough? i.e. add where the stronger mobs are, where the weaker ones are, and where there's no one around
 !4 [worldgen] 🌍 add submerged treasure
 !4 [worldgen] 🌍 set up far wandering enemy destination on world gen before player makes a move? to optimize
 !4 [worldgen] 🌍 stalagmites in caves
@@ -5040,7 +5037,7 @@ more difficult:
     } else if (roll <= 10) {
       addInventoryItem('seashell')
       log('You uncover a pretty seashell.', 'loot')
-    } else if (roll <= 11) log('You dig up a rusted spoon. Judging by its condition, someone has been waiting a very long time for dinner.', 'loot')
+    } else if (roll <= 11) log('You dig up a rusted fork. Judging by its condition, someone has been waiting a very long time for dinner.', 'loot')
     else if (roll <= 12) log('You find a pair of old, worn boots. They are beyond saving, so you throw them away.', 'loot')
     else if (roll <= 13) log('You dig out a bone. Whatever it was, it died ages ago.', 'loot')
     else if (roll <= 14) log('You dig out a shovel handle, snapped in half. Someone else tried digging here.', 'loot')
