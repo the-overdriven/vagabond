@@ -16,7 +16,7 @@
   --t5: #e0473f;
 }
 
-@media (pointer: fine) and (min-width: 721px) {
+@media (any-pointer: fine) and (min-width: 721px) {
   :root {
     --ui-font-scale: 1.1;
   }
@@ -1895,4 +1895,21 @@ body.hint-collapsed #hint .panel-toggle {
 #mobileInfoPanel .shooter-marker {
   color: #e0473f;
   font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif;
+}
+
+/* Native scrollbars match the brown panels on desktop. */
+@media (any-pointer: fine) and (min-width: 721px) {
+  * { scrollbar-color: #8b5b2d #21170f; scrollbar-width: thin; }
+  *::-webkit-scrollbar { width: 10px; }
+  *::-webkit-scrollbar-track { background: #21170f; }
+  *::-webkit-scrollbar-thumb {
+    background: #8b5b2d;
+    border: 2px solid #21170f;
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: #b17b42; }
+}
+.mobile-hit-separator { display: none; }
+@media (max-width: 720px), (pointer: coarse) {
+  #mobileInfoPanel .mobile-hit-separator { display: inline; }
 }

@@ -1,10 +1,8 @@
 <!-- TODO:
 
 
-!2 [ui] prettier brown vertical scrolls (desktop only)
 !2 [rendering] the brown cave floor is not exactly seamless
 !2 [character creation] add random button next to name?
-!2 [balance] freezing not severe enough: -1hp every 4 turns, not 5
 !3 [ui] tooltips on desktop should appear on the left side above canvas and also when fighting
 !3 [items] add weapon prefix to increase crit? deadly?
 !3 [permadeath] dying on permadeath should wait for player input before showing race selection for new char
@@ -44,9 +42,6 @@
 !8 [npc] procedurally generated NPC ?
 !8 [architecture] refactor index.html (extract more files: render.js, combat.js, enemyAI.js, trade.js, mapView.js, hunterQuests.js)
 
-You automatically equip the Dagger. (+2 ATK, +5 GRACE)
-You search the skeletal remains and take what you can find: Dagger.
-the logging order is wrong (lower message is newer)
 
 - [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
@@ -67,7 +62,6 @@ the logging order is wrong (lower message is newer)
 - items: scroll of chaos (teleports everyone in 8 radius to random tiles)
 
 - balance: old hunter's monster target should be closer to village and not so strong
-- fix: on mobile separate SPD from HIT chance with a centered dot
 - !1 feat: add a way to protect against freezing, i.e. Barbarian Fur
 - !1 feat: add prefix "Light" to weapons (grace +1)
 - !1 feat: all items should have a base cost in .json
@@ -75,7 +69,6 @@ the logging order is wrong (lower message is newer)
 - !1 feat: add Level Up! popup
 - !1 feat: add battle hammer (one-handed)
 - !1 feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
-- !1 feat: treasure map should be in sepia
 - !1 feat: add achievments to stats: strongest monster killed
 - !2 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller
 - !2 feat: add friendly animals near the village (random)
@@ -231,7 +224,7 @@ the logging order is wrong (lower message is newer)
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261003-1">
+  <link rel="stylesheet" href="css/style.css?v=20261004-2">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -3001,7 +2994,11 @@ the logging order is wrong (lower message is newer)
     if (!item || item.kind !== 'weapon' || player.equip.weapon) return false
     const before = statSnapshot()
     player.equip.weapon = item
-    if (announce) log(`You automatically equip the ${item.name}.${statDeltaText(before)}`, 'good')
+    if (announce) {
+      const message = `You automatically equip the ${item.name}.${statDeltaText(before)}`
+      if (suppressLootLog) deferredLootEquipMessage = message
+      else log(message, 'good')
+    }
     return true
   }
 
@@ -4880,6 +4877,7 @@ the logging order is wrong (lower message is newer)
   let foragedTiles = new Set()
   let dugSandTiles = new Set()
   let suppressLootLog = false
+  let deferredLootEquipMessage = ''
   let lastLootResult = ''
   let lastLootHighlights = []
   // Forage odds/results come from content/loot_tables.json's `forage` table.
@@ -5222,9 +5220,15 @@ the logging order is wrong (lower message is newer)
       }
       groundItems.push(chest)
       suppressLootLog = true
-      checkGroundAt(player.x, player.y)
-      suppressLootLog = false
-      log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot', lastLootHighlights)
+      deferredLootEquipMessage = ''
+      try {
+        checkGroundAt(player.x, player.y)
+        log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot', lastLootHighlights)
+        if (deferredLootEquipMessage) log(deferredLootEquipMessage, 'good')
+      } finally {
+        suppressLootLog = false
+        deferredLootEquipMessage = ''
+      }
       return
     }
     tryForage()
@@ -7688,7 +7692,7 @@ the logging order is wrong (lower message is newer)
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
       </div>
       <div class="statrow">
-      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak">
+      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
       <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>`
@@ -8379,6 +8383,10 @@ the logging order is wrong (lower message is newer)
       tmCtx.fillStyle = t ? (t.mini || t.color) : RENDER_STYLE.treasureMap.fallbackTerrain
       tmCtx.fillRect(x * TM_SCALE, y * TM_SCALE, TM_SCALE, TM_SCALE)
     }
+    // Filter the finished terrain once, rather than every tile draw.
+    tmCtx.filter = 'sepia(1)'
+    tmCtx.drawImage(treasureMapCanvas, 0, 0)
+    tmCtx.filter = 'none'
     if (treasureMapSpot) {
       const cx = treasureMapSpot.x * TM_SCALE + TM_SCALE / 2, cy = treasureMapSpot.y * TM_SCALE + TM_SCALE / 2
       tmCtx.strokeStyle = RENDER_STYLE.treasureMap.mark

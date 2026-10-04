@@ -626,7 +626,7 @@ Freezing is currently a surface mechanic.
 
 While standing on snow or taiga, the player starts to freeze.
 
-Every 5 cold turns:
+Every 4 cold turns:
 
 ```text
 -1 HP
@@ -847,7 +847,9 @@ dwarven remains on rubble. Each skeleton has an independent **10%** chance of
 containing the usual skeletal-remains loot, decided during world generation:
 there is no guaranteed reward (5–9 skeletons yield 0.5–0.9 rewards on average).
 The other 90% can be searched once but are empty. Searching never rerolls loot
-eligibility. Skeletons, their loot flags, and searched state persist in saves
+eligibility. If a discovered weapon is automatically equipped, its discovery
+message appears before the automatic-equip message; equipping still resolves
+immediately in the same action. Skeletons, their loot flags, and searched state persist in saves
 and replay; loot stays on the skeleton's own level and map identity.
 
 Fort ghost placement is guaranteed from actual valid floor candidates rather
@@ -4423,9 +4425,16 @@ the same tier color as inventory/equipment UI.
 
 ---
 
+Desktop layouts with a mouse or other fine pointer use a brown scrollbar thumb
+and dark brown track, including devices that also support touch. Narrow touch
+layouts keep native scrollbar styling. The treasure map renders its terrain in sepia while
+retaining the red treasure X, with no effect on world or discovery state.
+
 # 70. Mobile
 
-Touch controls reuse the same gameplay functions as keyboard controls.
+Touch controls reuse the same gameplay functions as keyboard controls. Enemy
+inspection separates SPD and hit chance with a centered dot on mobile; desktop
+retains its existing line break.
 The inspection prompt and touch controls are hidden while a modal overlay is open. The Bestiary keeps its own full-screen scrolling list and close control on touch layouts.
 The backpack opens the inventory, the magnifier runs the normal inspect action (including village huts), and the hand button uses the normal forage/loot action. Each button handles touch and click input while suppressing the duplicate click browsers emit after a touch.
 
