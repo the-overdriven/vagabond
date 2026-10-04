@@ -35,11 +35,17 @@ describe('Low-HP enrage', () => {
         for(const name of ['Orc','Minotaur','Owlbear','Lion','GAUR']) {
           enemies=[];occupied.clear();const e=rushEnemy(name,39,40)
           e.maxHp=100;e.hp=31
+          // Test established combat: unalarmed GAUR intercepts the first rare sighting's attacks.
+          e.aware=true;alarmEnemy(e)
           rushCheck(e.abilities.includes('enrage'),'template enrage '+name)
           rushCheck(!enemyIsEnraged(e),'above threshold')
           const base=e.atk
+          const rageLogsBefore=messages.filter(m=>m.startsWith('Pain drives ')).length
           await playerAttackEnemy(e,true)
-          rushCheck(enemyIsEnraged(e) && enemyAtk(e)===base*1.25 && e.atk===base,'derived bonus')
+          rushCheck(e.hp===29,'threshold-crossing damage: '+name)
+          rushCheck(enemyIsEnraged(e) && enemyAtk(e)===base*1.25 && e.atk===base,'derived bonus: '+name)
+          rushCheck(messages.filter(m=>m.startsWith('Pain drives ')).length===rageLogsBefore+1 &&
+            messages.includes('Pain drives '+name+' into a rage!'),'first crossing logs once: '+name)
           const before=messages.filter(m=>m.startsWith('Pain drives ')).length
           await playerAttackEnemy(e,true)
           rushCheck(messages.filter(m=>m.startsWith('Pain drives ')).length===before,'no duplicate rage log')
@@ -60,6 +66,23 @@ describe('Low-HP enrage', () => {
         rushCheck(enemyIsEnraged(replayData.initialState.enemies.find(other=>other.id===e.id)),'replay snapshot derived status')
         replayRecording=false
       } finally {chance=oldChance;damageRoll=oldDamage;log=oldLog}
+    })()`))
+  })
+
+  it('keeps GAUR first-sighting escape separate from enrage after it turns to fight', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const e=rushEnemy('GAUR',39,40);e.maxHp=100;e.hp=31
+      const oldChance=chance,oldDamage=damageRoll
+      try {
+        chance=()=>false;damageRoll=()=>2
+        rushCheck(rareFleeEligible(e),'unalarmed GAUR uses rare flight')
+        rushCheck(await playerAttackEnemy(e,true)===false && e.hp===31 && !enemyIsEnraged(e),
+          'first sighting intercepts damage before enrage')
+        rareCatch(e)
+        rushCheck(!rareFleeEligible(e),'cornered GAUR is now in combat')
+        await playerAttackEnemy(e,true)
+        rushCheck(e.hp===29 && enemyIsEnraged(e),'combat hit crosses enrage threshold')
+      } finally {chance=oldChance;damageRoll=oldDamage}
     })()`))
   })
 
