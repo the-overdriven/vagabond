@@ -221,12 +221,21 @@ describe('Fisherman and swimming', () => {
     cy.window().then(async win => {
       const result=await win.eval(`(async () => {
         replayAnimationsDisabled=true
-        const approach=()=>{const n=npcs.find(n=>n.name===FISHERMAN_NAME);player.x=n.x;player.y=n.y+1}
+        // Exercise the edge case explicitly instead of depending on world placement.
+        const hermit=npcs.find(n=>n.name===FISHERMAN_NAME)
+        hermit.x=MAP_W-1;hermit.y=MAP_H-1
+        const approach=()=>{
+          const n=npcs.find(n=>n.name===FISHERMAN_NAME)
+          player.x=n.x+(n.x+1<MAP_W?1:-1);player.y=n.y
+        }
         const learn=async()=>{
           const n=npcs.find(n=>n.name===FISHERMAN_NAME)
-          player.x=n.x+1;player.y=n.y
-          map[n.y][n.x+1]='grass';map[n.y+1][n.x+1]='water'
-          await tryMove(0,1)
+          approach()
+          const dy=n.y+1<MAP_H?1:-1
+          map[player.y][player.x]='grass';map[player.y+dy][player.x]='water'
+          grasslandTrees.delete(keyXY(player.x,player.y))
+          grasslandTrees.delete(keyXY(player.x,player.y+dy))
+          await tryMove(0,dy)
         }
         approach();player.race='human'
         fishermanQuest={type:'fish_predator',state:'ready',targetId:'already-dead'}

@@ -1,6 +1,7 @@
 describe('Ethereal Ghosts and Oculus true sight', () => {
   beforeEach(() => {
     cy.visit('/')
+    cy.window().then(win => win.eval('WORLD_SEED=1; rngState=WORLD_SEED'))
     cy.get('#raceName').clear().type('Ghost Tester')
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay').should('not.be.visible')
@@ -16,7 +17,8 @@ describe('Ethereal Ghosts and Oculus true sight', () => {
       for(let y=30;y<=55;y++) for(let x=30;x<=55;x++) {
         map[y][x]='grass'; discovered[y][x]=true; grasslandTrees.delete(keyXY(x,y))
       }
-      enemies=[]; groundItems=[]; occupied=new Set(); turnCount=0; consecutiveWaitTurns=0
+      // Keep the same NPC blockers before recording and after save/load.
+      enemies=[]; groundItems=[]; occupied=new Set(npcs.map(n=>keyXY(n.x,n.y))); turnCount=0; consecutiveWaitTurns=0
       player.x=40; player.y=40; player.hp=1000; player.maxHp=1000; player.race='human'
       player.godMode=false; player.invisibleTurns=0; player.poisonTurns=0
       player.freezing={active:false,turns:0}; player.curseDebuffs=[]; player.berryRegenTurns=0
