@@ -16,7 +16,6 @@
 !1 [items] Add "someone threw away a good spoon" to the description, silver spoon
 !1 [items] feat: all items should have a base cost in .json
 !1 [npc] witch is a crazy niece of hunter
-!1 [survival] feat: add a way to protect against freezing, i.e. Barbarian Fur
 !1 [ui] buy life potions should use life potion svg instead of the emoji
 !1 [ui] Fleeing (1/2) - remove 1/2
 !1 [ui] default zoom should be slightly bigger
@@ -35,7 +34,7 @@
 !2 [death] feat: enemies that killed you, grow their stats, and are distinguishable
 !2 [foraging] feat: when forage does something special, highlight it on desktop (i.e. loot skeleton)
 !2 [immersion] You hear footsteps.
-!2 [immersion] feat: monsters that are close make sounds, to warn player (log)
+!2 [immersion] feat: monsters that are close make sounds, to warn player (log), you hear...
 !2 [interaction] inspecting columns (when standing on a dwarven column tile), should not inspect surroundings
 !2 [inventory] feat: [inventory] add "consumables" category (apple emoji?), automatically hide "all" category when having more than 10 items
 !2 [map] feat: custom map markers
@@ -51,7 +50,6 @@
 !2 [rendering] hole in sand should be smaller
 !2 [rendering] picking up wheelbarrow should remove it instantly (redraw/refresh canvas instantly)
 !2 [rendering] the brown cave floor is not exactly seamless
-!2 [rendering] the brown cave floor is not exactly seamless
 !2 [survival] feat: add a way to protect against freezing, i.e. Barbarian Fur
 !2 [swimming] feat: add swimming (skill? (number represents how many tiles you can swim before you start drowning))
 !2 [terrain] foraged forest shouldn't give concealment
@@ -63,7 +61,6 @@
 !2 [ui] feat: add HP bars to symbols/glyphs, can be toggable, only on desktop
 !2 [worldgen] chest and potion and scroll shouldnt spawn on same tile
 !2 [worldgen] feat: add friendly animals near the village (random)
-!3 [ai] monsters should run away from temple, even if player is not inside
 !3 [architecture] refactor: Separate game state from game logic
 !3 [balance] humanoids should have less def? or items should give them only 0.7x of what they normally give
 !3 [balance] balance: orc/dwarf/catling + 1 ATK/DEF/SPD every 5 levels
@@ -75,34 +72,26 @@
 !3 [gear] - gear: add weapon prefix to increase crit? range: +2-10%. deadly?
 !3 [herbs] feat: add special herbs (akin to G2), placed in worldgen, not subject to foraging rng
 !3 [immersion] wolves howl in distance before they show up on screen
-!3 [items] add weapon prefix to increase crit? deadly?
 !3 [items] Gaudy item: aggro +1
 !3 [loot] feat: individual monster loot table, outside of tier logic
 !3 [mining] feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
 !3 [monster abilities] - monster ability: wrestler: swaps places with enemy. lifesteal: probably quickest to implement. coward: runs away at low HP.
 !3 [monsters] add deers. passive but run away
 !3 [mysteriando] the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
-!3 [npc] herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards. (or cousin instead of brother) - The witch will be Hunter's deranged aunt.
 !3 [npc] herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards. (or cousin instead of brother),
 !3 [npc] feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
 !3 [pathfinding] fix: autopath should ignore swimming, unless already in water
 !3 [permadeath] dying on permadeath should wait for player input before showing race selection for new char
-!3 [permadeath] dying on permadeath should wait for player input before showing race selection for new char
-!3 [quests] old hunter: "the lost item" fallback - wtf?
 !3 [status effects] Diseased: healing received −50% for 10 turns.
 !3 [survival] feat: add limited ability to rest (may be interrupted), might require setting up camp. abandoned campfire could be reused
 !3 [terrain] feat: More terrain effects beyond forest concealment
 !3 [ui] move log to side and expand canvas?
 !3 [ui] small health bars above enemies?
 !3 [ui] tooltips on desktop should appear on the left side above canvas and also when fighting
-!3 [ui] enemy tooltips on desktop should appear automatically
 !3 [ui] - feat: check different z levels on the map
 !3 [worldgen] volcanos shouldnt spawn in the cold north
 !3 [worldgen] water in the north should turn to ice. but not all
 !3 [worldgen] add torches on the wall
-!4 [balance] humanoids should have less def? or items should give them only 0.7x of what they normally give
-!4 [balance] how is xp for killing monsters calculated? maybe the formula should use enemy base xp + sum of HP/DEF/ATK/SPD/GRACE stats
-!4 [combat] feat: aoe dmg? for offensive char types
 !4 [enemy abilities] monster ability: cry for help (on low hp?)
 !4 [enemy affixes] new monster affixes: scrawny - atk, - def, clumsy/graceful - grace modifiers, sleepy, vigilant
 !4 [enemy AI] wandering monsters that dont have snow biome dont go to snow tiles
@@ -117,10 +106,8 @@
 !4 [monster abilities] imps steal items and flee
 !4 [monster abilities] add monsters that can swim, murkspawn will be first
 !4 [pathfinding] autopath should take your swimming skill into account
-!4 [pathfinding] fix: autopath should ignore swimming, unless already in water
 !4 [permadeath] starting a second game on permadeath world should respawn enemies underground?
 !4 [quests] feat: old hunter quest should unlock something, not only give xp
-!4 [rendering] small health bars above enemies?
 !4 [rendering] - animation refresh rate on mobile is too slow. when walking I see fungus some item or unmoving creature glyph blinking
 !4 [simulation] feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
 !4 [status effects] haste (increase speed)
@@ -129,40 +116,28 @@
 !4 [supabase] how come turn count is lower than steps taken on supabase?
 !4 [tracking] tracking is not useful enough?
 !4 [worldgen] add submerged treasure
-!4 [worldgen] water in the north should turn to ice. but not all
 !4 [worldgen] set up far wandering enemy destination on world gen before player makes a move? to optimize
 !4 [worldgen] stalagmites in caves
 !4 [worldgen] feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
-!4 [xp] xp calculations should take not only stats into account but also each ability
-!4 [xp] how is xp for monsters calculated? maybe the formula should use enemy base xp + final HP/DEF/ATK/SPD/GRACE stats
-!5 [audio] immersive monster sounds
-!5 [audio] immersive monster sounds (you hear...)
+!4 [xp] how is xp for monsters calculated? maybe the formula should use enemy base xp + final HP/DEF/ATK/SPD/GRACE stats + xp calculations should take not only stats into account but also each ability
 !5 [bestiary] feat: bestiary
 !5 [combat] some weapons (only two-handed weapons?) should deal AoE dmg, think of name
 !5 [combat] fleeing mechanic: either on very strong hit, or % of life
 !5 [fishing] catch fish in river, stones or biting fish in river
 !5 [foraging] when foraging, you can find some brushwood, needed for setting up a camp, you also need flint, can be found by digging
 !5 [fov] - fov: add light sources (like torches to increase pov, or light scrolls)
-!5 [items] add Chaos Scroll of Teleportation - teleports (everyone) to random walkable tile
 !5 [monster abilities] monster invisibility
 !5 [monster abilities] banshee: wail (confuse)
-!5 [permadeath] starting a second game on permadeath world should respawn enemies underground?
 !5 [stealth] feat: add steal/stealth mechanic?
 !5 [supabase] supabase/graveyard death record: add dropped item + world traits
 !5 [terrain] poison fields
-!5 [tracking] more use of tracking? where the stronger mobs are, where the weaker ones are, and where there's no one around
-!5 [ui] move log to side and expand canvas?
 !5 [worldgen] guarantee some islands with treasure chests?
 !6 [balance] - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
 !6 [economy] prosperity: clearing monsters in the vicinity of the village adds some items to merchant
 !6 [npc] procedurally generated NPC ?
-!6 [tracking] tracking is not useful enough? i.e. add where the stronger mobs are, where the weaker ones are, and where there's no one around + add deers
-!6 [worldgen] guarantee some islands with treasure chests?
 !7 [enemy AI] monster fight each other (only when player near? they leave bodies?)
-!7 [fov] fov: add light sources (like torches to increase pov, or light scrolls)
 !7 [skills] skill: butchering
 !8 [architecture] refactor index.html (extract more files: render.js, combat.js, enemyAI.js, trade.js, mapView.js, hunterQuests.js)
-!8 [npc] procedurally generated NPC ?
 - !3 feat: more monster abilities, i.e. scorpions and GS poison you? ghosts can be damaged only with magic weapons, brutes should have knockback, lich dispel, wolf can summon wolves, spider can shoot web, banshee can heal, beholder should summon skeletons, beholder should be renamed to Oculus. make different monsters more special? i.e. brutes have throwback, lich can dispell invisibility. !! boars and minotaurs have charging behavior. If there's a straight line of 3+ tiles: they gain amount of turns equivalent of the distance between them and player and hit the player immediately. msg log logs: <name> charges at you!
   brutes have throwback, lich can dispell invisibility
   Add an enemy that becomes enraged when its HP falls below 30% and gets bonus to atk
