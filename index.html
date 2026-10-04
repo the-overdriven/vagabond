@@ -4,45 +4,48 @@ highest prio: deeper dungeons for endgame
 
 but first:
 
-!1 [sheet/graveyard] 🏆 feat: add achievments to stats: strongest monster killed
-!1 [balance] ⚖️ nerf ghosts, oculus
-!1 [balance] ⚖️ boost vampire. spd!!!
-!1 [balance] ⚖️ nerf wolf
-!1 [balance] 🍖 balance: non-humanoids should drop food
-!1 [balance] ⚖️ balance: old hunter's monster target should be closer to village and not so strong
+!1 [balance] ⚖️ nerf ghosts, oculus (manual)
+!1 [balance] ⚖️ boost vampire. spd!!! (manual)
+!1 [balance] ⚖️ nerf wolf (manual)
+!1 [items] 🎒 Add "someone threw away a good spoon" to the description, silver spoon (manual)
+
+!4 [monster abilities] 👹 imps and nymphs (and also tokka and wretchling) steal items and flee (ability: thief), reuse flee ability, when they have stolen something -> add red bag symbol (same place as bow or skull)
+!1 improve (regenerate) speed potion tile, should look like current life potion but yellow
+!1 [sheet/graveyard] 🏆 feat: add achievments to char sheet stats: strongest monster killed, also send it to supabase
+!1 [balance] ⚖️ balance: old hunter's monster target should be closer to village and not so strong (prefer tier 3 than 4)
 !1 [dialogue] 💬 a <monster name>, they call it.
-!1 [items] 🎒 Add "someone threw away a good spoon" to the description, silver spoon
 !1 [items] 🎒 feat: all items should have a base cost in .json
-!1 [ui] 🖥️ buy life potions should use life potion svg instead of the emoji
-!1 [ui] 🖥️ Fleeing (1/2) - remove 1/2
+!1 [ui] 🖥️ herbalist services: buy life potions should use life potion svg instead of the emoji
+!1 [ui] 🖥️ Fleeing (1/2) - what is this 1/2? why does player needs it? remove 1/2
 !1 [ui] 🖥️ feat: add Level Up! popup
-!1 [ui] 🖥️ add char sheet to mobile?
-!1 [worldbuilding] ⛏️ "we must dig deeper" written in dwarven ruins
-!2 [caves] 🕸️ cave: add webs
-!2 [caves] 🕸️ tier 4 cave monster should take rarity into account
-!2 [combat] ⚔️ vulture: stronger against low hp
-!2 [immersion] 👂 feat: monsters that are close make sounds, to warn player (log), you hear... + you hear footsteps
+!1 [ui] 🖥️ add char sheet to mobile? show fullscreen from inventory view
+!2 [caves] 🕸️ cave: add webs randomly sprinkled in caves (generate tiles)
+!2 [caves] 🕸️ tier 4 cave monster (level 2) should take rarity into account, goblins/skeletons/skinks/kobolds shouldn't have rare monsters there
+!2 [combat] ⚔️ vulture and hyena: add ability carrionInstinct: adds 25% ATK if player has less than 20% HP
 !2 [monsters] 👹 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller... sleeping = opposite of alarmed, there is a small chance they wake up. zzz
-!2 [quests] 📜 old hunter: "the lost item" fallback - wtf?
-!2 [quests] 📜 old hunter shouldnt give quests that involve dealing with far wandering monsters
-!2 [rendering] 🎨 swimming underground doesnt crop the character
-!2 [rendering] 🎨 hole in sand should be smaller
+!2 [quests] 📜 old hunter: "the lost item" fallback - wtf is that fallback?
+!2 [rendering] 🎨 swimming underground doesnt crop the character as it does on surface
 !2 [rendering] 🎨 the brown cave floor is not exactly seamless
-!2 [terrain] 🏞️ foraged forest shouldn't give concealment
-!2 [ui] 🖥️ being concealed should show this status in char tooltip (and chance to hide)
-!2 [ui] 🖥️ also when (un)equipping items it should colour them with their tier colours
-!2 [ui] 🖥️ enemy tooltips on desktop should appear automatically (add HP bars to symbols/glyphs, can be toggable, only on desktop)
+!2 [terrain] 🏞️ foraged forest tile shouldn't give concealment
+!2 [ui] 🖥️ being concealed should show this status in char tooltip (and % chance to hide against closest monster)
+!2 [ui] 🖥️ also when (un)equipping items it should colour items in message log with their tier colours
 !2 [worldgen] 🌍 chest and potion and scroll shouldnt spawn on same tile
-!2 [worldgen] 🌍 feat: add friendly animals near the village (random)
-!3 [balance] ⚖️ humanoids should have less def? or items should give them only 0.7x of what they normally give
+!3 [balance] ⚖️ humanoids should have less def? or better: items should give them only 0.5-0.7x of what they normally give (it should be a range to make it harder to identify if they wear magical item or not)
 !3 [balance] ⚖️ balance: orc/dwarf/catling + 1 ATK/DEF/SPD every 5 levels
-!3 [combat] ⚔️ death shield (fatal hit leaves it at 1hp)
-!3 [combat] ⚔️ bulgy fungus: nearby creatures receive dmg
+!3 [combat] ⚔️ add one-time ability: deathShield (fatal hit leaves it at 1hp), for now add it to gargoyle and add appropriate msg log
 !3 [enemy AI] 🤖 monsters should run away from temple, even if player is not inside
+
+!3 [combat] ⚔️ add bulgy fungus monster: similar to fungus but nearby creatures receive dmg when it dies
+!2 [ui] 🖥️ enemy tooltips on desktop should appear automatically (add HP bars to symbols/glyphs, can be toggable, only on desktop)
+!2 [rendering] 🎨 hole in sand should be smaller (manual)
+!2 [immersion] 👂 feat: monsters that are close make sounds, to warn player (log), you hear... + you hear footsteps
+!1 [worldbuilding] ⛏️ "we must dig deeper" written in dwarven ruins (before grotto)
 
 ------------
 
 low prio:
+!2 [worldgen] 🌍 feat: add friendly animals near the village (random)
+!1 [balance] 🍖 balance: non-humanoids should drop food
 *!1 [gear] ⚔️ feat: add prefix "Light" or similar to weapons (grace +1)
 *!1 [gear] ⚔️ feat: add battle hammer (one-handed)
 *!2 [gear] ⚔️ feat: increase bonus/prefix ranges, so that weaker magic weapons outpower higher tier non-prefixed weapons more often, color the bonus differently
@@ -94,7 +97,6 @@ more difficult:
 !4 [monster abilities] 👹 champion aura: inspired (+ atk/def)
 !4 [monster abilities] 👹 healer monsters, heal others of same type
 !4 [monster abilities] 👹 mummy: curse
-!4 [monster abilities] 👹 imps steal items and flee
 !4 [monster abilities] 👹 add monsters that can swim, murkspawn will be first
 !4 [pathfinding] 🧭 autopath should take your swimming skill into account
 !4 [permadeath] ☠️ starting a second game on permadeath world should respawn enemies underground?
