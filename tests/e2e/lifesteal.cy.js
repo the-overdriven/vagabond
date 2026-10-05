@@ -38,11 +38,13 @@ describe('Vampire lifesteal and underground guarantee', () => {
 
   it('uses effective damage for an overkill hit before resolving death', () => {
     cy.window().then(win => win.eval(`(() => {
-      const previous = {chance, damageRoll, missChance, die, hp:player.hp, poisonTurns:player.poisonTurns}
+      const previous = {chance, damageRoll, missChance, die, hp:player.hp, poisonTurns:player.poisonTurns,
+        spawnPoint:{x:spawnPoint.x,y:spawnPoint.y}}
       const vampire = {name:'Vampire',abilities:['lifesteal'],hp:40,maxHp:100,atk:30,def:0,spd:3,
         aggro:4,alive:true,x:player.x+1,y:player.y,level:0,humanoid:false}
       let deathHealing = null
       try {
+        spawnPoint = {x:0,y:0}
         player.hp = 6
         chance = p => p === 0.30
         missChance = () => 0
@@ -53,6 +55,7 @@ describe('Vampire lifesteal and underground guarantee', () => {
       } finally {
         chance = previous.chance; damageRoll = previous.damageRoll; missChance = previous.missChance
         die = previous.die; player.hp = previous.hp; player.poisonTurns = previous.poisonTurns
+        spawnPoint = previous.spawnPoint
       }
     })()`))
   })

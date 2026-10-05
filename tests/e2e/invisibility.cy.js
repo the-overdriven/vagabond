@@ -96,7 +96,9 @@ describe('Scroll of Invisibility', () => {
         enemies.push(e)
         occupied.add(keyXY(e.x, e.y))
         const originalRng = rng
+        const originalSpawnPoint = {x:spawnPoint.x, y:spawnPoint.y}
         try {
+          spawnPoint = {x:0, y:0}
           rng = () => 0.2
           reactToInvisibleAttack(e, 0)
           const fled = {x: e.x, y: e.y, occupied: occupied.has(keyXY(e.x, e.y))}
@@ -119,6 +121,7 @@ describe('Scroll of Invisibility', () => {
           return {fled, cornered, missedHp, playerHp: player.hp}
         } finally {
           rng = originalRng
+          spawnPoint = originalSpawnPoint
         }
       })()`)
       expect(result.fled.occupied).to.equal(true)

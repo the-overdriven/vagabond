@@ -3709,8 +3709,10 @@ start a sighting. Active flight takes priority over temple flight and idle AI.
 
 The first steps occur immediately, including when a wander step enters sighting
 range. Flight itself deals no damage, sets no alarm or spotted message, and leaves
-no tracks. It uses the deterministic temple-retreat neighbor selection. Far paths
-are cleared when flight starts; normal far targeting and tracks resume afterward.
+no tracks. Each flee step deterministically chooses a legal neighboring tile that
+strictly increases Chebyshev distance from the player; if none exists, the normal
+catch/slip rules apply. Far paths are cleared when flight starts; normal far targeting
+and tracks resume afterward.
 
 Configuration in `content/enemy_config.json`:
 
@@ -4352,16 +4354,11 @@ Current save version:
 32
 ```
 
-`src/version.js` is the single source of truth for both the deployed game version
-and the current save schema version. `VAGABOND_SAVE_VERSION` is consumed by
-save/load; replay starting snapshots use that same save format. Tests should
-reference the shared version rather than hardcoding the schema number.
-
 Saves are JSON files.
 
-Version 32 stores humanoid gear effectiveness, applied equipment bonuses and the
-spent death-shield flag. Current saves restore them directly without rerolls or
-reapplying stat bonuses; older schemas are rejected.
+Version 32 stores humanoid gear effectiveness, applied equipment bonuses, and the
+spent death-shield flag. Current saves and replay snapshots restore these values
+directly without rerolling or reapplying stat bonuses. Older schemas are rejected.
 
 Version 30 adds the generated decorative cave overlay list. Current saves and
 replay snapshots restore it without rerolling placement or consuming RNG.
@@ -5298,7 +5295,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's save schema version (`VAGABOND_SAVE_VERSION` in `src/version.js`).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 32).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

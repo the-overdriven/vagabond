@@ -151,6 +151,18 @@ function rareSlipAway(e, minDistance, stampede = false) {
   return true
 }
 
+function rareStepAwayFromPlayer(e) {
+  const destination = enemyEscapeDestination(e)
+  if (!destination) return false
+  const fromX = e.x, fromY = e.y
+  occupied.delete(keyXY(fromX, fromY))
+  e.x = destination.x
+  e.y = destination.y
+  occupied.add(keyXY(e.x, e.y))
+  finishEnemyMove(e, fromX, fromY)
+  return true
+}
+
 // True spends this enemy's turn fleeing. False permits ordinary combat after a
 // second-sighting catch. Invisible players can cause flight but are not chased.
 function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
@@ -165,7 +177,7 @@ function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
   e.rareFleeAcc -= steps
   e.rareFleeTurns--
   for (let step = 0; step < steps; step++) {
-    if (enemyStepAwayFromTemple(e)) continue
+    if (rareStepAwayFromPlayer(e)) continue
     if (e.rareSightings > 1 && !hidden) {
       rareCatch(e)
       return false
