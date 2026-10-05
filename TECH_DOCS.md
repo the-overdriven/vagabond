@@ -843,7 +843,7 @@ It contains several tombstones, including one anomalous tombstone.
 
 </details>
 
-## Dwarven Ruin / Fort
+## Dwarven Fort / Dwarven Ruins
 <details>
   <summary>Details</summary>
 
@@ -861,7 +861,8 @@ A large underground dwarven settlement/ruin containing:
 - a guaranteed artifact chest
 - a direct surface gate
 
-The fort is the dedicated generic-chain level at **z:-3**. Fort enemies and
+The fort is the dedicated generic-chain level at **z:-3** and now serves as
+the entrance complex (**D0**) for the deeper Dwarven Ruins. Fort enemies and
 ground objects use `level: -3`, `levelKind: 'chain'`, and the fort's
 `caveIndex` so they remain associated with the correct map identity.
 The surface `dwarvengate` enters z:-3 directly, and the fort's
@@ -869,6 +870,195 @@ The surface `dwarvengate` enters z:-3 directly, and the fort's
 does not place intermediary entrances, stairs, cave templates, or cave
 descriptors on z:-1 or z:-2; the normal caves on those depths keep only their
 own passages.
+
+Every generated world also places one dedicated dwarven descent on a distant,
+reachable marble tile inside D0. It leads into a persistent **3–5-floor**
+Dwarven Ruins stratum generated at the same time as the world. The new floors
+continue the generic depth chain from **z:-4** downward: three floors end at
+z:-6 and five floors end at z:-8. Each intermediate floor has one dedicated
+up stair and one dedicated down stair; the coordinates match across adjacent
+levels so changing depth does not move the player laterally. The final floor
+replaces its down stair with a visible but non-descending collapsed work stair
+toward the future Deep Mines.
+
+The stratum length and every layout decision use the seeded game RNG. Floor
+metadata includes its 1-based dungeon floor, total floor count, and normalized
+progress:
+
+```text
+progress = floorIndex / (floorCount - 1)
+```
+
+where `floorIndex` is zero-based inside the Ruins. This gives 0 on the first
+floor and 1 on the final floor for 3-, 4-, and 5-floor strata alike. The current
+foundation generates connected rooms/corridors with localized collapses and
+requires the entrance and exit to be separated by at least the configured
+walking/graph distance (**28 tiles** by default), rather than merely by visual
+or Euclidean distance. A failed floor layout is retried deterministically up to
+**12 times** before the existing world-attempt retry path rejects the world.
+
+Ordinary room entrances can now receive dwarven doors. The default chance is
+**45% per eligible two-tile room entrance**; both leaves start closed. A closed
+door blocks movement, sight, and projectiles. Bumping an unlocked closed door
+opens that one leaf and consumes one player turn without moving the player; the
+next movement action can pass through it. Open doors remain open permanently.
+Humanoid enemies treat unlocked closed doors as traversable routes but spend an
+action opening the encountered leaf before moving through it. Non-humanoids do
+not open them, while ethereal traversal retains its existing ability to pass
+through otherwise blocked terrain. Auto-travel may route through a known closed
+door and accounts for the extra opening action. Door state lives directly in the
+Ruins terrain map, so save/load and replay restore the exact open/closed state.
+
+Every Ruins floor now also contains one **two-leaf mandatory progression gate**
+on the route from its entrance to its deeper exit. The gate is selected only
+when closing both leaves genuinely disconnects those two points, so it cannot be
+bypassed through another corridor. Each gate has an independent **30% chance**
+to generate already breached/open. A pre-breached gate needs no key. Otherwise,
+exactly one matching **Dwarven Key** is placed on a reachable marble tile on the
+entrance side of the intact gate; the key can therefore always be collected
+without crossing the gate it unlocks. Bumping an intact gate while carrying its
+matching key consumes the key, opens both leaves, and costs **1 turn** without
+also moving the player. Mandatory gates cannot be breached with a weapon.
+
+Locked terrain blocks movement, sight, and projectiles until opened or breached.
+Keys are tied to a specific physical lock rather than acting as universal
+Dwarven keys. Auto-travel may plan through a locked door/gate only when the
+matching key is already carried; it never chooses weapon breaching on the
+player's behalf. Humanoids can still open ordinary *unlocked* doors, but do not
+unlock or breach locked doors. Ethereal movement keeps its existing terrain-
+passing exception.
+
+Each ordinary doorway that receives a door then has an independent **10% chance
+to be locked**. The roll is made once for the two-leaf doorway, never per leaf:
+when a doorway locks, **both adjacent leaves share one lock and one matching
+key**. This prevents a locked leaf from being bypassed simply by opening its
+sibling. Generated ordinary-door keys are placed only on marble reachable from
+the floor entrance while all generated locks are still closed, so a key cannot
+spawn behind its own lock or form a circular dependency with another lock.
+
+A matching key opens both leaves in **1 turn** and is consumed. Without the key,
+the player may instead attempt to breach the struck leaf with any equipped
+weapon; bare fists cannot attempt a breach and do not consume a turn. A weapon
+attempt always costs **1 turn**, does not consume or damage the weapon, and
+succeeds with:
+
+```text
+P(breach) = min(1, weapon ATK / 100)
+```
+
+For example, a 10 ATK weapon has a 10% success chance per attempt. Each actual
+weapon-breach attempt, successful or not, also has an independent **25% chance**
+to Alarm one enemy: the nearest eligible non-Alarmed monster on the current
+level, with no distance limit. Distance ties resolve deterministically. Already
+Alarmed or otherwise ineligible monsters are skipped, so repeated noisy attempts
+can progressively wake multiple enemies. A breached ordinary door leaf remains
+permanently passable; breaching one leaf does not automatically destroy the
+other.
+
+Gate/door terrain state and ground keys use the existing persistent level/item
+data, so saves and replay restore opened/breached locks, remaining keys, and
+consumed keys exactly. No additional save-schema field is required for locks.
+
+The Ruins stratum also contains one permanent **shortcut lift**. Its upper
+platform is on D1, is guaranteed reachable from the D1 entrance with all locks
+still closed, and begins unpowered. The deeper endpoint is selected with
+seeded RNG from the configured normalized depth range **50–100%** of the
+stratum, which means D2–D3 for a three-floor stratum and D3–D5 for a five-floor
+stratum. A wall-mounted control lever is generated beside the deeper platform.
+Bumping that lever costs **1 turn**, permanently powers both endpoints, and
+enables two-way inspect-to-travel between the two fixed platforms. The D1 side
+cannot activate the lift remotely. Lift travel itself follows the existing
+level-transition convention and does not add a separate combat turn.
+
+Lift endpoint/lever coordinates and powered state are persisted explicitly;
+the platform terrain state is also stored in the ordinary Ruins map grids.
+Lift metadata was introduced in save schema **34**. Current game version is
+**v56**, save schema **35**; older saves are rejected. Vaults and loot
+progression remain later batches.
+
+### Dwarven Ruins traps (batch 5)
+
+`src/dungeonTraps.js` places reusable spikes and wall-arrow mechanisms after
+stairs, locks, keys and the shortcut lift are generated. Each floor targets
+2–4 traps, stopping early if no safe placement remains. Placement uses seeded
+RNG once; entering or loading a floor never regenerates mechanisms. Triggers
+stay at least four Chebyshev tiles from entrances, ground objects and lift
+platforms. Every staircase, key and lift retains a route avoiding all triggers;
+keys reachable before unlocking also retain their original accessibility.
+Trap triggers are separated by more than three tiles. Existing monsters cannot
+start within two tiles of either a trigger or emitter. Summoning uses the same
+`DungeonTraps.safeSpawn` predicate; future encounter placement must use it too.
+
+Spikes trigger on entry by players and enemies, including flying and ethereal
+creatures. Forced movement also triggers them. Remaining on a trigger or
+restoring a save does not. A pressure plate fires a cardinal wall arrow toward
+the first creature in its lane, regardless of who stepped on it. Closed doors,
+projectile-blocking terrain and ground items stop the arrow; an item on a
+creature's tile intercepts before that creature. The emitter remains a wall.
+Automatic player travel excludes all trigger tiles; manual movement is allowed.
+
+Balance lives in `dungeons.dwarvenRuins.traps` in `world_generation.json`:
+spike ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Damage uses normal
+DEF reduction, armor glancing and base critical rules; arrows also use the
+ranged dodge multiplier. Traps grant no player XP, kill count, bestiary entry,
+strongest-kill record or immediate quest-kill credit. Normal loot and stolen
+items still drop, and enemy fatal-hit protection still applies. Resolution and
+RNG finish before presentation; projectile animation never determines a hit.
+
+Each deep level saves its `traps` array, including stable ID, trigger, type and
+optional emitter, direction and range. Schema 35 restores it directly alongside
+terrain, including replay initial snapshots. Both trap types are exercised by
+`tests/e2e/dwarven-traps.cy.js` and its shared support checks. No tests were added
+to the smoke spec. Checks cover movement, blocking, kill credit, save/replay,
+seeded generation and safe routes on 3–5 floors. Runtime checks were executed
+in Node with DOM/canvas presentation mocked; browser/Cypress visual checks
+have not been executed in this batch.
+
+ASCII glyphs are `^` for spikes, `_` for pressure plates and `!` for wall-arrow
+emitters. Image mode uses the generated trap atlas and a separate pressure
+plate tile. Rendering supports `sourceRect: [x, y, width, height]` for atlas
+regions without changing the gameplay tile. Shared underground FOV now honors
+`TILE.blocksSight`, so closed doors, levers and arrow walls block sight.
+The uploaded source omitted `sw.js`; its offline cache list still needs the
+new module and image paths if this installation uses a service worker.
+
+### Dwarven Ruins encounters (batch 6)
+
+Each floor now has a coherent seeded population. From its walkable area, the
+stratum rolls one density growth rate in **10–15% per floor** and budgets threat
+as `round(walkable tiles / 75 × (1 + floorIndex × growth))`. Enemy tier costs
+that many budget points. This increases the number and composition of threats
+without silently inflating monster stats. A small minimum budget ensures the
+required family mix and a roamer can appear even on a small floor.
+
+A floor selects **2–4 dominant species** weighted by template rarity, excluding
+rarity 0.1 or lower from that dominant pool. Guards cluster in generated rooms;
+a broader eligible pool supplies occasional roamers, which retain their species
+wandering behavior. There is exactly **one Champion per floor**, usually in a
+remote room with a guard of the same species when placement allows. Other prefixes begin at **11%** and rise by **2.5 percentage
+points per floor**; random prefix rolls exclude Champion.
+
+Cave species may appear when their tier's depth permits it. Surface species
+must opt in using a `z-N` biome tag, meaning depth N or deeper. Current tier
+thresholds are tier 2–3 at D1 (z:-4), tier 4 from z:-6. These tags only affect
+dungeon eligibility; names, stats and ordinary surface biomes stay intact.
+Entrances keep an eight-tile enemy clearance. Encounter spawns also avoid
+trap triggers and emitters within the configured two-tile trap clearance,
+existing objects and other monsters.
+
+A fleeing creature that actually moves on a Ruins floor may warn nearby
+eligible monsters within the normal five-tile Alarmed range. The closest
+eligible target gets a seeded **50%** chance if the same species, or **10%**
+otherwise. Hesitation or opening a door does not count as movement. Once
+alarmed, the target is not rolled again. This can make luring a wounded enemy
+past a guard room risky; preventing its escape or choosing another route are
+useful responses.
+
+Enemies, prefixes, positions and wander state use the existing save and replay
+fields. Room bounds are generation-only; loading does not regenerate the
+population. This batch does not change the save schema. The supplied service
+worker now precaches the trap module, dungeon rules, and trap art for offline
+play with game version v56.
 
 The surface `dwarvengate` must remain spatially distinct from ordinary cave
 entrances. After the fort is generated, every non-crypt random cave entrance is
@@ -925,7 +1115,11 @@ z:-1 caves
   ↓
 z:-2 deeper caves
   ↓
-z:-3 Dwarven Fort
+z:-3 Dwarven Fort / D0
+  ↓
+z:-4 ... z:-6/-8 Dwarven Ruins (3–5 floors)
+  ↓
+sealed continuation toward the Deep Mines
 ```
 
 The **Crypt is a separate map/structure**, but its first level shares the z:-1
@@ -997,11 +1191,37 @@ so enemies and items cannot appear or act on the wrong z:-2 map.
 ## z:-3: Dwarven Fort
 
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
-and is not generated as a normal random cave.
+and is not generated as a normal random cave. It is also D0, the entrance
+complex for the Dwarven Ruins.
 Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
 same coordinates. No fort-related transitions are stamped on z:-1 or z:-2.
-Generic `caveup` tiles still ascend to the preceding cave depth, including any
-encountered elsewhere on z:-3.
+A generated `dwarvenstairsdown` elsewhere on reachable fort marble begins the
+Ruins chain at z:-4. Generic `caveup` tiles still ascend to the preceding cave
+depth, including any encountered elsewhere on z:-3.
+
+## z:-4 and deeper: Dwarven Ruins
+
+The Dwarven Ruins add **3–5 persistent chain levels**, selected once during
+seeded world generation. They therefore occupy z:-4 through z:-6, z:-7, or
+z:-8 depending on the rolled floor count. Each floor is stored as another
+`deepLevels` entry rather than in a parallel dungeon-state system.
+
+Adjacent floors use dedicated dwarven stair tiles. `dwarvenstairsdown` uses
+ASCII `>` and `dwarvenstairsup` uses `<`; tile-image mode uses dedicated dwarven
+stone stair art rather than cave-stair artwork. The sealed Deep Mines
+continuation uses `X` in ASCII and its own collapsed-shaft image. Inspecting the
+sealed continuation describes the old excavation but does not change z-level.
+The world-map level selector derives arbitrary chain depths instead of assuming
+that z:-3 is the deepest possible level, and labels discovered Ruins floors by
+their generated floor number.
+
+The generated Ruins map and its single serialized local map intentionally share
+the same runtime object. Persistent terrain mutations on these floors, including
+ordinary doors changing from `dwarvendoorclosed` (`+` in ASCII) to
+`dwarvendooropen` (`/`), therefore use the existing `deepLevels[].caveMaps` save
+representation without a second copy drifting out of sync. Closed doors also use
+the same opacity rule for player FOV and enemy sight and the same terrain blocker
+rule used by ranged projectiles. Each floor has its own discovery grid.
 
 ## Cave/crypt/mausoleum separation
 
@@ -2010,7 +2230,8 @@ AGGRO still supplies the distance boundary. A clear projectile line is an additi
 separate requirement. The same deterministic tile line is used for collision and the
 visual projectile. Intermediate projectile blockers include forest/ancient forest/
 taiga, grassland trees, hills (unless the shooter stands on a hill), walls, mountains,
-boulders, columns/statues and other solid structures. The attacker's own tile and the
+boulders, columns/statues, closed dwarven doors and other solid structures. Open doors
+do not block shots. The attacker's own tile and the
 player's target tile are not rejected merely for being forest/hill. Living ground
 monsters and NPCs between attacker and target block the shot; flying creatures do not.
 Blocked shots cause ordinary chase/pathfinding, with no friendly fire and no ammunition
@@ -4351,10 +4572,18 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-32
+33
 ```
 
 Saves are JSON files.
+
+Version 33 extends the generic `deepLevels` chain with all generated Dwarven
+Ruins floors and their exact transition terrain/discovery state. Saves can
+restore an active chain depth below z:-3 directly; replay starting snapshots use
+the same restoration path. The Ruins floor map and its serialized local map are
+kept as one runtime object after loading so later persistent dungeon mutations
+cannot desynchronize the two representations. No compatibility path is added
+for older save/replay schemas.
 
 Version 32 stores humanoid gear effectiveness, applied equipment bonuses, and the
 spent death-shield flag. Current saves and replay snapshots restore these values
@@ -4452,7 +4681,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 32** saves. Other versions are rejected
+Current gameplay state requires **version 33** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -5295,7 +5524,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 32).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 33).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
