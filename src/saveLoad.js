@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 31 // Persistent sleeping wyverns
+const SAVE_VERSION = 32 // Enemy gear effectiveness and spent death shields
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -196,6 +196,9 @@ function buildSaveObject() {
       prefixBase: e.prefixBase || null,
       crit: !!e.crit,
       sleeping: e.sleeping === true,
+      gearScale: e.gearScale,
+      gearBonuses: e.gearBonuses ? {...e.gearBonuses} : null,
+      deathShieldUsed: e.deathShieldUsed === true,
       aware: !!e.aware,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
@@ -685,6 +688,9 @@ function loadGameFromObject(data, opts = {}) {
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
       prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,
       sleeping: e.sleeping === true,
+      gearScale: e.gearScale,
+      gearBonuses: e.gearBonuses ? {...e.gearBonuses} : null,
+      deathShieldUsed: e.deathShieldUsed === true,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
       alarmed: !!e.alarmed && (typeof e.aggro !== 'number' || e.aggro !== 0),

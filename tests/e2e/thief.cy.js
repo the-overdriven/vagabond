@@ -86,14 +86,14 @@ describe('One-time monster theft', () => {
           theftCheck(e.stolenItemEquipped && e.equipment===e.stolenItem,'equip ownership '+kind)
           theftCheck(messages.includes('Imp has equipped '+item.name+'.'),'equipment log '+kind)
           if(kind==='weapon') {
-            theftCheck(e.atk===before.atk+9 && combatDelay(e.equipment,false,e)===6/5,'weapon attack and grace')
+            theftCheck(e.atk===before.atk+9*e.gearScale && combatDelay(e.equipment,false,e)===6/(5*e.gearScale),'weapon attack and grace')
           } else {
-            theftCheck(e.def===before.def+8 && e.spd===Math.max(1,before.spd-1) &&
-              e.hp===before.hp+4 && e.maxHp===before.maxHp+4,'defensive gear bonuses and penalty')
+            theftCheck(e.def===before.def+8*e.gearScale && e.spd===Math.max(1,before.spd-1) &&
+              e.hp===before.hp+Math.round(4*e.gearScale) && e.maxHp===before.maxHp+Math.round(4*e.gearScale),'defensive gear bonuses and penalty')
           }
           const stats={atk:e.atk,def:e.def,spd:e.spd,hp:e.hp,maxHp:e.maxHp}
           const save=JSON.parse(JSON.stringify(buildSaveObject()))
-          theftCheck(save.version===31,'gear save version')
+          theftCheck(save.version===32,'gear save version')
           loadGameFromObject(save,{isReplayInit:true})
           const loaded=enemies.find(v=>v.id===id)
           theftCheck(loaded.stolenItemEquipped && loaded.equipment.kind===kind,'equipped state restored')
@@ -134,7 +134,7 @@ describe('One-time monster theft', () => {
       const baseAtk=e.atk;let seed=1
       while(true) {rngState=seed;if(rng()<0.1) break;seed++}
       rngState=seed;startReplayRecording();skipTurn()
-      theftCheck(e.stolenItemEquipped && e.atk===baseAtk+7,'recorded gear equipped')
+      theftCheck(e.stolenItemEquipped && e.atk===baseAtk+7*e.gearScale,'recorded gear equipped')
       for(let i=0;i<4;i++) skipTurn()
       const state=()=>({hp:player.hp,turn:turnCount,inventory:player.inventory,enemies:buildSaveObject().enemies})
       const expected=JSON.stringify(state()),recorded=JSON.parse(JSON.stringify(replayData))
@@ -165,9 +165,9 @@ describe('One-time monster theft', () => {
         for(const [dx,dy] of DIRS8) map[e.y+dy][e.x+dx]='grass'
         npcs=[{x:42,y:39},{x:42,y:40},{x:42,y:41}]
         theftCheck(!tryEnemyTheft(e) && calls===0,'NPCs close escape tiles');npcs=[]
-        map[player.y][player.x]='temple';rng=()=>0;enemyTurn()
+        map[player.y][player.x]='temple';spawnPoint={x:player.x,y:player.y};rng=()=>0;enemyTurn()
         theftCheck(!e.theftUsed && player.inventory.length===1,'temple prevents theft')
-        map[player.y][player.x]='grass';occupied.clear();e.x=41;e.y=41;occupied.add(keyXY(e.x,e.y))
+        map[player.y][player.x]='grass';spawnPoint={x:120,y:120};occupied.clear();e.x=41;e.y=41;occupied.add(keyXY(e.x,e.y))
         theftCheck(tryEnemyTheft(e),'diagonal theft')
       } finally {rng=oldRng;damageRoll=oldDamage}
     })()`))

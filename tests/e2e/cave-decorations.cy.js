@@ -25,6 +25,13 @@ describe('Decorative caves and deep threat rarity', () => {
         }
         try {await generateNewWorld()} finally {pickWeighted=originalPickWeighted}
         check(selections===deepLevels[0].caves.filter(c=>c.scenario).length,'each deep cave receives its weighted threat')
+        const lootCells=new Set()
+        for(const g of groundItems.filter(g=>['chest','potion','speedpotion'].includes(g.kind)||g.kind.startsWith('scroll'))) {
+          const k=(g.level??0)+':'+(g.levelKind||((g.level??0)<0?'chain':'surface'))+':'+g.x+','+g.y
+          check(!lootCells.has(k),'chests, potions and scrolls occupy distinct tiles');lootCells.add(k)
+        }
+        for(const [kind,count] of [['potion',WORLD_GEN_CONFIG.surfaceLoot.loosePotions],['speedpotion',WORLD_GEN_CONFIG.surfaceLoot.looseSpeedPotions],['scrollOfInvisibility',WORLD_GEN_CONFIG.surfaceLoot.looseScrolls]])
+          check(groundItems.filter(g=>(g.level??0)===0&&g.kind===kind).length===count,'loose supply count preserved '+kind)
         check(caveDecorations.length>0 && new Set(caveDecorations.map(p=>p.kind)).size===3,'all three decorations generated')
         const occupiedProps=new Set()
         for(const level of [-1,-2]) {
@@ -56,7 +63,7 @@ describe('Decorative caves and deep threat rarity', () => {
         spawnCaveDecorations()
         check(original===JSON.stringify(caveDecorations)&&rngBefore===rngState,'repeat placement consumes no gameplay RNG')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
-        check(saved.version===31,'current save schema')
+        check(saved.version===32,'current save schema')
         loadGameFromObject(saved,{isReplayInit:true})
         check(JSON.stringify(caveDecorations)===original,'current save and replay restoration retain props')
         const terrainBefore=JSON.stringify(undergroundMap)

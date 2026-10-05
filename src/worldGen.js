@@ -2542,7 +2542,7 @@ function spawnRemoteHighTierChests() {
   // inside the aggro range of tier-3+ monsters so reaching them carries risk.
   const candidates = enemies.filter(e => e.alive && e.level === 0 && e.tier >= cfg.guardedChestMinEnemyTier && e.x >= 0 && e.y >= 0)
   let placed = 0
-  const used = new Set(groundItems.filter(g => g.kind === 'chest' && onCurrentLevel(g)).map(g => keyXY(g.x, g.y)))
+  const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const shuffled = candidates.slice()
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = randInt(0, i);
@@ -2596,7 +2596,7 @@ function spawnEdgeHighTierChests() {
 
 function spawnOrdinarySurfaceChests() {
   const cfg = WORLD_GEN_CONFIG.surfaceLoot
-  const usedChests = new Set(groundItems.filter(g => g.kind === 'chest' && (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
+  const usedChests = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const spots = []
   for (let y = cfg.placementEdgeMargin; y < MAP_H - cfg.placementEdgeMargin; y++) for (let x = cfg.placementEdgeMargin; x < MAP_W - cfg.placementEdgeMargin; x++) {
     const tile = map[y][x]
@@ -2618,52 +2618,20 @@ function spawnOrdinarySurfaceChests() {
 function spawnGroundStuff() {
   const cfg = WORLD_GEN_CONFIG.surfaceLoot
   spawnOrdinarySurfaceChests()
-  // loose potions
-  for (let i = 0; i < cfg.loosePotions; i++) {
-    let x, y, tries = 0
-    do {
-      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
-      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
-      tries++
+  const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
+  const spots = []
+  for (let y = cfg.placementEdgeMargin; y < MAP_H - cfg.placementEdgeMargin; y++) {
+    for (let x = cfg.placementEdgeMargin; x < MAP_W - cfg.placementEdgeMargin; x++) {
+      if (!isWalkable(x,y) || ['temple','belltower','caveentrance'].includes(map[y][x]) || used.has(keyXY(x,y))) continue
+      spots.push({x,y})
     }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
-    if (tries >= cfg.looseItemPlacementTries) continue
-    groundItems.push({x, y, kind: 'potion'})
   }
-  // scrolls of invisibility
-  for (let i = 0; i < cfg.looseScrolls; i++) {
-    let x, y, tries = 0
-    do {
-      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
-      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
-      tries++
-    }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
-    if (tries >= cfg.looseItemPlacementTries) continue
-    groundItems.push({x, y, kind: 'scrollOfInvisibility'})
-  }
-  // speed potions
-  for (let i = 0; i < cfg.looseSpeedPotions; i++) {
-    let x, y, tries = 0
-    do {
-      x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
-      y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
-      tries++
-    }
-    while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
-    if (tries >= cfg.looseItemPlacementTries) continue
-    groundItems.push({x, y, kind: 'speedpotion'})
-  }
-  // Additional loose supplies use the same legal placement rules as other items.
-  for (const [kind, count] of [['herb', cfg.looseHerbs], ['mushroom', cfg.looseMushrooms]]) {
-    for (let i = 0; i < count; i++) {
-      let x, y, tries = 0
-      do {
-        x = randInt(cfg.placementEdgeMargin, MAP_W - cfg.placementEdgeMargin - 1)
-        y = randInt(cfg.placementEdgeMargin, MAP_H - cfg.placementEdgeMargin - 1)
-        tries++
-      } while ((!isWalkable(x, y) || map[y][x] === 'temple' || map[y][x] === 'belltower' || map[y][x] === 'caveentrance') && tries < cfg.looseItemPlacementTries)
-      if (tries < cfg.looseItemPlacementTries) groundItems.push({x, y, kind})
+  for (const [kind,count] of [['potion',cfg.loosePotions], ['scrollOfInvisibility',cfg.looseScrolls],
+    ['speedpotion',cfg.looseSpeedPotions], ['herb',cfg.looseHerbs], ['mushroom',cfg.looseMushrooms]]) {
+    for (let i=0;i<count && spots.length;i++) {
+      const index=randInt(0,spots.length-1), spot=spots[index]
+      spots[index]=spots[spots.length-1];spots.pop()
+      groundItems.push({...spot,kind})
     }
   }
   // A handful of equipment pieces are buried beneath surface sand. Their

@@ -2,15 +2,6 @@
 
 highest prio: deeper dungeons for endgame
 
-but first:
-
-!2 [ui] 🖥️ also when (un)equipping items it should colour items in message log with their tier colours
-!2 [worldgen] 🌍 chest and potion and scroll shouldnt spawn on same tile
-!3 [balance] ⚖️ humanoids should have less def? or better: items should give them only 0.5-0.7x of what they normally give (it should be a range to make it harder to identify if they wear magical item or not)
-!3 [balance] ⚖️ balance: orc/dwarf/catling + 1 ATK/DEF/SPD every 5 levels
-!3 [combat] ⚔️ add one-time ability: deathShield (fatal hit leaves it at 1hp), for now add it to gargoyle and add appropriate msg log
-!3 [enemy AI] 🤖 monsters should run away from temple, even if player is not standing/moving on temple ground
-
 need to refine:
 !3 [combat] ⚔️ add bulgy fungus monster: similar to fungus but nearby creatures receive dmg when it dies
 !2 [ui] 🖥️ enemy tooltips on desktop should appear automatically (add HP bars to symbols/glyphs, can be toggable, only on desktop)
@@ -1776,23 +1767,40 @@ more difficult:
     applyEnemyEquipment(e, rollEnemyEquipment(e) || rollEnemyDropEquipment(e))
   }
 
+  function initializeEnemyGearScale(e) {
+    if (Number.isFinite(e.gearScale)) return
+    e.gearScale = e.humanoid ? 0.5 + rng() * 0.2 : 1
+  }
+
+  function enemyGearStat(e, value) {
+    return value > 0 ? value * (e?.gearScale ?? 1) : value
+  }
+
+  function enemyWeaponGrace(e, weapon) {
+    const base = weapon.grace !== undefined ? weapon.grace : 6 - weapon.spd
+    return Math.max(1, enemyGearStat(e, base) +
+      (weapon.mod === 'grace' ? enemyGearStat(e, weapon.modAmt) : 0))
+  }
+
   function applyEnemyEquipment(e, item) {
     if (!e || !item) return
+    initializeEnemyGearScale(e)
+    if (e.gearBonuses) for (const [stat, value] of Object.entries(e.gearBonuses)) e[stat] -= value
+    const before = {atk:e.atk, def:e.def, spd:e.spd, hp:e.hp, maxHp:e.maxHp}
     e.equipment = item
     e.stolenItemEquipped = item === e.stolenItem
-    if (item.kind === 'weapon') {
-      if (item.atk) e.atk += item.atk
-      if (item.mod === 'atk') e.atk += item.modAmt
-    } else {
-      if (item.def) e.def += item.def
-      if (item.mod === 'def') e.def += item.modAmt
-      e.spd = Math.max(1, e.spd - 1)
-      if (item.mod === 'spd') e.spd += item.modAmt
-      if (item.mod === 'hp') {
-        e.maxHp += item.modAmt
-        e.hp += item.modAmt
-      }
+    for (const stat of ['atk', 'def', 'spd', 'hp']) {
+      // Weapon SPD is legacy GRACE data, not a movement bonus.
+      const base = stat === 'spd' && item.kind === 'weapon' ? 0 : (item[stat] || 0)
+      let bonus = enemyGearStat(e, base) + (item.mod === stat ? enemyGearStat(e, item.modAmt) : 0)
+      if (stat === 'hp') {
+        bonus = Math.round(bonus)
+        e.maxHp += bonus; e.hp += bonus
+      } else e[stat] += bonus
     }
+    if (item.kind !== 'weapon') e.spd = Math.max(1, e.spd - 1)
+    e.gearBonuses = Object.fromEntries(Object.entries(before).map(([stat,value]) => [stat,e[stat]-value]))
+    e.hp = Math.max(1, Math.min(e.hp,e.maxHp))
   }
 
   function itemStatLine(it) {
@@ -1855,7 +1863,8 @@ more difficult:
 
   function raceBonus(stat) {
     const race = raceDef()
-    return (race && race.stats && race.stats[stat]) || 0
+    return ((race && race.stats && race.stats[stat]) || 0) +
+      (race?.levelStat === stat ? Math.floor(player.lvl / 5) : 0)
   }
 
   function raceHas(flag) {
@@ -2110,7 +2119,7 @@ more difficult:
     const title = document.createElement('strong')
     title.textContent = 'Level Up!'
     const detail = document.createElement('span')
-    detail.textContent = `Level ${player.lvl} · +${gains.hp} max HP${gains.spd ? ` · +${gains.spd} SPD` : ''}${gains.grace ? ` · +${gains.grace} GRACE` : ''}`
+    detail.textContent = `Level ${player.lvl} · +${gains.hp} max HP${gains.atk ? ` · +${gains.atk} ATK` : ''}${gains.def ? ` · +${gains.def} DEF` : ''}${gains.spd ? ` · +${gains.spd} SPD` : ''}${gains.grace ? ` · +${gains.grace} GRACE` : ''}`
     popup.replaceChildren(title, detail)
     popup.hidden = false
     void popup.offsetWidth
@@ -2123,18 +2132,21 @@ more difficult:
     player.xp += amount
     player.totalXpEarned += Math.max(0, amount)
     log(`You gain ${amount} XP.`, 'good')
-    const gains = {hp: 0, spd: 0, grace: 0}
+    const gains = {hp: 0, atk: 0, def: 0, spd: 0, grace: 0}
     let leveled = false
     while (player.xp >= xpToNext(player.lvl)) {
       player.xp -= xpToNext(player.lvl)
       player.lvl++
       const hpGain = 10
       player.maxHp += hpGain
-      const spdGain = player.lvl % 2 === 0 ? 1 : 0
+      const racialGain = player.lvl % 5 === 0 ? raceDef()?.levelStat : null
+      const atkGain = racialGain === 'atk' ? 1 : 0
+      const defGain = racialGain === 'def' ? 1 : 0
+      const spdGain = (player.lvl % 2 === 0 ? 1 : 0) + (racialGain === 'spd' ? 1 : 0)
       const graceGain = player.lvl % 5 === 0 ? 1 : 0
       leveled = true
-      gains.hp += hpGain; gains.spd += spdGain; gains.grace += graceGain
-      log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''}${graceGain ? `, +${graceGain} GRACE` : ''})`, 'good')
+      gains.atk += atkGain; gains.def += defGain; gains.hp += hpGain; gains.spd += spdGain; gains.grace += graceGain
+      log(`You reached Level ${player.lvl}! (+${hpGain} max HP${atkGain ? `, +${atkGain} ATK` : ''}${defGain ? `, +${defGain} DEF` : ''}${spdGain ? `, +${spdGain} SPD` : ''}${graceGain ? `, +${graceGain} GRACE` : ''})`, 'good')
     }
     if (leveled) { updateHud(); showLevelUpPopup(gains) }
   }
@@ -2293,6 +2305,9 @@ more difficult:
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
     initializeEnemySleep(enemy)
+    initializeEnemyGearScale(enemy)
+    enemy.gearBonuses = enemy.gearBonuses || null
+    enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
@@ -3009,7 +3024,7 @@ more difficult:
     if (!Array.isArray(highlights) || highlights.length === 0) return
     const matches = highlights
       .filter(h => h && typeof h.text === 'string' && h.text.length)
-      .map(h => ({...h, index:msg.indexOf(h.text)}))
+      .map(h => ({...h, index:Number.isInteger(h.index) ? h.index : msg.indexOf(h.text)}))
       .filter(h => h.index >= 0)
       .sort((a, b) => a.index - b.index)
     if (!matches.length) return
@@ -3032,6 +3047,18 @@ more difficult:
     if (!item) return []
     const text = displayName || (item.kind === 'artifact' ? artifactDisplayName(item) : item.name)
     return text ? [{text, tier:Number.isFinite(item.tier) ? item.tier : null}] : []
+  }
+
+  function equipmentLog(msg, items, cls = 'good') {
+    let cursor = 0
+    const highlights = items.filter(Boolean).flatMap(item => {
+      const text = item.name
+      const index = msg.indexOf(text, cursor)
+      if (index < 0) return []
+      cursor = index + text.length
+      return [{text, index, tier: item.tier}]
+    })
+    return log(msg, cls, highlights)
   }
 
   function lootLog(msg, item = null, displayName = null) {
@@ -3102,8 +3129,8 @@ more difficult:
     player.equip.weapon = item
     if (announce) {
       const message = `You automatically equip the ${item.name}.${statDeltaText(before)}`
-      if (suppressLootLog) deferredLootEquipMessage = message
-      else log(message, 'good')
+      if (suppressLootLog) deferredLootEquipMessage = {message, item}
+      else equipmentLog(message, [item])
     }
     return true
   }
@@ -3205,7 +3232,8 @@ more difficult:
   function enemyGrace(e) {
     if (!e) return null
     const template = enemyTemplateForSavedEnemy(e)
-    const grace = e.grace ?? (template && template.grace)
+    const natural = e.grace ?? (template && template.grace)
+    const grace = natural + (e.equipment?.kind !== 'weapon' && e.equipment?.mod === 'grace' ? enemyGearStat(e,e.equipment.modAmt) : 0)
     return Number.isFinite(grace) && grace > 0 ? grace : null
   }
 
@@ -3214,7 +3242,7 @@ more difficult:
     // their natural GRACE while unarmed; an equipped weapon overrides it.
     let grace
     if (weapon && weapon.kind === 'weapon') {
-      grace = weaponGrace(weapon)
+      grace = isPlayer ? weaponGrace(weapon) : enemyWeaponGrace(enemy, weapon)
       if (isPlayer) grace = Math.max(1, grace - playerGracePenalty())
     } else if (!isPlayer) {
       grace = enemyGrace(enemy)
@@ -3277,7 +3305,7 @@ more difficult:
   }
 
   function tryEnemyTheft(e) {
-    if (!enemyHasAbility(e, 'thief') || e.theftUsed || !e.alive || e.hp <= 0 ||
+    if (enemyInsideSanctuary(e) || !enemyHasAbility(e, 'thief') || e.theftUsed || !e.alive || e.hp <= 0 ||
         playerHiddenFromEnemy(e) || enemyIsPassive(e) ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) !== ATTACK_RANGE ||
         !enemyHasSight(e) || !enemyEscapeDestination(e)) return false
@@ -3297,7 +3325,7 @@ more difficult:
     log(`${e.name} has snatched ${artifactDisplayName(e.stolenItem)} from you and runs away!`, 'bad')
     if (!e.equipment && ['weapon', 'shield', 'armor'].includes(e.stolenItem.kind)) {
       applyEnemyEquipment(e, e.stolenItem)
-      log(`${e.name} has equipped ${artifactDisplayName(e.stolenItem)}.`, 'bad')
+      equipmentLog(`${e.name} has equipped ${artifactDisplayName(e.stolenItem)}.`, [e.stolenItem], 'bad')
     }
     tryWoundedEnemyFlee(e, true)
     updateHud()
@@ -3392,6 +3420,7 @@ more difficult:
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
+    absorbEnemyFatalHit(e)
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
     if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
@@ -3432,7 +3461,7 @@ more difficult:
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null) {
-    if (e.summonedTurn === turnCount) return false
+    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e)) return false
     if (enemyIsPassive(e)) return false
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
@@ -3534,7 +3563,7 @@ more difficult:
   }
 
   function enemyRangedAttackPlayer(e, path = null) {
-    if (e.summonedTurn === turnCount) return false
+    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e)) return false
     const shot = shooterDefinition(e)
     if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
     clearAutoPath()
@@ -3586,12 +3615,21 @@ more difficult:
   function recordStrongestEnemyKill(e) {
     const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
     const naturalGrace = enemyGrace(e) || 0
-    const grace = weapon ? weaponGrace(weapon) : naturalGrace
+    const grace = weapon ? enemyWeaponGrace(e, weapon) : naturalGrace
     const stats = {atk: e.atk, def: e.def, spd: e.spd,
       grace: grace > 0 ? Math.max(1, grace - gearGracePenalty(e.equipment)) : 0}
     const strength = monsterStrength(stats)
     if (player.strongestEnemyKilled && strength <= player.strongestEnemyKilled.strength) return
     player.strongestEnemyKilled = {name: e.name, species: trackSpecies(e), tier: e.tier, strength, stats}
+  }
+
+  function absorbEnemyFatalHit(e) {
+    if (e.hp > 0 || e.deathShieldUsed || !enemyHasAbility(e, 'deathShield')) return false
+    e.hp = 1
+    e.deathShieldUsed = true
+    log(`The ${e.name}'s death shield shatters, leaving it barely alive!`, 'bad')
+    spawnDamageNumber(e.x, e.y, 'Shield breaks!', '#b6d9ef', 200)
+    return true
   }
 
   function killEnemy(e) {
@@ -3668,9 +3706,9 @@ more difficult:
     if (killer && killer.humanoid && remainingWeapons.length) {
       const candidate = pick(remainingWeapons)
       if (!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) {
-        killer.equipment = {...candidate}
+        applyEnemyEquipment(killer, {...candidate})
         killer.stolenItemEquipped = false
-        log(`The ${killer.name} takes up ${killer.equipment.name}.`, 'bad')
+        equipmentLog(`The ${killer.name} takes up ${killer.equipment.name}.`, [killer.equipment], 'bad')
       }
     }
     const body = {
@@ -4526,23 +4564,23 @@ more difficult:
     return true
   }
 
+  function enemyInsideSanctuary(e) {
+    return currentZ === 0 && (e.level ?? 0) === 0 &&
+      Math.max(Math.abs(e.x - spawnPoint.x), Math.abs(e.y - spawnPoint.y)) < FLEE_DISTANCE
+  }
+
   function enemyStepAwayFromTemple(e) {
-    // Flee logic for the temple's no-farming zone: pick the open neighbour tile
-    // that puts the most distance between the enemy and the player - not the
-    // temple's centre - so it keeps retreating away from the player every turn
-    // no matter which direction that leads, even off the visible screen, instead
-    // of just circling the temple at a "safe enough" radius.
     let best = null, bestDist = -1
     for (const [dx, dy] of DIRS8) {
       const nx = e.x + dx, ny = e.y + dy
       if (!enemyTileOpen(e, nx, ny)) continue
-      const d = Math.max(Math.abs(nx - player.x), Math.abs(ny - player.y))
+      const d = Math.max(Math.abs(nx - spawnPoint.x), Math.abs(ny - spawnPoint.y))
       if (d > bestDist) {
         bestDist = d
         best = {x: nx, y: ny}
       }
     }
-    const curDist = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    const curDist = Math.max(Math.abs(e.x - spawnPoint.x), Math.abs(e.y - spawnPoint.y))
     if (!best || bestDist <= curDist) return false // boxed in or already fleeing correctly
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
@@ -4553,14 +4591,6 @@ more difficult:
     return true
   }
 
-  // While the player stands on temple ground, any enemy currently visible on
-  // screen starts fleeing (regardless of aggro state) - stops using the
-  // Temple's free healing as a way to safely tank hits mid-fight. Once
-  // fleeing starts it keeps going, even after the enemy walks off the visible
-  // screen, until it's put a full FLEE_DISTANCE tiles between itself and the
-  // player - otherwise it would simply freeze right at the screen's edge
-  // (wandering doesn't apply to off-screen enemies either, so nothing would
-  // ever push it further away).
   let turnCount = 0
   let consecutiveWaitTurns = 0
   const MAX_CONSECUTIVE_WAIT_TURNS = 10
@@ -4686,6 +4716,16 @@ more difficult:
     }
     for (const e of enemies.slice()) {
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      if (enemyInsideSanctuary(e)) {
+        if (!e.fleeingHoly && enemyIsVisibleOnMainView(e)) log(`The ${e.name} retreats from the sacred ground.`, 'info')
+        e.fleeingHoly = true; e.aware = false
+        e.forestConcealX = null; e.forestConcealY = null
+        wakeSleepingEnemy(e)
+        enemyStepAwayFromTemple(e)
+        if (enemyInsideSanctuary(e)) enemyStepAwayFromTemple(e)
+        continue
+      }
+      e.fleeingHoly = false
       const hiddenFromEnemy = playerHidden && !enemyHasAbility(e, 'trueSight')
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue
@@ -4713,18 +4753,6 @@ more difficult:
         continue
       }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      const shouldFlee = isTempleGround(map[player.y][player.x]) && (enemyIsOnScreen(e) || e.fleeingHoly) && distFromPlayer < FLEE_DISTANCE
-      if (shouldFlee) {
-        e.fleeingHoly = true
-        if (e.aware) {
-          e.aware = false
-          log(`The ${e.name} retreats from the sacred ground.`, 'info')
-        }
-        enemyStepAwayFromTemple(e)
-        enemyStepAwayFromTemple(e) // monsters flee quickly
-        continue
-      }
-      if (e.fleeingHoly) e.fleeingHoly = false
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
       let aggroRange = effectiveAggroRange(e)
@@ -5444,7 +5472,7 @@ more difficult:
       try {
         checkGroundAt(player.x, player.y)
         log(`You search the skeletal remains and take what you can find: ${lastLootResult}`, 'loot', lastLootHighlights)
-        if (deferredLootEquipMessage) log(deferredLootEquipMessage, 'good')
+        if (deferredLootEquipMessage) equipmentLog(deferredLootEquipMessage.message, [deferredLootEquipMessage.item])
       } finally {
         suppressLootLog = false
         deferredLootEquipMessage = ''
@@ -7958,6 +7986,7 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' <span class="thief-marker" aria-label="carrying stolen item"></span>' : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyHasAbility(e, 'carrionInstinct') ? `<div class="crit">Carrion Instinct${enemyCarrionInstinctActive(e) ? ' · active (+1 AGGRO, +25% ATK)' : ' · +1 AGGRO and +25% ATK below 20% player HP'}</div>` : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
@@ -9401,9 +9430,9 @@ more difficult:
       const oldShield = player.equip.shield
       player.equip.shield = null
       player.inventory.push(oldShield)
-      log(`${equipLead} the ${it.name}, removing the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, 'good')
+      equipmentLog(`${equipLead} the ${it.name}, removing the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, [old, it, oldShield])
     } else {
-      log(`${equipLead} the ${it.name}.${statDeltaText(before)}`, 'good')
+      equipmentLog(`${equipLead} the ${it.name}.${statDeltaText(before)}`, [old, it])
     }
     consumeItemTurn()
   }
@@ -9417,7 +9446,7 @@ more difficult:
     const before = statSnapshot()
     player.equip[slot] = null
     player.inventory.push(item)
-    log(`You unequip the ${item.name}.${statDeltaText(before)}`, 'good')
+    equipmentLog(`You unequip the ${item.name}.${statDeltaText(before)}`, [item])
     consumeItemTurn()
   }
 

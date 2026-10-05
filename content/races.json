@@ -17,28 +17,31 @@
     "id": "catling",
     "name": "Catling",
     "avatar": "catling.jpg",
-    "bonus": "+3 SPD",
+    "bonus": "+3 SPD, +1 SPD every 5 levels",
     "stats": {
       "spd": 3
-    }
+    },
+    "levelStat": "spd"
   },
   {
     "id": "dwarf",
     "name": "Dwarf",
     "avatar": "dwarf.jpg",
-    "bonus": "+3 DEF",
+    "bonus": "+3 DEF, +1 DEF every 5 levels",
     "stats": {
       "def": 3
-    }
+    },
+    "levelStat": "def"
   },
   {
     "id": "orc",
     "name": "Orc",
     "avatar": "orc.jpg",
-    "bonus": "+3 ATK",
+    "bonus": "+3 ATK, +1 ATK every 5 levels",
     "stats": {
       "atk": 3
-    }
+    },
+    "levelStat": "atk"
   },
   {
     "id": "leprechaun",

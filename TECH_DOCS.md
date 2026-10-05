@@ -104,15 +104,15 @@ including against alarmed unaware enemies (alarmed but not chasing the player).*
 
 ## Catling
 
-**+3 SPD**
+**+3 SPD, plus +1 SPD at levels 5, 10, 15, ...**
 
 ## Dwarf
 
-**+3 DEF**
+**+3 DEF, plus +1 DEF at levels 5, 10, 15, ...**
 
 ## Orc
 
-**+3 ATK**
+**+3 ATK, plus +1 ATK at levels 5, 10, 15, ...**
 
 ## Leprechaun
 
@@ -179,7 +179,7 @@ input blocking and consumes no turn or RNG. Desktop keeps its collapsible
 character stats. Mobile sheet navigation is presentation state, not save data.
 
 A level gain displays a brief animated **Level Up!** notice with the resulting
-level and total max-HP, SPD and GRACE gains. Multiple levels earned from one XP
+level and total max-HP, ATK, DEF, SPD and GRACE gains. Multiple levels earned from one XP
 award share one notice. The notice requires no dismissal, does not intercept
 input, and never delays stat changes or turns. Reduced-motion preferences
 suppress the animation. Replay playback suppresses the notice; recording and
@@ -347,10 +347,15 @@ On level-up:
 - maximum HP increases by 10
 - SPD increases by 1 on every second level, starting from lvl 2 (`floor(level / 2)`)
 - player GRACE bonus increases by 1 on every fifth level (`floor(level / 5)`)
+- Orcs gain +1 ATK, Dwarves +1 DEF, and Catlings +1 SPD on every fifth level
 - derived stats are recalculated as needed
 
 Therefore, the level-based SPD gains occur at levels 2, 4, 6, 8, etc., while
 level-based GRACE gains occur at levels 5, 10, 15, 20, etc.
+
+Racial scaling is `3 + floor(level / 5)` in the race's specialty stat. It stacks
+with ordinary level gains. Death can create XP debt but does not lower level,
+so it does not remove racial milestones. New characters restart at +3.
 
 XP is affected by the player's XP multiplier.
 
@@ -1507,6 +1512,18 @@ No new persistent flags or save-format change is required; the current format
 remains 25. New worlds receive the updated template abilities, while saved
 instances restore their recorded arrays exactly.
 
+## Death shield
+
+Gargoyle has `deathShield`: its first lethal hit leaves it at exactly **1 HP**
+and permanently consumes the shield. No kill, XP or loot is awarded until it
+actually dies. A subsequent hit can kill it immediately, including an extra
+strike in the same turn. Healing does not recharge the shield.
+
+The shared inspection tooltip shows **Death Shield · ready/spent**. Activation
+logs `The <name>'s death shield shatters, leaving it barely alive!` and displays
+a brief **Shield breaks!** effect. Survival resolves before animation and
+extra strikes; the spent flag is initialized and saved for replay determinism.
+
 ## Gang power
 
 Goblin, Skink, and Kobold have `gangPower`. Each gains +1 melee ATK per other
@@ -2169,20 +2186,20 @@ System (section 83).
 
 The Temple is a safety zone.
 
-Enemies near the Temple flee when the player is on Temple ground.
+On the surface, monsters strictly within **15 tiles Chebyshev distance** of
+the Temple center (`spawnPoint`) retreat regardless of the player's position,
+visibility or movement. They take up to two outward steps per game turn,
+stopping at distance 15. Retreat has priority over sleep, theft, passive
+behavior, ranged attacks and pursuit. Sleeping creatures wake to retreat.
+Immediate counterattacks are also suppressed inside the sanctuary.
 
-An enemy starts fleeing once it is within the same 20-tile active range used
-for wandering (section 22) - or is already fleeing - while the player stands
-on Temple ground. Once started, fleeing continues (even if the enemy moves
-outside that range) until it reaches the flee distance below.
+Retreat steps obey terrain and occupancy; a boxed-in monster waits rather than
+attacking or teleporting. Creatures outside the boundary behave normally and
+can still shoot inward. The sanctuary does not extend underground. The existing
+20-tile avoidance rule for far-wandering travelers remains separate.
 
-Flee distance is approximately:
-
-```text
-15 tiles
-```
-
-This prevents the Temple from becoming an unrestricted combat exploit.
+This makes the village a reliable refuge but also allows players to drive
+monsters back toward the boundary and retreat safely after attacking.
 
 ---
 
@@ -2658,7 +2675,7 @@ A two-handed weapon prevents shield use.
 
 Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
 Equipment stat changes in equip/unequip logs use green for increases and red for decreases, including GRACE.
-Equipment swap messages name the previously equipped item before the new item in one log line; equipping a two-handed weapon also names the shield it removes.
+Equipment swap messages name the previously equipped item before the new item in one log line; equipping a two-handed weapon also names the shield it removes. Every named item uses its tier colour, including automatic equips, unequips, and monster gear pickups. Identically named items retain their own colours.
 
 If the player has no weapon, looted weapons are automatically equipped.
 
@@ -3055,6 +3072,23 @@ Artifact chance and quality (effect tier, curse odds) scale with Magic Find
 Humanoid enemies can carry equipment. The worn item affects the enemy's stats
 and is dropped as that same item when the humanoid dies.
 
+## Humanoid equipment effectiveness
+
+Each humanoid receives one seeded, persistent effectiveness factor uniformly
+distributed from **0.50 to 0.70**, replacing full **1.00** effectiveness. The
+same factor applies to positive equipment ATK, DEF, SPD, HP and GRACE, including
+modifiers, stolen gear and replacement gear. Negative modifiers and existing
+gear penalties retain their full effect. HP gains round to whole HP; other
+combat stats retain fractions internally and display rounded values. Weapon
+GRACE still replaces natural GRACE, with an effective minimum of 1.
+
+The factor belongs to the monster, is not revealed in its tooltip, and does
+not reroll when gear changes. Replacing equipment removes its previous applied
+bonuses before applying the new item. Nonhumanoid thieves retain full gear
+effectiveness. Items themselves remain unchanged and drop with full stats;
+the random effectiveness makes enemy stats a less precise clue to modifiers.
+The multiplier and applied bonuses persist in current saves and replay states.
+
 ## Equipment is generated on spawn
 
 A humanoid is assigned equipment when the enemy is created, before the player
@@ -3151,7 +3185,11 @@ Non-humanoid enemies do not wear or drop normal weapons, armor, or shields.
 
 # 45. Chests
 
-The surface and underground areas contain chests.
+The surface and underground areas contain chests. Generated chests, potions
+and scrolls cannot occupy the same tile on the same level/map. Surface loose
+supplies sample legal, unoccupied ground-item positions without replacement,
+preserving configured counts while enough valid positions exist. Cave loot
+already reserves each selected position. Runtime drops are unaffected.
 The surface starts with up to four remote tier-3 chests guarded by tier-3+
 monsters, ordinary chests at roughly one per **720 eligible walkable tiles**,
 and up to twelve additional edge chests. The ordinary chest density
@@ -4408,7 +4446,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 31** saves. Other versions are rejected
+Current gameplay state requires **version 32** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -5251,7 +5289,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 31).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 32).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -5743,7 +5781,7 @@ within 20 tiles gives a 1% spontaneous wake chance. Successfully spotting the
 player in their reduced range wakes them immediately; invisibility, line of
 sight and forest concealment still apply. A landed hit or nearby combat alarm
 also wakes them. Waking restores flight and makes them Alarmed; they never
-return to sleep. Current save schema **31** persists the sleeping boolean,
+return to sleep. Current save schema **32** persists the sleeping boolean,
 including replay initial states; loading never rerolls it. Older schemas are
 rejected rather than migrated.
 
@@ -5758,3 +5796,7 @@ Water and river tiles clip grounded creatures to their upper half on every
 level, including underground. Flying creatures retain their flight rendering.
 Brown deep-cave floor textures alternate horizontal and vertical mirroring by
 world-coordinate parity so neighboring edges match without new art or RNG.
+
+Version 32 additionally stores humanoid gear effectiveness, applied equipment
+bonuses and the spent death-shield flag. Current saves restore them directly
+without rerolls or reapplying stat bonuses; older schemas are rejected.
