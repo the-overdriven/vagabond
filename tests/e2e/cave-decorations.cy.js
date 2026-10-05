@@ -63,7 +63,7 @@ describe('Decorative caves and deep threat rarity', () => {
         spawnCaveDecorations()
         check(original===JSON.stringify(caveDecorations)&&rngBefore===rngState,'repeat placement consumes no gameplay RNG')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
-        check(saved.version===32,'current save schema')
+        check(saved.version===self.VAGABOND_SAVE_VERSION,'current save schema')
         loadGameFromObject(saved,{isReplayInit:true})
         check(JSON.stringify(caveDecorations)===original,'current save and replay restoration retain props')
         const terrainBefore=JSON.stringify(undergroundMap)

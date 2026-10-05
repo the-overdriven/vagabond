@@ -4349,10 +4349,19 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-30
+32
 ```
 
+`src/version.js` is the single source of truth for both the deployed game version
+and the current save schema version. `VAGABOND_SAVE_VERSION` is consumed by
+save/load; replay starting snapshots use that same save format. Tests should
+reference the shared version rather than hardcoding the schema number.
+
 Saves are JSON files.
+
+Version 32 stores humanoid gear effectiveness, applied equipment bonuses and the
+spent death-shield flag. Current saves restore them directly without rerolls or
+reapplying stat bonuses; older schemas are rejected.
 
 Version 30 adds the generated decorative cave overlay list. Current saves and
 replay snapshots restore it without rerolling placement or consuming RNG.
@@ -5289,7 +5298,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 32).
+The replay `version` is independent of the game's save schema version (`VAGABOND_SAVE_VERSION` in `src/version.js`).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
