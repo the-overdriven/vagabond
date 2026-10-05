@@ -4,13 +4,6 @@ highest prio: deeper dungeons for endgame
 
 but first:
 
-!2 [combat] ⚔️ vulture and hyena and jackal and chupacabra: add ability carrionInstinct: adds 25% ATK if player has less than 20% HP
-!2 [monsters] 👹 feat: chance that not every wyvern is currently flying, some are on the ground and their aggro is 2x smaller... sleeping = opposite of alarmed, there is a small chance they wake up. zzz
-!2 [quests] 📜 old hunter: "the lost item" fallback - wtf is that fallback?
-!2 [rendering] 🎨 swimming underground doesnt crop the character as it does on surface
-!2 [rendering] 🎨 the brown cave floor is not exactly seamless
-!2 [terrain] 🏞️ foraged forest tile shouldn't give concealment
-!2 [ui] 🖥️ being concealed should show this status in char tooltip (and % chance to hide against closest monster)
 !2 [ui] 🖥️ also when (un)equipping items it should colour items in message log with their tier colours
 !2 [worldgen] 🌍 chest and potion and scroll shouldnt spawn on same tile
 !3 [balance] ⚖️ humanoids should have less def? or better: items should give them only 0.5-0.7x of what they normally give (it should be a range to make it harder to identify if they wear magical item or not)
@@ -93,7 +86,6 @@ more difficult:
 !4 [tracking] 🐾 tracking is not useful enough? i.e. add where the stronger mobs are, where the weaker ones are, and where there's no one around
 !4 [worldgen] 🌍 add submerged treasure
 !4 [worldgen] 🌍 set up far wandering enemy destination on world gen before player makes a move? to optimize
-!4 [worldgen] 🌍 stalagmites in caves
 !4 [worldgen] 🌍 feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
 !4 [xp] ⭐ how is xp for monsters calculated? maybe the formula should use enemy base xp + final HP/DEF/ATK/SPD/GRACE stats + xp calculations should take not only stats into account but also each ability
 !5 [combat] ⚔️ some weapons (only two-handed weapons?) should deal AoE dmg, think of name
@@ -231,7 +223,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261005-1">
+  <link rel="stylesheet" href="css/style.css?v=20261004-2">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -391,6 +383,7 @@ more difficult:
         </div>
       </div>
     </div>
+    <div id="levelUpPopup" role="status" aria-live="polite" hidden></div>
     <div class="overlay" id="invOverlay">
       <div class="panelbox">
         <h2 id="charTitle">Character</h2>
@@ -426,8 +419,9 @@ more difficult:
           <div class="statgrid" id="statGrid"></div>
         </details>
         <div class="closehint">
+          <button class="slbtn" id="btnInvCharacter" type="button">Character</button>
+          <button class="slbtn" id="btnCharacterBack" type="button">Back to inventory</button>
           <button class="slbtn" id="btnInvToMap" type="button">View Map</button>
-          <button class="slbtn" id="btnInvCharSheet" type="button">Char Sheet</button>
           <button class="slbtn" id="btnInvBestiary" type="button">Bestiary</button>
           <button class="slbtn" id="btnInvCloseBottom" type="button">Close</button>
         </div>
@@ -475,19 +469,6 @@ more difficult:
         <p class="bestiary-intro">You have slain 0 different creatures.</p>
         <div id="bestiaryList" class="bestiary-list" aria-live="polite"></div>
         <div class="closehint"><button class="slbtn" id="btnBestiaryCloseBottom" type="button">Close</button></div>
-      </div>
-    </div>
-    <div class="overlay" id="charSheetOverlay" role="dialog" aria-modal="true" aria-labelledby="charSheetTitle">
-      <div class="panelbox">
-        <div class="charsheet-header">
-          <h2 id="charSheetTitle">Character Sheet</h2>
-          <button class="slbtn overlay-close" id="btnCharSheetClose" type="button" aria-label="Close character sheet">✕</button>
-        </div>
-        <div class="statgrid" id="charSheetGrid"></div>
-        <div class="closehint">
-          <button class="slbtn" id="btnCharSheetToInv" type="button">Inventory</button>
-          <button class="slbtn" id="btnCharSheetCloseBottom" type="button">Close</button>
-        </div>
       </div>
     </div>
     <div class="overlay" id="tradeOverlay">
@@ -826,6 +807,7 @@ more difficult:
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let RANGED_CONFIG = {}
+  let CARRION_CONFIG, WYVERN_SLEEP_CONFIG
   let THIEF_CONFIG
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
   let cryptCaveIndex = -1
@@ -914,6 +896,8 @@ more difficult:
     ENEMY_FAR_VILLAGE_AVOID_RADIUS = content.enemyConfig.wandering.farVillageAvoidRadius ?? 20
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
+    CARRION_CONFIG = content.enemyConfig.carrionInstinct
+    WYVERN_SLEEP_CONFIG = content.enemyConfig.wyvernSleep
     THIEF_CONFIG = content.enemyConfig.thief
     RARE_FLEE = content.enemyConfig.rareFlee
     TRACK_CONFIG = content.enemyConfig.tracking
@@ -999,7 +983,6 @@ more difficult:
   const IS_COARSE_POINTER = window.matchMedia?.('(pointer: coarse)')?.matches ?? false
 
   const PLAYER_HUT_BACKGROUNDS = Object.freeze(['img/backgrounds/hut.jpg', 'img/backgrounds/hut2.jpg'])
-  const LIFE_POTION_ICON = 'img/icons/life-potion.png'
   const PLAYER_CAVE_BACKGROUNDS = Object.freeze(['img/backgrounds/cave.jpg'])
 
   function stableBackgroundVariant(paths, x, y) {
@@ -1074,12 +1057,11 @@ more difficult:
       for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
         if (visual?.image) paths.push(visual.image)
       }
-      paths.push(LIFE_POTION_ICON, itemIconPath('herb'))
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
       paths.push(...PLAYER_HUT_BACKGROUNDS, ...PLAYER_CAVE_BACKGROUNDS)
-      for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
+      for (const visual of [...Object.values(RENDER_STYLE?.groundItems || {}), ...Object.values(RENDER_STYLE?.caveDecorations || {})]) {
         if (visual?.image) paths.push(visual.image)
       }
       for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
@@ -1096,9 +1078,6 @@ more difficult:
         if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
       }
       for (const visual of Object.values(RENDER_STYLE?.projectiles || {})) {
-        if (visual?.image) paths.push(visual.image)
-      }
-      for (const visual of Object.values(RENDER_STYLE?.caveDecor || {})) {
         if (visual?.image) paths.push(visual.image)
       }
     }
@@ -2115,11 +2094,36 @@ more difficult:
     return m
   }
 
+  let levelUpPopupTimer = null
+  function clearLevelUpPopup() {
+    clearTimeout(levelUpPopupTimer)
+    levelUpPopupTimer = null
+    const popup = document.getElementById('levelUpPopup')
+    popup.hidden = true
+    popup.classList.remove('show')
+  }
+
+  function showLevelUpPopup(gains) {
+    if (replayPlaying || replaySimulationMode || replayAnimationsDisabled) return
+    clearLevelUpPopup()
+    const popup = document.getElementById('levelUpPopup')
+    const title = document.createElement('strong')
+    title.textContent = 'Level Up!'
+    const detail = document.createElement('span')
+    detail.textContent = `Level ${player.lvl} · +${gains.hp} max HP${gains.spd ? ` · +${gains.spd} SPD` : ''}${gains.grace ? ` · +${gains.grace} GRACE` : ''}`
+    popup.replaceChildren(title, detail)
+    popup.hidden = false
+    void popup.offsetWidth
+    popup.classList.add('show')
+    levelUpPopupTimer = setTimeout(clearLevelUpPopup, 2800)
+  }
+
   function gainXp(amount) {
     amount = Math.round(amount * xpMultiplier())
     player.xp += amount
     player.totalXpEarned += Math.max(0, amount)
     log(`You gain ${amount} XP.`, 'good')
+    const gains = {hp: 0, spd: 0, grace: 0}
     let leveled = false
     while (player.xp >= xpToNext(player.lvl)) {
       player.xp -= xpToNext(player.lvl)
@@ -2129,25 +2133,10 @@ more difficult:
       const spdGain = player.lvl % 2 === 0 ? 1 : 0
       const graceGain = player.lvl % 5 === 0 ? 1 : 0
       leveled = true
+      gains.hp += hpGain; gains.spd += spdGain; gains.grace += graceGain
       log(`You reached Level ${player.lvl}! (+${hpGain} max HP${spdGain ? `, +${spdGain} SPD` : ''}${graceGain ? `, +${graceGain} GRACE` : ''})`, 'good')
     }
-    if (leveled) {
-      updateHud()
-      showLevelUpPopup(player.lvl)
-    }
-  }
-
-  // Purely cosmetic DOM overlay: no RNG, no game state, safe during replays.
-  function showLevelUpPopup(lvl) {
-    const stage = document.getElementById('stage')
-    if (!stage) return
-    stage.querySelector('.levelup-popup')?.remove()
-    const el = document.createElement('div')
-    el.className = 'levelup-popup'
-    el.setAttribute('aria-hidden', 'true')
-    el.innerHTML = `<span class="levelup-title">Level Up!</span><span class="levelup-sub">Level ${lvl}</span>`
-    el.addEventListener('animationend', e => { if (e.target === el) el.remove() })
-    stage.appendChild(el)
+    if (leveled) { updateHud(); showLevelUpPopup(gains) }
   }
 
   /* ============================== EXPLORATION ============================== */
@@ -2174,7 +2163,7 @@ more difficult:
   let nextEnemyId = 1
 
   function enemyHasAbility(enemy, ability) {
-    return !!enemy?.abilities?.includes(ability)
+    return !(ability === 'fly' && enemy?.sleeping) && !!enemy?.abilities?.includes(ability)
   }
 
   const DEFAULT_SUMMON_MSG = 'The <name> waves a hand and mutters incomprehensible words. Moments later, <amount> <species> appear!'
@@ -2266,6 +2255,35 @@ more difficult:
     return !!shooterDefinition(e) && Number.isFinite(e.shotsRemaining) && e.shotsRemaining > 0
   }
 
+  function initializeEnemySleep(e) {
+    if (Object.prototype.hasOwnProperty.call(e, 'sleeping')) return
+    const level = e.level ?? 0
+    const terrain = level === 0 ? surfaceMap : level === -1 ? undergroundMap : deepLevels[-level - 2]?.map
+    const tile = terrain?.[e.y]?.[e.x]
+    const safeGround = TILE[tile]?.walk && !['water', 'river', 'lava'].includes(tile)
+    e.sleeping = (e.baseName || e.name) === 'Wyvern' && !e.aware && !e.alarmed &&
+      !!safeGround && chance(WYVERN_SLEEP_CONFIG.spawnChance)
+  }
+
+  function wakeSleepingEnemy(e) {
+    if (!e.sleeping) return
+    e.sleeping = false
+    if (e.hp > 0 && onCurrentLevel(e) && enemyIsVisibleOnMainView(e)) log(`The ${e.name} wakes and takes flight!`, 'bad')
+  }
+
+  function sleepingEnemyTurn(e, hidden, dist) {
+    if (!e.sleeping) return false
+    const spotsPlayer = !hidden && dist <= effectiveAggroRange(e) &&
+      enemyHasSight(e) && !forestConcealsPlayer(e, dist)
+    if (spotsPlayer) {
+      alarmEnemy(e)
+      e.aware = true
+      e.forestConcealX = null; e.forestConcealY = null
+      logEnemySpotting(e)
+    } else if (dist <= WYVERN_SLEEP_CONFIG.activeRadius && chance(WYVERN_SLEEP_CONFIG.wakeChance)) alarmEnemy(e)
+    return e.sleeping
+  }
+
   function addEnemy(enemy) {
     if (!enemy.id) enemy.id = `enemy_${nextEnemyId++}`
     else {
@@ -2274,6 +2292,7 @@ more difficult:
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
+    initializeEnemySleep(enemy)
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
@@ -2551,11 +2570,13 @@ more difficult:
       })
     }
     for (const g of groundItems) {
-      if (g.kind !== 'gear' && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact' && (g.artifactGuaranteed || g.kind === 'artifact' || g.item)) {
+      if (g.kind === 'stolenloot' && (g.level ?? 0) === 0 && g.item?.name &&
+          !isStackableKind(g.item.kind) && (g.item.kind !== 'artifact' || g.item.identified)) {
         out.push({
           type: 'deliver_item',
           targetItemId: g.id,
-          targetItemName: g.name || g.item?.name || g.description || 'the lost item',
+          targetItemName: g.item.name,
+          targetItem: g.item,
           rewardXp: 100
         })
       }
@@ -2598,7 +2619,7 @@ more difficult:
     // Tag the actual item object (not just its name) so it can be found and
     // removed unambiguously later, even if the player is carrying another
     // item that happens to share the same display name.
-    if (oldHunterQuest.type === 'recover_item' && oldHunterQuest.targetItem) {
+    if (['recover_item', 'deliver_item'].includes(oldHunterQuest.type) && oldHunterQuest.targetItem) {
       oldHunterQuest.targetItem.hunterQuestId = oldHunterQuest.id
     }
     return oldHunterQuest
@@ -3297,8 +3318,14 @@ more difficult:
       Math.max(Math.abs(other.x - e.x), Math.abs(other.y - e.y)) <= range).length
   }
 
+  function enemyCarrionInstinctActive(e) {
+    return e.alive !== false && e.hp > 0 && player.hp > 0 &&
+      player.hp < playerMaxHp() * CARRION_CONFIG.playerHpThreshold && enemyHasAbility(e, 'carrionInstinct')
+  }
+
   function enemyAtk(e) {
-    return (e.atk + enemyGangPower(e)) * (enemyIsEnraged(e) ? 1.25 : 1)
+    return (e.atk + enemyGangPower(e)) * (enemyIsEnraged(e) ? 1.25 : 1) *
+      (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.attackMultiplier : 1)
   }
 
   function logEnemyEnrageTransition(e, wasEnraged) {
@@ -3690,6 +3717,7 @@ more difficult:
   }
 
   function resetForNewCharacter() {
+    clearLevelUpPopup()
     // A permadeath always starts the next character back on the surface at
     // the Temple, even when the previous character died underground.
     currentZ = 0
@@ -3900,7 +3928,9 @@ more difficult:
 
   function alarmEnemy(e) {
     if (e.rareFleeTurns > 0 && rareFleeEligible(e)) return false
-    if (!e.alive || enemyIsPassive(e) || e.alarmed) return false
+    if (!e.alive || enemyIsPassive(e)) return false
+    wakeSleepingEnemy(e)
+    if (e.alarmed) return false
     e.alarmed = true
     e.alarmedZ = currentZ
     e.alarmedLevelKind = currentLevelKind()
@@ -3941,19 +3971,47 @@ more difficult:
   }
 
   function effectiveAggroRange(e) {
-    return Math.max(1, enemyAggroRange(e) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
+    return Math.max(1, enemyAggroRange(e) * (e.sleeping ? WYVERN_SLEEP_CONFIG.aggroMultiplier : 1) +
+      (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.aggroBonus : 0) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
   }
 
   // A successful forest hiding roll lasts at this player position. The player
   // can try again by moving; an enemy moving closer cannot reroll it until
   // reaching the adjacent tile. The saved coordinates preserve this across loads.
-  function forestConcealsPlayer(e, dist) {
+  function playerHasForestCover() {
+    return currentZ === 0 && (map[player.y]?.[player.x] === 'forest' || map[player.y]?.[player.x] === 'ancientForest') &&
+      !foragedTiles.has(keyXY(player.x, player.y))
+  }
+
+  function forestHideChance(e, dist) {
     const halfling = raceDef()?.id === 'halfling'
-    if (e.aware || dist <= ATTACK_RANGE || currentZ !== 0 ||
-        (e.alarmed && !halfling) ||
-        (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest')) return false
+    if (!playerHasForestCover() || e.aware || dist <= ATTACK_RANGE || (e.alarmed && !halfling)) return 0
+    return Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.20 : 0))
+  }
+
+  function playerConcealmentInfo() {
+    if (!playerHasForestCover()) return ''
+    const visible = enemies.filter(e => e.alive && onCurrentLevel(e) && !enemyIsPassive(e) && enemyIsVisibleOnMainView(e))
+    visible.sort((a,b) => Math.max(Math.abs(a.x-player.x),Math.abs(a.y-player.y)) -
+      Math.max(Math.abs(b.x-player.x),Math.abs(b.y-player.y)))
+    const e = visible[0]
+    if (!e) return '<div class="pfx">Forest cover · no visible monster nearby</div>'
+    const dist = Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
+    const hidden = forestHideChance(e, dist) > 0 && e.forestConcealX === player.x && e.forestConcealY === player.y
+    const concealed = visible.filter(other => {
+      const d = Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y))
+      return forestHideChance(other,d)>0 && other.forestConcealX===player.x && other.forestConcealY===player.y
+    })
+    const statuses = concealed.map(other => `<div class="pfx">Concealed from ${other.name}</div>`).join('')
+    const odds = Math.round(100 * forestHideChance(e,dist))
+    return statuses + `<div class="pfx">Hide chance vs ${e.name}: ${odds}%${hidden ? ' (new check; current cover holds)' : dist > effectiveAggroRange(e) ? ' (if it checks from this distance)' : ''}</div>`
+  }
+
+  function forestConcealsPlayer(e, dist) {
+    const probability = forestHideChance(e, dist)
+    if (!probability) return false
     if (e.forestConcealX === player.x && e.forestConcealY === player.y) return true
-    if (!chance(Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.20 : 0)))) return false
+    if (!chance(probability)) return false
     e.forestConcealX = player.x
     e.forestConcealY = player.y
     if (enemyIsVisibleOnMainView(e)) log(`The trees conceal you from the ${e.name}.`, 'info')
@@ -4630,6 +4688,7 @@ more difficult:
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       const hiddenFromEnemy = playerHidden && !enemyHasAbility(e, 'trueSight')
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+      if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue
       if (!(e.rareFleeTurns > 0) && e.rareArmed === false &&
           rareDistance >= RARE_FLEE.rearmDistance && rareFleeEligible(e)) e.rareArmed = true
       if (e.rareFleeTurns > 0 && rareFleeEligible(e)) {
@@ -4669,8 +4728,7 @@ more difficult:
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
       let aggroRange = effectiveAggroRange(e)
-      if (currentZ !== 0 ||
-          (map[player.y][player.x] !== 'forest' && map[player.y][player.x] !== 'ancientForest') ||
+      if (!playerHasForestCover() ||
           (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {
         e.forestConcealX = null
         e.forestConcealY = null
@@ -5077,6 +5135,7 @@ more difficult:
       return
     }
     foragedTiles.add(key)
+    for (const e of enemies) { e.forestConcealX = null; e.forestConcealY = null }
 
     // This tile was already discovered before foraging, so markDiscovered()
     // would early-return and leave the cached minimap using normal forest colour.
@@ -5504,7 +5563,7 @@ more difficult:
   }
 
   /* ============================== MOVEMENT ============================== */
-  let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false, charSheetOpen = false
+  let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false
   let raceOpen = true // block play input from startup through character creation
   let worldGenerating = false
   let reusingWorldAfterPermadeath = false
@@ -6447,13 +6506,13 @@ more difficult:
     const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
-    const transformed = a !== 1 || visual.flipX
+    const transformed = a !== 1 || visual.flipX || visual.flipY
     if (!transformed) { ctx.drawImage(cached, x, y); return true }
     ctx.save()
     ctx.globalAlpha = a
-    if (visual.flipX) {
-      ctx.translate(x + size, y)
-      ctx.scale(-1, 1)
+    if (visual.flipX || visual.flipY) {
+      ctx.translate(x + (visual.flipX ? size : 0), y + (visual.flipY ? size : 0))
+      ctx.scale(visual.flipX ? -1 : 1, visual.flipY ? -1 : 1)
       ctx.drawImage(cached, 0, 0)
     } else ctx.drawImage(cached, x, y)
     ctx.restore()
@@ -6498,62 +6557,6 @@ more difficult:
 
     byScale.set(key, composed)
     return composed
-  }
-
-  // Cosmetic cave dressing (webs in corners, stalagmites, small mushrooms).
-  // Purely a function of coordinates: no game RNG, nothing saved, no gameplay
-  // effect, so worlds, replays and saves are unaffected.
-  function caveDecorRoll(x, y, salt) {
-    let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(currentZ | 0, 2246822519) + Math.imul(salt, 3266489917)) | 0
-    h = Math.imul(h ^ (h >>> 13), 1274126177)
-    h ^= h >>> 16
-    return (h >>> 0) / 4294967296
-  }
-
-  function drawCaveDecorSprite(px, py, visual, flipX, flipY) {
-    const image = resolveVisualImage(visual)
-    if (!image) return
-    const cached = scaledVisualCanvas(image, visual.scale ?? 1)
-    if (!flipX && !flipY) {
-      ctx.drawImage(cached, px + (TILE_PX - cached.width) / 2, py + (TILE_PX - cached.height) / 2)
-      return
-    }
-    ctx.save()
-    ctx.translate(px + TILE_PX / 2, py + TILE_PX / 2)
-    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1)
-    ctx.drawImage(cached, -cached.width / 2, -cached.height / 2)
-    ctx.restore()
-  }
-
-  function drawCaveDecor(px, py, mx, my, tileKey, itemTiles) {
-    const decor = RENDER_STYLE.caveDecor
-    if (!decor || (tileKey !== 'cavefloor' && tileKey !== 'cavefloor2')) return
-    if (itemTiles.has(keyXY(mx, my))) return
-    // Only dress plain cave: any stairs, entrance, crypt or fort tile nearby
-    // means the spot stays clear.
-    const at = (dx, dy) => map[my + dy]?.[mx + dx]
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue
-      const t = at(dx, dy)
-      if (t !== undefined && t !== 'cavefloor' && t !== 'cavefloor2' && t !== 'cavewall') return
-    }
-    const wallN = at(0, -1) === 'cavewall', wallS = at(0, 1) === 'cavewall'
-    const wallW = at(-1, 0) === 'cavewall', wallE = at(1, 0) === 'cavewall'
-    if ((wallN || wallS) && (wallW || wallE) && decor.web && caveDecorRoll(mx, my, 1) < decor.web.chance) {
-      // The web sprite hangs from its top-left corner; mirror it into the
-      // corner this tile actually has (ties between two corners are hashed).
-      const flipX = wallW && wallE ? caveDecorRoll(mx, my, 2) < 0.5 : !wallW
-      const flipY = wallN && wallS ? caveDecorRoll(mx, my, 3) < 0.5 : !wallN
-      drawCaveDecorSprite(px, py, decor.web, flipX, flipY)
-      return
-    }
-    if (!(wallN || wallS || wallW || wallE)) return
-    const r = caveDecorRoll(mx, my, 4)
-    const stalChance = decor.stalagmite?.chance ?? 0
-    if (decor.stalagmite && r < stalChance)
-      drawCaveDecorSprite(px, py, decor.stalagmite, caveDecorRoll(mx, my, 5) < 0.5, false)
-    else if (decor.mushrooms && r < stalChance + decor.mushrooms.chance)
-      drawCaveDecorSprite(px, py, decor.mushrooms, caveDecorRoll(mx, my, 6) < 0.5, false)
   }
 
   function drawImageVisualWithShadow(px, py, visual, alpha) {
@@ -6636,7 +6639,7 @@ more difficult:
     if (!visual) return null
 
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y))
-      return RENDER_STYLE.terrainTiles?.cavefloorBrown || visual
+      return {...(RENDER_STYLE.terrainTiles?.cavefloorBrown || visual), flipX: !!(x & 1), flipY: !!(y & 1)}
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
 
     const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
@@ -6837,7 +6840,7 @@ more difficult:
   function drawSwimmingCreature(px, py, draw, visibleFraction = 1 / 2) {
     const tileX = Math.floor((px + TILE_PX / 2) / TILE_PX + camX)
     const tileY = Math.floor((py + TILE_PX / 2) / TILE_PX + camY)
-    const tile = currentZ === 0 && map[tileY]?.[tileX]
+    const tile = map[tileY]?.[tileX]
     if (tile !== 'water' && tile !== 'river') {
       draw()
       return
@@ -7297,11 +7300,6 @@ more difficult:
     const renderRows = VIEW_H + (fracY ? 1 : 0)
     const mapW = map && map[0] ? map[0].length : MAP_W
     const mapH = map ? map.length : MAP_H
-    let caveDecorItemTiles = null
-    if (currentZ < 0 && USE_TILE_IMAGES && RENDER_STYLE.caveDecor) {
-      caveDecorItemTiles = new Set()
-      for (const g of groundItems) if (onCurrentLevel(g)) caveDecorItemTiles.add(keyXY(g.x, g.y))
-    }
     for (let vy = 0; vy < renderRows; vy++) {
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
@@ -7376,7 +7374,6 @@ more difficult:
             drawImageVisual(px, py, RENDER_STYLE.specialTiles.dugSand)
             ctx.restore()
           }
-          if (caveDecorItemTiles) drawCaveDecor(px, py, mx, my, tileKey, caveDecorItemTiles)
         }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
@@ -7387,6 +7384,24 @@ more difficult:
       }
     }
     drawBeastTracks()
+    // Decorative overlays never enter the loot, collision or inspection systems.
+    for (const prop of caveDecorations) {
+      if (!onCurrentLevel(prop) || (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y)))) continue
+      const vx = Math.round((prop.x - camX) * TILE_PX), vy = Math.round((prop.y - camY) * TILE_PX)
+      if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
+      const visual = RENDER_STYLE.caveDecorations[prop.kind]
+      if (!visual) continue
+      let drawn
+      if (prop.rotation) {
+        ctx.save()
+        ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
+        ctx.rotate(prop.rotation * Math.PI / 2)
+        drawn = drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, visual)
+        ctx.restore()
+      } else drawn = drawImageVisual(vx, vy, visual)
+      if (drawn) continue
+      drawTile(vx, vy, visual.glyph, visual.color, tileBackground(prop.x, prop.y, map[prop.y][prop.x]))
+    }
     // ground items
     for (const g of groundItems) {
       if (!onCurrentLevel(g)) continue
@@ -7541,6 +7556,14 @@ more difficult:
         ctx.restore()
       }
 
+      if (e.sleeping) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(10, Math.round(TILE_PX * 0.3))}px Consolas, monospace`
+        ctx.fillStyle = '#c4c4db'; ctx.strokeStyle = '#15121e'; ctx.lineWidth = 2
+        ctx.textAlign = 'right'; ctx.textBaseline = 'top'
+        ctx.strokeText('zzz', vx + TILE_PX, vy); ctx.fillText('zzz', vx + TILE_PX, vy)
+        ctx.restore()
+      }
       if (e.alarmed) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
@@ -7902,6 +7925,7 @@ more difficult:
       <div class="nm">${player.name}</div>
       <div style="color:var(--ember-bright);font-size:calc(11px * var(--ui-font-scale));">${race.name}${player.permadeath ? ' · Permadeath' : ''}</div>
       <div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));margin-top:2px;">${race.bonus}</div>
+      ${playerConcealmentInfo()}
       </div>`
       }
     }
@@ -7934,6 +7958,8 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' <span class="thief-marker" aria-label="carrying stolen item"></span>' : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
+      ${enemyHasAbility(e, 'carrionInstinct') ? `<div class="crit">Carrion Instinct${enemyCarrionInstinctActive(e) ? ' · active (+1 AGGRO, +25% ATK)' : ' · +1 AGGRO and +25% ATK below 20% player HP'}</div>` : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>
@@ -8839,6 +8865,11 @@ more difficult:
     sg.innerHTML = ''
     const rows = [
       ['🧬 Race', race.name],
+      ...(IS_COARSE_POINTER ? [
+        ['Level', player.lvl], ['HP', `${player.hp} / ${playerMaxHp()}`],
+        ['ATK', playerAtk()], ['DEF', playerDef()], ['SPD', playerSpd()],
+        ['Magic Find', playerMf()], ['Gold', player.gold], ['Deaths', player.deaths]
+      ] : []),
       // ['🎚️ Level', player.lvl],
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
@@ -8859,13 +8890,13 @@ more difficult:
         ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge[0].toUpperCase()).join(', ') || 'none'})`
       ]] : []),
       ['☠️ Creatures Slain', player.kills],
-      ['🏆 Strongest Slain Enemy', player.strongestEnemyKilled
+      ['🏆 Strongest Enemy Killed', player.strongestEnemyKilled
         ? `${player.strongestEnemyKilled.name} (strength ${player.strongestEnemyKilled.strength})` : 'None'],
       ['📍 Position', player.x + ', ' + player.y],
     ]
     for (const [k, v] of rows) {
       const d = document.createElement('div')
-      d.className = k === '🏆 Strongest Slain Enemy' ? 'row achievement-row' : 'row'
+      d.className = k === '🏆 Strongest Enemy Killed' ? 'row achievement-row' : 'row'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k
@@ -9074,18 +9105,19 @@ more difficult:
     if (herbalist || fisherman) {
       const buyList = document.getElementById('tradeBuyList')
       buyList.innerHTML = ''
-      const addService = (label, action, icon) => {
+      const addService = (label, action, iconKind = null) => {
         const row = document.createElement('div')
         row.className = 'invitem'
         const b = document.createElement('button')
-        if (icon) {
-          const img = document.createElement('img')
-          img.src = imageSrc(icon)
-          img.className = 'svc-icon'
-          img.alt = ''
-          img.setAttribute('aria-hidden', 'true')
-          b.append(img, label)
-        } else b.textContent = label
+        b.textContent = label
+        if (iconKind) {
+          const icon = document.createElement('img')
+          icon.src = imageSrc(itemIconPath(iconKind))
+          icon.alt = ''; icon.setAttribute('aria-hidden', 'true')
+          icon.className = 'service-icon'
+          icon.onerror = () => { icon.onerror = null; icon.src = imageSrc('img/tiles/life-potion.png') }
+          b.prepend(icon)
+        }
         b.onclick = action
         row.appendChild(b)
         buyList.appendChild(row)
@@ -9093,9 +9125,9 @@ more difficult:
       if (fisherman) addService('🐟 Buy Fish (5g)', buyFishermanFish)
       else {
         addService('🍄 Purify mushrooms (2g each)', purifyMushrooms)
-        addService(`Buy Life Potion (${HERBALIST_POTION_PRICE}g)`, buyHerbalistPotion, LIFE_POTION_ICON)
-        addService('Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion(), itemIconPath('herb'))
-        addService('Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true), itemIconPath('herb'))
+        addService(`Buy Life Potion (${HERBALIST_POTION_PRICE}g)`, buyHerbalistPotion, 'potion')
+        addService('🧪 Brew Life Potion (3 herbs + 10g)', () => makeHerbalistPotion())
+        addService('🧪 Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true))
       }
       document.getElementById('tradeSellList').innerHTML = fisherman ? '' : '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
       document.getElementById('tradeGold').textContent = player.gold
@@ -9583,20 +9615,20 @@ more difficult:
   document.querySelectorAll('.inv-tab').forEach(button => {
     button.addEventListener('click', () => setInvTab(button.dataset.tab))
   })
+  function showCharacterSheet(show) {
+    const overlay = document.getElementById('invOverlay')
+    if (!invOpen || !IS_COARSE_POINTER) return
+    overlay.classList.toggle('character-sheet', show)
+    overlay.querySelector('.stats-details').open = show
+    if (show) renderInventory()
+    document.getElementById(show ? 'btnCharacterBack' : 'btnInvCharacter').focus()
+  }
+  document.getElementById('btnInvCharacter').addEventListener('click', () => showCharacterSheet(true))
+  document.getElementById('btnCharacterBack').addEventListener('click', () => showCharacterSheet(false))
   document.getElementById('btnInvBestiary').addEventListener('click', () => {
     toggleInv(false)
     toggleBestiary(true)
   })
-  document.getElementById('btnInvCharSheet').addEventListener('click', () => {
-    toggleInv(false)
-    toggleCharSheet(true)
-  })
-  document.getElementById('btnCharSheetToInv').addEventListener('click', () => {
-    toggleCharSheet(false)
-    toggleInv(true)
-  })
-  document.getElementById('btnCharSheetClose').addEventListener('click', () => toggleCharSheet(false))
-  document.getElementById('btnCharSheetCloseBottom').addEventListener('click', () => toggleCharSheet(false))
   document.getElementById('btnInvToMap').addEventListener('click', () => {
     toggleInv(false)
     toggleMap(true)
@@ -9745,7 +9777,7 @@ more difficult:
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || bestiaryOpen || charSheetOpen || Graveyard.isOpen()
+    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
     requestAnimationFrame(updateMobileSafeAreas)
@@ -9803,28 +9835,10 @@ more difficult:
     const next = (force !== undefined) ? force : !invOpen
     if (next && mapOpen) toggleMap(false)
     if (next && bestiaryOpen) toggleBestiary(false)
-    if (next && charSheetOpen) toggleCharSheet(false)
+    if (!next) document.getElementById('invOverlay').classList.remove('character-sheet')
     invOpen = next
     document.getElementById('invOverlay').classList.toggle('show', invOpen)
     if (invOpen) renderInventory()
-    updateTouchControlsVisibility()
-  }
-
-  // Fullscreen character sheet for touch devices, reached from the inventory.
-  // It mirrors the stat grid the inventory builds, so both stay in sync.
-  function toggleCharSheet(force) {
-    const next = force !== undefined ? force : !charSheetOpen
-    if (next && invOpen) toggleInv(false)
-    if (next && mapOpen) toggleMap(false)
-    if (next && bestiaryOpen) toggleBestiary(false)
-    if (next && tradeOpen) toggleTrade(false)
-    charSheetOpen = next
-    document.getElementById('charSheetOverlay').classList.toggle('show', charSheetOpen)
-    if (charSheetOpen) {
-      renderInventory()
-      document.getElementById('charSheetGrid').replaceChildren(
-        ...[...document.getElementById('statGrid').children].map(row => row.cloneNode(true)))
-    }
     updateTouchControlsVisibility()
   }
 
@@ -10052,7 +10066,6 @@ more difficult:
       toggleTrade(false)
       toggleTreasureMap(false)
       toggleBestiary(false)
-      toggleCharSheet(false)
       return
     }
     if (k === 'k' || k === 'K') {
@@ -10077,7 +10090,7 @@ more difficult:
       if (!ev.repeat && !ev.shiftKey) useGodModeKey()
       return
     }
-    if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || charSheetOpen || Graveyard.isOpen()) return
+    if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()) return
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
       (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()
@@ -10364,6 +10377,7 @@ more difficult:
     clearGroundItemsUnderMerchant()
     spawnEdgeHighTierChests()
     placeFisherman()
+    spawnCaveDecorations()
     rebuildMinimapBases()
     ensureMerchantStock()
     stopDeathTransition()

@@ -169,6 +169,23 @@ base-species entry; unencountered species are hidden. The list reads the saved
 per-species kill counters and refreshes when opened. It does not affect gameplay,
 RNG or replay actions. A new permadeath character begins with an empty Bestiary.
 
+## Mobile character sheet and level feedback
+
+Mobile inventory includes a **Character** button. It opens a fullscreen sheet
+showing the character’s current stats, learned skills, kill achievement and
+other existing counters. **Back to inventory** returns to the same backpack;
+the close button exits inventory. The sheet uses the inventory’s existing
+input blocking and consumes no turn or RNG. Desktop keeps its collapsible
+character stats. Mobile sheet navigation is presentation state, not save data.
+
+A level gain displays a brief animated **Level Up!** notice with the resulting
+level and total max-HP, SPD and GRACE gains. Multiple levels earned from one XP
+award share one notice. The notice requires no dismissal, does not intercept
+input, and never delays stat changes or turns. Reduced-motion preferences
+suppress the animation. Replay playback suppresses the notice; recording and
+live play use identical gameplay rules. Loading or starting another character
+clears any outstanding notice.
+
 ## Strongest kill achievement
 
 The Character sheet records the strongest individual enemy killed by this
@@ -178,7 +195,7 @@ permanent spawned stats, including prefixes and equipped gear. Equipped weapon
 GRACE replaces natural GRACE; defensive gear GRACE penalties apply. Terrain,
 Alarmed, Enrage, Charge and temporary flight bonuses do not inflate the record.
 HP, rarity and abilities are outside this ranking. Equal scores retain the first
-kill. No kills displays "None".
+kill. No kills displays “None”.
 
 The record survives normal deaths, current saves and replay; a new character
 starts without it. Every actual death snapshots it before penalties or character
@@ -1021,6 +1038,26 @@ structures, including sarcophagi, burial niches, rubble, and the crypt trap.
 
 Up to six initial caves are attempted.
 
+## Decorative cave props
+
+Ordinary caves on z:-1 and z:-2 contain cobwebs, small stalagmite clusters and
+small mushrooms. These are cosmetic overlays: they do not block movement,
+vision or projectiles, alter terrain bonuses, slow actors, offer harvesting or
+loot, or participate in quests. Crypts, mausoleums and the Dwarven Fort are
+excluded. A clear floor tile at least three tiles from every entrance or stair
+is eligible, provided it initially contains no creature or ground item.
+Webs additionally require cave walls on two perpendicular sides and orient
+their sprites toward those walls.
+
+Placement uses a stable hash of world seed, depth and coordinates, without
+consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
+eligible floor positions have separate 1.8% stalagmite and 2.5% mushroom bands.
+One position holds at most one decoration. The generated placement is saved
+and restored directly, survives normal deaths and reused-world characters, and
+is cleared and regenerated for a new world. Props draw below items and actors
+and respect underground visibility. Their ASCII glyphs are `%` (web), `^`
+(stalagmites) and `♣` (small mushrooms).
+
 ## Guaranteed underground Vampire
 
 New worlds contain at least one Vampire in either crypt level or an ordinary
@@ -1073,7 +1110,12 @@ supplies (two potions and two scrolls). No Giant Rats, Giant Bats,
 Wolves, Boars, or Giant Bugs are selected for new z:-2 cave scenario groups.
 Each populated generic z:-2 cave also gets one guaranteed Champion of its
 scenario species, surrounded by four unprefixed guards of the same type, and
-one randomly chosen tier-3 or tier-4 enemy. The group is reserved before normal
+one rarity-weighted tier-3 or tier-4 enemy. Species with rarity ≤ 0.1 are
+excluded from this extra-threat pool; missing rarity means weight 1. The
+remaining species use their configured relative rarity weights. This replaces
+uniform selection, and applies to every ordinary deep scenario, including
+Ratling burrows. Scenario groups, Champion guards, and dedicated story spawns
+retain their own rules. The group is reserved before normal
 spawns in a chamber far from the staircase; the stronger enemy is also placed
 away from it. These are in addition to the normal 11% prefix
 rolls and carry the same level and cave identity as the group.
@@ -1959,7 +2001,7 @@ loss.
 
 ### Forest concealment
 
-On the surface, standing on ordinary or ancient forest gives the player a
+On the surface, standing on unforaged ordinary or ancient forest gives the player a
 chance to avoid an unaware, unalarmed enemy's first spotting attempt within its normal
 AGGRO range. The chance is `min(100%, 33% + 5% × distance in tiles)`, using
 Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
@@ -1975,15 +2017,17 @@ cannot be concealed from, even for a Halfling.
 A successful check protects the player's current tile from that enemy's
 further spotting checks, including after the enemy wanders or moves closer.
 Moving the player to another forest tile permits a new check; waiting or an
-enemy's movement does not. Moving out of the forest ends this concealment.
+enemy's movement does not. Moving out of the forest or foraging the tile ends this concealment immediately.
 An enemy leaving and returning to range cannot force another roll while the
 player stays on the same tile.
 At adjacent distance, the enemy spots or attacks normally. Newly spawned
 forest ambushers begin aware, so neither race can conceal from them. Forest
 concealment does not shorten AGGRO range. Successful per-enemy
 concealment coordinates are saved and restored in replay starting states so
-loading does not reroll a stationary player's cover; older saves default to
-no concealment state.
+loading does not reroll a stationary player's cover. The character tooltip reports actual
+per-enemy successful concealment and the hide probability against the nearest visible
+hostile monster. Probability is for a new check, not a reroll of cached cover.
+Tooltip rendering never consumes RNG.
 
 ### Alarmed
 
@@ -3549,7 +3593,7 @@ Other generated quest types include:
 - **Kill a specific monster:** kill a particular nearest eligible monster, preferring tier 3 over tier 4.
 - **Recover an item:** retrieve an item carried by a particular tier-3-or-4 monster.
 
-The first quest's monster objectives use reachable surface enemies. Eight-direction
+The first quest’s monster objectives use reachable surface enemies. Eight-direction
 walking distance from the village determines proximity; water and impassable
 terrain cannot shorten a route. If any eligible tier-3 enemies are reachable,
 tier 4 is excluded. Otherwise reachable tier-4 enemies are the fallback. Only
@@ -3562,7 +3606,10 @@ Tier-5 monsters, all far-wanderers (including world-generation promotions), and
 every base template with rarity <= 0.02 are excluded from new kill, group-kill,
 and carried-item recovery targets. Existing active quests are preserved. When
 both killing and item quests are available, killing quests retain their 50%
-chance; investigation quests retain their separate 30% chance.
+chance; investigation quests retain their separate 30% chance. The later rare
+hunt keeps its edge-biome selection and difficulty, and its opening names the
+quarry as “A <monster name>, they call it.” Monster names retain their exact
+configured spelling and capitalization.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
 Completing the first quest also teaches **Tracking**, once per character, using the
@@ -3649,7 +3696,8 @@ accumulator and takes its whole-number steps. Sighting one has a minimum pace of
 1.5 regardless of player speed. **Startled** temporarily raises effective enemy
 SPD to at least 5 during either flight, including terrain modifiers; base template
 stats are unchanged. The bonus ends immediately on catch or escape and is shown
-with `Fleeing (sighting/2)` in the enemy tooltip. Normal terrain bonuses still apply.
+with `Fleeing` and the Startled SPD bonus in the enemy tooltip. The internal
+sighting counter is not shown; its two-encounter rules are unchanged. Normal terrain bonuses still apply.
 
 Potion of Speed works through ordinary effective player SPD, costs its usual turn,
 and should be drunk before approaching. Open-ground tuning across all nine templates,
@@ -3918,7 +3966,7 @@ and purchase price remain configured in `merchant_stock.json`.
 ### Base purchase values
 
 Every non-gear definition in `content/items.json` and every weapon, shield and
-armor template has a non-negative `baseValue`, representing the normal per-unit
+armor template has a nonnegative `baseValue`, representing the normal per-unit
 purchase value. Generated artifacts take their `baseValue` from their selected
 entry in `artifact_effects.json`. The common household starting-weapon value
 and modifier purchase increment are configured in `loot_tables.json`.
@@ -3979,7 +4027,7 @@ The Herbalist opens services while adjacent:
   inventory order, leaving any unaffordable mushrooms in their stacks and
   reporting that not all could be checked. With fewer than 2g, no purification
   or RNG roll occurs.
-- **🧪 Buy Life Potion (100g)** supplies one Life Potion per purchase, with
+- **Buy Life Potion (100g)** supplies one Life Potion per purchase, with
   unlimited stock. Buying requires adjacency to the surface Herbalist and
   enough gold. It adds to the normal potion stack, uses no turn or RNG, and
   records a Herbalist purchase action for replay. Existing gold/inventory
@@ -3993,8 +4041,9 @@ The Herbalist opens services while adjacent:
   inventory order across stacks. Both options retain the same per-potion cost,
   consume no turn, and use no RNG. An unsuccessful attempt consumes nothing.
   Batch brewing is recorded as one replay action and follows the same rule
-  during playback. Service menu buttons use mushroom, potion, and fish emojis
-  to make the available actions easier to scan.
+  during playback. Buy Life Potion uses the existing potion SVG inventory icon
+  (with the life-potion tile as an image fallback). Other service icons retain
+  their current presentation.
 
 The Herbalist's other purpose is to hint that forests can be foraged for
 remedies, while also warning that forests are dangerous (because forest tiles
@@ -4262,10 +4311,13 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-29
+30
 ```
 
 Saves are JSON files.
+
+Version 30 adds the generated decorative cave overlay list. Current saves and
+replay snapshots restore it without rerolling placement or consuming RNG.
 
 Version 29 adds the character’s strongest-kill snapshot and generated
 gear/artifact base purchase values. Player initialization and new-character
@@ -4356,7 +4408,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 29** saves. Other versions are rejected
+Current gameplay state requires **version 31** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -5041,12 +5093,16 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 | 13 | Find a bone |
 | 14 | Find a broken shovel handle |
 | 15–16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
-| 17 | Find a silver spoon |
+| 17 | Find a silver spoon; flavor message only |
 | 18–100 | Find nothing |
 
 </details>
 
 Amber (worth 20g) and Seashell (worth 10g) are stackable inventory items.
+The silver spoon has a **1%** chance on an ordinary dig and logs “You dig up a
+silver spoon. Someone threw away a good spoon.” It is never an inventory item.
+This replaces one empty outcome (nothing: **84% → 83%**) without changing other
+loot chances, guaranteed buried finds, turn costs or the number of RNG rolls.
 
 ## Scarab spawning
 
@@ -5195,7 +5251,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 29).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 31).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -5670,3 +5726,35 @@ generation success as stable. Drought can remove safe forage while arming a
 larger share of humanoids; its exclusions prevent the strongest resource
 contradictions, but other dangerous combinations remain possible.
 
+
+
+### Carrion Instinct and sleeping Wyverns
+
+Vulture, Hyena, Jackal and Chupacabra have `carrionInstinct`. While the living
+player is strictly below 20% of current maximum HP, they gain +1 effective AGGRO
+and multiply ATK by 1.25, after gang power and enrage. At exactly 20% the effect
+is inactive. These derived effects never mutate saved base stats. Enemy tooltips
+show the ability and whether it is active.
+
+Wyverns spawn asleep with 25% probability on walkable dry ground, never water,
+river or lava. Sleeping Wyverns are grounded, stationary, marked `zzz`, and use
+half their base AGGRO before race, world and Alarmed modifiers. Each game turn
+within 20 tiles gives a 1% spontaneous wake chance. Successfully spotting the
+player in their reduced range wakes them immediately; invisibility, line of
+sight and forest concealment still apply. A landed hit or nearby combat alarm
+also wakes them. Waking restores flight and makes them Alarmed; they never
+return to sleep. Current save schema **31** persists the sleeping boolean,
+including replay initial states; loading never rerolls it. Older schemas are
+rejected rather than migrated.
+
+### Named Hunter deliveries and cave rendering
+
+Hunter delivery candidates must be actual named, nonstackable recoverable items
+in surface thief bags; artifacts must already be identified. Unopened loot
+containers cannot supply a delivery target. The exact item is tagged for the
+quest, and dialogue uses its name instead of the former "the lost item" fallback.
+
+Water and river tiles clip grounded creatures to their upper half on every
+level, including underground. Flying creatures retain their flight rendering.
+Brown deep-cave floor textures alternate horizontal and vertical mirroring by
+world-coordinate parity so neighboring edges match without new art or RNG.

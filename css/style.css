@@ -979,14 +979,6 @@ body.hint-collapsed #hint .panel-toggle {
   cursor: pointer;
 }
 
-.invitem button .svc-icon {
-  width: 1.6em;
-  height: 1.6em;
-  vertical-align: middle;
-  margin-right: 6px;
-  image-rendering: pixelated;
-}
-
 .invitem button:hover {
   background: var(--ember);
   color: #1a0f05;
@@ -1936,133 +1928,45 @@ body.hint-collapsed #hint .panel-toggle {
   clip-path: polygon(20% 0, 80% 0, 65% 25%, 90% 60%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 10% 60%, 35% 25%);
 }
 
-.levelup-popup {
-  position: absolute;
-  left: 50%;
-  top: 38%;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-  white-space: nowrap;
-  transform: translate(-50%, -50%);
-  animation: levelup-pop 2.2s ease-out forwards;
+/* Nonblocking level feedback and the mobile inventory's character view. */
+.service-icon { width: 20px; height: 20px; object-fit: contain; vertical-align: middle; margin-right: 7px; }
+#btnInvCharacter, #btnCharacterBack { display: none; }
+#levelUpPopup {
+  position: fixed; top: 19%; left: 50%; transform: translateX(-50%);
+  z-index: 250; pointer-events: none; text-align: center;
+  width: max-content; max-width: calc(100vw - 28px); box-sizing: border-box;
+  padding: 14px 22px; border: 1px solid #b17b42; border-radius: 6px;
+  background: rgba(28, 18, 9, .94); color: #efb455; box-shadow: 0 0 24px #b17b4260;
 }
-
-.levelup-popup .levelup-title {
-  font-size: clamp(26px, 6vw, 44px);
-  font-weight: bold;
-  letter-spacing: 2px;
-  color: #ffe08a;
-  text-shadow: 0 0 6px #e8a24f, 0 0 18px #e0773f, 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000;
+#levelUpPopup[hidden] { display: none; }
+#levelUpPopup strong { display: block; font-size: 28px; letter-spacing: 2px; }
+#levelUpPopup span { display: block; margin-top: 5px; color: #ead7b9; font-size: 13px; }
+#levelUpPopup.show { animation: level-up-toast 2.8s ease-out both; }
+@keyframes level-up-toast {
+  0% { opacity: 0; transform: translate(-50%, 12px) scale(.92); }
+  12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -14px) scale(1); }
 }
-
-.levelup-popup .levelup-sub {
-  font-size: clamp(14px, 3vw, 20px);
-  color: #fff6d6;
-  text-shadow: 0 2px 0 #000, 0 0 8px #000;
-}
-
-@keyframes levelup-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -30%) scale(0.4);
-  }
-  15% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.25);
-  }
-  28% {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  75% {
-    opacity: 1;
-    transform: translate(-50%, -80%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -140%) scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .levelup-popup {
-    animation: levelup-fade 2.2s linear forwards;
-  }
-
-  @keyframes levelup-fade {
-    0%, 80% {
-      opacity: 1;
-      transform: translate(-50%, -50%);
-    }
-    100% {
-      opacity: 0;
-      transform: translate(-50%, -50%);
-    }
-  }
+  #levelUpPopup.show { animation: none; }
 }
-
-/* Char sheet: opened from the inventory on touch devices only. */
-#btnInvCharSheet {
-  display: none;
-}
-
-.charsheet-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.charsheet-header h2 {
-  flex: 1;
-}
-
-.charsheet-header .overlay-close {
-  position: static;
-  flex: none;
-}
-
-#charSheetOverlay .closehint {
-  justify-content: center;
-  margin-top: 12px;
-}
-
 @media (pointer: coarse) {
-  #btnInvCharSheet {
-    display: inline-block;
-  }
-
-  #charSheetOverlay {
-    position: fixed;
-    inset: 0;
-    z-index: 160;
-    padding: 12px;
-    background: rgba(5, 4, 3, 0.85);
-    align-items: stretch;
-    justify-content: stretch;
-  }
-
-  #charSheetOverlay .panelbox {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: 100%;
-    min-height: 0;
-    box-sizing: border-box;
-    overflow-y: auto;
-  }
-
-  #charSheetOverlay .statgrid {
-    grid-template-columns: 1fr;
-    flex: none;
-  }
-
-  #charSheetOverlay .closehint {
-    margin-top: auto;
-    padding-top: 12px;
-  }
+  #invOverlay:not(.character-sheet) #btnInvCharacter { display: inline-block; }
+  #invOverlay .closehint { gap: 5px; flex-wrap: wrap; }
+  #invOverlay.character-sheet { top: 0; height: 100dvh; min-height: 100dvh; z-index: 200; }
+  #invOverlay.character-sheet .panelbox { overflow: hidden; padding-bottom: 70px; }
+  #invOverlay.character-sheet .paperdoll,
+  #invOverlay.character-sheet .section-heading,
+  #invOverlay.character-sheet .inv-tabs,
+  #invOverlay.character-sheet .invlist,
+  #invOverlay.character-sheet .stats-details summary,
+  #invOverlay.character-sheet .closehint button { display: none; }
+  #invOverlay.character-sheet .stats-details { display: block; overflow-y: auto; min-height: 0; flex: 1; }
+  #invOverlay.character-sheet .statgrid { grid-template-columns: 1fr; }
+  #invOverlay.character-sheet .statgrid .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; text-align: left; padding: 7px 0; }
+  #invOverlay.character-sheet .statgrid .row .lbl { text-align: left; }
+  #invOverlay.character-sheet .statgrid .row b { text-align: right; overflow-wrap: anywhere; }
+  #invOverlay.character-sheet .closehint { bottom: 0; }
+  #invOverlay.character-sheet #btnCharacterBack { display: inline-block; }
 }
+

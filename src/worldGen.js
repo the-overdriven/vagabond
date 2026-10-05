@@ -138,6 +138,7 @@ function generateSurface() {
   // A rejected cave/fort layout may already have spawned story loot and ghosts.
   enemies = []
   groundItems = []
+  caveDecorations = []
   occupied = new Set()
   const elevationNoiseFunctions = cfg.elevationNoise.layers.map(([x, y]) => makeNoise(x, y))
   const elevationNoiseWeights = cfg.elevationNoise.weights
@@ -1968,6 +1969,7 @@ function placeAncientForest() {
 
 /* ============================== ENEMIES / ITEMS ON MAP ============================== */
 let enemies = []
+let caveDecorations = [] // Cosmetic ordinary-cave overlays, saved separately from loot.
 let groundItems = [] // level 0 is surface, level -1 is the shared cave layer
 let occupied = new Set() // "x,y" for enemies
 
@@ -2406,10 +2408,7 @@ function spawnCaveScenarios() {
     }
     if (level === -2) {
       const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
-      // Rare creatures (rarity <= deepThreatMaxExcludedRarity) never appear as the
-      // lone z:-2 threat; the rest are drawn in proportion to their rarity.
-      const threatPool = ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier) &&
-        (t.rarity ?? 1) > cfg.deepThreatMaxExcludedRarity)
+      const threatPool = deepCaveThreatTemplates()
       // Choose an open pocket with four immediately adjacent guard positions.
       // Reserve the group before ordinary mobs, so none can displace it.
       const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
@@ -2950,4 +2949,53 @@ function spawnNpcs() {
     }
   }
   ensureGravediggerGrave()
+}
+
+function deepCaveThreatTemplates() {
+  const cfg = WORLD_GEN_CONFIG.cavePopulation
+  return ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier) &&
+    (t.rarity ?? 1) > cfg.deepThreatRarityCutoff)
+}
+
+function spawnCaveDecorations() {
+  caveDecorations = []
+  const cfg = WORLD_GEN_CONFIG.caveDecorations
+  // Coordinate hashing keeps purely decorative choices outside gameplay RNG.
+  const roll = (x, y, level) => {
+    let n = WORLD_SEED ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(level, 1274126177)
+    n = Math.imul(n ^ (n >>> 13), 1274126177)
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296
+  }
+  const used = new Set()
+  for (const layer of [
+    {level: -1, descriptors: caves, maps: caveMaps, shared: undergroundMap},
+    {level: -2, descriptors: deepLevels[0]?.caves || [], maps: deepLevels[0]?.caveMaps || [], shared: deepLevels[0]?.map}
+  ]) {
+    if (!layer.shared) continue
+    const entrances = layer.descriptors.flatMap(c => c.entrances || [])
+    const occupiedProps = new Set([...groundItems, ...enemies.filter(e => e.alive)]
+      .filter(e => e.level === layer.level).map(e => keyXY(e.x, e.y)))
+    for (let caveIndex = 0; caveIndex < layer.maps.length; caveIndex++) {
+      const descriptor = layer.descriptors[caveIndex], cm = layer.maps[caveIndex]
+      if (!descriptor || descriptor.crypt || !descriptor.scenario) continue
+      for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+        const floor = layer.level === -1 ? 'cavefloor' : 'cavefloor2'
+        const key = `${layer.level}:${x},${y}`
+        if (cm[y]?.[x] !== floor || layer.shared[y]?.[x] !== floor || used.has(key) || occupiedProps.has(keyXY(x,y))) continue
+        if (entrances.some(e => Math.max(Math.abs(e.x-x), Math.abs(e.y-y)) <= cfg.entranceClearance)) continue
+        const wall = (dx, dy) => layer.shared[y+dy]?.[x+dx] === 'cavewall'
+        const corner = (wall(0,-1) || wall(0,1)) && (wall(-1,0) || wall(1,0))
+        const r = roll(x,y,layer.level)
+        let kind = null
+        if (corner && r < cfg.webChance) kind = 'web'
+        else if (r >= cfg.webChance && r < cfg.webChance + cfg.stalagmiteChance) kind = 'stalagmites'
+        else if (r >= cfg.webChance + cfg.stalagmiteChance && r < cfg.webChance + cfg.stalagmiteChance + cfg.mushroomChance) kind = 'mushrooms'
+        if (kind) {
+          caveDecorations.push({x,y,kind,level:layer.level,levelKind:'chain',caveIndex,
+            ...(kind === 'web' ? {rotation: wall(0,-1) ? (wall(-1,0) ? 0 : 1) : (wall(1,0) ? 2 : 3)} : {})})
+          used.add(key)
+        }
+      }
+    }
+  }
 }

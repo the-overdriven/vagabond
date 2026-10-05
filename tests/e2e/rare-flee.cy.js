@@ -158,7 +158,7 @@ describe('Rare monster sightings and flight', () => {
       fleeAssert(!Object.keys(untouched).some(k=>k.startsWith('rare')), 'defaults omitted')
       enemyTurn()
       const save=JSON.parse(JSON.stringify(buildSaveObject())), id=e.id
-      fleeAssert(save.version===29, 'current save version')
+      fleeAssert(save.version===31, 'current save version')
       const saved=save.enemies.find(v=>v.id===id)
       fleeAssert(saved.rareSightings===1 && saved.rareFleeTurns===7 && saved.rareFleeAcc===0.5 && saved.rareArmed===false, 'exact mid-flight fields')
       loadGameFromObject(save,{isReplayInit:true}); replayAnimationsDisabled=true
@@ -221,7 +221,7 @@ describe('Rare monster sightings and flight', () => {
       const e=makeFleeEnemy('DRUSK',4)
       rareStartFlee(e,4,true)
       const info=tileInspectInfo(e.x,e.y)
-      fleeAssert(info.html.includes('Fleeing (1/2)') && info.html.includes('Startled (+'+rareStartledBonus(e)+' SPD)') && rareStartledBonus(e)>0, 'flight status explains SPD bonus')
+      fleeAssert(info.html.includes('Fleeing') && !info.html.includes('Fleeing (') && info.html.includes('Startled (+'+rareStartledBonus(e)+' SPD)') && rareStartledBonus(e)>0, 'flight status explains SPD bonus')
       e.rareFleeTurns=0
       fleeAssert(!tileInspectInfo(e.x,e.y).html.includes('Startled'), 'status ends with flight')
     })()`))

@@ -272,23 +272,6 @@
     "fallbackTerrain": "#000",
     "mark": "#8a1c1c"
   },
-  "caveDecor": {
-    "web": {
-      "image": "img/tiles/cave-web.png",
-      "scale": 1,
-      "chance": 0.55
-    },
-    "stalagmite": {
-      "image": "img/tiles/cave-stalagmite.png",
-      "scale": 1,
-      "chance": 0.05
-    },
-    "mushrooms": {
-      "image": "img/tiles/cave-mushrooms.png",
-      "scale": 1,
-      "chance": 0.06
-    }
-  },
   "terrainTiles": {
     "cavefloor": {
       "image": "img/tiles/cave-floor.png",
@@ -601,6 +584,27 @@
       "color": "#9a9184",
       "image": "img/projectiles/stone.png",
       "scale": 1
+    }
+  },
+  "caveDecorations": {
+    "web": {
+      "glyph": "%",
+      "color": "#aaa69a",
+      "image": "img/tiles/cave-web.png",
+      "scale": 1,
+      "filter": "brightness(1.8)"
+    },
+    "stalagmites": {
+      "glyph": "^",
+      "color": "#8e877d",
+      "image": "img/tiles/cave-stalagmites.png",
+      "scale": 1
+    },
+    "mushrooms": {
+      "glyph": "♣",
+      "color": "#b4a37e",
+      "image": "img/tiles/cave-mushrooms.png",
+      "scale": 0.8
     }
   }
 }

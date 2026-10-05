@@ -88,5 +88,16 @@
         "article": "an"
       }
     }
+  },
+  "carrionInstinct": {
+    "playerHpThreshold": 0.2,
+    "aggroBonus": 1,
+    "attackMultiplier": 1.25
+  },
+  "wyvernSleep": {
+    "spawnChance": 0.25,
+    "wakeChance": 0.01,
+    "activeRadius": 20,
+    "aggroMultiplier": 0.5
   }
 }

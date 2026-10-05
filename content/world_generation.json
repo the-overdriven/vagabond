@@ -470,7 +470,6 @@
       3,
       4
     ],
-    "deepThreatMaxExcludedRarity": 0.1,
     "deepMonsterMin": 24,
     "deepMonsterMax": 36,
     "deepMonsterTilesPerEnemy": 75,
@@ -479,7 +478,8 @@
     "deepProvisionCount": 4,
     "minimumFungus": 3,
     "deepMobEntranceClearance": 8,
-    "deepMobMinSpacing": 3
+    "deepMobMinSpacing": 3,
+    "deepThreatRarityCutoff": 0.1
   },
   "surfaceLoot": {
     "remoteHighTierChestCount": 4,
@@ -552,5 +552,11 @@
       "mushroom": 1
     },
     "humanoidHpMultiplier": 1
+  },
+  "caveDecorations": {
+    "entranceClearance": 2,
+    "webChance": 0.18,
+    "stalagmiteChance": 0.018,
+    "mushroomChance": 0.025
   }
 }

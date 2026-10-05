@@ -1,7 +1,7 @@
 'use strict'
 
 /* ============================== SAVE / LOAD ============================== */
-const SAVE_VERSION = 29 // Strongest-kill achievement and data-backed item base values
+const SAVE_VERSION = 31 // Persistent sleeping wyverns
 
 // Run-length encoding for the save file's map/discovery grids. Every
 // such grid (surfaceMap, each cave's full-map-sized caveMaps entry,
@@ -195,6 +195,7 @@ function buildSaveObject() {
       prefix: e.prefix || null,
       prefixBase: e.prefixBase || null,
       crit: !!e.crit,
+      sleeping: e.sleeping === true,
       aware: !!e.aware,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
@@ -215,6 +216,7 @@ function buildSaveObject() {
       shooterAbility: e.shooterAbility || null,
       shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
     })),
+    caveDecorations: caveDecorations.map(prop => ({...prop})),
     groundItems: groundItems.map(g => ({...g})),
     // NPC talkFreezeTurns affects whether npcTurn() consumes wander RNG, so it
     // is part of deterministic gameplay state and must survive save/load and
@@ -261,6 +263,7 @@ function saveGame() {
 }
 
 function loadGameFromObject(data, opts = {}) {
+  clearLevelUpPopup()
   const isReplayInit = !!opts.isReplayInit
   if (!data || typeof data !== 'object' || (!Array.isArray(data.map) && typeof data.map !== 'string')) {
     throw new Error('That does not look like a Vagabond save file.')
@@ -681,6 +684,7 @@ function loadGameFromObject(data, opts = {}) {
       equipment: e.equipment || null,
       x: e.x, y: e.y, homeTileType: e.homeTileType || null, alive: true,
       prefix: e.prefix || null, prefixBase: e.prefixBase || null, crit: !!e.crit, aware: !!e.aware,
+      sleeping: e.sleeping === true,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
       alarmed: !!e.alarmed && (typeof e.aggro !== 'number' || e.aggro !== 0),
@@ -763,6 +767,7 @@ function loadGameFromObject(data, opts = {}) {
   cemeteryTombstones = (data.cemeteryTombstones && typeof data.cemeteryTombstones === 'object') ? data.cemeteryTombstones : {}
   ensureGravediggerGrave()
 
+  caveDecorations = data.caveDecorations.map(prop => ({...prop}))
   groundItems = (data.groundItems || []).map(g => {
     const item = {...g}
     if (!item.levelKind && item.level === -3) {
