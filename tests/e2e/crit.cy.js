@@ -47,6 +47,7 @@ describe('Invisible opening criticals', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, message) => { if (!ok) throw new Error(message) }
       replayRecording=false; replayAnimationsDisabled=true
+      const savedNpcs=npcs
       currentZ=0; map=surfaceMap; enemies=[]; npcs=[]; occupied.clear()
       player.godMode=false; player.invisibleTurns=10; player.equip={weapon:null,shield:null,armor:null}
       const oldChance=chance, oldDamage=damageRoll, oldLog=log
@@ -83,15 +84,36 @@ describe('Invisible opening criticals', () => {
       const quarry=enemies[0]
       quarry.hp=1000;quarry.maxHp=1000;quarry.alarmed=false;quarry.abilities=[]
       player.invisibleTurns=10;map[quarry.y][quarry.x]='grass';grasslandTrees.delete(keyXY(quarry.x,quarry.y))
+      npcs=savedNpcs
+      for (const n of npcs) occupied.add(keyXY(n.x,n.y))
       stopCameraAnimation();stopAttackAnimation();replayData=null;startReplayRecording()
       await tryMove(1,0)
+      check(replayData.actions.length===1 && replayData.actions[0].type==='move' &&
+        replayData.actions[0].dx===1 && replayData.actions[0].dy===0,'invisible attack records one move')
       const live=JSON.stringify({hp:player.hp,turn:turnCount,target:enemies.find(x=>x.id===quarry.id).hp})
-      startReplayPlayback();clearTimeout(replayTimer);replayNextActionAt=0
-      await playNextReplayAction();clearTimeout(replayTimer)
-      check(lastReplayDiagnostic.completedActions===lastReplayDiagnostic.totalActions &&
-        lastReplayDiagnostic.consumedRng===lastReplayDiagnostic.recordedRng,'invisible attack replay completes without RNG desync')
-      check(JSON.stringify({hp:player.hp,turn:turnCount,target:enemies.find(x=>x.id===quarry.id).hp})===live,'live combat restored')
-      replayAnimationsDisabled=false
-    })()`))
+      startReplayPlayback()
+      check(replayPlaying,'invisible attack replay starts')
+      return {live, quarryId:quarry.id}
+    })()`)).then(({live, quarryId}) => {
+      cy.window().should(win => {
+        expect(win.eval('replayPlaying'),'replay finishes').to.equal(false)
+      }).then(win => {
+        const state=win.eval(`({
+          diagnostic:lastReplayDiagnostic,
+          actions:replayData.actions.length,rng:replayData.rng.length,
+          hp:player.hp,turn:turnCount,target:enemies.find(x=>x.id===${JSON.stringify(quarryId)})?.hp
+        })`)
+        if (state.diagnostic && !('completedActions' in state.diagnostic)) {
+          throw new Error(`Replay desync: ${JSON.stringify({
+            actionIndex:state.diagnostic.actionIndex,
+            expectedRng:state.diagnostic.expectedRng,
+            actualRng:state.diagnostic.actualRng
+          })}`)
+        }
+        expect(state.diagnostic,'replay completion diagnostic').to.have.property('completedActions',state.actions)
+        expect(state.diagnostic.consumedRng,'replay RNG consumption').to.equal(state.rng)
+        expect(JSON.stringify({hp:state.hp,turn:state.turn,target:state.target}),'live combat restored').to.equal(live)
+      })
+    })
   })
 })
