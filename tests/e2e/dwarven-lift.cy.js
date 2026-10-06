@@ -57,7 +57,7 @@ describe('Dwarven Ruins shortcut lift', () => {
       player.x = lift.upper.x
       player.y = lift.upper.y
       const beforeUpperInspect = turnCount
-      check(travelDwarvenLift() === true, 'unpowered upper lift interaction is handled')
+      inspect()
       check(currentZ === lift.upper.z && player.x === lift.upper.x && player.y === lift.upper.y,
         'D1 platform cannot activate or travel while unpowered')
       check(turnCount === beforeUpperInspect, 'checking an unpowered lift costs no turn')
@@ -82,11 +82,11 @@ describe('Dwarven Ruins shortcut lift', () => {
       check(RENDER_STYLE.terrainTiles.dwarvenleverpulled?.image === 'img/tiles/dwarven-lever-pulled.png', 'pulled lever uses its dedicated sprite')
 
       const beforeTravelTurn = turnCount
-      check(travelDwarvenLift() === true, 'powered lower lift travels')
+      inspect()
       check(currentZ === lift.upper.z && player.x === lift.upper.x && player.y === lift.upper.y,
         'lower lift arrives at exact D1 endpoint')
       check(turnCount === beforeTravelTurn, 'lift travel follows transition convention and costs no combat turn')
-      check(travelDwarvenLift() === true, 'powered upper lift travels back')
+      inspect()
       check(currentZ === lift.lower.z && player.x === lift.lower.x && player.y === lift.lower.y,
         'upper lift returns to exact deeper endpoint')
     })()`))

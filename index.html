@@ -1205,9 +1205,10 @@ more difficult:
   }
 
   function setDwarvenLiftPowered(powered) {
-    if (!dwarvenRuinsLift) return false
-    dwarvenRuinsLift.unlocked = !!powered
-    for (const endpoint of [dwarvenRuinsLift.upper, dwarvenRuinsLift.lower]) {
+    const lift = dwarvenRuinsLiftShortcut()
+    if (!lift) return false
+    lift.unlocked = !!powered
+    for (const endpoint of [lift.upper, lift.lower]) {
       const depth = chainDepthForZ(endpoint.z)
       const levelMap = depthUndergroundMap(depth)
       if (levelMap?.[endpoint.y]) levelMap[endpoint.y][endpoint.x] = powered ? 'dwarvenlifton' : 'dwarvenliftoff'
@@ -1217,7 +1218,7 @@ more difficult:
   }
 
   function activateDwarvenLiftLeverAt(x, y) {
-    const lift = dwarvenRuinsLift
+    const lift = dwarvenRuinsLiftShortcut()
     if (!lift || currentZ !== lift.lever?.z || x !== lift.lever.x || y !== lift.lever.y) return false
     if (lift.unlocked) {
       log('The dwarven lift lever is already locked in its powered position.', 'info')
@@ -1243,7 +1244,7 @@ more difficult:
   }
 
   function travelDwarvenLift() {
-    const lift = dwarvenRuinsLift
+    const lift = dwarvenRuinsLiftShortcut()
     if (!lift) return false
     const tile = map[player.y]?.[player.x]
     if (tile === 'dwarvenliftoff' || !lift.unlocked) {

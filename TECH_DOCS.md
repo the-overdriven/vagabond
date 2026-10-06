@@ -1007,8 +1007,10 @@ two-way inspect-to-travel between the two fixed platforms. The D1 side
 cannot activate the lift remotely. Lift travel itself follows the existing
 level-transition convention and does not add a separate combat turn.
 
-Lift endpoint/lever coordinates and powered state are persisted explicitly;
-the platform and pulled-lever terrain states are also stored in the ordinary
+Lift endpoint/lever coordinates and powered state are persisted explicitly in
+the generic dungeon-shortcut registry; runtime lever activation and inspect-to-travel
+always resolve the lift from that registry rather than a Ruins-only mirror variable.
+The platform and pulled-lever terrain states are also stored in the ordinary
 Ruins map grids. Lift metadata was introduced in save schema **34**. Distinct
 open-gate/pulled-lever terrain states use save schema **36**. Room descriptors,
 vault descriptors, selected encounter families and tactical enemy role metadata
@@ -1017,7 +1019,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v61**, save schema **39**; older saves are rejected.
+**v67**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
