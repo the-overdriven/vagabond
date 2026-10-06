@@ -351,6 +351,108 @@
     "remainsAttempts": 9,
     "corridorHorizontalFirstChance": 0.5
   },
+  "dungeons": {
+    "dwarvenRuins": {
+      "levelCountRange": [
+        3,
+        5
+      ],
+      "layout": {
+        "boundsXRange": [
+          28,
+          34
+        ],
+        "boundsYRange": [
+          20,
+          24
+        ],
+        "roomCountRange": [
+          8,
+          12
+        ],
+        "roomPlacementAttempts": 320,
+        "roomWidthRange": [
+          7,
+          14
+        ],
+        "roomHeightRange": [
+          6,
+          11
+        ],
+        "roomBoundsMargin": 4,
+        "roomSeparation": 3,
+        "entranceRoomSize": [
+          9,
+          9
+        ],
+        "corridorWideChance": 0.35,
+        "corridorHorizontalFirstChance": 0.5,
+        "collapseAttemptsRange": [
+          18,
+          28
+        ],
+        "collapseMinEntranceDistance": 7,
+        "rubbleChance": 0.6,
+        "minimumEntranceExitGraphDistance": 28,
+        "exitFarCandidateBand": 8
+      },
+      "doors": {
+        "ordinaryDoorChance": 0.45,
+        "ordinaryLockedDoorChance": 0.1,
+        "progressionGatePreBreachedChance": 0.3,
+        "breachAlarmChance": 0.25
+      },
+      "floorGenerationRetries": 12,
+      "shortcut": {
+        "targetFloorProgressRange": [
+          0.5,
+          1.0
+        ]
+      },
+      "traps": {
+        "countRange": [
+          2,
+          4
+        ],
+        "spikeAtk": 8,
+        "projectileAtk": 10,
+        "speed": 5,
+        "projectileRange": 12,
+        "spawnClearance": 2,
+        "entranceClearance": 3,
+        "minimumSeparation": 3
+      },
+      "encounters": {
+        "baseTilesPerEnemy": 65,
+        "densityGrowthRange": [
+          0.1,
+          0.15
+        ],
+        "dominantFamilyCountRange": [
+          2,
+          4
+        ],
+        "dominantRarityCutoff": 0.1,
+        "prefixBaseChance": 0.11,
+        "prefixGrowthPerFloor": 0.025,
+        "minDepthByTier": {
+          "2": 4,
+          "3": 4,
+          "4": 6
+        },
+        "entranceClearance": 8,
+        "minSpacing": 3,
+        "fleeAlertSameSpeciesChance": 0.5,
+        "fleeAlertDifferentSpeciesChance": 0.1
+      },
+      "chests": {
+        "perFloor": 1,
+        "tierEarly": 2,
+        "tierLate": 3,
+        "entranceClearance": 8
+      }
+    }
+  },
   "landmarks": {
     "blackPillarSearches": [
       [

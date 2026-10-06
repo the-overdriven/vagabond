@@ -897,8 +897,12 @@ walking/graph distance (**28 tiles** by default), rather than merely by visual
 or Euclidean distance. A failed floor layout is retried deterministically up to
 **12 times** before the existing world-attempt retry path rejects the world.
 
-Ordinary room entrances can now receive dwarven doors. The default chance is
-**45% per eligible two-tile room entrance**; both leaves start closed. A closed
+Ordinary room entrances can receive dwarven doors. The generator now finds
+actual two-tile corridor crossings through each room perimeter and only places
+a door if closing both leaves makes the room interior unreachable from the
+floor entrance. A collapsed wall or alternate corridor cannot leave a decorative,
+pointless door. The default chance remains **45% per eligible entrance**; both
+leaves start closed. A closed
 door blocks movement, sight, and projectiles. Bumping an unlocked closed door
 opens that one leaf and consumes one player turn without moving the player; the
 next movement action can pass through it. Open doors remain open permanently.
@@ -973,21 +977,22 @@ level-transition convention and does not add a separate combat turn.
 Lift endpoint/lever coordinates and powered state are persisted explicitly;
 the platform terrain state is also stored in the ordinary Ruins map grids.
 Lift metadata was introduced in save schema **34**. Current game version is
-**v56**, save schema **35**; older saves are rejected. Vaults and loot
+**v57**, save schema **35**; older saves are rejected. Vaults and loot
 progression remain later batches.
 
 ### Dwarven Ruins traps (batch 5)
 
-`src/dungeonTraps.js` places reusable spikes and wall-arrow mechanisms after
-stairs, locks, keys and the shortcut lift are generated. Each floor targets
+`src/dungeonTraps.js` places reusable spikes and wall-arrow mechanisms in
+**corridors outside room footprints**, after stairs, locks, keys and the shortcut
+lift are generated. Each floor targets
 2–4 traps, stopping early if no safe placement remains. Placement uses seeded
 RNG once; entering or loading a floor never regenerates mechanisms. Triggers
-stay at least four Chebyshev tiles from entrances, ground objects and lift
+stay at least four Chebyshev tiles from entrances, generated keys and lift
 platforms. Every staircase, key and lift retains a route avoiding all triggers;
 keys reachable before unlocking also retain their original accessibility.
 Trap triggers are separated by more than three tiles. Existing monsters cannot
 start within two tiles of either a trigger or emitter. Summoning uses the same
-`DungeonTraps.safeSpawn` predicate; future encounter placement must use it too.
+`DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement.
 
 Spikes trigger on entry by players and enemies, including flying and ethereal
 creatures. Forced movement also triggers them. Remaining on a trigger or
@@ -1019,14 +1024,15 @@ emitters. Image mode uses the generated trap atlas and a separate pressure
 plate tile. Rendering supports `sourceRect: [x, y, width, height]` for atlas
 regions without changing the gameplay tile. Shared underground FOV now honors
 `TILE.blocksSight`, so closed doors, levers and arrow walls block sight.
-The uploaded source omitted `sw.js`; its offline cache list still needs the
-new module and image paths if this installation uses a service worker.
+The supplied service worker now precaches the trap module and images for offline play.
 
 ### Dwarven Ruins encounters (batch 6)
 
 Each floor now has a coherent seeded population. From its walkable area, the
 stratum rolls one density growth rate in **10–15% per floor** and budgets threat
-as `round(walkable tiles / 75 × (1 + floorIndex × growth))`. Enemy tier costs
+as `round(walkable tiles / 65 × (1 + floorIndex × growth))`. This
+changes the base from **75 to 65 walkable tiles per budget point**, roughly
+15% more threat for the same-size floor. Enemy tier costs
 that many budget points. This increases the number and composition of threats
 without silently inflating monster stats. A small minimum budget ensures the
 required family mix and a roamer can appear even on a small floor.
@@ -1057,8 +1063,20 @@ useful responses.
 Enemies, prefixes, positions and wander state use the existing save and replay
 fields. Room bounds are generation-only; loading does not regenerate the
 population. This batch does not change the save schema. The supplied service
-worker now precaches the trap module, dungeon rules, and trap art for offline
-play with game version v56.
+worker precaches the trap module, dungeon rules, and trap art for offline
+play with game version v57.
+
+### Placement and modest rewards (v57)
+
+The Ruins now generate **one ordinary chest per floor**, up from zero. It is
+placed inside a room away from the entrance, monsters, keys, and trap mechanisms,
+with a route from the entrance that avoids trap triggers.
+Early floors use tier 2; floors at or beyond normalized progress 0.5 use tier 3.
+These are normal chests using the existing loot table. The guaranteed Fort
+artifact is separate; future vault rewards will use their own budget. Chests,
+keys, doors and traps persist in existing map/item/level data, so save schema 35
+is unchanged. The Dwarven Key's inventory and ground icons use the existing
+`img/icons/dwarven-key.svg` filename.
 
 The surface `dwarvengate` must remain spatially distinct from ordinary cave
 entrances. After the fort is generated, every non-crypt random cave entrance is

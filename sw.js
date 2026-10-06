@@ -27,6 +27,8 @@ const PRECACHE_URLS = [
   './icon-512.png',
   './icon-512-maskable.png',
   './src/worldGen.js',
+  './src/dungeonTraps.js',
+  './src/charge.js',
   './src/swimming.js',
   './src/npcFisherman.js',
   './src/fov.js',
@@ -42,7 +44,14 @@ const PRECACHE_URLS = [
   './content/item_modifiers.json',
   './content/enemy_templates.json',
   './content/enemy_default_biomes.json',
-  './content/enemy_prefixes.json'
+  './content/enemy_prefixes.json',
+  './content/world_generation.json',
+  './content/world_traits.json',
+  './content/tiles.json',
+  './content/rendering.json',
+  './content/items.json',
+  './img/tiles/dwarven-traps-atlas.png',
+  './img/tiles/dwarven-pressure-plate.png'
 ];
 
 // Ask the server every time (cheap conditional request, 304 if unchanged)

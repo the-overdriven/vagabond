@@ -107,9 +107,11 @@ function buildSaveObject() {
     // levels later never needs another save-format field - just another entry.
     deepLevels: deepLevels.map(lvl => ({
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
+      traps: structuredClone(lvl.traps || []),
       caves: lvl.caves,
       discovered: encodeBoolGrid(lvl.discovered),
     })),
+    dwarvenRuinsLift: dwarvenRuinsLift ? JSON.parse(JSON.stringify(dwarvenRuinsLift)) : null,
     cryptLevel2: cryptLevel2 ? {
       map: encodeTileGrid(cryptLevel2.map, '#'),
       discovered: encodeBoolGrid(cryptLevel2.discovered),
@@ -408,9 +410,13 @@ function loadGameFromObject(data, opts = {}) {
       }
     }
   }
-  // Re-stamp declared entrances after decoding, including old saves whose
-  // fort exit was encoded as a generic caveup tile.
-  deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map((lvlData, levelIndex) => {
+  // Rebuild each generic-chain level from its encoded local maps. Dwarven
+  // Ruins floors use one persistent local map per floor, so keep the shared
+  // map and that local map as the same object: future terrain-state changes
+  // (doors, mechanisms, traps) then serialize through the existing caveMaps
+  // field without a parallel copy drifting out of sync.
+  deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map((lvlData, levelIndex, allLevels) => {
+    const isDwarvenRuins = levelIndex >= 2
     const entranceTile = (x, y) => levelIndex === 1 && dwarvenRuin &&
       x === dwarvenRuin.x && y === dwarvenRuin.y ? 'dwarvenfortexit' : 'caveup'
     const lvlCaveMaps = (lvlData.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
@@ -419,28 +425,61 @@ function loadGameFromObject(data, opts = {}) {
       ...c,
       entrances: Array.isArray(c.entrances) && c.entrances.length ? c.entrances : [{x: c.x, y: c.y}],
     }))
-    for (let i = 0; i < lvlCaveMaps.length; i++) {
-      const entrances = lvlCaves[i] ? lvlCaves[i].entrances : []
-      for (const entrance of entrances) {
-        if (lvlCaveMaps[i][entrance.y] && lvlCaveMaps[i][entrance.y][entrance.x] !== undefined) {
-          lvlCaveMaps[i][entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
+
+    // The ordinary z:-2 caves and Dwarven Fort predate explicit transition
+    // tiles in their descriptors, so their declared entrances are still
+    // re-stamped. New Ruins floors already encode dwarven stairs exactly and
+    // must not have those tiles replaced with generic cave stairs.
+    if (!isDwarvenRuins) {
+      for (let i = 0; i < lvlCaveMaps.length; i++) {
+        const entrances = lvlCaves[i] ? lvlCaves[i].entrances : []
+        for (const entrance of entrances) {
+          if (lvlCaveMaps[i][entrance.y] && lvlCaveMaps[i][entrance.y][entrance.x] !== undefined) {
+            lvlCaveMaps[i][entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
+          }
         }
       }
     }
-    const lvlMap = blankCaveMap()
-    for (const cm of lvlCaveMaps) {
-      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-        if (cm[y][x] !== 'cavewall') lvlMap[y][x] = cm[y][x]
+
+    let lvlMap
+    if (isDwarvenRuins && lvlCaveMaps.length === 1) {
+      lvlMap = lvlCaveMaps[0]
+    } else {
+      lvlMap = blankCaveMap()
+      for (const cm of lvlCaveMaps) {
+        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+          if (cm[y][x] !== 'cavewall') lvlMap[y][x] = cm[y][x]
+        }
+      }
+      if (!isDwarvenRuins) {
+        for (const cave of lvlCaves) {
+          for (const entrance of cave.entrances || []) {
+            if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) {
+              lvlMap[entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
+            }
+          }
+        }
       }
     }
-    for (const cave of lvlCaves) {
-      for (const entrance of cave.entrances || []) {
-        if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) lvlMap[entrance.y][entrance.x] = entranceTile(entrance.x, entrance.y)
-      }
-    }
+
     const lvlDiscovered = decodeBoolGrid(lvlData.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
-    return {map: lvlMap, caveMaps: lvlCaveMaps, caves: lvlCaves, discovered: lvlDiscovered}
+    const dungeonFloor = isDwarvenRuins ? levelIndex - 1 : levelIndex === 1 ? 0 : null
+    const floorCount = Math.max(0, allLevels.length - 2)
+    const progress = isDwarvenRuins
+      ? (floorCount <= 1 ? 1 : (dungeonFloor - 1) / (floorCount - 1))
+      : 0
+    return {
+      map: lvlMap,
+      traps: structuredClone(lvlData.traps),
+      caveMaps: lvlCaveMaps,
+      caves: lvlCaves,
+      discovered: lvlDiscovered,
+      kind: isDwarvenRuins ? 'dwarvenRuins' : levelIndex === 1 ? 'dwarvenFort' : 'caves',
+      ...(dungeonFloor !== null ? {dungeonFloor, floorCount, progress} : {})
+    }
   })
+
+  dwarvenRuinsLift = data.dwarvenRuinsLift ? JSON.parse(JSON.stringify(data.dwarvenRuinsLift)) : null
 
   if (dwarvenRuin && deepLevels[1]) {
     const fortCaveIndex = deepLevels[1].caves.findIndex(c =>
@@ -483,7 +522,7 @@ function loadGameFromObject(data, opts = {}) {
   // Migrate the old generic chain numbering: z:-3 -> z:-2, z:-4 -> z:-3.
   if (!savedKind && savedZ === -3) savedZ = -2
   else if (!savedKind && savedZ === -4) savedZ = -3
-  const savedChainDepth = CHAIN_DEPTH_BY_Z[savedZ]
+  const savedChainDepth = chainDepthForZ(savedZ)
   const savedChainMap = savedChainDepth ? depthUndergroundMap(savedChainDepth) : null
   const loadCrypt2 = savedKind === 'crypt2' || (!savedKind && data.currentZ === -2)
   if (loadCrypt2 && cryptLevel2) {

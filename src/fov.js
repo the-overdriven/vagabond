@@ -46,7 +46,7 @@ const UndergroundFov = (() => {
     const line = traceLine(fromX, fromY, toX, toY)
     for (let i = 1; i < line.length - 1; i++) {
       const {x, y} = line[i]
-      if (!terrain[y]?.[x] || BLOCKS_SIGHT.has(terrain[y][x])) return false
+      if (!terrain[y]?.[x] || (BLOCKS_SIGHT.has(terrain[y][x]) || (typeof TILE !== 'undefined' && TILE[terrain[y][x]]?.blocksSight === true))) return false
     }
     return true
   }

@@ -140,6 +140,42 @@
       "mini": "#e8b85b",
       "walk": true
     },
+    "dwarvenstairsdown": {
+      "ch": ">",
+      "color": "#e8b85b",
+      "bg": "#302d2a",
+      "mini": "#e8b85b",
+      "walk": true
+    },
+    "dwarvenstairsup": {
+      "ch": "<",
+      "color": "#e8b85b",
+      "bg": "#302d2a",
+      "mini": "#e8b85b",
+      "walk": true
+    },
+    "dwarvenminessealed": {
+      "ch": "X",
+      "color": "#8f8170",
+      "bg": "#302d2a",
+      "mini": "#8f8170",
+      "walk": true,
+      "projectileBlock": true
+    },
+    "dwarvendoorclosed": {
+      "ch": "+",
+      "color": "#c58a45",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarvendooropen": {
+      "ch": "/",
+      "color": "#a97843",
+      "bg": "#302d2a",
+      "walk": true
+    },
     "marble": {
       "ch": "=",
       "color": "#c8c2b4",
@@ -315,6 +351,80 @@
       "color": "#39352d",
       "bg": "#050403",
       "mini": "#1c1a16"
+    },
+    "dwarvendoorlocked": {
+      "ch": "X",
+      "color": "#d39a50",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarvendoorbreached": {
+      "ch": ";",
+      "color": "#a97843",
+      "bg": "#302d2a",
+      "walk": true
+    },
+    "dwarvengatelocked": {
+      "ch": "H",
+      "color": "#d7a552",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarvengatebreached": {
+      "ch": "h",
+      "color": "#a97843",
+      "bg": "#302d2a",
+      "walk": true
+    },
+    "dwarvenliftoff": {
+      "ch": "O",
+      "color": "#8f8170",
+      "bg": "#302d2a",
+      "mini": "#8f8170",
+      "walk": true
+    },
+    "dwarvenlifton": {
+      "ch": "@",
+      "color": "#e8b85b",
+      "bg": "#302d2a",
+      "mini": "#e8b85b",
+      "walk": true
+    },
+    "dwarvenlever": {
+      "ch": "&",
+      "color": "#c58a45",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarvenspikes": {
+      "ch": "^",
+      "color": "#ceae79",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvenpressureplate": {
+      "ch": "_",
+      "color": "#ceae79",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvenarrowwall": {
+      "ch": "!",
+      "color": "#ceae79",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
     }
   },
   "tileCode": {
@@ -350,20 +460,35 @@
     "cavedown": "d",
     "caveup": "u",
     "dwarvenfortexit": "U",
+    "dwarvenstairsdown": "A",
+    "dwarvenstairsup": "B",
+    "dwarvenminessealed": "C",
+    "dwarvendoorclosed": "D",
+    "dwarvendooropen": "O",
     "marble": "=",
     "dwarvengate": "G",
     "dwarvenstatue": "S",
     "dwarvenwall": "W",
     "dwarvenrubble": "R",
-    "cryptstairsdown": "␁",
-    "cryptstairsup": "␂",
-    "crypt2floor": "␃",
-    "cryptrubble": "␄",
-    "crypt2niche": "␅",
-    "sarcophagus": "␆",
-    "crypttrap": "␇",
-    "crypttrapsprung": "␈",
-    "mausoleumstairsup": "␉"
+    "cryptstairsdown": "\u2401",
+    "cryptstairsup": "\u2402",
+    "crypt2floor": "\u2403",
+    "cryptrubble": "\u2404",
+    "crypt2niche": "\u2405",
+    "sarcophagus": "\u2406",
+    "crypttrap": "\u2407",
+    "crypttrapsprung": "\u2408",
+    "mausoleumstairsup": "\u2409",
+    "dwarvendoorlocked": "E",
+    "dwarvendoorbreached": "H",
+    "dwarvengatelocked": "I",
+    "dwarvengatebreached": "J",
+    "dwarvenliftoff": "K",
+    "dwarvenlifton": "N",
+    "dwarvenlever": "P",
+    "dwarvenspikes": "\u2530",
+    "dwarvenpressureplate": "\u2531",
+    "dwarvenarrowwall": "\u2532"
   },
   "tileDesc": {
     "water": "open water",
@@ -386,6 +511,11 @@
     "cavedown": "a narrow crack descending further into the dark",
     "caveup": "a rough passage leading back up",
     "dwarvenfortexit": "the Dwarven Fort exit, a stairway rising through the ruined gates",
+    "dwarvenstairsdown": "a broad dwarven staircase descending deeper into the ruined settlement",
+    "dwarvenstairsup": "a broad dwarven staircase leading back toward the upper ruins",
+    "dwarvenminessealed": "a collapsed work stair descending toward the old Deep Mines",
+    "dwarvendoorclosed": "a closed dwarven door of iron-bound timber",
+    "dwarvendooropen": "an open dwarven door of iron-bound timber",
     "temple": "the sacred ground of the Temple",
     "boulder": "a cluster of impassable boulders",
     "blackpillar": "a tall black stone pillar rising from the mountain\\'s peak",
@@ -409,7 +539,17 @@
     "sarcophagus": "an old stone sarcophagus",
     "crypttrap": "an old stone sarcophagus",
     "crypttrapsprung": "a shattered, empty sarcophagus",
-    "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum’s entrance"
+    "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum\u2019s entrance",
+    "dwarvendoorlocked": "a locked dwarven door of iron-bound timber",
+    "dwarvendoorbreached": "a dwarven door smashed open by force",
+    "dwarvengatelocked": "a heavy locked dwarven gate barring the way deeper into the ruins",
+    "dwarvengatebreached": "an opened or ruined dwarven gate whose broken leaves no longer bar passage",
+    "dwarvenliftoff": "an old dwarven lift platform, dark and without power",
+    "dwarvenlifton": "a powered dwarven lift platform humming with restored machinery",
+    "dwarvenlever": "a heavy dwarven control lever fixed into the wall beside the lift",
+    "dwarvenspikes": "small holes in the marble conceal reusable spikes; any creature stepping here triggers them",
+    "dwarvenpressureplate": "a pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
+    "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane"
   },
   "terrainSpeed": {
     "grass": 1,

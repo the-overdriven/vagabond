@@ -157,6 +157,12 @@
       "lootedColor": "#777",
       "image": "img/tiles/skeleton-remains.png",
       "scale": 0.92
+    },
+    "dwarvenkey": {
+      "glyph": "k",
+      "color": "#e0b35f",
+      "image": "img/icons/dwarven-key.svg",
+      "scale": 0.72
     }
   },
   "enemies": {
@@ -361,7 +367,32 @@
       "scale": 1
     },
     "dwarvenfortexit": {
-      "image": "img/tiles/cave-up.png",
+      "image": "img/tiles/dwarven-stairs-up.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenstairsdown": {
+      "image": "img/tiles/dwarven-stairs-down.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenstairsup": {
+      "image": "img/tiles/dwarven-stairs-up.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenminessealed": {
+      "image": "img/tiles/dwarven-mineshaft-sealed.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvendoorclosed": {
+      "image": "img/tiles/dwarven-door-closed.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvendooropen": {
+      "image": "img/tiles/dwarven-door-open.png",
       "baseTileKey": "marble",
       "scale": 1
     },
@@ -570,6 +601,68 @@
       "image": "img/tiles/thatched-hut.png",
       "scale": 1,
       "mirrorX": true
+    },
+    "dwarvendoorlocked": {
+      "image": "img/tiles/dwarven-door-locked.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvendoorbreached": {
+      "image": "img/tiles/dwarven-door-breached.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvengatelocked": {
+      "image": "img/tiles/dwarven-gate-locked.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvengatebreached": {
+      "image": "img/tiles/dwarven-gate-breached.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenliftoff": {
+      "image": "img/tiles/dwarven-lift-off.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenlifton": {
+      "image": "img/tiles/dwarven-lift-on.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenlever": {
+      "image": "img/tiles/dwarven-lever.png",
+      "baseTileKey": "dwarvenwall",
+      "scale": 1
+    },
+    "dwarvenspikes": {
+      "image": "img/tiles/dwarven-traps-atlas.png",
+      "sourceRect": [
+        640,
+        300,
+        330,
+        302
+      ],
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenarrowwall": {
+      "image": "img/tiles/dwarven-traps-atlas.png",
+      "sourceRect": [
+        970,
+        300,
+        308,
+        302
+      ],
+      "baseTileKey": "dwarvenwall",
+      "scale": 1
+    },
+    "dwarvenpressureplate": {
+      "image": "img/tiles/dwarven-pressure-plate.png",
+      "baseTileKey": "marble",
+      "scale": 1
     }
   },
   "projectiles": {

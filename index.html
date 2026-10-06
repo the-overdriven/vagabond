@@ -1175,12 +1175,15 @@ more difficult:
   /* ============================== LEVEL / MOVEMENT RUNTIME ============================== */
 
   // TILE_CODE / CODE_TILE now loaded from content/tiles.json (see loadContent()).
-  // Tiles the player can "inspect" while standing on them to change z level.
-  // caveentrance is the surface<->z:-1 link; cavedown/caveup are reused at
-  // every deeper transition in the generic chain (z:-1<->-3<->-4, skipping
-  // over z:-2 which is reserved for the crypt's own second level).
-  // dwarvenfortexit belongs only to the fort on z:-3 and leads to the surface.
-  const CAVE_TRANSITION_TILES = new Set(['caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup', 'cryptstairsdown', 'cryptstairsup', 'mausoleumtrapdoor', 'mausoleumstairsup'])
+  // Tiles the player can "inspect" while standing on them to change z level
+  // or interact with the sealed continuation. caveentrance links the surface
+  // to z:-1; cave stairs serve the natural caves; dedicated dwarven stairs
+  // connect the fort and persistent Dwarven Ruins floors.
+  const CAVE_TRANSITION_TILES = new Set([
+    'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup',
+    'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton',
+    'cryptstairsdown', 'cryptstairsup', 'mausoleumtrapdoor', 'mausoleumstairsup'
+  ])
 
   function depthUndergroundMap(depth) {
     if (depth <= 0) return null
@@ -1199,6 +1202,75 @@ more difficult:
     if (depth === 1) return undergroundDiscoveredL1
     const lvl = deepLevels[depth - 2]
     return lvl ? lvl.discovered : null
+  }
+
+  function setDwarvenLiftPowered(powered) {
+    if (!dwarvenRuinsLift) return false
+    dwarvenRuinsLift.unlocked = !!powered
+    for (const endpoint of [dwarvenRuinsLift.upper, dwarvenRuinsLift.lower]) {
+      const depth = chainDepthForZ(endpoint.z)
+      const levelMap = depthUndergroundMap(depth)
+      if (levelMap?.[endpoint.y]) levelMap[endpoint.y][endpoint.x] = powered ? 'dwarvenlifton' : 'dwarvenliftoff'
+    }
+    minimapDirty = true
+    return true
+  }
+
+  function activateDwarvenLiftLeverAt(x, y) {
+    const lift = dwarvenRuinsLift
+    if (!lift || currentZ !== lift.lever?.z || x !== lift.lever.x || y !== lift.lever.y) return false
+    if (lift.unlocked) {
+      log('The dwarven lift lever is already locked in its powered position.', 'info')
+      render()
+      updateTooltip()
+      flushPendingMove()
+      return true
+    }
+    setDwarvenLiftPowered(true)
+    consecutiveWaitTurns = 0
+    log('You wrench the dwarven lever down. Ancient machinery shudders awake, and the lift answers somewhere above.', 'good')
+    enemyTurn()
+    npcTurn()
+    updateHud()
+    render()
+    runAnimationLoop()
+    updateTooltip()
+    flushPendingMove()
+    return true
+  }
+
+  function travelDwarvenLift() {
+    const lift = dwarvenRuinsLift
+    if (!lift) return false
+    const tile = map[player.y]?.[player.x]
+    if (tile === 'dwarvenliftoff' || !lift.unlocked) {
+      log('The old dwarven lift is silent. Its machinery has no power.', 'info')
+      return true
+    }
+    if (tile !== 'dwarvenlifton') return false
+    const atUpper = currentZ === lift.upper.z && player.x === lift.upper.x && player.y === lift.upper.y
+    const atLower = currentZ === lift.lower.z && player.x === lift.lower.x && player.y === lift.lower.y
+    if (!atUpper && !atLower) return false
+    const destination = atUpper ? lift.lower : lift.upper
+    const depth = chainDepthForZ(destination.z)
+    const nextMap = depthUndergroundMap(depth)
+    if (!nextMap) return false
+    currentZ = destination.z
+    currentCave = -1
+    map = nextMap
+    undergroundDiscovered = depthUndergroundDiscovered(depth)
+    player.x = destination.x
+    player.y = destination.y
+    resetSwimming()
+    stopCameraAnimation()
+    snapCameraToPlayer()
+    minimapDirty = true
+    log(atUpper
+      ? `The restored lift grinds downward to Dwarven Ruins floor ${destination.floor}.`
+      : 'The restored lift hauls you back to Dwarven Ruins floor 1.', 'info')
+    render()
+    updateHud()
+    return true
   }
 
   function onCurrentLevel(entity) {
@@ -1250,7 +1322,7 @@ more difficult:
       if (tile === 'dwarvengate' && deepLevels[1]) {
         // The Dwarven gate is a direct entrance to the fort at z:-3.
         currentCave = -1
-        currentZ = -3
+        currentZ = chainZForDepth(3)
         map = depthUndergroundMap(3)
         undergroundDiscovered = depthUndergroundDiscovered(3)
         if (!map) return false
@@ -1283,10 +1355,10 @@ more difficult:
       else if (returnCave?.crypt) log('You climb out of the crypt and back into the ruined chapel.', 'info')
       else log('You climb back out into the mountain air.', 'info')
     } else if (tile === 'cavedown') {
-      const depth = CHAIN_DEPTH_BY_Z[currentZ], nextDepth = depth + 1
+      const depth = chainDepthForZ(currentZ), nextDepth = depth + 1
       const nextMap = depthUndergroundMap(nextDepth)
       if (!nextMap) return false
-      currentZ = CHAIN_Z_BY_DEPTH[nextDepth - 1]
+      currentZ = chainZForDepth(nextDepth)
       map = nextMap
       undergroundDiscovered = depthUndergroundDiscovered(nextDepth)
       log(caveScenarioIntro(currentZ, player.x, player.y) || 'You squeeze through the crack and descend deeper into the dark.', 'info')
@@ -1311,11 +1383,37 @@ more difficult:
       currentZ = 0
       currentCave = -1
       log('You climb back through the dwarven gates into the mountain air.', 'info')
+    } else if (tile === 'dwarvenstairsdown') {
+      const depth = chainDepthForZ(currentZ), nextDepth = depth + 1
+      const nextMap = depthUndergroundMap(nextDepth)
+      if (!nextMap || nextDepth < 4) return false
+      currentZ = chainZForDepth(nextDepth)
+      map = nextMap
+      undergroundDiscovered = depthUndergroundDiscovered(nextDepth)
+      const floor = deepLevels[nextDepth - 2]?.dungeonFloor || nextDepth - 3
+      log(floor === 1
+        ? 'You descend beneath the fort into the Dwarven Ruins. Abandoned halls continue below, silent and dust-choked.'
+        : `You descend to Dwarven Ruins floor ${floor}. The failed settlement continues deeper into the mountain.`, 'info')
+    } else if (tile === 'dwarvenstairsup') {
+      const depth = chainDepthForZ(currentZ), prevDepth = depth - 1
+      const prevMap = depthUndergroundMap(prevDepth)
+      if (!prevMap || depth < 4) return false
+      currentZ = chainZForDepth(prevDepth)
+      map = prevMap
+      undergroundDiscovered = depthUndergroundDiscovered(prevDepth)
+      log(prevDepth === 3
+        ? 'You climb back into the upper Dwarven Fort.'
+        : 'You climb back toward the upper Dwarven Ruins.', 'info')
+    } else if (tile === 'dwarvenliftoff' || tile === 'dwarvenlifton') {
+      return travelDwarvenLift()
+    } else if (tile === 'dwarvenminessealed') {
+      log('A broad work stair descends toward the old Deep Mines, but a cave-in blocks the way. Broken braces and mining debris show that the excavation once continued beyond it.', 'info')
+      return true
     } else if (tile === 'caveup') {
-      const depth = CHAIN_DEPTH_BY_Z[currentZ], prevDepth = depth - 1
+      const depth = chainDepthForZ(currentZ), prevDepth = depth - 1
       const prevMap = depthUndergroundMap(prevDepth)
       if (!prevMap) return false
-      currentZ = CHAIN_Z_BY_DEPTH[prevDepth - 1]
+      currentZ = chainZForDepth(prevDepth)
       map = prevMap
       undergroundDiscovered = depthUndergroundDiscovered(prevDepth)
       log('You climb back up to the upper cave.', 'info')
@@ -1344,6 +1442,129 @@ more difficult:
     return tile.walk
   }
 
+  const DUNGEON_DOOR_OPEN_STATE = Object.freeze({
+    dwarvendoorclosed: 'dwarvendooropen'
+  })
+
+  const DUNGEON_LOCK_STATE = Object.freeze({
+    dwarvendoorlocked: Object.freeze({
+      kind: 'door',
+      keyedOpenTile: 'dwarvendooropen',
+      breachedTile: 'dwarvendoorbreached',
+      breachable: true
+    }),
+    dwarvengatelocked: Object.freeze({
+      kind: 'gate',
+      keyedOpenTile: 'dwarvengatebreached',
+      breachedTile: null,
+      breachable: false
+    })
+  })
+
+  function isClosedDungeonDoorTile(tileKey) {
+    return !!DUNGEON_DOOR_OPEN_STATE[tileKey]
+  }
+
+  function isLockedDungeonDoorTile(tileKey) {
+    return !!DUNGEON_LOCK_STATE[tileKey]
+  }
+
+  function openDungeonDoorAt(x, y) {
+    const tileKey = map[y]?.[x]
+    const openTile = DUNGEON_DOOR_OPEN_STATE[tileKey]
+    if (!openTile) return false
+    map[y][x] = openTile
+    minimapDirty = true
+    return true
+  }
+
+  function dungeonLockLeavesAt(x, y) {
+    const tileKey = map[y]?.[x]
+    const info = DUNGEON_LOCK_STATE[tileKey]
+    if (!info) return []
+    const family = info.kind === 'gate'
+      ? new Set(['dwarvengatelocked', 'dwarvengatebreached'])
+      : new Set(['dwarvendoorlocked', 'dwarvendoorbreached'])
+    const leaves = [{x, y}]
+    const adjacent = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+      .map(([dx, dy]) => ({x: x + dx, y: y + dy}))
+      .filter(p => family.has(map[p.y]?.[p.x]))
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+    if (adjacent.length) leaves.push(adjacent[0])
+    return leaves.sort((a, b) => a.y - b.y || a.x - b.x)
+  }
+
+  function dungeonLockIdAt(x, y) {
+    const tileKey = map[y]?.[x]
+    const info = DUNGEON_LOCK_STATE[tileKey]
+    if (!info) return null
+    return dwarvenDungeonLockId(currentZ, info.kind, dungeonLockLeavesAt(x, y))
+  }
+
+  function matchingDungeonKeyAt(x, y) {
+    const keyId = dungeonLockIdAt(x, y)
+    if (!keyId) return null
+    return player.inventory.find(item => item.kind === 'dwarvenkey' && item.keyId === keyId) || null
+  }
+
+  function openDungeonLockWithKeyAt(x, y) {
+    const tileKey = map[y]?.[x]
+    const info = DUNGEON_LOCK_STATE[tileKey]
+    const keyId = dungeonLockIdAt(x, y)
+    if (!info || !keyId) return null
+    const keyIndex = player.inventory.findIndex(item => item.kind === 'dwarvenkey' && item.keyId === keyId)
+    if (keyIndex < 0) return null
+    const key = player.inventory[keyIndex]
+    const leaves = dungeonLockLeavesAt(x, y)
+    for (const leaf of leaves) {
+      if (map[leaf.y]?.[leaf.x] === tileKey) map[leaf.y][leaf.x] = info.keyedOpenTile
+    }
+    player.inventory.splice(keyIndex, 1)
+    minimapDirty = true
+    return {info, key, leaves}
+  }
+
+  function equippedWeaponBreachAtk() {
+    const weapon = player.equip.weapon
+    if (!weapon || weapon.kind !== 'weapon') return 0
+    return Math.max(0, (weapon.atk || 0) + (weapon.mod === 'atk' ? (weapon.modAmt || 0) : 0))
+  }
+
+  function alarmNearestEnemyFromBreach() {
+    const probability = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.doors?.breachAlarmChance ?? 0.25
+    if (!chance(probability)) return null
+    const candidates = enemies.map((enemy, index) => ({
+      enemy,
+      index,
+      distance: Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y))
+    })).filter(entry => entry.enemy.alive && onCurrentLevel(entry.enemy) && !entry.enemy.alarmed)
+      .sort((a, b) => a.distance - b.distance ||
+        String(a.enemy.id || '').localeCompare(String(b.enemy.id || '')) || a.index - b.index)
+    for (const entry of candidates) {
+      if (!alarmEnemy(entry.enemy)) continue
+      if (enemyIsVisibleOnMainView(entry.enemy))
+        log(`${entry.enemy.name} is alarmed by the noise.`, 'bad')
+      return entry.enemy
+    }
+    return null
+  }
+
+  function breachDungeonDoorAt(x, y) {
+    const tileKey = map[y]?.[x]
+    const info = DUNGEON_LOCK_STATE[tileKey]
+    const weapon = player.equip.weapon
+    if (!info || !info.breachable) return {attempted: false, success: false, reason: 'unbreachable'}
+    if (!weapon || weapon.kind !== 'weapon') return {attempted: false, success: false, reason: 'weapon'}
+    const breachAtk = equippedWeaponBreachAtk()
+    const success = chance(Math.min(1, breachAtk / 100))
+    if (success) {
+      map[y][x] = info.breachedTile
+      minimapDirty = true
+    }
+    const alarmedEnemy = alarmNearestEnemyFromBreach()
+    return {attempted: true, success, breachAtk, weapon, alarmedEnemy}
+  }
+
   // The bell tower is carved out of the Temple's own footprint during world
   // generation. It is Temple ground with a different glyph, not a separate
   // landmark, so it shares Temple-ground behavior such as healing and enemy flee.
@@ -1364,6 +1585,7 @@ more difficult:
 
 </script>
 <script src="src/worldGen.js"></script>
+<script src="src/dungeonTraps.js"></script>
 <script src="src/swimming.js"></script>
 <script src="src/charge.js"></script>
 <script src="src/npcFisherman.js"></script>
@@ -2186,6 +2408,7 @@ more difficult:
     const summonTemplate = ENEMY_TEMPLATE_BY_NAME[casterTemplate.summonSpecies]
     const spots = DIRS8.map(([dx, dy]) => ({x: enemy.x + dx, y: enemy.y + dy}))
       .filter(p => enemyCanTraverse(summonTemplate, p.x, p.y) &&
+        DungeonTraps.safeSpawn(p.x, p.y, currentZ, currentLevelKind()) &&
         !(p.x === player.x && p.y === player.y) &&
         !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === p.x && e.y === p.y) &&
         !npcs.some(n => currentZ === 0 && n.x === p.x && n.y === p.y))
@@ -3287,6 +3510,26 @@ more difficult:
     return destination
   }
 
+  function alertDwarvenRuinsEnemiesFromFlee(source) {
+    if (!source || source.levelKind !== 'chain' || (source.level ?? 0) > -4) return
+    const cfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.encounters
+    if (!cfg) return
+    const distance = target => Math.max(Math.abs(target.x - source.x), Math.abs(target.y - source.y))
+    const candidates = enemies.filter(target => target !== source && target.alive &&
+      onCurrentLevel(target) && !target.alarmed && !enemyIsPassive(target) &&
+      (target.rareFleeTurns ?? 0) <= 0 && distance(target) <= ALARM_TRIGGER_RANGE)
+      .sort((a, b) => distance(a) - distance(b) || (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0))
+    const target = candidates[0]
+    if (!target) return
+    const sourceSpecies = source.baseName || source.name
+    const sameSpecies = (target.baseName || target.name) === sourceSpecies
+    const probability = sameSpecies
+      ? (cfg.fleeAlertSameSpeciesChance ?? 0.50)
+      : (cfg.fleeAlertDifferentSpeciesChance ?? 0.10)
+    if (chance(probability) && alarmEnemy(target) && enemyIsVisibleOnMainView(target))
+      log(`${target.name} is alarmed by the fleeing ${sourceSpecies}.`, 'bad')
+  }
+
   function tryWoundedEnemyFlee(e, immediate = false) {
     if (!enemyIsFleeing(e)) return false
     const destination = enemyEscapeDestination(e)
@@ -3294,6 +3537,7 @@ more difficult:
     if (!destination) return false
     e.aware = !playerHiddenFromEnemy(e)
     if (!immediate && chance(0.10)) return true // Hesitation consumes the whole action.
+    if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     const fromX = e.x, fromY = e.y
     occupied.delete(keyXY(e.x, e.y))
     e.x = destination.x; e.y = destination.y
@@ -3301,6 +3545,7 @@ more difficult:
     e.farPath = null
     leaveBeastTrack(e, fromX, fromY)
     finishEnemyMove(e, fromX, fromY)
+    if (e.alive) alertDwarvenRuinsEnemiesFromFlee(e)
     return true
   }
 
@@ -3632,22 +3877,24 @@ more difficult:
     return true
   }
 
-  function killEnemy(e) {
+  function killEnemy(e, playerCredit = true) {
     if (!e.alive) return
-    recordStrongestEnemyKill(e)
-    const species = trackSpecies(e)
-    player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
-    if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
-    log(`You have slain the ${e.name}!`, 'good')
-    // Notify quest logic before removing the corpse. Recover-item quests
-    // must inspect the weapon/equipment the monster was carrying.
-    onOldHunterEnemyKilled(e)
+    if (playerCredit) {
+      recordStrongestEnemyKill(e)
+      const species = trackSpecies(e)
+      player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
+      if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
+      log(`You have slain the ${e.name}!`, 'good')
+      // Notify quest logic before removing the corpse. Recover-item quests
+      // must inspect the weapon/equipment the monster was carrying.
+      onOldHunterEnemyKilled(e)
+    } else log(`The ${e.name} is killed by a trap.`, 'info')
     e.alive = false
-    player.kills++
+    if (playerCredit) player.kills++
     spawnDeathAnim(e)
     occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
-    gainXp(xpForEnemy(e))
+    if (playerCredit) gainXp(xpForEnemy(e))
     if (e.stolenItem) {
       groundItems.push({x: e.x, y: e.y, level: e.level ?? currentZ,
         levelKind: e.levelKind || currentLevelKind(), caveIndex: e.caveIndex ?? currentCave,
@@ -4069,8 +4316,9 @@ more difficult:
       if (twice > -dy) { error -= dy; x += sx }
       if (twice < dx) { error += dx; y += sy }
       if (x === player.x && y === player.y) return true
-      if (map[y]?.[x] === 'cavewall' || map[y]?.[x] === 'dwarvenwall' ||
-        map[y]?.[x] === 'mountain' || map[y]?.[x] === 'snowmountain') return false
+      const sightTile = map[y]?.[x]
+      if (sightTile === 'cavewall' || sightTile === 'dwarvenwall' ||
+        sightTile === 'mountain' || sightTile === 'snowmountain' || TILE[sightTile]?.blocksSight === true) return false
     }
     return true
   }
@@ -4084,12 +4332,27 @@ more difficult:
     return tile === 'boulder' || tile === 'water'
   }
 
+  function enemyCanOpenDungeonDoor(e, x, y) {
+    return !!e?.humanoid && !enemyHasAbility(e, 'ethereal') &&
+      isClosedDungeonDoorTile(map[y]?.[x])
+  }
+
+  function enemyCanPathThrough(e, x, y) {
+    return enemyCanTraverse(e, x, y) || enemyCanOpenDungeonDoor(e, x, y)
+  }
+
+  function enemyOpenDoorInsteadOfMove(e, x, y) {
+    if (!enemyCanOpenDungeonDoor(e, x, y) || !openDungeonDoorAt(x, y)) return false
+    if (enemyIsVisibleOnMainView(e)) log(`The ${e.name} opens a dwarven door.`, 'info')
+    return true
+  }
+
   // How far outside the direct line the chase AI may detour to get around walls,
   // water, boulders or other monsters standing in the way.
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
 
   function enemyTileOpen(e, x, y) {
-    return enemyCanTraverse(e, x, y) && !occupied.has(keyXY(x, y)) && !(x === player.x && y === player.y)
+    return enemyCanPathThrough(e, x, y) && !occupied.has(keyXY(x, y)) && !(x === player.x && y === player.y)
   }
 
   function reactToInvisibleAttack(e, damage) {
@@ -4120,6 +4383,7 @@ more difficult:
       if (options.length) {
         const fromX = e.x, fromY = e.y
         const destination = pick(options)
+        if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return
         occupied.delete(keyXY(fromX, fromY))
         e.x = destination.x
         e.y = destination.y
@@ -4205,6 +4469,7 @@ more difficult:
     const step = enemyFindStep(e)
     if (!step) return false // genuinely boxed in
     if (enemyWanderMode(e) === 'far') e.farPath = null
+    if (enemyOpenDoorInsteadOfMove(e, step.x, step.y)) return true
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
     e.x = step.x
@@ -4338,7 +4603,7 @@ more difficult:
   function enemyFarCanTraverse(e, x, y, search) {
     const i = y * MAP_W + x
     if (!search.traversable[i])
-      search.traversable[i] = enemyCanTraverse(e, x, y) ? 1 : 2
+      search.traversable[i] = enemyCanPathThrough(e, x, y) ? 1 : 2
     return search.traversable[i] === 1
   }
 
@@ -4443,6 +4708,7 @@ more difficult:
       }
       if (!options.length) return false
       const destination = options[randInt(0, options.length - 1)]
+      if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
       occupied.delete(keyXY(e.x, e.y))
       const fromX = e.x, fromY = e.y
       e.x = destination.x
@@ -4459,7 +4725,7 @@ more difficult:
     }
 
     const targetValid = Number.isInteger(e.farTargetX) && Number.isInteger(e.farTargetY) &&
-      enemyCanTraverse(e, e.farTargetX, e.farTargetY)
+      enemyCanPathThrough(e, e.farTargetX, e.farTargetY)
     if (!targetValid || (e.x === e.farTargetX && e.y === e.farTargetY)) {
       e.farTargetX = null
       e.farTargetY = null
@@ -4486,6 +4752,7 @@ more difficult:
       if (!step || !enemyTileOpen(e, step.x, step.y)) return false
     }
     if (Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) !== 1) return false
+    if (enemyOpenDoorInsteadOfMove(e, step.x, step.y)) return true
 
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
@@ -4529,6 +4796,7 @@ more difficult:
       const pathHome = enemyBuildFarPath(e, e.homeX, e.homeY)
       const stepHome = pathHome && pathHome[0]
       if (stepHome && enemyTileOpen(e, stepHome.x, stepHome.y)) {
+        if (enemyOpenDoorInsteadOfMove(e, stepHome.x, stepHome.y)) return true
         occupied.delete(keyXY(e.x, e.y))
         const fromX = e.x, fromY = e.y
         e.x = stepHome.x
@@ -4548,13 +4816,14 @@ more difficult:
         if (leashed &&
           Math.max(Math.abs(nx - e.homeX), Math.abs(ny - e.homeY)) > homeRadius) continue
         if (nx === player.x && ny === player.y) continue
-        if (!enemyCanTraverse(e, nx, ny)) continue
+        if (!enemyCanPathThrough(e, nx, ny)) continue
         if (occupied.has(keyXY(nx, ny))) continue
         options.push({x: nx, y: ny})
       }
     }
     if (!options.length) return false
     const destination = options[randInt(0, options.length - 1)]
+    if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
     e.x = destination.x
@@ -4582,6 +4851,7 @@ more difficult:
     }
     const curDist = Math.max(Math.abs(e.x - spawnPoint.x), Math.abs(e.y - spawnPoint.y))
     if (!best || bestDist <= curDist) return false // boxed in or already fleeing correctly
+    if (enemyOpenDoorInsteadOfMove(e, best.x, best.y)) return true
     occupied.delete(keyXY(e.x, e.y))
     const fromX = e.x, fromY = e.y
     e.x = best.x
@@ -4714,7 +4984,9 @@ more difficult:
       if (!player.godMode) player.invisibleTurns--
       if (!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info')
     }
+    const turnMap = map
     for (const e of enemies.slice()) {
+      if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       if (enemyInsideSanctuary(e)) {
         if (!e.fleeingHoly && enemyIsVisibleOnMainView(e)) log(`The ${e.name} retreats from the sacred ground.`, 'info')
@@ -4812,7 +5084,7 @@ more difficult:
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
         if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
         let pursuitActions = hasExtraPursuitTurn ? 2 : 1
-        while (pursuitActions > 0) {
+        while (pursuitActions > 0 && e.alive && map === turnMap) {
           const distNow = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
           if (distNow <= ATTACK_RANGE) {
             if (enemyAttackPlayer(e)) return
@@ -4833,7 +5105,7 @@ more difficult:
         e.aware = false
         // A wander step can carry the enemy into its own aggro range, so re-check
         // straight away instead of leaving it oblivious until the next turn.
-        if ((enemyWanderMode(e) === 'far' || enemyIsOnScreen(e)) && enemyWander(e)) {
+        if ((enemyWanderMode(e) === 'far' || enemyIsOnScreen(e)) && enemyWander(e) && e.alive && map === turnMap && !deathTransition) {
           const distAfter = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
           if (rareStartFlee(e, distAfter)) {
             if (!rareFlee(e, distAfter) && distAfter <= ATTACK_RANGE && enemyAttackPlayer(e)) return
@@ -5586,6 +5858,11 @@ more difficult:
         log(`You pick up a Scroll of Invisibility.`, 'loot')
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
+      } else if (g.kind === 'dwarvenkey') {
+        addInventoryItem('dwarvenkey', {keyId: g.keyId})
+        log(`You pick up a Dwarven Key.`, 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
       }
     }
   }
@@ -5667,10 +5944,18 @@ more difficult:
     }
   }
 
+  function playerPathCanTraverse(x, y) {
+    if (DungeonTraps.isTrigger(map[y]?.[x])) return false
+    if (isWalkableForPlayer(x, y) || isClosedDungeonDoorTile(map[y]?.[x])) return true
+    // Auto-travel may spend a key it already carries, but it never starts
+    // noisy weapon breaching on the player's behalf.
+    return isLockedDungeonDoorTile(map[y]?.[x]) && !!matchingDungeonKeyAt(x, y)
+  }
+
   function findPlayerPath(targetX, targetY) {
     if (targetX < 0 || targetY < 0 || targetX >= MAP_W || targetY >= MAP_H) return null
     if (currentZ < 0 && !undergroundDiscovered?.[targetY]?.[targetX]) return null
-    if (!isWalkableForPlayer(targetX, targetY)) return null
+    if (!playerPathCanTraverse(targetX, targetY)) return null
     if (targetX === player.x && targetY === player.y) return []
     const queue = [{x: player.x, y: player.y}]
     const cameFrom = new Map()
@@ -5686,7 +5971,7 @@ more difficult:
         const nx = cur.x + dx, ny = cur.y + dy
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
         if (currentZ < 0 && !undergroundDiscovered?.[ny]?.[nx]) continue
-        if (!isWalkableForPlayer(nx, ny)) continue
+        if (!playerPathCanTraverse(nx, ny)) continue
         const nk = keyXY(nx, ny)
         if (cameFrom.has(nk)) continue
         if ((nx !== targetX || ny !== targetY) && occupied.has(nk)) continue
@@ -5842,9 +6127,81 @@ more difficult:
     }
     let moved = false
     const fromPos = {x: player.x, y: player.y}
+    if (map[ny]?.[nx] === 'dwarvenlever' && activateDwarvenLiftLeverAt(nx, ny)) return
+    if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
+      if (openDungeonDoorAt(nx, ny)) {
+        consecutiveWaitTurns = 0
+        log('You open the dwarven door.', 'info')
+        // Auto-travel already shifted this step before tryMove(). Reinsert the
+        // now-open doorway so the next action actually moves through it.
+        if (autoPath) autoPath.unshift({x: nx, y: ny})
+        enemyTurn()
+        npcTurn()
+        updateHud()
+        render()
+        runAnimationLoop()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
+    }
+    if (isLockedDungeonDoorTile(map[ny]?.[nx])) {
+      const lockInfo = DUNGEON_LOCK_STATE[map[ny][nx]]
+      const keyed = matchingDungeonKeyAt(nx, ny)
+      if (keyed) {
+        const opened = openDungeonLockWithKeyAt(nx, ny)
+        if (opened) {
+          consecutiveWaitTurns = 0
+          log(lockInfo.kind === 'gate'
+            ? 'The Dwarven Key turns in the old lock. You unlock and open the gate.'
+            : 'The Dwarven Key turns in the old lock. You unlock and open the door.', 'info')
+          if (autoPath) autoPath.unshift({x: nx, y: ny})
+          enemyTurn()
+          npcTurn()
+          updateHud()
+          render()
+          runAnimationLoop()
+          updateTooltip()
+          flushPendingMove()
+          return
+        }
+      }
+      clearAutoPath()
+      if (!lockInfo.breachable) {
+        log('The dwarven gate is locked. It cannot be breached; you need its key.', 'info')
+        render()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
+      const weapon = player.equip.weapon
+      if (!weapon || weapon.kind !== 'weapon') {
+        log('The locked dwarven door will not yield to bare fists. You need a weapon to breach it.', 'info')
+        render()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
+      consecutiveWaitTurns = 0
+      const breach = breachDungeonDoorAt(nx, ny)
+      if (breach.success)
+        log(`You smash through the locked dwarven door with your ${weapon.name}.`, 'good')
+      else
+        log(`You strike the locked dwarven door with your ${weapon.name}, but it holds.`, 'info')
+      enemyTurn()
+      npcTurn()
+      updateHud()
+      render()
+      runAnimationLoop()
+      updateTooltip()
+      flushPendingMove()
+      return
+    }
     if (isWalkableForPlayer(nx, ny)) {
       player.x = nx
       player.y = ny
+      DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
+      if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       completeFishermanLesson(fromPos)
       advanceSwimming(true, fromPos)
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
@@ -5885,6 +6242,12 @@ more difficult:
           log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
         } else if (onto === 'dwarvenfortexit') {
           log('You stand at the Dwarven Fort exit. Press "inspect" to climb out through the gates.', 'info')
+        } else if (onto === 'dwarvenstairsdown') {
+          log('A broad dwarven stair descends into the ruined settlement below. Press "inspect" to descend.', 'info')
+        } else if (onto === 'dwarvenstairsup') {
+          log('A broad dwarven stair leads back toward the upper ruins. Press "inspect" to climb up.', 'info')
+        } else if (onto === 'dwarvenminessealed') {
+          log('A collapsed work stair continues toward the old Deep Mines. Press "inspect" to examine it.', 'info')
         } else if (onto === 'caveup') {
           log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
         } else if (onto === 'cryptstairsdown') {
@@ -6422,7 +6785,7 @@ more difficult:
   function tileBackground(x, y, tileKey) {
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
-    if (currentZ < 0 && (tileKey === 'dwarvengate' || tileKey === 'dwarvenfortexit')) return TILE.marble.bg
+    if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
     const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
     if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return RENDER_STYLE.specialTiles.dugSand.bg
@@ -6475,6 +6838,20 @@ more difficult:
   // drawing the scene crosses a terrain-frame boundary on a slower device.
   let visualFrameTime = null
 
+  const subImageCache = new WeakMap()
+  function resolveSubImage(image, rect) {
+    let variants = subImageCache.get(image)
+    if (!variants) { variants = new Map(); subImageCache.set(image, variants) }
+    const key = rect.join(',')
+    if (!variants.has(key)) {
+      const sprite = document.createElement('canvas')
+      sprite.width = rect[2]; sprite.height = rect[3]
+      sprite.getContext('2d').drawImage(image, ...rect, 0, 0, rect[2], rect[3])
+      variants.set(key, sprite)
+    }
+    return variants.get(key)
+  }
+
   function resolveVisualImage(visual) {
     if (!USE_TILE_IMAGES) return null
     if (!visual) return null
@@ -6484,7 +6861,10 @@ more difficult:
       const frameImage = preloadedImages.get(visual.frames[frameIndex]) || null
       if (frameImage) return frameImage
     }
-    if (visual?.image) return preloadedImages.get(visual.image) || null
+    if (visual?.image) {
+      const image = preloadedImages.get(visual.image) || null
+      return image && visual.sourceRect ? resolveSubImage(image, visual.sourceRect) : image
+    }
     return null
   }
 
@@ -6636,7 +7016,7 @@ more difficult:
     ].filter(Boolean)
 
     // Underground entrances/exits use dungeon floors, never a surface fallback.
-    if (tileKey === 'dwarvenfortexit' && currentZ < 0) return 'marble'
+    if (currentZ < 0 && ['dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return 'marble'
     if (tileKey === 'caveup' || tileKey === 'cavedown' || tileKey === 'caveentrance') {
       if (currentZ < 0) return currentZ === -1 ? 'cavefloor' : 'cavefloor2'
     }
@@ -7024,6 +7404,8 @@ more difficult:
   // Enemies slide between tiles using the same easing/duration as the player's
   // camera pan, so a turn reads as one continuous motion rather than a snap.
   function finishEnemyMove(e, fromX, fromY) {
+    DungeonTraps.onEntry(e, fromX, fromY)
+    if (!e.alive) return
     if (enemyWanderMode(e) === 'far') {
       e.farPrevX = fromX
       e.farPrevY = fromY
@@ -8380,7 +8762,7 @@ more difficult:
   function currentMapViewKey() {
     if (currentZ === 0) return 'surface'
     if (currentLevelKind() === 'crypt2') return 'crypt2'
-    return `chain:${CHAIN_DEPTH_BY_Z[currentZ]}`
+    return `chain:${chainDepthForZ(currentZ)}`
   }
 
   function exploredMapLevels() {
@@ -8389,9 +8771,12 @@ more difficult:
       {key: 'chain:1', label: 'Caves (−1)', z: -1, terrain: undergroundMap, seen: undergroundDiscoveredL1}
     ]
     for (let i = 0; i < deepLevels.length; i++) {
-      const z = CHAIN_Z_BY_DEPTH[i + 1]
-      if (z === undefined) continue
-      levels.push({key: `chain:${i + 2}`, label: `${z === -2 ? 'Caves' : 'Depth'} (${z})`, z,
+      const depth = i + 2
+      const z = chainZForDepth(depth)
+      const label = i === 0 ? `Caves (${z})`
+        : i === 1 ? `Dwarven Fort (${z})`
+          : `Dwarven Ruins ${i - 1} (${z})`
+      levels.push({key: `chain:${depth}`, label, z,
         terrain: deepLevels[i].map, seen: deepLevels[i].discovered})
       if (z === -2 && cryptLevel2) levels.push({key: 'crypt2', label: 'Crypt (−2)', z: -2,
         terrain: cryptLevel2.map, seen: cryptLevel2.discovered})
@@ -10401,6 +10786,8 @@ more difficult:
     spawnRemoteHighTierChests()
     spawnGroundStuff()
     spawnCaveScenarios()
+    spawnDwarvenRuinsEncounters()
+    spawnDwarvenRuinsChests()
     ensureUndergroundVampire()
     spawnNpcs()
     clearGroundItemsUnderMerchant()

@@ -313,5 +313,20 @@
       }
     ],
     "baseValue": 0
+  },
+  "dwarvenkey": {
+    "name": "Dwarven Key",
+    "icon": "img/icons/dwarven-key.svg",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "?",
+        "handler": "inspect"
+      }
+    ],
+    "description": "A heavy iron key cut for one of the old locks beneath the Dwarven Fort.",
+    "baseValue": 0
   }
 }

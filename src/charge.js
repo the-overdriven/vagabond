@@ -24,6 +24,8 @@ function forcePlayerPosition(x, y) {
   const from = {x: player.x, y: player.y}
   clearAutoPath()
   player.x = x; player.y = y
+  DungeonTraps.onEntry(player, from.x, from.y)
+  if (player.hp <= 0 || deathTransition) return
   // Forced movement spends water endurance, but never earns swimming practice.
   advanceSwimming(false, from)
   if (player.hp <= 0 || deathTransition) return

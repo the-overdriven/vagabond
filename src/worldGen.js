@@ -56,16 +56,31 @@ let undergroundDiscoveredL1 = [] // z:-1 discovery grid (storage)
 // crypt's dedicated second map. Map identity, not the z number, keeps those
 // two maps separate. Each entry: {map, caveMaps, caves, discovered}.
 let deepLevels = []
+let dwarvenRuinsLift = null // persistent paired D1/deeper shortcut metadata
 let undergroundDiscovered = [] // ACTIVE underground discovery grid, swapped on every level transition
 let currentZ = 0
 let currentCave = -1
 
-// The generic cavedown/caveup chain follows the actual underground depth:
-// depth 1 = z:-1, depth 2 = z:-2, depth 3 = z:-3. The crypt's dedicated
-// second map also uses z:-2, but is identified by its map type when active.
-const CHAIN_Z_BY_DEPTH = [-1, -2, -3]
-const CHAIN_DEPTH_BY_Z = {[-1]: 1, [-2]: 2, [-3]: 3}
-// depth here means "chain position below the surface": 1 = z:-1, 2 = z:-2, 3 = z:-3.
+// The generic underground chain uses its actual depth as z:
+// depth 1 = z:-1, depth 2 = z:-2, depth 3 = z:-3, and so on.
+// The crypt's dedicated second map also uses z:-2, but map identity keeps it
+// separate from the generic chain.
+function chainZForDepth(depth) {
+  return Number.isInteger(depth) && depth > 0 ? -depth : null
+}
+function chainDepthForZ(z) {
+  return Number.isInteger(z) && z < 0 ? -z : null
+}
+
+// Dungeon lock IDs are derived from immutable map identity plus the sorted
+// physical leaves of the doorway. Keys can therefore persist as ordinary
+// inventory/ground-item data without a parallel lock registry.
+function dwarvenDungeonLockId(level, kind, leaves) {
+  const points = (leaves || []).map(p => ({x: p.x, y: p.y}))
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+  return `dwarven:${level}:${kind}:${points.map(p => `${p.x},${p.y}`).join('|')}`
+}
+// depth means "chain position below the surface": 1 = z:-1, 2 = z:-2, etc.
 
 /* Entrance flavor is loaded from content/dwarven_ruin_entrances.json. */
 let villageHuts = []
@@ -637,6 +652,7 @@ function carveShallowCave(cm, spot, style) {
 }
 
 function generateCaves() {
+  dwarvenRuinsLift = null
   const cfg = WORLD_GEN_CONFIG.caves.shallow
   cryptCaveExclusionCenter = null
   for (let y = 1; y < MAP_H - 1 && !cryptCaveExclusionCenter; y++) for (let x = 1; x < MAP_W - 1; x++) {
@@ -751,6 +767,7 @@ function generateCaves() {
   const fortTooClose = dwarvenRuin && caves.some(c => !c.crypt && (c.entrances || []).some(e =>
     Math.max(Math.abs(e.x - dwarvenRuin.x), Math.abs(e.y - dwarvenRuin.y)) <= 15))
   if (fortTooClose) return false
+  if (!buildDwarvenRuinsStratum()) return false
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
@@ -1302,6 +1319,456 @@ function buildDwarvenRuin(targetLevel) {
       description: 'The bones are laid where the collapse caught them.'
     })
   }
+
+}
+
+function dungeonWalkDistances(cm, start, blocked = null) {
+  const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+  const distances = new Map()
+  const queue = [{x: start.x, y: start.y}]
+  distances.set(keyXY(start.x, start.y), 0)
+  for (let qi = 0; qi < queue.length; qi++) {
+    const p = queue[qi], nextDistance = distances.get(keyXY(p.x, p.y)) + 1
+    for (const [dx, dy] of DIRS4) {
+      const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || distances.has(key) || blocked?.has(key)) continue
+      if (!TILE[cm[y]?.[x]]?.walk) continue
+      distances.set(key, nextDistance)
+      queue.push({x, y})
+    }
+  }
+  return distances
+}
+
+function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
+  const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout
+  const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+  const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+  const boundsX = randInt(cfg.boundsXRange[0], cfg.boundsXRange[1])
+  const boundsY = randInt(cfg.boundsYRange[0], cfg.boundsYRange[1])
+  const minX = Math.max(2, entry.x - boundsX), maxX = Math.min(MAP_W - 3, entry.x + boundsX)
+  const minY = Math.max(2, entry.y - boundsY), maxY = Math.min(MAP_H - 3, entry.y + boundsY)
+  const cm = blankCaveMap()
+
+  const carve = (x, y) => {
+    if (x >= minX && x <= maxX && y >= minY && y <= maxY) cm[y][x] = 'marble'
+  }
+  const carveWide = (x, y, width = 2) => {
+    const span = Math.max(2, width)
+    for (let dy = 0; dy < span; dy++) for (let dx = 0; dx < span; dx++) {
+      carve(x + dx - Math.floor(span / 2), y + dy - Math.floor(span / 2))
+    }
+  }
+  const rooms = []
+  const doorways = []
+  const [entranceW, entranceH] = cfg.entranceRoomSize
+  rooms.push({
+    x: Math.max(minX + 1, Math.min(maxX - entranceW, entry.x - Math.floor(entranceW / 2))),
+    y: Math.max(minY + 1, Math.min(maxY - entranceH, entry.y - Math.floor(entranceH / 2))),
+    w: entranceW, h: entranceH, cx: entry.x, cy: entry.y
+  })
+  const roomCount = randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
+  for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts; attempt++) {
+    const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1])
+    const h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
+    const minRoomX = minX + cfg.roomBoundsMargin
+    const maxRoomX = maxX - w - cfg.roomBoundsMargin
+    const minRoomY = minY + cfg.roomBoundsMargin
+    const maxRoomY = maxY - h - cfg.roomBoundsMargin
+    if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
+    const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
+    const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
+    if (rooms.every(r => candidate.x > r.x + r.w + cfg.roomSeparation ||
+      candidate.x + candidate.w + cfg.roomSeparation < r.x ||
+      candidate.y > r.y + r.h + cfg.roomSeparation ||
+      candidate.y + candidate.h + cfg.roomSeparation < r.y)) rooms.push(candidate)
+  }
+  if (rooms.length < 3) return null
+
+  for (const r of rooms) {
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) carve(x, y)
+  }
+
+  const connected = [rooms[0]]
+  const parentByRoom = new Map()
+  while (connected.length < rooms.length) {
+    let best = null
+    for (const r of rooms) {
+      if (connected.includes(r)) continue
+      for (const c of connected) {
+        const d = Math.abs(r.cx - c.cx) + Math.abs(r.cy - c.cy)
+        if (!best || d < best.d) best = {r, c, d}
+      }
+    }
+    if (!best) return null
+    const {r, c} = best
+    parentByRoom.set(r, c)
+    const corridor = (x1, y1, x2, y2) => {
+      const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
+      while (x1 !== x2) {
+        carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
+        x1 += sx
+      }
+      while (y1 !== y2) {
+        carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
+        y1 += sy
+      }
+      carveWide(x2, y2, 2)
+    }
+    if (chance(cfg.corridorHorizontalFirstChance)) {
+      corridor(c.cx, c.cy, r.cx, c.cy)
+      corridor(r.cx, c.cy, r.cx, r.cy)
+    } else {
+      corridor(c.cx, c.cy, c.cx, r.cy)
+      corridor(c.cx, r.cy, r.cx, r.cy)
+    }
+    connected.push(r)
+  }
+
+  // The entrance room stays open. Find the actual corridor crossing each
+  // child's perimeter; center-to-center direction alone can point at a wall.
+  for (let i = 1; i < rooms.length; i++) {
+    const r = rooms[i], parent = parentByRoom.get(r) || rooms[0]
+    const candidates = []
+    for (const side of ['left', 'right', 'top', 'bottom']) {
+      const vertical = side === 'left' || side === 'right'
+      const fixed = side === 'left' ? r.x : side === 'right' ? r.x + r.w - 1 :
+        side === 'top' ? r.y : r.y + r.h - 1
+      const from = vertical ? r.y + 1 : r.x + 1
+      const to = vertical ? r.y + r.h - 3 : r.x + r.w - 3
+      const outward = side === 'left' || side === 'top' ? -1 : 1
+      for (let offset = from; offset <= to; offset++) {
+        const leaves = [offset, offset + 1].map(v => vertical ? {x: fixed, y: v} : {x: v, y: fixed})
+        const outside = leaves.map(p => vertical ? {x: p.x + outward, y: p.y} : {x: p.x, y: p.y + outward})
+        const inside = leaves.map(p => vertical ? {x: p.x - outward, y: p.y} : {x: p.x, y: p.y - outward})
+        if (!outside.every(p => cm[p.y]?.[p.x] === 'marble') ||
+            !inside.every(p => cm[p.y]?.[p.x] === 'marble')) continue
+        const centerOffset = vertical ? r.cy : r.cx
+        const parentFacing = side === 'left' ? parent.cx < r.cx :
+          side === 'right' ? parent.cx > r.cx :
+          side === 'top' ? parent.cy < r.cy : parent.cy > r.cy
+        candidates.push({leaves, score: (parentFacing ? 100 : 0) - Math.abs(offset - centerOffset)})
+      }
+    }
+    if (!candidates.length) return null
+    candidates.sort((a, b) => b.score - a.score)
+    const doorway = candidates[0].leaves
+    for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
+      if (xx === r.x || xx === r.x + r.w - 1 || yy === r.y || yy === r.y + r.h - 1) cm[yy][xx] = 'dwarvenwall'
+    }
+    for (const p of doorway) cm[p.y][p.x] = 'marble'
+    doorways.push({leaves: doorway, room: r})
+  }
+
+  for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+    if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
+  }
+  cm[entry.y][entry.x] = 'dwarvenstairsup'
+
+  const collapseAttempts = randInt(cfg.collapseAttemptsRange[0], cfg.collapseAttemptsRange[1])
+  for (let i = 0; i < collapseAttempts; i++) {
+    const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
+    if (cm[y][x] !== 'marble') continue
+    if (Math.abs(x - entry.x) + Math.abs(y - entry.y) <= cfg.collapseMinEntranceDistance) continue
+    cm[y][x] = chance(cfg.rubbleChance) ? 'dwarvenrubble' : 'dwarvenwall'
+  }
+
+  // Repair any collapse/wall combination that detached an outer walkable tile.
+  const reachable = () => dungeonWalkDistances(cm, entry)
+  const outerTiles = []
+  for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+    if (!TILE[cm[y]?.[x]]?.walk) continue
+    if (DIRS4.some(([dx, dy]) => !TILE[cm[y + dy]?.[x + dx]]?.walk)) outerTiles.push({x, y})
+  }
+  let distances = reachable()
+  for (const tile of outerTiles) {
+    if (distances.has(keyXY(tile.x, tile.y))) continue
+    let best = null
+    for (const [key, distance] of distances.entries()) {
+      const [rx, ry] = key.split(',').map(Number)
+      const d = Math.abs(rx - tile.x) + Math.abs(ry - tile.y)
+      if (!best || d < best.d) best = {x: rx, y: ry, d, distance}
+    }
+    if (!best) return null
+    let cx = tile.x, cy = tile.y
+    const repair = (x, y) => {
+      carve(x, y); carve(x + 1, y); carve(x, y + 1); carve(x + 1, y + 1)
+    }
+    while (cx !== best.x) { repair(cx, cy); cx += Math.sign(best.x - cx) }
+    while (cy !== best.y) { repair(cx, cy); cy += Math.sign(best.y - cy) }
+    repair(best.x, best.y)
+    cm[entry.y][entry.x] = 'dwarvenstairsup'
+    distances = reachable()
+  }
+
+  const minimumDistance = cfg.minimumEntranceExitGraphDistance
+  const exitCandidates = []
+  for (const [key, distance] of distances.entries()) {
+    if (distance < minimumDistance) continue
+    const [x, y] = key.split(',').map(Number)
+    if (cm[y]?.[x] !== 'marble') continue
+    exitCandidates.push({x, y, distance})
+  }
+  if (!exitCandidates.length) return null
+
+  // Prefer the far end of the valid range so the mandatory route cannot
+  // collapse into a technically valid but trivial short floor.
+  const maxDistance = Math.max(...exitCandidates.map(p => p.distance))
+  const farCandidates = exitCandidates.filter(p => p.distance >= Math.max(minimumDistance, maxDistance - cfg.exitFarCandidateBand))
+  const exit = pick(farCandidates)
+  const finalFloor = floorIndex === floorCount - 1
+  cm[exit.y][exit.x] = finalFloor ? 'dwarvenminessealed' : 'dwarvenstairsdown'
+
+  const doorCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors || {}
+  const floorZ = chainZForDepth(floorIndex + 4)
+
+  // Every Ruins floor has one mandatory progression gate on a two-tile room
+  // entrance that genuinely separates the entrance side from the deeper exit.
+  // Blocking both leaves and recomputing reachability makes the gate structural,
+  // rather than decorative: there must be no alternate corridor around it.
+  const structuralDoors = []
+  for (const {leaves: doorway, room} of doorways) {
+    if (doorway.length !== 2 || doorway.some(p => cm[p.y]?.[p.x] !== 'marble')) continue
+    const blocked = new Set(doorway.map(p => keyXY(p.x, p.y)))
+    const interior = {x: room.cx, y: room.cy}
+    if (!dungeonWalkDistances(cm, entry).has(keyXY(interior.x, interior.y))) continue
+    const after = dungeonWalkDistances(cm, entry, blocked)
+    if (after.has(keyXY(interior.x, interior.y))) continue
+    structuralDoors.push({leaves: doorway, room,
+      blocksExit: !after.has(keyXY(exit.x, exit.y))})
+  }
+  const gateCandidates = structuralDoors.filter(d => d.blocksExit).map(d => d.leaves)
+  if (!gateCandidates.length) return null
+  const gateDoorway = pick(gateCandidates)
+  const gateKeyId = dwarvenDungeonLockId(floorZ, 'gate', gateDoorway)
+  const gatePreBreached = chance(doorCfg.progressionGatePreBreachedChance ?? 0)
+  for (const p of gateDoorway) cm[p.y][p.x] = gatePreBreached ? 'dwarvengatebreached' : 'dwarvengatelocked'
+
+  // An intact mandatory gate receives exactly one matching key on the
+  // entrance-side component. The gate is already non-walkable here, so this
+  // cannot place its key beyond itself or create a self-locking progression.
+  let progressionKey = null
+  if (!gatePreBreached) {
+    const keyDistances = dungeonWalkDistances(cm, entry)
+    const candidates = []
+    for (const [key, distance] of keyDistances.entries()) {
+      if (distance <= 0) continue
+      const [x, y] = key.split(',').map(Number)
+      if (cm[y]?.[x] !== 'marble') continue
+      if (x === exit.x && y === exit.y) continue
+      if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
+      candidates.push({x, y})
+    }
+    if (!candidates.length) return null
+    const spot = pick(candidates)
+    progressionKey = {x: spot.x, y: spot.y, keyId: gateKeyId}
+  }
+
+  // Ordinary doors roll once per physical two-leaf doorway. If that doorway
+  // becomes locked, both leaves share the same derived lock ID so the player
+  // cannot bypass the lock by using the adjacent leaf.
+  const doorChance = doorCfg.ordinaryDoorChance ?? 0
+  const lockedDoorChance = doorCfg.ordinaryLockedDoorChance ?? 0
+  const ordinaryLocks = []
+  for (const {leaves: doorway} of structuralDoors) {
+    if (doorway === gateDoorway) continue
+    if (!chance(doorChance)) continue
+    if (doorway.length !== 2 || doorway.some(p => cm[p.y]?.[p.x] !== 'marble')) continue
+    const locked = chance(lockedDoorChance)
+    for (const p of doorway) cm[p.y][p.x] = locked ? 'dwarvendoorlocked' : 'dwarvendoorclosed'
+    if (locked) ordinaryLocks.push({
+      leaves: doorway.map(p => ({x: p.x, y: p.y})),
+      keyId: dwarvenDungeonLockId(floorZ, 'door', doorway)
+    })
+  }
+
+  // Ordinary lock keys are chosen only from the component reachable from the
+  // floor entrance while *all* generated locks remain closed. This prevents a
+  // key from spawning behind its own door or behind another locked doorway,
+  // eliminating circular key dependencies.
+  const ordinaryKeys = []
+  if (ordinaryLocks.length) {
+    const reachable = dungeonWalkDistances(cm, entry)
+    const reservedKeys = new Set()
+    const candidates = []
+    for (const [key, distance] of reachable.entries()) {
+      if (distance <= 0) continue
+      const [x, y] = key.split(',').map(Number)
+      if (cm[y]?.[x] !== 'marble') continue
+      if (x === exit.x && y === exit.y) continue
+      if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
+      candidates.push({x, y})
+    }
+    if (candidates.length < ordinaryLocks.length) return null
+    for (const lock of ordinaryLocks) {
+      const available = candidates.filter(p => !reservedKeys.has(keyXY(p.x, p.y)))
+      if (!available.length) return null
+      const spot = pick(available)
+      reservedKeys.add(keyXY(spot.x, spot.y))
+      ordinaryKeys.push({x: spot.x, y: spot.y, keyId: lock.keyId})
+    }
+  }
+
+  const progress = floorCount <= 1 ? 1 : floorIndex / (floorCount - 1)
+  const descriptor = {
+    x: entry.x,
+    y: entry.y,
+    entrances: [{x: entry.x, y: entry.y}, {x: exit.x, y: exit.y}],
+    dwarvenRuins: true,
+    dungeonFloor: floorIndex + 1,
+    floorCount,
+    progress
+  }
+  const discovered = Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
+  return {
+    map: cm,
+    caveMaps: [cm],
+    caves: [descriptor],
+    discovered,
+    kind: 'dwarvenRuins',
+    dungeonFloor: floorIndex + 1,
+    floorCount,
+    progress,
+    progressionKey,
+    ordinaryKeys,
+    // Only needed during world creation; actors themselves persist in saves.
+    _encounterRooms: rooms.map(r => ({x:r.x,y:r.y,w:r.w,h:r.h,cx:r.cx,cy:r.cy})),
+    _doorways: structuralDoors.map(d => ({leaves: d.leaves, room: {x:d.room.cx,y:d.room.cy}}))
+  }
+}
+
+function placeDwarvenRuinsFortDescent() {
+  const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout
+  const fort = deepLevels[1]
+  if (!fort || !dwarvenRuin || dwarvenRuin.caveIndex < 0) return null
+  const distances = dungeonWalkDistances(fort.map, dwarvenRuin)
+  const candidates = []
+  for (const [key, distance] of distances.entries()) {
+    if (distance < cfg.minimumEntranceExitGraphDistance) continue
+    const [x, y] = key.split(',').map(Number)
+    if (fort.map[y]?.[x] !== 'marble') continue
+    if (enemies.some(e => e.alive && e.level === -3 && e.x === x && e.y === y)) continue
+    if (groundItems.some(g => (g.level ?? 0) === -3 && g.x === x && g.y === y)) continue
+    candidates.push({x, y, distance})
+  }
+  if (!candidates.length) return null
+  const maxDistance = Math.max(...candidates.map(p => p.distance))
+  const far = candidates.filter(p => p.distance >= Math.max(cfg.minimumEntranceExitGraphDistance, maxDistance - cfg.exitFarCandidateBand))
+  const stair = pick(far)
+  fort.map[stair.y][stair.x] = 'dwarvenstairsdown'
+  const local = fort.caveMaps[dwarvenRuin.caveIndex]
+  if (local?.[stair.y]) local[stair.y][stair.x] = 'dwarvenstairsdown'
+  return {x: stair.x, y: stair.y}
+}
+
+function placeDwarvenRuinsLift(levelCount) {
+  const shortcutCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.shortcut || {}
+  const progressRange = shortcutCfg.targetFloorProgressRange || [0.5, 1]
+  if (levelCount < 2 || !deepLevels[2]) return false
+
+  const minFloor = Math.max(2, Math.min(levelCount, Math.ceil(levelCount * progressRange[0])))
+  const maxFloor = Math.max(minFloor, Math.min(levelCount, Math.ceil(levelCount * progressRange[1])))
+  const targetFloor = randInt(minFloor, maxFloor)
+  const upperIndex = 2
+  const lowerIndex = targetFloor + 1
+  const upperLevel = deepLevels[upperIndex]
+  const lowerLevel = deepLevels[lowerIndex]
+  if (!upperLevel || !lowerLevel) return false
+
+  const occupiedGround = (z) => new Set(groundItems.filter(g => (g.level ?? 0) === z).map(g => keyXY(g.x, g.y)))
+  const upperZ = chainZForDepth(4)
+  const lowerZ = chainZForDepth(targetFloor + 3)
+  const upperGround = occupiedGround(upperZ)
+  const lowerGround = occupiedGround(lowerZ)
+
+  const endpointCandidates = (level, ground, requireWall, reachable = null) => {
+    const out = []
+    for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+      if (level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y))) continue
+      if (reachable && !reachable.has(keyXY(x, y))) continue
+      const wallNeighbors = [[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
+        .filter(p => level.map[p.y]?.[p.x] === 'dwarvenwall')
+      if (requireWall && !wallNeighbors.length) continue
+      out.push({x, y, wallNeighbors})
+    }
+    return out
+  }
+
+  // The upper platform belongs on the entrance side of D1's intact locks so
+  // the unlocked lift is a true shortcut back toward the Fort, not a landing
+  // point stranded behind D1's progression gate.
+  const upperReachable = dungeonWalkDistances(upperLevel.map, upperLevel.caves[0].entrances[0])
+  const upperCandidates = endpointCandidates(upperLevel, upperGround, false, upperReachable)
+  const lowerCandidates = endpointCandidates(lowerLevel, lowerGround, true)
+  if (!upperCandidates.length || !lowerCandidates.length) return false
+  const upper = pick(upperCandidates)
+  const lower = pick(lowerCandidates)
+  const lever = pick(lower.wallNeighbors)
+
+  upperLevel.map[upper.y][upper.x] = 'dwarvenliftoff'
+  lowerLevel.map[lower.y][lower.x] = 'dwarvenliftoff'
+  lowerLevel.map[lever.y][lever.x] = 'dwarvenlever'
+  dwarvenRuinsLift = {
+    id: 'dwarven-ruins-lift-1',
+    unlocked: false,
+    upper: {floor: 1, z: upperZ, x: upper.x, y: upper.y},
+    lower: {floor: targetFloor, z: lowerZ, x: lower.x, y: lower.y},
+    lever: {z: lowerZ, x: lever.x, y: lever.y}
+  }
+  return true
+}
+
+function buildDwarvenRuinsStratum() {
+  const cfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins
+  if (!cfg || !deepLevels[1]) return false
+  deepLevels[0].kind = 'caves'
+  deepLevels[1].kind = 'dwarvenFort'
+  deepLevels[1].dungeonFloor = 0
+  deepLevels[1].progress = 0
+
+  const levelCount = randInt(cfg.levelCountRange[0], cfg.levelCountRange[1])
+  let entry = placeDwarvenRuinsFortDescent()
+  if (!entry) return false
+  for (let floorIndex = 0; floorIndex < levelCount; floorIndex++) {
+    let level = null
+    for (let attempt = 0; attempt < cfg.floorGenerationRetries && !level; attempt++) {
+      level = createDwarvenRuinsFloor(entry, floorIndex, levelCount)
+    }
+    if (!level) return false
+    deepLevels.push(level)
+    if (level.progressionKey) {
+      groundItems.push({
+        x: level.progressionKey.x,
+        y: level.progressionKey.y,
+        level: chainZForDepth(floorIndex + 4),
+        levelKind: 'chain',
+        caveIndex: -1,
+        kind: 'dwarvenkey',
+        keyId: level.progressionKey.keyId,
+        progressionKey: true
+      })
+    }
+    for (const ordinaryKey of level.ordinaryKeys || []) {
+      groundItems.push({
+        x: ordinaryKey.x,
+        y: ordinaryKey.y,
+        level: chainZForDepth(floorIndex + 4),
+        levelKind: 'chain',
+        caveIndex: -1,
+        kind: 'dwarvenkey',
+        keyId: ordinaryKey.keyId,
+        ordinaryDoorKey: true
+      })
+    }
+    const descriptor = level.caves[0]
+    if (floorIndex < levelCount - 1) {
+      const down = descriptor.entrances[1]
+      entry = {x: down.x, y: down.y}
+    }
+  }
+  if (!placeDwarvenRuinsLift(levelCount)) return false
+  DungeonTraps.generate()
+  return true
 }
 
 // Organic grotto chambers and winding passages, using the world seed.
@@ -2518,6 +2985,276 @@ function spawnCaveScenarios() {
         homeTileType: site.floorTile, alive: true, prefix: null, equipment: null
       })
       fungusCount++
+    }
+  }
+}
+
+function dwarvenRuinsEncounterTemplatesForDepth(z, cfg) {
+  const depth = Math.abs(z)
+  return ENEMY_TEMPLATES.filter(tmpl => {
+    const minDepth = Number(cfg.minDepthByTier?.[String(tmpl.tier)])
+    if (!Number.isFinite(minDepth) || depth < minDepth) return false
+    if ((tmpl.aggro ?? AGGRO_RANGE) <= 0) return false
+    const biomes = tmpl.biomes || []
+    const explicitDepths = biomes
+      .map(b => typeof b === 'string' && /^z-\d+$/.test(b) ? Math.abs(Number(b.slice(1))) : null)
+      .filter(Number.isFinite)
+    // Ruins eligibility is content-driven: native cave species are eligible by
+    // tier depth, while surface species must opt in with a z-* tag. This keeps
+    // biome-specific surface fauna (lions, crabs, nymphs, etc.) out of the hold.
+    if (!biomes.includes('cave') && !explicitDepths.length) return false
+    if (explicitDepths.length && depth < Math.min(...explicitDepths)) return false
+    return true
+  })
+}
+
+function spawnDwarvenRuinsEncounters() {
+  const cfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.encounters
+  if (!cfg) return
+  const ruins = deepLevels.slice(2).filter(level => level?.kind === 'dwarvenRuins')
+  if (!ruins.length) return
+
+  const growthMin = cfg.densityGrowthRange?.[0] ?? 0.10
+  const growthMax = cfg.densityGrowthRange?.[1] ?? growthMin
+  // One seeded growth rate per stratum keeps later floors monotonically denser
+  // instead of letting independent rolls make a deeper floor unexpectedly sparser.
+  const densityGrowth = growthMin + rng() * Math.max(0, growthMax - growthMin)
+  const prefixNames = Object.keys(ENEMY_PREFIXES).filter(name => name !== 'Champion')
+  const cutoff = cfg.dominantRarityCutoff ?? 0.1
+  const minSpacing = Math.max(1, cfg.minSpacing ?? 3)
+  const entranceClearance = Math.max(0, cfg.entranceClearance ?? 8)
+
+  const weightedWithoutReplacement = (pool, count) => {
+    const available = pool.slice()
+    const chosen = []
+    while (available.length && chosen.length < count) {
+      const pickTmpl = pickWeighted(available, tmpl => Math.max(0.0001, tmpl.rarity ?? 1))
+      chosen.push(pickTmpl)
+      available.splice(available.indexOf(pickTmpl), 1)
+    }
+    return chosen
+  }
+
+  for (let floorIndex = 0; floorIndex < ruins.length; floorIndex++) {
+    const level = ruins[floorIndex]
+    const z = chainZForDepth(floorIndex + 4)
+    const eligible = dwarvenRuinsEncounterTemplatesForDepth(z, cfg)
+    if (!eligible.length) continue
+
+    const descriptor = level.caves?.[0]
+    const entrances = descriptor?.entrances || []
+    const roomBounds = Array.isArray(level._encounterRooms) ? level._encounterRooms.slice(1) : []
+    const walkableTiles = []
+    const safeTiles = []
+    for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+      const tile = level.map[y]?.[x]
+      if (!TILE[tile]?.walk) continue
+      walkableTiles.push({x, y})
+      if (tile !== 'marble') continue
+      if (entrances.some(e => Math.max(Math.abs(e.x - x), Math.abs(e.y - y)) <= entranceClearance)) continue
+      if (!DungeonTraps.safeSpawn(x, y, z)) continue
+      if (groundItems.some(item => (item.level ?? 0) === z && item.x === x && item.y === y)) continue
+      if (enemies.some(enemy => enemy.alive && (enemy.level ?? 0) === z && enemy.x === x && enemy.y === y)) continue
+      safeTiles.push({x, y})
+    }
+    if (!safeTiles.length) continue
+
+    let threatBudget = Math.max(1, Math.round(
+      walkableTiles.length / Math.max(1, cfg.baseTilesPerEnemy ?? 75) *
+      (1 + floorIndex * densityGrowth)
+    ))
+
+    let dominantPool = eligible.filter(tmpl => (tmpl.rarity ?? 1) > cutoff)
+    if (dominantPool.length < 2) dominantPool = eligible.slice()
+    const requestedFamilies = randInt(cfg.dominantFamilyCountRange?.[0] ?? 2, cfg.dominantFamilyCountRange?.[1] ?? 4)
+    let dominant = weightedWithoutReplacement(dominantPool, Math.min(requestedFamilies, dominantPool.length))
+    while (dominant.length > 2 && dominant.reduce((sum, tmpl) => sum + Math.max(1, tmpl.tier), 0) > threatBudget) {
+      dominant.pop()
+    }
+    if (dominant.length < Math.min(2, dominantPool.length)) {
+      dominant = weightedWithoutReplacement(dominantPool, Math.min(2, dominantPool.length))
+    }
+    if (!dominant.length) continue
+
+    // The Champion is one representative of a dominant base-species family,
+    // not an extra species. This guarantees exactly one Champion per floor.
+    const championTemplate = pickWeighted(dominant, tmpl => Math.max(0.0001, tmpl.rarity ?? 1))
+    const minFamilyCost = dominant.reduce((sum, tmpl) => sum + Math.max(1, tmpl.tier), 0)
+    const outsiderPool = eligible.filter(tmpl => !dominant.includes(tmpl))
+    const roamerPool = outsiderPool.length ? outsiderPool : eligible
+    const cheapestRoamerCost = Math.min(...roamerPool.map(tmpl => Math.max(1, tmpl.tier)))
+    threatBudget = Math.max(threatBudget, minFamilyCost + cheapestRoamerCost + Math.max(1, championTemplate.tier))
+
+    const spawned = []
+    const isSpaced = p => spawned.every(s => Math.max(Math.abs(s.x - p.x), Math.abs(s.y - p.y)) >= minSpacing)
+    const available = safeTiles.slice()
+    const takeSpot = (room = null, far = false) => {
+      let candidates = available.filter(isSpaced)
+      if (room) {
+        const inside = candidates.filter(p => p.x > room.x && p.x < room.x + room.w - 1 &&
+          p.y > room.y && p.y < room.y + room.h - 1)
+        if (inside.length) candidates = inside
+      }
+      if (!candidates.length) return null
+      if (far && entrances[0]) {
+        const maxD = Math.max(...candidates.map(p => Math.max(Math.abs(p.x - entrances[0].x), Math.abs(p.y - entrances[0].y))))
+        const remote = candidates.filter(p => Math.max(Math.abs(p.x - entrances[0].x), Math.abs(p.y - entrances[0].y)) >= maxD - 4)
+        if (remote.length) candidates = remote
+      }
+      const spot = pick(candidates)
+      available.splice(available.findIndex(p => p.x === spot.x && p.y === spot.y), 1)
+      spawned.push(spot)
+      return spot
+    }
+
+    const spawnTemplate = (tmpl, spot, prefix = null, roamer = false) => {
+      if (!tmpl || !spot) return false
+      const enemy = {
+        name: tmpl.name,
+        baseName: tmpl.name,
+        tier: tmpl.tier,
+        level: z,
+        levelKind: 'chain',
+        caveIndex: -1,
+        hp: tmpl.hp,
+        maxHp: tmpl.hp,
+        atk: tmpl.atk,
+        def: tmpl.def,
+        spd: tmpl.spd,
+        grace: tmpl.grace,
+        abilities: [...tmpl.abilities],
+        humanoid: !!tmpl.humanoid,
+        aggro: tmpl.aggro ?? AGGRO_RANGE,
+        x: spot.x,
+        y: spot.y,
+        homeX: spot.x,
+        homeY: spot.y,
+        homeTileType: level.map[spot.y][spot.x],
+        alive: true,
+        prefix: null,
+        equipment: null,
+        // Organized room encounters hold their room until aggroed; roamers keep
+        // the template's existing wander behavior (with normal underground rules).
+        ...(roamer ? {} : {wander: false})
+      }
+      if (prefix) {
+        enemy.prefix = prefix
+        enemy.prefixBase = prefixBaseStats(enemy)
+        applyEnemyPrefix(enemy, prefix)
+        enemy.name = prefix + ' ' + enemy.name
+      } else {
+        const prefixChance = Math.min(1, (cfg.prefixBaseChance ?? 0) + floorIndex * (cfg.prefixGrowthPerFloor ?? 0))
+        if (prefixNames.length && chance(prefixChance)) {
+          const rolled = pick(prefixNames)
+          enemy.prefix = rolled
+          enemy.prefixBase = prefixBaseStats(enemy)
+          applyEnemyPrefix(enemy, rolled)
+          enemy.name = rolled + ' ' + enemy.name
+        }
+      }
+      addEnemy(enemy)
+      return true
+    }
+
+    let spent = 0
+    const rooms = roomBounds.slice()
+    for (let i = rooms.length - 1; i > 0; i--) {
+      const j = randInt(0, i)
+      ;[rooms[i], rooms[j]] = [rooms[j], rooms[i]]
+    }
+    const farthestRoom = rooms.length && entrances[0]
+      ? rooms.reduce((best, room) => {
+          const d = Math.max(Math.abs(room.cx - entrances[0].x), Math.abs(room.cy - entrances[0].y))
+          return !best || d > best.d ? {room, d} : best
+        }, null)?.room
+      : null
+    const artifactRoom = level._artifactRoom || null
+
+    // The final floor's Champion guards the optional artifact side vault rather
+    // than the mandatory route. Other floors keep the far-room Champion rule.
+    const championRoom = artifactRoom || farthestRoom
+    const championSpot = takeSpot(championRoom, true) || takeSpot(null, true)
+    if (championSpot && spawnTemplate(championTemplate, championSpot, 'Champion', false)) spent += Math.max(1, championTemplate.tier)
+    // A Champion leads a recognizable pair, rather than standing alone.
+    if (championSpot) {
+      const escortSpot = takeSpot(championRoom)
+      if (escortSpot && spawnTemplate(championTemplate, escortSpot, null, false)) spent += Math.max(1, championTemplate.tier)
+    }
+
+    // Make every selected dominant family visible at least once. On the final
+    // floor, the first non-Champion family also goes into the artifact vault so
+    // the guaranteed artifact is guarded by a small encounter, not one body.
+    let roomCursor = 0
+    let artifactGuardPending = !!artifactRoom
+    for (const tmpl of dominant) {
+      if (tmpl === championTemplate) continue
+      const room = artifactGuardPending ? artifactRoom : (rooms.length ? rooms[roomCursor++ % rooms.length] : null)
+      const spot = takeSpot(room)
+      if (artifactGuardPending) artifactGuardPending = false
+      if (!spot) continue
+      if (spawnTemplate(tmpl, spot, null, false)) spent += Math.max(1, tmpl.tier)
+    }
+
+    // Spend most remaining threat by reinforcing coherent one-species rooms.
+    let guard = 0
+    while (spent < threatBudget - cheapestRoamerCost && available.length && guard++ < 100) {
+      const tmpl = dominant[guard % dominant.length]
+      const cost = Math.max(1, tmpl.tier)
+      if (spent + cost > threatBudget - cheapestRoamerCost) break
+      const room = rooms.length ? rooms[guard % rooms.length] : null
+      const spot = takeSpot(room)
+      if (!spot) break
+      if (spawnTemplate(tmpl, spot, null, false)) spent += cost
+    }
+
+    // Keep at least one broader-pool roamer where placement permits. Rarity is
+    // still weighted here, so unusual outsiders remain possible without taking
+    // over the organized room composition.
+    guard = 0
+    while (spent < threatBudget && available.length && guard++ < 100) {
+      const affordable = roamerPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
+      if (!affordable.length) break
+      const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
+      const spot = takeSpot(null)
+      if (!spot) break
+      if (spawnTemplate(tmpl, spot, null, true)) spent += Math.max(1, tmpl.tier)
+    }
+  }
+}
+
+
+function spawnDwarvenRuinsChests() {
+  const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.chests
+  for (let i = 2; i < deepLevels.length; i++) {
+    const level = deepLevels[i]
+    if (level.kind !== 'dwarvenRuins') continue
+    const z = chainZForDepth(i + 2), entry = level.caves[0].entrances[0]
+    const safeRoute = DungeonTraps.safeReachable(level.map, entry,
+      new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
+    const rooms = (level._encounterRooms || []).slice(1)
+    const available = []
+    for (const room of rooms) {
+      const spots = []
+      for (let y = room.y + 1; y < room.y + room.h - 1; y++)
+        for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+          if (level.map[y]?.[x] !== 'marble' || !safeRoute.has(keyXY(x, y)) ||
+              Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= cfg.entranceClearance ||
+              !DungeonTraps.safeSpawn(x, y, z) ||
+              enemies.some(e => e.alive && e.level === z && e.x === x && e.y === y) ||
+              groundItems.some(g => g.level === z && g.x === x && g.y === y)) continue
+          spots.push({x, y})
+        }
+      if (spots.length) available.push({room, spots,
+        distance: Math.max(Math.abs(room.cx - entry.x), Math.abs(room.cy - entry.y))})
+    }
+    available.sort((a, b) => b.distance - a.distance)
+    for (let n = 0; n < cfg.perFloor && available.length; n++) {
+      const choices = available.splice(0, Math.min(3, available.length))
+      const selected = pick(choices)
+      available.push(...choices.filter(c => c !== selected))
+      const spot = pick(selected.spots)
+      groundItems.push({x: spot.x, y: spot.y, level: z, levelKind: 'chain', caveIndex: -1,
+        kind: 'chest', tier: level.progress >= 0.5 ? cfg.tierLate : cfg.tierEarly, opened: false})
     }
   }
 }
