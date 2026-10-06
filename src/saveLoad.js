@@ -127,6 +127,7 @@ function buildSaveObject() {
     treasureMapSpot: treasureMapSpot,
     treasureMapUnearthed: treasureMapUnearthed,
     spawnPoint: {x: spawnPoint.x, y: spawnPoint.y},
+    villageCenter: villageCenter ? {x: villageCenter.x, y: villageCenter.y} : null,
     worldEdgesReached: Object.assign({}, worldEdgesReached),
     oldHunterQuest: oldHunterQuest,
     oldHunterQuestSerial,
@@ -607,18 +608,10 @@ function loadGameFromObject(data, opts = {}) {
   if (oldHunterQuest && ['kill_specific', 'recover_item'].includes(oldHunterQuest.type)) hunterTargetEnemy(oldHunterQuest)
   if (oldHunterQuest) oldHunterQuestSerial = Math.max(oldHunterQuestSerial, parseInt(String(oldHunterQuest.id).split('_')[1]) || 0)
 
-  // villageCenter isn't stored explicitly - it's just wherever 'village'
-  // tiles ended up in the restored map.
-  villageCenter = null
-  outer:
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        if (map[y][x] === 'village') {
-          villageCenter = {x, y}
-          break outer
-        }
-      }
-    }
+  // The generated village center is gameplay state: several quest/world rules use
+  // distance from this exact origin. Reconstructing it from the first village tile
+  // can choose a different coordinate and desynchronize save/replay decisions.
+  villageCenter = data.villageCenter ? {x: data.villageCenter.x, y: data.villageCenter.y} : null
 
   // bigBellPos likewise isn't stored explicitly - recover it from the
   // restored map so the Drunk's rumor line still points the right way.

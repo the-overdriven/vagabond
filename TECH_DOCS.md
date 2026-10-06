@@ -3989,8 +3989,10 @@ world-generation or dialogue decision depends on animation or unseeded randomnes
 `fishermanQuest` is an extensible `{type, state, targetId, ...}` record. The current
 `fish_predator` variant is **Empty Nets**. No predator exists before the first
 conversation. Activation chooses a free, foot-reachable land bank at least 25
-tiles away, preferring the same connected water region, and creates one
-non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
+tiles away, preferring the same connected water region. The generated village
+center used by the target exclusion rule is persisted exactly in saves/replay
+snapshots so restoring the same action cannot change the legal target set. Activation
+then creates one non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
 Only that stored enemy ID's death, through the shared kill hook, makes the
 quest ready. The `!` is shown before activation, when ready, and on completed
 quests with an unclaimed reward and no pending lesson. Bumping or adjacent clicking gives short, gruff,
@@ -5758,7 +5760,7 @@ not raw keyboard events. Current action types are:
 - `forage` - normal forage/search/loot action;
 - `dig` - shovel digging, including the sand+shovel `F` shortcut;
 - `skipTurn` - wait action;
-- `talk` - currently Old Hunter direct interaction;
+- `talk` - direct Old Hunter and Fisherman Hermit interaction;
 - `buy` / `sell` - Merchant transactions;
 - `herbalist` - mushroom purification, potion brewing, or potion purchases;
 - `equip` / `unequip` - equipment changes;

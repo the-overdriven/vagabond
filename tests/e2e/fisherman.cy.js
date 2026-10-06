@@ -498,12 +498,14 @@ describe('Fisherman and swimming', () => {
           const n=npcs.find(n=>n.name===FISHERMAN_NAME)
           player.x=n.x;player.y=n.y+1
           enemies=[];occupied=new Set(npcs.map(n=>keyXY(n.x,n.y)))
+          const originalVillageCenter=JSON.stringify(villageCenter)
           const initial=JSON.parse(JSON.stringify(buildSaveObject()))
           interactFisherman()
           const first=JSON.stringify(fishermanQuest)
           const target=enemies.find(e=>e.id===fishermanQuest.targetId)
           const firstTarget=JSON.stringify({id:target.id,x:target.x,y:target.y})
           loadGameFromObject(initial,{isReplayInit:true})
+          const center=JSON.stringify(villageCenter)===originalVillageCenter
           await runReplayAction({type:'talk',npc:FISHERMAN_NAME})
           const second=JSON.stringify(fishermanQuest)
           const secondTarget=enemies.find(e=>e.id===fishermanQuest.targetId)
@@ -520,9 +522,9 @@ describe('Fisherman and swimming', () => {
           loadGameFromObject(before,{isReplayInit:true})
           replayAnimationsDisabled=true
           for(const a of actions) await runReplayAction(a)
-          return {quest,swim:expected===JSON.stringify({hp:player.hp,swim:player.swimTurns,practice:player.swimmingPractice})}
+          return {quest,center,swim:expected===JSON.stringify({hp:player.hp,swim:player.swimTurns,practice:player.swimmingPractice})}
         })()`)
-        expect(result).to.deep.equal({quest:true,swim:true})
+        expect(result).to.deep.equal({quest:true,center:true,swim:true})
       })
   })
 })
