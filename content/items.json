@@ -316,7 +316,7 @@
   },
   "dwarvenkey": {
     "name": "Dwarven Key",
-    "icon": "img/icons/dwarven-key.svg",
+    "icon": "img/tiles/dwarven-key.png",
     "category": "other",
     "stackable": false,
     "sellValue": 0,

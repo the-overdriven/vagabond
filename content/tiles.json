@@ -374,6 +374,12 @@
       "projectileBlock": true,
       "blocksSight": true
     },
+    "dwarvengateopen": {
+      "ch": "/",
+      "color": "#d7a552",
+      "bg": "#302d2a",
+      "walk": true
+    },
     "dwarvengatebreached": {
       "ch": "h",
       "color": "#a97843",
@@ -401,6 +407,57 @@
       "walk": false,
       "projectileBlock": true,
       "blocksSight": true
+    },
+    "dwarvenleverpulled": {
+      "ch": "\\",
+      "color": "#e0b35f",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarvenbed": {
+      "ch": "▥",
+      "color": "#9c7651",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true
+    },
+    "dwarvenbedbarricade": {
+      "ch": "≋",
+      "color": "#b58a5d",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true
+    },
+    "dwarvenshelf": {
+      "ch": "▤",
+      "color": "#8f6f4f",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
+    "dwarventable": {
+      "ch": "═",
+      "color": "#98734e",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true
+    },
+    "dwarvencrate": {
+      "ch": "□",
+      "color": "#9a7449",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true
+    },
+    "dwarvenprisonbars": {
+      "ch": "╫",
+      "color": "#8f8a80",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true
     },
     "dwarvenspikes": {
       "ch": "^",
@@ -482,10 +539,18 @@
     "dwarvendoorlocked": "E",
     "dwarvendoorbreached": "H",
     "dwarvengatelocked": "I",
+    "dwarvengateopen": "Q",
     "dwarvengatebreached": "J",
     "dwarvenliftoff": "K",
     "dwarvenlifton": "N",
     "dwarvenlever": "P",
+    "dwarvenleverpulled": "L",
+    "dwarvenbed": "╒",
+    "dwarvenbedbarricade": "╓",
+    "dwarvenshelf": "╔",
+    "dwarventable": "╕",
+    "dwarvencrate": "╖",
+    "dwarvenprisonbars": "╘",
     "dwarvenspikes": "\u2530",
     "dwarvenpressureplate": "\u2531",
     "dwarvenarrowwall": "\u2532"
@@ -543,10 +608,18 @@
     "dwarvendoorlocked": "a locked dwarven door of iron-bound timber",
     "dwarvendoorbreached": "a dwarven door smashed open by force",
     "dwarvengatelocked": "a heavy locked dwarven gate barring the way deeper into the ruins",
-    "dwarvengatebreached": "an opened or ruined dwarven gate whose broken leaves no longer bar passage",
+    "dwarvengateopen": "an intact dwarven progression gate standing open",
+    "dwarvengatebreached": "a ruined dwarven gate whose broken leaves no longer bar passage",
     "dwarvenliftoff": "an old dwarven lift platform, dark and without power",
     "dwarvenlifton": "a powered dwarven lift platform humming with restored machinery",
     "dwarvenlever": "a heavy dwarven control lever fixed into the wall beside the lift",
+    "dwarvenleverpulled": "a dwarven lift lever locked down in its powered position",
+    "dwarvenbed": "a low stone-and-timber dwarven bed frame",
+    "dwarvenbedbarricade": "a bed frame dragged across the room as an improvised barricade",
+    "dwarvenshelf": "a tall dwarven shelf that breaks movement, sight and projectile lines",
+    "dwarventable": "a heavy dwarven table left where the settlement fell silent",
+    "dwarvencrate": "a reinforced storage crate too heavy to shift",
+    "dwarvenprisonbars": "iron prison bars dividing the old cell block",
     "dwarvenspikes": "small holes in the marble conceal reusable spikes; any creature stepping here triggers them",
     "dwarvenpressureplate": "a pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
     "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane"

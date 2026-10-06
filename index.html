@@ -1227,6 +1227,9 @@ more difficult:
       return true
     }
     setDwarvenLiftPowered(true)
+    const leverDepth = chainDepthForZ(currentZ)
+    const leverMap = depthUndergroundMap(leverDepth)
+    if (leverMap?.[y]?.[x] === 'dwarvenlever') leverMap[y][x] = 'dwarvenleverpulled'
     consecutiveWaitTurns = 0
     log('You wrench the dwarven lever down. Ancient machinery shudders awake, and the lift answers somewhere above.', 'good')
     enemyTurn()
@@ -1455,11 +1458,25 @@ more difficult:
     }),
     dwarvengatelocked: Object.freeze({
       kind: 'gate',
-      keyedOpenTile: 'dwarvengatebreached',
+      keyedOpenTile: 'dwarvengateopen',
       breachedTile: null,
       breachable: false
     })
   })
+
+  function currentDungeonPackageId() {
+    const depth = chainDepthForZ(currentZ)
+    if (!depth || depth < 2) return null
+    const level = deepLevels[depth - 2]
+    if (!level) return null
+    const activeMapMatches = level.map === map || (level.caveMaps || []).includes(map)
+    return activeMapMatches ? (level.dungeonPackage || level.caves?.[0]?.dungeonPackage || null) : null
+  }
+
+  function currentDungeonPackageConfig() {
+    const packageId = currentDungeonPackageId()
+    return packageId ? dungeonPackageConfig(packageId) : null
+  }
 
   function isClosedDungeonDoorTile(tileKey) {
     return !!DUNGEON_DOOR_OPEN_STATE[tileKey]
@@ -1483,7 +1500,7 @@ more difficult:
     const info = DUNGEON_LOCK_STATE[tileKey]
     if (!info) return []
     const family = info.kind === 'gate'
-      ? new Set(['dwarvengatelocked', 'dwarvengatebreached'])
+      ? new Set(['dwarvengatelocked', 'dwarvengateopen', 'dwarvengatebreached'])
       : new Set(['dwarvendoorlocked', 'dwarvendoorbreached'])
     const leaves = [{x, y}]
     const adjacent = [[0, -1], [-1, 0], [1, 0], [0, 1]]
@@ -1498,13 +1515,19 @@ more difficult:
     const tileKey = map[y]?.[x]
     const info = DUNGEON_LOCK_STATE[tileKey]
     if (!info) return null
-    return dwarvenDungeonLockId(currentZ, info.kind, dungeonLockLeavesAt(x, y))
+    const packageId = currentDungeonPackageId() || 'dwarvenRuins'
+    return dungeonPackageLockId(packageId, currentZ, info.kind, dungeonLockLeavesAt(x, y))
+  }
+
+  function dungeonKeyItemKind() {
+    return currentDungeonPackageConfig()?.progressionKeys?.itemKind || 'dwarvenkey'
   }
 
   function matchingDungeonKeyAt(x, y) {
     const keyId = dungeonLockIdAt(x, y)
     if (!keyId) return null
-    return player.inventory.find(item => item.kind === 'dwarvenkey' && item.keyId === keyId) || null
+    const itemKind = dungeonKeyItemKind()
+    return player.inventory.find(item => item.kind === itemKind && item.keyId === keyId) || null
   }
 
   function openDungeonLockWithKeyAt(x, y) {
@@ -1512,7 +1535,8 @@ more difficult:
     const info = DUNGEON_LOCK_STATE[tileKey]
     const keyId = dungeonLockIdAt(x, y)
     if (!info || !keyId) return null
-    const keyIndex = player.inventory.findIndex(item => item.kind === 'dwarvenkey' && item.keyId === keyId)
+    const itemKind = dungeonKeyItemKind()
+    const keyIndex = player.inventory.findIndex(item => item.kind === itemKind && item.keyId === keyId)
     if (keyIndex < 0) return null
     const key = player.inventory[keyIndex]
     const leaves = dungeonLockLeavesAt(x, y)
@@ -1531,7 +1555,7 @@ more difficult:
   }
 
   function alarmNearestEnemyFromBreach() {
-    const probability = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.doors?.breachAlarmChance ?? 0.25
+    const probability = currentDungeonPackageConfig()?.doors?.breachAlarmChance ?? 0.25
     if (!chance(probability)) return null
     const candidates = enemies.map((enemy, index) => ({
       enemy,
@@ -3895,6 +3919,11 @@ more difficult:
     occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
     if (playerCredit) gainXp(xpForEnemy(e))
+    if (e.carriedDungeonKey) {
+      groundItems.push({x:e.x,y:e.y,level:e.level ?? currentZ,levelKind:e.levelKind || currentLevelKind(),
+        caveIndex:e.caveIndex ?? currentCave,kind:'dwarvenkey',keyId:e.carriedDungeonKey.keyId,progressionKey:true})
+      e.carriedDungeonKey = null
+    }
     if (e.stolenItem) {
       groundItems.push({x: e.x, y: e.y, level: e.level ?? currentZ,
         levelKind: e.levelKind || currentLevelKind(), caveIndex: e.caveIndex ?? currentCave,
@@ -5163,7 +5192,7 @@ more difficult:
           !Number.isFinite(item.sellValue) || item.sellValue < 0 ||
           !Number.isFinite(item.baseValue) || item.baseValue < 0 || !Array.isArray(item.actions))
         throw new Error('Invalid item definition: ' + kind)
-      if (item.icon !== undefined && (typeof item.icon !== 'string' || !/^img\/icons\/[A-Za-z0-9 _-]+\.svg$/.test(item.icon)))
+      if (item.icon !== undefined && (typeof item.icon !== 'string' || !/^img\/(?:icons|tiles)\/[A-Za-z0-9 _-]+\.(?:svg|png)$/.test(item.icon)))
         throw new Error('Invalid item icon: ' + kind)
       for (const action of item.actions) {
         if (!action || typeof action.label !== 'string' || !Object.hasOwn(ITEM_ACTION_HANDLERS, action.handler))
@@ -5724,6 +5753,13 @@ more difficult:
         return
       }
       skeleton.looted = true
+      if (skeleton.dungeonKey?.keyId) {
+        addInventoryItem('dwarvenkey', {keyId:skeleton.dungeonKey.keyId, progressionKey:!!skeleton.dungeonKey.progressionKey})
+        skeleton.dungeonKey = null
+        log('Beneath the dead dwarf’s ribs, you find a Dwarven Key.', 'loot')
+        updateHud()
+        return
+      }
       if (skeleton.hasLoot === false) {
         log('You search the skeletal remains, but find nothing.', 'info')
         return
@@ -6127,7 +6163,7 @@ more difficult:
     }
     let moved = false
     const fromPos = {x: player.x, y: player.y}
-    if (map[ny]?.[nx] === 'dwarvenlever' && activateDwarvenLiftLeverAt(nx, ny)) return
+    if (['dwarvenlever', 'dwarvenleverpulled'].includes(map[ny]?.[nx]) && activateDwarvenLiftLeverAt(nx, ny)) return
     if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
       if (openDungeonDoorAt(nx, ny)) {
         consecutiveWaitTurns = 0
@@ -10764,42 +10800,70 @@ more difficult:
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
     beastTracks.clear()
-    generateMap()
-    const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
-    if (weaponHuts.length !== 1 || weaponHuts[0].mausoleum || !STARTING_WEAPONS.includes(weaponHuts[0].startingWeapon)) {
-      throw new Error('The world generator is out of date. Reload the game to get the starting weapon in a village hut.')
+    const validationCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.validation || {}
+    const populationAttempts = Math.max(1, Math.floor(validationCfg.postPopulationWorldRetries ?? 1))
+    let acceptedValidation = null
+
+    for (let populationAttempt = 1; populationAttempt <= populationAttempts; populationAttempt++) {
+      // A discarded populated world must leave no persistent actor identity or
+      // NPC state behind. World generation keeps consuming the seeded RNG, but
+      // accepted entity IDs are independent of how many rejected attempts came
+      // before it.
+      nextEnemyId = 1
+      npcs = []
+      generateMap()
+      const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
+      if (weaponHuts.length !== 1 || weaponHuts[0].mausoleum || !STARTING_WEAPONS.includes(weaponHuts[0].startingWeapon)) {
+        throw new Error('The world generator is out of date. Reload the game to get the starting weapon in a village hut.')
+      }
+      const guaranteedGoldHuts = villageHuts.filter(h => h.guaranteedGold && h.goldLoot >= 2 && h.goldLoot <= 9 && !h.goldLootTaken)
+      if (guaranteedGoldHuts.length !== 1 || guaranteedGoldHuts[0].mausoleum || guaranteedGoldHuts[0].startingWeapon) {
+        throw new Error('The world generator is out of date. Reload the game to get the guaranteed gold in a village hut.')
+      }
+      initDiscovered()
+      rebuildMinimapBases()
+      player.x = spawnPoint.x
+      player.y = spawnPoint.y
+      player.hp = playerMaxHp()
+      checkPlayerHealthWarning()
+      foragedTiles = new Set()
+      spawnEnemies()
+      spawnCemeteryGhouls()
+      spawnBellGuardians()
+      spawnRemoteHighTierChests()
+      spawnGroundStuff()
+      spawnCaveScenarios()
+      spawnDwarvenRuinsEncounters()
+      spawnDwarvenRuinsChests()
+
+      acceptedValidation = validateDwarvenRuinsStratum()
+      if (!acceptedValidation.ok) {
+        if (populationAttempt === populationAttempts) {
+          throw new Error(`Dwarven Ruins post-population validation failed after ${populationAttempts} attempts: ${acceptedValidation.issues.join('; ')}`)
+        }
+        console.warn(`Discarding populated world ${populationAttempt}/${populationAttempts}: ${acceptedValidation.issues.join('; ')}`)
+        continue
+      }
+
+      // Content that is independent from the Ruins invariant pass is only
+      // generated after the world has been accepted, so rejected attempts do
+      // not consume IDs or create persistent side effects unnecessarily.
+      ensureUndergroundVampire()
+      spawnNpcs()
+      clearGroundItemsUnderMerchant()
+      spawnEdgeHighTierChests()
+      placeFisherman()
+      spawnCaveDecorations()
+      rebuildMinimapBases()
+      ensureMerchantStock()
+      stopDeathTransition()
+      stopAttackAnimation()
+      snapCameraToPlayer()
+      updateHud()
+      return
     }
-    const guaranteedGoldHuts = villageHuts.filter(h => h.guaranteedGold && h.goldLoot >= 2 && h.goldLoot <= 9 && !h.goldLootTaken)
-    if (guaranteedGoldHuts.length !== 1 || guaranteedGoldHuts[0].mausoleum || guaranteedGoldHuts[0].startingWeapon) {
-      throw new Error('The world generator is out of date. Reload the game to get the guaranteed gold in a village hut.')
-    }
-    initDiscovered()
-    rebuildMinimapBases()
-    player.x = spawnPoint.x
-    player.y = spawnPoint.y
-    player.hp = playerMaxHp()
-    checkPlayerHealthWarning()
-    foragedTiles = new Set()
-    spawnEnemies()
-    spawnCemeteryGhouls()
-    spawnBellGuardians()
-    spawnRemoteHighTierChests()
-    spawnGroundStuff()
-    spawnCaveScenarios()
-    spawnDwarvenRuinsEncounters()
-    spawnDwarvenRuinsChests()
-    ensureUndergroundVampire()
-    spawnNpcs()
-    clearGroundItemsUnderMerchant()
-    spawnEdgeHighTierChests()
-    placeFisherman()
-    spawnCaveDecorations()
-    rebuildMinimapBases()
-    ensureMerchantStock()
-    stopDeathTransition()
-    stopAttackAnimation()
-    snapCameraToPlayer()
-    updateHud()
+
+    throw new Error('World generation ended without an accepted Dwarven Ruins validation result.')
   }
 
   async function init() {

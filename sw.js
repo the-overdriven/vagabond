@@ -50,6 +50,15 @@ const PRECACHE_URLS = [
   './content/tiles.json',
   './content/rendering.json',
   './content/items.json',
+  './img/tiles/dwarven-key.png',
+  './img/tiles/dwarven-gate-open.png',
+  './img/tiles/dwarven-lever-pulled.png',
+  './img/tiles/dwarven-bed.png',
+  './img/tiles/dwarven-bed-barricade.png',
+  './img/tiles/dwarven-bookshelf.png',
+  './img/tiles/dwarven-table.png',
+  './img/tiles/dwarven-crate.png',
+  './img/tiles/dwarven-prison-bars.png',
   './img/tiles/dwarven-traps-atlas.png',
   './img/tiles/dwarven-pressure-plate.png'
 ];

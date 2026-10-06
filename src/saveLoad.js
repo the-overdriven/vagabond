@@ -107,11 +107,18 @@ function buildSaveObject() {
     // levels later never needs another save-format field - just another entry.
     deepLevels: deepLevels.map(lvl => ({
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
+      dungeonPackage: lvl.dungeonPackage || lvl.caves?.[0]?.dungeonPackage || null,
       traps: structuredClone(lvl.traps || []),
       caves: lvl.caves,
+      rooms: structuredClone(lvl.rooms || []),
+      roomGraph: structuredClone(lvl.roomGraph || lvl.caves?.[0]?.roomGraph || null),
+      progressionKey: structuredClone(lvl.progressionKey || null),
+      vaults: structuredClone(lvl.vaults || []),
+      encounterFamilies: Array.isArray(lvl.encounterFamilies) ? lvl.encounterFamilies.slice() : [],
+      artifactRoomId: lvl.artifactRoomId || null,
       discovered: encodeBoolGrid(lvl.discovered),
     })),
-    dwarvenRuinsLift: dwarvenRuinsLift ? JSON.parse(JSON.stringify(dwarvenRuinsLift)) : null,
+    dungeonShortcuts: structuredClone(dungeonShortcuts),
     cryptLevel2: cryptLevel2 ? {
       map: encodeTileGrid(cryptLevel2.map, '#'),
       discovered: encodeBoolGrid(cryptLevel2.discovered),
@@ -186,6 +193,7 @@ function buildSaveObject() {
       stolenItemEquipped: e.stolenItemEquipped === true,
       theftUsed: e.theftUsed === true,
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
+      carriedDungeonKey: e.carriedDungeonKey ? structuredClone(e.carriedDungeonKey) : null,
       summonUsed: e.summonUsed === true,
       summonedTurn: e.summonedTurn,
       grace: e.grace ?? null,
@@ -220,6 +228,10 @@ function buildSaveObject() {
       ...rareFleeSaveState(e),
       shooterAbility: e.shooterAbility || null,
       shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
+      dungeonRole: e.dungeonRole || null,
+      encounterFamily: e.encounterFamily || null,
+      dungeonRoomId: e.dungeonRoomId || null,
+      dungeonVaultId: e.dungeonVaultId || null,
     })),
     caveDecorations: caveDecorations.map(prop => ({...prop})),
     groundItems: groundItems.map(g => ({...g})),
@@ -475,11 +487,20 @@ function loadGameFromObject(data, opts = {}) {
       caves: lvlCaves,
       discovered: lvlDiscovered,
       kind: isDwarvenRuins ? 'dwarvenRuins' : levelIndex === 1 ? 'dwarvenFort' : 'caves',
+      dungeonPackage: lvlData.dungeonPackage || lvlCaves[0]?.dungeonPackage || null,
+      rooms: structuredClone(lvlData.rooms || lvlCaves[0]?.rooms || []),
+      roomGraph: structuredClone(lvlData.roomGraph || lvlCaves[0]?.roomGraph || null),
+      progressionKey: structuredClone(lvlData.progressionKey || null),
+      vaults: structuredClone(lvlData.vaults || lvlCaves[0]?.vaults || []),
+      encounterFamilies: Array.isArray(lvlData.encounterFamilies)
+        ? lvlData.encounterFamilies.slice()
+        : (Array.isArray(lvlCaves[0]?.encounterFamilies) ? lvlCaves[0].encounterFamilies.slice() : []),
+      artifactRoomId: lvlData.artifactRoomId || lvlCaves[0]?.artifactRoomId || null,
       ...(dungeonFloor !== null ? {dungeonFloor, floorCount, progress} : {})
     }
   })
 
-  dwarvenRuinsLift = data.dwarvenRuinsLift ? JSON.parse(JSON.stringify(data.dwarvenRuinsLift)) : null
+  dungeonShortcuts = structuredClone(data.dungeonShortcuts)
 
   if (dwarvenRuin && deepLevels[1]) {
     const fortCaveIndex = deepLevels[1].caves.findIndex(c =>
@@ -719,6 +740,7 @@ function loadGameFromObject(data, opts = {}) {
       stolenItemEquipped: e.stolenItemEquipped === true,
       theftUsed: e.theftUsed === true,
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
+      carriedDungeonKey: e.carriedDungeonKey ? structuredClone(e.carriedDungeonKey) : null,
       summonUsed: e.summonUsed === true,
       summonedTurn: e.summonedTurn,
       grace: e.grace ?? null,
@@ -751,6 +773,10 @@ function loadGameFromObject(data, opts = {}) {
       ...rareFleeDefaults(e),
       shooterAbility: typeof e.shooterAbility === 'string' ? e.shooterAbility : null,
       shotsRemaining: Number.isFinite(e.shotsRemaining) ? Math.max(0, e.shotsRemaining | 0) : 0,
+      dungeonRole: typeof e.dungeonRole === 'string' ? e.dungeonRole : null,
+      encounterFamily: typeof e.encounterFamily === 'string' ? e.encounterFamily : null,
+      dungeonRoomId: typeof e.dungeonRoomId === 'string' ? e.dungeonRoomId : null,
+      dungeonVaultId: typeof e.dungeonVaultId === 'string' ? e.dungeonVaultId : null,
     })
   })
   occupied = new Set()

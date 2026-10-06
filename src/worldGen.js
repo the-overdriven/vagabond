@@ -56,7 +56,25 @@ let undergroundDiscoveredL1 = [] // z:-1 discovery grid (storage)
 // crypt's dedicated second map. Map identity, not the z number, keeps those
 // two maps separate. Each entry: {map, caveMaps, caves, discovered}.
 let deepLevels = []
-let dwarvenRuinsLift = null // persistent paired D1/deeper shortcut metadata
+let dungeonShortcuts = [] // persistent shortcut registry shared by reusable dungeon packages
+
+function dungeonShortcutsForPackage(packageId) {
+  return (dungeonShortcuts || []).filter(shortcut => shortcut?.packageId === packageId)
+}
+
+function dungeonShortcutById(shortcutId) {
+  return (dungeonShortcuts || []).find(shortcut => shortcut?.id === shortcutId) || null
+}
+
+function dwarvenRuinsLiftShortcut() {
+  const shortcutId = dungeonPackageConfig('dwarvenRuins')?.shortcut?.id || 'dwarven-ruins-lift-1'
+  return dungeonShortcutById(shortcutId)
+}
+
+function dungeonPackageLevels(packageId) {
+  return deepLevels.map((level, index) => ({level, index, z: chainZForDepth(index + 2)}))
+    .filter(entry => entry.level?.dungeonPackage === packageId)
+}
 let undergroundDiscovered = [] // ACTIVE underground discovery grid, swapped on every level transition
 let currentZ = 0
 let currentCave = -1
@@ -72,13 +90,38 @@ function chainDepthForZ(z) {
   return Number.isInteger(z) && z < 0 ? -z : null
 }
 
-// Dungeon lock IDs are derived from immutable map identity plus the sorted
-// physical leaves of the doorway. Keys can therefore persist as ordinary
-// inventory/ground-item data without a parallel lock registry.
-function dwarvenDungeonLockId(level, kind, leaves) {
-  const points = (leaves || []).map(p => ({x: p.x, y: p.y}))
+// Reusable dungeon-package helpers. Content packages (Dwarven Ruins now, later
+// Mines/Caverns/etc.) keep their own terrain/art while sharing identity, graph,
+// progression and validation primitives.
+function dungeonPackageConfig(packageId) {
+  return WORLD_GEN_CONFIG.dungeons?.[packageId] || null
+}
+
+function dungeonStableFeatureId(namespace, level, kind, points) {
+  const sorted = (points || []).map(p => ({x: p.x, y: p.y}))
     .sort((a, b) => a.y - b.y || a.x - b.x)
-  return `dwarven:${level}:${kind}:${points.map(p => `${p.x},${p.y}`).join('|')}`
+  return `${namespace}:${level}:${kind}:${sorted.map(p => `${p.x},${p.y}`).join('|')}`
+}
+
+function dungeonPackageLockId(packageId, level, kind, leaves) {
+  const namespace = dungeonPackageConfig(packageId)?.lockNamespace || packageId
+  return dungeonStableFeatureId(namespace, level, kind, leaves)
+}
+
+// Compatibility wrapper for Dwarven content; the namespace itself comes from
+// package configuration so later strata can reuse the lock identity system.
+function dwarvenDungeonLockId(level, kind, leaves) {
+  return dungeonPackageLockId('dwarvenRuins', level, kind, leaves)
+}
+
+function dungeonProgressMultiplier(range, progress, fallback = 1) {
+  if (!Array.isArray(range) || range.length < 2) return fallback
+  const t = Math.max(0, Math.min(1, Number(progress) || 0))
+  return Number(range[0]) + (Number(range[1]) - Number(range[0])) * t
+}
+
+function dungeonRoomGraphDegree(graph, roomIndex) {
+  return (graph?.edges || []).reduce((count, edge) => count + Number(edge.a === roomIndex || edge.b === roomIndex), 0)
 }
 // depth means "chain position below the surface": 1 = z:-1, 2 = z:-2, etc.
 
@@ -652,7 +695,7 @@ function carveShallowCave(cm, spot, style) {
 }
 
 function generateCaves() {
-  dwarvenRuinsLift = null
+  dungeonShortcuts = []
   const cfg = WORLD_GEN_CONFIG.caves.shallow
   cryptCaveExclusionCenter = null
   for (let y = 1; y < MAP_H - 1 && !cryptCaveExclusionCenter; y++) for (let x = 1; x < MAP_W - 1; x++) {
@@ -975,6 +1018,35 @@ function buildCryptLevel2() {
 // gate's descent intuitive and making the layout persist in saves.
 let dwarvenRuin = null
 
+function dungeonRoomHasSeparation(rooms, candidate, separation) {
+  return rooms.every(room => candidate.x > room.x + room.w + separation ||
+    candidate.x + candidate.w + separation < room.x ||
+    candidate.y > room.y + room.h + separation ||
+    candidate.y + candidate.h + separation < room.y)
+}
+
+function carveDungeonRoomConnection(carveWide, a, b, cfg) {
+  const carveCorridor = (x1, y1, x2, y2) => {
+    const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
+    while (x1 !== x2) {
+      carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
+      x1 += sx
+    }
+    while (y1 !== y2) {
+      carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
+      y1 += sy
+    }
+    carveWide(x2, y2, 2)
+  }
+  if (chance(cfg.corridorHorizontalFirstChance)) {
+    carveCorridor(a.cx, a.cy, b.cx, a.cy)
+    carveCorridor(b.cx, a.cy, b.cx, b.cy)
+  } else {
+    carveCorridor(a.cx, a.cy, a.cx, b.cy)
+    carveCorridor(a.cx, b.cy, b.cx, b.cy)
+  }
+}
+
 function buildDwarvenRuin(targetLevel) {
   const cfg = WORLD_GEN_CONFIG.dwarvenFort
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
@@ -1030,7 +1102,7 @@ function buildDwarvenRuin(targetLevel) {
     const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1]), h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
     const rx = randInt(minX + cfg.roomBoundsMargin, maxX - w - cfg.roomBoundsMargin), ry = randInt(minY + cfg.roomBoundsMargin, maxY - h - cfg.roomBoundsMargin)
     const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
-    if (rooms.every(r => candidate.x > r.x + r.w + cfg.roomSeparation || candidate.x + candidate.w + cfg.roomSeparation < r.x || candidate.y > r.y + r.h + cfg.roomSeparation || candidate.y + candidate.h + cfg.roomSeparation < r.y)) rooms.push(candidate)
+    if (dungeonRoomHasSeparation(rooms, candidate, cfg.roomSeparation)) rooms.push(candidate)
   }
   const [entranceW, entranceH] = cfg.entranceRoomSize
   const entranceRoom = {x: x0 - Math.floor(entranceW / 2), y: y0 - Math.floor(entranceH / 2), w: entranceW, h: entranceH, cx: x0, cy: y0}
@@ -1044,15 +1116,7 @@ function buildDwarvenRuin(targetLevel) {
       if (!best || d < best.d) best = {r, c, d}
     }
     const {r, c} = best
-    const horizontalFirst = chance(cfg.corridorHorizontalFirstChance)
-    const corridor = (x1, y1, x2, y2) => {
-      const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
-      while (x1 !== x2) { carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2); x1 += sx }
-      while (y1 !== y2) { carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2); y1 += sy }
-      carveWide(x2, y2, 2)
-    }
-    if (horizontalFirst) { corridor(c.cx, c.cy, r.cx, c.cy); corridor(r.cx, c.cy, r.cx, r.cy) }
-    else { corridor(c.cx, c.cy, c.cx, r.cy); corridor(c.cx, r.cy, r.cx, r.cy) }
+    carveDungeonRoomConnection(carveWide, c, r, cfg)
     connected.push(r)
   }
   // Give every room exactly one doorway into its corridor network.
@@ -1340,8 +1404,536 @@ function dungeonWalkDistances(cm, start, blocked = null) {
   return distances
 }
 
+// Generation-time reachability may look through doors that have a valid future
+// interaction (open/unlock/breach). This is deliberately separate from normal
+// pathfinding so it cannot make a locked gate traversable during play.
+function dungeonWalkDistancesWithDoorTraversal(cm, start) {
+  const traversableDoor = new Set(['dwarvendoorclosed','dwarvendoorlocked','dwarvengatelocked'])
+  const DIRS4 = [[0,-1],[0,1],[-1,0],[1,0]]
+  const distances = new Map([[keyXY(start.x, start.y), 0]])
+  const queue = [{x:start.x, y:start.y}]
+  for (let qi = 0; qi < queue.length; qi++) {
+    const p = queue[qi], nextDistance = distances.get(keyXY(p.x, p.y)) + 1
+    for (const [dx, dy] of DIRS4) {
+      const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || distances.has(key)) continue
+      const tile = cm[y]?.[x]
+      if (!TILE[tile]?.walk && !traversableDoor.has(tile)) continue
+      distances.set(key, nextDistance)
+      queue.push({x, y})
+    }
+  }
+  return distances
+}
+
+function dwarvenRoomArchetypeForProgress(progress, finalFloor = false) {
+  const roomCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.rooms || {}
+  const defs = roomCfg.archetypes || {}
+  const names = Object.keys(defs)
+  if (!names.length) return 'Storage'
+  const defensive = new Set(['Barracks', 'Armory', 'Dormitory', 'Prison'])
+  return pickWeighted(names, name => {
+    const def = defs[name] || {}
+    const early = Number(def.weightEarly ?? 1)
+    const late = Number(def.weightLate ?? early)
+    let weight = Math.max(0.0001, early + (late - early) * progress)
+    if (finalFloor && defensive.has(name)) weight *= Number(roomCfg.finalFloorDefensiveWeightMultiplier ?? 1)
+    return weight
+  })
+}
+
+function dwarvenRoomInterior(room) {
+  const out = []
+  for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+    for (let x = room.x + 1; x < room.x + room.w - 1; x++) out.push({x, y})
+  }
+  return out
+}
+
+function dungeonClearProjectileLine(cm, from, to) {
+  let x0 = from.x, y0 = from.y
+  const x1 = to.x, y1 = to.y
+  const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
+  const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
+  let err = dx + dy
+  while (!(x0 === x1 && y0 === y1)) {
+    const e2 = 2 * err
+    if (e2 >= dy) { err += dy; x0 += sx }
+    if (e2 <= dx) { err += dx; y0 += sy }
+    if (x0 === x1 && y0 === y1) return true
+    if (TILE[cm[y0]?.[x0]]?.projectileBlock) return false
+  }
+  return true
+}
+
+function dwarvenRoomEntryPoint(cm, room) {
+  const leaves = room.doorways?.[0] || []
+  if (!leaves.length) return {x: room.cx, y: room.cy}
+  const mx = leaves.reduce((sum, p) => sum + p.x, 0) / leaves.length
+  const my = leaves.reduce((sum, p) => sum + p.y, 0) / leaves.length
+  const candidates = dwarvenRoomInterior(room).filter(p => cm[p.y]?.[p.x] === 'marble')
+  if (!candidates.length) return {x: room.cx, y: room.cy}
+  return candidates.reduce((best, p) => {
+    const d = Math.abs(p.x - mx) + Math.abs(p.y - my)
+    return !best || d < best.d ? {...p, d} : best
+  }, null)
+}
+
+function deriveDwarvenTacticalSlots(cm, room, roleCounts = null) {
+  const requested = roleCounts || {backline: 1, frontline: 2, group: 2, champion: 1, any: 2}
+  const entry = dwarvenRoomEntryPoint(cm, room)
+  const interior = dwarvenRoomInterior(room).filter(p => cm[p.y]?.[p.x] === 'marble')
+  const used = new Set()
+  const take = (pool, count) => {
+    const result = []
+    for (const p of pool) {
+      const key = keyXY(p.x, p.y)
+      if (used.has(key)) continue
+      used.add(key)
+      result.push({x: p.x, y: p.y})
+      if (result.length >= count) break
+    }
+    return result
+  }
+  const byEntryDistance = interior.map(p => ({...p, d: Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y)}))
+  const zoneKeys = ids => new Set(dungeonZonePoints(room, ids).map(p => keyXY(p.x,p.y)))
+  const backlineZones = zoneKeys(['backline','archive','stores','treasure','reliquary','sleeping','rubble','cistern'])
+  const frontlineZones = zoneKeys(['frontline','guard','approach','barricade','walkway','aisles'])
+  const groupZones = zoneKeys(['guard','cells','sleeping','stores','rubble','treasure'])
+  const preferZone = (pool, keys) => {
+    if (!keys.size) return pool
+    const preferred = pool.filter(p => keys.has(keyXY(p.x,p.y)))
+    return preferred.length ? preferred.concat(pool.filter(p => !keys.has(keyXY(p.x,p.y)))) : pool
+  }
+  const backlinePool = preferZone(byEntryDistance.filter(p => dungeonClearProjectileLine(cm, p, entry))
+    .sort((a, b) => b.d - a.d || a.y - b.y || a.x - b.x), backlineZones)
+  const frontlinePool = preferZone(byEntryDistance.slice().sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x), frontlineZones)
+  const groupPool = preferZone(interior.map(p => ({...p, d: Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy)}))
+    .sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x), groupZones)
+  const anyPool = interior.slice()
+  for (let i = anyPool.length - 1; i > 0; i--) {
+    const j = randInt(0, i)
+    ;[anyPool[i], anyPool[j]] = [anyPool[j], anyPool[i]]
+  }
+  return {
+    backline: take(backlinePool, Math.max(0, requested.backline || 0)),
+    frontline: take(frontlinePool, Math.max(0, requested.frontline || 0)),
+    group: take(groupPool, Math.max(0, requested.group || 0)),
+    champion: take(backlinePool.length ? backlinePool : groupPool, Math.max(0, requested.champion || 0)),
+    any: take(anyPool, Math.max(0, requested.any || 0))
+  }
+}
+
+function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set()) {
+  if (!room || room.archetype === 'Entrance Hall') return
+  const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
+  const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
+  const doorwayKeys = new Set((room.doorways || []).flat().map(p => keyXY(p.x, p.y)))
+  const protectedTile = p => reserved.has(keyXY(p.x, p.y)) ||
+    (room.prisonCellDoorCandidate && p.x === room.prisonCellDoorCandidate.x && p.y === room.prisonCellDoorCandidate.y) ||
+    Math.abs(p.x - room.cx) <= 1 && Math.abs(p.y - room.cy) <= 1 ||
+    [...doorwayKeys].some(key => {
+      const [x, y] = key.split(',').map(Number)
+      return Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= 1
+    })
+  const allInterior = dwarvenRoomInterior(room)
+  const edge = allInterior.filter(p => cm[p.y]?.[p.x] === 'marble' && !protectedTile(p) &&
+    (p.x <= room.x + 2 || p.x >= room.x + room.w - 3 || p.y <= room.y + 2 || p.y >= room.y + room.h - 3))
+  const center = allInterior.filter(p => cm[p.y]?.[p.x] === 'marble' && !protectedTile(p))
+  const shuffle = arr => {
+    const copy = arr.slice()
+    for (let i = copy.length - 1; i > 0; i--) { const j = randInt(0, i); [copy[i], copy[j]] = [copy[j], copy[i]] }
+    return copy
+  }
+  const zonePool = (ids, fallback = center) => {
+    const points = dungeonZonePoints(room, ids).filter(p => cm[p.y]?.[p.x] === 'marble' && !protectedTile(p))
+    return points.length ? points : fallback
+  }
+  const place = (tile, count, pool = edge) => {
+    let placed = 0
+    for (const p of shuffle(pool)) {
+      if (cm[p.y]?.[p.x] !== 'marble' || protectedTile(p)) continue
+      cm[p.y][p.x] = tile
+      if (++placed >= count) break
+    }
+    return placed
+  }
+  const span = Math.max(1, Math.floor((room.w + room.h) / 8))
+  if (room.archetype === 'Barracks') place('dwarvenbed', Math.min(5, 2 + span), zonePool(['backline','sleeping'], edge))
+  else if (room.archetype === 'Armory') place('dwarvencrate', Math.min(5, 2 + span), zonePool(['stores','treasure'], edge))
+  else if (room.archetype === 'Dining Hall') place('dwarventable', Math.min(4, 1 + span), center)
+  else if (room.archetype === 'Library') place('dwarvenshelf', Math.min(6, 2 + span), zonePool(['archive','aisles'], edge))
+  else if (room.archetype === 'Forge') place('dwarvencrate', Math.min(3, 1 + span), zonePool(['backline'], edge))
+  else if (room.archetype === 'Workshop') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['stores'], edge))
+  else if (room.archetype === 'Dormitory') place('dwarvenbed', Math.min(7, 3 + span), zonePool(['sleeping'], edge))
+  else if (room.archetype === 'Burial Chamber' || room.archetype === 'Temple') place('dwarvenstatue', Math.min(3, span), zonePool(['reliquary'], edge))
+  else if (room.archetype === 'Storage') place('dwarvencrate', Math.min(6, 2 + span), zonePool(['stores','treasure'], edge))
+
+  const vaultType = room.vaultType
+  if (vaultType === 'collapsedHall') place('dwarvenrubble', Math.min(7, 3 + span), zonePool(['rubble'], center))
+  else if (vaultType === 'libraryArchive') place('dwarvenshelf', Math.min(4, 1 + span), zonePool(['archive'], edge))
+  else if (vaultType === 'forgeKillzone') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['backline'], center))
+  else if (vaultType === 'treasury' || vaultType === 'trappedArmory') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['treasure','stores'], edge))
+  else if (vaultType === 'floodedCistern') place('water', Math.min(6, Math.max(2, span + 1)), zonePool(['cistern'], center))
+
+  // Prison architecture is structural rather than decorative: bars divide a
+  // far-side cell area from the guard side and leave one real door position.
+  // Vault prison blocks always lock it; ordinary Prison rooms can lock it via
+  // the archetype's configured internalLockedCellChance.
+  if (room.archetype === 'Prison') {
+    const entry = dwarvenRoomEntryPoint(cm, room)
+    const zones = room.vaultZones?.length ? room.vaultZones : dungeonInternalZones(room, ['guard','cells'], entry)
+    if (!room.vaultZones?.length) room.internalZones = structuredClone(zones)
+    const cell = zones.find(zone => zone.id === 'cells')
+    const horizontalApproach = Math.abs(entry.x - room.cx) >= Math.abs(entry.y - room.cy)
+    const split = horizontalApproach
+      ? (entry.x <= room.cx ? cell?.x1 : cell?.x2)
+      : (entry.y <= room.cy ? cell?.y1 : cell?.y2)
+    const towardCell = horizontalApproach
+      ? (entry.x <= room.cx ? 1 : -1)
+      : (entry.y <= room.cy ? 1 : -1)
+    const dividerCoords = [...new Set([split,
+      Number.isFinite(split) ? split + towardCell : null,
+      horizontalApproach ? room.cx : room.cy].filter(Number.isFinite))]
+    const doorwayNear = p => [...doorwayKeys].some(key => {
+      const [x,y] = key.split(',').map(Number)
+      return Math.max(Math.abs(p.x-x),Math.abs(p.y-y)) <= 1
+    })
+    let line = []
+    for (const divider of dividerCoords) {
+      const candidateLine = allInterior.filter(p =>
+        cm[p.y]?.[p.x] === 'marble' && !reserved.has(keyXY(p.x,p.y)) && !doorwayNear(p) &&
+        (horizontalApproach ? p.x === divider : p.y === divider))
+        .sort((a,b) => Math.abs((horizontalApproach ? a.y : a.x) - (horizontalApproach ? room.cy : room.cx)) -
+          Math.abs((horizontalApproach ? b.y : b.x) - (horizontalApproach ? room.cy : room.cx)))
+      if (candidateLine.length > line.length) line = candidateLine
+      if (line.length >= 3) break
+    }
+    if (line.length < 3) {
+      room.prisonCellGenerationFailed = true
+    } else {
+      const door = line[0]
+      for (const p of line) if (!(p.x === door.x && p.y === door.y) && cm[p.y]?.[p.x] === 'marble') cm[p.y][p.x] = 'dwarvenprisonbars'
+      room.prisonCellDoorCandidate = {x:door.x,y:door.y}
+      room.prisonCellAxis = horizontalApproach ? 'vertical' : 'horizontal'
+    }
+  }
+
+  const barricadeChance = Math.min(1, dungeonProgressMultiplier(story.barricadeChanceRange, progress, 0) * finalBarricadeMultiplier)
+  if (vaultType === 'fortifiedBarracks' || vaultType === 'barricadedDormitory' ||
+      (room.archetype === 'Dormitory' && chance(barricadeChance))) {
+    const near = zonePool(['barricade','frontline','guard'], center)
+    if (!place('dwarvenbedbarricade', 1, near)) place('dwarvenbedbarricade', 1, center)
+    if (finalFloor && finalBarricadeMultiplier > 1.5) place('dwarvenbedbarricade', 1, edge.filter(p => !near.some(n => n.x === p.x && n.y === p.y)))
+  }
+
+  // Optional branches acquire gradually heavier defensive debris as the
+  // stratum deepens. It never seals the branch doorway or a reserved tile.
+  const debrisChance = dungeonProgressMultiplier(story.optionalDefenseDebrisChanceRange, progress, 0)
+  if (room.optional && !room.vaultType && chance(debrisChance)) {
+    const entry = dwarvenRoomEntryPoint(cm, room)
+    const far = center.slice().sort((a,b) =>
+      (Math.abs(b.x-entry.x)+Math.abs(b.y-entry.y)) - (Math.abs(a.x-entry.x)+Math.abs(a.y-entry.y)))
+    place('dwarvenrubble', finalFloor ? 2 : 1, far.slice(0, Math.max(4, Math.ceil(far.length / 3))))
+  }
+}
+
+function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved) {
+  const roomDefs = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.rooms?.archetypes || {}
+  for (const room of roomMetas) {
+    const door = room.prisonCellDoorCandidate
+    if (room.archetype !== 'Prison' || !door || cm[door.y]?.[door.x] !== 'marble') continue
+    const forceLocked = room.vaultType === 'prisonBlock'
+    const lockChance = Math.min(1, Math.max(0, Number(roomDefs.Prison?.internalLockedCellChance ?? 0)))
+    const locked = forceLocked || chance(lockChance)
+    if (!locked) {
+      cm[door.y][door.x] = 'dwarvendoorclosed'
+      room.internalDoors = [{leaves:[{x:door.x,y:door.y}],kind:'prisonCell',locked:false}]
+      continue
+    }
+    cm[door.y][door.x] = 'dwarvendoorlocked'
+    const keyId = dwarvenDungeonLockId(floorZ, 'door', [door])
+    const reachable = dungeonWalkDistances(cm, entry)
+    const candidates = []
+    for (const [key, distance] of reachable.entries()) {
+      if (distance <= 0 || reserved.has(key)) continue
+      const [x,y] = key.split(',').map(Number)
+      if (cm[y]?.[x] !== 'marble') continue
+      if (x > room.x && x < room.x + room.w - 1 && y > room.y && y < room.y + room.h - 1) continue
+      candidates.push({x,y,distance})
+    }
+    if (!candidates.length) return false
+    candidates.sort((a,b) => b.distance - a.distance || a.y - b.y || a.x - b.x)
+    const keyBand = Math.max(1, Math.floor(roomDefs.Prison?.internalKeyFarCandidateBand ?? 8))
+    const band = candidates.slice(0, Math.min(keyBand, candidates.length))
+    const keySpot = pick(band)
+    ordinaryLocks.push({leaves:[{x:door.x,y:door.y}],keyId,roomId:room.id,
+      vaultId:vaults.find(v => v.roomId === room.id)?.id || null,internalRoomLock:true})
+    ordinaryKeys.push({x:keySpot.x,y:keySpot.y,keyId,internalRoomKey:true})
+    reserved.add(keyXY(keySpot.x,keySpot.y))
+    room.internalLocks = [{keyId,leaves:[{x:door.x,y:door.y}],kind:'prisonCell'}]
+    const vault = vaults.find(v => v.roomId === room.id)
+    if (vault) vault.internalLocks = structuredClone(room.internalLocks)
+  }
+  return true
+}
+
+function dungeonInternalZones(room, names = [], entry = null) {
+  const x1 = room.x + 1, y1 = room.y + 1
+  const x2 = room.x + room.w - 2, y2 = room.y + room.h - 2
+  const midX = Math.floor((x1 + x2) / 2), midY = Math.floor((y1 + y2) / 2)
+  const from = entry || {x: room.cx, y: room.cy}
+  const horizontalApproach = Math.abs(from.x - room.cx) >= Math.abs(from.y - room.cy)
+  const entryOnLowSide = horizontalApproach ? from.x <= room.cx : from.y <= room.cy
+  const nearRect = horizontalApproach
+    ? (entryOnLowSide ? {x1,y1,x2:midX,y2} : {x1:midX,y1,x2,y2})
+    : (entryOnLowSide ? {x1,y1,x2,y2:midY} : {x1,y1:midY,x2,y2})
+  const farRect = horizontalApproach
+    ? (entryOnLowSide ? {x1:midX,y1,x2,y2} : {x1,y1,x2:midX,y2})
+    : (entryOnLowSide ? {x1,y1:midY,x2,y2} : {x1,y1,x2,y2:midY})
+  const near = new Set(['frontline','guard','approach','barricade','walkway','aisles'])
+  const far = new Set(['backline','archive','stores','treasure','reliquary','sleeping','rubble','cells','cistern'])
+  return names.map(name => ({id:name, ...(far.has(name) ? farRect : near.has(name) ? nearRect : {x1,y1,x2,y2})}))
+}
+
+function dungeonZonePoints(room, zoneIds = []) {
+  const zones = Array.isArray(room?.vaultZones) && room.vaultZones.length ? room.vaultZones : room?.internalZones
+  if (!Array.isArray(zones) || !zones.length || !zoneIds.length) return []
+  const wanted = new Set(zoneIds)
+  const out = []
+  for (const zone of zones) {
+    if (!wanted.has(zone.id)) continue
+    for (let y = zone.y1; y <= zone.y2; y++) for (let x = zone.x1; x <= zone.x2; x++) {
+      if (x > room.x && x < room.x + room.w - 1 && y > room.y && y < room.y + room.h - 1) out.push({x,y})
+    }
+  }
+  return out
+}
+
+function dwarvenVaultInternalZones(cm, room, names = []) {
+  return dungeonInternalZones(room, names, dwarvenRoomEntryPoint(cm, room))
+}
+
+function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoorway, progress, floorZ, finalFloor, hooks = {}) {
+  const cfg = dungeonPackageConfig(packageId)?.vaults || {}
+  const buildZones = hooks.buildZones || ((grid, room, names) => dungeonInternalZones(room, names, dwarvenRoomEntryPoint(grid, room)))
+  const buildSlots = hooks.buildSlots || deriveDwarvenTacticalSlots
+  const defs = cfg.definitions || {}
+  const gateRoom = structuralDoors.find(d => d.leaves === gateDoorway)?.room || null
+  const selectable = roomMetas.filter(room => room.index > 0 && room._source !== gateRoom)
+  if (!selectable.length) return null
+
+  const selected = []
+  const usedRooms = new Set()
+  const usedTypes = new Set()
+  const definitionFits = (type, room, ignoreArchetype = false, allowFallback = false) => {
+    const def = defs[type]
+    if (!def || (def.fallbackOnly && !allowFallback)) return false
+    const range = def.progressRange || [0, 1]
+    const minSize = def.minSize || [1, 1]
+    const maxSize = def.maxSize || [Infinity, Infinity]
+    const entranceRange = def.requiredEntrances || [1, Infinity]
+    const entranceCount = Math.max(1, Number(room.connectionCount) || room.doorways?.length || 0)
+    const doorRequirement = def.doorRequirement || 'any'
+    const requiresStructuralEntrance = doorRequirement === 'closed' || doorRequirement === 'locked'
+    const hasStructuralEntrance = structuralDoors.some(door => door.room === room._source && door.leaves !== gateDoorway)
+    return progress >= range[0] && progress <= range[1] &&
+      room.w >= minSize[0] && room.h >= minSize[1] && room.w <= maxSize[0] && room.h <= maxSize[1] &&
+      entranceCount >= entranceRange[0] && entranceCount <= entranceRange[1] &&
+      (!requiresStructuralEntrance || hasStructuralEntrance) &&
+      (ignoreArchetype || !Array.isArray(def.archetypes) || def.archetypes.includes(room.archetype))
+  }
+  const attach = (type, room, artifactReserved = false) => {
+    const def = defs[type]
+    room.vaultType = type
+    room.vaultLabel = def.label || type
+    if (Array.isArray(def.archetypes) && def.archetypes.length && !def.archetypes.includes(room.archetype)) room.archetype = def.archetypes[0]
+    room.vaultZones = buildZones(cm, room, def.internalZones || [])
+    const slots = buildSlots(cm, room, def.roles || {})
+    room.tacticalSlots = slots
+    const vault = {
+      id: `${packageId}-vault:${floorZ}:${selected.length}`,
+      type,
+      label: def.label || type,
+      roomId: room.id,
+      entrance: dwarvenRoomEntryPoint(cm, room),
+      roles: structuredClone(def.roles || {}),
+      slots,
+      zones: structuredClone(room.vaultZones || []),
+      doorRequirement: def.doorRequirement || 'any',
+      trapBias: def.trapBias === true,
+      trapTypes: Array.isArray(def.trapTypes) ? def.trapTypes.slice() : [],
+      lootMultiplier: Number(def.lootMultiplier ?? 1),
+      tierBiasBonus: Number(def.tierBiasBonus ?? 0),
+      artifactReserved
+    }
+    selected.push(vault)
+    usedRooms.add(room.id)
+    usedTypes.add(type)
+    return vault
+  }
+
+  let artifactRoom = null
+  if (finalFloor) {
+    const optional = selectable.filter(room => room.optional)
+      .sort((a, b) => (Math.abs(b.cx - roomMetas[0].cx) + Math.abs(b.cy - roomMetas[0].cy)) -
+        (Math.abs(a.cx - roomMetas[0].cx) + Math.abs(a.cy - roomMetas[0].cy)))
+    const configuredArtifactTypes = Array.isArray(cfg.artifactTypes) ? cfg.artifactTypes : []
+    artifactRoom = optional.find(room => configuredArtifactTypes.some(type => definitionFits(type, room, true))) || null
+    if (artifactRoom) {
+      const artifactTypes = configuredArtifactTypes.filter(type => definitionFits(type, artifactRoom, true))
+      if (!artifactTypes.length) return null
+      const type = pickWeighted(artifactTypes, t => Math.max(0.0001, defs[t]?.weight ?? 1))
+      attach(type, artifactRoom, true)
+    } else {
+      // A final floor must never lose its artifact because the ordinary vault
+      // roll produced no suitable room. Promote the farthest spare branch into
+      // a dedicated guarded side chamber; it is fallback-only and therefore
+      // never enters normal vault selection.
+      artifactRoom = optional.find(room => definitionFits('guardedArtifactChamber', room, true, true)) || null
+      if (!artifactRoom) return null
+      attach('guardedArtifactChamber', artifactRoom, true)
+    }
+  }
+
+  const rolledTarget = Math.max(1, randInt(cfg.countRange?.[0] ?? 1, cfg.countRange?.[1] ?? 2))
+  const target = finalFloor ? Math.max(Math.max(1, Math.floor(cfg.finalFloorMinimumCount ?? 1)), rolledTarget) : rolledTarget
+  if (finalFloor) {
+    const defensiveTypes = Array.isArray(cfg.finalFloorDefensiveTypes) ? cfg.finalFloorDefensiveTypes : []
+    const candidates = []
+    for (const room of selectable.filter(room => !usedRooms.has(room.id))) {
+      for (const type of defensiveTypes) {
+        if (!usedTypes.has(type) && definitionFits(type, room, true)) candidates.push({room, type})
+      }
+    }
+    if (!candidates.length) return null
+    const choice = pickWeighted(candidates, entry => Math.max(0.0001, defs[entry.type]?.weight ?? 1))
+    attach(choice.type, choice.room, false)
+  }
+  let guard = 0
+  const selectionGuardLimit = Math.max(1, Math.floor(cfg.selectionGuardLimit ?? 50))
+  while (selected.length < target && guard++ < selectionGuardLimit) {
+    const rooms = selectable.filter(room => !usedRooms.has(room.id))
+    if (!rooms.length) break
+    const room = pick(rooms)
+    let types = Object.keys(defs).filter(type => !defs[type]?.fallbackOnly && !usedTypes.has(type) && definitionFits(type, room, false))
+    if (!types.length) types = Object.keys(defs).filter(type => !defs[type]?.fallbackOnly && !usedTypes.has(type) && definitionFits(type, room, true))
+    if (!types.length) { usedRooms.add(room.id); continue }
+    const type = pickWeighted(types, t => Math.max(0.0001, defs[t]?.weight ?? 1))
+    attach(type, room, false)
+  }
+  if (!selected.length) return null
+  return {vaults: selected, artifactRoom}
+}
+
+function dungeonRoomGraphDistances(graph, startIndex) {
+  const distances = new Map([[startIndex, 0]])
+  const queue = [startIndex]
+  const adjacency = new Map()
+  for (const edge of graph.edges || []) {
+    if (!adjacency.has(edge.a)) adjacency.set(edge.a, [])
+    if (!adjacency.has(edge.b)) adjacency.set(edge.b, [])
+    adjacency.get(edge.a).push(edge.b)
+    adjacency.get(edge.b).push(edge.a)
+  }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const current = queue[qi]
+    const nextDistance = distances.get(current) + 1
+    for (const next of adjacency.get(current) || []) {
+      if (distances.has(next)) continue
+      distances.set(next, nextDistance)
+      queue.push(next)
+    }
+  }
+  return distances
+}
+
+// Generic room-graph foundation used by authored dungeon strata. Geography is
+// placed first, but no corridor is carved until this graph has selected the
+// mandatory route, optional branches and loop edges. That keeps progression
+// reasoning independent from tile carving and makes the same graph metadata
+// reusable by later dungeon content packages.
+function buildDungeonRoomGraph(rooms, cfg = {}) {
+  if (!Array.isArray(rooms) || rooms.length < 3) return null
+  const minGraphDistance = Math.max(2, Math.floor(cfg.minimumEntranceExitRoomGraphDistance ?? 3))
+  if (rooms.length < minGraphDistance + 1) return null
+  const branchRange = Array.isArray(cfg.optionalBranchCountRange) ? cfg.optionalBranchCountRange : [1, 3]
+  const requestedMinBranches = Math.max(0, Math.floor(branchRange[0] ?? 0))
+  const branchCapacity = rooms.length - (minGraphDistance + 1)
+  if (branchCapacity < requestedMinBranches) return null
+  const maxBranches = Math.max(requestedMinBranches, Math.min(branchCapacity, Math.floor(branchRange[1] ?? branchRange[0] ?? 0)))
+  const minBranches = requestedMinBranches
+  const branchTarget = maxBranches > 0 ? randInt(minBranches, maxBranches) : 0
+  const routeNodeCount = Math.max(minGraphDistance + 1, rooms.length - branchTarget)
+  const unused = new Set(rooms.map((_, index) => index).slice(1))
+  const mainRoute = [0]
+  const treeEdges = []
+  const distanceBetween = (a, b) => Math.abs(rooms[a].cx - rooms[b].cx) + Math.abs(rooms[a].cy - rooms[b].cy)
+
+  while (mainRoute.length < routeNodeCount && unused.size) {
+    const from = mainRoute[mainRoute.length - 1]
+    const candidates = [...unused].map(index => ({index, distance: distanceBetween(from, index)}))
+      .sort((a, b) => a.distance - b.distance || a.index - b.index)
+    // Prefer nearby rooms so corridors remain readable, while a small seeded
+    // candidate band prevents every graph from degenerating into one pattern.
+    const band = candidates.slice(0, Math.min(3, candidates.length))
+    const chosen = pick(band).index
+    treeEdges.push({a: from, b: chosen, kind: 'main'})
+    mainRoute.push(chosen)
+    unused.delete(chosen)
+  }
+  if (mainRoute.length < minGraphDistance + 1) return null
+
+  const branchRoots = []
+  for (const index of [...unused]) {
+    const candidates = mainRoute.slice(0, -1).map(parent => ({parent, distance: distanceBetween(parent, index)}))
+      .sort((a, b) => a.distance - b.distance || a.parent - b.parent)
+    if (!candidates.length) return null
+    const parent = candidates[0].parent
+    treeEdges.push({a: parent, b: index, kind: 'branch'})
+    branchRoots.push({root: parent, room: index})
+    unused.delete(index)
+  }
+
+  const graph = {
+    entranceRoom: 0,
+    exitRoom: mainRoute[mainRoute.length - 1],
+    mainRoute: mainRoute.slice(),
+    branches: branchRoots,
+    edges: treeEdges.map(edge => ({...edge}))
+  }
+  const existing = new Set(graph.edges.map(edge => edge.a < edge.b ? `${edge.a}:${edge.b}` : `${edge.b}:${edge.a}`))
+  const loopPairs = []
+  for (let a = 0; a < rooms.length; a++) for (let b = a + 1; b < rooms.length; b++) {
+    if (existing.has(`${a}:${b}`)) continue
+    loopPairs.push({a, b, distance: distanceBetween(a, b)})
+  }
+  loopPairs.sort((a, b) => a.distance - b.distance || a.a - b.a || a.b - b.b)
+  const loopLimit = Math.max(0, Math.floor(cfg.loopMaxConnections ?? 0))
+  let loopsAdded = 0
+  for (const pair of loopPairs) {
+    if (loopsAdded >= loopLimit) break
+    if (!chance(cfg.loopProbability ?? 0)) continue
+    const candidate = {...pair, kind: 'loop'}
+    graph.edges.push(candidate)
+    const graphDistance = dungeonRoomGraphDistances(graph, graph.entranceRoom).get(graph.exitRoom)
+    if (!Number.isFinite(graphDistance) || graphDistance < minGraphDistance) {
+      graph.edges.pop()
+      continue
+    }
+    loopsAdded++
+  }
+  const graphDistance = dungeonRoomGraphDistances(graph, graph.entranceRoom).get(graph.exitRoom)
+  if (!Number.isFinite(graphDistance) || graphDistance < minGraphDistance) return null
+  graph.graphDistance = graphDistance
+  return graph
+}
+
 function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout
+  const progress = floorCount <= 1 ? 1 : floorIndex / (floorCount - 1)
+  const finalFloor = floorIndex === floorCount - 1
+  const storyCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.story || {}
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
   const boundsX = randInt(cfg.boundsXRange[0], cfg.boundsXRange[1])
@@ -1378,51 +1970,24 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
     const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
     const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
-    if (rooms.every(r => candidate.x > r.x + r.w + cfg.roomSeparation ||
-      candidate.x + candidate.w + cfg.roomSeparation < r.x ||
-      candidate.y > r.y + r.h + cfg.roomSeparation ||
-      candidate.y + candidate.h + cfg.roomSeparation < r.y)) rooms.push(candidate)
+    if (dungeonRoomHasSeparation(rooms, candidate, cfg.roomSeparation)) rooms.push(candidate)
   }
   if (rooms.length < 3) return null
+  const roomGraph = buildDungeonRoomGraph(rooms, cfg)
+  if (!roomGraph) return null
 
   for (const r of rooms) {
     for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) carve(x, y)
   }
 
-  const connected = [rooms[0]]
+  const connectRoomCenters = (a, b) => carveDungeonRoomConnection(carveWide, a, b, cfg)
+
   const parentByRoom = new Map()
-  while (connected.length < rooms.length) {
-    let best = null
-    for (const r of rooms) {
-      if (connected.includes(r)) continue
-      for (const c of connected) {
-        const d = Math.abs(r.cx - c.cx) + Math.abs(r.cy - c.cy)
-        if (!best || d < best.d) best = {r, c, d}
-      }
-    }
-    if (!best) return null
-    const {r, c} = best
-    parentByRoom.set(r, c)
-    const corridor = (x1, y1, x2, y2) => {
-      const sx = Math.sign(x2 - x1), sy = Math.sign(y2 - y1)
-      while (x1 !== x2) {
-        carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
-        x1 += sx
-      }
-      while (y1 !== y2) {
-        carveWide(x1, y1, chance(cfg.corridorWideChance) ? 3 : 2)
-        y1 += sy
-      }
-      carveWide(x2, y2, 2)
-    }
-    if (chance(cfg.corridorHorizontalFirstChance)) {
-      corridor(c.cx, c.cy, r.cx, c.cy)
-      corridor(r.cx, c.cy, r.cx, r.cy)
-    } else {
-      corridor(c.cx, c.cy, c.cx, r.cy)
-      corridor(c.cx, r.cy, r.cx, r.cy)
-    }
-    connected.push(r)
+  for (const edge of roomGraph.edges.filter(edge => edge.kind !== 'loop')) {
+    const parent = rooms[edge.a], child = rooms[edge.b]
+    if (!parent || !child) return null
+    parentByRoom.set(child, parent)
+    connectRoomCenters(parent, child)
   }
 
   // The entrance room stays open. Find the actual corridor crossing each
@@ -1460,12 +2025,22 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     doorways.push({leaves: doorway, room: r})
   }
 
+  // Loop decisions were already made in the abstract room graph. Carve them
+  // only after primary room walls/doorways exist so the loop creates its own
+  // visible secondary connection without changing graph semantics.
+  for (const edge of roomGraph.edges.filter(edge => edge.kind === 'loop')) {
+    connectRoomCenters(rooms[edge.a], rooms[edge.b])
+  }
+
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
     if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
   }
   cm[entry.y][entry.x] = 'dwarvenstairsup'
 
-  const collapseAttempts = randInt(cfg.collapseAttemptsRange[0], cfg.collapseAttemptsRange[1])
+  const collapseBase = randInt(cfg.collapseAttemptsRange[0], cfg.collapseAttemptsRange[1])
+  const rubbleProgressMultiplier = dungeonProgressMultiplier(storyCfg.rubbleProgressMultiplierRange, progress, 1)
+  const rubbleMultiplier = finalFloor ? Math.max(rubbleProgressMultiplier, Number(storyCfg.finalFloorRubbleMultiplier ?? 1)) : rubbleProgressMultiplier
+  const collapseAttempts = Math.max(1, Math.round(collapseBase * rubbleMultiplier))
   for (let i = 0; i < collapseAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] !== 'marble') continue
@@ -1501,22 +2076,25 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     distances = reachable()
   }
 
-  const minimumDistance = cfg.minimumEntranceExitGraphDistance
+  const minimumWalkingDistance = Math.max(1, Math.floor(cfg.minimumEntranceExitWalkingDistance ?? 1))
+  const graphExitRoom = rooms[roomGraph.exitRoom]
+  if (!graphExitRoom) return null
   const exitCandidates = []
-  for (const [key, distance] of distances.entries()) {
-    if (distance < minimumDistance) continue
-    const [x, y] = key.split(',').map(Number)
-    if (cm[y]?.[x] !== 'marble') continue
-    exitCandidates.push({x, y, distance})
+  for (let y = graphExitRoom.y + 1; y < graphExitRoom.y + graphExitRoom.h - 1; y++) {
+    for (let x = graphExitRoom.x + 1; x < graphExitRoom.x + graphExitRoom.w - 1; x++) {
+      const distance = distances.get(keyXY(x, y))
+      if (!Number.isFinite(distance) || distance < minimumWalkingDistance) continue
+      if (cm[y]?.[x] !== 'marble') continue
+      exitCandidates.push({x, y, distance})
+    }
   }
   if (!exitCandidates.length) return null
 
-  // Prefer the far end of the valid range so the mandatory route cannot
-  // collapse into a technically valid but trivial short floor.
+  // The abstract graph chooses the exit room; tile distance only chooses a
+  // sensible stair position within that already-selected destination room.
   const maxDistance = Math.max(...exitCandidates.map(p => p.distance))
-  const farCandidates = exitCandidates.filter(p => p.distance >= Math.max(minimumDistance, maxDistance - cfg.exitFarCandidateBand))
+  const farCandidates = exitCandidates.filter(p => p.distance >= Math.max(minimumWalkingDistance, maxDistance - cfg.exitFarCandidateBand))
   const exit = pick(farCandidates)
-  const finalFloor = floorIndex === floorCount - 1
   cm[exit.y][exit.x] = finalFloor ? 'dwarvenminessealed' : 'dwarvenstairsdown'
 
   const doorCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors || {}
@@ -1537,31 +2115,95 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     structuralDoors.push({leaves: doorway, room,
       blocksExit: !after.has(keyXY(exit.x, exit.y))})
   }
-  const gateCandidates = structuralDoors.filter(d => d.blocksExit).map(d => d.leaves)
+  const mainRouteRooms = new Set(roomGraph.mainRoute.map(index => rooms[index]))
+  const gateCandidates = structuralDoors.filter(d => d.blocksExit && mainRouteRooms.has(d.room)).map(d => d.leaves)
   if (!gateCandidates.length) return null
   const gateDoorway = pick(gateCandidates)
   const gateKeyId = dwarvenDungeonLockId(floorZ, 'gate', gateDoorway)
   const gatePreBreached = chance(doorCfg.progressionGatePreBreachedChance ?? 0)
   for (const p of gateDoorway) cm[p.y][p.x] = gatePreBreached ? 'dwarvengatebreached' : 'dwarvengatelocked'
 
-  // An intact mandatory gate receives exactly one matching key on the
-  // entrance-side component. The gate is already non-walkable here, so this
-  // cannot place its key beyond itself or create a self-locking progression.
+  // Intact gates choose a progression-key scenario after rooms/vaults are
+  // known. The key can be carried by a champion, hidden in searchable remains,
+  // guarded by a trap-side room, or placed behind one reachable local lock.
   let progressionKey = null
-  if (!gatePreBreached) {
-    const keyDistances = dungeonWalkDistances(cm, entry)
-    const candidates = []
-    for (const [key, distance] of keyDistances.entries()) {
-      if (distance <= 0) continue
-      const [x, y] = key.split(',').map(Number)
-      if (cm[y]?.[x] !== 'marble') continue
-      if (x === exit.x && y === exit.y) continue
-      if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
-      candidates.push({x, y})
+  let progressionKeyPlan = gatePreBreached ? null : {keyId: gateKeyId, mode: null}
+
+  const doorwayByRoom = new Map()
+  for (const {leaves, room} of doorways) {
+    if (!doorwayByRoom.has(room)) doorwayByRoom.set(room, [])
+    doorwayByRoom.get(room).push(leaves.map(p => ({x:p.x,y:p.y})))
+  }
+  const roomMetas = rooms.map((room, index) => ({
+    id: `dwarven-room:${floorZ}:${index}`,
+    index,
+    x: room.x,
+    y: room.y,
+    w: room.w,
+    h: room.h,
+    cx: room.cx,
+    cy: room.cy,
+    archetype: index === 0 ? 'Entrance Hall' : dwarvenRoomArchetypeForProgress(progress, finalFloor),
+    doorways: doorwayByRoom.get(room) || [],
+    connectionCount: dungeonRoomGraphDegree(roomGraph, index),
+    onMainRoute: roomGraph.mainRoute.includes(index),
+    optional: index > 0 && !roomGraph.mainRoute.includes(index),
+    vaultType: null,
+    vaultLabel: null,
+    tacticalSlots: null,
+    _source: room
+  }))
+  const roomMetaBySource = new Map(roomMetas.map(room => [room._source, room]))
+  const vaultSelection = selectDungeonVaults('dwarvenRuins', cm, roomMetas, structuralDoors, gateDoorway, progress, floorZ, finalFloor, {
+    buildZones: dwarvenVaultInternalZones,
+    buildSlots: deriveDwarvenTacticalSlots
+  })
+  if (!vaultSelection) return null
+  const vaults = vaultSelection.vaults
+  const artifactRoom = vaultSelection.artifactRoom
+  const roomCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.rooms?.archetypes || {}
+  const vaultCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.vaults?.definitions || {}
+  const keyCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.progressionKeys || {}
+
+  let progressionSideDoorway = null
+  let progressionSideRoom = null
+  let progressionForceUnlocked = false
+  if (progressionKeyPlan) {
+    const modeWeights = keyCfg.modes || {remains: 1}
+    const entranceSideReach = dungeonWalkDistances(cm, entry)
+    const structuralByRoom = new Map(structuralDoors.filter(d => d.leaves !== gateDoorway).map(d => [d.room, d]))
+    const entranceSideRooms = roomMetas.filter(room => room.index > 0 &&
+      entranceSideReach.has(keyXY(room.cx, room.cy)) && room._source !== structuralDoors.find(d => d.leaves === gateDoorway)?.room)
+    const sideRooms = entranceSideRooms.filter(room => room.optional && structuralByRoom.has(room._source))
+    const unlockedSideRooms = sideRooms.filter(room =>
+      (vaultCfg[room.vaultType]?.doorRequirement || 'any') !== 'locked')
+    const eligibleModes = []
+    if (entranceSideRooms.length && Number(modeWeights.championCarrier) > 0) eligibleModes.push('championCarrier')
+    if (Number(modeWeights.remains) > 0) eligibleModes.push('remains')
+    if (unlockedSideRooms.length && Number(modeWeights.trapGuardedSideRoom) > 0) eligibleModes.push('trapGuardedSideRoom')
+    if (sideRooms.length && Number(modeWeights.lockedSideRoom) > 0) eligibleModes.push('lockedSideRoom')
+    if (!eligibleModes.length) return null
+    const mode = pickWeighted(eligibleModes, value => Math.max(0.0001, Number(modeWeights[value]) || 0))
+    progressionKeyPlan.mode = mode
+    if (mode === 'championCarrier') {
+      const ordered = entranceSideRooms.slice().sort((a, b) =>
+        (Math.abs(b.cx-entry.x)+Math.abs(b.cy-entry.y)) - (Math.abs(a.cx-entry.x)+Math.abs(a.cy-entry.y)))
+      progressionSideRoom = ordered[0]
+      progressionKeyPlan.targetRoomId = progressionSideRoom.id
+      const structural = structuralByRoom.get(progressionSideRoom._source)
+      if (structural) { progressionSideDoorway = structural.leaves; progressionForceUnlocked = true }
+    } else if (mode === 'trapGuardedSideRoom' || mode === 'lockedSideRoom') {
+      const pool = mode === 'trapGuardedSideRoom' ? unlockedSideRooms : sideRooms
+      progressionSideRoom = pick(pool)
+      progressionSideDoorway = structuralByRoom.get(progressionSideRoom._source)?.leaves || null
+      if (!progressionSideDoorway) return null
+      progressionKeyPlan.targetRoomId = progressionSideRoom.id
+      progressionForceUnlocked = mode === 'trapGuardedSideRoom'
+      if (mode === 'trapGuardedSideRoom') {
+        progressionKeyPlan.trapGuarded = true
+        progressionKeyPlan.guardPoint = dwarvenRoomEntryPoint(cm, progressionSideRoom)
+      }
     }
-    if (!candidates.length) return null
-    const spot = pick(candidates)
-    progressionKey = {x: spot.x, y: spot.y, keyId: gateKeyId}
   }
 
   // Ordinary doors roll once per physical two-leaf doorway. If that doorway
@@ -1570,15 +2212,38 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const doorChance = doorCfg.ordinaryDoorChance ?? 0
   const lockedDoorChance = doorCfg.ordinaryLockedDoorChance ?? 0
   const ordinaryLocks = []
-  for (const {leaves: doorway} of structuralDoors) {
+  for (const {leaves: doorway, room} of structuralDoors) {
     if (doorway === gateDoorway) continue
-    if (!chance(doorChance)) continue
     if (doorway.length !== 2 || doorway.some(p => cm[p.y]?.[p.x] !== 'marble')) continue
-    const locked = chance(lockedDoorChance)
+    const meta = roomMetaBySource.get(room)
+    const vault = vaults.find(candidate => candidate.roomId === meta?.id) || null
+    const vaultDoorRequirement = vaultCfg[meta?.vaultType]?.doorRequirement || 'any'
+    const forcedProgressionLock = progressionKeyPlan?.mode === 'lockedSideRoom' && doorway === progressionSideDoorway
+    const forcedProgressionUnlocked = progressionForceUnlocked && doorway === progressionSideDoorway
+    const forceLocked = forcedProgressionLock || vaultDoorRequirement === 'locked'
+    const forceClosedUnlocked = !forceLocked && (forcedProgressionUnlocked || vaultDoorRequirement === 'closed')
+    if (!forceLocked && !forceClosedUnlocked && !chance(doorChance)) continue
+    const breachedProgressMultiplier = dungeonProgressMultiplier(storyCfg.breachedDoorProgressMultiplierRange, progress, 1)
+    const breachedMultiplier = finalFloor ? Math.max(breachedProgressMultiplier, Number(storyCfg.finalFloorBreachedDoorMultiplier ?? 1)) : breachedProgressMultiplier
+    const breachedChance = Math.min(1, (doorCfg.ordinaryBreachedDoorChance ?? 0) * breachedMultiplier)
+    if (!forceLocked && !forceClosedUnlocked && chance(breachedChance)) {
+      for (const p of doorway) cm[p.y][p.x] = 'dwarvendoorbreached'
+      continue
+    }
+    const archetypeLockMultiplier = Number(roomCfg[meta?.archetype]?.lockMultiplier ?? 1)
+    const vaultLockMultiplier = Number(vaultCfg[meta?.vaultType]?.lockMultiplier ?? 1)
+    const locked = forceLocked || (!forceClosedUnlocked &&
+      chance(Math.min(1, lockedDoorChance * archetypeLockMultiplier * vaultLockMultiplier)))
     for (const p of doorway) cm[p.y][p.x] = locked ? 'dwarvendoorlocked' : 'dwarvendoorclosed'
+    if (vault && (vaultDoorRequirement === 'closed' || vaultDoorRequirement === 'locked')) {
+      vault.entranceDoorLeaves = doorway.map(p => ({x:p.x,y:p.y}))
+    }
     if (locked) ordinaryLocks.push({
       leaves: doorway.map(p => ({x: p.x, y: p.y})),
-      keyId: dwarvenDungeonLockId(floorZ, 'door', doorway)
+      keyId: dwarvenDungeonLockId(floorZ, 'door', doorway),
+      roomId: meta?.id || null,
+      vaultId: vaults.find(vault => vault.roomId === meta?.id)?.id || null,
+      progressionSideLock: forcedProgressionLock
     })
   }
 
@@ -1609,15 +2274,120 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
   }
 
-  const progress = floorCount <= 1 ? 1 : floorIndex / (floorCount - 1)
+  if (progressionKeyPlan) {
+    const usedKeyTiles = new Set(ordinaryKeys.map(key => keyXY(key.x, key.y)))
+    const validKeyTile = (x, y) => cm[y]?.[x] === 'marble' && !usedKeyTiles.has(keyXY(x, y)) &&
+      !(x === entry.x && y === entry.y) && !(x === exit.x && y === exit.y) &&
+      !doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))
+    if (progressionKeyPlan.mode === 'lockedSideRoom') {
+      const sideLock = ordinaryLocks.find(lock => lock.progressionSideLock)
+      if (!sideLock || !progressionSideRoom) return null
+      progressionKeyPlan.requiresLockId = sideLock.keyId
+      const candidates = dwarvenRoomInterior(progressionSideRoom).filter(p => validKeyTile(p.x, p.y))
+      if (!candidates.length) return null
+      const spot = pick(candidates)
+      progressionKey = {...progressionKeyPlan, x:spot.x, y:spot.y}
+    } else if (progressionKeyPlan.mode === 'trapGuardedSideRoom') {
+      if (!progressionSideRoom) return null
+      const candidates = dwarvenRoomInterior(progressionSideRoom).filter(p => validKeyTile(p.x, p.y))
+      if (!candidates.length) return null
+      const spot = pick(candidates)
+      progressionKey = {...progressionKeyPlan, x:spot.x, y:spot.y}
+    } else if (progressionKeyPlan.mode === 'remains') {
+      const reachable = dungeonWalkDistances(cm, entry)
+      const candidates = [...reachable.keys()].map(key => {
+        const [x, y] = key.split(',').map(Number)
+        return {x, y, distance:reachable.get(key)}
+      }).filter(p => p.distance > 0 && validKeyTile(p.x, p.y))
+      if (!candidates.length) return null
+      const maxDistance = Math.max(...candidates.map(p => p.distance))
+      const farBand = Math.max(0, Math.floor(keyCfg.remainsFarCandidateBand ?? 8))
+      const remote = candidates.filter(p => p.distance >= Math.max(1, maxDistance - farBand))
+      const spot = pick(remote.length ? remote : candidates)
+      progressionKey = {...progressionKeyPlan, x:spot.x, y:spot.y}
+    } else if (progressionKeyPlan.mode === 'championCarrier') {
+      if (!progressionKeyPlan.targetRoomId) return null
+      progressionKey = {...progressionKeyPlan}
+    } else return null
+  }
+
+  const reserved = new Set([
+    keyXY(entry.x, entry.y),
+    keyXY(exit.x, exit.y),
+    ...(progressionKey && Number.isInteger(progressionKey.x) && Number.isInteger(progressionKey.y)
+      ? [keyXY(progressionKey.x, progressionKey.y)] : []),
+    ...ordinaryKeys.map(k => keyXY(k.x, k.y))
+  ])
+  for (const room of roomMetas) {
+    decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved)
+    if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
+  }
+  if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
+  for (const room of roomMetas.filter(room => room.archetype === 'Prison')) {
+    const hasBars = dwarvenRoomInterior(room).some(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars')
+    const hasCellDoor = (room.internalLocks || []).some(lock => lock.kind === 'prisonCell') ||
+      (room.internalDoors || []).some(door => door.kind === 'prisonCell')
+    if (!hasBars || !hasCellDoor) return null
+  }
+  for (const room of roomMetas) {
+    if (room.index === 0) continue
+    const vault = vaults.find(v => v.roomId === room.id)
+    room.tacticalSlots = deriveDwarvenTacticalSlots(cm, room, vault?.roles || null)
+    if (vault) vault.slots = structuredClone(room.tacticalSlots)
+  }
+
+  // Dressing, rubble and locks may reshape optional spaces, but may never
+  // invalidate a mandatory key or the eventual route to the exit.
+  const closedReach = dungeonWalkDistances(cm, entry)
+  if (progressionKey?.mode === 'remains' && !closedReach.has(keyXY(progressionKey.x, progressionKey.y))) return null
+  if (ordinaryKeys.some(key => !closedReach.has(keyXY(key.x, key.y)))) return null
+  const eventualReach = dungeonWalkDistancesWithDoorTraversal(cm, entry)
+  if (!eventualReach.has(keyXY(exit.x, exit.y))) return null
+  for (const room of roomMetas) for (const slots of Object.values(room.tacticalSlots || {})) {
+    if ((slots || []).some(p => cm[p.y]?.[p.x] !== 'marble')) return null
+  }
+
+  const serializableRooms = roomMetas.map(({_source, ...room}) => room)
+  const serializableArtifactRoom = artifactRoom
+    ? serializableRooms.find(room => room.id === artifactRoom.id) || null
+    : null
+  let artifactSpot = null
+  if (artifactRoom) {
+    const tacticalKeys = new Set(Object.values(artifactRoom.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y)))
+    const artifactCandidates = dwarvenRoomInterior(artifactRoom).filter(p =>
+      cm[p.y]?.[p.x] === 'marble' && eventualReach.has(keyXY(p.x, p.y)) &&
+      !reserved.has(keyXY(p.x, p.y)) && !tacticalKeys.has(keyXY(p.x, p.y)))
+    if (!artifactCandidates.length) return null
+    artifactSpot = pick(artifactCandidates)
+  }
+  const serializableRoomGraph = {
+    entranceRoomId: serializableRooms[roomGraph.entranceRoom]?.id || null,
+    exitRoomId: serializableRooms[roomGraph.exitRoom]?.id || null,
+    graphDistance: roomGraph.graphDistance,
+    mainRoute: roomGraph.mainRoute.map(index => serializableRooms[index]?.id).filter(Boolean),
+    branches: roomGraph.branches.map(branch => ({
+      rootRoomId: serializableRooms[branch.root]?.id || null,
+      roomId: serializableRooms[branch.room]?.id || null
+    })).filter(branch => branch.rootRoomId && branch.roomId),
+    edges: roomGraph.edges.map(edge => ({
+      aRoomId: serializableRooms[edge.a]?.id || null,
+      bRoomId: serializableRooms[edge.b]?.id || null,
+      kind: edge.kind
+    })).filter(edge => edge.aRoomId && edge.bRoomId)
+  }
   const descriptor = {
     x: entry.x,
     y: entry.y,
     entrances: [{x: entry.x, y: entry.y}, {x: exit.x, y: exit.y}],
     dwarvenRuins: true,
+    dungeonPackage: 'dwarvenRuins',
     dungeonFloor: floorIndex + 1,
     floorCount,
-    progress
+    progress,
+    rooms: serializableRooms,
+    roomGraph: structuredClone(serializableRoomGraph),
+    vaults: structuredClone(vaults),
+    artifactRoomId: serializableArtifactRoom?.id || null
   }
   const discovered = Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   return {
@@ -1626,13 +2396,20 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     caves: [descriptor],
     discovered,
     kind: 'dwarvenRuins',
+    dungeonPackage: 'dwarvenRuins',
     dungeonFloor: floorIndex + 1,
     floorCount,
     progress,
     progressionKey,
     ordinaryKeys,
+    rooms: serializableRooms,
+    roomGraph: structuredClone(serializableRoomGraph),
+    vaults: structuredClone(vaults),
+    artifactRoomId: serializableArtifactRoom?.id || null,
+    _artifactRoom: serializableArtifactRoom,
+    _artifactSpot: artifactSpot,
     // Only needed during world creation; actors themselves persist in saves.
-    _encounterRooms: rooms.map(r => ({x:r.x,y:r.y,w:r.w,h:r.h,cx:r.cx,cy:r.cy})),
+    _encounterRooms: serializableRooms,
     _doorways: structuralDoors.map(d => ({leaves: d.leaves, room: {x:d.room.cx,y:d.room.cy}}))
   }
 }
@@ -1644,7 +2421,7 @@ function placeDwarvenRuinsFortDescent() {
   const distances = dungeonWalkDistances(fort.map, dwarvenRuin)
   const candidates = []
   for (const [key, distance] of distances.entries()) {
-    if (distance < cfg.minimumEntranceExitGraphDistance) continue
+    if (distance < cfg.minimumEntranceExitWalkingDistance) continue
     const [x, y] = key.split(',').map(Number)
     if (fort.map[y]?.[x] !== 'marble') continue
     if (enemies.some(e => e.alive && e.level === -3 && e.x === x && e.y === y)) continue
@@ -1653,7 +2430,7 @@ function placeDwarvenRuinsFortDescent() {
   }
   if (!candidates.length) return null
   const maxDistance = Math.max(...candidates.map(p => p.distance))
-  const far = candidates.filter(p => p.distance >= Math.max(cfg.minimumEntranceExitGraphDistance, maxDistance - cfg.exitFarCandidateBand))
+  const far = candidates.filter(p => p.distance >= Math.max(cfg.minimumEntranceExitWalkingDistance, maxDistance - cfg.exitFarCandidateBand))
   const stair = pick(far)
   fort.map[stair.y][stair.x] = 'dwarvenstairsdown'
   const local = fort.caveMaps[dwarvenRuin.caveIndex]
@@ -1708,13 +2485,15 @@ function placeDwarvenRuinsLift(levelCount) {
   upperLevel.map[upper.y][upper.x] = 'dwarvenliftoff'
   lowerLevel.map[lower.y][lower.x] = 'dwarvenliftoff'
   lowerLevel.map[lever.y][lever.x] = 'dwarvenlever'
-  dwarvenRuinsLift = {
-    id: 'dwarven-ruins-lift-1',
+  dungeonShortcuts.push({
+    id: shortcutCfg.id || 'dwarven-ruins-lift-1',
+    packageId: 'dwarvenRuins',
+    kind: 'lift',
     unlocked: false,
     upper: {floor: 1, z: upperZ, x: upper.x, y: upper.y},
     lower: {floor: targetFloor, z: lowerZ, x: lower.x, y: lower.y},
     lever: {z: lowerZ, x: lever.x, y: lever.y}
-  }
+  })
   return true
 }
 
@@ -1737,16 +2516,20 @@ function buildDwarvenRuinsStratum() {
     if (!level) return false
     deepLevels.push(level)
     if (level.progressionKey) {
-      groundItems.push({
-        x: level.progressionKey.x,
-        y: level.progressionKey.y,
-        level: chainZForDepth(floorIndex + 4),
-        levelKind: 'chain',
-        caveIndex: -1,
-        kind: 'dwarvenkey',
-        keyId: level.progressionKey.keyId,
-        progressionKey: true
-      })
+      const key = level.progressionKey
+      const z = chainZForDepth(floorIndex + 4)
+      if (key.mode === 'remains') {
+        groundItems.push({
+          x:key.x,y:key.y,level:z,levelKind:'chain',caveIndex:-1,kind:'skeleton',looted:false,hasLoot:false,
+          dungeonKey:{kind:'dwarvenkey',keyId:key.keyId,progressionKey:true},
+          description:'A dead dwarf still grips a small iron key beneath its ribs.'
+        })
+      } else if (key.mode !== 'championCarrier') {
+        groundItems.push({
+          x:key.x,y:key.y,level:z,levelKind:'chain',caveIndex:-1,kind:'dwarvenkey',keyId:key.keyId,
+          progressionKey:true,progressionKeyMode:key.mode
+        })
+      }
     }
     for (const ordinaryKey of level.ordinaryKeys || []) {
       groundItems.push({
@@ -1760,6 +2543,23 @@ function buildDwarvenRuinsStratum() {
         ordinaryDoorKey: true
       })
     }
+    if (level._artifactSpot) {
+      const lootCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.loot
+      groundItems.push({
+        x: level._artifactSpot.x,
+        y: level._artifactSpot.y,
+        level: chainZForDepth(floorIndex + 4),
+        levelKind: 'chain',
+        caveIndex: -1,
+        kind: 'chest',
+        tier: lootCfg.artifactTier,
+        opened: false,
+        artifactGuaranteed: true,
+        dwarvenRuinsArtifact: true,
+        vaultId: level.vaults.find(vault => vault.artifactReserved)?.id || null
+      })
+    }
+    spawnDwarvenRuinsRoomProps(level, chainZForDepth(floorIndex + 4))
     const descriptor = level.caves[0]
     if (floorIndex < levelCount - 1) {
       const down = descriptor.entrances[1]
@@ -1767,7 +2567,7 @@ function buildDwarvenRuinsStratum() {
     }
   }
   if (!placeDwarvenRuinsLift(levelCount)) return false
-  DungeonTraps.generate()
+  if (!DungeonTraps.generate()) return false
   return true
 }
 
@@ -2989,68 +3789,104 @@ function spawnCaveScenarios() {
   }
 }
 
-function dwarvenRuinsEncounterTemplatesForDepth(z, cfg) {
+function dungeonEncounterTemplatesForDepth(packageId, z, cfg, hooks = {}) {
   const depth = Math.abs(z)
+  const nativeBiomes = new Set(Array.isArray(cfg?.nativeBiomes) && cfg.nativeBiomes.length ? cfg.nativeBiomes : ['cave'])
   return ENEMY_TEMPLATES.filter(tmpl => {
-    const minDepth = Number(cfg.minDepthByTier?.[String(tmpl.tier)])
+    const minDepth = Number(cfg?.minDepthByTier?.[String(tmpl.tier)])
     if (!Number.isFinite(minDepth) || depth < minDepth) return false
     if ((tmpl.aggro ?? AGGRO_RANGE) <= 0) return false
     const biomes = tmpl.biomes || []
     const explicitDepths = biomes
       .map(b => typeof b === 'string' && /^z-\d+$/.test(b) ? Math.abs(Number(b.slice(1))) : null)
       .filter(Number.isFinite)
-    // Ruins eligibility is content-driven: native cave species are eligible by
-    // tier depth, while surface species must opt in with a z-* tag. This keeps
-    // biome-specific surface fauna (lions, crabs, nymphs, etc.) out of the hold.
-    if (!biomes.includes('cave') && !explicitDepths.length) return false
+    // Dungeon packages declare which existing biome memberships count as
+    // native. Other species must opt in with an explicit z-* depth tag.
+    if (!biomes.some(biome => nativeBiomes.has(biome)) && !explicitDepths.length) return false
     if (explicitDepths.length && depth < Math.min(...explicitDepths)) return false
+    if (typeof hooks.templateEligible === 'function' && !hooks.templateEligible(tmpl, {packageId,z,depth,cfg})) return false
     return true
   })
 }
 
-function spawnDwarvenRuinsEncounters() {
-  const cfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.encounters
+function dungeonEncounterFamilies(eligible, cfg) {
+  const byName = new Map((eligible || []).map(tmpl => [tmpl.name, tmpl]))
+  const families = []
+  for (const [id, def] of Object.entries(cfg?.families || {})) {
+    const members = (def.members || []).map(name => byName.get(name)).filter(Boolean)
+    if (!members.length) continue
+    const common = members.filter(tmpl => (tmpl.rarity ?? 1) > (cfg.dominantRarityCutoff ?? 0.1))
+    families.push({id, weight: Number(def.weight ?? 1), members, commonMembers: common})
+  }
+  if (!families.length) {
+    for (const tmpl of eligible || []) families.push({id: tmpl.name, weight: Math.max(0.0001, tmpl.rarity ?? 1), members: [tmpl], commonMembers: [tmpl]})
+  }
+  return families
+}
+
+function dungeonEncounterFamiliesForDepth(packageId, z, cfg, hooks = {}) {
+  const eligible = dungeonEncounterTemplatesForDepth(packageId, z, cfg, hooks)
+  return {eligible, families: dungeonEncounterFamilies(eligible, cfg)}
+}
+
+function spawnDungeonPackageEncounters(packageId, hooks = {}) {
+  const packageCfg = dungeonPackageConfig(packageId) || {}
+  const cfg = packageCfg.encounters
   if (!cfg) return
-  const ruins = deepLevels.slice(2).filter(level => level?.kind === 'dwarvenRuins')
+  const ruins = dungeonPackageLevels(packageId)
   if (!ruins.length) return
 
   const growthMin = cfg.densityGrowthRange?.[0] ?? 0.10
   const growthMax = cfg.densityGrowthRange?.[1] ?? growthMin
-  // One seeded growth rate per stratum keeps later floors monotonically denser
-  // instead of letting independent rolls make a deeper floor unexpectedly sparser.
   const densityGrowth = growthMin + rng() * Math.max(0, growthMax - growthMin)
   const prefixNames = Object.keys(ENEMY_PREFIXES).filter(name => name !== 'Champion')
-  const cutoff = cfg.dominantRarityCutoff ?? 0.1
   const minSpacing = Math.max(1, cfg.minSpacing ?? 3)
+  const tacticalMinSpacing = Math.max(1, cfg.tacticalMinSpacing ?? 1)
   const entranceClearance = Math.max(0, cfg.entranceClearance ?? 8)
-
-  const weightedWithoutReplacement = (pool, count) => {
-    const available = pool.slice()
-    const chosen = []
+  const shooterAbility = tmpl => (tmpl?.abilities || []).find(ability => Object.hasOwn(RANGED_CONFIG?.abilities || {}, ability)) || null
+  const isShooterTemplate = tmpl => !!shooterAbility(tmpl)
+  const hasGangPower = tmpl => (tmpl?.abilities || []).includes('gangPower')
+  const weightedWithoutReplacement = (pool, count, weightFn) => {
+    const available = pool.slice(), chosen = []
     while (available.length && chosen.length < count) {
-      const pickTmpl = pickWeighted(available, tmpl => Math.max(0.0001, tmpl.rarity ?? 1))
-      chosen.push(pickTmpl)
-      available.splice(available.indexOf(pickTmpl), 1)
+      const value = pickWeighted(available, item => Math.max(0.0001, weightFn(item)))
+      chosen.push(value)
+      available.splice(available.indexOf(value), 1)
     }
     return chosen
   }
+  const chooseMember = (family, role = 'any') => {
+    let pool = family?.members?.slice() || []
+    if (!pool.length) return null
+    if (role === 'backline') {
+      const shooters = pool.filter(isShooterTemplate)
+      if (!shooters.length) return null
+      pool = shooters
+    } else if (role === 'frontline') {
+      const preferred = pool.filter(tmpl => hasGangPower(tmpl) || !isShooterTemplate(tmpl))
+      if (preferred.length) pool = preferred
+    } else if (role === 'group') {
+      const gang = pool.filter(hasGangPower)
+      if (gang.length) pool = gang
+    }
+    return pickWeighted(pool, tmpl => Math.max(0.0001, tmpl.rarity ?? 1))
+  }
 
   for (let floorIndex = 0; floorIndex < ruins.length; floorIndex++) {
-    const level = ruins[floorIndex]
-    const z = chainZForDepth(floorIndex + 4)
-    const eligible = dwarvenRuinsEncounterTemplatesForDepth(z, cfg)
-    if (!eligible.length) continue
+    const {level, z} = ruins[floorIndex]
+    const {eligible, families} = dungeonEncounterFamiliesForDepth(packageId, z, cfg, hooks)
+    if (!eligible.length || !families.length) continue
 
     const descriptor = level.caves?.[0]
     const entrances = descriptor?.entrances || []
-    const roomBounds = Array.isArray(level._encounterRooms) ? level._encounterRooms.slice(1) : []
-    const walkableTiles = []
-    const safeTiles = []
+    const rooms = Array.isArray(level.rooms) && level.rooms.length ? level.rooms : (level._encounterRooms || [])
+    const roomById = new Map(rooms.map(room => [room.id, room]))
+    const walkableTiles = [], safeTiles = []
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
       const tile = level.map[y]?.[x]
       if (!TILE[tile]?.walk) continue
       walkableTiles.push({x, y})
-      if (tile !== 'marble') continue
+      if (Array.isArray(cfg.spawnFloorTiles) && cfg.spawnFloorTiles.length && !cfg.spawnFloorTiles.includes(tile)) continue
       if (entrances.some(e => Math.max(Math.abs(e.x - x), Math.abs(e.y - y)) <= entranceClearance)) continue
       if (!DungeonTraps.safeSpawn(x, y, z)) continue
       if (groundItems.some(item => (item.level ?? 0) === z && item.x === x && item.y === y)) continue
@@ -3064,50 +3900,74 @@ function spawnDwarvenRuinsEncounters() {
       (1 + floorIndex * densityGrowth)
     ))
 
-    let dominantPool = eligible.filter(tmpl => (tmpl.rarity ?? 1) > cutoff)
-    if (dominantPool.length < 2) dominantPool = eligible.slice()
+    let dominantPool = families.filter(family => family.commonMembers.length)
+    if (dominantPool.length < 2) dominantPool = families.slice()
     const requestedFamilies = randInt(cfg.dominantFamilyCountRange?.[0] ?? 2, cfg.dominantFamilyCountRange?.[1] ?? 4)
-    let dominant = weightedWithoutReplacement(dominantPool, Math.min(requestedFamilies, dominantPool.length))
-    while (dominant.length > 2 && dominant.reduce((sum, tmpl) => sum + Math.max(1, tmpl.tier), 0) > threatBudget) {
-      dominant.pop()
-    }
-    if (dominant.length < Math.min(2, dominantPool.length)) {
-      dominant = weightedWithoutReplacement(dominantPool, Math.min(2, dominantPool.length))
-    }
+    let dominant = weightedWithoutReplacement(dominantPool, Math.min(requestedFamilies, dominantPool.length), family =>
+      family.weight * family.members.reduce((sum, tmpl) => sum + Math.max(0.0001, tmpl.rarity ?? 1), 0))
     if (!dominant.length) continue
 
-    // The Champion is one representative of a dominant base-species family,
-    // not an extra species. This guarantees exactly one Champion per floor.
-    const championTemplate = pickWeighted(dominant, tmpl => Math.max(0.0001, tmpl.rarity ?? 1))
-    const minFamilyCost = dominant.reduce((sum, tmpl) => sum + Math.max(1, tmpl.tier), 0)
-    const outsiderPool = eligible.filter(tmpl => !dominant.includes(tmpl))
+    const vaults = Array.isArray(level.vaults) ? level.vaults : []
+    const needsShooterFamily = vaults.some(vault => (vault.roles?.backline || 0) > 0 && (vault.slots?.backline || []).length)
+    const shooterFamilies = families.filter(family => family.members.some(isShooterTemplate))
+    if (needsShooterFamily && shooterFamilies.length && !dominant.some(family => family.members.some(isShooterTemplate))) {
+      const shooterFamily = pickWeighted(shooterFamilies, family => Math.max(0.0001, family.weight))
+      if (dominant.length >= Math.max(1, requestedFamilies)) dominant[dominant.length - 1] = shooterFamily
+      else dominant.push(shooterFamily)
+      dominant = [...new Map(dominant.map(family => [family.id, family])).values()]
+    }
+
+    level.encounterFamilies = dominant.map(family => family.id)
+    if (descriptor) descriptor.encounterFamilies = level.encounterFamilies.slice()
+
+    const dominantMemberNames = new Set(dominant.flatMap(family => family.members.map(tmpl => tmpl.name)))
+    const outsiderPool = eligible.filter(tmpl => !dominantMemberNames.has(tmpl.name))
     const roamerPool = outsiderPool.length ? outsiderPool : eligible
-    const cheapestRoamerCost = Math.min(...roamerPool.map(tmpl => Math.max(1, tmpl.tier)))
-    threatBudget = Math.max(threatBudget, minFamilyCost + cheapestRoamerCost + Math.max(1, championTemplate.tier))
+    const championCount = Math.max(1, Math.floor(cfg.championsPerFloor ?? 1))
+    const championFamily = pickWeighted(dominant, family => Math.max(0.0001, family.weight))
+    const championTemplate = chooseMember(championFamily, 'champion') || eligible[0]
+    const cheapestDominant = dominant.reduce((sum, family) => sum + Math.min(...family.members.map(tmpl => Math.max(1, tmpl.tier))), 0)
+    const cheapestRoamer = Math.min(...roamerPool.map(tmpl => Math.max(1, tmpl.tier)))
+    const guaranteedShooterCost = needsShooterFamily && shooterFamilies.length
+      ? Math.min(...shooterFamilies.flatMap(family => family.members.filter(isShooterTemplate).map(tmpl => Math.max(1, tmpl.tier))))
+      : 0
+    threatBudget = Math.max(threatBudget,
+      Math.max(1, championTemplate.tier) * 2 * championCount + cheapestDominant + cheapestRoamer + guaranteedShooterCost)
 
     const spawned = []
-    const isSpaced = p => spawned.every(s => Math.max(Math.abs(s.x - p.x), Math.abs(s.y - p.y)) >= minSpacing)
-    const available = safeTiles.slice()
-    const takeSpot = (room = null, far = false) => {
-      let candidates = available.filter(isSpaced)
+    const spawnedFamilies = new Set()
+    const usedPositions = new Set()
+    const safeSet = new Set(safeTiles.map(p => keyXY(p.x, p.y)))
+    const isSpaced = (p, tactical = false) => spawned.every(s =>
+      Math.max(Math.abs(s.x - p.x), Math.abs(s.y - p.y)) >= (tactical ? tacticalMinSpacing : minSpacing))
+    const validSpot = (p, tactical = false) => !!p && safeSet.has(keyXY(p.x, p.y)) &&
+      !usedPositions.has(keyXY(p.x, p.y)) && isSpaced(p, tactical)
+    const claimSpot = (p) => {
+      usedPositions.add(keyXY(p.x, p.y))
+      spawned.push({x:p.x, y:p.y})
+      return {x:p.x, y:p.y}
+    }
+    const takeRoleSpot = (room, role) => {
+      for (const p of room?.tacticalSlots?.[role] || []) if (validSpot(p, true)) return claimSpot(p)
+      return null
+    }
+    const takeSpot = (room = null, far = false, tactical = false) => {
+      let candidates = safeTiles.filter(p => validSpot(p, tactical))
       if (room) {
-        const inside = candidates.filter(p => p.x > room.x && p.x < room.x + room.w - 1 &&
-          p.y > room.y && p.y < room.y + room.h - 1)
+        const inside = candidates.filter(p => p.x > room.x && p.x < room.x + room.w - 1 && p.y > room.y && p.y < room.y + room.h - 1)
         if (inside.length) candidates = inside
       }
       if (!candidates.length) return null
       if (far && entrances[0]) {
         const maxD = Math.max(...candidates.map(p => Math.max(Math.abs(p.x - entrances[0].x), Math.abs(p.y - entrances[0].y))))
-        const remote = candidates.filter(p => Math.max(Math.abs(p.x - entrances[0].x), Math.abs(p.y - entrances[0].y)) >= maxD - 4)
+        const remoteBand = Math.max(0, Math.floor(cfg.remoteCandidateBand ?? 4))
+        const remote = candidates.filter(p => Math.max(Math.abs(p.x - entrances[0].x), Math.abs(p.y - entrances[0].y)) >= maxD - remoteBand)
         if (remote.length) candidates = remote
       }
-      const spot = pick(candidates)
-      available.splice(available.findIndex(p => p.x === spot.x && p.y === spot.y), 1)
-      spawned.push(spot)
-      return spot
+      return claimSpot(pick(candidates))
     }
 
-    const spawnTemplate = (tmpl, spot, prefix = null, roamer = false) => {
+    const spawnTemplate = (tmpl, spot, prefix = null, roamer = false, role = 'any', familyId = null, roomId = null, vaultId = null) => {
       if (!tmpl || !spot) return false
       const enemy = {
         name: tmpl.name,
@@ -3133,9 +3993,21 @@ function spawnDwarvenRuinsEncounters() {
         alive: true,
         prefix: null,
         equipment: null,
-        // Organized room encounters hold their room until aggroed; roamers keep
-        // the template's existing wander behavior (with normal underground rules).
+        dungeonRole: role,
+        encounterFamily: familyId,
+        dungeonRoomId: roomId,
+        dungeonVaultId: vaultId,
         ...(roamer ? {} : {wander: false})
+      }
+      if (role === 'backline') {
+        const ability = shooterAbility(tmpl)
+        if (ability) {
+          enemy.shooterAbility = ability
+          enemy.shotsRemaining = RANGED_CONFIG.startingShots
+        }
+      } else if (role === 'frontline' || role === 'group') {
+        enemy.shooterAbility = null
+        enemy.shotsRemaining = 0
       }
       if (prefix) {
         enemy.prefix = prefix
@@ -3143,7 +4015,7 @@ function spawnDwarvenRuinsEncounters() {
         applyEnemyPrefix(enemy, prefix)
         enemy.name = prefix + ' ' + enemy.name
       } else {
-        const prefixChance = Math.min(1, (cfg.prefixBaseChance ?? 0) + floorIndex * (cfg.prefixGrowthPerFloor ?? 0))
+        const prefixChance = Math.min(cfg.prefixChanceCap ?? 1, (cfg.prefixBaseChance ?? 0) + floorIndex * (cfg.prefixGrowthPerFloor ?? 0))
         if (prefixNames.length && chance(prefixChance)) {
           const rolled = pick(prefixNames)
           enemy.prefix = rolled
@@ -3153,111 +4025,478 @@ function spawnDwarvenRuinsEncounters() {
         }
       }
       addEnemy(enemy)
-      return true
+      if (familyId) spawnedFamilies.add(familyId)
+      return enemy
     }
 
     let spent = 0
-    const rooms = roomBounds.slice()
-    for (let i = rooms.length - 1; i > 0; i--) {
-      const j = randInt(0, i)
-      ;[rooms[i], rooms[j]] = [rooms[j], rooms[i]]
-    }
-    const farthestRoom = rooms.length && entrances[0]
-      ? rooms.reduce((best, room) => {
+    const organizedBudget = Math.max(1, Math.floor(threatBudget * Math.min(1, Math.max(0, cfg.dominantFamilyShare ?? 0.82))))
+    const nonEntranceRooms = rooms.filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
+    const farthestRoom = nonEntranceRooms.length && entrances[0]
+      ? nonEntranceRooms.reduce((best, room) => {
           const d = Math.max(Math.abs(room.cx - entrances[0].x), Math.abs(room.cy - entrances[0].y))
           return !best || d > best.d ? {room, d} : best
         }, null)?.room
       : null
-    const artifactRoom = level._artifactRoom || null
-
-    // The final floor's Champion guards the optional artifact side vault rather
-    // than the mandatory route. Other floors keep the far-room Champion rule.
-    const championRoom = artifactRoom || farthestRoom
-    const championSpot = takeSpot(championRoom, true) || takeSpot(null, true)
-    if (championSpot && spawnTemplate(championTemplate, championSpot, 'Champion', false)) spent += Math.max(1, championTemplate.tier)
-    // A Champion leads a recognizable pair, rather than standing alone.
-    if (championSpot) {
-      const escortSpot = takeSpot(championRoom)
-      if (escortSpot && spawnTemplate(championTemplate, escortSpot, null, false)) spent += Math.max(1, championTemplate.tier)
+    const artifactVault = vaults.find(vault => vault.artifactReserved)
+    const championVault = vaults.find(vault => (vault.roles?.champion || 0) > 0) || artifactVault || null
+    const keyCarrierPlan = level.progressionKey?.mode === 'championCarrier' ? level.progressionKey : null
+    const keyCarrierRoom = keyCarrierPlan ? roomById.get(keyCarrierPlan.targetRoomId) || null : null
+    for (let championIndex = 0; championIndex < championCount; championIndex++) {
+      const family = championIndex === 0
+        ? championFamily
+        : pickWeighted(dominant, candidate => Math.max(0.0001, candidate.weight))
+      const tmpl = chooseMember(family, 'champion') || eligible[0]
+      const championRoom = championIndex === 0
+        ? (keyCarrierRoom || roomById.get(championVault?.roomId) || farthestRoom)
+        : (nonEntranceRooms[championIndex % Math.max(1, nonEntranceRooms.length)] || farthestRoom)
+      const championRoomVault = vaults.find(vault => vault.roomId === championRoom?.id) || null
+      const vaultId = championIndex === 0 ? championRoomVault?.id || championVault?.id || null : null
+      const championSpot = takeRoleSpot(championRoom, 'champion') || takeRoleSpot(championRoom, 'group') ||
+        takeRoleSpot(championRoom, 'frontline') || takeRoleSpot(championRoom, 'any') ||
+        takeSpot(championRoom, true, true) || takeSpot(null, true)
+      if (!championSpot) continue
+      const championEnemy = spawnTemplate(tmpl, championSpot, 'Champion', false, 'champion', family.id,
+        championRoom?.id || null, vaultId)
+      if (!championEnemy) continue
+      if (championIndex === 0 && keyCarrierPlan) {
+        const keyItemKind = packageCfg.progressionKeys?.itemKind || hooks.progressionKeyItemKind || 'dungeonkey'
+        championEnemy.carriedDungeonKey = {kind:keyItemKind,keyId:keyCarrierPlan.keyId,progressionKey:true}
+      }
+      spent += Math.max(1, tmpl.tier)
+      const escortTemplate = chooseMember(family, 'group') || tmpl
+      const escortSpot = takeRoleSpot(championRoom, 'group') || takeRoleSpot(championRoom, 'frontline') || takeSpot(championRoom, false, true)
+      if (escortSpot && spawnTemplate(escortTemplate, escortSpot, null, false, 'group', family.id,
+        championRoom?.id || null, vaultId)) spent += Math.max(1, escortTemplate.tier)
     }
 
-    // Make every selected dominant family visible at least once. On the final
-    // floor, the first non-Champion family also goes into the artifact vault so
-    // the guaranteed artifact is guarded by a small encounter, not one body.
+    // Vaults spend their most tactical slots first. A backline slot is not a
+    // cosmetic label: where the selected family has a ranged-capable member,
+    // that spawn is forced to be a shooter and therefore starts with ammo.
+    let vaultFamilyCursor = 0
+    for (const vault of vaults) {
+      const room = roomById.get(vault.roomId)
+      if (!room) continue
+      let familyChoices = dominant
+      if ((vault.roles?.backline || 0) > 0) {
+        const shooterDominant = dominant.filter(family => family.members.some(isShooterTemplate))
+        if (shooterDominant.length) familyChoices = shooterDominant
+      }
+      const family = familyChoices[vaultFamilyCursor++ % familyChoices.length]
+      vault.encounterFamily = family.id
+      room.encounterFamily = family.id
+      for (const role of ['backline', 'frontline', 'group', 'any']) {
+        const slots = room.tacticalSlots?.[role] || []
+        const requested = Math.min(Number(vault.roles?.[role] || 0), slots.length)
+        for (let n = 0; n < requested; n++) {
+          const tmpl = chooseMember(family, role)
+          if (!tmpl) continue
+          const cost = Math.max(1, tmpl.tier)
+          if (spent + cost > organizedBudget && !(role === 'backline' && n === 0)) break
+          const spot = takeRoleSpot(room, role)
+          if (!spot) break
+          if (spawnTemplate(tmpl, spot, null, false, role, family.id, room.id, vault.id)) spent += cost
+        }
+      }
+    }
+
+    // Make every selected family visible even if the tactical vaults happened
+    // to consume the whole first budget slice with another family.
     let roomCursor = 0
-    let artifactGuardPending = !!artifactRoom
-    for (const tmpl of dominant) {
-      if (tmpl === championTemplate) continue
-      const room = artifactGuardPending ? artifactRoom : (rooms.length ? rooms[roomCursor++ % rooms.length] : null)
-      const spot = takeSpot(room)
-      if (artifactGuardPending) artifactGuardPending = false
-      if (!spot) continue
-      if (spawnTemplate(tmpl, spot, null, false)) spent += Math.max(1, tmpl.tier)
+    for (const family of dominant) {
+      if (spawnedFamilies.has(family.id)) continue
+      const room = nonEntranceRooms.length ? nonEntranceRooms[roomCursor++ % nonEntranceRooms.length] : null
+      const tmpl = chooseMember(family, room?.archetype === 'Barracks' ? 'group' : 'any')
+      const spot = takeRoleSpot(room, 'group') || takeRoleSpot(room, 'any') || takeSpot(room, false, true)
+      if (!tmpl || !spot) continue
+      if (spawnTemplate(tmpl, spot, null, false, 'group', family.id, room?.id || null, null)) spent += Math.max(1, tmpl.tier)
     }
 
-    // Spend most remaining threat by reinforcing coherent one-species rooms.
+    // Procedural rooms use the same role geometry as authored vaults. Room
+    // archetype changes how much of the remaining floor budget it receives.
+    const roomDefs = packageCfg.rooms?.archetypes || {}
+    const ordinaryRooms = nonEntranceRooms.filter(room => !room.vaultType)
+    for (const room of ordinaryRooms) {
+      if (spent >= organizedBudget) break
+      const family = dominant[roomCursor++ % dominant.length]
+      room.encounterFamily = family.id
+      const multiplier = Math.max(0.5, Number(roomDefs[room.archetype]?.encounterMultiplier ?? 1))
+      const target = Math.max(1, Math.min(4, Math.round(multiplier * 2)))
+      const configuredRoleOrder = roomDefs[room.archetype]?.tacticalRoleOrder
+      const roleOrder = Array.isArray(configuredRoleOrder) && configuredRoleOrder.length
+        ? configuredRoleOrder
+        : ['group','any','frontline']
+      for (let n = 0; n < target && spent < organizedBudget; n++) {
+        const role = roleOrder[n % roleOrder.length]
+        const tmpl = chooseMember(family, role)
+        const cost = tmpl ? Math.max(1, tmpl.tier) : Infinity
+        if (!tmpl || spent + cost > organizedBudget) break
+        const spot = takeRoleSpot(room, role) || takeSpot(room, false, true)
+        if (!spot) break
+        if (spawnTemplate(tmpl, spot, null, false, role, family.id, room.id, null)) spent += cost
+      }
+    }
+
+    // Ambient roamers remain the broad-pool exception and retain each template's
+    // normal wander behavior. They are never forced into tactical roles.
     let guard = 0
-    while (spent < threatBudget - cheapestRoamerCost && available.length && guard++ < 100) {
-      const tmpl = dominant[guard % dominant.length]
-      const cost = Math.max(1, tmpl.tier)
-      if (spent + cost > threatBudget - cheapestRoamerCost) break
-      const room = rooms.length ? rooms[guard % rooms.length] : null
-      const spot = takeSpot(room)
-      if (!spot) break
-      if (spawnTemplate(tmpl, spot, null, false)) spent += cost
-    }
-
-    // Keep at least one broader-pool roamer where placement permits. Rarity is
-    // still weighted here, so unusual outsiders remain possible without taking
-    // over the organized room composition.
-    guard = 0
-    while (spent < threatBudget && available.length && guard++ < 100) {
+    while (spent < threatBudget && guard++ < 100) {
       const affordable = roamerPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
       if (!affordable.length) break
       const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
       const spot = takeSpot(null)
       if (!spot) break
-      if (spawnTemplate(tmpl, spot, null, true)) spent += Math.max(1, tmpl.tier)
+      if (spawnTemplate(tmpl, spot, null, true, 'roamer', null, null, null)) spent += Math.max(1, tmpl.tier)
     }
   }
 }
 
+function spawnDwarvenRuinsEncounters() {
+  return spawnDungeonPackageEncounters('dwarvenRuins')
+}
+
+function spawnDwarvenRuinsRoomProps(level, z) {
+  if (!level || level.dungeonPackage !== 'dwarvenRuins') return
+  const story = dungeonPackageConfig(level.dungeonPackage)?.story || {}
+  const rooms = (level.rooms || []).filter(room => room.index !== 0)
+  const occupied = new Set(groundItems.filter(g => (g.level ?? 0) === z).map(g => keyXY(g.x, g.y)))
+  const slotKeys = new Set(rooms.flatMap(room => Object.values(room.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y))))
+  // Keep authored shooter lanes clear of decorative ground props as well as
+  // terrain. Ground items stop projectiles, so occupying an intermediate lane
+  // cell would silently turn a valid backline role into a fake one.
+  for (const room of rooms) {
+    const entry = dwarvenRoomEntryPoint(level.map, room)
+    for (const slot of room.tacticalSlots?.backline || []) {
+      let x0 = slot.x, y0 = slot.y
+      const dx = Math.abs(entry.x - x0), sx = x0 < entry.x ? 1 : -1
+      const dy = -Math.abs(entry.y - y0), sy = y0 < entry.y ? 1 : -1
+      let err = dx + dy
+      while (!(x0 === entry.x && y0 === entry.y)) {
+        const e2 = 2 * err
+        if (e2 >= dy) { err += dy; x0 += sx }
+        if (e2 <= dx) { err += dx; y0 += sy }
+        slotKeys.add(keyXY(x0, y0))
+      }
+    }
+  }
+  const roomSpots = room => dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'marble' &&
+    !occupied.has(keyXY(p.x, p.y)) && !slotKeys.has(keyXY(p.x, p.y)) &&
+    Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1)
+  const addProp = (room, kind, description) => {
+    const spots = roomSpots(room)
+    if (!spots.length) return false
+    const spot = pick(spots)
+    groundItems.push({x:spot.x,y:spot.y,kind,looted:false,level:z,levelKind:'chain',caveIndex:-1,
+      ...(description ? {description} : {})})
+    occupied.add(keyXY(spot.x, spot.y))
+    return true
+  }
+  for (const room of rooms) {
+    if (room.archetype === 'Forge') addProp(room, 'anvil', 'A dwarven anvil abandoned in the middle of unfinished work.')
+    else if (room.archetype === 'Burial Chamber' || room.archetype === 'Temple')
+      addProp(room, 'dwarvenremains', 'Old dwarven remains lie where this chamber was overrun.')
+  }
+  const range = story.remainsPerFloorRange || [2, 4]
+  const base = randInt(range[0], range[1])
+  const progressMultiplier = dungeonProgressMultiplier(story.remainsProgressMultiplierRange, level.progress, 1)
+  const remainsMultiplier = level.progress >= 1 ? Math.max(progressMultiplier, Number(story.finalFloorRemainsMultiplier ?? 1)) : progressMultiplier
+  const target = Math.max(1, Math.round(base * remainsMultiplier))
+  for (let n = 0; n < target; n++) {
+    const candidates = rooms.filter(room => roomSpots(room).length)
+    if (!candidates.length) break
+    const room = pick(candidates)
+    addProp(room, 'dwarvenremains', level.progress >= 1
+      ? 'Dwarven remains are piled around a failed defensive position.'
+      : 'Dwarven remains lie amid the abandoned settlement.')
+  }
+}
+
+function dungeonLootBudget(packageId, floorIndex, hasMajorVault = false) {
+  const cfg = dungeonPackageConfig(packageId)?.loot || {}
+  let budget = (cfg.baseBudget ?? 1) * (1 + floorIndex * (cfg.growthPerFloor ?? 0))
+  if (hasMajorVault && chance(cfg.majorVaultBonusChance ?? 0)) budget += 1
+  return Math.max(1, Math.round(budget))
+}
+
+function dungeonLootTier(packageId, floorIndex, room = null, vault = null) {
+  const cfg = dungeonPackageConfig(packageId)?.loot || {}
+  const bias = Math.min(cfg.tierBiasCap ?? 1,
+    floorIndex * (cfg.tierBiasGrowth ?? 0) + Number(room?.tierBiasBonus ?? 0) + Number(vault?.tierBiasBonus ?? 0))
+  const tiers = Object.entries(cfg.tierWeights || {'2':1}).map(([tier, weight]) => ({
+    tier: Number(tier),
+    weight: Math.max(0.0001, Number(weight) * (1 + bias * Math.max(0, Number(tier) - 1)))
+  }))
+  return pickWeighted(tiers, entry => entry.weight).tier
+}
 
 function spawnDwarvenRuinsChests() {
-  const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.chests
-  for (let i = 2; i < deepLevels.length; i++) {
-    const level = deepLevels[i]
-    if (level.kind !== 'dwarvenRuins') continue
-    const z = chainZForDepth(i + 2), entry = level.caves[0].entrances[0]
+  const packageId = 'dwarvenRuins'
+  const packageCfg = dungeonPackageConfig(packageId) || {}
+  const cfg = packageCfg.loot || {}
+  const roomDefs = packageCfg.rooms?.archetypes || {}
+  for (const {level, z} of dungeonPackageLevels(packageId)) {
+    const floorIndex = Math.max(0, (level.dungeonFloor || 1) - 1)
+    const entry = level.caves[0].entrances[0]
     const safeRoute = DungeonTraps.safeReachable(level.map, entry,
       new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
-    const rooms = (level._encounterRooms || []).slice(1)
-    const available = []
-    for (const room of rooms) {
+    const rooms = (level.rooms || level._encounterRooms || []).filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
+    const vaultByRoom = new Map((level.vaults || []).map(vault => [vault.roomId, vault]))
+    const candidatesForRoom = room => {
       const spots = []
-      for (let y = room.y + 1; y < room.y + room.h - 1; y++)
-        for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
-          if (level.map[y]?.[x] !== 'marble' || !safeRoute.has(keyXY(x, y)) ||
-              Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= cfg.entranceClearance ||
-              !DungeonTraps.safeSpawn(x, y, z) ||
-              enemies.some(e => e.alive && e.level === z && e.x === x && e.y === y) ||
-              groundItems.some(g => g.level === z && g.x === x && g.y === y)) continue
-          spots.push({x, y})
-        }
-      if (spots.length) available.push({room, spots,
-        distance: Math.max(Math.abs(room.cx - entry.x), Math.abs(room.cy - entry.y))})
+      for (let y = room.y + 1; y < room.y + room.h - 1; y++) for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+        if (level.map[y]?.[x] !== 'marble' || !safeRoute.has(keyXY(x, y)) ||
+            Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= cfg.entranceClearance ||
+            !DungeonTraps.safeSpawn(x, y, z) ||
+            enemies.some(e => e.alive && e.level === z && e.x === x && e.y === y) ||
+            groundItems.some(g => g.level === z && g.x === x && g.y === y)) continue
+        spots.push({x, y})
+      }
+      return spots
     }
-    available.sort((a, b) => b.distance - a.distance)
-    for (let n = 0; n < cfg.perFloor && available.length; n++) {
-      const choices = available.splice(0, Math.min(3, available.length))
-      const selected = pick(choices)
-      available.push(...choices.filter(c => c !== selected))
-      const spot = pick(selected.spots)
-      groundItems.push({x: spot.x, y: spot.y, level: z, levelKind: 'chain', caveIndex: -1,
-        kind: 'chest', tier: level.progress >= 0.5 ? cfg.tierLate : cfg.tierEarly, opened: false})
+
+    // The guaranteed Ruins artifact chest is placed during stratum construction
+    // so props, traps, and encounters all treat its tile as occupied. Ordinary
+    // depth-scaled loot is added here afterward.
+
+    const chestCount = dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length)
+    const roomUse = new Map()
+    for (let n = 0; n < chestCount; n++) {
+      const available = rooms.map(room => ({room, spots:candidatesForRoom(room)})).filter(entry => entry.spots.length)
+      if (!available.length) break
+      const chosen = pickWeighted(available, entry => {
+        const room = entry.room, vault = vaultByRoom.get(room.id)
+        const roomMultiplier = Number(roomDefs[room.archetype]?.lootMultiplier ?? 1)
+        const vaultMultiplier = Number(vault?.lootMultiplier ?? 1)
+        const repeatPenalty = 1 / (1 + (roomUse.get(room.id) || 0))
+        return Math.max(0.05, roomMultiplier * vaultMultiplier * repeatPenalty)
+      })
+      const room = chosen.room, vault = vaultByRoom.get(room.id)
+      room.tierBiasBonus = Number(roomDefs[room.archetype]?.tierBiasBonus ?? 0)
+      const spot = pick(chosen.spots)
+      groundItems.push({x:spot.x,y:spot.y,level:z,levelKind:'chain',caveIndex:-1,kind:'chest',
+        tier:dungeonLootTier(packageId, floorIndex, room, vault),opened:false,
+        dungeonRoomId:room.id,vaultId:vault?.id || null})
+      roomUse.set(room.id, (roomUse.get(room.id) || 0) + 1)
     }
   }
 }
+
+
+function dungeonGenerationLockLeavesAt(cm, x, y) {
+  const tile = cm[y]?.[x]
+  const isGate = tile === 'dwarvengatelocked'
+  const isDoor = tile === 'dwarvendoorlocked'
+  if (!isGate && !isDoor) return []
+  const family = isGate
+    ? new Set(['dwarvengatelocked','dwarvengateopen','dwarvengatebreached'])
+    : new Set(['dwarvendoorlocked','dwarvendoorbreached'])
+  const leaves = [{x,y}]
+  const adjacent = [[0,-1],[-1,0],[1,0],[0,1]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
+    .filter(p => family.has(cm[p.y]?.[p.x]))
+    .sort((a,b) => a.y-b.y || a.x-b.x)
+  if (adjacent.length) leaves.push(adjacent[0])
+  return leaves.sort((a,b) => a.y-b.y || a.x-b.x)
+}
+
+function dungeonGenerationReachableWithKeys(cm, start, z, heldKeys) {
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]]
+  const seen = new Set([keyXY(start.x,start.y)]), queue = [{x:start.x,y:start.y}]
+  for (let qi=0; qi<queue.length; qi++) {
+    const p = queue[qi]
+    for (const [dx,dy] of dirs) {
+      const x=p.x+dx, y=p.y+dy, key=keyXY(x,y)
+      if (x<0 || y<0 || x>=MAP_W || y>=MAP_H || seen.has(key)) continue
+      const tile = cm[y]?.[x]
+      let passable = !!TILE[tile]?.walk || tile === 'dwarvendoorclosed'
+      if (!passable && (tile === 'dwarvendoorlocked' || tile === 'dwarvengatelocked')) {
+        const kind = tile === 'dwarvengatelocked' ? 'gate' : 'door'
+        const lockId = dwarvenDungeonLockId(z, kind, dungeonGenerationLockLeavesAt(cm,x,y))
+        passable = heldKeys.has(lockId)
+      }
+      if (!passable) continue
+      seen.add(key); queue.push({x,y})
+    }
+  }
+  return seen
+}
+
+function validateDwarvenRuinsKeyDependencies(level, z, entry, exit) {
+  const plan = level.progressionKey || null
+  if (!plan) {
+    const hasBreachedGate = level.map.some(row => row.includes('dwarvengatebreached'))
+    return {ok:hasBreachedGate, reason:hasBreachedGate ? null : 'missing breached progression gate'}
+  }
+  const keySources = []
+  for (const item of groundItems) {
+    if ((item.level ?? 0) !== z) continue
+    if (item.kind === 'dwarvenkey' && item.keyId) keySources.push({x:item.x,y:item.y,keyId:item.keyId,kind:'ground'})
+    if (item.dungeonKey?.kind === 'dwarvenkey' && item.dungeonKey.keyId)
+      keySources.push({x:item.x,y:item.y,keyId:item.dungeonKey.keyId,kind:'remains'})
+  }
+  for (const enemy of enemies) if (enemy.alive && (enemy.level ?? 0) === z && enemy.carriedDungeonKey?.keyId)
+    keySources.push({x:enemy.x,y:enemy.y,keyId:enemy.carriedDungeonKey.keyId,kind:'carrier'})
+
+  const matchingProgressionSources = keySources.filter(source => source.keyId === plan.keyId)
+  if (matchingProgressionSources.length !== 1)
+    return {ok:false, reason:`progression key has ${matchingProgressionSources.length} live sources`}
+
+  const held = new Set(), collected = new Set()
+  let reachable = null, changed = true
+  while (changed) {
+    changed = false
+    reachable = dungeonGenerationReachableWithKeys(level.map, entry, z, held)
+    for (let i=0; i<keySources.length; i++) {
+      if (collected.has(i) || !reachable.has(keyXY(keySources[i].x,keySources[i].y))) continue
+      collected.add(i); held.add(keySources[i].keyId); changed = true
+    }
+  }
+  reachable = dungeonGenerationReachableWithKeys(level.map, entry, z, held)
+  if (!held.has(plan.keyId)) return {ok:false, reason:`${plan.mode} progression key is not reachable before its gate`}
+  if (!reachable.has(keyXY(exit.x,exit.y))) return {ok:false, reason:'exit remains unreachable after collecting reachable keys'}
+  if (plan.mode === 'lockedSideRoom' && plan.requiresLockId && !held.has(plan.requiresLockId))
+    return {ok:false, reason:'locked side-room local key is not reachable'}
+  return {ok:true, reason:null}
+}
+
+function validateDungeonStratumBasics(packageId) {
+  const cfg = dungeonPackageConfig(packageId) || {}
+  const issues = []
+  const levels = deepLevels.map((level, index) => ({level,index}))
+    .filter(entry => entry.level?.dungeonPackage === packageId)
+  const [minFloors,maxFloors] = cfg.levelCountRange || [0,Infinity]
+  if (levels.length < minFloors || levels.length > maxFloors)
+    issues.push(`floor count ${levels.length} outside ${minFloors}-${maxFloors}`)
+
+  const contexts = []
+  for (let floorIndex=0; floorIndex<levels.length; floorIndex++) {
+    const {level,index} = levels[floorIndex]
+    const z = chainZForDepth(index + 2)
+    const descriptor = level.caves?.[0], entry = descriptor?.entrances?.[0], exit = descriptor?.entrances?.[1]
+    const tag = `D${floorIndex+1}`
+    const context = {level,index,z,descriptor,entry,exit,tag,floorIndex}
+    contexts.push(context)
+    if (!entry || !exit) { issues.push(`${tag}: missing entrance/exit`); continue }
+    const graph = level.roomGraph || descriptor?.roomGraph
+    if (!graph || graph.graphDistance < (cfg.layout?.minimumEntranceExitRoomGraphDistance ?? 1))
+      issues.push(`${tag}: room graph distance is too short or missing`)
+    if (!graph?.mainRoute?.length || graph.mainRoute[0] !== graph.entranceRoomId || graph.mainRoute.at(-1) !== graph.exitRoomId)
+      issues.push(`${tag}: main-route metadata is inconsistent`)
+
+    const eventual = dungeonWalkDistancesWithDoorTraversal(level.map, entry)
+    context.eventual = eventual
+    const walkingDistance = eventual.get(keyXY(exit.x,exit.y))
+    if (!Number.isFinite(walkingDistance) || walkingDistance < (cfg.layout?.minimumEntranceExitWalkingDistance ?? 1))
+      issues.push(`${tag}: entrance/exit walking separation is invalid`)
+
+    for (const room of level.rooms || []) {
+      if (room.index === 0) continue
+      const connected = dwarvenRoomInterior(room).some(p => eventual.has(keyXY(p.x,p.y)))
+      if (!connected) issues.push(`${tag}: disconnected room ${room.id}`)
+    }
+    for (const vault of level.vaults || []) {
+      const room = (level.rooms || []).find(candidate => candidate.id === vault.roomId)
+      if (!room) { issues.push(`${tag}: vault ${vault.id} has no room`); continue }
+      const def = cfg.vaults?.definitions?.[vault.type] || {}
+      const entranceRange = def.requiredEntrances || [1, Infinity]
+      const connectionCount = Math.max(1, Number(room.connectionCount) || room.doorways?.length || 0)
+      if (connectionCount < entranceRange[0] || connectionCount > entranceRange[1])
+        issues.push(`${tag}: vault ${vault.id} has ${connectionCount} graph entrances outside ${entranceRange[0]}-${entranceRange[1]}`)
+      const requiredZones = new Set(def.internalZones || [])
+      const actualZones = new Set((vault.zones || []).map(zone => zone.id))
+      for (const zone of requiredZones) if (!actualZones.has(zone)) issues.push(`${tag}: vault ${vault.id} is missing ${zone} zone`)
+      if ((vault.roles?.backline || 0) > 0 && !(vault.slots?.backline || []).length)
+        issues.push(`${tag}: vault ${vault.id} has no usable backline slot`)
+    }
+
+    const trapBlocked = new Set((level.traps || []).map(trap => keyXY(trap.trigger.x,trap.trigger.y)))
+    const trapSafe = DungeonTraps.safeReachable(level.map, entry, trapBlocked)
+    context.trapSafe = trapSafe
+    if (!trapSafe.has(keyXY(exit.x,exit.y))) issues.push(`${tag}: traps block mandatory traversal`)
+
+    const floorEnemies = enemies.filter(enemy => enemy.alive && (enemy.level ?? 0) === z)
+    context.floorEnemies = floorEnemies
+    const champions = floorEnemies.filter(enemy => enemy.prefix === 'Champion')
+    const expectedChampions = Math.max(1,Math.floor(cfg.encounters?.championsPerFloor ?? 1))
+    if (champions.length !== expectedChampions) issues.push(`${tag}: expected ${expectedChampions} champion, found ${champions.length}`)
+    for (const enemy of floorEnemies) {
+      if (!TILE[level.map[enemy.y]?.[enemy.x]]?.walk) issues.push(`${tag}: enemy ${enemy.id || enemy.name} on invalid terrain`)
+      if ((level.traps || []).some(trap => Math.max(Math.abs(enemy.x-trap.trigger.x),Math.abs(enemy.y-trap.trigger.y)) <= (cfg.traps?.spawnClearance ?? 0)))
+        issues.push(`${tag}: enemy ${enemy.id || enemy.name} spawned too near a trap`)
+    }
+
+    const floorGround = groundItems.filter(item => (item.level ?? 0) === z)
+    context.floorGround = floorGround
+    const occupiedGround = new Set()
+    for (const item of floorGround) {
+      const key = keyXY(item.x,item.y)
+      if (occupiedGround.has(key)) issues.push(`${tag}: multiple ground objects share ${key}`)
+      occupiedGround.add(key)
+      if ((level.traps || []).some(trap => trap.trigger.x === item.x && trap.trigger.y === item.y))
+        issues.push(`${tag}: ground object occupies a trap trigger at ${key}`)
+    }
+  }
+  return {ok:issues.length === 0,issues,contexts,levels:levels.map(entry => entry.level)}
+}
+
+function validateDwarvenRuinsStratum() {
+  const cfg = dungeonPackageConfig('dwarvenRuins') || {}
+  const base = validateDungeonStratumBasics('dwarvenRuins')
+  const issues = base.issues.slice()
+  let artifactCount = 0
+
+  for (const context of base.contexts) {
+    const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context
+    if (!entry || !exit) continue
+    if (level.progressionKey && Number.isInteger(level.progressionKey.x) && Number.isInteger(level.progressionKey.y) &&
+        !trapSafe.has(keyXY(level.progressionKey.x,level.progressionKey.y)))
+      issues.push(`${tag}: traps make the progression key unavoidable/unreachable`)
+    if (level.progressionKey?.mode === 'trapGuardedSideRoom') {
+      const guard = level.progressionKey.guardPoint
+      const radius = cfg.progressionKeys?.trapGuardRadius ?? 4
+      if (!guard || !(level.traps || []).some(trap => Math.max(Math.abs(trap.trigger.x-guard.x),Math.abs(trap.trigger.y-guard.y)) <= radius))
+        issues.push(`${tag}: trap-guarded key room has no nearby trap`)
+    }
+
+    const dependency = validateDwarvenRuinsKeyDependencies(level,z,entry,exit)
+    if (!dependency.ok) issues.push(`${tag}: ${dependency.reason}`)
+
+    for (const vault of level.vaults || []) {
+      const room = (level.rooms || []).find(candidate => candidate.id === vault.roomId)
+      if (!room) continue
+      const def = cfg.vaults?.definitions?.[vault.type] || {}
+      const entranceDoorLeaves = Array.isArray(vault.entranceDoorLeaves) && vault.entranceDoorLeaves.length
+        ? vault.entranceDoorLeaves : (room.doorways || []).flat()
+      const doorwayTiles = entranceDoorLeaves.map(p => level.map[p.y]?.[p.x])
+      if (def.doorRequirement === 'locked' && (!doorwayTiles.length || !doorwayTiles.every(tile => tile === 'dwarvendoorlocked')))
+        issues.push(`${tag}: vault ${vault.id} requires a locked entrance`)
+      if (def.doorRequirement === 'closed' && (!doorwayTiles.length || !doorwayTiles.every(tile => tile === 'dwarvendoorclosed' || tile === 'dwarvendoorlocked')))
+        issues.push(`${tag}: vault ${vault.id} requires a closed entrance`)
+    }
+    for (const room of level.rooms || []) {
+      if (room.archetype !== 'Prison') continue
+      const hasBars = dwarvenRoomInterior(room).some(p => level.map[p.y]?.[p.x] === 'dwarvenprisonbars')
+      const hasCellDoor = (room.internalLocks || []).some(lock => lock.kind === 'prisonCell') ||
+        (room.internalDoors || []).some(door => door.kind === 'prisonCell')
+      if (!hasBars || !hasCellDoor) issues.push(`${tag}: Prison room ${room.id} lacks a functional barred side cell`)
+    }
+
+    artifactCount += (floorGround || []).filter(item => item.dwarvenRuinsArtifact && item.artifactGuaranteed).length
+    if (floorIndex === base.contexts.length-1 && !level.map.some(row => row.includes('dwarvenminessealed')))
+      issues.push(`${tag}: sealed Deep Mines continuation is missing`)
+  }
+
+  if (artifactCount !== 1) issues.push(`expected exactly one Ruins artifact chest, found ${artifactCount}`)
+  const ruinLift = dungeonShortcutsForPackage('dwarvenRuins')[0] || null
+  if (!ruinLift?.upper || !ruinLift?.lower || !ruinLift?.lever) issues.push('shortcut lift metadata is incomplete')
+  else {
+    const upper = deepLevels[chainDepthForZ(ruinLift.upper.z)-2]
+    const lower = deepLevels[chainDepthForZ(ruinLift.lower.z)-2]
+    if (upper?.map[ruinLift.upper.y]?.[ruinLift.upper.x] !== 'dwarvenliftoff') issues.push('upper lift endpoint is invalid')
+    if (!['dwarvenliftoff','dwarvenlifton'].includes(lower?.map[ruinLift.lower.y]?.[ruinLift.lower.x])) issues.push('lower lift endpoint is invalid')
+  }
+  return {ok:issues.length === 0, issues}
+}
+
 
 function guardedChestSpots(e, used, accept = () => true) {
   const edgeMargin = WORLD_GEN_CONFIG.surfaceLoot.placementEdgeMargin

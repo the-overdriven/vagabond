@@ -890,12 +890,30 @@ progress = floorIndex / (floorCount - 1)
 ```
 
 where `floorIndex` is zero-based inside the Ruins. This gives 0 on the first
-floor and 1 on the final floor for 3-, 4-, and 5-floor strata alike. The current
-foundation generates connected rooms/corridors with localized collapses and
-requires the entrance and exit to be separated by at least the configured
-walking/graph distance (**28 tiles** by default), rather than merely by visual
-or Euclidean distance. A failed floor layout is retried deterministically up to
-**12 times** before the existing world-attempt retry path rejects the world.
+floor and 1 on the final floor for 3-, 4-, and 5-floor strata alike. After room
+rectangles are positioned, the generator builds a **room graph before carving
+corridors**. The graph chooses the entrance, main route, exit, **2–4 optional
+branch rooms**, and up to two seeded loop edges (`loopProbability: 0.18`). Only
+then are corridor edges carved into terrain. The exit must be at least **4
+room-graph edges** from the entrance and at least **28 walkable tiles** away after
+carving; these are separate configuration knobs. Loops are rejected if they
+would shorten the room-graph route below the configured minimum. Localized
+collapses then damage the layout, and progression-gate selection runs against
+the finished topology so a loop can never turn the mandatory gate into a
+decorative bypass. Shared room-spacing and corridor-carving helpers are used by
+the existing Fort and the deeper Ruins rather than maintaining separate copies
+of those primitives. A failed floor layout is retried deterministically up to
+**12 times** before the world-generation attempt is rejected.
+
+The reusable dungeon-package layer owns the rules that later strata should share:
+room graphs, stable feature/lock IDs, vault selection and entrance constraints,
+encounter-family/depth filtering, tactical role ordering, depth loot budgets and
+tier bias, trap configuration, shortcut registration, and base stratum
+validation. Package configuration supplies the content-specific choices (for
+example native enemy biomes, valid encounter floor tiles, key item kind, lock
+namespace, vault definitions and room tactical-role preferences). Dwarven Ruins
+therefore remains the first content package, while dwarven tile art and story
+props stay content-specific instead of being baked into the reusable rules.
 
 Ordinary room entrances can receive dwarven doors. The generator now finds
 actual two-tile corridor crossings through each room perimeter and only places
@@ -918,11 +936,25 @@ on the route from its entrance to its deeper exit. The gate is selected only
 when closing both leaves genuinely disconnects those two points, so it cannot be
 bypassed through another corridor. Each gate has an independent **30% chance**
 to generate already breached/open. A pre-breached gate needs no key. Otherwise,
-exactly one matching **Dwarven Key** is placed on a reachable marble tile on the
-entrance side of the intact gate; the key can therefore always be collected
-without crossing the gate it unlocks. Bumping an intact gate while carrying its
+exactly one matching **Dwarven Key source** is generated on the reachable side of
+the gate using one of four seeded scenarios:
+
+```text
+champion carrier       -> the guaranteed floor Champion carries the key
+searchable remains     -> the key is recovered while searching dwarven remains
+trap-guarded side room -> the key lies in an optional room with a nearby trap
+locked side room       -> a reachable local key opens the side room containing the progression key
+```
+
+The dependency validator proves that local keys can be collected in order and
+that the progression key can be obtained without crossing its own gate. No
+arbitrary nested key chains are generated. Killing a key-carrying Champion drops
+the ordinary key item through the normal corpse/drop path; searchable remains use
+the existing remains interaction. Bumping an intact gate while carrying its
 matching key consumes the key, opens both leaves, and costs **1 turn** without
-also moving the player. Mandatory gates cannot be breached with a weapon.
+also moving the player. Key-opened gates use a distinct persistent **intact open**
+terrain state; only gates generated pre-breached use the ruined/breached state.
+Mandatory gates cannot be breached with a weapon.
 
 Locked terrain blocks movement, sight, and projectiles until opened or breached.
 Keys are tied to a specific physical lock rather than acting as universal
@@ -969,16 +1001,23 @@ still closed, and begins unpowered. The deeper endpoint is selected with
 seeded RNG from the configured normalized depth range **50–100%** of the
 stratum, which means D2–D3 for a three-floor stratum and D3–D5 for a five-floor
 stratum. A wall-mounted control lever is generated beside the deeper platform.
-Bumping that lever costs **1 turn**, permanently powers both endpoints, and
-enables two-way inspect-to-travel between the two fixed platforms. The D1 side
+Bumping that lever costs **1 turn**, permanently powers both endpoints, changes
+the lever itself to a persistent pulled/locked-down terrain state, and enables
+two-way inspect-to-travel between the two fixed platforms. The D1 side
 cannot activate the lift remotely. Lift travel itself follows the existing
 level-transition convention and does not add a separate combat turn.
 
 Lift endpoint/lever coordinates and powered state are persisted explicitly;
-the platform terrain state is also stored in the ordinary Ruins map grids.
-Lift metadata was introduced in save schema **34**. Current game version is
-**v57**, save schema **35**; older saves are rejected. Vaults and loot
-progression remain later batches.
+the platform and pulled-lever terrain states are also stored in the ordinary
+Ruins map grids. Lift metadata was introduced in save schema **34**. Distinct
+open-gate/pulled-lever terrain states use save schema **36**. Room descriptors,
+vault descriptors, selected encounter families and tactical enemy role metadata
+use schema **37**. Schema **38** adds the persistent room graph, progression-key
+scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces the
+Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
+persists each deep level's dungeon-package identity, so later dungeon strata can
+reuse shortcuts without another dedicated save field. Current game version is
+**v61**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -1037,12 +1076,15 @@ that many budget points. This increases the number and composition of threats
 without silently inflating monster stats. A small minimum budget ensures the
 required family mix and a roamer can appear even on a small floor.
 
-A floor selects **2–4 dominant species** weighted by template rarity, excluding
-rarity 0.1 or lower from that dominant pool. Guards cluster in generated rooms;
-a broader eligible pool supplies occasional roamers, which retain their species
-wandering behavior. There is exactly **one Champion per floor**, usually in a
-remote room with a guard of the same species when placement allows. Other prefixes begin at **11%** and rise by **2.5 percentage
-points per floor**; random prefix rolls exclude Champion.
+A floor selects **2–4 dominant encounter families** (goblinoids, undead,
+marauders, or cave predators when their members are depth-eligible). Template
+rarity still weights members inside the family, while rarity 0.1 or lower is
+excluded from choosing a family as a dominant population. Organized rooms draw
+from one family at a time; a broader eligible pool supplies occasional roamers,
+which retain their species wandering behavior. The configured default is exactly
+**one Champion per floor**, usually leading an escort in a remote or tactical
+room. Other prefixes begin at **11%**, rise by **2.5 percentage points per
+floor**, and cap at **28%**; random prefix rolls exclude Champion.
 
 Cave species may appear when their tier's depth permits it. Surface species
 must opt in using a `z-N` biome tag, meaning depth N or deeper. Current tier
@@ -1060,23 +1102,131 @@ alarmed, the target is not rolled again. This can make luring a wounded enemy
 past a guard room risky; preventing its escape or choosing another route are
 useful responses.
 
-Enemies, prefixes, positions and wander state use the existing save and replay
-fields. Room bounds are generation-only; loading does not regenerate the
-population. This batch does not change the save schema. The supplied service
-worker precaches the trap module, dungeon rules, and trap art for offline
-play with game version v57.
+Enemies, prefixes, positions, tactical role, encounter-family identity, room/vault
+identity and wander state are persisted. Loading restores the exact population;
+it never regenerates tactical encounters from room metadata.
 
-### Placement and modest rewards (v57)
+### Rooms, vaults, tactical encounters and loot (v61)
 
-The Ruins now generate **one ordinary chest per floor**, up from zero. It is
-placed inside a room away from the entrance, monsters, keys, and trap mechanisms,
-with a route from the entrance that avoids trap triggers.
-Early floors use tier 2; floors at or beyond normalized progress 0.5 use tier 3.
-These are normal chests using the existing loot table. The guaranteed Fort
-artifact is separate; future vault rewards will use their own budget. Chests,
-keys, doors and traps persist in existing map/item/level data, so save schema 35
-is unchanged. The Dwarven Key's inventory and ground icons use the existing
-`img/icons/dwarven-key.svg` filename.
+Every non-entrance room receives one gameplay archetype: **Barracks, Armory,
+Dining Hall, Library, Forge, Workshop, Dormitory, Burial Chamber, Temple,
+Prison, or Storage**. Normalized floor progress changes their weights from early
+habitation toward military/industrial rooms. On the final floor, Barracks,
+Armory, Dormitory and Prison weights receive an additional **1.45x defensive
+multiplier**. Archetypes change encounter budget/roles, lock likelihood, loot
+placement/quality and physical furniture rather than being cosmetic labels.
+
+Each floor then selects **1–2 major vaults** from ten procedural concepts:
+fortified barracks, trapped armory, treasury, library archive, prison block,
+flooded cistern, collapsed hall, sealed tomb, forge killzone and barricaded
+dormitory. Vault definitions constrain normalized progress, minimum/maximum
+room dimensions, allowed entrance count, internal zones, door/lock requirement,
+allowed trap mechanisms, tactical roles and loot modifiers. Dimensions and
+orientation still come from the containing procedural room, so a repeated
+concept does not produce a copied fixed rectangle. These constraints affect the
+actual generated room: locked/closed vault entrances are enforced, trap-biased
+vaults restrict mechanism types, and internal patterns create shelves, water,
+rubble, defensive furniture or bars. A prison-block vault creates a real barred
+cell partition with its own locked cell door and separately reachable local key,
+rather than decorative bars only. Ordinary **Prison** archetype rooms use the same
+cell subdivision and always place a reachable key for their locked side cell.
+
+Vault entrance limits are measured from the actual room graph, including loop
+connections, so a one-entrance archive/tomb cannot silently gain a second route.
+Vault internal zones are oriented from the room entrance and actively drive
+furniture, water/rubble patterns and tactical slot preference instead of existing
+only as labels.
+
+Vault and ordinary-room tactical slots are geometric roles, not monster names:
+
+```text
+backline  -> far from the entrance with a clear projectile line
+frontline -> near entrances and chokepoints
+group     -> clustered interior positions
+champion  -> guarded tactical position
+any       -> remaining valid interior positions
+```
+
+A vault backline slot is strict: when a shooter-capable family is available the
+floor ensures such a family participates, and the backline spawn is forced to
+be an actual ranged variant with normal starting ammunition. Frontline/group
+slots suppress the ranged role even when the underlying species can normally
+roll as a shooter. Champion placement cannot consume a backline slot, and room
+props are kept out of the clear firing lane from backline to entrance. This lets
+the same fortified architecture produce different species compositions without
+hard-coding a Goblin or Skeleton to a coordinate.
+
+Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
+use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
+crates, and prisons use bars. Vaults add their own patterns, including water in
+cisterns and rubble in collapsed halls. Fortified barracks and barricaded
+dormitories drag bed frames into chokepoints. Final-floor dormitories have a
+strong additional barricade chance. Furniture never replaces stairs, keys,
+doors or the protected room center/door approach used by traversal validation.
+
+Environmental damage now rises continuously with normalized floor progress: rubble
+pressure scales **0.9x → 1.3x**, remains **0.8x → 1.5x**, breached-door pressure
+**0.75x → 2.0x**, dormitory barricade chance **5% → 22%**, and optional defensive
+debris **3% → 16%** before the final-floor override. The final floor additionally
+raises rubble to at least **1.65x**, ordinary breached-door pressure to at least
+**5x**, environmental remains to at least **2.5x**, and multiplies barricade
+pressure by **2.2x**. It always reserves at least two major vaults: one optional artifact
+vault plus a separate fortified-barracks, barricaded-dormitory, forge-killzone,
+or collapsed-hall defensive scenario. This prevents the final floor from rolling
+an ordinary-looking treasury/tomb-only profile. The result should visibly read as
+a failed holdout: more broken defenses, bodies, rubble and improvised chokepoints,
+while the sealed lower transition still points only toward continued excavation
+in the future Deep Mines.
+
+Ordinary Ruins loot uses a depth budget rather than one fixed chest:
+
+```text
+lootBudget = 2 × (1 + floorIndex × 0.10)
+tierBias   = min(0.55, floorIndex × 0.12 + room/vault bonuses)
+adjustedWeight(tier) = baseWeight(tier) × (1 + tierBias × (tier - 1))
+```
+
+The budget is rounded to whole ordinary chests; major vaults can add an extra
+budget point. Room/vault multipliers bias where rewards are concentrated, so
+armories and treasuries attract more of the floor's reward budget than dining
+halls or dormitories. Existing chest generation, Magic Find and identification
+rules still resolve the contents.
+
+Exactly **one additional guaranteed artifact chest** exists in the Dwarven
+Ruins stratum, on the final floor, separate from the existing Fort artifact. The
+final-floor generator first reserves a reachable optional treasury/sealed-tomb/
+trapped-armory vault **and a specific free tile inside it** before props, traps,
+or enemies are placed. If none of those normal artifact vaults fits, the
+farthest suitable optional branch is promoted into a dedicated **Guarded Artifact
+Chamber** with its own locked entrance, trap options, guard/frontline/backline
+roles and reliquary zone. The chest is reserved before population, so later
+props, traps or enemies cannot consume its location. The artifact chest is not
+required for descent.
+
+After traps, encounters and Ruins loot are populated, a final deterministic
+validator is invoked by real new-world generation before the world is accepted. Vaults that
+require a closed or locked entrance are only assigned where that entrance is structurally
+meaningful; ordinary Prison rooms must successfully build their barred side cell during
+floor generation rather than relying on a later whole-world rejection. It verifies
+floor count, room-graph and physical entrance/exit separation, room/vault
+connectivity, trap-safe mandatory traversal, solvable key dependencies, the
+Champion guarantee, valid enemy terrain/clearance, ground-object conflicts,
+exactly one final-floor artifact, the lift endpoints and the sealed Deep Mines
+continuation. Structural floor failures are retried by the floor generator; a
+late population failure discards the world attempt and regenerates it, up to
+**3 configured attempts**. Enemy IDs restart for every discarded attempt so the
+number of retries cannot alter stable IDs or replay ordering in the accepted
+world.
+
+Tile and ASCII modes distinguish intact-open and breached progression gates.
+`dwarvengateopen` uses `img/tiles/dwarven-gate-open.png`, never the breached-gate
+sprite. The pulled lever likewise has dedicated `dwarven-lever-pulled.png` art.
+Room furniture/barricades are mechanical terrain with dedicated ASCII glyphs,
+colors, inspect strings, and 40×40 tile art for beds, dragged-bed barricades,
+bookshelves, tables, crates, and prison bars. These images are precached for
+offline play alongside the dedicated open-gate and pulled-lever sprites. The
+Dwarven Key uses `img/tiles/dwarven-key.png` consistently on the ground and in
+inventory.
 
 The surface `dwarvengate` must remain spatially distinct from ordinary cave
 entrances. After the fort is generated, every non-crypt random cave entrance is
@@ -1236,7 +1386,8 @@ their generated floor number.
 The generated Ruins map and its single serialized local map intentionally share
 the same runtime object. Persistent terrain mutations on these floors, including
 ordinary doors changing from `dwarvendoorclosed` (`+` in ASCII) to
-`dwarvendooropen` (`/`), therefore use the existing `deepLevels[].caveMaps` save
+`dwarvendooropen` (`/`), keyed progression gates changing to a distinct intact
+open state, and the lift lever changing to its pulled state, therefore use the existing `deepLevels[].caveMaps` save
 representation without a second copy drifting out of sync. Closed doors also use
 the same opacity rule for player FOV and enemy sight and the same terrain blocker
 rule used by ranged projectiles. Each floor has its own discovery grid.
@@ -2885,7 +3036,7 @@ Each definition contains a default `name`, inventory `category` (`supplies` or
 `other`), `stackable`, base `sellValue`, and ordered `actions`. Optional
 `description`, `effect`, `carryStats`, and `icon` fields describe inspection
 text, behavior parameters, carrying modifiers, and an inventory-icon override.
-Without an override the icon is `img/icons/<kind>.svg`.
+Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon overrides may use either `.svg` or `.png` and may point to local `img/icons/` or `img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile (`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay consistent.
 
 Actions name approved JavaScript handlers; JSON contains no executable rules.
 Inventory buttons and replay item-use actions share that handler registry.

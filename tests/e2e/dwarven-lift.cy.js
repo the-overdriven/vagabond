@@ -29,7 +29,7 @@ describe('Dwarven Ruins shortcut lift', () => {
       cfg.levelCountRange = oldRange
       cfg.shortcut.targetFloorProgressRange = oldShortcut
 
-      const lift = dwarvenRuinsLift
+      const lift = dwarvenRuinsLiftShortcut()
       check(lift && lift.id === 'dwarven-ruins-lift-1', 'lift metadata exists')
       check(lift.upper.floor === 1 && lift.upper.z === -4, 'upper platform is fixed on D1')
       const upperReachable = dungeonWalkDistances(deepLevels[2].map, deepLevels[2].caves[0].entrances[0])
@@ -77,6 +77,9 @@ describe('Dwarven Ruins shortcut lift', () => {
       check(depthUndergroundMap(4)[lift.upper.y][lift.upper.x] === 'dwarvenlifton' &&
         depthUndergroundMap(lowerDepth)[lift.lower.y][lift.lower.x] === 'dwarvenlifton',
         'activation powers both endpoints')
+      check(depthUndergroundMap(lowerDepth)[lift.lever.y][lift.lever.x] === 'dwarvenleverpulled',
+        'activated lever changes to its persistent pulled terrain state')
+      check(RENDER_STYLE.terrainTiles.dwarvenleverpulled?.image === 'img/tiles/dwarven-lever-pulled.png', 'pulled lever uses its dedicated sprite')
 
       const beforeTravelTurn = turnCount
       check(travelDwarvenLift() === true, 'powered lower lift travels')
@@ -104,7 +107,7 @@ describe('Dwarven Ruins shortcut lift', () => {
       rngState = WORLD_SEED
       await generateNewWorld()
 
-      const lift = dwarvenRuinsLift
+      const lift = dwarvenRuinsLiftShortcut()
       const lowerDepth = chainDepthForZ(lift.lower.z)
       currentZ = lift.lower.z
       map = depthUndergroundMap(lowerDepth)
@@ -125,16 +128,18 @@ describe('Dwarven Ruins shortcut lift', () => {
       const recorded = JSON.parse(JSON.stringify(replayData))
       check(recorded.actions.length === 1 && recorded.actions[0].type === 'move', 'lever bump records as one move action')
       check(recorded.rng.length === 0, 'lift activation consumes no gameplay RNG')
-      check(dwarvenRuinsLift.unlocked && turnCount === 1, 'recorded activation powers lift in one turn')
+      check(dwarvenRuinsLiftShortcut().unlocked && turnCount === 1, 'recorded activation powers lift in one turn')
 
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
-      check(save.version === SAVE_VERSION && save.dwarvenRuinsLift?.unlocked === true, 'current save schema stores powered lift metadata')
+      check(save.version === SAVE_VERSION && save.dungeonShortcuts.find(shortcut => shortcut.id === WORLD_GEN_CONFIG.dungeons.dwarvenRuins.shortcut.id)?.unlocked === true, 'current save schema stores powered lift metadata')
       loadGameFromObject(save, {isReplayInit:true})
-      check(dwarvenRuinsLift.unlocked, 'powered state restores')
-      check(depthUndergroundMap(4)[dwarvenRuinsLift.upper.y][dwarvenRuinsLift.upper.x] === 'dwarvenlifton',
+      check(dwarvenRuinsLiftShortcut().unlocked, 'powered state restores')
+      check(depthUndergroundMap(4)[dwarvenRuinsLiftShortcut().upper.y][dwarvenRuinsLiftShortcut().upper.x] === 'dwarvenlifton',
         'powered upper platform terrain restores')
-      check(depthUndergroundMap(chainDepthForZ(dwarvenRuinsLift.lower.z))[dwarvenRuinsLift.lower.y][dwarvenRuinsLift.lower.x] === 'dwarvenlifton',
+      check(depthUndergroundMap(chainDepthForZ(dwarvenRuinsLiftShortcut().lower.z))[dwarvenRuinsLiftShortcut().lower.y][dwarvenRuinsLiftShortcut().lower.x] === 'dwarvenlifton',
         'powered lower platform terrain restores')
+      check(depthUndergroundMap(chainDepthForZ(dwarvenRuinsLiftShortcut().lever.z))[dwarvenRuinsLiftShortcut().lever.y][dwarvenRuinsLiftShortcut().lever.x] === 'dwarvenleverpulled',
+        'pulled lever terrain remains pulled after load')
 
       loadGameFromObject(recorded.initialState, {isReplayInit:true})
       replayAnimationsDisabled = true
@@ -145,7 +150,7 @@ describe('Dwarven Ruins shortcut lift', () => {
       replayRngIndex = 0
       try {
         for (const action of recorded.actions) await runReplayAction(action)
-        check(dwarvenRuinsLift.unlocked && turnCount === 1, 'replay reaches identical powered state and turn count')
+        check(dwarvenRuinsLiftShortcut().unlocked && turnCount === 1, 'replay reaches identical powered state and turn count')
         check(replayRngIndex === recorded.rng.length, 'replay consumes identical zero-length RNG trace')
       } finally {
         replayPlaying = false

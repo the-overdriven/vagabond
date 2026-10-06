@@ -353,6 +353,7 @@
   },
   "dungeons": {
     "dwarvenRuins": {
+      "lockNamespace": "dwarven",
       "levelCountRange": [
         3,
         5
@@ -387,18 +388,596 @@
         ],
         "corridorWideChance": 0.35,
         "corridorHorizontalFirstChance": 0.5,
+        "loopProbability": 0.18,
+        "loopMaxConnections": 2,
+        "optionalBranchCountRange": [
+          2,
+          4
+        ],
+        "minimumEntranceExitRoomGraphDistance": 4,
+        "minimumEntranceExitWalkingDistance": 28,
         "collapseAttemptsRange": [
           18,
           28
         ],
         "collapseMinEntranceDistance": 7,
         "rubbleChance": 0.6,
-        "minimumEntranceExitGraphDistance": 28,
         "exitFarCandidateBand": 8
+      },
+      "rooms": {
+        "finalFloorDefensiveWeightMultiplier": 1.45,
+        "archetypes": {
+          "Barracks": {
+            "weightEarly": 0.9,
+            "weightLate": 1.8,
+            "encounterMultiplier": 1.35,
+            "lootMultiplier": 1.1,
+            "tierBiasBonus": 0.05,
+            "tacticalRoleOrder": [
+              "backline",
+              "frontline",
+              "group",
+              "group"
+            ]
+          },
+          "Armory": {
+            "weightEarly": 0.55,
+            "weightLate": 1.25,
+            "encounterMultiplier": 1.2,
+            "lootMultiplier": 1.75,
+            "tierBiasBonus": 0.2,
+            "lockMultiplier": 2.2,
+            "tacticalRoleOrder": [
+              "frontline",
+              "backline",
+              "any"
+            ]
+          },
+          "Dining Hall": {
+            "weightEarly": 1.5,
+            "weightLate": 0.55,
+            "encounterMultiplier": 0.8,
+            "lootMultiplier": 0.8,
+            "tierBiasBonus": 0
+          },
+          "Library": {
+            "weightEarly": 1.15,
+            "weightLate": 0.65,
+            "encounterMultiplier": 0.85,
+            "lootMultiplier": 1.05,
+            "tierBiasBonus": 0.05,
+            "tacticalRoleOrder": [
+              "backline",
+              "any",
+              "frontline"
+            ]
+          },
+          "Forge": {
+            "weightEarly": 0.85,
+            "weightLate": 1.3,
+            "encounterMultiplier": 1.0,
+            "lootMultiplier": 1.35,
+            "tierBiasBonus": 0.12
+          },
+          "Workshop": {
+            "weightEarly": 1.25,
+            "weightLate": 0.9,
+            "encounterMultiplier": 0.9,
+            "lootMultiplier": 1.1,
+            "tierBiasBonus": 0.05
+          },
+          "Dormitory": {
+            "weightEarly": 1.55,
+            "weightLate": 1.0,
+            "encounterMultiplier": 0.9,
+            "lootMultiplier": 0.75,
+            "tierBiasBonus": 0
+          },
+          "Burial Chamber": {
+            "weightEarly": 0.65,
+            "weightLate": 0.95,
+            "encounterMultiplier": 0.9,
+            "lootMultiplier": 1.2,
+            "tierBiasBonus": 0.12
+          },
+          "Temple": {
+            "weightEarly": 0.55,
+            "weightLate": 0.8,
+            "encounterMultiplier": 0.9,
+            "lootMultiplier": 1.25,
+            "tierBiasBonus": 0.15
+          },
+          "Prison": {
+            "weightEarly": 0.55,
+            "weightLate": 1.15,
+            "encounterMultiplier": 1.15,
+            "lootMultiplier": 0.8,
+            "tierBiasBonus": 0,
+            "lockMultiplier": 1.6,
+            "internalLockedCellChance": 1.0,
+            "internalKeyFarCandidateBand": 8,
+            "tacticalRoleOrder": [
+              "frontline",
+              "group",
+              "frontline"
+            ]
+          },
+          "Storage": {
+            "weightEarly": 1.35,
+            "weightLate": 0.85,
+            "encounterMultiplier": 0.75,
+            "lootMultiplier": 1.3,
+            "tierBiasBonus": 0.05,
+            "lockMultiplier": 1.3
+          }
+        }
+      },
+      "vaults": {
+        "countRange": [
+          1,
+          2
+        ],
+        "definitions": {
+          "fortifiedBarracks": {
+            "label": "Fortified Barracks",
+            "weight": 1.3,
+            "progressRange": [
+              0.15,
+              1
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Barracks"
+            ],
+            "roles": {
+              "backline": 2,
+              "frontline": 4,
+              "group": 2,
+              "champion": 0,
+              "any": 0
+            },
+            "lootMultiplier": 1.25,
+            "tierBiasBonus": 0.08,
+            "maxSize": [
+              15,
+              11
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "frontline",
+              "backline"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": []
+          },
+          "trappedArmory": {
+            "label": "Trapped Armory",
+            "weight": 1.1,
+            "lockMultiplier": 2.0,
+            "progressRange": [
+              0,
+              1
+            ],
+            "minSize": [
+              8,
+              7
+            ],
+            "archetypes": [
+              "Armory"
+            ],
+            "roles": {
+              "backline": 1,
+              "frontline": 2,
+              "group": 1,
+              "champion": 0,
+              "any": 1
+            },
+            "lootMultiplier": 1.75,
+            "tierBiasBonus": 0.22,
+            "trapBias": true,
+            "maxSize": [
+              14,
+              11
+            ],
+            "requiredEntrances": [
+              1,
+              1
+            ],
+            "internalZones": [
+              "guard",
+              "stores"
+            ],
+            "doorRequirement": "locked",
+            "trapTypes": [
+              "spikes",
+              "projectile"
+            ]
+          },
+          "treasury": {
+            "label": "Treasury",
+            "weight": 0.8,
+            "lockMultiplier": 2.5,
+            "progressRange": [
+              0.25,
+              1
+            ],
+            "minSize": [
+              8,
+              7
+            ],
+            "archetypes": [
+              "Storage",
+              "Armory"
+            ],
+            "roles": {
+              "backline": 2,
+              "frontline": 2,
+              "group": 1,
+              "champion": 1,
+              "any": 0
+            },
+            "lootMultiplier": 2.25,
+            "tierBiasBonus": 0.3,
+            "maxSize": [
+              13,
+              10
+            ],
+            "requiredEntrances": [
+              1,
+              1
+            ],
+            "internalZones": [
+              "guard",
+              "treasure"
+            ],
+            "doorRequirement": "locked",
+            "trapTypes": [
+              "projectile"
+            ]
+          },
+          "libraryArchive": {
+            "label": "Library Archive",
+            "weight": 0.9,
+            "progressRange": [
+              0,
+              0.8
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Library"
+            ],
+            "roles": {
+              "backline": 2,
+              "frontline": 1,
+              "group": 0,
+              "champion": 0,
+              "any": 2
+            },
+            "lootMultiplier": 1.25,
+            "tierBiasBonus": 0.12,
+            "maxSize": [
+              16,
+              11
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "aisles",
+              "archive"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": []
+          },
+          "prisonBlock": {
+            "label": "Prison Block",
+            "weight": 1.0,
+            "progressRange": [
+              0.2,
+              1
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Prison"
+            ],
+            "roles": {
+              "backline": 0,
+              "frontline": 3,
+              "group": 2,
+              "champion": 0,
+              "any": 1
+            },
+            "lootMultiplier": 0.9,
+            "tierBiasBonus": 0,
+            "maxSize": [
+              16,
+              12
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "guard",
+              "cells"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": []
+          },
+          "floodedCistern": {
+            "label": "Flooded Cistern",
+            "weight": 0.75,
+            "progressRange": [
+              0,
+              0.85
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Workshop",
+              "Storage"
+            ],
+            "roles": {
+              "backline": 2,
+              "frontline": 1,
+              "group": 0,
+              "champion": 0,
+              "any": 2
+            },
+            "lootMultiplier": 1.1,
+            "tierBiasBonus": 0.08,
+            "maxSize": [
+              16,
+              12
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "walkway",
+              "cistern"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": []
+          },
+          "collapsedHall": {
+            "label": "Collapsed Hall",
+            "weight": 1.1,
+            "progressRange": [
+              0,
+              1
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Dining Hall",
+              "Temple",
+              "Workshop"
+            ],
+            "roles": {
+              "backline": 1,
+              "frontline": 2,
+              "group": 2,
+              "champion": 0,
+              "any": 1
+            },
+            "lootMultiplier": 1.0,
+            "tierBiasBonus": 0.05,
+            "maxSize": [
+              16,
+              12
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "approach",
+              "rubble"
+            ],
+            "doorRequirement": "any",
+            "trapTypes": []
+          },
+          "sealedTomb": {
+            "label": "Sealed Tomb",
+            "weight": 0.75,
+            "lockMultiplier": 2.0,
+            "progressRange": [
+              0.2,
+              1
+            ],
+            "minSize": [
+              8,
+              7
+            ],
+            "archetypes": [
+              "Burial Chamber",
+              "Temple"
+            ],
+            "roles": {
+              "backline": 0,
+              "frontline": 2,
+              "group": 1,
+              "champion": 1,
+              "any": 0
+            },
+            "lootMultiplier": 1.7,
+            "tierBiasBonus": 0.25,
+            "maxSize": [
+              13,
+              10
+            ],
+            "requiredEntrances": [
+              1,
+              1
+            ],
+            "internalZones": [
+              "guard",
+              "reliquary"
+            ],
+            "doorRequirement": "locked",
+            "trapTypes": [
+              "spikes"
+            ]
+          },
+          "forgeKillzone": {
+            "label": "Forge Killzone",
+            "weight": 1.0,
+            "progressRange": [
+              0.25,
+              1
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Forge"
+            ],
+            "roles": {
+              "backline": 2,
+              "frontline": 3,
+              "group": 0,
+              "champion": 0,
+              "any": 1
+            },
+            "lootMultiplier": 1.35,
+            "tierBiasBonus": 0.12,
+            "maxSize": [
+              16,
+              11
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "frontline",
+              "backline"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": [
+              "projectile"
+            ]
+          },
+          "barricadedDormitory": {
+            "label": "Barricaded Dormitory",
+            "weight": 1.3,
+            "progressRange": [
+              0.45,
+              1
+            ],
+            "minSize": [
+              9,
+              7
+            ],
+            "archetypes": [
+              "Dormitory"
+            ],
+            "roles": {
+              "backline": 1,
+              "frontline": 3,
+              "group": 3,
+              "champion": 0,
+              "any": 0
+            },
+            "lootMultiplier": 0.9,
+            "tierBiasBonus": 0.03,
+            "maxSize": [
+              16,
+              11
+            ],
+            "requiredEntrances": [
+              1,
+              2
+            ],
+            "internalZones": [
+              "barricade",
+              "sleeping"
+            ],
+            "doorRequirement": "closed",
+            "trapTypes": []
+          },
+          "guardedArtifactChamber": {
+            "label": "Guarded Artifact Chamber",
+            "weight": 0,
+            "fallbackOnly": true,
+            "progressRange": [
+              1,
+              1
+            ],
+            "minSize": [
+              1,
+              1
+            ],
+            "maxSize": [
+              99,
+              99
+            ],
+            "requiredEntrances": [
+              1,
+              1
+            ],
+            "archetypes": [
+              "Burial Chamber"
+            ],
+            "roles": {
+              "backline": 1,
+              "frontline": 2,
+              "group": 1,
+              "champion": 1,
+              "any": 0
+            },
+            "lootMultiplier": 2.0,
+            "tierBiasBonus": 0.3,
+            "doorRequirement": "locked",
+            "trapBias": true,
+            "trapTypes": [
+              "spikes",
+              "projectile"
+            ],
+            "internalZones": [
+              "guard",
+              "reliquary"
+            ]
+          }
+        },
+        "finalFloorMinimumCount": 2,
+        "artifactTypes": [
+          "treasury",
+          "sealedTomb",
+          "trappedArmory"
+        ],
+        "finalFloorDefensiveTypes": [
+          "fortifiedBarracks",
+          "barricadedDormitory",
+          "forgeKillzone",
+          "collapsedHall"
+        ],
+        "selectionGuardLimit": 50
       },
       "doors": {
         "ordinaryDoorChance": 0.45,
         "ordinaryLockedDoorChance": 0.1,
+        "ordinaryBreachedDoorChance": 0.04,
         "progressionGatePreBreachedChance": 0.3,
         "breachAlarmChance": 0.25
       },
@@ -407,7 +986,8 @@
         "targetFloorProgressRange": [
           0.5,
           1.0
-        ]
+        ],
+        "id": "dwarven-ruins-lift-1"
       },
       "traps": {
         "countRange": [
@@ -420,10 +1000,21 @@
         "projectileRange": 12,
         "spawnClearance": 2,
         "entranceClearance": 3,
-        "minimumSeparation": 3
+        "minimumSeparation": 3,
+        "tileKeys": {
+          "spikes": "dwarvenspikes",
+          "pressurePlate": "dwarvenpressureplate",
+          "projectileEmitter": "dwarvenarrowwall"
+        }
       },
       "encounters": {
         "baseTilesPerEnemy": 65,
+        "nativeBiomes": [
+          "cave"
+        ],
+        "spawnFloorTiles": [
+          "marble"
+        ],
         "densityGrowthRange": [
           0.1,
           0.15
@@ -433,8 +1024,59 @@
           4
         ],
         "dominantRarityCutoff": 0.1,
+        "dominantFamilyShare": 0.82,
+        "families": {
+          "goblinoids": {
+            "weight": 1.3,
+            "members": [
+              "Goblin",
+              "Kobold",
+              "Skink",
+              "Ratling"
+            ]
+          },
+          "undead": {
+            "weight": 1.2,
+            "members": [
+              "Skeleton",
+              "Ghoul",
+              "Ghost",
+              "Banshee",
+              "Gravehound"
+            ]
+          },
+          "marauders": {
+            "weight": 1.0,
+            "members": [
+              "Orc",
+              "Ogre",
+              "Minotaur",
+              "Imp",
+              "Gargoyle"
+            ]
+          },
+          "cavePredators": {
+            "weight": 0.8,
+            "members": [
+              "Giant Spider",
+              "Owlbear",
+              "Murkspawn",
+              "Grivel",
+              "Grivkin",
+              "Kveld",
+              "Tulla",
+              "Spineback",
+              "NULK",
+              "DRUSK",
+              "ASHFANG",
+              "NHALUUN"
+            ]
+          }
+        },
         "prefixBaseChance": 0.11,
         "prefixGrowthPerFloor": 0.025,
+        "prefixChanceCap": 0.28,
+        "championsPerFloor": 1,
         "minDepthByTier": {
           "2": 4,
           "3": 4,
@@ -442,14 +1084,69 @@
         },
         "entranceClearance": 8,
         "minSpacing": 3,
+        "tacticalMinSpacing": 1,
         "fleeAlertSameSpeciesChance": 0.5,
-        "fleeAlertDifferentSpeciesChance": 0.1
+        "fleeAlertDifferentSpeciesChance": 0.1,
+        "remoteCandidateBand": 4
       },
-      "chests": {
-        "perFloor": 1,
-        "tierEarly": 2,
-        "tierLate": 3,
-        "entranceClearance": 8
+      "loot": {
+        "baseBudget": 2,
+        "growthPerFloor": 0.1,
+        "tierBiasGrowth": 0.12,
+        "tierBiasCap": 0.55,
+        "entranceClearance": 8,
+        "tierWeights": {
+          "1": 0.08,
+          "2": 0.5,
+          "3": 0.32,
+          "4": 0.1
+        },
+        "artifactTier": 5,
+        "majorVaultBonusChance": 0.35
+      },
+      "story": {
+        "remainsPerFloorRange": [
+          2,
+          4
+        ],
+        "finalFloorRemainsMultiplier": 2.5,
+        "finalFloorBarricadeMultiplier": 2.2,
+        "finalFloorBreachedDoorMultiplier": 5,
+        "finalFloorRubbleMultiplier": 1.65,
+        "rubbleProgressMultiplierRange": [
+          0.9,
+          1.3
+        ],
+        "remainsProgressMultiplierRange": [
+          0.8,
+          1.5
+        ],
+        "breachedDoorProgressMultiplierRange": [
+          0.75,
+          2.0
+        ],
+        "barricadeChanceRange": [
+          0.05,
+          0.22
+        ],
+        "optionalDefenseDebrisChanceRange": [
+          0.03,
+          0.16
+        ]
+      },
+      "progressionKeys": {
+        "itemKind": "dwarvenkey",
+        "modes": {
+          "championCarrier": 1.0,
+          "remains": 0.85,
+          "trapGuardedSideRoom": 0.75,
+          "lockedSideRoom": 0.75
+        },
+        "trapGuardRadius": 4,
+        "remainsFarCandidateBand": 8
+      },
+      "validation": {
+        "postPopulationWorldRetries": 3
       }
     }
   },

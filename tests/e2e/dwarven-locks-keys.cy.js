@@ -77,7 +77,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       await tryMove(approach.dx, approach.dy)
       check(turnCount === openTurn + 1, 'unlocking/opening the gate costs exactly one turn')
       check(player.x === approach.x && player.y === approach.y, 'opening the gate does not also move the player')
-      check(gate.every(p => map[p.y][p.x] === 'dwarvengatebreached'), 'one matching key opens both gate leaves')
+      check(gate.every(p => map[p.y][p.x] === 'dwarvengateopen'), 'one matching key opens both gate leaves without marking them ruined')
       check(!player.inventory.some(item => item.kind === 'dwarvenkey' && item.keyId === keyGround[0].keyId),
         'gate key is consumed on opening')
 
@@ -85,14 +85,18 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       check(save.version === self.VAGABOND_SAVE_VERSION, 'gate state uses the current save schema')
       loadGameFromObject(save, {isReplayInit:true})
       const restored = deepLevels[2]
-      check(gate.every(p => restored.map[p.y][p.x] === 'dwarvengatebreached'), 'opened gate survives save/replay restoration')
+      check(gate.every(p => restored.map[p.y][p.x] === 'dwarvengateopen'), 'intact opened gate survives save/replay restoration')
       check(!player.inventory.some(item => item.kind === 'dwarvenkey' && item.keyId === keyGround[0].keyId),
         'consumed key stays consumed after restoration')
 
       check(TILE.dwarvengatelocked.projectileBlock === true && TILE.dwarvengatelocked.blocksSight === true,
         'locked gate blocks projectiles and sight')
+      check(TILE.dwarvengateopen.walk === true && TILE.dwarvengateopen.projectileBlock !== true &&
+        TILE.dwarvengateopen.blocksSight !== true, 'intact opened gate is fully passable')
       check(TILE.dwarvengatebreached.walk === true && TILE.dwarvengatebreached.projectileBlock !== true &&
-        TILE.dwarvengatebreached.blocksSight !== true, 'opened/breached gate is fully passable')
+        TILE.dwarvengatebreached.blocksSight !== true, 'pre-breached ruined gate remains fully passable')
+      check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image === 'img/tiles/dwarven-gate-open.png', 'intact open gate uses its dedicated sprite')
+      check(itemIconPath('dwarvenkey') === 'img/tiles/dwarven-key.png', 'Dwarven Key uses the PNG path')
     })()`))
   })
 
@@ -380,6 +384,68 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         replaySimulationMode = false
         activeReplay = null
       }
+    })()`))
+  })
+
+
+  it('generates all four controlled progression-key scenarios with solvable dependencies', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check = (ok, msg) => { if (!ok) throw new Error(msg) }
+      const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
+      const modes = ['championCarrier','remains','trapGuardedSideRoom','lockedSideRoom']
+      const savedModes = {...cfg.progressionKeys.modes}
+      const savedGateChance = cfg.doors.progressionGatePreBreachedChance
+      const savedRange = cfg.levelCountRange.slice()
+      cfg.doors.progressionGatePreBreachedChance = 0
+      cfg.levelCountRange = [3,3]
+      for (let modeIndex = 0; modeIndex < modes.length; modeIndex++) {
+        const mode = modes[modeIndex]
+        for (const key of modes) cfg.progressionKeys.modes[key] = key === mode ? 1 : 0
+        replayRecording = false
+        replayPlaying = false
+        currentZ = 0
+        currentCave = -1
+        map = surfaceMap
+        applyWorldTraits([])
+        WORLD_SEED = 73001 + modeIndex * 101
+        rngState = WORLD_SEED
+        await generateNewWorld()
+
+        for (let i = 0; i < deepLevels.slice(2).length; i++) {
+          const level = deepLevels[i + 2]
+          const z = chainZForDepth(i + 4)
+          check(level.progressionKey?.mode === mode, mode + ': intact floor uses forced progression-key mode')
+          const entry = level.caves[0].entrances[0]
+          const exit = level.caves[0].entrances[1]
+          const dependency = validateDwarvenRuinsKeyDependencies(level, z, entry, exit)
+          check(dependency.ok, mode + ': key dependency is solvable: ' + dependency.reason)
+          const keyId = level.progressionKey.keyId
+          const direct = groundItems.filter(item => item.level === z && item.kind === 'dwarvenkey' && item.keyId === keyId)
+          const remains = groundItems.filter(item => item.level === z && item.dungeonKey?.keyId === keyId)
+          const carriers = enemies.filter(enemy => enemy.alive && enemy.level === z && enemy.carriedDungeonKey?.keyId === keyId)
+          check(direct.length + remains.length + carriers.length === 1, mode + ': exactly one live progression-key source exists')
+
+          if (mode === 'championCarrier') {
+            check(carriers.length === 1 && carriers[0].prefix === 'Champion', 'champion-carrier key is held by the guaranteed champion')
+            check(carriers[0].dungeonRoomId === level.progressionKey.targetRoomId, 'key champion occupies the selected reachable encounter room')
+          } else if (mode === 'remains') {
+            check(remains.length === 1 && remains[0].kind === 'skeleton', 'remains scenario hides key in searchable dwarven remains')
+          } else if (mode === 'trapGuardedSideRoom') {
+            check(direct.length === 1, 'trap-guarded side room contains the progression key')
+            const guard = level.progressionKey.guardPoint
+            const radius = cfg.progressionKeys.trapGuardRadius
+            check((level.traps || []).some(trap => Math.max(Math.abs(trap.trigger.x - guard.x), Math.abs(trap.trigger.y - guard.y)) <= radius),
+              'trap-guarded side room has an active nearby trap mechanism')
+          } else if (mode === 'lockedSideRoom') {
+            check(direct.length === 1 && !!level.progressionKey.requiresLockId, 'locked side room contains the progression key behind a local lock')
+            const localKey = groundItems.find(item => item.level === z && item.kind === 'dwarvenkey' && item.keyId === level.progressionKey.requiresLockId)
+            check(!!localKey, 'locked side-room lock has one separately reachable local key')
+          }
+        }
+      }
+      cfg.progressionKeys.modes = savedModes
+      cfg.doors.progressionGatePreBreachedChance = savedGateChance
+      cfg.levelCountRange = savedRange
     })()`))
   })
 

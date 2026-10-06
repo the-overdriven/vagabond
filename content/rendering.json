@@ -161,7 +161,7 @@
     "dwarvenkey": {
       "glyph": "k",
       "color": "#e0b35f",
-      "image": "img/icons/dwarven-key.svg",
+      "image": "img/tiles/dwarven-key.png",
       "scale": 0.72
     }
   },
@@ -617,6 +617,11 @@
       "baseTileKey": "marble",
       "scale": 1
     },
+    "dwarvengateopen": {
+      "image": "img/tiles/dwarven-gate-open.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
     "dwarvengatebreached": {
       "image": "img/tiles/dwarven-gate-breached.png",
       "baseTileKey": "marble",
@@ -635,6 +640,41 @@
     "dwarvenlever": {
       "image": "img/tiles/dwarven-lever.png",
       "baseTileKey": "dwarvenwall",
+      "scale": 1
+    },
+    "dwarvenleverpulled": {
+      "image": "img/tiles/dwarven-lever-pulled.png",
+      "baseTileKey": "dwarvenwall",
+      "scale": 1
+    },
+    "dwarvenbed": {
+      "image": "img/tiles/dwarven-bed.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenbedbarricade": {
+      "image": "img/tiles/dwarven-bed-barricade.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenshelf": {
+      "image": "img/tiles/dwarven-bookshelf.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarventable": {
+      "image": "img/tiles/dwarven-table.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvencrate": {
+      "image": "img/tiles/dwarven-crate.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenprisonbars": {
+      "image": "img/tiles/dwarven-prison-bars.png",
+      "baseTileKey": "marble",
       "scale": 1
     },
     "dwarvenspikes": {

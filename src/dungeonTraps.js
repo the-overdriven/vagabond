@@ -3,20 +3,24 @@
 // Mechanisms are generated once and saved with their existing deep-level maps.
 // Entry events resolve synchronously; projectile animations only show the result.
 const DungeonTraps = (() => {
-  const triggerTiles = new Set(['dwarvenspikes', 'dwarvenpressureplate'])
   const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
-  const config = () => WORLD_GEN_CONFIG.dungeons.dwarvenRuins.traps
+  const configForLevel = level => dungeonPackageConfig(level?.dungeonPackage)?.traps || null
   const distance = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
-  const activeLevel = () => currentLevelKind() === 'chain' && currentZ <= -4
+  const activeLevel = () => currentLevelKind() === 'chain' && currentZ < 0
     ? deepLevels[chainDepthForZ(currentZ) - 2] : null
-  const isTrigger = tile => triggerTiles.has(tile)
+  const isTrigger = tile => Object.values(WORLD_GEN_CONFIG.dungeons || {}).some(pkg => {
+    const tiles = pkg?.traps?.tileKeys
+    return tile === tiles?.spikes || tile === tiles?.pressurePlate
+  })
 
   function safeSpawn(x, y, z, levelKind = 'chain') {
-    if (z > -4 || levelKind !== 'chain') return true
+    if (levelKind !== 'chain' || z >= 0) return true
     const level = deepLevels[chainDepthForZ(z) - 2]
+    const cfg = configForLevel(level)
+    if (!cfg) return true
     return !(level?.traps || []).some(trap =>
-      distance({x, y}, trap.trigger) <= config().spawnClearance ||
-      (trap.emitter && distance({x, y}, trap.emitter) <= config().spawnClearance))
+      distance({x, y}, trap.trigger) <= cfg.spawnClearance ||
+      (trap.emitter && distance({x, y}, trap.emitter) <= cfg.spawnClearance))
   }
 
   // Generation checks routes with all doors unlocked, while treating every
@@ -33,10 +37,10 @@ const DungeonTraps = (() => {
   }
 
   function generate() {
-    const cfg = config()
-    for (let i = 2; i < deepLevels.length; i++) {
+    for (let i = 0; i < deepLevels.length; i++) {
       const level = deepLevels[i]
-      if (level.kind !== 'dwarvenRuins') continue
+      const cfg = configForLevel(level)
+      if (!cfg?.tileKeys) continue
       level.traps = []
       const terrain = level.map, z = chainZForDepth(i + 2)
       const entrances = level.caves[0].entrances
@@ -44,26 +48,43 @@ const DungeonTraps = (() => {
       const inRoom = (x, y) => rooms.some(r =>
         x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
       const ground = groundItems.filter(g => g.level === z)
-      const required = [...entrances, ...ground]
-      if (dwarvenRuinsLift) for (const p of [dwarvenRuinsLift.upper, dwarvenRuinsLift.lower]) {
-        if (p.z === z) required.push(p)
+      const keyGround = ground.filter(g => g.kind === 'dwarvenkey')
+      const keyRemains = ground.filter(g => g.dungeonKey?.kind === 'dwarvenkey')
+      const required = [...entrances, ...keyGround, ...keyRemains]
+      for (const shortcut of dungeonShortcutsForPackage(level.dungeonPackage)) for (const p of [shortcut.upper, shortcut.lower]) {
+        if (p?.z === z) required.push(p)
       }
+      const trapBiasedVaults = (level.vaults || []).filter(v => v.trapBias && v.entrance)
+      const progressionGuard = level.progressionKey?.mode === 'trapGuardedSideRoom'
+        ? level.progressionKey.guardPoint || null : null
+      const trapGuardRadius = dungeonPackageConfig(level.dungeonPackage)?.progressionKeys?.trapGuardRadius ?? 4
       const blocked = new Set(), candidates = []
       for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
         if (terrain[y][x] !== 'marble' || inRoom(x, y) ||
             required.some(p => distance(p, {x,y}) <= cfg.entranceClearance)) continue
         const nearDoor = directions.some(([dx,dy]) => isClosedDungeonDoorTile(terrain[y+dy]?.[x+dx]) || isLockedDungeonDoorTile(terrain[y+dy]?.[x+dx]))
         const walls = directions.filter(([dx,dy]) => terrain[y+dy]?.[x+dx] === 'dwarvenwall')
-        if (nearDoor || walls.length) candidates.push({x, y, walls})
+        if (nearDoor || walls.length) {
+          const preferredVault = trapBiasedVaults.find(v => distance(v.entrance, {x,y}) <= 4) || null
+          const progressionPreferred = !!progressionGuard && distance(progressionGuard, {x,y}) <= trapGuardRadius
+          candidates.push({x, y, walls,
+            preferred: progressionPreferred || !!preferredVault,
+            progressionPreferred,
+            allowedTypes: preferredVault?.trapTypes || []})
+        }
       }
       // One seeded shuffle, then bounded attempts; never reroll at runtime.
       for (let n = candidates.length - 1; n > 0; n--) {
         const j = randInt(0, n); [candidates[n], candidates[j]] = [candidates[j], candidates[n]]
       }
+      candidates.sort((a, b) => Number(b.progressionPreferred) - Number(a.progressionPreferred) ||
+        Number(b.preferred) - Number(a.preferred))
       const count = randInt(cfg.countRange[0], cfg.countRange[1])
       for (const candidate of candidates) {
         if (level.traps.length >= count) break
-        const type = level.traps.length % 2 === 0 ? 'spikes' : 'projectile'
+        const allowedTypes = Array.isArray(candidate.allowedTypes) && candidate.allowedTypes.length
+          ? candidate.allowedTypes : ['spikes','projectile']
+        const type = allowedTypes[level.traps.length % allowedTypes.length]
         let trigger = {x:candidate.x, y:candidate.y}, emitter = null, direction = null
         if (type === 'projectile') {
           const wall = candidate.walls.find(([dx,dy]) =>
@@ -83,18 +104,22 @@ const DungeonTraps = (() => {
         // Preserve all currently reachable keys with intact locks too.
         const before = dungeonWalkDistances(terrain, entrances[0])
         const after = dungeonWalkDistances(terrain, entrances[0], nextBlocked)
-        if (ground.some(p => before.has(keyXY(p.x,p.y)) && !after.has(keyXY(p.x,p.y)))) continue
-        const trap = {id:`dwarven-trap:${z}:${level.traps.length}`, type, trigger,
+        if (keyGround.some(p => before.has(keyXY(p.x,p.y)) && !after.has(keyXY(p.x,p.y)))) continue
+        const trap = {id:`${level.dungeonPackage}-trap:${z}:${level.traps.length}`, type, trigger,
           ...(emitter ? {emitter, direction, range:cfg.projectileRange} : {})}
         level.traps.push(trap); blocked.add(keyXY(trigger.x, trigger.y))
-        terrain[trigger.y][trigger.x] = type === 'spikes' ? 'dwarvenspikes' : 'dwarvenpressureplate'
-        if (emitter) terrain[emitter.y][emitter.x] = 'dwarvenarrowwall'
+        terrain[trigger.y][trigger.x] = type === 'spikes' ? cfg.tileKeys.spikes : cfg.tileKeys.pressurePlate
+        if (emitter) terrain[emitter.y][emitter.x] = cfg.tileKeys.projectileEmitter
       }
+      if (progressionGuard && !level.traps.some(trap => distance(trap.trigger, progressionGuard) <= trapGuardRadius)) return false
     }
+    return true
   }
 
   function hit(target, trap) {
-    const cfg = config(), isPlayer = target === player
+    const level = activeLevel()
+    const cfg = configForLevel(level), isPlayer = target === player
+    if (!cfg) return {damage:0, missed:false}
     if (isPlayer && player.godMode) return {damage:0, missed:false}
     const speed = isPlayer ? playerSpd() : enemySpd(target)
     const missed = trap.type === 'projectile' && chance(Math.min(1,

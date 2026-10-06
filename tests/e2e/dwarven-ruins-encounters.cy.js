@@ -44,9 +44,19 @@ describe('Dwarven Ruins encounter progression', () => {
           const champions = mobs.filter(e => e.prefix === 'Champion')
           const species = new Set(mobs.map(e => e.baseName || e.name))
 
-          check(champions.length === 1, 'exactly one Champion per Ruins floor')
+          check(champions.length === cfg.championsPerFloor, 'configured Champion count per Ruins floor')
           check(mobs.some(e => e !== champions[0] && e.baseName === champions[0].baseName),
             'Champion leads at least one same-species guard')
+          for (const vault of level.vaults || []) {
+            const vaultMobs = mobs.filter(e => e.dungeonVaultId === vault.id)
+            if ((vault.roles?.backline || 0) > 0 && (vault.slots?.backline || []).length) {
+              const backline = vaultMobs.filter(e => e.dungeonRole === 'backline')
+              check(backline.length >= 1, 'vault backline role produces at least one tactical enemy')
+              check(backline.every(e => enemyIsShooter(e)), 'vault backline enemies are actual shooter variants')
+            }
+            check(vaultMobs.filter(e => e.dungeonRole === 'frontline' || e.dungeonRole === 'group').every(e => !enemyIsShooter(e)),
+              'frontline/group vault roles stay melee even for shooter-capable species')
+          }
           check(mobs.length >= 3, 'Ruins floor has a meaningful encounter population')
           check(species.size >= 2, 'Ruins floor exposes at least two base-species families')
           check(!mobs.some(e => e !== champions[0] && e.prefix === 'Champion'), 'ordinary prefix rolls never create a second Champion')
