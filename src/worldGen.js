@@ -596,20 +596,33 @@ function placeTreasureMapSpot() {
   if (sandTiles.length) treasureMapSpot = pick(sandTiles)
 }
 
-function isTempleConnectedToEdge() {
+function surfaceReachableFromTemple() {
+  const dirs8 = [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]]
   const queue = [{x: spawnPoint.x, y: spawnPoint.y}]
   const seen = new Set([keyXY(spawnPoint.x, spawnPoint.y)])
-  while (queue.length) {
-    const p = queue.shift()
-    if (p.x === 0 || p.y === 0 || p.x === MAP_W - 1 || p.y === MAP_H - 1) return true
-    for (const [dx, dy] of DIRS8) {
+  for (let i = 0; i < queue.length; i++) {
+    const p = queue[i]
+    for (const [dx, dy] of dirs8) {
       const x = p.x + dx, y = p.y + dy
       if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue
       const key = keyXY(x, y)
-      if (seen.has(key) || !TILE[map[y][x]] || !TILE[map[y][x]].walk) continue
+      if (seen.has(key) || !TILE[map[y][x]]?.walk) continue
       seen.add(key)
       queue.push({x, y})
     }
+  }
+  return seen
+}
+
+function isSurfacePointReachableFromTemple(x, y) {
+  return surfaceReachableFromTemple().has(keyXY(x, y))
+}
+
+function isTempleConnectedToEdge() {
+  const seen = surfaceReachableFromTemple()
+  for (const key of seen) {
+    const [x, y] = key.split(',').map(Number)
+    if (x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) return true
   }
   return false
 }
@@ -806,6 +819,10 @@ function generateCaves() {
     discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   })
   buildDwarvenRuin(deepLevels[1])
+  // The surface Fort gate must belong to the Temple's walkable component.
+  // Candidate selection already enforces this, and this check remains as a
+  // defensive invariant against future terrain/gate-placement changes.
+  if (!dwarvenRuin || !isSurfacePointReachableFromTemple(dwarvenRuin.x, dwarvenRuin.y)) return false
   // More cave entrances must never put a random cave mouth next to the gate.
   const fortTooClose = dwarvenRuin && caves.some(c => !c.crypt && (c.entrances || []).some(e =>
     Math.max(Math.abs(e.x - dwarvenRuin.x), Math.abs(e.y - dwarvenRuin.y)) <= 15))
@@ -1051,10 +1068,11 @@ function buildDwarvenRuin(targetLevel) {
   const cfg = WORLD_GEN_CONFIG.dwarvenFort
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+  const templeReachable = surfaceReachableFromTemple()
   const candidates = []
   for (let y = cfg.candidateEdgeMargin; y < MAP_H - cfg.candidateEdgeMargin; y++) for (let x = cfg.candidateEdgeMargin; x < MAP_W - cfg.candidateEdgeMargin; x++) {
     if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain') continue
-    if (DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) candidates.push({x, y})
+    if (DIRS8.some(([dx, dy]) => templeReachable.has(keyXY(x + dx, y + dy)))) candidates.push({x, y})
   }
   // The fort is mandatory. Prefer a natural mountain entrance, but if
   // the generated world has no suitable mountain tile, create a small
@@ -1064,7 +1082,8 @@ function buildDwarvenRuin(targetLevel) {
     const northLimit = Math.max(cfg.fallbackNorthMinRows, Math.floor(MAP_H * cfg.fallbackNorthFraction))
     for (let y = cfg.candidateEdgeMargin; y < northLimit; y++) for (let x = cfg.candidateEdgeMargin; x < MAP_W - cfg.candidateEdgeMargin; x++) {
       if (!TILE[map[y]?.[x]]?.walk) continue
-      if (!DIRS8.some(([dx, dy]) => TILE[map[y + dy]?.[x + dx]]?.walk)) continue
+      if (!templeReachable.has(keyXY(x, y))) continue
+      if (!DIRS8.some(([dx, dy]) => templeReachable.has(keyXY(x + dx, y + dy)))) continue
       fallback.push({x, y})
     }
     const gate = fallback.length ? pick(fallback) : {x: Math.floor(MAP_W / 2), y: cfg.fallbackCenterY}

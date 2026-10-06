@@ -1592,7 +1592,9 @@ to the surface or renders from the canonical surface state.
 
 World generation checks whether the Temple can reach a map edge through walkable terrain. This is to prevent situation where player is stuck in a village surrounded by non-walkable tiles.
 
-If the generated world fails this condition, it is regenerated.
+The surface Dwarven Fort entrance has a separate reachability invariant. Natural Fort candidates must border the same 8-direction walkable component as the Temple; a fallback mountain outcrop may likewise only be created on that component. After the Fort gate is stamped, cave/fort generation defensively flood-fills from the Temple again and rejects the world if the gate is not reachable. This prevents visually valid mountain pockets from containing an inaccessible Fort entrance.
+
+If either surface connectivity condition fails, the world attempt is regenerated.
 
 The z:-1 crypt must remain a separate walkable region from all randomly
 generated caves. The generation-time exclusion zone prevents normal cave blobs

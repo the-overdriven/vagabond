@@ -63,6 +63,25 @@ describe('Persistent Dwarven Ruins stratum', () => {
           return false
         }
 
+        const surfaceReachable = (start, target) => {
+          const queue = [start]
+          const seen = new Set([keyXY(start.x, start.y)])
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+          for (let i = 0; i < queue.length; i++) {
+            const p = queue[i]
+            if (p.x === target.x && p.y === target.y) return true
+            for (const [dx,dy] of dirs) {
+              const x = p.x + dx, y = p.y + dy, key = keyXY(x,y)
+              if (seen.has(key) || !TILE[surfaceMap[y]?.[x]]?.walk) continue
+              seen.add(key)
+              queue.push({x,y})
+            }
+          }
+          return false
+        }
+        check(surfaceReachable(spawnPoint, {x:dwarvenRuin.x, y:dwarvenRuin.y}),
+          'surface Dwarven Fort gate is reachable from the Temple')
+
         const fortDown = positions(deepLevels[1].map, 'dwarvenstairsdown')
         check(fortDown.length === 1, 'fort has one Dwarven Ruins descent')
         check(reachable(deepLevels[1].map, {x: dwarvenRuin.x, y: dwarvenRuin.y}, fortDown[0]),
