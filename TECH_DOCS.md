@@ -1033,7 +1033,9 @@ platforms. Every staircase, key and lift retains a route avoiding all triggers;
 keys reachable before unlocking also retain their original accessibility.
 Trap triggers are separated by more than three tiles. Existing monsters cannot
 start within two tiles of either a trigger or emitter. Summoning uses the same
-`DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement.
+`DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement. Triggers
+and emitters also keep that clearance from authored room tactical slots, so
+traps cannot displace their intended encounters.
 
 Spikes trigger on entry by players and enemies, including flying and ethereal
 creatures. Forced movement also triggers them. Remaining on a trigger or

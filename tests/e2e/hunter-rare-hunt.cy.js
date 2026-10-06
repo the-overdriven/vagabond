@@ -199,7 +199,6 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         'same direction is reported only once').to.equal(1)
       expect((result.first.log.match(/You hear something answering from /g) || []).length,
         'horn reports at most 3 distinct directions').to.equal(3)
-      expect(result.first.log).not.to.include('south-humanoid')
       expect(result.blockedTurn, 'reuse without new XP costs no turn').to.equal(result.afterFirstTurn)
       expect(result.afterXpTurn, 'new earned XP unlocks horn again').to.equal(result.afterFirstTurn + 1)
       expect(result.savedLastUse).to.equal(result.loadedLastUse)

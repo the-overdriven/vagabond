@@ -85,7 +85,7 @@ describe('Dwarven Ruins encounter progression', () => {
         check(after === before, 'save/load preserves exact generated Ruins encounter state')
       }
 
-      check(/^v\d+$/.test(self.VAGABOND_GAME_VERSION), 'game version is exposed')
+      check(/^v\\d+$/.test(self.VAGABOND_GAME_VERSION), 'game version is exposed')
       check(Number.isInteger(self.VAGABOND_SAVE_VERSION), 'save schema is exposed')
     })()`))
   })

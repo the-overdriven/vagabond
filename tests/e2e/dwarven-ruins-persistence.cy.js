@@ -37,9 +37,16 @@ describe('Dwarven Ruins persistence', () => {
 
       const heldKeyId = 'test:persistent-local-key'
       addInventoryItem('dwarvenkey', {keyId:heldKeyId,ordinaryDoorKey:true})
-      const floorEnemy = enemies.find(enemy => enemy.alive && enemy.level === z)
+      const floorEnemy = enemies.find(enemy => enemy.alive && enemy.level === z && !enemyIsPassive(enemy))
       check(!!floorEnemy, 'test floor has an enemy to persist Alarmed/key-carrier state')
+      currentZ = z
+      map = level.map
+      undergroundDiscovered = level.discovered
+      player.x = floorEnemy.x
+      player.y = floorEnemy.y
       floorEnemy.alarmed = true
+      floorEnemy.alarmedZ = z
+      floorEnemy.alarmedLevelKind = 'chain'
       floorEnemy.aware = true
       floorEnemy.carriedDungeonKey = {kind:'dwarvenkey',keyId:'test:persistent-carrier-key',progressionKey:true}
 
@@ -168,6 +175,7 @@ describe('Dwarven Ruins persistence', () => {
         check(recorded.rng.length > 0, 'combined sequence records its gameplay RNG tape')
 
         loadGameFromObject(recorded.initialState,{isReplayInit:true})
+        WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors.breachAlarmChance = 1
         replayAnimationsDisabled = true
         replaySimulationMode = true
         activeReplay = recorded
@@ -194,7 +202,7 @@ describe('Dwarven Ruins persistence', () => {
           activeReplay = null
         }
       } finally {
-        cfg.doors.breachAlarmChance = oldAlarmChance
+        WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors.breachAlarmChance = oldAlarmChance
       }
     })()`))
   })

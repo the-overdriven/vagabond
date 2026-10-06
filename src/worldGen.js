@@ -1738,6 +1738,10 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
   const buildZones = hooks.buildZones || ((grid, room, names) => dungeonInternalZones(room, names, dwarvenRoomEntryPoint(grid, room)))
   const buildSlots = hooks.buildSlots || deriveDwarvenTacticalSlots
   const defs = cfg.definitions || {}
+  const entranceClearance = dungeonPackageConfig(packageId)?.encounters?.entranceClearance ?? 0
+  const backlineClearOfEntrances = (room, def) => !(def.roles?.backline > 0) ||
+    (buildSlots(cm, room, def.roles).backline || []).some(p =>
+      (hooks.entrances || []).every(e => Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) > entranceClearance))
   const gateRoom = structuralDoors.find(d => d.leaves === gateDoorway)?.room || null
   const selectable = roomMetas.filter(room => room.index > 0 && room._source !== gateRoom)
   if (!selectable.length) return null
@@ -1760,6 +1764,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
       room.w >= minSize[0] && room.h >= minSize[1] && room.w <= maxSize[0] && room.h <= maxSize[1] &&
       entranceCount >= entranceRange[0] && entranceCount <= entranceRange[1] &&
       (!requiresStructuralEntrance || hasStructuralEntrance) &&
+      backlineClearOfEntrances(room, def) &&
       (ignoreArchetype || !Array.isArray(def.archetypes) || def.archetypes.includes(room.archetype))
   }
   const attach = (type, room, artifactReserved = false) => {
@@ -2175,7 +2180,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const roomMetaBySource = new Map(roomMetas.map(room => [room._source, room]))
   const vaultSelection = selectDungeonVaults('dwarvenRuins', cm, roomMetas, structuralDoors, gateDoorway, progress, floorZ, finalFloor, {
     buildZones: dwarvenVaultInternalZones,
-    buildSlots: deriveDwarvenTacticalSlots
+    buildSlots: deriveDwarvenTacticalSlots,
+    entrances: [entry, exit]
   })
   if (!vaultSelection) return null
   const vaults = vaultSelection.vaults
@@ -2353,6 +2359,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const vault = vaults.find(v => v.roomId === room.id)
     room.tacticalSlots = deriveDwarvenTacticalSlots(cm, room, vault?.roles || null)
     if (vault) vault.slots = structuredClone(room.tacticalSlots)
+    if (vault?.roles?.backline > 0 && !(vault.slots.backline || []).some(p =>
+      [entry, exit].every(e => Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) >
+        (WORLD_GEN_CONFIG.dungeons.dwarvenRuins.encounters?.entranceClearance ?? 0)))) return null
   }
 
   // Dressing, rubble and locks may reshape optional spaces, but may never
@@ -3966,8 +3975,15 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       spawned.push({x:p.x, y:p.y})
       return {x:p.x, y:p.y}
     }
-    const takeRoleSpot = (room, role) => {
+    const takeRoleSpot = (room, role, required = false) => {
       for (const p of room?.tacticalSlots?.[role] || []) if (validSpot(p, true)) return claimSpot(p)
+      if (required) {
+        for (const p of room?.tacticalSlots?.[role] || [])
+          if (safeSet.has(keyXY(p.x, p.y)) && !usedPositions.has(keyXY(p.x, p.y))) return claimSpot(p)
+        const fallback = safeTiles.find(p => !usedPositions.has(keyXY(p.x, p.y)) &&
+          p.x > room.x && p.x < room.x + room.w - 1 && p.y > room.y && p.y < room.y + room.h - 1)
+        if (fallback) return claimSpot(fallback)
+      }
       return null
     }
     const takeSpot = (room = null, far = false, tactical = false) => {
@@ -4061,34 +4077,6 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const championVault = vaults.find(vault => (vault.roles?.champion || 0) > 0) || artifactVault || null
     const keyCarrierPlan = level.progressionKey?.mode === 'championCarrier' ? level.progressionKey : null
     const keyCarrierRoom = keyCarrierPlan ? roomById.get(keyCarrierPlan.targetRoomId) || null : null
-    for (let championIndex = 0; championIndex < championCount; championIndex++) {
-      const family = championIndex === 0
-        ? championFamily
-        : pickWeighted(dominant, candidate => Math.max(0.0001, candidate.weight))
-      const tmpl = chooseMember(family, 'champion') || eligible[0]
-      const championRoom = championIndex === 0
-        ? (keyCarrierRoom || roomById.get(championVault?.roomId) || farthestRoom)
-        : (nonEntranceRooms[championIndex % Math.max(1, nonEntranceRooms.length)] || farthestRoom)
-      const championRoomVault = vaults.find(vault => vault.roomId === championRoom?.id) || null
-      const vaultId = championIndex === 0 ? championRoomVault?.id || championVault?.id || null : null
-      const championSpot = takeRoleSpot(championRoom, 'champion') || takeRoleSpot(championRoom, 'group') ||
-        takeRoleSpot(championRoom, 'frontline') || takeRoleSpot(championRoom, 'any') ||
-        takeSpot(championRoom, true, true) || takeSpot(null, true)
-      if (!championSpot) continue
-      const championEnemy = spawnTemplate(tmpl, championSpot, 'Champion', false, 'champion', family.id,
-        championRoom?.id || null, vaultId)
-      if (!championEnemy) continue
-      if (championIndex === 0 && keyCarrierPlan) {
-        const keyItemKind = packageCfg.progressionKeys?.itemKind || hooks.progressionKeyItemKind || 'dungeonkey'
-        championEnemy.carriedDungeonKey = {kind:keyItemKind,keyId:keyCarrierPlan.keyId,progressionKey:true}
-      }
-      spent += Math.max(1, tmpl.tier)
-      const escortTemplate = chooseMember(family, 'group') || tmpl
-      const escortSpot = takeRoleSpot(championRoom, 'group') || takeRoleSpot(championRoom, 'frontline') || takeSpot(championRoom, false, true)
-      if (escortSpot && spawnTemplate(escortTemplate, escortSpot, null, false, 'group', family.id,
-        championRoom?.id || null, vaultId)) spent += Math.max(1, escortTemplate.tier)
-    }
-
     // Vaults spend their most tactical slots first. A backline slot is not a
     // cosmetic label: where the selected family has a ranged-capable member,
     // that spawn is forced to be a shooter and therefore starts with ammo.
@@ -4112,11 +4100,39 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
           if (!tmpl) continue
           const cost = Math.max(1, tmpl.tier)
           if (spent + cost > organizedBudget && !(role === 'backline' && n === 0)) break
-          const spot = takeRoleSpot(room, role)
+          const spot = takeRoleSpot(room, role, role === 'backline' && n === 0)
           if (!spot) break
           if (spawnTemplate(tmpl, spot, null, false, role, family.id, room.id, vault.id)) spent += cost
         }
       }
+    }
+
+    for (let championIndex = 0; championIndex < championCount; championIndex++) {
+      const family = championIndex === 0
+        ? championFamily
+        : pickWeighted(dominant, candidate => Math.max(0.0001, candidate.weight))
+      const tmpl = chooseMember(family, 'champion') || eligible[0]
+      const championRoom = championIndex === 0
+        ? (keyCarrierRoom || roomById.get(championVault?.roomId) || farthestRoom)
+        : (nonEntranceRooms[championIndex % Math.max(1, nonEntranceRooms.length)] || farthestRoom)
+      const championRoomVault = vaults.find(vault => vault.roomId === championRoom?.id) || null
+      const vaultId = championIndex === 0 ? championRoomVault?.id || championVault?.id || null : null
+      const championSpot = takeRoleSpot(championRoom, 'champion') || takeRoleSpot(championRoom, 'group') ||
+        takeRoleSpot(championRoom, 'frontline') || takeRoleSpot(championRoom, 'any') ||
+        takeSpot(championRoom, true, true) || takeSpot(null, true)
+      if (!championSpot) continue
+      const championEnemy = spawnTemplate(tmpl, championSpot, 'Champion', false, 'champion', family.id,
+        championRoom?.id || null, vaultId)
+      if (!championEnemy) continue
+      if (championIndex === 0 && keyCarrierPlan) {
+        const keyItemKind = packageCfg.progressionKeys?.itemKind || hooks.progressionKeyItemKind || 'dungeonkey'
+        championEnemy.carriedDungeonKey = {kind:keyItemKind,keyId:keyCarrierPlan.keyId,progressionKey:true}
+      }
+      spent += Math.max(1, tmpl.tier)
+      const escortSpot = takeRoleSpot(championRoom, 'group') || takeRoleSpot(championRoom, 'frontline') ||
+        takeSpot(championRoom, false, true) || takeSpot(null, false, true) || takeSpot()
+      if (escortSpot && spawnTemplate(tmpl, escortSpot, null, false, 'group', family.id,
+        championRoom?.id || null, vaultId)) spent += Math.max(1, tmpl.tier)
     }
 
     // Make every selected family visible even if the tactical vaults happened

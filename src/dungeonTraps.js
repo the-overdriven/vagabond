@@ -44,7 +44,8 @@ const DungeonTraps = (() => {
       level.traps = []
       const terrain = level.map, z = chainZForDepth(i + 2)
       const entrances = level.caves[0].entrances
-      const rooms = level._encounterRooms || []
+      const rooms = level.rooms || level._encounterRooms || []
+      const tacticalSpots = rooms.flatMap(room => Object.values(room.tacticalSlots || {}).flat())
       const inRoom = (x, y) => rooms.some(r =>
         x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
       const ground = groundItems.filter(g => g.level === z)
@@ -97,6 +98,8 @@ const DungeonTraps = (() => {
         if (terrain[trigger.y]?.[trigger.x] !== 'marble' || inRoom(trigger.x, trigger.y) ||
             required.some(p => distance(p, trigger) <= cfg.entranceClearance)) continue
         if (level.traps.some(t => distance(t.trigger, trigger) <= cfg.minimumSeparation)) continue
+        if (tacticalSpots.some(p => distance(p, trigger) <= cfg.spawnClearance ||
+            (emitter && distance(p, emitter) <= cfg.spawnClearance))) continue
         if (enemies.some(e => e.level === z && (distance(e, trigger) <= cfg.spawnClearance || (emitter && distance(e, emitter) <= cfg.spawnClearance)))) continue
         const nextBlocked = new Set(blocked).add(keyXY(trigger.x, trigger.y))
         const reachable = safeReachable(terrain, entrances[0], nextBlocked)

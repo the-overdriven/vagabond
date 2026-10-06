@@ -53,7 +53,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
             for (const [dx, dy] of dirs) {
               const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
               const tile = grid[y]?.[x]
-              const traversable = TILE[tile]?.walk || tile === 'dwarvendoorclosed' ||
+              const traversable = TILE[tile]?.walk || tile === 'dwarvendoorclosed' || tile === 'dwarvendoorlocked' ||
                 (allowLockedGate && tile === 'dwarvengatelocked')
               if (seen.has(key) || !traversable) continue
               seen.add(key)
@@ -269,7 +269,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         currentCave = -1
         map = surfaceMap
         applyWorldTraits([])
-        cfg.levelCountRange = [fixture.count,fixture.count]
+        WORLD_GEN_CONFIG.dungeons.dwarvenRuins.levelCountRange = [fixture.count,fixture.count]
         WORLD_SEED = fixture.seed
         rngState = WORLD_SEED
         await generateNewWorld()
@@ -283,7 +283,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(!!lift && lift.packageId === 'dwarvenRuins', 'forced-count stratum owns one package-tagged lift shortcut')
         check(lift.lower.floor >= 2 && lift.lower.floor <= fixture.count, 'lift target remains inside the generated stratum')
       }
-      cfg.levelCountRange = oldRange
+      WORLD_GEN_CONFIG.dungeons.dwarvenRuins.levelCountRange = oldRange
     })()`))
   })
 

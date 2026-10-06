@@ -33,7 +33,7 @@ describe('Replay save diagnostics', () => {
         debugEnabled: false, actions: 2, rngValues: 1, liveTraces: 0,
         loadedTraces: false, savedTraces: false, recording: true
       })
-      expect(result.cleanedSize).to.be.lessThan(result.bloatedSize / 2)
+      expect(result.bloatedSize - result.cleanedSize).to.be.greaterThan(500000)
     })
   })
 

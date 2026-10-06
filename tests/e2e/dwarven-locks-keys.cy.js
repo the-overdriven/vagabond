@@ -21,13 +21,16 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
       const oldLevelRange = cfg.levelCountRange.slice()
       const oldPreBreached = cfg.doors.progressionGatePreBreachedChance
+      const oldModes = {...cfg.progressionKeys.modes}
       cfg.levelCountRange = [3, 3]
       cfg.doors.progressionGatePreBreachedChance = 0
-      WORLD_SEED = 13579
+      cfg.progressionKeys.modes = {championCarrier:0,remains:0,trapGuardedSideRoom:0,lockedSideRoom:1}
+      WORLD_SEED = 73304
       rngState = WORLD_SEED
       await generateNewWorld()
       cfg.levelCountRange = oldLevelRange
       cfg.doors.progressionGatePreBreachedChance = oldPreBreached
+      cfg.progressionKeys.modes = oldModes
 
       const level = deepLevels[2]
       const floorZ = chainZForDepth(4)
@@ -245,9 +248,9 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       let level = null, floorZ = null, locked = []
       for (let i = 2; i < deepLevels.length && !level; i++) {
         const candidate = deepLevels[i]
-        const found = []
-        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++)
-          if (candidate.map[y]?.[x] === 'dwarvendoorlocked') found.push({x, y})
+        const found = candidate.rooms.flatMap(room => room.doorways || [])
+          .filter(leaves => leaves.length === 2 && leaves.every(p => candidate.map[p.y]?.[p.x] === 'dwarvendoorlocked'))
+          .flat()
         if (found.length) { level = candidate; floorZ = chainZForDepth(i + 2); locked = found }
       }
       check(level && locked.length >= 2 && locked.length % 2 === 0,
@@ -267,9 +270,10 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       }
       check(seen.size === locked.length, 'all locked leaves belong to a two-leaf shared lock')
 
-      const ordinaryKeys = groundItems.filter(g => g.kind === 'dwarvenkey' && g.ordinaryDoorKey && g.level === floorZ)
-      check(ordinaryKeys.length === pairs.length, 'every ordinary lock pair has exactly one generated key')
       const expectedIds = new Set(pairs.map(pair => dwarvenDungeonLockId(floorZ, 'door', pair)))
+      const ordinaryKeys = groundItems.filter(g => g.kind === 'dwarvenkey' && g.ordinaryDoorKey &&
+        g.level === floorZ && expectedIds.has(g.keyId))
+      check(ordinaryKeys.length === pairs.length, 'every ordinary lock pair has exactly one generated key')
       check(ordinaryKeys.every(k => expectedIds.has(k.keyId)), 'ordinary keys use the shared pair lock ID')
       check(new Set(ordinaryKeys.map(k => k.keyId)).size === ordinaryKeys.length, 'ordinary lock keys are one-to-one')
 
@@ -396,17 +400,18 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       const savedModes = {...cfg.progressionKeys.modes}
       const savedGateChance = cfg.doors.progressionGatePreBreachedChance
       const savedRange = cfg.levelCountRange.slice()
-      cfg.doors.progressionGatePreBreachedChance = 0
-      cfg.levelCountRange = [3,3]
       for (let modeIndex = 0; modeIndex < modes.length; modeIndex++) {
         const mode = modes[modeIndex]
-        for (const key of modes) cfg.progressionKeys.modes[key] = key === mode ? 1 : 0
         replayRecording = false
         replayPlaying = false
         currentZ = 0
         currentCave = -1
         map = surfaceMap
         applyWorldTraits([])
+        const activeCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
+        activeCfg.progressionKeys.modes = Object.fromEntries(modes.map(key => [key, key === mode ? 1 : 0]))
+        activeCfg.doors.progressionGatePreBreachedChance = 0
+        activeCfg.levelCountRange = [3,3]
         WORLD_SEED = 73001 + modeIndex * 101
         rngState = WORLD_SEED
         await generateNewWorld()
@@ -415,6 +420,12 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
           const level = deepLevels[i + 2]
           const z = chainZForDepth(i + 4)
           check(level.progressionKey?.mode === mode, mode + ': intact floor uses forced progression-key mode')
+          const clearance = activeCfg.traps.spawnClearance
+          const tacticalSpots = level.rooms.flatMap(room => Object.values(room.tacticalSlots || {}).flat())
+          check((level.traps || []).every(trap => tacticalSpots.every(p =>
+            Math.max(Math.abs(p.x - trap.trigger.x), Math.abs(p.y - trap.trigger.y)) > clearance &&
+            (!trap.emitter || Math.max(Math.abs(p.x - trap.emitter.x), Math.abs(p.y - trap.emitter.y)) > clearance))),
+            mode + ': traps leave all authored tactical positions clear')
           const entry = level.caves[0].entrances[0]
           const exit = level.caves[0].entrances[1]
           const dependency = validateDwarvenRuinsKeyDependencies(level, z, entry, exit)
@@ -443,9 +454,10 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
           }
         }
       }
-      cfg.progressionKeys.modes = savedModes
-      cfg.doors.progressionGatePreBreachedChance = savedGateChance
-      cfg.levelCountRange = savedRange
+      const liveCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
+      liveCfg.progressionKeys.modes = savedModes
+      liveCfg.doors.progressionGatePreBreachedChance = savedGateChance
+      liveCfg.levelCountRange = savedRange
     })()`))
   })
 

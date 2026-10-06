@@ -15,16 +15,26 @@ describe('Decorative caves and deep threat rarity', () => {
         const traits=names.map(name=>WORLD_TRAITS.find(t=>t.name===name))
         check(traits.every(Boolean),'requested trait fixtures exist')
         applyWorldTraits(traits);WORLD_SEED=${seed};rngState=WORLD_SEED
-        let selections=0;const originalPickWeighted=pickWeighted
+        let selections=0,inCaveScenarios=false;const originalPickWeighted=pickWeighted
+        const originalSpawnCaveScenarios=spawnCaveScenarios
+        spawnCaveScenarios=()=>{
+          selections=0;inCaveScenarios=true
+          try{return originalSpawnCaveScenarios()}finally{inCaveScenarios=false}
+        }
         pickWeighted=(pool,weight)=>{
-          if(pool.length && pool.every(t=>deepCaveThreatTemplates().includes(t))) {
+          if(inCaveScenarios && pool.length && pool.every(t=>deepCaveThreatTemplates().includes(t))) {
             selections++;check(pool.every(t=>(t.rarity??1)>.1),'rare species excluded from actual bonus spawns')
             check(pool.every(t=>weight(t)===(t.rarity??1)),'actual bonus spawn uses rarity weights')
           }
           return originalPickWeighted(pool,weight)
         }
-        try {await generateNewWorld()} finally {pickWeighted=originalPickWeighted}
-        check(selections===deepLevels[0].caves.filter(c=>c.scenario).length,'each deep cave receives its weighted threat')
+        try {await generateNewWorld()} finally {
+          pickWeighted=originalPickWeighted
+          spawnCaveScenarios=originalSpawnCaveScenarios
+        }
+        check(selections===deepLevels[0].caves.filter(c=>c.scenario).length,
+          'each deep cave receives its weighted threat: '+selections+' selections for '+
+          deepLevels[0].caves.filter(c=>c.scenario).length+' scenarios')
         const lootCells=new Set()
         for(const g of groundItems.filter(g=>['chest','potion','speedpotion'].includes(g.kind)||g.kind.startsWith('scroll'))) {
           const k=(g.level??0)+':'+(g.levelKind||((g.level??0)<0?'chain':'surface'))+':'+g.x+','+g.y
