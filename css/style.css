@@ -286,7 +286,12 @@ canvas {
   color: white;
 }
 
-@media (pointer: fine) {
+/* Wide layouts use the desktop overlay treatment whenever touch/coarse input
+   is not the primary mode. Headless browsers can report pointer:none even
+   though they otherwise exercise the desktop layout, so include that mode
+   explicitly while keeping coarse-pointer/mobile layouts excluded. */
+@media (min-width: 721px) and (pointer: fine),
+       (min-width: 721px) and (pointer: none) {
   #root {
     padding: 0;
   }

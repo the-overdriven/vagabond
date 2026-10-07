@@ -3,12 +3,21 @@ const {trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks} = 
 describe('Dwarven Ruins reusable traps', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Dwarven Trap Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
-    cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
-    cy.window().then(win => win.eval(trapFixture.toString()))
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    // These tests replace the active Ruins floor immediately. Loading the
+    // checked-in current-format save gives them a deterministic initialized
+    // world without paying for an unrelated random world-generation pass in
+    // every beforeEach. The seeded generation cases below still generate the
+    // worlds they actually verify.
+    cy.readFile('tests/saves/Tester_start.json').then(save => {
+      cy.window().then(win => {
+        win.__dwarvenTrapBootstrapSave = save
+        win.eval(`loadGameFromObject(window.__dwarvenTrapBootstrapSave, {isReplayInit:true})`)
+        delete win.__dwarvenTrapBootstrapSave
+        win.eval(`raceOpen=false; document.getElementById('raceOverlay').classList.remove('show')`)
+        win.eval(trapFixture.toString())
+      })
+    })
   })
 
   it('resolves movement, blocking, safe paths, and uncredited deaths', () => {

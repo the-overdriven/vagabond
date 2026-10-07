@@ -5076,8 +5076,11 @@ Current desktop controls include:
 
 Tile size starts at **40** canvas pixels on desktop and **56** on
 coarse-pointer mobile devices (four additional zoom steps). It changes in
-four-pixel steps from 20 to 96. Desktop `#root` has no outer padding and the
-stage fills the entire browser viewport, including the area behind the top HUD.
+four-pixel steps from 20 to 96. Wide layouts whose primary pointer is not
+coarse use the desktop overlay layout; this includes keyboard/headless contexts
+that report no primary pointer, while coarse-pointer/touch layouts remain on the
+mobile rules. Desktop `#root` has no outer padding and the stage fills the entire
+browser viewport, including the area behind the top HUD.
 The HUD is a fixed overlay centered at the top and does not reserve camera
 height. Wide desktop layouts keep the HUD on one row; narrow-window/mobile rules
 may wrap it. HUD presentation never resizes the map. The full-viewport desktop
@@ -5121,7 +5124,9 @@ fully bright, the second- and third-newest use slightly lower brightness, and
 older history is further dimmed and mildly desaturated. Loot messages use white
 as their base text color; when the looted object has an item tier, the item name
 uses the same tier color as inventory/equipment UI. Mobile keeps its existing
-separate log layout and safe-area behavior.
+separate log layout and safe-area behavior. Touch/narrow safe-area measurements
+are applied after layout settles and only when their measured dimensions change,
+so HUD/log resizing cannot feed back into the same resize-observer cycle.
 
 ---
 
