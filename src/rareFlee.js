@@ -151,8 +151,32 @@ function rareSlipAway(e, minDistance, stampede = false) {
   return true
 }
 
+function rareEscapeDestination(e) {
+  const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+  const awayX = e.x - player.x, awayY = e.y - player.y
+  const awayLength = Math.hypot(awayX, awayY) || 1
+  let destination = null, bestAlignment = -Infinity, bestDistance = distance
+  for (const [dx, dy] of DIRS8) {
+    const x = e.x + dx, y = e.y + dy
+    const nextDistance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+    if (nextDistance <= distance || !enemyTileOpen(e, x, y) ||
+        (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+    // Rare beasts bolt along the line directly away from the player when they
+    // can. This avoids arbitrary diagonal tie-breaking when several steps grow
+    // the same Chebyshev gap. Terrain and map edges still force fallbacks.
+    const alignment = (dx * awayX + dy * awayY) / (Math.hypot(dx, dy) * awayLength)
+    if (alignment > bestAlignment + 1e-9 ||
+        (Math.abs(alignment - bestAlignment) <= 1e-9 && nextDistance > bestDistance)) {
+      destination = {x, y}
+      bestAlignment = alignment
+      bestDistance = nextDistance
+    }
+  }
+  return destination
+}
+
 function rareStepAwayFromPlayer(e) {
-  const destination = enemyEscapeDestination(e)
+  const destination = rareEscapeDestination(e)
   if (!destination) return false
   const fromX = e.x, fromY = e.y
   occupied.delete(keyXY(fromX, fromY))

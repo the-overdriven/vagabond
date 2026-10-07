@@ -29,7 +29,7 @@ function beginFleeGame() {
       projectileAnims=[]; damageAnims=[]; fxAnims=[]; soundAnims=[]
       rngState=246813579
     }
-    window.makeFleeEnemy = (name='GAUR',distance=6,extra={}) => {
+    window.makeFleeEnemy = (name='GAUR',distance=5,extra={}) => {
       const t=ENEMY_TEMPLATE_BY_NAME[name], x=player.x+distance, y=player.y
       const e=addEnemy({...t,id:'flee-'+enemies.length,name,baseName:name,x,y,homeX:x,homeY:y,
         homeTileType:'grass',level:0,alive:true,hp:200,maxHp:200,aware:false,alarmed:false,
@@ -97,16 +97,47 @@ describe('Rare monster sightings and flight', () => {
     })()`))
   })
 
+  it('starts sightings only within five tiles and bolts directly away from the player', () => {
+    cy.window().then(win => win.eval(`(() => {
+      resetFleeArena()
+      let e=makeFleeEnemy('SKELD',6,{wander:false,aggro:0})
+      enemyTurn()
+      fleeAssert(e.rareSightings===0 && !e.rareFleeTurns, 'six tiles is outside rare sighting range')
+
+      resetFleeArena()
+      e=makeFleeEnemy('SKELD',5,{wander:false,aggro:0})
+      enemyTurn()
+      fleeAssert(e.rareSightings===1 && e.rareFleeTurns>0, 'five tiles starts the sighting')
+
+      resetFleeArena()
+      e=makeFleeEnemy('ASHFANG',5,{rareSightings:1})
+      const start={x:e.x,y:e.y}
+      rareStartFlee(e,5,true)
+      rareFlee(e,5)
+      fleeAssert(e.x===start.x+1 && e.y===start.y, 'east-side beast bolts due east when approached from west')
+
+      resetFleeArena()
+      e=makeFleeEnemy('ASHFANG',5,{rareSightings:1})
+      occupied.delete(keyXY(e.x,e.y))
+      e.y=player.y-5
+      occupied.add(keyXY(e.x,e.y))
+      const diagonal={x:e.x,y:e.y}
+      rareStartFlee(e,5,true)
+      rareFlee(e,5)
+      fleeAssert(e.x===diagonal.x+1 && e.y===diagonal.y-1, 'diagonal approach produces the opposite diagonal bolt')
+    })()`))
+  })
+
   it('makes the second sighting a speed chase and restores ordinary speed on catch or escape', () => {
     cy.window().then(win => win.eval(`(() => {
       for(const potion of [false,true]) {
         resetFleeArena(5)
         if(potion) {player.inventory=[createItem('speedpotion')];useSpeedPotion(0)}
-        const e=makeFleeEnemy('DRUSK',6,{rareSightings:1})
-        rareStartFlee(e,6,true)
+        const e=makeFleeEnemy('DRUSK',5,{rareSightings:1})
+        rareStartFlee(e,5,true)
         fleeAssert(enemySpd(e)===RARE_FLEE.startledMinSpd && e.spd===2, 'temporary Startled, base SPD unchanged')
         const result=fleeChase(e)
-        fleeAssert(result.caught===potion, 'potion catches from six tiles; normal speed escapes')
+        fleeAssert(result.caught===potion, 'potion catches from five tiles; normal speed escapes')
         fleeAssert(!e.rareFleeTurns && enemySpd(e)===Math.max(1,e.spd+enemyTileEffects(e).speed) && rareStartledBonus(e)===0, 'temporary speed ends with flight')
       }
       resetFleeArena()
@@ -124,18 +155,18 @@ describe('Rare monster sightings and flight', () => {
       enemyTurn(); fleeAssert(e.rareSightings===1 && !e.rareArmed, 'nearby cannot rearm')
       player.x=e.x-RARE_FLEE.rearmDistance; enemyTurn()
       fleeAssert(e.rareArmed, 'distance rearms')
-      player.x=e.x-6; enemyTurn(); fleeAssert(e.rareSightings===2 && e.rareFleeTurns>0, 'second encounter starts')
+      player.x=e.x-5; enemyTurn(); fleeAssert(e.rareSightings===2 && e.rareFleeTurns>0, 'second encounter starts at five tiles')
       resetFleeArena(); e=makeFleeEnemy('GAUR',1,{rareSightings:2})
       enemyTurn(); fleeAssert(!e.rareFleeTurns && e.aware && e.alarmed, 'third approach fights')
       for(const [name,extra,z] of [['Kveld',{rareFleeTurns:8,rareSightings:1},0],['GAUR',{},-1],['GAUR',{alarmed:true},0]]) {
         resetFleeArena(); e=makeFleeEnemy(name,6,extra); currentZ=z
         fleeAssert(!rareFleeEligible(e) && !rareFleeBlocksAttack(e), 'ineligible stale flags never grant immunity')
       }
-      resetFleeArena(); e=makeFleeEnemy('Vampire',6)
+      resetFleeArena(); e=makeFleeEnemy('Vampire',5)
       map[player.y][player.x]='forest'; e.forestConcealX=player.x;e.forestConcealY=player.y
-      fleeAssert(!rareStartFlee(e,6), 'forest concealment prevents sighting')
+      fleeAssert(!rareStartFlee(e,5), 'forest concealment prevents sighting')
       map[player.y][player.x]='grass'; player.invisibleTurns=20
-      fleeAssert(!rareStartFlee(e,6), 'invisibility prevents visual sighting')
+      fleeAssert(!rareStartFlee(e,5), 'invisibility prevents visual sighting')
       e.x=player.x+1; occupied=new Set([keyXY(e.x,e.y)])
       await playerAttackEnemy(e); enemyTurn()
       fleeAssert(e.rareSightings===1 && e.rareFleeTurns>0 && !e.aware && !e.alarmed && e.hp===200, 'invisible first strike flees safely')

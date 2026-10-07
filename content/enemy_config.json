@@ -54,7 +54,7 @@
   "rareFlee": {
     "maxRarity": 0.02,
     "sightings": 2,
-    "sightRange": 8,
+    "sightRange": 5,
     "rearmDistance": 14,
     "fleeTurns": [8, 10],
     "paceFloorFirst": 1.5,

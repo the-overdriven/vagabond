@@ -4165,7 +4165,7 @@ MIREHOWL, NHALUUN. Kveld and other more common templates retain normal AI.
 Underground encounters use normal AI; an off-level flight pauses until returning.
 
 Two sightings precede ordinary combat. An unaware, armed beast notices a visible,
-unconcealed player within 8 tiles. The first sighting cannot be hit or cornered;
+unconcealed player within 5 tiles. The first sighting cannot be hit or cornered;
 the second can be caught by reaching adjacency or blocking every outward step.
 Caught beasts become aware and Alarmed; a third approach uses ordinary combat.
 An attack can start the flight before damage or evasion, including an invisible
@@ -4176,8 +4176,10 @@ start a sighting. Active flight takes priority over temple flight and idle AI.
 The first steps occur immediately, including when a wander step enters sighting
 range. Flight itself deals no damage, sets no alarm or spotted message, and leaves
 no tracks. Each flee step deterministically chooses a legal neighboring tile that
-strictly increases Chebyshev distance from the player; if none exists, the normal
-catch/slip rules apply. Far paths are cleared when flight starts; normal far targeting
+strictly increases Chebyshev distance from the player and prefers the direction most
+directly away from the player. This prevents arbitrary sideways/diagonal bolts when a
+straight escape is open; terrain and world edges force the next-best legal direction.
+If no outward step exists, the normal catch/slip rules apply. Far paths are cleared when flight starts; normal far targeting
 and tracks resume afterward.
 
 Configuration in `content/enemy_config.json`:
@@ -4186,7 +4188,7 @@ Configuration in `content/enemy_config.json`:
 "rareFlee": {
   "maxRarity": 0.02,
   "sightings": 2,
-  "sightRange": 8,
+  "sightRange": 5,
   "rearmDistance": 14,
   "fleeTurns": [8, 10],
   "paceFloorFirst": 1.5,
@@ -4206,11 +4208,11 @@ with `Fleeing` and the Startled SPD bonus in the enemy tooltip. The internal
 sighting counter is not shown; its two-encounter rules are unchanged. Normal terrain bonuses still apply.
 
 Potion of Speed works through ordinary effective player SPD, costs its usual turn,
-and should be drunk before approaching. Open-ground tuning across all nine templates,
-starting gaps 3–8 and effective player SPD 3/5/8 found no catches at unboosted SPD
-3 or 5. With a potion, 25/36 SPD-3 and 36/36 SPD-5 scenarios at gaps <= 6 caught
-the beast; naturally fast SPD-8 characters can also catch it. Terrain and obstacles
-change the outcome. Neither natural speed nor a potion defeats the first escape.
+and should be drunk before approaching. Rare sightings begin only at gaps of 5 or
+less, keeping the beast close enough to be visually readable when the flight message
+appears. The second sighting remains a speed chase: boosted or naturally fast
+characters can catch it in open terrain, while terrain and obstacles change the
+outcome. Neither natural speed nor a potion defeats the first escape.
 
 At the end of either uncaught flee timer, or when boxed in during the first flight,
 the beast slips away. A BFS starts at the beast's own tile over walkable surface
