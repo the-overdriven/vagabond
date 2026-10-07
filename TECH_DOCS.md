@@ -499,6 +499,14 @@ During enemy turns, relevant temporary systems tick, including:
 
 Ordering matters when adding future mechanics.
 
+Turn-consuming actions that leave the player on the same tile still use the same
+presentation pipeline as movement. After enemy and NPC rules resolve, the shared
+animation loop must run until their movement reaches its final tile. This includes
+item/equipment actions, foraging, digging, waiting, and other stationary interactions.
+Animation never controls rules or RNG: actor destinations are resolved first, and the
+animation loop only presents those already-determined start/end positions and guarantees
+a final repaint.
+
 ---
 
 # 8. Auto-Pathing

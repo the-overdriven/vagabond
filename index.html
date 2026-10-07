@@ -5495,6 +5495,7 @@ more difficult:
     npcTurn()
     updateHud()
     render()
+    runAnimationLoop()
   }
 
   function tryDig(options = {}) {
@@ -5515,8 +5516,11 @@ more difficult:
     enemyTurn()
     npcTurn()
     updateHud()
-    // Redraw immediately so the darker sand is visible.
+    // Redraw immediately so the darker sand is visible, then keep repainting
+    // any enemy/NPC movement until its already-resolved animation reaches the
+    // final tile.
     render()
+    runAnimationLoop()
     if (treasureMapSpot && key === keyXY(treasureMapSpot.x, treasureMapSpot.y)) {
       const existing = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && g.kind === 'treasurecasket')
       if (existing) {
@@ -9901,6 +9905,7 @@ more difficult:
     npcTurn()
     updateHud()
     render()
+    runAnimationLoop()
     renderInventory()
     updateTooltip()
   }
