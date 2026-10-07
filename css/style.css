@@ -392,7 +392,7 @@ canvas {
 #hint {
   position: fixed;
   right: 14px;
-  top: 380px;
+  top: 335px;
   width: 250px;
   padding: 7px;
   box-sizing: border-box;
@@ -439,7 +439,7 @@ body.side-collapsed #sidePanel .mini-actions {
 body.side-collapsed #btnSideCollapse {
   position: fixed;
   right: 14px;
-  top: 110px;
+  top: 90px;
   left: auto;
   z-index: 20;
   width: 28px;
@@ -471,7 +471,7 @@ body.hint-collapsed #hint .panel-toggle {
 body.hint-collapsed #hint .panel-toggle {
   position: fixed;
   right: 14px;
-  top: 380px;
+  top: 335px;
   left: auto;
   z-index: 20;
   width: 28px;
@@ -483,7 +483,7 @@ body.hint-collapsed #hint .panel-toggle {
 #sidePanel {
   position: fixed;
   right: 14px;
-  top: 110px;
+  top: 90px;
   width: 250px;
   z-index: 8;
 }

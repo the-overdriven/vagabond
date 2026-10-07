@@ -213,7 +213,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261004-2">
+  <link rel="stylesheet" href="css/style.css?v=20261007-1">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -8369,18 +8369,29 @@ more difficult:
     return !window.matchMedia('(pointer: coarse)').matches
   }
 
-  function hideDesktopCombatTooltip() {
-    desktopCombatTooltipEnemy = null
+  function hideDesktopCombatTooltipVisual() {
     if (tooltip.dataset.autoCombat === 'true') {
       tooltip.style.display = 'none'
       delete tooltip.dataset.autoCombat
     }
   }
 
+  function hideDesktopCombatTooltip() {
+    desktopCombatTooltipEnemy = null
+    hideDesktopCombatTooltipVisual()
+  }
+
   function renderDesktopCombatTooltip() {
     const e = desktopCombatTooltipEnemy
     if (!desktopUsesHoverTooltips() || !e || !e.alive || !onCurrentLevel(e) || !undergroundTileVisible(e.x, e.y)) {
       hideDesktopCombatTooltip()
+      return false
+    }
+    // The keyboard-hint panel already occupies the desktop combat-inspection
+    // corner. Keep the combat target remembered, but only pin its tooltip while
+    // hints are collapsed; movement still clears the target as usual.
+    if (!document.body.classList.contains('hint-collapsed')) {
+      hideDesktopCombatTooltipVisual()
       return false
     }
     const info = tileInspectInfo(e.x, e.y)
@@ -10430,6 +10441,7 @@ more difficult:
     const hintLabel = collapsed ? 'Expand keyboard hints' : 'Collapse keyboard hints'
     document.getElementById('btnHintCollapse').setAttribute('aria-label', hintLabel)
     document.getElementById('btnHintCollapse').title = hintLabel
+    if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
   })
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()

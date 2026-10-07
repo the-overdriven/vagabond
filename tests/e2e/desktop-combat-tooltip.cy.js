@@ -18,7 +18,7 @@ describe('Desktop combat enemy tooltip', () => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: false}))
   })
 
-  it('pins attacked enemies at bottom-right, switches targets, and hides after movement', () => {
+  it('pins attacked enemies only with collapsed hints, switches targets, and hides after movement', () => {
     cy.viewport(1440, 900)
     beginNewGame('Combat Tooltip Tester')
 
@@ -35,6 +35,7 @@ describe('Desktop combat enemy tooltip', () => {
       player.equip={weapon:null,armor:null,shield:null}
       snapCameraToPlayer();lastMousePx=null;lastMousePy=null;hoveredEnemy=null
       tooltip.style.display='none';hideDesktopCombatTooltip()
+      document.body.classList.remove('hint-collapsed')
       check(desktopUsesHoverTooltips(),'desktop must use fine-pointer tooltip behavior')
 
       const makeEnemy=(name,x,y)=>{
@@ -50,8 +51,12 @@ describe('Desktop combat enemy tooltip', () => {
       try {
         chance=()=>false;damageRoll=()=>2
         await playerAttackEnemy(a,true)
-        check(desktopCombatTooltipEnemy===a,'first attacked enemy becomes pinned target')
-        check(tooltip.dataset.autoCombat==='true' && tooltip.style.display==='block','combat tooltip is visibly pinned')
+        check(desktopCombatTooltipEnemy===a,'first attacked enemy becomes combat tooltip target')
+        check(tooltip.dataset.autoCombat!=='true' && tooltip.style.display==='none','expanded hints suppress the automatic combat tooltip')
+
+        document.getElementById('btnHintCollapse').click()
+        check(document.body.classList.contains('hint-collapsed'),'hint panel collapses')
+        check(tooltip.dataset.autoCombat==='true' && tooltip.style.display==='block','collapsed hints reveal the combat tooltip')
         check(tooltip.textContent.includes('Goblin') && tooltip.textContent.includes('HP 98 / 100'),'pinned tooltip refreshes post-hit HP')
         let stageRect=document.getElementById('stage').getBoundingClientRect()
         let tipRect=tooltip.getBoundingClientRect()
@@ -60,6 +65,13 @@ describe('Desktop combat enemy tooltip', () => {
 
         await playerAttackEnemy(b,true)
         check(desktopCombatTooltipEnemy===b && tooltip.textContent.includes('Kobold'),'new attacked enemy replaces pinned target')
+
+        document.getElementById('btnHintCollapse').click()
+        check(!document.body.classList.contains('hint-collapsed'),'hint panel expands')
+        check(desktopCombatTooltipEnemy===b,'expanding hints keeps the temporary combat target')
+        check(tooltip.dataset.autoCombat!=='true' && tooltip.style.display==='none','expanding hints hides the pinned tooltip')
+        document.getElementById('btnHintCollapse').click()
+        check(tooltip.dataset.autoCombat==='true' && tooltip.textContent.includes('Kobold'),'collapsing hints restores the remembered combat tooltip')
 
         enemyTurn=()=>{};npcTurn=()=>{}
         await tryMove(0,1)
@@ -86,6 +98,7 @@ describe('Desktop combat enemy tooltip', () => {
       }
       player.x=40;player.y=40;player.hp=1000;player.maxHp=1000
       player.equip={weapon:null,armor:null,shield:null};snapCameraToPlayer();hideDesktopCombatTooltip()
+      document.body.classList.add('hint-collapsed')
       const t=ENEMY_TEMPLATE_BY_NAME.Goblin
       const e=addEnemy({...t,baseName:'Goblin',name:'Goblin',x:41,y:40,level:0,hp:100,maxHp:100,
         alive:true,homeX:41,homeY:40,homeTileType:'grass',prefix:null,equipment:null,abilities:[]})

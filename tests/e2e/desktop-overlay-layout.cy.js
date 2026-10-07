@@ -12,6 +12,27 @@ describe('Desktop overlay layout', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   })
 
+  it('keeps the desktop map and hint panels in a compact upper-right stack', () => {
+    cy.window().then(win => {
+      const side = win.document.getElementById('sidePanel').getBoundingClientRect()
+      const hint = win.document.getElementById('hint').getBoundingClientRect()
+      const gap = hint.top - side.bottom
+      expect(side.top).to.be.closeTo(90, 0.5)
+      expect(hint.top).to.be.closeTo(335, 0.5)
+      expect(gap, 'map-to-hints gap').to.be.greaterThan(0)
+      expect(gap, 'map-to-hints gap').to.be.lessThan(45)
+    })
+
+    cy.get('#btnSideCollapse').click({force: true})
+    cy.get('#btnSideCollapse').should($button => {
+      expect($button[0].getBoundingClientRect().top).to.be.closeTo(90, 0.5)
+    })
+    cy.get('#btnHintCollapse').click({force: true})
+    cy.get('#btnHintCollapse').should($button => {
+      expect($button[0].getBoundingClientRect().top).to.be.closeTo(335, 0.5)
+    })
+  })
+
   it('keeps race selection above gameplay-side overlays while leaving the HUD on one row', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
 
@@ -211,5 +232,7 @@ describe('Desktop overlay layout', () => {
       expect(style.position).not.to.equal('fixed')
       expect(parseFloat(style.width)).to.be.within(360, 390)
     })
+    cy.get('#sidePanel').should('have.css', 'display', 'none')
+    cy.get('#hint').should('have.css', 'display', 'none')
   })
 })
