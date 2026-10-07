@@ -1109,7 +1109,12 @@
           2,
           4
         ],
+        "searchableSkeletonsPerFloorRange": [
+          3,
+          5
+        ],
         "finalFloorRemainsMultiplier": 2.5,
+        "finalFloorSearchableSkeletonsMultiplier": 2.5,
         "finalFloorBarricadeMultiplier": 2.2,
         "finalFloorBreachedDoorMultiplier": 5,
         "finalFloorRubbleMultiplier": 1.65,
@@ -1118,6 +1123,10 @@
           1.3
         ],
         "remainsProgressMultiplierRange": [
+          0.8,
+          1.5
+        ],
+        "searchableSkeletonsProgressMultiplierRange": [
           0.8,
           1.5
         ],

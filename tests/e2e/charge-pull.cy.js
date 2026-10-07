@@ -1,4 +1,4 @@
-describe('Grass Charge and Pull', () => {
+describe('Charge and Pull terrain rules', () => {
   beforeEach(() => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Rush Tester')
@@ -48,6 +48,25 @@ describe('Grass Charge and Pull', () => {
         map[38][39]='forest'; rushCheck(!!enemyChargeLine(e),'walkable side terrain allowed')
         rushCheck(!tryEnemyRush(e) && rolls===1,'failed proc preserves position')
       } finally {chance=previousChance}
+    })()`))
+  })
+
+  it('allows Giant Spider Pull on sand, cave floors, and marble while Charge stays grass-only', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const spider=rushEnemy('Giant Spider',37,40)
+      const boar=rushEnemy('Boar',37,42)
+      for(const terrain of ['grass','sand','cavefloor','cavefloor2','marble']) {
+        player.x=40; player.y=40
+        spider.x=37; spider.y=40
+        occupied=new Set([keyXY(spider.x,spider.y),keyXY(boar.x,boar.y)])
+        for(let x=37;x<=40;x++) map[40][x]=terrain
+        rushCheck(enemyChargeLine(spider)?.distance===3,'pull line allowed on '+terrain)
+      }
+      player.x=40; player.y=42
+      for(let x=37;x<=40;x++) map[42][x]='sand'
+      rushCheck(!enemyChargeLine(boar),'charge remains blocked on sand')
+      for(let x=37;x<=40;x++) map[42][x]='grass'
+      rushCheck(enemyChargeLine(boar)?.distance===3,'charge remains allowed on grass')
     })()`))
   })
 

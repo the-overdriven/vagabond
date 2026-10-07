@@ -1492,6 +1492,7 @@ more difficult:
     if (!openTile) return false
     map[y][x] = openTile
     minimapDirty = true
+    invalidateUndergroundFov()
     return true
   }
 
@@ -1545,6 +1546,7 @@ more difficult:
     }
     player.inventory.splice(keyIndex, 1)
     minimapDirty = true
+    invalidateUndergroundFov()
     return {info, key, leaves}
   }
 
@@ -1586,6 +1588,7 @@ more difficult:
     if (success) {
       map[y][x] = info.breachedTile
       minimapDirty = true
+      invalidateUndergroundFov()
     }
     const alarmedEnemy = alarmNearestEnemyFromBreach()
     return {attempted: true, success, breachAtk, weapon, alarmedEnemy}
@@ -2427,6 +2430,7 @@ more difficult:
   }
 
   const DEFAULT_SUMMON_MSG = 'The <name> waves a hand and mutters incomprehensible words. Moments later, <amount> <species> appear!'
+  const SUMMON_ANIM_MS = 1000
 
   function tryEnemySummon(enemy) {
     if (!enemyHasAbility(enemy, 'summon') || enemy.summonUsed || !chance(0.10)) return false
@@ -2459,7 +2463,7 @@ more difficult:
       addEnemy(summoned)
       alarmEnemy(summoned)
       occupied.add(keyXY(spot.x, spot.y))
-      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df')
+      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df', 0, SUMMON_ANIM_MS)
     }
     enemy.summonUsed = true
     if (!enemy.aware) {
@@ -7405,8 +7409,9 @@ more difficult:
     runAnimationLoop()
   }
 
-  function spawnDamageNumber(x, y, amount, color, delay) {
-    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0})
+  function spawnDamageNumber(x, y, amount, color, delay, duration) {
+    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0,
+      duration: duration || DAMAGE_ANIM_MS})
     runAnimationLoop()
   }
 
@@ -7954,7 +7959,7 @@ more difficult:
       const p = damageAnims[i]
       const elapsed = now - p.start
       if (elapsed < p.delay) continue
-      const t = Math.min(1, (elapsed - p.delay) / DAMAGE_ANIM_MS)
+      const t = Math.min(1, (elapsed - p.delay) / (p.duration || DAMAGE_ANIM_MS))
       if (t >= 1) {
         damageAnims.splice(i, 1)
         continue
@@ -9048,6 +9053,10 @@ more difficult:
   }
 
   let undergroundFovCache = null
+  function invalidateUndergroundFov() {
+    undergroundFovCache = null
+  }
+
   function currentUndergroundFov() {
     if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||

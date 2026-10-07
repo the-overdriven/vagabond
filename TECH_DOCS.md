@@ -1205,12 +1205,23 @@ strong additional barricade chance. Furniture never replaces stairs, keys,
 doors or the protected room center/door approach used by traversal validation.
 
 Environmental damage now rises continuously with normalized floor progress: rubble
-pressure scales **0.9x → 1.3x**, remains **0.8x → 1.5x**, breached-door pressure
+pressure scales **0.9x → 1.3x**, decorative-remains pressure **0.8x → 1.5x**, breached-door pressure
 **0.75x → 2.0x**, dormitory barricade chance **5% → 22%**, and optional defensive
-debris **3% → 16%** before the final-floor override. The final floor additionally
-raises rubble to at least **1.65x**, ordinary breached-door pressure to at least
-**5x**, environmental remains to at least **2.5x**, and multiplies barricade
-pressure by **2.2x**. It always reserves at least two major vaults: one optional artifact
+debris **3% → 16%** before the final-floor override. **Decorative `dwarvenremains` and
+searchable skeletal remains are separate populations and must not be conflated.** Each
+Ruins floor keeps the original seeded **2–4 decorative `dwarvenremains`** roll, scaled
+by depth. In addition, it rolls **3–5 searchable skeletal remains** as real `skeleton`
+ground objects using the normal one-time search rules and an independent **10% loot
+chance**. The two populations use separate placement rolls and cannot occupy the same
+tile.
+
+On the final floor, both populations become denser to sell the failed-last-stand
+scene. Decorative remains use at least a **2.5x** multiplier, yielding **5–10** ambient
+`dwarvenremains` before room-specific decorations; searchable skeletons independently
+use at least a **2.5x** multiplier, yielding **8–13** ambient searchable corpses before
+any progression-key corpse. The final floor also raises rubble to at least **1.65x**,
+ordinary breached-door pressure to at least **5x**, and multiplies barricade pressure
+by **2.2x**. It always reserves at least two major vaults: one optional artifact
 vault plus a separate fortified-barracks, barricaded-dormitory, forge-killzone,
 or collapsed-hall defensive scenario. This prevents the final floor from rolling
 an ordinary-looking treasury/tomb-only profile. The result should visibly read as
@@ -2075,12 +2086,18 @@ persistent flag or save-version change.
 
 ## Charge and Pull
 
-Boar and Minotaur have `charge`; Giant Spider has `pull`. While the player is
-visible and within current aggro range, an aligned target at distance two or
-more can trigger a rush. Alignment is horizontal, vertical, or an exact diagonal.
-Both endpoints and every intervening tile must be walkable grass without trees,
-other creatures, or NPCs. Diagonal routes cannot cut blocked corners. There is
-no additional distance cap beyond aggro range. Invalid routes use no RNG.
+Boar and Minotaur have `charge`; Giant Spider has `pull`. In the code and some
+internal descriptions, **rush** is the shared umbrella term for these two
+straight-line abilities; it is not a third ability. While the player is visible
+and within current aggro range, an aligned target at distance two or more can
+trigger either Charge or Pull, depending on the monster. Alignment is horizontal,
+vertical, or an exact diagonal.
+**Charge remains grass-only.** For Pull, every tile on the line may instead be
+walkable `grass`, `sand`, `cavefloor`, `cavefloor2`, or `marble`, so Giant Spiders
+can use the ability in caves and Dwarven floors as well as on the surface. Trees,
+other creatures, NPCs, walls, water, furniture, and other non-eligible terrain
+still break the line. Diagonal routes cannot cut blocked corners. There is no
+additional distance cap beyond aggro range. Invalid routes use no RNG.
 
 Charge has a 60% chance per eligible turn. The monster crosses the gap and stops
 adjacent, then makes one melee attack with half the usual dodge chance. Before
@@ -2090,11 +2107,11 @@ Normal armor, glancing, and critical rules still apply. A surviving player hit
 for positive damage is pushed one tile directly away, if traversable and free.
 Water is eligible even without Swimming; blocked destinations prevent knockback.
 
-Pull has a 70% chance to connect. The web drags the player onto the grass tile
-adjacent to the spider, followed by one ordinary melee attack. The attack can
+Pull has a 70% chance to connect. The web drags the player onto the eligible
+floor tile adjacent to the spider, followed by one ordinary melee attack. The attack can
 miss normally and gains no damage bonus. Both abilities replace normal movement
 and allow no extra weapon-timing attacks or speed pursuit actions that turn.
-There is no cooldown or use limit; fleeing along a clear grass line remains risky.
+There is no cooldown or use limit; fleeing along a clear eligible line remains risky.
 
 Forced player movement refreshes visibility and camera position, grants no steps,
 swimming practice, or voluntary-movement quest progress, and does not collect
@@ -2138,8 +2155,11 @@ immediately on creation, using the normal Alarmed lifetime and AGGRO bonus;
 this also prevents invisible opening-critical bonuses against them. They cannot attack in
 the creation turn, including through immediate retaliation or ranged attacks;
 they may act on the next enemy turn. Placement and rules resolve before visual
-effects. A floating Summoned! marker and a log show the actual spawned count.
-Lich and Serpent Queen use the default hand-wave message; Wolf uses its custom
+effects. A floating Summoned! marker and a log show the actual spawned count. The
+marker uses a **1000 ms** animation rather than the ordinary **650 ms** combat-text
+lifetime so the label remains readable; this is presentation-only and does not
+delay the summon action or monster turns. Lich and Serpent Queen use the default
+hand-wave message; Wolf uses its custom
 hungry-howl message. Messages support `<name>`, `<amount>`, and `<species>`.
 
 Summons use normal XP and species loot rules. With the existing stat-based XP
@@ -4959,7 +4979,10 @@ There are separate discovery structures for:
 every underground map: ordinary caves, grottos, the crypt, mausoleum, and
 Dwarven Fort. The game has no facing direction, so sight extends in all
 directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
-crypt niches, boulders, and the Black Pillar. The blocking wall face itself
+crypt niches, boulders, the Black Pillar, and closed/locked Dwarven doors. Open
+and breached doors do **not** block sight. Opening, unlocking, or breaching a door
+immediately invalidates the cached underground FOV so tiles behind it become visible
+in the same action, even though the player has not moved. The blocking wall face itself
 remains visible. Water does not block sight. Diagonal sight follows tile
 centers: an adjacent open diagonal tile remains visible even if the two
 cardinal neighbors are walls. Surface visibility is unchanged. The same module also

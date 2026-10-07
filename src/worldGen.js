@@ -4217,12 +4217,12 @@ function spawnDwarvenRuinsRoomProps(level, z) {
   const roomSpots = room => dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'marble' &&
     !occupied.has(keyXY(p.x, p.y)) && !slotKeys.has(keyXY(p.x, p.y)) &&
     Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1)
-  const addProp = (room, kind, description) => {
+  const addProp = (room, kind, description, extra = null) => {
     const spots = roomSpots(room)
     if (!spots.length) return false
     const spot = pick(spots)
     groundItems.push({x:spot.x,y:spot.y,kind,looted:false,level:z,levelKind:'chain',caveIndex:-1,
-      ...(description ? {description} : {})})
+      ...(description ? {description} : {}), ...(extra || {})})
     occupied.add(keyXY(spot.x, spot.y))
     return true
   }
@@ -4231,18 +4231,40 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     else if (room.archetype === 'Burial Chamber' || room.archetype === 'Temple')
       addProp(room, 'dwarvenremains', 'Old dwarven remains lie where this chamber was overrun.')
   }
-  const range = story.remainsPerFloorRange || [2, 4]
-  const base = randInt(range[0], range[1])
-  const progressMultiplier = dungeonProgressMultiplier(story.remainsProgressMultiplierRange, level.progress, 1)
-  const remainsMultiplier = level.progress >= 1 ? Math.max(progressMultiplier, Number(story.finalFloorRemainsMultiplier ?? 1)) : progressMultiplier
-  const target = Math.max(1, Math.round(base * remainsMultiplier))
-  for (let n = 0; n < target; n++) {
+  // Decorative dwarven remains and searchable skeletal remains are separate
+  // populations. The former preserve the ruined-fort dressing; the latter are
+  // interactive corpses using the normal one-time search/loot rules.
+  const remainsRange = story.remainsPerFloorRange || [2, 4]
+  const remainsBase = randInt(remainsRange[0], remainsRange[1])
+  const remainsProgress = dungeonProgressMultiplier(story.remainsProgressMultiplierRange, level.progress, 1)
+  const remainsMultiplier = level.progress >= 1
+    ? Math.max(remainsProgress, Number(story.finalFloorRemainsMultiplier ?? 1))
+    : remainsProgress
+  const remainsTarget = Math.max(1, Math.round(remainsBase * remainsMultiplier))
+  for (let n = 0; n < remainsTarget; n++) {
     const candidates = rooms.filter(room => roomSpots(room).length)
     if (!candidates.length) break
     const room = pick(candidates)
     addProp(room, 'dwarvenremains', level.progress >= 1
       ? 'Dwarven remains are piled around a failed defensive position.'
       : 'Dwarven remains lie amid the abandoned settlement.')
+  }
+
+  const skeletonRange = story.searchableSkeletonsPerFloorRange || [3, 5]
+  const skeletonBase = randInt(skeletonRange[0], skeletonRange[1])
+  const skeletonProgress = dungeonProgressMultiplier(story.searchableSkeletonsProgressMultiplierRange, level.progress, 1)
+  const skeletonMultiplier = level.progress >= 1
+    ? Math.max(skeletonProgress, Number(story.finalFloorSearchableSkeletonsMultiplier ?? 1))
+    : skeletonProgress
+  const skeletonTarget = Math.max(1, Math.round(skeletonBase * skeletonMultiplier))
+  for (let n = 0; n < skeletonTarget; n++) {
+    const candidates = rooms.filter(room => roomSpots(room).length)
+    if (!candidates.length) break
+    const room = pick(candidates)
+    addProp(room, 'skeleton', level.progress >= 1
+      ? 'The bones are piled around a failed defensive position.'
+      : 'A dead dwarf lies where the settlement fell.',
+      {hasLoot: chance(0.10)})
   }
 }
 

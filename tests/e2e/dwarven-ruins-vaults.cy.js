@@ -30,7 +30,8 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         check(Array.isArray(def.trapTypes), 'vault definition declares allowed trap types')
       }
       for (const range of [cfg.story.rubbleProgressMultiplierRange,cfg.story.remainsProgressMultiplierRange,
-          cfg.story.breachedDoorProgressMultiplierRange,cfg.story.barricadeChanceRange,cfg.story.optionalDefenseDebrisChanceRange]) {
+          cfg.story.searchableSkeletonsProgressMultiplierRange,cfg.story.breachedDoorProgressMultiplierRange,
+          cfg.story.barricadeChanceRange,cfg.story.optionalDefenseDebrisChanceRange]) {
         check(dungeonProgressMultiplier(range,0) <= dungeonProgressMultiplier(range,0.5) &&
           dungeonProgressMultiplier(range,0.5) <= dungeonProgressMultiplier(range,1),
           'environmental-defense pressure increases continuously with normalized depth')
@@ -57,6 +58,36 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
           const rooms = level.rooms || []
           const vaults = level.vaults || []
           const mobs = enemies.filter(e => e.alive && (e.level ?? 0) === z)
+          const decorativeRemains = groundItems.filter(g => g.level === z && g.kind === 'dwarvenremains')
+          const ambientSkeletons = groundItems.filter(g => g.level === z && g.kind === 'skeleton' && !g.dungeonKey)
+          const remainsBaseMin = cfg.story.remainsPerFloorRange[0]
+          const remainsProgress = dungeonProgressMultiplier(cfg.story.remainsProgressMultiplierRange, level.progress, 1)
+          const remainsMultiplier = level.progress >= 1
+            ? Math.max(remainsProgress, cfg.story.finalFloorRemainsMultiplier)
+            : remainsProgress
+          const minimumDecorativeRemains = Math.max(1, Math.round(remainsBaseMin * remainsMultiplier))
+          check(decorativeRemains.length >= minimumDecorativeRemains,
+            'depth-scaled decorative dwarven remains are preserved on every Ruins floor')
+
+          const skeletonBaseMin = cfg.story.searchableSkeletonsPerFloorRange[0]
+          const skeletonProgress = dungeonProgressMultiplier(cfg.story.searchableSkeletonsProgressMultiplierRange, level.progress, 1)
+          const skeletonMultiplier = level.progress >= 1
+            ? Math.max(skeletonProgress, cfg.story.finalFloorSearchableSkeletonsMultiplier)
+            : skeletonProgress
+          const minimumSkeletons = Math.max(1, Math.round(skeletonBaseMin * skeletonMultiplier))
+          check(ambientSkeletons.length >= minimumSkeletons,
+            'searchable skeletal remains are added independently on every Ruins floor')
+          check(ambientSkeletons.every(g => g.looted === false && typeof g.hasLoot === 'boolean'),
+            'ambient Ruins skeletons use the searchable skeletal-remains rules')
+          const occupiedRemains = new Set(decorativeRemains.map(g => g.x + ',' + g.y))
+          check(ambientSkeletons.every(g => !occupiedRemains.has(g.x + ',' + g.y)),
+            'decorative and searchable remains never overlap')
+          if (i === ruins.length - 1) {
+            check(minimumDecorativeRemains >= 5 && decorativeRemains.length >= 5,
+              'the final floor keeps a dense field of decorative dwarven remains')
+            check(minimumSkeletons >= 8 && ambientSkeletons.length >= 8,
+              'the final floor also has a dense last-stand field of searchable skeletal remains')
+          }
           check(rooms.length >= 2, 'floor persists room descriptors')
           check(vaults.length >= 1, 'every floor has at least one major vault')
           check(rooms.filter(room => room.index !== 0).every(room => expectedRooms.has(room.archetype)),

@@ -15,7 +15,7 @@ function beginSummonArena() {
       for(let y=30;y<=55;y++) for(let x=30;x<=55;x++) {
         map[y][x]='grass'; discovered[y][x]=true; grasslandTrees.delete(keyXY(x,y))
       }
-      enemies=[]; groundItems=[]; occupied=new Set(); turnCount=0; consecutiveWaitTurns=0
+      enemies=[]; groundItems=[]; occupied=new Set(); damageAnims=[]; turnCount=0; consecutiveWaitTurns=0
       player.x=40; player.y=40; player.hp=1000; player.maxHp=1000; player.race='human'
       player.godMode=false; player.invisibleTurns=0; player.poisonTurns=0
       player.freezing={active:false,turns:0}; player.curseDebuffs=[]; player.berryRegenTurns=0
@@ -48,6 +48,9 @@ describe('Once-only monster summoning', () => {
           const children=enemies.filter(e=>e!==caster), t=ENEMY_TEMPLATE_BY_NAME[caster.summonSpecies]
           const strength=caster.summonStrength ?? 1
           summonCheck(children.length===caster.summonAmount,'maximum count: '+name)
+          const summonFx=damageAnims.filter(anim=>anim.amount==='Summoned!')
+          summonCheck(SUMMON_ANIM_MS===1000 && SUMMON_ANIM_MS>DAMAGE_ANIM_MS,'summon label lasts longer than ordinary combat text')
+          summonCheck(summonFx.slice(-children.length).every(anim=>anim.duration===SUMMON_ANIM_MS),'each summoned creature gets the slower label duration')
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
             summonCheck(e.atk===Math.max(1,Math.round(t.atk*strength)) && e.def===Math.max(0,Math.round(t.def*strength)),'template ATK/DEF')
