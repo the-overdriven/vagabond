@@ -1492,6 +1492,7 @@ more difficult:
     if (!openTile) return false
     map[y][x] = openTile
     minimapDirty = true
+    invalidateUndergroundFov()
     return true
   }
 
@@ -1545,13 +1546,12 @@ more difficult:
     }
     player.inventory.splice(keyIndex, 1)
     minimapDirty = true
+    invalidateUndergroundFov()
     return {info, key, leaves}
   }
 
-  function equippedWeaponBreachAtk() {
-    const weapon = player.equip.weapon
-    if (!weapon || weapon.kind !== 'weapon') return 0
-    return Math.max(0, (weapon.atk || 0) + (weapon.mod === 'atk' ? (weapon.modAmt || 0) : 0))
+  function playerBreachAtk() {
+    return Math.max(0, playerAtk())
   }
 
   function alarmNearestEnemyFromBreach() {
@@ -1579,11 +1579,12 @@ more difficult:
     const weapon = player.equip.weapon
     if (!info || !info.breachable) return {attempted: false, success: false, reason: 'unbreachable'}
     if (!weapon || weapon.kind !== 'weapon') return {attempted: false, success: false, reason: 'weapon'}
-    const breachAtk = equippedWeaponBreachAtk()
+    const breachAtk = playerBreachAtk()
     const success = chance(Math.min(1, breachAtk / 100))
     if (success) {
       map[y][x] = info.breachedTile
       minimapDirty = true
+      invalidateUndergroundFov()
     }
     const alarmedEnemy = alarmNearestEnemyFromBreach()
     return {attempted: true, success, breachAtk, weapon, alarmedEnemy}
@@ -9074,6 +9075,9 @@ more difficult:
   }
 
   let undergroundFovCache = null
+  function invalidateUndergroundFov() {
+    undergroundFovCache = null
+  }
   function currentUndergroundFov() {
     if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||

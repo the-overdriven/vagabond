@@ -997,7 +997,9 @@ Dwarven keys. Auto-travel may plan through a locked door/gate only when the
 matching key is already carried; it never chooses weapon breaching on the
 player's behalf. Humanoids can still open ordinary *unlocked* doors, but do not
 unlock or breach locked doors. Ethereal movement keeps its existing terrain-
-passing exception.
+passing exception. Any door/gate transition from sight-blocking to open or breached
+terrain invalidates the cached underground FOV immediately, so sight through the
+new opening updates in the same action rather than waiting for player movement.
 
 Each ordinary doorway that receives a door then has an independent **10% chance
 to be locked**. The roll is made once for the two-leaf doorway, never per leaf:
@@ -1071,9 +1073,11 @@ lift are generated. Each floor targets
 2–4 traps, stopping early if no safe placement remains. Placement uses seeded
 RNG once; entering or loading a floor never regenerates mechanisms. Triggers
 stay at least four Chebyshev tiles from entrances, generated keys and lift
-platforms. Every staircase, key and lift retains a route avoiding all triggers;
-keys reachable before unlocking also retain their original accessibility.
-Trap triggers are separated by more than three tiles. Existing monsters cannot
+platforms. Every staircase, Dwarven key source (including key-bearing searchable
+remains) and lift endpoint retains a route avoiding all triggers; keys reachable
+before unlocking also retain their original accessibility. Optional loot and
+non-key searchable/decorative remains are not mandatory safe-route targets and may
+sit beyond a trap. Trap triggers are separated by more than three tiles. Existing monsters cannot
 start within two tiles of either a trigger or emitter. Summoning uses the same
 `DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement. Triggers
 and emitters also keep that clearance from authored room tactical slots, so

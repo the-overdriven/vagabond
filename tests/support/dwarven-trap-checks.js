@@ -81,7 +81,9 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
     check(new Set(l.traps.map(t=>t.type)).size===2,'both trap types generated')
     const blocked=new Set(l.traps.map(t=>keyXY(t.trigger.x,t.trigger.y)))
     const reachable=DungeonTraps.safeReachable(l.map,entry,blocked)
-    const required=[...l.caves[0].entrances,...groundItems.filter(g=>g.level===z)]
+    const requiredKeys=groundItems.filter(g=>g.level===z &&
+      (g.kind==='dwarvenkey' || g.dungeonKey?.kind==='dwarvenkey'))
+    const required=[...l.caves[0].entrances,...requiredKeys]
     if(dwarvenRuinsLiftShortcut())required.push(...[dwarvenRuinsLiftShortcut().upper,dwarvenRuinsLiftShortcut().lower].filter(p=>p.z===z))
     check(required.every(p=>reachable.has(keyXY(p.x,p.y))),'stairs, keys, lift accessible while avoiding every trap')
     for(const t of l.traps){
