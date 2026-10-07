@@ -419,6 +419,16 @@ behavior, and coarse-pointer/mobile input does not use this cursor or desktop
 click-attack shortcut. The sword SVG is decoded with the essential startup
 images, before character selection opens, and the cursor uses that preloaded URL.
 
+On fine-pointer desktop layouts, attacking an enemy also keeps a temporary combat
+inspection visible. If that enemy is not already being inspected by hovering its
+glyph, the shared enemy tooltip is pinned to the bottom-right of the game stage and
+refreshes as the attack changes HP or combat status. Attacking another enemy replaces
+the pinned target; killing the target clears it. A successful player movement clears
+the temporary inspection, matching the mobile combat-inspection lifetime. Hovering
+the attacked enemy continues to use the normal cursor-relative tooltip instead of
+creating a second copy. This desktop-only presentation state is not saved or replayed;
+coarse-pointer/mobile inspection and layout remain unchanged.
+
 Walking into an NPC triggers interaction instead of entering its tile.
 
 ## Swimming

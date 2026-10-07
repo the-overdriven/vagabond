@@ -87,7 +87,6 @@ more difficult:
 !5 [monster abilities] 👹 monster invisibility
 !5 [monster abilities] 👹 banshee: wail (confuse)
 !5 [stealth] feat: add steal/stealth mechanic?
-!5 [supabase] 🗄️ supabase/graveyard death record: add dropped item + world traits
 !5 [terrain] 🏞️ poison fields
 !5 [worldgen] 🌍 guarantee some islands with treasure chests?
 !6 [balance] ⚖️ - balance: Give Merling a reason to seek water: submerged chests, rare fish / meat, underwater caves, sunken artifacts, Merling can cross deep water, i.e. dive with F to get sunken chest
@@ -3641,6 +3640,7 @@ more difficult:
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
     updateMobileInfoPanel(e.x, e.y)
+    showDesktopCombatTooltip(e)
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
     // document is hidden, because browsers throttle/suspend rAF in background tabs.
     if (!replayAnimationsDisabled) await animateAttackLunge(player.x, player.y, e.x, e.y)
@@ -3671,6 +3671,7 @@ more difficult:
         spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
         log(`The ${e.name} evades your attack.`, 'bad')
         updateMobileInfoPanel(e.x, e.y)
+        showDesktopCombatTooltip(e)
         return false
       }
     }
@@ -3678,6 +3679,7 @@ more difficult:
       spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
+      showDesktopCombatTooltip(e)
       return false
     }
     const armor = equippedArmor(e.equipment)
@@ -3717,8 +3719,10 @@ more difficult:
     if (e.hp <= 0) {
       killEnemy(e)
       updateMobileInfoPanel(e.x, e.y)
+      showDesktopCombatTooltip(e)
     } else {
       updateMobileInfoPanel(e.x, e.y)
+      showDesktopCombatTooltip(e)
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null
       if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
@@ -6306,6 +6310,7 @@ more difficult:
       maybeSpawnForestAmbush(nx, ny)
       moved = true
       consecutiveWaitTurns = 0
+      hideDesktopCombatTooltip()
       if (mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.'
     } else if (autoPath) {
       clearAutoPath()
@@ -8358,6 +8363,62 @@ more difficult:
 
   const tooltip = document.getElementById('tooltip')
   const defaultTooltipParent = tooltip.parentElement
+  let desktopCombatTooltipEnemy = null
+
+  function desktopUsesHoverTooltips() {
+    return !window.matchMedia('(pointer: coarse)').matches
+  }
+
+  function hideDesktopCombatTooltip() {
+    desktopCombatTooltipEnemy = null
+    if (tooltip.dataset.autoCombat === 'true') {
+      tooltip.style.display = 'none'
+      delete tooltip.dataset.autoCombat
+    }
+  }
+
+  function renderDesktopCombatTooltip() {
+    const e = desktopCombatTooltipEnemy
+    if (!desktopUsesHoverTooltips() || !e || !e.alive || !onCurrentLevel(e) || !undergroundTileVisible(e.x, e.y)) {
+      hideDesktopCombatTooltip()
+      return false
+    }
+    const info = tileInspectInfo(e.x, e.y)
+    if (!info || info.enemy !== e) {
+      hideDesktopCombatTooltip()
+      return false
+    }
+    tooltip.classList.toggle('mini', info.mini)
+    tooltip.innerHTML = info.html
+    tooltip.style.display = 'block'
+    tooltip.dataset.autoCombat = 'true'
+    const stage = document.getElementById('stage')
+    const margin = 12
+    tooltip.style.left = Math.max(0, stage.clientWidth - tooltip.offsetWidth - margin) + 'px'
+    tooltip.style.top = Math.max(0, stage.clientHeight - tooltip.offsetHeight - margin) + 'px'
+    return true
+  }
+
+  function desktopPointerInspectsEnemy(e) {
+    if (!e || lastMousePx === null || lastMousePy === null) return false
+    const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX)
+    const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    return tileInspectInfo(mx, my)?.enemy === e
+  }
+
+  function showDesktopCombatTooltip(e) {
+    if (!desktopUsesHoverTooltips()) return
+    if (!e || !e.alive) {
+      if (desktopCombatTooltipEnemy === e) hideDesktopCombatTooltip()
+      return
+    }
+    desktopCombatTooltipEnemy = e
+    // Keep the ordinary cursor-relative tooltip while the pointer is actually
+    // over this enemy. Remember the combat target so the bottom-right pin can
+    // take over if the enemy moves away from the pointer during the same fight.
+    if (desktopPointerInspectsEnemy(e) && tooltip.style.display !== 'none' && tooltip.dataset.autoCombat !== 'true') return
+    renderDesktopCombatTooltip()
+  }
 
   function slug(name) {
     return name.toLowerCase().replace(/\s+/g, '_')
@@ -8499,7 +8560,10 @@ more difficult:
   }
 
   function updateTooltip() {
-    if (lastMousePx === null) return
+    if (lastMousePx === null) {
+      if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
+      return
+    }
     const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
     const info = tileInspectInfo(mx, my)
@@ -8510,12 +8574,13 @@ more difficult:
       render() // redraw so the range overlay appears/updates/clears immediately
     }
     if (!info) {
-      tooltip.style.display = 'none'
+      if (!desktopCombatTooltipEnemy || !renderDesktopCombatTooltip()) tooltip.style.display = 'none'
       return
     }
     tooltip.classList.toggle('mini', info.mini)
     tooltip.innerHTML = info.html
     tooltip.style.display = 'block'
+    delete tooltip.dataset.autoCombat
     const stage = document.getElementById('stage')
     const canvasRect = canvas.getBoundingClientRect()
     const stageRect = stage.getBoundingClientRect()
@@ -8570,7 +8635,7 @@ more difficult:
   canvas.addEventListener('mouseleave', () => {
     lastMousePx = null
     lastMousePy = null
-    tooltip.style.display = 'none'
+    if (!desktopCombatTooltipEnemy || !renderDesktopCombatTooltip()) tooltip.style.display = 'none'
     if (!window.matchMedia('(pointer: coarse)').matches) canvas.style.cursor = ''
     if (hoveredEnemy) {
       hoveredEnemy = null
