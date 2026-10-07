@@ -51,7 +51,7 @@ describe('Charge and Pull terrain rules', () => {
     })()`))
   })
 
-  it('allows Giant Spider Pull on sand, cave floors, and marble while Charge stays grass-only', () => {
+  it('allows Charge in caves and on marble while Pull additionally works on sand', () => {
     cy.window().then(win => win.eval(`(() => {
       const spider=rushEnemy('Giant Spider',37,40)
       const boar=rushEnemy('Boar',37,42)
@@ -63,10 +63,13 @@ describe('Charge and Pull terrain rules', () => {
         rushCheck(enemyChargeLine(spider)?.distance===3,'pull line allowed on '+terrain)
       }
       player.x=40; player.y=42
+      boar.x=37; boar.y=42
+      for(const terrain of ['grass','cavefloor','cavefloor2','marble']) {
+        for(let x=37;x<=40;x++) map[42][x]=terrain
+        rushCheck(enemyChargeLine(boar)?.distance===3,'charge line allowed on '+terrain)
+      }
       for(let x=37;x<=40;x++) map[42][x]='sand'
       rushCheck(!enemyChargeLine(boar),'charge remains blocked on sand')
-      for(let x=37;x<=40;x++) map[42][x]='grass'
-      rushCheck(enemyChargeLine(boar)?.distance===3,'charge remains allowed on grass')
     })()`))
   })
 

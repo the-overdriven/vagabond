@@ -2092,9 +2092,10 @@ straight-line abilities; it is not a third ability. While the player is visible
 and within current aggro range, an aligned target at distance two or more can
 trigger either Charge or Pull, depending on the monster. Alignment is horizontal,
 vertical, or an exact diagonal.
-**Charge remains grass-only.** For Pull, every tile on the line may instead be
-walkable `grass`, `sand`, `cavefloor`, `cavefloor2`, or `marble`, so Giant Spiders
-can use the ability in caves and Dwarven floors as well as on the surface. Trees,
+For Charge, every tile on the line must be walkable `grass`, `cavefloor`,
+`cavefloor2`, or `marble`, allowing Boars and Minotaurs to charge in caves and
+Dwarven floors as well as on grass. Pull uses the same terrain set and additionally
+allows `sand`, so Giant Spiders retain their broader surface coverage. Trees,
 other creatures, NPCs, walls, water, furniture, and other non-eligible terrain
 still break the line. Diagonal routes cannot cut blocked corners. There is no
 additional distance cap beyond aggro range. Invalid routes use no RNG.

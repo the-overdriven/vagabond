@@ -1,9 +1,10 @@
 'use strict'
 
 // A rush consumes no RNG unless the entire straight route is usable. Charge
-// stays grass-only; Giant Spider Pull also works across sand and underground
-// floor terrain so the ability remains relevant outside the surface biome.
-const PULL_LINE_TILES = new Set(['grass', 'sand', 'cavefloor', 'cavefloor2', 'marble'])
+// works on open natural/constructed floors; Giant Spider Pull additionally works
+// across sand so the ability remains relevant outside grassland.
+const CHARGE_LINE_TILES = new Set(['grass', 'cavefloor', 'cavefloor2', 'marble'])
+const PULL_LINE_TILES = new Set([...CHARGE_LINE_TILES, 'sand'])
 
 function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
   const dx = player.x - e.x, dy = player.y - e.y
@@ -12,7 +13,7 @@ function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
       (dx !== 0 && dy !== 0 && Math.abs(dx) !== Math.abs(dy))) return null
   const sx = Math.sign(dx), sy = Math.sign(dy)
   const cornerOpen = (x, y) => isWalkable(x, y) && !grasslandTrees.has(keyXY(x, y))
-  const clear = (x, y) => (charge ? map[y]?.[x] === 'grass' : PULL_LINE_TILES.has(map[y]?.[x])) &&
+  const clear = (x, y) => (charge ? CHARGE_LINE_TILES : PULL_LINE_TILES).has(map[y]?.[x]) &&
     cornerOpen(x, y) &&
     !enemies.some(other => other !== e && other.alive && onCurrentLevel(other) && other.x === x && other.y === y) &&
     !(currentZ === 0 && npcs.some(n => n.x === x && n.y === y))
