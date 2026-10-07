@@ -3888,9 +3888,12 @@ more difficult:
     const grace = weapon ? enemyWeaponGrace(e, weapon) : naturalGrace
     const stats = {atk: e.atk, def: e.def, spd: e.spd,
       grace: grace > 0 ? Math.max(1, grace - gearGracePenalty(e.equipment)) : 0}
-    const strength = monsterStrength(stats)
-    if (player.strongestEnemyKilled && strength <= player.strongestEnemyKilled.strength) return
-    player.strongestEnemyKilled = {name: e.name, species: trackSpecies(e), tier: e.tier, strength, stats}
+    const exactStrength = monsterStrength(stats)
+    const previousExactStrength = player.strongestEnemyKilled
+      ? monsterStrength(player.strongestEnemyKilled.stats) : -Infinity
+    if (exactStrength <= previousExactStrength) return
+    player.strongestEnemyKilled = {name: e.name, species: trackSpecies(e), tier: e.tier,
+      strength: Math.round(exactStrength), stats}
   }
 
   function absorbEnemyFatalHit(e) {
@@ -9342,7 +9345,7 @@ more difficult:
       ]] : []),
       ['☠️ Creatures Slain', player.kills],
       ['🏆 Strongest Enemy Killed', player.strongestEnemyKilled
-        ? `${player.strongestEnemyKilled.name} (strength ${player.strongestEnemyKilled.strength})` : 'None'],
+        ? `${player.strongestEnemyKilled.name} (strength ${Math.round(player.strongestEnemyKilled.strength)})` : 'None'],
       ['📍 Position', player.x + ', ' + player.y],
     ]
     for (const [k, v] of rows) {

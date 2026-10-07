@@ -123,6 +123,35 @@ describe('Graveyard', () => {
     })
   })
 
+  it('rounds strongest-kill strength while preserving exact stat comparison and decimal stats', () => {
+    configureTestGraveyard()
+    beginNewGame('Strength Tester')
+    const rows = []
+    cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) }
+      })})}
+      win.eval(`player.strongestEnemyKilled = null
+        recordStrongestEnemyKill({name:'First Banshee', baseName:'Banshee', tier:4,
+          atk:21.2, def:2, spd:4, grace:1.35})
+        recordStrongestEnemyKill({name:'Second Banshee', baseName:'Banshee', tier:4,
+          atk:21.289643402164803, def:2, spd:4, grace:1.3976985338144003})`)
+      const strongest = win.eval('structuredClone(player.strongestEnemyKilled)')
+      expect(strongest.name).to.equal('Second Banshee')
+      expect(strongest.strength).to.equal(29)
+      expect(strongest.stats.atk).to.equal(21.289643402164803)
+      expect(strongest.stats.grace).to.equal(1.3976985338144003)
+      win.eval(`die({name:'Lich', alive:false})`)
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      expect(records[0].strongest_enemy_killed.strength).to.equal(29)
+      expect(records[0].strongest_enemy_killed.stats.atk).to.equal(21.289643402164803)
+      expect(records[0].strongest_enemy_killed.stats.grace).to.equal(1.3976985338144003)
+    })
+  })
+
   it('submits the final permadeath once before the character is replaced', () => {
     configureTestGraveyard()
     cy.visit('/')

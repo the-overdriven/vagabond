@@ -228,7 +228,7 @@ const Graveyard = (() => {
         ['Gold', row.gold], ['Cumulated XP', row.cumulated_xp], ['Deaths', row.death_number],
         ['Steps', row.steps_taken], ['Creatures slain', row.creatures_slain],
         ['Strongest enemy killed', row.strongest_enemy_killed
-          ? `${row.strongest_enemy_killed.name} (strength ${row.strongest_enemy_killed.strength})` : 'None']
+          ? `${row.strongest_enemy_killed.name} (strength ${Math.round(row.strongest_enemy_killed.strength)})` : 'None']
       ]) extras.appendChild(detail(label, value))
       card.append(extras)
       list.append(card)
