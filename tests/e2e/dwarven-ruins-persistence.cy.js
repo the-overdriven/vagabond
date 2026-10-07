@@ -8,6 +8,16 @@ describe('Dwarven Ruins persistence', () => {
     cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   })
 
+  it('keeps lava and pulled-lever save codes distinct', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check = (ok, msg) => { if (!ok) throw new Error(msg) }
+      check(TILE_CODE.lava !== TILE_CODE.dwarvenleverpulled, 'lava and pulled lever use distinct save codes')
+      check(CODE_TILE[TILE_CODE.lava] === 'lava', 'lava reverse mapping stays lava')
+      check(CODE_TILE[TILE_CODE.dwarvenleverpulled] === 'dwarvenleverpulled', 'pulled lever reverse mapping stays pulled lever')
+      check(TILE.dwarvenleverpulled.ch.length === 1 && TILE.dwarvenleverpulled.ch.charCodeAt(0) === 92, 'pulled lever ASCII glyph is unchanged')
+    })()`))
+  })
+
   it('restores room graph, key sources, door mutations, traps, alerts, discovery, and lift state together', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, msg) => { if (!ok) throw new Error(msg) }
@@ -53,7 +63,10 @@ describe('Dwarven Ruins persistence', () => {
       check(setDwarvenLiftPowered(true), 'test can activate persistent lift state')
       const leverDepth = chainDepthForZ(dwarvenRuinsLiftShortcut().lever.z)
       const leverLevel = deepLevels[leverDepth - 2]
-      leverLevel.map[dwarvenRuinsLiftShortcut().lever.y][dwarvenRuinsLiftShortcut().lever.x] = 'dwarvenleverpulled'
+      // A save written by the buggy tile-code table used the same code as lava at
+      // this coordinate. Simulate that decoded state; shortcut metadata must repair
+      // only the registered lever when the save is loaded.
+      leverLevel.map[dwarvenRuinsLiftShortcut().lever.y][dwarvenRuinsLiftShortcut().lever.x] = 'lava'
       const liftBefore = JSON.stringify(dwarvenRuinsLiftShortcut())
 
       const save = JSON.parse(JSON.stringify(buildSaveObject()))

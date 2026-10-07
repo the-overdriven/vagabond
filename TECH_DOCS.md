@@ -1014,8 +1014,13 @@ Lift endpoint/lever coordinates and powered state are persisted explicitly in
 the generic dungeon-shortcut registry; runtime lever activation and inspect-to-travel
 always resolve the lift from that registry rather than a Ruins-only mirror variable.
 The platform and pulled-lever terrain states are also stored in the ordinary
-Ruins map grids. Lift metadata was introduced in save schema **34**. Distinct
-open-gate/pulled-lever terrain states use save schema **36**. Room descriptors,
+Ruins map grids. Terrain save codes are one-to-one with terrain IDs: lava and the
+pulled lever must never share an internal code, and these save codes are separate
+from the visible ASCII glyphs. On load, an already-powered shortcut reasserts the
+pulled terrain only at its registered lever coordinate, so saves written during a
+code collision restore lava normally without losing the powered lever. Lift
+metadata was introduced in save schema **34**. Distinct open-gate/pulled-lever
+terrain states use save schema **36**. Room descriptors,
 vault descriptors, selected encounter families and tactical enemy role metadata
 use schema **37**. Schema **38** adds the persistent room graph, progression-key
 scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces the

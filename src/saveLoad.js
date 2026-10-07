@@ -503,6 +503,19 @@ function loadGameFromObject(data, opts = {}) {
 
   dungeonShortcuts = structuredClone(data.dungeonShortcuts)
 
+  // The shortcut registry is authoritative for persistent lever state. Reassert
+  // the pulled terrain at the registered coordinate after map decoding so saves
+  // written while lava and dwarvenleverpulled shared a tile code restore both
+  // terrains correctly without changing any display glyphs.
+  for (const shortcut of (dungeonShortcuts || [])) {
+    if (shortcut?.packageId !== 'dwarvenRuins' || !shortcut.unlocked || !shortcut.lever) continue
+    const leverDepth = chainDepthForZ(shortcut.lever.z)
+    const leverMap = depthUndergroundMap(leverDepth)
+    if (leverMap?.[shortcut.lever.y]?.[shortcut.lever.x] !== undefined) {
+      leverMap[shortcut.lever.y][shortcut.lever.x] = 'dwarvenleverpulled'
+    }
+  }
+
   if (dwarvenRuin && deepLevels[1]) {
     const fortCaveIndex = deepLevels[1].caves.findIndex(c =>
       (c.entrances || []).some(e => e.x === dwarvenRuin.x && e.y === dwarvenRuin.y)
