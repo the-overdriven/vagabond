@@ -213,7 +213,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261008-1">
+  <link rel="stylesheet" href="css/style.css?v=20261008-2">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -6814,8 +6814,8 @@ more difficult:
     const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
     applyGameViewport(nextWidth, nextHeight)
 
-    document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 12)}px`)
-    document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(10, Math.round(window.innerHeight - stageRect.bottom + 12))}px`)
+    document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
+    document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(40, Math.round(window.innerHeight - stageRect.bottom + 40))}px`)
   }
 
   function setTileSize(size) {
@@ -10335,8 +10335,8 @@ more difficult:
 
   // Desktop-only log resizing is presentation state. The fixed bottom-left
   // anchor means the resize grip moves the top edge upward and the right edge outward.
-  const DESKTOP_LOG_MIN_WIDTH = 320
-  const DESKTOP_LOG_MIN_HEIGHT = 90
+  const DESKTOP_LOG_MIN_WIDTH = 300
+  const DESKTOP_LOG_MIN_HEIGHT = 120
   const DESKTOP_LOG_MAX_WIDTH_RATIO = 0.8
   const DESKTOP_LOG_MAX_HEIGHT_RATIO = 0.6
   let desktopLogResize = null
@@ -10363,11 +10363,20 @@ more difficult:
     if (logEl.releasePointerCapture && logEl.hasPointerCapture?.(pointerId)) logEl.releasePointerCapture(pointerId)
   }
 
+  function desktopLogResizeGripHit(event, rect) {
+    // Keep the resize grip clear of the native vertical scrollbar. The painted
+    // corner sits 16px in from the right edge and this hit box matches it.
+    const scrollbarClearance = 14
+    const resizeZone = 24
+    const gripRight = rect.right - scrollbarClearance
+    return event.clientX >= gripRight - resizeZone && event.clientX <= gripRight + 2 &&
+      event.clientY >= rect.top && event.clientY <= rect.top + resizeZone + 4
+  }
+
   logEl.addEventListener('pointerdown', event => {
     if (window.matchMedia('(pointer:coarse)').matches || event.button !== 0) return
     const rect = logEl.getBoundingClientRect()
-    const resizeZone = 22
-    if (event.clientX < rect.right - resizeZone || event.clientY > rect.top + resizeZone) return
+    if (!desktopLogResizeGripHit(event, rect)) return
     event.preventDefault()
     desktopLogResize = {
       pointerId: event.pointerId,
@@ -10386,8 +10395,7 @@ more difficult:
     if (!desktopLogResize) {
       if (window.matchMedia('(pointer:coarse)').matches) return
       const rect = logEl.getBoundingClientRect()
-      const inResizeZone = event.clientX >= rect.right - 22 && event.clientY <= rect.top + 22
-      logEl.style.cursor = inResizeZone ? 'nesw-resize' : ''
+      logEl.style.cursor = desktopLogResizeGripHit(event, rect) ? 'nesw-resize' : ''
       return
     }
     if (event.pointerId !== desktopLogResize.pointerId) return

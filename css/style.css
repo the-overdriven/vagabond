@@ -343,20 +343,23 @@ canvas {
      over the lower-left of the game view and keeps normal pointer/scroll input. */
   #logpanel {
     position: fixed;
-    left: var(--desktop-log-left, 14px);
-    bottom: var(--desktop-log-bottom, 12px);
+    left: var(--desktop-log-left, 10px);
+    bottom: var(--desktop-log-bottom, 40px);
     z-index: 9;
-    width: min(640px, calc(var(--game-width, 840px) - 24px));
-    min-width: min(320px, calc(var(--game-width, 840px) - 24px));
+    box-sizing: border-box;
+    width: min(420px, calc(var(--game-width, 840px) - 24px));
+    min-width: min(300px, calc(var(--game-width, 840px) - 24px));
     max-width: min(80vw, calc(var(--game-width, 840px) - 24px));
-    height: 135px;
-    min-height: 90px;
-    max-height: min(60vh, calc(var(--game-height, 600px) - 24px));
+    height: 260px;
+    min-height: 120px;
+    max-height: min(60vh, calc(var(--game-height, 600px) - 84px));
     margin: 0;
+    padding-right: 26px;
     overflow: auto;
+    scrollbar-gutter: stable;
     background:
-      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) top right / 16px 2px no-repeat,
-      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) top right / 2px 16px no-repeat,
+      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) right 16px top 6px / 16px 2px no-repeat,
+      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) right 16px top 6px / 2px 16px no-repeat,
       linear-gradient(180deg, rgba(35, 26, 18, 0.78), rgba(26, 19, 14, 0.78));
     border-color: rgba(74, 51, 32, 0.88);
     box-shadow: 0 0 16px rgba(0, 0, 0, 0.38);
@@ -367,6 +370,15 @@ canvas {
   #logpanel.resizing {
     user-select: none;
     cursor: nesw-resize;
+  }
+
+  /* Chrome/Windows can reserve arrow buttons at the ends of a native
+     scrollbar. The log uses the space beside the track for its resize grip,
+     so remove those buttons from this panel only. */
+  #logpanel::-webkit-scrollbar-button {
+    width: 0;
+    height: 0;
+    display: none;
   }
 }
 
@@ -1910,7 +1922,7 @@ body.hint-collapsed #hint .panel-toggle {
   left: max(8px, calc((100% - var(--game-width, 100%)) / 2 + 8px));
   right: max(8px, calc((100% - var(--game-width, 100%)) / 2 + 8px));
   bottom: max(8px, calc((100% - var(--game-height, 100%)) / 2 + 8px));
-  z-index: 5;
+  z-index: 10;
   pointer-events: none;
 }
 

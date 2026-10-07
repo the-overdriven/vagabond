@@ -5142,14 +5142,19 @@ before each tile-size step. Desktop inspection tooltips remain overlays above
 the canvas and side panels; near the right or top edge they flip/clamp back into
 the visible canvas instead of being clipped by the browser edge.
 
-On desktop the message log floats over the lower-left of the canvas rather than
-consuming camera height. Its panel background is semi-transparent so terrain
-remains perceptible beneath it, while the log itself remains scrollable and
-continues to intercept pointer/wheel input normally. A top-right resize grip lets
-the player change both width and height without resizing the game camera. The
-default is 640×135 px; resizing is bounded to at least 320×90 px when space
-permits, at most 80% of the stage width and 60% of its height, and always kept
-inside the stage. The resize is presentation-only and is not saved or replayed.
+On desktop the message log floats as a narrow, taller panel along the lower-left
+side of the canvas rather than consuming camera height. Its bottom edge is kept
+above the active-status strip so ordinary log use does not cover status badges.
+Its panel background is semi-transparent so terrain remains perceptible beneath
+it, while the log itself remains scrollable and continues to intercept
+pointer/wheel input normally. A top-right resize grip lets the player change both
+width and height without resizing the game camera; the grip is inset from the
+native vertical scrollbar so the scrollbar cannot cover its visible or clickable
+area. The default is 420×260 px; resizing is bounded to at least 300×120 px when
+space permits, at most 80% of the stage width and 60% of its height, and always
+kept inside the stage. The bottom clearance is preserved while resizing, so the
+panel grows upward/rightward instead of back over the status row. The resize is
+presentation-only and is not saved or replayed.
 The newest entry stays
 fully bright, the second- and third-newest use slightly lower brightness, and
 older history is further dimmed and mildly desaturated. Loot messages use white

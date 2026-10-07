@@ -152,15 +152,15 @@ describe('Desktop overlay layout', () => {
       cy.wrap($log)
         .trigger('pointerdown', {
           pointerId: 7, button: 0, buttons: 1,
-          clientX: rect.right - 5, clientY: rect.top + 5, force: true
+          clientX: rect.right - 24, clientY: rect.top + 8, force: true
         })
         .trigger('pointermove', {
           pointerId: 7, button: 0, buttons: 1,
-          clientX: rect.right + 100, clientY: rect.top - 60, force: true
+          clientX: rect.right + 76, clientY: rect.top - 52, force: true
         })
         .trigger('pointerup', {
           pointerId: 7, button: 0, buttons: 0,
-          clientX: rect.right + 100, clientY: rect.top - 60, force: true
+          clientX: rect.right + 76, clientY: rect.top - 52, force: true
         })
     })
 
@@ -191,6 +191,9 @@ describe('Desktop overlay layout', () => {
         expect(style.position).to.equal('fixed')
         expect(Number(style.zIndex)).to.be.greaterThan(0)
         expect(style.backgroundImage).to.include('rgba')
+        expect(logRect.width, 'desktop log default width').to.be.lessThan(500)
+        expect(logRect.height, 'desktop log default height').to.be.greaterThan(200)
+        expect(stageRect.bottom - logRect.bottom, 'status-strip clearance below log').to.be.at.least(70)
         expect(logRect.left).to.be.greaterThan(stageRect.left)
         expect(logRect.right).to.be.lessThan(stageRect.right)
         expect(logRect.top).to.be.lessThan(stageRect.bottom)
