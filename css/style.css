@@ -288,29 +288,57 @@ canvas {
 
 @media (pointer: fine) {
   #root {
-    padding-bottom: 0;
+    padding: 0;
   }
 
-  #logpanel {
-    margin-top: auto;
-  }
-
-  /* Relative positioning keeps the desktop offset without transform creating
-     a stacking context that traps tooltips beneath the fixed side panels. */
+  /* Desktop side panels are overlays. The stage itself fills every available
+     browser pixel below the HUD. The canvas may be up to one tile larger than
+     the stage in either direction and is centred/clipped so square tiles never
+     need to be stretched merely to eliminate edge gaps. */
   #stage {
-    width: calc(var(--game-width, 840px) + 4px);
+    width: 100vw;
+    height: var(--desktop-stage-height, calc(100vh - 60px));
     max-width: none;
-    left: -146px;
+    left: auto;
+    overflow: hidden;
+    border-radius: 0;
   }
 
-  body.side-collapsed.hint-collapsed #stage {
-    left: -14px;
+  #stage > canvas#game {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
   }
 
+  /* The log no longer consumes vertical layout space on desktop. It floats
+     over the lower-left of the game view and keeps normal pointer/scroll input. */
   #logpanel {
-    width: 640px;
-    max-width: 92vw;
-    margin-top: -8px;
+    position: fixed;
+    left: var(--desktop-log-left, 14px);
+    bottom: var(--desktop-log-bottom, 12px);
+    z-index: 9;
+    width: min(640px, calc(var(--game-width, 840px) - 24px));
+    min-width: min(320px, calc(var(--game-width, 840px) - 24px));
+    max-width: min(80vw, calc(var(--game-width, 840px) - 24px));
+    height: 135px;
+    min-height: 90px;
+    max-height: min(60vh, calc(var(--game-height, 600px) - 24px));
+    margin: 0;
+    overflow: auto;
+    background:
+      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) top right / 16px 2px no-repeat,
+      linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) top right / 2px 16px no-repeat,
+      linear-gradient(180deg, rgba(35, 26, 18, 0.78), rgba(26, 19, 14, 0.78));
+    border-color: rgba(74, 51, 32, 0.88);
+    box-shadow: 0 0 16px rgba(0, 0, 0, 0.38);
+  }
+
+  /* The desktop log grows rightward and upward from its bottom-left anchor.
+     The painted top-right corner stays visible even while log history scrolls. */
+  #logpanel.resizing {
+    user-select: none;
+    cursor: nesw-resize;
   }
 }
 

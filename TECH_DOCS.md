@@ -5049,30 +5049,46 @@ Current desktop controls include:
 
 Tile size starts at **40** canvas pixels on desktop and **56** on
 coarse-pointer mobile devices (four additional zoom steps). It changes in
-four-pixel steps from 20 to 96. Desktop recomputes the camera's tile count from available stage width
-and height, keeping 7–50 tiles horizontally and sizing the canvas to complete
-tiles. A cramped window caps the effective tile size so the canvas fits.
-On desktop, collapsing both the side map and keyboard hints releases their shared
-right-side reservation and expands the canvas; collapsing either panel alone
-keeps that reservation. Both toggles recalculate the viewport. On
-coarse-pointer layouts the 16-column baseline scales with tile size (also
-bounded to 7–50 columns), while the existing vertical drag still controls
-visible rows. Pointer hit testing uses the canvas's actual displayed-to-buffer
-ratio. Zoom is presentation-only: it does not change world coordinates,
-gameplay RNG, save data, or the separate world-map zoom. Rasterized terrain
-and item image caches are rebuilt when tile size changes.
+four-pixel steps from 20 to 96. Desktop `#root` has no outer padding and the
+stage fills the exact browser width and all remaining height below the HUD. Map
+tiles remain square, unscaled canvas pixels: if the available width or height is
+not an exact multiple of the tile size, the camera renders one extra edge
+column/row and the stage symmetrically clips the sub-tile excess. This avoids
+grey side/bottom gutters without distorting terrain; at most part of one tile is
+clipped at each pair of opposite edges. A cramped window caps the effective tile size
+so at least seven columns fit; desktop otherwise has no 50-tile camera cap, so
+wide and tall monitors expose additional map instead of leaving unused space.
+The right-side minimap and keyboard hints are fixed overlays and never reserve
+canvas width. Expanding or collapsing either panel therefore does not resize the
+camera or make the map jump. Coarse-pointer layouts retain the 16-column
+baseline scaling and 7–50-column bounds, while the existing vertical drag still
+controls visible rows. Pointer hit testing uses the canvas's actual
+displayed-to-buffer ratio. Zoom is presentation-only: it does not change world
+coordinates, gameplay RNG, save data, or the separate world-map zoom.
+Rasterized terrain and item image caches are rebuilt when tile size changes.
 
 Wheel zoom listens only on the game canvas: scrolling over the message log,
 inventory, trade panels, or other scrollable content keeps its usual behavior.
 The separate full-map wheel zoom still applies when the map is open. Ctrl/Meta
 wheel remains available for browser zoom. Small trackpad deltas accumulate
-before each tile-size step.
+before each tile-size step. Desktop inspection tooltips remain overlays above
+the canvas and side panels; near the right or top edge they flip/clamp back into
+the visible canvas instead of being clipped by the browser edge.
 
-The message log keeps the newest entry fully bright and gives the second- and third-newest
-entries slightly lower brightness. Older history is further dimmed and mildly desaturated so
-recent consequences remain visually prominent without hiding previous messages. Loot messages
-use white as their base text color; when the looted object has an item tier, the item name uses
-the same tier color as inventory/equipment UI.
+On desktop the message log floats over the lower-left of the canvas rather than
+consuming camera height. Its panel background is semi-transparent so terrain
+remains perceptible beneath it, while the log itself remains scrollable and
+continues to intercept pointer/wheel input normally. A top-right resize grip lets
+the player change both width and height without resizing the game camera. The
+default is 640×135 px; resizing is bounded to at least 320×90 px when space
+permits, at most 80% of the stage width and 60% of its height, and always kept
+inside the stage. The resize is presentation-only and is not saved or replayed.
+The newest entry stays
+fully bright, the second- and third-newest use slightly lower brightness, and
+older history is further dimmed and mildly desaturated. Loot messages use white
+as their base text color; when the looted object has an item tier, the item name
+uses the same tier color as inventory/equipment UI. Mobile keeps its existing
+separate log layout and safe-area behavior.
 
 ---
 

@@ -6760,6 +6760,7 @@ more difficult:
     ctx.textBaseline = 'top'
     ctx.textAlign = 'center'
     document.documentElement.style.setProperty('--game-width', `${canvas.width}px`)
+    document.documentElement.style.setProperty('--game-height', `${canvas.height}px`)
     if (tileSizeChanged) {
       // Both caches contain canvases already rasterized at the old tile size.
       scaledVisualCache = new WeakMap()
@@ -6785,20 +6786,28 @@ more difficult:
 
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
-    const sideOpen = !document.body.classList.contains('side-collapsed')
-    const hintOpen = !document.body.classList.contains('hint-collapsed')
-    const reserved = sideOpen || hintOpen ? 292 : 28
-    const availableWidth = Math.max(1, window.innerWidth - reserved - 28)
-    const logPanel = document.getElementById('logpanel')
-    const stageTop = document.getElementById('stage').getBoundingClientRect().top
-    const availableHeight = Math.max(1, window.innerHeight - stageTop - logPanel.getBoundingClientRect().height - 12)
-    // Fit the canvas into the stage while keeping seven to fifty columns.
-    // Extremely short windows may show fewer than seven rows.
+    const stage = document.getElementById('stage')
+    const stageTop = stage.getBoundingClientRect().top
+    // The desktop stage reaches the browser edges. Its 2 px border is included
+    // in the stage box, leaving the inner content area for square map tiles.
+    const stageHeight = Math.max(1, window.innerHeight - stageTop)
+    const availableWidth = Math.max(1, window.innerWidth - 4)
+    const availableHeight = Math.max(1, stageHeight - 4)
+    document.documentElement.style.setProperty('--desktop-stage-height', `${stageHeight}px`)
+
+    // Preserve exact square tile pixels. When the browser dimensions are not an
+    // exact multiple of TILE_PX, render one extra edge row/column and let the
+    // full-size stage clip the equal sub-tile excess from both sides. This fills
+    // the viewport without stretching terrain or leaving grey gutters.
     const maxFittingTile = Math.floor(Math.min(availableWidth, availableHeight) / MIN_VIEW_TILES)
     TILE_PX = Math.max(12, Math.min(requestedTilePx, maxFittingTile))
-    const nextWidth = Math.max(MIN_VIEW_TILES, Math.min(MAX_VIEW_TILES, Math.floor(availableWidth / TILE_PX)))
-    const nextHeight = Math.max(1, Math.min(MAX_VIEW_TILES, Math.floor(availableHeight / TILE_PX)))
+    const nextWidth = Math.max(MIN_VIEW_TILES, Math.ceil(availableWidth / TILE_PX))
+    const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
     applyGameViewport(nextWidth, nextHeight)
+
+    const stageRect = stage.getBoundingClientRect()
+    document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 12)}px`)
+    document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(10, Math.round(window.innerHeight - stageRect.bottom + 12))}px`)
   }
 
   function setTileSize(size) {
@@ -8504,10 +8513,21 @@ more difficult:
     tooltip.classList.toggle('mini', info.mini)
     tooltip.innerHTML = info.html
     tooltip.style.display = 'block'
-    tooltip.style.left = (lastMousePx + 16) + 'px'
-    const belowTop = lastMousePy + 16
-    const aboveTop = lastMousePy - tooltip.offsetHeight - 16
-    tooltip.style.top = (belowTop + tooltip.offsetHeight > canvas.clientHeight ? aboveTop : belowTop) + 'px'
+    const stage = document.getElementById('stage')
+    const canvasRect = canvas.getBoundingClientRect()
+    const stageRect = stage.getBoundingClientRect()
+    const pointerX = canvasRect.left - stageRect.left + lastMousePx * canvasRect.width / canvas.width
+    const pointerY = canvasRect.top - stageRect.top + lastMousePy * canvasRect.height / canvas.height
+    const visibleWidth = stage.clientWidth
+    const visibleHeight = stage.clientHeight
+    const rightLeft = pointerX + 16
+    const leftLeft = pointerX - tooltip.offsetWidth - 16
+    tooltip.style.left = Math.min(Math.max(0, rightLeft + tooltip.offsetWidth > visibleWidth
+      ? leftLeft : rightLeft), Math.max(0, visibleWidth - tooltip.offsetWidth)) + 'px'
+    const belowTop = pointerY + 16
+    const aboveTop = pointerY - tooltip.offsetHeight - 16
+    tooltip.style.top = Math.min(Math.max(0, belowTop + tooltip.offsetHeight > visibleHeight
+      ? aboveTop : belowTop), Math.max(0, visibleHeight - tooltip.offsetHeight)) + 'px'
   }
 
   // Converts a pointer event's viewport coordinates into canvas-buffer pixel
@@ -10237,6 +10257,81 @@ more difficult:
     requestAnimationFrame(updateMobileSafeAreas)
   }
 
+  // Desktop-only log resizing is presentation state. The fixed bottom-left
+  // anchor means the resize grip moves the top edge upward and the right edge outward.
+  const DESKTOP_LOG_MIN_WIDTH = 320
+  const DESKTOP_LOG_MIN_HEIGHT = 90
+  const DESKTOP_LOG_MAX_WIDTH_RATIO = 0.8
+  const DESKTOP_LOG_MAX_HEIGHT_RATIO = 0.6
+  let desktopLogResize = null
+
+  function desktopLogResizeBounds() {
+    const stageRect = document.getElementById('stage').getBoundingClientRect()
+    const logRect = logEl.getBoundingClientRect()
+    const maxWidth = Math.max(1, Math.min(stageRect.width - 24, stageRect.width * DESKTOP_LOG_MAX_WIDTH_RATIO, stageRect.right - logRect.left - 12))
+    const maxHeight = Math.max(1, Math.min(stageRect.height - 24, stageRect.height * DESKTOP_LOG_MAX_HEIGHT_RATIO, logRect.bottom - stageRect.top - 12))
+    return {
+      minWidth: Math.min(DESKTOP_LOG_MIN_WIDTH, maxWidth),
+      minHeight: Math.min(DESKTOP_LOG_MIN_HEIGHT, maxHeight),
+      maxWidth,
+      maxHeight
+    }
+  }
+
+  function finishDesktopLogResize(event) {
+    if (!desktopLogResize || (event?.pointerId != null && event.pointerId !== desktopLogResize.pointerId)) return
+    const pointerId = desktopLogResize.pointerId
+    desktopLogResize = null
+    logEl.classList.remove('resizing')
+    logEl.style.cursor = ''
+    if (logEl.releasePointerCapture && logEl.hasPointerCapture?.(pointerId)) logEl.releasePointerCapture(pointerId)
+  }
+
+  logEl.addEventListener('pointerdown', event => {
+    if (window.matchMedia('(pointer:coarse)').matches || event.button !== 0) return
+    const rect = logEl.getBoundingClientRect()
+    const resizeZone = 22
+    if (event.clientX < rect.right - resizeZone || event.clientY > rect.top + resizeZone) return
+    event.preventDefault()
+    desktopLogResize = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: rect.width,
+      height: rect.height
+    }
+    logEl.classList.add('resizing')
+    if (logEl.setPointerCapture) {
+      try { logEl.setPointerCapture(event.pointerId) } catch {}
+    }
+  })
+
+  logEl.addEventListener('pointermove', event => {
+    if (!desktopLogResize) {
+      if (window.matchMedia('(pointer:coarse)').matches) return
+      const rect = logEl.getBoundingClientRect()
+      const inResizeZone = event.clientX >= rect.right - 22 && event.clientY <= rect.top + 22
+      logEl.style.cursor = inResizeZone ? 'nesw-resize' : ''
+      return
+    }
+    if (event.pointerId !== desktopLogResize.pointerId) return
+    event.preventDefault()
+    const bounds = desktopLogResizeBounds()
+    const width = Math.max(bounds.minWidth, Math.min(bounds.maxWidth,
+      desktopLogResize.width + event.clientX - desktopLogResize.startX))
+    // The log is bottom-anchored, so dragging the top edge upward increases height.
+    const height = Math.max(bounds.minHeight, Math.min(bounds.maxHeight,
+      desktopLogResize.height + desktopLogResize.startY - event.clientY))
+    logEl.style.width = `${Math.round(width)}px`
+    logEl.style.height = `${Math.round(height)}px`
+  })
+
+  logEl.addEventListener('pointerleave', () => {
+    if (!desktopLogResize) logEl.style.cursor = ''
+  })
+  logEl.addEventListener('pointerup', finishDesktopLogResize)
+  logEl.addEventListener('pointercancel', finishDesktopLogResize)
+
   // Reserve the HUD's visible area above touch and narrow-window dialogs.
   function updateMobileSafeAreas() {
     if (!window.matchMedia('(pointer:coarse)').matches && window.innerWidth > 720) return
@@ -10249,6 +10344,10 @@ more difficult:
     const mobileSafeAreaObserver = new ResizeObserver(updateMobileSafeAreas)
     mobileSafeAreaObserver.observe(document.getElementById('hud'))
     mobileSafeAreaObserver.observe(document.getElementById('logpanel'))
+    // Desktop camera height follows the actual HUD footprint as it wraps on
+    // narrower windows. Side-panel and log changes intentionally do not resize it.
+    const desktopViewportObserver = new ResizeObserver(resizeDesktopViewport)
+    desktopViewportObserver.observe(document.getElementById('hud'))
   }
   window.addEventListener('resize', updateMobileSafeAreas)
   document.getElementById('btnSideCollapse').addEventListener('click', () => {
@@ -10258,7 +10357,6 @@ more difficult:
     const sideLabel = collapsed ? 'Expand map panel' : 'Collapse map panel'
     document.getElementById('btnSideCollapse').setAttribute('aria-label', sideLabel)
     document.getElementById('btnSideCollapse').title = sideLabel
-    resizeDesktopViewport()
   })
   document.getElementById('btnHintCollapse').addEventListener('click', () => {
     document.body.classList.toggle('hint-collapsed')
@@ -10267,7 +10365,6 @@ more difficult:
     const hintLabel = collapsed ? 'Expand keyboard hints' : 'Collapse keyboard hints'
     document.getElementById('btnHintCollapse').setAttribute('aria-label', hintLabel)
     document.getElementById('btnHintCollapse').title = hintLabel
-    resizeDesktopViewport()
   })
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()
