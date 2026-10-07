@@ -12,7 +12,33 @@ describe('Desktop overlay layout', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   })
 
-  it('uses the desktop viewport without reserving space for side panels or the log', () => {
+  it('keeps race selection above gameplay-side overlays while leaving the HUD on one row', () => {
+    cy.get('#raceOverlay').should('have.class', 'show')
+
+    cy.get('#hud').should($hud => {
+      const hud = $hud[0]
+      const tops = [...hud.querySelectorAll(':scope > .stat')].map(el => Math.round(el.getBoundingClientRect().top))
+      expect(new Set(tops).size).to.equal(1)
+    })
+
+    cy.window().then(win => {
+      const race = win.document.getElementById('raceOverlay')
+      for (const id of ['sidePanel', 'hint', 'logpanel']) {
+        const el = win.document.getElementById(id)
+        const rect = el.getBoundingClientRect()
+        const x = Math.max(1, Math.min(win.innerWidth - 2, rect.left + rect.width / 2))
+        const y = Math.max(1, Math.min(win.innerHeight - 2, rect.top + rect.height / 2))
+        const top = win.document.elementFromPoint(x, y)
+        expect(top === race || race.contains(top), `${id} must stay below race selection`).to.equal(true)
+      }
+
+      const hudBottom = win.document.getElementById('hud').getBoundingClientRect().bottom
+      const panelTop = race.querySelector('.panelbox').getBoundingClientRect().top
+      expect(panelTop).to.be.greaterThan(hudBottom)
+    })
+  })
+
+  it('uses the full desktop viewport without reserving space for the HUD, side panels or log', () => {
     let initialCanvas
     cy.get('#game').then($canvas => {
       const canvas = $canvas[0]
@@ -22,14 +48,47 @@ describe('Desktop overlay layout', () => {
       const canvasRect = canvas.getBoundingClientRect()
       const style = canvas.ownerDocument.defaultView.getComputedStyle(stage)
       expect(stageRect.left).to.be.closeTo(0, 0.5)
+      expect(stageRect.top).to.be.closeTo(0, 0.5)
       expect(stageRect.right).to.be.closeTo(1440, 0.5)
       expect(stageRect.bottom).to.be.closeTo(900, 0.5)
+      expect(style.position).to.equal('absolute')
       expect(style.overflow).to.equal('hidden')
       expect(canvasRect.left).to.be.at.most(stageRect.left + 2)
       expect(canvasRect.right).to.be.at.least(stageRect.right - 2)
       expect(canvasRect.top).to.be.at.most(stageRect.top + 2)
       expect(canvasRect.bottom).to.be.at.least(stageRect.bottom - 2)
       expect(Math.abs((stageRect.left - canvasRect.left) - (canvasRect.right - stageRect.right))).to.be.lessThan(2)
+    })
+
+    let initialHudHeight
+    cy.get('#hud').should($hud => {
+      const hud = $hud[0]
+      const hudRect = hud.getBoundingClientRect()
+      const stageRect = hud.ownerDocument.getElementById('stage').getBoundingClientRect()
+      const style = hud.ownerDocument.defaultView.getComputedStyle(hud)
+      initialHudHeight = hudRect.height
+      expect(style.position).to.equal('fixed')
+      expect(style.flexWrap).to.equal('nowrap')
+      expect(Number(style.zIndex)).to.be.greaterThan(30)
+      expect(hudRect.top).to.be.closeTo(stageRect.top, 0.5)
+      expect(hudRect.bottom).to.be.greaterThan(stageRect.top)
+      expect(hudRect.bottom).to.be.lessThan(stageRect.bottom)
+      const rowTops = [...hud.querySelectorAll(':scope > .stat')].map(el => Math.round(el.getBoundingClientRect().top))
+      expect(new Set(rowTops).size).to.equal(1)
+    })
+
+    // Even if CSS is deliberately forced to wrap the HUD, presentation-only
+    // HUD height changes must not resize the map camera underneath it.
+    cy.get('#hud').then($hud => {
+      $hud[0].style.width = '360px'
+      $hud[0].style.flexWrap = 'wrap'
+    })
+    cy.get('#hud').should($hud => {
+      expect($hud[0].getBoundingClientRect().height).to.be.greaterThan(initialHudHeight)
+    })
+    cy.get('#game').should($canvas => {
+      expect($canvas[0].width).to.equal(initialCanvas.width)
+      expect($canvas[0].height).to.equal(initialCanvas.height)
     })
 
     cy.get('#btnSideCollapse').click({force: true})

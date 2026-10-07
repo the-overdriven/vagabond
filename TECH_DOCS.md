@@ -88,8 +88,11 @@ and duplicate Begin clicks cannot start a second world.
 
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
-On narrow windows, the character form scrolls within the space below the HUD
-so its fields remain accessible without covering the Load button.
+On desktop the character-selection overlay stays above gameplay-only overlays
+(the side minimap, keyboard hints and message log) while the top HUD remains
+visible; the form itself is kept below the HUD. On narrow windows, the character
+form scrolls within the space below the HUD so its fields remain accessible
+without covering the Load button.
 
 There are currently **10 races**.
 
@@ -5050,9 +5053,15 @@ Current desktop controls include:
 Tile size starts at **40** canvas pixels on desktop and **56** on
 coarse-pointer mobile devices (four additional zoom steps). It changes in
 four-pixel steps from 20 to 96. Desktop `#root` has no outer padding and the
-stage fills the exact browser width and all remaining height below the HUD. Map
-tiles remain square, unscaled canvas pixels: if the available width or height is
-not an exact multiple of the tile size, the camera renders one extra edge
+stage fills the entire browser viewport, including the area behind the top HUD.
+The HUD is a fixed overlay centered at the top and does not reserve camera
+height. Wide desktop layouts keep the HUD on one row; narrow-window/mobile rules
+may wrap it. HUD presentation never resizes the map. The full-viewport desktop
+stage deliberately avoids creating a separate stacking context so modal overlays
+inside it can still cover gameplay-side overlays such as the minimap, keyboard
+hints and message log.
+Map tiles remain square, unscaled canvas pixels: if the available width or height
+is not an exact multiple of the tile size, the camera renders one extra edge
 column/row and the stage symmetrically clips the sub-tile excess. This avoids
 grey side/bottom gutters without distorting terrain; at most part of one tile is
 clipped at each pair of opposite edges. A cramped window caps the effective tile size
@@ -5903,8 +5912,9 @@ for equipment/stats. Equipped gear shows the inventory stat line in brackets,
 for example `Meat Cleaver (ATK 1, GRACE 1)`; earlier records without the
 additional item stats still show their stored names. Red highlights permadeath;
 amber highlights normal deaths.
-The HUD button remains reachable during character selection and other narrow-
-window dialogs. These dialogs reserve the measured HUD area above their content.
+The HUD button remains reachable during character selection. Character
+selection keeps its panel below the desktop HUD, while narrow-window dialogs
+reserve the measured HUD area above their content.
 Opening/closing never consumes a game turn or changes replay/save state. The
 overlay fills the viewport with one scrolling records list; its title and X
 close control remain visible.

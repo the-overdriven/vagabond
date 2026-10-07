@@ -291,15 +291,32 @@ canvas {
     padding: 0;
   }
 
-  /* Desktop side panels are overlays. The stage itself fills every available
-     browser pixel below the HUD. The canvas may be up to one tile larger than
-     the stage in either direction and is centred/clipped so square tiles never
-     need to be stretched merely to eliminate edge gaps. */
+  /* Desktop HUD floats over the game without reserving camera height. Wide
+     desktop layouts keep it on one row; genuinely narrow windows may wrap in
+     the dedicated max-width rule below. */
+  #hud {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: max-content;
+    max-width: 100vw;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+  }
+
+  /* Desktop stage fills the entire browser behind the HUD. Use absolute rather
+     than fixed positioning here: a fixed stage creates its own stacking
+     context and would trap in-stage modal overlays below the sibling log,
+     minimap and keyboard hints. The canvas may be up to one tile larger than
+     the stage and is centred/clipped so square tiles stay unscaled. */
   #stage {
+    position: absolute;
+    inset: 0;
     width: 100vw;
-    height: var(--desktop-stage-height, calc(100vh - 60px));
+    height: 100vh;
     max-width: none;
-    left: auto;
     overflow: hidden;
     border-radius: 0;
   }
@@ -309,6 +326,13 @@ canvas {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
+  }
+
+  /* Race selection used to live below the HUD because the stage itself started
+     below it. Keep that readable separation even though gameplay now renders
+     behind the HUD. The overlay still covers the gameplay-side panels/log. */
+  #raceOverlay {
+    padding-top: calc(var(--desktop-hud-height, 52px) + 8px);
   }
 
   /* The log no longer consumes vertical layout space on desktop. It floats
@@ -1380,11 +1404,25 @@ body.hint-collapsed #hint .panel-toggle {
   .cursed-world-option:has(#cursedWorldToggle:checked) ~ .cursed-world-mobile-note { display: block; }
 }
 
+/* Mouse-driven but compact windows may wrap the HUD rather than overflow it.
+   Normal desktop widths keep the single-row HUD. */
+@media (pointer: fine) and (min-width: 721px) and (max-width: 1100px) {
+  #hud {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 /* Narrow windows need usable dialogs regardless of the browser pointer mode. */
 @media (max-width: 720px) {
   #hud {
     position: relative;
     z-index: 110;
+    width: auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    transform: none;
+    left: auto;
   }
   #invOverlay, #mapOverlay, #treasureMapOverlay, #tradeOverlay, #raceOverlay {
     position: fixed;

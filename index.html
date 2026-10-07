@@ -6787,13 +6787,13 @@ more difficult:
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const stage = document.getElementById('stage')
-    const stageTop = stage.getBoundingClientRect().top
-    // The desktop stage reaches the browser edges. Its 2 px border is included
-    // in the stage box, leaving the inner content area for square map tiles.
-    const stageHeight = Math.max(1, window.innerHeight - stageTop)
-    const availableWidth = Math.max(1, window.innerWidth - 4)
-    const availableHeight = Math.max(1, stageHeight - 4)
-    document.documentElement.style.setProperty('--desktop-stage-height', `${stageHeight}px`)
+    // The desktop stage fills the browser behind the HUD. Its 2 px border is
+    // included in the stage box, leaving the inner content area for map tiles.
+    const stageRect = stage.getBoundingClientRect()
+    const hudRect = document.getElementById('hud').getBoundingClientRect()
+    document.documentElement.style.setProperty('--desktop-hud-height', `${Math.ceil(hudRect.height)}px`)
+    const availableWidth = Math.max(1, stageRect.width - 4)
+    const availableHeight = Math.max(1, stageRect.height - 4)
 
     // Preserve exact square tile pixels. When the browser dimensions are not an
     // exact multiple of TILE_PX, render one extra edge row/column and let the
@@ -6805,7 +6805,6 @@ more difficult:
     const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
     applyGameViewport(nextWidth, nextHeight)
 
-    const stageRect = stage.getBoundingClientRect()
     document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 12)}px`)
     document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(10, Math.round(window.innerHeight - stageRect.bottom + 12))}px`)
   }
@@ -10344,10 +10343,6 @@ more difficult:
     const mobileSafeAreaObserver = new ResizeObserver(updateMobileSafeAreas)
     mobileSafeAreaObserver.observe(document.getElementById('hud'))
     mobileSafeAreaObserver.observe(document.getElementById('logpanel'))
-    // Desktop camera height follows the actual HUD footprint as it wraps on
-    // narrower windows. Side-panel and log changes intentionally do not resize it.
-    const desktopViewportObserver = new ResizeObserver(resizeDesktopViewport)
-    desktopViewportObserver.observe(document.getElementById('hud'))
   }
   window.addEventListener('resize', updateMobileSafeAreas)
   document.getElementById('btnSideCollapse').addEventListener('click', () => {
