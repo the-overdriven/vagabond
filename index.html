@@ -6751,19 +6751,50 @@ more difficult:
   let requestedTilePx = INITIAL_TILE_PX, TILE_PX = INITIAL_TILE_PX, renderedTilePx = INITIAL_TILE_PX
   canvas.width = VIEW_W * TILE_PX
   canvas.height = VIEW_H * TILE_PX
+  let visibleCanvasBounds = {left: 0, top: 0, right: canvas.width, bottom: canvas.height}
   ctx.imageSmoothingEnabled = false
   ctx.textBaseline = 'top'
   ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
   ctx.textAlign = 'center'
 
-  function applyGameViewport(width, height) {
-    if (width === VIEW_W && height === VIEW_H && TILE_PX === renderedTilePx) return false
+  function updateVisibleCanvasBounds(visibleWidth = canvas.width, visibleHeight = canvas.height) {
+    const clippedX = Math.max(0, (canvas.width - Math.min(canvas.width, visibleWidth)) / 2)
+    const clippedY = Math.max(0, (canvas.height - Math.min(canvas.height, visibleHeight)) / 2)
+    const next = {
+      left: clippedX,
+      top: clippedY,
+      right: canvas.width - clippedX,
+      bottom: canvas.height - clippedY
+    }
+    const changed = Object.keys(next).some(key => Math.abs(next[key] - visibleCanvasBounds[key]) > 0.01)
+    visibleCanvasBounds = next
+    return changed
+  }
+
+  function depthLabelRect() {
+    const width = 78, height = 25
+    const rightInset = 8, topInset = 6
+    return {
+      x: Math.max(visibleCanvasBounds.left + 2, visibleCanvasBounds.right - rightInset - width),
+      y: visibleCanvasBounds.top + topInset,
+      width,
+      height
+    }
+  }
+
+  function applyGameViewport(width, height, visibleWidth = null, visibleHeight = null) {
+    if (width === VIEW_W && height === VIEW_H && TILE_PX === renderedTilePx) {
+      const visibleBoundsChanged = updateVisibleCanvasBounds(visibleWidth ?? canvas.width, visibleHeight ?? canvas.height)
+      if (visibleBoundsChanged && map.length) render()
+      return visibleBoundsChanged
+    }
     const tileSizeChanged = TILE_PX !== renderedTilePx
     VIEW_W = width
     VIEW_H = height
     renderedTilePx = TILE_PX
     canvas.width = VIEW_W * TILE_PX
     canvas.height = VIEW_H * TILE_PX
+    updateVisibleCanvasBounds(visibleWidth ?? canvas.width, visibleHeight ?? canvas.height)
     ctx.imageSmoothingEnabled = false
     ctx.font = (TILE_PX - 4) + "px Consolas, 'Courier New', monospace"
     ctx.textBaseline = 'top'
@@ -6812,7 +6843,7 @@ more difficult:
     TILE_PX = Math.max(12, Math.min(requestedTilePx, maxFittingTile))
     const nextWidth = Math.max(MIN_VIEW_TILES, Math.ceil(availableWidth / TILE_PX))
     const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
-    applyGameViewport(nextWidth, nextHeight)
+    applyGameViewport(nextWidth, nextHeight, availableWidth, availableHeight)
 
     document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
     document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(40, Math.round(window.innerHeight - stageRect.bottom + 40))}px`)
@@ -8243,12 +8274,13 @@ more difficult:
       if (enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
     if (currentZ < 0) {
+      const depthRect = depthLabelRect()
       ctx.save()
       ctx.fillStyle = RENDER_STYLE.depthLabel.background
-      ctx.fillRect(canvas.width - 86, 6, 78, 25)
+      ctx.fillRect(depthRect.x, depthRect.y, depthRect.width, depthRect.height)
       ctx.fillStyle = RENDER_STYLE.depthLabel.color
       ctx.font = 'bold 16px Consolas, \'Courier New\', monospace'
-      ctx.fillText('Z ' + currentZ, canvas.width - 47, 10)
+      ctx.fillText('Z ' + currentZ, depthRect.x + depthRect.width / 2, depthRect.y + 4)
       ctx.restore()
     }
     // range overlays are drawn last so they tint everything underneath without

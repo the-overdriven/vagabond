@@ -202,6 +202,33 @@ describe('Desktop overlay layout', () => {
     })
   })
 
+  it('keeps the underground depth badge inside the visible clipped canvas', () => {
+    cy.window().then(win => {
+      const checkDepthBadge = () => {
+        const badge = win.eval('depthLabelRect()')
+        const canvas = win.document.getElementById('game')
+        const canvasRect = canvas.getBoundingClientRect()
+        const stageRect = win.document.getElementById('stage').getBoundingClientRect()
+        const scaleX = canvasRect.width / canvas.width
+        const scaleY = canvasRect.height / canvas.height
+        const screen = {
+          left: canvasRect.left + badge.x * scaleX,
+          top: canvasRect.top + badge.y * scaleY,
+          right: canvasRect.left + (badge.x + badge.width) * scaleX,
+          bottom: canvasRect.top + (badge.y + badge.height) * scaleY
+        }
+        expect(screen.left, 'depth badge left').to.be.at.least(stageRect.left + 1.5)
+        expect(screen.top, 'depth badge top').to.be.at.least(stageRect.top + 1.5)
+        expect(screen.right, 'depth badge right').to.be.at.most(stageRect.right - 1.5)
+        expect(screen.bottom, 'depth badge bottom').to.be.at.most(stageRect.bottom - 1.5)
+      }
+
+      checkDepthBadge()
+      win.eval('setTileSize(52)')
+      checkDepthBadge()
+    })
+  })
+
   it('keeps a right-edge inspection tooltip inside the canvas', () => {
     cy.get('#raceName').clear().type('Layout Tester')
     cy.get('#btnBegin').click()

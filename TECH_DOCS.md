@@ -5122,7 +5122,10 @@ Map tiles remain square, unscaled canvas pixels: if the available width or heigh
 is not an exact multiple of the tile size, the camera renders one extra edge
 column/row and the stage symmetrically clips the sub-tile excess. This avoids
 grey side/bottom gutters without distorting terrain; at most part of one tile is
-clipped at each pair of opposite edges. A cramped window caps the effective tile size
+clipped at each pair of opposite edges. Canvas HUD elements that hug an edge,
+including the underground `Z` depth badge, are positioned against the **visible**
+canvas bounds rather than the oversized render buffer so this deliberate clipping
+cannot trim them after resize or zoom. A cramped window caps the effective tile size
 so at least seven columns fit; desktop otherwise has no 50-tile camera cap, so
 wide and tall monitors expose additional map instead of leaving unused space.
 The right-side minimap and keyboard hints are fixed overlays and never reserve
