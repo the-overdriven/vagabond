@@ -1,6 +1,14 @@
 const cdp = (command, params) =>
   Cypress.automation('remote:debugger:protocol', {command, params})
 
+function expectHudSingleRow(hud) {
+  const centers = [...hud.querySelectorAll(':scope > .stat')].map(el => {
+    const rect = el.getBoundingClientRect()
+    return (rect.top + rect.bottom) / 2
+  })
+  expect(Math.max(...centers) - Math.min(...centers), 'HUD stat vertical-center spread').to.be.lessThan(1.5)
+}
+
 describe('Desktop overlay layout', () => {
   afterEach(() => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: false}))
@@ -37,9 +45,7 @@ describe('Desktop overlay layout', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
 
     cy.get('#hud').should($hud => {
-      const hud = $hud[0]
-      const tops = [...hud.querySelectorAll(':scope > .stat')].map(el => Math.round(el.getBoundingClientRect().top))
-      expect(new Set(tops).size).to.equal(1)
+      expectHudSingleRow($hud[0])
     })
 
     cy.window().then(win => {
@@ -94,8 +100,7 @@ describe('Desktop overlay layout', () => {
       expect(hudRect.top).to.be.closeTo(stageRect.top, 0.5)
       expect(hudRect.bottom).to.be.greaterThan(stageRect.top)
       expect(hudRect.bottom).to.be.lessThan(stageRect.bottom)
-      const rowTops = [...hud.querySelectorAll(':scope > .stat')].map(el => Math.round(el.getBoundingClientRect().top))
-      expect(new Set(rowTops).size).to.equal(1)
+      expectHudSingleRow(hud)
     })
 
     // Even if CSS is deliberately forced to wrap the HUD, presentation-only

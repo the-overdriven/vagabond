@@ -213,7 +213,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261007-2">
+  <link rel="stylesheet" href="css/style.css?v=20261008-1">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -1492,7 +1492,6 @@ more difficult:
     if (!openTile) return false
     map[y][x] = openTile
     minimapDirty = true
-    invalidateUndergroundFov()
     return true
   }
 
@@ -1546,16 +1545,13 @@ more difficult:
     }
     player.inventory.splice(keyIndex, 1)
     minimapDirty = true
-    invalidateUndergroundFov()
     return {info, key, leaves}
   }
 
-  function playerBreachAtk() {
-    // Breaching requires an equipped weapon, but its chance uses the same final
-    // ATK shown in the HUD/combat rules rather than the weapon's raw ATK alone.
+  function equippedWeaponBreachAtk() {
     const weapon = player.equip.weapon
     if (!weapon || weapon.kind !== 'weapon') return 0
-    return Math.max(0, playerAtk())
+    return Math.max(0, (weapon.atk || 0) + (weapon.mod === 'atk' ? (weapon.modAmt || 0) : 0))
   }
 
   function alarmNearestEnemyFromBreach() {
@@ -1583,12 +1579,11 @@ more difficult:
     const weapon = player.equip.weapon
     if (!info || !info.breachable) return {attempted: false, success: false, reason: 'unbreachable'}
     if (!weapon || weapon.kind !== 'weapon') return {attempted: false, success: false, reason: 'weapon'}
-    const breachAtk = playerBreachAtk()
+    const breachAtk = equippedWeaponBreachAtk()
     const success = chance(Math.min(1, breachAtk / 100))
     if (success) {
       map[y][x] = info.breachedTile
       minimapDirty = true
-      invalidateUndergroundFov()
     }
     const alarmedEnemy = alarmNearestEnemyFromBreach()
     return {attempted: true, success, breachAtk, weapon, alarmedEnemy}
@@ -2430,7 +2425,6 @@ more difficult:
   }
 
   const DEFAULT_SUMMON_MSG = 'The <name> waves a hand and mutters incomprehensible words. Moments later, <amount> <species> appear!'
-  const SUMMON_ANIM_MS = 1000
 
   function tryEnemySummon(enemy) {
     if (!enemyHasAbility(enemy, 'summon') || enemy.summonUsed || !chance(0.10)) return false
@@ -2463,7 +2457,7 @@ more difficult:
       addEnemy(summoned)
       alarmEnemy(summoned)
       occupied.add(keyXY(spot.x, spot.y))
-      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df', 0, SUMMON_ANIM_MS)
+      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df')
     }
     enemy.summonUsed = true
     if (!enemy.aware) {
@@ -7409,9 +7403,8 @@ more difficult:
     runAnimationLoop()
   }
 
-  function spawnDamageNumber(x, y, amount, color, delay, duration) {
-    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0,
-      duration: duration || DAMAGE_ANIM_MS})
+  function spawnDamageNumber(x, y, amount, color, delay) {
+    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0})
     runAnimationLoop()
   }
 
@@ -7959,7 +7952,7 @@ more difficult:
       const p = damageAnims[i]
       const elapsed = now - p.start
       if (elapsed < p.delay) continue
-      const t = Math.min(1, (elapsed - p.delay) / (p.duration || DAMAGE_ANIM_MS))
+      const t = Math.min(1, (elapsed - p.delay) / DAMAGE_ANIM_MS)
       if (t >= 1) {
         damageAnims.splice(i, 1)
         continue
@@ -8410,10 +8403,6 @@ more difficult:
     tooltip.innerHTML = info.html
     tooltip.style.display = 'block'
     tooltip.dataset.autoCombat = 'true'
-    const stage = document.getElementById('stage')
-    const margin = 12
-    tooltip.style.left = Math.max(0, stage.clientWidth - tooltip.offsetWidth - margin) + 'px'
-    tooltip.style.top = Math.max(0, stage.clientHeight - tooltip.offsetHeight - margin) + 'px'
     return true
   }
 
@@ -9053,10 +9042,6 @@ more difficult:
   }
 
   let undergroundFovCache = null
-  function invalidateUndergroundFov() {
-    undergroundFovCache = null
-  }
-
   function currentUndergroundFov() {
     if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||

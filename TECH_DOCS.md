@@ -421,9 +421,10 @@ images, before character selection opens, and the cursor uses that preloaded URL
 
 On fine-pointer desktop layouts, attacking an enemy also keeps a temporary combat
 inspection target. While the keyboard-hint panel is collapsed, if that enemy is not
-already being inspected by hovering its glyph, the shared enemy tooltip is pinned to
-the bottom-right of the game stage and refreshes as the attack changes HP or combat
-status. Expanded keyboard hints suppress the pinned tooltip without discarding the
+already being inspected by hovering its glyph, the shared enemy tooltip is pinned
+exactly 12 px inside the visible bottom-right edge of the full-screen desktop game
+stage and refreshes as the attack changes HP or combat status. Expanded keyboard hints suppress the pinned
+tooltip without discarding the
 combat target; collapsing the hints can reveal it again until the player moves.
 Attacking another enemy replaces the target; killing the target clears it. A successful
 player movement clears the temporary inspection, matching the mobile combat-inspection
@@ -5058,10 +5059,14 @@ edge-reward rules are unchanged.
 
 ### Active player statuses
 
-Compact badges sit inside the bottom-left of the canvas in both tile and ASCII
-modes. Only active effects appear; the strip disappears when empty. Backgrounds
-are 70% opaque (90% when hovered, focused, or inspected); text and icons remain
-fully opaque. Badges wrap upward on narrow screens without resizing the canvas.
+Compact badges sit inside the bottom-left of the actual tile canvas in both tile
+and ASCII modes, rather than merely using the outer desktop stage bounds. Their
+layout follows the canvas's live displayed rectangle during viewport resizing, even
+before the camera-size calculation settles, so they never drift into the surrounding
+overlay area. Only active effects
+appear; the strip disappears when empty. Backgrounds are 70% opaque (90% when
+hovered, focused, or inspected); text and icons remain fully opaque. Badges wrap
+upward on narrow screens without resizing the canvas.
 Hover, keyboard focus, or tap reveals details above the row. Tap again, tap
 outside, or press Escape to dismiss. Inspecting a badge does not spend a turn.
 

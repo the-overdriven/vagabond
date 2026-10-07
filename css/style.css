@@ -286,10 +286,9 @@ canvas {
   color: white;
 }
 
-/* Wide layouts use the desktop overlay treatment whenever touch/coarse input
-   is not the primary mode. Headless browsers can report pointer:none even
-   though they otherwise exercise the desktop layout, so include that mode
-   explicitly while keeping coarse-pointer/mobile layouts excluded. */
+/* Wide non-touch layouts use the desktop overlay treatment. Headless
+   Chromium can report pointer:none, so include that desktop-like mode while
+   keeping coarse-pointer/mobile layouts excluded. */
 @media (min-width: 721px) and (pointer: fine),
        (min-width: 721px) and (pointer: none) {
   #root {
@@ -1120,6 +1119,17 @@ body.hint-collapsed #hint .panel-toggle {
   width: calc(170px * var(--ui-font-scale));
 }
 
+/* Automatic desktop combat inspection is pinned to the viewport because the
+   desktop game stage fills that viewport. Keeping this positioning in CSS
+   avoids border/containing-block rounding differences in headless browsers. */
+#tooltip[data-auto-combat="true"] {
+  position: fixed;
+  left: auto !important;
+  top: auto !important;
+  right: 12px;
+  bottom: 12px;
+}
+
 #tooltip .statrow {
   font-size: calc(11px * var(--ui-font-scale));
 }
@@ -1411,7 +1421,8 @@ body.hint-collapsed #hint .panel-toggle {
 
 /* Mouse-driven but compact windows may wrap the HUD rather than overflow it.
    Normal desktop widths keep the single-row HUD. */
-@media (pointer: fine) and (min-width: 721px) and (max-width: 1100px) {
+@media (pointer: fine) and (min-width: 721px) and (max-width: 1100px),
+       (pointer: none) and (min-width: 721px) and (max-width: 1100px) {
   #hud {
     width: 100%;
     flex-wrap: wrap;
@@ -1891,9 +1902,14 @@ body.hint-collapsed #hint .panel-toggle {
 /* Active effects float over the canvas; unused space still accepts map input. */
 #playerStatuses {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
+  /* The desktop stage can be larger than the tile canvas while a viewport
+     resize is settling. Anchor badges to the actual canvas bounds rather than
+     the outer stage so they never drift into the surrounding overlay area.
+     When the canvas fills/overfills the stage these expressions reduce to the
+     normal 8px inset, including on mobile where the canvas is CSS-scaled. */
+  left: max(8px, calc((100% - var(--game-width, 100%)) / 2 + 8px));
+  right: max(8px, calc((100% - var(--game-width, 100%)) / 2 + 8px));
+  bottom: max(8px, calc((100% - var(--game-height, 100%)) / 2 + 8px));
   z-index: 5;
   pointer-events: none;
 }

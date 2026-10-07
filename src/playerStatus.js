@@ -53,6 +53,42 @@ const playerStatusDetail = document.getElementById('playerStatusDetail')
 let inspectedPlayerStatus = null
 let pinnedPlayerStatus = null
 let playerStatusSignature = null
+let playerStatusLayoutFrame = 0
+
+function positionPlayerStatusesOverCanvas() {
+  const stage = playerStatusRoot.parentElement
+  const canvas = stage?.querySelector('canvas#game')
+  if (!stage || !canvas) return
+  const stageRect = stage.getBoundingClientRect()
+  const canvasRect = canvas.getBoundingClientRect()
+  if (!stageRect.width || !stageRect.height || !canvasRect.width || !canvasRect.height) return
+
+  // Absolute children of #stage are positioned from its padding box. Anchor the
+  // status strip to the live CSS canvas rectangle rather than cached buffer/CSS
+  // variables, so it stays over the map even between a browser resize and the
+  // next camera-size calculation. If the canvas overfills the clipped stage, the
+  // ordinary 8px visible-stage inset is already inside the rendered map.
+  const originLeft = stageRect.left + stage.clientLeft
+  const originTop = stageRect.top + stage.clientTop
+  const visibleRight = originLeft + stage.clientWidth
+  const visibleBottom = originTop + stage.clientHeight
+  const left = Math.max(8, canvasRect.left - originLeft + 8)
+  const right = Math.max(8, visibleRight - canvasRect.right + 8)
+  const bottom = Math.max(8, visibleBottom - canvasRect.bottom + 8)
+  playerStatusRoot.style.left = `${left}px`
+  playerStatusRoot.style.right = `${right}px`
+  playerStatusRoot.style.bottom = `${bottom}px`
+}
+
+function schedulePlayerStatusLayout() {
+  if (playerStatusLayoutFrame) return
+  playerStatusLayoutFrame = requestAnimationFrame(() => {
+    playerStatusLayoutFrame = 0
+    positionPlayerStatusesOverCanvas()
+  })
+}
+
+window.addEventListener('resize', schedulePlayerStatusLayout)
 
 function inspectPlayerStatus(id) {
   inspectedPlayerStatus = id
@@ -65,6 +101,7 @@ function inspectPlayerStatus(id) {
 }
 
 function updatePlayerStatuses() {
+  positionPlayerStatusesOverCanvas()
   const statuses = activePlayerStatuses()
   const signature = JSON.stringify(statuses)
   if (signature === playerStatusSignature) return

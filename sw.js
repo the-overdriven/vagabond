@@ -36,7 +36,7 @@ const PRECACHE_URLS = [
   './src/saveLoad.js',
   './src/version.js',
   './src/graveyard.js',
-  './css/style.css?v=20261007-2',
+  './css/style.css?v=20261008-1',
   './content/starting_weapons.json',
   './content/gear_weapons.json',
   './content/gear_shields.json',
