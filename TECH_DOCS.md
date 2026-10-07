@@ -1009,14 +1009,16 @@ spawn behind its own lock or form a circular dependency with another lock.
 A matching key opens both leaves in **1 turn** and is consumed. Without the key,
 the player may instead attempt to breach the struck leaf with any equipped
 weapon; bare fists cannot attempt a breach and do not consume a turn. A weapon
-attempt always costs **1 turn**, does not consume or damage the weapon, and
-succeeds with:
+attempt always costs **1 turn**, does not consume or damage the weapon, and uses
+the player's **final ATK** (the same ATK shown in the HUD, including the equipped
+weapon and other current ATK bonuses/penalties):
 
 ```text
-P(breach) = min(1, weapon ATK / 100)
+P(breach) = min(1, max(0, final ATK) / 100)
 ```
 
-For example, a 10 ATK weapon has a 10% success chance per attempt. Each actual
+For example, a character at 18 final ATK has an 18% success chance per attempt,
+regardless of how much of that ATK comes from the equipped weapon itself. Each actual
 weapon-breach attempt, successful or not, also has an independent **25% chance**
 to Alarm one enemy: the nearest eligible non-Alarmed monster on the current
 level, with no distance limit. Distance ties resolve deterministically. Already

@@ -161,14 +161,18 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       for (const p of pair) map[p.y][p.x] = 'dwarvendoorlocked'
       player.x = approach.x
       player.y = approach.y
-      player.equip.weapon = {kind:'weapon', name:'Test Pick', atk:100}
+      player.equip.weapon = {kind:'weapon', name:'Test Pick', atk:1}
+      player.baseAtk = 100
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors
       const oldAlarmChance = cfg.breachAlarmChance
       cfg.breachAlarmChance = 0
+      check(playerBreachAtk() === playerAtk() && playerBreachAtk() >= 100,
+        'breach chance uses final player ATK rather than the equipped weapon raw ATK')
       const breachTurn = turnCount
       await tryMove(approach.dx, approach.dy)
       check(turnCount === breachTurn + 1, 'weapon breach attempt consumes exactly one turn')
-      check(map[approach.leaf.y][approach.leaf.x] === 'dwarvendoorbreached', '100 ATK weapon guarantees that struck leaf breaches')
+      check(map[approach.leaf.y][approach.leaf.x] === 'dwarvendoorbreached',
+        '100+ final ATK guarantees the struck leaf breaches even with a 1 ATK weapon')
       const otherLeaf = pair.find(p => p.x !== approach.leaf.x || p.y !== approach.leaf.y)
       check(map[otherLeaf.y][otherLeaf.x] === 'dwarvendoorlocked', 'breaching one physical leaf does not destroy the other')
 
