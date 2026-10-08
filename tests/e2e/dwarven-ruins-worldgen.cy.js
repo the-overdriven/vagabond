@@ -82,6 +82,31 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(surfaceReachable(spawnPoint, {x:dwarvenRuin.x, y:dwarvenRuin.y}),
           'surface Dwarven Fort gate is reachable from the Temple')
 
+        // Every stair landing on the Fort and deeper levels must be free on all
+        // eight surrounding tiles, not just on the entry tile itself.
+        for (let index=1;index<deepLevels.length;index++) {
+          const level=deepLevels[index],z=-index-2
+          const landings=['dwarvenstairsup','dwarvenstairsdown','dwarvenminessealed']
+            .flatMap(type=>positions(level.map,type))
+          for (const stair of landings) {
+            for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++) {
+              if(!dx&&!dy)continue
+              const x=stair.x+dx,y=stair.y+dy
+              check(level.map[y]?.[x]==='marble','stair has clear adjacent marble '+z+':'+x+','+y)
+              check(!groundItems.some(g=>(g.level??0)===z&&g.x===x&&g.y===y),
+                'stair landing has no initial ground object')
+            }
+          }
+        }
+        const finalStairLevel=ruins.at(-1)
+        const workStair=positions(finalStairLevel.map,'dwarvenminessealed')[0]
+        const workRoom=finalStairLevel.rooms.find(room=>workStair.x>=room.x&&workStair.x<room.x+room.w &&
+          workStair.y>=room.y&&workStair.y<room.y+room.h)
+        check(!!workRoom,'sealed stair belongs to a generated room')
+        for(let y=workRoom.y;y<workRoom.y+workRoom.h;y++)for(let x=workRoom.x;x<workRoom.x+workRoom.w;x++)
+          check(!['dwarvenbed','dwarvenbedbarricade','dwarvenshelf'].includes(finalStairLevel.map[y]?.[x]),
+            'sealed Deep Mines room has no beds or bookshelves')
+
         const fortDown = positions(deepLevels[1].map, 'dwarvenstairsdown')
         check(fortDown.length === 1, 'fort has one Dwarven Ruins descent')
         check(reachable(deepLevels[1].map, {x: dwarvenRuin.x, y: dwarvenRuin.y}, fortDown[0]),

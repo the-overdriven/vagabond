@@ -83,9 +83,15 @@ describe('Decorative caves and deep threat rarity', () => {
         check(fortWebs.length>0 && fortWebs.every(p=>p.kind==='web'), 'dwarven masonry receives webs')
         for(const p of fortWebs) {
           const floor=deepLevels[-p.level-2]
-          check(floor.map[p.y][p.x]==='marble','dwarven web on floor')
-          const wall=(dx,dy)=>floor.map[p.y+dy]?.[p.x+dx]==='dwarvenwall'
-          check((wall(0,-1)||wall(0,1))&&(wall(-1,0)||wall(1,0)),'dwarven wall corner')
+          check(floor.map[p.y][p.x]==='dwarvenwall','dwarven web mounted on wall')
+          const cornerAdjacent = [[0,-1],[0,1],[-1,0],[1,0]]
+            .some(([dx,dy]) => {
+              const x=p.x+dx,y=p.y+dy
+              if(floor.map[y]?.[x]!=='marble')return false
+              const wall=(wx,wy)=>floor.map[y+wy]?.[x+wx]==='dwarvenwall'
+              return (wall(0,-1)||wall(0,1))&&(wall(-1,0)||wall(1,0))
+            })
+          check(cornerAdjacent,'web mounted beside a real corner')
         }
         check(dwarvenRuin && deepLevels[1],'fort still generated')
       })()`))

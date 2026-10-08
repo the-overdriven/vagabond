@@ -5100,7 +5100,8 @@ more difficult:
         if (enemyAttackPlayer(e)) return
         continue
       }
-      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 && dist <= 2)) &&
+      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 &&
+          (dist <= 2 || enemyHasAbility(e, 'ethereal')))) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue

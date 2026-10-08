@@ -659,12 +659,12 @@
     },
     "dwarvenlever": {
       "image": "img/tiles/dwarven-lever.png",
-      "baseTileKey": "dwarvenwall",
+      "baseTileKey": "marble",
       "scale": 1
     },
     "dwarvenleverpulled": {
       "image": "img/tiles/dwarven-lever-pulled.png",
-      "baseTileKey": "dwarvenwall",
+      "baseTileKey": "marble",
       "scale": 1
     },
     "dwarvenbed": {

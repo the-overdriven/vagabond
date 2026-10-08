@@ -1060,7 +1060,8 @@ still closed, and begins unpowered. The deeper endpoint is selected with
 seeded RNG from the configured normalized depth range **50–100%** of the
 stratum, which means D2–D3 for a three-floor stratum and D3–D5 for a five-floor
 stratum. A wall-mounted control lever is generated beside the deeper platform.
-Bumping that lever costs **1 turn**, permanently powers both endpoints, changes
+Its inactive and pulled sprites visually use marble as their underlay, even
+though the underlying lever terrain remains blocking like a wall. Bumping that lever costs **1 turn**, permanently powers both endpoints, changes
 the lever itself to a persistent pulled/locked-down terrain state, and enables
 two-way inspect-to-travel between the two fixed platforms. The D1 side
 cannot activate the lift remotely. Lift travel itself follows the existing
@@ -1252,8 +1253,11 @@ use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
 crates, and prisons use bars. Vaults add their own patterns, including water in
 cisterns and rubble in collapsed halls. Fortified barracks and barricaded
 dormitories drag bed frames into chokepoints. Final-floor dormitories have a
-strong additional barricade chance. Furniture never replaces stairs, keys,
-doors or the protected room center/door approach used by traversal validation.
+strong additional barricade chance, except the final room containing the sealed
+Deep Mines work stair: that room never contains beds, bed barricades, or
+bookshelves, regardless of its other room/vault roles. Furniture never replaces
+stairs, keys, doors, or the protected room center/door approach used by traversal
+validation.
 
 Environmental damage now rises continuously with normalized floor progress: rubble
 pressure scales **0.9x → 1.3x**, decorative-remains pressure **0.8x → 1.5x**, breached-door pressure
@@ -1502,7 +1506,11 @@ z:-8 depending on the rolled floor count. Each floor is stored as another
 
 Adjacent floors use dedicated dwarven stair tiles. `dwarvenstairsdown` uses
 ASCII `>` and `dwarvenstairsup` uses `<`; tile-image mode uses dedicated dwarven
-stone stair art rather than cave-stair artwork. The sealed Deep Mines
+stone stair art rather than cave-stair artwork. Every Dwarven stair has a full
+3×3 marble landing: the eight surrounding cells must be free of walls, furniture,
+props, and initially placed occupants. The Fort descent and later Ruins exits
+are selected only at valid clear landings; decoration and loot placement protect
+them on both ends of each paired stair. The sealed Deep Mines
 continuation uses `X` in ASCII and its own collapsed-shaft image. Inspecting the
 sealed continuation describes the old excavation but does not change z-level.
 The world-map level selector derives arbitrary chain depths instead of assuming
@@ -1564,11 +1572,13 @@ Ordinary caves on z:-1 and z:-2 contain cobwebs, small stalagmite clusters and
 small mushrooms. These are cosmetic overlays: they do not block movement,
 vision or projectiles, alter terrain bonuses, slow actors, offer harvesting or
 loot, or participate in quests. Crypts and mausoleums are excluded. The Dwarven Fort and deeper
-Dwarven Ruins also receive webs only (35% of eligible masonry-wall corners),
-without extra stalagmites or mushrooms. The same deterministic hash applies. A clear floor tile at least three tiles from every entrance or stair
-is eligible, provided it initially contains no creature or ground item.
-Webs additionally require cave walls on two perpendicular sides and orient
-their sprites toward those walls.
+Dwarven Ruins also receive webs only (35% of eligible masonry corners),
+without extra stalagmites or mushrooms. Each eligible marble-floor corner
+anchors a web on **one of its two adjacent perpendicular masonry wall tiles**,
+chosen by a seeded coordinate hash. Webs never lie on the room floor, cover an
+existing ground item, or change wall collision or opacity. The ordinary cave
+props instead occupy clear floor tiles at least three tiles from entrances or
+stairs, with webs requiring cave walls on two perpendicular sides.
 
 Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
@@ -2001,7 +2011,10 @@ paths, including scripted dwarven-ruin Ghosts, receive it. Ethereal creatures
 can traverse any in-bounds terrain, including walls, mountains, water, and lava.
 Actor collision and map boundaries still apply. Chasing, wandering, evasion,
 and invisible-attack retreat use the same terrain permission. Walls retain
-their normal sight-blocking behavior.
+their normal sight-blocking behavior. A Ghost that has already detected the
+player continues phasing toward their last known direction while within aggro
+range even if a wall or bookshelf interrupts sight; ghosts do not acquire
+unseen targets through solid walls.
 
 Only an equipped weapon with a modifier prefix (`weapon.mod`) can damage an
 ethereal creature. Any weapon modifier qualifies, including non-damage modifiers;

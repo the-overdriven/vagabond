@@ -1707,7 +1707,7 @@ function deriveDwarvenTacticalSlots(cm, room, roleCounts = null) {
   }
 }
 
-function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}) {
+function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false) {
   if (!room || room.archetype === 'Entrance Hall') return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
   const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
@@ -1744,19 +1744,19 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
     return placed
   }
   const span = Math.max(1, Math.floor((room.w + room.h) / 8))
-  if (room.archetype === 'Barracks') place('dwarvenbed', Math.min(5, 2 + span), zonePool(['backline','sleeping'], edge))
+  if (!sealedWorkStairRoom && room.archetype === 'Barracks') place('dwarvenbed', Math.min(5, 2 + span), zonePool(['backline','sleeping'], edge))
   else if (room.archetype === 'Armory') place('dwarvencrate', Math.min(5, 2 + span), zonePool(['stores','treasure'], edge))
   else if (room.archetype === 'Dining Hall') place('dwarventable', Math.min(4, 1 + span), center)
-  else if (room.archetype === 'Library') place('dwarvenshelf', Math.min(6, 2 + span), zonePool(['archive','aisles'], edge))
+  else if (!sealedWorkStairRoom && room.archetype === 'Library') place('dwarvenshelf', Math.min(6, 2 + span), zonePool(['archive','aisles'], edge))
   else if (room.archetype === 'Forge') place('dwarvencrate', Math.min(3, 1 + span), zonePool(['backline'], edge))
   else if (room.archetype === 'Workshop') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['stores'], edge))
-  else if (room.archetype === 'Dormitory') place('dwarvenbed', Math.min(7, 3 + span), zonePool(['sleeping'], edge))
+  else if (!sealedWorkStairRoom && room.archetype === 'Dormitory') place('dwarvenbed', Math.min(7, 3 + span), zonePool(['sleeping'], edge))
   else if (room.archetype === 'Burial Chamber' || room.archetype === 'Temple') place('dwarvenstatue', Math.min(3, span), zonePool(['reliquary'], edge))
   else if (room.archetype === 'Storage') place('dwarvencrate', Math.min(6, 2 + span), zonePool(['stores','treasure'], edge))
 
   const vaultType = room.vaultType
   if (vaultType === 'collapsedHall') place('dwarvenrubble', Math.min(7, 3 + span), zonePool(['rubble'], center))
-  else if (vaultType === 'libraryArchive') place('dwarvenshelf', Math.min(4, 1 + span), zonePool(['archive'], edge))
+  else if (!sealedWorkStairRoom && vaultType === 'libraryArchive') place('dwarvenshelf', Math.min(4, 1 + span), zonePool(['archive'], edge))
   else if (vaultType === 'forgeKillzone') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['backline'], center))
   else if (vaultType === 'treasury' || vaultType === 'trappedArmory') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['treasure','stores'], edge))
   else if (vaultType === 'floodedCistern') place('water', Math.min(6, Math.max(2, span + 1)), zonePool(['cistern'], center))
@@ -1822,8 +1822,8 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
   }
 
   const barricadeChance = Math.min(1, dungeonProgressMultiplier(story.barricadeChanceRange, progress, 0) * finalBarricadeMultiplier)
-  if (vaultType === 'fortifiedBarracks' || vaultType === 'barricadedDormitory' ||
-      (room.archetype === 'Dormitory' && chance(barricadeChance))) {
+  if (!sealedWorkStairRoom && (vaultType === 'fortifiedBarracks' || vaultType === 'barricadedDormitory' ||
+      (room.archetype === 'Dormitory' && chance(barricadeChance)))) {
     const near = zonePool(['barricade','frontline','guard'], center)
     if (!place('dwarvenbedbarricade', 1, near)) place('dwarvenbedbarricade', 1, center)
     if (finalFloor && finalBarricadeMultiplier > 1.5) place('dwarvenbedbarricade', 1, edge.filter(p => !near.some(n => n.x === p.x && n.y === p.y)))
@@ -2146,6 +2146,23 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   return graph
 }
 
+// Every Dwarven staircase has a full, unobstructed 3x3 marble landing.
+// Use this during placement and again after room dressing to reject blocked layouts.
+function dwarvenStairLandingClear(cm, x, y) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (dx === 0 && dy === 0) continue
+    if (cm[y + dy]?.[x + dx] !== 'marble') return false
+  }
+  return true
+}
+
+function dwarvenStairLandingKeys(x, y) {
+  const keys = []
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+    keys.push(keyXY(x + dx, y + dy))
+  return keys
+}
+
 function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout
   const progress = floorCount <= 1 ? 1 : floorIndex / (floorCount - 1)
@@ -2304,7 +2321,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     for (let x = graphExitRoom.x + 1; x < graphExitRoom.x + graphExitRoom.w - 1; x++) {
       const distance = distances.get(keyXY(x, y))
       if (!Number.isFinite(distance) || distance < minimumWalkingDistance) continue
-      if (cm[y]?.[x] !== 'marble') continue
+      if (cm[y]?.[x] !== 'marble' || !dwarvenStairLandingClear(cm, x, y)) continue
       exitCandidates.push({x, y, distance})
     }
   }
@@ -2481,7 +2498,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       if (distance <= 0) continue
       const [x, y] = key.split(',').map(Number)
       if (cm[y]?.[x] !== 'marble') continue
-      if (x === exit.x && y === exit.y) continue
+      if ([entry, exit].some(stair => Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) <= 1)) continue
       if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
       candidates.push({x, y})
     }
@@ -2498,7 +2515,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (progressionKeyPlan) {
     const usedKeyTiles = new Set(ordinaryKeys.map(key => keyXY(key.x, key.y)))
     const validKeyTile = (x, y) => cm[y]?.[x] === 'marble' && !usedKeyTiles.has(keyXY(x, y)) &&
-      !(x === entry.x && y === entry.y) && !(x === exit.x && y === exit.y) &&
+      [entry, exit].every(stair => Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) > 1) &&
       !doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))
     if (progressionKeyPlan.mode === 'lockedSideRoom') {
       const sideLock = ordinaryLocks.find(lock => lock.progressionSideLock)
@@ -2533,14 +2550,15 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   }
 
   const reserved = new Set([
-    keyXY(entry.x, entry.y),
-    keyXY(exit.x, exit.y),
+    ...dwarvenStairLandingKeys(entry.x, entry.y),
+    ...dwarvenStairLandingKeys(exit.x, exit.y),
     ...(progressionKey && Number.isInteger(progressionKey.x) && Number.isInteger(progressionKey.y)
       ? [keyXY(progressionKey.x, progressionKey.y)] : []),
     ...ordinaryKeys.map(k => keyXY(k.x, k.y))
   ])
   for (const room of roomMetas) {
-    decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved, overlayUnderlays)
+    decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved, overlayUnderlays,
+      finalFloor && room.index === roomGraph.exitRoom)
     if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
   }
   if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
@@ -2559,6 +2577,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       [entry, exit].every(e => Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) >
         (WORLD_GEN_CONFIG.dungeons.dwarvenRuins.encounters?.entranceClearance ?? 0)))) return null
   }
+
+  // All eight surrounding tiles remain free after furniture and prison placement.
+  if (![entry, exit].every(stair => dwarvenStairLandingClear(cm, stair.x, stair.y))) return null
 
   // Dressing, rubble and locks may reshape optional spaces, but may never
   // invalidate a mandatory key or the eventual route to the exit.
@@ -2650,9 +2671,10 @@ function placeDwarvenRuinsFortDescent() {
   for (const [key, distance] of distances.entries()) {
     if (distance < cfg.minimumEntranceExitWalkingDistance) continue
     const [x, y] = key.split(',').map(Number)
-    if (fort.map[y]?.[x] !== 'marble') continue
-    if (enemies.some(e => e.alive && e.level === -3 && e.x === x && e.y === y)) continue
-    if (groundItems.some(g => (g.level ?? 0) === -3 && g.x === x && g.y === y)) continue
+    if (fort.map[y]?.[x] !== 'marble' || !dwarvenStairLandingClear(fort.map, x, y)) continue
+    if (dwarvenStairLandingKeys(x, y).some(key =>
+      enemies.some(e => e.alive && e.level === -3 && keyXY(e.x, e.y) === key) ||
+      groundItems.some(g => (g.level ?? 0) === -3 && keyXY(g.x, g.y) === key))) continue
     candidates.push({x, y, distance})
   }
   if (!candidates.length) return null
@@ -2689,6 +2711,10 @@ function placeDwarvenRuinsLift(levelCount) {
     const out = []
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
       if (level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y))) continue
+      // Leave the stair landings unobstructed, including when the lift is
+      // generated after the floor furniture and stair locations.
+      if ((level.caves?.[0]?.entrances || []).some(stair =>
+        Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) <= 1)) continue
       if (reachable && !reachable.has(keyXY(x, y))) continue
       const wallNeighbors = [[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
         .filter(p => level.map[p.y]?.[p.x] === 'dwarvenwall')
@@ -4449,9 +4475,11 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     const c = room.prisonCellRegion
     return !!c && p.x >= c.x1 && p.x <= c.x2 && p.y >= c.y1 && p.y <= c.y2
   }
+  const stairLandings = (level.caves?.[0]?.entrances || []).flatMap(e => dwarvenStairLandingKeys(e.x, e.y))
+  const stairLandingKeys = new Set(stairLandings)
   const roomSpots = (room, outsideCells = false) => dwarvenRoomInterior(room).filter(p =>
     level.map[p.y]?.[p.x] === 'marble' && !occupied.has(keyXY(p.x, p.y)) &&
-    !slotKeys.has(keyXY(p.x, p.y)) &&
+    !slotKeys.has(keyXY(p.x, p.y)) && !stairLandingKeys.has(keyXY(p.x, p.y)) &&
     Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1 &&
     (!outsideCells || !inPrisonCell(room, p)))
   const addProp = (room, kind, description, extra = null, outsideCells = false) => {
@@ -4556,6 +4584,8 @@ function spawnDwarvenRuinsChests() {
   for (const {level, z} of dungeonPackageLevels(packageId)) {
     const floorIndex = Math.max(0, (level.dungeonFloor || 1) - 1)
     const entry = level.caves[0].entrances[0]
+    const stairLandings = new Set((level.caves?.[0]?.entrances || [])
+      .flatMap(stair => dwarvenStairLandingKeys(stair.x, stair.y)))
     const safeRoute = DungeonTraps.safeReachable(level.map, entry,
       new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
     const rooms = (level.rooms || level._encounterRooms || []).filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
@@ -4564,6 +4594,7 @@ function spawnDwarvenRuinsChests() {
       const spots = []
       for (let y = room.y + 1; y < room.y + room.h - 1; y++) for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
         if (level.map[y]?.[x] !== 'marble' || !safeRoute.has(keyXY(x, y)) ||
+            stairLandings.has(keyXY(x, y)) ||
             Math.max(Math.abs(x - entry.x), Math.abs(y - entry.y)) <= cfg.entranceClearance ||
             !DungeonTraps.safeSpawn(x, y, z) ||
             enemies.some(e => e.alive && e.level === z && e.x === x && e.y === y) ||
@@ -5383,13 +5414,19 @@ function spawnCaveDecorations() {
       .filter(entity => entity.level === level).map(entity => keyXY(entity.x,entity.y)))
     const entrances = (layer.caves || []).flatMap(c => c.entrances || [])
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
-      if (layer.map[y][x] !== 'marble' || occupiedProps.has(keyXY(x,y))) continue
+      if (layer.map[y][x] !== 'marble') continue
       if (entrances.some(e => Math.max(Math.abs(e.x-x), Math.abs(e.y-y)) <= cfg.entranceClearance)) continue
       const wall = (dx,dy) => layer.map[y+dy]?.[x+dx] === 'dwarvenwall'
-      if (!((wall(0,-1) || wall(0,1)) && (wall(-1,0) || wall(1,0)))) continue
-      if (roll(x,y,level) >= 0.35) continue
-      caveDecorations.push({x,y,kind:'web',level,levelKind:'chain',caveIndex:-1,
-        rotation: wall(0,-1) ? (wall(-1,0) ? 0 : 1) : (wall(1,0) ? 2 : 3)})
+      const vertical = wall(0,-1) ? {x,y:y-1,rotation:0} : wall(0,1) ? {x,y:y+1,rotation:2} : null
+      const horizontal = wall(-1,0) ? {x:x-1,y,rotation:3} : wall(1,0) ? {x:x+1,y,rotation:1} : null
+      if (!vertical || !horizontal || roll(x,y,level) >= 0.35) continue
+      const selected = roll(x+13,y+37,level) < 0.5 ? vertical : horizontal
+      const key = `${level}:${keyXY(selected.x,selected.y)}`
+      if (used.has(key) || occupiedProps.has(keyXY(selected.x,selected.y))) continue
+      // Wall-mounted decorations must not replace or obstruct their masonry.
+      if (layer.map[selected.y]?.[selected.x] !== 'dwarvenwall') continue
+      caveDecorations.push({...selected,kind:'web',level,levelKind:'chain',caveIndex:-1})
+      used.add(key)
     }
   }
 }

@@ -66,6 +66,35 @@ describe('Ethereal Ghosts and Oculus true sight', () => {
     })()`))
   })
 
+  it('keeps an alerted Ghost phasing through furniture after sight is interrupted', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      currentZ=-1;currentCave=0;map=blankCaveMap()
+      for(let y=35;y<=45;y++)for(let x=35;x<=45;x++)map[y][x]='marble'
+      player.x=40;player.y=40
+      const ghost=makeSenseEnemy('Ghost',43,40)
+      for(const tile of ['dwarvenbed','dwarvencrate','dwarvenshelf']){
+        map[40][42]=tile
+        ghost.x=43;ghost.y=40;ghost.aware=true
+        occupied=new Set([keyXY(43,40)])
+        check(enemyHasAbility(ghost,'ethereal'),'Ghost keeps ethereal ability')
+        if(tile==='dwarvenshelf') check(!enemyHasSight(ghost),'bookshelf blocks normal sight')
+        // Once alert, a Ghost may move inside a physical obstacle, even
+        // when that furniture interrupts its direct view of the player.
+        check(enemyCanTraverse(ghost,42,40),'phases through '+tile)
+        enemyStepTowardPlayer(ghost)
+        check(ghost.x===42&&ghost.y===40,'Ghost moves inside '+tile)
+      }
+      // The same behavior must occur in the actual AI turn, even though
+      // the bookshelf now hides the already-alert Ghost's line of sight.
+      ghost.x=43;ghost.y=40;ghost.aware=true;occupied=new Set([keyXY(43,40)])
+      map[40][42]='dwarvenshelf'
+      const originalChance=chance
+      try { chance=()=>false; enemyTurn() } finally { chance=originalChance }
+      check(ghost.x===42&&ghost.y===40,'aware Ghost chases through an opaque shelf')
+    })()`))
+  })
+
   it('suppresses spotting messages behind an underground FOV blocker', () => {
     cy.window().then(win => win.eval(`(() => {
       currentZ=-1; currentCave=0

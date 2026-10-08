@@ -33,6 +33,9 @@ describe('Dwarven Ruins rendering paths', () => {
           check(RENDER_STYLE.terrainTiles[key]?.image || ['dwarvendoorlocked','dwarvenspikes','dwarvenpressureplate','dwarvenarrowwall','dwarvenlever','dwarvenliftoff','dwarvenlifton'].includes(key),
             key + ' has tile rendering support or intentional base rendering')
         }
+        check(RENDER_STYLE.terrainTiles.dwarvenlever.baseTileKey === 'marble' &&
+          RENDER_STYLE.terrainTiles.dwarvenleverpulled.baseTileKey === 'marble',
+          'both lever states render over marble while blocking terrain is unchanged')
         USE_TILE_IMAGES = true
         render()
         check(document.getElementById('game').width > 0 && document.getElementById('game').height > 0, 'tile canvas renders')
