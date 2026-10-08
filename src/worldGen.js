@@ -1444,16 +1444,18 @@ function dungeonWalkDistances(cm, start, blocked = null) {
 // Generation-time reachability may look through doors that have a valid future
 // interaction (open/unlock/breach). This is deliberately separate from normal
 // pathfinding so it cannot make a locked gate traversable during play.
-function dungeonWalkDistancesWithDoorTraversal(cm, start) {
+function dungeonWalkDistancesWithDoorTraversal(cm, start, blocked = null, allowDiagonals = false) {
   const traversableDoor = new Set(['dwarvendoorclosed','dwarvendoorlocked','dwarvenprisondoorclosed','dwarvenprisondoorlocked','dwarvengatelocked'])
-  const DIRS4 = [[0,-1],[0,1],[-1,0],[1,0]]
+  const dirs = allowDiagonals
+    ? [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]]
+    : [[0,-1],[0,1],[-1,0],[1,0]]
   const distances = new Map([[keyXY(start.x, start.y), 0]])
   const queue = [{x:start.x, y:start.y}]
   for (let qi = 0; qi < queue.length; qi++) {
     const p = queue[qi], nextDistance = distances.get(keyXY(p.x, p.y)) + 1
-    for (const [dx, dy] of DIRS4) {
+    for (const [dx, dy] of dirs) {
       const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
-      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || distances.has(key)) continue
+      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || distances.has(key) || blocked?.has(key)) continue
       const tile = cm[y]?.[x]
       if (!TILE[tile]?.walk && !traversableDoor.has(tile)) continue
       distances.set(key, nextDistance)
@@ -1485,6 +1487,15 @@ function dwarvenRoomInterior(room) {
     for (let x = room.x + 1; x < room.x + room.w - 1; x++) out.push({x, y})
   }
   return out
+}
+
+function dwarvenPrisonCellPoints(room) {
+  const region = room?.prisonCellRegion
+  if (!region) return []
+  const points = []
+  for (let y = region.y1; y <= region.y2; y++) for (let x = region.x1; x <= region.x2; x++)
+    points.push({x, y})
+  return points
 }
 
 function dungeonClearProjectileLine(cm, from, to) {
@@ -1638,23 +1649,40 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
       const [x,y] = key.split(',').map(Number)
       return Math.max(Math.abs(p.x-x),Math.abs(p.y-y)) <= 1
     })
-    let line = []
+    let line = [], cellRegion = null
     for (const divider of dividerCoords) {
-      const candidateLine = allInterior.filter(p =>
-        cm[p.y]?.[p.x] === 'marble' && !reserved.has(keyXY(p.x,p.y)) && !doorwayNear(p) &&
-        (horizontalApproach ? p.x === divider : p.y === divider))
+      const candidateLine = allInterior.filter(p => horizontalApproach ? p.x === divider : p.y === divider)
         .sort((a,b) => Math.abs((horizontalApproach ? a.y : a.x) - (horizontalApproach ? room.cy : room.cx)) -
           Math.abs((horizontalApproach ? b.y : b.x) - (horizontalApproach ? room.cy : room.cx)))
-      if (candidateLine.length > line.length) line = candidateLine
-      if (line.length >= 3) break
+      const expectedLength = horizontalApproach ? room.h - 2 : room.w - 2
+      // A partial partition is worse than no cell: actors can walk around a
+      // missing end bar (including diagonally) and bypass its locked door.
+      if (candidateLine.length !== expectedLength || candidateLine.some(p =>
+        cm[p.y]?.[p.x] !== 'marble' || reserved.has(keyXY(p.x,p.y)) || doorwayNear(p))) continue
+      const far = horizontalApproach
+        ? {x1: towardCell > 0 ? divider + 1 : room.x + 1,
+          x2: towardCell > 0 ? room.x + room.w - 2 : divider - 1,
+          y1: room.y + 1, y2: room.y + room.h - 2}
+        : {x1: room.x + 1, x2: room.x + room.w - 2,
+          y1: towardCell > 0 ? divider + 1 : room.y + 1,
+          y2: towardCell > 0 ? room.y + room.h - 2 : divider - 1}
+      const depth = horizontalApproach ? far.x2 - far.x1 + 1 : far.y2 - far.y1 + 1
+      if (depth < 2) continue
+      const viable = allInterior.filter(p => p.x >= far.x1 && p.x <= far.x2 &&
+        p.y >= far.y1 && p.y <= far.y2 && cm[p.y]?.[p.x] === 'marble' && !reserved.has(keyXY(p.x,p.y)))
+      if (viable.length < 3) continue
+      line = candidateLine
+      cellRegion = far
+      break
     }
-    if (line.length < 3) {
+    if (line.length < 3 || !cellRegion) {
       room.prisonCellGenerationFailed = true
     } else {
       const door = line[0]
       for (const p of line) if (!(p.x === door.x && p.y === door.y) && cm[p.y]?.[p.x] === 'marble') cm[p.y][p.x] = 'dwarvenprisonbars'
       room.prisonCellDoorCandidate = {x:door.x,y:door.y}
       room.prisonCellAxis = horizontalApproach ? 'vertical' : 'horizontal'
+      room.prisonCellRegion = cellRegion
     }
   }
 
@@ -1713,6 +1741,16 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     room.internalLocks = [{keyId,leaves:[{x:door.x,y:door.y}],kind:'prisonCell'}]
     const vault = vaults.find(v => v.roomId === room.id)
     if (vault) vault.internalLocks = structuredClone(room.internalLocks)
+  }
+  // Other doors might open later. Even then, every locked cell must have
+  // exactly one entry: its own leaf. Test eight-way movement, including the
+  // diagonal corner cases that four-way worldgen reachability misses.
+  for (const room of roomMetas) {
+    if (room.archetype !== 'Prison' || !room.prisonCellRegion) continue
+    const cellDoor = room.prisonCellDoorCandidate
+    const withoutCellDoor = dungeonWalkDistancesWithDoorTraversal(cm, entry,
+      new Set([keyXY(cellDoor.x, cellDoor.y)]), true)
+    if (dwarvenPrisonCellPoints(room).some(p => withoutCellDoor.has(keyXY(p.x, p.y)))) return false
   }
   return true
 }
@@ -4206,6 +4244,30 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       }
     }
 
+    // Some cells still have an armed prisoner. Use a real ranged-capable
+    // species and the ordinary ammo/wandering rules, not a stationary turret.
+    const cellShooterChance = 0.65
+    const cellShooterPool = eligible.filter(isShooterTemplate)
+    for (const room of nonEntranceRooms.filter(room => room.archetype === 'Prison')) {
+      const cell = room.prisonCellRegion
+      if (!cell || !cellShooterPool.length) continue
+      const inCell = p => p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2
+      if (enemies.some(e => e.alive && e.level === z && inCell(e) && enemyIsShooter(e))) continue
+      if (!chance(cellShooterChance)) continue
+      const candidates = safeTiles.filter(p => inCell(p) && validSpot(p, true))
+      if (!candidates.length) continue
+      // Prefer a clear lane toward the bars, with the shooter in front of any
+      // stored loot/remains rather than stuck firing through those objects.
+      const door = room.prisonCellDoorCandidate
+      candidates.sort((a,b) =>
+        Number(dungeonClearProjectileLine(level.map, b, door)) - Number(dungeonClearProjectileLine(level.map, a, door)) ||
+        (Math.abs(a.x-door.x)+Math.abs(a.y-door.y)) - (Math.abs(b.x-door.x)+Math.abs(b.y-door.y)))
+      const tmpl = pickWeighted(cellShooterPool, t => Math.max(0.0001, t.rarity ?? 1))
+      const spot = claimSpot(candidates[0])
+      if (spawnTemplate(tmpl, spot, null, 'backline', null, room.id,
+        vaults.find(vault => vault.roomId === room.id)?.id || null)) spent += Math.max(1, tmpl.tier)
+    }
+
     // Ambient roamers remain the broad-pool exception for family selection,
     // but all encounter roles now share normal species wandering behavior.
     let guard = 0
@@ -4248,17 +4310,48 @@ function spawnDwarvenRuinsRoomProps(level, z) {
       }
     }
   }
-  const roomSpots = room => dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'marble' &&
-    !occupied.has(keyXY(p.x, p.y)) && !slotKeys.has(keyXY(p.x, p.y)) &&
-    Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1)
-  const addProp = (room, kind, description, extra = null) => {
-    const spots = roomSpots(room)
+  const inPrisonCell = (room, p) => {
+    const c = room.prisonCellRegion
+    return !!c && p.x >= c.x1 && p.x <= c.x2 && p.y >= c.y1 && p.y <= c.y2
+  }
+  const roomSpots = (room, outsideCells = false) => dwarvenRoomInterior(room).filter(p =>
+    level.map[p.y]?.[p.x] === 'marble' && !occupied.has(keyXY(p.x, p.y)) &&
+    !slotKeys.has(keyXY(p.x, p.y)) &&
+    Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1 &&
+    (!outsideCells || !inPrisonCell(room, p)))
+  const addProp = (room, kind, description, extra = null, outsideCells = false) => {
+    const spots = roomSpots(room, outsideCells)
     if (!spots.length) return false
     const spot = pick(spots)
     groundItems.push({x:spot.x,y:spot.y,kind,looted:false,level:z,levelKind:'chain',caveIndex:-1,
       ...(description ? {description} : {}), ...(extra || {})})
     occupied.add(keyXY(spot.x, spot.y))
     return true
+  }
+  // Each prison cell gets its own occupant or cache. This is *additional* to
+  // the floor's original scattered decorative and searchable remains rolls.
+  // A body in a cell does not reduce the number of bodies elsewhere.
+  for (const room of rooms.filter(room => room.archetype === 'Prison')) {
+    const cell = room.prisonCellRegion
+    if (!cell) continue
+    const inside = p => p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2
+    // Keep firing lanes clear if possible, but never leave a cell empty just
+    // because every good corpse location also overlaps a tactical slot.
+    let spots = roomSpots(room).filter(inside)
+    if (!spots.length) spots = dwarvenPrisonCellPoints(room).filter(p =>
+      level.map[p.y]?.[p.x] === 'marble' && !occupied.has(keyXY(p.x, p.y)))
+    if (!spots.length) continue
+    const spot = pick(spots)
+    if (chance(0.75)) {
+      groundItems.push({x:spot.x,y:spot.y,level:z,levelKind:'chain',caveIndex:-1,
+        kind:'skeleton',looted:false,hasLoot:chance(0.10),
+        description:'A dead prisoner lies behind the old dwarven bars.'})
+    } else {
+      groundItems.push({x:spot.x,y:spot.y,level:z,levelKind:'chain',caveIndex:-1,
+        kind:'chest',opened:false,tier:dungeonLootTier('dwarvenRuins', Math.max(0, (level.dungeonFloor || 1)-1), room),
+        dungeonRoomId:room.id})
+    }
+    occupied.add(keyXY(spot.x, spot.y))
   }
   for (const room of rooms) {
     if (room.archetype === 'Forge') addProp(room, 'anvil', 'A dwarven anvil abandoned in the middle of unfinished work.')
@@ -4276,12 +4369,12 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     : remainsProgress
   const remainsTarget = Math.max(1, Math.round(remainsBase * remainsMultiplier))
   for (let n = 0; n < remainsTarget; n++) {
-    const candidates = rooms.filter(room => roomSpots(room).length)
+    const candidates = rooms.filter(room => roomSpots(room, true).length)
     if (!candidates.length) break
     const room = pick(candidates)
     addProp(room, 'dwarvenremains', level.progress >= 1
       ? 'Dwarven remains are piled around a failed defensive position.'
-      : 'Dwarven remains lie amid the abandoned settlement.')
+      : 'Dwarven remains lie amid the abandoned settlement.', null, true)
   }
 
   const skeletonRange = story.searchableSkeletonsPerFloorRange || [3, 5]
@@ -4292,13 +4385,13 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     : skeletonProgress
   const skeletonTarget = Math.max(1, Math.round(skeletonBase * skeletonMultiplier))
   for (let n = 0; n < skeletonTarget; n++) {
-    const candidates = rooms.filter(room => roomSpots(room).length)
+    const candidates = rooms.filter(room => roomSpots(room, true).length)
     if (!candidates.length) break
     const room = pick(candidates)
     addProp(room, 'skeleton', level.progress >= 1
       ? 'The bones are piled around a failed defensive position.'
       : 'A dead dwarf lies where the settlement fell.',
-      {hasLoot: chance(0.10)})
+      {hasLoot: chance(0.10)}, true)
   }
 }
 
@@ -4571,6 +4664,16 @@ function validateDwarvenRuinsStratum() {
       const hasCellDoor = (room.internalLocks || []).some(lock => lock.kind === 'prisonCell') ||
         (room.internalDoors || []).some(door => door.kind === 'prisonCell')
       if (!hasBars || !hasCellDoor) issues.push(`${tag}: Prison room ${room.id} lacks a functional barred side cell`)
+      const cell = room.prisonCellRegion, door = room.prisonCellDoorCandidate
+      if (!cell || !door) { issues.push(`${tag}: Prison room ${room.id} is missing cell geometry`); continue }
+      const cells = dwarvenPrisonCellPoints(room)
+      const content = [...(floorGround || []), ...(context.floorEnemies || [])].some(p =>
+        p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2)
+      if (!content) issues.push(`${tag}: Prison room ${room.id} has an empty cell`)
+      const reachableAroundCellDoor = dungeonWalkDistancesWithDoorTraversal(level.map, entry,
+        new Set([keyXY(door.x, door.y)]), true)
+      if (cells.some(p => reachableAroundCellDoor.has(keyXY(p.x, p.y))))
+        issues.push(`${tag}: Prison room ${room.id} can be entered without using its barred door`)
     }
 
     artifactCount += (floorGround || []).filter(item => item.dwarvenRuinsArtifact && item.artifactGuaranteed).length

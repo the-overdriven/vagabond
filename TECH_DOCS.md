@@ -1201,6 +1201,20 @@ rather than decorative bars only. Barred partitions use dedicated prison-door
 terrain and artwork, independent of regular entrances and mandatory gates. Ordinary
 **Prison** archetype rooms use the same
 cell subdivision and always place a reachable key for their locked side cell.
+The bar divider must span the entire room interior, without gaps at its ends;
+generation rejects any alternate route into the cell, including diagonal moves
+and routes that could open other doors. Closed bars and prison doors block
+movement but do **not** block sight or projectiles.
+
+Each prison cell contains an additional seeded object: a **75% chance** of a
+searchable prisoner's skeleton (with the usual independent **10%** loot chance)
+or otherwise a chest, on an unoccupied cell floor tile. This guarantees a
+visible reason to investigate every cell. Separately, a cell has a **65% chance**
+to receive a real ranged-capable enemy, provided an eligible species and safe
+spawn tile exist; one already present counts toward this purpose. Prison
+shooters retain normal ammo, wandering and combat rules and can fire through
+their bars. These cell objects are **in addition to** normal room loot and
+floor-wide remains, not replacements for them.
 
 Vault entrance limits are measured from the actual room graph, including loop
 connections, so a one-entrance archive/tomb cannot silently gain a second route.
@@ -1244,7 +1258,9 @@ Ruins floor keeps the original seeded **2–4 decorative `dwarvenremains`** roll
 by depth. In addition, it rolls **3–5 searchable skeletal remains** as real `skeleton`
 ground objects using the normal one-time search rules and an independent **10% loot
 chance**. The two populations use separate placement rolls and cannot occupy the same
-tile.
+tile. These ambient remains are distributed outside prison-cell interiors;
+cell-specific skeletons are generated independently so the scattered remains
+population is not reduced by adding prison occupants.
 
 On the final floor, both populations become denser to sell the failed-last-stand
 scene. Decorative remains use at least a **2.5x** multiplier, yielding **5–10** ambient
@@ -1293,6 +1309,7 @@ floor generation rather than relying on a later whole-world rejection. It verifi
 floor count, room-graph and physical entrance/exit separation, room/vault
 connectivity, trap-safe mandatory traversal, solvable key dependencies, the
 Champion guarantee, valid enemy terrain/clearance, ground-object conflicts,
+nonempty sealed prison cells with no eight-direction bypass routes,
 exactly one final-floor artifact, the lift endpoints and the sealed Deep Mines
 continuation. Structural floor failures are retried by the floor generator; a
 late population failure discards the world attempt and regenerates it, up to
