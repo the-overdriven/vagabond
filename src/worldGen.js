@@ -4002,7 +4002,9 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       return claimSpot(pick(candidates))
     }
 
-    const spawnTemplate = (tmpl, spot, prefix = null, roamer = false, role = 'any', familyId = null, roomId = null, vaultId = null) => {
+    // Do not override wandering for tactical roles: addEnemy applies each
+    // species mode and home radius, including underground far -> roam.
+    const spawnTemplate = (tmpl, spot, prefix = null, role = 'any', familyId = null, roomId = null, vaultId = null) => {
       if (!tmpl || !spot) return false
       const enemy = {
         name: tmpl.name,
@@ -4031,8 +4033,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         dungeonRole: role,
         encounterFamily: familyId,
         dungeonRoomId: roomId,
-        dungeonVaultId: vaultId,
-        ...(roamer ? {} : {wander: false})
+        dungeonVaultId: vaultId
       }
       if (role === 'backline') {
         const ability = shooterAbility(tmpl)
@@ -4102,7 +4103,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
           if (spent + cost > organizedBudget && !(role === 'backline' && n === 0)) break
           const spot = takeRoleSpot(room, role, role === 'backline' && n === 0)
           if (!spot) break
-          if (spawnTemplate(tmpl, spot, null, false, role, family.id, room.id, vault.id)) spent += cost
+          if (spawnTemplate(tmpl, spot, null, role, family.id, room.id, vault.id)) spent += cost
         }
       }
     }
@@ -4121,7 +4122,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         takeRoleSpot(championRoom, 'frontline') || takeRoleSpot(championRoom, 'any') ||
         takeSpot(championRoom, true, true) || takeSpot(null, true)
       if (!championSpot) continue
-      const championEnemy = spawnTemplate(tmpl, championSpot, 'Champion', false, 'champion', family.id,
+      const championEnemy = spawnTemplate(tmpl, championSpot, 'Champion', 'champion', family.id,
         championRoom?.id || null, vaultId)
       if (!championEnemy) continue
       if (championIndex === 0 && keyCarrierPlan) {
@@ -4131,7 +4132,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       spent += Math.max(1, tmpl.tier)
       const escortSpot = takeRoleSpot(championRoom, 'group') || takeRoleSpot(championRoom, 'frontline') ||
         takeSpot(championRoom, false, true) || takeSpot(null, false, true) || takeSpot()
-      if (escortSpot && spawnTemplate(tmpl, escortSpot, null, false, 'group', family.id,
+      if (escortSpot && spawnTemplate(tmpl, escortSpot, null, 'group', family.id,
         championRoom?.id || null, vaultId)) spent += Math.max(1, tmpl.tier)
     }
 
@@ -4144,7 +4145,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       const tmpl = chooseMember(family, room?.archetype === 'Barracks' ? 'group' : 'any')
       const spot = takeRoleSpot(room, 'group') || takeRoleSpot(room, 'any') || takeSpot(room, false, true)
       if (!tmpl || !spot) continue
-      if (spawnTemplate(tmpl, spot, null, false, 'group', family.id, room?.id || null, null)) spent += Math.max(1, tmpl.tier)
+      if (spawnTemplate(tmpl, spot, null, 'group', family.id, room?.id || null, null)) spent += Math.max(1, tmpl.tier)
     }
 
     // Procedural rooms use the same role geometry as authored vaults. Room
@@ -4168,12 +4169,12 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         if (!tmpl || spent + cost > organizedBudget) break
         const spot = takeRoleSpot(room, role) || takeSpot(room, false, true)
         if (!spot) break
-        if (spawnTemplate(tmpl, spot, null, false, role, family.id, room.id, null)) spent += cost
+        if (spawnTemplate(tmpl, spot, null, role, family.id, room.id, null)) spent += cost
       }
     }
 
-    // Ambient roamers remain the broad-pool exception and retain each template's
-    // normal wander behavior. They are never forced into tactical roles.
+    // Ambient roamers remain the broad-pool exception for family selection,
+    // but all encounter roles now share normal species wandering behavior.
     let guard = 0
     while (spent < threatBudget && guard++ < 100) {
       const affordable = roamerPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
@@ -4181,7 +4182,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
       const spot = takeSpot(null)
       if (!spot) break
-      if (spawnTemplate(tmpl, spot, null, true, 'roamer', null, null, null)) spent += Math.max(1, tmpl.tier)
+      if (spawnTemplate(tmpl, spot, null, 'roamer', null, null, null)) spent += Math.max(1, tmpl.tier)
     }
   }
 }

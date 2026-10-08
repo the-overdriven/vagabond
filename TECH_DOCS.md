@@ -1138,11 +1138,14 @@ A floor selects **2–4 dominant encounter families** (goblinoids, undead,
 marauders, or cave predators when their members are depth-eligible). Template
 rarity still weights members inside the family, while rarity 0.1 or lower is
 excluded from choosing a family as a dominant population. Organized rooms draw
-from one family at a time; a broader eligible pool supplies occasional roamers,
-which retain their species wandering behavior. The configured default is exactly
-**one Champion per floor**, usually leading an escort in a remote or tactical
-room. Other prefixes begin at **11%**, rise by **2.5 percentage points per
-floor**, and cap at **28%**; random prefix rolls exclude Champion.
+from one family at a time; a broader eligible pool supplies occasional roamers.
+**All** Ruins enemies use their species' normal idle wandering mode and home radius,
+including Champions, escorts, ranged backliners and other tactical room/vault guards.
+Roles determine initial positions and shooter selection, not stationary behavior;
+`far` still becomes `roam` underground and normal active-range/terrain limits apply.
+The configured default is exactly **one Champion per floor**, usually spawning
+with an escort in a remote or tactical room. Other prefixes begin at **11%**,
+rise by **2.5 percentage points per floor**, and cap at **28%**; random prefix rolls exclude Champion.
 
 Cave species may appear when their tier's depth permits it. Surface species
 must opt in using a `z-N` biome tag, meaning depth N or deeper. Current tier

@@ -62,6 +62,14 @@ describe('Dwarven Ruins encounter progression', () => {
           check(!mobs.some(e => e !== champions[0] && e.prefix === 'Champion'), 'ordinary prefix rolls never create a second Champion')
 
           for (const enemy of mobs) {
+            const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName]
+            check(!!tmpl, 'every Ruins encounter has a species template')
+            const templateMode = Object.prototype.hasOwnProperty.call(tmpl, 'wander')
+              ? tmpl.wander : defaultEnemyWanderMode()
+            check(enemyWanderMode(enemy) === enemyWanderForLevel(templateMode, z),
+              'every Ruins role, including Champions and shooters, inherits species wandering')
+            if (Number.isFinite(tmpl.homeRadius)) check(enemy.homeRadius === tmpl.homeRadius,
+              'Ruins encounters preserve the species home radius')
             check(DungeonTraps.safeSpawn(enemy.x, enemy.y, z), 'enemy spawn stays clear of trap danger')
             const minDepth = Number(cfg.minDepthByTier[String(enemy.tier)])
             check(Number.isFinite(minDepth) && Math.abs(z) >= minDepth, 'enemy satisfies tier depth gate')
@@ -87,6 +95,49 @@ describe('Dwarven Ruins encounter progression', () => {
 
       check(/^v\\d+$/.test(self.VAGABOND_GAME_VERSION), 'game version is exposed')
       check(Number.isInteger(self.VAGABOND_SAVE_VERSION), 'save schema is exposed')
+    })()`))
+  })
+
+  it('allows Champions, escorts and shooters to take their normal idle wander steps', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check = (ok, msg) => { if (!ok) throw new Error(msg) }
+      currentZ = -4
+      currentCave = -1
+      map = deepLevels[2].map
+      undergroundDiscovered = deepLevels[2].discovered
+      for (let y = 20; y <= 30; y++) for (let x = 20; x <= 30; x++) {
+        map[y][x] = 'marble'
+        undergroundDiscovered[y][x] = true
+      }
+      player.x = 20
+      player.y = 30
+      const originalChance = chance
+      chance = () => true
+      try {
+        for (const [role, name] of [
+          ['champion', 'Goblin'], ['group', 'Skeleton'],
+          ['backline', 'Kobold'], ['frontline', 'Ghoul'], ['roamer', 'Orc']
+        ]) {
+          const tmpl = ENEMY_TEMPLATE_BY_NAME[name]
+          enemies = []
+          occupied = new Set()
+          const actor = addEnemy({
+            name: tmpl.name, baseName: tmpl.name, level: -4, levelKind: 'chain', caveIndex: -1,
+            x: 25, y: 25, homeX: 25, homeY: 25, homeTileType: 'marble',
+            hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk, def: tmpl.def,
+            spd: tmpl.spd, grace: tmpl.grace, aggro: tmpl.aggro, tier: tmpl.tier,
+            abilities: [...tmpl.abilities], humanoid: !!tmpl.humanoid,
+            alive: true, prefix: role === 'champion' ? 'Champion' : null,
+            equipment: null, dungeonRole: role
+          })
+          check(enemyWanderMode(actor) === enemyWanderForLevel(tmpl.wander, -4),
+            role + ' inherits the template mode')
+          check(enemyWander(actor), role + ' takes an idle wander step')
+          check(actor.x !== 25 || actor.y !== 25, role + ' leaves its starting tile')
+        }
+      } finally {
+        chance = originalChance
+      }
     })()`))
   })
 
