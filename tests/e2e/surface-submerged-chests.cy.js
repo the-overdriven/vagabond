@@ -74,4 +74,45 @@ describe('Submerged surface treasure', () => {
       return true
     })()`))
   })
+
+  it('renders submerged chests with the same water clipping used for swimmers', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const previous = {map, groundItems, currentZ, camX, camY, playerX: player.x, playerY: player.y}
+      const check = (condition, message) => { if (!condition) throw Error(message) }
+      try {
+        map = Array.from({length:MAP_H}, () => Array(MAP_W).fill('grass'))
+        groundItems = [{x: 20, y: 20, kind: 'chest', tier: 2, opened: false}]
+        map[20][20] = 'water'
+        currentZ = 0
+        camX = 18
+        camY = 18
+        player.x = 5
+        player.y = 5
+        let clipped = 0
+        const chestPx = Math.round((20 - camX) * TILE_PX)
+        const chestPy = Math.round((20 - camY) * TILE_PX)
+        const originalDrawSwimmingCreature = drawSwimmingCreature
+        drawSwimmingCreature = (px, py, draw, visibleFraction) => {
+          if (px === chestPx && py === chestPy) clipped++
+          return originalDrawSwimmingCreature(px, py, draw, visibleFraction)
+        }
+        try {
+          renderScene(performance.now())
+        } finally {
+          drawSwimmingCreature = originalDrawSwimmingCreature
+        }
+        check(clipped > 0, 'submerged chest uses swimming-style clipping when rendered')
+      } finally {
+        map = previous.map
+        groundItems = previous.groundItems
+        currentZ = previous.currentZ
+        camX = previous.camX
+        camY = previous.camY
+        player.x = previous.playerX
+        player.y = previous.playerY
+      }
+      return true
+    })()`))
+  })
+
 })

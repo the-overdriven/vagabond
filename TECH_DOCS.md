@@ -3765,8 +3765,10 @@ can be placed in the sea (or vice versa). No ground item or occupied creature
 may share a submerged chest tile. Ordinary surface chest tier uses the same
 spawn-distance formula and tier config; contents, Magic Find, and gold bonuses
 use the existing chest system. Chests are collected by entering their water
-square and do not alter swimming or drowning mechanics. They are created at
-world generation and persist with the normal ground item save/replay state.
+square and do not alter swimming or drowning mechanics. On the main view they
+render half-submerged, using the same water clipping treatment as swimming
+creatures. They are created at world generation and persist with the normal
+ground item save/replay state.
 
 Chest loot can include:
 

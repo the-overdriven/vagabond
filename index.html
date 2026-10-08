@@ -7945,19 +7945,25 @@ more difficult:
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
-      if (g.kind === 'stolenloot') {
-        drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65)
-        continue
+      const drawGroundItem = () => {
+        if (g.kind === 'stolenloot') {
+          drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65)
+          return
+        }
+        if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
+          ctx.save()
+          ctx.filter = 'grayscale(0.7) brightness(0.8)'
+          const drawn = drawImageVisualWithShadow(vx, vy, visual)
+          ctx.restore()
+          if (drawn) return
+        } else if (drawImageVisualWithShadow(vx, vy, visual)) return
+        const glyph = groundGlyph(g)
+        if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
       }
-      if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
-        ctx.save()
-        ctx.filter = 'grayscale(0.7) brightness(0.8)'
-        const drawn = drawImageVisualWithShadow(vx, vy, visual)
-        ctx.restore()
-        if (drawn) continue
-      } else if (drawImageVisualWithShadow(vx, vy, visual)) continue
-      const glyph = groundGlyph(g)
-      if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
+      // Submerged treasure should visually sit in the water like swimmers do,
+      // instead of floating fully above the surface.
+      if (g.kind === 'chest') drawSwimmingCreature(vx, vy, drawGroundItem)
+      else drawGroundItem()
     }
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {
