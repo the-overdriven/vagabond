@@ -202,6 +202,28 @@ describe('Desktop overlay layout', () => {
     })
   })
 
+  it('moves the desktop log above a taller wrapped status strip without resizing the camera', () => {
+    cy.get('#game').then($canvas => {
+      const initialWidth = $canvas[0].width
+      const initialHeight = $canvas[0].height
+      cy.get('#playerStatuses').then($statuses => {
+        const statuses = $statuses[0]
+        statuses.hidden = false
+        statuses.querySelector('#playerStatusList').style.minHeight = '120px'
+      })
+      cy.get('#logpanel').should($log => {
+        const statuses = $log[0].ownerDocument.getElementById('playerStatuses')
+        const statusTop = statuses.getBoundingClientRect().top
+        const logBottom = $log[0].getBoundingClientRect().bottom
+        expect(statusTop - logBottom, 'log clears tall statuses').to.be.at.least(12)
+      })
+      cy.get('#game').should($canvasAfter => {
+        expect($canvasAfter[0].width).to.equal(initialWidth)
+        expect($canvasAfter[0].height).to.equal(initialHeight)
+      })
+    })
+  })
+
   it('keeps the underground depth badge inside the visible clipped canvas', () => {
     cy.window().then(win => {
       const checkDepthBadge = () => {

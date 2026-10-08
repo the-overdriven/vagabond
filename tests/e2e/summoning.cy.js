@@ -51,6 +51,8 @@ describe('Once-only monster summoning', () => {
           const summonFx=damageAnims.filter(anim=>anim.amount==='Summoned!')
           summonCheck(SUMMON_ANIM_MS===1000 && SUMMON_ANIM_MS>DAMAGE_ANIM_MS,'summon label lasts longer than ordinary combat text')
           summonCheck(summonFx.slice(-children.length).every(anim=>anim.duration===SUMMON_ANIM_MS),'each summoned creature gets the slower label duration')
+          spawnDamageNumber(player.x, player.y, 'Hit!', '#ffffff')
+          summonCheck(damageAnims[damageAnims.length-1].duration===DAMAGE_ANIM_MS,'ordinary damage labels keep their original duration')
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
             summonCheck(e.atk===Math.max(1,Math.round(t.atk*strength)) && e.def===Math.max(0,Math.round(t.def*strength)),'template ATK/DEF')

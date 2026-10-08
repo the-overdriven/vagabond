@@ -2458,7 +2458,7 @@ more difficult:
       addEnemy(summoned)
       alarmEnemy(summoned)
       occupied.add(keyXY(spot.x, spot.y))
-      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df')
+      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df', 0, SUMMON_ANIM_MS)
     }
     enemy.summonUsed = true
     if (!enemy.aware) {
@@ -6825,6 +6825,19 @@ more difficult:
     applyGameViewport(columns, mobileViewH)
   }
 
+  // Keep the message log above the status badges, including when many effects
+  // wrap onto multiple rows. Purely presentational: it never affects turns/RNG.
+  function updateDesktopLogAnchor(stageRect = document.getElementById('stage').getBoundingClientRect()) {
+    if (window.innerWidth <= 720 || window.matchMedia('(pointer:coarse)').matches) return
+    const statusEl = document.getElementById('playerStatuses')
+    const statusRect = statusEl && !statusEl.hidden ? statusEl.getBoundingClientRect() : null
+    const clearance = Math.max(80, statusRect && statusRect.height
+      ? Math.ceil(stageRect.bottom - statusRect.top + 12) : 0)
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
+    rootStyle.setProperty('--desktop-log-bottom', `${Math.round(window.innerHeight - stageRect.bottom + clearance)}px`)
+  }
+
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const stage = document.getElementById('stage')
@@ -6846,8 +6859,7 @@ more difficult:
     const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
     applyGameViewport(nextWidth, nextHeight, availableWidth, availableHeight)
 
-    document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
-    document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(40, Math.round(window.innerHeight - stageRect.bottom + 40))}px`)
+    updateDesktopLogAnchor(stageRect)
   }
 
   function setTileSize(size) {
@@ -7369,6 +7381,7 @@ more difficult:
   const FX_ANIM_MS = 420
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
+  const SUMMON_ANIM_MS = 1000
   function drawThiefBag(x, y, size) {
     ctx.save()
     ctx.translate(x, y)
@@ -7435,8 +7448,8 @@ more difficult:
     runAnimationLoop()
   }
 
-  function spawnDamageNumber(x, y, amount, color, delay) {
-    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0})
+  function spawnDamageNumber(x, y, amount, color, delay, duration = DAMAGE_ANIM_MS) {
+    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0, duration})
     runAnimationLoop()
   }
 
@@ -7984,7 +7997,7 @@ more difficult:
       const p = damageAnims[i]
       const elapsed = now - p.start
       if (elapsed < p.delay) continue
-      const t = Math.min(1, (elapsed - p.delay) / DAMAGE_ANIM_MS)
+      const t = Math.min(1, (elapsed - p.delay) / (p.duration || DAMAGE_ANIM_MS))
       if (t >= 1) {
         damageAnims.splice(i, 1)
         continue
@@ -10498,6 +10511,11 @@ more difficult:
     document.getElementById('btnHintCollapse').title = hintLabel
     if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
   })
+  // Badge visibility and line wrapping can change without a viewport resize.
+  if (window.ResizeObserver) {
+    const desktopStatusObserver = new ResizeObserver(() => updateDesktopLogAnchor())
+    desktopStatusObserver.observe(document.getElementById('playerStatuses'))
+  }
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()
   resizeDesktopViewport()

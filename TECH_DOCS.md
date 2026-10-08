@@ -1068,7 +1068,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v74**, save schema **39**; older saves are rejected.
+**v75**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -5155,8 +5155,10 @@ the canvas and side panels; near the right or top edge they flip/clamp back into
 the visible canvas instead of being clipped by the browser edge.
 
 On desktop the message log floats as a narrow, taller panel along the lower-left
-side of the canvas rather than consuming camera height. Its bottom edge is kept
-above the active-status strip so ordinary log use does not cover status badges.
+side of the canvas rather than consuming camera height. Its bottom edge keeps
+at least 80 px of clearance from the viewport bottom and automatically moves
+higher when multiple active-status badges wrap into a taller strip, so ordinary
+log use does not cover status badges.
 Its panel background is semi-transparent so terrain remains perceptible beneath
 it, while the log itself remains scrollable and continues to intercept
 pointer/wheel input normally. A top-right resize grip lets the player change both
