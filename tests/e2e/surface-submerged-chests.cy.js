@@ -120,4 +120,68 @@ describe('Submerged surface treasure', () => {
     })()`))
   })
 
+  it('gently bobs visible water chests without changing their tiles, RNG, or land chests', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const previous = {map, groundItems, currentZ, x: player.x, y: player.y, rngState, images: USE_TILE_IMAGES}
+      const originalBob = submergedChestBobOffset
+      const chestPath = RENDER_STYLE.groundItems.chest.image
+      const originalChestImage = preloadedImages.get(chestPath)
+      const check = (condition, message) => { if (!condition) throw Error(message) }
+      try {
+        map = Array.from({length:MAP_H}, () => Array(MAP_W).fill('grass'))
+        map[20][20] = 'water'
+        groundItems = [
+          {x: 20, y: 20, kind: 'chest', tier: 2, opened: false},
+          {x: 21, y: 20, kind: 'chest', tier: 2, opened: false}
+        ]
+        currentZ = 0
+        player.x = 20
+        player.y = 21
+        USE_TILE_IMAGES = true
+        if (!originalChestImage) {
+          const replacement = document.createElement('canvas')
+          replacement.width = 2; replacement.height = 2
+          replacement.getContext('2d').fillRect(0, 0, 2, 2)
+          preloadedImages.set(chestPath, replacement)
+        }
+        const initialRng = rngState
+        const initialPositions = JSON.stringify(groundItems)
+        const times = [0, 675, 1350, 2025, 2700]
+        const offsets = times.map(time => originalBob(20, 20, time))
+        check(JSON.stringify(offsets[0]) === JSON.stringify(offsets[4]), 'bob motion loops')
+        check(new Set(offsets.map(offset => offset.dx + ',' + offset.dy)).size > 1,
+          'sprite bobs over time even without gameplay turns')
+        check(offsets.every(offset => Math.abs(offset.dx) <= Math.max(1, Math.round(TILE_PX / 40)) &&
+          Math.abs(offset.dy) <= Math.max(1, Math.round(TILE_PX / 20))), 'bob remains inside its tile')
+        check(times.some(time => JSON.stringify(originalBob(20, 20, time)) !==
+          JSON.stringify(originalBob(23, 20, time))), 'chests have different animation phases')
+        const called = []
+        submergedChestBobOffset = (x, y, time) => {
+          called.push({x, y, time})
+          return originalBob(x, y, time)
+        }
+        renderScene(675)
+        renderScene(1350)
+        check(called.length === 2 && called.every(c => c.x === 20 && c.y === 20),
+          'only the submerged chest animates in tile mode')
+        USE_TILE_IMAGES = false
+        renderScene(2025)
+        check(called.length === 2, 'ASCII mode keeps chests stationary')
+        check(JSON.stringify(groundItems) === initialPositions, 'animation never moves the actual chests')
+        check(rngState === initialRng, 'animation never consumes game RNG')
+      } finally {
+        submergedChestBobOffset = originalBob
+        map = previous.map
+        groundItems = previous.groundItems
+        currentZ = previous.currentZ
+        player.x = previous.x
+        player.y = previous.y
+        rngState = previous.rngState
+        USE_TILE_IMAGES = previous.images
+        if (!originalChestImage) preloadedImages.delete(chestPath)
+      }
+      return true
+    })()`))
+  })
+
 })

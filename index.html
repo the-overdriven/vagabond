@@ -7387,6 +7387,17 @@ more difficult:
     ctx.restore()
   }
 
+  // Purely visual motion: chest locations, pickups, and RNG never change.
+  // Derive an individual phase from world coordinates rather than storing state.
+  function submergedChestBobOffset(x, y, now) {
+    const phase = (((x * 73 + y * 151) % 251) / 251) * Math.PI * 2
+    const angle = now * (Math.PI * 2 / 2700) + phase
+    return {
+      dx: Math.round(Math.sin(angle + 0.9) * TILE_PX / 40),
+      dy: Math.round(Math.sin(angle) * TILE_PX / 20)
+    }
+  }
+
   let camX = 0, camY = 0
   let animLoopFrame = null
   let cameraAnimating = false
@@ -7964,10 +7975,19 @@ more difficult:
         const glyph = groundGlyph(g)
         if (glyph) drawTile(vx, vy, glyph.ch, glyph.color, tileBackground(g.x, g.y, map[g.y][g.x]))
       }
-      // Submerged treasure should visually sit in the water like swimmers do,
-      // instead of floating fully above the surface.
-      if (g.kind === 'chest') drawSwimmingCreature(vx, vy, drawGroundItem)
-      else drawGroundItem()
+      // Keep the waterline anchored to the tile; move only the chest sprite
+      // inside the existing half-submerged clip. Land chests and ASCII stay still.
+      if (g.kind === 'chest') {
+        const bobbing = map[g.y]?.[g.x] === 'water' && !!resolveVisualImage(visual)
+        drawSwimmingCreature(vx, vy, () => {
+          if (!bobbing) { drawGroundItem(); return }
+          const {dx, dy} = submergedChestBobOffset(g.x, g.y, now)
+          ctx.save()
+          ctx.translate(dx, dy)
+          drawGroundItem()
+          ctx.restore()
+        })
+      } else drawGroundItem()
     }
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {

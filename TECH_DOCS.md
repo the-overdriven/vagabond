@@ -3784,8 +3784,12 @@ spawn-distance formula and tier config; contents, Magic Find, and gold bonuses
 use the existing chest system. Chests are collected by entering their water
 square and do not alter swimming or drowning mechanics. On the main view they
 render half-submerged, using the same water clipping treatment as swimming
-creatures. They are created at world generation and persist with the normal
-ground item save/replay state.
+creatures. In tile mode, each chest gently bobs in place (about 1 pixel sideways
+and 2 pixels vertically at 40-pixel tile size, on a 2.7-second cycle), with a
+position-dependent phase. The waterline stays fixed, land chests and ASCII
+sprites stay still, and movement is only visual: loot coordinates, RNG, pickup,
+save, and replay rules are unchanged. They are created at world generation and
+persist with the normal ground item save/replay state.
 
 Chest loot can include:
 
