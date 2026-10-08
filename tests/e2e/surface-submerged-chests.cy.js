@@ -84,16 +84,19 @@ describe('Submerged surface treasure', () => {
         groundItems = [{x: 20, y: 20, kind: 'chest', tier: 2, opened: false}]
         map[20][20] = 'water'
         currentZ = 0
-        camX = 18
-        camY = 18
-        player.x = 5
-        player.y = 5
-        let clipped = 0
-        const chestPx = Math.round((20 - camX) * TILE_PX)
-        const chestPy = Math.round((20 - camY) * TILE_PX)
+        // renderScene recalculates the camera from the player position.
+        // Keep the water chest nearby instead of relying on a manually set camera.
+        player.x = 21
+        player.y = 21
+        const chestDraws = []
         const originalDrawSwimmingCreature = drawSwimmingCreature
         drawSwimmingCreature = (px, py, draw, visibleFraction) => {
-          if (px === chestPx && py === chestPy) clipped++
+          // Match the same world-coordinate calculation used by the renderer.
+          const tx = Math.floor((px + TILE_PX / 2) / TILE_PX + camX)
+          const ty = Math.floor((py + TILE_PX / 2) / TILE_PX + camY)
+          if (tx === 20 && ty === 20) {
+            chestDraws.push({terrain: map[ty]?.[tx], fraction: visibleFraction ?? 1 / 2})
+          }
           return originalDrawSwimmingCreature(px, py, draw, visibleFraction)
         }
         try {
@@ -101,7 +104,9 @@ describe('Submerged surface treasure', () => {
         } finally {
           drawSwimmingCreature = originalDrawSwimmingCreature
         }
-        check(clipped > 0, 'submerged chest uses swimming-style clipping when rendered')
+        check(chestDraws.length === 1 && chestDraws[0].terrain === 'water' &&
+          chestDraws[0].fraction === 1 / 2,
+          'water chest is drawn once with the standard half-submerged clipping')
       } finally {
         map = previous.map
         groundItems = previous.groundItems
