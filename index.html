@@ -6825,19 +6825,6 @@ more difficult:
     applyGameViewport(columns, mobileViewH)
   }
 
-  // Keep the message log above the status badges, including when many effects
-  // wrap onto multiple rows. Purely presentational: it never affects turns/RNG.
-  function updateDesktopLogAnchor(stageRect = document.getElementById('stage').getBoundingClientRect()) {
-    if (window.innerWidth <= 720 || window.matchMedia('(pointer:coarse)').matches) return
-    const statusEl = document.getElementById('playerStatuses')
-    const statusRect = statusEl && !statusEl.hidden ? statusEl.getBoundingClientRect() : null
-    const clearance = Math.max(80, statusRect && statusRect.height
-      ? Math.ceil(stageRect.bottom - statusRect.top + 12) : 0)
-    const rootStyle = document.documentElement.style
-    rootStyle.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
-    rootStyle.setProperty('--desktop-log-bottom', `${Math.round(window.innerHeight - stageRect.bottom + clearance)}px`)
-  }
-
   function resizeDesktopViewport() {
     if (window.matchMedia('(pointer:coarse)').matches) return
     const stage = document.getElementById('stage')
@@ -6859,7 +6846,8 @@ more difficult:
     const nextHeight = Math.max(1, Math.ceil(availableHeight / TILE_PX))
     applyGameViewport(nextWidth, nextHeight, availableWidth, availableHeight)
 
-    updateDesktopLogAnchor(stageRect)
+    document.documentElement.style.setProperty('--desktop-log-left', `${Math.round(stageRect.left + 10)}px`)
+    document.documentElement.style.setProperty('--desktop-log-bottom', `${Math.max(40, Math.round(window.innerHeight - stageRect.bottom + 40))}px`)
   }
 
   function setTileSize(size) {
@@ -10511,11 +10499,6 @@ more difficult:
     document.getElementById('btnHintCollapse').title = hintLabel
     if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
   })
-  // Badge visibility and line wrapping can change without a viewport resize.
-  if (window.ResizeObserver) {
-    const desktopStatusObserver = new ResizeObserver(() => updateDesktopLogAnchor())
-    desktopStatusObserver.observe(document.getElementById('playerStatuses'))
-  }
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()
   resizeDesktopViewport()

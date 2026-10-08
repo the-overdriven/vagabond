@@ -193,7 +193,7 @@ describe('Desktop overlay layout', () => {
         expect(style.backgroundImage).to.include('rgba')
         expect(logRect.width, 'desktop log default width').to.be.lessThan(500)
         expect(logRect.height, 'desktop log default height').to.be.greaterThan(200)
-        expect(stageRect.bottom - logRect.bottom, 'status-strip clearance below log').to.be.at.least(70)
+        expect(stageRect.bottom - logRect.bottom, 'original desktop log bottom inset').to.be.closeTo(40, 0.5)
         expect(logRect.left).to.be.greaterThan(stageRect.left)
         expect(logRect.right).to.be.lessThan(stageRect.right)
         expect(logRect.top).to.be.lessThan(stageRect.bottom)
@@ -202,20 +202,20 @@ describe('Desktop overlay layout', () => {
     })
   })
 
-  it('moves the desktop log above a taller wrapped status strip without resizing the camera', () => {
+  it('keeps the log anchored when the status strip grows', () => {
     cy.get('#game').then($canvas => {
       const initialWidth = $canvas[0].width
       const initialHeight = $canvas[0].height
-      cy.get('#playerStatuses').then($statuses => {
-        const statuses = $statuses[0]
-        statuses.hidden = false
-        statuses.querySelector('#playerStatusList').style.minHeight = '120px'
-      })
-      cy.get('#logpanel').should($log => {
-        const statuses = $log[0].ownerDocument.getElementById('playerStatuses')
-        const statusTop = statuses.getBoundingClientRect().top
-        const logBottom = $log[0].getBoundingClientRect().bottom
-        expect(statusTop - logBottom, 'log clears tall statuses').to.be.at.least(12)
+      cy.get('#logpanel').then($log => {
+        const originalBottom = $log[0].getBoundingClientRect().bottom
+        cy.get('#playerStatuses').then($statuses => {
+          const statuses = $statuses[0]
+          statuses.hidden = false
+          statuses.querySelector('#playerStatusList').style.minHeight = '120px'
+        })
+        cy.get('#logpanel').should($updated => {
+          expect($updated[0].getBoundingClientRect().bottom, 'log anchor is unchanged').to.be.closeTo(originalBottom, 0.5)
+        })
       })
       cy.get('#game').should($canvasAfter => {
         expect($canvasAfter[0].width).to.equal(initialWidth)

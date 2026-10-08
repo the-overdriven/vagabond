@@ -1068,7 +1068,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v75**, save schema **39**; older saves are rejected.
+**v76**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -5155,10 +5155,9 @@ the canvas and side panels; near the right or top edge they flip/clamp back into
 the visible canvas instead of being clipped by the browser edge.
 
 On desktop the message log floats as a narrow, taller panel along the lower-left
-side of the canvas rather than consuming camera height. Its bottom edge keeps
-at least 80 px of clearance from the viewport bottom and automatically moves
-higher when multiple active-status badges wrap into a taller strip, so ordinary
-log use does not cover status badges.
+side of the canvas rather than consuming camera height. It keeps its original
+40 px bottom inset relative to the stage instead of shifting in response to
+active-status badges. Very tall status strips may therefore overlap the log.
 Its panel background is semi-transparent so terrain remains perceptible beneath
 it, while the log itself remains scrollable and continues to intercept
 pointer/wheel input normally. A top-right resize grip lets the player change both
@@ -5166,8 +5165,8 @@ width and height without resizing the game camera; the grip is inset from the
 native vertical scrollbar so the scrollbar cannot cover its visible or clickable
 area. The default is 420×260 px; resizing is bounded to at least 300×120 px when
 space permits, at most 80% of the stage width and 60% of its height, and always
-kept inside the stage. The bottom clearance is preserved while resizing, so the
-panel grows upward/rightward instead of back over the status row. The resize is
+kept inside the stage. The bottom anchor is preserved while resizing, so the
+panel grows upward/rightward without moving its resting position. The resize is
 presentation-only and is not saved or replayed.
 The newest entry stays
 fully bright, the second- and third-newest use slightly lower brightness, and
