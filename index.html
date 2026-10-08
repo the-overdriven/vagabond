@@ -681,6 +681,7 @@ more difficult:
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
+  let unrotatedWorldWidth, unrotatedWorldHeight
   let WORLD_GEN_CONFIG = {}
   let BASE_WORLD_GEN_CONFIG = {}
   let WORLD_TRAITS = []
@@ -735,6 +736,8 @@ more difficult:
     }
     MAP_W = mapConfig.world.width
     MAP_H = mapConfig.world.height
+    unrotatedWorldWidth = MAP_W
+    unrotatedWorldHeight = MAP_H
     // The density divisor is per walkable tile, so it scales with either world area.
     WEAPONS = WORLD_GEN_CONFIG.lootRules.commonStartingWeapons
       ? BASE_WEAPONS.concat(STARTING_WEAPONS.filter(name => !BASE_WEAPONS.some(w => w.name === name))
@@ -11072,6 +11075,10 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    // A prior world may have rotated 90/270 degrees; start every new world
+    // with the configured dimensions before allocating any surface or dungeon maps.
+    MAP_W = unrotatedWorldWidth
+    MAP_H = unrotatedWorldHeight
     beastTracks.clear()
     const validationCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.validation || {}
     const populationAttempts = Math.max(1, Math.floor(validationCfg.postPopulationWorldRetries ?? 1))

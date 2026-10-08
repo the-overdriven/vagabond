@@ -129,17 +129,22 @@ describe('Vagabond smoke test', () => {
         expect($overlay).not.to.have.class('show')
       })
 
-    cy.window().its('__VAGABOND_E2E__').invoke('getWorldShape').should(shape => {
-      expect(shape.width).to.equal(260)
-      expect(shape.height).to.equal(180)
-    })
-    cy.window().then(win => {
-      const dimensions = win.eval(`(() => {
-        const save = buildSaveObject()
-        loadGameFromObject(save)
-        return {savedWidth: save.mapWidth, savedHeight: save.mapHeight, width: MAP_W, height: MAP_H}
-      })()`)
-      expect(dimensions).to.deep.equal({savedWidth: 260, savedHeight: 180, width: 260, height: 180})
+    // Save dimensions can be rectangular or rotated; do not hardcode the
+    // dimensions of an older (pre-rotation) smoke fixture.
+    cy.readFile('tests/saves/Tester_start.json').then(fixture => {
+      cy.window().its('__VAGABOND_E2E__').invoke('getWorldShape').should(shape => {
+        expect(shape.width).to.equal(fixture.mapWidth)
+        expect(shape.height).to.equal(fixture.mapHeight)
+      })
+      cy.window().then(win => {
+        const dimensions = win.eval(`(() => {
+          const save = buildSaveObject()
+          loadGameFromObject(save)
+          return {savedWidth: save.mapWidth, savedHeight: save.mapHeight, width: MAP_W, height: MAP_H}
+        })()`)
+        expect(dimensions).to.deep.equal({savedWidth: fixture.mapWidth, savedHeight: fixture.mapHeight,
+          width: fixture.mapWidth, height: fixture.mapHeight})
+      })
     })
 
     cy.get('#logpanel .good')
@@ -149,14 +154,31 @@ describe('Vagabond smoke test', () => {
 
     waitForLogIdle()
 
-    // Walk onto the gate tile - stepping onto a dwarvengate tile is what
-    // logs this message, not inspecting it.
-    pressMove('down')
-    cy.get('#hDef').should('have.text', '1') // hill gives +1 DEF
-    pressMove('up')
-
-    cy.get('#logpanel .info')
-      .should('contain', 'You stand beneath the open dwarven gates')
+    // Approach the actual gate rather than assuming that an old save places
+    // the player exactly one step north of it.
+    cy.window().then(win => {
+      const approach = win.eval(`(() => {
+        for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+          if (surfaceMap[y][x] !== 'dwarvengate') continue
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const fromX = x - dx, fromY = y - dy
+            if (!TILE[surfaceMap[fromY]?.[fromX]]?.walk ||
+                surfaceMap[fromY][fromX] === 'dwarvengate') continue
+            player.x = fromX
+            player.y = fromY
+            enemies = enemies.filter(e => e.x !== x || e.y !== y)
+            occupied.delete(keyXY(x, y))
+            snapCameraToPlayer()
+            return {dx,dy}
+          }
+        }
+        throw Error('No walkable approach to the dwarven gate')
+      })()`)
+      const direction = approach.dx === 1 ? 'right' : approach.dx === -1 ? 'left' :
+        approach.dy === 1 ? 'down' : 'up'
+      pressMove(direction)
+    })
+    cy.get('#logpanel .info').should('contain', 'You stand beneath the open dwarven gates')
   })
 
   it('opens the inventory and map overlays and switches between them', () => {

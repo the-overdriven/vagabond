@@ -633,6 +633,7 @@ function rotateGeneratedWorld(quarterTurns) {
       const v = vector(value.dx,value.dy); value.dx = v.x; value.dy = v.y
     }
     if (typeof value.keyId === 'string') value.keyId = rotatedLockId(value.keyId)
+    if (typeof value.requiresLockId === 'string') value.requiresLockId = rotatedLockId(value.requiresLockId)
     if (typeof value.rotation === 'number' && value.kind === 'web') value.rotation = (value.rotation + turns) % 4
     for (const [name, child] of Object.entries(value)) {
       if (name === 'map' || name === 'caveMaps' || name === 'discovered') continue

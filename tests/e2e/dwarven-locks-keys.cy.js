@@ -1,11 +1,17 @@
 describe('Dwarven Ruins locks, keys, gates and breaching', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Dwarven Lock Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
-    cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    // The lock cases generate their own fixed-seed worlds. Restore a current
+    // schema bootstrap instead of generating an unrelated random world first.
+    cy.readFile('tests/saves/Tester_start.json').then(save => {
+      cy.window().then(win => {
+        win.__dwarvenLockBootstrapSave = save
+        win.eval('loadGameFromObject(window.__dwarvenLockBootstrapSave, {isReplayInit:true})')
+        delete win.__dwarvenLockBootstrapSave
+        win.eval("raceOpen = false; document.getElementById('raceOverlay').classList.remove('show')")
+      })
+    })
   })
 
   it('places a reachable mandatory key, consumes it to open the gate, and preserves the result', () => {

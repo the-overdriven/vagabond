@@ -658,7 +658,7 @@
     "dwarvencrate": "a reinforced storage crate too heavy to shift",
     "dwarvenprisonbars": "iron prison bars dividing the old cell block",
     "dwarvenspikes": "small holes in the marble conceal reusable spikes; any creature stepping here triggers them",
-    "dwarvenpressureplate": "apparently a pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
+    "dwarvenpressureplate": "a hidden pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
     "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane"
   },
   "terrainSpeed": {

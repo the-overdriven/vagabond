@@ -1083,7 +1083,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v83**, save schema **40**; older saves are rejected.
+**v86**, save schema **40**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -1413,7 +1413,11 @@ one of four orientations with equal **25%** probability: unchanged (cold north),
 map rotation, not a movement or temperature modifier: the surface, shared caves,
 crypt, Dwarven Fort, every deeper Ruins floor, entrances, stairs, locks and their
 keys, traps and projectile directions, and terrain underlays are transformed
-together. On rectangular worlds, a quarter-turn swaps width and height. Stored
+together. This includes the secondary lock ID required by a progression key
+inside a locked side room: it must continue to identify the same rotated lock.
+On rectangular worlds, a quarter-turn swaps width and height. Each fresh
+generation restores the configured, unrotated dimensions before allocating maps,
+including when regenerating multiple worlds in the same session. Stored
 coordinates already describe the rotated layout, so save/replay needs no new
 rotation flag, and seeded gameplay remains deterministic. Cosmetic cave decorations
 are then hashed against the final rotated coordinates without consuming RNG.
@@ -4933,13 +4937,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-39
+40
 ```
 
 Saves are JSON files.
 
-Version 39 stores the dungeon-package shortcut registry and each deep level's
-package identity; versions 34–38 introduced the Ruins lift, traps, distinct
+Version 40 distinguishes barred prison doors from solid doors in saved
+terrain. Version 39 stores the dungeon-package shortcut registry and each deep
+level's package identity; versions 34–38 introduced the Ruins lift, traps, distinct
 terrain states, room/vault descriptors, room graph and progression-key state
 (see section 13). Saves from other schema versions are rejected.
 
