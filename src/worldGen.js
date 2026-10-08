@@ -691,12 +691,23 @@ function generateMap() {
   const worldAttempts = MAX_WORLD_ATTEMPTS
   for (let attempt = 1; attempt <= worldAttempts; attempt++) {
     generateSurface()
+    // A bell on a mountain edge is not necessarily connected to the Temple.
+    // Check the complete walking component after volcanoes have been stamped.
+    if (!isBigBellReachableFromTemple()) {
+      if (attempt === worldAttempts) {
+        throw new Error(`Could not place a Temple-reachable Big Bell in ${worldAttempts} world attempts.`)
+      }
+      console.warn(`Discarding world ${attempt}: the Big Bell cannot be reached from the Temple.`)
+      continue
+    }
     if (!isTempleConnectedToEdge()) {
       if (attempt === worldAttempts) {
         console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
         surfaceMap = map.map(row => row.slice())
         if (!generateCaves() || deepLevels[0]?.caves?.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves)
           throw new Error('Could not generate two distinct second-level caves.')
+        if (!isBigBellReachableFromTemple())
+          throw new Error('Cave generation left the Big Bell unreachable from the Temple.')
         // Cave generation stamps entrances onto `map`; keep the canonical
         // surface copy in sync even when this is the final fallback world.
         surfaceMap = map.map(row => row.slice())
@@ -712,13 +723,15 @@ function generateMap() {
     // refresh the minimap can show descriptor-based entrance markers
     // while the game canvas still renders the original mountain tile.
     surfaceMap = map.map(row => row.slice())
-    if (cavesValid) {
+    // Cave/fort entrance stamping can also change the surface; do not accept a
+    // world in which that later work cut off the bell's walking approach.
+    if (cavesValid && isBigBellReachableFromTemple()) {
       break
     }
     if (attempt === worldAttempts) {
-      throw new Error(`World generation failed cave/fort clearance validation in ${worldAttempts} attempts.`)
+      throw new Error(`World generation failed cave/fort or Big Bell reachability validation in ${worldAttempts} attempts.`)
     }
-    console.warn(`Discarding world ${attempt}: invalid cave placement near the village/mausoleum or crypt. Generating a new world.`)
+    console.warn(`Discarding world ${attempt}: invalid cave/fort placement or inaccessible Big Bell. Generating a new world.`)
   }
   placeTreasureMapSpot()
 }
@@ -755,6 +768,11 @@ function surfaceReachableFromTemple() {
 
 function isSurfacePointReachableFromTemple(x, y) {
   return surfaceReachableFromTemple().has(keyXY(x, y))
+}
+
+function isBigBellReachableFromTemple() {
+  return !!bigBellPos && map[bigBellPos.y]?.[bigBellPos.x] === 'bigbell' &&
+    isSurfacePointReachableFromTemple(bigBellPos.x, bigBellPos.y)
 }
 
 function isTempleConnectedToEdge() {
@@ -3107,9 +3125,13 @@ let bigBellPos = null
 
 function placeBigBell() {
   const cfg = WORLD_GEN_CONFIG.landmarks
-  // Preferred: a mountain tile near the temple, right on the mountain's
-  // edge (bordering walkable ground) so the guards have room to stand.
-  function search(minR, maxR, requireEdge) {
+  bigBellPos = null
+  // Work with the Temple's connected walking area, not arbitrary pockets of
+  // walkable snow/grass stranded on the other side of the mountains.
+  const connected = surfaceReachableFromTemple()
+  // Prefer a mountain edge with enough accessible spaces for both guards.
+  // If none exists, one accessible neighbor is sufficient for the bell.
+  function search(minR, maxR, minAccessibleNeighbors) {
     for (let r = minR; r <= maxR; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
@@ -3120,17 +3142,11 @@ function placeBigBell() {
           // Keep well clear of the black pillar - the two landmarks
           // shouldn't spawn side by side.
           if (blackPillarPos && Math.max(Math.abs(x - blackPillarPos.x), Math.abs(y - blackPillarPos.y)) < BELL_PILLAR_MIN_DIST) continue
-          if (requireEdge) {
-            let onEdge = false
-            for (let ny = -1; ny <= 1 && !onEdge; ny++) {
-              for (let nx = -1; nx <= 1 && !onEdge; nx++) {
-                if (nx === 0 && ny === 0) continue
-                const t = map[y + ny] && map[y + ny][x + nx]
-                if (t && TILE[t] && TILE[t].walk) onEdge = true
-              }
-            }
-            if (!onEdge) continue
+          let accessibleNeighbors = 0
+          for (const [nx, ny] of DIRS8) {
+            if (connected.has(keyXY(x + nx, y + ny))) accessibleNeighbors++
           }
+          if (accessibleNeighbors < minAccessibleNeighbors) continue
           return {x, y}
         }
       }
@@ -3138,36 +3154,19 @@ function placeBigBell() {
     return null
   }
 
-  // At least 20 tiles from the temple, but still "not too far from the
-  // center of the map" overall - widening/dropping the edge requirement
-  // only if the terrain nearby doesn't offer a clean mountain edge.
+  // At least 20 tiles from the temple; widen the search before settling for
+  // a narrower approach. Never fall back to an inaccessible mountain pocket.
   const searches = cfg.bigBellSearches
-  const spot = search(searches[0][0], searches[0][1], searches[0][2]) ||
-    search(searches[1][0], searches[1][1], searches[1][2]) ||
-    search(searches[2][0], searches[2][1] ?? Math.max(MAP_W, MAP_H), searches[2][2])
+  const widest = searches[searches.length - 1]
+  let spot = null
+  for (const [minR, maxR] of searches) {
+    spot = search(minR, maxR ?? Math.max(MAP_W, MAP_H), Math.max(1, cfg.bellGuardianCount))
+    if (spot) break
+  }
+  if (!spot) spot = search(widest[0], widest[1] ?? Math.max(MAP_W, MAP_H), 1)
   if (!spot) return
   map[spot.y][spot.x] = 'bigbell'
   bigBellPos = spot
-  // The last-resort fallback above drops the walkable-edge requirement,
-  // so the bell can end up fully sealed in by mountains. Guarantee at
-  // least one walkable neighbor so it's always reachable.
-  let hasWalkableNeighbor = false
-  for (let ny = -1; ny <= 1 && !hasWalkableNeighbor; ny++) {
-    for (let nx = -1; nx <= 1 && !hasWalkableNeighbor; nx++) {
-      if (nx === 0 && ny === 0) continue
-      const t = map[spot.y + ny] && map[spot.y + ny][spot.x + nx]
-      if (t && TILE[t] && TILE[t].walk) hasWalkableNeighbor = true
-    }
-  }
-  if (!hasWalkableNeighbor) {
-    for (const [dx, dy] of DIRS8) {
-      const nx = spot.x + dx, ny = spot.y + dy
-      if (map[ny] && map[ny][nx] !== undefined) {
-        map[ny][nx] = 'grass'
-        break
-      }
-    }
-  }
 }
 
 function spawnBellGuardians() {

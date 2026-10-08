@@ -853,6 +853,10 @@ It is intentionally unexplained and primarily serves as a mystery/lore element.
 
 A large brass bell placed near mountains and guarded by two brutes (randomly picked: either cyclops, or ogres).
 
+Its mountain-edge position must be reachable on foot from the Temple, not just
+border any walkable snow or grass in an isolated mountain pocket. World
+rotation preserves the route.
+
 It cannot initially be carried normally.
 
 A later mystery interaction allows it to be moved.
@@ -1732,9 +1736,17 @@ to the surface or renders from the canonical surface state.
 
 World generation checks whether the Temple can reach a map edge through walkable terrain. This is to prevent situation where player is stuck in a village surrounded by non-walkable tiles.
 
+The Big Bell also has a strict Temple-reachability invariant: placement scans
+the Temple's eight-direction walkable component and only accepts mountain tiles
+next to that component. It prefers space for both guardians, widening the
+search if necessary, while keeping the bell at least 20 tiles from the Temple.
+After volcanoes and cave/fort entrances are stamped, reachability is checked
+again. An absent or isolated bell rejects the world attempt rather than
+creating a disconnected patch of grass inside the mountains.
+
 The surface Dwarven Fort entrance has a separate reachability invariant. Natural Fort candidates must border the same 8-direction walkable component as the Temple; a fallback mountain outcrop may likewise only be created on that component. After the Fort gate is stamped, cave/fort generation defensively flood-fills from the Temple again and rejects the world if the gate is not reachable. This prevents visually valid mountain pockets from containing an inaccessible Fort entrance.
 
-If either surface connectivity condition fails, the world attempt is regenerated.
+If these surface connectivity checks fail, the world attempt is regenerated.
 
 The z:-1 crypt must remain a separate walkable region from all randomly
 generated caves. The generation-time exclusion zone prevents normal cave blobs
