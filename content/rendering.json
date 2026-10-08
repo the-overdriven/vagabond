@@ -715,8 +715,7 @@
       "scale": 1
     },
     "dwarvenpressureplate": {
-      "image": "img/tiles/dwarven-pressure-plate.png",
-      "baseTileKey": "marble",
+      "image": "img/tiles/marble-floor.png",
       "scale": 1
     }
   },

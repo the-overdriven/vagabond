@@ -1315,6 +1315,12 @@
     "remoteHighTierChestTier": 3,
     "ordinaryChestBaseTier": 1,
     "ordinaryChestMaxTier": 5,
+    "submergedChests": {
+      "countRange": [15, 30],
+      "shoreDistanceRange": [4, 8],
+      "lakeShare": 0.35,
+      "placementEdgeMargin": 2
+    },
     "looseHerbs": 0,
     "looseMushrooms": 0
   },

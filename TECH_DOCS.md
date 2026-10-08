@@ -1080,7 +1080,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v77**, save schema **39**; older saves are rejected.
+**v83**, save schema **40**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -1120,12 +1120,15 @@ Each deep level saves its `traps` array, including stable ID, trigger, type and
 optional emitter, direction and range. Schema 35 restores it directly alongside
 terrain, including replay initial snapshots.
 
-ASCII glyphs are `^` for spikes, `_` for pressure plates and `!` for wall-arrow
-emitters. In image mode, spike traps use `dwarven-floor-trap-0.png` when empty
+ASCII glyphs are `^` for spikes and `!` for wall-arrow emitters. Wall-arrow
+pressure plates are disguised as ordinary `marble` flooring in both tile and
+ASCII modes (including inspection text); their hidden gameplay tile and entry
+trigger remain intact, and auto-travel still avoids them. In image mode, spike
+traps use `dwarven-floor-trap-0.png` when empty
 and `dwarven-floor-trap-1.png` while the player or a living monster occupies
 the tile. Occupancy changes the displayed image only; spikes still deal damage
 on entry, not each turn spent standing on them. The arrow emitter still uses
-the trap atlas, and its pressure plate has a separate tile. Rendering supports
+the trap atlas. Rendering supports
 `sourceRect: [x, y, width, height]` for atlas regions without changing the
 gameplay tile. Shared underground FOV now honors
 `TILE.blocksSight`, so closed doors, levers and arrow walls block sight.
@@ -3729,6 +3732,23 @@ the former 45 chests per ~32,370 eligible tiles of a 260 × 180 world.
 Up to five of the edge chests are placed along the northern edge first; remaining
 ones can appear on any edge. Each edge chest is on walkable ground within a
 tier-3+ monster's aggro range, with tier matching that monster.
+
+Submerged treasure adds **15–30 ordinary surface chests** per generated world,
+controlled by `surfaceLoot.submergedChests` in `content/world_generation.json`.
+They spawn only in deep `water`, both in edge-connected seas and enclosed lakes,
+**4–8 swimming steps from the nearest walkable dry shore**, measured across
+water using eight-direction movement. Water directly beside shore is distance 1;
+shore-near tiles at distances 1–3 cannot contain these chests. Small lakes and
+water bodies lacking eligible positions are excluded; if a world does not have
+enough eligible water, actual placement falls below the requested count rather
+than violating the minimum distance. The `lakeShare` knob gives enclosed lakes a
+35% share when sufficient qualifying positions exist, otherwise the remainder
+can be placed in the sea (or vice versa). No ground item or occupied creature
+may share a submerged chest tile. Ordinary surface chest tier uses the same
+spawn-distance formula and tier config; contents, Magic Find, and gold bonuses
+use the existing chest system. Chests are collected by entering their water
+square and do not alter swimming or drowning mechanics. They are created at
+world generation and persist with the normal ground item save/replay state.
 
 Chest loot can include:
 

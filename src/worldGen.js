@@ -4766,6 +4766,105 @@ function spawnEdgeHighTierChests() {
   placeNear(anyEdge, cfg.allEdgeChestLimit)
 }
 
+function surfaceOrdinaryChestTier(x, y) {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot
+  return Math.min(cfg.ordinaryChestMaxTier,
+    cfg.ordinaryChestBaseTier + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / cfg.chestDistancePerTier))
+}
+
+// Submerged treasure requires a real 4–8-step swim to the nearest dry shore.
+// Water touching the world border is sea; enclosed water bodies are lakes.
+function submergedSurfaceChestCandidates() {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot.submergedChests
+  const [minDistance, maxDistance] = cfg.shoreDistanceRange
+  const width = MAP_W, height = MAP_H, length = width * height
+  const regions = new Int32Array(length).fill(-1)
+  const shoreDistances = new Int16Array(length).fill(-1)
+  const queue = new Int32Array(length)
+  const directions = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]
+  const isDryShore = tile => !!TILE[tile]?.walk &&
+    tile !== 'water' && tile !== 'river' && tile !== 'frozenriver'
+  const seaRegions = []
+  let regionId = 0
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const start = y * width + x
+    if (map[y][x] !== 'water' || regions[start] !== -1) continue
+    let head = 0, tail = 1, sea = false
+    queue[0] = start
+    regions[start] = regionId
+    while (head < tail) {
+      const pos = queue[head++], px = pos % width, py = (pos / width) | 0
+      if (px === 0 || py === 0 || px === width - 1 || py === height - 1) sea = true
+      for (const [dx, dy] of directions) {
+        const nx = px + dx, ny = py + dy
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height || map[ny][nx] !== 'water') continue
+        const next = ny * width + nx
+        if (regions[next] === -1) { regions[next] = regionId; queue[tail++] = next }
+      }
+    }
+    seaRegions[regionId++] = sea
+  }
+
+  // Multi-source water-only BFS measures shortest swimming distance from a
+  // traversable shore. This uses the player's eight-direction movement model.
+  let head = 0, tail = 0
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (map[y][x] !== 'water') continue
+    if (!directions.some(([dx, dy]) => isDryShore(map[y + dy]?.[x + dx]))) continue
+    const index = y * width + x
+    shoreDistances[index] = 1
+    queue[tail++] = index
+  }
+  while (head < tail) {
+    const pos = queue[head++], x = pos % width, y = (pos / width) | 0
+    if (shoreDistances[pos] >= maxDistance) continue
+    for (const [dx, dy] of directions) {
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height || map[ny][nx] !== 'water') continue
+      const next = ny * width + nx
+      if (shoreDistances[next] !== -1) continue
+      shoreDistances[next] = shoreDistances[pos] + 1
+      queue[tail++] = next
+    }
+  }
+  const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x,g.y)))
+  const pools = {sea: [], lake: []}
+  for (let y = cfg.placementEdgeMargin; y < height - cfg.placementEdgeMargin; y++)
+    for (let x = cfg.placementEdgeMargin; x < width - cfg.placementEdgeMargin; x++) {
+      const index = y * width + x, distance = shoreDistances[index]
+      if (distance < minDistance || distance > maxDistance || used.has(keyXY(x, y)) || occupied.has(keyXY(x, y))) continue
+      pools[seaRegions[regions[index]] ? 'sea' : 'lake'].push({x, y})
+    }
+  return pools
+}
+
+function spawnSubmergedSurfaceChests() {
+  const cfg = WORLD_GEN_CONFIG.surfaceLoot.submergedChests
+  if (!cfg?.countRange || !cfg?.shoreDistanceRange) return
+  const pools = submergedSurfaceChestCandidates()
+  const total = Math.min(pools.sea.length + pools.lake.length, randInt(...cfg.countRange))
+  const lakeTarget = Math.min(pools.lake.length, Math.round(total * cfg.lakeShare))
+  const seaTarget = Math.min(pools.sea.length, total - lakeTarget)
+  const counts = {sea: seaTarget, lake: lakeTarget}
+  // When one water class is scarce, fill the remaining budget from the other.
+  let remaining = total - seaTarget - lakeTarget
+  for (const type of ['sea','lake']) {
+    const extra = Math.min(remaining, pools[type].length - counts[type])
+    counts[type] += extra
+    remaining -= extra
+  }
+  for (const type of ['sea','lake']) {
+    const spots = pools[type]
+    for (let i = 0; i < counts[type]; i++) {
+      const index = randInt(0, spots.length - 1)
+      const {x, y} = spots[index]
+      spots[index] = spots[spots.length - 1]
+      spots.pop()
+      groundItems.push({x, y, kind:'chest', tier:surfaceOrdinaryChestTier(x, y), opened:false})
+    }
+  }
+}
+
 function spawnOrdinarySurfaceChests() {
   const cfg = WORLD_GEN_CONFIG.surfaceLoot
   const usedChests = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
@@ -4782,14 +4881,14 @@ function spawnOrdinarySurfaceChests() {
     const {x, y} = spots[index]
     spots[index] = spots[spots.length - 1]
     spots.pop()
-    const distTier = Math.min(cfg.ordinaryChestMaxTier, cfg.ordinaryChestBaseTier + Math.floor((Math.abs(x - spawnPoint.x) + Math.abs(y - spawnPoint.y)) / cfg.chestDistancePerTier))
-    groundItems.push({x, y, kind: 'chest', tier: distTier, opened: false})
+    groundItems.push({x, y, kind: 'chest', tier: surfaceOrdinaryChestTier(x, y), opened: false})
   }
 }
 
 function spawnGroundStuff() {
   const cfg = WORLD_GEN_CONFIG.surfaceLoot
   spawnOrdinarySurfaceChests()
+  spawnSubmergedSurfaceChests()
   const used = new Set(groundItems.filter(g => (g.level ?? 0) === 0).map(g => keyXY(g.x, g.y)))
   const spots = []
   for (let y = cfg.placementEdgeMargin; y < MAP_H - cfg.placementEdgeMargin; y++) {

@@ -80,6 +80,24 @@ describe('Dwarven Ruins reusable traps', () => {
     })()`))
   })
 
+  it('hides wall arrow triggers as ordinary marble in tile and ASCII modes', () => {
+    cy.window().then(win => win.eval(`(() => {
+      trapFixture()
+      const x = 12, y = 12
+      map[y][x] = 'dwarvenpressureplate'
+      const marble = RENDER_STYLE.terrainTiles.marble.image
+      const hidden = RENDER_STYLE.terrainTiles.dwarvenpressureplate.image
+      const check = (condition, label) => { if (!condition) throw Error(label) }
+      check(hidden === marble, 'image mode uses exactly the marble art')
+      check(terrainVisual('dwarvenpressureplate', x, y).image === marble, 'runtime tile has no visible plate')
+      check(TILE.dwarvenpressureplate.ch === TILE.marble.ch, 'base ASCII glyph matches marble')
+      check(TILE_CODE.dwarvenpressureplate !== TILE_CODE.marble && CODE_TILE[TILE_CODE.dwarvenpressureplate] === 'dwarvenpressureplate', 'unique save/replay terrain code retained')
+      check(map[y][x] === 'dwarvenpressureplate', 'gameplay terrain still identifies the trigger')
+      check(DungeonTraps.isTrigger('dwarvenpressureplate'), 'auto-travel still recognizes the trigger')
+      return true
+    })()`))
+  })
+
   it('restores mechanisms and replays both trap types with the same RNG tape', () => {
     cy.window().then(win => win.eval(`(${trapPersistenceChecks.toString()})()`))
   })
