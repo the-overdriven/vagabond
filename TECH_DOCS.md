@@ -205,11 +205,16 @@ stored/displayed strength is rounded to the nearest integer. No kills displays
 
 The record survives normal deaths, current saves and replay; a new character
 starts without it. Every actual death snapshots it before penalties or character
-reset and sends it as `strongest_enemy_killed` to the Graveyard. The rounded
-strength is sent with the exact permanent ATK/DEF/SPD/GRACE snapshot; these stats
-may be fractional because humanoid equipment scaling can produce decimal values.
-Expanded online records show the same achievement. This trophy grants no gameplay
-bonus.
+reset and sends it as `strongest_enemy_killed` to the Graveyard. The in-game
+achievement and save/replay keep exact permanent ATK/DEF/SPD/GRACE stats for
+ranking (humanoid gear can produce fractions). At the online submission boundary,
+the total strength is recomputed from those exact stats and rounded, and **each**
+ATK/DEF/SPD/GRACE stat is independently rounded to an integer. Consequently the
+rounded total need not equal the sum of the individually rounded stats. This
+also normalizes records restored from saves that contain an unrounded strength.
+An invalid or non-finite trophy is omitted from the submitted death, not from
+the live game, so it cannot prevent the death record being posted. Expanded online
+records show the same achievement. This trophy grants no gameplay bonus.
 
 ## ATK
 
@@ -1063,7 +1068,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v68**, save schema **39**; older saves are rejected.
+**v74**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -6003,13 +6008,14 @@ other dashboard configuration is required for a new default project. If the
 project already has a `pgrst.db_pre_request` hook, compose the checks rather
 than overwrite it.
 The database uses a nullable JSONB `strongest_enemy_killed` column with bounded
-name, species, tier, strength and stat snapshot validation. For databases that
-already have the achievement constraint, apply
-`supabase-graveyard-strongest-decimals.sql` before deploying v68. It keeps the
-reported strength as a bounded integer but permits bounded decimal values in the
-ATK/DEF/SPD/GRACE snapshot, matching humanoid equipment scaling. Older online
-records display “None”. The frontend includes the column in both death submission
-and Graveyard queries.
+name, species, tier, strength and stat snapshot validation. The client submits
+integers for the tier, strength and four stats even if the underlying monster
+stats are fractional; this also works with the original all-integer constraint.
+The earlier `supabase-graveyard-strongest-decimals.sql` migration allowed decimals
+in stat fields, but is **not required** for current client submissions. Existing
+databases must still have the `strongest_enemy_killed` JSONB column and its
+corresponding constraint. Older online records display “None”. The frontend
+includes the column in both death submission and Graveyard queries.
 
 For an existing Graveyard database, apply `supabase-graveyard-drowning.sql`
 before deploying the client so its cause constraint accepts drowning deaths.
@@ -6050,8 +6056,8 @@ ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if
 present, artifact effect ID when present, and the inventory-formatted
 `stat_line`), `artifacts` (compact JSONB artifact inventory snapshots with
 their `stat_line`), `steps_taken`,
-`creatures_slain`, `strongest_enemy_killed` (name, species, tier, rounded integer
-strength and exact permanent ATK/DEF/SPD/GRACE, which may be fractional),
+`creatures_slain`, `strongest_enemy_killed` (name, species, integer tier,
+rounded integer strength and independently rounded integer ATK/DEF/SPD/GRACE),
 `turn_count` (turns in the current page session, reset on
 load), `world_seed` (original seed restored from saves), and `game_version`
 (the current release version from `src/version.js`). `WORLD_SEED` is reassignable so

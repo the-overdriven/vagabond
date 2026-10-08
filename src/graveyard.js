@@ -156,13 +156,40 @@ const Graveyard = (() => {
     return inventory.filter(item => item.kind === 'artifact').map(item => snapshotItem(item, statLine))
   }
 
+  function snapshotStrongestEnemyKill(kill) {
+    if (!kill) return null
+    const statNames = ['atk', 'def', 'spd', 'grace']
+    // Spawned enemy stats stay exact in saves/replays for ranking. Supabase's
+    // death_strongest_enemy_check expects integers for all five uploaded numbers.
+    if (typeof kill.name !== 'string' || !kill.name ||
+        typeof kill.species !== 'string' || !kill.species ||
+        !Number.isFinite(kill.tier) ||
+        !statNames.every(stat => Number.isFinite(kill.stats?.[stat]))) {
+      console.warn('Invalid strongest-kill snapshot; uploading death without the trophy')
+      return null
+    }
+    const exactStrength = statNames.reduce((sum, stat) => sum + kill.stats[stat], 0)
+    const strength = Math.round(exactStrength)
+    const tier = Math.round(kill.tier)
+    const stats = Object.fromEntries(statNames.map(stat => [stat, Math.round(kill.stats[stat])]))
+    if (![strength, tier, ...Object.values(stats)].every(Number.isSafeInteger)) {
+      console.warn('Out-of-range strongest-kill snapshot; uploading death without the trophy')
+      return null
+    }
+    // Derive strength from exact stats, not an old saved strength field. It may
+    // differ from the sum of independently rounded stats by one or two points.
+    return {name: kill.name, species: kill.species, tier, strength, stats}
+  }
+
   function recordDeath(snapshot) {
     // This guard precedes UUID generation, storage access, SDK loading and all network activity.
     if (replayActive() || !online() || !configured()) return
     const death_event_id = newId()
     const player_id = playerId()
     if (!death_event_id || !player_id) return
-    const record = {...snapshot, death_event_id, player_id,
+    const record = {...snapshot,
+      strongest_enemy_killed: snapshotStrongestEnemyKill(snapshot.strongest_enemy_killed),
+      death_event_id, player_id,
       killed_at: new Date().toISOString(), game_version: self.VAGABOND_GAME_VERSION}
     // No await in the death path. Never retry or queue an offline death.
     getClient().then(client => client.from('death_records').insert(record))
