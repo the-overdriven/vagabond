@@ -996,15 +996,19 @@ also moving the player. Key-opened gates use a distinct persistent **intact open
 terrain state; only gates generated pre-breached use the ruined/breached state.
 Mandatory gates cannot be breached with a weapon.
 
-Locked terrain blocks movement, sight, and projectiles until opened or breached.
-Keys are tied to a specific physical lock rather than acting as universal
-Dwarven keys. Auto-travel may plan through a locked door/gate only when the
+Closed wooden doors (including ordinary locks and mandatory progression gates)
+block movement, sight and projectiles. Barred prison doors instead block only movement
+while allowing sight and projectiles through the bars, even when locked. Their
+adjacent prison-bar partitions follow the same sight and projectile rules. Keys are tied
+to a specific physical lock rather than acting as universal Dwarven keys. Auto-travel may plan through a locked door/gate only when the
 matching key is already carried; it never chooses weapon breaching on the
 player's behalf. Humanoids can still open ordinary *unlocked* doors, but do not
 unlock or breach locked doors. Ethereal movement keeps its existing terrain-
 passing exception. Any door/gate transition from sight-blocking to open or breached
 terrain invalidates the cached underground FOV immediately, so sight through the
 new opening updates in the same action rather than waiting for player movement.
+Opening a barred cell door removes its movement barrier; sight and projectile
+lanes were already open.
 
 Each ordinary doorway that receives a door then has an independent **10% chance
 to be locked**. The roll is made once for the two-leaf doorway, never per leaf:
@@ -1182,7 +1186,9 @@ actual generated room: locked/closed vault entrances are enforced, trap-biased
 vaults restrict mechanism types, and internal patterns create shelves, water,
 rubble, defensive furniture or bars. A prison-block vault creates a real barred
 cell partition with its own locked cell door and separately reachable local key,
-rather than decorative bars only. Ordinary **Prison** archetype rooms use the same
+rather than decorative bars only. Barred partitions use dedicated prison-door
+terrain and artwork, independent of regular entrances and mandatory gates. Ordinary
+**Prison** archetype rooms use the same
 cell subdivision and always place a reachable key for their locked side cell.
 
 Vault entrance limits are measured from the actual room graph, including loop
@@ -1283,13 +1289,16 @@ late population failure discards the world attempt and regenerates it, up to
 number of retries cannot alter stable IDs or replay ordering in the accepted
 world.
 
-Tile and ASCII modes distinguish intact-open and breached progression gates.
-`dwarvengateopen` uses `img/tiles/dwarven-gate-open.png`, never the breached-gate
-sprite. The pulled lever likewise has dedicated `dwarven-lever-pulled.png` art.
+Tile and ASCII modes distinguish locked, intact-open and breached progression
+gates, while reusing the normal solid dwarven door sprites for room entrances
+and progression gates. The bars beside a prison cell use
+`dwarven-prison-bars.png`; closed and locked cell leaves use
+`dwarven-prison-door-locked.png`, with `dwarven-gate-open.png` reserved for their
+open state. The pulled lever has dedicated `dwarven-lever-pulled.png` art.
 Room furniture/barricades are mechanical terrain with dedicated ASCII glyphs,
 colors, inspect strings, and 40×40 tile art for beds, dragged-bed barricades,
 bookshelves, tables, crates, and prison bars. These images are precached for
-offline play alongside the dedicated open-gate and pulled-lever sprites. The
+offline play alongside the prison-door and pulled-lever sprites. The
 Dwarven Key uses `img/tiles/dwarven-key.png` consistently on the ground and in
 inventory.
 
@@ -4968,7 +4977,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 39** saves. Other versions are rejected
+Current gameplay state requires **version 40** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -4994,8 +5003,10 @@ There are separate discovery structures for:
 every underground map: ordinary caves, grottos, the crypt, mausoleum, and
 Dwarven Fort. The game has no facing direction, so sight extends in all
 directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
-crypt niches, boulders, the Black Pillar, and closed/locked Dwarven doors. Open
-and breached doors do **not** block sight. Opening, unlocking, or breaching a door
+crypt niches, boulders, the Black Pillar, and closed/locked solid Dwarven doors.
+Prison bars and closed/locked barred prison doors allow sight and projectiles
+through, but block creature movement until a prison door is opened. Open and breached
+doors do **not** block sight. Opening, unlocking, or breaching a door
 immediately invalidates the cached underground FOV so tiles behind it become visible
 in the same action, even though the player has not moved. The blocking wall face itself
 remains visible. Water does not block sight. Diagonal sight follows tile

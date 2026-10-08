@@ -53,7 +53,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
             for (const [dx, dy] of dirs) {
               const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
               const tile = grid[y]?.[x]
-              const traversable = TILE[tile]?.walk || tile === 'dwarvendoorclosed' || tile === 'dwarvendoorlocked' ||
+              const traversable = TILE[tile]?.walk || tile === 'dwarvendoorclosed' || tile === 'dwarvendoorlocked' || tile === 'dwarvenprisondoorclosed' || tile === 'dwarvenprisondoorlocked' ||
                 (allowLockedGate && tile === 'dwarvengatelocked')
               if (seen.has(key) || !traversable) continue
               seen.add(key)
@@ -237,11 +237,11 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(TILE.dwarvenminessealed.ch === 'X', 'ASCII sealed-continuation glyph')
         check(TILE.dwarvengatelocked.ch === 'H' && TILE.dwarvengateopen.ch === '/' && TILE.dwarvengatebreached.ch === 'h',
           'ASCII progression-gate glyphs distinguish locked, intact-open and breached states')
-        check(RENDER_STYLE.terrainTiles.dwarvengatelocked?.image === 'img/tiles/dwarven-gate-locked.png', 'locked-gate art')
-        check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image === 'img/tiles/dwarven-gate-open.png', 'dedicated open-gate art')
+        check(RENDER_STYLE.terrainTiles.dwarvengatelocked?.image === 'img/tiles/dwarven-door-closed.png', 'locked progression gate uses ordinary closed-door art')
+        check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image === 'img/tiles/dwarven-door-open.png', 'opened progression gate uses ordinary open-door art')
         check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image !== RENDER_STYLE.terrainTiles.dwarvengatebreached?.image,
           'intact-open and breached gates never share a sprite')
-        check(RENDER_STYLE.terrainTiles.dwarvengatebreached?.image === 'img/tiles/dwarven-gate-breached.png', 'breached-gate art')
+        check(RENDER_STYLE.terrainTiles.dwarvengatebreached?.image === 'img/tiles/dwarven-door-breached.png', 'breached progression gate uses ordinary breached-door art')
         check(RENDER_STYLE.terrainTiles.dwarvenleverpulled?.image === 'img/tiles/dwarven-lever-pulled.png', 'pulled lever has dedicated art')
         check(RENDER_STYLE.terrainTiles.dwarvenbed?.image === 'img/tiles/dwarven-bed.png', 'bed art')
         check(RENDER_STYLE.terrainTiles.dwarvenbedbarricade?.image === 'img/tiles/dwarven-bed-barricade.png', 'bed barricade art')

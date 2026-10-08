@@ -1446,7 +1446,8 @@ more difficult:
   }
 
   const DUNGEON_DOOR_OPEN_STATE = Object.freeze({
-    dwarvendoorclosed: 'dwarvendooropen'
+    dwarvendoorclosed: 'dwarvendooropen',
+    dwarvenprisondoorclosed: 'dwarvenprisondooropen'
   })
 
   const DUNGEON_LOCK_STATE = Object.freeze({
@@ -1454,6 +1455,12 @@ more difficult:
       kind: 'door',
       keyedOpenTile: 'dwarvendooropen',
       breachedTile: 'dwarvendoorbreached',
+      breachable: true
+    }),
+    dwarvenprisondoorlocked: Object.freeze({
+      kind: 'door',
+      keyedOpenTile: 'dwarvenprisondooropen',
+      breachedTile: 'dwarvenprisondoorbreached',
       breachable: true
     }),
     dwarvengatelocked: Object.freeze({
@@ -1502,7 +1509,9 @@ more difficult:
     if (!info) return []
     const family = info.kind === 'gate'
       ? new Set(['dwarvengatelocked', 'dwarvengateopen', 'dwarvengatebreached'])
-      : new Set(['dwarvendoorlocked', 'dwarvendoorbreached'])
+      : tileKey === 'dwarvenprisondoorlocked'
+        ? new Set(['dwarvenprisondoorlocked', 'dwarvenprisondoorbreached'])
+        : new Set(['dwarvendoorlocked', 'dwarvendoorbreached'])
     const leaves = [{x, y}]
     const adjacent = [[0, -1], [-1, 0], [1, 0], [0, 1]]
       .map(([dx, dy]) => ({x: x + dx, y: y + dy}))

@@ -360,6 +360,34 @@
       "projectileBlock": true,
       "blocksSight": true
     },
+    "dwarvenprisondoorclosed": {
+      "ch": "┼",
+      "color": "#9f998e",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvenprisondoorlocked": {
+      "ch": "╪",
+      "color": "#d39a50",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvenprisondooropen": {
+      "ch": "/",
+      "color": "#9f998e",
+      "bg": "#302d2a",
+      "walk": true
+    },
+    "dwarvenprisondoorbreached": {
+      "ch": ";",
+      "color": "#9f998e",
+      "bg": "#302d2a",
+      "walk": true
+    },
     "dwarvendoorbreached": {
       "ch": ";",
       "color": "#a97843",
@@ -457,7 +485,8 @@
       "color": "#8f8a80",
       "bg": "#302d2a",
       "walk": false,
-      "projectileBlock": true
+      "projectileBlock": false,
+      "blocksSight": false
     },
     "dwarvenspikes": {
       "ch": "^",
@@ -537,6 +566,10 @@
     "crypttrapsprung": "\u2408",
     "mausoleumstairsup": "\u2409",
     "dwarvendoorlocked": "E",
+    "dwarvenprisondoorclosed": "╧",
+    "dwarvenprisondoorlocked": "╨",
+    "dwarvenprisondooropen": "╩",
+    "dwarvenprisondoorbreached": "╦",
     "dwarvendoorbreached": "H",
     "dwarvengatelocked": "I",
     "dwarvengateopen": "Q",
@@ -606,6 +639,10 @@
     "crypttrapsprung": "a shattered, empty sarcophagus",
     "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum\u2019s entrance",
     "dwarvendoorlocked": "a locked dwarven door of iron-bound timber",
+    "dwarvenprisondoorclosed": "a closed iron-barred dwarven prison door, with a clear view into its cell",
+    "dwarvenprisondoorlocked": "a locked iron-barred dwarven prison door; you can see through its bars",
+    "dwarvenprisondooropen": "an iron-barred dwarven prison door swung open",
+    "dwarvenprisondoorbreached": "a broken dwarven prison gate that no longer blocks the cell",
     "dwarvendoorbreached": "a dwarven door smashed open by force",
     "dwarvengatelocked": "a heavy locked dwarven gate barring the way deeper into the ruins",
     "dwarvengateopen": "an intact dwarven progression gate standing open",

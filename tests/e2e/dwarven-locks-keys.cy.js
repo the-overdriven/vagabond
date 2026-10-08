@@ -98,7 +98,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         TILE.dwarvengateopen.blocksSight !== true, 'intact opened gate is fully passable')
       check(TILE.dwarvengatebreached.walk === true && TILE.dwarvengatebreached.projectileBlock !== true &&
         TILE.dwarvengatebreached.blocksSight !== true, 'pre-breached ruined gate remains fully passable')
-      check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image === 'img/tiles/dwarven-gate-open.png', 'intact open gate uses its dedicated sprite')
+      check(RENDER_STYLE.terrainTiles.dwarvengateopen?.image === 'img/tiles/dwarven-door-open.png', 'intact open gate uses normal door sprite')
       check(itemIconPath('dwarvenkey') === 'img/tiles/dwarven-key.png', 'Dwarven Key uses the PNG path')
     })()`))
   })
@@ -216,7 +216,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       check(TILE.dwarvendoorlocked.projectileBlock === true && TILE.dwarvendoorlocked.blocksSight === true,
         'locked ordinary door blocks projectiles and sight')
       check(TILE.dwarvendoorbreached.walk === true, 'breached ordinary door is walkable')
-      check(RENDER_STYLE.terrainTiles.dwarvendoorlocked?.image === 'img/tiles/dwarven-door-locked.png', 'locked-door art')
+      check(RENDER_STYLE.terrainTiles.dwarvendoorlocked?.image === 'img/tiles/dwarven-door-closed.png', 'ordinary lock uses closed-door art')
       check(RENDER_STYLE.terrainTiles.dwarvendoorbreached?.image === 'img/tiles/dwarven-door-breached.png', 'breached-door art')
       check(WORLD_GEN_CONFIG.dungeons.dwarvenRuins.doors.ordinaryLockedDoorChance === 0.10,
         'ordinary procedural lock frequency is 10% per doorway pair')

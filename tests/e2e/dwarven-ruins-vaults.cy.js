@@ -167,6 +167,12 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
               'ordinary Prison room contains a barred side-cell subdivision')
             const lock = (room.internalLocks || []).find(lock => lock.kind === 'prisonCell')
             check(!!lock, 'ordinary Prison side cell is actually locked')
+            check(lock.leaves.length === 1 && level.map[lock.leaves[0].y]?.[lock.leaves[0].x] === 'dwarvenprisondoorlocked',
+              'prison cell uses its own single-leaf barred door, not the ordinary room entrance')
+            const cellDoor = lock.leaves[0]
+            check([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) =>
+              level.map[cellDoor.y+dy]?.[cellDoor.x+dx] === 'dwarvenprisonbars'),
+              'barred prison door is adjacent to its prison partition')
             check(groundItems.some(item => item.level === z && item.kind === 'dwarvenkey' && item.keyId === lock.keyId),
               'ordinary Prison cell lock has a reachable matching local key')
           }

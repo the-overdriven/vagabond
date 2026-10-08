@@ -1427,7 +1427,7 @@ function dungeonWalkDistances(cm, start, blocked = null) {
 // interaction (open/unlock/breach). This is deliberately separate from normal
 // pathfinding so it cannot make a locked gate traversable during play.
 function dungeonWalkDistancesWithDoorTraversal(cm, start) {
-  const traversableDoor = new Set(['dwarvendoorclosed','dwarvendoorlocked','dwarvengatelocked'])
+  const traversableDoor = new Set(['dwarvendoorclosed','dwarvendoorlocked','dwarvenprisondoorclosed','dwarvenprisondoorlocked','dwarvengatelocked'])
   const DIRS4 = [[0,-1],[0,1],[-1,0],[1,0]]
   const distances = new Map([[keyXY(start.x, start.y), 0]])
   const queue = [{x:start.x, y:start.y}]
@@ -1666,11 +1666,11 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     const lockChance = Math.min(1, Math.max(0, Number(roomDefs.Prison?.internalLockedCellChance ?? 0)))
     const locked = forceLocked || chance(lockChance)
     if (!locked) {
-      cm[door.y][door.x] = 'dwarvendoorclosed'
+      cm[door.y][door.x] = 'dwarvenprisondoorclosed'
       room.internalDoors = [{leaves:[{x:door.x,y:door.y}],kind:'prisonCell',locked:false}]
       continue
     }
-    cm[door.y][door.x] = 'dwarvendoorlocked'
+    cm[door.y][door.x] = 'dwarvenprisondoorlocked'
     const keyId = dwarvenDungeonLockId(floorZ, 'door', [door])
     const reachable = dungeonWalkDistances(cm, entry)
     const candidates = []
@@ -4342,11 +4342,13 @@ function spawnDwarvenRuinsChests() {
 function dungeonGenerationLockLeavesAt(cm, x, y) {
   const tile = cm[y]?.[x]
   const isGate = tile === 'dwarvengatelocked'
-  const isDoor = tile === 'dwarvendoorlocked'
+  const isDoor = tile === 'dwarvendoorlocked' || tile === 'dwarvenprisondoorlocked'
   if (!isGate && !isDoor) return []
   const family = isGate
     ? new Set(['dwarvengatelocked','dwarvengateopen','dwarvengatebreached'])
-    : new Set(['dwarvendoorlocked','dwarvendoorbreached'])
+    : tile === 'dwarvenprisondoorlocked'
+      ? new Set(['dwarvenprisondoorlocked','dwarvenprisondoorbreached'])
+      : new Set(['dwarvendoorlocked','dwarvendoorbreached'])
   const leaves = [{x,y}]
   const adjacent = [[0,-1],[-1,0],[1,0],[0,1]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
     .filter(p => family.has(cm[p.y]?.[p.x]))
@@ -4364,8 +4366,8 @@ function dungeonGenerationReachableWithKeys(cm, start, z, heldKeys) {
       const x=p.x+dx, y=p.y+dy, key=keyXY(x,y)
       if (x<0 || y<0 || x>=MAP_W || y>=MAP_H || seen.has(key)) continue
       const tile = cm[y]?.[x]
-      let passable = !!TILE[tile]?.walk || tile === 'dwarvendoorclosed'
-      if (!passable && (tile === 'dwarvendoorlocked' || tile === 'dwarvengatelocked')) {
+      let passable = !!TILE[tile]?.walk || tile === 'dwarvendoorclosed' || tile === 'dwarvenprisondoorclosed'
+      if (!passable && (tile === 'dwarvendoorlocked' || tile === 'dwarvenprisondoorlocked' || tile === 'dwarvengatelocked')) {
         const kind = tile === 'dwarvengatelocked' ? 'gate' : 'door'
         const lockId = dwarvenDungeonLockId(z, kind, dungeonGenerationLockLeavesAt(cm,x,y))
         passable = heldKeys.has(lockId)

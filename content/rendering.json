@@ -603,7 +603,7 @@
       "mirrorX": true
     },
     "dwarvendoorlocked": {
-      "image": "img/tiles/dwarven-door-locked.png",
+      "image": "img/tiles/dwarven-door-closed.png",
       "baseTileKey": "marble",
       "scale": 1
     },
@@ -613,16 +613,36 @@
       "scale": 1
     },
     "dwarvengatelocked": {
-      "image": "img/tiles/dwarven-gate-locked.png",
+      "image": "img/tiles/dwarven-door-closed.png",
       "baseTileKey": "marble",
       "scale": 1
     },
     "dwarvengateopen": {
-      "image": "img/tiles/dwarven-gate-open.png",
+      "image": "img/tiles/dwarven-door-open.png",
       "baseTileKey": "marble",
       "scale": 1
     },
     "dwarvengatebreached": {
+      "image": "img/tiles/dwarven-door-breached.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenprisondoorclosed": {
+      "image": "img/tiles/dwarven-prison-door-locked.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenprisondoorlocked": {
+      "image": "img/tiles/dwarven-prison-door-locked.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenprisondooropen": {
+      "image": "img/tiles/dwarven-gate-open.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvenprisondoorbreached": {
       "image": "img/tiles/dwarven-gate-breached.png",
       "baseTileKey": "marble",
       "scale": 1

@@ -59,6 +59,7 @@ const PRECACHE_URLS = [
   './img/tiles/dwarven-table.png',
   './img/tiles/dwarven-crate.png',
   './img/tiles/dwarven-prison-bars.png',
+  './img/tiles/dwarven-prison-door-locked.png',
   './img/tiles/dwarven-floor-trap-0.png',
   './img/tiles/dwarven-floor-trap-1.png',
   './img/tiles/dwarven-traps-atlas.png',
