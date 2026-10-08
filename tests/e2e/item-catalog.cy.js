@@ -218,7 +218,12 @@ describe('Non-gear item catalog', () => {
   })
 
   it('brews only affordable whole potions across herb stacks without turns or RNG', () => {
-    beginNewGame('Brewing Tester')
+    // Brewing needs the loaded item catalog, not a randomly generated world.
+    // Keep world generation out of this unit-like E2E case: failed procedural
+    // generation must be diagnosed by the dedicated worldgen tests instead.
+    cy.visit('/')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.get('#loadingOverlay').should('not.be.visible')
     cy.window().then(win => {
       const results = win.eval(`(() => {
         const cases = [
