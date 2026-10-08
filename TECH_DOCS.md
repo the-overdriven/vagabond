@@ -646,7 +646,15 @@ these textures; `marble` has a lighter stone-floor image, and walkable
 `cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt stairs,
 mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
 coffin images over the appropriate floor. The regular coffin already uses
-`specialTiles.coffin`. ASCII mode still displays the terrain glyphs.
+`specialTiles.coffin`. Dwarven rubble and columns are transparent image
+props composited over **the original terrain at their exact map coordinate**,
+not a fixed marble, grass, or neighboring floor guess. The underlay is recorded
+when world generation places the prop and saved with the existing tile-underlay
+data; underground underlays are keyed by depth to keep floors independent.
+Where no underlay is recorded, tile-image mode draws only the transparent prop
+without inserting a fabricated floor. Underground floor textures never inherit
+the surface grass/snow fallback. ASCII mode retains its normal terrain glyph
+and background.
 
 The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
 gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the

@@ -6881,6 +6881,9 @@ more difficult:
   }
 
   function tileBackground(x, y, tileKey) {
+    // These sprites must not paint a synthetic floor behind their alpha.
+    // The floor, when present, is composited from the recorded underlay.
+    if (USE_TILE_IMAGES && (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')) return 'transparent'
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
     if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
@@ -7102,6 +7105,12 @@ more difficult:
     if (tileKey === 'snowmountain') return 'snow'
     if (tileKey === 'marble') return null
 
+    // Rubble and columns are transparent on every level. Render the terrain
+    // that was at this exact coordinate before the prop replaced the map cell.
+    // Never substitute marble, grass or a guessed neighboring biome.
+    if (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')
+      return tileUnderlays[tileUnderlayKey(x, y, currentZ)] || null
+
     const neighbors = [
       map?.[y - 1]?.[x],
       map?.[y + 1]?.[x],
@@ -7119,6 +7128,10 @@ more difficult:
       if (currentZ < 0) return currentZ === -1 ? 'cavefloor' : 'cavefloor2'
     }
     if (tileKey === 'dwarvengate' && currentZ < 0) return 'marble'
+
+    // Everything below is a surface-biome heuristic. Underground floor images
+    // are already the ground; they must not recursively acquire grass underlays.
+    if (currentZ < 0) return null
 
     // Surface transparent objects should prefer the visible neighbouring biome.
     const snowCount = neighbors.filter(t => t === 'snow' || t === 'taiga' || t === 'snowmountain').length

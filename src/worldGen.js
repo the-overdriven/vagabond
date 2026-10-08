@@ -40,9 +40,13 @@ function combineWeightedNoise(noiseFunctions, weights, x, y, width, height) {
 
 let map = [] // map[y][x] = tile key string
 let surfaceMap = null
-// Transparent landmark/biome glyphs replace their map tile in storage, so
-// remember what terrain was underneath them for rendering and saves.
+// Transparent terrain props replace their map cell but render on top of its
+// original floor. Surface keys remain x,y; underground keys include the depth
+// so a prop at the same coordinates on another floor cannot borrow its ground.
 let tileUnderlays = {}
+function tileUnderlayKey(x, y, z = 0) {
+  return z === 0 ? keyXY(x, y) : `${z}:${keyXY(x, y)}`
+}
 // Visual-only trees scattered through broad grassland.
 let grasslandTrees = new Set()
 let undergroundMap = null       // z:-1 shared map (storage)
@@ -1097,8 +1101,13 @@ function buildDwarvenRuin(targetLevel) {
   }
   const gate = pick(candidates), x0 = gate.x, y0 = gate.y
   map[y0][x0] = 'dwarvengate'
-  if (x0 > 0) map[y0][x0 - 1] = 'dwarvenstatue'
-  if (x0 < MAP_W - 1) map[y0][x0 + 1] = 'dwarvenstatue'
+  // Preserve the exact terrain displaced by each surface column, including
+  // snowy mountains and other non-grass entrance surroundings.
+  for (const sx of [x0 - 1, x0 + 1]) {
+    if (sx < 0 || sx >= MAP_W) continue
+    tileUnderlays[tileUnderlayKey(sx, y0)] = map[y0][sx]
+    map[y0][sx] = 'dwarvenstatue'
+  }
   if (surfaceMap) {
     surfaceMap[y0][x0] = 'dwarvengate'
     if (x0 > 0) surfaceMap[y0][x0 - 1] = 'dwarvenstatue'
@@ -1175,9 +1184,14 @@ function buildDwarvenRuin(targetLevel) {
   }
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
   cm[y0][x0] = targetLevel ? 'dwarvenfortexit' : 'dwarvengate'
+  const fortOverlayUnderlays = {}
   for (let i = 0; i < cfg.collapseAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
-    if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > cfg.collapseMinGateDistance) cm[y][x] = chance(cfg.rubbleChance) ? 'dwarvenrubble' : 'dwarvenwall'
+    if (cm[y][x] === 'marble' && Math.abs(x - x0) + Math.abs(y - y0) > cfg.collapseMinGateDistance) {
+      const rubble = chance(cfg.rubbleChance)
+      if (rubble) fortOverlayUnderlays[keyXY(x, y)] = cm[y][x]
+      cm[y][x] = rubble ? 'dwarvenrubble' : 'dwarvenwall'
+    }
   }
   // Final connectivity repair: every outermost walkable fort tile must
   // have a path to the gate.  Room walls and rubble can otherwise seal
@@ -1235,6 +1249,10 @@ function buildDwarvenRuin(targetLevel) {
   dwarvenRuin = {x: x0, y: y0, caveIndex: ruinMaps.length - 1, level: targetLevel ? -3 : -1}
   const ghost = ENEMY_TEMPLATES.find(t => t.name === 'Ghost')
   const ruinLevel = targetLevel ? -3 : -1
+  for (const [xy, floor] of Object.entries(fortOverlayUnderlays)) {
+    const [x, y] = xy.split(',').map(Number)
+    if (cm[y]?.[x] === 'dwarvenrubble') tileUnderlays[`${ruinLevel}:${xy}`] = floor
+  }
   if (ghost) {
     // Spawn eight ghosts on actual fort floor tiles
     const ghostSpots = []
@@ -1543,7 +1561,7 @@ function deriveDwarvenTacticalSlots(cm, room, roleCounts = null) {
   }
 }
 
-function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set()) {
+function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}) {
   if (!room || room.archetype === 'Entrance Hall') return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
   const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
@@ -1572,6 +1590,8 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
     let placed = 0
     for (const p of shuffle(pool)) {
       if (cm[p.y]?.[p.x] !== 'marble' || protectedTile(p)) continue
+      if (tile === 'dwarvenrubble' || tile === 'dwarvenstatue')
+        overlayUnderlays[keyXY(p.x, p.y)] = cm[p.y][p.x]
       cm[p.y][p.x] = tile
       if (++placed >= count) break
     }
@@ -1965,6 +1985,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const minX = Math.max(2, entry.x - boundsX), maxX = Math.min(MAP_W - 3, entry.x + boundsX)
   const minY = Math.max(2, entry.y - boundsY), maxY = Math.min(MAP_H - 3, entry.y + boundsY)
   const cm = blankCaveMap()
+  const overlayUnderlays = {}
 
   const carve = (x, y) => {
     if (x >= minX && x <= maxX && y >= minY && y <= maxY) cm[y][x] = 'marble'
@@ -2069,7 +2090,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] !== 'marble') continue
     if (Math.abs(x - entry.x) + Math.abs(y - entry.y) <= cfg.collapseMinEntranceDistance) continue
-    cm[y][x] = chance(cfg.rubbleChance) ? 'dwarvenrubble' : 'dwarvenwall'
+    const rubble = chance(cfg.rubbleChance)
+    if (rubble) overlayUnderlays[keyXY(x, y)] = cm[y][x]
+    cm[y][x] = rubble ? 'dwarvenrubble' : 'dwarvenwall'
   }
 
   // Repair any collapse/wall combination that detached an outer walkable tile.
@@ -2344,7 +2367,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     ...ordinaryKeys.map(k => keyXY(k.x, k.y))
   ])
   for (const room of roomMetas) {
-    decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved)
+    decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved, overlayUnderlays)
     if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
   }
   if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
@@ -2436,6 +2459,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     artifactRoomId: serializableArtifactRoom?.id || null,
     _artifactRoom: serializableArtifactRoom,
     _artifactSpot: artifactSpot,
+    // Local, visual-only underlays; committed only after this generated floor
+    // has passed validation (failed generation retries must not leak entries).
+    _overlayUnderlays: overlayUnderlays,
     // Only needed during world creation; actors themselves persist in saves.
     _encounterRooms: serializableRooms,
     _doorways: structuralDoors.map(d => ({leaves: d.leaves, room: {x:d.room.cx,y:d.room.cy}}))
@@ -2542,6 +2568,13 @@ function buildDwarvenRuinsStratum() {
       level = createDwarvenRuinsFloor(entry, floorIndex, levelCount)
     }
     if (!level) return false
+    const z = chainZForDepth(floorIndex + 4)
+    for (const [xy, floor] of Object.entries(level._overlayUnderlays || {})) {
+      const [x, y] = xy.split(',').map(Number)
+      if (['dwarvenrubble', 'dwarvenstatue'].includes(level.map[y]?.[x]))
+        tileUnderlays[`${z}:${xy}`] = floor
+    }
+    delete level._overlayUnderlays
     deepLevels.push(level)
     if (level.progressionKey) {
       const key = level.progressionKey
