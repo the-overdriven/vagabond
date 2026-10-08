@@ -1008,7 +1008,10 @@ Closed wooden doors (including ordinary locks and mandatory progression gates)
 block movement, sight and projectiles. Barred prison doors instead block only movement
 while allowing sight and projectiles through the bars, even when locked. Their
 adjacent prison-bar partitions follow the same sight and projectile rules. Keys are tied
-to a specific physical lock rather than acting as universal Dwarven keys. Auto-travel may plan through a locked door/gate only when the
+to a specific physical lock rather than acting as universal Dwarven keys.
+Inspecting a Dwarven Key also states its originating underground floor
+(e.g. `Found on floor -5.`), determined from its existing lock identity;
+keys retain that label through save, load and replay. Auto-travel may plan through a locked door/gate only when the
 matching key is already carried; it never chooses weapon breaching on the
 player's behalf. Humanoids can still open ordinary *unlocked* doors, but do not
 unlock or breach locked doors. Ethereal movement keeps its existing terrain-
@@ -1401,6 +1404,20 @@ uses **z:-2**. A z value identifies depth, not a unique map. The crypt's
 dedicated `cryptstairsdown` / `cryptstairsup` transitions and the saved
 `currentLevelKind` distinguish Crypt Level 2 from the generic z:-2 cave map.
 
+## Whole-world cardinal rotation
+
+Once a newly generated world has passed the dungeon population validator and
+all actors and loot have been placed, one seeded roll chooses
+one of four orientations with equal **25%** probability: unchanged (cold north),
+90° clockwise (cold east), 180° (cold south) or 270° (cold west). This is a true
+map rotation, not a movement or temperature modifier: the surface, shared caves,
+crypt, Dwarven Fort, every deeper Ruins floor, entrances, stairs, locks and their
+keys, traps and projectile directions, and terrain underlays are transformed
+together. On rectangular worlds, a quarter-turn swaps width and height. Stored
+coordinates already describe the rotated layout, so save/replay needs no new
+rotation flag, and seeded gameplay remains deterministic. Cosmetic cave decorations
+are then hashed against the final rotated coordinates without consuming RNG.
+
 ## z:-1: Shared cave layer (includes crypt and mausoleum)
 
 Normal caves are generated on the shared underground map.
@@ -1542,8 +1559,9 @@ Up to six initial caves are attempted.
 Ordinary caves on z:-1 and z:-2 contain cobwebs, small stalagmite clusters and
 small mushrooms. These are cosmetic overlays: they do not block movement,
 vision or projectiles, alter terrain bonuses, slow actors, offer harvesting or
-loot, or participate in quests. Crypts, mausoleums and the Dwarven Fort are
-excluded. A clear floor tile at least three tiles from every entrance or stair
+loot, or participate in quests. Crypts and mausoleums are excluded. The Dwarven Fort and deeper
+Dwarven Ruins also receive webs only (35% of eligible masonry-wall corners),
+without extra stalagmites or mushrooms. The same deterministic hash applies. A clear floor tile at least three tiles from every entrance or stair
 is eligible, provided it initially contains no creature or ground item.
 Webs additionally require cave walls on two perpendicular sides and orient
 their sprites toward those walls.
@@ -4340,7 +4358,9 @@ Slips and new far routes use seeded RNG; animation timing never drives gameplay.
 Only surface, non-flying, non-humanoid `far` wanderers leave tracks. Each successful
 idle travel step (including a random detour) with a valid stored destination has
 one seeded **3%** roll. Waiting, blocked movement, attacks, pursuit, teleports and
-other wander modes produce no tracks and consume no track RNG. Tracks occupy the
+other wander modes produce no tracks and consume no track RNG. Unfrozen
+rivers and other open water do not retain tracks or consume track RNG; frozen
+river tiles do. Tracks occupy the
 vacated tile; a new impression replaces any existing track on that tile.
 
 The bearing is the nearest of eight compass directions from the track tile to the

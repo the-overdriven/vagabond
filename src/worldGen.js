@@ -552,6 +552,140 @@ function placeVolcanoes() {
 // A temple walled in by mountains with no route to any map edge is a dead
 // world - the player could never reach the edges or most of the content. We
 // don't repair such a map, we throw it away and roll a fresh one.
+// Turn an accepted, fully populated world clockwise. No rule/animation RNG is
+// consumed while moving generated data; a single seeded roll selects 0/1/2/3.
+// Coordinates on every underground map share surface world space.
+function rotateGeneratedWorld(quarterTurns) {
+  const turns = ((quarterTurns % 4) + 4) % 4
+  if (!turns) return
+  const width = MAP_W, height = MAP_H
+  const point = (x, y) => {
+    if (turns === 1) return {x: height - 1 - y, y: x}
+    if (turns === 2) return {x: width - 1 - x, y: height - 1 - y}
+    return {x: y, y: width - 1 - x}
+  }
+  const vector = (x, y) => turns === 1 ? {x: -y, y: x} :
+    turns === 2 ? {x: -x, y: -y} : {x: y, y: -x}
+  const rotatedWidth = turns % 2 ? height : width
+  const rotatedHeight = turns % 2 ? width : height
+  const visitedGrids = new WeakMap()
+  const grid = original => {
+    if (!Array.isArray(original) || !original.length || !Array.isArray(original[0])) return original
+    if (visitedGrids.has(original)) return visitedGrids.get(original)
+    const result = Array.from({length:rotatedHeight}, () => new Array(rotatedWidth))
+    visitedGrids.set(original, result)
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const to = point(x,y)
+      result[to.y][to.x] = original[y][x]
+    }
+    return result
+  }
+  // The dungeon key is a deterministic coordinate-derived identifier. Rewrite
+  // the leaves as well as the tile positions, so matching keys still unlock.
+  const rotatedLockId = id => {
+    if (typeof id !== 'string') return id
+    const match = id.match(/^(.+?:-\d+:(?:gate|door):)(\d+,\d+(?:\|\d+,\d+)*)$/)
+    if (!match) return id
+    const leaves = match[2].split('|').map(pair => {
+      const [x,y] = pair.split(',').map(Number)
+      return point(x,y)
+    }).sort((a,b) => a.y - b.y || a.x - b.x)
+    return match[1] + leaves.map(p => `${p.x},${p.y}`).join('|')
+  }
+  const seen = new WeakSet()
+  const positions = (value) => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return
+    seen.add(value)
+    if (Array.isArray(value)) {
+      value.forEach(positions)
+      return
+    }
+    // Swap room bounding boxes using their four corners. A 90-degree turn
+    // changes width and height, including for non-square map configurations.
+    if (Number.isInteger(value.x1) && Number.isInteger(value.y1) &&
+        Number.isInteger(value.x2) && Number.isInteger(value.y2)) {
+      const corners = [point(value.x1,value.y1), point(value.x2,value.y2),
+        point(value.x1,value.y2), point(value.x2,value.y1)]
+      value.x1 = Math.min(...corners.map(p => p.x))
+      value.x2 = Math.max(...corners.map(p => p.x))
+      value.y1 = Math.min(...corners.map(p => p.y))
+      value.y2 = Math.max(...corners.map(p => p.y))
+    }
+    if (Number.isInteger(value.w) && Number.isInteger(value.h) &&
+        Number.isInteger(value.x) && Number.isInteger(value.y)) {
+      // Room x/y identifies the top-left of a rectangular footprint.
+      const corners = [point(value.x,value.y), point(value.x+value.w-1,value.y),
+        point(value.x,value.y+value.h-1), point(value.x+value.w-1,value.y+value.h-1)]
+      value.x = Math.min(...corners.map(p => p.x))
+      value.y = Math.min(...corners.map(p => p.y))
+      if (turns % 2) [value.w,value.h] = [value.h,value.w]
+    } else if (Number.isInteger(value.x) && Number.isInteger(value.y)) {
+      const p = point(value.x,value.y)
+      value.x = p.x; value.y = p.y
+    }
+    for (const [xx,yy] of [['cx','cy'],['homeX','homeY'],['farTargetX','farTargetY'],
+      ['forestConcealX','forestConcealY'],['farPrevX','farPrevY'],
+      ['lastSeenX','lastSeenY']]) {
+      if (!Number.isInteger(value[xx]) || !Number.isInteger(value[yy])) continue
+      const p = point(value[xx],value[yy]); value[xx] = p.x; value[yy] = p.y
+    }
+    if (Number.isInteger(value.dx) && Number.isInteger(value.dy)) {
+      const v = vector(value.dx,value.dy); value.dx = v.x; value.dy = v.y
+    }
+    if (typeof value.keyId === 'string') value.keyId = rotatedLockId(value.keyId)
+    if (typeof value.rotation === 'number' && value.kind === 'web') value.rotation = (value.rotation + turns) % 4
+    for (const [name, child] of Object.entries(value)) {
+      if (name === 'map' || name === 'caveMaps' || name === 'discovered') continue
+      if (name === 'keyId') continue
+      positions(child)
+    }
+  }
+  const coordsFromKey = key => {
+    const match = key.match(/^(?:(-\d+):)?(\d+),(\d+)$/)
+    if (!match) return key
+    const p = point(Number(match[2]), Number(match[3]))
+    return (match[1] ? match[1] + ':' : '') + keyXY(p.x,p.y)
+  }
+  const rekeySet = input => new Set([...input].map(coordsFromKey))
+  const rekeyObject = obj => Object.fromEntries(Object.entries(obj).map(([key,val]) => [coordsFromKey(key),val]))
+
+  map = grid(map)
+  surfaceMap = map
+  undergroundMap = grid(undergroundMap)
+  caveMaps = caveMaps.map(grid)
+  undergroundDiscoveredL1 = grid(undergroundDiscoveredL1)
+  discovered = grid(discovered)
+  for (const level of deepLevels) {
+    level.map = grid(level.map)
+    level.caveMaps = (level.caveMaps || []).map(grid)
+    level.discovered = grid(level.discovered)
+  }
+  if (cryptLevel2) {
+    cryptLevel2.map = grid(cryptLevel2.map)
+    cryptLevel2.discovered = grid(cryptLevel2.discovered)
+    positions(cryptLevel2)
+  }
+  // The local mausoleum template is not a full-world grid. Its playable cells
+  // already belong to the rotated z:-1 map; keep the template as a local sketch.
+  positions(caves); positions(deepLevels); positions(dungeonShortcuts)
+  positions(villageHuts); positions(enemies); positions(groundItems)
+  positions(npcs); positions(caveDecorations)
+  for (const value of [spawnPoint, villageCenter, mausoleumHutPos,
+    dwarvenRuin, bigBellPos, blackPillarPos, cryptCaveExclusionCenter,
+    treasureMapSpot, fishermanHut, fishermanQuest, oldHunterQuest]) positions(value)
+  grasslandTrees = rekeySet(grasslandTrees)
+  tileUnderlays = rekeyObject(tileUnderlays)
+  cemeteryTombstones = rekeyObject(cemeteryTombstones)
+  if (gravediggerGraveKey) gravediggerGraveKey = coordsFromKey(gravediggerGraveKey)
+  foragedTiles = rekeySet(foragedTiles)
+  dugSandTiles = rekeySet(dugSandTiles)
+  occupied = rekeySet(occupied)
+  MAP_W = rotatedWidth; MAP_H = rotatedHeight
+  // Discovery and render caches point to the new grids from now on.
+  undergroundDiscovered = undergroundDiscoveredL1
+  minimapDirty = true
+}
+
 function generateMap() {
   const worldAttempts = MAX_WORLD_ATTEMPTS
   for (let attempt = 1; attempt <= worldAttempts; attempt++) {
@@ -5235,6 +5369,26 @@ function spawnCaveDecorations() {
           used.add(key)
         }
       }
+    }
+  }
+
+  // Dwarven Fort and deeper Ruins: webs cling to actual masonry corners.
+  // Use the same coordinate hash as ordinary caves, preserving game RNG.
+  for (let index = 1; index < deepLevels.length; index++) {
+    const layer = deepLevels[index]
+    if (!layer?.map || !['dwarvenFort','dwarvenRuins'].includes(layer.kind)) continue
+    const level = chainZForDepth(index + 2)
+    const occupiedProps = new Set([...groundItems, ...enemies.filter(e => e.alive)]
+      .filter(entity => entity.level === level).map(entity => keyXY(entity.x,entity.y)))
+    const entrances = (layer.caves || []).flatMap(c => c.entrances || [])
+    for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+      if (layer.map[y][x] !== 'marble' || occupiedProps.has(keyXY(x,y))) continue
+      if (entrances.some(e => Math.max(Math.abs(e.x-x), Math.abs(e.y-y)) <= cfg.entranceClearance)) continue
+      const wall = (dx,dy) => layer.map[y+dy]?.[x+dx] === 'dwarvenwall'
+      if (!((wall(0,-1) || wall(0,1)) && (wall(-1,0) || wall(1,0)))) continue
+      if (roll(x,y,level) >= 0.35) continue
+      caveDecorations.push({x,y,kind:'web',level,levelKind:'chain',caveIndex:-1,
+        rotation: wall(0,-1) ? (wall(-1,0) ? 0 : 1) : (wall(1,0) ? 2 : 3)})
     }
   }
 }

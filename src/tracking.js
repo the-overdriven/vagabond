@@ -19,6 +19,8 @@ function trackDirection(dx, dy) {
 function leaveBeastTrack(enemy, fromX, fromY) {
   if (currentZ !== 0 || enemyWanderMode(enemy) !== 'far' || enemyHasAbility(enemy, 'fly') || enemy.humanoid) return
   if (Math.max(Math.abs(enemy.x - fromX), Math.abs(enemy.y - fromY)) !== 1) return
+  // Water washes tracks away; frozen rivers keep their normal evidence.
+  if (map[fromY]?.[fromX] === 'river' || map[fromY]?.[fromX] === 'water') return
   if (!Number.isInteger(enemy.farTargetX) || !Number.isInteger(enemy.farTargetY) ||
       !enemyCanTraverse(enemy, enemy.farTargetX, enemy.farTargetY)) return
   const direction = trackDirection(enemy.farTargetX - fromX, enemy.farTargetY - fromY)

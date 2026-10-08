@@ -86,6 +86,25 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('never leaves tracks on flowing water, but allows them on frozen rivers', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const originalRng=rng, originalTile=map[40][40]
+      let calls=0
+      try {
+        rng=()=>{calls++;return 0}
+        for (const water of ['river','water']) {
+          map[40][40]=water
+          beastTracks.clear()
+          leaveBeastTrack(trackEnemy({x:41}),40,40)
+          trackAssert(beastTracks.size===0 && calls===0, 'water leaves no tracks or RNG: '+water)
+        }
+        map[40][40]='frozenriver'
+        leaveBeastTrack(trackEnemy({x:41}),40,40)
+        trackAssert(beastTracks.size===1 && calls===1,'frozen river retains tracks')
+      } finally {map[40][40]=originalTile;rng=originalRng}
+    })()`))
+  })
+
   it('keeps hover generic and reveals freshness/species only to a trained tracker', () => {
     cy.window().then(win => win.eval(`(() => {
       const t = {x:40,y:40,direction:1,species:'Wolf',age:0}

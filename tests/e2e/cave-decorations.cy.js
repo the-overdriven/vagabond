@@ -79,7 +79,14 @@ describe('Decorative caves and deep threat rarity', () => {
         const terrainBefore=JSON.stringify(undergroundMap)
         resetForNewCharacter()
         check(JSON.stringify(caveDecorations)===original && JSON.stringify(undergroundMap)===terrainBefore,'reused world keeps cosmetic layout')
-        check(!caveDecorations.some(p=>p.level===-3),'fort excluded')
+        const fortWebs=caveDecorations.filter(p=>p.level<=-3)
+        check(fortWebs.length>0 && fortWebs.every(p=>p.kind==='web'), 'dwarven masonry receives webs')
+        for(const p of fortWebs) {
+          const floor=deepLevels[-p.level-2]
+          check(floor.map[p.y][p.x]==='marble','dwarven web on floor')
+          const wall=(dx,dy)=>floor.map[p.y+dy]?.[p.x+dx]==='dwarvenwall'
+          check((wall(0,-1)||wall(0,1))&&(wall(-1,0)||wall(1,0)),'dwarven wall corner')
+        }
         check(dwarvenRuin && deepLevels[1],'fort still generated')
       })()`))
     })

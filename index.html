@@ -5192,7 +5192,9 @@ more difficult:
     inspect: idx => {
       if (!canUseItemsWhileSwimming()) return
       const item = player.inventory[idx]
-      log(itemDefinition(item.kind).description || item.description, 'info')
+      const description = itemDefinition(item.kind).description || item.description
+      const floor = item.kind === 'dwarvenkey' ? Number(item.keyId?.split(':')[1]) : NaN
+      log(description + (Number.isInteger(floor) && floor < 0 ? ` Found on floor ${floor}.` : ''), 'info')
     },
     inscription: idx => {
       if (!canUseItemsWhileSwimming()) return
@@ -11118,7 +11120,13 @@ more difficult:
       clearGroundItemsUnderMerchant()
       spawnEdgeHighTierChests()
       placeFisherman()
+      rotateGeneratedWorld(randInt(0, 3))
+      player.x = spawnPoint.x
+      player.y = spawnPoint.y
+      // Decorations are hashed against final coordinates so regeneration is
+      // idempotent even in a rotated world, without advancing gameplay RNG.
       spawnCaveDecorations()
+      invalidateUndergroundFov()
       rebuildMinimapBases()
       ensureMerchantStock()
       stopDeathTransition()
