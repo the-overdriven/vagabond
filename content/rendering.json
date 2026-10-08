@@ -678,13 +678,8 @@
       "scale": 1
     },
     "dwarvenspikes": {
-      "image": "img/tiles/dwarven-traps-atlas.png",
-      "sourceRect": [
-        640,
-        300,
-        330,
-        302
-      ],
+      "image": "img/tiles/dwarven-floor-trap-0.png",
+      "activeImage": "img/tiles/dwarven-floor-trap-1.png",
       "baseTileKey": "marble",
       "scale": 1
     },

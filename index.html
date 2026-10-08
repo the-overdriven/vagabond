@@ -7135,6 +7135,15 @@ more difficult:
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
 
+    // A spike trap is raised while someone occupies its tile. This is a
+    // presentation-only state: trap damage still resolves on entry, and no
+    // animation frame or saved flag affects gameplay or replay.
+    if (tileKey === 'dwarvenspikes') {
+      const occupiedByPlayer = player.x === x && player.y === y
+      const occupiedByEnemy = enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y)
+      return occupiedByPlayer || occupiedByEnemy ? {...visual, image: visual.activeImage} : visual
+    }
+
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y))
       return {...(RENDER_STYLE.terrainTiles?.cavefloorBrown || visual), flipX: !!(x & 1), flipY: !!(y & 1)}
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}

@@ -1068,7 +1068,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v76**, save schema **39**; older saves are rejected.
+**v77**, save schema **39**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -1109,9 +1109,13 @@ optional emitter, direction and range. Schema 35 restores it directly alongside
 terrain, including replay initial snapshots.
 
 ASCII glyphs are `^` for spikes, `_` for pressure plates and `!` for wall-arrow
-emitters. Image mode uses the generated trap atlas and a separate pressure
-plate tile. Rendering supports `sourceRect: [x, y, width, height]` for atlas
-regions without changing the gameplay tile. Shared underground FOV now honors
+emitters. In image mode, spike traps use `dwarven-floor-trap-0.png` when empty
+and `dwarven-floor-trap-1.png` while the player or a living monster occupies
+the tile. Occupancy changes the displayed image only; spikes still deal damage
+on entry, not each turn spent standing on them. The arrow emitter still uses
+the trap atlas, and its pressure plate has a separate tile. Rendering supports
+`sourceRect: [x, y, width, height]` for atlas regions without changing the
+gameplay tile. Shared underground FOV now honors
 `TILE.blocksSight`, so closed doors, levers and arrow walls block sight.
 The supplied service worker now precaches the trap module and images for offline play.
 
