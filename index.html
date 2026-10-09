@@ -356,6 +356,16 @@ more difficult:
         </div>
         <div class="race-grid" id="raceGrid"></div>
         <div class="race-foot">
+          <label class="world-size-option" for="worldSizeSelect">World size
+            <select id="worldSizeSelect" aria-label="World size">
+              <option value="XS">XS</option>
+              <option value="S">S</option>
+              <option value="M">M</option>
+              <option value="L" selected>L</option>
+              <option value="XL">XL</option>
+              <option value="XXL">XXL</option>
+            </select>
+          </label>
           <div class="race-options">
             <label class="permadeath-option" for="permadeathToggle"><input type="checkbox" id="permadeathToggle">
               Permadeath</label>
@@ -690,9 +700,14 @@ more difficult:
   let BASE_WEAPONS = []
   let activeWorldTraits = [] // resolved effect values, stored in saves and replay snapshots
 
-  function applyWorldTraits(traits) {
+  function applyWorldTraits(traits, size = BASE_MAP_CONFIG.world.defaultSize) {
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
     const mapConfig = structuredClone(BASE_MAP_CONFIG)
+    const side = mapConfig.world.sizePresets?.[size]
+    if (!Number.isInteger(side) || side <= 0 || !Object.hasOwn(mapConfig.world.sizePresets, size))
+      throw new Error('Invalid world size selection.')
+    mapConfig.world.width = side
+    mapConfig.world.height = side
     for (const trait of traits) {
       if (!Array.isArray(trait.effects)) throw new Error('Invalid world trait effects.')
       for (const effect of trait.effects) {
@@ -710,14 +725,6 @@ more difficult:
               weights[result] += empty * effect.value / 2 / width
             }
           } else for (const result of ['berries', 'herb', 'mushroom']) weights[result] *= 1 - effect.value
-          continue
-        }
-        if (effect.type === 'scale_area') {
-          if (!Number.isFinite(effect.value) || effect.value < 0.5 || effect.value > 1.25)
-            throw new Error('Invalid world area scale.')
-          const scale = Math.sqrt(effect.value)
-          mapConfig.world.width = Math.round(BASE_MAP_CONFIG.world.width * scale)
-          mapConfig.world.height = Math.round(BASE_MAP_CONFIG.world.height * scale)
           continue
         }
         const path = effect.param?.split('.')
@@ -751,7 +758,7 @@ more difficult:
       a.excludes?.includes(b.name) || b.excludes?.includes(a.name)
   }
 
-  function chooseWorldTraits() {
+  function chooseWorldTraits(size = BASE_MAP_CONFIG.world.defaultSize) {
     if (!WORLD_TRAITS.length) throw new Error('No world traits are configured.')
     const {count, min, max} = TRAITS_PER_WORLD
     const requested = count === 'random' ? randInt(min, max) : count
@@ -786,7 +793,7 @@ more difficult:
           : effect.value
       }))
     }))
-    applyWorldTraits(resolved)
+    applyWorldTraits(resolved, size)
   }
   let BELL_GUARD_EXCLUSION_RADIUS, BELL_PILLAR_MIN_DIST
   let ANCIENT_FOREST_SIZE, ANCIENT_FOREST_MIN_VILLAGE_DIST
@@ -11025,6 +11032,11 @@ more difficult:
     const cursedWorldToggle = document.getElementById('cursedWorldToggle')
     cursedWorldToggle.checked = reusingWorldAfterPermadeath && activeWorldTraits.length > 0
     cursedWorldToggle.disabled = reusingWorldAfterPermadeath
+    const worldSizeSelect = document.getElementById('worldSizeSelect')
+    worldSizeSelect.value = reusingWorldAfterPermadeath
+      ? Object.keys(BASE_MAP_CONFIG.world.sizePresets).find(size => BASE_MAP_CONFIG.world.sizePresets[size] === MAP_W) || BASE_MAP_CONFIG.world.defaultSize
+      : BASE_MAP_CONFIG.world.defaultSize
+    worldSizeSelect.disabled = reusingWorldAfterPermadeath
     document.getElementById('replayToggle').checked = false
     const nameInput = document.getElementById('raceName')
     nameInput.value = ''
@@ -11056,8 +11068,9 @@ more difficult:
       player.characterId = Graveyard.newCharacterId()
       if (reusingWorldAfterPermadeath) snapCameraToPlayer()
       else {
-        if (document.getElementById('cursedWorldToggle').checked) chooseWorldTraits()
-        else applyWorldTraits([])
+        const selectedWorldSize = document.getElementById('worldSizeSelect').value
+        if (document.getElementById('cursedWorldToggle').checked) chooseWorldTraits(selectedWorldSize)
+        else applyWorldTraits([], selectedWorldSize)
         await generateNewWorld()
       }
       worldGenerating = false

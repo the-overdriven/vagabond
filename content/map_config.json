@@ -2,7 +2,16 @@
   "world": {
     "width": 260,
     "height": 260,
-    "maxGenerationAttempts": 50
+    "maxGenerationAttempts": 50,
+    "defaultSize": "L",
+    "sizePresets": {
+      "XS": 184,
+      "S": 210,
+      "M": 235,
+      "L": 260,
+      "XL": 290,
+      "XXL": 320
+    }
   },
   "landmarks": {
     "bellGuardExclusionRadius": 8,

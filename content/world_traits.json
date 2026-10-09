@@ -66,17 +66,59 @@
       ]
     },
     {
-      "name": "world_size",
-      "_note": "Scales surface area to 50-125% of the default 260 x 260 tiles (roughly 184 x 184 to 291 x 291). Both dimensions share one area roll; ordinary population scales with eligible walkable area.",
-      "direction": "two_way",
+      "name": "beast_kingdom",
+      "flavor_text": "The wilds belong to claw, horn and fang; armed travellers are few.",
+      "_note": "Ordinary surface non-humanoid species are weighted 2.5x their normal rarity (base 1x), replacing some humanoids without increasing total population. Fewer humanoids means fewer equipment-bearing enemies; special spawns and caves are unchanged.",
+      "direction": "one_way",
+      "excludes": [
+        "drought"
+      ],
       "effects": [
         {
-          "param": "map.world.area",
-          "type": "scale_area",
-          "value": [
-            0.5,
-            1.25
-          ]
+          "param": "surfaceEnemies.nonHumanoidRarityMultiplier",
+          "type": "additive",
+          "value": 1.5
+        }
+      ]
+    },
+    {
+      "name": "drowned_lands",
+      "flavor_text": "Great waters have swallowed valleys and old roads; treasures glimmer beneath the surface.",
+      "_note": "Lowers the inland lake noise threshold 0.72 -> 0.66, deepens lake carving 0.40 -> 0.44, allows 17 river sources instead of 14, raises submerged chest range 15-30 -> 20-38, and shifts desired inland-lake share from 35% to 55% (limited by eligible water). No changes to underwater breathing or ice.",
+      "direction": "one_way",
+      "excludes": [
+        "drought"
+      ],
+      "effects": [
+        {
+          "param": "surface.lakes.noiseThreshold",
+          "type": "additive",
+          "value": -0.06
+        },
+        {
+          "param": "surface.lakes.carveAmount",
+          "type": "additive",
+          "value": 0.04
+        },
+        {
+          "param": "surface.rivers.maxSources",
+          "type": "additive",
+          "value": 3
+        },
+        {
+          "param": "surfaceLoot.submergedChests.countRange.0",
+          "type": "additive",
+          "value": 5
+        },
+        {
+          "param": "surfaceLoot.submergedChests.countRange.1",
+          "type": "additive",
+          "value": 8
+        },
+        {
+          "param": "surfaceLoot.submergedChests.lakeShare",
+          "type": "additive",
+          "value": 0.2
         }
       ]
     },

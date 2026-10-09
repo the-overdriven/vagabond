@@ -318,6 +318,10 @@ function loadGameFromObject(data, opts = {}) {
   }
   if (!decoded) throw new Error('Save file map dimensions do not match.')
   surfaceMap = decoded
+  // Save/replay restores the world size as well as the current map. Subsequent
+  // world-level operations must not fall back to the default L dimensions.
+  unrotatedWorldWidth = savedWidth
+  unrotatedWorldHeight = savedHeight
   dwarvenRuin = null
   for (let y = 0; y < MAP_H && !dwarvenRuin; y++) for (let x = 0; x < MAP_W; x++) {
     if (surfaceMap[y][x] === 'dwarvengate') {

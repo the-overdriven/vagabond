@@ -86,6 +86,8 @@ The overlay blocks input and allows a paint before synchronous generation.
 Character race and Permadeath are set before world generation. Invalid names
 and duplicate Begin clicks cannot start a second world.
 
+**World size** is independently selectable at character creation (XS, S, M, L, XL,
+XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
 On desktop the character-selection overlay stays above gameplay-only overlays
@@ -548,8 +550,19 @@ Direct interaction cancels pathing.
 
 # 9. World
 
-The default surface map is **260 × 260 tiles**. Cursed world can roll
-a different area; see [§85. Cursed World](#85-cursed-world).
+The surface size is selected independently of Cursed world at character creation.
+**L** (260×260 tiles) is the default. The six square presets are configured in
+`content/map_config.json`:
+
+| XS | S | M | L (default) | XL | XXL |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 184×184 | 210×210 | 235×235 | 260×260 | 290×290 | 320×320 |
+
+The selected dimensions remain fixed for the world. Loading a save or starting
+another permadeath character in the same world preserves those dimensions;
+only a newly generated world can select a different size. The surface
+population and ordinary chests scale with eligible walkable terrain, while
+specific landmarks and guaranteed spawns do not multiply with map area.
 
 The world is procedurally generated.
 New worlds have a land boundary to the north; inland lakes remain possible.
@@ -5501,7 +5514,7 @@ NPC- or feature-specific where the corresponding general system remains absent.
 **Movement, world and exploration**
 
 - [x] 8-direction movement, auto-pathing and swimming/drowning
-- [x] Procedural surface; 260×260 default world (variable area under Cursed world)
+- [x] Procedural surface; selectable XS–XXL world size (260×260 L default)
 - [x] Terrain effects, rivers, volcanoes and lava, snow/freezing, taiga and Ancient Forest
 - [x] Temple, village, cemetery, Black Pillar and Big Bell
 - [x] Surface caves, deeper caves, crypt, mausoleum and ordinary cave scenarios
@@ -6226,16 +6239,18 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 
 ## Selection
 
-The **Cursed world** checkbox in character creation is off by default. Its
-brown desktop tooltip warns that this experimental mode can be unbalanced. On
-mobile-sized or touch screens, the three checkboxes form separate full-width
-rows, and the warning appears below them only while Cursed world is checked.
+The **Cursed world** checkbox in character creation is off by default.
+The Cursed world label has a brown desktop tooltip warning that the mode may
+be unbalanced. On mobile-sized or touch screens, the World size selector appears separately and
+the three checkboxes form separate full-width rows. The warning appears below
+them only while Cursed world is checked.
 The desktop tooltip is anchored to
 the Cursed world label; each checkbox sits beside its text with a small fixed
 gap. With the checkbox off, generation
 uses the base configuration and logs no trait line.
 The mobile checkbox layout and the warning's checked/unchecked visibility
-are covered by `tests/e2e/race-options.cy.js`.
+are covered by `tests/e2e/startup-ui.cy.js` and
+`tests/e2e/cursed-world-options.cy.js`.
 After a valid name/race is confirmed, a cursed world draws the requested
 number of traits before world generation. All generation retries use the
 same resolved effects. Each nonempty `flavor_text` is logged on a new line
@@ -6266,7 +6281,7 @@ world rather than revealing the changed parameter.
 This example is illustrative and is not an active trait. Every active trait
 has a human-readable `_note` explaining its mechanical changes relative to
 the base values in
-`world_generation.json` (or `map_config.json` for world size). `_note` is
+`world_generation.json`. `_note` is
 metadata for developers and is not an effect or a player-facing flavor line.
 `count` may be an integer **1–5**, or `"random"` to draw an integer inclusively from `min` to
 `max` (default **1–5**). The chosen count is fixed for this world. Candidates
@@ -6279,7 +6294,7 @@ less likely to be drawn.
 trait IDs. If a conflicting pair appears in the initial draw, a trait marked
 `direction: "one_way"` wins against `"two_way"`, independent of draw order.
 The other candidate is dropped; the selection fills the empty slot with the
-next nonconflicting candidate, if available. The current 40-entry pool has
+next nonconflicting candidate, if available. The current 41-entry pool has
 ample room to reach the configured 1–5 active traits. Group conflicts do not
 make every modifier to a shared parameter exclusive: compatible traits can
 stack, and their numerical effects are applied in selected order.
@@ -6298,15 +6313,11 @@ lower it; a range spanning zero can do either. A trait's several ranges are
 Unknown numeric paths, unsupported types, and nonfinite resolved effects fail
 world generation visibly rather than silently doing nothing.
 
-The special effect `{"param":"map.world.area","type":"scale_area",
-"value":[0.5,1.25]}` changes *surface area*. It scales both default world
-dimensions by the square root of one shared area roll and rounds to tile
-counts. Thus a 260×260 default becomes about **184×184 to 291×291**, not
-130×130 to 325×325. This interpretation preserves the promised 50–125% tile
-area and leaves more room for the guaranteed two distinct z:-2 caves. The
-`world_size` trait has no `flavor_text`, so it logs nothing. The surface
-population and ordinary chests already scale by eligible walkable tiles;
-special guaranteed spawns do not scale by area.
+World size is *not* an effect. Cursed traits only change numeric parameters
+in `content/world_generation.json`; the independent size preset is applied
+when preparing the world's map dimensions. This keeps size deterministic and
+prevents trait selection from silently changing the map area. Save/replay
+snapshots already preserve the actual dimensions of the generated map.
 
 Only `surface.snow.bandFraction` has a dedicated clamp (0.08–0.55). Other
 probabilities and nonnegative sizes are controlled by the configured values
@@ -6326,10 +6337,11 @@ are the current behavior, not future proposals.
 
 | Family | Traits | Behavior and notable constraints |
 | --- | --- | --- |
-| Climate and size | `cold_world`, `wild_weather`, `world_size`, `drought` | Snow expands near the Temple, snow parameters vary both ways, total map area rolls silently, or water and forage become scarce. The two snow climates conflict; specific cold wins. |
+| Climate and dryness | `cold_world`, `wild_weather`, `drought` | Snow expands near the Temple, snow parameters vary both ways, or water and forage become scarce. The two snow climates conflict; specific cold wins. |
 | Cave extent | `hollow_world`, `shallow_earth`, `great_caverns`, `world_beneath_the_world` | Deep layouts enlarge; shallow passages contract with more caves and additional entrances; all caves open up; or more branches, threats and chests appear. These share a cave scale exclusion group. The guaranteed grotto/burrow pair still uses different algorithms. |
 | Deep cave character | `wormways`, `halls_below`, `flooded_depths`, `fungal_bloom`, `deep_bounty` | Optional branches favor burrows or grottos, more grotto water forms, Fungus is more common, or supplies and threats increase together. Wormways and Halls Below conflict; guaranteed distinct z:-2 caves remain. |
-| Forest and wildlife | `ancient_wilderness`, `eyes_in_the_trees`, `wild_frontier`, `migration_season`, `restless_wilds`, `great_migration`, `watchful_world` | Ancient forest/ambush/rough terrain vary; mobile enemies promote to roam/far; grouped migrants start near edges; enemy aggro reach grows by one. Existing underground wall sight checks still apply. Forest and migration themes each have a conflict group. |
+| Forest and wildlife | `ancient_wilderness`, `eyes_in_the_trees`, `wild_frontier`, `migration_season`, `restless_wilds`, `great_migration`, `watchful_world`, `beast_kingdom` | Ancient forest/ambush/rough terrain vary; mobile enemies promote to roam/far; grouped migrants start near edges; enemy aggro reach grows by one. Beast Kingdom increases the share of non-humanoid surface spawns without raising their total count. Forest and migration themes each have a conflict group. |
+| Surface water | `drowned_lands` | More inland lakes and river sources; more submerged chests, biased toward inland lakes when suitable water tiles exist. Drought excludes this trait. Swimming rules and ice mechanics are unchanged. |
 | Enemy quality | `champions_age`, `mundane_age`, `wild_blood`, `uncertain_blood`, `things_below` | Random prefixes rise or fall; Mundane Age raises ordinary surface density; variance broadens; Things Below shifts density underground. The guaranteed deep champion and guards are never removed by lower random prefix odds. Elite ages conflict. |
 | Equipment and money | `treasure_age`, `age_of_rust`, `relic_world`, `cursed_riches`, `poor_kingdom` | Better modifier rolls carry more elite enemies, common tier-one junk weapons offset weaker modifiers, artifacts rise alongside danger, richer gear brings more curses, or chest gold shrinks. Merchant prices do not change. These five share a wealth conflict group. |
 | Supplies and digging | `herbal_bloom`, `blighted_harvest`, `buried_age`, `treasure_at_the_edges`, `far_fortune`, `strange_fortune` | Herbs/mushrooms and Fungus rise while loose life potions fall; forage yields less and mushrooms poison more often; loot moves underground, toward edges, or farther from the village; supply composition changes. Herbal/Blighted/Fungal themes conflict as harvest traits. Drought excludes all three to avoid contradictory or near-empty forage. |
@@ -6351,6 +6363,19 @@ density, far/roam promotion, and migrant group count/size use
 tier are also configured there. Only mobile home/roam templates are promoted;
 immobile enemies stay still. Migrants select legal surface edge sites and use
 the existing opposite-edge `far` path logic.
+Beast Kingdom changes only the **relative** template-selection weight of
+non-humanoids from 1× to 2.5×, with no new enemies or extra population.
+Humanoids are still possible, but dropped equipment is less plentiful.
+It conflicts with Drought, whose weighting favors humanoids. This is a
+species-composition choice, not a change to underground or mandatory spawns.
+Drowned Lands lowers the lake noise threshold from 0.72 to 0.66, raises lake
+carving from 0.40 to 0.44, and raises maximum river sources from 14 to 17.
+Its submerged-chest budget rises from 15–30 to 20–38, with target lake share
+35% → 55%. This share is conditional on having eligible submerged tiles
+4–8 swimming steps from shore; chests are never placed on land or closer to
+shore just to reach the budget. Stronger lake carving can reduce accessible
+land, so normal landmark reachability checks still apply. No dynamic cracking
+ice or special drowning rules are introduced.
 Forest ambush odds are additive: `eyes_in_the_trees` raises 4% to 13%,
 `wild_frontier` raises 4% to 8%, and `drought` raises 4% to 11%.
 The first two conflict as forest traits, but either can stack with Drought,
@@ -6387,10 +6412,9 @@ carry; the remaining share is shields. The fallback equipment drop roll is
 unchanged. `lootRules.worldGoldMultiplier` scales chest gold but leaves
 merchant prices untouched. The Age of Rust `commonStartingWeapons` switch
 still adds the hut's improvised weapons as tier-one ordinary drops and marks
-the hut copy tier one. A special `map.world.area` effect scales both map
-dimensions because their base values reside in `map_config.json`; it is
-separate from terrain-generation parameters. Neutral values reproduce the
-normal world's probabilities and counts.
+the hut copy tier one. World size presets live in `map_config.json` and are independent of all
+cursed traits. Neutral generation values reproduce the normal world's
+probabilities and counts.
 
 Drought lowers lake carving and river sources, reduces the water elevation
 threshold, widens the sand band, cuts forest forage and cave Fungus, and
@@ -6398,7 +6422,8 @@ raises forest ambush chance. It leaves the frozen-river guarantee active. Its
 non-humanoid rarity multiplier is 0.4 and prepared humanoid HP multiplier is
 0.85; the equipment roll rises from `0.45 + 0.03 × tier` to
 `0.61 + 0.03 × tier`, with weapon share rising from 50% to 70%. It excludes
-Herbal Bloom, Blighted Harvest, Fungal Bloom, and Flooded Depths. Ordinary
+Herbal Bloom, Blighted Harvest, Fungal Bloom, Flooded Depths,
+Beast Kingdom and Drowned Lands. Ordinary
 population is unchanged, so humanoids replace some beasts rather than making
 the world empty.
 
@@ -6411,7 +6436,10 @@ Current-schema data with a single `worldTrait` object is accepted as a one-eleme
 array, and data with neither trait field uses the base config. A replay
 initial snapshot is taken after world generation and includes the same array.
 Saved map dimensions and terrain are restored from the save; the map is not
-regenerated on load. Updating base JSON later can change how a saved offset
+regenerated on load. No additional world-size persistence flag is necessary:
+`mapWidth`, `mapHeight` and the serialized map contain the selected size.
+Replay initial states carry those same dimensions; a permadeath restart
+reuses the existing dimensions rather than changing them. Updating base JSON later can change how a saved offset
 is interpreted, though the saved map itself remains intact.
 
 These traits are deliberately high variance. At five traits, stacked increases

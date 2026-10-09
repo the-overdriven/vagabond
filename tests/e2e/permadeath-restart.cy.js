@@ -3,6 +3,7 @@ describe('Permadeath restart', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('First Wanderer')
     cy.get('#permadeathToggle').check()
+    cy.get('#worldSizeSelect').select('M')
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
@@ -21,6 +22,7 @@ describe('Permadeath restart', () => {
       expect(win.localStorage.getItem('vagabond_online_player_id')).to.equal(null)
     })
     cy.get('#cursedWorldToggle').should('be.disabled')
+    cy.get('#worldSizeSelect').should('be.disabled').and('have.value', 'M')
     cy.get('#permadeathToggle').should('not.be.checked')
     cy.get('#raceName').type('Second Wanderer')
     cy.get('#raceGrid .race-card').eq(1).click()
@@ -30,6 +32,8 @@ describe('Permadeath restart', () => {
 
     cy.window().then(win => {
       expect(win.eval('surfaceMap')).to.equal(world)
+      expect(win.eval('MAP_W')).to.equal(235)
+      expect(win.eval('MAP_H')).to.equal(235)
       expect(win.eval('WORLD_SEED')).to.equal(seed)
       expect(win.eval('player.characterId')).not.to.equal(characterId)
       expect(win.eval('player.name')).to.equal('Second Wanderer')

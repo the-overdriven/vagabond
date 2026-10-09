@@ -1362,6 +1362,28 @@ body.hint-collapsed #hint .panel-toggle {
   gap: 10px;
 }
 
+/* World size is independent of Cursed world and available for every run. */
+.world-size-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ember-bright);
+  font-size: calc(12px * var(--ui-font-scale));
+  white-space: nowrap;
+}
+
+.world-size-option select {
+  background: #120d09;
+  color: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
+  font: inherit;
+  cursor: pointer;
+}
+.world-size-option select:focus-visible { outline: 1px solid var(--ember); }
+.world-size-option select:disabled { opacity: 0.65; cursor: default; }
+
 .permadeath-option {
   display: inline-flex;
   align-items: center;
@@ -1421,6 +1443,7 @@ body.hint-collapsed #hint .panel-toggle {
     gap: 8px;
   }
   .race-options > .permadeath-option { width: 100%; }
+  .world-size-option { width: 100%; justify-content: flex-start; }
   .cursed-world-option:hover .cursed-world-tip { display: none; }
   .cursed-world-mobile-note {
     width: 100%;
