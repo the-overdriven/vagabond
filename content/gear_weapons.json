@@ -15,7 +15,7 @@
   {"name": "Lance",            "atk":9,  "grace":2, "twoHanded": true,  "tier": 3, "baseValue": 110},
   {"name": "Flail",            "atk":8,  "grace":2, "twoHanded": false, "tier": 3, "baseValue": 110},
   {"name": "Chain Whip",       "atk":7,  "grace":4, "twoHanded": false, "tier": 4, "baseValue": 180},
-  {"name": "War Sickle",       "atk":9,  "grace":5, "twoHanded": true,  "tier": 4, "baseValue": 180},
+  {"name": "War Sickle",       "atk":9,  "grace":3, "twoHanded": true,  "tier": 4, "baseValue": 180},
   {"name": "Two-handed Sword", "atk":11, "grace":2, "twoHanded": true,  "tier": 4, "baseValue": 180},
   {"name": "War Hammer",       "atk":12, "grace":1, "twoHanded": true,  "tier": 4, "baseValue": 180},
   {"name": "Two-handed Axe",   "atk":13, "grace":1, "twoHanded": true,  "tier": 4, "baseValue": 180},

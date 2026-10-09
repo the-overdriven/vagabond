@@ -4265,7 +4265,7 @@ and carried-item recovery targets. Existing active quests are preserved. When
 both killing and item quests are available, killing quests retain their 50%
 chance; investigation quests retain their separate 30% chance. The later rare
 hunt keeps its edge-biome selection and difficulty, and its opening names the
-quarry as “A <monster name>, they call it.” Monster names retain their exact
+quarry as “<monster name>, they call it.” Monster names retain their exact
 configured spelling and capitalization.
 
 Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.

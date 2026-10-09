@@ -2,6 +2,46 @@
 
 highest prio: deeper dungeons for endgame
 
+currently mountains never spawn in the south - this should be possible
+"it's not too late to retreat!" -> actually it is too late, they should get alarmed in next turn when it happens
+"dwarven remains. Dwarven remains lie amid the abandoned settlement."
+boxes/crates should be more square
+anvil is a bit too big
+someone should reveal to us the location of dwarven fort!
+use dwarven-rubble, dwarven-column-indoor
+we need different indoor column tiles (statues)
+tracks should last longer (slightly)
+new background for dwarven ruins
+old dwarven remains -> too generic sometimes
+feat: crates are not walkable but are destroyable, after destroying sometimes they can drop an item (scroll, or potion)
+thief's bag should be less raw on non-ascii (same shape, just add more depth)
+collapsed work stair -> write better
+🗄️ supabase/graveyard death record: add dropped item + world traits + world size
+on non-permadeath, after we die, mark the place with skull on map - after retrieving remains, remove the mark
+there are no tiles for fortifications (ruined defensive positions) and broken-down door on floor
+ice might crack and turn to water
+dwarven columns on surface should remove tree tiles if they are rendered over them
+add a way to drop items
+there used to be an error when saves didnt work, now there's only console log
+horn should have smaller range
+add prolonged hammer
+and should be animated (slow down animation), like a thrown web
+red animated Enraged! when enemy becomes enraged
+fix thornmaw pic
+Carrion Instinct should be added to tooltip only when it's active
+fix: i shouldnt be ambushed close to temple grounds
+it's possible to abuse "retreats from sacred ground!" - they shouldnt come close if im standing within the attack range, the distance is too far too
+add silk slug
+scrolls of homecoming respawn at merchant? they shouldnt
+cursed gear shouldnt have an effect when in inventory
+market ui: add tabs
+webs can spawn near giant spider (decorative)
+bestiary sort by name,strength,amount + show amount on mobile
+tombstones are not being dropped anymore?
+
+Before the final random variance and rounding, the attack therefore deals about **3.33 damage**. The `random(-1, +2)` term then modifies this before rounding, with a minimum final damage of 1.
+this should be even more random -> (-1,+2) is nothing. it should be 0.7x-1.2x with values closer to 1x having higher probability.
+
 need to refine:
 !3 [combat] ⚔️ add bulgy fungus monster: similar to fungus but nearby creatures receive dmg when it dies
 !2 [ui] 🖥️ enemy tooltips on desktop should appear automatically (add HP bars to symbols/glyphs, can be toggable, only on desktop)
@@ -2921,7 +2961,7 @@ more difficult:
   function hunterFlavor(q) {
     const reason = pick(['something has been feeding there', 'the tracks stop where the dead begin to walk', 'travellers have gone missing', 'I found fresh blood where no living thing should have been', 'the silence has become too deep'])
     if (q.type === 'investigate_area') return pick([`Old Hunter says: I have heard strange reports around ${q.targetLabel}, ${hunterLocationPhrase(q)}. Go there and investigate the place, then report back to me. I'll mark the location on your map.`, `Old Hunter says: Something is wrong at ${q.targetLabel}, ${hunterLocationPhrase(q)}. Find the entrance and look carefully around it. Tell me what you discover. I'll mark the location on your map.`])
-    if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. A ${q.targetName}, they call it. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
+    if (q.type === 'rare_hunt') return `Old Hunter says: I found tracks I never expected to see again. ${q.targetName}, they call it. Most hunters live and die without seeing one. I have seen its sign only once before. It crossed toward the ${hunterDirection(q)} edge. Follow what I taught you. Find that exact beast, and end its trail.`
     if (q.type === 'kill_specific') return pick([
       `Old Hunter says: There is one ${q.targetName} out there I want gone. Not its kind - that particular one. It is ${hunterLocationPhrase(q)}, and ${reason}. Find it. Make sure it does not come back.`,
       `Old Hunter says: I know the trail of a ${q.targetName}. I last saw it ${hunterLocationPhrase(q)}. Something follows wherever it goes. Hunt that creature down, and leave the trail cold.`,
@@ -9546,13 +9586,13 @@ more difficult:
         ` (${Object.entries(worldEdgesReached).filter(([, reached]) => reached).map(([edge]) => edge[0].toUpperCase()).join(', ') || 'none'})`
       ]] : []),
       ['☠️ Creatures Slain', player.kills],
-      ['🏆 Strongest Enemy Killed', player.strongestEnemyKilled
+      ['🏆 Strongest slain enemy', player.strongestEnemyKilled
         ? `${player.strongestEnemyKilled.name} (strength ${Math.round(player.strongestEnemyKilled.strength)})` : 'None'],
       ['📍 Position', player.x + ', ' + player.y],
     ]
     for (const [k, v] of rows) {
       const d = document.createElement('div')
-      d.className = k === '🏆 Strongest Enemy Killed' ? 'row achievement-row' : 'row'
+      d.className = k === '🏆 Strongest slain enemy' ? 'row achievement-row' : 'row'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k
