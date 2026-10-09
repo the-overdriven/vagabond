@@ -93,6 +93,10 @@ describe('Desktop combat enemy tooltip', () => {
       replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
       currentZ=0;currentCave=-1;map=surfaceMap;deathTransition=null
       enemies=[];npcs=[];occupied=new Set()
+      // Keep the hover fixture independent of random surface loot/tracks.
+      // Otherwise the vacated enemy tile may still have an inspectable object,
+      // and its ordinary hover tooltip correctly takes precedence over the pin.
+      groundItems=[];beastTracks.clear()
       for(let y=38;y<=42;y++) for(let x=38;x<=42;x++) {
         map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
       }
@@ -117,7 +121,9 @@ describe('Desktop combat enemy tooltip', () => {
         check(tooltip.style.left===hoverLeft && tooltip.style.top===hoverTop,'hover tooltip keeps cursor-relative position')
         check(tooltip.textContent.includes('HP 98 / 100'),'hover tooltip refreshes after the hit')
 
-        occupied.delete(keyXY(e.x,e.y));e.x=42;occupied.add(keyXY(e.x,e.y));updateTooltip()
+        occupied.delete(keyXY(e.x,e.y));e.x=42;occupied.add(keyXY(e.x,e.y))
+        check(tileInspectInfo(41,40)===null,'vacated hover tile has no unrelated inspectable objects')
+        updateTooltip()
         check(tooltip.dataset.autoCombat==='true' && tooltip.textContent.includes('Goblin'),'pin takes over if the combat target moves away from the cursor')
 
         lastMousePx=null;lastMousePy=null;hoveredEnemy=null;tooltip.style.display='none'
