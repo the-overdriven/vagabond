@@ -3,8 +3,15 @@ describe('One-time monster theft', () => {
     cy.viewport(1440, 900)
     cy.visit('/')
     cy.get('#raceName').clear().type('Thief Tester')
+    // These cases test theft, not world size or generation randomness. Use one
+    // known seed and the smallest map to keep repeated setup deterministic.
+    cy.get('#worldSizeSelect').select('XS')
+    cy.window().then(win => win.eval('WORLD_SEED = 12345; rngState = WORLD_SEED'))
     cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
+    cy.get('#loadingOverlay').should($overlay => {
+      expect($overlay.text(), 'world generation status').not.to.include('failed')
+      expect($overlay, 'world generation finished').not.to.be.visible
+    })
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => win.eval(`(() => {
       window.theftCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}

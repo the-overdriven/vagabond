@@ -16,6 +16,8 @@ describe('World size and surface cursed traits', () => {
     cy.get('#cursedWorldToggle').check()
     cy.get('#worldSizeSelect').should('have.value', 'XS')
     cy.viewport(390, 844)
+    // On narrow screens the race dialog scrolls; its footer starts below the fold.
+    cy.get('#raceOverlay .panelbox').scrollTo('bottom')
     cy.get('#worldSizeSelect').should('be.visible').select('XXL')
     cy.get('#cursedWorldToggle').uncheck()
     cy.get('#worldSizeSelect').should('have.value', 'XXL')
