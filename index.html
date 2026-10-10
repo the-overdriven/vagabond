@@ -1158,7 +1158,8 @@ more difficult:
       e[stat] = value
     }
     for (const stat of ['hp', 'maxHp', 'atk', 'def', 'spd', 'aggro']) {
-      if (typeof e[stat] === 'number') e[stat] = Math.round(e[stat])
+      // Equipment can grant fractional stats; only round stats this prefix changed.
+      if (Object.hasOwn(effects, stat) && typeof e[stat] === 'number') e[stat] = Math.round(e[stat])
     }
   }
 
@@ -1191,8 +1192,8 @@ more difficult:
     const now = prefixBaseStats(e)
     const out = []
     for (const s of PREFIX_STATS) {
-      const delta = (now[s.key] || 0) - (base[s.key] || 0)
-      if (delta) out.push({label: s.label, delta: Math.round(delta)})
+      const delta = Math.round((now[s.key] || 0) - (base[s.key] || 0))
+      if (delta !== 0) out.push({label: s.label, delta})
     }
     return out
   }

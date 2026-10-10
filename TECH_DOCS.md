@@ -2533,6 +2533,12 @@ min
 from
 ```
 
+Only stats named by a prefix are rounded after applying it. Unrelated
+fractional bonuses from humanoid equipment remain intact: for example, Swift
+changes SPD without changing a Ratling's gear-derived ATK or DEF. The enemy
+tooltip compares final stats against the pre-prefix snapshot, showing only
+rounded differences of at least one stat point (positive or negative).
+
 ## Enemy XP
 
 XP awarded for killing an enemy is calculated from its final spawned stats:
