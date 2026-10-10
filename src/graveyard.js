@@ -138,10 +138,10 @@ const Graveyard = (() => {
 
   function snapshotItem(item, statLine) {
     if (!item) return null
-    const {kind, base, name, replayId, tier, mod, modAmt, effectId, identified,
+    const {kind, base, name, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
       speedPenalty, xpBonus} = item
-    return {kind, base, name, replayId, tier, mod, modAmt, effectId, identified,
+    return {kind, base, name, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       atk, def, spd, grace, speedPenalty, xpBonus, stat_line: statLine(item),
       bonuses: bonuses ? {...bonuses} : undefined,
       curse: curse ? {...curse, types: curse.types?.slice()} : curse,
@@ -251,6 +251,10 @@ const Graveyard = (() => {
         ['Max HP', row.max_hp], ['Weapon', gearLabel(row.equipment?.weapon, row.weapon)],
         ['Armor', gearLabel(row.equipment?.armor, row.armor)],
         ['Shield', gearLabel(row.equipment?.shield, row.shield)],
+        ['Dropped item', gearLabel(row.dropped_item, null)],
+        ['World size', row.world_size || '-'],
+        ['World traits', Array.isArray(row.world_traits) && row.world_traits.length
+          ? row.world_traits.map(trait => trait?.name).filter(Boolean).join(', ') : 'None'],
         ['Artifacts', Array.isArray(row.artifacts) ? row.artifacts.map(item => item?.name).join(', ') : '-'],
         ['Gold', row.gold], ['Cumulated XP', row.cumulated_xp], ['Deaths', row.death_number],
         ['Steps', row.steps_taken], ['Creatures slain', row.creatures_slain],
@@ -273,7 +277,7 @@ const Graveyard = (() => {
       const client = await getClient()
       if (request !== requestNumber || !visible || !online() || replayActive()) return
       let query = client.from('death_records')
-        .select('character_name,race,level,killer_name,cause_of_death,permadeath,death_number,killed_at,atk,def,spd,grace,max_hp,weapon,armor,shield,equipment,artifacts,gold,cumulated_xp,steps_taken,creatures_slain,strongest_enemy_killed')
+        .select('character_name,race,level,killer_name,cause_of_death,permadeath,death_number,killed_at,atk,def,spd,grace,max_hp,weapon,armor,shield,equipment,artifacts,gold,cumulated_xp,steps_taken,creatures_slain,strongest_enemy_killed,dropped_item,world_traits,world_size')
         .order('created_at', {ascending: false}).limit(50)
       if (filter !== 'all') query = query.eq('permadeath', filter === 'true')
       const {data, error} = await query
@@ -320,6 +324,6 @@ const Graveyard = (() => {
     window.addEventListener('offline', () => { if (visible) void refresh() })
   }
 
-  return {init, open, close, isOpen: () => visible, recordDeath, snapshotEquipment, snapshotArtifacts,
+  return {init, open, close, isOpen: () => visible, recordDeath, snapshotItem, snapshotEquipment, snapshotArtifacts,
     newCharacterId, reconcileDeathCount}
 })()

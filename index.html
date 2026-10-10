@@ -16,7 +16,6 @@ old dwarven remains -> too generic sometimes
 feat: crates are not walkable but are destroyable, after destroying sometimes they can drop an item (scroll, or potion)
 thief's bag should be less raw on non-ascii (same shape, just add more depth)
 collapsed work stair -> write better
-🗄️ supabase/graveyard death record: add dropped item + world traits + world size
 on non-permadeath, after we die, mark the place with skull on map - after retrieving remains, remove the mark
 there are no tiles for fortifications (ruined defensive positions) and broken-down door on floor
 ice might crack and turn to water
@@ -28,16 +27,11 @@ add prolonged hammer
 and should be animated (slow down animation), like a thrown web
 red animated Enraged! when enemy becomes enraged
 fix thornmaw pic
-Carrion Instinct should be added to tooltip only when it's active
-fix: i shouldnt be ambushed close to temple grounds
 it's possible to abuse "retreats from sacred ground!" - they shouldnt come close if im standing within the attack range, the distance is too far too
 add silk slug
 scrolls of homecoming respawn at merchant? they shouldnt
-cursed gear shouldnt have an effect when in inventory
 market ui: add tabs
-webs can spawn near giant spider (decorative)
 bestiary sort by name,strength,amount + show amount on mobile
-tombstones are not being dropped anymore?
 
 Before the final random variance and rounding, the attack therefore deals about **3.33 damage**. The `random(-1, +2)` term then modifies this before rounding, with a minimum final damage of 1.
 this should be even more random -> (-1,+2) is nothing. it should be 0.7x-1.2x with values closer to 1x having higher probability.
@@ -2020,14 +2014,16 @@ more difficult:
   }
 
   function tickArtifactCurses() {
-    for (const it of player.inventory) {
-      if (it.kind !== 'artifact' || !it.curse) continue
+    // Keep curse risk aligned with artifact benefits. Equipped artifacts and
+    // passive trinkets are active; unequipped gear in the backpack is inert.
+    forEachActiveArtifact(it => {
+      if (!it.curse) return
       it.curseTimer = (it.curseTimer || 0) + 1
       if (it.curseTimer >= it.curse.everyTurns) {
         it.curseTimer = 0
         triggerArtifactCurse(it)
       }
-    }
+    })
     if (player.curseDebuffs.length) {
       for (const d of player.curseDebuffs) d.turnsLeft--
       player.curseDebuffs = player.curseDebuffs.filter(d => d.turnsLeft > 0)
@@ -4204,7 +4200,7 @@ more difficult:
     const shore = cause === 'drowning' ? drowningShore() : null
     resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
-    Graveyard.recordDeath({
+    const deathRecord = {
       character_name: player.name,
       race: player.race,
       permadeath: player.permadeath,
@@ -4230,9 +4226,13 @@ more difficult:
       strongest_enemy_killed: player.strongestEnemyKilled ? structuredClone(player.strongestEnemyKilled) : null,
       turn_count: turnCount,
       world_seed: WORLD_SEED,
+      world_size: Object.entries(BASE_MAP_CONFIG.world.sizePresets)
+        .find(([, side]) => side === unrotatedWorldWidth && side === unrotatedWorldHeight)?.[0] || null,
+      world_traits: activeWorldTraits.map(trait => ({name: trait.name,
+        effects: trait.effects.map(effect => ({param: effect.param, type: effect.type, value: effect.value}))})),
       last_position: {x: player.x, y: player.y, z: currentZ, level_kind: currentLevelKind(),
         biome: map[player.y]?.[player.x] || null}
-    })
+    }
     player.invisibleTurns = 0
     player.godInvisible = false
     player.speedPotionTurns = 0
@@ -4263,6 +4263,10 @@ more difficult:
     const remains = player.permadeath ? createPermadeathBody(killer, false) : createNormalDeathRemains(false)
     if (remains && shore) { remains.x = shore.x; remains.y = shore.y }
     const droppedItem = player.permadeath ? null : remains?.item
+    // Roll the actual loss before uploading, but preserve the pre-penalty
+    // player snapshot captured above. Do not consume any additional RNG.
+    Graveyard.recordDeath({...deathRecord,
+      dropped_item: Graveyard.snapshotItem(droppedItem, itemStatLine)})
     const deathLogId = log(
       player.permadeath
         ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
@@ -6125,6 +6129,8 @@ more difficult:
     // including god mode while its invisibility is enabled.
     if (playerIsInvisible()) return
     if (raceHas('noForestAmbush')) return // elves move through woodland unseen
+    // Temple sanctuary applies to ambush spawns as well as ordinary enemies.
+    if (currentZ === 0 && Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < FLEE_DISTANCE) return
     const ancient = map[y][x] === 'ancientForest'
     if (map[y][x] !== 'forest' && !ancient) return
     if (!chance(WORLD_GEN_CONFIG.surfaceEnemies.forestAmbushChance)) return
@@ -6133,6 +6139,7 @@ more difficult:
       const nx = x + dx, ny = y + dy
       if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
       if (map[ny][nx] !== (ancient ? 'ancientForest' : 'forest')) continue
+      if (Math.max(Math.abs(nx - spawnPoint.x), Math.abs(ny - spawnPoint.y)) < FLEE_DISTANCE) continue
       if (!isWalkable(nx, ny)) continue
       if (occupied.has(keyXY(nx, ny))) continue
       candidates.push({x: nx, y: ny})
@@ -8634,7 +8641,7 @@ more difficult:
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
-      ${enemyHasAbility(e, 'carrionInstinct') ? `<div class="crit">Carrion Instinct${enemyCarrionInstinctActive(e) ? ' · active (+1 AGGRO, +25% ATK)' : ' · +1 AGGRO and +25% ATK below 20% player HP'}</div>` : ''}
+      ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
       <div class="hprow">
       <div class="hpbarwrap"><div class="hpbar" style="width:${hpPct}%"></div></div>

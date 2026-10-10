@@ -1600,6 +1600,15 @@ stairs, with webs requiring cave walls on two perpendicular sides.
 Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
 eligible floor positions have separate 1.8% stalagmite and 2.5% mushroom bands.
+On the surface, living Giant Spiders generate up to two decorative webs per
+spider, scattered **2–3 tiles from their original spawn point** (Chebyshev
+distance, on ordinary dry grass/forest/hill ground). They never occupy the
+spider's tile or an immediately adjacent tile, existing loot, NPCs, or enemy
+spawn tiles, and overlapping webs are prevented. Their placement uses the
+same seeded coordinate-hash method, not combat RNG. They remain in place if
+the spider wanders or dies. As with cave webs, they confer no status, hazard,
+loot, or obstruction, and render behind items and creatures.
+
 One position holds at most one decoration. The generated placement is saved
 and restored directly, survives normal deaths and reused-world characters, and
 is cleared and regenerated for a new world. Props draw below items and actors
@@ -2383,8 +2392,8 @@ The Deadly enemy prefix raises critical-hit chance to 15%. Critical hits double 
 Vulture, Hyena, Jackal and Chupacabra have `carrionInstinct`. While the living
 player is strictly below 20% of current maximum HP, they gain +1 effective AGGRO
 and multiply ATK by 1.25, after gang power and enrage. At exactly 20% the effect
-is inactive. These derived effects never mutate saved base stats. Enemy tooltips
-show the ability and whether it is active.
+is inactive. These derived effects never mutate saved base stats. Enemy tooltips display Carrion Instinct **only while the threshold is met**;
+otherwise the ability is hidden, including its inactive description.
 
 Wyverns spawn asleep with 25% probability on walkable dry ground, never water,
 river or lava. Sleeping Wyverns are grounded, stationary, marked `zzz`, and use
@@ -2779,7 +2788,11 @@ the Temple center (`spawnPoint`) retreat regardless of the player's position,
 visibility or movement. They take up to two outward steps per game turn,
 stopping at distance 15. Retreat has priority over sleep, theft, passive
 behavior, ranged attacks and pursuit. Sleeping creatures wake to retreat.
-Immediate counterattacks are also suppressed inside the sanctuary.
+Immediate counterattacks are also suppressed inside the sanctuary. Forest
+ambushes do not roll or spawn while the player is strictly within the same
+15-tile sanctuary, even on otherwise eligible forest tiles. An ambusher
+cannot spawn inside that zone from a player standing just beyond its edge.
+The border itself (at distance 15) is not protected against an ambush.
 
 Retreat steps obey terrain and occupancy; a boxed-in monster waits rather than
 attacking or teleporting. Creatures outside the boundary behave normally and
@@ -3439,7 +3452,11 @@ Artifacts can be:
 
 Not every artifact needs to be equipped.
 
-Passive artifacts can work while simply being carried.
+Passive trinkets work while simply carried. **Equippable artifacts in the
+backpack are inert**, both for their bonuses and their curses: curse timers
+advance only while equipped (or while carrying a passive trinket), and a
+backpack curse does not trigger. An equipped item's timer resumes after it
+is re-equipped.
 
 ---
 
@@ -3600,7 +3617,10 @@ lasting 3–6 turns
 
 The artifact maintains a curse timer.
 
-When its interval is reached, a curse effect triggers.
+When its interval is reached, a curse effect triggers. Only an equipped
+weapon, shield or armor artifact—or an unequipped passive trinket—advances a
+curse timer. Putting equippable cursed gear into the backpack suspends its
+curse without resetting elapsed active turns.
 
 ---
 
@@ -3615,6 +3635,13 @@ Enemy kills can provide:
 <summary>Also</summary>
 Mysterious tombstones (only liches)
 </details>
+
+Liches have an **80%** chance to give one Mysterious Tombstone directly to
+the player's inventory on a credited kill, until the world's finite pool of
+inscriptions is exhausted. Each inscription appears once per world in a
+shuffled order. That pool is initialized from the loaded inscription catalog
+when a world is generated (also when generation is retried), not when the page
+first initializes the empty content placeholders.
 
 Gold drops from enemy kills are currently **disabled** (the calculation is
 still present in a code comment for easy reinstatement):
@@ -5959,7 +5986,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 39).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 40).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -6150,6 +6177,13 @@ databases must still have the `strongest_enemy_killed` JSONB column and its
 corresponding constraint. Older online records display “None”. The frontend
 includes the column in both death submission and Graveyard queries.
 
+For an existing database, also run
+`supabase-graveyard-add-world-death-fields.sql` **before deploying this
+client**. It adds nullable `dropped_item` (JSONB), `world_traits` (JSONB)
+and `world_size` (text) columns; older rows continue to be readable. The
+migration is supplied alongside the changed source files. New projects need
+these columns in their baseline schema or must apply the same migration.
+
 For an existing Graveyard database, apply `supabase-graveyard-drowning.sql`
 before deploying the client so its cause constraint accepts drowning deaths.
 For poison support, `death_cause_check` must also allow `poison` in both
@@ -6170,8 +6204,12 @@ does not reuse a death number; older saves without a character ID use their
 world seed, name, race, and mode as a legacy identity. This does not synchronize
 counts across browsers or recover records from a cleared browser store.
 Replay playback neither reads nor updates this count. Death number is
-incremented before snapshot, but the snapshot is taken before XP/max-HP
-penalties, backpack drops, teleport, corpse transfer, or character reset.
+incremented before snapshot. Player stats, equipment and location are captured
+before XP/max-HP penalties, backpack drops, teleport, corpse transfer, or
+character reset. The `dropped_item` field is attached **after** the actual
+non-permadeath item-loss roll; it contains one lost item (with its identity,
+item details and stat line), or null when nothing was dropped or on permadeath.
+This changes neither the loss probability nor gameplay RNG.
 The mode is read from `player.permadeath` directly; non-permadeath deaths each
 produce a separate event and the same character continues; a permadeath
 produces exactly one final event. Requests are fire-and-forget.
@@ -6192,7 +6230,11 @@ their `stat_line`), `steps_taken`,
 `creatures_slain`, `strongest_enemy_killed` (name, species, integer tier,
 rounded integer strength and independently rounded integer ATK/DEF/SPD/GRACE),
 `turn_count` (turns in the current page session, reset on
-load), `world_seed` (original seed restored from saves), and `game_version`
+load), `world_seed` (original seed restored from saves), `world_size` (the
+selected XS–XXL preset), `world_traits` (JSONB array of actual selected trait
+names and resolved additive effects, or an empty array for normal worlds),
+`dropped_item` (nullable compact JSONB snapshot of what the player lost),
+and `game_version`
 (the current release version from `src/version.js`). `WORLD_SEED` is reassignable so
 loading a save restores its original seed instead of reporting the new page
 load's seed. The service worker imports that same version file for its cache

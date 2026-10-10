@@ -123,6 +123,36 @@ describe('Graveyard', () => {
     })
   })
 
+  it('submits actual dropped item, resolved world traits and world size', () => {
+    configureTestGraveyard()
+    beginNewGame('World Record Tester')
+    const rows = []
+    cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error: null}) }
+      })})}
+      win.eval(`(() => {
+        const trait=WORLD_TRAITS.find(t=>t.name==='cold_world') || WORLD_TRAITS[0]
+        activeWorldTraits=[structuredClone(trait)]
+        player.inventory=[createItem('herb',{count:3})]
+        player.equip.weapon=null;player.equip.armor=null;player.equip.shield=null
+        window.recordPreset=Object.entries(BASE_MAP_CONFIG.world.sizePresets)
+          .find(([,side])=>side===unrotatedWorldWidth)?.[0]
+        die({name:'Lich',alive:false})
+      })()`)
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      const record=records[0]
+      expect(record.dropped_item).to.include({kind:'herb',name:'Healing Herb',count:1})
+      expect(record.world_size).to.equal('L')
+      expect(record.world_traits).to.have.length(1)
+      expect(record.world_traits[0].name).to.be.a('string')
+      expect(record.world_traits[0].effects).to.be.an('array')
+    })
+  })
+
   it('rounds every uploaded strongest-kill number while preserving exact gameplay ranking', () => {
     configureTestGraveyard()
     beginNewGame('Strength Tester')

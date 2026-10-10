@@ -191,6 +191,7 @@ function initDiscovered() {
 
 function generateSurface() {
   const cfg = WORLD_GEN_CONFIG.surface
+  tombstonesRemaining = TOMBSTONE_INSCRIPTIONS.length
   shuffleTombstoneOrder()
   mausoleumMap = null
   mausoleumHutPos = null
@@ -5361,6 +5362,39 @@ function deepCaveThreatTemplates() {
     (t.rarity ?? 1) > cfg.deepThreatRarityCutoff)
 }
 
+// Surface spider nests are cosmetic only: generate after the final map rotation,
+// from final coordinates without advancing the replay-sensitive RNG stream.
+function spawnSurfaceSpiderWebs(roll) {
+  const occupiedProps = new Set([...groundItems.filter(g => (g.level ?? 0) === 0),
+    ...enemies.filter(e => e.alive && (e.level ?? 0) === 0),
+    ...npcs].map(e => keyXY(e.x, e.y)))
+  const used = new Set()
+  for (const spider of enemies) {
+    if (!spider.alive || (spider.level ?? 0) !== 0 || (spider.baseName || spider.name) !== 'Giant Spider') continue
+    // Two or three tile steps from the spawn point, never on or next to
+    // the spider. Use Chebyshev distance like the game's other radii.
+    const sites = []
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const distance = Math.max(Math.abs(dx), Math.abs(dy))
+      if (distance < 2 || distance > 3) continue
+      const x = spider.x + dx, y = spider.y + dy, key = keyXY(x, y)
+      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue
+      if (!['grass','forest','ancientForest','hill'].includes(surfaceMap[y]?.[x])) continue
+      if (occupiedProps.has(key) || used.has(key)) continue
+      sites.push({x,y,rank:roll(x,y,31)})
+    }
+    sites.sort((a,b) => a.rank - b.rank || a.y - b.y || a.x - b.x)
+    let count = 0
+    for (const site of sites) {
+      if (count >= 2) break
+      if (roll(site.x,site.y,37) >= 0.45) continue
+      caveDecorations.push({x:site.x,y:site.y,kind:'web',level:0,levelKind:'surface',caveIndex:-1})
+      used.add(keyXY(site.x,site.y))
+      count++
+    }
+  }
+}
+
 function spawnCaveDecorations() {
   caveDecorations = []
   const cfg = WORLD_GEN_CONFIG.caveDecorations
@@ -5428,4 +5462,5 @@ function spawnCaveDecorations() {
       used.add(key)
     }
   }
+  spawnSurfaceSpiderWebs(roll)
 }
