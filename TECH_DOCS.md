@@ -2260,9 +2260,14 @@ can immediately cause normal drowning damage. Combat and relocation resolve
 synchronously; animations never determine rules or RNG. Successful Pull visually
 throws the cave-web graphic toward the original player tile for 420 ms, then
 drags the player to the resolved destination over 360 ms. The melee lunge and
-damage text follow the drag. ASCII uses a moving `%` web glyph. Replay simulation
-skips the presentation, and no animation state is saved. Existing abilities and
-swimming state are saved and replayed normally, with no new persistent flag.
+damage text follow the drag. If Pull triggers after the player's own step,
+the web-and-drag presentation takes priority over the ordinary walking pan:
+the player remains visually at the web's target tile until it arrives, then
+slides toward the spider. The final position and damage are already resolved
+for the turn, regardless of animation timing. ASCII uses a moving `%` web glyph.
+Replay simulation skips the presentation, and no animation state is saved.
+Existing abilities and swimming state are saved and replayed normally, with
+no new persistent flag.
 
 ## Summoning
 

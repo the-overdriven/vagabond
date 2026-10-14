@@ -147,6 +147,51 @@ describe('Charge and Pull terrain rules', () => {
     })()`))
   })
 
+  it("preserves the web impact and drag after the player walks into a spider's Pull lane", () => {
+    cy.window().then(async win => win.eval(`(async () => {
+      const oldChance=chance, oldDamage=damageRoll, oldLoop=runAnimationLoop
+      try {
+        chance=p=>p===.70; damageRoll=()=>10; runAnimationLoop=()=>{}
+        stopCameraAnimation(); clearEnemyAnims()
+        enemies=[]; occupied.clear(); damageAnims=[]; projectileAnims=[]
+        replayAnimationsDisabled=false; replaySimulationMode=false
+        player.x=40; player.y=41; player.hp=1000
+        const spider=rushEnemy('Giant Spider',37,40)
+        const steps=player.steps
+        await tryMove(0,-1)
+        rushCheck(player.x===38 && player.y===40,'Pull resolves deterministically on walking turn')
+        rushCheck(player.steps===steps+1,'only the voluntary step counts')
+        const web=projectileAnims.find(anim=>anim.projectile==='web')
+        rushCheck(!!web && web.path[1].x===40 && web.path[1].y===40,'web targets tile after walking')
+        rushCheck(moveAnim?.kind==='pull' && moveAnim.fromX===40 && moveAnim.toX===38,
+          'ordinary walking pan must not overwrite delayed drag')
+        rushCheck(moveAnim.start>=web.start+420 && moveAnim.duration===360,
+          'drag begins only after web impact')
+        render(web.start+180)
+        rushCheck(camX===targetCamX(40) && camY===targetCamY(40),
+          'player stays visibly on target tile while web travels')
+        render(moveAnim.start+180)
+        rushCheck(camX<targetCamX(40) && camX>targetCamX(38),
+          'camera and player follow the drag only after web impact')
+        render(moveAnim.start+360)
+        rushCheck(moveAnim===null && camX===targetCamX(38),
+          'drag ends at resolved player position')
+        rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=780),
+          'melee feedback follows the completed drag')
+
+        // Ordinary walking without a Pull must retain its usual short pan.
+        stopCameraAnimation(); enemies=[]; occupied.clear(); projectileAnims=[]
+        player.x=40; player.y=41
+        await tryMove(0,-1)
+        rushCheck(moveAnim?.kind==='normal' && moveAnim.duration===MOVE_ANIM_MS,
+          'uninterrupted walking keeps normal animation')
+      } finally {
+        chance=oldChance; damageRoll=oldDamage; runAnimationLoop=oldLoop
+        replayAnimationsDisabled=true; stopCameraAnimation(); clearEnemyAnims()
+      }
+    })()`))
+  })
+
   it('sequences web, drag and melee effects without changing Pull outcomes', () => {
     cy.window().then(win => win.eval(`(() => {
       const oldChance=chance,oldDamage=damageRoll,oldLoop=runAnimationLoop

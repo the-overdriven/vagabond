@@ -6472,7 +6472,11 @@ more difficult:
     enemyTurn()
     npcTurn()
     updateHud()
-    if (moved) animateCameraToPlayer(fromPos)
+    // A successful Pull has its own web-then-drag camera animation. Do not
+    // replace it with the ordinary 140 ms walking pan when the spider reacts
+    // to this movement in the same turn (the normal pan would snap the player
+    // to the pulled destination before the web arrives).
+    if (moved && moveAnim?.kind !== 'pull') animateCameraToPlayer(fromPos)
     else {
       render()
       runAnimationLoop()
@@ -7788,6 +7792,7 @@ more difficult:
       fromY: fromY,
       toX: player.x,
       toY: player.y,
+      kind: presentation.kind || 'normal',
       start: performance.now() + (presentation.delay || 0),
       duration: presentation.duration || MOVE_ANIM_MS
     }

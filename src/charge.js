@@ -82,7 +82,7 @@ function tryEnemyRush(e) {
       spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs)
     }
     forcePlayerPosition(e.x + line.sx, e.y + line.sy,
-      animated ? {delay:throwMs, duration:pullMs} : undefined)
+      animated ? {kind:'pull', delay:throwMs, duration:pullMs} : undefined)
     const firstDamage = damageAnims.length
     if (player.hp > 0 && !deathTransition) {
       enemyAttackPlayer(e, true)
