@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v96**, save/replay version **43**; older saves are rejected.
+**v97**, save/replay version **44**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -4542,6 +4542,14 @@ that satisfy all three rules:
 - `humanoid: false`
 - `rarity <= 0.1`
 
+Species already represented by a living monster anywhere in the world, including
+underground, are excluded. Species previously killed in this world are also
+excluded, including kills by earlier permadeath characters and trap deaths.
+Prefixes count as their base species. This world history persists through
+save/load, replay and character changes, and resets only with a new world.
+Existing active hunts retain their exact target; this restriction applies when
+offering a new hunt.
+
 The selection remains data-driven: adding or changing an enemy template automatically
 changes the eligible pool. A candidate must also have at least one valid surface spawn
 tile in one of its configured biomes. The spawn tile must be walkable, reachable from
@@ -4552,8 +4560,9 @@ from the village. The desired minimum Chebyshev distance is:
 
 Among qualifying distant tiles, the hunt uses the closest available world-edge band
 and allows tiles up to 3 squares farther inward. A species with no valid tile beyond
-the minimum village distance is skipped; if no qualifying species can be placed that
-far away, the rare hunt is not generated rather than moving the quarry closer.
+the minimum village distance is skipped. If the eligible pool is empty or no
+candidate can be placed that far away, the Hunter postpones the hunt without
+spawning a duplicate or moving the quarry closer.
 
 The Hunter emphasizes that the creature is exceptionally rare and gives the direction
 of the **initial sign** he found. That bearing is frozen when the quest starts; it does
@@ -5271,7 +5280,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-43
+44
 ```
 
 Saves are JSON files.
@@ -5280,6 +5289,10 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 44 adds world-level killed-species history for rare-hunt eligibility.
+It is independent of the current character's Bestiary/Tracking knowledge and
+is captured in replay snapshots. Older saves are rejected without migration.
 
 Version 43 adds the world-level Merchant fort-hint flag. It persists with the
 surface discovery grid through save/load and replay and does not reset when

@@ -248,6 +248,7 @@ function buildSaveObject() {
     merchantStock: merchantStock,
     herbalistGiftGiven: herbalistGiftGiven,
     merchantFortHintGiven: merchantFortHintGiven,
+    worldKilledSpecies: [...worldKilledSpecies],
     foragedTiles: [...foragedTiles],
     dugSandTiles: [...dugSandTiles],
     gravediggerGraveKey: gravediggerGraveKey,
@@ -289,6 +290,9 @@ function loadGameFromObject(data, opts = {}) {
   }
   if (data.version !== SAVE_VERSION) {
     throw new Error('This save uses a different game format. Please start a new world.')
+  }
+  if (!Array.isArray(data.worldKilledSpecies) || data.worldKilledSpecies.some(species => typeof species !== 'string')) {
+    throw new Error('Save data is missing valid world species history.')
   }
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
@@ -709,6 +713,7 @@ function loadGameFromObject(data, opts = {}) {
   merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : []
   herbalistGiftGiven = !!data.herbalistGiftGiven
   merchantFortHintGiven = data.merchantFortHintGiven === true
+  worldKilledSpecies = new Set(data.worldKilledSpecies)
   // Replay's initialState is a snapshot of an already-current-version live
   // game - it never needs backfilling, and doing so here would call rng()
   // outside the recorded action stream (replayPlaying/replayRecording are

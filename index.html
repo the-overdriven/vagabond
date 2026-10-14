@@ -846,6 +846,7 @@ more difficult:
   let treasureMapUnearthed = false
   let herbalistGiftGiven = false
   let merchantFortHintGiven = false
+  let worldKilledSpecies = new Set()
   let CRYPT2_EXPLORER_FLAVOR
   let CRYPT2_TRAP_DISCOVER
   let CRYPT2_TRAP_TRIGGER
@@ -2727,7 +2728,10 @@ more difficult:
   }
 
   function hunterRareTemplates() {
-    return ENEMY_TEMPLATES.filter(t => t && t.wander === 'far' && t.humanoid === false && Number(t.rarity ?? 1) <= 0.1)
+    const unavailable = new Set(worldKilledSpecies)
+    for (const e of enemies) if (e.alive) unavailable.add(trackSpecies(e))
+    return ENEMY_TEMPLATES.filter(t => t && t.wander === 'far' && t.humanoid === false &&
+      Number(t.rarity ?? 1) <= 0.1 && !unavailable.has(t.name))
   }
 
   function hunterReachableSurfaceTiles() {
@@ -4020,6 +4024,7 @@ more difficult:
 
   function killEnemy(e, playerCredit = true) {
     if (!e.alive) return
+    worldKilledSpecies.add(trackSpecies(e))
     if (playerCredit) {
       recordStrongestEnemyKill(e)
       const species = trackSpecies(e)
@@ -11237,6 +11242,7 @@ more difficult:
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
     merchantFortHintGiven = false
+    worldKilledSpecies = new Set()
     // A prior world may have rotated 90/270 degrees; start every new world
     // with the configured dimensions before allocating any surface or dungeon maps.
     MAP_W = unrotatedWorldWidth
