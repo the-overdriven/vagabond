@@ -449,6 +449,8 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
           if (mode === 'championCarrier') {
             check(carriers.length === 1 && carriers[0].prefix === 'Champion', 'champion-carrier key is held by the guaranteed champion')
             check(carriers[0].dungeonRoomId === level.progressionKey.targetRoomId, 'key champion occupies the selected reachable encounter room')
+            check(!carriers[0].abilities.includes('ethereal'), 'key champion cannot phase into an impassable tile')
+            check(carriers[0].baseName !== 'Ghost', 'Ghost champions never carry progression keys')
           } else if (mode === 'remains') {
             check(remains.length === 1 && remains[0].kind === 'skeleton', 'remains scenario hides key in searchable dwarven remains')
           } else if (mode === 'trapGuardedSideRoom') {

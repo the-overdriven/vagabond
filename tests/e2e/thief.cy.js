@@ -189,8 +189,14 @@ describe('One-time monster theft', () => {
         chance=()=>true;tryEnemyTheft(e);chance=()=>false;damageRoll=()=>5
         occupied.delete(keyXY(e.x,e.y));e.x=65;e.y=40;occupied.add(keyXY(e.x,e.y))
         const x=e.x;enemyTurn();theftCheck(e.x===x+1 && e.shotsRemaining===10,'outside aggro retreat')
-        player.invisibleTurns=5;const invisibleX=e.x;enemyTurn()
-        theftCheck(e.x===invisibleX+1 && e.stolenItem,'invisible retreat');player.invisibleTurns=0
+        player.invisibleTurns=5;const invisibleX=e.x
+        theftCheck(!enemyIsFleeing(e) && !tryWoundedEnemyFlee(e), 'invisible thief cannot retreat intentionally')
+        enemyTurn()
+        theftCheck(e.x===invisibleX && e.stolenItem,'invisible thief keeps loot without fleeing')
+        player.invisibleTurns=0
+        theftCheck(enemyIsFleeing(e),'theft escape resumes when player becomes visible')
+        const visibleX=e.x;enemyTurn()
+        theftCheck(e.x===visibleX+1,'visible thief flees again')
         currentZ=-1;const offX=e.x;enemyTurn();theftCheck(e.x===offX,'off-level pause');currentZ=0
         occupied.clear();e.x=41;e.y=40;occupied.add(keyXY(e.x,e.y))
         for(const [dx,dy] of DIRS8) if(e.x+dx!==player.x || e.y+dy!==player.y) map[e.y+dy][e.x+dx]='mountain'

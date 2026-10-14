@@ -8,7 +8,8 @@ describe('Ethereal Ghosts and Oculus true sight', () => {
     cy.get('#raceOverlay').should('not.have.class','show')
     cy.window().then(win => win.eval(`(() => {
       window.senseCheck = (ok,msg) => {if (!ok) throw new Error(msg)}
-      senseCheck(enemies.filter(e=>(e.baseName || e.name)==='Ghost').every(e=>e.abilities.includes('ethereal')),'all generated Ghost paths')
+      senseCheck(enemies.filter(e=>(e.baseName || e.name)==='Ghost').every(e=>
+        e.abilities.includes('ethereal') && !e.abilities.includes('evades')),'all Ghosts are ethereal without evasion')
       replayRecording=false; replayPlaying=false; replaySimulationMode=false; activeReplay=null
       replayData=null; replayAnimationsDisabled=true
       currentZ=0; currentCave=-1; map=surfaceMap; raceOpen=false

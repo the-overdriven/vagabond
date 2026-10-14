@@ -1430,7 +1430,7 @@ function buildDwarvenRuin(targetLevel) {
         atk: ghost.atk,
         def: ghost.def,
         spd: ghost.spd,
-        abilities: [...ghost.abilities, 'evades'],
+        abilities: [...ghost.abilities],
         humanoid: true,
         aggro: ghost.aggro ?? AGGRO_RANGE,
         x: gx,
@@ -4344,7 +4344,13 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       const family = championIndex === 0
         ? championFamily
         : pickWeighted(dominant, candidate => Math.max(0.0001, candidate.weight))
-      const tmpl = chooseMember(family, 'champion') || eligible[0]
+      let tmpl = chooseMember(family, 'champion') || eligible[0]
+      // Progression keys must never be carried into impassable terrain.
+      // Ethereal champions can phase into walls before the player kills them.
+      if (championIndex === 0 && keyCarrierPlan && tmpl?.abilities?.includes('ethereal')) {
+        tmpl = (family.members || []).find(member => !member.abilities?.includes('ethereal')) ||
+          eligible.find(member => !member.abilities?.includes('ethereal')) || null
+      }
       const championRoom = championIndex === 0
         ? (keyCarrierRoom || roomById.get(championVault?.roomId) || farthestRoom)
         : (nonEntranceRooms[championIndex % Math.max(1, nonEntranceRooms.length)] || farthestRoom)

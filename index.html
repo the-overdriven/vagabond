@@ -2928,6 +2928,22 @@ more difficult:
     if (killOptions.length && itemOptions.length) pool = chance(0.5) ? killOptions : itemOptions
     else if (killOptions.length) pool = killOptions
     const q = pool[randInt(0, pool.length - 1)]
+    if (q.type === 'kill_specific') {
+      const target = enemies.find(e => e.alive && e.id === q.targetEnemyId)
+      if (target && !target.prefix) {
+        // A named individual hunt must be a genuinely special opponent.
+        // Promote an already reachable target, preserving its ID and position.
+        const prefixes = Object.keys(ENEMY_PREFIXES).filter(name => name !== 'Champion')
+        if (prefixes.length) {
+          const prefix = pick(prefixes)
+          target.prefix = prefix
+          target.prefixBase = prefixBaseStats(target)
+          applyEnemyPrefix(target, prefix)
+          target.name = `${prefix} ${target.name}`
+        }
+      }
+      if (target) q.targetName = target.name
+    }
     oldHunterQuest = {
       id: `hunter_${++oldHunterQuestSerial}`,
       state: 'active',
@@ -3573,7 +3589,7 @@ more difficult:
   }
 
   function enemyIsFleeing(e) {
-    return e.alive !== false && e.hp > 0 && (!!e.stolenItem ||
+    return e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) && (!!e.stolenItem ||
       (e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')))
   }
 
@@ -4465,33 +4481,12 @@ more difficult:
       log(`The ${e.name} is confused at the unseen attack!`, 'info')
       return
     }
-    const fleeChance = Math.max(0.05, Math.min(0.90,
+    const recoilChance = Math.max(0.05, Math.min(0.90,
       (30 - 2 * e.tier - enemyAggroRange(e) + damage / 2) / 100))
-    if (roll < 0.10 + fleeChance) {
-      const options = []
-      let bestDistance = -1
-      for (const [dx, dy] of DIRS8) {
-        const x = e.x + dx, y = e.y + dy
-        if (!enemyTileOpen(e, x, y) ||
-          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
-        const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
-        if (distance > bestDistance) {
-          options.length = 0
-          bestDistance = distance
-        }
-        if (distance === bestDistance) options.push({x, y})
-      }
-      log(`The ${e.name} panics at the unseen attack and flees in terror!${options.length ? '' : ' But is cornered with no way to escape!'}`, 'info')
-      if (options.length) {
-        const fromX = e.x, fromY = e.y
-        const destination = pick(options)
-        if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return
-        occupied.delete(keyXY(fromX, fromY))
-        e.x = destination.x
-        e.y = destination.y
-        occupied.add(keyXY(e.x, e.y))
-        finishEnemyMove(e, fromX, fromY)
-      }
+    if (roll < 0.10 + recoilChance) {
+      // The monster recoils from the blow, but cannot locate an invisible
+      // attacker well enough to choose a direction to run away from them.
+      log(`The ${e.name} recoils from the unseen attack!`, 'info')
       return
     }
     log(`The ${e.name} panics at the unseen attack and lashes out wildly into the empty air!`, 'bad')
@@ -6944,7 +6939,7 @@ more difficult:
   function tileBackground(x, y, tileKey) {
     // These sprites must not paint a synthetic floor behind their alpha.
     // The floor, when present, is composited from the recorded underlay.
-    if (USE_TILE_IMAGES && (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')) return 'transparent'
+    if (USE_TILE_IMAGES && (tileKey === 'cryptrubble' || tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')) return 'transparent'
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
     if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
@@ -7169,6 +7164,7 @@ more difficult:
     // Rubble and columns are transparent on every level. Render the terrain
     // that was at this exact coordinate before the prop replaced the map cell.
     // Never substitute marble, grass or a guessed neighboring biome.
+    if (tileKey === 'cryptrubble') return 'crypt2floor'
     if (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')
       return tileUnderlays[tileUnderlayKey(x, y, currentZ)] || null
 
@@ -7450,6 +7446,16 @@ more difficult:
     return {
       dx: Math.round(Math.sin(angle + 0.9) * TILE_PX / 40),
       dy: Math.round(Math.sin(angle) * TILE_PX / 20)
+    }
+  }
+
+  // Only a draw offset: no RNG, saved position, swimming skill or turns change.
+  function swimmingPlayerBobOffset(now, drowning) {
+    const angle = now * (Math.PI * 2 / (drowning ? 1700 : 2700)) + 1.1
+    const amplitude = drowning ? 3 : 1.4
+    return {
+      dx: Math.sin(angle + 0.9) * TILE_PX / 40 * amplitude,
+      dy: Math.sin(angle) * TILE_PX / 20 * amplitude
     }
   }
 
@@ -8346,7 +8352,13 @@ more difficult:
       (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
         ? Math.min(Math.PI / 2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI / 2)
         : 0
+      const inWater = map[player.y]?.[player.x] === 'water' || map[player.y]?.[player.x] === 'river'
       drawSwimmingCreature(vx, vy, () => {
+        ctx.save()
+        if (USE_TILE_IMAGES && inWater && !deathTransition) {
+          const {dx, dy} = swimmingPlayerBobOffset(now, isDrowning())
+          ctx.translate(dx, dy)
+        }
         if (deathRotation) {
           ctx.save()
           ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2)
@@ -8356,6 +8368,7 @@ more difficult:
         } else {
           drawPlayerVisual(vx, vy, playerColor, playerAlpha)
         }
+        ctx.restore()
       }, isDrowning() ? 1 / 3.8 : 1 / 2.5)
     }
     // Ground creatures appear behind tree canopies; flying enemies are drawn

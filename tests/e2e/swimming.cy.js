@@ -3,6 +3,7 @@ function beginGame() {
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type('Swimming Tester')
   cy.get('#btnBegin').click()
+  cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 
@@ -52,4 +53,25 @@ describe('Swimming visuals', () => {
       expect(result.moving).to.deep.equal([255, 0])
     })
   })
+  for (const [width, height] of [[1280,800],[390,844]]) {
+    it(`gives drowning a stronger visual-only bob at ${width}px`, () => {
+      cy.viewport(width,height)
+      beginGame()
+      cy.window().then(win => win.eval(`(() => {
+        const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+        const times=[0,170,430,900,1330,1990,2350]
+        const normal=times.map(t=>swimmingPlayerBobOffset(t,false))
+        const drowning=times.map(t=>swimmingPlayerBobOffset(t,true))
+        check(JSON.stringify(normal)===JSON.stringify(times.map(t=>swimmingPlayerBobOffset(t,false))),
+          'bob deterministic for the same render timestamp')
+        const max=values=>Math.max(...values.map(p=>Math.hypot(p.dx,p.dy)))
+        check(max(drowning)>max(normal)*2,'drowning moves more dramatically')
+        const saved=JSON.stringify(buildSaveObject())
+        for(const t of times) {swimmingPlayerBobOffset(t,false);swimmingPlayerBobOffset(t,true)}
+        check(JSON.stringify(buildSaveObject())===saved,'bob has no gameplay or save effects')
+        check(!!document.getElementById('game'),'canvas present')
+      })()`))
+    })
+  }
+
 })

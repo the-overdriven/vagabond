@@ -83,7 +83,7 @@ describe('Scroll of Invisibility', () => {
     cy.get('#logpanel').should('not.contain.text', 'The Goblin has spotted you!')
   })
 
-  it('flees to a free tile, reports being cornered, and lashes out at reduced accuracy', () => {
+  it('recoils without moving or fleeing, but can still lash out at reduced accuracy', () => {
     beginGame()
     cy.window().then(win => {
       const result = win.eval(`(() => {
@@ -95,68 +95,52 @@ describe('Scroll of Invisibility', () => {
         }
         enemies.push(e)
         occupied.add(keyXY(e.x, e.y))
-        const originalRng = rng
-        const originalSpawnPoint = {x:spawnPoint.x, y:spawnPoint.y}
+        const oldRng = rng
         try {
-          spawnPoint = {x:0, y:0}
-          rng = () => 0.2
+          rng=()=>0.2
+          const before={x:e.x,y:e.y}, occupancy=occupied.size
           reactToInvisibleAttack(e, 0)
-          const fled = {x: e.x, y: e.y, occupied: occupied.has(keyXY(e.x, e.y))}
-          for (const [dx, dy] of DIRS8) {
-            const x = e.x + dx, y = e.y + dy
-            if (map[y]?.[x] !== undefined) map[y][x] = 'cavewall'
-          }
+          const after={x:e.x,y:e.y}
+          player.hp=50
+          const missedRolls=[0.6,0.1,0.5,0.5]
+          rng=()=>missedRolls.shift()??0.5
           reactToInvisibleAttack(e, 0)
-          const cornered = {x: e.x, y: e.y}
-          e.x = player.x + 1
-          e.y = player.y
-          player.hp = 50
-          const rolls = [0.6, 0.1, 0.5, 0.5]
-          rng = () => rolls.shift() ?? 0.5
+          const missedHp=player.hp
+          const hitRolls=[0.6,0.99,0.5,0.5]
+          rng=()=>hitRolls.shift()??0.5
           reactToInvisibleAttack(e, 0)
-          const missedHp = player.hp
-          const hitRolls = [0.6, 0.99, 0.5, 0.5]
-          rng = () => hitRolls.shift() ?? 0.5
-          reactToInvisibleAttack(e, 0)
-          return {fled, cornered, missedHp, playerHp: player.hp}
-        } finally {
-          rng = originalRng
-          spawnPoint = originalSpawnPoint
-        }
+          return {before,after,occupancyUnchanged:occupied.size===occupancy,missedHp,hp:player.hp}
+        } finally {rng=oldRng}
       })()`)
-      expect(result.fled.occupied).to.equal(true)
-      expect(result.cornered).to.deep.equal({x: result.fled.x, y: result.fled.y})
+      expect(result.before).to.deep.equal(result.after)
+      expect(result.occupancyUnchanged).to.equal(true)
       expect(result.missedHp).to.equal(50)
-      expect(result.playerHp).to.be.lessThan(50)
+      expect(result.hp).to.be.lessThan(50)
     })
-    cy.get('#logpanel').should('contain.text', 'But is cornered with no way to escape!')
+    cy.get('#logpanel').should('contain.text', 'recoils from the unseen attack!')
     cy.get('#logpanel').should('contain.text', 'lashes out wildly into the empty air!')
   })
 
-  it('uses damage, tier, and aggro in the flee threshold', () => {
+  it('uses damage, tier, and aggro in the recoil threshold without moving', () => {
     beginGame()
     cy.window().then(win => {
-      const result = win.eval(`(() => {
-        replayAnimationsDisabled = true
-        const e = {
-          name: 'Goblin', tier: 2, aggro: 3, hp: 100, maxHp: 100,
-          atk: 1, def: 0, spd: 2, x: player.x + 1, y: player.y,
-          level: currentZ, alive: true
-        }
-        enemies.push(e)
-        occupied.add(keyXY(e.x, e.y))
-        const originalRng = rng
+      const result=win.eval(`(() => {
+        const e={name:'Goblin',tier:2,aggro:3,hp:100,maxHp:100,atk:1,def:0,spd:2,
+          x:player.x+1,y:player.y,level:currentZ,alive:true}
+        const oldRng=rng,oldLog=log,logs=[]
         try {
-          rng = () => 0.34
-          reactToInvisibleAttack(e, 0)
-          const withoutDamage = {x: e.x, y: e.y}
-          reactToInvisibleAttack(e, 4)
-          return {withoutDamage, withDamage: {x: e.x, y: e.y}}
-        } finally {
-          rng = originalRng
-        }
+          rng=()=>0.34
+          log=msg=>logs.push(msg)
+          const before={x:e.x,y:e.y}
+          reactToInvisibleAttack(e,0)
+          reactToInvisibleAttack(e,4)
+          return {before,after:{x:e.x,y:e.y},messages:logs}
+        } finally {rng=oldRng;log=oldLog}
       })()`)
-      expect(result.withDamage).to.not.deep.equal(result.withoutDamage)
+      expect(result.after).to.deep.equal(result.before)
+      expect(result.messages[0]).to.include('lashes out wildly')
+      expect(result.messages[1]).to.include('recoils')
     })
   })
+
 })

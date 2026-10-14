@@ -77,6 +77,10 @@ describe('Dwarven rubble and column floor layers', () => {
               if (tileBackground(1, 1, tile) !== 'transparent') throw new Error('Overlay fills a background')
             }
           }
+          currentZ = -2
+          map[1][1] = 'cryptrubble'
+          const cryptFloor = overlayBaseTileKey('cryptrubble', 1, 1)
+          const cryptIsTransparent = tileBackground(1, 1, 'cryptrubble') === 'transparent'
           currentZ = -5
           const missingDoesNotGuess = overlayBaseTileKey('dwarvenrubble', 1, 1)
           currentZ = 0
@@ -85,7 +89,7 @@ describe('Dwarven rubble and column floor layers', () => {
           USE_TILE_IMAGES = false
           const asciiDoesNotComposite = overlayBaseTileKey('dwarvenstatue', 1, 1)
           const asciiKeepsBackground = tileBackground(1, 1, 'dwarvenstatue') === TILE.snowmountain.bg
-          return {floors, missingDoesNotGuess, surface, asciiDoesNotComposite, asciiKeepsBackground}
+          return {floors, cryptFloor, cryptIsTransparent, missingDoesNotGuess, surface, asciiDoesNotComposite, asciiKeepsBackground}
         } finally {
           map = original.map
           currentZ = original.currentZ
@@ -94,6 +98,8 @@ describe('Dwarven rubble and column floor layers', () => {
         }
       })()`)
       expect(result.floors).to.deep.equal(['cavefloor','cavefloor','cavefloor2','cavefloor2'])
+      expect(result.cryptFloor).to.equal('crypt2floor')
+      expect(result.cryptIsTransparent).to.equal(true)
       expect(result.missingDoesNotGuess).to.equal(null)
       expect(result.surface).to.equal('snowmountain')
       expect(result.asciiDoesNotComposite).to.equal(null)

@@ -32,7 +32,7 @@ function rareFleeSaveState(e) {
 }
 
 function rareStartledBonus(e, ordinarySpeed = Math.max(1, e.spd + enemyTileEffects(e).speed)) {
-  return e.rareFleeTurns > 0 && rareFleeEligible(e)
+  return e.rareFleeTurns > 0 && rareFleeEligible(e) && !playerHiddenFromEnemy(e)
     ? Math.max(0, RARE_FLEE.startledMinSpd - ordinarySpeed) : 0
 }
 
@@ -42,9 +42,9 @@ function rareFleePace(e) {
 }
 
 function rareStartFlee(e, dist, attacked = false) {
-  if (dist > RARE_FLEE.sightRange || e.rareFleeTurns > 0 || e.aware ||
+  if (playerHiddenFromEnemy(e) || dist > RARE_FLEE.sightRange || e.rareFleeTurns > 0 || e.aware ||
       (e.rareSightings || 0) >= RARE_FLEE.sightings || e.rareArmed === false || !rareFleeEligible(e)) return false
-  if (!attacked && (playerHiddenFromEnemy(e) || forestConcealsPlayer(e, dist))) return false
+  if (!attacked && forestConcealsPlayer(e, dist)) return false
   e.rareSightings = (e.rareSightings || 0) + 1
   e.rareArmed = false
   e.rareFleeTurns = RARE_FLEE.fleeTurns[Math.min(e.rareSightings - 1, RARE_FLEE.fleeTurns.length - 1)]
@@ -72,14 +72,20 @@ function rareCatch(e) {
   log(`The ${e.name} is cornered and turns to fight!`, 'good')
 }
 
-// Attack interception precedes animation, evasion, damage and Alarmed. An unseen
-// attacker provokes flight too; it cannot bypass the first two sightings.
+// An unseen attack can interrupt an existing flight but cannot start a sighting.
+// This clears flight before the normal hit/alarm rules, without spending a turn
+// or advancing the flight timer based on animation timing.
 function rareFleeBlocksAttack(e) {
   if (!rareFleeEligible(e)) return false
+  if (playerHiddenFromEnemy(e)) {
+    e.rareFleeTurns = 0
+    e.rareFleeAcc = 0
+    return false
+  }
   const dist = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
   rareStartFlee(e, dist, true)
   if (!(e.rareFleeTurns > 0)) return false
-  if (e.rareSightings === 1 || playerHiddenFromEnemy(e)) {
+  if (e.rareSightings === 1) {
     log(`The ${e.name} slips past your blow.`, 'good')
     return true
   }
@@ -187,10 +193,10 @@ function rareStepAwayFromPlayer(e) {
   return true
 }
 
-// True spends this enemy's turn fleeing. False permits ordinary combat after a
-// second-sighting catch. Invisible players can cause flight but are not chased.
+// A hidden player cannot direct flight. Preserve any remaining timer so
+// reappearing resumes the same encounter instead of resetting sighting count.
 function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
-  if (!(e.rareFleeTurns > 0) || !rareFleeEligible(e)) return false
+  if (!(e.rareFleeTurns > 0) || !rareFleeEligible(e) || hidden) return false
   if (e.rareSightings > 1 && !hidden && dist <= ATTACK_RANGE) {
     rareCatch(e)
     return false

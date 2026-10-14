@@ -168,16 +168,31 @@ describe('Rare monster sightings and flight', () => {
       map[player.y][player.x]='grass'; player.invisibleTurns=20
       fleeAssert(!rareStartFlee(e,5), 'invisibility prevents visual sighting')
       e.x=player.x+1; occupied=new Set([keyXY(e.x,e.y)])
+      fleeAssert(!rareFleeBlocksAttack(e) && e.rareSightings===0 && e.rareFleeTurns===0,
+        'invisible first strike does not start protected flight')
       await playerAttackEnemy(e); enemyTurn()
-      fleeAssert(e.rareSightings===1 && e.rareFleeTurns>0 && !e.aware && !e.alarmed && e.hp===200, 'invisible first strike flees safely')
-      resetFleeArena(); player.invisibleTurns=20
-      e=makeFleeEnemy('Vampire',1,{rareSightings:1})
-      await playerAttackEnemy(e); enemyTurn()
-      fleeAssert(e.rareSightings===2 && e.rareFleeTurns>0 && !e.aware && !e.alarmed, 'invisible second strike flees too')
-      const turns=e.rareFleeTurns; currentZ=-1; enemyTurn()
-      fleeAssert(e.rareFleeTurns===turns, 'off-level flight pauses')
+      fleeAssert(e.rareSightings===0 && !e.rareFleeTurns, 'invisible hit cannot create a sighting')
+      resetFleeArena(); e=makeFleeEnemy('DRUSK',1,{rareSightings:1})
+      rareStartFlee(e,1,true)
+      const turns=e.rareFleeTurns, before={x:e.x,y:e.y}, sightings=e.rareSightings
+      player.invisibleTurns=20
+      fleeAssert(!rareFlee(e,1) && !rareStartledBonus(e), 'no flight step or startled speed against invisible player')
+      const oldWander=enemyWander
+      try {enemyWander=()=>false; enemyTurn()} finally {enemyWander=oldWander}
+      fleeAssert(e.rareFleeTurns===turns && e.rareSightings===sightings &&
+        e.x===before.x && e.y===before.y, 'invisible DRUSK pauses directed flight')
+      fleeAssert(!rareFleeBlocksAttack(e) && e.rareFleeTurns===0, 'invisible ambush interrupts flight')
+      player.invisibleTurns=0
+      resetFleeArena(); e=makeFleeEnemy('DRUSK',5,{rareSightings:1})
+      rareStartFlee(e,5,true)
+      player.invisibleTurns=4;const paused=e.rareFleeTurns
+      fleeAssert(!rareFlee(e,5) && e.rareFleeTurns===paused,'active flight suspended while hidden')
+      player.invisibleTurns=0
+      fleeAssert(rareFlee(e,5) && e.rareFleeTurns<paused,'flight resumes after reveal')
+      const remaining=e.rareFleeTurns; currentZ=-1; enemyTurn()
+      fleeAssert(e.rareFleeTurns===remaining, 'off-level flight pauses')
       currentZ=0; e.alive=false; enemyTurn()
-      fleeAssert(e.rareFleeTurns===turns, 'dead monsters do not flee')
+      fleeAssert(e.rareFleeTurns===remaining, 'dead monsters do not flee')
     })()`))
   })
 

@@ -656,7 +656,10 @@ In tile-image mode, `content/rendering.json` maps ordinary cave floors
 z:-2 burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave walls
 (`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
 these textures; `marble` has a lighter stone-floor image, and walkable
-`cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt stairs,
+`cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt rubble in
+tile mode overlays the original `crypt2floor` tile without a painted square,
+just as dwarven rubble overlays its recorded floor underlay; ASCII backgrounds
+stay unchanged. Crypt stairs,
 mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
 coffin images over the appropriate floor. The regular coffin already uses
 `specialTiles.coffin`. Dwarven rubble and columns are transparent image
@@ -1013,7 +1016,9 @@ locked side room       -> a reachable local key opens the side room containing t
 
 The dependency validator proves that local keys can be collected in order and
 that the progression key can be obtained without crossing its own gate. No
-arbitrary nested key chains are generated. Killing a key-carrying Champion drops
+arbitrary nested key chains are generated. Key-carrying Champions must be non-ethereal so they cannot phase into an
+impassable tile with the key; other Champions (including Ghosts) remain eligible
+for normal generation. Killing a key-carrying Champion drops
 the ordinary key item through the normal corpse/drop path; searchable remains use
 the existing remains interaction. Bumping an intact gate while carrying its
 matching key consumes the key, opens both leaves, and costs **1 turn** without
@@ -2036,7 +2041,8 @@ it is not a persistent status or a new chance to hesitate.
 
 Evasive species are those whose templates include `evades`: Giant Bat, Monkey,
 Wasp, Vulture, Grivkin, Harpy, Skerva, Vampire, and NHALUUN.
-Scripted flying Ghosts in the dwarven ruins also receive `evades`.
+Ghosts, including the scripted fort encounters and their prefixed variants,
+do not receive `evades`; their defense is ethereal immunity to mundane weapons.
 
 ## Ethereal
 
@@ -2126,6 +2132,8 @@ pursuit action applies. With no distance-increasing escape tile, normal combat
 resumes, so an adjacent cornered monster fights back. Once outside aggro range,
 normal wandering rules apply. Invisible players retain ordinary detection rules.
 
+Wounded retreat stops while the player is invisible to that enemy. It resumes
+if the player becomes visible again while the HP threshold still applies.
 Crossing below the threshold on a surviving hit logs "Wounded <name> retreats!"
 once per crossing. Subsequent hits below the threshold do not repeat the message;
 fatal hits do not log retreat. Inspection shows Fleeing while the condition holds.
@@ -2149,8 +2157,10 @@ Success replaces the attack, logs “<name> has snatched <item> from you and run
 away!”, and immediately grants one guaranteed escape step. Thereafter the thief
 reuses wounded retreat movement: one step per enemy turn, with a **10%** chance
 to hesitate. Carrying a stolen item keeps it fleeing regardless of HP, aggro
-range, or player invisibility; it does not wander home or shoot while it can
-escape. A cornered thief resumes ordinary combat and tries retreating again
+range while the player is visible; it does not wander home or shoot while it can
+escape. Losing sight of an invisible player suspends directed retreat, without
+removing the stolen item, resetting the one-time theft, or forcing the player to
+become visible. A cornered thief resumes ordinary combat and tries retreating again
 when an escape tile opens. Off-level thieves remain paused like other enemies.
 Sacred-ground protection still prevents new thefts.
 
@@ -3844,9 +3854,11 @@ square and do not alter swimming or drowning mechanics. On the main view they
 render half-submerged, using the same water clipping treatment as swimming
 creatures. In tile mode, each chest gently bobs in place (about 1 pixel sideways
 and 2 pixels vertically at 40-pixel tile size, on a 2.7-second cycle), with a
-position-dependent phase. The waterline stays fixed, land chests and ASCII
-sprites stay still, and movement is only visual: loot coordinates, RNG, pickup,
-save, and replay rules are unchanged. They are created at world generation and
+position-dependent phase. The player also bobs gently while swimming; drowning
+makes the side-to-side and vertical motion roughly twice as fast and three
+times as large. Clipping and the waterline stay anchored to the tile. Land
+actors, ASCII sprites, and game positions stay still; movement is only visual:
+loot coordinates, swimming turns, RNG, pickup, save, and replay rules are unchanged. They are created at world generation and
 persist with the normal ground item save/replay state.
 
 Chest loot can include:
@@ -3970,11 +3982,11 @@ provokes exactly one immediate reaction instead of that enemy's wander action
 for the turn. A miss causes no reaction; evasive enemies cannot use their
 special dodge against an invisible attacker. An enemy killed by the attack
 cannot react. A single roll gives
-10% confusion (no action), then a flee chance of
+10% confusion (no action), then a recoil chance of
 `clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
-On a flee result the enemy moves one tile to an open walkable neighbor,
-preferring maximum distance from the player; if no tile is available, it stays
-put and reports being cornered. The remaining probability is a wild lash-out:
+On what was formerly a flee result, the enemy now recoils but stays in place:
+it cannot determine a retreat direction from an unseen attacker. The remaining
+probability is a wild lash-out:
 if still adjacent, the enemy makes one ordinary attack with one tenth of its
 normal hit chance (including normal damage, armor, and critical-hit rules).
 No reaction grants lasting awareness or subsequent pursuit. God mode
@@ -4288,7 +4300,12 @@ walking distance from the village determines proximity; water and impassable
 terrain cannot shorten a route. If any eligible tier-3 enemies are reachable,
 tier 4 is excluded. Otherwise reachable tier-4 enemies are the fallback. Only
 the closest targets in that preferred tier remain eligible; equally close
-targets retain seeded quest variety. A kill target need not have a prefix.
+targets retain seeded quest variety. Every individual `kill_specific` quest names a prefixed enemy. If the nearest
+chosen living target lacks a prefix, accepting that quest gives it one random
+non-Champion enemy prefix (with the usual stat changes) before saving its name.
+Group kills and item recoveries do not require prefixed targets. Quest target ID,
+position, and spawn pool are unchanged; this prevents ordinary monsters from
+being described as special named individuals.
 Group kills use equally close members of the same species. Ground-item delivery
 candidates retain their existing rules.
 
@@ -4359,10 +4376,14 @@ Two sightings precede ordinary combat. An unaware, armed beast notices a visible
 unconcealed player within 5 tiles. The first sighting cannot be hit or cornered;
 the second can be caught by reaching adjacency or blocking every outward step.
 Caught beasts become aware and Alarmed; a third approach uses ordinary combat.
-An attack can start the flight before damage or evasion, including an invisible
-attack. An invisible attacker triggers flight during either sighting, without
-catching or damaging the beast. Invisibility and forest concealment alone never
-start a sighting. Active flight takes priority over temple flight and idle AI.
+A visible attack can start the flight before damage or evasion. An invisible
+attacker cannot start a sighting or directed escape, and can strike a beast
+without triggering first-sighting flight protection. Becoming invisible during an
+existing flight pauses its remaining turns and removes the temporary speed bonus;
+the beast resumes its remaining escape when it can see the player again. Attacking
+it while unseen cancels that flight and resolves the normal invisible attack.
+Forest concealment and invisibility alone never start a sighting. Active visible
+flight takes priority over temple flight and idle AI.
 
 The first steps occur immediately, including when a wander step enters sighting
 range. Flight itself deals no damage, sets no alarm or spotted message, and leaves

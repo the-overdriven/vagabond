@@ -39,6 +39,34 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
     })()`))
   })
 
+  it('always gives an ordinary specific-kill target a real prefix before describing it', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const tmpl=ENEMY_TEMPLATE_BY_NAME.Harpy
+      const e=addEnemy({...tmpl,id:'test-hunter-harpy',name:tmpl.name,baseName:tmpl.name,
+        x:player.x+3,y:player.y+3,homeX:player.x+3,homeY:player.y+3,
+        homeTileType:'hill',level:0,alive:true,hp:tmpl.hp,maxHp:tmpl.hp,
+        atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,prefix:null,equipment:null})
+      const oldCandidates=hunterCandidates,oldChance=chance,oldQuest=oldHunterQuest
+      try {
+        oldHunterQuest=null
+        hunterCandidates=()=>[{type:'kill_specific',targetEnemyId:e.id,targetName:e.name,rewardXp:100}]
+        chance=()=>false // choose killing quest rather than an investigation
+        const q=generateOldHunterQuest()
+        if(!e.prefix || e.prefix==='Champion' || !e.name.startsWith(e.prefix+' Harpy'))
+          throw Error('first named quarry must have an actual non-Champion prefix')
+        if(q.targetName!==e.name || q.targetEnemyId!==e.id)
+          throw Error('Hunter dialogue tracks the full prefixed name and exact original target')
+        if(!e.prefixBase || !e.abilities.includes('fly'))
+          throw Error('promotion retains abilities and a pre-prefix stat snapshot')
+        const saved=buildSaveObject().enemies.find(enemy=>enemy.id===e.id)
+        if(saved.prefix!==e.prefix || saved.name!==e.name)
+          throw Error('prefixed quest quarry persists in the current save')
+      } finally {
+        hunterCandidates=oldCandidates;chance=oldChance;oldHunterQuest=oldQuest
+      }
+    })()`))
+  })
+
   it('offers the post-Tracking hunt, spawns one qualifying quarry near an edge, and requires that exact beast', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
