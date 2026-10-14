@@ -3855,7 +3855,9 @@ render half-submerged, using the same water clipping treatment as swimming
 creatures. In tile mode, each chest gently bobs in place (about 1 pixel sideways
 and 2 pixels vertically at 40-pixel tile size, on a 2.7-second cycle), with a
 position-dependent phase. The player gently bobs in deep `water` (lakes and
-seas) at a constant rate, including while drowning. River tiles retain their
+seas) at a constant rate, including while drowning. Its vertical bob moves
+**downward from the usual sprite position, never above it**, so the fixed
+water clip cannot cut off the top of the head. River tiles retain their
 half-submerged clipping but **do not bob**. Clipping and the waterline stay
 anchored to the tile. Land actors, ASCII sprites, and game positions stay still;
 movement is only visual: loot coordinates, swimming turns, RNG, pickup, save,

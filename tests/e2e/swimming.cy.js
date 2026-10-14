@@ -69,6 +69,12 @@ describe('Swimming visuals', () => {
         const normal = times.map(t => originalBob(t, 'water'))
         const maximum = Math.max(...normal.map(({dx,dy}) => Math.hypot(dx,dy)))
         check(maximum > 1 && maximum < TILE_PX / 10, 'deep-water bob stays gentle')
+        check(normal.every(({dy}) => dy >= 0), 'sprite never moves above the clip and cuts off its head')
+        const fullCycle = Array.from({length: 271}, (_, i) => originalBob(i * 10, 'water').dy)
+        check(Math.min(...fullCycle) >= 0 && Math.min(...fullCycle) < TILE_PX / 100,
+          'bob returns to the normal sprite height without rising above it')
+        check(Math.max(...fullCycle) > TILE_PX / 20 && Math.max(...fullCycle) < TILE_PX / 10,
+          'bob visibly dips downward without disappearing beneath the waterline')
         check(new Set(normal.map(({dx,dy}) => dx + ',' + dy)).size > 1,
           'water movement changes with render timestamp')
         for (const terrain of ['river','frozenriver','grass']) {

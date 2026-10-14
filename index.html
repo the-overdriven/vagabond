@@ -7454,10 +7454,12 @@ more difficult:
   function swimmingPlayerBobOffset(now, terrain) {
     if (terrain !== 'water') return {dx: 0, dy: 0}
     const angle = now * (Math.PI * 2 / 2700) + 1.1
+    // Start at the normal sprite height and dip down into the water; never
+    // rise past the top of the fixed swimming clip and crop the player's head.
     const amplitude = 1.4
     return {
       dx: Math.sin(angle + 0.9) * TILE_PX / 40 * amplitude,
-      dy: Math.sin(angle) * TILE_PX / 20 * amplitude
+      dy: (1 + Math.sin(angle)) * TILE_PX / 40 * amplitude
     }
   }
 
