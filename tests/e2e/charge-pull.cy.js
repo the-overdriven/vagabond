@@ -127,6 +127,69 @@ describe('Charge and Pull terrain rules', () => {
       } finally {chance=oldChance;damageRoll=oldDamage}
     })()`))
   })
+  it('shows Charge crossing each tile before its melee hit and any knockback', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const oldChance=chance, oldDamage=damageRoll, oldLoop=runAnimationLoop
+      try {
+        chance=p=>p===.60; damageRoll=()=>10; runAnimationLoop=()=>{}
+        const outcomes=[]
+        for(const direction of ['cardinal','diagonal']) for(const animated of [true,false]) {
+          stopCameraAnimation(); clearEnemyAnims()
+          enemies=[]; occupied.clear(); damageAnims=[]; projectileAnims=[]
+          replayAnimationsDisabled=!animated; replaySimulationMode=false
+          player.x=40; player.y=40; player.hp=1000
+          const x=37, y=direction==='diagonal'?37:40
+          const minotaur=rushEnemy('Minotaur',x,y), startHp=player.hp
+          rushCheck(tryEnemyRush(minotaur),'minotaur charge succeeds')
+          const py=direction==='diagonal'?41:40
+          rushCheck(minotaur.x===39 && minotaur.y===(direction==='diagonal'?39:40),
+            'charge resolves adjacent to player immediately')
+          rushCheck(player.x===41 && player.y===py && player.hp===startHp-10,
+            'knockback and damage stay synchronous')
+          outcomes.push([direction,player.x,player.y,player.hp,minotaur.x,minotaur.y])
+          if(animated) {
+            const anim=minotaur.chargeAnim, impact=anim.start+anim.duration
+            rushCheck(!!anim && anim.steps===2 && anim.duration===240,
+              'two 120 ms tile steps, not one teleport')
+            rushCheck(minotaur.animStart===undefined,'ordinary move animation does not override charge')
+            const at=ms=>chargeVisualPosition(anim,anim.start+ms)
+            const close=(a,b)=>Math.abs(a-b)<.001
+            rushCheck(close(at(0).x,37) && close(at(85).x,38) && close(at(119).x,38),
+              'first tile reached then paused')
+            rushCheck(close(at(120).x,38) && close(at(205).x,39) && close(at(239).x,39),
+              'second tile starts only after pause')
+            if(direction==='diagonal')
+              rushCheck(close(at(85).y,38) && close(at(205).y,39),
+                'diagonal charge passes through both tile steps')
+            rushCheck(minotaur.attackStart===impact,'melee lunge starts after arrival')
+            rushCheck(moveAnim?.kind==='charge-knockback' && moveAnim.start>=impact-2,
+              'camera and player wait at the hit tile until impact')
+            rushCheck(damageAnims.some(d=>typeof d.amount==='number' && d.start+d.delay>=impact-2),
+              'damage text waits for impact')
+            rushCheck(chargeAnimationPending(),'player input is locked during charge')
+            render(impact-1)
+            rushCheck(camX===targetCamX(40) && camY===targetCamY(40),
+              'player still at hit tile just before charge impact')
+            render(impact+70)
+            rushCheck(camX>targetCamX(40) && camX<targetCamX(41),
+              'camera advances only after knockback')
+            render(impact+221)
+            rushCheck(!chargeAnimationPending(),'presentation unlocks when charge and melee finish')
+          } else {
+            rushCheck(!minotaur.chargeAnim && !chargeAnimationPending(),
+              'replay simulation skips charge presentation')
+          }
+        }
+        rushCheck(JSON.stringify(outcomes[0])===JSON.stringify(outcomes[1]) &&
+          JSON.stringify(outcomes[2])===JSON.stringify(outcomes[3]),
+          'animated and simulation charges have identical outcomes')
+      } finally {
+        chance=oldChance; damageRoll=oldDamage; runAnimationLoop=oldLoop
+        replayAnimationsDisabled=true; stopCameraAnimation(); clearEnemyAnims()
+      }
+    })()`))
+  })
+
   it('replays rush movement and combat with the same RNG and saved state', () => {
     cy.window().then(win => win.eval(`(async () => {
       rushEnemy('Boar',38,40);rushEnemy('Giant Spider',43,40)

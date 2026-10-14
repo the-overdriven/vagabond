@@ -6254,7 +6254,7 @@ more difficult:
 
   async function tryMove(dx, dy) {
     if (mapOpen || invOpen || tradeOpen || raceOpen || Graveyard.isOpen() || deathTransition) return
-    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim)) {
+    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending())) {
       pendingMove = {dx: dx, dy: dy}
       return
     }
@@ -6476,7 +6476,7 @@ more difficult:
     // replace it with the ordinary 140 ms walking pan when the spider reacts
     // to this movement in the same turn (the normal pan would snap the player
     // to the pulled destination before the web arrives).
-    if (moved && moveAnim?.kind !== 'pull') animateCameraToPlayer(fromPos)
+    if (moved && moveAnim?.kind !== 'pull' && moveAnim?.kind !== 'charge-knockback') animateCameraToPlayer(fromPos)
     else {
       render()
       runAnimationLoop()
@@ -6487,7 +6487,7 @@ more difficult:
 
   function skipTurn() {
     if (mapOpen || invOpen || tradeOpen || raceOpen || Graveyard.isOpen() || deathTransition) return
-    if (cameraAnimating || attackAnim) return
+    if (cameraAnimating || attackAnim || chargeAnimationPending()) return
     recordReplayAction({type: 'skipTurn'})
     if (consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS &&
       !(deepSwimmingWater(player.x, player.y) && !player.godMode && !raceHas('swims'))) {
@@ -7553,6 +7553,9 @@ more difficult:
   let attackAnimResolve = null
   let deathTransition = null
   const MOVE_ANIM_MS = 140
+  const CHARGE_STEP_MOVE_MS = 85
+  const CHARGE_STEP_PAUSE_MS = 35
+  const CHARGE_STEP_MS = CHARGE_STEP_MOVE_MS + CHARGE_STEP_PAUSE_MS
 
   // FX animations: a glyph bumps up/down, shrinks, and fades out instead of
   // just vanishing. Used for item/chest pickups (moves up) and enemy deaths
@@ -7714,6 +7717,32 @@ more difficult:
     e.animStart = performance.now()
   }
 
+  function beginEnemyChargeAnim(e, fromX, fromY, line) {
+    e.animStart = undefined // The ordinary one-step slide would cross the whole route.
+    if (replayAnimationsDisabled || replaySimulationMode || !e.alive) return
+    const steps = line.distance - 1
+    e.chargeAnim = {
+      fromX, fromY, sx: line.sx, sy: line.sy, steps,
+      targetX: player.x, targetY: player.y,
+      start: performance.now(), duration: steps * CHARGE_STEP_MS
+    }
+    runAnimationLoop()
+  }
+
+  function chargeVisualPosition(anim, now) {
+    const elapsed = Math.max(0, now - anim.start)
+    const step = Math.min(anim.steps - 1, Math.floor(elapsed / CHARGE_STEP_MS))
+    const t = Math.max(0, Math.min(1, (elapsed - step * CHARGE_STEP_MS) / CHARGE_STEP_MOVE_MS))
+    const p = 1 - Math.pow(1 - t, 3)
+    return {x: anim.fromX + (step + p) * anim.sx,
+      y: anim.fromY + (step + p) * anim.sy}
+  }
+
+  function chargeAnimationPending() {
+    return !replayAnimationsDisabled && !replaySimulationMode &&
+      enemies.some(e => e.alive && e.chargeAnim && onCurrentLevel(e))
+  }
+
   function beginEnemyAttackAnim(e) {
     if (replayAnimationsDisabled) {
       e.attackStart = undefined
@@ -7727,6 +7756,7 @@ more difficult:
     for (const e of enemies) {
       e.animStart = undefined
       e.attackStart = undefined
+      e.chargeAnim = undefined
     }
     for (const n of npcs) n.animStart = undefined
   }
@@ -7734,7 +7764,13 @@ more difficult:
   function enemyAnimsPending() {
     for (const e of enemies) {
       if (!onCurrentLevel(e)) continue
-      if (e.animStart !== undefined || e.attackStart !== undefined) return true
+      if (!e.alive) {
+        e.animStart = undefined
+        e.attackStart = undefined
+        e.chargeAnim = undefined
+        continue
+      }
+      if (e.animStart !== undefined || e.attackStart !== undefined || e.chargeAnim) return true
     }
     return false
   }
@@ -7751,14 +7787,20 @@ more difficult:
     if (animLoopFrame !== null) return
     const step = (now) => {
       render(now)
-      if (cameraAnimating && !moveAnim) {
-        // Keep the input lock until the completed frame has had a chance to
-        // paint. Never run the next turn's world simulation inside this rAF.
+      if (cameraAnimating && !moveAnim && !chargeAnimationPending()) {
+        // Keep the input lock through a charge following the player's own step.
+        // Only presentation waits; the monster's turn was resolved immediately.
         if (pendingMoveTask === null) pendingMoveTask = setTimeout(() => {
           pendingMoveTask = null
-          if (!cameraAnimating || moveAnim) return
+          if (!cameraAnimating || moveAnim || chargeAnimationPending()) return
           cameraAnimating = false
           flushPendingMove()
+        }, 0)
+      } else if (!cameraAnimating && !attackAnim && !chargeAnimationPending() &&
+          (pendingMove || (autoPath && autoPath.length))) {
+        if (pendingMoveTask === null) pendingMoveTask = setTimeout(() => {
+          pendingMoveTask = null
+          if (!cameraAnimating && !attackAnim && !chargeAnimationPending()) flushPendingMove()
         }, 0)
       }
       if (animationsPending()) {
@@ -8231,7 +8273,14 @@ more difficult:
       if (!onCurrentLevel(e)) continue
       if (!e.alive) continue
       let ex = e.x, ey = e.y
-      if (e.animStart !== undefined) {
+      const charge = e.chargeAnim
+      const charging = charge && now < charge.start + charge.duration
+      if (charging) {
+        // Show a real tile-by-tile rush with a short beat between steps.
+        const pos = chargeVisualPosition(charge, now)
+        ex = pos.x
+        ey = pos.y
+      } else if (e.animStart !== undefined) {
         const t = Math.min(1, (now - e.animStart) / MOVE_ANIM_MS)
         if (t >= 1) {
           e.animStart = undefined
@@ -8241,13 +8290,14 @@ more difficult:
           ey = e.animFromY + (e.y - e.animFromY) * p
         }
       }
-      if (e.attackStart !== undefined) {
+      if (e.attackStart !== undefined && !charging) {
         const t = Math.max(0, Math.min(1, (now - e.attackStart) / 220))
         const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35
-        ex = e.x + (player.x - e.x) * lunge
-        ey = e.y + (player.y - e.y) * lunge
+        ex = e.x + ((charge?.targetX ?? player.x) - e.x) * lunge
+        ey = e.y + ((charge?.targetY ?? player.y) - e.y) * lunge
         if (t >= 1) e.attackStart = undefined
       }
+      if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
       if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue

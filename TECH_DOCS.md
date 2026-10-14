@@ -2246,6 +2246,12 @@ orthogonal or diagonal tile steps. Distance two gives +25%; three gives +50%.
 Normal armor, glancing, and critical rules still apply. A surviving player hit
 for positive damage is pushed one tile directly away, if traversable and free.
 Water is eligible even without Swimming; blocked destinations prevent knockback.
+Visually, Charge advances one tile at a time: each crossed tile takes 85 ms of
+movement followed by a 35 ms pause. The melee lunge and damage feedback start
+only after the final tile; successful knockback likewise appears after impact.
+Movement and waiting input pause until the charge presentation is finished.
+This timing is cosmetic and does not change the number of turns, RNG, combat,
+or the resolved enemy position.
 
 Pull has a 70% chance to connect. The web drags the player onto the eligible
 floor tile adjacent to the spider, followed by one ordinary melee attack. The attack can

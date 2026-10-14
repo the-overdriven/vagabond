@@ -51,7 +51,12 @@ function enemyKnockback(e, line, charge = false) {
       (!(isWalkable(player.x + line.sx, player.y) || deepSwimmingWater(player.x + line.sx, player.y)) ||
        !(isWalkable(player.x, player.y + line.sy) || deepSwimmingWater(player.x, player.y + line.sy)))) return
   log(`The ${e.name}'s ${charge ? 'charge' : 'critical strike'} knocks you back!`, 'bad')
-  forcePlayerPosition(x, y)
+  const impactAt = charge && e.chargeAnim
+    ? e.chargeAnim.start + e.chargeAnim.duration : null
+  forcePlayerPosition(x, y, impactAt === null ? undefined : {
+    kind: 'charge-knockback', delay: Math.max(0, impactAt - performance.now()),
+    duration: MOVE_ANIM_MS
+  })
 }
 
 function tryEnemyRush(e) {
@@ -71,7 +76,17 @@ function tryEnemyRush(e) {
     e.farPath = null
     occupied.add(keyXY(e.x, e.y))
     finishEnemyMove(e, fromX, fromY)
+    // Presentation follows each crossed tile, but the whole charge (including
+    // its hit and knockback) is resolved immediately for saves and replay.
+    beginEnemyChargeAnim(e, fromX, fromY, line)
+    const firstDamage = damageAnims.length
     enemyAttackPlayer(e, true, 1, {atkMultiplier: 1 + 0.25 * (line.distance - 1), line})
+    if (e.chargeAnim) {
+      const impactAt = e.chargeAnim.start + e.chargeAnim.duration
+      if (e.attackStart !== undefined) e.attackStart = impactAt
+      for (const effect of damageAnims.slice(firstDamage))
+        effect.delay += Math.max(0, impactAt - effect.start)
+    }
   } else {
     log(`${e.name} throws a web at you and drags you closer!`, 'bad')
     const throwMs = 420, pullMs = 360
