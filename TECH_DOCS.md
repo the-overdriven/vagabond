@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v97**, save/replay version **44**; older saves are rejected.
+**v98**, save/replay version **45**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -4186,11 +4186,11 @@ provokes exactly one immediate reaction instead of that enemy's wander action
 for the turn. A miss causes no reaction; evasive enemies cannot use their
 special dodge against an invisible attacker. An enemy killed by the attack
 cannot react. A single roll gives
-10% confusion (no action), then a recoil chance of
+10% confusion (no action), then a flee chance of
 `clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
-On what was formerly a flee result, the enemy now recoils but stays in place:
-it cannot determine a retreat direction from an unseen attacker. The remaining
-probability is a wild lash-out:
+On a flee result, the enemy moves one tile to an open walkable neighbor,
+preferring maximum distance from the player; if no tile is available, it stays
+put and reports being cornered. The remaining probability is a wild lash-out:
 if still adjacent, the enemy makes one ordinary attack with one tenth of its
 normal hit chance (including normal damage, armor, and critical-hit rules).
 No reaction grants lasting awareness or subsequent pursuit. God mode
@@ -5280,7 +5280,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-44
+45
 ```
 
 Saves are JSON files.
@@ -5289,6 +5289,10 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 45 restores the one-tile flee response to invisible attacks. Its
+additional seeded destination roll changes the replay RNG contract; older saves
+and replay snapshots are rejected.
 
 Version 44 adds world-level killed-species history for rare-hunt eligibility.
 It is independent of the current character's Bestiary/Tracking knowledge and

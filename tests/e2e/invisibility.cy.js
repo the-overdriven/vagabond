@@ -105,7 +105,7 @@ describe('Scroll of Invisibility', () => {
     cy.get('#logpanel').should('not.contain.text', 'The Goblin has spotted you!')
   })
 
-  it('recoils without moving or fleeing, but can still lash out at reduced accuracy', () => {
+  it('may flee one tile from an invisible hit, or lash out at reduced accuracy', () => {
     beginGame()
     cy.window().then(win => {
       const result = win.eval(`(() => {
@@ -120,9 +120,11 @@ describe('Scroll of Invisibility', () => {
         const oldRng = rng
         try {
           rng=()=>0.2
-          const before={x:e.x,y:e.y}, occupancy=occupied.size
+          const before={x:e.x,y:e.y}
           reactToInvisibleAttack(e, 0)
-          const after={x:e.x,y:e.y}
+          const fled={x:e.x,y:e.y}
+          const fledDistance=Math.max(Math.abs(fled.x-player.x),Math.abs(fled.y-player.y))
+          occupied.delete(keyXY(e.x,e.y));e.x=player.x+1;e.y=player.y;occupied.add(keyXY(e.x,e.y))
           player.hp=50
           const missedRolls=[0.6,0.1,0.5,0.5]
           rng=()=>missedRolls.shift()??0.5
@@ -131,19 +133,19 @@ describe('Scroll of Invisibility', () => {
           const hitRolls=[0.6,0.99,0.5,0.5]
           rng=()=>hitRolls.shift()??0.5
           reactToInvisibleAttack(e, 0)
-          return {before,after,occupancyUnchanged:occupied.size===occupancy,missedHp,hp:player.hp}
+          return {before,fled,fledDistance,missedHp,hp:player.hp}
         } finally {rng=oldRng}
       })()`)
-      expect(result.before).to.deep.equal(result.after)
-      expect(result.occupancyUnchanged).to.equal(true)
+      expect(result.fled).to.not.deep.equal(result.before)
+      expect(result.fledDistance).to.be.greaterThan(1)
       expect(result.missedHp).to.equal(50)
       expect(result.hp).to.be.lessThan(50)
     })
-    cy.get('#logpanel').should('contain.text', 'recoils from the unseen attack!')
+    cy.get('#logpanel').should('contain.text', 'flees in terror!')
     cy.get('#logpanel').should('contain.text', 'lashes out wildly into the empty air!')
   })
 
-  it('uses damage, tier, and aggro in the recoil threshold without moving', () => {
+  it('uses damage, tier, and aggro in the flee threshold', () => {
     beginGame()
     cy.window().then(win => {
       const result=win.eval(`(() => {
@@ -156,12 +158,13 @@ describe('Scroll of Invisibility', () => {
           const before={x:e.x,y:e.y}
           reactToInvisibleAttack(e,0)
           reactToInvisibleAttack(e,4)
-          return {before,after:{x:e.x,y:e.y},messages:logs.filter(msg=>msg.includes('lashes out wildly') || msg.includes('recoils'))}
+          return {before,after:{x:e.x,y:e.y},messages:logs.filter(msg=>
+            msg.includes('lashes out wildly') || msg.includes('flees in terror'))}
         } finally {rng=oldRng;log=oldLog}
       })()`)
-      expect(result.after).to.deep.equal(result.before)
+      expect(result.after).to.not.deep.equal(result.before)
       expect(result.messages[0]).to.include('lashes out wildly')
-      expect(result.messages[1]).to.include('recoils')
+      expect(result.messages[1]).to.include('flees in terror')
     })
   })
 

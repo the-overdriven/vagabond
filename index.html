@@ -4522,12 +4522,33 @@ more difficult:
       log(`The ${e.name} is confused at the unseen attack!`, 'info')
       return
     }
-    const recoilChance = Math.max(0.05, Math.min(0.90,
+    const fleeChance = Math.max(0.05, Math.min(0.90,
       (30 - 2 * e.tier - enemyAggroRange(e) + damage / 2) / 100))
-    if (roll < 0.10 + recoilChance) {
-      // The monster recoils from the blow, but cannot locate an invisible
-      // attacker well enough to choose a direction to run away from them.
-      log(`The ${e.name} recoils from the unseen attack!`, 'info')
+    if (roll < 0.10 + fleeChance) {
+      const options = []
+      let bestDistance = -1
+      for (const [dx, dy] of DIRS8) {
+        const x = e.x + dx, y = e.y + dy
+        if (!enemyTileOpen(e, x, y) ||
+          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+        const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+        if (distance > bestDistance) {
+          options.length = 0
+          bestDistance = distance
+        }
+        if (distance === bestDistance) options.push({x, y})
+      }
+      log(`The ${e.name} panics at the unseen attack and flees in terror!${options.length ? '' : ' But is cornered with no way to escape!'}`, 'info')
+      if (options.length) {
+        const fromX = e.x, fromY = e.y
+        const destination = pick(options)
+        if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return
+        occupied.delete(keyXY(fromX, fromY))
+        e.x = destination.x
+        e.y = destination.y
+        occupied.add(keyXY(e.x, e.y))
+        finishEnemyMove(e, fromX, fromY)
+      }
       return
     }
     log(`The ${e.name} panics at the unseen attack and lashes out wildly into the empty air!`, 'bad')
