@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v86**, save schema **40**; older saves are rejected.
+**v93**, save/replay version **41**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -3452,99 +3452,164 @@ omitted from inventory and trade stat lines.
 # 36. Equipment Modifiers
 
 Ordinary generated weapons, shields and armor can receive **one** prefix. Under
-normal world rules, the chance is `min(90%, 40% + 2% × generation MF)`.
-After a successful modifier roll, each of the six configured prefixes is equally
-likely. The prefix type and amount are independent of the item's base tier.
-The Merchant's guaranteed enchanted weapon always has a prefix.
+normal world rules its chance is `min(90%, 40% + 2% × generation MF)`. The six
+prefixes are equally likely once a modifier is selected. The Merchant's guaranteed
+enchanted weapon always has a prefix. Its purchase price is the greater of the
+normal configured price and its selling price plus 1g, preventing immediate
+buy/sell profit when an exceptional modifier promotes a cheap base to tier 5. Base item tier does not limit the bonus.
 
-| Prefix | Effect while equipped | Range at generation MF 0 | Effect of generation MF on strength |
-|---|---|---|---|
-| Mighty | Adds to player ATK | +1–10 ATK | Favors higher rolls; maximum stays +10 |
-| Sturdy | Adds to player DEF | +1–10 DEF | Favors higher rolls; maximum stays +10 |
-| Swift | Adds to player SPD, without changing weapon GRACE | +1–10 SPD | Favors higher rolls; maximum stays +10 |
-| Lucky | Adds to player MF | +1–10 MF | Favors higher rolls; maximum stays +10 |
-| Resilient | Adds to maximum HP | +10–59 HP | Adds `floor(generation MF × 0.3)` to the rolled bonus |
-| Profound | Increases earned XP | +5–15% XP | Actual XP percentage is not increased by MF |
+| Prefix | Equipped effect | Ordinary range at MF 0, without monster quality | Exceptional range |
+|---|---|---:|---:|
+| Mighty | Player ATK | +1–10 | +11–20 |
+| Sturdy | Player DEF | +1–10 | +11–20 |
+| Swift | Player SPD; weapon GRACE is unchanged | +1–10 | +11–20 |
+| Lucky | Player MF | +1–10 | +11–20 |
+| Resilient | Maximum HP | +10–59 | +60–100 |
+| Profound | Earned XP | +5–15% | +16–30% |
 
-The same prefix can appear on any of the three gear types: for example, a Mighty
-shield increases player ATK while equipped. Backpack gear is inactive. Bonuses
-from equipped items add together; the +10 limit is per item, not a limit on the
-character's combined bonus. These ranges describe ordinary gear prefixes;
-artifact effects use their separate catalog. There is currently **no randomly
-selected GRACE prefix** in `content/item_modifiers.json`, although the combat
-code supports that stat.
+Every prefix may appear on weapons, shields or armor. Backpack gear is inactive;
+equipped bonuses add across slots. Artifact effects use their separate catalog.
+There is no randomly selected GRACE prefix in `content/item_modifiers.json`.
 
-## ATK, DEF, SPD and MF bonus distribution
+## Ordinary amounts and Magic Find
 
-These four prefixes share the same amount roll. At generation MF 0, probabilities
-are conditional on already having that prefix:
+Within the ordinary branch, ATK, DEF, SPD and MF use these thresholds:
 
-| Bonus amount | Chance |
+| Bonus | Chance at generation MF 0, without monster quality |
 |---|---:|
 | +1 | 45% |
 | +2 | 30% |
 | +3 | 15% |
 | +4 | 7% |
 | +5 | 2% |
-| +6–10 | 1% combined; 0.2% for each value |
+| +6–10 | 1% combined; 0.2% each |
 
-Generation MF shifts an inclusive 1–100 roll upward by `round(MF × 0.5)`,
-capped at 100, before applying the thresholds above. It improves the odds rather
-than adding directly to the resulting stat. For example, at generation MF 10,
-the combined chance of +6–10 is 6%, with 1.2% for each value; the range remains
-+1–10. With the normal 40% modifier chance and six equally likely prefixes, a
-random piece of equipment at MF 0 has approximately **0.0133%** chance of being
-Mighty +10 (roughly one in 7,500 pieces), rather than a 0.2% unconditional chance.
+Their inclusive 1–100 roll increases by `round(generation MF × 0.5)` plus the
+monster quality boost below, capped at 100 before applying the thresholds. MF
+changes probabilities, not the ordinary +10 maximum. At MF 10 without monster
+quality, +6–10 has 6% combined probability within the ordinary branch.
 
-## HP and XP bonus distribution
-
-Resilient uses the following rule, where `U` is a seeded uniform roll in `[0,1)`:
+Resilient uses a seeded uniform `U` in `[0,1)`:
 
 ```text
-HP bonus = 10 + floor(50 × U^5) + floor(generation MF × 0.3)
+quality = min(1 - epsilon, U + monster quality boost / 100)
+HP bonus = min(100, 10 + floor(50 × quality^5) + floor(generation MF × 0.3))
 ```
 
-The fifth power strongly favors the lower end: at MF 0, approximately 45.7%
-of Resilient items give exactly +10 HP. At generation MF 10 the range is +13–62
-HP; at MF 20 it is +16–65. Unlike the other flat-stat prefixes, HP has no fixed
-upper bonus independent of generation MF.
+Without monster quality, the MF-0 ordinary range is +10–59, with approximately
+45.7% giving +10 HP. MF 10 gives +13–62; MF 20 gives +16–65. The final +100 HP
+cap applies to both branches. An ordinary MF-adjusted result above +59 also
+promotes the item to tier 5; promotion does not require the exceptional gate.
 
-Profound rolls each whole percentage from +5% through +15% with equal probability
-(1/11 each). Equipped XP bonuses add before applying the multiplier and rounding
-the award. For example, +10% on a weapon and +15% on armor give +25% together:
-a base award of 100 XP becomes 125 XP, assuming no racial XP bonus.
+Ordinary Profound uses `5 + min(10, floor(min(1, U + boost / 100) × 11))`.
+Without monster quality, every whole value from +5% to +15% is equally likely.
+MF does not raise XP strength. Equipped XP percentages add before award rounding:
++10% on a weapon and +15% on armor produce +25%, so 100 base XP becomes 125
+without a racial XP bonus. Profound retains a separate ordinary numeric pricing
+roll; its actual XP percentage determines promotion, not that pricing amount.
 
-Profound also receives a separate internal numeric modifier amount, but this
-does not determine its XP percentage. Equipment pricing uses that internal
-amount, so a +15% XP item is not necessarily priced above a +5% XP item.
+## Exceptional bonuses and tier-5 promotion
 
-## Worked gear examples
+Each selected prefix first tests an exceptional gate. Without a monster source,
+or for a tier-1 monster, this is **0.10%**. Each additional monster tier adds
+**0.02 percentage points**, reaching **0.18%** at tier 5. MF never increases this
+gate; it can still increase the chance to receive a prefix at all.
 
-All examples assume no additional modifiers, racial effects or artifact bonuses:
+Exceptional values are picked with decreasing weights:
 
-| Item | Example prefix roll | Result |
-|---|---|---|
-| Prolonged Hammer: ATK 10, GRACE 1 | Mighty +4 ATK | ATK contribution 14; GRACE remains 1; still two-handed |
-| Prolonged Hammer: ATK 10, GRACE 1 | Mighty +10 ATK | ATK contribution 20; the rare maximum roll |
-| Armor with base DEF 4 | Sturdy +3 DEF | DEF contribution 7 |
-| Equipped weapon | Swift +2 SPD | Player SPD +2; weapon GRACE is unchanged |
-| Equipped shield | Lucky +3 MF | Player MF +3; improves eligible future loot rolls |
-| Equipped armor at generation MF 0 | Resilient +18 HP | A base maximum of 70 HP becomes 88 HP |
-| Equipped weapon | Profound +15% XP | A base award of 100 XP becomes 115 XP |
+```text
+weight(value) = maximum + 1 - value
+```
 
-A Mighty Prolonged Hammer therefore contributes **11–20 ATK**, compared with a
-mundane War Hammer's 12 ATK. A +2 roll ties that damage contribution; +3 or higher
-surpasses it. Both retain GRACE 1 and require both hands. This comparison concerns
-ATK, not guaranteed damage after defense, random variance and critical hits.
+For ATK/DEF/SPD/MF, +11 has weight 10 and +20 weight 1 (total 55). For HP,
++60 has weight 41 and +100 weight 1 (total 861). For XP, +16% has weight 15 and
++30% weight 1 (total 120). The largest bonuses are therefore the rarest.
+At MF 0 with no monster boost, approximately one in 2,500 ordinary generated
+gear items enters the exceptional branch, counting all six prefix types. A
+specific Mighty +20 is approximately one in 825,000 such items. These are
+probabilities, not guarantees or pity counters.
 
-## Which loot sources use generation MF
+Any final bonus above its old ceiling (**+10 ATK/DEF/SPD/MF, +59 HP, +15% XP**)
+sets the finished item's tier to **5**. Existing tier coloring makes its name
+red in inventory, equipment, trade and item logs. Base ATK/DEF, GRACE, speed
+penalties, hand requirements, base purchase value and base-icon lookup remain
+unchanged. Tier-based selling uses the promoted tier. A base stat above a ceiling
+alone does not promote an item; the comparison is against its prefix bonus.
 
-The values above use the MF passed to the gear generator when the item is made.
-Chest gear passes the player's MF. Humanoid worn equipment and the Merchant's
-guaranteed gear use the default generation MF of zero; their modifier amounts
-are not improved by the player's current MF. A worn humanoid item does not
-reroll its prefix when dropped. The humanoid's partial equipment effectiveness
-can reduce the enemy's benefit, but the recovered item's own bonuses stay intact.
+The rolled bonus and tier are ordinary item fields preserved through saves,
+replay starting snapshots, equipment swaps, theft and drops. No additional
+exceptional-item flag or reroll-on-load logic exists.
+
+## Monster quality
+
+The source monster's original tier improves ordinary quality slightly, independently
+of player MF. It also sets the exceptional chance:
+
+| Monster tier | Ordinary quality boost | Exceptional gate per selected prefix |
+|---|---:|---:|
+| 1 | +0 | 0.10% |
+| 2 | +1 | 0.12% |
+| 3 | +2 | 0.14% |
+| 4 | +3 | 0.16% |
+| 5 | +4 | 0.18% |
+
+For flat stats, boost is added to the 1–100 roll; HP and XP use its normalized
+value before their amount formulas. Worn humanoid equipment is rolled once
+using monster tier and generation MF 0. Better gear also strengthens its wearer
+under the normal partial equipment-effectiveness rule. The exact same item drops;
+killing a monster does not reroll or improve it. Chest gear uses player MF,
+without a monster-source boost. Guaranteed Merchant gear has no monster boost.
+
+## Worked examples and roll chances
+
+The following chances include the chance of getting a modifier, selecting that
+prefix, and rolling the exact bonus. They assume the stated base item has
+**already been selected**, generation MF 0 and no monster-source boost, except
+the explicitly marked MF-10 row. They are not chances per kill and do not include
+the chance of selecting that particular weapon/armor/shield from the base pool.
+
+| Selected base item | Prefix | Equipped result | Chance of this prefix and exact bonus | Approximately 1 in |
+|---|---|---|---:|---:|
+| Prolonged Hammer: ATK 10, GRACE 1, tier 3 | Mighty +4 | ATK 14, GRACE 1, tier 3 | 0.46620000% | 215 |
+| Prolonged Hammer: ATK 10, GRACE 1, tier 3 | Mighty +20 | ATK 30, GRACE 1, **tier 5/red**, two-handed | 0.00012121% | 825,000 |
+| Armor: DEF 4, tier 2 | Sturdy +12 | DEF 16, **tier 5/red** | 0.00109091% | 91,667 |
+| Dagger: ATK 2, GRACE 5, tier 1 | Swift +11 | Player SPD +11; base ATK/GRACE unchanged; **tier 5/red** | 0.00121212% | 82,500 |
+| Shield: tier 1 | Lucky +15 | Player MF +15, **tier 5/red** | 0.00072727% | 137,500 |
+| Armor at generation MF 10 | Resilient +62 | Maximum HP +62, **tier 5/red** | 0.04073653% | 2,455 |
+| Weapon: tier 2 | Profound +30% | 100 base XP becomes 130; **tier 5/red** | 0.00005556% | 1,800,000 |
+
+The MF-10 Resilient +62 chance counts both possible routes: the top ordinary
+MF-adjusted HP roll and an exceptional +62 roll. Mighty +4 includes the 99.9%
+chance of taking the ordinary branch. Exact maximum rolls are extremely rare;
+a +20 flat-stat bonus is not a reward to expect in a typical run.
+
+## Actual exceptional gear drop chance per humanoid kill
+
+At player MF 0, with normal world traits and ordinary humanoid equipment rules,
+the two equipment-generation attempts give `1 - (1 - p)^2` chance of wearing
+gear, where `p = 45% + 3% × monster tier`. Worn equipment drops as the same item.
+The following probabilities count **any base item and any of the six prefixes**,
+but require the exceptional branch (+11–20 flat stats, +60–100 HP, or +16–30% XP):
+
+| Monster tier | Chance of wearing/dropping gear | Exceptional chance per selected prefix | Exceptional gear per kill | Approximately 1 in kills |
+|---|---:|---:|---:|---:|
+| 1 | 72.96% | 0.10% | 0.029184% | 3,427 |
+| 2 | 75.99% | 0.12% | 0.036475% | 2,742 |
+| 3 | 78.84% | 0.14% | 0.044150% | 2,265 |
+| 4 | 81.51% | 0.16% | 0.052166% | 1,917 |
+| 5 | 84.00% | 0.18% | 0.060480% | 1,653 |
+
+For a tier-5 humanoid at MF 0, a **Mighty +20 on any base item** has probability
+`84% × 40% × (1/6) × 0.18% × (1/55)`, or approximately **0.00018327%**:
+**one in 545,635 kills**. Requiring a specific base weapon reduces that chance
+further according to the weapon-type and weighted base-item selection rules.
+
+These are generation probabilities, not a reroll on death. An enemy's equipment
+is stored when it is created. Already-worn gear, replacements and stolen items
+retain their own existing rolls. At nonzero player MF, gear availability can
+increase; ordinary chest HP rolls above +59 can also create tier-5 items without
+entering the exceptional branch. These figures are not general artifact, chest,
+or all-enemy drop rates.
 ---
 
 # 37. Artifacts
@@ -3872,6 +3937,21 @@ into the item generator. Therefore MF does **not**:
 - increase its modifier chance
 - increase its modifier amount
 - reroll the item when the humanoid dies
+
+### Monster-tier equipment quality
+
+The generation tier is an upper limit on base equipment, not a guarantee of
+matching equipment. Within that eligible base-item pool, each item has weight
+**2** when matching the source monster's tier, **1.5** when one tier below, and
+**1** when further below. Items remain individually weighted, so tier probabilities
+also depend on the number of eligible catalog entries. The fallback roll may
+lower the upper limit by one, but the original monster tier still determines
+quality and weights. Chest and Merchant base selections retain uniform weighting.
+
+Monster tier additionally improves prefix strength and the exceptional gate as
+specified in section 36. Player MF still does not improve worn-item modifier
+quality. An exceptional roll may promote a weak base item above the source tier;
+that is an intentional tier-5 quality classification, not a new base item.
 
 The worn item is already stored on the enemy as `e.equipment`.
 Combat glancing-hit messages and enemy tooltips show only the equipment's base
@@ -5136,10 +5216,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-40
+41
 ```
 
 Saves are JSON files.
+
+Version 41 establishes the expanded gear-bonus RNG contract: older snapshots
+and recordings are rejected because their loot rolls consume a different random
+sequence. Item fields remain unchanged; there is no migration.
 
 Version 40 distinguishes barred prison doors from solid doors in saved
 terrain. Version 39 stores the dungeon-package shortcut registry and each deep
@@ -5251,7 +5335,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 40** saves. Other versions are rejected
+Current gameplay state requires **version 41** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
