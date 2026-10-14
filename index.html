@@ -1447,7 +1447,7 @@ more difficult:
     } else if (tile === 'dwarvenliftoff' || tile === 'dwarvenlifton') {
       return travelDwarvenLift()
     } else if (tile === 'dwarvenminessealed') {
-      log('A broad work stair descends toward the old Deep Mines, but a cave-in blocks the way. Broken braces and mining debris show that the excavation once continued beyond it.', 'info')
+      log('A collapsed mine stairway descends toward the old Deep Mines, but a cave-in blocks the way. Broken braces and mining debris show that the excavation once continued beyond it.', 'info')
       return true
     } else if (tile === 'caveup') {
       const depth = chainDepthForZ(currentZ), prevDepth = depth - 1
@@ -6357,7 +6357,7 @@ more difficult:
         } else if (onto === 'dwarvenstairsup') {
           log('A broad dwarven stair leads back toward the upper ruins. Press "inspect" to climb up.', 'info')
         } else if (onto === 'dwarvenminessealed') {
-          log('A collapsed work stair continues toward the old Deep Mines. Press "inspect" to examine it.', 'info')
+          log('A collapsed mine stairway leads toward the old Deep Mines. Press "inspect" to examine it.', 'info')
         } else if (onto === 'caveup') {
           log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
         } else if (onto === 'cryptstairsdown') {

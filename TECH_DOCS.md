@@ -946,8 +946,9 @@ continue the generic depth chain from **z:-4** downward: three floors end at
 z:-6 and five floors end at z:-8. Each intermediate floor has one dedicated
 up stair and one dedicated down stair; the coordinates match across adjacent
 levels so changing depth does not move the player laterally. The final floor
-replaces its down stair with a visible but non-descending collapsed work stair
-toward the future Deep Mines.
+replaces its down stair with the visible **Collapsed Mine Stairway** toward
+the future Deep Mines. A cave-in blocks descent; inspecting it describes the
+ruined passage without changing level.
 
 The stratum length and every layout decision use the seeded game RNG. Floor
 metadata includes its 1-based dungeon floor, total floor count, and normalized
@@ -3336,6 +3337,7 @@ Current base weapons include:
 | Morning Star | 3 | 7 | 2 | No |
 | Lance | 3 | 9 | 2 | Yes |
 | Flail | 3 | 8 | 2 | No |
+| Prolonged Hammer | 3 | 10 | 1 | Yes |
 | Chain Whip | 4 | 7 | 4 | No |
 | War Sickle | 4 | 9 | 5 | Yes |
 | Two-handed Sword | 4 | 11 | 2 | Yes |
@@ -3348,6 +3350,16 @@ Current base weapons include:
 | Kanabo Club | 5 | 15 | 1 | Yes |
 | Crescent Blades | 5 | 13 | 5 | Yes |
 | Titan Warpick | 5 | 18 | 1 | Yes |
+
+Prolonged Hammer is a long-handled hammer with a compact head and small peen.
+It offers tier-3 heavy damage at low GRACE: 10 ATK, 1 GRACE, two-handed, and
+110g base purchase value. It is a weaker counterpart to the tier-4 War Hammer
+(12 ATK, 1 GRACE). Compared with the tier-3 Lance (9 ATK, 2 GRACE), it trades
+faster attack timing for one more ATK. It occupies both hands and enters the
+ordinary tier-3-and-higher weapon-generation pools, including humanoid gear and
+loot. Its handle and peen are visual features: melee range and door-breaching
+rules remain those of an ordinary two-handed weapon. The transparent 24×24 SVG
+is `img/icons/Prolonged Hammer.svg`; magic variants retain the same base icon.
 
 Crescent Blades represent a matched pair equipped as one two-handed weapon:
 they occupy both hands and prevent shield use under the existing equipment rules.
