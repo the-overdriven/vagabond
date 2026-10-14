@@ -149,6 +149,31 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
     })
   })
 
+  it('includes beasts at 40 tiles and excludes beasts at 41 tiles', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const previous = {enemies, log, consumeItemTurn, spawnHornSoundAnim}
+      const messages = []
+      try {
+        log = text => messages.push(text)
+        consumeItemTurn = () => {}; spawnHornSoundAnim = () => {}
+        player.inventory = [createItem('echoBlightHorn')]
+        const beast = distance => ({id:'boundary',alive:true,humanoid:false,level:currentZ,
+          x:player.x+distance,y:player.y})
+        for (const distance of [40,41]) {
+          enemies = [beast(distance)]; messages.length = 0
+          delete player.inventory[0].lastUseTotalXp
+          useEchoBlightHorn(0)
+          const answers = messages.filter(text => text.startsWith('You hear something answering'))
+          if (answers.length !== (distance === 40 ? 1 : 0)) throw Error('horn boundary '+distance)
+          if (distance === 41 && !messages.includes('Nothing answers.')) throw Error('out-of-range silence')
+        }
+      } finally {
+        enemies=previous.enemies; log=previous.log
+        consumeItemTurn=previous.consumeItemTurn; spawnHornSoundAnim=previous.spawnHornSoundAnim
+      }
+    })()`))
+  })
+
   it('sounds the 3 closest distinct beast directions, enforces XP-gated reuse, persists cooldown, and replays deterministically', () => {
     cy.window().then(win => win.eval(`(async () => {
       replayRecording = false; replayPlaying = false; replayAnimationsDisabled = false
@@ -165,7 +190,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         mk('southwest-beast', player.x-15, player.y+15),
         mk('south-beast', player.x, player.y+25),
         mk('south-humanoid', player.x, player.y+3, true),
-        mk('outside-beast', player.x+81, player.y),
+        mk('outside-beast', player.x+41, player.y),
         mk('underground-beast', player.x+2, player.y, false, -1)
       ]
       occupied = new Set(enemies.filter(e=>e.level===0).map(e=>keyXY(e.x,e.y)))

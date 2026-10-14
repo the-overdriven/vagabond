@@ -117,7 +117,7 @@ describe('Tracking and beast evidence', () => {
         rng = () => { throw new Error('inspection consumed RNG') }
         trackAssert(inspectBeastTrack(t) === "Fresh tracks lead northeast. You've never seen paw prints like these before.", 'unknown species')
         player.killsBySpecies.Wolf = 1
-        for (const [age,start] of [[0,'Fresh'],[49,'Fresh'],[50,'The'],[149,'The'],[150,'Fading'],[199,'Fading']]) {
+        for (const [age,start] of [[0,'Fresh'],[59,'Fresh'],[60,'The'],[179,'The'],[180,'Fading'],[239,'Fading']]) {
           t.age = age; trackAssert(inspectBeastTrack(t) === start+' wolf tracks lead northeast.', 'freshness '+age)
         }
         trackAssert(tileInspectInfo(40,40).html.includes('foot tracks?'), 'trained hover still generic')
@@ -149,9 +149,9 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
-  it('preserves tracks, counters and lesson across save/load and expires tracks on turn 200', () => {
+  it('preserves tracks, counters and lesson across save/load and expires tracks on turn 240', () => {
     cy.window().then(win => win.eval(`(() => {
-      beastTracks.set(keyXY(40,40), {x:40,y:40,direction:7,species:'Wolf',age:149})
+      beastTracks.set(keyXY(40,40), {x:40,y:40,direction:7,species:'Wolf',age:189})
       oldHunterQuest = {id:'hunter_12',type:'investigate',state:'ready'}; oldHunterQuestSerial = 12
       const before = JSON.parse(JSON.stringify(buildSaveObject()))
       interactOldHunter(); player.killsBySpecies.Wolf = 3
@@ -167,8 +167,8 @@ describe('Tracking and beast evidence', () => {
       trackAssert(oldHunterQuest.type === 'rare_hunt' && oldHunterQuest.state === 'active', 'loaded completed quest exposes rare hunt')
       currentZ = -1
       for (let i=0;i<50;i++) ageBeastTracks()
-      trackAssert([...beastTracks.values()][0].age === 199, 'age while underground')
-      ageBeastTracks(); trackAssert(beastTracks.size === 0, 'expires at 200')
+      trackAssert([...beastTracks.values()][0].age === 239, 'age while underground')
+      ageBeastTracks(); trackAssert(beastTracks.size === 0, 'expires at 240')
       currentZ = 0
     })()`))
   })

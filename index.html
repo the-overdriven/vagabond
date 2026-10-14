@@ -2,23 +2,15 @@
 
 highest prio: deeper dungeons for endgame
 
-!1 [balance] ⚖️ horn should have smaller range
-!1 [gear] ⚔️ add prolonged hammer
 !1 [graphics] 🎨 boxes/crates should be more square
 !1 [graphics] 🎨 anvil is a bit too big
-!1 [graphics] 🎨 thief's bag should be less raw on non-ascii (same shape, just add more depth)
 !1 [graphics] 🎨 fix thornmaw pic
 !1 [text] 📝 "dwarven remains. Dwarven remains lie amid the abandoned settlement."
-!1 [text] 📝 collapsed work stair -> write better
 !1 [text] 📝 old dwarven remains -> too generic sometimes
-!1 [tracking] 👣 tracks should last longer (slightly)
-!2 [animation] ✨ pull should be animated (slow down animation), like a thrown web
-!2 [combat] ⚔️ red animated Enraged! when enemy becomes enraged
 !2 [graphics] 🎨 use dwarven-rubble, dwarven-column-indoor
 !2 [graphics] 🎨 we need different indoor column tiles (statues)
 !2 [graphics] 🎨 new background for dwarven ruins
 !2 [graphics] 🎨 there are no tiles for fortifications (ruined defensive positions) and broken-down door on floor
-!2 [merchant] 💰 scrolls of homecoming respawn at merchant? they shouldnt
 !2 [ui] 🖥️ there used to be an error when saves didnt work, now there's only console log
 !2 [worldgen] 🌍 dwarven columns on surface should remove tree tiles if they are rendered over them
 !3 [combat] ⚔️ "it's not too late to retreat!" -> actually it is too late, they should get alarmed in next turn when it happens
@@ -9935,7 +9927,7 @@ more difficult:
   }
 
   function buyItem(it) {
-    if (!it) return
+    if (!it || it.count === 0) return
     ensureReplayItemIds()
     const replayId = it.replayId
     const value = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
@@ -9944,10 +9936,12 @@ more difficult:
     if (stackable) {
       consolidateConsumableStacks()
       const existing = player.inventory.find(i => i.kind === it.kind)
-      if (existing) existing.count = (existing.count || 1) + 1
+      if (existing) existing.count = (existing.count ?? 1) + 1
       else player.inventory.push({...it, count: 1})
       it.count = (it.count || 1) - 1
-      if (it.count <= 0 && it.kind !== MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind) {
+      // Keep depleted finite scroll entries so save restoration cannot refill them.
+      if (it.count <= 0 && ![MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind,
+        MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.kind].includes(it.kind)) {
         const idx = merchantStock.indexOf(it)
         if (idx >= 0) merchantStock.splice(idx, 1)
       }
@@ -9978,7 +9972,7 @@ more difficult:
     if (stackable) {
       it.count = (it.count || 1) - 1
       const existing = merchantStock.find(s => s.kind === it.kind && s.name === it.name)
-      if (existing) existing.count = (existing.count || 1) + 1
+      if (existing) existing.count = (existing.count ?? 1) + 1
       else merchantStock.push({kind: it.kind, name: it.name, count: 1})
       if (it.count <= 0) player.inventory.splice(idx, 1)
     } else {
@@ -10305,7 +10299,7 @@ more difficult:
     for (const e of enemies) {
       if (!e.alive || e.humanoid || !onCurrentLevel(e)) continue
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      if (distance > 80) continue
+      if (distance > 40) continue
       const direction = trackDirection(e.x - player.x, e.y - player.y)
       if (direction === null) continue
       const current = nearestByDirection.get(direction)

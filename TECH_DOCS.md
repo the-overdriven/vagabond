@@ -4008,7 +4008,9 @@ Returns the player to the Temple. Temple healing follows the same level 1
 exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
 and replay action are `homecomingscroll`, and
 its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 100g, with
-nine in stock at world creation. The stock config key is `scrolls.homecomingScroll`.
+nine in stock at world creation. This stock is finite and never automatically
+replenished after purchases, save/load, or replay restoration. Selling a scroll
+back adds exactly one scroll to the available stock. The stock config key is `scrolls.homecomingScroll`.
 
 ## Potion of Speed
 
@@ -4485,10 +4487,10 @@ cannot make sense of them.” With Tracking, it reports bearing and freshness:
 
 | Age in turns | Example for a recognized species |
 |---|---|
-| 0–49 | Fresh wolf tracks lead northeast. |
-| 50–149 | The wolf tracks lead northeast. |
-| 150–199 | Fading wolf tracks lead northeast. |
-| 200 | Track removed |
+| 0–59 | Fresh wolf tracks lead northeast. |
+| 60–179 | The wolf tracks lead northeast. |
+| 180–239 | Fading wolf tracks lead northeast. |
+| 240 | Track removed |
 
 Species recognition requires at least one player kill of that **base species**;
 prefixes share one counter. Every enemy killed through the normal kill handler
@@ -4525,7 +4527,7 @@ sound-wave effect around the player; this animation has no gameplay RNG and is d
 for replay simulation.
 
 When used, living **non-humanoid** enemies on the player's current level within
-**80 tiles Chebyshev distance** can answer, regardless of line of sight, darkness, forest,
+**40 tiles Chebyshev distance** can answer, regardless of line of sight, darkness, forest,
 walls, or other intervening terrain. To keep the signal readable, the horn reports at most
 **3 distinct directions**. For each of the eight compass directions, only the nearest
 qualifying monster is considered; the horn then reports the three closest of those
@@ -4627,6 +4629,9 @@ The Merchant:
 
 Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
 world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
+Homecoming scrolls are finite: an exhausted stack remains in saved stock with
+count zero and is hidden from trade. Restoration does not replenish it. Selling
+a scroll back adds exactly one; an empty stack cannot be purchased.
 
 During new-world NPC placement, Merchant candidate tiles are rejected if a
 surface ground item already occupies that coordinate. As a compatibility guard,

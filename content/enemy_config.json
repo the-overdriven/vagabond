@@ -65,9 +65,9 @@
   },
   "tracking": {
     "chance": 0.03,
-    "lifetimeTurns": 200,
-    "freshTurns": 50,
-    "fadingFromTurns": 150
+    "lifetimeTurns": 240,
+    "freshTurns": 60,
+    "fadingFromTurns": 180
   },
   "ranged": {
     "shooterChance": 0.5,
