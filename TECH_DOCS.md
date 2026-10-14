@@ -3451,26 +3451,100 @@ omitted from inventory and trade stat lines.
 
 # 36. Equipment Modifiers
 
-Normal equipment has a **40% chance** to receive a modifier at MF 0. Each point
-of Magic Find adds 2 percentage points, up to a **90% cap**.
+Ordinary generated weapons, shields and armor can receive **one** prefix. Under
+normal world rules, the chance is `min(90%, 40% + 2% × generation MF)`.
+After a successful modifier roll, each of the six configured prefixes is equally
+likely. The prefix type and amount are independent of the item's base tier.
+The Merchant's guaranteed enchanted weapon always has a prefix.
 
-Current modifiers:
+| Prefix | Effect while equipped | Range at generation MF 0 | Effect of generation MF on strength |
+|---|---|---|---|
+| Mighty | Adds to player ATK | +1–10 ATK | Favors higher rolls; maximum stays +10 |
+| Sturdy | Adds to player DEF | +1–10 DEF | Favors higher rolls; maximum stays +10 |
+| Swift | Adds to player SPD, without changing weapon GRACE | +1–10 SPD | Favors higher rolls; maximum stays +10 |
+| Lucky | Adds to player MF | +1–10 MF | Favors higher rolls; maximum stays +10 |
+| Resilient | Adds to maximum HP | +10–59 HP | Adds `floor(generation MF × 0.3)` to the rolled bonus |
+| Profound | Increases earned XP | +5–15% XP | Actual XP percentage is not increased by MF |
 
-| Modifier  | Effect |
-|-----------|--------|
-| Profound  | XP     |
-| Resilient | HP     |
-| Mighty    | ATK    |
-| Sturdy    | DEF    |
-| Swift     | SPD    |
-| Lucky     | MF     |
+The same prefix can appear on any of the three gear types: for example, a Mighty
+shield increases player ATK while equipped. Backpack gear is inactive. Bonuses
+from equipped items add together; the +10 limit is per item, not a limit on the
+character's combined bonus. These ranges describe ordinary gear prefixes;
+artifact effects use their separate catalog. There is currently **no randomly
+selected GRACE prefix** in `content/item_modifiers.json`, although the combat
+code supports that stat.
 
-XP modifiers receive a percentage bonus in the approximate range:
+## ATK, DEF, SPD and MF bonus distribution
+
+These four prefixes share the same amount roll. At generation MF 0, probabilities
+are conditional on already having that prefix:
+
+| Bonus amount | Chance |
+|---|---:|
+| +1 | 45% |
+| +2 | 30% |
+| +3 | 15% |
+| +4 | 7% |
+| +5 | 2% |
+| +6–10 | 1% combined; 0.2% for each value |
+
+Generation MF shifts an inclusive 1–100 roll upward by `round(MF × 0.5)`,
+capped at 100, before applying the thresholds above. It improves the odds rather
+than adding directly to the resulting stat. For example, at generation MF 10,
+the combined chance of +6–10 is 6%, with 1.2% for each value; the range remains
++1–10. With the normal 40% modifier chance and six equally likely prefixes, a
+random piece of equipment at MF 0 has approximately **0.0133%** chance of being
+Mighty +10 (roughly one in 7,500 pieces), rather than a 0.2% unconditional chance.
+
+## HP and XP bonus distribution
+
+Resilient uses the following rule, where `U` is a seeded uniform roll in `[0,1)`:
 
 ```text
-+5% to +15%
+HP bonus = 10 + floor(50 × U^5) + floor(generation MF × 0.3)
 ```
 
+The fifth power strongly favors the lower end: at MF 0, approximately 45.7%
+of Resilient items give exactly +10 HP. At generation MF 10 the range is +13–62
+HP; at MF 20 it is +16–65. Unlike the other flat-stat prefixes, HP has no fixed
+upper bonus independent of generation MF.
+
+Profound rolls each whole percentage from +5% through +15% with equal probability
+(1/11 each). Equipped XP bonuses add before applying the multiplier and rounding
+the award. For example, +10% on a weapon and +15% on armor give +25% together:
+a base award of 100 XP becomes 125 XP, assuming no racial XP bonus.
+
+Profound also receives a separate internal numeric modifier amount, but this
+does not determine its XP percentage. Equipment pricing uses that internal
+amount, so a +15% XP item is not necessarily priced above a +5% XP item.
+
+## Worked gear examples
+
+All examples assume no additional modifiers, racial effects or artifact bonuses:
+
+| Item | Example prefix roll | Result |
+|---|---|---|
+| Prolonged Hammer: ATK 10, GRACE 1 | Mighty +4 ATK | ATK contribution 14; GRACE remains 1; still two-handed |
+| Prolonged Hammer: ATK 10, GRACE 1 | Mighty +10 ATK | ATK contribution 20; the rare maximum roll |
+| Armor with base DEF 4 | Sturdy +3 DEF | DEF contribution 7 |
+| Equipped weapon | Swift +2 SPD | Player SPD +2; weapon GRACE is unchanged |
+| Equipped shield | Lucky +3 MF | Player MF +3; improves eligible future loot rolls |
+| Equipped armor at generation MF 0 | Resilient +18 HP | A base maximum of 70 HP becomes 88 HP |
+| Equipped weapon | Profound +15% XP | A base award of 100 XP becomes 115 XP |
+
+A Mighty Prolonged Hammer therefore contributes **11–20 ATK**, compared with a
+mundane War Hammer's 12 ATK. A +2 roll ties that damage contribution; +3 or higher
+surpasses it. Both retain GRACE 1 and require both hands. This comparison concerns
+ATK, not guaranteed damage after defense, random variance and critical hits.
+
+## Which loot sources use generation MF
+
+The values above use the MF passed to the gear generator when the item is made.
+Chest gear passes the player's MF. Humanoid worn equipment and the Merchant's
+guaranteed gear use the default generation MF of zero; their modifier amounts
+are not improved by the player's current MF. A worn humanoid item does not
+reroll its prefix when dropped. The humanoid's partial equipment effectiveness
+can reduce the enemy's benefit, but the recovered item's own bonuses stay intact.
 ---
 
 # 37. Artifacts
@@ -5602,17 +5676,17 @@ NPC- or feature-specific where the corresponding general system remains absent.
 - [x] Temple, village, cemetery, Black Pillar and Big Bell
 - [x] Surface caves, deeper caves, crypt, mausoleum and ordinary cave scenarios
 - [x] Dwarven Fort (D0) and Dwarven Ruins (D1–D5): stairs, doors,
-      locks and keys, progression gates, shortcut lift, traps, encounters,
-      rooms and vaults
+  locks and keys, progression gates, shortcut lift, traps, encounters,
+  rooms and vaults
 - [x] Foraging, sand digging, buried treasure and Scarab encounters
 - [x] Fog/discovery and beast-trail Tracking
 
 **Enemies and combat**
 
 - [x] Enemy roster, stats, prefixes, equipment, AI, aggro, pathfinding
-      and home/roam/far wandering
+  and home/roam/far wandering
 - [x] Combat, misses, mitigation, armor glancing, player and enemy critical
-      hits, weapon timing and extra attacks
+  hits, weapon timing and extra attacks
 - [x] Flying, evasion, ethereal, true sight, death shield and gang power
 - [x] Wounded fleeing, Thief, Enrage, critical knockback, charge and pull
 - [x] Summoning, lifesteal, poison and ranged shooter variants
