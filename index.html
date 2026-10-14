@@ -25,7 +25,6 @@ highest prio: deeper dungeons for endgame
 !4 [worldgen] 🌍 currently mountains never spawn in the south - this should be possible
 !5 [environment] ❄️ ice might crack and turn to water
 
-Before the final random variance and rounding, the attack therefore deals about **3.33 damage**. The `random(-1, +2)` term then modifies this before rounding, with a minimum final damage of 1.
 this should be even more random -> (-1,+2) is nothing. it should be 0.7x-1.2x with values closer to 1x having higher probability.
 
 need to refine:
@@ -3555,7 +3554,15 @@ more difficult:
 
   function damageRoll(atk, def) {
     const mitigatedAtk = atk * 10 / (10 + Math.max(0, def))
-    return Math.max(1, Math.round(mitigatedAtk + (rng() * 3 - 1)))
+    const lowerSpread = Math.max(1, mitigatedAtk * 0.30)
+    const upperSpread = Math.max(2, mitigatedAtk * 0.20)
+    const range = lowerSpread + upperSpread
+    const roll = rng()
+    // Inverse triangular CDF: one seeded draw, peak at the mitigated damage.
+    const variance = roll < lowerSpread / range
+      ? -lowerSpread + Math.sqrt(roll * range * lowerSpread)
+      : upperSpread - Math.sqrt((1 - roll) * range * upperSpread)
+    return Math.max(1, Math.round(mitigatedAtk + variance))
   }
 
   function missChance(attackerSpd, defenderSpd) {

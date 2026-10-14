@@ -146,12 +146,12 @@ describe('Ranged shooter monster variants', () => {
         player.equip.weapon={kind:'weapon',name:'Slow Test Weapon',base:'Club',atk:1,grace:0}
         let before = player.hp; useRolls([0.99,0.5,0.99])
         enemyRangedAttackPlayer(e, clearProjectilePath(e))
-        rangedAssert(before-player.hp === 6, 'arrow uses fixed 5 ATK, not monster/prefix/weapon ATK')
+        rangedAssert(before-player.hp === 5, 'arrow uses fixed 5 ATK, not monster/prefix/weapon ATK')
         rangedAssert(e.shotsRemaining === 9, 'ordinary hit consumes one ammo and GRACE grants no extra shot')
 
         resetRangedArena(); e=makeShooter('Goblin',3,{atk:99})
         before=player.hp; useRolls([0.99,0.5,0.99]); enemyRangedAttackPlayer(e,clearProjectilePath(e))
-        rangedAssert(before-player.hp === 4, 'stone uses fixed 3 ATK')
+        rangedAssert(before-player.hp === 3, 'stone uses fixed 3 ATK')
 
         resetRangedArena(); e=makeShooter('Skeleton',3)
         rangedAssert(Math.abs(rangedDodgeChance(e) - 0.30) < 1e-9, 'equal-speed ranged dodge is 2x melee 15%')
@@ -169,11 +169,11 @@ describe('Ranged shooter monster variants', () => {
         resetRangedArena(); e=makeShooter('Skeleton',3)
         player.equip.armor={kind:'armor',name:'Test Armor',base:'Robe',def:0}
         before=player.hp; useRolls([0.99,0,0.5,0]); enemyRangedAttackPlayer(e,clearProjectilePath(e))
-        rangedAssert(before-player.hp === 2, 'glancing and critical rolls are mutually exclusive')
+        rangedAssert(before-player.hp === 1, 'glancing and critical rolls are mutually exclusive')
 
         resetRangedArena(); e=makeShooter('Skeleton',3)
         before=player.hp; useRolls([0.99,0.5,0]); enemyRangedAttackPlayer(e,clearProjectilePath(e))
-        rangedAssert(before-player.hp === 12, 'critical doubles fixed arrow damage')
+        rangedAssert(before-player.hp === 10, 'critical doubles fixed arrow damage')
 
         resetRangedArena(); e=makeShooter('Skeleton',3,{shotsRemaining:2})
         before=player.hp; useRolls([0]); enemyRangedAttackPlayer(e,clearProjectilePath(e))

@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v93**, save/replay version **41**; older saves are rejected.
+**v94**, save/replay version **42**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -2919,11 +2919,33 @@ Examples:
 Final damage is then:
 
 ```text
-max(1, round(mitigatedAtk + random(-1, +2)))
+lowerSpread = max(1, mitigatedAtk × 0.30)
+upperSpread = max(2, mitigatedAtk × 0.20)
+variance = triangular(-lowerSpread, peak = 0, +upperSpread)
+finalDamage = max(1, round(mitigatedAtk + variance))
 ```
 
-The random term is continuous from `-1` through `+2`, using the game's seeded
-RNG, so the final rounded result can vary.
+The continuous triangular distribution peaks at zero adjustment: outcomes near
+mitigated ATK are more likely than extremes. Every damage roll consumes exactly
+one seeded RNG draw through the inverse CDF, independently of animations.
+
+The minimum spread of -1/+2 preserves the old range for weak attacks. At
+mitigated ATK 10 or higher, both proportional spreads apply and the range is
+0.7×–1.2×. The distribution is asymmetric: before rounding its mean is
+`mitigatedAtk + (upperSpread - lowerSpread) / 3`, approaching 0.9667× for strong
+attacks. It replaces the old uniform additive roll with mean +0.5 damage.
+
+| Mitigated ATK | Lower/upper spread | Rounded ordinary damage range |
+|---|---|---|
+| 2 | -1 / +2 | 1–4 |
+| 3.33 | -1 / +2 | 2–5 |
+| 10 | -3 / +2 | 7–12 |
+| 50 | -15 / +10 | 35–60 |
+
+The shared rule applies to player melee, enemy melee and fixed-ATK ranged shots.
+Charge/Enrage affect ATK before this roll; critical and armor-glancing rules
+then modify the rolled damage. The base minimum is 1; a later glancing hit may
+still reduce it to zero under the existing armor rules.
 
 ### Example: Goblin
 
@@ -2947,8 +2969,10 @@ mitigatedAtk = 4 × 10 / (10 + 2)
 ```
 
 Before the final random variance and rounding, the attack therefore deals about
-**3.33 damage**. The `random(-1, +2)` term then modifies this before rounding,
-with a minimum final damage of 1.
+**3.33 damage**. The minimum -1/+2 spread produces 2–5 rounded damage,
+with a triangular peak near the mitigated value and a minimum final damage of 1.
+For this example, 2/3/4/5 damage occur with probabilities approximately
+0.93% / 43.06% / 44.44% / 11.57%.
 
 The same DEF calculation applies when the player attacks a Goblin: a player
 with ATK 4 hitting a Goblin with DEF 2 starts from the same `3.333...`
@@ -2960,8 +2984,9 @@ can also gain equipment bonuses.
 
 When player wearing a brass armor is hit:
 An enemy with 4 ATK has a mitigated ATK of 2 against brass armor.
-Damage then applies the game's random variance and rounding, so 4 ATK can deal 1–4 damage, with 2 damage occurring about 33.3% of the time.
-In general, with 10 DEF, an enemy needs 6 ATK or more to guarantee at least 2 damage.
+Damage then applies the triangular -1/+2 spread, so 4 ATK can deal 1–4 damage,
+with 2 damage occurring about 54.17% of the time. With 10 DEF, an enemy needs
+5 ATK or more to guarantee at least 2 ordinary damage before glancing effects.
 
 ---
 
@@ -3351,7 +3376,8 @@ Current base weapons include:
 | Crescent Blades | 5 | 13 | 5 | Yes |
 | Titan Warpick | 5 | 18 | 1 | Yes |
 
-Prolonged Hammer is a long-handled hammer with a compact head and small peen.
+Prolonged Hammer has a Lucerne-style silhouette: a thin long handle, compact
+pronged hammer face, small rear peen and a long spike above the head.
 It offers tier-3 heavy damage at low GRACE: 10 ATK, 1 GRACE, two-handed, and
 110g base purchase value. It is a weaker counterpart to the tier-4 War Hammer
 (12 ATK, 1 GRACE). Compared with the tier-3 Lance (9 ATK, 2 GRACE), it trades
@@ -5216,10 +5242,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-41
+42
 ```
 
 Saves are JSON files.
+
+Version 42 changes deterministic damage outcomes to triangular proportional
+variance with a minimum spread. Older recordings use different combat results
+and are rejected without migration; persisted item fields remain unchanged.
 
 Version 41 establishes the expanded gear-bonus RNG contract: older snapshots
 and recordings are rejected because their loot rolls consume a different random
@@ -5335,7 +5365,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 41** saves. Other versions are rejected
+Current gameplay state requires **version 42** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
