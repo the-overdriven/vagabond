@@ -7449,10 +7449,12 @@ more difficult:
     }
   }
 
-  // Only a draw offset: no RNG, saved position, swimming skill or turns change.
-  function swimmingPlayerBobOffset(now, drowning) {
-    const angle = now * (Math.PI * 2 / (drowning ? 1700 : 2700)) + 1.1
-    const amplitude = drowning ? 3 : 1.4
+  // Deep water only; rivers remain clipped but still. Drowning never amplifies
+  // this visual-only offset or affects RNG, position, swimming turns, or saves.
+  function swimmingPlayerBobOffset(now, terrain) {
+    if (terrain !== 'water') return {dx: 0, dy: 0}
+    const angle = now * (Math.PI * 2 / 2700) + 1.1
+    const amplitude = 1.4
     return {
       dx: Math.sin(angle + 0.9) * TILE_PX / 40 * amplitude,
       dy: Math.sin(angle) * TILE_PX / 20 * amplitude
@@ -8352,11 +8354,11 @@ more difficult:
       (deathTransition.phase === 'pending' || deathTransition.phase === 'out')
         ? Math.min(Math.PI / 2, Math.max(0, (now - deathTransition.deathStart) / 280) * Math.PI / 2)
         : 0
-      const inWater = map[player.y]?.[player.x] === 'water' || map[player.y]?.[player.x] === 'river'
+      const playerTerrain = map[player.y]?.[player.x]
       drawSwimmingCreature(vx, vy, () => {
         ctx.save()
-        if (USE_TILE_IMAGES && inWater && !deathTransition) {
-          const {dx, dy} = swimmingPlayerBobOffset(now, isDrowning())
+        if (USE_TILE_IMAGES && playerTerrain === 'water' && !deathTransition) {
+          const {dx, dy} = swimmingPlayerBobOffset(now, playerTerrain)
           ctx.translate(dx, dy)
         }
         if (deathRotation) {

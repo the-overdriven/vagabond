@@ -54,22 +54,70 @@ describe('Swimming visuals', () => {
     })
   })
   for (const [width, height] of [[1280,800],[390,844]]) {
-    it(`gives drowning a stronger visual-only bob at ${width}px`, () => {
+    it(`bobs only in deep water without stronger drowning motion at ${width}px`, () => {
       cy.viewport(width,height)
       beginGame()
       cy.window().then(win => win.eval(`(() => {
-        const check=(ok,msg)=>{if(!ok)throw Error(msg)}
-        const times=[0,170,430,900,1330,1990,2350]
-        const normal=times.map(t=>swimmingPlayerBobOffset(t,false))
-        const drowning=times.map(t=>swimmingPlayerBobOffset(t,true))
-        check(JSON.stringify(normal)===JSON.stringify(times.map(t=>swimmingPlayerBobOffset(t,false))),
-          'bob deterministic for the same render timestamp')
-        const max=values=>Math.max(...values.map(p=>Math.hypot(p.dx,p.dy)))
-        check(max(drowning)>max(normal)*2,'drowning moves more dramatically')
-        const saved=JSON.stringify(buildSaveObject())
-        for(const t of times) {swimmingPlayerBobOffset(t,false);swimmingPlayerBobOffset(t,true)}
-        check(JSON.stringify(buildSaveObject())===saved,'bob has no gameplay or save effects')
-        check(!!document.getElementById('game'),'canvas present')
+        const check = (ok, msg) => { if (!ok) throw Error(msg) }
+        const x = player.x, y = player.y
+        const before = {
+          terrain: map[y][x], tileImages: USE_TILE_IMAGES,
+          swimming: player.swimming, swimTurns: player.swimTurns, drowning: player.drowning
+        }
+        const originalBob = swimmingPlayerBobOffset
+        const times = [0,170,430,900,1330,1990,2350]
+        const normal = times.map(t => originalBob(t, 'water'))
+        const maximum = Math.max(...normal.map(({dx,dy}) => Math.hypot(dx,dy)))
+        check(maximum > 1 && maximum < TILE_PX / 10, 'deep-water bob stays gentle')
+        check(new Set(normal.map(({dx,dy}) => dx + ',' + dy)).size > 1,
+          'water movement changes with render timestamp')
+        for (const terrain of ['river','frozenriver','grass']) {
+          check(times.every(t => {
+            const {dx,dy} = originalBob(t, terrain)
+            return dx === 0 && dy === 0
+          }), terrain + ' has no bob')
+        }
+        const saved = JSON.stringify(buildSaveObject())
+        for (const t of times) originalBob(t, 'water')
+        check(JSON.stringify(buildSaveObject()) === saved, 'bob computation has no saved effects')
+        const called = []
+        try {
+          USE_TILE_IMAGES = true
+          swimmingPlayerBobOffset = (time, terrain) => {
+            called.push({time, terrain, ...originalBob(time, terrain)})
+            return originalBob(time, terrain)
+          }
+          map[y][x] = 'river'
+          renderScene(675)
+          check(called.length === 0, 'river player remains still in tile rendering')
+          map[y][x] = 'water'
+          player.swimming = 3
+          player.swimTurns = 2
+          renderScene(675)
+          check(called.length === 1, 'swimming player bobs in deep water')
+          player.swimTurns = 8
+          renderScene(675)
+          check(called.length === 2 && called[0].dx === called[1].dx &&
+            called[0].dy === called[1].dy, 'drowning keeps the same gentle bob')
+          map[y][x] = 'frozenriver'
+          renderScene(675)
+          check(called.length === 2, 'frozen river has no bob')
+          map[y][x] = 'grass'
+          renderScene(675)
+          check(called.length === 2, 'land has no bob')
+          map[y][x] = 'water'
+          USE_TILE_IMAGES = false
+          renderScene(675)
+          check(called.length === 2, 'ASCII mode has no bob')
+        } finally {
+          swimmingPlayerBobOffset = originalBob
+          map[y][x] = before.terrain
+          USE_TILE_IMAGES = before.tileImages
+          player.swimming = before.swimming
+          player.swimTurns = before.swimTurns
+          player.drowning = before.drowning
+          render()
+        }
       })()`))
     })
   }

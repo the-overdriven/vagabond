@@ -3854,11 +3854,12 @@ square and do not alter swimming or drowning mechanics. On the main view they
 render half-submerged, using the same water clipping treatment as swimming
 creatures. In tile mode, each chest gently bobs in place (about 1 pixel sideways
 and 2 pixels vertically at 40-pixel tile size, on a 2.7-second cycle), with a
-position-dependent phase. The player also bobs gently while swimming; drowning
-makes the side-to-side and vertical motion roughly twice as fast and three
-times as large. Clipping and the waterline stay anchored to the tile. Land
-actors, ASCII sprites, and game positions stay still; movement is only visual:
-loot coordinates, swimming turns, RNG, pickup, save, and replay rules are unchanged. They are created at world generation and
+position-dependent phase. The player gently bobs in deep `water` (lakes and
+seas) at a constant rate, including while drowning. River tiles retain their
+half-submerged clipping but **do not bob**. Clipping and the waterline stay
+anchored to the tile. Land actors, ASCII sprites, and game positions stay still;
+movement is only visual: loot coordinates, swimming turns, RNG, pickup, save,
+and replay rules are unchanged. They are created at world generation and
 persist with the normal ground item save/replay state.
 
 Chest loot can include:
