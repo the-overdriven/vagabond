@@ -3,6 +3,7 @@ describe('Generated world dimensions and rotated cold edge', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('World Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     cy.window().its('__VAGABOND_E2E__').invoke('getWorldShape').should(shape => {

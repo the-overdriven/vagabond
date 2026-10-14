@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v95**, save/replay version **43**; older saves are rejected.
+**v96**, save/replay version **43**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -2175,9 +2175,9 @@ bag only, without an additional equipment drop. Replacing that gear later throug
 existing permadeath loot rules leaves the stolen item recoverable in its bag.
 
 A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
-and mobile inspection. Tile-mode map markers, dropped bags, and desktop/mobile inspection use the same shaded
-red bag SVG, retaining the original silhouette; ASCII markers retain their
-existing drawing. Victory skull and Alarmed markers shift to avoid overlap.
+and mobile inspection. Only dropped bags on the floor in tile mode use the shaded red bag SVG.
+Carrier map markers and desktop/mobile inspection retain the original flat
+red silhouette in both rendering modes; ASCII floor bags retain their existing drawing. Victory skull and Alarmed markers shift to avoid overlap.
 Killing it drops a bag at its exact map location; forage recovers the original
 item, preserving quest IDs and all other properties. Other monster loot is
 unchanged. Theft, random selection, hesitation, and movement resolve through
@@ -5276,6 +5276,11 @@ Current save version:
 
 Saves are JSON files.
 
+NPC restoration preserves the saved list exactly, including a valid empty list.
+Loading does not generate replacement NPCs or consume NPC-placement RNG; a
+missing or invalid NPC list is rejected. This keeps save/load and replay
+consistent even when the current world state deliberately has no NPCs.
+
 Version 43 adds the world-level Merchant fort-hint flag. It persists with the
 surface discovery grid through save/load and replay and does not reset when
 a new character reuses the same world. Older saves are rejected without migration.
@@ -6362,6 +6367,16 @@ differences from changing RNG consumption during playback.
 
 Old Hunter quest generation also uses the seeded RNG path (`chance()`), so its
 procedural quest selection is included in the recorded RNG sequence.
+
+Service-worker registration is disabled under Cypress so browser tests execute
+current server files and network-response fixtures. Graveyard and startup
+response-fixture tests also bypass browser/service-worker caches through CDP,
+including workers left by earlier runs.
+
+E2E tests that start a world through Begin must wait for the loading overlay
+to close before reading or modifying generated map state. Mechanics fixtures
+use controlled terrain; procedural-generation tests check generated terrain
+separately.
 
 The replay save/load E2E test starts a character through Begin and waits for
 world generation to finish before arranging its deterministic Temple fixture.

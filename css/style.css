@@ -2050,8 +2050,6 @@ body.hint-collapsed #hint .panel-toggle {
   clip-path: polygon(20% 0, 80% 0, 65% 25%, 90% 60%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 10% 60%, 35% 25%);
 }
 
-.thief-marker-image { background: none; clip-path: none; object-fit: contain; width: 1.1em; }
-
 /* Nonblocking level feedback and the mobile inventory's character view. */
 .service-icon { width: 20px; height: 20px; object-fit: contain; vertical-align: middle; margin-right: 7px; }
 #btnInvCharacter, #btnCharacterBack { display: none; }

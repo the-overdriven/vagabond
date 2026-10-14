@@ -3,6 +3,7 @@ describe('Surface edge chests', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Chest Density Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     cy.window().then(win => {
@@ -64,6 +65,7 @@ describe('Surface edge chests', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Chest Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     cy.window().then(win => {

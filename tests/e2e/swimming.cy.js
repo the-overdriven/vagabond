@@ -2,8 +2,15 @@ function beginGame() {
   cy.visit('/')
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type('Swimming Tester')
+  // These cases test mechanics, not random world-generation attempts.
+  cy.get('#worldSizeSelect').select('XS')
+  cy.window().then(win => win.eval('WORLD_SEED = 12345; rngState = WORLD_SEED'))
   cy.get('#btnBegin').click()
-  cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+  cy.get('#loadingOverlay', {timeout:60000}).should($overlay => {
+    expect($overlay.text(), 'world generation status').not.to.include('failed')
+    expect($overlay, 'world generation finished').not.to.be.visible
+  })
+  cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 
@@ -83,9 +90,14 @@ describe('Swimming visuals', () => {
             return dx === 0 && dy === 0
           }), terrain + ' has no bob')
         }
-        const saved = JSON.stringify(buildSaveObject())
+        const savedState = () => {
+          const state = buildSaveObject()
+          delete state.savedAt // Wall-clock metadata is not gameplay state.
+          return JSON.stringify(state)
+        }
+        const saved = savedState()
         for (const t of times) originalBob(t, 'water')
-        check(JSON.stringify(buildSaveObject()) === saved, 'bob computation has no saved effects')
+        check(savedState() === saved, 'bob computation has no saved effects')
         const called = []
         try {
           USE_TILE_IMAGES = true

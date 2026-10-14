@@ -1,6 +1,7 @@
 describe('Gear balance, racial growth, death shields and sanctuary', () => {
   beforeEach(() => {
     cy.visit('/');cy.get('#raceName').clear().type('Balance Tester');cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.window().then(win=>win.eval(`(() => {
       window.check=(ok,msg)=>{if(!ok)throw new Error(msg)}
       replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true;deathTransition=null

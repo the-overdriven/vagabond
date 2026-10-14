@@ -2,8 +2,30 @@ function beginGame() {
   cy.visit('/')
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type('Invisibility Tester')
+  // These cases test mechanics, not random world-generation attempts.
+  cy.get('#worldSizeSelect').select('XS')
+  cy.window().then(win => win.eval('WORLD_SEED = 12345; rngState = WORLD_SEED'))
   cy.get('#btnBegin').click()
+  cy.get('#loadingOverlay', {timeout:60000}).should($overlay => {
+    expect($overlay.text(), 'world generation status').not.to.include('failed')
+    expect($overlay, 'world generation finished').not.to.be.visible
+  })
+  cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   cy.get('#raceOverlay').should('not.have.class', 'show')
+  cy.window().then(win => win.eval(`(() => {
+    // Test retaliation outside Temple sanctuary with controlled combat stats.
+    replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
+    enemies=[];npcs=[];groundItems=[];occupied=new Set();currentZ=0;map=surfaceMap
+    player.x=spawnPoint.x<MAP_W/2?MAP_W-12:12
+    player.y=spawnPoint.y<MAP_H/2?MAP_H-12:12
+    for(let y=player.y-2;y<=player.y+2;y++)for(let x=player.x-2;x<=player.x+2;x++) {
+      map[y][x]='grass';grasslandTrees.delete(keyXY(x,y));discovered[y][x]=true
+    }
+    player.baseAtk=2;player.baseDef=0;player.baseSpd=2;player.lvl=1
+    player.hp=50;player.maxHp=50;player.poisonTurns=0;player.invisibleTurns=0
+    player.curseDebuffs=[];player.equip={weapon:null,armor:null,shield:null}
+    resetSwimming();deathTransition=null;stopCameraAnimation();stopAttackAnimation();snapCameraToPlayer()
+  })()`))
 }
 
 describe('Scroll of Invisibility', () => {
@@ -134,7 +156,7 @@ describe('Scroll of Invisibility', () => {
           const before={x:e.x,y:e.y}
           reactToInvisibleAttack(e,0)
           reactToInvisibleAttack(e,4)
-          return {before,after:{x:e.x,y:e.y},messages:logs}
+          return {before,after:{x:e.x,y:e.y},messages:logs.filter(msg=>msg.includes('lashes out wildly') || msg.includes('recoils'))}
         } finally {rng=oldRng;log=oldLog}
       })()`)
       expect(result.after).to.deep.equal(result.before)

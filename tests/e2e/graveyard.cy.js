@@ -3,12 +3,21 @@ function beginNewGame(name = 'E2E Tester') {
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type(name)
   cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 
 function configureTestGraveyard(enabled = true) {
+  // The mocked online backend must not depend on the host's network status.
+  cy.on('window:before:load', win => {
+    Object.defineProperty(win.navigator, 'onLine', {configurable: true, value: true})
+  })
   cy.intercept('GET', '**/src/graveyard.js', request => {
+    // Every case rewrites these constants; never reuse another case's cached script.
+    delete request.headers['if-none-match']
+    delete request.headers['if-modified-since']
     request.continue(response => {
+      response.headers['cache-control'] = 'no-store'
       response.body = response.body
         .replace(/^const SUPABASE_URL = .*$/m,
           enabled ? "const SUPABASE_URL = 'https://test.supabase.co'" : "const SUPABASE_URL = ''")
@@ -21,6 +30,15 @@ function configureTestGraveyard(enabled = true) {
 }
 
 describe('Graveyard', () => {
+  beforeEach(() => {
+    cy.then(() => Cypress.automation('remote:debugger:protocol', {
+      command:'Network.setCacheDisabled',params:{cacheDisabled:true}
+    }))
+    cy.then(() => Cypress.automation('remote:debugger:protocol', {
+      command:'Network.setBypassServiceWorker',params:{bypass:true}
+    }))
+  })
+
   it('opens and closes the Graveyard without changing the live game', () => {
     configureTestGraveyard(false)
     beginNewGame()
@@ -247,6 +265,7 @@ describe('Graveyard', () => {
     cy.get('#raceName').clear().type('Final Tester')
     cy.get('#permadeathToggle').check()
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     const rows = []
     cy.window().then(win => {
       win.__VAGABOND_TEST_GRAVEYARD__ = true

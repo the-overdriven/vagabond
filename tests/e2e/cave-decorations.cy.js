@@ -3,6 +3,7 @@ describe('Decorative caves and deep threat rarity', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Cave Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })
 

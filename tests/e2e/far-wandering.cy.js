@@ -3,6 +3,7 @@ describe('Far wandering after a chase', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Wander Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => {
       const result = win.eval(`(() => {

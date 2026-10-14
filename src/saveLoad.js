@@ -797,7 +797,7 @@ function loadGameFromObject(data, opts = {}) {
   nextEnemyId = Math.max(nextEnemyId, data.nextEnemyId || 1)
   for (const e of enemies) occupied.add(keyXY(e.x, e.y))
 
-  if (Array.isArray(data.npcs) && data.npcs.length) {
+  if (Array.isArray(data.npcs)) {
     npcs = data.npcs.map(n => {
       if (n.name === 'Ancient Lich') return {
         ...ANCIENT_BELL_LICH,
@@ -825,7 +825,7 @@ function loadGameFromObject(data, opts = {}) {
     })
     for (const n of npcs) occupied.add(keyXY(n.x, n.y))
   } else {
-    spawnNpcs() // older save from before NPCs existed
+    throw new Error('Save data is missing NPC state.')
   }
   if (treasureMapUnearthed) completeTreasureMapBurial()
   if (bellRung) {

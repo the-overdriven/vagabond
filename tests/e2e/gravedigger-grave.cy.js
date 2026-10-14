@@ -3,6 +3,7 @@ describe('Gravedigger unfinished grave', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Grave Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => {
       const result = win.eval(`(() => {

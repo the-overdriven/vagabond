@@ -3,6 +3,7 @@ function beginGame() {
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type('Crit Tester')
   cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 

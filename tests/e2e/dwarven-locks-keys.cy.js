@@ -9,6 +9,17 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         win.__dwarvenLockBootstrapSave = save
         win.eval('loadGameFromObject(window.__dwarvenLockBootstrapSave, {isReplayInit:true})')
         delete win.__dwarvenLockBootstrapSave
+        win.eval(`window.makeOrdinaryLockTestPair = level => {
+          const x=Math.floor(MAP_W/2),y=Math.floor(MAP_H/2)
+          // A mechanics arena avoids assuming random doors exist on floor one.
+          for(let dy=-10;dy<=10;dy++)for(let dx=-10;dx<=10;dx++)level.map[y+dy][x+dx]='marble'
+          level.traps=[]
+          const pair=[{x,y},{x:x+1,y}]
+          for(const leaf of pair)level.map[leaf.y][leaf.x]='dwarvendoorlocked'
+          invalidateUndergroundFov()
+          return pair
+        }`)
+
         win.eval("raceOpen = false; document.getElementById('raceOverlay').classList.remove('show')")
       })
     })
@@ -131,17 +142,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       enemies = []
       occupied = new Set()
 
-      const closed = []
-      for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++)
-        if (map[y][x] === 'dwarvendoorclosed') closed.push({x, y})
-      check(closed.length >= 2, 'generated floor has an ordinary door pair for lock mechanics')
-      let pair = null
-      for (const p of closed) {
-        const q = closed.find(other => Math.abs(other.x - p.x) + Math.abs(other.y - p.y) === 1)
-        if (q) { pair = [p, q].sort((a,b) => a.y - b.y || a.x - b.x); break }
-      }
-      check(pair, 'ordinary doorway has adjacent leaves')
-      for (const p of pair) map[p.y][p.x] = 'dwarvendoorlocked'
+      const pair = window.makeOrdinaryLockTestPair(level)
 
       const approach = pair.flatMap(leaf => [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy]) => ({
         x: leaf.x + dx, y: leaf.y + dy, dx: -dx, dy: -dy, leaf
@@ -345,16 +346,8 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       turnCount = 0
       consecutiveWaitTurns = 0
 
-      const closed = []
-      for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++)
-        if (map[y][x] === 'dwarvendoorclosed') closed.push({x, y})
-      let pair = null
-      for (const p of closed) {
-        const q = closed.find(other => Math.abs(other.x - p.x) + Math.abs(other.y - p.y) === 1)
-        if (q) { pair = [p, q].sort((a,b) => a.y - b.y || a.x - b.x); break }
-      }
-      check(pair, 'replay fixture has ordinary door pair')
-      for (const p of pair) map[p.y][p.x] = 'dwarvendoorlocked'
+      const pair = window.makeOrdinaryLockTestPair(level)
+
       const approach = pair.flatMap(leaf => [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy]) => ({
         x: leaf.x + dx, y: leaf.y + dy, dx: -dx, dy: -dy, leaf
       }))).find(p => TILE[map[p.y]?.[p.x]]?.walk)

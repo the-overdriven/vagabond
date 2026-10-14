@@ -3,6 +3,7 @@ describe('Surface monster population', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Population Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     cy.window().then(win => {
@@ -34,7 +35,8 @@ describe('Surface monster population', () => {
         }
         try {
           pickWeighted = (...args) => {
-            attempts++
+            // Count enemy template selection, excluding weighted equipment/bonus rolls.
+            if(args[0].length && args[0].every(entry=>ENEMY_TEMPLATES.includes(entry))) attempts++
             return originalPickWeighted(...args)
           }
           const beforeTiles = eligible()
@@ -47,7 +49,7 @@ describe('Surface monster population', () => {
           }
           const afterTiles = eligible()
           const afterSpawns = countAttempts()
-          return {beforeTiles, beforeSpawns, afterTiles, afterSpawns, tilesPerEnemy: SURFACE_TILES_PER_ENEMY}
+          return {beforeTiles, beforeSpawns, afterTiles, afterSpawns, tilesPerEnemy: SURFACE_TILES_PER_ENEMY, density: WORLD_GEN_CONFIG.surfaceEnemies.populationDensityMultiplier}
         } finally {
           for (const [x, y, tile] of changed) map[y][x] = tile
           enemies = originalEnemies
@@ -59,9 +61,9 @@ describe('Surface monster population', () => {
       })()`)
       expect(result.tilesPerEnemy).to.equal(260)
       expect(Math.round(31252 / result.tilesPerEnemy)).to.equal(120)
-      expect(result.beforeSpawns).to.equal(Math.round(result.beforeTiles / result.tilesPerEnemy))
+      expect(result.beforeSpawns).to.equal(Math.round(result.beforeTiles / result.tilesPerEnemy * result.density))
       expect(result.afterTiles).to.be.lessThan(result.beforeTiles)
-      expect(result.afterSpawns).to.equal(Math.round(result.afterTiles / result.tilesPerEnemy))
+      expect(result.afterSpawns).to.equal(Math.round(result.afterTiles / result.tilesPerEnemy * result.density))
       expect(result.afterSpawns).to.be.lessThan(result.beforeSpawns)
     })
   })

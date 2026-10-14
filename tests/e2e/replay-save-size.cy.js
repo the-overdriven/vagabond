@@ -4,6 +4,7 @@ describe('Replay save diagnostics', () => {
     cy.get('#raceName').clear().type('Replay Tester')
     cy.get('#replayToggle').check()
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     cy.window().then(win => {
@@ -42,6 +43,7 @@ describe('Replay save diagnostics', () => {
     cy.get('#raceName').clear().type('Replay Tester')
     cy.get('#replayToggle').check()
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
 
     let before

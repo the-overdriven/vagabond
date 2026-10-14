@@ -35,6 +35,7 @@ describe('Turn and idle rendering performance regressions', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Performance Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })
 

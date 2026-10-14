@@ -3,6 +3,7 @@ describe('Nonblocking level-up feedback', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Level Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class','show')
     cy.window().then(win=>win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw new Error(msg)}

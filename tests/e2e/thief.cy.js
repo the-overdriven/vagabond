@@ -255,11 +255,18 @@ describe('One-time monster theft', () => {
         updateMobileInfoPanel(e.x,e.y)
         const marker=document.querySelector('#mobileInfoPanel .thief-marker')
         theftCheck(!!marker,'bag marker exists')
-        if(images) {
-          theftCheck(marker.tagName==='IMG' && marker.getAttribute('src')===imageSrc(RENDER_STYLE.overlays.thiefBagImage),'shaded bag image')
-          const image=preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
-          theftCheck(image && image.naturalWidth>0,'bag image decoded')
-        } else theftCheck(marker.tagName==='SPAN' && getComputedStyle(marker).backgroundColor==='rgb(224, 71, 63)','ASCII red bag silhouette')
+        theftCheck(marker.tagName==='SPAN' && getComputedStyle(marker).backgroundColor==='rgb(224, 71, 63)','original tooltip bag silhouette in both modes')
+        const image=preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
+        theftCheck(image && image.naturalWidth>0,'floor bag image decoded')
+        const originalDrawImage=ctx.drawImage
+        let bagImageDraws=0
+        ctx.drawImage=function(...args) { if(args[0]===image) bagImageDraws++;return originalDrawImage.apply(this,args) }
+        try {
+          drawThiefBag(40,40,20)
+          theftCheck(bagImageDraws===0,'carrier marker keeps original drawing')
+          drawThiefBag(40,40,20,true)
+          theftCheck(bagImageDraws===(images?1:0),'only tile-mode floor bags use shaded image')
+        } finally {ctx.drawImage=originalDrawImage}
       }
     })()`))
   })

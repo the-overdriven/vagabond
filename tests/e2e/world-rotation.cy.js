@@ -3,6 +3,7 @@ describe('Whole-world rotation and Dwarven Key floors', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Rotation Tester')
     cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay', {timeout: 90000}).should('not.have.class','show')
   })
 

@@ -17,6 +17,11 @@ function moveMouse(selector) {
 }
 
 describe('Startup assets and character creation UI', () => {
+  beforeEach(() => {
+    // Response delays and decoded assets must come from this case's intercepts.
+    cy.then(() => cdp('Network.setCacheDisabled', {cacheDisabled:true}))
+    cy.then(() => cdp('Network.setBypassServiceWorker', {bypass:true}))
+  })
   afterEach(() => {
     cy.then(() => cdp('Emulation.setEmulatedMedia', {features: []}))
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: false}))

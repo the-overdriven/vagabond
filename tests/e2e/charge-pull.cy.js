@@ -2,8 +2,15 @@ describe('Charge and Pull terrain rules', () => {
   beforeEach(() => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Rush Tester')
+    // These cases test mechanics, not random world-generation attempts.
+    cy.get('#worldSizeSelect').select('XS')
+    cy.window().then(win => win.eval('WORLD_SEED = 12345; rngState = WORLD_SEED'))
     cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
+    cy.get('#loadingOverlay', {timeout:60000}).should($overlay => {
+      expect($overlay.text(), 'world generation status').not.to.include('failed')
+      expect($overlay, 'world generation finished').not.to.be.visible
+    })
+    cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => win.eval(`(() => {
       window.rushCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}

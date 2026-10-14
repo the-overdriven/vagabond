@@ -7535,8 +7535,9 @@ more difficult:
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
   const SUMMON_ANIM_MS = 1000
-  function drawThiefBag(x, y, size) {
-    const image = USE_TILE_IMAGES && preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
+  // The shaded asset is reserved for dropped floor bags; carrier markers stay flat.
+  function drawThiefBag(x, y, size, dropped = false) {
+    const image = dropped && USE_TILE_IMAGES && preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
     if (image) {
       ctx.drawImage(image, x - size * 0.55, y, size * 1.1, size)
       return
@@ -7557,7 +7558,6 @@ more difficult:
   }
 
   function thiefMarkerHTML() {
-    if (USE_TILE_IMAGES) return `<img class="thief-marker thief-marker-image" src="${imageSrc(RENDER_STYLE.overlays.thiefBagImage)}" alt="carrying stolen item">`
     return '<span class="thief-marker" aria-label="carrying stolen item"></span>'
   }
 
@@ -8089,7 +8089,7 @@ more difficult:
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
         if (g.kind === 'stolenloot') {
-          drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65)
+          drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65, true)
           return
         }
         if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
@@ -11391,7 +11391,8 @@ more difficult:
   // Registers the service worker (required by Chromium/Brave for the
   // "Add to Home screen" install prompt and for standalone/fullscreen
   // display). Safe to no-op if unsupported or served over plain HTTP.
-  if ('serviceWorker' in navigator) {
+  // E2E must execute current server files and allow per-case response fixtures.
+  if ('serviceWorker' in navigator && !window.Cypress) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).catch(err => {
         console.warn('Service worker registration failed:', err)

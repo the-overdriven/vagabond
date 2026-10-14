@@ -97,6 +97,8 @@ describe('One-time Merchant Dwarven Fort hint', () => {
       for(let attempt=0;attempt<20 && !merchantFortHintGiven;attempt++)tryOpenTrade(npcs[0])
       hintCheck(merchantFortHintGiven && turnCount===turn,'free shop interaction reveals fort')
       const recorded=JSON.parse(JSON.stringify(replayData)),expected=JSON.stringify(discovered)
+      // Match startReplayPlayback: dismiss the live shop before restoring playback.
+      toggleTrade(false)
       loadGameFromObject(recorded.initialState,{isReplayInit:true})
       hintCheck(!merchantFortHintGiven,'replay begins before hint')
       replayPlaying=true;replayRecording=false;replaySimulationMode=true;replayAnimationsDisabled=true
