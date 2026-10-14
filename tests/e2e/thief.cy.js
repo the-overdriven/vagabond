@@ -254,7 +254,12 @@ describe('One-time monster theft', () => {
           info.html.includes('☠') && info.html.includes('Fleeing'),'shared markers and status')
         updateMobileInfoPanel(e.x,e.y)
         const marker=document.querySelector('#mobileInfoPanel .thief-marker')
-        theftCheck(marker && getComputedStyle(marker).backgroundColor==='rgb(224, 71, 63)','red bag silhouette')
+        theftCheck(!!marker,'bag marker exists')
+        if(images) {
+          theftCheck(marker.tagName==='IMG' && marker.getAttribute('src')===imageSrc(RENDER_STYLE.overlays.thiefBagImage),'shaded bag image')
+          const image=preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
+          theftCheck(image && image.naturalWidth>0,'bag image decoded')
+        } else theftCheck(marker.tagName==='SPAN' && getComputedStyle(marker).backgroundColor==='rgb(224, 71, 63)','ASCII red bag silhouette')
       }
     })()`))
   })

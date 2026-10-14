@@ -244,6 +244,7 @@
     "aggroRangeEdge": "rgba(224,71,63,0.08)",
     "rangeOwnerOutline": "rgba(232,162,79,0.9)",
     "aggroRangeBoundary": "rgba(224,71,63,0.82)",
+    "thiefBagImage": "img/overlays/thief-bag.svg",
     "pathFootstepImage": "img/icons/bootmarks.svg",
     "pathFootstepScale": 0.56,
     "pathFootstepAlpha": 0.88
@@ -720,6 +721,13 @@
     }
   },
   "projectiles": {
+    "web": {
+      "glyph": "%",
+      "color": "#dedbd1",
+      "image": "img/tiles/cave-web.png",
+      "scale": 0.65,
+      "filter": "brightness(1.8)"
+    },
     "arrow": {
       "glyph": "➤",
       "color": "#d7c7a5",

@@ -123,4 +123,23 @@ describe('Low-HP enrage', () => {
     })()`))
   })
 
+  it('shows one red animated label per living threshold crossing and skips replay simulation', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const e=rushEnemy('Orc'); e.maxHp=100; e.hp=29
+      damageAnims=[]; replayAnimationsDisabled=false; replaySimulationMode=false
+      logEnemyEnrageTransition(e,false)
+      const label=damageAnims.find(effect=>effect.amount==='Enraged!')
+      rushCheck(label && label.color==='#e0473f' && label.duration===1000 && label.delay===220,'red rising label')
+      logEnemyEnrageTransition(e,true)
+      rushCheck(damageAnims.filter(effect=>effect.amount==='Enraged!').length===1,'no repeat below threshold')
+      e.hp=0; logEnemyEnrageTransition(e,false)
+      rushCheck(damageAnims.length===1,'fatal hit has no rage label')
+      e.hp=29; replayAnimationsDisabled=true; logEnemyEnrageTransition(e,false)
+      rushCheck(damageAnims.length===1,'disabled replay has no label')
+      replayAnimationsDisabled=false; replaySimulationMode=true; logEnemyEnrageTransition(e,false)
+      rushCheck(damageAnims.length===1,'replay simulation has no label')
+      replaySimulationMode=false; replayAnimationsDisabled=true
+    })()`))
+  })
+
 })

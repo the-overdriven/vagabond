@@ -25,7 +25,7 @@ function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
   return {sx, sy, distance}
 }
 
-function forcePlayerPosition(x, y) {
+function forcePlayerPosition(x, y, presentation) {
   const from = {x: player.x, y: player.y}
   clearAutoPath()
   player.x = x; player.y = y
@@ -35,7 +35,7 @@ function forcePlayerPosition(x, y) {
   advanceSwimming(false, from)
   if (player.hp <= 0 || deathTransition) return
   currentUndergroundFov()
-  animateCameraToPlayer(from)
+  animateCameraToPlayer(from, presentation)
   updateHud()
   updateTooltip()
 }
@@ -74,9 +74,24 @@ function tryEnemyRush(e) {
     enemyAttackPlayer(e, true, 1, {atkMultiplier: 1 + 0.25 * (line.distance - 1), line})
   } else {
     log(`${e.name} throws a web at you and drags you closer!`, 'bad')
-    spawnDamageNumber(player.x, player.y, 'Web!', RENDER_STYLE.damage.miss)
-    forcePlayerPosition(e.x + line.sx, e.y + line.sy)
-    if (player.hp > 0 && !deathTransition) enemyAttackPlayer(e, true)
+    const throwMs = 420, pullMs = 360
+    const animated = !replayAnimationsDisabled && !replaySimulationMode
+    const from = {x:player.x, y:player.y}
+    if (animated) {
+      spawnProjectileAnim([{x:e.x,y:e.y}, from], 'web', throwMs)
+      spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs)
+    }
+    forcePlayerPosition(e.x + line.sx, e.y + line.sy,
+      animated ? {delay:throwMs, duration:pullMs} : undefined)
+    const firstDamage = damageAnims.length
+    if (player.hp > 0 && !deathTransition) {
+      enemyAttackPlayer(e, true)
+      // Only presentation waits for the thrown web and drag; rules have resolved.
+      if (animated) {
+        if (e.attackStart !== undefined) e.attackStart += throwMs + pullMs
+        for (const effect of damageAnims.slice(firstDamage)) effect.delay += throwMs + pullMs
+      }
+    }
   }
   return true
 }

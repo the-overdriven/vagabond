@@ -2174,7 +2174,9 @@ bag only, without an additional equipment drop. Replacing that gear later throug
 existing permadeath loot rules leaves the stolen item recoverable in its bag.
 
 A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
-and mobile inspection. Victory skull and Alarmed markers shift to avoid overlap.
+and mobile inspection. Tile-mode map markers, dropped bags, and desktop/mobile inspection use the same shaded
+red bag SVG, retaining the original silhouette; ASCII markers retain their
+existing drawing. Victory skull and Alarmed markers shift to avoid overlap.
 Killing it drops a bag at its exact map location; forage recovers the original
 item, preserving quest IDs and all other properties. Other monster loot is
 unchanged. Theft, random selection, hesitation, and movement resolve through
@@ -2193,6 +2195,9 @@ Ranged projectile ATK and XP rewards remain unchanged.
 Crossing the threshold after an attack logs "Pain drives <name> into a rage!".
 Healing out of enrage logs that its rage subsides. Fatal hits do not trigger
 an enrage message, and subsequent hits below the threshold do not repeat it.
+Each live threshold crossing also shows red rising **Enraged!** text for one
+second after a short delay so it remains readable beside damage numbers.
+The effect appears in tile and ASCII modes and is skipped during replay simulation.
 Enraged creatures have a red outline in tile and ASCII modes. Inspection shows
 Enraged (ATK +25%) and their current effective ATK on desktop and mobile.
 
@@ -2251,7 +2256,11 @@ Forced player movement refreshes visibility and camera position, grants no steps
 swimming practice, or voluntary-movement quest progress, and does not collect
 items or trigger transitions. Forced water entry consumes water endurance and
 can immediately cause normal drowning damage. Combat and relocation resolve
-synchronously; animations never determine rules or RNG. Existing abilities and
+synchronously; animations never determine rules or RNG. Successful Pull visually
+throws the cave-web graphic toward the original player tile for 420 ms, then
+drags the player to the resolved destination over 360 ms. The melee lunge and
+damage text follow the drag. ASCII uses a moving `%` web glyph. Replay simulation
+skips the presentation, and no animation state is saved. Existing abilities and
 swimming state are saved and replayed normally, with no new persistent flag.
 
 ## Summoning

@@ -140,4 +140,37 @@ describe('Charge and Pull terrain rules', () => {
     })()`))
   })
 
+  it('sequences web, drag and melee effects without changing Pull outcomes', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const oldChance=chance,oldDamage=damageRoll,oldLoop=runAnimationLoop
+      try {
+        chance=p=>p===.70; damageRoll=()=>10; runAnimationLoop=()=>{}
+        const outcomes=[]
+        for(const animated of [true,false]) {
+          stopCameraAnimation(); enemies=[]; occupied.clear(); damageAnims=[]; projectileAnims=[]
+          player.x=40;player.y=40;player.hp=1000
+          replayAnimationsDisabled=!animated; replaySimulationMode=false
+          const e=rushEnemy('Giant Spider',37,40),steps=player.steps,turn=turnCount
+          rushCheck(tryEnemyRush(e),'connected pull')
+          outcomes.push([player.x,player.y,player.hp,player.steps-steps,turnCount-turn])
+          if(animated) {
+            const web=projectileAnims[0]
+            rushCheck(web.projectile==='web' && web.duration===420,'slower thrown web')
+            rushCheck(web.path[0].x===37 && web.path[1].x===40,'web targets original tile')
+            rushCheck(moveAnim.fromX===40 && moveAnim.toX===38 && moveAnim.duration===360,'visual drag')
+            rushCheck(moveAnim.start>=web.start+420,'drag waits for web')
+            rushCheck(damageAnims.some(effect=>effect.amount==='Web!' && effect.delay===420),'web impact text')
+            rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=780),'melee follows drag')
+            render(web.start)
+            rushCheck(moveAnim!==null,'pre-start rendering does not finish drag')
+          } else rushCheck(!projectileAnims.length && !moveAnim,'simulation skips web and drag')
+        }
+        rushCheck(JSON.stringify(outcomes[0])===JSON.stringify(outcomes[1]),'same rules with and without animation')
+      } finally {
+        chance=oldChance;damageRoll=oldDamage;runAnimationLoop=oldLoop
+        replayAnimationsDisabled=true;stopCameraAnimation();clearEnemyAnims()
+      }
+    })()`))
+  })
+
 })

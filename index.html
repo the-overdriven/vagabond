@@ -3692,7 +3692,11 @@ more difficult:
 
   function logEnemyEnrageTransition(e, wasEnraged) {
     const enraged = enemyIsEnraged(e)
-    if (enraged && !wasEnraged) log(`Pain drives ${e.name} into a rage!`, 'bad')
+    if (enraged && !wasEnraged) {
+      log(`Pain drives ${e.name} into a rage!`, 'bad')
+      if (!replayAnimationsDisabled && !replaySimulationMode)
+        spawnDamageNumber(e.x, e.y, 'Enraged!', '#e0473f', 220, 1000)
+    }
     else if (wasEnraged && !enraged && e.hp > 0 && e.alive !== false)
       log(`${e.name}'s rage subsides.`, 'info')
   }
@@ -7476,6 +7480,11 @@ more difficult:
   const DAMAGE_ANIM_MS = 650
   const SUMMON_ANIM_MS = 1000
   function drawThiefBag(x, y, size) {
+    const image = USE_TILE_IMAGES && preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
+    if (image) {
+      ctx.drawImage(image, x - size * 0.55, y, size * 1.1, size)
+      return
+    }
     ctx.save()
     ctx.translate(x, y)
     ctx.scale(size, size)
@@ -7489,6 +7498,11 @@ more difficult:
     ctx.closePath(); ctx.fill(); ctx.stroke()
     ctx.beginPath(); ctx.moveTo(-0.18, 0.30); ctx.lineTo(0.18, 0.30); ctx.stroke()
     ctx.restore()
+  }
+
+  function thiefMarkerHTML() {
+    if (USE_TILE_IMAGES) return `<img class="thief-marker thief-marker-image" src="${imageSrc(RENDER_STYLE.overlays.thiefBagImage)}" alt="carrying stolen item">`
+    return '<span class="thief-marker" aria-label="carrying stolen item"></span>'
   }
 
   function enemyGlyph(e) {
@@ -7546,13 +7560,13 @@ more difficult:
     runAnimationLoop()
   }
 
-  function spawnProjectileAnim(path, projectile) {
-    if (replayAnimationsDisabled || !Array.isArray(path) || path.length < 2) return
+  function spawnProjectileAnim(path, projectile, duration = RANGED_CONFIG.projectileAnimationMs) {
+    if (replayAnimationsDisabled || replaySimulationMode || !Array.isArray(path) || path.length < 2) return
     projectileAnims.push({
       path: path.map(point => ({x: point.x, y: point.y})),
       projectile,
       start: performance.now(),
-      duration: RANGED_CONFIG.projectileAnimationMs
+      duration
     })
     runAnimationLoop()
   }
@@ -7677,7 +7691,7 @@ more difficult:
     cameraAnimating = false
   }
 
-  function animateCameraToPlayer(fromPos) {
+  function animateCameraToPlayer(fromPos, presentation = {}) {
     if (replayAnimationsDisabled) {
       moveAnim = null
       cameraAnimating = false
@@ -7692,8 +7706,8 @@ more difficult:
       fromY: fromY,
       toX: player.x,
       toY: player.y,
-      start: performance.now(),
-      duration: MOVE_ANIM_MS
+      start: performance.now() + (presentation.delay || 0),
+      duration: presentation.duration || MOVE_ANIM_MS
     }
     cameraAnimating = true
     runAnimationLoop()
@@ -7877,7 +7891,7 @@ more difficult:
     let viewPlayerX = player.x
     let viewPlayerY = player.y
     if (moveAnim) {
-      const t = Math.min(1, (now - moveAnim.start) / moveAnim.duration)
+      const t = Math.max(0, Math.min(1, (now - moveAnim.start) / moveAnim.duration))
       const p = 1 - Math.pow(1 - t, 3)
       viewPlayerX = moveAnim.fromX + (moveAnim.toX - moveAnim.fromX) * p
       viewPlayerY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * p
@@ -8141,7 +8155,7 @@ more difficult:
         }
       }
       if (e.attackStart !== undefined) {
-        const t = Math.min(1, (now - e.attackStart) / 220)
+        const t = Math.max(0, Math.min(1, (now - e.attackStart) / 220))
         const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35
         ex = e.x + (player.x - e.x) * lunge
         ey = e.y + (player.y - e.y) * lunge
@@ -8647,7 +8661,7 @@ more difficult:
         mini: false, enemy: e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' <span class="thief-marker" aria-label="carrying stolen item"></span>' : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
