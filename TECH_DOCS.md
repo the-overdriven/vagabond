@@ -1107,7 +1107,7 @@ scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces th
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
 reuse shortcuts without another dedicated save field. Current game version is
-**v94**, save/replay version **42**; older saves are rejected.
+**v95**, save/replay version **43**; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -4828,6 +4828,35 @@ The Merchant:
 - must not occupy the same surface coordinate as any `groundItems` entry,
   including hidden `buriedgear` and `buriedartifact` objects
 
+## One-time Dwarven Fort hint
+
+While the surface fort entrance is undiscovered, each eligible Merchant bump
+conversation or adjacent shop opening has a **50%** chance to add this line:
+
+> They say the old dwarven fort still holds a fortune. I've sold supplies to
+> plenty who went looking. Few came back.
+
+Existing dialogue stays in the normal conversation. A failed roll gives no hint
+and permits another attempt. The successful interaction discovers the **5×5
+surface area** centered on the fort entrance, using the same radius-2 reveal
+mechanism as the Old Hunter's cave investigation. It exposes the entrance and
+nearby terrain on the map, not the underground fort or a route across the world.
+A separate log confirms that the Merchant marked the ruins on the map.
+
+The world-level `merchantFortHintGiven` flag becomes true on success, suppressing
+all further hint dialogue and hint RNG rolls. Already-discovered entrances,
+missing entrances, other NPCs and off-surface interactions do not roll. Adjacent
+shop openings retain their existing zero-turn cost, so reopening permits free
+retries before success. Bump conversations retain their normal turn behavior.
+
+The flag starts false for each genuinely new world and remains unchanged through
+normal death and new characters reusing a permadeath world. Current saves store
+it beside Merchant stock; restoration and replay starting snapshots preserve it.
+Replay shop-opening actions mirror the hint roll and discovery even when the
+trade overlay is suppressed. Bump interactions replay through ordinary movement.
+Chance, reveal radius and the hint line are configured on the Merchant template
+in `content/npcs.json` under `fortHint`.
+
 Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
 world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
 Homecoming scrolls are finite: an exhausted stack remains in saved stock with
@@ -5242,10 +5271,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-42
+43
 ```
 
 Saves are JSON files.
+
+Version 43 adds the world-level Merchant fort-hint flag. It persists with the
+surface discovery grid through save/load and replay and does not reset when
+a new character reuses the same world. Older saves are rejected without migration.
 
 Version 42 changes deterministic damage outcomes to triangular proportional
 variance with a minimum spread. Older recordings use different combat results
@@ -5365,7 +5398,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 42** saves. Other versions are rejected
+Current gameplay state requires **version 43** saves. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization

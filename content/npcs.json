@@ -42,7 +42,12 @@
       "free": false,
       "portrait": "merchant",
       "static": true,
-      "trades": true
+      "trades": true,
+      "fortHint": {
+        "chance": 0.5,
+        "radius": 2,
+        "line": "They say the old dwarven fort still holds a fortune. I've sold supplies to plenty who went looking. Few came back. Where is it? I will mark it on your map."
+      }
     },
     {
       "name": "Herbalist",

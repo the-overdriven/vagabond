@@ -845,6 +845,7 @@ more difficult:
   let treasureMapSpot = null // {x,y} sand tile the treasure map points to
   let treasureMapUnearthed = false
   let herbalistGiftGiven = false
+  let merchantFortHintGiven = false
   let CRYPT2_EXPLORER_FLAVOR
   let CRYPT2_TRAP_DISCOVER
   let CRYPT2_TRAP_TRIGGER
@@ -5410,6 +5411,21 @@ more difficult:
     addInventoryItem('herb')
   }
 
+  function tryMerchantFortHint(npc) {
+    if (!npc || npc.name !== 'Merchant' || currentZ !== 0 || merchantFortHintGiven || !dwarvenRuin) return false
+    const {x, y} = dwarvenRuin
+    if (!Number.isInteger(x) || !Number.isInteger(y) ||
+        surfaceMap[y]?.[x] !== 'dwarvengate' || discovered[y]?.[x]) return false
+    const hint = NPC_TEMPLATES.find(template => template.name === 'Merchant').fortHint
+    if (!chance(hint.chance)) return false
+    merchantFortHintGiven = true
+    revealArea(x, y, hint.radius)
+    log(`Merchant says: ${hint.line}`, 'info')
+    log('The Merchant marks the dwarven fort ruins on your map.', 'info')
+    render()
+    return true
+  }
+
   function grantHerbalistFirstGift(npc) {
     if (!npc || npc.name !== 'Herbalist' || herbalistGiftGiven) return false
     herbalistGiftGiven = true
@@ -6265,6 +6281,7 @@ more difficult:
           : pick(npcTarget.lines)
         log(`${npcTarget.name} says: ${npcTarget.name === 'Ancient Lich' ? `${raceDef().name}... ${dialogue}` : dialogue}`, 'info')
       }
+      tryMerchantFortHint(npcTarget)
       enemyTurn()
       npcTurn()
       render()
@@ -10056,6 +10073,7 @@ more difficult:
     grantHerbalistFirstGift(npc)
     freezeNpcFromWandering(npc)
     serviceNpc = npc
+    tryMerchantFortHint(npc)
     toggleTrade(true)
   }
 
@@ -11218,6 +11236,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    merchantFortHintGiven = false
     // A prior world may have rotated 90/270 degrees; start every new world
     // with the configured dimensions before allocating any surface or dungeon maps.
     MAP_W = unrotatedWorldWidth

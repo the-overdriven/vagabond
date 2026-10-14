@@ -247,6 +247,7 @@ function buildSaveObject() {
     tombstoneOrder: tombstoneOrder,
     merchantStock: merchantStock,
     herbalistGiftGiven: herbalistGiftGiven,
+    merchantFortHintGiven: merchantFortHintGiven,
     foragedTiles: [...foragedTiles],
     dugSandTiles: [...dugSandTiles],
     gravediggerGraveKey: gravediggerGraveKey,
@@ -707,6 +708,7 @@ function loadGameFromObject(data, opts = {}) {
   tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length === TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_, i) => i)
   merchantStock = Array.isArray(data.merchantStock) ? data.merchantStock : []
   herbalistGiftGiven = !!data.herbalistGiftGiven
+  merchantFortHintGiven = data.merchantFortHintGiven === true
   // Replay's initialState is a snapshot of an already-current-version live
   // game - it never needs backfilling, and doing so here would call rng()
   // outside the recorded action stream (replayPlaying/replayRecording are

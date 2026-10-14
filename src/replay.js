@@ -321,6 +321,7 @@ async function runReplayAction(action) {
       grantHerbalistFirstGift(npc)
       freezeNpcFromWandering(npc)
       serviceNpc = npc
+      tryMerchantFortHint(npc)
       break
     }
     case 'buy': {
