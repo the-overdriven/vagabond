@@ -453,9 +453,13 @@ swim naturally without skill levels, practice or a time limit. Rivers are
 explicitly **not** swimming terrain; their existing player/enemy half-submerged
 rendering remains unchanged. Intact/cracking lake ice and frozen rivers are
 also excluded. When lake ice breaks, its tile becomes ordinary deep `water`:
-Swimming/Merling rules apply immediately, including normal drowning for a
-non-swimmer. Forced entry grants no practice and still allows escape through
-adjacent water until reaching shore. The tile remains freezing (§12).
+Swimming/Merling rules apply immediately. The collapse deals a single
+`max(1, round(playerMaxHp() × 0.08))` HP plunge hit to every non-Merling,
+even one who has learned Swimming. This replaces, rather than adds to, the
+ordinary drowning hit on the entry turn. Non-swimmers also enter the Drowning
+state; later drowning turns use the normal 5% damage. Merlings take no plunge
+hit. Forced entry grants no practice and still allows escape through adjacent
+water until reaching shore. The tile remains freezing (§12).
 
 Learning Swimming 5 allows five safe consecutive deep-water movements/waits;
 the entry step counts as the first. Each subsequent movement/wait costs
@@ -791,9 +795,10 @@ tiles, including neighbors cracked by an instant break, survive that turn.
 
 Monsters never initiate cracking or collapse. Underground terrain, god mode
 and flight do not roll or spread cracks. Disabling god mode restores normal
-rules on the next spent turn. Merlings and learned swimmers can break ice but
-use their normal swimming protection. Rendering and animation timing never
-roll or advance these rules.
+rules on the next spent turn. Merlings are immune to the collapse damage;
+learned swimmers still take the one-time 8% max-HP plunge hit, but can swim
+without immediate drowning. Rendering and animation timing never roll or
+advance these rules.
 
 Each transition logs a warning, shows an animated popup and stops auto-travel.
 Cracking ice retains its state when vacated, uses a bright white fracture overlay in
@@ -801,17 +806,19 @@ tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
 The hero hover portrait on both lake-ice stages reuses the frozen-river
 background variants, selected deterministically from the tile coordinates.
 Broken ice uses normal water rendering and swimming/drowning visuals. Falling
-through immediately checks normal drowning without granting swimming practice;
-freezing continues on the same turn. Reaching intact ice or land ends swimming,
-but only reaching warm terrain ends freezing. Broken tiles never refreeze, and water washes away any tracks on the tile.
+through inflicts the single 8% max-HP plunge hit (except Merlings) without
+granting swimming practice; normal drowning starts for non-swimmers but cannot
+deal a second hit that turn. Freezing continues on the same turn. Reaching
+intact ice or land ends swimming, but only warm terrain ends freezing. Broken
+tiles never refreeze, and water washes away any tracks on the tile.
 
 Ice stages live in the saved surface grid; the existing snow underlay preserves
 the cold-water property after breaking. Both rotate with the world and restore
 through current saves and replay snapshots. No new player status or parallel
 ice registry is needed. Every collapsed tile keeps its snow underlay, loses
 any tracks and refreshes its map display. The player receives only one forced
-water-entry check regardless of how many neighboring tiles collapse. Chances
-are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`,
+water-entry check and one plunge hit regardless of how many neighboring tiles
+collapse. Chances are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`,
 `environment.iceSpreadChance` and `environment.crackingIceBreakChance`.
 
 ---

@@ -27,7 +27,9 @@ function reconcileSwimming() {
 }
 
 // Called only by successful movement and waiting, never by drawing or the turn clock.
-function advanceSwimming(moved, from = null) {
+// An ice collapse deals a single larger plunge hit in place of this turn's
+// ordinary drowning damage, even to characters who already know Swimming.
+function advanceSwimming(moved, from = null, fellThroughIce = false) {
   const here = {x: player.x, y: player.y, z: currentZ}
   const prior = player.swimPosition
   if (prior && (prior.z !== currentZ || (from
@@ -58,18 +60,20 @@ function advanceSwimming(moved, from = null) {
     }
   }
   player.swimTurns = (player.swimTurns || 0) + 1
-  if (!isDrowning()) {
+  const drowning = isDrowning()
+  if (!drowning && !fellThroughIce) {
     player.drowning = false
     return
   }
-  if (!player.drowning) log('You are drowning! Get back to shore!', 'bad')
-  player.drowning = true
-  const damage = Math.max(1, Math.round(playerMaxHp() * 0.05))
+  if (drowning && !player.drowning) log('You are drowning! Get back to shore!', 'bad')
+  player.drowning = drowning
+  const damage = Math.max(1, Math.round(playerMaxHp() * (fellThroughIce ? 0.08 : 0.05)))
   player.hp = Math.max(0, player.hp - damage)
+  if (fellThroughIce) log(`The plunge into freezing water costs you ${damage} HP.`, 'bad')
   checkPlayerHealthWarning()
   spawnDamageNumber(player.x, player.y, damage, RENDER_STYLE.damage.playerHit)
   if (player.hp <= 0) {
-    log('You have drown.', 'bad')
+    log(fellThroughIce ? 'The freezing water claims your life.' : 'You have drown.', 'bad')
     die(null, 'drowning')
     return false
   }

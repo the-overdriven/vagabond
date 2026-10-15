@@ -36,26 +36,38 @@ async function rules() {
   run("beastTracks.set('30,30',{x:30,y:30,direction:0,species:'Wolf',age:0})")
   run('enemyTurn()')
   check("map[30][30]==='water' && surfaceMap[30][30]==='water' && iceRolls[2]===.1", '10% breaks cracked ice')
-  check("player.hp===95 && player.swimTurns===1 && player.drowning && player.freezing.active && player.freezing.turns===2 && player.swimmingPractice===0", 'forced entry drowns once, grants no practice and remains cold')
+  check("player.hp===92 && player.swimTurns===1 && player.drowning && player.freezing.active && player.freezing.turns===2 && player.swimmingPractice===0", 'forced entry costs 8% once, grants no practice and remains cold')
   check("!beastTracks.has('30,30')", 'water washes away tracks when the ice breaks')
   run('skipTurn()')
-  check('player.hp===90 && player.swimTurns===2 && turnCount===3', 'subsequent wait causes one normal drowning tick')
+  check('player.hp===87 && player.swimTurns===2 && turnCount===3', 'subsequent wait costs the ordinary 5% drowning tick')
   run("map[30][31]='ice';tileUnderlays['31,30']='snow';chance=()=>false")
   await run('tryMove(1,0)')
   check('player.x===31 && !player.drowning && player.swimTurns===0 && player.freezing.turns===4', 'non-swimmer can escape onto intact ice without ending cold exposure')
   await run('tryMove(1,0)')
   check('!player.freezing.active && player.freezing.turns===0', 'warm land ends cold exposure')
 
-  for (const [race,swimming] of [['human',5],['merling',0]]) {
+  for (const [race,swimming,hp] of [['human',5,92],['merling',0,100]]) {
     reset('crackingice',race,swimming)
     run('chance=()=>true;enemyTurn()')
-    check("map[30][30]==='water' && !player.drowning && player.hp===playerMaxHp() && player.swimmingPractice===0", race+' uses normal swimming protection')
+    check(`map[30][30]==='water' && !player.drowning && player.hp===${hp} && player.swimmingPractice===0`, race+' ice plunge damage respects natural swimming')
+    run('skipTurn()')
+    check(`player.hp===${hp} && !player.drowning`, race+' avoids normal drowning on the next safe swimming turn')
+    const plungeSave = plain(run('buildSaveObject()'))
+    context.plungeSave = plungeSave
+    run('loadGameFromObject(structuredClone(plungeSave),{isReplayInit:true})')
+    check(`player.hp===${hp} && map[30][30]==='water'`, race+' saved plunge does not damage again on load')
   }
+  reset('crackingice', 'human', 5)
+  run('player.hp=7;var realIceDie=die;var iceDeathCause=null;die=(killer,cause)=>{iceDeathCause=cause};chance=()=>true;enemyTurn();die=realIceDie')
+  check("player.hp===0 && iceDeathCause==='drowning'", 'the icy plunge can kill an experienced swimmer with the water death cause')
+  reset('crackingice', 'human', 0)
+  run('player.maxHp=33;player.hp=33;chance=()=>true;enemyTurn()')
+  check('player.hp===30 && player.drowning && player.swimTurns===1', 'plunge damage rounds once to 8% of max HP (33 -> 3)')
   reset('ice')
   run('replayAnimationsDisabled=false;chance=p=>p!==.01;enemyTurn();enemyTurn()')
   check("damageAnims.some(a=>a.amount==='Ice cracking!') && damageAnims.some(a=>a.amount==='Ice breaks!')", 'both transition popups are queued')
   check("ruleMessages.some(s=>s.includes('ice cracks')) && ruleMessages.some(s=>s.includes('ice breaks')) && ruleMessages.some(s=>s.includes('drowning'))", 'transition and drowning messages are logged')
-  check("player.hp===95 && map[30][30]==='water'", 'animation setting does not change rule results')
+  check("player.hp===92 && map[30][30]==='water'", 'animation setting does not change rule results')
 
   for (const terrain of ['river','frozenriver','grass','water']) {
     reset(terrain)
@@ -109,7 +121,7 @@ async function rules() {
     run(`map[30+${dy}][30+${dx}]='ice';var stepBreakRolls=[];chance=p=>{stepBreakRolls.push(p);return p===.85||p===.1}`)
     await run(`tryMove(${dx},${dy})`)
     check(`stepBreakRolls.length===3&&stepBreakRolls[0]===.01&&stepBreakRolls[1]===.85&&stepBreakRolls[2]===.1&&map[30+${dy}][30+${dx}]==='water'&&map[30][30]==='water'`, 'stepping from cracking ice checks 1%, 85%, then the extra 10%, including diagonals')
-    check('player.hp===95&&player.drowning&&player.swimTurns===1', 'same-step break applies only one drowning check')
+    check('player.hp===92&&player.drowning&&player.swimTurns===1', 'same-step break applies only one plunge hit')
   }
   reset('crackingice')
   run("map[30][31]='ice';var safeStepRolls=[];chance=p=>{safeStepRolls.push(p);return p===.85}")
@@ -118,7 +130,7 @@ async function rules() {
   reset('crackingice')
   run("map[30][31]='ice';map[30][32]='ice';chance=p=>{if(p!==.01)throw Error('instant break must skip the extra recheck');return true}")
   await run('tryMove(1,0)')
-  check("map[30][31]==='water'&&map[30][30]==='water'&&map[30][32]==='crackingice'&&player.hp===95", 'instant break keeps priority when moving from cracking ice')
+  check("map[30][31]==='water'&&map[30][30]==='water'&&map[30][32]==='crackingice'&&player.hp===92", 'instant break keeps priority when moving from cracking ice')
   for(const origin of ['grass','ice','frozenriver','water']) {
     reset(origin)
     run("map[30][31]='ice';map[31][32]='crackingice';var otherOriginRolls=[];chance=p=>{otherOriginRolls.push(p);return p===.85}")
@@ -139,7 +151,7 @@ async function rules() {
   }
   map[30][32]='crackingice';chance=p=>{if(p!==.1)throw Error('cracked ice uses only its 10% roll');return true};enemyTurn()`)
   check("DIRS8.every(([dx,dy])=>map[30+dy][30+dx]==='water'&&surfaceMap[30+dy][30+dx]==='water'&&tileUnderlays[keyXY(30+dx,30+dy)]==='snow'&&!beastTracks.has(keyXY(30+dx,30+dy)))", 'all eight already-cracking neighbors collapse, retain cold and lose tracks')
-  check("map[30][32]==='crackingice' && player.hp===95 && player.swimTurns===1", 'neighbor collapse never chains or adds extra drowning checks')
+  check("map[30][32]==='crackingice' && player.hp===92 && player.swimTurns===1", 'neighbor collapse never chains or adds extra plunge hits')
   run('var collapsedSave=JSON.parse(JSON.stringify(buildSaveObject()));loadGameFromObject(collapsedSave,{isReplayInit:true})')
   check("DIRS8.every(([dx,dy])=>map[30+dy][30+dx]==='water'&&tileUnderlays[keyXY(30+dx,30+dy)]==='snow')&&map[30][32]==='crackingice'", 'save restores collapsed neighbors and untouched second ring')
 
@@ -153,7 +165,7 @@ async function rules() {
     var instantRolls=[];chance=p=>{instantRolls.push(p);return true};enemyTurn()`)
   check("instantRolls.length===1&&instantRolls[0]===.01&&map[30][30]==='water'&&map[29][30]==='water'", 'instant break skips the ordinary cracking roll and collapses already-cracking neighbors')
   check("DIRS8.filter(([dx,dy])=>map[30+dy][30+dx]==='crackingice').length===5&&map[30][32]==='ice'&&map[30][31]==='frozenriver'&&map[31][29]==='grass'", 'instant break cracks only adjacent intact ice, without immediately collapsing it')
-  check("player.hp===95&&player.swimTurns===1&&player.freezing.active&&ruleMessages.some(s=>s.includes('Cracks spread'))", 'instant entry drowns once, stays cold and logs the nearby cracking')
+  check("player.hp===92&&player.swimTurns===1&&player.freezing.active&&ruleMessages.some(s=>s.includes('Cracks spread'))", 'instant entry deals one 8% plunge hit, stays cold and logs the nearby cracking')
   reset('grass')
   run("map[30][31]='ice';map[31][32]='crackingice';var priorityRolls=[];chance=p=>{priorityRolls.push(p);return true}")
   await run('tryMove(1,0)')
@@ -260,7 +272,7 @@ async function rules() {
   assert.equal(context.iceReplay.rng.length,2)
   await verifyReplay(failedSpreadExpected)
   run('chance=originalIceCheckChance')
-  console.log('PASS ice stages, instant break, cracking-origin step recheck, one-ring collapse, forced drowning, protection, freezing, feedback, saves, rotation and replay')
+  console.log('PASS ice stages, instant break, cracking-origin step recheck, one-ring collapse, single 8% plunge, swimming and Merling protection, freezing, feedback, saves, rotation and replay')
 }
 
 async function worldgen() {

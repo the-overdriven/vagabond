@@ -74,7 +74,7 @@ function tickLakeIce(playerMovement = null) {
     spawnDamageNumber(x, y, breaks ? 'Ice breaks!' : 'Ice cracking!',
       breaks ? '#70cce8' : '#ffe2a8', 0, 1000)
   }
-  // This is forced entry, not a swimming movement: no practice, but a
-  // non-swimmer immediately takes normal drowning damage and can swim out.
-  if (breaks) advanceSwimming(false)
+  // Forced entry grants no practice. Apply one icy-plunge hit (rather than
+  // ordinary drowning damage on this turn), then use normal swimming rules.
+  if (breaks) advanceSwimming(false, null, true)
 }
