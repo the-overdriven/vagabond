@@ -140,6 +140,7 @@ function buildSaveObject() {
     ancientBellLichSpawned: ancientBellLichSpawned,
     villageHuts: villageHuts,
     mausoleumHutPos: mausoleumHutPos,
+    mausoleumQuarterTurns: mausoleumQuarterTurns,
     mausoleumDiscovered: isMausoleumDiscovered,
     player: {
       x: player.x, y: player.y,
@@ -678,11 +679,15 @@ function loadGameFromObject(data, opts = {}) {
   villageHuts = Array.isArray(data.villageHuts) ? data.villageHuts : villageHuts
   reconcileVillageHuts()
   syncMausoleumHutToOddTombstone()
-  // The mausoleum is generated as part of the world. Rebuild its deterministic
-  // structure while reconstructing undergroundMap from the saved cave layers;
-  // entering it never creates terrain or loot.
+  // The mausoleum is not part of caveMaps. Re-stamp its generated footprint
+  // in the original orientation, but leave saved loot (including opened chests)
+  // untouched. Rotation is game state, never inferred from animation timing.
+  const mausoleumHut = villageHuts.find(h => h.mausoleum)
+  mausoleumQuarterTurns = Number.isInteger(data.mausoleumQuarterTurns) && data.mausoleumQuarterTurns >= 0 && data.mausoleumQuarterTurns < 4
+    ? data.mausoleumQuarterTurns
+    : mausoleumHut ? inferMausoleumQuarterTurns(mausoleumHut, data.groundItems, undergroundDiscoveredL1) : 0
   mausoleumMap = null
-  initializeMausoleum()
+  initializeMausoleum({restore: true})
   // Reconcile progression for saves made before the explicit quest fields
   // existed, or saves where only one side of the event was serialized.
   if (!bellRung && Array.isArray(data.npcs) && data.npcs.some(n => n.name === 'Ancient Lich')) bellRung = true

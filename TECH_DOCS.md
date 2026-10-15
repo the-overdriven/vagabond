@@ -1562,6 +1562,16 @@ The existing `cryptConnectedToRandomCave()` flood-fill remains as a final safety
 check because future cave/crypt geometry changes must not silently reconnect the
 two regions.
 
+The 9×9 mausoleum contains four fixed **tier-5 chests** in its four
+interior corners, with a central sarcophagus and a staircase at the hut.
+World rotation turns the room and chests together around that staircase.
+The room's quarter-turn orientation (0–3) is persisted in saves and replay
+snapshots: restoring the world reconstructs the rotated room from its cave-layer
+context without generating fresh loot. Chests that have been opened stay
+absent, and remaining chests never overlap the sarcophagus. Restoring a
+current-format save created before the orientation field was recorded uses its
+remaining marked chests and explored mausoleum tiles to reconstruct the layout.
+
 The mausoleum has a separate defensive validation after the random z:-1 caves
 have been merged. Its 9x9 template is anchored on the mausoleum hut, with the
 actual stamped interior occupying approximately `x = hut.x-3..hut.x+3` and

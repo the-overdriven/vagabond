@@ -133,6 +133,42 @@ function dungeonRoomGraphDegree(graph, roomIndex) {
 let villageHuts = []
 let mausoleumMap = null
 let mausoleumHutPos = null
+let mausoleumQuarterTurns = 0
+const MAUSOLEUM_CHEST_POSITIONS = [[1, 1], [7, 1], [1, 7], [7, 7]]
+
+function mausoleumOffset(localX, localY, turns = mausoleumQuarterTurns) {
+  const x = localX - 4, y = localY - 7
+  switch (turns % 4) {
+    case 1: return {x: -y, y: x}
+    case 2: return {x: -x, y: -y}
+    case 3: return {x: y, y: -x}
+    default: return {x, y}
+  }
+}
+
+// Existing current-format saves may predate the stored rotation. Their remaining
+// marked chests and explored tiles still identify the rotated 9x9 room.
+function inferMausoleumQuarterTurns(hut, items, seen) {
+  const remaining = (items || []).filter(item => item.mausoleumChest && item.kind === 'chest')
+  const candidates = []
+  for (let turns = 0; turns < 4; turns++) {
+    const positions = new Set(MAUSOLEUM_CHEST_POSITIONS.map(([x, y]) => {
+      const p = mausoleumOffset(x, y, turns)
+      return keyXY(hut.x + p.x, hut.y + p.y)
+    }))
+    if (remaining.every(chest => positions.has(keyXY(chest.x, chest.y)))) {
+      let explored = 0
+      for (let y = 1; y <= 7; y++) for (let x = 1; x <= 7; x++) {
+        const p = mausoleumOffset(x, y, turns)
+        if (seen?.[hut.y + p.y]?.[hut.x + p.x]) explored++
+      }
+      candidates.push({turns, explored})
+    }
+  }
+  if (!candidates.length) throw new Error('Saved mausoleum chests do not match its room layout.')
+  candidates.sort((a, b) => b.explored - a.explored || a.turns - b.turns)
+  return candidates[0].turns
+}
 
 function createMausoleum() {
   const w = 9, h = 9, m = Array.from({length: h}, () => Array(w).fill('crypt2floor'))
@@ -143,33 +179,32 @@ function createMausoleum() {
   return m
 }
 
-function initializeMausoleum() {
+function initializeMausoleum({restore = false} = {}) {
   const hut = villageHuts.find(h => h.mausoleum)
   if (!hut || !undergroundMap) return
-  if (isMausoleumAdjacentToRandomCave()) return
+  // Generation validates the unrotated footprint. A restored world has already
+  // passed validation; its surrounding cave maps may now be rotated.
+  if (!restore && isMausoleumAdjacentToRandomCave()) return
 
   mausoleumMap = createMausoleum()
   mausoleumHutPos = {x: hut.x, y: hut.y}
-  const originX = hut.x
-  const originY = hut.y
-
   for (let y = 0; y < mausoleumMap.length; y++) {
     for (let x = 0; x < mausoleumMap[0].length; x++) {
-      const worldX = originX + x - 4
-      const worldY = originY + y - 7
+      const offset = mausoleumOffset(x, y)
+      const worldX = hut.x + offset.x, worldY = hut.y + offset.y
       if (worldX < 0 || worldY < 0 || worldX >= MAP_W || worldY >= MAP_H) continue
       if (mausoleumMap[y][x] !== 'mountain') undergroundMap[worldY][worldX] = mausoleumMap[y][x]
     }
   }
-  undergroundMap[originY][originX] = 'mausoleumstairsup'
 
-  // Mausoleum loot is part of the generated world, not an entry-time event.
+  // Restoring must never recreate opened chests or replace their saved state.
+  if (restore) return
   groundItems = groundItems.filter(item => !item.mausoleumChest)
-  const chestPositions = [[1, 1], [7, 1], [1, 7], [7, 7]]
-  for (const [localX, localY] of chestPositions) {
+  for (const [localX, localY] of MAUSOLEUM_CHEST_POSITIONS) {
+    const offset = mausoleumOffset(localX, localY)
     groundItems.push({
-      x: originX + localX - 4,
-      y: originY + localY - 7,
+      x: hut.x + offset.x,
+      y: hut.y + offset.y,
       kind: 'chest',
       tier: 5,
       opened: false,
@@ -195,6 +230,7 @@ function generateSurface() {
   shuffleTombstoneOrder()
   mausoleumMap = null
   mausoleumHutPos = null
+  mausoleumQuarterTurns = 0
   tileUnderlays = {}
   grasslandTrees = new Set()
   map.length = 0 // a retried world must not append onto the discarded one
@@ -559,6 +595,7 @@ function placeVolcanoes() {
 function rotateGeneratedWorld(quarterTurns) {
   const turns = ((quarterTurns % 4) + 4) % 4
   if (!turns) return
+  if (mausoleumMap) mausoleumQuarterTurns = (mausoleumQuarterTurns + turns) % 4
   const width = MAP_W, height = MAP_H
   const point = (x, y) => {
     if (turns === 1) return {x: height - 1 - y, y: x}
