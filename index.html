@@ -2689,6 +2689,7 @@ more difficult:
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
+    enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
@@ -3675,7 +3676,8 @@ more difficult:
   }
 
   function enemyIsFleeing(e) {
-    return e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) && (!!e.stolenItem ||
+    return e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) &&
+      ((!!e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) ||
       (e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')))
   }
 
@@ -3726,6 +3728,13 @@ more difficult:
     e.x = destination.x; e.y = destination.y
     occupied.add(keyXY(e.x, e.y))
     e.farPath = null
+    if (e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
+      e.theftEscapeSteps++
+      if (e.theftEscapeSteps === THIEF_CONFIG.maxEscapeSteps) {
+        // The thief stops its special escape and settles at its new position.
+        e.homeX = e.x; e.homeY = e.y
+      }
+    }
     leaveBeastTrack(e, fromX, fromY)
     finishEnemyMove(e, fromX, fromY)
     if (e.alive) alertDwarvenRuinsEnemiesFromFlee(e)
@@ -3749,6 +3758,7 @@ more difficult:
       e.stolenItem.count = 1
     } else player.inventory.splice(stolen.index, 1)
     e.theftUsed = true
+    e.theftEscapeSteps = 0
     e.attackStart = undefined
     log(`${e.name} has snatched ${artifactDisplayName(e.stolenItem)} from you and runs away!`, 'bad')
     if (!e.equipment && ['weapon', 'shield', 'armor'].includes(e.stolenItem.kind)) {

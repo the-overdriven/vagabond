@@ -2243,13 +2243,18 @@ retry next eligible turn; each monster can succeed only once.
 Success replaces the attack, logs “<name> has snatched <item> from you and runs
 away!”, and immediately grants one guaranteed escape step. Thereafter the thief
 reuses wounded retreat movement: one step per enemy turn, with a **10%** chance
-to hesitate. Carrying a stolen item keeps it fleeing regardless of HP, aggro
-range while the player is visible; it does not wander home or shoot while it can
-escape. Losing sight of an invisible player suspends directed retreat, without
-removing the stolen item, resetting the one-time theft, or forcing the player to
-become visible. A cornered thief resumes ordinary combat and tries retreating again
-when an escape tile opens. Off-level thieves remain paused like other enemies.
-Sacred-ground protection still prevents new thefts.
+to hesitate. The special loot escape lasts **40 successful movement steps in total**
+(including the guaranteed first step), regardless of HP and aggro range while
+the player is visible. Hesitation, opened doors without movement, being cornered,
+invisibility, and off-level turns do not advance the counter. Losing sight of an
+invisible player suspends directed retreat without losing the loot or resetting
+the one-time theft. A cornered thief fights normally until it can escape again.
+
+On the 40th escape step, the thief anchors its home at the stopping tile and
+resumes normal wandering, aggro, and combat behavior from the following turn.
+The stolen item remains on the thief and the theft escape never restarts; ordinary
+low-HP fleeing can still apply to monsters with `flee`. Sacred-ground protection
+still prevents new thefts.
 
 A thief with an empty equipment slot immediately equips stolen weapons, shields,
 or armor and logs "<name> has equipped <item>." Monsters have one equipment slot;
@@ -5377,7 +5382,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-51
+52
 ```
 
 Saves are JSON files.
@@ -5386,6 +5391,12 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 52 adds each enemy's `theftEscapeSteps` counter, initialized to zero,
+advanced only by successful special thief-escape moves, and saved/restored for
+current saves and replay snapshots. The 40-step limit ends forced loot escape
+without destroying the stolen item or altering ordinary wounded flight. The
+save/replay version is bumped; no older-save compatibility is added.
 
 Version 51 adds the explicit persistent `player.highscoresDisqualified` flag.
 Current saves and replay starting snapshots must contain a boolean value; no
@@ -6725,9 +6736,10 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 The desktop/mobile HUD has a 🏆 button with the tooltip **Highscores**, available
 during character selection as well as play. It opens a Graveyard-style dialog
 with Non-permadeath and Permadeath mode buttons. Rows show rank, character/race,
-level and rounded permanent strength; expanded rows show the level-up snapshot's
-stats, equipment, artifacts, achievements, world details, version and date. They
-do not claim that a historical character is alive. Remote text is rendered as
+level and rounded permanent strength; expanded rows show the character's
+stats, equipment, artifacts, achievements, world details, version and date,
+without a redundant level-up achievement label. They do not claim that a
+historical character is alive. Remote text is rendered as
 text, never HTML, and long names/stat lines wrap within the scrollable list.
 Narrow HUD action rows wrap to keep the trophy reachable with Replay visible.
 

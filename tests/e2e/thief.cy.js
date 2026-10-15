@@ -219,15 +219,76 @@ describe('One-time monster theft', () => {
     })()`))
   })
 
+  it('ends stolen-loot escape after 40 successful steps, retaining loot and save state', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const oldChance=chance
+      try {
+        resetTheftArena()
+        // A long, one-tile escape corridor makes successful steps measurable.
+        for(let x=42;x<=95;x++) {
+          map[40][x]='grass'
+          map[39][x]='mountain'
+          map[41][x]='mountain'
+        }
+        const e=makeThief('Imp'),id=e.id
+        player.inventory=[createItem('potion')]
+        chance=()=>true
+        theftCheck(tryEnemyTheft(e),'theft succeeds')
+        theftCheck(e.theftEscapeSteps===1 && e.x===42,'guaranteed escape counts as first step')
+        const stalledX=e.x
+        theftCheck(tryWoundedEnemyFlee(e) && e.x===stalledX && e.theftEscapeSteps===1,
+          'hesitation consumes no escape steps')
+        chance=()=>false
+        map[40][43]='mountain'
+        theftCheck(!tryWoundedEnemyFlee(e) && e.theftEscapeSteps===1,'being cornered consumes no steps')
+        map[40][43]='grass'
+        player.invisibleTurns=5
+        theftCheck(!tryWoundedEnemyFlee(e) && e.theftEscapeSteps===1,'invisibility pauses escape steps')
+        player.invisibleTurns=0
+        for(let i=0;i<38;i++) theftCheck(tryWoundedEnemyFlee(e),'escape advances toward limit '+i)
+        theftCheck(e.theftEscapeSteps===39 && e.x===80 && enemyIsFleeing(e),'39 steps still fleeing')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        theftCheck(saved.enemies.find(enemy=>enemy.id===id).theftEscapeSteps===39,'count serialized')
+        loadGameFromObject(saved,{isReplayInit:true})
+        const restored=enemies.find(enemy=>enemy.id===id)
+        theftCheck(restored.theftEscapeSteps===39 && enemyIsFleeing(restored),'escape resumes after load')
+        theftCheck(tryWoundedEnemyFlee(restored),'40th escape step')
+        theftCheck(restored.theftEscapeSteps===40 && restored.x===81 &&
+          restored.homeX===81 && restored.homeY===40,'40th step becomes new home')
+        theftCheck(!enemyIsFleeing(restored) && !tryWoundedEnemyFlee(restored),
+          'special stolen-loot escape stops at cap')
+        const stoppedX=restored.x
+        enemyTurn()
+        theftCheck(restored.x===stoppedX && !!restored.stolenItem && restored.theftUsed,
+          'normal idle AI does not restart fleeing or lose the item')
+        restored.abilities.push('flee');restored.hp=5
+        theftCheck(enemyIsFleeing(restored),'ordinary low-HP flee remains available')
+        restored.hp=restored.maxHp
+        const finalSave=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(finalSave,{isReplayInit:true})
+        const finalThief=enemies.find(enemy=>enemy.id===id)
+        theftCheck(finalThief.theftEscapeSteps===40 && !enemyIsFleeing(finalThief),
+          'completed escape remains completed after a second load')
+      } finally {chance=oldChance}
+    })()`))
+  })
+
   it('replays theft, item choice and subsequent hesitation from seeded actions', () => {
     cy.window().then(win => win.eval(`(async () => {
       const e=makeThief();player.inventory=[createItem('potion',{count:4}),createItem('herb',{count:3})]
       // The first seeded eligibility roll succeeds, without replacing gameplay RNG.
       let seed=1
       while(true) {rngState=seed;if(rng()<0.1) break;seed++}
+      // Keep a legal straight escape route until the 40-step limit is reached.
+      for(let x=42;x<=95;x++) {
+        map[40][x]='grass'
+        map[39][x]='mountain'
+        map[41][x]='mountain'
+      }
       rngState=seed;startReplayRecording();skipTurn()
-      theftCheck(e.theftUsed,'recorded theft succeeds')
-      for(let i=0;i<8;i++) skipTurn()
+      theftCheck(e.theftUsed && e.theftEscapeSteps===1,'recorded theft starts escape counter')
+      for(let i=0;i<90;i++) skipTurn()
+      theftCheck(e.theftEscapeSteps===40 && !enemyIsFleeing(e),'recorded escape reaches limit')
       const state=()=>({hp:player.hp,turn:turnCount,inventory:player.inventory,enemies:buildSaveObject().enemies})
       const expected=JSON.stringify(state()),recorded=JSON.parse(JSON.stringify(replayData))
       loadGameFromObject(recorded.initialState,{isReplayInit:true})

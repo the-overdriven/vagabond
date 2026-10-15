@@ -190,7 +190,6 @@ const Highscores = (() => {
       extras.className = 'graveyard-details'
       const date = new Date(row.created_at)
       for (const [label, value] of [
-        ['Snapshot', 'Level-up achievement'],
         ['ATK', number(row.atk)], ['DEF', number(row.def)],
         ['SPD', number(row.spd)], ['GRACE', number(row.grace)],
         ['Max HP', number(row.max_hp)], ['MF', number(row.mf)],

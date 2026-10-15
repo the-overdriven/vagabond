@@ -1,6 +1,7 @@
 {
   "thief": {
-    "chance": 0.1
+    "chance": 0.1,
+    "maxEscapeSteps": 40
   },
   "combat": {
     "attackRange": 1,
