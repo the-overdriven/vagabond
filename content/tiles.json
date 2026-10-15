@@ -605,8 +605,8 @@
     "dwarvenarrowwall": "\u2532"
   },
   "tileDesc": {
-    "ice": "lake ice; standing here may crack it (2% per turn)",
-    "crackingice": "cracking lake ice; it may break into freezing deep water (10% per turn)",
+    "ice": "lake ice; 1% chance per turn to break immediately, otherwise 2% to start cracking. Stepping beside cracking ice guarantees cracking if it does not break.",
+    "crackingice": "cracking lake ice; 10% chance per turn to break into freezing water. Also collapses if an adjacent ice tile breaks.",
     "water": "open water",
     "river": "a running river",
     "frozenriver": "a frozen river, its surface sealed beneath a sheet of ice",

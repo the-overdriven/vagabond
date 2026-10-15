@@ -749,25 +749,40 @@ rotation. Ice is applied after landmark/cave validation, so required walking
 routes are checked with lakes still impassable. Fisherman access likewise
 excludes fragile lake ice.
 
-| Tile under the player | Chance per elapsed turn | Result |
-| --- | ---: | --- |
-| Ice | 2% | Cracking ice |
-| Ice entered beside cracking ice | 100% on that step | Cracking ice |
-| Cracking ice | 10% | Permanent deep water, still freezing |
-| Frozen river | 0% | Never breaks |
+| Tile under the player | Checks per elapsed turn | Result |
+| --- | --- | --- |
+| Intact ice | First: 1% instant break | Deep freezing water, skipping the cracking stage |
+| Intact ice surviving that check | 2% | Cracking ice |
+| Intact ice entered beside cracking ice, surviving the instant check | Guaranteed on that step | Cracking ice |
+| Cracking ice | 10% | Deep freezing water |
+| Frozen river | None | Never breaks |
 
-Only the player's occupied tile is tested, once per spent turn, including
-movement, waiting, combat and item actions. Stepping onto intact ice beside
-cracking ice guarantees that the entered tile cracks; all eight neighbors count,
-including diagonals and the tile just vacated. This replaces the 2% roll without
-consuming RNG. Only that entered tile changes: cracks never spread on their own,
-and waiting beside cracking ice keeps the normal 2% chance. Already-cracking
-ice keeps its 10% break chance when entered. One turn can advance only one
-stage, so a newly cracked tile cannot also break on that step. Monsters do not
-crack ice; underground terrain, god mode and flight do not roll or spread cracks.
-Disabling god mode restores these normal rules on the next spent turn. Merlings
-and learned swimmers can break ice but use their normal swimming protection.
-Rendering and animation timing never roll or advance these rules.
+Only the player's occupied tile initiates checks, once per spent turn,
+including movement, waiting, combat and item actions. The 1% instant-break
+check comes first on intact ice, even when stepping beside cracking ice.
+Otherwise the normal 2% roll or guaranteed adjacent-step cracking applies.
+Thus ordinary intact ice has a 1% instant-break outcome and a 1.98% cracking
+outcome per turn (99% × 2%). Already-cracking ice uses only its 10% break roll.
+
+Stepping onto intact ice beside cracking ice checks all eight neighbors,
+including diagonals and the tile just vacated. If the instant-break check
+fails, that entered tile becomes cracking ice without a further RNG roll.
+Waiting beside cracking ice does not guarantee cracking.
+
+Whenever the player's tile breaks into water, its eight neighbors that were
+already cracking also become freezing water. This is one ring only: those
+neighbor collapses do not trigger a chain reaction. A 1% instant break also
+turns adjacent intact lake ice into cracking ice. All neighbor states are
+read before any tiles change, so newly cracked neighbors survive the turn.
+Ordinary 10% breaks leave intact neighbors unchanged; frozen rivers, land and
+existing water are never converted. A tile that just entered the cracking
+stage gets no additional break check during that turn.
+
+Monsters never initiate cracking or collapse. Underground terrain, god mode
+and flight do not roll or spread cracks. Disabling god mode restores normal
+rules on the next spent turn. Merlings and learned swimmers can break ice but
+use their normal swimming protection. Rendering and animation timing never
+roll or advance these rules.
 
 Each transition logs a warning, shows an animated popup and stops auto-travel.
 Cracking ice retains its state when vacated, uses a bright white fracture overlay in
@@ -780,7 +795,10 @@ but only reaching warm terrain ends freezing. Broken tiles never refreeze, and w
 Ice stages live in the saved surface grid; the existing snow underlay preserves
 the cold-water property after breaking. Both rotate with the world and restore
 through current saves and replay snapshots. No new player status or parallel
-ice registry is needed. Chances are configured in `environment.iceCrackChance`
+ice registry is needed. Every collapsed tile keeps its snow underlay, loses
+any tracks and refreshes its map display. The player receives only one forced
+water-entry check regardless of how many neighboring tiles collapse. Chances
+are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`
 and `environment.crackingIceBreakChance`.
 
 ---
@@ -5346,7 +5364,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-47
+48
 ```
 
 Saves are JSON files.
@@ -5355,6 +5373,11 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 48 adds the 1% instant-break check and one-ring neighboring collapse.
+Their map changes use the existing surface grid and cold underlays; no new
+persistent fields are required. The new RNG order changes the replay contract,
+so older saves and replay starting snapshots are rejected.
 
 Version 47 adds deterministic cracking when the player steps onto ice beside
 cracking ice. The guaranteed transition replaces a random roll, changing the

@@ -14,7 +14,7 @@ function freezeSurfaceLakes() {
   }
 }
 
-// One rule roll per elapsed player turn, before freezing and enemy actions.
+// Rule checks run once per elapsed player turn, before freezing and enemies.
 // Animation clocks, rendering and monsters never advance lake ice.
 function tickLakeIce(playerMoved = false) {
   if (currentZ !== 0 || player.godMode || raceHas('fly')) return
@@ -22,34 +22,53 @@ function tickLakeIce(playerMoved = false) {
   const tile = map[y]?.[x]
   if (!isLakeIce(tile)) return
   const cracking = tile === 'crackingice'
-  // Only a successful player step propagates an existing fracture. Do not
-  // spread to unoccupied tiles, and never advance two stages in one turn.
+  // An instant break takes priority, even on a step beside cracked ice.
+  const cfg = WORLD_GEN_CONFIG.environment
+  const instantBreak = !cracking && chance(cfg.iceInstantBreakChance)
   const spreads = !cracking && playerMoved && DIRS8.some(([dx, dy]) =>
     map[y + dy]?.[x + dx] === 'crackingice')
-  const cfg = WORLD_GEN_CONFIG.environment
-  if (!spreads && !chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
+  if (!instantBreak && !spreads && !chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
 
-  const next = cracking ? 'water' : 'crackingice'
-  map[y][x] = next
-  surfaceMap[y][x] = next
-  // Keep the cold marker after breaking, including across rotation/save/replay.
-  tileUnderlays[keyXY(x, y)] = 'snow'
+  const breaks = cracking || instantBreak
+  const changes = [{x, y, next: breaks ? 'water' : 'crackingice'}]
+  let collapsed = 0, spread = 0
+  if (breaks) for (const [dx, dy] of DIRS8) {
+    const nx = x + dx, ny = y + dy, neighbor = map[ny]?.[nx]
+    // Snapshot just the original eight neighbors. Newly cracked tiles survive
+    // this turn, and collapsed neighbors never propagate a second collapse.
+    if (neighbor === 'crackingice') {
+      changes.push({x: nx, y: ny, next: 'water'})
+      collapsed++
+    } else if (instantBreak && neighbor === 'ice') {
+      changes.push({x: nx, y: ny, next: 'crackingice'})
+      spread++
+    }
+  }
+
+  for (const change of changes) {
+    map[change.y][change.x] = change.next
+    surfaceMap[change.y][change.x] = change.next
+    // Keep cold metadata and wash tracks away on every collapsed tile.
+    const key = keyXY(change.x, change.y)
+    tileUnderlays[key] = 'snow'
+    if (change.next === 'water') beastTracks.delete(key)
+  }
   clearAutoPath()
   ensureMiniBases()
-  for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y)
+  for (const change of changes) for (const scale of MINI_SCALES)
+    paintMiniTile(miniBases[scale], change.x, change.y)
   mapPreviewBase = null
   minimapDirty = true
 
-  log(cracking ? 'The ice breaks beneath you! You fall into freezing water.'
+  log(breaks ? 'The ice breaks beneath you! You fall into freezing water.'
     : 'The ice cracks beneath your feet! It may give way if you stay.', 'bad')
+  if (collapsed) log('The nearby cracked ice also collapses into freezing water.', 'bad')
+  if (spread) log('Cracks spread across the nearby ice.', 'bad')
   if (!replayAnimationsDisabled && !replaySimulationMode) {
-    spawnDamageNumber(x, y, cracking ? 'Ice breaks!' : 'Ice cracking!',
-      cracking ? '#70cce8' : '#ffe2a8', 0, 1000)
+    spawnDamageNumber(x, y, breaks ? 'Ice breaks!' : 'Ice cracking!',
+      breaks ? '#70cce8' : '#ffe2a8', 0, 1000)
   }
   // This is forced entry, not a swimming movement: no practice, but a
   // non-swimmer immediately takes normal drowning damage and can swim out.
-  if (cracking) {
-    beastTracks.delete(keyXY(x, y))
-    advanceSwimming(false)
-  }
+  if (breaks) advanceSwimming(false)
 }

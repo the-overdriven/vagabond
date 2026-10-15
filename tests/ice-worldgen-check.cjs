@@ -31,11 +31,11 @@ function reset(tile='ice', race='human', swimming=0) {
 async function rules() {
   run('var originalIceCheckChance=chance')
   reset()
-  run('var iceRolls=[];chance=p=>{iceRolls.push(p);return true};enemyTurn()')
-  check("map[30][30]==='crackingice' && player.hp===100 && iceRolls.length===1 && iceRolls[0]===.02", '2% advances one stage without falling through')
+  run('var iceRolls=[];chance=p=>{iceRolls.push(p);return p!==.01};enemyTurn()')
+  check("map[30][30]==='crackingice' && player.hp===100 && iceRolls.length===2 && iceRolls[0]===.01 && iceRolls[1]===.02", '2% advances one stage without falling through')
   run("beastTracks.set('30,30',{x:30,y:30,direction:0,species:'Wolf',age:0})")
   run('enemyTurn()')
-  check("map[30][30]==='water' && surfaceMap[30][30]==='water' && iceRolls[1]===.1", '10% breaks cracked ice')
+  check("map[30][30]==='water' && surfaceMap[30][30]==='water' && iceRolls[2]===.1", '10% breaks cracked ice')
   check("player.hp===95 && player.swimTurns===1 && player.drowning && player.freezing.active && player.freezing.turns===2 && player.swimmingPractice===0", 'forced entry drowns once, grants no practice and remains cold')
   check("!beastTracks.has('30,30')", 'water washes away tracks when the ice breaks')
   run('skipTurn()')
@@ -52,7 +52,7 @@ async function rules() {
     check("map[30][30]==='water' && !player.drowning && player.hp===playerMaxHp() && player.swimmingPractice===0", race+' uses normal swimming protection')
   }
   reset('ice')
-  run('replayAnimationsDisabled=false;chance=()=>true;enemyTurn();enemyTurn()')
+  run('replayAnimationsDisabled=false;chance=p=>p!==.01;enemyTurn();enemyTurn()')
   check("damageAnims.some(a=>a.amount==='Ice cracking!') && damageAnims.some(a=>a.amount==='Ice breaks!')", 'both transition popups are queued')
   check("ruleMessages.some(s=>s.includes('ice cracks')) && ruleMessages.some(s=>s.includes('ice breaks')) && ruleMessages.some(s=>s.includes('drowning'))", 'transition and drowning messages are logged')
   check("player.hp===95 && map[30][30]==='water'", 'animation setting does not change rule results')
@@ -77,12 +77,12 @@ async function rules() {
   await run('tryMove(1,0)')
   check('turnCount===0', 'blocked movement spends no turn and makes no ice roll')
   reset()
-  run("autoPath=[{x:31,y:30}];chance=()=>true;enemyTurn()")
+  run("autoPath=[{x:31,y:30}];chance=p=>p!==.01;enemyTurn()")
   check('!autoPath', 'cracking stops auto-travel')
 
   for (const [dx,dy] of [[1,0],[1,1]]) {
     reset()
-    run(`map[30][31]='ice';map[30+${dy}][31+${dx}]='crackingice';chance=()=>{throw Error('automatic spreading must not roll RNG')}`)
+    run(`map[30][31]='ice';map[30+${dy}][31+${dx}]='crackingice';chance=p=>{if(p!==.01)throw Error('only the instant-break roll precedes automatic cracking');return false}`)
     await run('tryMove(1,0)')
     check("map[30][31]==='crackingice' && map[30][30]==='ice' && player.hp===100 && !player.drowning", 'walking beside cardinal/diagonal cracking ice advances only the stepped-on tile, one stage')
     run('var spreadRolls=[];chance=p=>{spreadRolls.push(p);return false};skipTurn()')
@@ -90,19 +90,49 @@ async function rules() {
   }
   reset()
   run("map[30][31]='crackingice';var idleSpreadRolls=[];chance=p=>{idleSpreadRolls.push(p);return false};skipTurn()")
-  check("map[30][30]==='ice' && idleSpreadRolls[0]===.02", 'waiting beside cracking ice retains the 2% chance')
+  check("map[30][30]==='ice' && idleSpreadRolls.length===2 && idleSpreadRolls[0]===.01 && idleSpreadRolls[1]===.02", 'waiting beside cracking ice retains the 2% chance')
   for (const neighbor of ['water','frozenriver']) {
     reset()
     run(`map[30][31]='ice';map[30][32]=${JSON.stringify(neighbor)};var nonSpreadRolls=[];chance=p=>{nonSpreadRolls.push(p);return false}`)
     await run('tryMove(1,0)')
-    check("map[30][31]==='ice' && nonSpreadRolls[0]===.02", neighbor+' does not propagate cracking')
+    check("map[30][31]==='ice' && nonSpreadRolls.length===2 && nonSpreadRolls[0]===.01 && nonSpreadRolls[1]===.02", neighbor+' does not propagate cracking')
   }
   reset()
   run("map[30][31]='ice';map[30][32]='crackingice';player.godMode=true;chance=()=>{throw Error('god mode spread RNG')}")
   await run('tryMove(1,0)')
   check("map[30][31]==='ice'", 'god mode still prevents automatic cracking')
-  run('useGodModeKey(true);chance=()=>true;enemyTurn()')
+  run('useGodModeKey(true);chance=p=>p!==.01;enemyTurn()')
   check("map[30][31]==='crackingice'", 'disabling god mode restores normal ice cracking')
+
+  reset('crackingice')
+  run(`for(const [dx,dy] of DIRS8){
+    map[30+dy][30+dx]='crackingice';
+    beastTracks.set(keyXY(30+dx,30+dy),{x:30+dx,y:30+dy,direction:0,species:'Wolf',age:0});
+  }
+  map[30][32]='crackingice';chance=p=>{if(p!==.1)throw Error('cracked ice uses only its 10% roll');return true};enemyTurn()`)
+  check("DIRS8.every(([dx,dy])=>map[30+dy][30+dx]==='water'&&surfaceMap[30+dy][30+dx]==='water'&&tileUnderlays[keyXY(30+dx,30+dy)]==='snow'&&!beastTracks.has(keyXY(30+dx,30+dy)))", 'all eight already-cracking neighbors collapse, retain cold and lose tracks')
+  check("map[30][32]==='crackingice' && player.hp===95 && player.swimTurns===1", 'neighbor collapse never chains or adds extra drowning checks')
+  run('var collapsedSave=JSON.parse(JSON.stringify(buildSaveObject()));loadGameFromObject(collapsedSave,{isReplayInit:true})')
+  check("DIRS8.every(([dx,dy])=>map[30+dy][30+dx]==='water'&&tileUnderlays[keyXY(30+dx,30+dy)]==='snow')&&map[30][32]==='crackingice'", 'save restores collapsed neighbors and untouched second ring')
+
+  reset('crackingice')
+  run("map[30][31]='ice';map[31][31]='frozenriver';map[29][29]='river';map[30][29]='crackingice';map[29][30]='water';chance=()=>true;enemyTurn()")
+  check("map[30][29]==='water'&&map[30][31]==='ice'&&map[31][31]==='frozenriver'&&map[29][29]==='river'&&map[29][30]==='water'&&map[31][30]==='grass'", 'normal break changes only neighbors that were already cracking')
+
+  reset()
+  run(`for(const [dx,dy] of DIRS8)map[30+dy][30+dx]='ice';
+    map[29][30]='crackingice';map[30][31]='frozenriver';map[31][29]='grass';map[30][32]='ice';
+    var instantRolls=[];chance=p=>{instantRolls.push(p);return true};enemyTurn()`)
+  check("instantRolls.length===1&&instantRolls[0]===.01&&map[30][30]==='water'&&map[29][30]==='water'", 'instant break skips the ordinary cracking roll and collapses already-cracking neighbors')
+  check("DIRS8.filter(([dx,dy])=>map[30+dy][30+dx]==='crackingice').length===5&&map[30][32]==='ice'&&map[30][31]==='frozenriver'&&map[31][29]==='grass'", 'instant break cracks only adjacent intact ice, without immediately collapsing it')
+  check("player.hp===95&&player.swimTurns===1&&player.freezing.active&&ruleMessages.some(s=>s.includes('Cracks spread'))", 'instant entry drowns once, stays cold and logs the nearby cracking')
+  reset('grass')
+  run("map[30][31]='ice';map[31][32]='crackingice';var priorityRolls=[];chance=p=>{priorityRolls.push(p);return true}")
+  await run('tryMove(1,0)')
+  check("priorityRolls.length===1&&priorityRolls[0]===.01&&map[30][31]==='water'&&map[31][32]==='water'&&player.drowning", '1% instant break takes priority over guaranteed adjacent-step cracking')
+  reset()
+  run("player.x=0;player.y=0;map[0][0]='ice';map[0][1]='crackingice';map[1][1]='ice';map[1][0]='snow';chance=()=>true;tickLakeIce()")
+  check("map[0][0]==='water'&&map[0][1]==='water'&&map[1][1]==='crackingice'&&map[1][0]==='snow'", 'one-ring changes stay within bounds at world corners')
 
   for (const terrain of ['ice','crackingice','water']) {
     reset(terrain)
@@ -120,7 +150,7 @@ async function rules() {
   for(;;seed++) {
     let state=seed
     const rng=()=>{state=(state+0x6D2B79F5)|0;let t=Math.imul(state^(state>>>15),1|state);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}
-    if(rng()<.02&&rng()<.1) break
+    if(rng()>=.01&&rng()<.02&&rng()<.1) break
   }
   reset()
   run(`rngState=${seed};startReplayRecording();skipTurn();skipTurn()`)
@@ -130,7 +160,7 @@ async function rules() {
     practice:player.swimmingPractice,freezing:player.freezing,turn:turnCount,steps:player.steps})`))
   const expected=state()
   context.iceReplay=plain(run('replayForSave()'))
-  assert.equal(context.iceReplay.rng.length,2)
+  assert.equal(context.iceReplay.rng.length,3)
   assert.equal(context.iceReplay.actions.length,3)
   async function verifyReplay(expected) {
     for(const disabled of [false,true]) {
@@ -152,16 +182,33 @@ async function rules() {
   reset('grass')
   run(`map[30][31]='ice';map[31][32]='crackingice';rngState=${seed};startReplayRecording()`)
   await run('tryMove(1,0)')
-  check("map[30][31]==='crackingice' && replayData.rng.length===0", 'recorded adjacent step cracks without consuming RNG')
+  check("map[30][31]==='crackingice' && replayData.rng.length===1", 'recorded adjacent step checks instant break before guaranteed cracking')
   run('skipTurn()')
   check("map[30][31]==='water' && player.drowning", 'propagated cracking can break on the following turn')
   await run('tryMove(-1,0)')
   const spreadExpected=state()
   context.iceReplay=plain(run('replayForSave()'))
-  assert.equal(context.iceReplay.rng.length,1)
+  assert.equal(context.iceReplay.rng.length,2)
   await verifyReplay(spreadExpected)
+
+  // A real recorded instant break changes both neighboring stages. Replaying
+  // the action must reproduce the same ring without additional RNG requests.
+  let instantSeed=1
+  for(;;instantSeed++) {
+    let state=(instantSeed+0x6D2B79F5)|0
+    let t=Math.imul(state^(state>>>15),1|state)
+    t=(t+Math.imul(t^(t>>>7),61|t))^t
+    if(((t^(t>>>14))>>>0)/4294967296<.01) break
+  }
+  reset()
+  run(`map[30][31]='crackingice';map[31][31]='ice';map[30][32]='crackingice';rngState=${instantSeed};startReplayRecording();skipTurn()`)
+  check("map[30][30]==='water'&&map[30][31]==='water'&&map[31][31]==='crackingice'&&map[30][32]==='crackingice'", 'recording captures instant break, neighbor collapse and new cracking without a chain')
+  const instantExpected=state()
+  context.iceReplay=plain(run('replayForSave()'))
+  assert.equal(context.iceReplay.rng.length,1)
+  await verifyReplay(instantExpected)
   run('chance=originalIceCheckChance')
-  console.log('PASS ice stages, forced drowning, protection, freezing, feedback, saves, rotation and replay')
+  console.log('PASS ice stages, instant break, one-ring collapse, forced drowning, protection, freezing, feedback, saves, rotation and replay')
 }
 
 async function worldgen() {
