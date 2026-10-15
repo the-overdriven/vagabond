@@ -13,7 +13,7 @@ function fixture(options = {}) {
   const client = {
     rpc(name, args) {
       calls.reads.push({name,args})
-      return options.read ? options.read(args.p_permadeath) : Promise.resolve({data:[],error:null})
+      return options.read ? options.read(name === 'highscores_permadeath_top_ten') : Promise.resolve({data:[],error:null})
     },
     from(table) { return {insert(record) {
       calls.inserts.push({table,record})
@@ -65,8 +65,10 @@ test('startup reads both modes once with the configured shared Supabase SDK/clie
   assert.equal(f.calls.configuration.url,vm.runInContext('SUPABASE_URL',f.ctx))
   assert.equal(f.calls.configuration.key,vm.runInContext('SUPABASE_PUBLISHABLE_KEY',f.ctx))
   assert.equal(f.calls.configuration.options.auth.persistSession,false)
-  assert.deepEqual(f.calls.reads.map(c=>c.args.p_permadeath), [false,true])
-  assert.equal(f.calls.reads.every(c=>c.name==='highscores_top_ten'), true)
+  assert.deepEqual(f.calls.reads.map(c=>c.name),
+    ['highscores_top_ten','highscores_permadeath_top_ten'])
+  assert.equal(f.calls.reads[0].args.p_permadeath, false)
+  assert.equal(f.calls.reads[1].args, undefined)
   assert.equal(f.highscores.getBoard(false).status, 'loaded')
   assert.equal(f.highscores.getBoard(true).status, 'loaded')
 })
@@ -128,7 +130,7 @@ test('startup failures are mode-local, unknown cutoff allows submission, no retr
 
 test('full-board level and exact-strength cutoffs apply independently by mode', async () => {
   const full=Array.from({length:10},(_,i)=>({id:`r${i}`,character_id:`r${i}`,level:5,
-    strength:10+i,permadeath:true,created_at:'2026-10-15T12:00:00+00:00'}))
+    strength:10+i,permadeath:true,is_dead:false,created_at:'2026-10-15T12:00:00+00:00'}))
   const f=fixture({read:mode=>Promise.resolve({data:mode?full:[],error:null})}); f.init(); await flush()
   f.highscores.recordLevel(character('skip'),()=>snapshot('skip',4,true))
   f.highscores.recordLevel(character('exact'),()=>({...snapshot('exact',5,true),atk:2.5}))
@@ -211,4 +213,17 @@ test('out-of-order refresh responses cannot replace a newer board', async () => 
   assert.equal(f.highscores.getBoard(false).status,'loaded')
   assert.equal(f.highscores.getBoard(false).rows.length,0)
   pending[1]({data:[],error:null}); await flush()
+})
+
+test('permadeath status must be a server boolean; normal board does not require it', async () => {
+  const base={id:'row',character_id:'row',character_name:'Test',race:'human',level:3,
+    strength:8,created_at:'2026-10-15T12:00:00+00:00'}
+  const f=fixture({read:mode=>Promise.resolve({data:[{...base,permadeath:mode,...(mode?{is_dead:true}:{})}],error:null})})
+  f.init(); await flush()
+  assert.equal(f.highscores.getBoard(false).status,'loaded')
+  assert.equal(f.highscores.getBoard(true).rows[0].is_dead,true)
+  const invalid=fixture({read:mode=>Promise.resolve({data:[{...base,permadeath:mode}],error:null})})
+  invalid.init();await flush()
+  assert.equal(invalid.highscores.getBoard(false).status,'loaded')
+  assert.equal(invalid.highscores.getBoard(true).status,'unavailable')
 })

@@ -77,8 +77,8 @@ const Highscores = (() => {
   function validRankingRow(row, mode) {
     return row && typeof row.id === 'string' && typeof row.created_at === 'string' &&
       typeof row.character_id === 'string' && row.character_id.length > 0 &&
-      row.permadeath === mode && Number.isSafeInteger(row.level) && row.level >= 2 &&
-      Number.isFinite(row.strength)
+      row.permadeath === mode && (!mode || typeof row.is_dead === 'boolean') &&
+      Number.isSafeInteger(row.level) && row.level >= 2 && Number.isFinite(row.strength)
   }
 
   async function refresh(permadeath) {
@@ -94,7 +94,11 @@ const Highscores = (() => {
       // SUPABASE_PUBLISHABLE_KEY. Keep one configuration and SDK instance.
       const client = await OnlineSupabase.getOnlineClient()
       if (!client || replayActive() || !OnlineSupabase.onlineAvailable()) throw Error('Online read cancelled')
-      const {data, error} = await client.rpc('highscores_top_ten', {p_permadeath:permadeath})
+      // The normal leaderboard never touches Graveyard. Only the permadeath
+      // RPC joins the ten ranked characters against their recorded deaths.
+      const {data, error} = permadeath
+        ? await client.rpc('highscores_permadeath_top_ten')
+        : await client.rpc('highscores_top_ten', {p_permadeath:false})
       if (error) throw error
       if (!Array.isArray(data) || data.length > 10 ||
           !data.every(row => validRankingRow(row, permadeath)) ||
@@ -185,6 +189,13 @@ const Highscores = (() => {
       const name = document.createElement('strong')
       const race = text(row.race, '?')
       name.textContent = `#${index + 1} ${text(row.character_name, 'Unknown')} the ${race.charAt(0).toUpperCase() + race.slice(1)}`
+      if (row.permadeath && row.is_dead) {
+        const skull = document.createElement('span')
+        skull.textContent = ' 💀'
+        skull.title = 'Died in permadeath'
+        skull.setAttribute('aria-label', 'Died in permadeath')
+        name.append(skull)
+      }
       heading.append(name, detail('Level', number(row.level)), detail('Strength', number(row.strength)))
       const extras = document.createElement('div')
       extras.className = 'graveyard-details'

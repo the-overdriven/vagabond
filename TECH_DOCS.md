@@ -6677,11 +6677,17 @@ item details and stat line), or null when nothing was dropped or on permadeath.
 This changes neither the loss probability nor gameplay RNG.
 The mode is read from `player.permadeath` directly; non-permadeath deaths each
 produce a separate event and the same character continues; a permadeath
-produces exactly one final event. Requests are fire-and-forget.
+produces exactly one final event. Requests are fire-and-forget. New death
+submissions include the saved `character_id`, matching Highscores milestones
+for that character rather than the browser-wide `player_id`. Apply
+`supabase-highscores-permadeath-deaths.sql` before deploying the client: it
+adds this nullable Graveyard column, its narrow insert grant and a partial
+index covering permadeath deaths only. Historical rows with no character ID
+remain unmatchable. Graveyard's read view and other policies are unchanged.
 
 Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `death_event_id`, `killed_at`, `last_position` (x/y/z, level kind, tile/biome),
-`player_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
+`player_id`, `character_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
 `cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
 `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
 `drowning` (shown as Drown), `poison` (shown as Poisoned to death),
@@ -6747,9 +6753,11 @@ during character selection as well as play. It opens a Graveyard-style dialog
 with Non-permadeath and Permadeath mode buttons. Rows show rank, character/race,
 level and rounded permanent strength; expanded rows show the character's
 stats, equipment, artifacts, achievements, world details, version and date,
-without a redundant level-up achievement label. They do not claim that a
-historical character is alive. Remote text is rendered as
-text, never HTML, and long names/stat lines wrap within the scrollable list.
+without a redundant level-up achievement label. Permadeath rows show 💀
+when a matching permadeath death is recorded; an unmarked row is not proof
+that the character is still alive (including older deaths, offline deaths or
+failed uploads). Non-permadeath rows never show death markers. Remote text
+is rendered as text, never HTML, and long names/stat lines wrap within the scrollable list.
 Narrow HUD action rows wrap to keep the trophy reachable with Replay visible.
 
 The title, mode controls and close button remain outside the scrolling list on
@@ -6778,9 +6786,15 @@ ranking strength; this batch does not change that existing balance behavior.
 `supabase-highscores.sql` creates `highscore_records` and the read-only
 `highscores_top_ten(p_permadeath)` RPC. The query selects each character's
 highest-level milestone before sorting and limiting to ten. Character IDs, not
-names, identify records. One immutable snapshot is permitted per character and
-level, so a repeat cannot replace its equipment or strength. Numeric stats
-retain fractions and the database generates their summed strength.
+names, identify records. The separate
+`highscores_permadeath_top_ten()` RPC uses the same ranking, then adds an
+`is_dead` boolean through at most ten indexed `death_records` lookups. Only
+the permadeath board invokes it; normal-mode reads use the original RPC and
+never query Graveyard. The death marker updates when the board is refreshed,
+without polling or an additional client request. One immutable snapshot is
+permitted per character and level, so a repeat cannot replace its equipment
+or strength. Numeric stats retain fractions and the database generates their
+summed strength.
 
 Startup fetches both boards once without delaying boot, character creation,
 loading, or world generation. Fewer than ten entries permit any new milestone;
@@ -6845,8 +6859,14 @@ reads, updates and deletes remain denied; reads use the bounded RPC. Duplicate
 milestones and multi-row submissions remain rejected. The follow-up is safe to
 reapply without clearing counters, checks the foundation and pgcrypto,
 and reloads the API schema. No game/save-format change is required. See
-`HIGHSCORES_SETUP.md` for installation and database verification. These SQL files
-have been tested locally, not executed against the live Supabase project.
+`HIGHSCORES_SETUP.md` for installation and database verification. For the optional permadeath skull marker, apply
+`supabase-highscores-permadeath-deaths.sql` after the Highscores migrations and
+before deploying the changed browser client. It adds no permission to edit or
+delete records and does not alter either write rate limiter. The marker is
+informational: without authenticated identities, public clients can forge
+Graveyard submissions using visible character IDs. The existing Highscores
+migrations were tested locally; the death-marker migration has not been applied
+to the live Supabase project.
 
 ---
 

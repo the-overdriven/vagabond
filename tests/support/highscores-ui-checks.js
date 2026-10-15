@@ -2,7 +2,7 @@ function highscoreRows(mode) {
   return Array.from({length:10},(_,index)=>({
     id:`record-${mode}-${index}`,character_id:`character-${mode}-${index}`,
     character_name:index===0?'<img src=x onerror=alert(1)>':`Veteran ${index}`,
-    race:'elf',permadeath:mode,level:20-index,strength:30.25-index,
+    race:'elf',permadeath:mode,is_dead:mode && index%2===0,level:20-index,strength:30.25-index,
     atk:10.25,def:8,spd:6,grace:6,max_hp:240,mf:5,gold:400,
     cumulated_xp:12345,death_number:mode?0:3,steps_taken:700,creatures_slain:120,
     equipment:{weapon:{name:'A Very Long Sword Name',stat_line:'ATK 10.25, GRACE 6 '+('x'.repeat(600))}},
@@ -37,6 +37,7 @@ async function recordChecks() {
   let cards=[...document.querySelectorAll('#highscoresList > details')]
   check(cards.length===10,'top ten records rendered')
   check(cards[0].querySelector('strong').textContent.startsWith('#1 <img'),'names are literal text and ranks are visible')
+  check(cards.every(card=>!card.querySelector('strong').textContent.includes('💀')),'normal highscore board never renders death markers')
   check(document.querySelectorAll('#highscoresList img, #highscoresList script').length===0,'remote HTML is never parsed')
   cards[0].open=true
   check(cards[0].textContent.includes('Strongest slain enemy: GIANT TOAD'),'achievement details')
@@ -53,7 +54,11 @@ async function recordChecks() {
   document.querySelector('#highscoresFilters [data-mode="true"]').click();await tick()
   cards=[...document.querySelectorAll('#highscoresList > details')]
   check(cards.length===10&&cards.every(card=>card.classList.contains('permadeath')),'mode switch uses separate board')
+  check(cards[0].querySelector('strong').textContent.endsWith('💀'),'dead permadeath character shows a skull')
+  check(cards[0].querySelector('strong span').getAttribute('aria-label')==='Died in permadeath','death status has an accessible label')
+  check(!cards[1].querySelector('strong').textContent.includes('💀'),'unmarked permadeath character has no skull')
   check(window.__highscoresOnline.reads.length===queries+1,'switch fetches only requested mode')
+  check(window.__highscoresOnline.reads.at(-1).name==='highscores_permadeath_top_ten','only permadeath mode uses death-aware RPC')
   check(document.querySelector('#highscoresFilters [data-mode="true"]').getAttribute('aria-pressed')==='true','active mode is accessible')
   check(window.__highscoresOnline.posts.length===0,'viewing records never submits a milestone')
 }

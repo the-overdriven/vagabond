@@ -122,6 +122,7 @@ describe('Graveyard', () => {
       expect(records).to.have.length(1)
       expect(records[0]).to.include({permadeath: false, death_number: 1, max_hp: 50,
         killer_name: 'Minotaur', killer_prefix: 'Champion', game_version: expectedVersion})
+      expect(records[0].character_id).to.be.a('string').and.not.be.empty
       expect(records[0].death_event_id).to.match(/^[0-9a-f-]{36}$/)
       expect(records[0].equipment.weapon).to.include({atk: 1, grace: 1, stat_line: 'ATK 1, GRACE 1'})
       expect(records[0].equipment.armor).to.include({def: 3, modAmt: 2, stat_line: 'DEF 3+2'})

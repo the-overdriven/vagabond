@@ -11,9 +11,10 @@ function installOnlineMock(win, options = {}) {
         online.reads.push({name,args})
         if(options.deferred) return new Promise(resolve=>online.pendingReads.push({args,resolve}))
         if(options.pending) return new Promise(()=>{})
-        const data = options.rows ? options.rows[String(args.p_permadeath)] : options.fullPermadeath && args.p_permadeath
+        const mode=name==='highscores_permadeath_top_ten'
+        const data = options.rows ? options.rows[String(mode)] : options.fullPermadeath && mode
           ? Array.from({length:10},(_,i)=>({id:`board-${i}`,character_id:`board-${i}`,
-            character_name:'Other',race:'human',permadeath:true,level:50,strength:100,
+            character_name:'Other',race:'human',permadeath:true,is_dead:false,level:50,strength:100,
             created_at:'2026-10-15T12:00:00+00:00'})) : []
         return Promise.resolve({data,error:options.failReads?{message:'Unavailable'}:null})
       },

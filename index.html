@@ -4320,6 +4320,7 @@ more difficult:
     resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
     const deathRecord = {
+      character_id: player.characterId,
       character_name: player.name,
       race: player.race,
       permadeath: player.permadeath,
