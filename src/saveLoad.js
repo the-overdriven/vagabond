@@ -282,6 +282,8 @@ function saveGame() {
   } catch (err) {
     console.error(err)
     log('Failed to save the game.', 'bad')
+    // A save exception must be visible even if the message log is obscured.
+    window.alert('Failed to save the game: ' + (err?.message || err))
   }
 }
 

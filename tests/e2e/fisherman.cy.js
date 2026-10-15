@@ -45,9 +45,10 @@ describe('Fisherman and swimming', () => {
     })
     cy.get('#tradeTitle').should('contain', 'Fisherman')
     cy.get('#tradeBuyList button').should('have.length', 1).and('have.text', '🐟 Buy Fish (5g)').click()
-    cy.get('#tradeGold').should('have.text', '0')
+    cy.get('#tradeGold').should('not.exist')
+    cy.get('#hGold').should('have.text', '0')
     cy.get('#tradeBuyList button').click()
-    cy.get('#tradeGold').should('have.text', '0')
+    cy.get('#hGold').should('have.text', '0')
   })
 
   it('accepts a single land-to-water step at range three and paints only the discovered hut tile', () => {

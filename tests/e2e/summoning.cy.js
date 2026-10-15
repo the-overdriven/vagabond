@@ -35,7 +35,7 @@ function beginSummonArena() {
 describe('Once-only monster summoning', () => {
   beforeEach(beginSummonArena)
 
-  it('uses direct templates, one-third Wolf HP/ATK/DEF, and unchanged SPD/GRACE', () => {
+  it('uses direct templates, half-strength Wolf HP/ATK/DEF, and unchanged SPD/GRACE', () => {
     cy.window().then(win => win.eval(`(() => {
       const previous={chance,randInt}
       try {
@@ -47,6 +47,7 @@ describe('Once-only monster summoning', () => {
           summonCheck(tryEnemySummon(caster),'successful summon: '+name)
           const children=enemies.filter(e=>e!==caster), t=ENEMY_TEMPLATE_BY_NAME[caster.summonSpecies]
           const strength=caster.summonStrength ?? 1
+          if (name === 'Wolf') summonCheck(strength === 0.5, 'summoned Wolf uses half strength')
           summonCheck(children.length===caster.summonAmount,'maximum count: '+name)
           const summonFx=damageAnims.filter(anim=>anim.amount==='Summoned!')
           summonCheck(SUMMON_ANIM_MS===1000 && SUMMON_ANIM_MS>DAMAGE_ANIM_MS,'summon label lasts longer than ordinary combat text')

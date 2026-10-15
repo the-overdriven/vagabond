@@ -23,6 +23,39 @@ describe('World size and surface cursed traits', () => {
     cy.get('#worldSizeSelect').should('have.value', 'XXL')
   })
 
+  it('draws 3–6 compatible traits reproducibly with seeded RNG', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const originalRng = rngState
+      try {
+        if (TRAITS_PER_WORLD.min !== 3 || TRAITS_PER_WORLD.max !== 6)
+          throw new Error('random cursed-world trait range')
+        const originalConfig = TRAITS_PER_WORLD
+        try {
+          TRAITS_PER_WORLD = {...originalConfig, count: 2}
+          let rejected = false
+          try { chooseWorldTraits('L') } catch (err) { rejected = /Invalid traits_per_world count/.test(err.message) }
+          if (!rejected) throw new Error('trait count 2 should be rejected')
+        } finally { TRAITS_PER_WORLD = originalConfig }
+        for (const seed of [17, 2026, 99441]) {
+          rngState = seed
+          chooseWorldTraits('L')
+          const first = JSON.stringify(activeWorldTraits)
+          const count = activeWorldTraits.length
+          if (count < 3 || count > 6)
+            throw new Error('selected trait count for seed ' + seed + ': ' + count)
+          rngState = seed
+          chooseWorldTraits('L')
+          if (JSON.stringify(activeWorldTraits) !== first)
+            throw new Error('non-deterministic traits for seed ' + seed)
+        }
+      } finally {
+        rngState = originalRng
+        applyWorldTraits([], 'L')
+      }
+      return true
+    })()`))
+  })
+
   it('excludes world size from the trait pool and resolves both new surface traits deterministically', () => {
     cy.window().then(win => win.eval(`(() => {
       const check = (value, message) => { if (!value) throw Error(message) }

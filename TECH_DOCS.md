@@ -167,12 +167,18 @@ random equipment do not affect the order; records without a species template
 follow the known species. On desktop, hovering or keyboard-
 focusing an entry shows its portrait above the Bestiary overlay; on touch
 screens, tapping a row expands a small portrait below the name and count. The
-touch layout keeps the title and close control visible while entries scroll.
+touch layout keeps the title and header close control visible while entries scroll,
+and provides a separate Close button below the list.
 Desktop retains the compact modal and hover portrait. This character-specific
 record is separate from the online Graveyard. Prefix variants share their
 base-species entry; unencountered species are hidden. The list reads the saved
 per-species kill counters and refreshes when opened. It does not affect gameplay,
 RNG or replay actions. A new permadeath character begins with an empty Bestiary.
+
+Explicit save-file export errors are logged in red and also shown in a browser
+error dialog; the alert remains visible even when the game log is obscured by
+a modal. Browser download cancellations or silently blocked downloads cannot
+be detected by the game.
 
 ## Mobile character sheet and level feedback
 
@@ -2390,7 +2396,7 @@ actions do not create additional summon rolls that turn.
 |---|---|---|---|
 | Lich | Skeleton | 1–3 | 1 |
 | Serpent Queen | Serpent | 1–2 | 1 |
-| Wolf | Wolf | 1–3 | 1/3 |
+| Wolf | Wolf | 1–3 | 1/2 |
 
 Spawns use free adjacent tiles, excluding the player, living monsters on the
 same level, and surface NPCs. The summoned species' normal traversal rules
@@ -2418,8 +2424,8 @@ hand-wave message; Wolf uses its custom
 hungry-howl message. Messages support `<name>`, `<amount>`, and `<species>`.
 
 Summons use normal XP and species loot rules. With the existing stat-based XP
-formula, an unprefixed summoned Wolf yields 12 XP versus 17 for a normal Wolf.
-The summoner's
+formula, an unprefixed summoned Wolf yields **14 XP**, versus **16 XP**
+for a normal Wolf (up from **11 XP** at 0.3 strength). The summoner's
 `summonUsed` flag and each summoned creature's `summonedTurn` initialize explicitly,
 persist in current saves and replay initial states, and restore exactly.
 Re-entering levels and loading never reset the once-only summon. Saves also
@@ -3401,7 +3407,12 @@ and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
 sidebars are open. This applies even when the browser reports no pointer. 
 Inventory actions remain reachable without horizontal scrolling. 
-Touch devices retain their existing full-screen dialog layout.
+On touch screens, the trade panel fills the available height: both stock
+columns have independently scrolling lists rather than the 280px desktop cap,
+and the Close control remains visible above the bottom message log.
+The trade panel shows item/service prices but not a separate player-gold total;
+current gold remains visible in the HUD for merchants and service providers.
+Touch devices retain the existing full-screen layout for the other dialogs.
 
 ## Non-gear item catalog
 
@@ -6897,7 +6908,7 @@ world rather than revealing the changed parameter.
 
 ```json
 {
-  "traits_per_world": {"count": "random", "min": 1, "max": 5},
+  "traits_per_world": {"count": "random", "min": 3, "max": 6},
   "traits": [
     {
       "name": "example_trait",
@@ -6918,8 +6929,8 @@ has a human-readable `_note` explaining its mechanical changes relative to
 the base values in
 `world_generation.json`. `_note` is
 metadata for developers and is not an effect or a player-facing flavor line.
-`count` may be an integer **1–5**, or `"random"` to draw an integer inclusively from `min` to
-`max` (default **1–5**). The chosen count is fixed for this world. Candidates
+`count` may be an integer **3–6**, or `"random"` to draw an integer inclusively from `min` to
+`max` (default **3–6**). The chosen count is fixed for this world. Candidates
 are drawn without replacement using the seeded gameplay RNG. The optional
 positive `weight` defaults to `1`; `the_bell_is_guarded` uses `0.25` so it is
 less likely to be drawn.
@@ -6930,7 +6941,7 @@ trait IDs. If a conflicting pair appears in the initial draw, a trait marked
 `direction: "one_way"` wins against `"two_way"`, independent of draw order.
 The other candidate is dropped; the selection fills the empty slot with the
 next nonconflicting candidate, if available. The current 41-entry pool has
-ample room to reach the configured 1–5 active traits. Group conflicts do not
+ample room to reach the configured 3–6 active traits. Group conflicts do not
 make every modifier to a shared parameter exclusive: compatible traits can
 stack, and their numerical effects are applied in selected order.
 

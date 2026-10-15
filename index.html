@@ -3,7 +3,6 @@
 highest prio: deeper dungeons for endgame
 
 !1 [graphics] 🎨 boxes/crates should be more square
-!1 [graphics] 🎨 anvil is a bit too big
 !1 [graphics] 🎨 fix thornmaw pic
 !1 [text] 📝 "dwarven remains. Dwarven remains lie amid the abandoned settlement."
 !1 [text] 📝 old dwarven remains -> too generic sometimes
@@ -11,7 +10,6 @@ highest prio: deeper dungeons for endgame
 !2 [graphics] 🎨 we need different indoor column tiles (statues)
 !2 [graphics] 🎨 new background for dwarven ruins
 !2 [graphics] 🎨 there are no tiles for fortifications (ruined defensive positions) and broken-down door on floor
-!2 [ui] 🖥️ there used to be an error when saves didnt work, now there's only console log
 !2 [worldgen] 🌍 dwarven columns on surface should remove tree tiles if they are rendered over them
 !3 [combat] ⚔️ "it's not too late to retreat!" -> actually it is too late, they should get alarmed in next turn when it happens
 !3 [monsters] 👹 add silk slug
@@ -19,12 +17,7 @@ highest prio: deeper dungeons for endgame
 !3 [ui] 🖥️ bestiary sort by name,strength,amount + show amount on mobile
 !4 [combat] ⚔️ it's possible to abuse "retreats from sacred ground!" - they shouldnt come close if im standing within the attack range, the distance is too far too
 !4 [dungeon] 🏰 feat: crates are not walkable but are destroyable, after destroying sometimes they can drop an item (scroll, or potion)
-!4 [exploration] 🧭 someone should reveal to us the location of dwarven fort!
 !4 [items] 🎒 add a way to drop items
-!4 [permadeath] 💀 on non-permadeath, after we die, mark the place with skull on map - after retrieving remains, remove the mark
-
-
-this should be even more random -> (-1,+2) is nothing. it should be 0.7x-1.2x with values closer to 1x having higher probability.
 
 need to refine:
 !3 [combat] ⚔️ add bulgy fungus monster: similar to fungus but nearby creatures receive dmg when it dies
@@ -499,7 +492,6 @@ more difficult:
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
         <h2 id="tradeTitle">Trade with the Merchant</h2>
-        <div class="trade-gold">Gold: <span id="tradeGold">0</span></div>
         <div class="trade-cols">
           <div class="trade-col">
             <b class="section-title">FOR SALE</b>
@@ -734,7 +726,7 @@ more difficult:
   let WORLD_GEN_CONFIG = {}
   let BASE_WORLD_GEN_CONFIG = {}
   let WORLD_TRAITS = []
-  let TRAITS_PER_WORLD = {count: 'random', min: 1, max: 5}
+  let TRAITS_PER_WORLD = {count: 'random', min: 3, max: 6}
   let BASE_MAP_CONFIG = {}
   let BASE_WEAPONS = []
   let activeWorldTraits = [] // resolved effect values, stored in saves and replay snapshots
@@ -801,7 +793,7 @@ more difficult:
     if (!WORLD_TRAITS.length) throw new Error('No world traits are configured.')
     const {count, min, max} = TRAITS_PER_WORLD
     const requested = count === 'random' ? randInt(min, max) : count
-    if (!Number.isInteger(requested) || requested < 1 || requested > 5) throw new Error('Invalid traits_per_world count.')
+    if (!Number.isInteger(requested) || requested < 3 || requested > 6) throw new Error('Invalid traits_per_world count.')
     const pool = WORLD_TRAITS.slice()
     const ordered = []
     // Weighted draws without replacement keep rare story traits genuinely rare.
@@ -10060,10 +10052,8 @@ more difficult:
         addService('🧪 Brew Life Potions (use all herbs)', () => makeHerbalistPotion(true))
       }
       document.getElementById('tradeSellList').innerHTML = fisherman ? '' : '<div class="invitem"><span class="nm">Bring your ingredients to the Herbalist (healing herbs and mushrooms).</span></div>'
-      document.getElementById('tradeGold').textContent = player.gold
       return
     }
-    document.getElementById('tradeGold').textContent = player.gold
 
     const buyList = document.getElementById('tradeBuyList')
     buyList.innerHTML = ''
