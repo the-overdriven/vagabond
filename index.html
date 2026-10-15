@@ -1052,7 +1052,7 @@ more difficult:
     if (hut) return stableBackgroundVariant(PLAYER_HUT_BACKGROUNDS, x, y)
 
     const tile = map?.[y]?.[x]
-    const paths = PLAYER_TERRAIN_BACKGROUNDS[tile]
+    const paths = PLAYER_TERRAIN_BACKGROUNDS[isLakeIce(tile) ? 'frozenriver' : tile]
     return stableBackgroundVariant(paths, x, y)
   }
 

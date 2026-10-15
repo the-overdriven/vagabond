@@ -787,6 +787,8 @@ roll or advance these rules.
 Each transition logs a warning, shows an animated popup and stops auto-travel.
 Cracking ice retains its state when vacated, uses a bright white fracture overlay in
 tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
+The hero hover portrait on both lake-ice stages reuses the frozen-river
+background variants, selected deterministically from the tile coordinates.
 Broken ice uses normal water rendering and swimming/drowning visuals. Falling
 through immediately checks normal drowning without granting swimming practice;
 freezing continues on the same turn. Reaching intact ice or land ends swimming,
