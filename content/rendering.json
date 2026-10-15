@@ -269,7 +269,11 @@
     "playerOnTransition": "#ff8c32",
     "sidePlayer": "#ffffff",
     "playerOutline": "#000",
-    "spawnPoint": "#ffe08a"
+    "spawnPoint": "#ffe08a",
+    "playerRemains": {
+      "glyph": "💀",
+      "alpha": 0.55
+    }
   },
   "transitions": {
     "deathFade": "rgba(0,0,0,{alpha})"

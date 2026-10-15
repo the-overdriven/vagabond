@@ -3310,6 +3310,14 @@ When HP reaches zero in normal mode:
 - a distinct `playerremains` ground object holds that item and uses the
   skeletal-remains glyph without becoming a `skeleton` or permadeath `deadbody`
 - the forage/loot action restores the item and removes `playerremains` from the world
+- each outstanding `playerremains` is marked by a small, semi-transparent 💀 on
+  the corresponding floor of the full world map and the nearby side minimap.
+  Multiple deaths may leave multiple markers; each disappears as soon as its
+  remains are recovered. The marker points to the **retrievable remains**, so
+  drowning deaths mark the safe shore instead of the underwater death tile.
+  When no backpack item can drop, no remains or marker are created. The marker
+  never reveals new terrain, affects gameplay or consumes RNG; it is derived
+  from the already-persisted ground objects in current saves and replay
 - death animation occurs
 - temporary effects (regeneration, invisibility, speed, freezing and curse
   penalties) end on death; an ordinary living Temple return preserves them

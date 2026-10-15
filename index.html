@@ -4283,11 +4283,13 @@ more difficult:
           stopDeathTransition()
           resetForNewCharacter()
           if (remains) groundItems.push(remains)
+          minimapDirty = true
           openRaceSelect()
           render(now)
           return
         }
         if (remains) groundItems.push(remains)
+        minimapDirty = true
         updateHud()
         deathTransition = {phase: 'in', start: now, duration: 900, rotation: 0}
         render(now)
@@ -4395,12 +4397,14 @@ more difficult:
       if (!player.permadeath) {
         returnPlayerToTemple()
         if (remains) groundItems.push(remains)
+        minimapDirty = true
         updateHud()
         updateTooltip()
         render()
       } else {
         resetForNewCharacter()
         if (remains) groundItems.push(remains)
+        minimapDirty = true
         openRaceSelect()
         render()
       }
@@ -5933,6 +5937,7 @@ more difficult:
       else log('Nothing remains to recover.', 'loot')
       spawnPickupAnim(playerRemains)
       groundItems.splice(groundItems.indexOf(playerRemains), 1)
+      minimapDirty = true
       updateHud()
       render()
       return
@@ -9462,6 +9467,28 @@ more difficult:
     return mapPreviewBase.canvas
   }
 
+  // Only recoverable normal-death remains are map markers. Reusing their world
+  // objects gives us save/load and replay persistence without a parallel flag.
+  function drawDeathRemainsMarkers(ctx, scale, ox, oy, zoom, viewKey) {
+    const marker = RENDER_STYLE.minimap.playerRemains
+    ctx.save()
+    ctx.globalAlpha = marker.alpha
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = `${Math.max(9, scale * 2.5) * zoom}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`
+    for (const remains of groundItems) {
+      if (remains.kind !== 'playerremains') continue
+      const level = remains.level ?? 0
+      const key = level === 0 ? 'surface' : remains.levelKind === 'crypt2' ? 'crypt2' : `chain:${-level}`
+      if (key !== viewKey) continue
+      const x = (remains.x - ox + 0.5) * scale * zoom
+      const y = (remains.y - oy + 0.5) * scale * zoom
+      if (x < 0 || y < 0 || x >= ctx.canvas.width || y >= ctx.canvas.height) continue
+      ctx.fillText(marker.glyph, x, y)
+    }
+    ctx.restore()
+  }
+
   function renderMinimapCanvas(ctx, scale, originX, originY, showMapPlayer) {
     ensureMiniBases()
     const w = ctx.canvas.width, h = ctx.canvas.height
@@ -9508,6 +9535,7 @@ more difficult:
         ctx.textBaseline = 'middle'
         ctx.fillText(RENDER_STYLE.minimap.temple.glyph, tx, ty)
       }
+      drawDeathRemainsMarkers(ctx, scale, ox, oy, zoom, view.key)
       if (!onPlayerLevel) return
       const px = (player.x - ox) * scale * zoom + scale * zoom / 2
       const py = (player.y - oy) * scale * zoom + scale * zoom / 2
@@ -9546,6 +9574,7 @@ more difficult:
       ctx.fillStyle = RENDER_STYLE.minimap.spawnPoint
       ctx.fillRect((spawnPoint.x - ox) * scale - 1, (spawnPoint.y - oy) * scale - 1, dot, dot)
     }
+    drawDeathRemainsMarkers(ctx, scale, ox, oy, 1, currentMapViewKey())
     ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? RENDER_STYLE.minimap.playerOnTransition : RENDER_STYLE.minimap.sidePlayer
     ctx.fillRect((player.x - ox) * scale - 1, (player.y - oy) * scale - 1, dot, dot)
   }

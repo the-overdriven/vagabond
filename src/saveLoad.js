@@ -960,6 +960,9 @@ function loadGameFromObject(data, opts = {}) {
   stopDeathTransition()
   snapCameraToPlayer()
   reconcileSwimming()
+  // Restored ground items may add or remove death markers even if the
+  // player's position (and therefore the side map's origin) is unchanged.
+  minimapDirty = true
   updateHud()
   render()
   if (!isReplayInit && !opts.isReplayRestore) log('Game loaded.', 'good')
