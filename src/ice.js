@@ -27,7 +27,9 @@ function tickLakeIce(playerMovement = null) {
   const instantBreak = !cracking && chance(cfg.iceInstantBreakChance)
   const spreads = !cracking && playerMovement && DIRS8.some(([dx, dy]) =>
     map[y + dy]?.[x + dx] === 'crackingice')
-  if (!instantBreak && !spreads && !chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
+  const transitionChance = cracking ? cfg.crackingIceBreakChance
+    : spreads ? cfg.iceSpreadChance : cfg.iceCrackChance
+  if (!instantBreak && !chance(transitionChance)) return
 
   // Leaving cracking ice puts extra stress on the next intact tile. Only this
   // movement gets a same-turn break recheck; random new cracks keep a warning.

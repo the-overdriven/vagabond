@@ -1364,6 +1364,7 @@
     "freezingDamage": 1,
     "iceCrackChance": 0.02,
     "iceInstantBreakChance": 0.01,
+    "iceSpreadChance": 0.85,
     "crackingIceBreakChance": 0.1,
     "undergroundFovRadius": 8,
     "enemyAggroBonus": 0,

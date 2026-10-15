@@ -82,7 +82,7 @@ async function rules() {
 
   for (const [dx,dy] of [[1,0],[1,1]]) {
     reset()
-    run(`map[30][31]='ice';map[30+${dy}][31+${dx}]='crackingice';chance=p=>{if(p!==.01)throw Error('only the instant-break roll precedes automatic cracking');return false}`)
+    run(`map[30][31]='ice';map[30+${dy}][31+${dx}]='crackingice';chance=p=>{if(p!==.01&&p!==.85)throw Error('only instant and spread checks apply');return p===.85}`)
     await run('tryMove(1,0)')
     check("map[30][31]==='crackingice' && map[30][30]==='ice' && player.hp===100 && !player.drowning", 'walking beside cardinal/diagonal cracking ice advances only the stepped-on tile, one stage')
     run('var spreadRolls=[];chance=p=>{spreadRolls.push(p);return false};skipTurn()')
@@ -106,24 +106,30 @@ async function rules() {
 
   for (const [dx,dy] of [[1,0],[1,1]]) {
     reset('crackingice')
-    run(`map[30+${dy}][30+${dx}]='ice';var stepBreakRolls=[];chance=p=>{stepBreakRolls.push(p);return p===.1}`)
+    run(`map[30+${dy}][30+${dx}]='ice';var stepBreakRolls=[];chance=p=>{stepBreakRolls.push(p);return p===.85||p===.1}`)
     await run(`tryMove(${dx},${dy})`)
-    check(`stepBreakRolls.length===2&&stepBreakRolls[0]===.01&&stepBreakRolls[1]===.1&&map[30+${dy}][30+${dx}]==='water'&&map[30][30]==='water'`, 'stepping from cracking ice checks 1% first, then the extra 10%, including diagonal movement')
+    check(`stepBreakRolls.length===3&&stepBreakRolls[0]===.01&&stepBreakRolls[1]===.85&&stepBreakRolls[2]===.1&&map[30+${dy}][30+${dx}]==='water'&&map[30][30]==='water'`, 'stepping from cracking ice checks 1%, 85%, then the extra 10%, including diagonals')
     check('player.hp===95&&player.drowning&&player.swimTurns===1', 'same-step break applies only one drowning check')
   }
   reset('crackingice')
-  run("map[30][31]='ice';var safeStepRolls=[];chance=p=>{safeStepRolls.push(p);return false}")
+  run("map[30][31]='ice';var safeStepRolls=[];chance=p=>{safeStepRolls.push(p);return p===.85}")
   await run('tryMove(1,0)')
-  check("safeStepRolls.length===2&&safeStepRolls[1]===.1&&map[30][31]==='crackingice'&&map[30][30]==='crackingice'&&player.hp===100", 'failed same-step recheck leaves both cracking tiles intact')
+  check("safeStepRolls.length===3&&safeStepRolls[1]===.85&&safeStepRolls[2]===.1&&map[30][31]==='crackingice'&&map[30][30]==='crackingice'&&player.hp===100", 'failed same-step recheck leaves both cracking tiles intact')
   reset('crackingice')
   run("map[30][31]='ice';map[30][32]='ice';chance=p=>{if(p!==.01)throw Error('instant break must skip the extra recheck');return true}")
   await run('tryMove(1,0)')
   check("map[30][31]==='water'&&map[30][30]==='water'&&map[30][32]==='crackingice'&&player.hp===95", 'instant break keeps priority when moving from cracking ice')
   for(const origin of ['grass','ice','frozenriver','water']) {
     reset(origin)
-    run("map[30][31]='ice';map[31][32]='crackingice';var otherOriginRolls=[];chance=p=>{otherOriginRolls.push(p);return false}")
+    run("map[30][31]='ice';map[31][32]='crackingice';var otherOriginRolls=[];chance=p=>{otherOriginRolls.push(p);return p===.85}")
     await run('tryMove(1,0)')
-    check("otherOriginRolls.length===1&&otherOriginRolls[0]===.01&&map[30][31]==='crackingice'", origin+' origins do not get the extra break recheck')
+    check("otherOriginRolls.length===2&&otherOriginRolls[0]===.01&&otherOriginRolls[1]===.85&&map[30][31]==='crackingice'", origin+' origins do not get the extra break recheck')
+  }
+  for(const origin of ['crackingice','grass']) {
+    reset(origin)
+    run("map[30][31]='ice';map[31][32]='crackingice';var failedSpreadRolls=[];chance=p=>{failedSpreadRolls.push(p);return false}")
+    await run('tryMove(1,0)')
+    check("failedSpreadRolls.length===2&&failedSpreadRolls[0]===.01&&failedSpreadRolls[1]===.85&&map[30][31]==='ice'&&player.hp===100&&!player.drowning", 'failed 85% spread leaves intact ice unchanged without fallback cracking or extra breaking from '+origin)
   }
 
   reset('crackingice')
@@ -204,13 +210,13 @@ async function rules() {
   reset('grass')
   run(`map[30][31]='ice';map[31][32]='crackingice';rngState=${seed};startReplayRecording()`)
   await run('tryMove(1,0)')
-  check("map[30][31]==='crackingice' && replayData.rng.length===1", 'recorded adjacent step checks instant break before guaranteed cracking')
+  check("map[30][31]==='crackingice' && replayData.rng.length===2", 'recorded adjacent step checks instant break before the 85% spread roll')
   run('skipTurn()')
   check("map[30][31]==='water' && player.drowning", 'propagated cracking can break on the following turn')
   await run('tryMove(-1,0)')
   const spreadExpected=state()
   context.iceReplay=plain(run('replayForSave()'))
-  assert.equal(context.iceReplay.rng.length,2)
+  assert.equal(context.iceReplay.rng.length,3)
   await verifyReplay(spreadExpected)
 
   // A real recorded instant break changes both neighboring stages. Replaying
@@ -236,8 +242,23 @@ async function rules() {
   check("map[30][31]==='water'&&map[30][30]==='water'&&map[31][32]==='water'&&map[30][32]==='ice'&&map[31][33]==='crackingice'", 'extra 10% break collapses the original cracking neighbors without instant-break spread or chaining')
   const stepBreakExpected=state()
   context.iceReplay=plain(run('replayForSave()'))
-  assert.equal(context.iceReplay.rng.length,2)
+  assert.equal(context.iceReplay.rng.length,3)
   await verifyReplay(stepBreakExpected)
+
+  let failedSpreadSeed=1
+  for(;;failedSpreadSeed++) {
+    let state=failedSpreadSeed
+    const next=()=>{state=(state+0x6D2B79F5)|0;let t=Math.imul(state^(state>>>15),1|state);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}
+    if(next()>=.01&&next()>=.85)break
+  }
+  reset('crackingice')
+  run(`map[30][31]='ice';rngState=${failedSpreadSeed};startReplayRecording()`)
+  await run('tryMove(1,0)')
+  check("map[30][31]==='ice'&&map[30][30]==='crackingice'", 'recorded failed spread preserves both original tile states')
+  const failedSpreadExpected=state()
+  context.iceReplay=plain(run('replayForSave()'))
+  assert.equal(context.iceReplay.rng.length,2)
+  await verifyReplay(failedSpreadExpected)
   run('chance=originalIceCheckChance')
   console.log('PASS ice stages, instant break, cracking-origin step recheck, one-ring collapse, forced drowning, protection, freezing, feedback, saves, rotation and replay')
 }

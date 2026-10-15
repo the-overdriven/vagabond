@@ -753,7 +753,7 @@ excludes fragile lake ice.
 | --- | --- | --- |
 | Intact ice | First: 1% instant break | Deep freezing water, skipping the cracking stage |
 | Intact ice surviving that check | 2% | Cracking ice |
-| Intact ice entered beside cracking ice, surviving the instant check | Guaranteed on that step | Cracking ice |
+| Intact ice entered beside cracking ice, surviving the instant check | 85% on that step | Cracking ice |
 | New cracking ice reached from a cracking-ice tile | Extra 10% check on that same step | Deep freezing water if it succeeds |
 | Cracking ice | 10% | Deep freezing water |
 | Frozen river | None | Never breaks |
@@ -761,19 +761,22 @@ excludes fragile lake ice.
 Only the player's occupied tile initiates checks, once per spent turn,
 including movement, waiting, combat and item actions. The 1% instant-break
 check comes first on intact ice, even when stepping beside cracking ice.
-Otherwise the normal 2% roll or guaranteed adjacent-step cracking applies.
+Otherwise the normal 2% roll or 85% adjacent-step cracking check applies.
 Thus ordinary intact ice has a 1% instant-break outcome and a 1.98% cracking
 outcome per turn (99% × 2%). Already-cracking ice uses only its 10% break roll.
 
 Stepping onto intact ice beside cracking ice checks all eight neighbors,
 including diagonals and the tile just vacated. If the instant-break check
-fails, that entered tile becomes cracking ice without the ordinary 2% roll.
-When the step started on cracking ice, the newly cracked destination immediately
-gets an additional 10% break check. Its total chance to become water on that
-step is **10.9%**: `1% + 99% × 10%`. A failed recheck leaves it cracking.
-Moving from any other terrain does not get this extra check, even if another
-neighbor guarantees cracking. Waiting beside cracking ice does not guarantee
-cracking. Randomly starting to crack still grants a warning stage.
+fails, the entered tile has an 85% chance to become cracking ice. A failed
+spread roll leaves it intact: there is no fallback 2% roll or extra break check.
+When the step started on cracking ice and the 85% roll succeeds, the newly
+cracked destination immediately gets an additional 10% break check. Its total
+chance to become water on that step is **9.415%**:
+`1% + 99% × 85% × 10%` (previously 10.9%). A failed break recheck leaves it
+cracking. Moving from any other terrain does not get that extra break check,
+even if a neighboring crack makes the 85% spread rule apply. Waiting beside
+cracking ice keeps the ordinary 2% cracking chance after the instant-break
+check. Randomly starting to crack still grants a warning stage.
 
 Whenever the player's tile breaks into water, its eight neighbors that were
 already cracking also become freezing water. This is one ring only: those
@@ -808,8 +811,8 @@ through current saves and replay snapshots. No new player status or parallel
 ice registry is needed. Every collapsed tile keeps its snow underlay, loses
 any tracks and refreshes its map display. The player receives only one forced
 water-entry check regardless of how many neighboring tiles collapse. Chances
-are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`
-and `environment.crackingIceBreakChance`.
+are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`,
+`environment.iceSpreadChance` and `environment.crackingIceBreakChance`.
 
 ---
 
@@ -5374,7 +5377,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-49
+50
 ```
 
 Saves are JSON files.
@@ -5383,6 +5386,11 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 50 changes adjacent-step cracking from guaranteed to an 85% roll.
+Failed spread checks leave intact ice unchanged and skip the extra break roll.
+The changed conditional RNG sequence requires current-version saves and replay
+starting snapshots; no new persistent fields are added.
 
 Version 49 adds the same-step 10% break recheck only when moving from cracking
 ice onto intact ice. The origin terrain is transient action context, reconstructed
