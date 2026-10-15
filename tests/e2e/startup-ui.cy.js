@@ -88,7 +88,12 @@ describe('Startup assets and character creation UI', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('.cursed-world-mobile-note').should('not.be.visible')
     cy.get('#cursedWorldToggle').check()
-    cy.get('.cursed-world-mobile-note').should('be.visible')
+    // The mobile race panel scrolls inside a fixed overlay; the note can be below
+    // the fold even when CSS correctly displays it. Scroll the note into view.
+    cy.get('.cursed-world-mobile-note')
+      .should('have.css', 'display', 'block')
+      .scrollIntoView()
+      .should('be.visible')
     cy.get('.cursed-world-tip').should('not.be.visible')
     cy.get('#cursedWorldToggle').uncheck()
     cy.get('.cursed-world-mobile-note').should('not.be.visible')
