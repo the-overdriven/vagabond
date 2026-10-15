@@ -1,63 +1,15 @@
 'use strict'
 
-// Fill these with the Project URL and browser publishable (or legacy anon) key.
-const SUPABASE_URL = 'https://xjpxokbcnbntddzhyixu.supabase.co'
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_qpfz-3NXo6CUz8u91xrKHg_2VlTIR0b'
-
 const Graveyard = (() => {
-  const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js'
-  const TIMEOUT_MS = 6000
-  const PLAYER_ID_KEY = 'vagabond_online_player_id'
   const DEATH_COUNT_KEY = 'vagabond_death_count_'
-  let sdkPromise = null
-  let clientPromise = null
   let visible = false
   let requestNumber = 0
   let replayActive = () => false
   let visibilityChanged = () => {}
   let filter = 'all'
 
-  function configured() {
-    if (window.Cypress && !window.__VAGABOND_TEST_GRAVEYARD__) return false
-    try {
-      const url = new URL(SUPABASE_URL)
-      return url.protocol === 'https:' && !!url.hostname && !/placeholder|example|your[-_]/i.test(url.hostname) &&
-        SUPABASE_PUBLISHABLE_KEY.length > 30 && /^(sb_publishable_|eyJ)/.test(SUPABASE_PUBLISHABLE_KEY)
-    } catch {
-      return false
-    }
-  }
-
-  function online() {
-    return navigator.onLine !== false
-  }
-
-  function newId() {
-    if (typeof crypto === 'undefined') return null
-    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-    if (typeof crypto.getRandomValues !== 'function') return null
-    const bytes = crypto.getRandomValues(new Uint8Array(16))
-    bytes[6] = (bytes[6] & 15) | 64
-    bytes[8] = (bytes[8] & 63) | 128
-    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-  }
-
-  function playerId() {
-    try {
-      const stored = localStorage.getItem(PLAYER_ID_KEY)
-      if (stored && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(stored)) return stored
-      const id = newId()
-      if (!id) return null
-      localStorage.setItem(PLAYER_ID_KEY, id)
-      return id
-    } catch {
-      return null
-    }
-  }
-
   function newCharacterId() {
-    return newId() || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    return OnlineSupabase.newId() || `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
   }
 
   function reconcileDeathCount(player, worldSeed, died = false) {
@@ -88,52 +40,6 @@ const Graveyard = (() => {
       console.warn('Could not save local Graveyard death count', error)
     }
     return player.deaths
-  }
-
-  function loadSdk() {
-    if (window.supabase?.createClient) return Promise.resolve(window.supabase)
-    if (!sdkPromise) {
-      sdkPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = SDK_URL
-        script.async = true
-        let timer
-        const fail = () => {
-          clearTimeout(timer)
-          script.remove()
-          reject(new Error('Supabase SDK unavailable'))
-        }
-        script.onload = () => {
-          clearTimeout(timer)
-          if (window.supabase?.createClient) resolve(window.supabase)
-          else fail()
-        }
-        script.onerror = fail
-        timer = setTimeout(fail, TIMEOUT_MS)
-        document.head.appendChild(script)
-      }).catch(error => {
-        sdkPromise = null
-        throw error
-      })
-    }
-    return sdkPromise
-  }
-
-  function getClient() {
-    if (!clientPromise) {
-      clientPromise = loadSdk().then(sdk => sdk.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: {persistSession: false, autoRefreshToken: false, detectSessionInUrl: false},
-        global: {fetch: (input, init) => {
-          const controller = new AbortController()
-          const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-          return fetch(input, {...init, signal: controller.signal}).finally(() => clearTimeout(timer))
-        }}
-      })).catch(error => {
-        clientPromise = null
-        throw error
-      })
-    }
-    return clientPromise
   }
 
   function snapshotItem(item, statLine) {
@@ -183,17 +89,19 @@ const Graveyard = (() => {
 
   function recordDeath(snapshot) {
     // This guard precedes UUID generation, storage access, SDK loading and all network activity.
-    if (replayActive() || !online() || !configured()) return
-    const death_event_id = newId()
-    const player_id = playerId()
+    if (replayActive() || !OnlineSupabase.onlineAvailable()) return
+    const death_event_id = OnlineSupabase.newId()
+    const player_id = OnlineSupabase.onlinePlayerId()
     if (!death_event_id || !player_id) return
     const record = {...snapshot,
       strongest_enemy_killed: snapshotStrongestEnemyKill(snapshot.strongest_enemy_killed),
       death_event_id, player_id,
       killed_at: new Date().toISOString(), game_version: self.VAGABOND_GAME_VERSION}
     // No await in the death path. Never retry or queue an offline death.
-    getClient().then(client => client.from('death_records').insert(record))
-      .then(({error}) => { if (error) console.warn('Graveyard submission unavailable') })
+    OnlineSupabase.getOnlineClient().then(client => {
+      if (!client || !OnlineSupabase.onlineAvailable()) return null
+      return client.from('death_records').insert(record)
+    }).then(result => { if (result?.error) console.warn('Graveyard submission unavailable') })
       .catch(() => console.warn('Graveyard submission unavailable'))
   }
 
@@ -270,12 +178,12 @@ const Graveyard = (() => {
     const request = ++requestNumber
     document.getElementById('graveyardList').replaceChildren()
     if (replayActive()) { status('Graveyard unavailable during replay.'); return }
-    if (!online()) { status('Online Graveyard unavailable while offline.'); return }
-    if (!configured()) { status('Online Graveyard unavailable.'); return }
+    if (!OnlineSupabase.online()) { status('Online Graveyard unavailable while offline.'); return }
+    if (!OnlineSupabase.configured()) { status('Online Graveyard unavailable.'); return }
     status('Loading...')
     try {
-      const client = await getClient()
-      if (request !== requestNumber || !visible || !online() || replayActive()) return
+      const client = await OnlineSupabase.getOnlineClient()
+      if (!client || request !== requestNumber || !visible || !OnlineSupabase.onlineAvailable() || replayActive()) return
       let query = client.from('death_records')
         .select('character_name,race,level,killer_name,cause_of_death,permadeath,death_number,killed_at,atk,def,spd,grace,max_hp,weapon,armor,shield,equipment,artifacts,gold,cumulated_xp,steps_taken,creatures_slain,strongest_enemy_killed,dropped_item,world_traits,world_size')
         .order('created_at', {ascending: false}).limit(50)
@@ -325,5 +233,6 @@ const Graveyard = (() => {
   }
 
   return {init, open, close, isOpen: () => visible, recordDeath, snapshotItem, snapshotEquipment, snapshotArtifacts,
-    newCharacterId, reconcileDeathCount}
+    newCharacterId, reconcileDeathCount,
+    snapshotStrongestEnemyKill}
 })()

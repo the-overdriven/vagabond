@@ -12,7 +12,7 @@ function configureTestGraveyard(enabled = true) {
   cy.on('window:before:load', win => {
     Object.defineProperty(win.navigator, 'onLine', {configurable: true, value: true})
   })
-  cy.intercept('GET', '**/src/graveyard.js', request => {
+  cy.intercept('GET', '**/src/supabase.js', request => {
     // Every case rewrites these constants; never reuse another case's cached script.
     delete request.headers['if-none-match']
     delete request.headers['if-modified-since']
@@ -79,7 +79,7 @@ describe('Graveyard', () => {
     })
     cy.get('#btnGraveyard').click()
     cy.get('#graveyardStatus').should('have.text', 'Online Graveyard unavailable while offline.')
-    cy.get('script[src*="supabase"]').should('not.exist')
+    cy.get('script[src*="@supabase/supabase-js"]').should('not.exist')
     cy.get('#btnGraveyardClose').click()
   })
 
@@ -348,7 +348,7 @@ describe('Graveyard', () => {
       win.eval('replayPlaying = true; die(); replayPlaying = false')
     })
     cy.wrap(rows).should('have.length', 0)
-    cy.get('script[src*="supabase"]').should('not.exist')
+    cy.get('script[src*="@supabase/supabase-js"]').should('not.exist')
   })
 
   for (const {cause, trigger} of [

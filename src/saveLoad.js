@@ -146,6 +146,7 @@ function buildSaveObject() {
       x: player.x, y: player.y,
       name: player.name, race: player.race,
       characterId: player.characterId,
+      highscoresDisqualified: player.highscoresDisqualified,
       permadeath: player.permadeath,
       lvl: player.lvl, xp: player.xp,
       totalXpEarned: player.totalXpEarned, lastTempleHealXp: player.lastTempleHealXp,
@@ -291,6 +292,9 @@ function loadGameFromObject(data, opts = {}) {
   }
   if (data.version !== SAVE_VERSION) {
     throw new Error('This save uses a different game format. Please start a new world.')
+  }
+  if (typeof data.player?.highscoresDisqualified !== 'boolean') {
+    throw new Error('Save data is missing Highscores eligibility.')
   }
   if (!Array.isArray(data.worldKilledSpecies) || data.worldKilledSpecies.some(species => typeof species !== 'string')) {
     throw new Error('Save data is missing valid world species history.')
@@ -706,6 +710,8 @@ function loadGameFromObject(data, opts = {}) {
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
   player.godMode = !!data.player.godMode
+  player.highscoresDisqualified = data.player.highscoresDisqualified
+  Highscores.reconcileExclusion(player, isReplayInit || !!opts.isReplayRestore)
   player.godInvisible = player.godMode && (typeof data.player.godInvisible === 'boolean'
     ? data.player.godInvisible : true)
   player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns | 0) : 0

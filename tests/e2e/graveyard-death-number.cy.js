@@ -1,6 +1,6 @@
 describe('Graveyard death numbers after loading', () => {
   it('keeps a character numbered across rewinds without mixing other characters or replays', () => {
-    cy.intercept('GET', '**/src/graveyard.js', request => {
+    cy.intercept('GET', '**/src/supabase.js', request => {
       request.continue(response => {
         response.body = response.body
           .replace(/^const SUPABASE_URL = .*$/m, "const SUPABASE_URL = 'https://test.supabase.co'")

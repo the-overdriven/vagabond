@@ -1182,8 +1182,8 @@ use schema **37**. Schema **38** adds the persistent room graph, progression-key
 scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces the
 Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
 persists each deep level's dungeon-package identity, so later dungeon strata can
-reuse shortcuts without another dedicated save field. Current game version is
-**v98**, save/replay version **45**; older saves are rejected.
+reuse shortcuts without another dedicated save field. The current save/replay
+format is listed in §66; older saves are rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
@@ -5377,7 +5377,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-50
+51
 ```
 
 Saves are JSON files.
@@ -5386,6 +5386,12 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 51 adds the explicit persistent `player.highscoresDisqualified` flag.
+Current saves and replay starting snapshots must contain a boolean value; no
+older-save compatibility path is added. Live loads reconcile the flag against
+the browser's exclusion ledger, while replay initialization/restoration reads
+only the saved flag. Online cutoffs and request state are not gameplay save data.
 
 Version 50 changes adjacent-step cracking from guaranteed to an 85% roll.
 Failed spread checks leave intact ice unchanged and skip the extra break roll.
@@ -5818,6 +5824,11 @@ It:
 - sets gold to 500
 
 This is a development feature, not normal gameplay.
+
+Enabling it permanently excludes this character from future Highscores
+submissions, even after disabling it or loading an earlier save on the same
+browser. Existing legitimate milestones remain. The exclusion is saved and
+replayed; playback never modifies the browser's live exclusion ledger.
 
 ---
 
@@ -6589,10 +6600,12 @@ overlay fills the viewport with one scrolling records list; its title and X
 close control remain visible.
 
 Architecture: GitHub Pages -> lazily loaded, pinned Supabase browser JS SDK
-(`src/graveyard.js`) -> Supabase Data API -> PostgreSQL `death_records`. There
+(`src/supabase.js`) -> Supabase Data API -> PostgreSQL `death_records`. There
 is no backend, account, service key, build step, reward, or gameplay dependency.
 Edit `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of
-`src/graveyard.js`. Use the Project URL and browser publishable key (or legacy
+`src/supabase.js`. Both Graveyard and Highscores use its shared client,
+SDK initialization, browser identity and offline/replay guards. Use the Project
+URL and browser publishable key (or legacy
 anon key), **never** a secret/service_role key. The schema, policies, indexes,
 validation and pre-request rate limit are in `supabase-graveyard.sql`: paste it
 into the Supabase SQL Editor of a new project. Keep the Data API enabled. No
@@ -6675,7 +6688,7 @@ cache for service-worker imports so a changed version file triggers an update
 even when `sw.js` itself has not changed. Playtime is not recorded:
 there is no reliable persisted playtime counter. Neither full saves nor
 replay/RNG histories are uploaded. The existing service worker precaches
-`src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
+`src/supabase.js`, `src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
 The cross-origin SDK is **not** precached or required for boot,
 and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT.
 Offline deaths are not queued or retried.
@@ -6706,6 +6719,113 @@ IDs, forge plausible rows and modes, or send direct Data API requests.
 An authoritative server would be required to verify a run. Never treat the
 two death-mode populations as interchangeable in later balance analysis.
 Remote text is rendered with DOM `textContent`, never interpolated into HTML.
+
+## Online Highscores (optional)
+
+The desktop/mobile HUD has a 🏆 button with the tooltip **Highscores**, available
+during character selection as well as play. It opens a Graveyard-style dialog
+with Non-permadeath and Permadeath mode buttons. Rows show rank, character/race,
+level and rounded permanent strength; expanded rows show the level-up snapshot's
+stats, equipment, artifacts, achievements, world details, version and date. They
+do not claim that a historical character is alive. Remote text is rendered as
+text, never HTML, and long names/stat lines wrap within the scrollable list.
+Narrow HUD action rows wrap to keep the trophy reachable with Replay visible.
+
+The title, mode controls and close button remain outside the scrolling list on
+desktop and mobile. Escape, X or clicking the backdrop closes it; keyboard
+focus stays within the dialog and returns to the previous control on close.
+Highscores and Graveyard are mutually exclusive. Opening during live play clears
+queued movement and hides touch controls; it consumes no turn or RNG and blocks
+live gameplay keys. Recorded replay actions continue normally if the dialog is
+opened during playback, but its unavailable state makes no online query.
+
+Each mode has its own top ten: permadeath and non-permadeath. Cursed and normal
+worlds share their mode board. Ranking uses level first, then exact permanent
+`ATK + DEF + SPD + GRACE`; exact ties prefer the earlier server receipt, then
+record ID. Only display values may be rounded. Maximum HP, MF, XP and gold do
+not contribute. Historical achievements remain after death.
+
+`playerPermanentStats()` reuses the ordinary player formulas without terrain,
+potions, temporary curse debuffs, frozen-water penalties or carried-item speed
+effects. Permanent race/level bonuses, equipped modifiers, active artifact
+ATK/DEF, shield/armor penalties, SPD's minimum of 1, and GRACE's minimum of 0
+remain. Unarmed GRACE and artifact-weapon handling match the current character
+stat formula. The calculation changes no state or RNG. Artifact SPD bonuses
+are currently absent from the game's speed formula and therefore do not add
+ranking strength; this batch does not change that existing balance behavior.
+
+`supabase-highscores.sql` creates `highscore_records` and the read-only
+`highscores_top_ten(p_permadeath)` RPC. The query selects each character's
+highest-level milestone before sorting and limiting to ten. Character IDs, not
+names, identify records. One immutable snapshot is permitted per character and
+level, so a repeat cannot replace its equipment or strength. Numeric stats
+retain fractions and the database generates their summed strength.
+
+Startup fetches both boards once without delaying boot, character creation,
+loading, or world generation. Fewer than ten entries permit any new milestone;
+full boards compare the character's level and exact strength with tenth place.
+A failed or unfinished read leaves the cutoff unknown and permits submission.
+The cached cutoff is only an optimization: other players can displace a result
+before it is posted. There is no polling or automatic post-insert refresh.
+Opening the dialog or switching mode fetches the currently selected board.
+Late responses cannot replace another mode's list or reopen a closed dialog.
+Loading, empty, offline and failed-query states are shown in the dialog.
+
+Only a live level-up triggers a submission. One XP award granting several
+levels captures one deep-cloned final-level snapshot after all gains resolve.
+Gear changes, XP without leveling, death, save/load, and reconnect do not send
+milestones. The snapshot includes Graveyard-style equipment, artifacts, world
+details, and achievements, without killer/cause/location/drop fields. Changing
+characters during a pending request cannot change its captured identity/data.
+
+`src/highscores.js` contains ranking, eligibility, submission and UI code in one
+file. Both online features use the configured client and timeout from
+`src/supabase.js`, which creates the client using `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY`. Graveyard's item snapshot serializers remain shared.
+Highscores reads through
+`client.rpc('highscores_top_ten', {p_permadeath})` and sends milestones through
+`client.from('highscore_records').insert(record)`.
+Offline actions skip network work; failed submissions are neither
+queued nor automatically retried. Playback guards run before snapshot/storage
+work and again before a pending insert. No gameplay RNG, turns or rules depend
+on network timing. The shared transport and Highscores scripts are precached
+for offline play. Extracting the client changes no database schema or save format.
+
+God-mode activation sets `highscoresDisqualified` before its stat grants. It
+survives disabling god mode, death and saves. A browser-local ledger also blocks
+earlier live saves of the same character, with an in-memory fallback when
+storage fails. Replay applies the saved flag and recorded god-mode actions but
+never reads/writes that ledger; live-snapshot restoration remains exact. New
+characters start eligible. Clearing browser data, another browser or edited
+saves can bypass local history: this is not authoritative cheat protection.
+
+Install `supabase-highscores.sql` first, then
+`supabase-highscores-enable-writes.sql`. The follow-up adds only Highscores
+objects and permissions. A dedicated BEFORE INSERT statement trigger calls
+`private.limit_highscore_writes()` once per insert statement. No Graveyard
+function, table, secret, trigger, grants, or authenticator hook setting is changed.
+Highscores generates and preserves its own `private.highscore_secret` and has a
+separate quota of **60 committed write requests per IP per UTC hour**, shared
+across both modes. Only the HMAC of the forwarded address is stored. The same
+gateway/header trust and shared-NAT limitations as Graveyard apply. Counters
+are transactional: failed or rejected inserts roll back their increments.
+The trigger also applies to administrative inserts, which need request headers.
+
+An earlier draft extended the Graveyard hook. If already applied, run the
+optional `supabase-highscores-restore-graveyard.sql` repair before the corrected
+write migration. It restores the exact original function supplied for this
+project without deleting records/counters. Both scripts detect the earlier
+draft to prevent accidental repairs or double counting. Fresh installations
+skip the repair entirely.
+
+Browser roles can insert only the snapshot payload columns. IDs and timestamps
+remain server-generated; strength is calculated by the database. Direct table
+reads, updates and deletes remain denied; reads use the bounded RPC. Duplicate
+milestones and multi-row submissions remain rejected. The follow-up is safe to
+reapply without clearing counters, checks the foundation and pgcrypto,
+and reloads the API schema. No game/save-format change is required. See
+`HIGHSCORES_SETUP.md` for installation and database verification. These SQL files
+have been tested locally, not executed against the live Supabase project.
 
 ---
 

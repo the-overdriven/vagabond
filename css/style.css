@@ -693,7 +693,7 @@ body.hint-collapsed #hint .panel-toggle {
   justify-content: center;
 }
 
-#graveyardOverlay {
+#graveyardOverlay, #highscoresOverlay {
   position: fixed;
   inset: 0;
   z-index: 160;
@@ -701,7 +701,7 @@ body.hint-collapsed #hint .panel-toggle {
   background: rgba(5, 4, 3, 0.85);
 }
 
-#graveyardOverlay .panelbox {
+#graveyardOverlay .panelbox, #highscoresOverlay .panelbox {
   display: flex;
   flex-direction: column;
   width: min(94vw, 720px);
@@ -723,32 +723,32 @@ body.hint-collapsed #hint .panel-toggle {
   background: var(--panel2);
 }
 
-#graveyardOverlay .graveyard-header h2 {
+#graveyardOverlay .graveyard-header h2, #highscoresOverlay .graveyard-header h2 {
   flex: 1;
 }
 
-#graveyardOverlay .graveyard-header .overlay-close {
+#graveyardOverlay .graveyard-header .overlay-close, #highscoresOverlay .graveyard-header .overlay-close {
   position: static;
   flex: none;
 }
 
-#graveyardStatus {
+#graveyardStatus, #highscoresStatus {
   color: var(--parchment-dim);
   text-align: center;
   flex: none;
 }
 
-#graveyardFilters {
+#graveyardFilters, #highscoresFilters {
   flex: none;
   flex-wrap: wrap;
 }
 
-#graveyardFilters .active {
+#graveyardFilters .active, #highscoresFilters .active {
   color: var(--ember-bright);
   border-color: var(--ember);
 }
 
-#graveyardList {
+#graveyardList, #highscoresList {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -786,6 +786,26 @@ body.hint-collapsed #hint .panel-toggle {
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid var(--border);
+}
+
+#highscoresHelp {
+  flex: none;
+  margin: 0 0 6px;
+  color: var(--parchment-dim);
+  font-size: calc(11px * var(--ui-font-scale));
+  line-height: 1.4;
+}
+
+#highscoresStatus {
+  margin: 6px 0;
+}
+
+#highscoresStatus:empty {
+  display: none;
+}
+
+#highscoresList .graveyard-record {
+  overflow-wrap: anywhere;
 }
 
 .panelbox h2 {
@@ -1466,6 +1486,13 @@ body.hint-collapsed #hint .panel-toggle {
 
 /* Narrow windows need usable dialogs regardless of the browser pointer mode. */
 @media (max-width: 720px) {
+  #hud .stat-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   #hud {
     position: relative;
     z-index: 110;
