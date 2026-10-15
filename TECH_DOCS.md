@@ -1316,7 +1316,9 @@ terrain and artwork, independent of regular entrances and mandatory gates. Ordin
 cell subdivision and always place a reachable key for their locked side cell.
 The bar divider must span the entire room interior, without gaps at its ends;
 generation rejects any alternate route into the cell, including diagonal moves
-and routes that could open other doors. Closed bars and prison doors block
+and routes that could open other doors. World rotation also rotates the cell
+partition's orientation and bounds, preserving the complete divider and its
+single doorway after generation and save/restore. Closed bars and prison doors block
 movement but do **not** block sight or projectiles.
 
 Each prison cell contains an additional seeded object: a **75% chance** of a

@@ -57,14 +57,41 @@ describe('Dwarven Ruins populated prison cells', () => {
               'prison shooters have ammunition')
           }
         }
-        const before = deepLevels.slice(2).map(level => (level.rooms || [])
+        const cellsBeforeRotation = deepLevels.slice(2).flatMap(level => (level.rooms || [])
+          .filter(room => room.archetype === 'Prison').map(room => ({room, axis:room.prisonCellAxis})))
+        // Force an additional quarter turn even when the seeded world was
+        // initially generated unrotated or upside down.
+        rotateGeneratedWorld(1)
+        for (const {room, axis} of cellsBeforeRotation) {
+          const expectedAxis = axis === 'vertical' ? 'horizontal' : 'vertical'
+          check(room.prisonCellAxis === expectedAxis, 'quarter-turn rotates the prison divider axis')
+        }
+        const checkRotatedCells = phase => {
+          for (const level of deepLevels.slice(2)) for (const room of level.rooms || []) {
+            if (room.archetype !== 'Prison') continue
+            const door = room.prisonCellDoorCandidate
+            for (const p of dwarvenRoomInterior(room)) {
+              if (room.prisonCellAxis === 'vertical' ? p.x !== door.x : p.y !== door.y) continue
+              const tile = level.map[p.y]?.[p.x]
+              const isDoor = p.x === door.x && p.y === door.y
+              check(isDoor ? tile === 'dwarvenprisondoorlocked' || tile === 'dwarvenprisondoorclosed'
+                : tile === 'dwarvenprisonbars',
+                phase + ': entire rotated prison partition and doorway remain intact')
+            }
+            const noDoor = dungeonWalkDistancesWithDoorTraversal(level.map, level.caves[0].entrances[0],
+              new Set([keyXY(door.x, door.y)]), true)
+            check(!dwarvenPrisonCellPoints(room).some(p => noDoor.has(keyXY(p.x, p.y))),
+              phase + ': no eight-direction bypass around the rotated cell door')
+          }
+        }
+        checkRotatedCells('after quarter-turn')
+        const snapshot = () => deepLevels.slice(2).map(level => (level.rooms || [])
           .filter(room => room.archetype === 'Prison')
-          .map(room => room.prisonCellRegion))
+          .map(room => ({axis:room.prisonCellAxis, region:room.prisonCellRegion, door:room.prisonCellDoorCandidate})))
+        const before = snapshot()
         loadGameFromObject(JSON.parse(JSON.stringify(buildSaveObject())), {isReplayInit:true})
-        const after = deepLevels.slice(2).map(level => (level.rooms || [])
-          .filter(room => room.archetype === 'Prison')
-          .map(room => room.prisonCellRegion))
-        check(JSON.stringify(before) === JSON.stringify(after), 'cell geometry survives save/restore')
+        check(JSON.stringify(before) === JSON.stringify(snapshot()), 'cell geometry and axis survive save/restore')
+        checkRotatedCells('after restore')
       }
       check(testedCells > 0, 'fixed seeds exercise real prison cells')
     })()`))

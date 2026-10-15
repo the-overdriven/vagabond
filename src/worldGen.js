@@ -680,6 +680,10 @@ function rotateGeneratedWorld(quarterTurns) {
     if (Number.isInteger(value.dx) && Number.isInteger(value.dy)) {
       const v = vector(value.dx,value.dy); value.dx = v.x; value.dy = v.y
     }
+    // Prison dividers rotate with the room: a vertical bar line becomes
+    // horizontal after a quarter turn (and vice versa).
+    if (turns % 2 && (value.prisonCellAxis === 'vertical' || value.prisonCellAxis === 'horizontal'))
+      value.prisonCellAxis = value.prisonCellAxis === 'vertical' ? 'horizontal' : 'vertical'
     if (typeof value.keyId === 'string') value.keyId = rotatedLockId(value.keyId)
     if (typeof value.requiresLockId === 'string') value.requiresLockId = rotatedLockId(value.requiresLockId)
     if (typeof value.rotation === 'number' && value.kind === 'web') value.rotation = (value.rotation + turns) % 4
