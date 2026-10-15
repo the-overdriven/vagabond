@@ -752,17 +752,25 @@ excludes fragile lake ice.
 | Tile under the player | Chance per elapsed turn | Result |
 | --- | ---: | --- |
 | Ice | 2% | Cracking ice |
+| Ice entered beside cracking ice | 100% on that step | Cracking ice |
 | Cracking ice | 10% | Permanent deep water, still freezing |
 | Frozen river | 0% | Never breaks |
 
-Only the player's occupied tile rolls, once per spent turn, including movement,
-waiting, combat and item actions. One turn can advance only one stage. Monsters
-do not crack ice; underground terrain, god mode and flight do not roll. Merlings
+Only the player's occupied tile is tested, once per spent turn, including
+movement, waiting, combat and item actions. Stepping onto intact ice beside
+cracking ice guarantees that the entered tile cracks; all eight neighbors count,
+including diagonals and the tile just vacated. This replaces the 2% roll without
+consuming RNG. Only that entered tile changes: cracks never spread on their own,
+and waiting beside cracking ice keeps the normal 2% chance. Already-cracking
+ice keeps its 10% break chance when entered. One turn can advance only one
+stage, so a newly cracked tile cannot also break on that step. Monsters do not
+crack ice; underground terrain, god mode and flight do not roll or spread cracks.
+Disabling god mode restores these normal rules on the next spent turn. Merlings
 and learned swimmers can break ice but use their normal swimming protection.
 Rendering and animation timing never roll or advance these rules.
 
 Each transition logs a warning, shows an animated popup and stops auto-travel.
-Cracking ice retains its state when vacated, uses a visible fracture overlay in
+Cracking ice retains its state when vacated, uses a bright white fracture overlay in
 tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
 Broken ice uses normal water rendering and swimming/drowning visuals. Falling
 through immediately checks normal drowning without granting swimming practice;
@@ -5338,7 +5346,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-46
+47
 ```
 
 Saves are JSON files.
@@ -5347,6 +5355,11 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 47 adds deterministic cracking when the player steps onto ice beside
+cracking ice. The guaranteed transition replaces a random roll, changing the
+replay RNG contract without adding persistent fields. Older saves and replay
+starting snapshots are rejected.
 
 Version 46 adds ice/cracking-ice surface tile codes and the seeded per-turn
 ice RNG contract. The existing surface grid, terrain underlays and swimming/

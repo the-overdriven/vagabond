@@ -16,14 +16,18 @@ function freezeSurfaceLakes() {
 
 // One rule roll per elapsed player turn, before freezing and enemy actions.
 // Animation clocks, rendering and monsters never advance lake ice.
-function tickLakeIce() {
+function tickLakeIce(playerMoved = false) {
   if (currentZ !== 0 || player.godMode || raceHas('fly')) return
   const {x, y} = player
   const tile = map[y]?.[x]
   if (!isLakeIce(tile)) return
   const cracking = tile === 'crackingice'
+  // Only a successful player step propagates an existing fracture. Do not
+  // spread to unoccupied tiles, and never advance two stages in one turn.
+  const spreads = !cracking && playerMoved && DIRS8.some(([dx, dy]) =>
+    map[y + dy]?.[x + dx] === 'crackingice')
   const cfg = WORLD_GEN_CONFIG.environment
-  if (!chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
+  if (!spreads && !chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
 
   const next = cracking ? 'water' : 'crackingice'
   map[y][x] = next

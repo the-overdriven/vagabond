@@ -80,6 +80,30 @@ async function rules() {
   run("autoPath=[{x:31,y:30}];chance=()=>true;enemyTurn()")
   check('!autoPath', 'cracking stops auto-travel')
 
+  for (const [dx,dy] of [[1,0],[1,1]]) {
+    reset()
+    run(`map[30][31]='ice';map[30+${dy}][31+${dx}]='crackingice';chance=()=>{throw Error('automatic spreading must not roll RNG')}`)
+    await run('tryMove(1,0)')
+    check("map[30][31]==='crackingice' && map[30][30]==='ice' && player.hp===100 && !player.drowning", 'walking beside cardinal/diagonal cracking ice advances only the stepped-on tile, one stage')
+    run('var spreadRolls=[];chance=p=>{spreadRolls.push(p);return false};skipTurn()')
+    check('spreadRolls.length===1 && spreadRolls[0]===.1', 'the next turn uses the normal 10% break chance')
+  }
+  reset()
+  run("map[30][31]='crackingice';var idleSpreadRolls=[];chance=p=>{idleSpreadRolls.push(p);return false};skipTurn()")
+  check("map[30][30]==='ice' && idleSpreadRolls[0]===.02", 'waiting beside cracking ice retains the 2% chance')
+  for (const neighbor of ['water','frozenriver']) {
+    reset()
+    run(`map[30][31]='ice';map[30][32]=${JSON.stringify(neighbor)};var nonSpreadRolls=[];chance=p=>{nonSpreadRolls.push(p);return false}`)
+    await run('tryMove(1,0)')
+    check("map[30][31]==='ice' && nonSpreadRolls[0]===.02", neighbor+' does not propagate cracking')
+  }
+  reset()
+  run("map[30][31]='ice';map[30][32]='crackingice';player.godMode=true;chance=()=>{throw Error('god mode spread RNG')}")
+  await run('tryMove(1,0)')
+  check("map[30][31]==='ice'", 'god mode still prevents automatic cracking')
+  run('useGodModeKey(true);chance=()=>true;enemyTurn()')
+  check("map[30][31]==='crackingice'", 'disabling god mode restores normal ice cracking')
+
   for (const terrain of ['ice','crackingice','water']) {
     reset(terrain)
     run("player.freezing={active:true,turns:3};if(deepSwimmingWater(30,30))advanceSwimming(false);var savedIce=JSON.parse(JSON.stringify(buildSaveObject()));loadGameFromObject(savedIce,{isReplayInit:true})")
@@ -108,19 +132,34 @@ async function rules() {
   context.iceReplay=plain(run('replayForSave()'))
   assert.equal(context.iceReplay.rng.length,2)
   assert.equal(context.iceReplay.actions.length,3)
-  for(const disabled of [false,true]) {
-    run(`loadGameFromObject(structuredClone(iceReplay.initialState),{isReplayInit:true});
-      activeReplay=iceReplay;replayRngIndex=0;replayPlaying=true;replayRecording=false;
-      replayAnimationsDisabled=${disabled};replaySimulationMode=${disabled};`)
-    for(let index=0;index<context.iceReplay.actions.length;index++) {
-      // Camera timing is not simulated by this rule harness.
-      run('cameraAnimating=false;attackAnim=null')
-      await run(`runReplayAction(iceReplay.actions[${index}])`)
+  async function verifyReplay(expected) {
+    for(const disabled of [false,true]) {
+      run(`loadGameFromObject(structuredClone(iceReplay.initialState),{isReplayInit:true});
+        activeReplay=iceReplay;replayRngIndex=0;replayPlaying=true;replayRecording=false;
+        replayAnimationsDisabled=${disabled};replaySimulationMode=${disabled};`)
+      for(let index=0;index<context.iceReplay.actions.length;index++) {
+        // Camera timing is not simulated by this rule harness.
+        run('cameraAnimating=false;attackAnim=null')
+        await run(`runReplayAction(iceReplay.actions[${index}])`)
+      }
+      assert.deepEqual(state(),expected,'replay reproduces ice and drowning with animations '+disabled)
+      check('replayRngIndex===activeReplay.rng.length', 'replay consumes every recorded RNG value')
+      run('stopReplayPlayback()')
     }
-    assert.deepEqual(state(),expected,'replay reproduces ice and drowning with animations '+disabled)
-    check('replayRngIndex===activeReplay.rng.length', 'replay consumes every recorded RNG value')
-    run('stopReplayPlayback()')
   }
+  await verifyReplay(expected)
+
+  reset('grass')
+  run(`map[30][31]='ice';map[31][32]='crackingice';rngState=${seed};startReplayRecording()`)
+  await run('tryMove(1,0)')
+  check("map[30][31]==='crackingice' && replayData.rng.length===0", 'recorded adjacent step cracks without consuming RNG')
+  run('skipTurn()')
+  check("map[30][31]==='water' && player.drowning", 'propagated cracking can break on the following turn')
+  await run('tryMove(-1,0)')
+  const spreadExpected=state()
+  context.iceReplay=plain(run('replayForSave()'))
+  assert.equal(context.iceReplay.rng.length,1)
+  await verifyReplay(spreadExpected)
   run('chance=originalIceCheckChance')
   console.log('PASS ice stages, forced drowning, protection, freezing, feedback, saves, rotation and replay')
 }
@@ -160,5 +199,5 @@ async function worldgen() {
   }
 }
 
-async function main(){await run('loadContent()');await rules();await worldgen()}
+async function main(){await run('loadContent()');await rules();if(!process.argv.includes('--rules-only'))await worldgen()}
 main().catch(error=>{console.error(error);process.exitCode=1})

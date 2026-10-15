@@ -5120,14 +5120,14 @@ more difficult:
     }
   }
 
-  function enemyTurn(reactedEnemy = null) {
+  function enemyTurn(reactedEnemy = null, playerMoved = false) {
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
     ageBeastTracks()
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
-    tickLakeIce()
+    tickLakeIce(playerMoved)
     if (player.hp <= 0 || deathTransition) return
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
@@ -6472,7 +6472,7 @@ more difficult:
       updateTooltip()
       return
     }
-    enemyTurn()
+    enemyTurn(null, true)
     npcTurn()
     updateHud()
     // A successful Pull has its own web-then-drag camera animation. Do not
