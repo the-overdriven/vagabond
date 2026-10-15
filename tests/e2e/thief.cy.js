@@ -287,7 +287,16 @@ describe('One-time monster theft', () => {
       }
       rngState=seed;startReplayRecording();skipTurn()
       theftCheck(e.theftUsed && e.theftEscapeSteps===1,'recorded theft starts escape counter')
-      for(let i=0;i<90;i++) skipTurn()
+      // Waiting is capped at 10 consecutive turns. Move between shorter runs
+      // so every recorded wait actually advances the enemy and its escape count.
+      for(let i=0;i<90 && e.theftEscapeSteps<THIEF_CONFIG.maxEscapeSteps;i++) {
+        if(i>0 && i%8===0) {
+          const nextY=player.y===40?41:40
+          await tryMove(0,nextY-player.y)
+          theftCheck(player.y===nextY && consecutiveWaitTurns===0,'movement resets wait cap')
+        }
+        if(e.theftEscapeSteps<THIEF_CONFIG.maxEscapeSteps) skipTurn()
+      }
       theftCheck(e.theftEscapeSteps===40 && !enemyIsFleeing(e),'recorded escape reaches limit')
       const state=()=>({hp:player.hp,turn:turnCount,inventory:player.inventory,enemies:buildSaveObject().enemies})
       const expected=JSON.stringify(state()),recorded=JSON.parse(JSON.stringify(replayData))
