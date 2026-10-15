@@ -754,6 +754,7 @@ excludes fragile lake ice.
 | Intact ice | First: 1% instant break | Deep freezing water, skipping the cracking stage |
 | Intact ice surviving that check | 2% | Cracking ice |
 | Intact ice entered beside cracking ice, surviving the instant check | Guaranteed on that step | Cracking ice |
+| New cracking ice reached from a cracking-ice tile | Extra 10% check on that same step | Deep freezing water if it succeeds |
 | Cracking ice | 10% | Deep freezing water |
 | Frozen river | None | Never breaks |
 
@@ -766,8 +767,13 @@ outcome per turn (99% × 2%). Already-cracking ice uses only its 10% break roll.
 
 Stepping onto intact ice beside cracking ice checks all eight neighbors,
 including diagonals and the tile just vacated. If the instant-break check
-fails, that entered tile becomes cracking ice without a further RNG roll.
-Waiting beside cracking ice does not guarantee cracking.
+fails, that entered tile becomes cracking ice without the ordinary 2% roll.
+When the step started on cracking ice, the newly cracked destination immediately
+gets an additional 10% break check. Its total chance to become water on that
+step is **10.9%**: `1% + 99% × 10%`. A failed recheck leaves it cracking.
+Moving from any other terrain does not get this extra check, even if another
+neighbor guarantees cracking. Waiting beside cracking ice does not guarantee
+cracking. Randomly starting to crack still grants a warning stage.
 
 Whenever the player's tile breaks into water, its eight neighbors that were
 already cracking also become freezing water. This is one ring only: those
@@ -775,8 +781,10 @@ neighbor collapses do not trigger a chain reaction. A 1% instant break also
 turns adjacent intact lake ice into cracking ice. All neighbor states are
 read before any tiles change, so newly cracked neighbors survive the turn.
 Ordinary 10% breaks leave intact neighbors unchanged; frozen rivers, land and
-existing water are never converted. A tile that just entered the cracking
-stage gets no additional break check during that turn.
+existing water are never converted. The extra 10% check for a step from
+cracking ice uses these ordinary-break rules, so it can also collapse the
+tile just vacated. It does not crack intact neighbors. Other newly cracked
+tiles, including neighbors cracked by an instant break, survive that turn.
 
 Monsters never initiate cracking or collapse. Underground terrain, god mode
 and flight do not roll or spread cracks. Disabling god mode restores normal
@@ -5366,7 +5374,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-48
+49
 ```
 
 Saves are JSON files.
@@ -5375,6 +5383,12 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 49 adds the same-step 10% break recheck only when moving from cracking
+ice onto intact ice. The origin terrain is transient action context, reconstructed
+from movement during replay rather than saved as a player flag. The additional
+conditional RNG call changes the replay contract; older saves and replay
+starting snapshots are rejected.
 
 Version 48 adds the 1% instant-break check and one-ring neighboring collapse.
 Their map changes use the existing surface grid and cold underlays; no new

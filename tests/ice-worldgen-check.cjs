@@ -104,6 +104,28 @@ async function rules() {
   run('useGodModeKey(true);chance=p=>p!==.01;enemyTurn()')
   check("map[30][31]==='crackingice'", 'disabling god mode restores normal ice cracking')
 
+  for (const [dx,dy] of [[1,0],[1,1]]) {
+    reset('crackingice')
+    run(`map[30+${dy}][30+${dx}]='ice';var stepBreakRolls=[];chance=p=>{stepBreakRolls.push(p);return p===.1}`)
+    await run(`tryMove(${dx},${dy})`)
+    check(`stepBreakRolls.length===2&&stepBreakRolls[0]===.01&&stepBreakRolls[1]===.1&&map[30+${dy}][30+${dx}]==='water'&&map[30][30]==='water'`, 'stepping from cracking ice checks 1% first, then the extra 10%, including diagonal movement')
+    check('player.hp===95&&player.drowning&&player.swimTurns===1', 'same-step break applies only one drowning check')
+  }
+  reset('crackingice')
+  run("map[30][31]='ice';var safeStepRolls=[];chance=p=>{safeStepRolls.push(p);return false}")
+  await run('tryMove(1,0)')
+  check("safeStepRolls.length===2&&safeStepRolls[1]===.1&&map[30][31]==='crackingice'&&map[30][30]==='crackingice'&&player.hp===100", 'failed same-step recheck leaves both cracking tiles intact')
+  reset('crackingice')
+  run("map[30][31]='ice';map[30][32]='ice';chance=p=>{if(p!==.01)throw Error('instant break must skip the extra recheck');return true}")
+  await run('tryMove(1,0)')
+  check("map[30][31]==='water'&&map[30][30]==='water'&&map[30][32]==='crackingice'&&player.hp===95", 'instant break keeps priority when moving from cracking ice')
+  for(const origin of ['grass','ice','frozenriver','water']) {
+    reset(origin)
+    run("map[30][31]='ice';map[31][32]='crackingice';var otherOriginRolls=[];chance=p=>{otherOriginRolls.push(p);return false}")
+    await run('tryMove(1,0)')
+    check("otherOriginRolls.length===1&&otherOriginRolls[0]===.01&&map[30][31]==='crackingice'", origin+' origins do not get the extra break recheck')
+  }
+
   reset('crackingice')
   run(`for(const [dx,dy] of DIRS8){
     map[30+dy][30+dx]='crackingice';
@@ -207,8 +229,17 @@ async function rules() {
   context.iceReplay=plain(run('replayForSave()'))
   assert.equal(context.iceReplay.rng.length,1)
   await verifyReplay(instantExpected)
+
+  reset('crackingice')
+  run(`map[30][31]='ice';map[30][32]='ice';map[31][32]='crackingice';map[31][33]='crackingice';rngState=${seed};startReplayRecording()`)
+  await run('tryMove(1,0)')
+  check("map[30][31]==='water'&&map[30][30]==='water'&&map[31][32]==='water'&&map[30][32]==='ice'&&map[31][33]==='crackingice'", 'extra 10% break collapses the original cracking neighbors without instant-break spread or chaining')
+  const stepBreakExpected=state()
+  context.iceReplay=plain(run('replayForSave()'))
+  assert.equal(context.iceReplay.rng.length,2)
+  await verifyReplay(stepBreakExpected)
   run('chance=originalIceCheckChance')
-  console.log('PASS ice stages, instant break, one-ring collapse, forced drowning, protection, freezing, feedback, saves, rotation and replay')
+  console.log('PASS ice stages, instant break, cracking-origin step recheck, one-ring collapse, forced drowning, protection, freezing, feedback, saves, rotation and replay')
 }
 
 async function worldgen() {

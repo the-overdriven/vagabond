@@ -5120,14 +5120,14 @@ more difficult:
     }
   }
 
-  function enemyTurn(reactedEnemy = null, playerMoved = false) {
+  function enemyTurn(reactedEnemy = null, playerMovement = null) {
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
     ageBeastTracks()
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
-    tickLakeIce(playerMoved)
+    tickLakeIce(playerMovement)
     if (player.hp <= 0 || deathTransition) return
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
@@ -6322,6 +6322,7 @@ more difficult:
     }
     let moved = false
     const fromPos = {x: player.x, y: player.y}
+    const fromTile = map[player.y]?.[player.x]
     if (['dwarvenlever', 'dwarvenleverpulled'].includes(map[ny]?.[nx]) && activateDwarvenLiftLeverAt(nx, ny)) return
     if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
       if (openDungeonDoorAt(nx, ny)) {
@@ -6472,7 +6473,7 @@ more difficult:
       updateTooltip()
       return
     }
-    enemyTurn(null, true)
+    enemyTurn(null, {fromTile})
     npcTurn()
     updateHud()
     // A successful Pull has its own web-then-drag camera animation. Do not

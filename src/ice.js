@@ -16,7 +16,7 @@ function freezeSurfaceLakes() {
 
 // Rule checks run once per elapsed player turn, before freezing and enemies.
 // Animation clocks, rendering and monsters never advance lake ice.
-function tickLakeIce(playerMoved = false) {
+function tickLakeIce(playerMovement = null) {
   if (currentZ !== 0 || player.godMode || raceHas('fly')) return
   const {x, y} = player
   const tile = map[y]?.[x]
@@ -25,11 +25,15 @@ function tickLakeIce(playerMoved = false) {
   // An instant break takes priority, even on a step beside cracked ice.
   const cfg = WORLD_GEN_CONFIG.environment
   const instantBreak = !cracking && chance(cfg.iceInstantBreakChance)
-  const spreads = !cracking && playerMoved && DIRS8.some(([dx, dy]) =>
+  const spreads = !cracking && playerMovement && DIRS8.some(([dx, dy]) =>
     map[y + dy]?.[x + dx] === 'crackingice')
   if (!instantBreak && !spreads && !chance(cracking ? cfg.crackingIceBreakChance : cfg.iceCrackChance)) return
 
-  const breaks = cracking || instantBreak
+  // Leaving cracking ice puts extra stress on the next intact tile. Only this
+  // movement gets a same-turn break recheck; random new cracks keep a warning.
+  const stepBreak = !instantBreak && spreads && playerMovement.fromTile === 'crackingice' &&
+    chance(cfg.crackingIceBreakChance)
+  const breaks = cracking || instantBreak || stepBreak
   const changes = [{x, y, next: breaks ? 'water' : 'crackingice'}]
   let collapsed = 0, spread = 0
   if (breaks) for (const [dx, dy] of DIRS8) {
