@@ -40,6 +40,9 @@ describe('Swimming restrictions and visibility', () => {
         unequipItem('weapon')
         const blocked = JSON.stringify(player.inventory) === before && turnCount === turns &&
           player.equip.weapon.name === 'Equipped sword' && !player.equip.blackkey
+        // Drinking advances an enemy turn. Remove unrelated monster attacks so
+        // the assertion measures the Merling's potion instead of combat damage.
+        enemies = []
         player.race = 'merling'; player.hp = playerMaxHp() - 10
         usePotion(0)
         return {blocked, merling: player.inventory[0].kind === 'scrollOfInvisibility' &&
