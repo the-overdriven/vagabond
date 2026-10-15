@@ -13,7 +13,7 @@ function fishermanFootReachable() {
     const p = queue[head]
     for (const [dx, dy] of DIRS8) {
       const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
-      if (seen.has(key) || !TILE[surfaceMap[y]?.[x]]?.walk) continue
+      if (seen.has(key) || !TILE[surfaceMap[y]?.[x]]?.walk || isLakeIce(surfaceMap[y][x])) continue
       seen.add(key)
       queue.push({x, y})
     }

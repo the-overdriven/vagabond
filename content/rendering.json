@@ -280,6 +280,15 @@
     "mark": "#8a1c1c"
   },
   "terrainTiles": {
+    "ice": {
+      "image": "img/tiles/ice.png",
+      "scale": 1
+    },
+    "crackingice": {
+      "image": "img/tiles/ice.png",
+      "overlayImage": "img/tiles/cracking-ice-overlay.svg",
+      "scale": 1
+    },
     "cavefloor": {
       "image": "img/tiles/cave-floor.png",
       "scale": 1

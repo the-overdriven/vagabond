@@ -451,7 +451,11 @@ Ordinary characters start with Swimming unknown (zero); trying to enter deep
 `water` logs **You don't know how to swim.** without advancing time. Merlings
 swim naturally without skill levels, practice or a time limit. Rivers are
 explicitly **not** swimming terrain; their existing player/enemy half-submerged
-rendering remains unchanged. Ice and frozen rivers are also excluded.
+rendering remains unchanged. Intact/cracking lake ice and frozen rivers are
+also excluded. When lake ice breaks, its tile becomes ordinary deep `water`:
+Swimming/Merling rules apply immediately, including normal drowning for a
+non-swimmer. Forced entry grants no practice and still allows escape through
+adjacent water until reaching shore. The tile remains freezing (§12).
 
 Learning Swimming 5 allows five safe consecutive deep-water movements/waits;
 the entry step counts as the first. Each subsequent movement/wait costs
@@ -577,7 +581,12 @@ Generation uses multiple layers of interpolated random noise for things such as:
 - boulders
 - snow boundaries
 
-The world has an island-style elevation falloff.
+The world has an island-style elevation falloff on low ground. The coastal
+penalty fades smoothly as the raw noise rises from the lowland threshold
+(0.58) to the mountain threshold (0.68); natural peaks retain their elevation
+at every latitude. Southern mountains are therefore possible before world
+rotation, while low coastal terrain can still become sea. The northern land
+boundary retains its existing exemption from coastal falloff.
 
 The Temple is placed near the map center.
 
@@ -605,7 +614,9 @@ Current terrain includes:
 - snow
 - sand
 - river
+- frozen river
 - water
+- lake ice and cracking lake ice
 - mountains
 - snow mountains
 - volcanoes
@@ -722,21 +733,47 @@ There is currently no general terrain-based ATK or vision system.
 
 # 12. Snow / Cold
 
-Snow and taiga are cold terrain.
+Freezing is a surface mechanic. Snow, taiga, frozen rivers, both lake-ice
+stages and water exposed by broken lake ice are cold terrain. A snow underlay
+also marks cold river water. Each elapsed turn on cold terrain advances the
+existing Freezing counter; the configured defaults are **1 HP every 5 cold
+turns**. Moving between cold tiles preserves that counter. Leaving cold terrain
+clears it. There is no general cold-resistance equipment system.
 
-Freezing is currently a surface mechanic.
+## Frozen lakes
 
-While standing on snow or taiga, the player starts to freeze.
+Deep surface water inside the ragged cold-region boundary starts as walkable
+`ice`; rivers retain their separate, safe `frozenriver` rules. Climate uses the
+same snow noise and trait-adjusted threshold as nearby land, before cardinal
+rotation. Ice is applied after landmark/cave validation, so required walking
+routes are checked with lakes still impassable. Fisherman access likewise
+excludes fragile lake ice.
 
-Every 4 cold turns:
+| Tile under the player | Chance per elapsed turn | Result |
+| --- | ---: | --- |
+| Ice | 2% | Cracking ice |
+| Cracking ice | 10% | Permanent deep water, still freezing |
+| Frozen river | 0% | Never breaks |
 
-```text
--1 HP
-```
+Only the player's occupied tile rolls, once per spent turn, including movement,
+waiting, combat and item actions. One turn can advance only one stage. Monsters
+do not crack ice; underground terrain, god mode and flight do not roll. Merlings
+and learned swimmers can break ice but use their normal swimming protection.
+Rendering and animation timing never roll or advance these rules.
 
-Leaving snow/taiga clears the freezing state.
+Each transition logs a warning, shows an animated popup and stops auto-travel.
+Cracking ice retains its state when vacated, uses a visible fracture overlay in
+tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
+Broken ice uses normal water rendering and swimming/drowning visuals. Falling
+through immediately checks normal drowning without granting swimming practice;
+freezing continues on the same turn. Reaching intact ice or land ends swimming,
+but only reaching warm terrain ends freezing. Broken tiles never refreeze, and water washes away any tracks on the tile.
 
-There is currently no implemented general cold-resistance equipment system.
+Ice stages live in the saved surface grid; the existing snow underlay preserves
+the cold-water property after breaking. Both rotate with the world and restore
+through current saves and replay snapshots. No new player status or parallel
+ice registry is needed. Chances are configured in `environment.iceCrackChance`
+and `environment.crackingIceBreakChance`.
 
 ---
 
@@ -5301,7 +5338,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-45
+46
 ```
 
 Saves are JSON files.
@@ -5310,6 +5347,11 @@ NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a
 missing or invalid NPC list is rejected. This keeps save/load and replay
 consistent even when the current world state deliberately has no NPCs.
+
+Version 46 adds ice/cracking-ice surface tile codes and the seeded per-turn
+ice RNG contract. The existing surface grid, terrain underlays and swimming/
+freezing fields preserve all ice and cold-water state; older saves and replay
+starting snapshots are rejected.
 
 Version 45 restores the one-tile flee response to invisible attacks. Its
 additional seeded destination roll changes the replay RNG contract; older saves
@@ -6746,8 +6788,9 @@ Its submerged-chest budget rises from 15–30 to 20–38, with target lake share
 35% → 55%. This share is conditional on having eligible submerged tiles
 4–8 swimming steps from shore; chests are never placed on land or closer to
 shore just to reach the budget. Stronger lake carving can reduce accessible
-land, so normal landmark reachability checks still apply. No dynamic cracking
-ice or special drowning rules are introduced.
+land, so normal landmark reachability checks still apply. Water inside the
+cold region freezes under the general lake-ice rules (§12), including with
+Drowned Lands; this trait adds no separate ice or drowning modifiers.
 Forest ambush odds are additive: `eyes_in_the_trees` raises 4% to 13%,
 `wild_frontier` raises 4% to 8%, and `drought` raises 4% to 11%.
 The first two conflict as forest traits, but either can stack with Drought,

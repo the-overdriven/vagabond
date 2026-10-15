@@ -261,7 +261,14 @@ function generateSurface() {
       let e = combineWeightedNoise(elevationNoiseFunctions, elevationNoiseWeights, x, y, MAP_W, MAP_H)
       e += (roughnessNoiseFunction(x, y, MAP_W, MAP_H) - 0.5) * cfg.elevationNoise.roughnessAmplitude
       const d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxD
-      e -= Math.pow(d, cfg.islandFalloff.distancePower) * cfg.islandFalloff.strength * Math.min(1, y / northernFalloffDepth) // island falloff fades out at the northern edge
+      // Keep the coast on low ground without erasing natural mountain ranges
+      // in the south. Falloff fades smoothly across raw lowland/hill elevation;
+      // raw mountain-height noise retains its elevation at every latitude.
+      const peak = Math.max(0, Math.min(1, (e - cfg.terrainThresholds.lowlandMaxElevation) /
+        (cfg.terrainThresholds.hillMaxElevation - cfg.terrainThresholds.lowlandMaxElevation)))
+      const coastalWeight = 1 - peak * peak * (3 - 2 * peak)
+      e -= Math.pow(d, cfg.islandFalloff.distancePower) * cfg.islandFalloff.strength *
+        Math.min(1, y / northernFalloffDepth) * coastalWeight
       const lk = lakeNoiseFunction(x, y, MAP_W, MAP_H)
       if (lk > cfg.lakes.noiseThreshold && e > cfg.lakes.minElevation && e < cfg.lakes.maxElevation) e -= cfg.lakes.carveAmount // carve inland lakes
       if (y < cfg.northBoundary.rows) e = Math.max(e, cfg.northBoundary.minElevation) // keep the cold northern boundary on land
@@ -296,9 +303,12 @@ function generateSurface() {
   for (let y = 0; y < SNOW_BAND; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const t = map[y][x]
-      if (t !== 'grass' && t !== 'forest' && t !== 'hill' && t !== 'sand') continue
+      if (t !== 'water' && t !== 'grass' && t !== 'forest' && t !== 'hill' && t !== 'sand') continue
       const coldness = (SNOW_BAND - y) / SNOW_BAND + (snowEdgeFn(x, y, MAP_W, MAP_H) - 0.5) * cfg.snow.edgeNoiseAmplitude
-      if (coldness > cfg.snow.coldnessThreshold) map[y][x] = 'snow'
+      if (coldness > cfg.snow.coldnessThreshold) {
+        if (t === 'water') tileUnderlays[keyXY(x, y)] = 'snow'
+        else map[y][x] = 'snow'
+      }
     }
   }
   // Snowy north: exposed mountains get a snow cap, with a few more peaks
@@ -772,6 +782,9 @@ function generateMap() {
     console.warn(`Discarding world ${attempt}: invalid cave/fort placement or inaccessible Big Bell. Generating a new world.`)
   }
   placeTreasureMapSpot()
+  // Validate mandatory walking routes while lakes are still impassable.
+  // Fragile ice must never be required to reach a landmark or entrance.
+  freezeSurfaceLakes()
 }
 
 // Picks the sand tile the treasure map's X marks. Chosen once per world so
@@ -796,7 +809,7 @@ function surfaceReachableFromTemple() {
       const x = p.x + dx, y = p.y + dy
       if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue
       const key = keyXY(x, y)
-      if (seen.has(key) || !TILE[map[y][x]]?.walk) continue
+      if (seen.has(key) || !TILE[map[y][x]]?.walk || isLakeIce(map[y][x])) continue
       seen.add(key)
       queue.push({x, y})
     }
@@ -5312,7 +5325,7 @@ function clearGroundItemsUnderMerchant() {
 function npcCanTraverseSurface(x, y) {
   if (!isWalkable(x, y)) return false
   const tile = map[y][x]
-  return tile !== 'river' && tile !== 'water' && tile !== 'forest'
+  return tile !== 'river' && tile !== 'water' && !isLakeIce(tile) && tile !== 'forest'
 }
 
 function templeNpcCandidates(maxDistance) {

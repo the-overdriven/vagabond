@@ -1362,6 +1362,8 @@
   "environment": {
     "freezingDamageIntervalTurns": 5,
     "freezingDamage": 1,
+    "iceCrackChance": 0.02,
+    "crackingIceBreakChance": 0.1,
     "undergroundFovRadius": 8,
     "enemyAggroBonus": 0,
     "mushroomPoisonChance": 0.5,

@@ -22,8 +22,7 @@ highest prio: deeper dungeons for endgame
 !4 [exploration] 🧭 someone should reveal to us the location of dwarven fort!
 !4 [items] 🎒 add a way to drop items
 !4 [permadeath] 💀 on non-permadeath, after we die, mark the place with skull on map - after retrieving remains, remove the mark
-!4 [worldgen] 🌍 currently mountains never spawn in the south - this should be possible
-!5 [environment] ❄️ ice might crack and turn to water
+
 
 this should be even more random -> (-1,+2) is nothing. it should be 0.7x-1.2x with values closer to 1x having higher probability.
 
@@ -1659,6 +1658,7 @@ more difficult:
 <script src="src/worldGen.js"></script>
 <script src="src/dungeonTraps.js"></script>
 <script src="src/swimming.js"></script>
+<script src="src/ice.js"></script>
 <script src="src/charge.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
@@ -3289,7 +3289,7 @@ more difficult:
           if (leash && Math.max(Math.abs(nx - n.homeX), Math.abs(ny - n.homeY)) > ENEMY_WANDER_RADIUS) continue
           if (nx === player.x && ny === player.y) continue
           if (!isWalkable(nx, ny)) continue
-          if (map[ny][nx] === 'forest' || map[ny][nx] === 'river' || map[ny][nx] === 'water') continue
+          if (map[ny][nx] === 'forest' || map[ny][nx] === 'river' || map[ny][nx] === 'water' || isLakeIce(map[ny][nx])) continue
           if (occupied.has(keyXY(nx, ny))) continue
           options.push({x: nx, y: ny})
         }
@@ -5087,10 +5087,11 @@ more difficult:
   }
 
   function tickFreezing() {
-    // Freezing exists only on the surface. Snow and taiga are both inherently
-    // hostile cold terrain; once the player leaves them, the status clears.
+    // Surface ice and the water exposed beneath it remain cold, just as snow
+    // and taiga do. Only leaving cold terrain clears the exposure counter.
     const tile = currentZ === 0 && map[player.y] ? map[player.y][player.x] : null
-    const cold = tile === 'snow' || tile === 'taiga' || (tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow'))
+    const cold = tile === 'snow' || tile === 'taiga' || isLakeIce(tile) || tile === 'frozenriver' ||
+      ((tile === 'river' || tile === 'water') && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
     if (!player.freezing) player.freezing = {active: false, turns: 0}
     if (!cold) {
       if (player.freezing.active) {
@@ -5125,6 +5126,8 @@ more difficult:
     turnCount++
     ageBeastTracks()
     tickPlayerPoison()
+    if (player.hp <= 0 || deathTransition) return
+    tickLakeIce()
     if (player.hp <= 0 || deathTransition) return
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
@@ -7025,6 +7028,8 @@ more difficult:
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
     if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
+    // Lake climate metadata must not replace the blue ASCII ground with snow.
+    if (isLakeIce(tileKey) || tileKey === 'water') return TILE[tileKey].bg
     const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
     if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return RENDER_STYLE.specialTiles.dugSand.bg
@@ -7242,6 +7247,7 @@ more difficult:
     if (tileKey === 'taiga') return 'snow'
     if (tileKey === 'snowmountain') return 'snow'
     if (tileKey === 'marble') return null
+    if (isLakeIce(tileKey)) return null
 
     // Rubble and columns are transparent on every level. Render the terrain
     // that was at this exact coordinate before the prop replaced the map cell.
@@ -7310,7 +7316,7 @@ more difficult:
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
 
     const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
-    const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver'
+    const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver' || isLakeIce(t)
     const isSandTile = t => t === 'sand'
     const isGrassLikeTile = t => t === 'grass' || t === 'forest'
     const isSnowLikeTile = t => t === 'snow' || t === 'taiga' || t === 'snowmountain'
