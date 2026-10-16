@@ -5161,7 +5161,16 @@ function spawnGroundStuff() {
     for (let i=0;i<count && spots.length;i++) {
       const index=randInt(0,spots.length-1), spot=spots[index]
       spots[index]=spots[spots.length-1];spots.pop()
-      groundItems.push({...spot,kind})
+      let dropKind = kind
+      const variants = LOOSE_CONSUMABLE_VARIANTS
+      if (['scrollOfInvisibility', 'speedpotion'].includes(kind) && chance(variants.chance)) {
+        let roll = rng() * variants.table.reduce((sum, entry) => sum + entry.weight, 0)
+        for (const entry of variants.table) {
+          roll -= entry.weight
+          if (roll < 0) { dropKind = entry.kind; break }
+        }
+      }
+      groundItems.push({...spot,kind:dropKind})
     }
   }
   // A handful of equipment pieces are buried beneath surface sand. Their

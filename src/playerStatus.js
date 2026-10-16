@@ -44,6 +44,13 @@ function activePlayerStatuses() {
     statuses.push({id: 'speed', icon: 'ϟ', label: 'Speed', counter: `${player.speedPotionTurns}t`,
       detail: `Speed potion: ${turns(player.speedPotionTurns)} remaining.`})
   }
+  if (player.deathShieldReady) statuses.push({id: 'death-shield', icon: '⛨', label: 'Death Shield', counter: '',
+    detail: 'Death Shield ready: survive one fatal damage event at 1 HP. Further damage can kill you immediately.'})
+  for (const [id, label, icon, duration, detail] of [
+    ['stone-skin', 'Stone Skin', '▣', player.stoneSkinTurns, `+${player.stoneSkinBonus} DEF, −3 GRACE`],
+    ['berserk', 'Berserk', '⚔', player.berserkTurns, `+${player.berserkBonus} ATK, −3 DEF, −2 GRACE`]
+  ]) if (duration > 0) statuses.push({id, icon, label, counter: `${duration}t`,
+    detail: `${label}: ${detail}; ${turns(duration)} remaining.`})
   return statuses
 }
 

@@ -3233,7 +3233,8 @@ Player bonus GRACE acts as an affinity for graceful weapons rather than being ad
 level GRACE = floor(level / 5)
 player bonus GRACE = racial GRACE + level GRACE
 gear GRACE penalty = 1 for a non-Buckler shield + armor.gracePenalty (if any)
-effective player weapon GRACE = max(1, weapon GRACE - gear GRACE penalty)
+temporary GRACE penalty = 3 while Stone Skin + 2 while Berserk
+effective player weapon GRACE = max(1, weapon GRACE - gear GRACE penalty - temporary GRACE penalty)
 base player delay = 6 / effective player weapon GRACE
 weapon affinity = min(1, effective player weapon GRACE / 5)²
 GRACE reduction = player bonus GRACE × 0.25 × weapon affinity
@@ -3243,7 +3244,8 @@ player delay = max(0.25, base delay - GRACE reduction)
 This makes both racial and level GRACE provide almost no benefit with slow
 weapons and progressively more benefit with graceful weapons. A GRACE 5 or
 higher weapon receives the full reduction. The player's displayed GRACE is
-weapon GRACE + racial GRACE + level GRACE - gear GRACE penalty, with a minimum
+weapon GRACE + racial GRACE + level GRACE - gear GRACE penalty - temporary
+GRACE penalty, with a minimum
 of 0. Combat timing separately floors effective weapon GRACE at 1, so heavy
 gear cannot disable the enemy's extra-attack checks by reducing the player's
 displayed GRACE to zero. Bucklers and armors without `gracePenalty` leave GRACE
@@ -4281,21 +4283,25 @@ exceeds the roll determines the result. If no entry matches, the configured
 The roll is at least 0 and strictly below 100. Thresholds are cumulative:
 each result's percentage chance is its upper threshold minus the previous
 threshold (starting at 0). `elseResult` gets the remaining percentage above
-the last threshold. Rescaling from 110 preserves the original probabilities;
-the stored thresholds retain floating-point precision.
+the last threshold. The table uses the configured percentages directly.
 
 | Result | Cumulative upper threshold (rounded) | Chance (rounded) |
 |---|---:|---:|
-| Gold | 40.909091 | 40.909091% |
-| Gear | 63.636364 | 22.727273% |
-| Life Potion | 77.272727 | 13.636364% |
-| Scroll of Invisibility (`scrollOfInvisibility`) | 81.818182 | 4.545455% |
-| Potion of Speed | 90.909091 | 9.090909% |
-| Scroll of Identification (`elseResult`) | 100 | 9.090909% |
+| Gold | 41 | 41% |
+| Gear | 63.6 | 22.6% |
+| Life Potion | 77.3 | 13.7% |
+| Scroll of Invisibility | 80.5 | 3.2% |
+| Potion of Speed | 85 | 4.5% |
+| Potion of Stone Skin | 88 | 3% |
+| Potion of Berserk | 91 | 3% |
+| Scroll of Fear | 93 | 2% |
+| Scroll of Chaos | 94.5 | 1.5% |
+| Scroll of Death Shield | 95 | 0.5% |
+| Scroll of Identification (`elseResult`) | 100 | 5% |
 
-For example, a roll of 79 gives an Invisibility scroll, 86 gives a Speed
-potion, and 95 reaches the Identification-scroll fallback. The specific item ID `scrollOfInvisibility` is shared by the catalog, loot
-results, ground pickups, merchant stock, and recorded replay actions.
+For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin,
+and 96 reaches the Identification-scroll fallback. All new supplies use their
+catalog item IDs in chest outcomes, ground pickups, inventory actions and replay.
 
 The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
@@ -4420,6 +4426,85 @@ so the potion never feeds its own bonus back into the formula. Wyrdling
 increases the complete calculated effect and duration by 25%. For example, a
 player at 6 SPD receives `3 + round(6/3) = +5 SPD`; a Wyrdling receives +6 SPD
 after the 25% bonus is rounded, for 19 turns.
+
+## Tactical consumables
+
+All five items are stackable Supplies in `content/items.json`. Reading or drinking
+uses one ordinary turn, with the same swimming restrictions as existing supplies.
+Each has a unique transparent image shared between inventory and ground rendering,
+a colored ASCII glyph (`?` for scrolls, `!` for potions), and an inspection action
+that describes its rules without consuming it.
+
+| Item | Effect | Duration | Base value / sell value |
+|---|---|---|---|
+| Scroll of Fear | Tier 1–3 monsters within 5 tiles flee | 10 turns | 80g / 40g |
+| Scroll of Death Shield | One fatal damage event leaves the player at 1 HP | Until spent | 200g / 100g |
+| Scroll of Chaos | Relocates the player and monsters within 8 tiles | Immediate | 120g / 60g |
+| Potion of Stone Skin | `+6 + floor(DEF / 6)` DEF; −3 GRACE | 15 turns | 60g / 30g |
+| Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
+
+Radii use Chebyshev distance (eight-direction tile distance) on the current map
+and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns;
+it does not increase their strength, radius or shield charges. As with Speed and
+Invisibility, the activation action consumes the first duration turn. Fear
+resolves one retreat action on that turn; its remaining timer then reads 9
+(or 12 for Wyrdling). Potion counters read 14 (or 18).
+
+**Fear:** every eligible monster in range is affected, including unseen or sleeping
+monsters. It retreats even from an invisible player and cannot shoot, summon,
+charge or pull while afraid. A monster with no retreat destination may use ordinary
+adjacent melee if it can see the player; it otherwise stays put. Any positive damage,
+including trap damage, ends that monster's fear immediately, even before its
+action later in the same turn; misses and zero damage do not. Fear takes priority
+over the immediate reaction to a non-damaging invisible hit.
+Repeated casts refresh to at least the new full duration, never add durations.
+Fear timers expire on elapsed world turns even if the player changes maps. A violet
+face marker and a Frightened tooltip counter distinguish it from wounded fleeing.
+Ordinary Ruins warnings from moving fleeing monsters still apply.
+
+**Death Shield:** protects against melee, ranged attacks, poison, freezing,
+drowning, poisonous mushrooms and dungeon traps. The charge is consumed immediately
+at damage resolution; another hit or hazard in the same turn can kill the player.
+It neither heals further nor cures poison. There is no expiry and healing does not
+recharge it. Reading another while ready consumes neither item nor turn. Its ready
+status stays visible, with a distinct shield-breaking message and floating effect.
+
+**Chaos:** the affected set is captured before anyone moves. Each actor receives a
+random distinct safe destination within 8 tiles of its own starting position, in
+its currently reachable terrain component on the same map/level. Connectivity uses
+that actor's movement abilities and eight-direction movement; closed and locked
+doors block connectivity. Landing tiles must be walkable dry ground, excluding
+water, rivers, lava, ice, trap triggers and occupied tiles. NPCs never move; monsters
+cannot land within the surface Temple's sanctuary. Original actor tiles remain
+reserved so an actor without a valid destination can safely stay put. The player
+is resolved first, then monsters in their existing stable order. Only actors with
+valid destinations consume a seeded destination roll. Movement resolves together
+before presentation; exploration, swimming state, occupancy and player pickup are
+updated immediately. Teleportation does not automatically enter stairs or another
+map. Monsters receive their ordinary action after the scroll is used.
+
+**Combat potions:** bonuses are sampled when drunk from the corresponding current
+stat excluding both combat potions. The stat used for scaling is floored at zero;
+gear, racial bonuses, terrain and other existing modifiers still apply. A repeated
+dose replaces the sampled bonus and refreshes duration without stacking or feeding
+its own bonus back into the formula. Both potion types may coexist. GRACE penalties
+stack with gear penalties in displayed GRACE and effective weapon combat timing;
+the existing minimum effective weapon GRACE of 1 still applies, so slow weapons
+pay less of a timing cost. Expiry or actual death removes the modifiers. Highscores
+uses permanent stats, excluding both potions and their GRACE penalties.
+
+Ordinary chests use the percentages above; guaranteed-artifact chests keep their
+artifact rule. On the surface, 40% of existing loose Invisibility/Speed slots become
+one tactical consumable, using relative weights Stone Skin 3, Berserk 3, Fear 2,
+Chaos 1.5, Death Shield 0.5. This changes composition without increasing loose-item
+counts or replacing loose Life Potions. The chance and weights are editable in
+`content/loot_tables.json` under `looseConsumableVariants`.
+
+Player potion timers, exact sampled bonuses and ready shield charge, plus each
+monster's remaining fear timer, initialize on new actors, persist in current saves
+and replay snapshots, and restore without rerolling effects. Save version 55 rejects
+older saves/replays; no conversion is provided. All item RNG and state changes run
+synchronously before animations.
 
 ## Scroll of Identification
 

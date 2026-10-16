@@ -138,9 +138,11 @@ const DungeonTraps = (() => {
     const wasEnraged = !isPlayer && enemyIsEnraged(target)
     target.hp -= damage
     if (isPlayer) {
+      absorbPlayerFatalDamage()
       checkPlayerHealthWarning()
       if (target.hp <= 0) die(null, 'dungeon trap')
     } else {
+      if (damage > 0) breakEnemyFear(target)
       absorbEnemyFatalHit(target)
       logEnemyEnrageTransition(target, wasEnraged)
       if (target.hp <= 0) killEnemy(target, false)

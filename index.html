@@ -715,6 +715,7 @@ more difficult:
   let SELL_VALUE_BY_TIER = []
   let ITEM_BASE_VALUES
   let ITEM_DEFINITIONS = {}
+  let LOOSE_CONSUMABLE_VARIANTS = null
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
@@ -973,6 +974,7 @@ more difficult:
       throw new Error('Every gear and artifact template needs a baseValue.')
     validateItemDefinitions(content.items)
     ITEM_DEFINITIONS = content.items
+    LOOSE_CONSUMABLE_VARIANTS = content.lootTables.looseConsumableVariants
     FORAGE_TABLE = content.lootTables.forage
     CHEST_LOOT_TABLE = content.lootTables.chestLoot
     BASE_MAP_CONFIG = content.mapConfig
@@ -1719,6 +1721,7 @@ more difficult:
 <script src="src/supabase.js"></script>
 <script src="src/graveyard.js"></script>
 <script src="src/highscores.js"></script>
+<script src="src/consumables.js"></script>
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
 <script src="src/rareFlee.js"></script>
@@ -2280,6 +2283,9 @@ more difficult:
     godInvisible: false,
     speedPotionTurns: 0,
     speedPotionBonus: 0,
+    stoneSkinTurns: 0, stoneSkinBonus: 0,
+    berserkTurns: 0, berserkBonus: 0,
+    deathShieldReady: false,
     berryRegenTurns: 0,
     poisonTurns: 0,
     lowHpWarningActive: false,
@@ -2321,7 +2327,7 @@ more difficult:
     player._bonusHp = bonusHp
   }
 
-  function playerAtk(permanent = false) {
+  function playerAtk(permanent = false, excludePotions = false) {
     let a = player.baseAtk + raceBonus('atk')
     for (const slot of ['weapon', 'shield', 'armor']) {
       const it = player.equip[slot]
@@ -2330,10 +2336,11 @@ more difficult:
       if (it.mod === 'atk') a += it.modAmt
     }
     a += artifactBonusSum('atk') + (permanent ? 0 : curseDebuffSum('atk'))
+    if (!permanent && !excludePotions && player.berserkTurns > 0) a += player.berserkBonus
     return a
   }
 
-  function playerDef(permanent = false) {
+  function playerDef(permanent = false, excludePotions = false) {
     let d = player.baseDef + raceBonus('def')
     for (const slot of ['weapon', 'shield', 'armor']) {
       const it = player.equip[slot]
@@ -2343,6 +2350,10 @@ more difficult:
     }
     if (!permanent) d += TERRAIN_DEFENSE[map[player.y] && map[player.y][player.x]] || 0
     d += artifactBonusSum('def') + (permanent ? 0 : curseDebuffSum('def'))
+    if (!permanent && !excludePotions) {
+      if (player.stoneSkinTurns > 0) d += player.stoneSkinBonus
+      if (player.berserkTurns > 0) d -= itemDefinition('berserkPotion').effect.defPenalty
+    }
     return d
   }
 
@@ -2385,20 +2396,21 @@ more difficult:
     return item.kind === 'armor' ? armorGracePenalty(item) : 0
   }
 
-  function playerGracePenalty() {
-    return gearGracePenalty(player.equip.shield) + gearGracePenalty(player.equip.armor)
+  function playerGracePenalty(permanent = false) {
+    return gearGracePenalty(player.equip.shield) + gearGracePenalty(player.equip.armor) +
+      (permanent ? 0 : potionGracePenalty())
   }
 
-  function playerGrace() {
+  function playerGrace(permanent = false) {
     const weapon = player.equip.weapon
-    const grace = weaponGrace(weapon) + playerGraceBonus() - playerGracePenalty()
+    const grace = weaponGrace(weapon) + playerGraceBonus() - playerGracePenalty(permanent)
     return Math.max(0, grace)
   }
 
   // Highscores uses the ordinary stat formulas without transient conditions.
   // This reads state only: no terrain/status mutation, RNG or online activity.
   function playerPermanentStats() {
-    return {atk: playerAtk(true), def: playerDef(true), spd: playerSpd(true), grace: playerGrace()}
+    return {atk: playerAtk(true), def: playerDef(true), spd: playerSpd(true), grace: playerGrace(true)}
   }
 
   // Racial and level GRACE share the same weapon-affinity channel in combat:
@@ -2725,6 +2737,7 @@ more difficult:
     initializeEnemyGearScale(enemy)
     enemy.gearBonuses = enemy.gearBonuses || null
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
+    enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
@@ -3904,6 +3917,7 @@ more difficult:
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
+    if (dmg > 0) breakEnemyFear(e)
     absorbEnemyFatalHit(e)
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
@@ -3969,6 +3983,7 @@ more difficult:
     if (glancing) dmg = Math.floor(dmg / 3)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
+    absorbPlayerFatalDamage()
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
     if (glancing) {
@@ -4075,6 +4090,7 @@ more difficult:
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
+    absorbPlayerFatalDamage()
 
     spawnProjectileAnim(projectilePath, projectile)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
@@ -4290,6 +4306,9 @@ more difficult:
       godInvisible: false,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
+      stoneSkinTurns: 0, stoneSkinBonus: 0,
+      berserkTurns: 0, berserkBonus: 0,
+      deathShieldReady: false,
       berryRegenTurns: 0,
       poisonTurns: 0,
       lowHpWarningActive: false,
@@ -4399,6 +4418,9 @@ more difficult:
     player.godInvisible = false
     player.speedPotionTurns = 0
     player.speedPotionBonus = 0
+    player.stoneSkinTurns = 0; player.stoneSkinBonus = 0
+    player.berserkTurns = 0; player.berserkBonus = 0
+    player.deathShieldReady = false
     player.poisonTurns = 0
     player.berryRegenTurns = 0
     player.freezing = {active: false, turns: 0}
@@ -4622,6 +4644,7 @@ more difficult:
   }
 
   function reactToInvisibleAttack(e, damage) {
+    if (e.fearTurns > 0) return // Zero-damage hits leave Fear in control of its action.
     if (enemyHasAbility(e, 'trueSight')) return
     if (enemyIsPassive(e)) return
     const roll = rng()
@@ -5205,6 +5228,7 @@ more difficult:
     if (!(player.poisonTurns > 0)) return
     player.poisonTurns--
     player.hp = Math.max(0, player.hp - 1)
+    absorbPlayerFatalDamage()
     log('Poison deals 1 HP damage.', 'bad')
     checkPlayerHealthWarning()
     spawnDamageNumber(player.x, player.y, 1, RENDER_STYLE.damage.playerHit)
@@ -5261,6 +5285,7 @@ more difficult:
       player.freezing.turns = 0
       const freezingDamage = WORLD_GEN_CONFIG.environment.freezingDamage
       player.hp = Math.max(0, player.hp - freezingDamage)
+      absorbPlayerFatalDamage()
       log(`The freezing cold bites you for ${freezingDamage} HP.`, 'bad')
       checkPlayerHealthWarning()
       updateHud()
@@ -5274,6 +5299,16 @@ more difficult:
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    try {
+      return resolveEnemyTurn(reactedEnemy, playerMovement)
+    } finally {
+      // Fear stays active through its last action and damage can cancel it
+      // immediately, including when a trap hits a monster later in turn order.
+      for (const e of enemies) if (e.fearTurns > 0) e.fearTurns--
+    }
+  }
+
+  function resolveEnemyTurn(reactedEnemy, playerMovement) {
     ageBeastTracks()
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
@@ -5291,6 +5326,7 @@ more difficult:
         log('The speed boost wears off.', 'info')
       }
     }
+    tickCombatPotions()
     const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
@@ -5327,6 +5363,10 @@ more difficult:
         continue
       }
       e.fleeingHoly = false
+      if (e.fearTurns > 0) {
+        if (takeFearTurn(e)) return
+        continue
+      }
       const hiddenFromEnemy = playerHiddenFromEnemy(e)
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue
@@ -5459,6 +5499,11 @@ more difficult:
   const ITEM_ACTION_HANDLERS = {
     potion: idx => usePotion(idx),
     speedpotion: idx => useSpeedPotion(idx),
+    scrollOfFear: idx => useTacticalConsumable(idx, 'scrollOfFear'),
+    scrollOfDeathShield: idx => useTacticalConsumable(idx, 'scrollOfDeathShield'),
+    scrollOfChaos: idx => useTacticalConsumable(idx, 'scrollOfChaos'),
+    stoneSkinPotion: idx => useTacticalConsumable(idx, 'stoneSkinPotion'),
+    berserkPotion: idx => useTacticalConsumable(idx, 'berserkPotion'),
     herb: idx => useHerb(idx),
     mushroom: idx => useMushroom(idx),
     ediblemushroom: idx => useEdibleMushroom(idx),
@@ -6163,6 +6208,13 @@ more difficult:
     },
   }
 
+  for (const kind of TACTICAL_CONSUMABLE_KINDS) CHEST_LOOT_HANDLERS[kind] = () => {
+    addInventoryItem(kind)
+    lastLootResult = `a ${itemDefinition(kind).name}.`
+    lastLootHighlights = []
+    if (!suppressLootLog) log(`You open a chest and find a ${itemDefinition(kind).name}!`, 'loot')
+  }
+
   function checkGroundAt(x, y) {
     for (let i = groundItems.length - 1; i >= 0; i--) {
       const g = groundItems[i]
@@ -6202,6 +6254,11 @@ more difficult:
         continue
       } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || g.kind === 'campfire' || g.kind === 'explorerremains') {
         continue
+      } else if (TACTICAL_CONSUMABLE_KINDS.includes(g.kind)) {
+        addInventoryItem(g.kind)
+        log(`You pick up a ${itemDefinition(g.kind).name}.`, 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
       } else if (g.kind === 'potion') {
         addPotion()
         log(`You pick up a Life Potion.`, 'loot')
@@ -8569,6 +8626,14 @@ more difficult:
         ctx.restore()
       }
 
+      if (e.fearTurns > 0) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.4))}px serif`
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+        ctx.fillStyle = '#d99bff'; ctx.strokeStyle = '#180b24'; ctx.lineWidth = 3
+        ctx.strokeText('☹', vx + 1, vy + 1); ctx.fillText('☹', vx + 1, vy + 1)
+        ctx.restore()
+      }
       if (e.sleeping) {
         ctx.save()
         ctx.font = `bold ${Math.max(10, Math.round(TILE_PX * 0.3))}px Consolas, monospace`
@@ -8986,7 +9051,7 @@ more difficult:
   }
 
   function groundItemLabel(g) {
-    return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : 'Item'
+    return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
   }
 
   let lastMousePx = null, lastMousePy = null
@@ -9042,6 +9107,7 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
@@ -10075,6 +10141,7 @@ more difficult:
       const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
       const prefix = isBest ? '✅ ' : ''
       nm.textContent = prefix + artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + (it.tier !== undefined ? ' [T' + it.tier + ']' : '')
+      if (TACTICAL_CONSUMABLE_KINDS.includes(it.kind)) nm.title = itemDefinition(it.kind).description
       row.appendChild(nm)
       if (it.kind === 'artifact') {
         if (!it.identified) {
@@ -10642,6 +10709,7 @@ more difficult:
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
       player.hp = Math.max(0, player.hp - amt)
+      absorbPlayerFatalDamage()
       log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
       checkPlayerHealthWarning()
       if (player.hp <= 0) die(null, 'poisonous_mushroom')

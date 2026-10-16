@@ -328,5 +328,130 @@
     ],
     "description": "A heavy iron key cut for one of the old locks beneath the Dwarven Fort.",
     "baseValue": 0
+  },
+  "scrollOfFear": {
+    "name": "Scroll of Fear",
+    "icon": "img/tiles/scroll-of-fear.png",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 40,
+    "baseValue": 80,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "scrollOfFear"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "radius": 5,
+      "maxTier": 3,
+      "durationTurns": 10
+    },
+    "description": "Tier 1–3 monsters within 5 tiles flee for 10 turns. Damaging a monster ends its fear; cornered monsters can fight."
+  },
+  "scrollOfDeathShield": {
+    "name": "Scroll of Death Shield",
+    "icon": "img/tiles/scroll-of-death-shield.png",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 100,
+    "baseValue": 200,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "scrollOfDeathShield"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "charges": 1
+    },
+    "description": "Survive one fatal damage event at 1 HP. No expiry or stacking. Further damage can kill you immediately."
+  },
+  "scrollOfChaos": {
+    "name": "Scroll of Chaos",
+    "icon": "img/tiles/scroll-of-chaos.png",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 60,
+    "baseValue": 120,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "scrollOfChaos"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "radius": 8,
+      "destinationRadius": 8
+    },
+    "description": "Teleports you and monsters within 8 tiles to distinct safe, reachable tiles within 8 tiles of each starting position. Stays on this level."
+  },
+  "stoneSkinPotion": {
+    "name": "Potion of Stone Skin",
+    "icon": "img/tiles/potion-of-stone-skin.png",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 30,
+    "baseValue": 60,
+    "actions": [
+      {
+        "label": "Drink",
+        "handler": "stoneSkinPotion"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "baseBonus": 6,
+      "statDivisor": 6,
+      "gracePenalty": 3,
+      "durationTurns": 15
+    },
+    "description": "For 15 turns: +6 DEF plus one sixth of DEF (rounded down), −3 GRACE. Repeated doses refresh without stacking."
+  },
+  "berserkPotion": {
+    "name": "Potion of Berserk",
+    "icon": "img/tiles/potion-of-berserk.png",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 30,
+    "baseValue": 60,
+    "actions": [
+      {
+        "label": "Drink",
+        "handler": "berserkPotion"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "baseBonus": 4,
+      "statDivisor": 6,
+      "gracePenalty": 2,
+      "defPenalty": 3,
+      "durationTurns": 15
+    },
+    "description": "For 15 turns: +4 ATK plus one sixth of ATK (rounded down), −2 GRACE, −3 DEF. Repeated doses refresh without stacking."
   }
 }

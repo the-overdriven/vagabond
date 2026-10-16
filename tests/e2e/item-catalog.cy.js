@@ -36,7 +36,7 @@ describe('Non-gear item catalog', () => {
         const forage = []
         const cases = []
         const consumables = CHEST_LOOT_TABLE.table.filter(entry =>
-          ['potion', 'scrollOfInvisibility', 'speedpotion'].includes(entry.result))
+          itemDefinition(entry.result)?.category === 'supplies')
         for (const entry of consumables) {
           const index = CHEST_LOOT_TABLE.table.indexOf(entry)
           const next = CHEST_LOOT_TABLE.table[index + 1]?.result || CHEST_LOOT_TABLE.elseResult
@@ -89,7 +89,7 @@ describe('Non-gear item catalog', () => {
       expect(result.chestScale).to.equal(100)
       expect(result.forageScale).to.equal(100)
       expect(result.scrollResult).to.equal('scrollOfInvisibility')
-      expect(result.chest, 'configured chest boundaries').to.have.length(10)
+      expect(result.chest, 'configured chest boundaries').to.have.length(25)
       for (const {roll, expected, actual} of result.chest) {
         expect(actual, 'chest roll ' + roll).to.equal(expected)
       }
@@ -106,7 +106,7 @@ describe('Non-gear item catalog', () => {
         try {
           player.inventory = []
           const chestKinds = []
-          for (const roll of [73, 79, 86, 95]) {
+          for (const roll of [73, 79, 83, 96]) {
             rng = () => { draws++; return roll / 100 }
             groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
             checkGroundAt(player.x, player.y)

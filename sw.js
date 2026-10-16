@@ -41,6 +41,7 @@ const PRECACHE_URLS = [
   './src/supabase.js',
   './src/graveyard.js',
   './src/highscores.js',
+  './src/consumables.js',
   './css/style.css?v=20261008-2',
   './content/starting_weapons.json',
   './content/gear_weapons.json',

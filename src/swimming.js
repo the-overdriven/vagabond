@@ -69,6 +69,7 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
   player.drowning = drowning
   const damage = Math.max(1, Math.round(playerMaxHp() * (fellThroughIce ? 0.08 : 0.05)))
   player.hp = Math.max(0, player.hp - damage)
+  absorbPlayerFatalDamage()
   if (fellThroughIce) log(`The plunge into freezing water costs you ${damage} HP.`, 'bad')
   checkPlayerHealthWarning()
   spawnDamageNumber(player.x, player.y, damage, RENDER_STYLE.damage.playerHit)

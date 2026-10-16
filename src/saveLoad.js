@@ -162,6 +162,10 @@ function buildSaveObject() {
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       speedPotionTurns: player.speedPotionTurns,
+      speedPotionBonus: player.speedPotionBonus,
+      stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,
+      berserkTurns: player.berserkTurns, berserkBonus: player.berserkBonus,
+      deathShieldReady: player.deathShieldReady,
       berryRegenTurns: player.berryRegenTurns,
       poisonTurns: player.poisonTurns,
       lowHpWarningActive: player.lowHpWarningActive,
@@ -215,6 +219,7 @@ function buildSaveObject() {
       gearScale: e.gearScale,
       gearBonuses: e.gearBonuses ? {...e.gearBonuses} : null,
       deathShieldUsed: e.deathShieldUsed === true,
+      fearTurns: e.fearTurns,
       aware: !!e.aware,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
@@ -722,6 +727,12 @@ function loadGameFromObject(data, opts = {}) {
   player.godInvisible = player.godMode && (typeof data.player.godInvisible === 'boolean'
     ? data.player.godInvisible : true)
   player.speedPotionTurns = Number.isFinite(player.speedPotionTurns) ? Math.max(0, player.speedPotionTurns | 0) : 0
+  player.stoneSkinTurns = data.player.stoneSkinTurns
+  player.stoneSkinBonus = data.player.stoneSkinBonus
+  player.berserkTurns = data.player.berserkTurns
+  player.berserkBonus = data.player.berserkBonus
+  player.deathShieldReady = data.player.deathShieldReady
+  player.speedPotionBonus = data.player.speedPotionBonus
   player.poisonTurns = Math.max(0, Math.floor(player.poisonTurns))
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
@@ -788,6 +799,7 @@ function loadGameFromObject(data, opts = {}) {
       gearScale: e.gearScale,
       gearBonuses: e.gearBonuses ? {...e.gearBonuses} : null,
       deathShieldUsed: e.deathShieldUsed === true,
+      fearTurns: e.fearTurns,
       forestConcealX: Number.isInteger(e.forestConcealX) ? e.forestConcealX : null,
       forestConcealY: Number.isInteger(e.forestConcealY) ? e.forestConcealY : null,
       alarmed: !!e.alarmed && (typeof e.aggro !== 'number' || e.aggro !== 0),

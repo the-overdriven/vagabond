@@ -163,6 +163,36 @@
       "color": "#e0b35f",
       "image": "img/tiles/dwarven-key.png",
       "scale": 0.72
+    },
+    "scrollOfFear": {
+      "glyph": "?",
+      "color": "#d99bff",
+      "image": "img/tiles/scroll-of-fear.png",
+      "scale": 0.9
+    },
+    "scrollOfDeathShield": {
+      "glyph": "?",
+      "color": "#a9d5ff",
+      "image": "img/tiles/scroll-of-death-shield.png",
+      "scale": 0.9
+    },
+    "scrollOfChaos": {
+      "glyph": "?",
+      "color": "#ed69cb",
+      "image": "img/tiles/scroll-of-chaos.png",
+      "scale": 0.9
+    },
+    "stoneSkinPotion": {
+      "glyph": "!",
+      "color": "#b7b9ab",
+      "image": "img/tiles/potion-of-stone-skin.png",
+      "scale": 0.9
+    },
+    "berserkPotion": {
+      "glyph": "!",
+      "color": "#ff6755",
+      "image": "img/tiles/potion-of-berserk.png",
+      "scale": 0.9
     }
   },
   "enemies": {

@@ -55,12 +55,32 @@
         "result": "potion"
       },
       {
-        "upTo": 82,
+        "upTo": 80.5,
         "result": "scrollOfInvisibility"
       },
       {
-        "upTo": 91,
+        "upTo": 85,
         "result": "speedpotion"
+      },
+      {
+        "upTo": 88,
+        "result": "stoneSkinPotion"
+      },
+      {
+        "upTo": 91,
+        "result": "berserkPotion"
+      },
+      {
+        "upTo": 93,
+        "result": "scrollOfFear"
+      },
+      {
+        "upTo": 94.5,
+        "result": "scrollOfChaos"
+      },
+      {
+        "upTo": 95,
+        "result": "scrollOfDeathShield"
       }
     ],
     "elseResult": "idscroll"
@@ -69,5 +89,31 @@
     "startingWeapon": 4,
     "modifierPerPoint": 10,
     "commonStartingWeapon": 30
+  },
+  "looseConsumableVariants": {
+    "_note": "Surface loose invisibility/speed slots have this chance to become one weighted tactical consumable. Life Potion and total supply counts stay unchanged.",
+    "chance": 0.4,
+    "table": [
+      {
+        "kind": "stoneSkinPotion",
+        "weight": 3
+      },
+      {
+        "kind": "berserkPotion",
+        "weight": 3
+      },
+      {
+        "kind": "scrollOfFear",
+        "weight": 2
+      },
+      {
+        "kind": "scrollOfChaos",
+        "weight": 1.5
+      },
+      {
+        "kind": "scrollOfDeathShield",
+        "weight": 0.5
+      }
+    ]
   }
 }
