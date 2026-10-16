@@ -156,6 +156,8 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       await tryMove(approach.dx, approach.dy)
       check(turnCount === fistTurn, 'bare-fist breach attempt consumes no turn')
       check(map[approach.leaf.y][approach.leaf.x] === 'dwarvendoorlocked', 'bare fists do not alter the lock')
+      check(inspectedDungeonLocks.has(dungeonLockIdAt(approach.leaf.x, approach.leaf.y)),
+        'first bump remembers its inspected lock')
 
       const lockId = dwarvenDungeonLockId(currentZ, 'door', pair)
       addInventoryItem('dwarvenkey', {keyId: lockId})
@@ -360,6 +362,9 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
 
       startReplayRecording()
       await tryMove(approach.dx, approach.dy)
+      check(turnCount === 0 && map[approach.leaf.y][approach.leaf.x] === 'dwarvendoorlocked',
+        'first bump only identifies the locked doorway')
+      await tryMove(approach.dx, approach.dy)
       const expected = JSON.stringify({
         tile: map[approach.leaf.y][approach.leaf.x],
         turn: turnCount,
@@ -367,7 +372,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         y: player.y
       })
       const recorded = JSON.parse(JSON.stringify(replayData))
-      check(recorded.actions.length === 1 && recorded.actions[0].type === 'move', 'breach records one move action')
+      check(recorded.actions.length === 2 && recorded.actions.every(a => a.type === 'move'), 'inspection and breach record two move actions')
       check(recorded.rng.length >= 2, 'breach attempt records success and noise RNG rolls')
 
       loadGameFromObject(recorded.initialState, {isReplayInit:true})

@@ -14,7 +14,7 @@ function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
   const sx = Math.sign(dx), sy = Math.sign(dy)
   const cornerOpen = (x, y) => isWalkable(x, y) && !grasslandTrees.has(keyXY(x, y))
   const clear = (x, y) => (charge ? CHARGE_LINE_TILES : PULL_LINE_TILES).has(map[y]?.[x]) &&
-    cornerOpen(x, y) &&
+    !enemySanctuaryTileForbidden(e, x, y) && cornerOpen(x, y) &&
     !enemies.some(other => other !== e && other.alive && onCurrentLevel(other) && other.x === x && other.y === y) &&
     !(currentZ === 0 && npcs.some(n => n.x === x && n.y === y))
   for (let i = 0; i <= distance; i++) {
@@ -62,7 +62,7 @@ function enemyKnockback(e, line, charge = false) {
 function tryEnemyRush(e) {
   const charge = enemyHasAbility(e, 'charge')
   if ((!charge && !enemyHasAbility(e, 'pull')) || playerHiddenFromEnemy(e) ||
-      enemyIsPassive(e) || e.summonedTurn === turnCount) return false
+      enemyIsPassive(e) || playerInsideSanctuary() || e.summonedTurn === turnCount) return false
   const line = enemyChargeLine(e, charge)
   if (!line || !chance(charge ? 0.60 : 0.70)) return false
   e.aware = true

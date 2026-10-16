@@ -15,8 +15,6 @@ highest prio: deeper dungeons for endgame
 !3 [monsters] 👹 add silk slug
 !3 [ui] 🖥️ market ui: add tabs
 !3 [ui] 🖥️ bestiary sort by name,strength,amount + show amount on mobile
-!4 [combat] ⚔️ it's possible to abuse "retreats from sacred ground!" - they shouldnt come close if im standing within the attack range, the distance is too far too
-!4 [dungeon] 🏰 feat: crates are not walkable but are destroyable, after destroying sometimes they can drop an item (scroll, or potion)
 !4 [items] 🎒 add a way to drop items
 
 need to refine:
@@ -861,6 +859,7 @@ more difficult:
   let gravediggerGraveKey = null
   let oldHunterQuest = null
   let oldHunterQuestSerial = 0
+  let inspectedDungeonLocks = new Set()
 
   async function loadContent() {
     const files = {
@@ -1624,6 +1623,34 @@ more difficult:
       return entry.enemy
     }
     return null
+  }
+
+  // Crates live alongside their floor's persistent map, rather than being
+  // reconstructed when an underground level is entered or loaded.
+  function dungeonCrateAt(x, y) {
+    if (map[y]?.[x] !== 'dwarvencrate' || currentDungeonPackageId() !== 'dwarvenRuins') return null
+    const level = deepLevels[chainDepthForZ(currentZ) - 2]
+    const index = level.crates.findIndex(crate => crate.x === x && crate.y === y)
+    return index < 0 ? null : {level, index, crate: level.crates[index]}
+  }
+
+  function strikeDwarvenCrateAt(x, y) {
+    const target = dungeonCrateAt(x, y)
+    if (!target || !player.equip.weapon || player.equip.weapon.kind !== 'weapon') return null
+    const damage = Math.max(1, playerAtk())
+    target.crate.hp = Math.max(0, target.crate.hp - damage)
+    const broken = target.crate.hp === 0
+    if (broken) {
+      map[y][x] = 'marble'
+      target.level.crates.splice(target.index, 1)
+      if (target.crate.lootKind) {
+        groundItems.push({x, y, level: currentZ, levelKind: 'chain', caveIndex: -1,
+          kind: target.crate.lootKind})
+      }
+      minimapDirty = true
+      invalidateUndergroundFov()
+    }
+    return {damage, broken, lootKind: broken ? target.crate.lootKind : null}
   }
 
   function breachDungeonDoorAt(x, y) {
@@ -2600,7 +2627,9 @@ more difficult:
   }
 
   function playerHiddenFromEnemy(enemy) {
-    return playerIsInvisible() && !enemyHasAbility(enemy, 'trueSight')
+    // Holy ground hides a protected player from all enemy targeting, including
+    // true sight. This does not grant invisibility to a player outside it.
+    return playerInsideSanctuary() || (playerIsInvisible() && !enemyHasAbility(enemy, 'trueSight'))
   }
 
   function logEnemySpotting(enemy, wandered = false) {
@@ -3821,7 +3850,8 @@ more difficult:
       const options = []
       for (const [dx, dy] of DIRS8) {
         const nx = e.x + dx, ny = e.y + dy
-        if (!enemyCanTraverse(e, nx, ny) || (nx === player.x && ny === player.y)) continue
+        if (!enemyCanTraverse(e, nx, ny) || enemySanctuaryTileForbidden(e, nx, ny) ||
+            (nx === player.x && ny === player.y)) continue
         if (occupied.has(keyXY(nx, ny)) || npcs.some(n => n.x === nx && n.y === ny)) continue
         options.push({x: nx, y: ny})
       }
@@ -3900,7 +3930,7 @@ more difficult:
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null) {
-    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e)) return false
+    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
@@ -4002,7 +4032,7 @@ more difficult:
   }
 
   function enemyRangedAttackPlayer(e, path = null) {
-    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e)) return false
+    if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     const shot = shooterDefinition(e)
     if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
     clearAutoPath()
@@ -4206,6 +4236,7 @@ more difficult:
 
   function resetForNewCharacter() {
     clearLevelUpPopup()
+    inspectedDungeonLocks = new Set()
     // A permadeath always starts the next character back on the surface at
     // the Temple, even when the previous character died underground.
     currentZ = 0
@@ -4555,6 +4586,7 @@ more difficult:
   }
 
   function enemyCanPathThrough(e, x, y) {
+    if (enemySanctuaryTileForbidden(e, x, y)) return false
     return enemyCanTraverse(e, x, y) || enemyCanOpenDungeonDoor(e, x, y)
   }
 
@@ -5050,9 +5082,52 @@ more difficult:
     return true
   }
 
+  function sanctuaryDistance(x, y) {
+    return Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y))
+  }
+
+  function playerInsideSanctuary() {
+    return currentZ === 0 && sanctuaryDistance(player.x, player.y) <= FLEE_DISTANCE
+  }
+
   function enemyInsideSanctuary(e) {
     return currentZ === 0 && (e.level ?? 0) === 0 &&
-      Math.max(Math.abs(e.x - spawnPoint.x), Math.abs(e.y - spawnPoint.y)) < FLEE_DISTANCE
+      sanctuaryDistance(e.x, e.y) <= FLEE_DISTANCE
+  }
+
+  // Outside enemies cannot enter holy ground or wander back into melee range
+  // of a protected player. Residents may still cross protected tiles to flee.
+  // Shared by idle movement, home paths, far travel and pursuit.
+  function enemySanctuaryTileForbidden(e, x, y) {
+    if (currentZ !== 0 || (e.level ?? 0) !== 0 || sanctuaryDistance(e.x, e.y) <= FLEE_DISTANCE) return false
+    return sanctuaryDistance(x, y) <= FLEE_DISTANCE ||
+      (playerInsideSanctuary() && Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) <= ATTACK_RANGE)
+  }
+
+  function enemyStepAwayFromProtectedPlayer(e) {
+    const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    if (distance > 1) return false
+    let best = null, bestDistance = distance, bestTempleDistance = -1
+    for (const [dx, dy] of DIRS8) {
+      const x = e.x + dx, y = e.y + dy
+      if (!enemyTileOpen(e, x, y)) continue
+      const nextDistance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+      const templeDistance = sanctuaryDistance(x, y)
+      if (nextDistance > bestDistance ||
+          (nextDistance === bestDistance && nextDistance > distance && templeDistance > bestTempleDistance)) {
+        best = {x, y}
+        bestDistance = nextDistance
+        bestTempleDistance = templeDistance
+      }
+    }
+    if (!best || bestDistance <= distance) return false
+    if (enemyOpenDoorInsteadOfMove(e, best.x, best.y)) return true
+    const fromX = e.x, fromY = e.y
+    occupied.delete(keyXY(e.x, e.y))
+    e.x = best.x; e.y = best.y
+    occupied.add(keyXY(e.x, e.y))
+    finishEnemyMove(e, fromX, fromY)
+    return true
   }
 
   function enemyStepAwayFromTemple(e) {
@@ -5217,8 +5292,25 @@ more difficult:
         if (enemyInsideSanctuary(e)) enemyStepAwayFromTemple(e)
         continue
       }
+      // Adjacent outsiders withdraw once; all other outsiders get their normal
+      // unseen-player idle turn (including homeReturn and far wandering).
+      // The movement filter prevents idle steps from undoing that separation.
+      if (playerInsideSanctuary() && (e.level ?? 0) === 0 &&
+          Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= ATTACK_RANGE) {
+        wakeSleepingEnemy(e)
+        const fromX = e.x, fromY = e.y
+        const wasVisible = enemyIsVisibleOnMainView(e)
+        enemyStepAwayFromProtectedPlayer(e)
+        const withdrew = e.x !== fromX || e.y !== fromY
+        if (withdrew && !e.fleeingHoly && wasVisible) log(`The ${e.name} retreats from the sacred ground.`, 'info')
+        // Retain the retreat episode when blocked; only moving away starts one.
+        e.fleeingHoly = e.fleeingHoly || withdrew
+        e.aware = false
+        e.forestConcealX = null; e.forestConcealY = null
+        continue
+      }
       e.fleeingHoly = false
-      const hiddenFromEnemy = playerHidden && !enemyHasAbility(e, 'trueSight')
+      const hiddenFromEnemy = playerHiddenFromEnemy(e)
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue
       if (!(e.rareFleeTurns > 0) && e.rareArmed === false &&
@@ -6265,7 +6357,7 @@ more difficult:
     if (playerIsInvisible()) return
     if (raceHas('noForestAmbush')) return // elves move through woodland unseen
     // Temple sanctuary applies to ambush spawns as well as ordinary enemies.
-    if (currentZ === 0 && Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < FLEE_DISTANCE) return
+    if (currentZ === 0 && Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) <= FLEE_DISTANCE) return
     const ancient = map[y][x] === 'ancientForest'
     if (map[y][x] !== 'forest' && !ancient) return
     if (!chance(WORLD_GEN_CONFIG.surfaceEnemies.forestAmbushChance)) return
@@ -6274,7 +6366,7 @@ more difficult:
       const nx = x + dx, ny = y + dy
       if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
       if (map[ny][nx] !== (ancient ? 'ancientForest' : 'forest')) continue
-      if (Math.max(Math.abs(nx - spawnPoint.x), Math.abs(ny - spawnPoint.y)) < FLEE_DISTANCE) continue
+      if (Math.max(Math.abs(nx - spawnPoint.x), Math.abs(ny - spawnPoint.y)) <= FLEE_DISTANCE) continue
       if (!isWalkable(nx, ny)) continue
       if (occupied.has(keyXY(nx, ny))) continue
       candidates.push({x: nx, y: ny})
@@ -6326,6 +6418,13 @@ more difficult:
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
     if (target) {
       clearAutoPath()
+      if (playerInsideSanctuary()) {
+        log('You cannot attack from sacred ground. Step beyond its protection.', 'info')
+        render()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
       consecutiveWaitTurns = 0
       const invisibleAttack = playerHiddenFromEnemy(target)
       const targetHp = target.hp
@@ -6429,6 +6528,15 @@ more difficult:
         flushPendingMove()
         return
       }
+      const lockId = dungeonLockIdAt(nx, ny)
+      if (!inspectedDungeonLocks.has(lockId)) {
+        inspectedDungeonLocks.add(lockId)
+        log('The dwarven door is locked. Strike it again to attempt a breach.', 'info')
+        render()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
       const weapon = player.equip.weapon
       if (!weapon || weapon.kind !== 'weapon') {
         log('The locked dwarven door will not yield to bare fists. You need a weapon to breach it.', 'info')
@@ -6438,11 +6546,40 @@ more difficult:
         return
       }
       consecutiveWaitTurns = 0
+      if (!replayAnimationsDisabled && !replaySimulationMode) void animateAttackLunge(player.x, player.y, nx, ny)
       const breach = breachDungeonDoorAt(nx, ny)
       if (breach.success)
         log(`You smash through the locked dwarven door with your ${weapon.name}.`, 'good')
       else
         log(`You strike the locked dwarven door with your ${weapon.name}, but it holds.`, 'info')
+      enemyTurn()
+      npcTurn()
+      updateHud()
+      render()
+      runAnimationLoop()
+      updateTooltip()
+      flushPendingMove()
+      return
+    }
+    if (map[ny]?.[nx] === 'dwarvencrate') {
+      clearAutoPath()
+      const target = dungeonCrateAt(nx, ny)
+      if (!target) return
+      const weapon = player.equip.weapon
+      if (!weapon || weapon.kind !== 'weapon') {
+        log('You need a weapon to smash the dwarven crate.', 'info')
+        render()
+        updateTooltip()
+        flushPendingMove()
+        return
+      }
+      consecutiveWaitTurns = 0
+      if (!replayAnimationsDisabled && !replaySimulationMode) void animateAttackLunge(player.x, player.y, nx, ny)
+      const result = strikeDwarvenCrateAt(nx, ny)
+      if (result?.broken) {
+        spawnCrateDeathAnim(nx, ny)
+        log('You smash dwarven crate into pieces.', 'good')
+      } else if (result) log(`You strike the dwarven crate with your ${weapon.name}.`, 'info')
       enemyTurn()
       npcTurn()
       updateHud()
@@ -7704,6 +7841,17 @@ more difficult:
     spawnFxAnim(e.x, e.y, enemyGlyph(e), enemyColor(e), 1)
   }
 
+  function spawnCrateDeathAnim(x, y) {
+    if (replayAnimationsDisabled || replaySimulationMode) return
+    // Rules have already removed the crate. Keep only its visual until the
+    // player's lunge finishes, then use the monster-death sink/fade effect.
+    const start = attackAnim ? attackAnim.start + attackAnim.duration : performance.now()
+    fxAnims.push({x, y, level: currentZ, tileKey: 'dwarvencrate',
+      ch: TILE.dwarvencrate.ch, color: TILE.dwarvencrate.color,
+      dir: 1, start, duration: FX_ANIM_MS})
+    runAnimationLoop()
+  }
+
   function spawnHornSoundAnim() {
     if (replayAnimationsDisabled) return
     soundAnims.push({x: player.x, y: player.y, start: performance.now(), duration: SOUND_ANIM_MS})
@@ -8225,6 +8373,10 @@ more difficult:
       const vy = Math.round((g.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
+      // Loot exists immediately for deterministic saves/replays, but must not
+      // show through a crate that is still finishing its destruction animation.
+      if (fxAnims.some(p => p.tileKey === 'dwarvencrate' && p.level === currentZ &&
+        p.x === g.x && p.y === g.y && now < p.start + p.duration)) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
         if (g.kind === 'stolenloot') {
@@ -8259,11 +8411,13 @@ more difficult:
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
         const p = fxAnims[i]
-        const t = Math.min(1, (now - p.start) / p.duration)
+        // A dying crate remains fully visible throughout the player's lunge.
+        const t = Math.max(0, Math.min(1, (now - p.start) / p.duration))
         if (t >= 1) {
           fxAnims.splice(i, 1)
           continue
         }
+        if (p.tileKey && p.level !== currentZ) continue
         if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
         const vx = Math.round((p.x - camX) * TILE_PX)
         const vy = Math.round((p.y - camY) * TILE_PX)
@@ -8273,15 +8427,19 @@ more difficult:
         ctx.globalAlpha = 1 - t
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2 + bump)
         ctx.scale(scale, scale)
-        ctx.fillStyle = p.color
-        const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
-        if (p.label) {
-          ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
-          ctx.lineWidth = 3
-          ctx.strokeStyle = '#0b0906'
-          ctx.strokeText(p.ch, 0, textY)
+        const drawnCrate = p.tileKey && USE_TILE_IMAGES &&
+          drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, terrainVisual(p.tileKey, p.x, p.y))
+        if (!drawnCrate) {
+          ctx.fillStyle = p.color
+          const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
+          if (p.label) {
+            ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
+            ctx.lineWidth = 3
+            ctx.strokeStyle = '#0b0906'
+            ctx.strokeText(p.ch, 0, textY)
+          }
+          ctx.fillText(p.ch, 0, textY)
         }
-        ctx.fillText(p.ch, 0, textY)
         ctx.restore()
       }
     }
@@ -11435,6 +11593,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    inspectedDungeonLocks = new Set()
     merchantFortHintGiven = false
     worldKilledSpecies = new Set()
     // A prior world may have rotated 90/270 degrees; start every new world
@@ -11496,6 +11655,7 @@ more difficult:
       spawnEdgeHighTierChests()
       placeFisherman()
       rotateGeneratedWorld(randInt(0, 3))
+      initializeDwarvenCrates()
       player.x = spawnPoint.x
       player.y = spawnPoint.y
       // Decorations are hashed against final coordinates so regeneration is

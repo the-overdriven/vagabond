@@ -49,7 +49,7 @@ describe('Surface encounters and item passives', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,message)=>{if(!ok)throw new Error(message)}
       currentZ=0;map=surfaceMap;player.race='human';player.invisibleTurns=0;player.godInvisible=false;player.godMode=false
-      const x=spawnPoint.x+FLEE_DISTANCE-1,y=spawnPoint.y
+      const x=spawnPoint.x+FLEE_DISTANCE,y=spawnPoint.y
       map[y][x]='forest'
       const originalChance=chance
       let called=0
@@ -58,9 +58,9 @@ describe('Surface encounters and item passives', () => {
         const rngBefore=rngState, count=enemies.length
         maybeSpawnForestAmbush(x,y)
         check(called===0 && rngBefore===rngState && enemies.length===count,'protected forest tile has no ambush roll')
-        // At the exact sanctuary boundary, an ambush roll is allowed, but
+        // Just outside the protected boundary, an ambush roll is allowed, but
         // it must never place an attacker one tile inside the retreat zone.
-        const edge=spawnPoint.x+FLEE_DISTANCE
+        const edge=spawnPoint.x+FLEE_DISTANCE+1
         for (const [dx,dy] of DIRS8) map[y+dy][edge+dx]='grass'
         map[y][edge]='forest'
         map[y][edge-1]='forest'

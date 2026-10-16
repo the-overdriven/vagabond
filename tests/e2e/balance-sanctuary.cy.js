@@ -81,7 +81,7 @@ describe('Gear balance, racial growth, death shields and sanctuary', () => {
       check(!enemyAttackPlayer(e)&&!enemyRangedAttackPlayer(e),'immediate melee and ranged attacks suppressed')
       check(player.hp===hp&&e.shotsRemaining===10&&rngState===rngBefore,'blocked attacks cost no ammo or RNG')
       enemyTurn();check(e.x===62&&!e.aware&&e.fleeingHoly,'retreats away from temple not toward player')
-      enemyTurn();enemyTurn();check(Math.max(Math.abs(e.x-50),Math.abs(e.y-50))>=15,'reaches sanctuary boundary')
+      enemyTurn();enemyTurn();check(Math.max(Math.abs(e.x-50),Math.abs(e.y-50))>FLEE_DISTANCE,'escapes sanctuary boundary')
       currentZ=-1;e.level=-1;e.x=50;e.y=50;check(!enemyInsideSanctuary(e),'underground is not sanctuary')
     })()`))
   })

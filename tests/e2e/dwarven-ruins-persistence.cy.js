@@ -166,12 +166,15 @@ describe('Dwarven Ruins persistence', () => {
 
         startReplayRecording()
         await tryMove(1,0)
-        check(level.map[y][doorX] === 'dwarvendoorbreached', 'first recorded move breaches the locked door')
+        check(level.map[y][doorX] === 'dwarvendoorlocked' && turnCount === 0,
+          'first recorded bump inspects the lock without advancing time')
+        await tryMove(1,0)
+        check(level.map[y][doorX] === 'dwarvendoorbreached', 'second recorded move breaches the locked door')
         check(enemy.alarmed === true, 'breach noise alarms the controlled enemy')
         await tryMove(1,0)
         const hpBeforeTrap = player.hp
         await tryMove(1,0)
-        check(player.x === trapX && player.y === y && player.hp < hpBeforeTrap, 'third move enters and triggers the reusable spike trap')
+        check(player.x === trapX && player.y === y && player.hp < hpBeforeTrap, 'fourth move enters and triggers the reusable spike trap')
 
         const expected = JSON.stringify({
           tile: level.map[y][doorX],
@@ -183,8 +186,8 @@ describe('Dwarven Ruins persistence', () => {
           traps: level.traps
         })
         const recorded = JSON.parse(JSON.stringify(replayData))
-        check(recorded.actions.length === 3 && recorded.actions.every(action => action.type === 'move'),
-          'breach plus traversal plus trap are recorded as three movement actions')
+        check(recorded.actions.length === 4 && recorded.actions.every(action => action.type === 'move'),
+          'inspection, breach, traversal and trap record four movement actions')
         check(recorded.rng.length > 0, 'combined sequence records its gameplay RNG tape')
 
         loadGameFromObject(recorded.initialState,{isReplayInit:true})

@@ -28,7 +28,7 @@
     "talkFreezeTurns": 6
   },
   "temple": {
-    "fleeDistance": 15
+    "fleeDistance": 10
   },
   "prefixStats": [
     {

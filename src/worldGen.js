@@ -602,6 +602,30 @@ function placeVolcanoes() {
 // Turn an accepted, fully populated world clockwise. No rule/animation RNG is
 // consumed while moving generated data; a single seeded roll selects 0/1/2/3.
 // Coordinates on every underground map share surface world space.
+function initializeDwarvenCrates() {
+  const config = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.crates
+  const loot = config?.loot
+  if (!Number.isInteger(config?.hp) || config.hp < 1 || !Array.isArray(loot) || !loot.length ||
+      loot.some(entry => !entry || !Number.isFinite(entry.weight) || entry.weight <= 0 ||
+        (entry.kind !== null && !['potion', 'speedpotion', 'scrollOfInvisibility'].includes(entry.kind))))
+    throw new Error('Invalid Dwarven crate durability or loot table.')
+  const total = loot.reduce((sum, entry) => sum + entry.weight, 0)
+  for (const level of deepLevels) {
+    if (level.dungeonPackage !== 'dwarvenRuins') continue
+    level.crates = []
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+      if (level.map[y]?.[x] !== 'dwarvencrate') continue
+      const roll = rng() * total
+      let cumulative = 0, lootKind = null
+      for (const entry of loot) {
+        cumulative += entry.weight
+        if (roll < cumulative) { lootKind = entry.kind; break }
+      }
+      level.crates.push({x, y, hp: config.hp, lootKind})
+    }
+  }
+}
+
 function rotateGeneratedWorld(quarterTurns) {
   const turns = ((quarterTurns % 4) + 4) % 4
   if (!turns) return

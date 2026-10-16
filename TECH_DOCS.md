@@ -1142,9 +1142,13 @@ the floor entrance while all generated locks are still closed, so a key cannot
 spawn behind its own lock or form a circular dependency with another lock.
 
 A matching key opens both leaves in **1 turn** and is consumed. Without the key,
-the player may instead attempt to breach the struck leaf with any equipped
-weapon; bare fists cannot attempt a breach and do not consume a turn. A weapon
-attempt always costs **1 turn**, does not consume or damage the weapon, and uses
+the first bump on a particular locked doorway identifies the lock without
+spending a turn. A subsequent bump attempts a breach with an equipped weapon,
+using the same **220 ms cosmetic attack lunge** as ordinary melee and crate
+strikes. Inspection is remembered per physical lock (including double-door
+leaves), survives save/replay, and resets with a new character. Bare fists
+cannot attempt a breach and do not consume a turn. Each actual weapon attempt
+costs **1 turn**, does not consume or damage the weapon, and uses
 the player's **final ATK** (the same ATK shown in the HUD, including the equipped
 weapon and other current ATK bonuses/penalties):
 
@@ -1364,8 +1368,28 @@ hard-coding a Goblin or Skeleton to a coordinate.
 
 Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
 use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
-crates, and prisons use bars. Vaults add their own patterns, including water in
-cisterns and rubble in collapsed halls. Fortified barracks and barricaded
+crates, and prisons use bars. Dwarven crates remain solid to movement and
+projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
+and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
+Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
+player's cosmetic melee lunge. A destroyed crate immediately becomes walkable
+marble for game rules and save/replay, but its sprite stays visible until the
+**220 ms lunge** finishes, then sinks, shrinks, and fades over **420 ms**, like
+a dying monster. This is presentation-only in tile and ASCII modes: loot is not
+shown beneath the crate until the effect ends, and neither gameplay nor replay
+waits on animation timing. Destruction logs
+`You smash dwarven crate into pieces.` Each generated crate
+rolls its contents **once during accepted world generation** and persists its
+remaining HP and pre-rolled contents per dungeon floor. Empty crates yield
+nothing. The small crate loot table is editable in
+`content/world_generation.json` → `dungeons.dwarvenRuins.crates`: the defaults
+are 90% empty, 6% Life Potion, 4% Scroll of Invisibility. Drops appear on the
+broken crate tile, are picked up normally, and cannot be rerolled through
+save/load or replay. The JSON loot entries use **relative weights** and support
+`null` (nothing), `potion`, `speedpotion`, and `scrollOfInvisibility`; changing those weights
+changes the odds without code edits. Destroyed terrain and remaining ground
+loot persist as part of the existing dungeon map/ground item records. Vaults
+add their own patterns, including water in cisterns and rubble in collapsed halls. Fortified barracks and barricaded
 dormitories drag bed frames into chokepoints. Final-floor dormitories have a
 strong additional barricade chance, except the final room containing the sealed
 Deep Mines work stair: that room never contains beds, bed barricades, or
@@ -2924,26 +2948,37 @@ System (section 83).
 
 # 23. Temple Enemy Behavior
 
-The Temple is a safety zone.
+The surface Temple sanctuary protects the player and bars approaching monsters
+within **10 tiles Chebyshev distance** of `spawnPoint`, **including tile 10**.
+Monsters already inside retreat outward up to two steps per game turn,
+regardless of visibility, sleeping, theft, ranged attacks or aggression; blocked
+retreating monsters wait rather than fighting or teleporting. Monsters outside
+cannot enter sanctuary tiles during pursuit, wandering, far-path travel or a
+charge. A player inside sanctuary is treated as undetectable by all monsters,
+even those with true sight: enemies abandon pursuit and use their ordinary idle
+behavior instead. Roaming monsters continue wandering, `far` travelers continue
+their journeys, and `homeReturn` monsters try to return to their original home
+(using their normal wandering chance and radius). A home inside sanctuary or
+adjacent to the protected player remains unreachable until protection ends.
 
-On the surface, monsters strictly within **15 tiles Chebyshev distance** of
-the Temple center (`spawnPoint`) retreat regardless of the player's position,
-visibility or movement. They take up to two outward steps per game turn,
-stopping at distance 15. Retreat has priority over sleep, theft, passive
-behavior, ranged attacks and pursuit. Sleeping creatures wake to retreat.
-Immediate counterattacks are also suppressed inside the sanctuary. Forest
-ambushes do not roll or spawn while the player is strictly within the same
-15-tile sanctuary, even on otherwise eligible forest tiles. An ambusher
-cannot spawn inside that zone from a player standing just beyond its edge.
-The border itself (at distance 15) is not protected against an ambush.
+An outside monster already adjacent to a protected player withdraws one step
+when possible; idle movement cannot approach to an adjacent tile again, keeping
+**at least two tiles of separation** without freezing unrelated wandering.
+The existing visible **"retreats from the sacred ground"** message appears once
+when a monster begins withdrawing, whether it was already inside or was
+adjacent just outside the boundary; ordinary wandering is not logged as retreat.
+Boxed-in enemies cannot attack across the boundary.
 
-Retreat steps obey terrain and occupancy; a boxed-in monster waits rather than
-attacking or teleporting. Creatures outside the boundary behave normally and
-can still shoot inward. The sanctuary does not extend underground. The existing
-20-tile avoidance rule for far-wandering travelers remains separate.
+Neither melee/ranged attacks nor charge/pull abilities may hit a protected
+player. Players also cannot melee-attack from sanctuary: to engage an enemy
+outside, they must leave its boundary. Such a blocked player attack does not
+consume a turn. All sanctuary decisions are part of deterministic turn rules,
+not presentation timing.
 
-This makes the village a reliable refuge but also allows players to drive
-monsters back toward the boundary and retreat safely after attacking.
+Forest ambushes neither roll for players standing at distance 10 or less nor
+spawn inside that distance from an adjacent unprotected forest tile. Underground
+levels have no sanctuary. The separate 20-tile far-wandering village avoidance
+rule is unchanged.
 
 ---
 

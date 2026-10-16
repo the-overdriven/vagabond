@@ -91,6 +91,7 @@ function buildSaveObject() {
     worldTraits: activeWorldTraits,
     rngState: rngState,
     nextEnemyId,
+    inspectedDungeonLocks: [...inspectedDungeonLocks],
     mapWidth: MAP_W,
     mapHeight: MAP_H,
     map: encodeTileGrid(surfaceMap, 'g'),
@@ -109,6 +110,7 @@ function buildSaveObject() {
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
       dungeonPackage: lvl.dungeonPackage || lvl.caves?.[0]?.dungeonPackage || null,
       traps: structuredClone(lvl.traps || []),
+      crates: structuredClone(lvl.crates || []),
       caves: lvl.caves,
       rooms: structuredClone(lvl.rooms || []),
       roomGraph: structuredClone(lvl.roomGraph || lvl.caves?.[0]?.roomGraph || null),
@@ -305,6 +307,7 @@ function loadGameFromObject(data, opts = {}) {
   // A load (manual, or the internal rewind-to-start a replay performs)
   // always supersedes whatever playback might currently be running.
   stopReplayPlayback()
+  inspectedDungeonLocks = new Set(data.inspectedDungeonLocks)
   applyWorldTraits(Array.isArray(data.worldTraits) ? data.worldTraits : data.worldTrait ? [data.worldTrait] : [])
   if (!isReplayInit && !opts.isReplayRestore) {
     preReplaySnapshot = null
@@ -501,6 +504,7 @@ function loadGameFromObject(data, opts = {}) {
     return {
       map: lvlMap,
       traps: structuredClone(lvlData.traps),
+      crates: structuredClone(lvlData.crates),
       caveMaps: lvlCaveMaps,
       caves: lvlCaves,
       discovered: lvlDiscovered,

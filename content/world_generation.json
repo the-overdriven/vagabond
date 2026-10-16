@@ -982,6 +982,14 @@
         "breachAlarmChance": 0.25
       },
       "floorGenerationRetries": 12,
+      "crates": {
+        "hp": 8,
+        "loot": [
+          {"kind": null,"weight": 90},
+          {"kind": "potion","weight": 6},
+          {"kind": "scrollOfInvisibility","weight": 4}
+        ]
+      },
       "shortcut": {
         "targetFloorProgressRange": [
           0.5,
