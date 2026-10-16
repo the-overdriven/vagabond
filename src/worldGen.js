@@ -1300,6 +1300,27 @@ function carveDungeonRoomConnection(carveWide, a, b, cfg) {
   }
 }
 
+// The entrance statues are transparent props, so clear their ground before
+// stamping them. Keep a consistent snowy approach when the gate borders snow;
+// otherwise preserve sand and replace mountains/tree cover with bare grass.
+function stampDwarvenSurfaceGate(x0, y0) {
+  const columnXs = [x0 - 1, x0 + 1].filter(x => x >= 0 && x < MAP_W)
+  const snowy = [x0, ...columnXs].some(x =>
+    ['snow', 'snowmountain', 'taiga'].includes(map[y0][x]))
+  map[y0][x0] = 'dwarvengate'
+  grasslandTrees.delete(keyXY(x0, y0))
+  for (const x of columnXs) {
+    const underlayKey = tileUnderlayKey(x, y0)
+    tileUnderlays[underlayKey] = snowy ? 'snow' : map[y0][x] === 'sand' ? 'sand' : 'grass'
+    grasslandTrees.delete(keyXY(x, y0))
+    map[y0][x] = 'dwarvenstatue'
+  }
+  if (surfaceMap) {
+    surfaceMap[y0][x0] = 'dwarvengate'
+    for (const x of columnXs) surfaceMap[y0][x] = 'dwarvenstatue'
+  }
+}
+
 function buildDwarvenRuin(targetLevel) {
   const cfg = WORLD_GEN_CONFIG.dwarvenFort
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
@@ -1332,19 +1353,7 @@ function buildDwarvenRuin(targetLevel) {
     candidates.push({x: fx, y: fy})
   }
   const gate = pick(candidates), x0 = gate.x, y0 = gate.y
-  map[y0][x0] = 'dwarvengate'
-  // Preserve the exact terrain displaced by each surface column, including
-  // snowy mountains and other non-grass entrance surroundings.
-  for (const sx of [x0 - 1, x0 + 1]) {
-    if (sx < 0 || sx >= MAP_W) continue
-    tileUnderlays[tileUnderlayKey(sx, y0)] = map[y0][sx]
-    map[y0][sx] = 'dwarvenstatue'
-  }
-  if (surfaceMap) {
-    surfaceMap[y0][x0] = 'dwarvengate'
-    if (x0 > 0) surfaceMap[y0][x0 - 1] = 'dwarvenstatue'
-    if (x0 < MAP_W - 1) surfaceMap[y0][x0 + 1] = 'dwarvenstatue'
-  }
+  stampDwarvenSurfaceGate(x0, y0)
   const cm = blankCaveMap(), minX = Math.max(2, x0 - cfg.boundsX), maxX = Math.min(MAP_W - 3, x0 + cfg.boundsX),
     minY = Math.max(2, y0 - cfg.boundsY), maxY = Math.min(MAP_H - 3, y0 + cfg.boundsY)
   // Generate a larger, irregular fort: sealed rooms with single entrances,

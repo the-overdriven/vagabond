@@ -82,6 +82,19 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(surfaceReachable(spawnPoint, {x:dwarvenRuin.x, y:dwarvenRuin.y}),
           'surface Dwarven Fort gate is reachable from the Temple')
 
+        const entranceColumns = positions(surfaceMap, 'dwarvenstatue')
+        check(entranceColumns.length === 2, 'surface Fort gate has two columns')
+        for (const column of entranceColumns) {
+          const dx = Math.abs(column.x - dwarvenRuin.x)
+          const dy = Math.abs(column.y - dwarvenRuin.y)
+          check(dx + dy === 1, 'surface column remains next to the rotated gate')
+          check(['grass', 'snow', 'sand'].includes(tileUnderlays[keyXY(column.x, column.y)]),
+            'surface column stands on cleared ground, never a mountain or tree')
+          check(!grasslandTrees.has(keyXY(column.x, column.y)),
+            'surface column removes any generated grassland tree')
+        }
+
+
         // Every stair landing on the Fort and deeper levels must be free on all
         // eight surrounding tiles, not just on the entry tile itself.
         for (let index=1;index<deepLevels.length;index++) {

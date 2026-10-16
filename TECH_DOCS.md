@@ -683,11 +683,13 @@ just as dwarven rubble overlays its recorded floor underlay; ASCII backgrounds
 stay unchanged. Crypt stairs,
 mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
 coffin images over the appropriate floor. The regular coffin already uses
-`specialTiles.coffin`. Dwarven rubble and columns are transparent image
-props composited over **the original terrain at their exact map coordinate**,
-not a fixed marble, grass, or neighboring floor guess. The underlay is recorded
-when world generation places the prop and saved with the existing tile-underlay
-data; underground underlays are keyed by depth to keep floors independent.
+`specialTiles.coffin`. Dwarven rubble and underground columns are
+transparent props composited over **the underlying floor at their exact map
+coordinate**. The two surface Fort entrance columns instead clear mountains
+and tree cover beneath them, exposing grass, sand or snow as appropriate for
+the surrounding terrain. No tree may occupy a column tile. The underlay is
+recorded during generation, rotates with the world and persists in saves;
+underground underlays are keyed by depth to keep floors independent.
 Where no underlay is recorded, tile-image mode draws only the transparent prop
 without inserting a fabricated floor. Underground floor textures never inherit
 the surface grass/snow fallback. ASCII mode retains its normal terrain glyph
