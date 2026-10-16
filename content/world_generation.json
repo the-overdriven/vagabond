@@ -984,6 +984,8 @@
       "floorGenerationRetries": 12,
       "crates": {
         "hp": 8,
+        "alarmNearbyRadius": 5,
+        "alarmDistantChance": 0.25,
         "loot": [
           {"kind": null,"weight": 90},
           {"kind": "potion","weight": 6},

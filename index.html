@@ -1606,14 +1606,14 @@ more difficult:
     return Math.max(0, playerAtk())
   }
 
-  function alarmNearestEnemyFromBreach() {
-    const probability = currentDungeonPackageConfig()?.doors?.breachAlarmChance ?? 0.25
+  function alarmNearestEnemyFromNoise(x, y, probability, minDistance = 0) {
     if (!chance(probability)) return null
     const candidates = enemies.map((enemy, index) => ({
       enemy,
       index,
-      distance: Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y))
-    })).filter(entry => entry.enemy.alive && onCurrentLevel(entry.enemy) && !entry.enemy.alarmed)
+      distance: Math.max(Math.abs(enemy.x - x), Math.abs(enemy.y - y))
+    })).filter(entry => entry.enemy.alive && onCurrentLevel(entry.enemy) &&
+      !entry.enemy.alarmed && entry.distance >= minDistance)
       .sort((a, b) => a.distance - b.distance ||
         String(a.enemy.id || '').localeCompare(String(b.enemy.id || '')) || a.index - b.index)
     for (const entry of candidates) {
@@ -1623,6 +1623,25 @@ more difficult:
       return entry.enemy
     }
     return null
+  }
+
+  function alarmNearestEnemyFromBreach() {
+    return alarmNearestEnemyFromNoise(player.x, player.y,
+      currentDungeonPackageConfig()?.doors?.breachAlarmChance ?? 0.25)
+  }
+
+  function alarmEnemiesFromCrateStrike(x, y) {
+    const config = currentDungeonPackageConfig()?.crates
+    const radius = config?.alarmNearbyRadius ?? ALARM_TRIGGER_RANGE
+    for (const enemy of enemies) {
+      if (!enemy.alive || !onCurrentLevel(enemy)) continue
+      if (Math.max(Math.abs(enemy.x - x), Math.abs(enemy.y - y)) > radius) continue
+      if (alarmEnemy(enemy) && enemyIsVisibleOnMainView(enemy))
+        log(`${enemy.name} is alarmed by the noise.`, 'bad')
+    }
+    // Every weapon blow also has a separate chance to wake one more distant
+    // enemy. This only sets Alarmed; it does not reveal an invisible player.
+    return alarmNearestEnemyFromNoise(x, y, config?.alarmDistantChance ?? 0.25, radius + 1)
   }
 
   // Crates live alongside their floor's persistent map, rather than being
@@ -6576,6 +6595,7 @@ more difficult:
       consecutiveWaitTurns = 0
       if (!replayAnimationsDisabled && !replaySimulationMode) void animateAttackLunge(player.x, player.y, nx, ny)
       const result = strikeDwarvenCrateAt(nx, ny)
+      if (result) alarmEnemiesFromCrateStrike(nx, ny)
       if (result?.broken) {
         spawnCrateDeathAnim(nx, ny)
         log('You smash dwarven crate into pieces.', 'good')

@@ -1374,7 +1374,21 @@ crates, and prisons use bars. Dwarven crates remain solid to movement and
 projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
 and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
 Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
-player's cosmetic melee lunge. A destroyed crate immediately becomes walkable
+player's cosmetic melee lunge. Every successful weapon strike against a crate,
+including the final blow, immediately Alarms all eligible nonpassive monsters
+within **5 tiles of the crate** (Chebyshev distance, no sight requirement).
+Each strike independently has a **25% chance** to Alarm the nearest eligible,
+not-yet-Alarmed monster **beyond that radius**, without a maximum distance;
+repeated strikes can alert different monsters. Ties resolve by stable enemy ID.
+These sound effects also apply when the player is invisible: Alarmed does not
+reveal the player or bypass normal visibility and pursuit rules. Newly Alarmed
+monsters visible in the main view log `<name> is alarmed by the noise.`; offscreen
+monsters are alerted silently. Both the guaranteed radius and the distant
+chance are independently editable as `alarmNearbyRadius` and
+`alarmDistantChance` in `content/world_generation.json` under
+`dungeons.dwarvenRuins.crates`. Crate noise is resolved before enemies take
+their turn, regardless of attack and destruction animations.
+A destroyed crate immediately becomes walkable
 marble for game rules and save/replay, but its sprite stays visible until the
 **220 ms lunge** finishes, then sinks, shrinks, and fades over **420 ms**, like
 a dying monster. This is presentation-only in tile and ASCII modes: loot is not

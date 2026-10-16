@@ -47,6 +47,38 @@ describe('Dwarven crate destruction, loot and persistence', () => {
         'destroyed crate never respawns')
     })()`))
   })
+  it('alerts nearby monsters and sometimes a farther one on every weapon strike, even while invisible', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const config=WORLD_GEN_CONFIG.dungeons.dwarvenRuins.crates
+      check(config.alarmNearbyRadius===5 && config.alarmDistantChance===0.25,
+        'crate noise parameters come from world-generation JSON')
+      function noiseEnemy(id,x,y,props={}) {
+        return {id,name:id,baseName:'Goblin',alive:true,hp:100,maxHp:100,atk:0,def:0,
+          spd:1,grace:1,tier:1,aggro:5,abilities:[],humanoid:false,
+          level:currentZ,levelKind:'chain',caveIndex:-1,x,y,homeX:x,homeY:y,
+          aware:false,alarmed:false,wander:false,...props}
+      }
+      player.invisibleTurns=100
+      enemies=[noiseEnemy('near-a',101,95),noiseEnemy('near-b',106,105),
+        noiseEnemy('far-a',107,100),noiseEnemy('far-b',110,100),
+        noiseEnemy('passive',103,100,{aggro:0}),
+        noiseEnemy('other-floor',102,100,{level:chainZForDepth(3)})]
+      occupied=new Set(enemies.filter(e=>onCurrentLevel(e)).map(e=>keyXY(e.x,e.y)))
+      config.alarmDistantChance=0
+      await tryMove(1,0)
+      check(enemies[0].alarmed && enemies[1].alarmed, 'all monsters within five tiles Alarm immediately')
+      check(!enemies[2].alarmed && !enemies[3].alarmed, 'outside the noise radius are initially safe')
+      check(!enemies[4].alarmed && !enemies[5].alarmed, 'passive and other-level monsters unaffected')
+      check(player.invisibleTurns>0 && !enemies[0].aware, 'noise does not reveal invisible player')
+      check(deepLevels[2].crates[0].hp>0, 'noise occurs even before crate breaks')
+      config.alarmDistantChance=1
+      await tryMove(1,0)
+      check(enemies[2].alarmed && !enemies[3].alarmed, 'nearest distant monster alarms first')
+      await tryMove(1,0)
+      check(enemies[3].alarmed, 'next blow can alarm another distant monster')
+    })()`))
+  })
   it('uses pre-rolled loot and replays breaking and picking up a full crate exactly', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -109,7 +141,6 @@ describe('Dwarven crate destruction, loot and persistence', () => {
         replayAnimationsDisabled=false;replaySimulationMode=false;USE_TILE_IMAGES=${tileGraphics};
         deepLevels[2].crates[0].hp=1
         deepLevels[2].crates[0].lootKind='potion'
-        const rngBefore=rngState
         await tryMove(1,0)
         const effect=fxAnims.find(p=>p.tileKey==='dwarvencrate'&&p.x===101&&p.y===100)
         check(map[100][101]==='marble','gameplay resolves before animation')
@@ -121,10 +152,11 @@ describe('Dwarven crate destruction, loot and persistence', () => {
         check(effect.duration===FX_ANIM_MS&&effect.dir===1,
           'crate uses monster sinking/fading effect')
         check(effect.level===currentZ,'death effect belongs to current floor')
-        check(rngState===rngBefore,'visual timing does not roll RNG')
+        const rngBeforeRender=rngState
         check(!Object.hasOwn(buildSaveObject(),'fxAnims'),
           'save does not contain transient effects')
         render(effect.start-1)
+        check(rngState===rngBeforeRender,'rendering does not roll RNG; attack noise may')
         check(fxAnims.includes(effect),'crate remains rendered while lunge runs')
       })()`))
       cy.wait(700)
