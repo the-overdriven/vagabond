@@ -55,6 +55,29 @@ describe('Tactical consumables', () => {
     })
   }
 
+  it('boosts Wyrdling combat-potion strength once, keeps penalties, and restores sampled values', () => {
+    loadConsumableWorld(1440)
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,message)=>{if(!ok)throw Error(message)};
+      toggleInv(false);player.race='wyrdling';player.baseAtk=18;player.baseDef=18;
+      player.equip={weapon:null,armor:null,shield:null};player.curseDebuffs=[];
+      map[player.y][player.x]='grass';
+      for(let dose=0;dose<2;dose++)for(const kind of ['stoneSkinPotion','berserkPotion']){
+        addInventoryItem(kind);
+        useTacticalConsumable(player.inventory.findIndex(item=>item.kind===kind),kind)
+      }
+      check(player.stoneSkinBonus===11&&player.berserkBonus===9,'whole bonus scales once and rounds');
+      check(player.stoneSkinTurns===17&&player.berserkTurns===18,'extended duration refreshes');
+      check(potionGracePenalty()===5&&playerDef()===26&&playerAtk()===27,'penalties stay unchanged');
+      const save=JSON.parse(JSON.stringify(buildSaveObject()));
+      loadGameFromObject(save,{isReplayInit:true});
+      check(player.stoneSkinBonus===11&&player.berserkBonus===9,'sampled boosted values persist');
+      updateHud();
+    })()`))
+    cy.get('[data-status="stone-skin"]').should('have.attr','data-detail').and('contain','+11 DEF')
+    cy.get('[data-status="berserk"]').should('have.attr','data-detail').and('contain','+9 ATK')
+  })
+
   it('keeps all five catalog icons, ground visuals, ASCII glyphs and pickup identities distinct', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => {

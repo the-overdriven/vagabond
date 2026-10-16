@@ -4462,8 +4462,18 @@ that describes its rules without consuming it.
 | Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
 
 Radii use Chebyshev distance (eight-direction tile distance) on the current map
-and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns;
-it does not increase their strength, radius or shield charges. As with Speed and
+and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
+It also multiplies each combat potion's entire positive stat bonus by 1.25,
+rounded to the nearest integer after adding the flat and scaling portions:
+
+```text
+Stone Skin DEF bonus = round((6 + floor(DEF / 6)) × 1.25)
+Berserk ATK bonus = round((4 + floor(ATK / 6)) × 1.25)
+```
+
+At 18 DEF, Stone Skin gives +11 instead of +9 DEF; at 18 ATK, Berserk gives
++9 instead of +7 ATK. Their GRACE/DEF penalties are unchanged. Fear's radius and
+tier restriction, Chaos's radii and Death Shield's single charge are unchanged. As with Speed and
 Invisibility, the activation action consumes the first duration turn. Fear
 resolves one retreat action on that turn; its remaining timer then reads 9
 (or 12 for Wyrdling). Potion counters read 14 (or 18).
@@ -4520,7 +4530,7 @@ counts or replacing loose Life Potions. The chance and weights are editable in
 
 Player potion timers, exact sampled bonuses and ready shield charge, plus each
 monster's remaining fear timer, initialize on new actors, persist in current saves
-and replay snapshots, and restore without rerolling effects. Save version 55 rejects
+and replay snapshots, and restore without rerolling effects. Save version 56 rejects
 older saves/replays; no conversion is provided. All item RNG and state changes run
 synchronously before animations.
 
@@ -5567,7 +5577,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-52
+55
 ```
 
 Saves are JSON files.

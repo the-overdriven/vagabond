@@ -166,7 +166,7 @@ function useTacticalConsumable(idx, kind) {
     const stone = kind === 'stoneSkinPotion'
     const stat = Math.max(0, stone ? playerDef(false, true) : playerAtk(false, true))
     // Sample without either potion; refreshing never scales from itself.
-    const bonus = effect.baseBonus + Math.floor(stat / effect.statDivisor)
+    const bonus = consumablePower(effect.baseBonus + Math.floor(stat / effect.statDivisor))
     player[stone ? 'stoneSkinBonus' : 'berserkBonus'] = bonus
     player[stone ? 'stoneSkinTurns' : 'berserkTurns'] = consumablePower(effect.durationTurns)
     log(stone ? `Your skin hardens like stone. (+${bonus} DEF, −3 GRACE)`
