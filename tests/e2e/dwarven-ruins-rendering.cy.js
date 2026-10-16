@@ -36,6 +36,8 @@ describe('Dwarven Ruins rendering paths', () => {
         check(RENDER_STYLE.terrainTiles.dwarvenlever.baseTileKey === 'marble' &&
           RENDER_STYLE.terrainTiles.dwarvenleverpulled.baseTileKey === 'marble',
           'both lever states render over marble while blocking terrain is unchanged')
+        for (const image of ['img/tiles/dwarven-column-indoor.png', 'img/tiles/dwarven-rubble.png'])
+          check(preloadedImages.has(image), 'Dwarven visual was preloaded: ' + image)
         USE_TILE_IMAGES = true
         render()
         check(document.getElementById('game').width > 0 && document.getElementById('game').height > 0, 'tile canvas renders')
@@ -86,10 +88,23 @@ describe('Dwarven rubble and column floor layers', () => {
           currentZ = 0
           map[1][1] = 'dwarvenstatue'
           const surface = overlayBaseTileKey('dwarvenstatue', 1, 1)
+          const surfaceColumnImage = terrainVisual('dwarvenstatue', 1, 1).image
+          currentZ = -4
+          const indoorColumnImage = terrainVisual('dwarvenstatue', 1, 1).image
+          const rubbleVariants = RENDER_STYLE.terrainTiles.dwarvenrubble.variants
+          const sample = []
+          for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) {
+            const chosen = terrainVisual('dwarvenrubble', x, y).image
+            if (terrainVisual('dwarvenrubble', x, y).image !== chosen) throw new Error('Rubble variant changed between renders')
+            sample.push(chosen)
+          }
+          const variantCoverage = rubbleVariants.every(path => sample.includes(path))
+          currentZ = 0
           USE_TILE_IMAGES = false
           const asciiDoesNotComposite = overlayBaseTileKey('dwarvenstatue', 1, 1)
           const asciiKeepsBackground = tileBackground(1, 1, 'dwarvenstatue') === TILE.snowmountain.bg
-          return {floors, cryptFloor, cryptIsTransparent, missingDoesNotGuess, surface, asciiDoesNotComposite, asciiKeepsBackground}
+          return {floors, cryptFloor, cryptIsTransparent, missingDoesNotGuess, surface, asciiDoesNotComposite, asciiKeepsBackground,
+            surfaceColumnImage, indoorColumnImage, rubbleVariants, variantCoverage}
         } finally {
           map = original.map
           currentZ = original.currentZ
@@ -104,6 +119,10 @@ describe('Dwarven rubble and column floor layers', () => {
       expect(result.surface).to.equal('snowmountain')
       expect(result.asciiDoesNotComposite).to.equal(null)
       expect(result.asciiKeepsBackground).to.equal(true)
+      expect(result.surfaceColumnImage).to.equal('img/tiles/ancient-stone-column.png')
+      expect(result.indoorColumnImage).to.equal('img/tiles/dwarven-column-indoor.png')
+      expect(result.rubbleVariants).to.deep.equal(['img/tiles/cave-rubble.png', 'img/tiles/dwarven-rubble.png'])
+      expect(result.variantCoverage).to.equal(true)
     })
   })
 

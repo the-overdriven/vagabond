@@ -677,15 +677,18 @@ In tile-image mode, `content/rendering.json` maps ordinary cave floors
 z:-2 burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave walls
 (`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
 these textures; `marble` has a lighter stone-floor image, and walkable
-`cryptrubble`/`dwarvenrubble` use a distinct rubble image. Crypt rubble in
-tile mode overlays the original `crypt2floor` tile without a painted square,
-just as dwarven rubble overlays its recorded floor underlay; ASCII backgrounds
-stay unchanged. Crypt stairs,
-mausoleum stairs, trap coffins, and the sarcophagus use existing transition or
-coffin images over the appropriate floor. The regular coffin already uses
-`specialTiles.coffin`. Dwarven rubble and underground columns are
+`cryptrubble` uses cave rubble, while `dwarvenrubble` alternates between
+cave rubble and `img/tiles/dwarven-rubble.png` with an even-weight,
+coordinate-based visual selection (no gameplay RNG). Crypt rubble in tile mode
+overlays the original `crypt2floor` tile without a painted square, just as
+dwarven rubble overlays its recorded floor underlay; ASCII backgrounds stay
+unchanged. Crypt stairs, mausoleum stairs, trap coffins, and the sarcophagus
+use existing transition or coffin images over the appropriate floor. The regular coffin already uses
+`specialTiles.coffin`. Underground Dwarven columns use
+`img/tiles/dwarven-column-indoor.png`; the two surface Fort entrance columns
+keep `img/tiles/ancient-stone-column.png`. Dwarven rubble and all columns are
 transparent props composited over **the underlying floor at their exact map
-coordinate**. The two surface Fort entrance columns instead clear mountains
+coordinate**. The surface entrance columns also clear mountains
 and tree cover beneath them, exposing grass, sand or snow as appropriate for
 the surrounding terrain. No tree may occupy a column tile. The underlay is
 recorded during generation, rotates with the world and persists in saves;

@@ -327,6 +327,10 @@
     },
     "dwarvenrubble": {
       "image": "img/tiles/cave-rubble.png",
+      "variants": [
+        "img/tiles/cave-rubble.png",
+        "img/tiles/dwarven-rubble.png"
+      ],
       "scale": 1
     },
     "dwarvenwall": {
@@ -428,6 +432,7 @@
     },
     "dwarvenstatue": {
       "image": "img/tiles/ancient-stone-column.png",
+      "undergroundImage": "img/tiles/dwarven-column-indoor.png",
       "scale": 1
     },
     "blackpillar": {
