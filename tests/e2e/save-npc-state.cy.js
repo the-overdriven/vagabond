@@ -4,6 +4,7 @@ describe('Exact current-save NPC restoration', () => {
     cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
     cy.readFile('tests/saves/Tester_start.json').then(save => {
       cy.window().then(win => {
+        expect(save.version, 'shared test fixture matches the current save format').to.equal(win.VAGABOND_SAVE_VERSION)
         win.__npcRestoreFixture=save
         win.eval('loadGameFromObject(window.__npcRestoreFixture,{isReplayInit:true})')
         delete win.__npcRestoreFixture

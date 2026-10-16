@@ -4530,7 +4530,7 @@ counts or replacing loose Life Potions. The chance and weights are editable in
 
 Player potion timers, exact sampled bonuses and ready shield charge, plus each
 monster's remaining fear timer, initialize on new actors, persist in current saves
-and replay snapshots, and restore without rerolling effects. Save version 56 rejects
+and replay snapshots, and restore without rerolling effects. Save version 55 rejects
 older saves/replays; no conversion is provided. All item RNG and state changes run
 synchronously before animations.
 
@@ -6625,7 +6625,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 40).
+The replay `version` is independent of the game's `SAVE_VERSION` (currently 55).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
