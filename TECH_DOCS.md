@@ -1402,11 +1402,29 @@ rolls its contents **once during accepted world generation** and persists its
 remaining HP and pre-rolled contents per dungeon floor. Empty crates yield
 nothing. The small crate loot table is editable in
 `content/world_generation.json` → `dungeons.dwarvenRuins.crates`: the defaults
-are 90% empty, 6% Life Potion, 4% Scroll of Invisibility. Drops appear on the
-broken crate tile, are picked up normally, and cannot be rerolled through
-save/load or replay. The JSON loot entries use **relative weights** and support
-`null` (nothing), `potion`, `speedpotion`, and `scrollOfInvisibility`; changing those weights
-changes the odds without code edits. Destroyed terrain and remaining ground
+provide a **16% total drop chance** (previously 10%), with one result per crate:
+
+| Result | Chance per crate |
+|---|---:|
+| Nothing | 84% |
+| Life Potion | 6% |
+| Scroll of Invisibility | 4% |
+| Potion of Stone Skin | 1.8% |
+| Potion of Berserk | 1.8% |
+| Scroll of Fear | 1.2% |
+| Scroll of Chaos | 0.9% |
+| Scroll of Death Shield | 0.3% |
+
+The five tactical consumables together account for 6% of crates. The original
+Life Potion (6%) and Invisibility (4%) chances are retained; the empty share
+falls from 90% to 84%. Death Shield remains the rarest. Drops appear on the broken crate tile, are picked up
+normally, and cannot be rerolled through save/load or replay. The JSON loot
+entries use **relative weights**: `P(result) = weight / sum(all weights)`. Supported
+kinds are `null` (nothing), `potion`, `speedpotion`, `scrollOfInvisibility`, and all
+five tactical consumable IDs; changing weights changes the odds without code
+edits. Contents still use exactly one seeded roll per crate during generation.
+Existing generated crates retain their saved contents; the expanded table is
+used for new worlds. Destroyed terrain and remaining ground
 loot persist as part of the existing dungeon map/ground item records. Vaults
 add their own patterns, including water in cisterns and rubble in collapsed halls. Fortified barracks and barricaded
 dormitories drag bed frames into chokepoints. Final-floor dormitories have a

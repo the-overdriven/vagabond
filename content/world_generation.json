@@ -987,9 +987,14 @@
         "alarmNearbyRadius": 5,
         "alarmDistantChance": 0.25,
         "loot": [
-          {"kind": null,"weight": 90},
+          {"kind": null,"weight": 84},
           {"kind": "potion","weight": 6},
-          {"kind": "scrollOfInvisibility","weight": 4}
+          {"kind": "scrollOfInvisibility","weight": 4},
+          {"kind": "stoneSkinPotion","weight": 1.8},
+          {"kind": "berserkPotion","weight": 1.8},
+          {"kind": "scrollOfFear","weight": 1.2},
+          {"kind": "scrollOfChaos","weight": 0.9},
+          {"kind": "scrollOfDeathShield","weight": 0.3}
         ]
       },
       "shortcut": {

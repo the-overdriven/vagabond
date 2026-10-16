@@ -607,7 +607,7 @@ function initializeDwarvenCrates() {
   const loot = config?.loot
   if (!Number.isInteger(config?.hp) || config.hp < 1 || !Array.isArray(loot) || !loot.length ||
       loot.some(entry => !entry || !Number.isFinite(entry.weight) || entry.weight <= 0 ||
-        (entry.kind !== null && !['potion', 'speedpotion', 'scrollOfInvisibility'].includes(entry.kind))))
+        (entry.kind !== null && !['potion', 'speedpotion', 'scrollOfInvisibility', ...TACTICAL_CONSUMABLE_KINDS].includes(entry.kind))))
     throw new Error('Invalid Dwarven crate durability or loot table.')
   const total = loot.reduce((sum, entry) => sum + entry.weight, 0)
   for (const level of deepLevels) {

@@ -116,7 +116,7 @@ async function main() {
         if(l.map[y]?.[x]==='dwarvencrate')tiles.push(keyXY(x,y));
       return tiles.length===l.crates.length && l.crates.every(c=>tiles.includes(keyXY(c.x,c.y)) &&
         c.hp===WORLD_GEN_CONFIG.dungeons.dwarvenRuins.crates.hp &&
-        [null,'potion','speedpotion','scrollOfInvisibility'].includes(c.lootKind))
+        [null,'potion','speedpotion','scrollOfInvisibility',...TACTICAL_CONSUMABLE_KINDS].includes(c.lootKind))
     })`, 'crate generation matches blocking tiles, configured HP and valid loot')
     run('rngState=WORLD_SEED;initializeDwarvenCrates()')
     assert.equal(JSON.stringify(run(`deepLevels.filter(l=>l.dungeonPackage==='dwarvenRuins')
