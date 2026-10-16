@@ -58,15 +58,25 @@ describe('Ultra-rare enemy templates', () => {
       const check=(ok,message)=>{if(!ok)throw new Error(message)}
       replayRecording=false; replayAnimationsDisabled=true
       currentZ=0; map=surfaceMap; player.invisibleTurns=0; player.godMode=false
-      map[player.y][player.x]='grass'
+      oldHunterQuest=null;enemies=[];npcs=[];occupied=new Set()
+      const control={...ENEMY_TEMPLATE_BY_NAME.Myrka,...rareFleeDefaults({}),baseName:'Myrka',
+        alive:true,level:0,x:player.x+4,y:player.y,aware:false,alarmed:false}
+      check(playerInsideSanctuary()&&!rareStartFlee(control,4),
+        'the starting sanctuary hides the player and cannot trigger a rare sighting')
+      // Rare sightings require a visible player outside the Temple sanctuary.
+      const offset=FLEE_DISTANCE+RARE_FLEE.sightRange+2
+      player.x=spawnPoint.x+offset<MAP_W-5 ? spawnPoint.x+offset : spawnPoint.x-offset
+      player.y=spawnPoint.y
+      map[player.y][player.x]='grass';grasslandTrees.delete(keyXY(player.x,player.y))
+      check(!playerInsideSanctuary()&&!playerHasForestCover(),'rare-sighting arena is unprotected and unconcealed')
       const names=['Myrka','Vampire','NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
       check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>Number(t.rarity??1)<=RARE_FLEE.maxRarity).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
-      for(const name of names) for(const wander of ['far','homeReturn','homeReanchored','roam',false]) {
+      for(const prefixed of [false,true]) for(const name of names) for(const wander of ['far','homeReturn','homeReanchored','roam',false]) {
         const t=ENEMY_TEMPLATE_BY_NAME[name]
-        const e={...t,...rareFleeDefaults({}),name:'Fierce '+name,baseName:name,prefix:{name:'Fierce'},
+        const e={...t,...rareFleeDefaults({}),name:prefixed?'Fierce '+name:name,baseName:name,prefix:prefixed?'Fierce':null,
           alive:true,level:0,x:player.x+4,y:player.y,aware:false,alarmed:false,wander}
-        check(rareStartFlee(e,4), name+' '+wander+' starts without a quest')
-        check(e.rareSightings===1 && e.rareFleeTurns===RARE_FLEE.fleeTurns[0] && !e.aware && !e.alarmed, 'cinematic flags')
+        check(rareStartFlee(e,4), e.name+' '+wander+' starts without a quest outside sanctuary')
+        check(e.rareSightings===1 && e.rareFleeTurns===RARE_FLEE.fleeTurns[0] && !e.aware && !e.alarmed, e.name+' '+wander+' cinematic flags')
         check(!rareStartFlee(e,4), 'ongoing flight cannot retrigger')
         e.rareFleeTurns=0; e.rareSightings=2; e.rareArmed=true
         check(!rareStartFlee(e,4), 'two sightings only')

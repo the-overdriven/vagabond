@@ -47,10 +47,13 @@ describe('Temple sanctuary boundary, immunity and pursuit', () => {
         'the retreat message is not repeated on idle turns')
       log=originalLog
       const saved=JSON.parse(JSON.stringify(buildSaveObject()))
-      const final=JSON.stringify({enemy:enemies[0],rng:rngState,turn:turnCount})
+      // Compare the persisted gameplay record; live objects also contain
+      // animation timestamps and omitted/default fields reconstructed on load.
+      const persistentState=()=>JSON.stringify({enemy:buildSaveObject().enemies[0],rng:rngState|0,turn:turnCount})
+      const final=persistentState()
       loadGameFromObject(saved,{isReplayInit:true})
-      check(JSON.stringify({enemy:enemies[0],rng:rngState,turn:turnCount})===final,
-        'enemy position and awareness persist exactly through restore')
+      check(persistentState()===final,
+        'enemy position, awareness and all persisted fields restore with identical RNG and turn')
     })()`))
   })
 

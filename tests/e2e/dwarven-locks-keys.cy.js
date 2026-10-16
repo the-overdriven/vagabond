@@ -125,6 +125,13 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       const check = (ok, msg) => { if (!ok) throw new Error(msg) }
       replayRecording = false
       replayPlaying = false
+      // This case asserts synchronous mechanics. Breach lunges otherwise leave
+      // attackAnim active and queue the immediately following scripted bump.
+      replayAnimationsDisabled = true
+      replaySimulationMode = false
+      stopAttackAnimation()
+      stopCameraAnimation()
+      pendingMove = null
       currentZ = 0
       currentCave = -1
       map = surfaceMap
@@ -186,6 +193,9 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       check(map[otherLeaf.y][otherLeaf.x] === 'dwarvendoorlocked', 'breaching one physical leaf does not destroy the other')
 
       addInventoryItem('dwarvenkey', {keyId: lockId})
+      check(dungeonLockIdAt(otherLeaf.x, otherLeaf.y) === lockId &&
+        matchingDungeonKeyAt(otherLeaf.x, otherLeaf.y)?.keyId === lockId,
+        'breached sibling retains the original shared lock identity')
       const otherApproach = [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy]) => ({
         x: otherLeaf.x + dx, y: otherLeaf.y + dy, dx: -dx, dy: -dy
       })).find(p => TILE[map[p.y]?.[p.x]]?.walk)

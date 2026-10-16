@@ -75,14 +75,25 @@ describe('Gear balance, racial growth, death shields and sanctuary', () => {
   })
   it('retreats from the temple while the player is elsewhere or invisible, without attacks', () => {
     cy.window().then(win=>win.eval(`(() => {
-      spawnPoint={x:50,y:50};player.x=80;player.y=50;player.invisibleTurns=20
-      const e=makeBalanceEnemy('Goblin',{x:60,y:50,aware:true,shooterAbility:'stones',shotsRemaining:10})
-      const hp=player.hp,rngBefore=rngState
-      check(!enemyAttackPlayer(e)&&!enemyRangedAttackPlayer(e),'immediate melee and ranged attacks suppressed')
-      check(player.hp===hp&&e.shotsRemaining===10&&rngState===rngBefore,'blocked attacks cost no ammo or RNG')
-      enemyTurn();check(e.x===62&&!e.aware&&e.fleeingHoly,'retreats away from temple not toward player')
-      enemyTurn();enemyTurn();check(Math.max(Math.abs(e.x-50),Math.abs(e.y-50))>FLEE_DISTANCE,'escapes sanctuary boundary')
-      currentZ=-1;e.level=-1;e.x=50;e.y=50;check(!enemyInsideSanctuary(e),'underground is not sanctuary')
+      spawnPoint={x:50,y:50};player.x=80;player.y=50
+      // Check both visible and invisible players, and both one/two-step exits.
+      for(const invisibleTurns of [0,20]) for(const startX of [59,60]) {
+        enemies=[];occupied=new Set();player.invisibleTurns=invisibleTurns
+        const e=makeBalanceEnemy('Goblin',{x:startX,y:50,homeX:startX,homeY:50,wander:false,
+          aware:true,shooterAbility:'shooterStones',shotsRemaining:10})
+        const hp=player.hp,rngBefore=rngState
+        check(enemyIsShooter(e),'uses a configured ranged ability')
+        check(!enemyAttackPlayer(e)&&!enemyRangedAttackPlayer(e),'immediate melee and ranged attacks suppressed')
+        check(player.hp===hp&&e.shotsRemaining===10&&rngState===rngBefore,'blocked attacks cost no ammo or RNG')
+        enemyTurn()
+        check(e.x===61&&e.y===50&&!e.aware&&e.fleeingHoly,
+          'retreat stops on the first tile outside sanctuary, even toward a distant player')
+        enemyTurn();enemyTurn()
+        check(e.x===61&&e.y===50&&!enemyInsideSanctuary(e),'idle enemy does not re-enter sanctuary')
+        check(player.hp===hp&&e.shotsRemaining===10,'retreat never attacks')
+      }
+      currentZ=-1;const e=enemies[0];e.level=-1;e.x=50;e.y=50
+      check(!enemyInsideSanctuary(e),'underground is not sanctuary')
     })()`))
   })
   it('colours each equipment name, including equal names with different tiers', () => {
