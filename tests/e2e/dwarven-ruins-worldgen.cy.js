@@ -195,6 +195,19 @@ describe('Persistent Dwarven Ruins stratum', () => {
           const gateLeaves = lockedGate.length ? lockedGate : breachedGate
           check(Math.abs(gateLeaves[0].x - gateLeaves[1].x) + Math.abs(gateLeaves[0].y - gateLeaves[1].y) === 1,
             'progression gate leaves are adjacent')
+          // A two-leaf doorway must never have an extra passable gap beside it,
+          // including after a loop/collapse/repair attempt.
+          for (const room of level.rooms.filter(room => room.index > 0)) {
+            check(dwarvenRoomPerimeterSealed(level.map, room,
+              (room.doorways || []).map(leaves => ({leaves}))),
+              'room perimeter has only declared door leaves: ' + room.id)
+          }
+          if (lockedGate.length) {
+            const blocked = new Set(lockedGate.map(p => keyXY(p.x,p.y)))
+            check(!dungeonWalkDistancesWithDoorTraversal(level.map,up[0],blocked,true)
+              .has(keyXY(target.x,target.y)),
+              'no diagonal gap can bypass an intact progression gate')
+          }
           const floorZ = chainZForDepth(i + 4)
           const progressionSources = [
             ...groundItems.filter(g => g.level === floorZ && g.kind === 'dwarvenkey' && g.keyId)

@@ -2260,6 +2260,94 @@ function carveReservedDungeonCorridor(carveWide, from, to, bounds, protectedRoom
   return true
 }
 
+// An optional loop joins corridors *outside* existing room entrances. The
+// authored doors remain the only breaches in a room perimeter. Route with a
+// stable four-way search, then widen only into cells outside all room footprints;
+// otherwise a two/three-cell brush can create a third tile beside a door.
+function carveDwarvenLoopOutsideRooms(cm, carve, from, to, bounds, rooms) {
+  const insideRoom = (x,y) => rooms.some(r => x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h)
+  const allowed = (x,y) => x >= bounds.minX+1 && x < bounds.maxX &&
+    y >= bounds.minY+1 && y < bounds.maxY && !insideRoom(x,y)
+  if (!allowed(from.x,from.y) || !allowed(to.x,to.y)) return false
+  const id = (x,y) => keyXY(x,y)
+  const queue=[from], previous=new Map([[id(from.x,from.y),null]])
+  const dirs=[[1,0],[0,1],[-1,0],[0,-1]]
+  for(let i=0;i<queue.length;i++) {
+    const pos=queue[i]
+    if(pos.x===to.x && pos.y===to.y) break
+    const ordered=dirs.slice().sort((a,b) =>
+      (Math.abs(to.x-pos.x-a[0])+Math.abs(to.y-pos.y-a[1])) -
+      (Math.abs(to.x-pos.x-b[0])+Math.abs(to.y-pos.y-b[1])))
+    for(const [dx,dy] of ordered) {
+      const x=pos.x+dx,y=pos.y+dy,k=id(x,y)
+      if(previous.has(k) || !allowed(x,y)) continue
+      previous.set(k,pos);queue.push({x,y})
+    }
+  }
+  if(!previous.has(id(to.x,to.y))) return false
+  const route=[]
+  for(let at=to;at;at=previous.get(id(at.x,at.y))) route.push(at)
+  // Never touch room terrain, including diagonally adjacent door jambs.
+  for(const pos of route) for(let dy=-1;dy<=0;dy++) for(let dx=-1;dx<=0;dx++) {
+    const x=pos.x+dx,y=pos.y+dy
+    if(allowed(x,y)) carve(x,y)
+  }
+  return true
+}
+
+// Restore connectivity after collapses without cutting a new hole in a room
+// perimeter. Only the already-selected two-leaf door cells may cross a wall;
+// other rock and damaged interior cells can be repaired on a short 4-way route.
+function repairDwarvenCorridorSafely(cm, from, connected, rooms, doorways, bounds, carve) {
+  const portalKeys=new Set(doorways.flatMap(d=>d.leaves.map(p=>keyXY(p.x,p.y))))
+  const allowed=(x,y) => {
+    if(x<=bounds.minX || x>=bounds.maxX || y<=bounds.minY || y>=bounds.maxY) return false
+    for(const r of rooms) {
+      if(x<r.x || x>=r.x+r.w || y<r.y || y>=r.y+r.h) continue
+      const edge=x===r.x || x===r.x+r.w-1 || y===r.y || y===r.y+r.h-1
+      if(edge && !portalKeys.has(keyXY(x,y))) return false
+      // Don't repair through a collapsed doorway; that would make an intended
+      // door vanish silently. This attempt should instead be retried.
+      if(edge && cm[y][x]!=='marble') return false
+    }
+    return true
+  }
+  if(!allowed(from.x,from.y)) return false
+  const queue=[from], parent=new Map([[keyXY(from.x,from.y),null]])
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+  let goal=null
+  for(let i=0;i<queue.length;i++) {
+    const pos=queue[i],k=keyXY(pos.x,pos.y)
+    if(connected.has(k)) {goal=pos;break}
+    for(const [dx,dy] of dirs) {
+      const x=pos.x+dx,y=pos.y+dy,nextKey=keyXY(x,y)
+      if(parent.has(nextKey) || !allowed(x,y)) continue
+      parent.set(nextKey,pos);queue.push({x,y})
+    }
+  }
+  if(!goal) return false
+  for(let at=goal;at;at=parent.get(keyXY(at.x,at.y))) {
+    // Prefer the existing two-cell corridor width, but never widen across an
+    // authored wall or alter one of its door leaves.
+    for(let dy=-1;dy<=0;dy++) for(let dx=-1;dx<=0;dx++) {
+      const x=at.x+dx,y=at.y+dy
+      if(allowed(x,y) && !portalKeys.has(keyXY(x,y)) && cm[y][x]!=='marble') carve(x,y)
+    }
+  }
+  return true
+}
+
+// Room walls have exactly their authored openings. Test walkability, not
+// just marble: breached doors are passable but must still occupy a known port.
+function dwarvenRoomPerimeterSealed(cm,room,doorways) {
+  const ports=new Set(doorways.flatMap(d=>d.leaves.map(p=>keyXY(p.x,p.y))))
+  for(let y=room.y;y<room.y+room.h;y++) for(let x=room.x;x<room.x+room.w;x++) {
+    if(x!==room.x && x!==room.x+room.w-1 && y!==room.y && y!==room.y+room.h-1) continue
+    if(TILE[cm[y]?.[x]]?.walk && !ports.has(keyXY(x,y))) return false
+  }
+  return true
+}
+
 // Generic room-graph foundation used by authored dungeon strata. Geography is
 // placed first, but no corridor is carved until this graph has selected the
 // mandatory route, optional branches and loop edges. That keeps progression
@@ -2542,12 +2630,42 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     doorways.push({leaves:hallGeometry.near,room:hall})
   }
 
-  // Loop decisions were already made in the abstract room graph. Carve them
-  // only after primary room walls/doorways exist so the loop creates its own
-  // visible secondary connection without changing graph semantics.
-  for (const edge of roomGraph.edges.filter(edge => edge.kind === 'loop')) {
-    if (!connectRoomCenters(rooms[edge.a], rooms[edge.b])) return null
+  // Loops connect the *outside* of the already-authored doorways, without
+  // opening a new hole in any room wall (even when the brush is two tiles wide).
+  // A loop that cannot be routed safely is removed from the optional graph.
+  const outsideDoor = (room) => {
+    const doorway=doorways.find(d=>d.room===room)?.leaves
+    if (doorway) return doorway.map(p => {
+      const dx=p.x===room.x ? -1 : p.x===room.x+room.w-1 ? 1 : 0
+      const dy=p.y===room.y ? -1 : p.y===room.y+room.h-1 ? 1 : 0
+      return {x:p.x+dx,y:p.y+dy}
+    }).filter(p=>cm[p.y]?.[p.x]==='marble')
+    // The entrance room is intentionally open rather than door-framed.
+    const border=[]
+    for(let y=room.y;y<room.y+room.h;y++) for(let x=room.x;x<room.x+room.w;x++) {
+      if(x!==room.x && x!==room.x+room.w-1 && y!==room.y && y!==room.y+room.h-1) continue
+      for(const [dx,dy] of DIRS4) {
+        const px=x+dx,py=y+dy
+        if((px<room.x || px>=room.x+room.w || py<room.y || py>=room.y+room.h) &&
+           cm[py]?.[px]==='marble') border.push({x:px,y:py})
+      }
+    }
+    return border
   }
+  for (const edge of roomGraph.edges.filter(edge=>edge.kind==='loop').slice()) {
+    const from=outsideDoor(rooms[edge.a]), to=outsideDoor(rooms[edge.b])
+    let connected=false
+    const pairs=[]
+    for(const a of from) for(const b of to) pairs.push({a,b,d:Math.abs(a.x-b.x)+Math.abs(a.y-b.y)})
+    pairs.sort((a,b)=>a.d-b.d || a.a.y-b.a.y || a.a.x-b.a.x || a.b.y-b.b.y || a.b.x-b.b.x)
+    for(const pair of pairs) {
+      if(carveDwarvenLoopOutsideRooms(cm,carve,pair.a,pair.b,{minX,minY,maxX,maxY},rooms)) {
+        connected=true;break
+      }
+    }
+    if(!connected) roomGraph.edges.splice(roomGraph.edges.indexOf(edge),1)
+  }
+  roomGraph.graphDistance=dungeonRoomGraphDistances(roomGraph,roomGraph.entranceRoom).get(roomGraph.exitRoom)
 
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
     if (cm[y][x] === 'cavewall' && DIRS8.some(([dx, dy]) => cm[y + dy]?.[x + dx] === 'marble')) cm[y][x] = 'dwarvenwall'
@@ -2558,9 +2676,10 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const rubbleProgressMultiplier = dungeonProgressMultiplier(storyCfg.rubbleProgressMultiplierRange, progress, 1)
   const rubbleMultiplier = finalFloor ? Math.max(rubbleProgressMultiplier, Number(storyCfg.finalFloorRubbleMultiplier ?? 1)) : rubbleProgressMultiplier
   const collapseAttempts = Math.max(1, Math.round(collapseBase * rubbleMultiplier))
+  const authoredDoorTiles=new Set(doorways.flatMap(d=>d.leaves.map(p=>keyXY(p.x,p.y))))
   for (let i = 0; i < collapseAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
-    if (cm[y][x] !== 'marble') continue
+    if (cm[y][x] !== 'marble' || authoredDoorTiles.has(keyXY(x,y))) continue
     if (hall && x >= hall.x-1 && x <= hall.x+hall.w && y >= hall.y-1 && y <= hall.y+hall.h) continue
     if (Math.abs(x - entry.x) + Math.abs(y - entry.y) <= cfg.collapseMinEntranceDistance) continue
     const rubble = chance(cfg.rubbleChance)
@@ -2568,32 +2687,27 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     cm[y][x] = rubble ? 'dwarvenrubble' : 'dwarvenwall'
   }
 
-  // Repair any collapse/wall combination that detached an outer walkable tile.
-  const reachable = () => dungeonWalkDistances(cm, entry)
-  const outerTiles = []
-  for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
-    if (!TILE[cm[y]?.[x]]?.walk) continue
-    if (DIRS4.some(([dx, dy]) => !TILE[cm[y + dy]?.[x + dx]]?.walk)) outerTiles.push({x, y})
+  // Collapse repair must respect every authored perimeter, not punch a new
+  // entrance beside a doorway. Restore the broken component via interior and
+  // external rock only; when no safe repair exists, retry this floor.
+  const reachable=()=>dungeonWalkDistances(cm,entry)
+  const outerTiles=[]
+  for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) {
+    if(!TILE[cm[y]?.[x]]?.walk) continue
+    if(DIRS4.some(([dx,dy])=>!TILE[cm[y+dy]?.[x+dx]]?.walk)) outerTiles.push({x,y})
   }
-  let distances = reachable()
-  for (const tile of outerTiles) {
-    if (distances.has(keyXY(tile.x, tile.y))) continue
-    let best = null
-    for (const [key, distance] of distances.entries()) {
-      const [rx, ry] = key.split(',').map(Number)
-      const d = Math.abs(rx - tile.x) + Math.abs(ry - tile.y)
-      if (!best || d < best.d) best = {x: rx, y: ry, d, distance}
-    }
-    if (!best) return null
-    let cx = tile.x, cy = tile.y
-    const repair = (x, y) => {
-      carve(x, y); carve(x + 1, y); carve(x, y + 1); carve(x + 1, y + 1)
-    }
-    while (cx !== best.x) { repair(cx, cy); cx += Math.sign(best.x - cx) }
-    while (cy !== best.y) { repair(cx, cy); cy += Math.sign(best.y - cy) }
-    repair(best.x, best.y)
-    cm[entry.y][entry.x] = 'dwarvenstairsup'
-    distances = reachable()
+  let distances=reachable()
+  for(const tile of outerTiles) {
+    if(distances.has(keyXY(tile.x,tile.y))) continue
+    if(!repairDwarvenCorridorSafely(cm,tile,distances,rooms,doorways,{minX,minY,maxX,maxY},carve)) return null
+    cm[entry.y][entry.x]='dwarvenstairsup'
+    distances=reachable()
+  }
+  if(rooms.some(room=>!distances.has(keyXY(room.cx,room.cy)))) return null
+  // A one-cell corner breach can be traversed diagonally. Check the entire
+  // perimeter, not merely the two-leaf door's four-way reachability.
+  for(const room of rooms.slice(1)) {
+    if(!dwarvenRoomPerimeterSealed(cm,room,doorways.filter(d=>d.room===room))) return null
   }
 
   const minimumWalkingDistance = Math.max(1, Math.floor(cfg.minimumEntranceExitWalkingDistance ?? 1))
@@ -2630,7 +2744,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const blocked = new Set(doorway.map(p => keyXY(p.x, p.y)))
     const interior = {x: room.cx, y: room.cy}
     if (!dungeonWalkDistances(cm, entry).has(keyXY(interior.x, interior.y))) continue
-    const after = dungeonWalkDistances(cm, entry, blocked)
+    const after = dungeonWalkDistancesWithDoorTraversal(cm, entry, blocked, true)
     if (after.has(keyXY(interior.x, interior.y))) continue
     structuralDoors.push({leaves: doorway, room,
       blocksExit: !after.has(keyXY(exit.x, exit.y))})
@@ -2927,6 +3041,10 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (ordinaryKeys.some(key => !closedReach.has(keyXY(key.x, key.y)))) return null
   const eventualReach = dungeonWalkDistancesWithDoorTraversal(cm, entry)
   if (!eventualReach.has(keyXY(exit.x, exit.y))) return null
+  if (!gatePreBreached) {
+    const gateBlocked=new Set(gateDoorway.map(p=>keyXY(p.x,p.y)))
+    if (dungeonWalkDistancesWithDoorTraversal(cm,entry,gateBlocked,true).has(keyXY(exit.x,exit.y))) return null
+  }
   if (hall) {
     const doorBlocked = new Set(hallGeometry.near.map(p => keyXY(p.x,p.y)))
     const withoutHall = dungeonWalkDistancesWithDoorTraversal(cm, entry, doorBlocked)
@@ -5201,6 +5319,21 @@ function validateDwarvenRuinsStratum() {
         issues.push(`${tag}: vault ${vault.id} requires a locked entrance`)
       if (def.doorRequirement === 'closed' && (!doorwayTiles.length || !doorwayTiles.every(tile => tile === 'dwarvendoorclosed' || tile === 'dwarvendoorlocked')))
         issues.push(`${tag}: vault ${vault.id} requires a closed entrance`)
+    }
+    // Fail the whole world if a loop, repair, or later placement creates an
+    // undeclared opening. This also detects diagonal leaks beside two-leaf gates.
+    for (const room of (level.rooms || []).filter(room=>room.index>0)) {
+      const doorways=(room.doorways || []).map(leaves=>({leaves}))
+      if(!dwarvenRoomPerimeterSealed(level.map,room,doorways))
+        issues.push(`${tag}: room ${room.id} has an unregistered wall opening`)
+    }
+    const gateLeaves=[]
+    for(let y=0;y<level.map.length;y++) for(let x=0;x<(level.map[y]?.length||0);x++)
+      if(level.map[y][x]==='dwarvengatelocked') gateLeaves.push({x,y})
+    if(gateLeaves.length===2) {
+      const blocked=new Set(gateLeaves.map(p=>keyXY(p.x,p.y)))
+      if(dungeonWalkDistancesWithDoorTraversal(level.map,entry,blocked,true).has(keyXY(exit.x,exit.y)))
+        issues.push(`${tag}: locked progression gate has an eight-way bypass`)
     }
     for (const room of level.rooms || []) {
       if (room.archetype !== 'Prison') continue

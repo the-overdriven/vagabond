@@ -1119,7 +1119,15 @@ Ruins terrain map, so save/load and replay restore the exact open/closed state.
 Every Ruins floor now also contains one **two-leaf mandatory progression gate**
 on the route from its entrance to its deeper exit. The gate is selected only
 when closing both leaves genuinely disconnects those two points, so it cannot be
-bypassed through another corridor. Each gate has an independent **30% chance**
+bypassed through another corridor. Finished room perimeters have **only
+registered two-leaf entrances**: optional loop passages join the exterior of
+existing entrances instead of cutting through masonry. Post-collapse repairs
+preserve every room wall and authored opening, rerouting through safe rock or
+rejecting the floor attempt. Both generation and final stratum validation
+reject unregistered walkable gaps and verify intact progression gates against
+**eight-direction movement**, preventing diagonal bypasses beside doors. This
+layout correction is deterministic and applies only to newly generated worlds.
+Each gate has an independent **30% chance**
 to generate already breached/open. A pre-breached gate needs no key. Otherwise,
 exactly one matching **Dwarven Key source** is generated on the reachable side of
 the gate using one of four seeded scenarios:
