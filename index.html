@@ -1907,6 +1907,7 @@ more difficult:
     return !!item && (item.kind === 'weapon' || (item.kind === 'artifact' && item.artifactSlot === 'weapon'))
   }
 
+
   // Resolve artifact bonus ranges when the item is created. A bonus like
   // [3,10] means the generated artifact gets one random value from 3 through 10.
   function rollArtifactBonuses(bonuses) {
@@ -2305,7 +2306,7 @@ more difficult:
     lvl: 1, xp: 0,
     totalXpEarned: 0, lastTempleHealXp: 0,
     maxHp: 50, hp: 50,
-    baseAtk: 2, baseDef: 0, baseSpd: 3, baseMf: 0,
+    baseAtk: 2, baseDef: 0, baseSpd: 5, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
     trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
     invisibleTurns: 0,
@@ -3629,7 +3630,8 @@ more difficult:
   }
 
   function maybeAutoEquipWeapon(item, announce = true) {
-    if (!item || item.kind !== 'weapon' || player.equip.weapon) return false
+    if (!item || item.kind !== 'weapon' || player.equip.weapon ||
+        (item.twoHanded && player.equip.shield)) return false
     const before = statSnapshot()
     player.equip.weapon = item
     if (announce) {
@@ -4380,7 +4382,7 @@ more difficult:
       hp: 50,
       baseAtk: 2,
       baseDef: 0,
-      baseSpd: 3,
+      baseSpd: 5,
       baseMf: 0,
       gold: 0,
       deaths: 0,
@@ -9328,7 +9330,7 @@ more difficult:
       ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
       ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
       ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
-      ${e.prefix === 'Champion' ? `<div class="pfx" style="color:#ebcc69">Inspired aura · +2 ATK / +1 DEF to ${inspiredAllyCount(e)} nearby allies</div>` : inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
+      ${e.prefix !== 'Champion' && inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}

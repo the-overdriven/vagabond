@@ -1,8 +1,12 @@
 'use strict'
 
-// Any template can opt into these independent abilities. The AI gives the whole
-// eligible spell pool one seeded cast roll, never one roll per known spell.
+// An eligible caster casts at most one spell each turn. Below the HP
+// thresholds survival takes priority; ordinary magic is rolled if it fails.
 const ENEMY_SPELL_CHANCE = 0.20
+// Low-HP spells use fixed slices of one seeded turn roll, not relative
+// weights: sacrificing stays 30% and teleporting stays 20%, even when
+// the other ability has no valid target. Together they occupy 50% of turns.
+const ENEMY_SURVIVAL_CAST_CHANCES = {sacrifice: 0.30, lowHpTeleport: 0.20}
 const ENEMY_DEBUFF_TURNS = 5
 const ENEMY_IMMUNITY_TURNS = 5
 const LOW_HP_TELEPORT_THRESHOLD = 0.25
@@ -90,6 +94,16 @@ function availableEnemySpells(e) {
   return spells
 }
 
+function rollEnemySurvivalSpell(eligible) {
+  const roll = rng()
+  let cumulative = 0
+  for (const [spell, probability] of Object.entries(ENEMY_SURVIVAL_CAST_CHANCES)) {
+    cumulative += probability
+    if (roll < cumulative) return eligible.includes(spell) ? spell : null
+  }
+  return null
+}
+
 function tryEnemySpell(e) {
   if (!e.alive || e.hp <= 0 || !onCurrentLevel(e) || enemyIsPassive(e) ||
       e.summonedTurn === turnCount || e.fearTurns > 0 || e.sleeping ||
@@ -99,9 +113,18 @@ function tryEnemySpell(e) {
   if (distance > effectiveAggroRange(e) || (forestHideChance(e, distance) > 0 &&
       e.forestConcealX === player.x && e.forestConcealY === player.y)) return false
   const spells = availableEnemySpells(e)
-  // No spell/RNG attempt for a dispeller without a buff, or a disarmer without gear.
-  if (!spells.length || !chance(ENEMY_SPELL_CHANCE)) return false
-  const spell = pick(spells)
+  // A separate seeded roll assigns fixed 30%/20% low-HP cast chances.
+  // If its selected spell has no valid target, normal magic can still fire;
+  // the unused chance never boosts the other survival ability.
+  if (!spells.length) return false
+  const survival = spells.filter(spell => spell in ENEMY_SURVIVAL_CAST_CHANCES)
+  const ordinary = spells.filter(spell => !(spell in ENEMY_SURVIVAL_CAST_CHANCES))
+  const survivalSpell = survival.length ? rollEnemySurvivalSpell(survival) : null
+  let spell = survivalSpell
+  if (!spell) {
+    if (!ordinary.length || !chance(ENEMY_SPELL_CHANCE)) return false
+    spell = pick(ordinary)
+  }
   if (spell === 'weaken') {
     player.weakenTurns = ENEMY_DEBUFF_TURNS
     player.hp = Math.min(player.hp, playerMaxHp())
@@ -118,7 +141,7 @@ function tryEnemySpell(e) {
     player.inventory.push(item)
     // Removing HP gear affects subsequent monsters now, even in headless replay.
     player.hp = Math.min(player.hp, playerMaxHp())
-    equipmentLog(`The ${e.name} disarms you! Your ${item.name} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
+    equipmentLog(`The ${e.name} casts a disarming spell! Your ${item.name} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
     spawnDamageNumber(player.x, player.y, 'Disarmed!', '#c7a5f6')
   } else if (spell === 'immunity') {
     e.immunityUsed = true

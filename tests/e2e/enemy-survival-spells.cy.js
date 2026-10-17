@@ -19,6 +19,9 @@ describe('Generic monster low-HP teleport and sacrifice',()=>{
   it('sacrifices only eligible monsters without player credit',()=>{
     cy.window().then(win=>win.eval('enemySurvivalSacrificeCheck()'))
   })
+  it('prioritizes a 50% survival cast (30% sacrifice, 20% teleport)',()=>{
+    cy.window().then(win=>win.eval('enemySurvivalWeightsCheck()'))
+  })
   it('replays both spells without RNG desync',()=>{
     cy.window().then(win=>win.eval('enemySurvivalReplayCheck()'))
   })

@@ -65,7 +65,8 @@ function genericEnemySpellChecks() {
 }
 
 function enemyDisarmChecks() {
-  const check=(ok,msg)=>{if(!ok)throw Error(msg)},original={chance,pick}
+  const check=(ok,msg)=>{if(!ok)throw Error(msg)},original={chance,pick,equipmentLog}
+  let lastDisarmMessage=''
   try {
     for(const slot of ['weapon','shield','armor']) {
       setupEnemySpellArena()
@@ -76,7 +77,10 @@ function enemyDisarmChecks() {
       player.equip[slot]=item;player.equip.blackkey=key;player.inventory=[other]
       player.hp=playerMaxHp()
       chance=()=>true;pick=choices=>choices[0]
+      equipmentLog=(message,...args)=>{lastDisarmMessage=message;original.equipmentLog(message,...args)}
       check(tryEnemySpell(e),'disarms '+slot)
+      check(lastDisarmMessage.startsWith(`The ${e.name} casts a disarming spell!`),
+        'spell wording names magical cause of disarm')
       check(player.equip[slot]===null&&player.inventory[1]===item,'exact item moved once')
       check(item.replayId===1234&&item.identified===false&&item.modAmt===20,'identity and modifiers preserved')
       check(player.inventory[0]===other&&player.equip.blackkey===key&&groundItems.length===0,'other items and quest slot untouched')
@@ -92,7 +96,7 @@ function enemyDisarmChecks() {
     chance=()=>true;pick=choices=>choices[1]??choices[0]
     check(tryEnemySpell(e)&&player.equip.weapon&&player.equip.armor&&!player.equip.shield,'one random occupied slot, not all equipment')
     check(player.inventory.length===1&&player.inventory[0].kind==='shield','only selected item moved')
-  } finally {chance=original.chance;pick=original.pick}
+  } finally {chance=original.chance;pick=original.pick;equipmentLog=original.equipmentLog}
 }
 
 function enemyDispelChecks() {

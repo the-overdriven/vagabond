@@ -63,7 +63,7 @@ Max HP: 50
 HP: 50
 ATK: 2
 DEF: 0
-SPD: 3
+SPD: 5
 MF: 0
 Gold: 0
 Deaths: 0
@@ -2237,7 +2237,8 @@ Inspired modifies *effective* combat stats, after spawning/prefixes, rather
 than permanently adding ATK or DEF to monsters. It uses the same radius as the
 Champion's gold visual aura; buffed allies have a small golden star on the tile
 and an Inspired tooltip. The Champion can announce its inspiration upon
-spotting the player. Defeating a visible Champion with followers gives a log
+spotting the player. The Champion tooltip omits its redundant aura summary;
+the Inspired status remains visible on affected followers. Defeating a visible Champion with followers gives a log
 and fading-aura popup. Nymph healing shows its exact HP gained; its spent use
 and Haste cooldown appear in monster inspection.
 
@@ -2345,17 +2346,23 @@ Lich uses the same one-use Death Shield; it does not recharge.
 ## Shared monster spells
 
 Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, `deathBolt`, `immunity`, `lowHpTeleport`, or `sacrifice`
-to its `abilities` array. Lich currently has all eight. The shared spell system
-uses abilities, never the monster's species or name, to decide what it can cast.
+to its `abilities` array. Lich currently has all eight. **Low-HP survival
+spells are resolved before ordinary casting** using one seeded roll each
+eligible turn: Sacrifice takes the first **30%** of the roll, and Teleport
+the next **20%**. If **both** are eligible, their combined chance is **50%**
+per turn; if only one is eligible, its probability stays **30%** or **20%**,
+without inheriting the other's share. An unavailable spell's roll slice is
+unused, but ordinary magic may still be cast on that turn.
 
-A monster attacking or pursuing a visible player in its effective aggro range
-gets **one 20% spell roll per turn** if any of its spells has a valid target.
-On success it chooses uniformly among its eligible spells and spends its action
-casting, with no melee attack, shot or pursuit move that turn. Additional pursuit
-actions do not grant extra spell rolls. Passive, frightened, sleeping, newly
-summoned or off-level monsters cannot cast. Invisibility, forest concealment,
-underground sight blockers and sanctuary retain their normal protections;
-True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
+If no survival spell fires, the caster gets the ordinary **20% spell-casting
+roll**, choosing uniformly from other valid spells. A successful cast consumes
+the monster's one action, and cannot stack with another cast, attack, or move
+on that turn. Pursuit never grants additional spell rolls. Passive, frightened,
+sleeping, newly summoned, or off-level monsters cannot cast. Invisibility,
+forest concealment, underground sight blockers, and sanctuary retain their
+normal protections; True Sight can reveal an invisible player but cannot
+bypass walls or sanctuary. Survival and ordinary abilities are determined by
+the monster's abilities, not its species or name.
 
 | Ability | Effect | Eligibility |
 |---|---|---|
@@ -2363,7 +2370,7 @@ True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
 | `slow` | SPD −10% for 5 player turns | Slow is not already active |
 | `disarm` | One uniformly random equipped weapon, shield or armor moves intact to the player's inventory | At least one of these slots is occupied |
 | `dispel` | Removes one uniformly random active temporary buff | At least one dispellable buff is active |
-| `deathBolt` | Fires a slow, skull-shaped magical projectile with fixed 10 ATK | Clear shot to the visible player within effective aggro |
+| `deathBolt` | Fires a slow, skull-shaped magical projectile with fixed 20 ATK | Clear shot to the visible player within effective aggro |
 | `immunity` | Blocks all incoming attacks for 5 player actions | Not already used by this monster |
 | `lowHpTeleport` | Teleports to a distant reachable tile outside player detection range | Below 25% HP; not used before; safe destination exists |
 | `sacrifice` | Kills one nearby monster and heals the caster by its remaining HP (capped at max HP) | Below 50% HP; eligible creature within 4 tiles and line of sight |
@@ -2375,7 +2382,8 @@ other SPD modifiers. Both appear in the status strip with remaining turns, do
 not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
 counters persist in saves and replay initial states.
 
-Disarm preserves the exact item's identity, modifiers, and identification state;
+Disarm is announced as a **disarming spell**, not a physical disarm. 
+It preserves the exact item's identity, modifiers, and identification state;
 it never drops or destroys it, and never touches the Black Key slot or passive
 backpack trinkets. HP changes caused by removing equipment resolve immediately,
 before any following monster acts. The cast consumes only the monster's action;
@@ -2417,9 +2425,9 @@ blocked hit and expiry all display log messages and floating text. The player ca
 heal or reposition while this temporary shield remains active.
 
 Low-HP Teleport is a **one-use** escape spell triggered strictly below 25%
-maximum HP. It joins the same shared 20% spell roll as other monster spells,
-never procs separately. It moves the caster 13 or more Chebyshev tiles away
-from the player (and at least 2 tiles beyond its **current effective aggro
+maximum HP. Each eligible turn has a fixed **20%** teleport chance through
+the survival roll, independent of the availability of Sacrifice. A successful cast moves the caster at
+least 13 Chebyshev tiles away from the player (and at least 2 tiles beyond its **current effective aggro
 range**, including Alarmed bonuses), choosing uniformly with seeded RNG from
 safe, unoccupied, traversable floor within a 20-step connected-area search.
 It cannot escape into sealed chambers, sanctuary, traps, walls, NPCs or occupied
@@ -2432,14 +2440,20 @@ Sacrifice is available strictly below 50% maximum HP when another living
 monster is within **4 tiles** (Chebyshev distance) with unobstructed sight.
 The victim is chosen uniformly using seeded RNG and removed with the ordinary
 death animation; its **current HP** is transferred to the caster, capped at
-its missing HP. Sacrifice is repeatable while eligible, but still competes in
-the same **one 20% spell roll per turn**. It gives the player no XP, kills,
+its missing HP. Sacrifice is repeatable while eligible, with a fixed
+**30%** per-turn chance through the survival roll, even if teleport is
+unavailable. Both abilities use the same seeded survival roll each turn,
+and each successful cast consumes the caster's action. It gives the player no XP, kills,
 quest progress or ordinary loot. Summoned monsters can be sacrificed. Monsters
 carrying progression keys or stolen items, active quest targets and temporarily
 immune monsters cannot be sacrificed; their progression or belongings must
 remain recoverable. Death Shield is not consumed in this sacrifice removal.
 Both spells obey normal caster sight, invisibility, forest cover, sanctuary
-and turn eligibility, and use no extra independent cast chance.
+and turn eligibility. Their resolution never depends on animations.
+
+Auto-looting does not automatically equip a two-handed weapon while a shield is
+equipped; the dropped weapon enters the backpack instead. The player may
+manually equip it, which unequips the shield using the ordinary equipment rule.
 
 Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
 buff removal and stat changes resolve synchronously with seeded RNG; animation
@@ -5850,14 +5864,25 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-62
+66
 ```
+
+Version 66 changes the seeded spell-selection rules to give eligible low-HP
+Sacrifice and Teleport fixed 30% and 20% chances on one survival roll before
+ordinary magic. If only one spell is available, its share does not increase.
+The changed RNG sequence requires a new save/replay version; older saves are
+not supported.
+
+Version 65 updates starting player SPD, monster template base SPD, spell-selection
+weights, and Death Bolt damage; replay rules change, so the save version is
+bumped with no compatibility code for older saves.
 
 Saves are JSON files. Version 63 adds the generic monster `lowHpTeleportUsed` flag to saved
 enemies and replay initial states. Sacrifice needs no persistent flag because
 it immediately removes the victim and heals the caster through existing state.
-Low-HP Teleport and Sacrifice use the shared seeded spell roll; no extra RNG
-is consumed if their targets are invalid. No migration of older saves is provided.
+Low-HP Teleport and Sacrifice use a separate seeded survival roll. No survival
+RNG is consumed if neither has a valid target. Their spell eligibility, one-use
+Teleport flag, and healing effects persist correctly in current saves and replays. No migration of older saves is provided.
 
 Version 62 adds generic monster `immunityUsed` and
 `immunityUntilTurn` fields to saved enemies and replay initial states. An
@@ -7270,9 +7295,8 @@ potions, temporary curse debuffs, frozen-water penalties or carried-item speed
 effects. Permanent race/level bonuses, equipped modifiers, active artifact
 ATK/DEF, shield/armor penalties, SPD's minimum of 1, and GRACE's minimum of 0
 remain. Unarmed GRACE and artifact-weapon handling match the current character
-stat formula. The calculation changes no state or RNG. Artifact SPD bonuses
-are currently absent from the game's speed formula and therefore do not add
-ranking strength; this batch does not change that existing balance behavior.
+stat formula. The calculation changes no state or RNG. Artifact SPD bonuses contribute to permanent SPD and highscore ranking strength
+through the normal player speed formula.
 
 `supabase-highscores.sql` creates `highscore_records` and the read-only
 `highscores_top_ten(p_permadeath)` RPC. The query selects each character's

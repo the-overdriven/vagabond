@@ -14,7 +14,7 @@ describe('Generic Death Bolt and skull projectile', () => {
     }))
   })
 
-  it('uses one generic 10 ATK cast with dodges, armor, death shield and slow impact feedback', () => {
+  it('uses one generic 20 ATK cast with dodges, armor, death shield and slow impact feedback', () => {
     cy.window().then(win => win.eval('deathBoltRulesCheck()'))
   })
 

@@ -53,7 +53,7 @@ describe('Monster Haste, Champion inspiration and Nymph HealSelf', () => {
       supportAssert(enemyAtk(wolf)===wolf.atk+2,'+2 atk')
       supportAssert(enemyDef(wolf)===wolf.def+1,'+1 def')
       supportAssert(tileInspectInfo(wolf.x,wolf.y).html.includes('Inspired'),'ally tooltip')
-      supportAssert(tileInspectInfo(leader.x,leader.y).html.includes('Inspired aura'),'leader tooltip')
+      supportAssert(!tileInspectInfo(leader.x,leader.y).html.includes('Inspired aura'),'no redundant leader aura tooltip')
       leader.hp=0;killEnemy(leader,false)
       supportAssert(enemyAtk(wolf)===wolf.atk,'buff cleared')
       supportAssert(!tileInspectInfo(wolf.x,wolf.y).html.includes('Inspired'),'tooltip updated')

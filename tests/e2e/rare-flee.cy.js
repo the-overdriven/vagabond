@@ -135,7 +135,7 @@ describe('Rare monster sightings and flight', () => {
         if(potion) {player.inventory=[createItem('speedpotion')];useSpeedPotion(0)}
         const e=makeFleeEnemy('DRUSK',5,{rareSightings:1})
         rareStartFlee(e,5,true)
-        fleeAssert(enemySpd(e)===RARE_FLEE.startledMinSpd && e.spd===2, 'temporary Startled, base SPD unchanged')
+        fleeAssert(enemySpd(e)===RARE_FLEE.startledMinSpd && e.spd===ENEMY_TEMPLATE_BY_NAME.DRUSK.spd, 'temporary Startled, base SPD unchanged')
         const result=fleeChase(e)
         fleeAssert(result.caught===potion, 'potion catches from five tiles; normal speed escapes')
         fleeAssert(!e.rareFleeTurns && enemySpd(e)===Math.max(1,e.spd+enemyTileEffects(e).speed) && rareStartledBonus(e)===0, 'temporary speed ends with flight')

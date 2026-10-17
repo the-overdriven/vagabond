@@ -91,7 +91,7 @@
     }
   },
   "deathBolt": {
-    "atk": 10,
+    "atk": 20,
     "projectile": "deathBolt",
     "label": "death bolt",
     "verb": "casts",

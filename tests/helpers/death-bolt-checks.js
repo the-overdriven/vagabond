@@ -7,7 +7,7 @@ function deathBoltRulesCheck() {
     const bolt = makeSpellTestEnemy('Skeleton', ['deathBolt'], 38, 40)
     check(ENEMY_TEMPLATE_BY_NAME.Lich.abilities.includes('deathBolt'), 'Lich is configured with Death Bolt')
     check(availableEnemySpells(bolt).includes('deathBolt'), 'other monster can use generic Death Bolt')
-    check(DEATH_BOLT_CONFIG.atk === 10 && DEATH_BOLT_CONFIG.animationMs === 650, 'balanced values are configured')
+    check(DEATH_BOLT_CONFIG.atk === 20 && DEATH_BOLT_CONFIG.animationMs === 650, 'balanced values are configured')
     check(RENDER_STYLE.projectiles.deathBolt.image === 'img/projectiles/death-bolt.png', 'supplied skull asset is used')
     const hp = player.hp
     replayAnimationsDisabled = false
@@ -15,7 +15,7 @@ function deathBoltRulesCheck() {
     chance = p => p === ENEMY_SPELL_CHANCE
     pick = choices => choices[0]
     check(tryEnemySpell(bolt), 'Death Bolt casts')
-    check(player.hp < hp && player.hp > 0, '10 ATK damage applies before animation completes')
+    check(player.hp < hp && player.hp > 0, '20 ATK damage applies before animation completes')
     check(turnCount === 0 && bolt.shotsRemaining === 0, 'casting neither advances a second turn nor spends ammunition')
     check(projectileAnims.length === 1 && projectileAnims[0].projectile === 'deathBolt' &&
       projectileAnims[0].duration === 650, 'visual skull has independent slow flight')
