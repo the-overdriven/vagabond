@@ -24,6 +24,7 @@ function beginSummonArena() {
     window.makeSummoner = (name='Lich',distance=3) => {
       const t=ENEMY_TEMPLATE_BY_NAME[name]
       const e=addEnemy({...t,id:'summoner',baseName:name,x:player.x+distance,y:player.y,
+        abilities:t.abilities.filter(ability=>!['weaken','slow','disarm','dispel'].includes(ability)),
         homeX:player.x+distance,homeY:player.y,homeTileType:'grass',level:0,levelKind:null,
         maxHp:t.hp,alive:true,aware:true,prefix:null,equipment:null})
       occupied.add(keyXY(e.x,e.y)); return e

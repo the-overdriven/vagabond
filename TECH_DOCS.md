@@ -2342,15 +2342,52 @@ a brief **Shield breaks!** effect. Survival resolves before animation and
 extra strikes; the spent flag is initialized and saved for replay determinism.
 Lich uses the same one-use Death Shield; it does not recharge.
 
-While pursuing a visible player, a Lich can spend its action on Weaken or Slow
-at a 20% chance per eligible turn. It chooses evenly among spells that are not
-already active. Weaken reduces derived maximum HP by 10% (rounded up, at least
-1), capping current HP to the reduced maximum without restoring that HP when
-the spell fades. Slow reduces derived SPD by 10% (rounded up, at least 1 SPD
-before the usual minimum of 1). Each lasts five player turns; neither stacks.
-Both are shown in the status strip, logged and marked with floating text.
-The spell resolves before presentation, including in replay. Death clears both
-effects; saves preserve their remaining turns.
+## Shared monster spells
+
+Any monster template can independently add `weaken`, `slow`, `disarm`, or `dispel`
+to its `abilities` array. Lich currently has all four. The shared spell system
+uses abilities, never the monster's species or name, to decide what it can cast.
+
+A monster attacking or pursuing a visible player in its effective aggro range
+gets **one 20% spell roll per turn** if any of its spells has a valid target.
+On success it chooses uniformly among its eligible spells and spends its action
+casting, with no melee attack, shot or pursuit move that turn. Additional pursuit
+actions do not grant extra spell rolls. Passive, frightened, sleeping, newly
+summoned or off-level monsters cannot cast. Invisibility, forest concealment,
+underground sight blockers and sanctuary retain their normal protections;
+True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
+
+| Ability | Effect | Eligibility |
+|---|---|---|
+| `weaken` | Maximum HP −10% for 5 player turns | Weaken is not already active |
+| `slow` | SPD −10% for 5 player turns | Slow is not already active |
+| `disarm` | One uniformly random equipped weapon, shield or armor moves intact to the player's inventory | At least one of these slots is occupied |
+| `dispel` | Removes one uniformly random active temporary buff | At least one dispellable buff is active |
+
+Weaken and Slow round their reductions up, with a minimum reduction of 1 and
+minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
+maximum; expiry restores the maximum without free healing. Slow applies after
+other SPD modifiers. Both appear in the status strip with remaining turns, do
+not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
+counters persist in saves and replay initial states.
+
+Disarm preserves the exact item's identity, modifiers, and identification state;
+it never drops or destroys it, and never touches the Black Key slot or passive
+backpack trinkets. HP changes caused by removing equipment resolve immediately,
+before any following monster acts. The cast consumes only the monster's action;
+the player can spend a later normal equipment action to put the item back on.
+
+Dispel can remove food Regeneration, Invisibility, Speed, Stone Skin, Berserk,
+or an unspent player Death Shield. Potion stat bonuses and drawbacks both end
+with the potion's effect. Racial traits, learned skills, equipment powers,
+god-mode invisibility and negative statuses are not dispellable. A normal Lich
+cannot target an invisible player, so Invisibility is removable only by a
+caster that can actually see that player. No eligible buff means no Dispel
+attempt or target-selection RNG.
+
+Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
+buff removal and stat changes resolve synchronously with seeded RNG; animation
+timing and tile/ASCII rendering never decide their results.
 
 ## Gang power
 
@@ -5744,10 +5781,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-58
+61
 ```
 
-Saves are JSON files.
+Saves are JSON files. Version 61 uses the generic `weakenTurns` and `slowTurns`
+player counters and shared ability-based spell selection. Equipped and backpack
+items, temporary buffs, and monster abilities retain their existing exact save
+and replay representation. Older save/replay initial states are rejected rather
+than migrated.
 
 Version 58 adds the per-monster `hasteReadyTurn`, `healSelfReadyTurn` and
 `healSelfUsed` fields to current saves and replay snapshots. The Champion's

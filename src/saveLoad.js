@@ -168,7 +168,7 @@ function buildSaveObject() {
       berserkTurns: player.berserkTurns, berserkBonus: player.berserkBonus,
       rootTurns: player.rootTurns, gazeTurns: player.gazeTurns, mummyCurseTurns: player.mummyCurseTurns,
       confusionTurns: player.confusionTurns, confusionSourceId: player.confusionSourceId,
-      lichWeakenTurns: player.lichWeakenTurns, lichSlowTurns: player.lichSlowTurns,
+      weakenTurns: player.weakenTurns, slowTurns: player.slowTurns,
       deathShieldReady: player.deathShieldReady,
       berryRegenTurns: player.berryRegenTurns,
       poisonTurns: player.poisonTurns,
@@ -747,8 +747,8 @@ function loadGameFromObject(data, opts = {}) {
   player.poisonTurns = Math.max(0, Math.floor(player.poisonTurns))
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
-  player.lichWeakenTurns = data.player.lichWeakenTurns
-  player.lichSlowTurns = data.player.lichSlowTurns
+  player.weakenTurns = data.player.weakenTurns
+  player.slowTurns = data.player.slowTurns
   player.permadeath = !!player.permadeath
   tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length
   tombstoneOrder = (Array.isArray(data.tombstoneOrder) && data.tombstoneOrder.length === TOMBSTONE_INSCRIPTIONS.length) ? data.tombstoneOrder.slice() : TOMBSTONE_INSCRIPTIONS.map((_, i) => i)

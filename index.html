@@ -1710,6 +1710,7 @@ more difficult:
 <script src="src/charge.js"></script>
 <script src="src/wrestler.js"></script>
 <script src="src/monsterStatuses.js"></script>
+<script src="src/enemySpells.js"></script>
 <script src="src/enemySupport.js"></script>
 <script src="src/enemyInvisibility.js"></script>
 <script src="src/spiderWeb.js"></script>
@@ -2288,7 +2289,7 @@ more difficult:
     berserkTurns: 0, berserkBonus: 0,
     rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
     confusionTurns: 0, confusionSourceId: null,
-    lichWeakenTurns: 0, lichSlowTurns: 0,
+    weakenTurns: 0, slowTurns: 0,
     deathShieldReady: false,
     berryRegenTurns: 0,
     poisonTurns: 0,
@@ -2375,7 +2376,7 @@ more difficult:
       s += curseDebuffSum('spd')
       s += carriedItemStat('spd')
     }
-    if (!permanent && player.lichSlowTurns > 0) s -= Math.max(1, Math.ceil(Math.max(1, s) * 0.10))
+    if (!permanent && player.slowTurns > 0) s -= Math.max(1, Math.ceil(Math.max(1, s) * 0.10))
     return s
   }
 
@@ -2466,7 +2467,7 @@ more difficult:
     let total = player.maxHp + bonus
     const pct = artifactMaxHpPct()
     if (pct) total = Math.max(1, Math.round(total * (1 + pct / 100)))
-    if (player.lichWeakenTurns > 0) total = Math.max(1, total - Math.max(1, Math.ceil(total * 0.10)))
+    if (player.weakenTurns > 0) total = Math.max(1, total - Math.max(1, Math.ceil(total * 0.10)))
     return total
   }
 
@@ -4353,7 +4354,7 @@ more difficult:
       berserkTurns: 0, berserkBonus: 0,
     rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
     confusionTurns: 0, confusionSourceId: null,
-    lichWeakenTurns: 0, lichSlowTurns: 0,
+    weakenTurns: 0, slowTurns: 0,
       deathShieldReady: false,
       berryRegenTurns: 0,
       poisonTurns: 0,
@@ -4468,7 +4469,7 @@ more difficult:
     player.berserkTurns = 0; player.berserkBonus = 0
     player.rootTurns = 0; player.gazeTurns = 0; player.mummyCurseTurns = 0
     player.confusionTurns = 0; player.confusionSourceId = null
-    player.lichWeakenTurns = 0; player.lichSlowTurns = 0
+    player.weakenTurns = 0; player.slowTurns = 0
     player.deathShieldReady = false
     player.poisonTurns = 0
     player.berryRegenTurns = 0
@@ -5475,7 +5476,7 @@ more difficult:
         }
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
-        if (tryLichDebuff(e)) continue
+        if (tryEnemySpell(e)) continue
         if (tryEnemyVanish(e)) continue
         if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
@@ -5490,7 +5491,7 @@ more difficult:
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
-        if (tryLichDebuff(e)) continue
+        if (tryEnemySpell(e)) continue
         if (tryEnemyVanish(e)) continue
         if (tryEnemySummon(e)) continue
         if (tryEnemyRush(e)) {
@@ -5522,7 +5523,6 @@ more difficult:
           announceInspiredLeader(e)
         }
         if (tryEnemyHaste(e, dist)) continue
-        if (tryLichDebuff(e)) continue
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
         if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
         let pursuitActions = hasExtraPursuitTurn ? 2 : 1

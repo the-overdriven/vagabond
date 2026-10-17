@@ -43,28 +43,6 @@ function tryEnemyGazeOrWail(e) {
   return false
 }
 
-function tryLichDebuff(e) {
-  if (!enemyHasAbility(e, 'lichDebuffs') || playerHiddenFromEnemy(e) ||
-      playerInsideSanctuary() || !enemyHasSight(e)) return false
-  const available = []
-  if (player.lichWeakenTurns <= 0) available.push('weaken')
-  if (player.lichSlowTurns <= 0) available.push('slow')
-  if (!available.length || !chance(0.20)) return false
-  const spell = available[randInt(0, available.length - 1)]
-  if (spell === 'weaken') {
-    player.lichWeakenTurns = 5
-    player.hp = Math.min(player.hp, playerMaxHp())
-    log(`The ${e.name} weakens you! Your maximum HP falls by 10% for 5 turns.`, 'bad')
-    spawnDamageNumber(player.x, player.y, 'Weakened!', '#c7a5f6')
-  } else {
-    player.lichSlowTurns = 5
-    log(`The ${e.name} slows you! Your SPD falls by 10% for 5 turns.`, 'bad')
-    spawnDamageNumber(player.x, player.y, 'Slowed!', '#c7a5f6')
-  }
-  clearAutoPath()
-  return true
-}
-
 function clearBansheeConfusion(e) {
   if (!e || player.confusionSourceId !== e.id || player.confusionTurns <= 0) return
   player.confusionTurns = 0
@@ -79,11 +57,13 @@ function tickMonsterStatuses() {
     ['gazeTurns','Your limbs regain their flexibility.'],
     ['mummyCurseTurns','The Mummy’s curse fades.'],
     ['confusionTurns','The Banshee’s wail fades from your mind.'],
-    ['lichWeakenTurns','The Lich’s weakening spell fades.'],
-    ['lichSlowTurns','The Lich’s slowing spell fades.']
+    ['weakenTurns','The weakening spell fades.'],
+    ['slowTurns','The slowing spell fades.']
   ]) if (player[key] > 0 && --player[key] === 0) {
     if (key === 'confusionTurns') player.confusionSourceId = null
     log(message, 'good')
+    if (key === 'weakenTurns' || key === 'slowTurns')
+      spawnDamageNumber(player.x, player.y, key === 'weakenTurns' ? 'Weaken fades!' : 'Slow fades!', '#b9e6bc')
   }
 }
 
