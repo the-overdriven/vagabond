@@ -364,7 +364,29 @@
       "scale": 1
     },
     "dwarvenwall": {
-      "image": "img/tiles/cave-wall.png",
+      "image": "img/tiles/dwarven-stone-wall.png",
+      "variants": [
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-cracked.png",
+        "img/tiles/dwarven-stone-wall-moss.png",
+        "img/tiles/dwarven-stone-wall-moss.png",
+        "img/tiles/dwarven-stone-wall-ivy.png",
+        "img/tiles/dwarven-stone-wall-ivy.png"
+      ],
       "scale": 1
     },
     "marble": {

@@ -1,3 +1,5 @@
+const {checkDwarvenWallVisuals} = require('../support/dwarven-wall-checks.js')
+
 describe('Dwarven Ruins rendering paths', () => {
   for (const viewport of [{name:'desktop',w:1280,h:800},{name:'mobile',w:390,h:844}]) {
     it(`renders Ruins mechanical terrain in tiles and ASCII on ${viewport.name}`, () => {
@@ -36,8 +38,13 @@ describe('Dwarven Ruins rendering paths', () => {
         check(RENDER_STYLE.terrainTiles.dwarvenlever.baseTileKey === 'marble' &&
           RENDER_STYLE.terrainTiles.dwarvenleverpulled.baseTileKey === 'marble',
           'both lever states render over marble while blocking terrain is unchanged')
-        for (const image of ['img/tiles/dwarven-column-indoor.png', 'img/tiles/dwarven-rubble.png'])
+        for (const image of ['img/tiles/dwarven-column-indoor.png', 'img/tiles/dwarven-rubble.png', 'img/tiles/dwarven-stone-wall.png', 'img/tiles/dwarven-stone-wall-cracked.png', 'img/tiles/dwarven-stone-wall-moss.png', 'img/tiles/dwarven-stone-wall-ivy.png'])
           check(preloadedImages.has(image), 'Dwarven visual was preloaded: ' + image)
+        for (const path of new Set(RENDER_STYLE.terrainTiles.dwarvenwall.variants)) {
+          const image = preloadedImages.get(path)
+          check(image?.naturalWidth === 100 && image?.naturalHeight === 100,
+            'wall artwork is exactly 100x100: ' + path)
+        }
         USE_TILE_IMAGES = true
         render()
         check(document.getElementById('game').width > 0 && document.getElementById('game').height > 0, 'tile canvas renders')
@@ -47,6 +54,7 @@ describe('Dwarven Ruins rendering paths', () => {
         USE_TILE_IMAGES = true
         render()
       })()`))
+      cy.window().then(win => expect(win.eval('(' + checkDwarvenWallVisuals.toString() + ')()')).to.equal(true))
       cy.get('#game').should('be.visible')
     })
   }

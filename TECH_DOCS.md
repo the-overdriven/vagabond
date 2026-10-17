@@ -712,6 +712,28 @@ encoded with `caveup`; it leaves all other deep-cave `caveup` entrances unchange
 it while composing overlays. Ancient Forest trees use the same grass ground
 as ordinary forest; no separate dark-ground image tile is used.
 
+Dwarven masonry walls on z:-3 and deeper use `img/tiles/dwarven-stone-wall.png`
+when any of their eight neighbors is walkable terrain or a dwarven doorway.
+Including closed doorways keeps wall materials stable when doors open. Buried
+masonry uses the existing dark cave-wall texture; natural cave walls retain
+that texture throughout. The simple overhead stone blocks distinguish room
+and corridor boundaries from solid rock. Dark charcoal masonry has four visual
+variants, selected by a stable coordinate hash: **30% plain, 50% cracked,
+10% moss-covered and 10% ivy-covered**. These are approximate
+frequencies across many tiles, not quotas for each room. Cracks do not weaken
+walls; moss and ivy are decorative, with no interaction. Unlit torches are no
+longer used. All four masonry assets are 100×100 pixels, designed for readability at a
+40×40 display size. Moss follows mortar joints and chipped edges in muted olive bands; ivy follows
+stone gaps with restrained dark-green leaves. Cracks retain the original
+stone fracture patterns with slightly wider, darker main splits. Shading and
+color stay close to the masonry so weathering blends into the wall.
+The renderer preserves an outer 10% border (rounded up to whole pixels) from the plain stone
+image on all four sides, keeping vegetation away from neighboring tiles.
+Repeated entries in the rendering variant list supply these weights.
+Selection uses terrain and coordinates only, never
+creature occupancy, visibility, animation timing or RNG. Collision, sight,
+ASCII glyphs and save/replay data are unchanged.
+
 The cave floor/wall images are rendering replacements for existing terrain
 IDs. Cave scenarios add no terrain IDs; the Dwarven Fort exit is a separate
 transition ID with its own save code and surface-ascent behavior.

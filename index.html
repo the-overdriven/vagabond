@@ -7591,6 +7591,18 @@ more difficult:
   }
 
   function drawImageVisual(px, py, visual, alpha) {
+    if (visual?.borderImage) {
+      const base = {...visual, image: visual.borderImage, borderImage: null}
+      const drewBase = drawImageVisual(px, py, base, alpha)
+      const inset = Math.ceil(TILE_PX * 0.10)
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(px + inset, py + inset, TILE_PX - inset * 2, TILE_PX - inset * 2)
+      ctx.clip()
+      const drewCenter = drawImageVisual(px, py, {...visual, borderImage: null}, alpha)
+      ctx.restore()
+      return drewBase || drewCenter
+    }
     const image = resolveVisualImage(visual)
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
@@ -7743,6 +7755,16 @@ more difficult:
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
 
+    // Exposed masonry is visual only; closed doorways also count so opening
+    // a door never changes the surrounding wall material.
+    if (tileKey === 'dwarvenwall' && currentZ <= -3) {
+      const exposed = DIRS8.some(([dx, dy]) => {
+        const key = map?.[y + dy]?.[x + dx]
+        return TILE[key]?.walk || /^(dwarven.*door|dwarvengate)/.test(key || '')
+      })
+      if (!exposed) return RENDER_STYLE.terrainTiles.cavewall
+    }
+
     // A spike trap is raised while someone occupies its tile. This is a
     // presentation-only state: trap damage still resolves on entry, and no
     // animation frame or saved flag affects gameplay or replay.
@@ -7879,6 +7901,11 @@ more difficult:
       else if (leftSame && !rightSame) image = visual.rightImage || visual.middleImage || visual.image
       else image = visual.singleImage || visual.image || visual.middleImage || visual.leftImage || visual.rightImage
     }
+
+    if (tileKey === 'dwarvenwall' && [
+      'img/tiles/dwarven-stone-wall-moss.png',
+      'img/tiles/dwarven-stone-wall-ivy.png'
+    ].includes(image)) return {...visual, image, borderImage: visual.image}
 
     const resolved = image ? {...visual, image} : visual
     return coordinateVisualVariant(resolved, x, y, tileKey === 'village' ? 97 : 0)
