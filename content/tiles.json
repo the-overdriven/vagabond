@@ -621,7 +621,7 @@
     "dwarventhrone": "╙"
   },
   "tileDesc": {
-    "ice": "lake ice; 1% instant break per turn, otherwise 2% to start cracking. Steps beside cracking ice have an 85% cracking chance; stepping from cracking ice adds a 10% break check if it cracks.",
+    "ice": "lake ice",
     "crackingice": "cracking lake ice; 10% chance per turn to break into freezing water. Also collapses if an adjacent ice tile breaks.",
     "water": "open water",
     "river": "a running river",

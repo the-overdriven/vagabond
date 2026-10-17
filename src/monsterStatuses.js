@@ -62,8 +62,6 @@ function tickMonsterStatuses() {
   ]) if (player[key] > 0 && --player[key] === 0) {
     if (key === 'confusionTurns') player.confusionSourceId = null
     log(message, 'good')
-    if (key === 'weakenTurns' || key === 'slowTurns')
-      spawnDamageNumber(player.x, player.y, key === 'weakenTurns' ? 'Weaken fades!' : 'Slow fades!', '#b9e6bc')
   }
 }
 

@@ -144,14 +144,14 @@ const DungeonTraps = (() => {
     if (isPlayer) {
       absorbPlayerFatalDamage()
       checkPlayerHealthWarning()
-      if (target.hp <= 0) die(null, 'dungeon trap')
+      // Fatal outcomes resolve after triggerTrap logs the damage.
     } else {
       if (damage > 0) breakEnemyFear(target)
       absorbEnemyFatalHit(target)
       logEnemyEnrageTransition(target, wasEnraged)
-      if (target.hp <= 0) killEnemy(target, false)
+      // Defer removal until the hit's damage message has been logged.
     }
-    return {damage, missed:false, glancing, critical:critical && !glancing}
+    return {damage, missed:false, glancing, critical:critical && !glancing, fatal:target.hp <= 0}
   }
 
   function triggerTrap(trap, actor) {
@@ -182,6 +182,10 @@ const DungeonTraps = (() => {
       result.missed ? `${who} dodge${target === player ? '' : 's'} the wall arrow.` :
       `${who} take${target === player ? '' : 's'} ${result.damage} damage from ${trap.type === 'spikes' ? 'the spikes' : 'a wall arrow'}${result.glancing ? ' (glancing)' : result.critical ? ' (critical)' : ''}.`,
       target === player ? 'bad' : 'info')
+    if (result.fatal) {
+      if (target === player) die(null, 'dungeon trap')
+      else killEnemy(target, false)
+    }
   }
 
   function onEntry(actor, fromX, fromY) {

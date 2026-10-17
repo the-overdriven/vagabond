@@ -7,6 +7,19 @@ function deathBoltRulesCheck() {
     const bolt = makeSpellTestEnemy('Skeleton', ['deathBolt'], 38, 40)
     check(ENEMY_TEMPLATE_BY_NAME.Lich.abilities.includes('deathBolt'), 'Lich is configured with Death Bolt')
     check(availableEnemySpells(bolt).includes('deathBolt'), 'other monster can use generic Death Bolt')
+    setupEnemySpellArena()
+    const lich=makeSpellTestEnemy('Lich', ['weaken','slow','disarm','dispel','deathBolt','immunity'],38,40)
+    player.equip.weapon={kind:'weapon',name:'Sword',base:'Sword',atk:2}
+    player.berryRegenTurns=8
+    let rollChoices=null
+    pick=choices=>{rollChoices=choices;return 'deathBolt'}
+    chance=p=>p===ENEMY_SPELL_CHANCE
+    check(tryEnemySpell(lich),'Lich can select weighted Death Bolt')
+    check(rollChoices.length===10 && rollChoices.filter(s=>s==='deathBolt').length===5,
+      'Death Bolt has five selection entries against five distinct ordinary alternatives')
+    setupEnemySpellArena()
+    const bolt2=makeSpellTestEnemy('Skeleton',['deathBolt'],38,40)
+    // The rest of the damage, graphics and replay checks use a single-ability caster.
     check(DEATH_BOLT_CONFIG.atk === 20 && DEATH_BOLT_CONFIG.animationMs === 650, 'balanced values are configured')
     check(RENDER_STYLE.projectiles.deathBolt.image === 'img/projectiles/death-bolt.png', 'supplied skull asset is used')
     const hp = player.hp
@@ -14,15 +27,15 @@ function deathBoltRulesCheck() {
     projectileAnims = []
     chance = p => p === ENEMY_SPELL_CHANCE
     pick = choices => choices[0]
-    check(tryEnemySpell(bolt), 'Death Bolt casts')
+    check(tryEnemySpell(bolt2), 'Death Bolt casts')
     check(player.hp < hp && player.hp > 0, '20 ATK damage applies before animation completes')
-    check(turnCount === 0 && bolt.shotsRemaining === 0, 'casting neither advances a second turn nor spends ammunition')
+    check(turnCount === 0 && bolt2.shotsRemaining === 0, 'casting neither advances a second turn nor spends ammunition')
     check(projectileAnims.length === 1 && projectileAnims[0].projectile === 'deathBolt' &&
       projectileAnims[0].duration === 650, 'visual skull has independent slow flight')
     check(projectileAnims[0].path[0].x === 38 && projectileAnims[0].path.at(-1).x === 40, 'flight traces the current shot')
     check(damageAnims.some(a => typeof a.amount === 'number' && a.delay === 650), 'impact number waits for skull visually')
     const one = player.hp
-    check(tryEnemySpell(bolt) && player.hp < one, 'Death Bolt never runs out of ammo')
+    check(tryEnemySpell(bolt2) && player.hp < one, 'Death Bolt never runs out of ammo')
 
     setupEnemySpellArena()
     const dodgeCaster = makeSpellTestEnemy('Skeleton', ['deathBolt'])

@@ -834,6 +834,9 @@ without immediate drowning. Rendering and animation timing never roll or
 advance these rules.
 
 Each transition logs a warning, shows an animated popup and stops auto-travel.
+Ordinary ice inspection shows only `lake ice`, without displaying the random
+break/cracking probabilities; the rules remain unchanged.
+
 Cracking ice retains its state when vacated, uses a bright white fracture overlay in
 tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
 The hero hover portrait on both lake-ice stages reuses the frozen-river
@@ -1268,8 +1271,10 @@ spike ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Damage uses normal
 DEF reduction, armor glancing and base critical rules; arrows also use the
 ranged dodge multiplier. Traps grant no player XP, kill count, bestiary entry,
 strongest-kill record or immediate quest-kill credit. Normal loot and stolen
-items still drop, and enemy fatal-hit protection still applies. Resolution and
-RNG finish before presentation; projectile animation never determines a hit.
+items still drop, and enemy fatal-hit protection still applies. A trap's damage
+message appears before its fatality message; deaths and drops still resolve in
+the same game action. Resolution and RNG finish before presentation; projectile
+animation never determines a hit.
 
 Each deep level saves its `traps` array, including stable ID, trigger, type and
 optional emitter, direction and range. Schema 35 restores it directly alongside
@@ -1366,8 +1371,7 @@ mines through the throne hall. Corridors, loops, collapses and reachability
 repair may not tunnel through its perimeter. Closing both leaves must isolate
 only the throne hall, while the ordinary mandatory route still reaches the
 sealed mine continuation. Generation retries rather than accepting extra
-connections, an unreachable throne hall or a compromised progression gate. 
-The hall has a three-cell clear central aisle and
+connections, an unreachable throne hall or a compromised progression gate. The hall has a three-cell clear central aisle and
 **three paired indoor stone columns**. Near the far end, exactly one
 **blocking dwarven stone throne** occupies the center of a **3×3 ceremonial
 dais**. Its eight exposed dais cells are walkable and have no gameplay bonus.
@@ -2467,7 +2471,11 @@ without inheriting the other's share. An unavailable spell's roll slice is
 unused, but ordinary magic may still be cast on that turn.
 
 If no survival spell fires, the caster gets the ordinary **20% spell-casting
-roll**, choosing uniformly from other valid spells. A successful cast consumes
+roll**. Eligible ordinary spells have equal weight except **Death Bolt, which
+has 5× selection weight**; the overall ordinary casting chance does not rise.
+With all six ordinary abilities eligible, its chance per ordinary cast changes
+from 1/6 to 5/10 (and its per-turn chance from roughly 3.3% to 10%, when no
+survival ability is eligible). A successful cast consumes
 the monster's one action, and cannot stack with another cast, attack, or move
 on that turn. Pursuit never grants additional spell rolls. Passive, frightened,
 sleeping, newly summoned, or off-level monsters cannot cast. Invisibility,
@@ -2490,8 +2498,9 @@ the monster's abilities, not its species or name.
 Weaken and Slow round their reductions up, with a minimum reduction of 1 and
 minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
 maximum; expiry restores the maximum without free healing. Slow applies after
-other SPD modifiers. Both appear in the status strip with remaining turns, do
-not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
+other SPD modifiers. Cast messages report the **actual numeric stat loss** after
+rounding and minimum-stat limits, not a percentage. Both appear in the status
+strip with remaining turns, do not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
 counters persist in saves and replay initial states.
 
 Disarm is announced as a **disarming spell**, not a physical disarm. 
@@ -2567,7 +2576,8 @@ Auto-looting does not automatically equip a two-handed weapon while a shield is
 equipped; the dropped weapon enters the backpack instead. The player may
 manually equip it, which unequips the shield using the ordinary equipment rule.
 
-Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
+Every successful cast has a log message and floating text. Weaken/Slow expiry
+is logged without floating text. Choices, item moves,
 buff removal and stat changes resolve synchronously with seeded RNG; animation
 timing and tile/ASCII rendering never decide their results.
 
@@ -5976,8 +5986,17 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-70
+72
 ```
+
+Version 72 increases the Death Bolt selection weight within ordinary spell
+choices, altering replay RNG outcomes. Trap fatality messages now follow the
+impact log; Weaken/Slow cast logs use exact stat losses, and their expiry
+floating text is removed. Ordinary ice inspection no longer discloses break
+probabilities. No new saved fields or conversion from older saves are added.
+
+Version 71 protects Dwarven Ruins room walls, entrances and progression gates
+against accidental corridor cuts and diagonal bypasses during world generation.
 
 Version 70 makes the guaranteed throne hall an optional single-entrance side
 branch instead of an intermediate room on the route to the collapsed mine.

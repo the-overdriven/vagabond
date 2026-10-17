@@ -36,9 +36,20 @@ async function trapRuleChecks() {
   map[12][15]='dwarvenpressureplate';map[12][9]='dwarvenarrowwall'
   const blocker=monster([]);blocker.x=12;enemies=[blocker];player.x=15
   const hp=player.hp;DungeonTraps.onEntry(player,14,12);check(blocker.hp<100&&player.hp===hp,'first creature intercepts arrow')
-  const blockedHp=blocker.hp;groundItems=[{kind:'potion',x:11,y:12,level:-4,levelKind:'chain'}]
-  DungeonTraps.onEntry(player,14,12);check(blocker.hp===blockedHp,'ground item blocks arrow')
-  groundItems=[];map[12][11]='dwarvendoorclosed';DungeonTraps.onEntry(player,14,12);check(blocker.hp===blockedHp,'closed door blocks arrow')
+  // A fatal arrow must announce the damage before the death; drops and
+  // credit still resolve in the same action.
+  blocker.hp=1
+  const oldLog=log, messages=[]
+  log=text=>messages.push(text)
+  DungeonTraps.onEntry(player,14,12)
+  log=oldLog
+  const impact=messages.findIndex(text=>text.includes('damage from a wall arrow'))
+  const death=messages.findIndex(text=>text.includes('is killed by a trap'))
+  check(impact>=0&&death>impact,'wall arrow damage precedes trap death message')
+  const freshBlocker=monster([]);freshBlocker.x=12;enemies=[freshBlocker]
+  const blockedHp=freshBlocker.hp;groundItems=[{kind:'potion',x:11,y:12,level:-4,levelKind:'chain'}]
+  DungeonTraps.onEntry(player,14,12);check(freshBlocker.hp===blockedHp,'ground item blocks arrow')
+  groundItems=[];map[12][11]='dwarvendoorclosed';DungeonTraps.onEntry(player,14,12);check(freshBlocker.hp===blockedHp,'closed door blocks arrow')
   check(!UndergroundFov.canSee(map,10,12,12,12),'door blocks shared FOV')
   check(!UndergroundFov.canSee(map,8,12,10,12),'emitter retains wall sight blocking')
   check(!DungeonTraps.safeSpawn(15,12,-4)&&!DungeonTraps.safeSpawn(17,12,-4)&&DungeonTraps.safeSpawn(18,12,-4),'spawn exclusion radius')

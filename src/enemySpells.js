@@ -3,6 +3,9 @@
 // An eligible caster casts at most one spell each turn. Below the HP
 // thresholds survival takes priority; ordinary magic is rolled if it fails.
 const ENEMY_SPELL_CHANCE = 0.20
+// Death Bolt competes with other eligible ordinary spells, but is selected
+// five times as often. Overall casting frequency is unchanged.
+const ENEMY_DEATH_BOLT_WEIGHT = 5
 // Low-HP spells use fixed slices of one seeded turn roll, not relative
 // weights: sacrificing stays 30% and teleporting stays 20%, even when
 // the other ability has no valid target. Together they occupy 50% of turns.
@@ -123,16 +126,20 @@ function tryEnemySpell(e) {
   let spell = survivalSpell
   if (!spell) {
     if (!ordinary.length || !chance(ENEMY_SPELL_CHANCE)) return false
-    spell = pick(ordinary)
+    spell = pick(ordinary.flatMap(name => Array(name === 'deathBolt' ? ENEMY_DEATH_BOLT_WEIGHT : 1).fill(name)))
   }
   if (spell === 'weaken') {
+    const before = playerMaxHp()
     player.weakenTurns = ENEMY_DEBUFF_TURNS
+    const lost = before - playerMaxHp()
     player.hp = Math.min(player.hp, playerMaxHp())
-    log(`The ${e.name} weakens you! Your maximum HP falls by 10% for ${ENEMY_DEBUFF_TURNS} turns.`, 'bad')
+    log(`The ${e.name} weakens you! Your maximum HP falls by ${lost} for ${ENEMY_DEBUFF_TURNS} turns.`, 'bad')
     spawnDamageNumber(player.x, player.y, 'Weakened!', '#c7a5f6')
   } else if (spell === 'slow') {
+    const before = playerSpd()
     player.slowTurns = ENEMY_DEBUFF_TURNS
-    log(`The ${e.name} slows you! Your SPD falls by 10% for ${ENEMY_DEBUFF_TURNS} turns.`, 'bad')
+    const lost = before - playerSpd()
+    log(`The ${e.name} slows you! Your SPD falls by ${lost} for ${ENEMY_DEBUFF_TURNS} turns.`, 'bad')
     spawnDamageNumber(player.x, player.y, 'Slowed!', '#c7a5f6')
   } else if (spell === 'disarm') {
     const slot = pick(playerDisarmSlots()), item = player.equip[slot]

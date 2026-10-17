@@ -35,12 +35,17 @@ function genericEnemySpellChecks() {
   try {
     for(const name of ['Lich','Skeleton']) {
       setupEnemySpellArena()
+      const spellLogs=[]
+      const previousLog=log
+      log=text=>spellLogs.push(text)
       const e=makeSpellTestEnemy(name,['weaken','slow'])
       const baseSpeed=playerSpd(),slowedSpeed=Math.max(1,baseSpeed-Math.ceil(baseSpeed*0.10))
       chance=()=>true;pick=choices=>choices[0]
       check(tryEnemySpell(e),'any assigned species can cast Weaken: '+name)
       check(player.weakenTurns===5&&playerMaxHp()===900&&player.hp===900,'10% HP reduction')
+      check(spellLogs.some(s=>s.includes('Your maximum HP falls by 100 for 5 turns.')),'exact max HP debuff in log')
       check(tryEnemySpell(e)&&player.slowTurns===5&&playerSpd()===slowedSpeed,'10% SPD reduction')
+      check(spellLogs.some(s=>s.includes(`Your SPD falls by ${baseSpeed-slowedSpeed} for 5 turns.`)),'exact SPD debuff in log')
       check(damageAnims.some(a=>a.amount==='Weakened!')&&damageAnims.some(a=>a.amount==='Slowed!'),'cast popups')
       chance=()=>{throw Error('fully active debuffs must not roll')}
       check(!tryEnemySpell(e),'does not stack or waste a cast')
@@ -51,8 +56,12 @@ function genericEnemySpellChecks() {
       check(enemies[0].abilities.join(',')==='weaken,slow','assigned abilities restored independently of species')
       for(let i=0;i<4;i++)tickMonsterStatuses()
       check(player.weakenTurns===1&&player.slowTurns===1&&playerSpd()===slowedSpeed,'active through fourth tick')
+      const beforeExpiryPopups=damageAnims.length
       tickMonsterStatuses()
       check(playerMaxHp()===1000&&playerSpd()===baseSpeed&&player.hp===900,'expiry restores stats without healing')
+      check(damageAnims.length===beforeExpiryPopups,'spell expiry does not create floating text')
+      check(spellLogs.includes('The weakening spell fades.')&&spellLogs.includes('The slowing spell fades.'),'expiry stays in log')
+      log=previousLog
     }
     setupEnemySpellArena()
     const lich=makeSpellTestEnemy('Lich')
