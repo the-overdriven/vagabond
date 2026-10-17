@@ -1077,7 +1077,7 @@ progress = floorIndex / (floorCount - 1)
 where `floorIndex` is zero-based inside the Ruins. This gives 0 on the first
 floor and 1 on the final floor for 3-, 4-, and 5-floor strata alike. After room
 rectangles are positioned, the generator builds a **room graph before carving
-corridors**. The graph chooses the entrance, main route, exit, **2–4 optional
+corridors**. The graph chooses the entrance, main route, exit, **4–6 optional
 branch rooms**, and up to two seeded loop edges (`loopProbability: 0.18`). Only
 then are corridor edges carved into terrain. The exit must be at least **4
 room-graph edges** from the entrance and at least **28 walkable tiles** away after
@@ -1325,11 +1325,11 @@ Enemies, prefixes, positions, tactical role, encounter-family identity, room/vau
 identity and wander state are persisted. Loading restores the exact population;
 it never regenerates tactical encounters from room metadata.
 
-### Guaranteed Throne Hall (v145, geometry, throne and last-stand defense)
+### Guaranteed Throne Hall (v146, side-branch layout and last-stand defense)
 
 The deepest generated **Dwarven Ruins** floor contains exactly one reserved
-**Throne Hall** on its mandatory room-graph route, immediately before a
-separate sealed Deep Mines chamber. It is a landmark room, not one of the
+**Throne Hall** as a single-entrance optional side branch, never on the
+mandatory route to the separate sealed Deep Mines chamber. It is a landmark room, not one of the
 randomly selected major vault types, and occupies one of the floor's ordinary
 room slots. Earlier Ruins floors and the entrance Fort contain no throne hall.
 The artifact chest is still in a separate optional vault. The throne hall
@@ -1339,18 +1339,27 @@ artifact vault remains compulsory, while a second fitted vault is an ordinary
 
 The floor reserves the hall's footprint **before** placing other rooms. Three
 possible interior dimensions are **9×19, 11×21, 11×23** cells, with four
-possible facings. For room capacity, the final floor extends its procedural
-half-bounds by 10 cells in both axes, targets 10–12 rooms within the existing
-8–12 room range, and uses at least two cells of separation for ordinary rooms
-(previously three on all floors). This slightly enlarges the final floor without
-increasing its treasure or enemy budget. All other floors keep their original
-bounds, room spacing and encounter rules.
+possible facings. All Dwarven Ruins floors now **target 11–15 rooms**
+(previously 8–12), with **4–6 guaranteed optional room-graph branches**
+(previously 2–4); physical room-placement constraints can reduce the final
+room count without reducing the branch guarantee. Their
+horizontal half-bounds range from **34–40** cells (previously 28–34), and
+vertical half-bounds from **26–30** (previously 20–24). The final floor keeps
+its additional 10-cell extension in both axes and permits at least two cells
+of ordinary room separation, rather than three. The larger layout offers
+more side exploration, but **does not increase enemy, chest, artifact, or loot
+budgets**; optional rooms may be sparsely furnished or dangerous without
+additional guaranteed rewards.
 
-The hall has **two specified double-leaf ports**: a front approach and an
-onward passage. Only those ports may interrupt its walls. Corridors, loops,
-collapses and reachability repair may not tunnel through its perimeter, and
-world generation retries rather than accepting a bypass of the landmark or
-sealed continuation. The hall has a three-cell clear central aisle and
+The hall has **exactly one specified two-leaf entrance**, at the short end
+opposite the throne. It is a **leaf branch** attached to a nearby main-route
+room, and the back wall is solid. There is no back passage or route to the
+mines through the throne hall. Corridors, loops, collapses and reachability
+repair may not tunnel through its perimeter. Closing both leaves must isolate
+only the throne hall, while the ordinary mandatory route still reaches the
+sealed mine continuation. Generation retries rather than accepting extra
+connections, an unreachable throne hall or a compromised progression gate. 
+The hall has a three-cell clear central aisle and
 **three paired indoor stone columns**. Near the far end, exactly one
 **blocking dwarven stone throne** occupies the center of a **3×3 ceremonial
 dais**. Its eight exposed dais cells are walkable and have no gameplay bonus.
@@ -1360,8 +1369,8 @@ blocking behavior. Ordinary scattered ground remains and loot are kept out of
 the hall until its encounter and decoration rules are introduced.
 
 Room metadata identifies the hall's special archetype and facing. A separate
-stable landmark record stores the recipe revision, associated room, front and
-rear ports, and the throne anchor. It is serialized alongside room/vault
+stable landmark record stores recipe revision 3, associated room, sole front
+entrance and the throne anchor. It is serialized alongside room/vault
 descriptors and restored without rerolling any world-generation decisions.
 Whole-world rotation transforms its rectangle, points and facing together.
 The throne graphic uses the landmark facing, with four sprites (north, east,
@@ -1389,9 +1398,10 @@ Champion and retains the same encounter-family count, wander/Alarmed rules,
 loot budget and rewards. Guards remain free to pursue the player; the hall
 does not lock during combat.
 
-The throne recipe is revision 2. The mandatory gate can occupy the front
-double-leaf entrance when no earlier room connection can serve as a structural
-progression gate. This remains a landmark rather than a new boss, interactive
+The throne recipe is revision 3. The progression gate **cannot** occupy the
+throne entrance: it belongs on the mandatory route to the sealed mine.
+The throne hall can still have an ordinary closed or locked door under the
+normal doorway rules. This remains a landmark rather than a new boss, interactive
 throne or source of additional artifacts. Landmark role positions, family assignments and enemy affiliations are
 persisted with existing room and monster records; loading never repopulates
 or rerolls the hall.
@@ -5958,8 +5968,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-68
+70
 ```
+
+Version 70 makes the guaranteed throne hall an optional single-entrance side
+branch instead of an intermediate room on the route to the collapsed mine.
+Dwarven Ruins floors also have more rooms and optional branches. The seeded
+world-generation graph and persisted landmark recipe have changed; current
+saves and replay snapshots use the new version without old-save conversion.
 
 Version 69 moves the guaranteed final-floor defensive encounter into the
 reserved throne hall. This changes vault selection, tactical monster positions,

@@ -360,16 +360,16 @@
       ],
       "layout": {
         "boundsXRange": [
-          28,
-          34
+          34,
+          40
         ],
         "boundsYRange": [
-          20,
-          24
+          26,
+          30
         ],
         "roomCountRange": [
-          8,
-          12
+          11,
+          15
         ],
         "roomPlacementAttempts": 320,
         "roomWidthRange": [
@@ -391,8 +391,8 @@
         "loopProbability": 0.18,
         "loopMaxConnections": 2,
         "optionalBranchCountRange": [
-          2,
-          4
+          4,
+          6
         ],
         "minimumEntranceExitRoomGraphDistance": 4,
         "minimumEntranceExitWalkingDistance": 28,

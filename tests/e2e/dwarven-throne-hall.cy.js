@@ -8,7 +8,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
   })
 
   for (const seed of [610061, 610062, 610063]) {
-    it(`reserves an intact mandatory hall, separate artifact, and legal route with seed ${seed}`, () => {
+    it(`reserves an intact optional throne hall, separate artifact, and legal mine route with seed ${seed}`, () => {
       cy.window().then(win => win.eval(`(async () => {
         const check = (ok, message) => { if (!ok) throw new Error(message) }
         applyWorldTraits([])
@@ -30,13 +30,13 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         const halls = final.landmarks || []
         check(halls.length === 1, 'one guaranteed landmark on the last floor')
         const hall = halls[0]
-        check(hall.id.endsWith(':throneHall') && hall.recipeRevision === 2, 'stable landmark identity')
+        check(hall.id.endsWith(':throneHall') && hall.recipeRevision === 3, 'stable landmark identity')
         check(hall.type === 'throneHall', 'correct landmark recipe')
         const room = final.rooms.find(candidate => candidate.id === hall.roomId)
         check(!!room && room.landmark === 'throneHall' && room.archetype === 'Throne Hall', 'dedicated hall room')
-        check(room.onMainRoute && !room.optional, 'throne hall is mandatory')
-        check(final.roomGraph.mainRoute.at(-2) === room.id && final.roomGraph.exitRoomId !== room.id,
-          'throne hall precedes a separate sealed-mines chamber')
+        check(!room.onMainRoute && room.optional, 'throne hall is optional')
+        check(!final.roomGraph.mainRoute.includes(room.id) && final.roomGraph.exitRoomId !== room.id,
+          'throne hall is outside the mandatory route to the mines')
         const validSize = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.landmarks.throneHall.interiorSizes
           .some(([w,l]) => Math.min(room.w-2,room.h-2) === w && Math.max(room.w-2,room.h-2) === l)
         check(validSize && hall.facing === room.facing, 'layout dimensions and facing')
@@ -53,8 +53,13 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
           'throne collision does not create unexpected sight or projectile cover')
         check(tileUnderlays[chainZForDepth(deepLevels.length+1) + ':' + keyXY(hall.thronePosition.x,hall.thronePosition.y)] === 'dwarvendais',
           'throne sits transparently on actual dais floor')
-        const ports = [...hall.entrance,...hall.onward]
-        check(hall.entrance.length === 2 && hall.onward.length === 2, 'exactly two double-leaf passage ports')
+        const ports = hall.entrance
+        check(hall.entrance.length === 2 && !('onward' in hall) && room.doorways.length === 1,
+          'exactly one double-leaf throne-room entrance')
+        check(room.optional && !room.onMainRoute && room.connectionCount === 1,
+          'throne hall is a one-connection optional room')
+        check(final.roomGraph.branches.some(branch => branch.roomId === room.id),
+          'throne hall is registered as a side branch')
         const portKeys = new Set(ports.map(p => keyXY(p.x,p.y)))
         for (let y=room.y;y<room.y+room.h;y++) for (let x=room.x;x<room.x+room.w;x++) {
           const edge = x===room.x || x===room.x+room.w-1 || y===room.y || y===room.y+room.h-1
@@ -63,9 +68,11 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         }
         const [entrance, exit] = final.caves[0].entrances
         const reaches = dungeonWalkDistancesWithDoorTraversal(final.map, entrance)
-        check(reaches.has(keyXY(exit.x,exit.y)), 'exit is solvable through the hall')
+        check(reaches.has(keyXY(exit.x,exit.y)) && reaches.has(keyXY(room.cx,room.cy)),
+          'mine exit and optional throne hall are both reachable')
         const blocked = dungeonWalkDistancesWithDoorTraversal(final.map, entrance, portKeys)
-        check(!blocked.has(keyXY(exit.x,exit.y)), 'cannot bypass the hall')
+        check(blocked.has(keyXY(exit.x,exit.y)) && !blocked.has(keyXY(room.cx,room.cy)),
+          'blocking throne entrance isolates only the throne, not the mine exit')
         check(final.vaults.filter(v => v.artifactReserved).length === 1, 'preserves optional artifact vault')
         check(final.vaults.length >= 1 && final.vaults.length <= 2,
           'throne hall replaces the extra compulsory defensive vault')
@@ -106,7 +113,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       check(hall.facing === (old.facing+1)%4 && room.facing === hall.facing, 'facing rotates')
       check(room.w === oldRoom.h && room.h === oldRoom.w, 'hall footprint rotates')
       check(JSON.stringify(hall.entrance) === JSON.stringify(old.entrance.map(rotated)), 'entry port rotates')
-      check(JSON.stringify(hall.onward) === JSON.stringify(old.onward.map(rotated)), 'exit port rotates')
+      check(!('onward' in hall), 'back wall stays sealed after rotation')
       check(JSON.stringify(hall.thronePosition) === JSON.stringify(rotated(old.thronePosition)), 'throne anchor rotates')
       check(now.map[hall.thronePosition.y]?.[hall.thronePosition.x] === 'dwarventhrone', 'throne follows rotation')
       currentZ=chainZForDepth(deepLevels.length+1)

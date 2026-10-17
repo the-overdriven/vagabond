@@ -141,7 +141,9 @@ describe('Persistent Dwarven Ruins stratum', () => {
           check(level.floorCount === ruins.length, 'floor count metadata is stable')
           check(Math.abs(level.progress - expectedProgress) < 1e-12, 'normalized floor progress')
           check(level.caveMaps.length === 1 && level.map === level.caveMaps[0], 'single persistent terrain object')
-          check(Array.isArray(level.rooms) && level.rooms.length >= 3, 'floor keeps generated room descriptors')
+          check(Array.isArray(level.rooms) && level.rooms.length >= WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout.minimumEntranceExitRoomGraphDistance +
+            1 + WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout.optionalBranchCountRange[0],
+            'expanded floor retains main route and four or more optional rooms')
           check(level.roomGraph?.mainRoute?.length >= 2, 'floor persists its room graph')
           check(level.roomGraph.graphDistance >= WORLD_GEN_CONFIG.dungeons.dwarvenRuins.layout.minimumEntranceExitRoomGraphDistance,
             'entrance and exit satisfy configured room-graph distance')

@@ -2208,7 +2208,7 @@ function dungeonRoomGraphDistances(graph, startIndex) {
 }
 
 // A reserved landmark is a real room, placed before ordinary room generation.
-// Only its declared two-leaf ports may interrupt its perimeter. Geometry is
+// Only its declared front two-leaf entrance may interrupt its perimeter. Geometry is
 // kept in world coordinates so generation, rotation, and saves agree.
 function dwarvenThroneHallGeometry(room) {
   const forward = [[0,-1],[1,0],[0,1],[-1,0]][room.facing]
@@ -2277,16 +2277,16 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const minBranches = requestedMinBranches
   const branchTarget = maxBranches > 0 ? randInt(minBranches, maxBranches) : 0
   const routeNodeCount = Math.max(minGraphDistance + 1, rooms.length - branchTarget)
-  const landmarkIndex = Number.isInteger(cfg.landmarkRoomIndex) ? cfg.landmarkRoomIndex : -1
-  const finalIndex = Number.isInteger(cfg.landmarkExitRoomIndex) ? cfg.landmarkExitRoomIndex : -1
-  const hasLandmark = landmarkIndex > 0 && finalIndex > 0 && landmarkIndex !== finalIndex
+  const sideLandmarkIndex = Number.isInteger(cfg.landmarkSideRoomIndex) ? cfg.landmarkSideRoomIndex : -1
+  const hasSideLandmark = sideLandmarkIndex > 0 && sideLandmarkIndex < rooms.length
+  if (hasSideLandmark && branchTarget < 1) return null
   const unused = new Set(rooms.map((_, index) => index).slice(1)
-    .filter(index => !hasLandmark || (index !== landmarkIndex && index !== finalIndex)))
+    .filter(index => !hasSideLandmark || index !== sideLandmarkIndex))
   const mainRoute = [0]
   const treeEdges = []
   const distanceBetween = (a, b) => Math.abs(rooms[a].cx - rooms[b].cx) + Math.abs(rooms[a].cy - rooms[b].cy)
 
-  while (mainRoute.length < routeNodeCount - (hasLandmark ? 2 : 0) && unused.size) {
+  while (mainRoute.length < routeNodeCount && unused.size) {
     const from = mainRoute[mainRoute.length - 1]
     const candidates = [...unused].map(index => ({index, distance: distanceBetween(from, index)}))
       .sort((a, b) => a.distance - b.distance || a.index - b.index)
@@ -2298,17 +2298,23 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
     mainRoute.push(chosen)
     unused.delete(chosen)
   }
-  if (hasLandmark) {
-    const from = mainRoute[mainRoute.length - 1]
-    treeEdges.push({a:from,b:landmarkIndex,kind:'main'})
-    treeEdges.push({a:landmarkIndex,b:finalIndex,kind:'main'})
-    mainRoute.push(landmarkIndex,finalIndex)
-  }
   if (mainRoute.length < minGraphDistance + 1) return null
 
   const branchRoots = []
+  if (hasSideLandmark) {
+    // The throne is an optional leaf, not a required passage to the mines.
+    // Prefer a nearby late-route chamber; don't attach it to the entrance or
+    // exit, and never select it as a branch root for anything else.
+    const parents = mainRoute.slice(1, -1).map(index => ({
+      index, distance: distanceBetween(index, sideLandmarkIndex)
+    })).sort((a,b) => a.distance-b.distance || a.index-b.index)
+    if (!parents.length) return null
+    const parent = parents[0].index
+    treeEdges.push({a:parent,b:sideLandmarkIndex,kind:'branch'})
+    branchRoots.push({root:parent,room:sideLandmarkIndex})
+  }
   for (const index of [...unused]) {
-    const candidates = mainRoute.slice(0, -1).filter(parent => !hasLandmark || parent !== landmarkIndex)
+    const candidates = mainRoute.slice(0, -1)
       .map(parent => ({parent, distance: distanceBetween(parent, index)}))
       .sort((a, b) => a.distance - b.distance || a.parent - b.parent)
     if (!candidates.length) return null
@@ -2328,7 +2334,7 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const existing = new Set(graph.edges.map(edge => edge.a < edge.b ? `${edge.a}:${edge.b}` : `${edge.b}:${edge.a}`))
   const loopPairs = []
   for (let a = 0; a < rooms.length; a++) for (let b = a + 1; b < rooms.length; b++) {
-    if (hasLandmark && [a,b].some(index => index === landmarkIndex || index === finalIndex)) continue
+    if (hasSideLandmark && (a === sideLandmarkIndex || b === sideLandmarkIndex)) continue
     if (existing.has(`${a}:${b}`)) continue
     loopPairs.push({a, b, distance: distanceBetween(a, b)})
   }
@@ -2441,7 +2447,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
     if (!hall) return null
   }
-  const roomCount = hall ? Math.max(10, randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])) : randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
+  const roomCount = randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
   for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts * (hall ? 3 : 1); attempt++) {
     const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1])
     const h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
@@ -2455,17 +2461,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if (dungeonRoomHasSeparation(rooms, candidate, hall ? Math.max(1,cfg.roomSeparation-1) : cfg.roomSeparation)) rooms.push(candidate)
   }
   if (rooms.length < 3) return null
-  let forcedExitIndex = -1
-  if (hall) {
-    const far = dwarvenThroneHallGeometry(hall).farOutside[0]
-    const eligible=rooms.map((room,index)=>({room,index})).filter(p=>p.index>1)
-      .sort((a,b)=> (Math.abs(a.room.cx-far.x)+Math.abs(a.room.cy-far.y)) -
-        (Math.abs(b.room.cx-far.x)+Math.abs(b.room.cy-far.y)) || a.index-b.index)
-    if (!eligible.length) return null
-    forcedExitIndex = eligible[0].index
-  }
   const roomGraph = buildDungeonRoomGraph(rooms, hall
-    ? {...cfg,landmarkRoomIndex:1,landmarkExitRoomIndex:forcedExitIndex} : cfg)
+    ? {...cfg, landmarkSideRoomIndex:1,
+        optionalBranchCountRange: hallCfg.optionalBranchCountRange || cfg.optionalBranchCountRange} : cfg)
   if (!roomGraph) return null
 
   for (const r of rooms) {
@@ -2480,12 +2478,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     x:hall.cx + hallGeometry.forward[0]*(Math.floor((hall.facing%2 ? hall.w : hall.h)/2)-3),
     y:hall.cy + hallGeometry.forward[1]*(Math.floor((hall.facing%2 ? hall.w : hall.h)/2)-3)
   } : null
-  const hallPortOutside = room => {
-    const isExit = room === rooms[forcedExitIndex]
-    const leaves = isExit ? hallGeometry.farOutside : hallGeometry.nearOutside
-    const x=Math.max(...leaves.map(p=>p.x)),y=Math.max(...leaves.map(p=>p.y))
-    return {x:x+(x>hall.x+hall.w-1?1:0),y:y+(y>hall.y+hall.h-1?1:0)}
-  }
+  const hallPortOutside = () => hallGeometry.nearOutside[1]
   const connectRoomCenters = (a,b) => {
     if (!hall) {carveDungeonRoomConnection(carveWide,a,b,cfg);return true}
     const from=a===hall ? hallPortOutside(b) : {x:a.cx,y:a.cy}
@@ -2506,6 +2499,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   // child's perimeter; center-to-center direction alone can point at a wall.
   for (let i = 1; i < rooms.length; i++) {
     const r = rooms[i], parent = parentByRoom.get(r) || rooms[0]
+    // Landmark entrances are authored below; generic room-door selection
+    // must not add or retain a second accidental doorway.
+    if (r === hall) continue
     const candidates = []
     for (const side of ['left', 'right', 'top', 'bottom']) {
       const vertical = side === 'left' || side === 'right'
@@ -2542,10 +2538,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       cm[y][x] = x===hall.x || x===hall.x+hall.w-1 ||
         y===hall.y || y===hall.y+hall.h-1 ? 'dwarvenwall' : 'marble'
     }
-    for (const leaves of [hallGeometry.near,hallGeometry.far]) {
-      for (const p of leaves) cm[p.y][p.x]='marble'
-      doorways.push({leaves,room:hall})
-    }
+    for (const p of hallGeometry.near) cm[p.y][p.x]='marble'
+    doorways.push({leaves:hallGeometry.near,room:hall})
   }
 
   // Loop decisions were already made in the abstract room graph. Carve them
@@ -2643,8 +2637,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   }
   const mainRouteRooms = new Set(roomGraph.mainRoute.map(index => rooms[index]))
   const gateCandidates = structuralDoors.filter(d => d.blocksExit && mainRouteRooms.has(d.room) &&
-    (!hall || d.room !== rooms[forcedExitIndex]) &&
-    (!hall || d.room !== hall || d.leaves === hallGeometry.near)).map(d => d.leaves)
+    d.room !== hall).map(d => d.leaves)
   if (!gateCandidates.length) return null
   const gateDoorway = pick(gateCandidates)
   const gateKeyId = dwarvenDungeonLockId(floorZ, 'gate', gateDoorway)
@@ -2934,8 +2927,14 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (ordinaryKeys.some(key => !closedReach.has(keyXY(key.x, key.y)))) return null
   const eventualReach = dungeonWalkDistancesWithDoorTraversal(cm, entry)
   if (!eventualReach.has(keyXY(exit.x, exit.y))) return null
-  if (hall && dungeonWalkDistancesWithDoorTraversal(cm, entry,
-    new Set([...hallGeometry.near,...hallGeometry.far].map(p => keyXY(p.x,p.y)))).has(keyXY(exit.x,exit.y))) return null
+  if (hall) {
+    const doorBlocked = new Set(hallGeometry.near.map(p => keyXY(p.x,p.y)))
+    const withoutHall = dungeonWalkDistancesWithDoorTraversal(cm, entry, doorBlocked)
+    if (!withoutHall.has(keyXY(exit.x,exit.y))) return null
+    const apron = {x:hall.cx,y:hall.cy}
+    if (withoutHall.has(keyXY(apron.x,apron.y))) return null
+    if (!eventualReach.has(keyXY(apron.x,apron.y))) return null
+  }
   for (const room of roomMetas) for (const slots of Object.values(room.tacticalSlots || {})) {
     if ((slots || []).some(p => cm[p.y]?.[p.x] !== 'marble')) return null
   }
@@ -2969,10 +2968,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     })).filter(edge => edge.aRoomId && edge.bRoomId)
   }
   const landmarks = hall ? [{
-    id:`dwarvenRuins-landmark:${floorZ}:throneHall`,type:'throneHall',recipeRevision:2,
+    id:`dwarvenRuins-landmark:${floorZ}:throneHall`,type:'throneHall',recipeRevision:3,
     roomId:serializableRooms[1].id,facing:hall.facing,
     entrance:hallGeometry.near.map(p=>({...p})),
-    onward:hallGeometry.far.map(p=>({...p})),
     thronePosition:{...thronePosition}
   }] : []
   const descriptor = {
@@ -5230,32 +5228,39 @@ function validateDwarvenRuinsStratum() {
       issues.push(`${tag}: expected ${isLast ? 1 : 0} throne hall landmarks, found ${hallRecords.length}`)
     for (const hallRecord of hallRecords) {
       const room = (level.rooms || []).find(r => r.id === hallRecord.roomId)
-      if (!room || room.landmark !== 'throneHall' || !room.onMainRoute || room.optional)
-        {issues.push(`${tag}: throne hall has no valid mandatory room`);continue}
+      if (!room || room.landmark !== 'throneHall' || room.onMainRoute || !room.optional ||
+          room.connectionCount !== 1 ||
+          (level.roomGraph?.branches || []).filter(branch => branch.roomId === room.id).length !== 1)
+        {issues.push(`${tag}: throne hall must be a single-connection optional branch`);continue}
       if (hallRecord.facing !== room.facing || !Number.isInteger(room.facing) || room.facing < 0 || room.facing > 3)
         issues.push(`${tag}: throne hall orientation mismatch`)
       const width = Math.min(room.w-2, room.h-2),length = Math.max(room.w-2,room.h-2)
       const sizes = cfg.landmarks?.throneHall?.interiorSizes || []
       if (!sizes.some(size => size[0] === width && size[1] === length))
         issues.push(`${tag}: throne hall has invalid dimensions`)
-      const near = hallRecord.entrance || [], far = hallRecord.onward || []
-      const ports = new Set([...near,...far].map(p => keyXY(p.x,p.y)))
-      if (near.length !== 2 || far.length !== 2)
-        issues.push(`${tag}: throne hall requires two two-leaf ports`)
+      const near = hallRecord.entrance || []
+      const ports = new Set(near.map(p => keyXY(p.x,p.y)))
+      if (near.length !== 2 || Object.hasOwn(hallRecord,'onward') || room.doorways?.length !== 1)
+        issues.push(`${tag}: throne hall requires exactly one two-leaf entrance`)
       for (let y=room.y;y<room.y+room.h;y++) for (let x=room.x;x<room.x+room.w;x++) {
         const edge=x===room.x || x===room.x+room.w-1 || y===room.y || y===room.y+room.h-1
         if (edge && !ports.has(keyXY(x,y)) && level.map[y]?.[x] !== 'dwarvenwall')
           issues.push(`${tag}: throne hall perimeter breached at ${x},${y}`)
       }
-      const blocked = new Set([...near,...far].map(p => keyXY(p.x,p.y)))
-      if (dungeonWalkDistancesWithDoorTraversal(level.map,entry,blocked).has(keyXY(exit.x,exit.y)))
-        issues.push(`${tag}: sealed passage can bypass the throne hall`)
+      const blocked = new Set(near.map(p => keyXY(p.x,p.y)))
+      const noHall = dungeonWalkDistancesWithDoorTraversal(level.map,entry,blocked)
+      if (!noHall.has(keyXY(exit.x,exit.y)))
+        issues.push(`${tag}: mine route incorrectly depends on entering the throne hall`)
+      if (noHall.has(keyXY(room.cx,room.cy)))
+        issues.push(`${tag}: throne hall has an unintended second entrance`)
+      if (!dungeonWalkDistancesWithDoorTraversal(level.map,entry).has(keyXY(room.cx,room.cy)))
+        issues.push(`${tag}: throne hall is not accessible by its entrance`)
       const throne = hallRecord.thronePosition
       if (!throne || level.map[throne.y]?.[throne.x] !== 'dwarventhrone')
         issues.push(`${tag}: missing blocking throne at landmark anchor`)
       const throneCells = dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'dwarventhrone')
       if (throneCells.length !== 1) issues.push(`${tag}: throne hall must have exactly one throne`)
-      if (hallRecord.recipeRevision !== 2) issues.push(`${tag}: unexpected throne recipe revision`)
+      if (hallRecord.recipeRevision !== 3) issues.push(`${tag}: unexpected throne recipe revision`)
       if (throne) {
         const direction = [[0,-1],[1,0],[0,1],[-1,0]][hallRecord.facing] || [0,0]
         const across = [direction[1],-direction[0]]
