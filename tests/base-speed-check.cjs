@@ -4,10 +4,10 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
 async function main(){
   await run('loadContent()')
   assert.equal(run('player.baseSpd'),5,'new characters start at 5 base SPD')
-  for(const [name,speed] of [['Wolf',6],['Lich',5],['DRUSK',4],['Fungus',2]]){
+  for(const [name,speed] of [['Wolf',6],['Lich',5],['DRUSK',4],['Fungus',0]]){
     context.monsterName=name
     assert.equal(run('ENEMY_TEMPLATE_BY_NAME[monsterName].spd'),speed,
-      name+' receives +2 base SPD')
+      name+' has the configured base SPD (stationary Fungus stays at 0)')
   }
   context.fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'saves/Tester_start.json'),'utf8'))
   assert.equal(context.fixture.version,run('SAVE_VERSION'))
