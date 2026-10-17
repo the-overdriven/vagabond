@@ -769,6 +769,12 @@
     }
   },
   "projectiles": {
+    "deathBolt": {
+      "glyph": "☠",
+      "color": "#c7a5f6",
+      "image": "img/projectiles/death-bolt.png",
+      "scale": 0.95
+    },
     "web": {
       "glyph": "%",
       "color": "#dedbd1",

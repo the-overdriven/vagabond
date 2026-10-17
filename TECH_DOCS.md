@@ -2344,8 +2344,8 @@ Lich uses the same one-use Death Shield; it does not recharge.
 
 ## Shared monster spells
 
-Any monster template can independently add `weaken`, `slow`, `disarm`, or `dispel`
-to its `abilities` array. Lich currently has all four. The shared spell system
+Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, or `deathBolt`
+to its `abilities` array. Lich currently has all five. The shared spell system
 uses abilities, never the monster's species or name, to decide what it can cast.
 
 A monster attacking or pursuing a visible player in its effective aggro range
@@ -2363,6 +2363,7 @@ True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
 | `slow` | SPD −10% for 5 player turns | Slow is not already active |
 | `disarm` | One uniformly random equipped weapon, shield or armor moves intact to the player's inventory | At least one of these slots is occupied |
 | `dispel` | Removes one uniformly random active temporary buff | At least one dispellable buff is active |
+| `deathBolt` | Fires a slow, skull-shaped magical projectile with fixed 10 ATK | Clear shot to the visible player within effective aggro |
 
 Weaken and Slow round their reductions up, with a minimum reduction of 1 and
 minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
@@ -2384,6 +2385,23 @@ god-mode invisibility and negative statuses are not dispellable. A normal Lich
 cannot target an invisible player, so Invisibility is removable only by a
 caster that can actually see that player. No eligible buff means no Dispel
 attempt or target-selection RNG.
+
+Death Bolt has **unlimited ammunition** and shares arrow/stone rules for ranged
+SPD-based dodge (2× normal), armor/DEF mitigation, glancing blows, and critical
+hits. Ordinary ranged misses deal no damage; glancing may deal zero; an actual
+non-glancing hit deals at least 1. Like ordinary projectiles, Death Bolt cannot
+pass through projectile-blocking terrain or living ground creatures, but can
+pass through flying creatures. A blocked line removes Death Bolt from that
+turn's eligible spell pool without consuming a cast or an RNG roll; the monster
+can still pursue or choose another spell. True Sight is required to target an
+invisible player. Sanctuary protections remain in force.
+
+The supplied pixel-art skull is rendered as a `deathBolt` projectile in tile mode
+(with an ASCII skull fallback), travelling for **650 ms** compared with **220 ms**
+for ordinary arrows/stones. Damage or a dodge resolves on the casting turn,
+not when the visual arrives; hit/miss floating text is delayed to match arrival.
+No extra game turn, projectile inventory, or persistent timer is created.
+Its ATK and flight duration are configurable in `content/enemy_config.json`.
 
 Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
 buff removal and stat changes resolve synchronously with seeded RNG; animation

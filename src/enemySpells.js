@@ -27,6 +27,7 @@ function availableEnemySpells(e) {
   if (enemyHasAbility(e, 'slow') && player.slowTurns <= 0) spells.push('slow')
   if (enemyHasAbility(e, 'disarm') && playerDisarmSlots().length) spells.push('disarm')
   if (enemyHasAbility(e, 'dispel') && playerDispelTargets().length) spells.push('dispel')
+  if (enemyHasAbility(e, 'deathBolt') && clearProjectilePath(e)) spells.push('deathBolt')
   return spells
 }
 
@@ -60,6 +61,9 @@ function tryEnemySpell(e) {
     player.hp = Math.min(player.hp, playerMaxHp())
     equipmentLog(`The ${e.name} disarms you! Your ${item.name} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
     spawnDamageNumber(player.x, player.y, 'Disarmed!', '#c7a5f6')
+  } else if (spell === 'deathBolt') {
+    // Resolves this game turn, not when the skull reaches its target.
+    enemyRangedAttackPlayer(e, null, DEATH_BOLT_CONFIG)
   } else if (spell === 'dispel') {
     const buff = pick(playerDispelTargets())
     player[buff.counter] = buff.boolean ? false : 0

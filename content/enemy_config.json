@@ -90,6 +90,14 @@
       }
     }
   },
+  "deathBolt": {
+    "atk": 10,
+    "projectile": "deathBolt",
+    "label": "death bolt",
+    "verb": "casts",
+    "article": "a",
+    "animationMs": 650
+  },
   "carrionInstinct": {
     "playerHpThreshold": 0.2,
     "aggroBonus": 1,

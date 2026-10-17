@@ -829,7 +829,7 @@ more difficult:
   let ATTACK_RANGE, AGGRO_RANGE, ALARM_TRIGGER_RANGE, ALARM_CLEAR_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
-  let RANGED_CONFIG = {}
+  let RANGED_CONFIG = {}, DEATH_BOLT_CONFIG = {}
   let CARRION_CONFIG, WYVERN_SLEEP_CONFIG
   let THIEF_CONFIG
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
@@ -928,6 +928,7 @@ more difficult:
     RARE_FLEE = content.enemyConfig.rareFlee
     TRACK_CONFIG = content.enemyConfig.tracking
     RANGED_CONFIG = content.enemyConfig.ranged || {}
+    DEATH_BOLT_CONFIG = content.enemyConfig.deathBolt || {}
     PREFIX_STATS = content.enemyConfig.prefixStats
     ARTIFACT_NOUNS = content.artifactNouns
     ARTIFACT_PREFIXES = content.artifactPrefixes
@@ -4093,19 +4094,22 @@ more difficult:
     return Math.min(1, missChance(enemySpd(e), playerSpd()) * RANGED_CONFIG.dodgeMultiplier)
   }
 
-  function enemyRangedAttackPlayer(e, path = null) {
+  function enemyRangedAttackPlayer(e, path = null, spellAttack = null) {
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
-    const shot = shooterDefinition(e)
-    if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || !enemyIsShooter(e)) return false
+    const shot = spellAttack || shooterDefinition(e)
+    if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || (!spellAttack && !enemyIsShooter(e))) return false
+    // Magical projectiles require the same unobstructed shot as physical ones.
+    // No ammunition is consumed for a spell; both types share all combat rolls.
+    const projectilePath = spellAttack ? clearProjectilePath(e) : (path || projectilePathBetween(e.x, e.y, player.x, player.y))
+    if (!projectilePath) return false
     clearAutoPath()
-    e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
-    const projectilePath = path || projectilePathBetween(e.x, e.y, player.x, player.y)
+    if (!spellAttack) e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
     const projectile = shot.projectile
-    const possessive = `${e.name}'s ${projectile}`
-    const animationDelay = RANGED_CONFIG.projectileAnimationMs
+    const possessive = `${e.name}'s ${shot.label || projectile}`
+    const animationDelay = spellAttack ? shot.animationMs : RANGED_CONFIG.projectileAnimationMs
 
     if (chance(rangedDodgeChance(e))) {
-      spawnProjectileAnim(projectilePath, projectile)
+      spawnProjectileAnim(projectilePath, projectile, animationDelay)
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, animationDelay)
       log(`You dodge the ${possessive}.`, 'good')
       return false
@@ -4122,14 +4126,14 @@ more difficult:
     player.hp -= dmg
     absorbPlayerFatalDamage()
 
-    spawnProjectileAnim(projectilePath, projectile)
+    spawnProjectileAnim(projectilePath, projectile, animationDelay)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, animationDelay + (critical ? 120 : 0))
     if (glancing) {
       if (dmg === 0) log(`The ${possessive} glances off your ${armor.name}!`, 'bad')
       else log(`The ${possessive} glances off your ${armor.name} and deals only ${dmg} damage.`, 'bad')
     } else {
-      log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${projectile} at you for ${dmg} damage.`, 'bad')
+      log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${shot.label || projectile} at you for ${dmg} damage.`, 'bad')
     }
     checkPlayerHealthWarning()
     updateHud()
