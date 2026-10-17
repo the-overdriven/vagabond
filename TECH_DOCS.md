@@ -3920,8 +3920,8 @@ Current armor:
 
 Armor subtracts only its stored `speedPenalty`; there is no additional flat SPD
 penalty. Robe and Jacket have no stored penalty; the other ordinary armor bases
-have the penalties above. Armor artifacts retain their 1 SPD cost as an explicit item
-property. The same seven ordinary armor bases retain `gracePenalty: 1`; this is
+have the penalties above. Armor artifacts inherit the exact SPD and GRACE penalties of their normal base,
+not a universal −1 SPD cost. The same seven ordinary armor bases retain `gracePenalty: 1`; this is
 independent of their new total SPD penalties. Built-in GRACE penalties are
 omitted from inventory and trade stat lines.
 
@@ -4118,7 +4118,7 @@ is re-equipped.
 
 Artifact generation uses separate content pools for:
 
-- nouns
+- standalone non-gear nouns (gear artifact nouns come directly from the three normal gear catalogs)
 - prefixes
 - epithets
 - dwarven names
@@ -4130,7 +4130,7 @@ Artifact generation uses separate content pools for:
 Current content includes approximately:
 
 ```text
-132 artifact nouns
+99 standalone artifact nouns, plus eligible gear names drawn from the weapon, shield, and armor catalogs
 17 artifact prefixes
 20 epithets
 792 Dwarf names
@@ -4138,6 +4138,19 @@ Current content includes approximately:
 14 artifact effects
 8 curse definitions
 ```
+
+Artifact gear bases are selected only if their ordinary gear tier is no higher
+than the rolled artifact effect tier. A selected gear noun retains its **full
+ordinary base properties**, including weapon ATK/GRACE and two-handed status,
+shield DEF and shield SPD/GRACE penalties, or armor DEF and its exact SPD/GRACE
+penalties. The rolled artifact effect then adds its own independent bonuses (including
+SPD, which affects the player's movement) and curse; it never replaces the
+base statistics. For example, a Brigandine artifact
+starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield
+and weapon artifacts retain normal physical gear behavior (including weapon
+attacks on doors/crates). Trinkets have no inherent equipment stats and remain
+passive in inventory. An identified gear artifact appears in its corresponding
+inventory tab and compares with normal gear for upgrade suggestions.
 
 These percentages apply only after an enemy has already rolled an artifact
 drop. They do not describe the chance of getting an artifact in the first

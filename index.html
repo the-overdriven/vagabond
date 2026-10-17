@@ -1651,7 +1651,7 @@ more difficult:
 
   function strikeDwarvenCrateAt(x, y) {
     const target = dungeonCrateAt(x, y)
-    if (!target || !player.equip.weapon || player.equip.weapon.kind !== 'weapon') return null
+    if (!target || !isWeaponItem(player.equip.weapon)) return null
     const damage = Math.max(1, playerAtk())
     target.crate.hp = Math.max(0, target.crate.hp - damage)
     const broken = target.crate.hp === 0
@@ -1673,7 +1673,7 @@ more difficult:
     const info = DUNGEON_LOCK_STATE[tileKey]
     const weapon = player.equip.weapon
     if (!info || !info.breachable) return {attempted: false, success: false, reason: 'unbreachable'}
-    if (!weapon || weapon.kind !== 'weapon') return {attempted: false, success: false, reason: 'weapon'}
+    if (!isWeaponItem(weapon)) return {attempted: false, success: false, reason: 'weapon'}
     const breachAtk = playerBreachAtk()
     const success = chance(Math.min(1, breachAtk / 100))
     if (success) {
@@ -1893,15 +1893,18 @@ more difficult:
     return lines.map(l => fillArtifactText(l, noun, name, possessor)).join(' ')
   }
 
-  // Artifact equipment is real gear when it is a weapon, shield, or armor.
-  // Other artifacts (tokens, tomes, rings, etc.) remain passive while carried.
-  function artifactEquipSlot(effect, noun) {
-    if (effect && ['weapon', 'shield', 'armor', 'trinket'].includes(effect.slot)) return effect.slot
-    const n = String(noun || '').toLowerCase()
-    if (WEAPONS.some(w => String(w.name).toLowerCase() === n)) return 'weapon'
-    if (SHIELDS.some(s => String(s.name).toLowerCase() === n)) return 'shield'
-    if (ARMORS.some(a => String(a.name).toLowerCase() === n)) return 'armor'
-    return 'trinket'
+  // Non-gear nouns are configured separately. Equipment artifact nouns and
+  // their physical properties come from the ordinary gear catalogs.
+  function artifactGearBase(noun) {
+    for (const [slot, catalog] of [['weapon', WEAPONS], ['shield', SHIELDS], ['armor', ARMORS]]) {
+      const base = catalog.find(item => item.name === noun)
+      if (base) return {slot, base}
+    }
+    return null
+  }
+
+  function isWeaponItem(item) {
+    return !!item && (item.kind === 'weapon' || (item.kind === 'artifact' && item.artifactSlot === 'weapon'))
   }
 
   // Resolve artifact bonus ranges when the item is created. A bonus like
@@ -1921,7 +1924,7 @@ more difficult:
   }
 
   function makeArtifactItem(tier, mf = 0) {
-    if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length || !ARTIFACT_NOUNS || !ARTIFACT_NOUNS.length) return null
+    if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length) return null
     // Magic Find's "quality" effect on artifacts: a chance to roll the
     // effect pool as if the source were one tier higher, and a reduced
     // chance of the artifact turning out cursed.
@@ -1935,8 +1938,13 @@ more difficult:
     const effect = emptyEffects.length && chance(WORLD_GEN_CONFIG.lootRules.emptyArtifactEffectChance)
       ? pick(emptyEffects)
       : pick(normalEffects.length ? normalEffects : pool)
-    const noun = pick(ARTIFACT_NOUNS)
-    const slot = artifactEquipSlot(null, noun)
+    // A low-tier artifact must not roll the statistics of a higher-tier
+    // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
+    const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
+      .filter(base => base.tier <= effect.tier).map(base => base.name)
+    const noun = pick([...ARTIFACT_NOUNS, ...eligibleGearNames])
+    const gear = artifactGearBase(noun)
+    const slot = gear?.slot || 'trinket'
     const isCursed = chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
 
     // Every non-cursed artifact gets a named owner. Cursed artifacts use
@@ -1976,7 +1984,16 @@ more difficult:
     const item = {
       kind: 'artifact', name, noun, tier: effect.tier, effectId: effect.id, baseValue: effect.baseValue,
       artifactSlot: slot,
-      speedPenalty: slot === 'armor' ? 1 : 0,
+      ...(gear ? {
+        base: gear.base.name,
+        ...(slot === 'weapon' ? {
+          atk: gear.base.atk, grace: gear.base.grace, twoHanded: !!gear.base.twoHanded
+        } : {def: gear.base.def}),
+        ...(slot === 'armor' ? {
+          speedPenalty: gear.base.speedPenalty || 0,
+          ...(gear.base.gracePenalty ? {gracePenalty: gear.base.gracePenalty} : {})
+        } : {})
+      } : {}),
       identified: false,
       bonuses: rollArtifactBonuses(effect.bonuses),
       maxHpPct: effect.maxHpPct || 0,
@@ -2194,6 +2211,17 @@ more difficult:
 
     if (it.kind === 'artifact') {
       if (!it.identified) return '???'
+      if (it.atk) parts.push('ATK ' + it.atk)
+      if (it.def) parts.push('DEF ' + it.def)
+      if (isWeaponItem(it) && it.grace !== undefined) parts.push('GRACE ' + it.grace)
+      if (it.artifactSlot === 'shield') {
+        parts.push('SPD ' + (it.base === 'Buckler' ? -1 : -2))
+        if (it.base !== 'Buckler') parts.push('GRACE -1')
+      }
+      if (it.artifactSlot === 'armor') {
+        if (it.speedPenalty) parts.push('SPD -' + it.speedPenalty)
+        if (it.gracePenalty) parts.push('GRACE -' + it.gracePenalty)
+      }
       if (it.bonuses) {
         if (it.bonuses.atk) parts.push('ATK +' + it.bonuses.atk)
         if (it.bonuses.def) parts.push('DEF +' + it.bonuses.def)
@@ -2230,7 +2258,7 @@ more difficult:
   }
 
   function weaponGrace(weapon) {
-    if (!weapon || weapon.kind !== 'weapon') return 0
+    if (!isWeaponItem(weapon) || (weapon.grace === undefined && weapon.spd === undefined)) return 0
     const baseGrace = weapon.grace !== undefined ? weapon.grace : 6 - weapon.spd
     return weapon.mod === 'grace' ? baseGrace + weapon.modAmt : baseGrace
   }
@@ -2365,7 +2393,7 @@ more difficult:
   }
 
   function playerSpdRaw(permanent = false) {
-    let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2)
+    let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2) + artifactBonusSum('spd')
     if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
     if (player.equip.armor) s -= (player.equip.armor.speedPenalty || 0)
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
@@ -2401,8 +2429,9 @@ more difficult:
 
   function gearGracePenalty(item) {
     if (!item) return 0
-    if (item.kind === 'shield') return item.base === 'Buckler' ? 0 : 1
-    return item.kind === 'armor' ? armorGracePenalty(item) : 0
+    const slot = item.kind === 'artifact' ? item.artifactSlot : item.kind
+    if (slot === 'shield') return item.base === 'Buckler' ? 0 : 1
+    return slot === 'armor' ? armorGracePenalty(item) : 0
   }
 
   function playerGracePenalty(permanent = false) {
@@ -3725,7 +3754,7 @@ more difficult:
     // Players must wield a weapon to take part in GRACE checks. Monsters use
     // their natural GRACE while unarmed; an equipped weapon overrides it.
     let grace
-    if (weapon && weapon.kind === 'weapon') {
+    if (isWeaponItem(weapon)) {
       grace = isPlayer ? weaponGrace(weapon) : enemyWeaponGrace(enemy, weapon)
       if (isPlayer) grace = Math.max(1, grace - playerGracePenalty())
     } else if (!isPlayer) {
@@ -5854,8 +5883,9 @@ more difficult:
   }
 
   function equipmentSortValues(item) {
-    const primaryStat = item.kind === 'weapon' ? 'atk' : 'def'
-    const primary = (item[primaryStat] || 0) + (item.mod === primaryStat ? (item.modAmt || 0) : 0)
+    const primaryStat = isWeaponItem(item) ? 'atk' : 'def'
+    const primary = (item[primaryStat] || 0) + (item.mod === primaryStat ? (item.modAmt || 0) : 0) +
+      (item.kind === 'artifact' ? (item.bonuses?.[primaryStat] || 0) : 0)
 
     // A weapon's built-in GRACE is part of its combat value. This also ensures
     // equal-total-ATK weapons prefer the more graceful weapon before tier is
@@ -5863,11 +5893,17 @@ more difficult:
     // XP and HP use larger numeric ranges than other bonuses, so divide them
     // by 3 for sorting. GRACE affects combat only on weapons, so do not give
     // shields/armor credit for an ineffective GRACE modifier.
-    let secondary = item.kind === 'weapon' ? (item.grace || 0) : 0
+    let secondary = isWeaponItem(item) ? (item.grace || 0) : 0
     if (item.mod && item.mod !== primaryStat) {
       if (item.mod === 'xp') secondary += Math.round((item.xpBonus || 0) / 3)
       else if (item.mod === 'hp') secondary += (item.modAmt || 0) / 3
       else if (item.mod !== 'grace' || item.kind === 'weapon') secondary += item.modAmt || 0
+    }
+
+    if (item.kind === 'artifact') {
+      for (const [stat, value] of Object.entries(item.bonuses || {})) {
+        if (stat !== primaryStat) secondary += stat === 'hp' ? value / 3 : value
+      }
     }
 
     // Keep the slot's defining combat stat dominant while still allowing
@@ -6736,7 +6772,7 @@ more difficult:
         return
       }
       const weapon = player.equip.weapon
-      if (!weapon || weapon.kind !== 'weapon') {
+      if (!isWeaponItem(weapon)) {
         log('The locked dwarven door will not yield to bare fists. You need a weapon to breach it.', 'info')
         render()
         updateTooltip()
@@ -6764,7 +6800,7 @@ more difficult:
       const target = dungeonCrateAt(nx, ny)
       if (!target) return
       const weapon = player.equip.weapon
-      if (!weapon || weapon.kind !== 'weapon') {
+      if (!isWeaponItem(weapon)) {
         log('You need a weapon to smash the dwarven crate.', 'info')
         render()
         updateTooltip()
@@ -10140,7 +10176,7 @@ more difficult:
   function bestSlotIndexes(kind) {
     const inventoryCandidates = player.inventory
       .map((it, idx) => ({it, idx}))
-      .filter(entry => entry.it.kind === kind)
+      .filter(entry => entry.it.kind === kind || (entry.it.kind === 'artifact' && entry.it.identified && entry.it.artifactSlot === kind))
 
     if (inventoryCandidates.length === 0) return new Set()
 
@@ -10173,11 +10209,12 @@ more difficult:
     const visible = []
     player.inventory.forEach((it, idx) => {
       let matches = true
-      if (invTab === 'weapon') matches = it.kind === 'weapon'
-      else if (invTab === 'armor') matches = it.kind === 'armor'
-      else if (invTab === 'shield') matches = it.kind === 'shield'
+      const category = it.kind === 'artifact' && it.identified ? it.artifactSlot : it.kind
+      if (invTab === 'weapon') matches = category === 'weapon'
+      else if (invTab === 'armor') matches = category === 'armor'
+      else if (invTab === 'shield') matches = category === 'shield'
       else if (invTab === 'supplies') matches = isConsumableKind(it.kind)
-      else if (invTab === 'other') matches = it.kind !== 'weapon' && it.kind !== 'armor' && it.kind !== 'shield' && !isConsumableKind(it.kind)
+      else if (invTab === 'other') matches = !['weapon', 'armor', 'shield'].includes(category) && !isConsumableKind(it.kind)
       if (matches) visible.push({it, idx})
     })
     if (invTab === 'all') {
@@ -10306,9 +10343,10 @@ more difficult:
     visible.forEach(({it, idx}) => {
       const row = document.createElement('div')
       row.className = 'invitem'
-      const isBest = (it.kind === 'weapon' && best.weapon.has(idx)) ||
-        (it.kind === 'shield' && best.shield.has(idx)) ||
-        (it.kind === 'armor' && best.armor.has(idx))
+      const kind = it.kind === 'artifact' && it.identified ? it.artifactSlot : it.kind
+      const isBest = (kind === 'weapon' && best.weapon.has(idx)) ||
+        (kind === 'shield' && best.shield.has(idx)) ||
+        (kind === 'armor' && best.armor.has(idx))
       if (isBest) row.classList.add('best-slot')
       const cls = it.tier ? tierColorClass(it.tier) : ''
       const line = itemStatLine(it)
