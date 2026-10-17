@@ -31,7 +31,9 @@ function activePlayerStatuses() {
     ['root', '⛓', 'Rooted', player.rootTurns, 'Cannot move, but can attack or use items.'],
     ['gaze', '◈', 'Petrified', player.gazeTurns, 'Petrifying Gaze: −3 SPD and −3 GRACE.'],
     ['mummy-curse', '☾', 'Cursed', player.mummyCurseTurns, 'Mummy curse: −2 ATK.'],
-    ['confused', '⁇', 'Confused', player.confusionTurns, '40% of movement attempts redirect to another walkable adjacent tile. Kill the Banshee to end early.']
+    ['confused', '⁇', 'Confused', player.confusionTurns, '40% of movement attempts redirect to another walkable adjacent tile. Kill the Banshee to end early.'],
+    ['lich-weaken', '↓', 'Weakened', player.lichWeakenTurns, 'Maximum HP reduced by 10%.'],
+    ['lich-slow', '↓', 'Slowed', player.lichSlowTurns, 'SPD reduced by 10%.']
   ]) if (counter > 0) statuses.push({id,icon,label,counter:`${counter}t`,detail:`${detail} ${turns(counter)} remaining.`})
   if (player.poisonTurns > 0) {
     statuses.push({id: 'poison', icon: '☠', label: 'Poisoned', counter: `${player.poisonTurns}t`,

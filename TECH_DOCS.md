@@ -2340,6 +2340,17 @@ The shared inspection tooltip shows **Death Shield · ready/spent**. Activation
 logs `The <name>'s death shield shatters, leaving it barely alive!` and displays
 a brief **Shield breaks!** effect. Survival resolves before animation and
 extra strikes; the spent flag is initialized and saved for replay determinism.
+Lich uses the same one-use Death Shield; it does not recharge.
+
+While pursuing a visible player, a Lich can spend its action on Weaken or Slow
+at a 20% chance per eligible turn. It chooses evenly among spells that are not
+already active. Weaken reduces derived maximum HP by 10% (rounded up, at least
+1), capping current HP to the reduced maximum without restoring that HP when
+the spell fades. Slow reduces derived SPD by 10% (rounded up, at least 1 SPD
+before the usual minimum of 1). Each lasts five player turns; neither stacks.
+Both are shown in the status strip, logged and marked with floating text.
+The spell resolves before presentation, including in replay. Death clears both
+effects; saves preserve their remaining turns.
 
 ## Gang power
 
