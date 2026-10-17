@@ -1025,7 +1025,7 @@
         }
       },
       "encounters": {
-        "baseTilesPerEnemy": 65,
+        "baseTilesPerEnemy": 17,
         "nativeBiomes": [
           "cave"
         ],
@@ -1033,15 +1033,18 @@
           "marble"
         ],
         "densityGrowthRange": [
-          0.1,
-          0.15
+          0.2,
+          0.25
         ],
         "dominantFamilyCountRange": [
           2,
           4
         ],
         "dominantRarityCutoff": 0.1,
-        "dominantFamilyShare": 0.82,
+        "dominantFamilyShare": 0.7,
+        "corridorBudgetShare": 0.2,
+        "corridorBudgetGrowthPerFloor": 0.015,
+        "corridorDoorClearance": 2,
         "families": {
           "goblinoids": {
             "weight": 1.3,

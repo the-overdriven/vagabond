@@ -4915,6 +4915,37 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         vaults.find(vault => vault.roomId === room.id)?.id || null)) spent += Math.max(1, tmpl.tier)
     }
 
+    // Reserve some of the increased population for actual corridors. Room
+    // encounter slots and ambient roamers otherwise absorb nearly every spawn,
+    // leaving long passages empty even when the floor has ample walkable area.
+    // Candidate order comes from the stable row-major safeTiles scan; only the
+    // seeded dungeon RNG chooses the species and a final position.
+    const corridorClearance = Math.max(0, Math.floor(cfg.corridorDoorClearance ?? 2))
+    const doorwayLeaves = rooms.flatMap(room => (room.doorways || []).flat())
+    const corridorSites = safeTiles.filter(p =>
+      !rooms.some(room => p.x >= room.x && p.x < room.x + room.w &&
+        p.y >= room.y && p.y < room.y + room.h) &&
+      !doorwayLeaves.some(leaf => Math.max(Math.abs(leaf.x-p.x), Math.abs(leaf.y-p.y)) <= corridorClearance))
+    const corridorShare = Math.max(0, Math.min(0.5,
+      (cfg.corridorBudgetShare ?? 0) + floorIndex * (cfg.corridorBudgetGrowthPerFloor ?? 0)))
+    const corridorTarget = Math.round(threatBudget * corridorShare)
+    const corridorPool = [...new Map(dominant.flatMap(family => family.members)
+      .map(tmpl => [tmpl.name, tmpl])).values()]
+    let corridorSpent = 0, corridorAttempts = 0
+    while (corridorSpent < corridorTarget && spent < threatBudget && corridorAttempts++ < 100) {
+      const affordable = corridorPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
+      if (!affordable.length) break
+      const candidates = corridorSites.filter(p => validSpot(p))
+      if (!candidates.length) break
+      const tmpl = pickWeighted(affordable, candidate => Math.max(0.0001, candidate.rarity ?? 1))
+      const spot = claimSpot(pick(candidates))
+      if (spawnTemplate(tmpl, spot, null, 'corridor', null, null, null)) {
+        const cost = Math.max(1, tmpl.tier)
+        spent += cost
+        corridorSpent += cost
+      }
+    }
+
     // Ambient roamers remain the broad-pool exception for family selection,
     // but all encounter roles now share normal species wandering behavior.
     let guard = 0

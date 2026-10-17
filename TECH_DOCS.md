@@ -1296,14 +1296,33 @@ The supplied service worker now precaches the trap module and images for offline
 
 ### Dwarven Ruins encounters (batch 6)
 
-Each floor now has a coherent seeded population. From its walkable area, the
-stratum rolls one density growth rate in **10–15% per floor** and budgets threat
-as `round(walkable tiles / 65 × (1 + floorIndex × growth))`. This
-changes the base from **75 to 65 walkable tiles per budget point**, roughly
-15% more threat for the same-size floor. Enemy tier costs
-that many budget points. This increases the number and composition of threats
-without silently inflating monster stats. A small minimum budget ensures the
-required family mix and a roamer can appear even on a small floor.
+Each floor has a coherent seeded population. After the Ruins footprint was
+expanded, the former **65 walkable tiles per threat point** left the larger
+floors noticeably empty. The budget is now:
+
+```text
+threat budget = round(walkable tiles / 17 × (1 + floorIndex × growth))
+growth = one seeded value in [0.20, 0.25] for the entire stratum
+```
+
+`floorIndex` begins at zero on D1; for an equally sized floor, D1 gains about
+**3.8×** the former base budget, while deeper floors grow faster than before
+(former growth: **10–15% per floor**). Each enemy still costs its normal tier
+in threat points, so the precise monster-count increase depends on the species
+mix; no species stats, loot, XP values or Champion count are multiplied.
+The minimum budget still supports the required family mix and Champion escort.
+More enemies increase the *total* obtainable combat XP and monster drops, even
+though individual rewards and placed chest/loot budgets are unchanged.
+
+The organized room budget targets **70%** (formerly **82%**), though
+required Champion and tactical encounters can exceed this slice. A separate corridor budget targets **20%** of threat on D1, rising
+**1.5 percentage points per deeper floor**. These corridor spawns use the
+floor's existing dominant families and normal species wandering; they appear
+only on walkable passage tiles outside any room rectangle and at least two
+tiles away from authored door leaves. The remainder can appear as ordinary
+ambient roamers. Both corridor and room spawns preserve entrance clearance,
+trap safety, terrain eligibility, spawn spacing and obstacle rules. Corridor
+placements reuse the existing wandering and persistence rules with the tactical role label `corridor`; they do not create new tile or status types.
 
 A floor selects **2–4 dominant encounter families** (goblinoids, undead,
 marauders, or cave predators when their members are depth-eligible). Template
@@ -1360,9 +1379,9 @@ horizontal half-bounds range from **34–40** cells (previously 28–34), and
 vertical half-bounds from **26–30** (previously 20–24). The final floor keeps
 its additional 10-cell extension in both axes and permits at least two cells
 of ordinary room separation, rather than three. The larger layout offers
-more side exploration, but **does not increase enemy, chest, artifact, or loot
-budgets**; optional rooms may be sparsely furnished or dangerous without
-additional guaranteed rewards.
+more side exploration. Chest, artifact and loot budgets remain unchanged;
+**enemy threat was subsequently raised** and spread into corridors to keep the
+expanded floors dangerous, particularly deeper underground.
 
 The hall has **exactly one specified two-leaf entrance**, at the short end
 opposite the throne. It is a **leaf branch** attached to a nearby main-route
@@ -1401,7 +1420,7 @@ The hall's own tactical slots are measured relative to its entrance: two
 frontline flankers near column gaps, two supporting defenders farther back,
 a far-side ranged slot when the chosen encounter family includes a shooter,
 and a position for the existing guaranteed Champion. Guards use one of the
-floor's already-selected encounter families and spend the **ordinary depth
+floor's already-selected encounter families and spend the **current depth
 threat budget**; when no shooter is available, the backline is omitted rather
 than inventing a ranged species. The Champion and its existing escort may
 defend the throne instead of a fitted vault, unless the Champion must carry

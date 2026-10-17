@@ -67,7 +67,17 @@ describe('Dwarven Ruins encounter progression', () => {
             check(vaultMobs.filter(e => e.dungeonRole === 'frontline' || e.dungeonRole === 'group').every(e => !enemyIsShooter(e)),
               'frontline/group vault roles stay melee even for shooter-capable species')
           }
-          check(mobs.length >= 3, 'Ruins floor has a meaningful encounter population')
+          check(mobs.length >= 12, 'expanded Ruins floor has a substantial enemy population')
+          const corridorMobs = mobs.filter(enemy => enemy.dungeonRole === 'corridor')
+          check(corridorMobs.length >= 2, 'ordinary passage corridors hold deliberate roaming threats')
+          check(corridorMobs.every(enemy => !level.rooms.some(room =>
+            enemy.x >= room.x && enemy.x < room.x + room.w &&
+            enemy.y >= room.y && enemy.y < room.y + room.h)),
+            'corridor roamers do not accidentally spawn inside rooms')
+          check(corridorMobs.every(enemy => level.rooms.every(room =>
+            (room.doorways || []).flat().every(leaf =>
+              Math.max(Math.abs(enemy.x - leaf.x), Math.abs(enemy.y - leaf.y)) > cfg.corridorDoorClearance))),
+            'dedicated corridor roamers do not block room doorways')
           check(species.size >= 2, 'Ruins floor exposes at least two base-species families')
           check(!mobs.some(e => e !== champions[0] && e.prefix === 'Champion'), 'ordinary prefix rolls never create a second Champion')
 
