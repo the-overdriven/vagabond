@@ -2751,6 +2751,7 @@ more difficult:
     enemy.gearBonuses = enemy.gearBonuses || null
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.immunityUsed = enemy.immunityUsed === true
+    enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
     enemy.immunityUntilTurn = Number.isInteger(enemy.immunityUntilTurn) ? Math.max(0, enemy.immunityUntilTurn) : 0
     enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
     enemy.theftUsed = enemy.theftUsed === true
@@ -4180,7 +4181,7 @@ more difficult:
     return true
   }
 
-  function killEnemy(e, playerCredit = true) {
+  function killEnemy(e, playerCredit = true, cause = 'trap') {
     const visibleAtDeath = enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
@@ -4194,7 +4195,7 @@ more difficult:
       // Notify quest logic before removing the corpse. Recover-item quests
       // must inspect the weapon/equipment the monster was carrying.
       onOldHunterEnemyKilled(e)
-    } else log(`The ${e.name} is killed by a trap.`, 'info')
+    } else if (cause === 'trap') log(`The ${e.name} is killed by a trap.`, 'info')
     e.alive = false
     if (inspiredNearby && visibleAtDeath) {
       log(`The ${e.name} falls; its followers lose their inspiration!`, 'good')
@@ -4225,7 +4226,7 @@ more difficult:
       e.stolenItemEquipped = false
       e.stolenItem = null
     }
-    lootFromEnemy(e)
+    if (cause !== 'sacrifice') lootFromEnemy(e)
     updateHud()
   }
 
@@ -9280,6 +9281,8 @@ more difficult:
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'lowHpTeleport') ? `<div class="pfx">Low-HP Teleport · ${e.lowHpTeleportUsed ? 'used' : 'ready below 25% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP, nearby monster</div>' : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}

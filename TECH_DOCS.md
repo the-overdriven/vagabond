@@ -2344,8 +2344,8 @@ Lich uses the same one-use Death Shield; it does not recharge.
 
 ## Shared monster spells
 
-Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, `deathBolt`, or `immunity`
-to its `abilities` array. Lich currently has all six. The shared spell system
+Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, `deathBolt`, `immunity`, `lowHpTeleport`, or `sacrifice`
+to its `abilities` array. Lich currently has all eight. The shared spell system
 uses abilities, never the monster's species or name, to decide what it can cast.
 
 A monster attacking or pursuing a visible player in its effective aggro range
@@ -2365,6 +2365,8 @@ True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
 | `dispel` | Removes one uniformly random active temporary buff | At least one dispellable buff is active |
 | `deathBolt` | Fires a slow, skull-shaped magical projectile with fixed 10 ATK | Clear shot to the visible player within effective aggro |
 | `immunity` | Blocks all incoming attacks for 5 player actions | Not already used by this monster |
+| `lowHpTeleport` | Teleports to a distant reachable tile outside player detection range | Below 25% HP; not used before; safe destination exists |
+| `sacrifice` | Kills one nearby monster and heals the caster by its remaining HP (capped at max HP) | Below 50% HP; eligible creature within 4 tiles and line of sight |
 
 Weaken and Slow round their reductions up, with a minimum reduction of 1 and
 minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
@@ -2413,6 +2415,31 @@ ready/spent state appear in the inspected monster's tooltip. Active immunity
 also shows a violet rune on the creature in both tile and ASCII mode. Cast,
 blocked hit and expiry all display log messages and floating text. The player can retreat,
 heal or reposition while this temporary shield remains active.
+
+Low-HP Teleport is a **one-use** escape spell triggered strictly below 25%
+maximum HP. It joins the same shared 20% spell roll as other monster spells,
+never procs separately. It moves the caster 13 or more Chebyshev tiles away
+from the player (and at least 2 tiles beyond its **current effective aggro
+range**, including Alarmed bonuses), choosing uniformly with seeded RNG from
+safe, unoccupied, traversable floor within a 20-step connected-area search.
+It cannot escape into sealed chambers, sanctuary, traps, walls, NPCs or occupied
+tiles. Without a suitable destination it is ineligible and consumes no RNG.
+Teleport replaces the monster's action, reanchors its return-home position and
+breaks pursuit. It does not move the player, create a new turn or depend on
+visual timing. The disappearance and arrival show floating text.
+
+Sacrifice is available strictly below 50% maximum HP when another living
+monster is within **4 tiles** (Chebyshev distance) with unobstructed sight.
+The victim is chosen uniformly using seeded RNG and removed with the ordinary
+death animation; its **current HP** is transferred to the caster, capped at
+its missing HP. Sacrifice is repeatable while eligible, but still competes in
+the same **one 20% spell roll per turn**. It gives the player no XP, kills,
+quest progress or ordinary loot. Summoned monsters can be sacrificed. Monsters
+carrying progression keys or stolen items, active quest targets and temporarily
+immune monsters cannot be sacrificed; their progression or belongings must
+remain recoverable. Death Shield is not consumed in this sacrifice removal.
+Both spells obey normal caster sight, invisibility, forest cover, sanctuary
+and turn eligibility, and use no extra independent cast chance.
 
 Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
 buff removal and stat changes resolve synchronously with seeded RNG; animation
@@ -5813,7 +5840,13 @@ Current save version:
 62
 ```
 
-Saves are JSON files. Version 62 adds generic monster `immunityUsed` and
+Saves are JSON files. Version 63 adds the generic monster `lowHpTeleportUsed` flag to saved
+enemies and replay initial states. Sacrifice needs no persistent flag because
+it immediately removes the victim and heals the caster through existing state.
+Low-HP Teleport and Sacrifice use the shared seeded spell roll; no extra RNG
+is consumed if their targets are invalid. No migration of older saves is provided.
+
+Version 62 adds generic monster `immunityUsed` and
 `immunityUntilTurn` fields to saved enemies and replay initial states. An
 absolute turn deadline, not animation timing, determines when immunity ends.
 No migration of older saves is provided.
