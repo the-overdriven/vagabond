@@ -35,6 +35,23 @@ function beginSummonArena() {
 describe('Once-only monster summoning', () => {
   beforeEach(beginSummonArena)
 
+  it('summons Ghouls with their own stats and announces the chosen species', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const previous={chance,randInt}
+      try {
+        chance=p=>p===0.10
+        randInt=(a,b)=>a===0&&b===1?1:a===1?b:a
+        const caster=makeSummoner('Lich')
+        summonCheck(tryEnemySummon(caster),'Ghoul cast succeeds')
+        const children=enemies.filter(e=>e!==caster)
+        summonCheck(children.length===3 && children.every(e=>e.baseName==='Ghoul'),'whole cast summons Ghouls')
+        summonCheck(children.every(e=>e.hp===ENEMY_TEMPLATE_BY_NAME.Ghoul.hp && e.atk===ENEMY_TEMPLATE_BY_NAME.Ghoul.atk),'Ghoul template stats')
+        summonCheck(caster.summonUsed,'one cast per Lich')
+      } finally {chance=previous.chance;randInt=previous.randInt}
+    })()`))
+    cy.get('#logpanel').should('contain.text', 'ghouls')
+  })
+
   it('uses direct templates, half-strength Wolf HP/ATK/DEF, and unchanged SPD/GRACE', () => {
     cy.window().then(win => win.eval(`(() => {
       const previous={chance,randInt}

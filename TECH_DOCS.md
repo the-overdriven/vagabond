@@ -2583,6 +2583,7 @@ no new persistent flag.
 ## Summoning
 
 Templates with `summon` in `abilities` specify `summonSpecies` and `summonAmount`,
+and may specify `summonSpeciesOptions` to choose one species for the entire cast,
 with optional `summonStrength` (defaults to 1) and `summonMsg`. On each active
 aggro turn, the monster has one 10% seeded chance to summon instead of its
 normal attack, shot, or chase. It can succeed only once in its lifetime.
@@ -2593,7 +2594,7 @@ actions do not create additional summon rolls that turn.
 
 | Summoner | Summoned species | Count roll | HP/ATK/DEF multiplier |
 |---|---|---|---|
-| Lich | Skeleton | 1–3 | 1 |
+| Lich | Skeleton or Ghoul (equal chance per cast) | 1–3 | 1 |
 | Serpent Queen | Serpent | 1–2 | 1 |
 | Wolf | Wolf | 1–3 | 1/2 |
 
@@ -2609,6 +2610,8 @@ scale with `summonStrength`, rounded to the nearest integer; HP and ATK have a
 minimum of 1, DEF a minimum of 0. SPD and GRACE are unchanged. Summons have no
 gear or prefixes. They copy template abilities except `summon`, preventing
 recursive Wolf packs. Skeletons retain their normal shooter assignment chance.
+The Lich's chosen species is shared by the entire group; Ghouls use their
+normal template stats.
 
 Summons inherit level, level kind, and cave identity. They become Alarmed
 immediately on creation, using the normal Alarmed lifetime and AGGRO bonus;

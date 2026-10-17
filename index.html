@@ -2614,7 +2614,10 @@ more difficult:
   function tryEnemySummon(enemy) {
     if (!enemyHasAbility(enemy, 'summon') || enemy.summonUsed || !chance(0.10)) return false
     const casterTemplate = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
-    const summonTemplate = ENEMY_TEMPLATE_BY_NAME[casterTemplate.summonSpecies]
+    const summonSpecies = casterTemplate.summonSpeciesOptions
+      ? casterTemplate.summonSpeciesOptions[randInt(0, casterTemplate.summonSpeciesOptions.length - 1)]
+      : casterTemplate.summonSpecies
+    const summonTemplate = ENEMY_TEMPLATE_BY_NAME[summonSpecies]
     const spots = DIRS8.map(([dx, dy]) => ({x: enemy.x + dx, y: enemy.y + dy}))
       .filter(p => enemyCanTraverse(summonTemplate, p.x, p.y) &&
         DungeonTraps.safeSpawn(p.x, p.y, currentZ, currentLevelKind()) &&
