@@ -1,3 +1,5 @@
+const {crateLootDistributionChecks, crateConsumablesPersistenceChecks} = require('../helpers/crate-consumables-checks.js')
+
 describe('Dwarven crate destruction, loot and persistence', () => {
   beforeEach(() => {
     cy.visit('/')
@@ -135,14 +137,10 @@ describe('Dwarven crate destruction, loot and persistence', () => {
     })()`))
   })
   it('uses the configured chances for empty crates and every consumable, with one generation roll per crate', () => {
-    cy.readFile('tests/helpers/crate-consumables-checks.js').then(source => {
-      cy.window().then(win => win.eval(source + '\ncrateLootDistributionChecks()'))
-    })
+    cy.window().then(win => win.eval('(' + crateLootDistributionChecks.toString() + ')()'))
   })
   it('preserves all five new crate drops through intact/drop saves, pickup and deterministic replay', () => {
-    cy.readFile('tests/helpers/crate-consumables-checks.js').then(source => {
-      cy.window().then(win => win.eval(source + '\ncrateConsumablesPersistenceChecks()'))
-    })
+    cy.window().then(win => win.eval('(' + crateConsumablesPersistenceChecks.toString() + ')()'))
   })
   for (const tileGraphics of [true, false]) {
     it(`finishes the player lunge before the crate death effect in ${tileGraphics ? 'tile' : 'ASCII'} mode`, () => {
