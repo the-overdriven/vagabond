@@ -452,6 +452,6 @@
       "defPenalty": 3,
       "durationTurns": 15
     },
-    "description": "For 15 turns: +4 ATK plus one sixth of ATK (rounded down), −2 GRACE, −3 DEF. Repeated doses refresh without stacking."
+    "description": "For 15 turns: +4 ATK plus one sixth of ATK (rounded down), −2 GRACE, −3 DEF. With an adjacent enemy, each action has a 25% chance to become a random melee attack instead. Repeated doses refresh without stacking."
   }
 }

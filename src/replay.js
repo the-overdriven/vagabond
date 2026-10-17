@@ -171,7 +171,12 @@ function findReplayItemIndex(list, replayId, fallbackIdx) {
 
 // Called at the exact point an action is accepted by the game - never from
 // raw keydown, so held modifier keys and UI-only input are not recorded.
+let skipPreRecordedItemAction = false
 function recordReplayAction(action) {
+  if (skipPreRecordedItemAction && action.type === 'useItem') {
+    skipPreRecordedItemAction = false
+    return
+  }
   if (!replayRecording || replayPlaying) return
   ensureReplayItemIds()
   const previous = replayData.actions.at(-1)
@@ -306,7 +311,7 @@ async function runReplayAction(action) {
       lootSkeletonOrForage()
       break
     case 'skipTurn':
-      skipTurn()
+      await skipTurn()
       break
     case 'talk':
       if (action.npc === 'Old Hunter') interactOldHunter()
@@ -420,7 +425,7 @@ async function runReplayAction(action) {
       const fn = action.action === 'identifyArtifact' ? identifyArtifact
         : Object.hasOwn(ITEM_ACTION_HANDLERS, action.action) ? ITEM_ACTION_HANDLERS[action.action] : null
       if (!fn) return replayDesync(`Replay desynchronized: unknown item action ${action.action}.`)
-      fn(idx)
+      await fn(idx)
       break
     }
     default:

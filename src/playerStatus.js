@@ -27,6 +27,12 @@ function activePlayerStatuses() {
     statuses.push({id: `penalty-${key}`, icon: '↓', label, counter: `${debuff.turnsLeft}t`,
       detail: `${label}: temporary penalty, ${turns(debuff.turnsLeft)} remaining.`})
   }
+  for (const [id, icon, label, counter, detail] of [
+    ['root', '⛓', 'Rooted', player.rootTurns, 'Cannot move, but can attack or use items.'],
+    ['gaze', '◈', 'Petrified', player.gazeTurns, 'Petrifying Gaze: −3 SPD and −3 GRACE.'],
+    ['mummy-curse', '☾', 'Cursed', player.mummyCurseTurns, 'Mummy curse: −2 ATK.'],
+    ['confused', '⁇', 'Confused', player.confusionTurns, '40% of movement attempts redirect to another walkable adjacent tile. Kill the Banshee to end early.']
+  ]) if (counter > 0) statuses.push({id,icon,label,counter:`${counter}t`,detail:`${detail} ${turns(counter)} remaining.`})
   if (player.poisonTurns > 0) {
     statuses.push({id: 'poison', icon: '☠', label: 'Poisoned', counter: `${player.poisonTurns}t`,
       detail: `Poison: ${turns(player.poisonTurns)} remaining. Lose 1 HP each turn. A Healing Herb or Life Potion cures it.`})
@@ -48,7 +54,7 @@ function activePlayerStatuses() {
     detail: 'Death Shield ready: survive one fatal damage event at 1 HP. Further damage can kill you immediately.'})
   for (const [id, label, icon, duration, detail] of [
     ['stone-skin', 'Stone Skin', '▣', player.stoneSkinTurns, `+${player.stoneSkinBonus} DEF, −3 GRACE`],
-    ['berserk', 'Berserk', '⚔', player.berserkTurns, `+${player.berserkBonus} ATK, −3 DEF, −2 GRACE`]
+    ['berserk', 'Berserk', '⚔', player.berserkTurns, `+${player.berserkBonus} ATK, −3 DEF, −2 GRACE; 25% chance per turn to attack a random adjacent enemy instead of acting`]
   ]) if (duration > 0) statuses.push({id, icon, label, counter: `${duration}t`,
     detail: `${label}: ${detail}; ${turns(duration)} remaining.`})
   return statuses

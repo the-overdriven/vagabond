@@ -68,19 +68,14 @@ more difficult:
 !4 [enemy affixes] ✨ new monster affixes: scrawny - atk, - def, clumsy/graceful - grace modifiers, sleepy, vigilant
 !4 [enemy AI] 🤖 wandering monsters that dont have snow biome dont go to snow tiles
 !4 [enemy AI] 🤖 optimize: set up far wandering enemy destination on world gen before player makes a move?
-!4 [monster abilities] 👹 dreadling: root
 !4 [monster abilities] 👹 gravehound and white tiger: haste
-!4 [monster abilities] 👹 Petrifying GazeBrief severe SPD/GRACE penalty rather than lost turn (gorgon)
 !4 [monster abilities] 👹 champion aura: inspired (+ atk/def)
 !4 [monster abilities] 👹 healer monsters, heal others of same type
-!4 [monster abilities] 👹 mummy: curse
-!4 [monster abilities] 👹 add monsters that can swim, murkspawn will be first
 !5 [monster abilities] 👹 monster invisibility
-!5 [monster abilities] 👹 banshee: wail (confuse)
 !3 feat: more monster abilities, i.e. lich dispel, spider can shoot web, banshee can heal or confuse, lich can dispell invisibility.
 
 !4 [enemy abilities] 👹 monster ability: cry for help (on low hp?)
-!3 [monster abilities] 👹 - monster ability: wrestler: swaps places with enemy. lifesteal: probably quickest to implement. coward: runs away at low HP.
+!3 [monster abilities] 👹 - monster ability: coward: runs away at low HP.
 !3 [monsters] 👹 add deers. passive but run away
 !4 [pathfinding] 🧭 autopath should take your swimming skill into account
 !4 [permadeath] ☠️ starting a second game on permadeath world should respawn enemies underground?
@@ -1714,6 +1709,7 @@ more difficult:
 <script src="src/ice.js"></script>
 <script src="src/charge.js"></script>
 <script src="src/wrestler.js"></script>
+<script src="src/monsterStatuses.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
@@ -2286,6 +2282,8 @@ more difficult:
     speedPotionBonus: 0,
     stoneSkinTurns: 0, stoneSkinBonus: 0,
     berserkTurns: 0, berserkBonus: 0,
+    rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
+    confusionTurns: 0, confusionSourceId: null,
     deathShieldReady: false,
     berryRegenTurns: 0,
     poisonTurns: 0,
@@ -2338,6 +2336,7 @@ more difficult:
     }
     a += artifactBonusSum('atk') + (permanent ? 0 : curseDebuffSum('atk'))
     if (!permanent && !excludePotions && player.berserkTurns > 0) a += player.berserkBonus
+    if (!permanent && player.mummyCurseTurns > 0) a -= 2
     return a
   }
 
@@ -2367,6 +2366,7 @@ more difficult:
       if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
       s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0
       if (map[player.y]?.[player.x] === 'frozenriver' || (map[player.y]?.[player.x] === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')) s -= 1
+      s -= player.gazeTurns > 0 ? 3 : 0
       s += curseDebuffSum('spd')
       s += carriedItemStat('spd')
     }
@@ -2399,7 +2399,7 @@ more difficult:
 
   function playerGracePenalty(permanent = false) {
     return gearGracePenalty(player.equip.shield) + gearGracePenalty(player.equip.armor) +
-      (permanent ? 0 : potionGracePenalty())
+      (permanent ? 0 : potionGracePenalty() + (player.gazeTurns > 0 ? 3 : 0))
   }
 
   function playerGrace(permanent = false) {
@@ -2746,6 +2746,9 @@ more difficult:
     enemy.summonUsed = enemy.summonUsed === true
     // Absolute enemy-turn deadline: five complete turns after a successful swap.
     enemy.wrestleReadyTurn = Number.isInteger(enemy.wrestleReadyTurn) ? enemy.wrestleReadyTurn : 0
+    enemy.rootReadyTurn = Number.isInteger(enemy.rootReadyTurn) ? enemy.rootReadyTurn : 0
+    enemy.gazeReadyTurn = Number.isInteger(enemy.gazeReadyTurn) ? enemy.gazeReadyTurn : 0
+    enemy.wailReadyTurn = Number.isInteger(enemy.wailReadyTurn) ? enemy.wailReadyTurn : 0
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
@@ -4008,7 +4011,10 @@ more difficult:
     }
     checkPlayerHealthWarning()
     applyEnemyLifesteal(e, effectiveDamage)
-    if (dmg > 0 && player.hp > 0) applyEnemyPoison(e)
+    if (dmg > 0 && player.hp > 0) {
+      applyEnemyPoison(e)
+      applyEnemyContactStatuses(e)
+    }
     updateHud()
     if (player.hp <= 0) {
       die(e)
@@ -4154,6 +4160,7 @@ more difficult:
       onOldHunterEnemyKilled(e)
     } else log(`The ${e.name} is killed by a trap.`, 'info')
     e.alive = false
+    clearBansheeConfusion(e)
     if (playerCredit) player.kills++
     spawnDeathAnim(e)
     occupied.delete(keyXY(e.x, e.y))
@@ -4311,6 +4318,8 @@ more difficult:
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
       berserkTurns: 0, berserkBonus: 0,
+    rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
+    confusionTurns: 0, confusionSourceId: null,
       deathShieldReady: false,
       berryRegenTurns: 0,
       poisonTurns: 0,
@@ -4423,6 +4432,8 @@ more difficult:
     player.speedPotionBonus = 0
     player.stoneSkinTurns = 0; player.stoneSkinBonus = 0
     player.berserkTurns = 0; player.berserkBonus = 0
+    player.rootTurns = 0; player.gazeTurns = 0; player.mummyCurseTurns = 0
+    player.confusionTurns = 0; player.confusionSourceId = null
     player.deathShieldReady = false
     player.poisonTurns = 0
     player.berryRegenTurns = 0
@@ -5323,6 +5334,7 @@ more difficult:
     tickRaceRegen()
     tickBerryRegen()
     tickArtifactCurses()
+    tickMonsterStatuses()
     if (player.speedPotionTurns > 0) {
       player.speedPotionTurns--
       if (player.speedPotionTurns === 0) {
@@ -5401,6 +5413,13 @@ more difficult:
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
       let aggroRange = effectiveAggroRange(e)
+      // Wail reaches four tiles even when the Banshee's normal chase radius
+      // remains three. Do not roll twice on a single enemy action.
+      if (dist > aggroRange && dist <= 4 && enemyHasAbility(e, 'wail') &&
+          !forestConcealsPlayer(e, dist) && tryEnemyGazeOrWail(e)) {
+        if (!e.aware) { e.aware = true; alarmEnemy(e); logEnemySpotting(e) }
+        continue
+      }
       if (!playerHasForestCover() ||
           (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {
         e.forestConcealX = null
@@ -5417,6 +5436,7 @@ more difficult:
           alarmEnemy(e)
           logEnemySpotting(e)
         }
+        if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
@@ -5428,6 +5448,7 @@ more difficult:
           (dist <= 2 || enemyHasAbility(e, 'ethereal')))) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryWoundedEnemyFlee(e)) continue
+        if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemySummon(e)) continue
         if (tryEnemyRush(e)) {
           if (player.hp <= 0 || deathTransition) return
@@ -5501,7 +5522,7 @@ more difficult:
 
   /* ============================== ITEM PICKUP ============================== */
   // Catalog data never becomes executable code. These handlers are shared with replay.
-  const ITEM_ACTION_HANDLERS = {
+  const ITEM_ACTION_HANDLERS_BASE = {
     potion: idx => usePotion(idx),
     speedpotion: idx => useSpeedPotion(idx),
     scrollOfFear: idx => useTacticalConsumable(idx, 'scrollOfFear'),
@@ -5535,6 +5556,30 @@ more difficult:
       log((item.kind === 'oddTombstone' ? 'Odd tombstone found in the ruined cemetery. ' : '') + (item.inscription || `The tombstone bears the name ${item.tombName}. Born ${item.tombBirth}, died ${item.tombDeath}.`), 'info')
     }
   }
+
+  const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','scrollOfFear','scrollOfDeathShield',
+    'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
+    'berries','fish','scrollOfInvisibility','homecomingscroll','echoBlightHorn'])
+  const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
+    async idx => {
+      const item = player.inventory[idx]
+      const frenzyEligible = FRENZY_ITEM_ACTIONS.has(action) && item &&
+        canUseItemsWhileSwimming() && player.berserkTurns > 0 && frenzyTargets().length > 0 &&
+        !(action === 'scrollOfDeathShield' && player.deathShieldReady)
+      if (frenzyEligible) {
+        // Must record the attempted item action before the RNG roll. The
+        // ordinary handler would otherwise record after the frenzy check.
+        ensureReplayItemIds()
+        recordReplayAction({type:'useItem',action,idx,replayId:item.replayId})
+        if (chance(0.25)) {
+          await performBerserkFrenzy()
+          return
+        }
+        if (replayRecording && !replayPlaying) skipPreRecordedItemAction = true
+      }
+      try { return await fn(idx) }
+      finally { skipPreRecordedItemAction = false }
+    }]))
 
   function validateItemDefinitions(definitions) {
     if (!definitions || Array.isArray(definitions) || typeof definitions !== 'object' || !Object.keys(definitions).length)
@@ -6492,6 +6537,10 @@ more difficult:
       return
     }
     recordReplayAction({type: 'move', dx: dx, dy: dy})
+    const frenzy = tryBerserkFrenzy()
+    if (frenzy) { await frenzy; return }
+    const redirected = confusionDirection(dx, dy)
+    dx = redirected.dx; dy = redirected.dy
     const nx = player.x + dx, ny = player.y + dy
     const ek = keyXY(nx, ny)
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
@@ -6516,6 +6565,14 @@ more difficult:
       updateHud()
       updateTooltip()
       flushPendingMove()
+      return
+    }
+    if (player.rootTurns > 0 && (dx !== 0 || dy !== 0)) {
+      clearAutoPath()
+      log('You struggle against the Dreadling’s roots.', 'bad')
+      spawnDamageNumber(player.x, player.y, 'Rooted!', '#afdf88')
+      consecutiveWaitTurns = 0
+      enemyTurn(); npcTurn(); updateHud(); render(); runAnimationLoop(); updateTooltip(); flushPendingMove()
       return
     }
     const npcTarget = currentZ === 0 && npcs.find(n => n.x === nx && n.y === ny)
@@ -6769,6 +6826,8 @@ more difficult:
     if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (cameraAnimating || attackAnim || chargeAnimationPending()) return
     recordReplayAction({type: 'skipTurn'})
+    const frenzy = tryBerserkFrenzy()
+    if (frenzy) return frenzy
     if (consecutiveWaitTurns >= MAX_CONSECUTIVE_WAIT_TURNS &&
       !(deepSwimmingWater(player.x, player.y) && !player.godMode && !raceHas('swims'))) {
       log(`You cannot wait more than ${MAX_CONSECUTIVE_WAIT_TURNS} turns in a row.`, 'info')
@@ -9122,6 +9181,10 @@ more difficult:
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'wail') ? `<div class="pfx">Wail · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}

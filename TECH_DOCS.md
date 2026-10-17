@@ -2180,6 +2180,40 @@ including an explicitly empty array. Replay initial states use the same save
 format; shooter role and remaining ammo continue to be separate instance state.
 Saves from previous formats are rejected; no old boolean conversion is added.
 
+## Monster-applied status effects
+
+The Dreadling, Gorgon, Mummy, and Banshee introduce timed combat statuses.
+They are applied during deterministic enemy actions, **not** after an animation
+finishes. Attack-based effects require a damaging melee hit; gaze and wail
+instead replace the monster's attack or movement action. A proc that fails its
+roll does not begin a cooldown. Each enemy owns its cooldown independently;
+status reapplications refresh the duration and never stack with themselves.
+
+| Monster / ability | Trigger | Effect | Duration | Cooldown after success |
+|---|---|---|---|---|
+| Dreadling — Root | 25% of damaging melee hits | Walking is blocked, but attacks and item use remain available. An attempted move spends a turn. | 3 player turns | 5 complete turns |
+| Gorgon — Petrifying Gaze | 25% per eligible enemy action; line of sight and ≤3 tiles | −3 SPD and −3 GRACE, respecting the normal stat floors | 3 player turns | 5 complete turns |
+| Mummy — Curse | 25% of damaging melee hits | −2 ATK | 4 player turns | None |
+| Banshee — Wail | 25% per eligible enemy action; line of sight and ≤4 tiles | Confusion: every movement attempt has a 40% chance to choose a different, currently walkable, unoccupied adjacent tile | 5 player turns | 7 complete turns |
+
+The Banshee's Wail may trigger at four tiles even though its ordinary AGGRO
+is three. When a player tries to attack an adjacent monster, confusion does
+**not** redirect that deliberate melee action. It also never redirects into
+another creature or a closed/locked door. Movement redirected onto a hazard
+uses that tile's ordinary movement and hazard rules; redirecting cannot make
+an impassable tile walkable. When there are no alternate legal destinations,
+the intended move proceeds. An actual misstep cancels auto-travel. Root
+prevents movement even while confused.
+
+Confusion tracks the **individual Banshee's ID**. Killing that specific Banshee
+immediately removes its confusion, but killing a different Banshee does not.
+Wails from a different caster refresh the timer and replace the source.
+Normal expiration also clears the source. Statuses survive save/load and replay;
+all application, struggle, misstep, expiration, and caster-death events have
+combat logs, with floating text on their most important effects. Active effects
+are visible on the player status strip. Both the player's counters and the
+monsters' absolute ready-turn deadlines are persisted by save schema **57**.
+
 ## Swimming monsters
 
 Murkspawn has the `swim` ability. In addition to its ordinary walkable terrain,
@@ -4514,6 +4548,18 @@ Invisibility, the activation action consumes the first duration turn. Fear
 resolves one retreat action on that turn; its remaining timer then reads 9
 (or 12 for Wyrdling). Potion counters read 14 (or 18).
 
+**Berserk frenzy:** while Berserk is active and at least one living enemy
+is adjacent, each attempted movement, wait, or ordinary consumable use has a
+**25%** chance to be replaced by an immediate melee attack against a uniformly
+random adjacent enemy. The attack consumes the attempted action's single turn;
+an interrupted consumable is not spent. The ordinary melee attack rules and
+counterattack phase still apply. With no adjacent enemy, the intended action
+proceeds without a frenzy roll. Berserk cannot initiate an attack while the
+player is protected by sanctuary. Berserk overrides Confusion when both might
+interfere with movement. This drawback does not alter the potion's stat bonuses
+or duration. RNG rolls and target choice happen at action resolution, before
+animations, and are attributed to the attempted action in replay recordings.
+
 **Fear:** every eligible monster in range is affected, including unseen or sleeping
 monsters. It retreats even from an invisible player and cannot shoot, summon,
 charge or pull while afraid. A monster with no retreat destination may use ordinary
@@ -5921,6 +5967,10 @@ outside, or press Escape to dismiss. Inspecting a badge does not spend a turn.
 | Berry regeneration | Remaining duration, including duration added by further berries. |
 | Invisibility | Remaining duration; god-mode invisibility shows `∞` while enabled. |
 | Speed potion | Remaining duration. |
+| Root | Remaining turns: walking blocked, melee/item use allowed. |
+| Petrifying Gaze | Remaining turns: −3 SPD / −3 GRACE. |
+| Mummy Curse | Remaining turns: −2 ATK. |
+| Confusion | Remaining turns: 40% redirected walk attempts, ending early when its Banshee dies. |
 | Drowning | Condition only, no countdown. Active while consecutive deep-water time exceeds the learned safe limit; each movement/wait costs 5% max HP, minimum 1. |
 
 Instant healing and permanent racial traits do not create timed badges. The UI
