@@ -2750,6 +2750,8 @@ more difficult:
     initializeEnemyGearScale(enemy)
     enemy.gearBonuses = enemy.gearBonuses || null
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
+    enemy.immunityUsed = enemy.immunityUsed === true
+    enemy.immunityUntilTurn = Number.isInteger(enemy.immunityUntilTurn) ? Math.max(0, enemy.immunityUntilTurn) : 0
     enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
@@ -3895,6 +3897,13 @@ more difficult:
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
     // document is hidden, because browsers throttle/suspend rAF in background tabs.
     if (!replayAnimationsDisabled) await animateAttackLunge(player.x, player.y, e.x, e.y)
+    // A protective spell absorbs even critical/extra attacks before any combat RNG.
+    // It cannot consume the separate one-use Death Shield.
+    if (enemyImmunityActive(e)) {
+      log(`Your attack cannot harm the ${e.name} while it is immune!`, 'bad')
+      spawnDamageNumber(e.x, e.y, 'Immune!', '#c7a5f6')
+      return false
+    }
     // Ethereal immunity resolves before combat rolls.
     // Evasion requires seeing the attacker, including through true sight.
     if (enemyHasAbility(e, 'ethereal') && !player.equip.weapon?.mod) {
@@ -5375,6 +5384,7 @@ more difficult:
     tickBerryRegen()
     tickArtifactCurses()
     tickMonsterStatuses()
+    expireEnemyImmunities()
     if (player.speedPotionTurns > 0) {
       player.speedPotionTurns--
       if (player.speedPotionTurns === 0) {
@@ -8772,6 +8782,17 @@ more difficult:
         ctx.restore()
       }
 
+      if (enemyImmunityActive(e)) {
+        // Persistent violet rune makes the protection visible on the map in
+        // both tile and ASCII modes, not only in the combat log/inspection.
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.44))}px serif`
+        ctx.textAlign = 'right'; ctx.textBaseline = 'top'
+        ctx.lineWidth = 3; ctx.strokeStyle = '#1c102c'; ctx.fillStyle = '#c7a5f6'
+        ctx.strokeText('◇', vx + TILE_PX, vy + 1)
+        ctx.fillText('◇', vx + TILE_PX, vy + 1)
+        ctx.restore()
+      }
       if (e.fearTurns > 0) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.4))}px serif`
@@ -9258,6 +9279,7 @@ more difficult:
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}

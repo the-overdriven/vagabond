@@ -2344,8 +2344,8 @@ Lich uses the same one-use Death Shield; it does not recharge.
 
 ## Shared monster spells
 
-Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, or `deathBolt`
-to its `abilities` array. Lich currently has all five. The shared spell system
+Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, `deathBolt`, or `immunity`
+to its `abilities` array. Lich currently has all six. The shared spell system
 uses abilities, never the monster's species or name, to decide what it can cast.
 
 A monster attacking or pursuing a visible player in its effective aggro range
@@ -2364,6 +2364,7 @@ True Sight can reveal an invisible player but cannot bypass walls or sanctuary.
 | `disarm` | One uniformly random equipped weapon, shield or armor moves intact to the player's inventory | At least one of these slots is occupied |
 | `dispel` | Removes one uniformly random active temporary buff | At least one dispellable buff is active |
 | `deathBolt` | Fires a slow, skull-shaped magical projectile with fixed 10 ATK | Clear shot to the visible player within effective aggro |
+| `immunity` | Blocks all incoming attacks for 5 player actions | Not already used by this monster |
 
 Weaken and Slow round their reductions up, with a minimum reduction of 1 and
 minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
@@ -2402,6 +2403,16 @@ for ordinary arrows/stones. Damage or a dodge resolves on the casting turn,
 not when the visual arrives; hit/miss floating text is delayed to match arrival.
 No extra game turn, projectile inventory, or persistent timer is created.
 Its ATK and flight duration are configurable in `content/enemy_config.json`.
+
+Immunity is a one-use protective cast per monster, never refreshed by healing.
+It blocks player melee and extra strikes, as well as dungeon spike and arrow
+traps, before damage, glancing or critical rolls. Death Shield remains unspent
+while immunity is active. The cast protects the next five player actions and
+expires before monsters act on the fifth subsequent turn; its timer and
+ready/spent state appear in the inspected monster's tooltip. Active immunity
+also shows a violet rune on the creature in both tile and ASCII mode. Cast,
+blocked hit and expiry all display log messages and floating text. The player can retreat,
+heal or reposition while this temporary shield remains active.
 
 Every successful cast and Weaken/Slow expiry has a message and floating text. Choices, item moves,
 buff removal and stat changes resolve synchronously with seeded RNG; animation
@@ -5799,10 +5810,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-61
+62
 ```
 
-Saves are JSON files. Version 61 uses the generic `weakenTurns` and `slowTurns`
+Saves are JSON files. Version 62 adds generic monster `immunityUsed` and
+`immunityUntilTurn` fields to saved enemies and replay initial states. An
+absolute turn deadline, not animation timing, determines when immunity ends.
+No migration of older saves is provided.
+
+Version 61 uses the generic `weakenTurns` and `slowTurns`
 player counters and shared ability-based spell selection. Equipped and backpack
 items, temporary buffs, and monster abilities retain their existing exact save
 and replay representation. Older save/replay initial states are rejected rather

@@ -4,6 +4,7 @@
 // eligible spell pool one seeded cast roll, never one roll per known spell.
 const ENEMY_SPELL_CHANCE = 0.20
 const ENEMY_DEBUFF_TURNS = 5
+const ENEMY_IMMUNITY_TURNS = 5
 const DISPELLABLE_PLAYER_BUFFS = [
   {counter:'berryRegenTurns', label:'Regeneration'},
   {counter:'invisibleTurns', label:'Invisibility'},
@@ -28,6 +29,7 @@ function availableEnemySpells(e) {
   if (enemyHasAbility(e, 'disarm') && playerDisarmSlots().length) spells.push('disarm')
   if (enemyHasAbility(e, 'dispel') && playerDispelTargets().length) spells.push('dispel')
   if (enemyHasAbility(e, 'deathBolt') && clearProjectilePath(e)) spells.push('deathBolt')
+  if (enemyHasAbility(e, 'immunity') && !e.immunityUsed && !enemyImmunityActive(e)) spells.push('immunity')
   return spells
 }
 
@@ -61,6 +63,11 @@ function tryEnemySpell(e) {
     player.hp = Math.min(player.hp, playerMaxHp())
     equipmentLog(`The ${e.name} disarms you! Your ${item.name} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
     spawnDamageNumber(player.x, player.y, 'Disarmed!', '#c7a5f6')
+  } else if (spell === 'immunity') {
+    e.immunityUsed = true
+    e.immunityUntilTurn = turnCount + ENEMY_IMMUNITY_TURNS
+    log(`The ${e.name} becomes immune to all attacks for ${ENEMY_IMMUNITY_TURNS} turns!`, 'bad')
+    spawnDamageNumber(e.x, e.y, 'Immune!', '#c7a5f6')
   } else if (spell === 'deathBolt') {
     // Resolves this game turn, not when the skull reaches its target.
     enemyRangedAttackPlayer(e, null, DEATH_BOLT_CONFIG)
@@ -74,4 +81,21 @@ function tryEnemySpell(e) {
   clearAutoPath()
   checkPlayerHealthWarning()
   return true
+}
+
+// Absolute expiry is checked independently of rendering or animation frames.
+// The five actions after casting are protected; the sixth spent action expires it.
+function enemyImmunityActive(e) {
+  return e.alive !== false && e.hp > 0 && e.immunityUntilTurn > turnCount
+}
+
+function expireEnemyImmunities() {
+  for (const e of enemies) {
+    if (!e.immunityUntilTurn || turnCount < e.immunityUntilTurn) continue
+    e.immunityUntilTurn = 0
+    if (e.alive && onCurrentLevel(e) && enemyIsVisibleOnMainView(e)) {
+      log(`The ${e.name}'s immunity fades.`, 'good')
+      spawnDamageNumber(e.x, e.y, 'Immunity fades!', '#b9e6bc')
+    }
+  }
 }

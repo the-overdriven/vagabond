@@ -124,6 +124,7 @@ const DungeonTraps = (() => {
     const cfg = configForLevel(level), isPlayer = target === player
     if (!cfg) return {damage:0, missed:false}
     if (isPlayer && player.godMode) return {damage:0, missed:false}
+    if (!isPlayer && enemyImmunityActive(target)) return {damage:0, missed:false, immune:true}
     const speed = isPlayer ? playerSpd() : enemySpd(target)
     const missed = trap.type === 'projectile' && chance(Math.min(1,
       missChance(cfg.speed, speed) * RANGED_CONFIG.dodgeMultiplier))
@@ -171,10 +172,11 @@ const DungeonTraps = (() => {
     // Nothing below changes gameplay or consumes gameplay RNG.
     if (path && path.length > 1) spawnProjectileAnim(path, 'arrow')
     if (!target) { log('A wall mechanism fires an arrow through the ruins.', 'info'); return }
-    spawnDamageNumber(at.x, at.y, result.missed ? 'Miss!' : result.damage,
+    spawnDamageNumber(at.x, at.y, result.immune ? 'Immune!' : result.missed ? 'Miss!' : result.damage,
       target === player ? RENDER_STYLE.damage.playerHit : RENDER_STYLE.damage.enemyHit)
     const who = target === player ? 'You' : target.name
-    log(result.missed ? `${who} dodge${target === player ? '' : 's'} the wall arrow.` :
+    log(result.immune ? `The ${who} is immune to the trap's attack!` :
+      result.missed ? `${who} dodge${target === player ? '' : 's'} the wall arrow.` :
       `${who} take${target === player ? '' : 's'} ${result.damage} damage from ${trap.type === 'spikes' ? 'the spikes' : 'a wall arrow'}${result.glancing ? ' (glancing)' : result.critical ? ' (critical)' : ''}.`,
       target === player ? 'bad' : 'info')
   }
