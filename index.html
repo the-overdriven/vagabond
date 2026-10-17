@@ -1489,6 +1489,13 @@ more difficult:
     dwarvenprisondoorclosed: 'dwarvenprisondooropen'
   })
 
+  // Only intact, unlocked door leaves can be pulled shut. The two-leaf
+  // progression gate is deliberately excluded: closing never recreates locks.
+  const DUNGEON_DOOR_CLOSED_STATE = Object.freeze({
+    dwarvendooropen: 'dwarvendoorclosed',
+    dwarvenprisondooropen: 'dwarvenprisondoorclosed'
+  })
+
   const DUNGEON_LOCK_STATE = Object.freeze({
     dwarvendoorlocked: Object.freeze({
       kind: 'door',
@@ -1539,6 +1546,39 @@ more difficult:
     map[y][x] = openTile
     minimapDirty = true
     invalidateUndergroundFov()
+    return true
+  }
+
+  function closeDungeonDoorAt(x, y) {
+    const closedTile = DUNGEON_DOOR_CLOSED_STATE[map[y]?.[x]]
+    if (!closedTile) return false
+    // Eight-direction adjacency matches ordinary melee/interaction reach.
+    // A creature standing in the doorway must never be embedded in a wall.
+    const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+    if (distance !== 1 || enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) ||
+      (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) return false
+    map[y][x] = closedTile
+    minimapDirty = true
+    invalidateUndergroundFov()
+    return true
+  }
+
+  function tryCloseDungeonDoorAt(x, y) {
+    if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return false
+    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending())) return false
+    if (!closeDungeonDoorAt(x, y)) return false
+    clearAutoPath()
+    hoveredAutoPath = null
+    consecutiveWaitTurns = 0
+    recordReplayAction({type: 'closeDoor', x, y})
+    log('You close the dwarven door.', 'info')
+    enemyTurn()
+    npcTurn()
+    updateHud()
+    render()
+    runAnimationLoop()
+    updateTooltip()
+    flushPendingMove()
     return true
   }
 
@@ -9554,6 +9594,13 @@ more difficult:
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
     updateMobileInfoPanel(mx, my)
+    // A tap on an adjacent open door is an interaction, not a path request.
+    // Occupied/open-but-ineligible doors are left unchanged without a turn.
+    if (DUNGEON_DOOR_CLOSED_STATE[map[my]?.[mx]] &&
+      Math.max(Math.abs(mx - player.x), Math.abs(my - player.y)) === 1) {
+      tryCloseDungeonDoorAt(mx, my)
+      return
+    }
     const n = currentZ === 0 && npcs.find(np => np.x === mx && np.y === my)
     if (n) {
       clearAutoPath()

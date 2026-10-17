@@ -1111,7 +1111,15 @@ pointless door. The default chance remains **45% per eligible entrance**; both
 leaves start closed. A closed
 door blocks movement, sight, and projectiles. Bumping an unlocked closed door
 opens that one leaf and consumes one player turn without moving the player; the
-next movement action can pass through it. Open doors remain open permanently.
+next movement action can pass through it. Clicking/tapping an **adjacent** intact
+open wooden or barred prison door closes **that leaf** for **one turn** without
+moving the player. Diagonal adjacency counts, but the player cannot close a
+leaf while standing on it or while a monster occupies it. Invalid attempts
+cost no turn. Closing changes the tile back to its ordinary **unlocked** closed
+state; it never restores a spent lock/key, repairs a breached leaf, or closes
+an open progression gate. Closed doors again use their existing collision,
+sight and projectile rules; FOV refreshes immediately. Door interactions stop
+auto-travel and replay as distinct deterministic actions.
 Humanoid enemies treat unlocked closed doors as traversable routes but spend an
 action opening the encountered leaf before moving through it. Non-humanoids do
 not open them, while ethereal traversal retains its existing ability to pass
@@ -6289,7 +6297,9 @@ Prison bars and closed/locked barred prison doors allow sight and projectiles
 through, but block creature movement until a prison door is opened. Open and breached
 doors do **not** block sight. Opening, unlocking, or breaching a door
 immediately invalidates the cached underground FOV so tiles behind it become visible
-in the same action, even though the player has not moved. The blocking wall face itself
+in the same action, even though the player has not moved. Closing an
+intact open door likewise invalidates the cached FOV, hiding tiles behind
+solid doors without altering the barred-door view. The blocking wall face itself
 remains visible. Water does not block sight. Diagonal sight follows tile
 centers: an adjacent open diagonal tile remains visible even if the two
 cardinal neighbors are walls. Surface visibility is unchanged. The same module also
