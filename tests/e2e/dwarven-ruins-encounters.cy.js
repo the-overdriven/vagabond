@@ -45,6 +45,16 @@ describe('Dwarven Ruins encounter progression', () => {
           const species = new Set(mobs.map(e => e.baseName || e.name))
 
           check(champions.length === cfg.championsPerFloor, 'configured Champion count per Ruins floor')
+          if (i === ruins.length-1) {
+            const hall = level.rooms.find(room => room.landmark === 'throneHall')
+            const defenders = mobs.filter(enemy => enemy.dungeonRoomId === hall?.id)
+            check(!!hall && defenders.some(e => e.dungeonRole === 'frontline') &&
+              defenders.some(e => e.dungeonRole === 'group'),
+              'final-floor throne hall has a frontline and supporting guard without extra Champions')
+            check(defenders.every(e => !e.dungeonVaultId), 'landmark guards do not belong to fitted vaults')
+            check(defenders.every(e => e.encounterFamily === hall.encounterFamily),
+              'throne guard family and room metadata remain coherent')
+          }
           check(mobs.some(e => e !== champions[0] && e.baseName === champions[0].baseName),
             'Champion leads at least one same-species guard')
           for (const vault of level.vaults || []) {

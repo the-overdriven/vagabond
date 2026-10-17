@@ -512,6 +512,15 @@
           }
         }
       },
+      "landmarks": {
+        "throneHall": {
+          "enabled": true,
+          "floorSelector": "final",
+          "count": 1,
+          "interiorSizes": [[9,19],[11,21],[11,23]],
+          "extraHalfBounds": 10
+        }
+      },
       "vaults": {
         "countRange": [
           1,
@@ -960,17 +969,10 @@
             ]
           }
         },
-        "finalFloorMinimumCount": 2,
         "artifactTypes": [
           "treasury",
           "sealedTomb",
           "trappedArmory"
-        ],
-        "finalFloorDefensiveTypes": [
-          "fortifiedBarracks",
-          "barricadedDormitory",
-          "forgeKillzone",
-          "collapsedHall"
         ],
         "selectionGuardLimit": 50
       },

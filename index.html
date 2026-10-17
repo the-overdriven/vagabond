@@ -7465,7 +7465,8 @@ more difficult:
   function tileBackground(x, y, tileKey) {
     // These sprites must not paint a synthetic floor behind their alpha.
     // The floor, when present, is composited from the recorded underlay.
-    if (USE_TILE_IMAGES && (tileKey === 'cryptrubble' || tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')) return 'transparent'
+    if (USE_TILE_IMAGES && (tileKey === 'cryptrubble' || tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue' ||
+      tileKey === 'dwarventhrone' || tileKey === 'dwarvendais')) return 'transparent'
     if (tileKey === 'coffin') return RENDER_STYLE.specialTiles.coffin.bg
     if (tileKey === 'cavefloor2' && brownDeepCaveAt(x, y)) return '#30231b'
     if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
@@ -7706,7 +7707,7 @@ more difficult:
     // that was at this exact coordinate before the prop replaced the map cell.
     // Never substitute marble, grass or a guessed neighboring biome.
     if (tileKey === 'cryptrubble') return 'crypt2floor'
-    if (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue')
+    if (tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue' || tileKey === 'dwarventhrone')
       return tileUnderlays[tileUnderlayKey(x, y, currentZ)] || null
 
     const neighbors = [
@@ -7754,6 +7755,16 @@ more difficult:
       : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
+
+    if (tileKey === 'dwarventhrone') {
+      const level = deepLevels[chainDepthForZ(currentZ)-2]
+      const landmark = level?.landmarks?.find(hall => hall.type === 'throneHall' &&
+        hall.thronePosition?.x === x && hall.thronePosition?.y === y)
+      if (!landmark || !Number.isInteger(landmark.facing) || landmark.facing < 0 || landmark.facing > 3)
+        throw new Error('Dwarven throne requires saved landmark position and facing')
+      const direction = ['north','east','south','west'][landmark.facing]
+      return {...visual,image:visual[direction + 'Image']}
+    }
 
     // Exposed masonry is visual only; closed doorways also count so opening
     // a door never changes the surrounding wall material.

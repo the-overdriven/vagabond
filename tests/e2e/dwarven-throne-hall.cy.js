@@ -1,0 +1,119 @@
+describe('Guaranteed Dwarven Throne Hall geometry', () => {
+  beforeEach(() => {
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Throne Hall Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.get('#raceOverlay', {timeout: 90000}).should('not.have.class', 'show')
+  })
+
+  for (const seed of [610061, 610062, 610063]) {
+    it(`reserves an intact mandatory hall, separate artifact, and legal route with seed ${seed}`, () => {
+      cy.window().then(win => win.eval(`(async () => {
+        const check = (ok, message) => { if (!ok) throw new Error(message) }
+        applyWorldTraits([])
+        WORLD_SEED = ${seed}
+        rngState = WORLD_SEED
+        currentZ = 0
+        currentCave = -1
+        map = surfaceMap
+        replayRecording = false
+        replayPlaying = false
+        await generateNewWorld()
+
+        const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
+        check(ruins.length >= 3 && ruins.length <= 5, 'supported ruins floor count')
+        ruins.slice(0, -1).forEach(level => {
+          check(!(level.landmarks || []).length, 'no landmark outside the final Ruins floor')
+        })
+        const final = ruins.at(-1)
+        const halls = final.landmarks || []
+        check(halls.length === 1, 'one guaranteed landmark on the last floor')
+        const hall = halls[0]
+        check(hall.id.endsWith(':throneHall') && hall.recipeRevision === 2, 'stable landmark identity')
+        check(hall.type === 'throneHall', 'correct landmark recipe')
+        const room = final.rooms.find(candidate => candidate.id === hall.roomId)
+        check(!!room && room.landmark === 'throneHall' && room.archetype === 'Throne Hall', 'dedicated hall room')
+        check(room.onMainRoute && !room.optional, 'throne hall is mandatory')
+        check(final.roomGraph.mainRoute.at(-2) === room.id && final.roomGraph.exitRoomId !== room.id,
+          'throne hall precedes a separate sealed-mines chamber')
+        const validSize = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.landmarks.throneHall.interiorSizes
+          .some(([w,l]) => Math.min(room.w-2,room.h-2) === w && Math.max(room.w-2,room.h-2) === l)
+        check(validSize && hall.facing === room.facing, 'layout dimensions and facing')
+        const columns = dwarvenRoomInterior(room).filter(p => final.map[p.y]?.[p.x] === 'dwarvenstatue')
+        check(columns.length === 6, 'three symmetrical pairs of indoor columns')
+        check(final.map[hall.thronePosition.y]?.[hall.thronePosition.x] === 'dwarventhrone',
+          'stone throne occupies landmark anchor')
+        check(final.map.flat().filter(tile => tile === 'dwarventhrone').length === 1,
+          'there is exactly one throne')
+        check(final.map.flat().filter(tile => tile === 'dwarvendais').length === 8,
+          'eight walkable dais cells surround the throne')
+        check(!TILE.dwarventhrone.walk && !TILE.dwarventhrone.projectileBlock &&
+          !TILE.dwarventhrone.blocksSight && TILE.dwarvendais.walk,
+          'throne collision does not create unexpected sight or projectile cover')
+        check(tileUnderlays[chainZForDepth(deepLevels.length+1) + ':' + keyXY(hall.thronePosition.x,hall.thronePosition.y)] === 'dwarvendais',
+          'throne sits transparently on actual dais floor')
+        const ports = [...hall.entrance,...hall.onward]
+        check(hall.entrance.length === 2 && hall.onward.length === 2, 'exactly two double-leaf passage ports')
+        const portKeys = new Set(ports.map(p => keyXY(p.x,p.y)))
+        for (let y=room.y;y<room.y+room.h;y++) for (let x=room.x;x<room.x+room.w;x++) {
+          const edge = x===room.x || x===room.x+room.w-1 || y===room.y || y===room.y+room.h-1
+          if (edge && !portKeys.has(keyXY(x,y)))
+            check(final.map[y]?.[x] === 'dwarvenwall', 'no accidental hall wall breach')
+        }
+        const [entrance, exit] = final.caves[0].entrances
+        const reaches = dungeonWalkDistancesWithDoorTraversal(final.map, entrance)
+        check(reaches.has(keyXY(exit.x,exit.y)), 'exit is solvable through the hall')
+        const blocked = dungeonWalkDistancesWithDoorTraversal(final.map, entrance, portKeys)
+        check(!blocked.has(keyXY(exit.x,exit.y)), 'cannot bypass the hall')
+        check(final.vaults.filter(v => v.artifactReserved).length === 1, 'preserves optional artifact vault')
+        check(final.vaults.length >= 1 && final.vaults.length <= 2,
+          'throne hall replaces the extra compulsory defensive vault')
+        const z = chainZForDepth(deepLevels.length+1)
+        const guards = enemies.filter(enemy => enemy.alive && enemy.level === z && enemy.dungeonRoomId === room.id)
+        check(guards.filter(enemy => ['frontline','group','backline'].includes(enemy.dungeonRole)).length >= 2,
+          'throne hall contains at least two defensive creatures from the existing budget')
+        check(guards.some(enemy => enemy.dungeonRole === 'frontline') &&
+          guards.some(enemy => enemy.dungeonRole === 'group'), 'frontline and supporting guards defend the hall')
+        check(guards.every(enemy => !enemy.dungeonVaultId), 'no hall guard is tagged as belonging to artifact vault')
+        check(enemies.filter(enemy => enemy.alive && enemy.level === z && enemy.prefix === 'Champion').length === 1,
+          'the hall does not duplicate the floor Champion')
+
+        const before = JSON.stringify({landmarks:final.landmarks,rooms:final.rooms,route:final.roomGraph})
+        const saved = JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        const restored = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
+        check(JSON.stringify({landmarks:restored.landmarks,rooms:restored.rooms,route:restored.roomGraph}) === before,
+          'save/replay restores landmark and graph exactly')
+        check(JSON.stringify(restored.caves[0].landmarks) === JSON.stringify(restored.landmarks),
+          'descriptor and authoritative level landmark copies agree')
+      })()`))
+    })
+  }
+
+  it('rotates the hall footprint, ports, throne anchor and facing together', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check = (ok, message) => { if (!ok) throw new Error(message) }
+      const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
+      const old = structuredClone(final.landmarks[0])
+      const oldRoom = structuredClone(final.rooms.find(r => r.id === old.roomId))
+      const height = MAP_H
+      const rotated = p => ({x:height - 1 - p.y, y:p.x})
+      rotateGeneratedWorld(1)
+      const now = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
+      const hall = now.landmarks[0]
+      const room = now.rooms.find(r => r.id === hall.roomId)
+      check(hall.facing === (old.facing+1)%4 && room.facing === hall.facing, 'facing rotates')
+      check(room.w === oldRoom.h && room.h === oldRoom.w, 'hall footprint rotates')
+      check(JSON.stringify(hall.entrance) === JSON.stringify(old.entrance.map(rotated)), 'entry port rotates')
+      check(JSON.stringify(hall.onward) === JSON.stringify(old.onward.map(rotated)), 'exit port rotates')
+      check(JSON.stringify(hall.thronePosition) === JSON.stringify(rotated(old.thronePosition)), 'throne anchor rotates')
+      check(now.map[hall.thronePosition.y]?.[hall.thronePosition.x] === 'dwarventhrone', 'throne follows rotation')
+      currentZ=chainZForDepth(deepLevels.length+1)
+      map=now.map
+      check(terrainVisual('dwarventhrone',hall.thronePosition.x,hall.thronePosition.y).image ===
+        'img/tiles/dwarven-throne-' + ['north','east','south','west'][hall.facing] + '.png',
+        'sprite matches rotated direction')
+    })()`))
+  })
+})

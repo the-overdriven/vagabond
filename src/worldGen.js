@@ -710,6 +710,9 @@ function rotateGeneratedWorld(quarterTurns) {
       value.prisonCellAxis = value.prisonCellAxis === 'vertical' ? 'horizontal' : 'vertical'
     if (typeof value.keyId === 'string') value.keyId = rotatedLockId(value.keyId)
     if (typeof value.requiresLockId === 'string') value.requiresLockId = rotatedLockId(value.requiresLockId)
+    if (value.type === 'throneHall' || value.landmark === 'throneHall') {
+      if (Number.isInteger(value.facing)) value.facing = (value.facing + turns) % 4
+    }
     if (typeof value.rotation === 'number' && value.kind === 'web') value.rotation = (value.rotation + turns) % 4
     for (const [name, child] of Object.entries(value)) {
       if (name === 'map' || name === 'caveMaps' || name === 'discovered') continue
@@ -1813,8 +1816,51 @@ function deriveDwarvenTacticalSlots(cm, room, roleCounts = null) {
   }
 }
 
+// Fixed role areas relative to the hall's near port. The central approach
+// remains open to movement, while flankers use column gaps and ranged guards
+// use an actual clear projectile line toward the entrance apron.
+function deriveDwarvenThroneHallSlots(cm, room, stairEntrances = []) {
+  const {near,forward} = dwarvenThroneHallGeometry(room)
+  const side = {x:forward[1],y:-forward[0]}
+  const longSpan = Math.max(room.w, room.h)-2
+  const entry = {x:near[0].x+forward[0]*3,y:near[0].y+forward[1]*3}
+  const clearance = dungeonPackageConfig('dwarvenRuins')?.encounters?.entranceClearance ?? 8
+  const pool = dwarvenRoomInterior(room).filter(p => cm[p.y]?.[p.x] === 'marble' &&
+    stairEntrances.every(stair => Math.max(Math.abs(p.x-stair.x),Math.abs(p.y-stair.y)) > clearance))
+    .map(p => ({...p,
+      depth:(p.x-near[0].x)*forward[0]+(p.y-near[0].y)*forward[1],
+      offset:Math.abs((p.x-room.cx)*side.x+(p.y-room.cy)*side.y)}))
+    .filter(p => p.depth >= 5 && p.depth <= longSpan-3)
+  const chosen = new Set()
+  const take = (candidates, n) => {
+    const out=[]
+    for (const p of candidates) {
+      const key=keyXY(p.x,p.y)
+      if (chosen.has(key)) continue
+      chosen.add(key)
+      out.push({x:p.x,y:p.y})
+      if (out.length === n) break
+    }
+    return out
+  }
+  const ordered = (points, score) => points.slice().sort((a,b) =>
+    score(a)-score(b) || a.y-b.y || a.x-b.x)
+  const backline = take(ordered(pool.filter(p => p.depth >= longSpan*0.55 &&
+    dungeonClearProjectileLine(cm,p,entry)),p =>
+      Math.abs(p.depth-longSpan*0.72)*4 + Math.abs(p.offset-2)),1)
+  const frontline = take(ordered(pool.filter(p => p.depth <= longSpan*0.65),p =>
+    Math.abs(p.depth-longSpan*0.33)*4 + Math.abs(p.offset-2)),2)
+  const group = take(ordered(pool.filter(p => p.depth >= longSpan*0.35),p =>
+    Math.abs(p.depth-longSpan*0.62)*4 + Math.abs(p.offset-2)),2)
+  const champion = take(ordered(pool,p =>
+    Math.abs(p.depth-longSpan*0.70)*4 + Math.abs(p.offset-1)),1)
+  const any = take(ordered(pool,p =>
+    Math.abs(p.depth-longSpan*0.58)*4 + Math.abs(p.offset-2)),2)
+  return {backline,frontline,group,champion,any}
+}
+
 function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false) {
-  if (!room || room.archetype === 'Entrance Hall') return
+  if (!room || room.archetype === 'Entrance Hall' || room.landmark === 'throneHall') return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
   const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
   const doorwayKeys = new Set((room.doorways || []).flat().map(p => keyXY(p.x, p.y)))
@@ -2042,7 +2088,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
     (buildSlots(cm, room, def.roles).backline || []).some(p =>
       (hooks.entrances || []).every(e => Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) > entranceClearance))
   const gateRoom = structuralDoors.find(d => d.leaves === gateDoorway)?.room || null
-  const selectable = roomMetas.filter(room => room.index > 0 && room._source !== gateRoom)
+  const selectable = roomMetas.filter(room => room.index > 0 && !room.landmark && room._source !== gateRoom)
   if (!selectable.length) return null
 
   const selected = []
@@ -2120,19 +2166,9 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
   }
 
   const rolledTarget = Math.max(1, randInt(cfg.countRange?.[0] ?? 1, cfg.countRange?.[1] ?? 2))
-  const target = finalFloor ? Math.max(Math.max(1, Math.floor(cfg.finalFloorMinimumCount ?? 1)), rolledTarget) : rolledTarget
-  if (finalFloor) {
-    const defensiveTypes = Array.isArray(cfg.finalFloorDefensiveTypes) ? cfg.finalFloorDefensiveTypes : []
-    const candidates = []
-    for (const room of selectable.filter(room => !usedRooms.has(room.id))) {
-      for (const type of defensiveTypes) {
-        if (!usedTypes.has(type) && definitionFits(type, room, true)) candidates.push({room, type})
-      }
-    }
-    if (!candidates.length) return null
-    const choice = pickWeighted(candidates, entry => Math.max(0.0001, defs[entry.type]?.weight ?? 1))
-    attach(choice.type, choice.room, false)
-  }
+  // The reserved throne hall fulfills the final defensive scenario. Only the
+  // artifact vault remains mandatory; a second fitted vault is a normal roll.
+  const target = finalFloor ? Math.max(1, rolledTarget) : rolledTarget
   let guard = 0
   const selectionGuardLimit = Math.max(1, Math.floor(cfg.selectionGuardLimit ?? 50))
   while (selected.length < target && guard++ < selectionGuardLimit) {
@@ -2171,6 +2207,59 @@ function dungeonRoomGraphDistances(graph, startIndex) {
   return distances
 }
 
+// A reserved landmark is a real room, placed before ordinary room generation.
+// Only its declared two-leaf ports may interrupt its perimeter. Geometry is
+// kept in world coordinates so generation, rotation, and saves agree.
+function dwarvenThroneHallGeometry(room) {
+  const forward = [[0,-1],[1,0],[0,1],[-1,0]][room.facing]
+  const vertical = forward[0] === 0
+  const center = vertical ? room.cx : room.cy
+  const half = [center - 1, center]
+  const near = vertical
+    ? half.map(x => ({x, y:forward[1] < 0 ? room.y + room.h-1 : room.y}))
+    : half.map(y => ({x:forward[0] < 0 ? room.x + room.w-1 : room.x, y}))
+  const far = vertical
+    ? half.map(x => ({x, y:forward[1] < 0 ? room.y : room.y+room.h-1}))
+    : half.map(y => ({x:forward[0] < 0 ? room.x : room.x+room.w-1, y}))
+  const outside = (port, distance) => port.map(p => ({x:p.x + distance*forward[0], y:p.y + distance*forward[1]}))
+  return {near, far, nearOutside:outside(near,-1), farOutside:outside(far,1), forward}
+}
+
+// Deterministic, obstacle-aware two-cell corridor. Non-landmark passages must
+// not accidentally tunnel through a reserved hall, including its outer walls.
+function carveReservedDungeonCorridor(carveWide, from, to, bounds, protectedRoom) {
+  const key = (x,y) => `${x},${y}`
+  const blocked = (x,y) => x < bounds.minX+1 || y < bounds.minY+1 ||
+    x > bounds.maxX-1 || y > bounds.maxY-1 ||
+    (x >= protectedRoom.x && x < protectedRoom.x+protectedRoom.w &&
+     y >= protectedRoom.y && y < protectedRoom.y+protectedRoom.h)
+  const permitted = new Set([key(from.x,from.y), key(to.x,to.y)])
+  const queue = [from], visited = new Set([key(from.x,from.y)])
+  const parents = new Map()
+  const dirs = [[1,0],[0,1],[-1,0],[0,-1]]
+  let found = false
+  for (let i=0;i<queue.length;i++) {
+    const at = queue[i]
+    if (at.x===to.x && at.y===to.y) {found=true;break}
+    // A stable distance-first order keeps the corridors short without using
+    // animation time, browser state or any unseeded source of randomness.
+    const nextDirs = dirs.slice().sort((a,b) =>
+      (Math.abs(to.x-at.x-a[0])+Math.abs(to.y-at.y-a[1])) -
+      (Math.abs(to.x-at.x-b[0])+Math.abs(to.y-at.y-b[1])))
+    for (const [dx,dy] of nextDirs) {
+      const x=at.x+dx, y=at.y+dy, k=key(x,y)
+      if (visited.has(k) || (blocked(x,y) && !permitted.has(k))) continue
+      visited.add(k); parents.set(k,at); queue.push({x,y})
+    }
+  }
+  if (!found) return false
+  const path=[]
+  let p=to
+  while (p) {path.push(p);p=parents.get(key(p.x,p.y))}
+  for (const step of path.reverse()) carveWide(step.x,step.y,2)
+  return true
+}
+
 // Generic room-graph foundation used by authored dungeon strata. Geography is
 // placed first, but no corridor is carved until this graph has selected the
 // mandatory route, optional branches and loop edges. That keeps progression
@@ -2188,12 +2277,16 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const minBranches = requestedMinBranches
   const branchTarget = maxBranches > 0 ? randInt(minBranches, maxBranches) : 0
   const routeNodeCount = Math.max(minGraphDistance + 1, rooms.length - branchTarget)
-  const unused = new Set(rooms.map((_, index) => index).slice(1))
+  const landmarkIndex = Number.isInteger(cfg.landmarkRoomIndex) ? cfg.landmarkRoomIndex : -1
+  const finalIndex = Number.isInteger(cfg.landmarkExitRoomIndex) ? cfg.landmarkExitRoomIndex : -1
+  const hasLandmark = landmarkIndex > 0 && finalIndex > 0 && landmarkIndex !== finalIndex
+  const unused = new Set(rooms.map((_, index) => index).slice(1)
+    .filter(index => !hasLandmark || (index !== landmarkIndex && index !== finalIndex)))
   const mainRoute = [0]
   const treeEdges = []
   const distanceBetween = (a, b) => Math.abs(rooms[a].cx - rooms[b].cx) + Math.abs(rooms[a].cy - rooms[b].cy)
 
-  while (mainRoute.length < routeNodeCount && unused.size) {
+  while (mainRoute.length < routeNodeCount - (hasLandmark ? 2 : 0) && unused.size) {
     const from = mainRoute[mainRoute.length - 1]
     const candidates = [...unused].map(index => ({index, distance: distanceBetween(from, index)}))
       .sort((a, b) => a.distance - b.distance || a.index - b.index)
@@ -2205,11 +2298,18 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
     mainRoute.push(chosen)
     unused.delete(chosen)
   }
+  if (hasLandmark) {
+    const from = mainRoute[mainRoute.length - 1]
+    treeEdges.push({a:from,b:landmarkIndex,kind:'main'})
+    treeEdges.push({a:landmarkIndex,b:finalIndex,kind:'main'})
+    mainRoute.push(landmarkIndex,finalIndex)
+  }
   if (mainRoute.length < minGraphDistance + 1) return null
 
   const branchRoots = []
   for (const index of [...unused]) {
-    const candidates = mainRoute.slice(0, -1).map(parent => ({parent, distance: distanceBetween(parent, index)}))
+    const candidates = mainRoute.slice(0, -1).filter(parent => !hasLandmark || parent !== landmarkIndex)
+      .map(parent => ({parent, distance: distanceBetween(parent, index)}))
       .sort((a, b) => a.distance - b.distance || a.parent - b.parent)
     if (!candidates.length) return null
     const parent = candidates[0].parent
@@ -2228,6 +2328,7 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const existing = new Set(graph.edges.map(edge => edge.a < edge.b ? `${edge.a}:${edge.b}` : `${edge.b}:${edge.a}`))
   const loopPairs = []
   for (let a = 0; a < rooms.length; a++) for (let b = a + 1; b < rooms.length; b++) {
+    if (hasLandmark && [a,b].some(index => index === landmarkIndex || index === finalIndex)) continue
     if (existing.has(`${a}:${b}`)) continue
     loopPairs.push({a, b, distance: distanceBetween(a, b)})
   }
@@ -2276,15 +2377,21 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const storyCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.story || {}
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   const DIRS8 = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]
-  const boundsX = randInt(cfg.boundsXRange[0], cfg.boundsXRange[1])
-  const boundsY = randInt(cfg.boundsYRange[0], cfg.boundsYRange[1])
+  const hallCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.landmarks?.throneHall
+  const hallFootprintMargin = finalFloor && hallCfg?.enabled ? (hallCfg.extraHalfBounds ?? 0) : 0
+  const boundsX = randInt(cfg.boundsXRange[0], cfg.boundsXRange[1]) + hallFootprintMargin
+  const boundsY = randInt(cfg.boundsYRange[0], cfg.boundsYRange[1]) + hallFootprintMargin
   const minX = Math.max(2, entry.x - boundsX), maxX = Math.min(MAP_W - 3, entry.x + boundsX)
   const minY = Math.max(2, entry.y - boundsY), maxY = Math.min(MAP_H - 3, entry.y + boundsY)
   const cm = blankCaveMap()
   const overlayUnderlays = {}
 
+  let reservedHall = null
   const carve = (x, y) => {
-    if (x >= minX && x <= maxX && y >= minY && y <= maxY) cm[y][x] = 'marble'
+    if (x < minX || x > maxX || y < minY || y > maxY) return
+    if (reservedHall && x >= reservedHall.x && x < reservedHall.x+reservedHall.w &&
+        y >= reservedHall.y && y < reservedHall.y+reservedHall.h) return
+    cm[y][x] = 'marble'
   }
   const carveWide = (x, y, width = 2) => {
     const span = Math.max(2, width)
@@ -2300,8 +2407,42 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     y: Math.max(minY + 1, Math.min(maxY - entranceH, entry.y - Math.floor(entranceH / 2))),
     w: entranceW, h: entranceH, cx: entry.x, cy: entry.y
   })
-  const roomCount = randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
-  for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts; attempt++) {
+  let hall = null
+  if (finalFloor && hallCfg?.enabled) {
+    const options = []
+    for (const [interiorWidth, interiorLength] of hallCfg.interiorSizes || []) {
+      for (let facing=0;facing<4;facing++) {
+        const w = facing%2 ? interiorLength+2 : interiorWidth+2
+        const h = facing%2 ? interiorWidth+2 : interiorLength+2
+        options.push({w,h,facing})
+      }
+    }
+    for (let i=options.length-1;i>0;i--) {
+      const j=randInt(0,i); [options[i],options[j]]=[options[j],options[i]]
+    }
+    for (const option of options) {
+      const x1=minX+cfg.roomBoundsMargin, x2=maxX-option.w-cfg.roomBoundsMargin
+      const y1=minY+cfg.roomBoundsMargin, y2=maxY-option.h-cfg.roomBoundsMargin
+      if (x1>x2 || y1>y2) continue
+      const positions=[]
+      for (let ry=y1;ry<=y2;ry+=2) for (let rx=x1;rx<=x2;rx+=2) {
+        const room={x:rx,y:ry,w:option.w,h:option.h,facing:option.facing,
+          cx:rx+Math.floor(option.w/2),cy:ry+Math.floor(option.h/2),landmark:'throneHall'}
+        if (!dungeonRoomHasSeparation(rooms,room,cfg.roomSeparation)) continue
+        const geom=dwarvenThroneHallGeometry(room)
+        if (![...geom.nearOutside,...geom.farOutside].every(p =>
+          p.x>minX+2 && p.x<maxX-2 && p.y>minY+2 && p.y<maxY-2)) continue
+        positions.push(room)
+      }
+      if (!positions.length) continue
+      hall=pick(positions)
+      rooms.push(hall)
+      break
+    }
+    if (!hall) return null
+  }
+  const roomCount = hall ? Math.max(10, randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])) : randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
+  for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts * (hall ? 3 : 1); attempt++) {
     const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1])
     const h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
     const minRoomX = minX + cfg.roomBoundsMargin
@@ -2311,24 +2452,54 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
     const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
     const candidate = {x: rx, y: ry, w, h, cx: rx + Math.floor(w / 2), cy: ry + Math.floor(h / 2)}
-    if (dungeonRoomHasSeparation(rooms, candidate, cfg.roomSeparation)) rooms.push(candidate)
+    if (dungeonRoomHasSeparation(rooms, candidate, hall ? Math.max(1,cfg.roomSeparation-1) : cfg.roomSeparation)) rooms.push(candidate)
   }
   if (rooms.length < 3) return null
-  const roomGraph = buildDungeonRoomGraph(rooms, cfg)
+  let forcedExitIndex = -1
+  if (hall) {
+    const far = dwarvenThroneHallGeometry(hall).farOutside[0]
+    const eligible=rooms.map((room,index)=>({room,index})).filter(p=>p.index>1)
+      .sort((a,b)=> (Math.abs(a.room.cx-far.x)+Math.abs(a.room.cy-far.y)) -
+        (Math.abs(b.room.cx-far.x)+Math.abs(b.room.cy-far.y)) || a.index-b.index)
+    if (!eligible.length) return null
+    forcedExitIndex = eligible[0].index
+  }
+  const roomGraph = buildDungeonRoomGraph(rooms, hall
+    ? {...cfg,landmarkRoomIndex:1,landmarkExitRoomIndex:forcedExitIndex} : cfg)
   if (!roomGraph) return null
 
   for (const r of rooms) {
     for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) carve(x, y)
   }
 
-  const connectRoomCenters = (a, b) => carveDungeonRoomConnection(carveWide, a, b, cfg)
+  // Rooms are initially carved as open footprints. After this point all
+  // ordinary corridor brushes must respect the hall perimeter.
+  reservedHall = hall
+  const hallGeometry = hall ? dwarvenThroneHallGeometry(hall) : null
+  const thronePosition = hall ? {
+    x:hall.cx + hallGeometry.forward[0]*(Math.floor((hall.facing%2 ? hall.w : hall.h)/2)-3),
+    y:hall.cy + hallGeometry.forward[1]*(Math.floor((hall.facing%2 ? hall.w : hall.h)/2)-3)
+  } : null
+  const hallPortOutside = room => {
+    const isExit = room === rooms[forcedExitIndex]
+    const leaves = isExit ? hallGeometry.farOutside : hallGeometry.nearOutside
+    const x=Math.max(...leaves.map(p=>p.x)),y=Math.max(...leaves.map(p=>p.y))
+    return {x:x+(x>hall.x+hall.w-1?1:0),y:y+(y>hall.y+hall.h-1?1:0)}
+  }
+  const connectRoomCenters = (a,b) => {
+    if (!hall) {carveDungeonRoomConnection(carveWide,a,b,cfg);return true}
+    const from=a===hall ? hallPortOutside(b) : {x:a.cx,y:a.cy}
+    const to=b===hall ? hallPortOutside(a) : {x:b.cx,y:b.cy}
+    return carveReservedDungeonCorridor(carveWide,from,to,
+      {minX,minY,maxX,maxY},hall)
+  }
 
   const parentByRoom = new Map()
   for (const edge of roomGraph.edges.filter(edge => edge.kind !== 'loop')) {
     const parent = rooms[edge.a], child = rooms[edge.b]
     if (!parent || !child) return null
     parentByRoom.set(child, parent)
-    connectRoomCenters(parent, child)
+    if (!connectRoomCenters(parent, child)) return null
   }
 
   // The entrance room stays open. Find the actual corridor crossing each
@@ -2366,11 +2537,22 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     doorways.push({leaves: doorway, room: r})
   }
 
+  if (hall) {
+    for (let y=hall.y;y<hall.y+hall.h;y++) for (let x=hall.x;x<hall.x+hall.w;x++) {
+      cm[y][x] = x===hall.x || x===hall.x+hall.w-1 ||
+        y===hall.y || y===hall.y+hall.h-1 ? 'dwarvenwall' : 'marble'
+    }
+    for (const leaves of [hallGeometry.near,hallGeometry.far]) {
+      for (const p of leaves) cm[p.y][p.x]='marble'
+      doorways.push({leaves,room:hall})
+    }
+  }
+
   // Loop decisions were already made in the abstract room graph. Carve them
   // only after primary room walls/doorways exist so the loop creates its own
   // visible secondary connection without changing graph semantics.
   for (const edge of roomGraph.edges.filter(edge => edge.kind === 'loop')) {
-    connectRoomCenters(rooms[edge.a], rooms[edge.b])
+    if (!connectRoomCenters(rooms[edge.a], rooms[edge.b])) return null
   }
 
   for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
@@ -2385,6 +2567,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   for (let i = 0; i < collapseAttempts; i++) {
     const x = randInt(minX + 2, maxX - 2), y = randInt(minY + 2, maxY - 2)
     if (cm[y][x] !== 'marble') continue
+    if (hall && x >= hall.x-1 && x <= hall.x+hall.w && y >= hall.y-1 && y <= hall.y+hall.h) continue
     if (Math.abs(x - entry.x) + Math.abs(y - entry.y) <= cfg.collapseMinEntranceDistance) continue
     const rubble = chance(cfg.rubbleChance)
     if (rubble) overlayUnderlays[keyXY(x, y)] = cm[y][x]
@@ -2459,7 +2642,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       blocksExit: !after.has(keyXY(exit.x, exit.y))})
   }
   const mainRouteRooms = new Set(roomGraph.mainRoute.map(index => rooms[index]))
-  const gateCandidates = structuralDoors.filter(d => d.blocksExit && mainRouteRooms.has(d.room)).map(d => d.leaves)
+  const gateCandidates = structuralDoors.filter(d => d.blocksExit && mainRouteRooms.has(d.room) &&
+    (!hall || d.room !== rooms[forcedExitIndex]) &&
+    (!hall || d.room !== hall || d.leaves === hallGeometry.near)).map(d => d.leaves)
   if (!gateCandidates.length) return null
   const gateDoorway = pick(gateCandidates)
   const gateKeyId = dwarvenDungeonLockId(floorZ, 'gate', gateDoorway)
@@ -2486,7 +2671,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     h: room.h,
     cx: room.cx,
     cy: room.cy,
-    archetype: index === 0 ? 'Entrance Hall' : dwarvenRoomArchetypeForProgress(progress, finalFloor),
+    archetype: index === 0 ? 'Entrance Hall' : room === hall ? 'Throne Hall' : dwarvenRoomArchetypeForProgress(progress, finalFloor),
+    ...(room === hall ? {landmark:'throneHall',facing:room.facing} : {}),
     doorways: doorwayByRoom.get(room) || [],
     connectionCount: dungeonRoomGraphDegree(roomGraph, index),
     onMainRoute: roomGraph.mainRoute.includes(index),
@@ -2604,6 +2790,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       if (distance <= 0) continue
       const [x, y] = key.split(',').map(Number)
       if (cm[y]?.[x] !== 'marble') continue
+      if (hall && x >= hall.x && x < hall.x+hall.w && y >= hall.y && y < hall.y+hall.h) continue
       if ([entry, exit].some(stair => Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) <= 1)) continue
       if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
       candidates.push({x, y})
@@ -2621,6 +2808,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (progressionKeyPlan) {
     const usedKeyTiles = new Set(ordinaryKeys.map(key => keyXY(key.x, key.y)))
     const validKeyTile = (x, y) => cm[y]?.[x] === 'marble' && !usedKeyTiles.has(keyXY(x, y)) &&
+      (!hall || x < hall.x || x >= hall.x+hall.w || y < hall.y || y >= hall.y+hall.h) &&
       [entry, exit].every(stair => Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) > 1) &&
       !doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))
     if (progressionKeyPlan.mode === 'lockedSideRoom') {
@@ -2667,6 +2855,56 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       finalFloor && room.index === roomGraph.exitRoom)
     if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
   }
+  if (hall) {
+    // Three paired supports preserve the central aisle and usable side routes.
+    const transverse = hall.facing%2 ? {x:0,y:1} : {x:1,y:0}
+    const forward = hallGeometry.forward
+    const origin = {x:hall.cx,y:hall.cy}
+    const longSpan = hall.facing%2 ? hall.w : hall.h
+    for (let row=0;row<3;row++) {
+      const step = -Math.floor(longSpan/2)+5+Math.floor(row*(longSpan-10)/2)
+      for (const side of [-1,1]) {
+        const lateral = Math.floor((hall.facing%2 ? hall.h : hall.w)/2)-2
+        const x=origin.x+step*forward[0]+side*lateral*transverse.x
+        const y=origin.y+step*forward[1]+side*lateral*transverse.y
+        if (cm[y]?.[x] !== 'marble') return null
+        overlayUnderlays[keyXY(x,y)]='marble'
+        cm[y][x]='dwarvenstatue'
+      }
+    }
+    // The dais is walkable; the stone throne itself obstructs only movement,
+    // not sight or projectiles. Give the transparent throne its actual underlay.
+    // No RNG or animation state is involved in either placement.
+    const side = {x:forward[1],y:-forward[0]}
+    for (let depth=-1;depth<=1;depth++) for (let offset=-1;offset<=1;offset++) {
+      const x=thronePosition.x+depth*forward[0]+offset*side.x
+      const y=thronePosition.y+depth*forward[1]+offset*side.y
+      if (cm[y]?.[x] !== 'marble') return null
+      cm[y][x]='dwarvendais'
+    }
+    overlayUnderlays[keyXY(thronePosition.x,thronePosition.y)]='dwarvendais'
+    cm[thronePosition.y][thronePosition.x]='dwarventhrone'
+  }
+  if (hall) {
+    // Modest walkable edge damage keeps the hall recognizable. Never touch
+    // the columns, dais, central aisle, ports or structural wall perimeter.
+    const direction = hallGeometry.forward
+    const side = {x:direction[1],y:-direction[0]}
+    const length = Math.max(hall.w,hall.h)-2
+    const width = Math.min(hall.w,hall.h)-2
+    const candidates = dwarvenRoomInterior(hall).filter(p => {
+      const depth=(p.x-hallGeometry.near[0].x)*direction[0]+(p.y-hallGeometry.near[0].y)*direction[1]
+      const offset=Math.abs((p.x-hall.cx)*side.x+(p.y-hall.cy)*side.y)
+      return cm[p.y]?.[p.x] === 'marble' && depth >= 4 && depth <= length-5 && offset >= Math.floor(width/2)-1
+    })
+    const amount = Math.min(candidates.length,randInt(2,3))
+    for (let n=0;n<amount;n++) {
+      const index=randInt(0,candidates.length-1)
+      const [spot] = candidates.splice(index,1)
+      overlayUnderlays[keyXY(spot.x,spot.y)]='marble'
+      cm[spot.y][spot.x]='dwarvenrubble'
+    }
+  }
   if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
   for (const room of roomMetas.filter(room => room.archetype === 'Prison')) {
     const hasBars = dwarvenRoomInterior(room).some(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars')
@@ -2677,7 +2915,9 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   for (const room of roomMetas) {
     if (room.index === 0) continue
     const vault = vaults.find(v => v.roomId === room.id)
-    room.tacticalSlots = deriveDwarvenTacticalSlots(cm, room, vault?.roles || null)
+    room.tacticalSlots = room.landmark === 'throneHall'
+      ? deriveDwarvenThroneHallSlots(cm, room, [entry, exit])
+      : deriveDwarvenTacticalSlots(cm, room, vault?.roles || null)
     if (vault) vault.slots = structuredClone(room.tacticalSlots)
     if (vault?.roles?.backline > 0 && !(vault.slots.backline || []).some(p =>
       [entry, exit].every(e => Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) >
@@ -2694,6 +2934,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (ordinaryKeys.some(key => !closedReach.has(keyXY(key.x, key.y)))) return null
   const eventualReach = dungeonWalkDistancesWithDoorTraversal(cm, entry)
   if (!eventualReach.has(keyXY(exit.x, exit.y))) return null
+  if (hall && dungeonWalkDistancesWithDoorTraversal(cm, entry,
+    new Set([...hallGeometry.near,...hallGeometry.far].map(p => keyXY(p.x,p.y)))).has(keyXY(exit.x,exit.y))) return null
   for (const room of roomMetas) for (const slots of Object.values(room.tacticalSlots || {})) {
     if ((slots || []).some(p => cm[p.y]?.[p.x] !== 'marble')) return null
   }
@@ -2726,6 +2968,13 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       kind: edge.kind
     })).filter(edge => edge.aRoomId && edge.bRoomId)
   }
+  const landmarks = hall ? [{
+    id:`dwarvenRuins-landmark:${floorZ}:throneHall`,type:'throneHall',recipeRevision:2,
+    roomId:serializableRooms[1].id,facing:hall.facing,
+    entrance:hallGeometry.near.map(p=>({...p})),
+    onward:hallGeometry.far.map(p=>({...p})),
+    thronePosition:{...thronePosition}
+  }] : []
   const descriptor = {
     x: entry.x,
     y: entry.y,
@@ -2738,6 +2987,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     rooms: serializableRooms,
     roomGraph: structuredClone(serializableRoomGraph),
     vaults: structuredClone(vaults),
+    landmarks: structuredClone(landmarks),
     artifactRoomId: serializableArtifactRoom?.id || null
   }
   const discovered = Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
@@ -2756,6 +3006,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     rooms: serializableRooms,
     roomGraph: structuredClone(serializableRoomGraph),
     vaults: structuredClone(vaults),
+    landmarks: structuredClone(landmarks),
     artifactRoomId: serializableArtifactRoom?.id || null,
     _artifactRoom: serializableArtifactRoom,
     _artifactSpot: artifactSpot,
@@ -2815,15 +3066,18 @@ function placeDwarvenRuinsLift(levelCount) {
 
   const endpointCandidates = (level, ground, requireWall, reachable = null) => {
     const out = []
+    const reservedRooms = (level.rooms || []).filter(room => room.landmark)
+    const reserved = (x,y) => reservedRooms.some(room =>
+      x >= room.x-2 && x <= room.x+room.w+1 && y >= room.y-2 && y <= room.y+room.h+1)
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
-      if (level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y))) continue
+      if (reserved(x,y) || level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y))) continue
       // Leave the stair landings unobstructed, including when the lift is
       // generated after the floor furniture and stair locations.
       if ((level.caves?.[0]?.entrances || []).some(stair =>
         Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) <= 1)) continue
       if (reachable && !reachable.has(keyXY(x, y))) continue
       const wallNeighbors = [[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
-        .filter(p => level.map[p.y]?.[p.x] === 'dwarvenwall')
+        .filter(p => !reserved(p.x,p.y) && level.map[p.y]?.[p.x] === 'dwarvenwall')
       if (requireWall && !wallNeighbors.length) continue
       out.push({x, y, wallNeighbors})
     }
@@ -2876,7 +3130,7 @@ function buildDwarvenRuinsStratum() {
     const z = chainZForDepth(floorIndex + 4)
     for (const [xy, floor] of Object.entries(level._overlayUnderlays || {})) {
       const [x, y] = xy.split(',').map(Number)
-      if (['dwarvenrubble', 'dwarvenstatue'].includes(level.map[y]?.[x]))
+      if (['dwarvenrubble', 'dwarvenstatue', 'dwarventhrone'].includes(level.map[y]?.[x]))
         tileUnderlays[`${z}:${xy}`] = floor
     }
     delete level._overlayUnderlays
@@ -4387,8 +4641,9 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     let spent = 0
     const organizedBudget = Math.max(1, Math.floor(threatBudget * Math.min(1, Math.max(0, cfg.dominantFamilyShare ?? 0.82))))
     const nonEntranceRooms = rooms.filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
-    const farthestRoom = nonEntranceRooms.length && entrances[0]
-      ? nonEntranceRooms.reduce((best, room) => {
+    const ordinaryEncounterRooms = nonEntranceRooms.filter(room => !room.landmark)
+    const farthestRoom = ordinaryEncounterRooms.length && entrances[0]
+      ? ordinaryEncounterRooms.reduce((best, room) => {
           const d = Math.max(Math.abs(room.cx - entrances[0].x), Math.abs(room.cy - entrances[0].y))
           return !best || d > best.d ? {room, d} : best
         }, null)?.room
@@ -4397,6 +4652,27 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const championVault = vaults.find(vault => (vault.roles?.champion || 0) > 0) || artifactVault || null
     const keyCarrierPlan = level.progressionKey?.mode === 'championCarrier' ? level.progressionKey : null
     const keyCarrierRoom = keyCarrierPlan ? roomById.get(keyCarrierPlan.targetRoomId) || null : null
+    const throneRoom = packageId === 'dwarvenRuins' && floorIndex === ruins.length-1
+      ? rooms.find(room => room.landmark === 'throneHall') || null : null
+    if (throneRoom) {
+      // This is the final-floor defensive encounter, not a bonus population.
+      // Favor a family with a ranged member when one is already selected, but
+      // never force a ranged species into a non-shooter family.
+      const shooterDominant = dominant.filter(family => family.members.some(isShooterTemplate))
+      const throneFamily = pickWeighted(shooterDominant.length ? shooterDominant : dominant,
+        family => Math.max(0.0001,family.weight))
+      throneRoom.encounterFamily = throneFamily.id
+      const roles = ['frontline','group','frontline','group',...(shooterDominant.length ? ['backline'] : [])]
+      for (const role of roles) {
+        const template = chooseMember(throneFamily,role)
+        if (!template) continue
+        const cost = Math.max(1,template.tier)
+        if (spent+cost > organizedBudget) break
+        const spot = takeRoleSpot(throneRoom,role)
+        if (!spot) continue
+        if (spawnTemplate(template,spot,null,role,throneFamily.id,throneRoom.id,null)) spent += cost
+      }
+    }
     // Vaults spend their most tactical slots first. A backline slot is not a
     // cosmetic label: where the selected family has a ranged-capable member,
     // that spawn is forced to be a shooter and therefore starts with ammo.
@@ -4439,10 +4715,11 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
           eligible.find(member => !member.abilities?.includes('ethereal')) || null
       }
       const championRoom = championIndex === 0
-        ? (keyCarrierRoom || roomById.get(championVault?.roomId) || farthestRoom)
+        ? (keyCarrierRoom || throneRoom || roomById.get(championVault?.roomId) || farthestRoom)
         : (nonEntranceRooms[championIndex % Math.max(1, nonEntranceRooms.length)] || farthestRoom)
       const championRoomVault = vaults.find(vault => vault.roomId === championRoom?.id) || null
-      const vaultId = championIndex === 0 ? championRoomVault?.id || championVault?.id || null : null
+      const vaultId = championIndex === 0
+        ? (championRoom?.landmark ? null : championRoomVault?.id || championVault?.id || null) : null
       const championSpot = takeRoleSpot(championRoom, 'champion') || takeRoleSpot(championRoom, 'group') ||
         takeRoleSpot(championRoom, 'frontline') || takeRoleSpot(championRoom, 'any') ||
         takeSpot(championRoom, true, true) || takeSpot(null, true)
@@ -4466,7 +4743,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     let roomCursor = 0
     for (const family of dominant) {
       if (spawnedFamilies.has(family.id)) continue
-      const room = nonEntranceRooms.length ? nonEntranceRooms[roomCursor++ % nonEntranceRooms.length] : null
+      const room = ordinaryEncounterRooms.length ? ordinaryEncounterRooms[roomCursor++ % ordinaryEncounterRooms.length] : null
       const tmpl = chooseMember(family, room?.archetype === 'Barracks' ? 'group' : 'any')
       const spot = takeRoleSpot(room, 'group') || takeRoleSpot(room, 'any') || takeSpot(room, false, true)
       if (!tmpl || !spot) continue
@@ -4476,7 +4753,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     // Procedural rooms use the same role geometry as authored vaults. Room
     // archetype changes how much of the remaining floor budget it receives.
     const roomDefs = packageCfg.rooms?.archetypes || {}
-    const ordinaryRooms = nonEntranceRooms.filter(room => !room.vaultType)
+    const ordinaryRooms = nonEntranceRooms.filter(room => !room.vaultType && !room.landmark)
     for (const room of ordinaryRooms) {
       if (spent >= organizedBudget) break
       const family = dominant[roomCursor++ % dominant.length]
@@ -4544,6 +4821,7 @@ function spawnDwarvenRuinsRoomProps(level, z) {
   if (!level || level.dungeonPackage !== 'dwarvenRuins') return
   const story = dungeonPackageConfig(level.dungeonPackage)?.story || {}
   const rooms = (level.rooms || []).filter(room => room.index !== 0)
+  const hall = rooms.find(room => room.landmark === 'throneHall') || null
   const occupied = new Set(groundItems.filter(g => (g.level ?? 0) === z).map(g => keyXY(g.x, g.y)))
   const slotKeys = new Set(rooms.flatMap(room => Object.values(room.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y))))
   // Keep authored shooter lanes clear of decorative ground props as well as
@@ -4572,6 +4850,14 @@ function spawnDwarvenRuinsRoomProps(level, z) {
   const stairLandingKeys = new Set(stairLandings)
   const roomSpots = (room, outsideCells = false) => dwarvenRoomInterior(room).filter(p =>
     level.map[p.y]?.[p.x] === 'marble' && !occupied.has(keyXY(p.x, p.y)) &&
+    (!room.landmark || (outsideCells && (() => {
+      const forward = [[0,-1],[1,0],[0,1],[-1,0]][room.facing]
+      const across = {x:forward[1],y:-forward[0]}
+      const depth = (p.x-room.cx)*forward[0]+(p.y-room.cy)*forward[1]
+      const offset = Math.abs((p.x-room.cx)*across.x+(p.y-room.cy)*across.y)
+      return offset >= Math.floor(Math.min(room.w,room.h)/2)-2 &&
+        Math.abs(depth) < Math.max(room.w,room.h)/2-4
+    })())) &&
     !slotKeys.has(keyXY(p.x, p.y)) && !stairLandingKeys.has(keyXY(p.x, p.y)) &&
     Math.abs(p.x - room.cx) + Math.abs(p.y - room.cy) > 1 &&
     (!outsideCells || !inPrisonCell(room, p)))
@@ -4625,9 +4911,9 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     : remainsProgress
   const remainsTarget = Math.max(1, Math.round(remainsBase * remainsMultiplier))
   for (let n = 0; n < remainsTarget; n++) {
-    const candidates = rooms.filter(room => roomSpots(room, true).length)
+    const candidates = rooms.filter(room => (n < 2 || !room.landmark) && roomSpots(room, true).length)
     if (!candidates.length) break
-    const room = pick(candidates)
+    const room = hall && n < 2 && candidates.includes(hall) ? hall : pick(candidates)
     addProp(room, 'dwarvenremains', level.progress >= 1
       ? 'Dwarven remains are piled around a failed defensive position.'
       : 'Dwarven remains lie amid the abandoned settlement.', null, true)
@@ -4641,7 +4927,7 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     : skeletonProgress
   const skeletonTarget = Math.max(1, Math.round(skeletonBase * skeletonMultiplier))
   for (let n = 0; n < skeletonTarget; n++) {
-    const candidates = rooms.filter(room => roomSpots(room, true).length)
+    const candidates = rooms.filter(room => !room.landmark && roomSpots(room, true).length)
     if (!candidates.length) break
     const room = pick(candidates)
     addProp(room, 'skeleton', level.progress >= 1
@@ -4681,7 +4967,8 @@ function spawnDwarvenRuinsChests() {
       .flatMap(stair => dwarvenStairLandingKeys(stair.x, stair.y)))
     const safeRoute = DungeonTraps.safeReachable(level.map, entry,
       new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
-    const rooms = (level.rooms || level._encounterRooms || []).filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
+    const rooms = (level.rooms || level._encounterRooms || []).filter(room =>
+      room.index !== 0 && room.archetype !== 'Entrance Hall' && !room.landmark)
     const vaultByRoom = new Map((level.vaults || []).map(vault => [vault.roomId, vault]))
     const candidatesForRoom = room => {
       const spots = []
@@ -4935,6 +5222,67 @@ function validateDwarvenRuinsStratum() {
         issues.push(`${tag}: Prison room ${room.id} can be entered without using its barred door`)
     }
 
+    const hallRecords = (level.landmarks || []).filter(record => record.type === 'throneHall')
+    if (JSON.stringify(level.caves?.[0]?.landmarks || []) !== JSON.stringify(level.landmarks || []))
+      issues.push(`${tag}: level and descriptor landmark metadata differ`)
+    const isLast = floorIndex === base.contexts.length - 1
+    if (hallRecords.length !== (isLast ? 1 : 0))
+      issues.push(`${tag}: expected ${isLast ? 1 : 0} throne hall landmarks, found ${hallRecords.length}`)
+    for (const hallRecord of hallRecords) {
+      const room = (level.rooms || []).find(r => r.id === hallRecord.roomId)
+      if (!room || room.landmark !== 'throneHall' || !room.onMainRoute || room.optional)
+        {issues.push(`${tag}: throne hall has no valid mandatory room`);continue}
+      if (hallRecord.facing !== room.facing || !Number.isInteger(room.facing) || room.facing < 0 || room.facing > 3)
+        issues.push(`${tag}: throne hall orientation mismatch`)
+      const width = Math.min(room.w-2, room.h-2),length = Math.max(room.w-2,room.h-2)
+      const sizes = cfg.landmarks?.throneHall?.interiorSizes || []
+      if (!sizes.some(size => size[0] === width && size[1] === length))
+        issues.push(`${tag}: throne hall has invalid dimensions`)
+      const near = hallRecord.entrance || [], far = hallRecord.onward || []
+      const ports = new Set([...near,...far].map(p => keyXY(p.x,p.y)))
+      if (near.length !== 2 || far.length !== 2)
+        issues.push(`${tag}: throne hall requires two two-leaf ports`)
+      for (let y=room.y;y<room.y+room.h;y++) for (let x=room.x;x<room.x+room.w;x++) {
+        const edge=x===room.x || x===room.x+room.w-1 || y===room.y || y===room.y+room.h-1
+        if (edge && !ports.has(keyXY(x,y)) && level.map[y]?.[x] !== 'dwarvenwall')
+          issues.push(`${tag}: throne hall perimeter breached at ${x},${y}`)
+      }
+      const blocked = new Set([...near,...far].map(p => keyXY(p.x,p.y)))
+      if (dungeonWalkDistancesWithDoorTraversal(level.map,entry,blocked).has(keyXY(exit.x,exit.y)))
+        issues.push(`${tag}: sealed passage can bypass the throne hall`)
+      const throne = hallRecord.thronePosition
+      if (!throne || level.map[throne.y]?.[throne.x] !== 'dwarventhrone')
+        issues.push(`${tag}: missing blocking throne at landmark anchor`)
+      const throneCells = dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'dwarventhrone')
+      if (throneCells.length !== 1) issues.push(`${tag}: throne hall must have exactly one throne`)
+      if (hallRecord.recipeRevision !== 2) issues.push(`${tag}: unexpected throne recipe revision`)
+      if (throne) {
+        const direction = [[0,-1],[1,0],[0,1],[-1,0]][hallRecord.facing] || [0,0]
+        const across = [direction[1],-direction[0]]
+        for (let forward=-1;forward<=1;forward++) for (let side=-1;side<=1;side++) {
+          const x=throne.x+forward*direction[0]+side*across[0]
+          const y=throne.y+forward*direction[1]+side*across[1]
+          if (level.map[y]?.[x] !== (forward===0 && side===0 ? 'dwarventhrone':'dwarvendais'))
+            issues.push(`${tag}: throne dais damaged at ${x},${y}`)
+        }
+        if (tileUnderlays[`${chainZForDepth(floorIndex+4)}:${keyXY(throne.x,throne.y)}`] !== 'dwarvendais')
+          issues.push(`${tag}: missing throne dais floor underlay`)
+      }
+      const hallGuards = (context.floorEnemies || []).filter(enemy => enemy.dungeonRoomId === room.id)
+      const ordinaryGuards = hallGuards.filter(enemy => ['frontline','group','backline'].includes(enemy.dungeonRole))
+      if (ordinaryGuards.length < 2 || !ordinaryGuards.some(enemy => enemy.dungeonRole === 'frontline') ||
+          !ordinaryGuards.some(enemy => enemy.dungeonRole === 'group'))
+        issues.push(`${tag}: throne hall lacks budgeted flank and supporting defenders`)
+      for (const guard of hallGuards) {
+        if (guard.dungeonVaultId) issues.push(`${tag}: throne guard incorrectly assigned to a fitted vault`)
+        if (!dwarvenRoomInterior(room).some(p => p.x === guard.x && p.y === guard.y))
+          issues.push(`${tag}: throne guard outside hall interior`)
+      }
+      for (const slots of Object.values(room.tacticalSlots || {})) for (const p of slots)
+        if (level.map[p.y]?.[p.x] !== 'marble') issues.push(`${tag}: damaged throne guard position`)
+      const columns = dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'dwarvenstatue')
+      if (columns.length !== 6) issues.push(`${tag}: throne hall requires six indoor columns`)
+    }
     artifactCount += (floorGround || []).filter(item => item.dwarvenRuinsArtifact && item.artifactGuaranteed).length
     if (floorIndex === base.contexts.length-1 && !level.map.some(row => row.includes('dwarvenminessealed')))
       issues.push(`${tag}: sealed Deep Mines continuation is missing`)

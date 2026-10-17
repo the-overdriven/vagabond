@@ -788,6 +788,19 @@
     "dwarvenpressureplate": {
       "image": "img/tiles/marble-floor.png",
       "scale": 1
+    },
+    "dwarvendais": {
+      "image": "img/tiles/dwarven-dais.png",
+      "scale": 1,
+      "baseTileKey": "marble"
+    },
+    "dwarventhrone": {
+      "image": "img/tiles/dwarven-throne-north.png",
+      "scale": 1,
+      "northImage": "img/tiles/dwarven-throne-north.png",
+      "eastImage": "img/tiles/dwarven-throne-east.png",
+      "southImage": "img/tiles/dwarven-throne-south.png",
+      "westImage": "img/tiles/dwarven-throne-west.png"
     }
   },
   "projectiles": {

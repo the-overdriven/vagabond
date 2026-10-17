@@ -13,7 +13,6 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
       const check = (ok, msg) => { if (!ok) throw new Error(msg) }
       const expectedRooms = new Set(['Barracks','Armory','Dining Hall','Library','Forge','Workshop','Dormitory','Burial Chamber','Temple','Prison','Storage'])
       const expectedVaults = new Set(['fortifiedBarracks','trappedArmory','treasury','libraryArchive','prisonBlock','floodedCistern','collapsedHall','sealedTomb','forgeKillzone','barricadedDormitory'])
-      const defensiveVaults = new Set(['fortifiedBarracks','barricadedDormitory','forgeKillzone','collapsedHall'])
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
       check(Object.keys(cfg.rooms.archetypes).length === 11 && Object.keys(cfg.rooms.archetypes).every(name => expectedRooms.has(name)),
         'all eleven regular room archetypes are configured')
@@ -90,7 +89,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
           }
           check(rooms.length >= 2, 'floor persists room descriptors')
           check(vaults.length >= 1, 'every floor has at least one major vault')
-          check(rooms.filter(room => room.index !== 0).every(room => expectedRooms.has(room.archetype)),
+          check(rooms.filter(room => room.index !== 0 && !room.landmark).every(room => expectedRooms.has(room.archetype)),
             'every non-entrance room has a known gameplay archetype')
           check(new Set(rooms.map(room => room.id)).size === rooms.length, 'room IDs are stable and unique within floor')
           check(new Set(vaults.map(vault => vault.id)).size === vaults.length, 'vault IDs are stable and unique within floor')
@@ -181,9 +180,13 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
           const minimumLoot = Math.max(1, Math.round(cfg.loot.baseBudget * (1 + i * cfg.loot.growthPerFloor)))
           check(regularChests.length >= minimumLoot, 'floor receives its depth-scaled minimum loot budget')
           if (i === ruins.length - 1) {
-            check(vaults.length >= 2, 'final floor reserves both artifact and defensive vaults')
-            check(vaults.some(vault => defensiveVaults.has(vault.type) && !vault.artifactReserved),
-              'final floor has a dedicated failed-defense vault')
+            check(vaults.length >= 1 && vaults.length <= 2,
+              'final floor rolls optional fitted vaults instead of forcing another defensive vault')
+            const throneRoom = rooms.find(room => room.landmark === 'throneHall')
+            const throneGuards = mobs.filter(enemy => enemy.dungeonRoomId === throneRoom?.id)
+            check(!!throneRoom && throneGuards.some(enemy => enemy.dungeonRole === 'frontline') &&
+              throneGuards.some(enemy => enemy.dungeonRole === 'group'),
+              'throne hall itself supplies the last-stand tactical defenders')
             const artifactVault = vaults.find(vault => vault.artifactReserved)
             check(!!artifactVault, 'final floor reserves an optional artifact vault')
             const artifactRoom = rooms.find(room => room.id === artifactVault.roomId)
@@ -233,21 +236,41 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
       currentCave = -1
       map = surfaceMap
       applyWorldTraits([])
-      const defs = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.vaults.definitions
-      const savedRanges = Object.fromEntries(['fortifiedBarracks','forgeKillzone','collapsedHall'].map(type => [type, defs[type].progressRange.slice()]))
-      const savedMin = defs.barricadedDormitory.minSize.slice()
-      for (const type of ['fortifiedBarracks','forgeKillzone','collapsedHall']) defs[type].progressRange = [0,0]
-      defs.barricadedDormitory.minSize = [1,1]
+      const vaultCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.vaults
+      const defs = vaultCfg.definitions
+      const savedCount = vaultCfg.countRange.slice()
+      const saved = Object.fromEntries(Object.entries(defs).map(([type, def]) =>
+        [type,{weight:def.weight,progressRange:def.progressRange?.slice(),minSize:def.minSize?.slice(),
+          requiredEntrances:def.requiredEntrances?.slice(),doorRequirement:def.doorRequirement}]))
+      vaultCfg.countRange = [2,2]
+      // Force the optional *second* fitted vault to exercise this recipe, no
+      // longer rely on a compulsory final-floor defensive-vault selection.
+      for (const [type,def] of Object.entries(defs)) {
+        if (type !== 'barricadedDormitory' && !['treasury','sealedTomb','trappedArmory','guardedArtifactChamber'].includes(type))
+          def.progressRange=[0,0]
+      }
+      defs.barricadedDormitory.weight=1000000
+      defs.barricadedDormitory.minSize=[1,1]
+      defs.barricadedDormitory.requiredEntrances=[1,10]
+      defs.barricadedDormitory.doorRequirement='any'
       WORLD_GEN_CONFIG.dungeons.dwarvenRuins.levelCountRange = [3,3]
       WORLD_SEED = 112358
       rngState = WORLD_SEED
-      await generateNewWorld()
-      for (const [type, range] of Object.entries(savedRanges)) defs[type].progressRange = range
-      defs.barricadedDormitory.minSize = savedMin
+      try { await generateNewWorld() } finally {
+        vaultCfg.countRange = savedCount
+        for (const [type, value] of Object.entries(saved)) {
+          const def = defs[type]
+          def.weight=value.weight
+          if (value.progressRange) def.progressRange=value.progressRange
+          if (value.minSize) def.minSize=value.minSize
+          if (value.requiredEntrances) def.requiredEntrances=value.requiredEntrances
+          def.doorRequirement=value.doorRequirement
+        }
+      }
 
       const final = deepLevels.at(-1)
       const vault = (final.vaults || []).find(v => v.type === 'barricadedDormitory')
-      check(!!vault, 'forced final defensive scenario selects barricaded dormitory')
+      check(!!vault, 'optional fitted vault can still select barricaded dormitory')
       const room = final.rooms.find(r => r.id === vault.roomId)
       let barricades = 0
       for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) {

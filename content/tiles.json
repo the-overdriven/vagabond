@@ -525,6 +525,20 @@
       "walk": false,
       "projectileBlock": true,
       "blocksSight": true
+    },
+    "dwarvendais": {
+      "ch": "·",
+      "color": "#827c73",
+      "bg": "#302d2a",
+      "walk": true
+    },
+    "dwarventhrone": {
+      "ch": "♛",
+      "color": "#aaa092",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": false,
+      "blocksSight": false
     }
   },
   "tileCode": {
@@ -572,15 +586,15 @@
     "dwarvenstatue": "S",
     "dwarvenwall": "W",
     "dwarvenrubble": "R",
-    "cryptstairsdown": "\u2401",
-    "cryptstairsup": "\u2402",
-    "crypt2floor": "\u2403",
-    "cryptrubble": "\u2404",
-    "crypt2niche": "\u2405",
-    "sarcophagus": "\u2406",
-    "crypttrap": "\u2407",
-    "crypttrapsprung": "\u2408",
-    "mausoleumstairsup": "\u2409",
+    "cryptstairsdown": "␁",
+    "cryptstairsup": "␂",
+    "crypt2floor": "␃",
+    "cryptrubble": "␄",
+    "crypt2niche": "␅",
+    "sarcophagus": "␆",
+    "crypttrap": "␇",
+    "crypttrapsprung": "␈",
+    "mausoleumstairsup": "␉",
     "dwarvendoorlocked": "E",
     "dwarvenprisondoorclosed": "╧",
     "dwarvenprisondoorlocked": "╨",
@@ -600,9 +614,11 @@
     "dwarventable": "╕",
     "dwarvencrate": "╖",
     "dwarvenprisonbars": "╘",
-    "dwarvenspikes": "\u2530",
-    "dwarvenpressureplate": "\u2531",
-    "dwarvenarrowwall": "\u2532"
+    "dwarvenspikes": "┰",
+    "dwarvenpressureplate": "┱",
+    "dwarvenarrowwall": "┲",
+    "dwarvendais": "╜",
+    "dwarventhrone": "╙"
   },
   "tileDesc": {
     "ice": "lake ice; 1% instant break per turn, otherwise 2% to start cracking. Steps beside cracking ice have an 85% cracking chance; stepping from cracking ice adds a 10% break check if it cracks.",
@@ -655,7 +671,7 @@
     "sarcophagus": "an old stone sarcophagus",
     "crypttrap": "an old stone sarcophagus",
     "crypttrapsprung": "a shattered, empty sarcophagus",
-    "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum\u2019s entrance",
+    "mausoleumstairsup": "a grand stone staircase leading up to the royal mausoleum’s entrance",
     "dwarvendoorlocked": "a locked dwarven door of iron-bound timber",
     "dwarvenprisondoorclosed": "a closed iron-barred dwarven prison door, with a clear view into its cell",
     "dwarvenprisondoorlocked": "a locked iron-barred dwarven prison door; you can see through its bars",
@@ -677,7 +693,9 @@
     "dwarvenprisonbars": "iron prison bars dividing the old cell block",
     "dwarvenspikes": "small holes in the marble conceal reusable spikes; any creature stepping here triggers them",
     "dwarvenpressureplate": "a hidden pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
-    "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane"
+    "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane",
+    "dwarvendais": "a worn ceremonial stone dais, etched with fading dwarven symbols",
+    "dwarventhrone": "a massive dwarven stone throne, empty and silent beneath the ruined halls"
   },
   "terrainSpeed": {
     "grass": 1,

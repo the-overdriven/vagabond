@@ -48,6 +48,8 @@ const DungeonTraps = (() => {
       const tacticalSpots = rooms.flatMap(room => Object.values(room.tacticalSlots || {}).flat())
       const inRoom = (x, y) => rooms.some(r =>
         x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+      const inLandmark = (x,y) => rooms.some(r => r.landmark &&
+        x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h)
       const ground = groundItems.filter(g => g.level === z)
       const keyGround = ground.filter(g => g.kind === 'dwarvenkey')
       const keyRemains = ground.filter(g => g.dungeonKey?.kind === 'dwarvenkey')
@@ -96,6 +98,7 @@ const DungeonTraps = (() => {
           trigger = {x:candidate.x+direction.dx, y:candidate.y+direction.dy}
         }
         if (terrain[trigger.y]?.[trigger.x] !== 'marble' || inRoom(trigger.x, trigger.y) ||
+            (emitter && inLandmark(emitter.x,emitter.y)) ||
             required.some(p => distance(p, trigger) <= cfg.entranceClearance)) continue
         if (level.traps.some(t => distance(t.trigger, trigger) <= cfg.minimumSeparation)) continue
         if (tacticalSpots.some(p => distance(p, trigger) <= cfg.spawnClearance ||

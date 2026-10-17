@@ -116,6 +116,7 @@ function buildSaveObject() {
       roomGraph: structuredClone(lvl.roomGraph || lvl.caves?.[0]?.roomGraph || null),
       progressionKey: structuredClone(lvl.progressionKey || null),
       vaults: structuredClone(lvl.vaults || []),
+      landmarks: structuredClone(lvl.landmarks || []),
       encounterFamilies: Array.isArray(lvl.encounterFamilies) ? lvl.encounterFamilies.slice() : [],
       artifactRoomId: lvl.artifactRoomId || null,
       discovered: encodeBoolGrid(lvl.discovered),
@@ -531,6 +532,7 @@ function loadGameFromObject(data, opts = {}) {
       roomGraph: structuredClone(lvlData.roomGraph || lvlCaves[0]?.roomGraph || null),
       progressionKey: structuredClone(lvlData.progressionKey || null),
       vaults: structuredClone(lvlData.vaults || lvlCaves[0]?.vaults || []),
+      landmarks: structuredClone(lvlData.landmarks || lvlCaves[0]?.landmarks || []),
       encounterFamilies: Array.isArray(lvlData.encounterFamilies)
         ? lvlData.encounterFamilies.slice()
         : (Array.isArray(lvlCaves[0]?.encounterFamilies) ? lvlCaves[0].encounterFamilies.slice() : []),

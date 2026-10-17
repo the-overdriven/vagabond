@@ -32,7 +32,7 @@ function statsFixture() {
     keyXY:(x,y)=>`${x},${y}`, itemDefinition:kind=>({carryStats:kind==='bigbell'?{spd:-2}:{}}),
     rng:()=>{throw new Error('ranking must not consume RNG')},
     Math:Object.assign(Object.create(Math), {random:()=>{throw new Error('no random ranking')}})})
-  const functions = ['raceDef','raceBonus','raceGrace','weaponGrace','armorGracePenalty',
+  const functions = ['raceDef','raceBonus','raceGrace','isWeaponItem','weaponGrace','armorGracePenalty',
     'gearGracePenalty','playerGracePenalty','levelGrace','playerGraceBonus','playerGrace',
     'forEachActiveArtifact','artifactBonusSum','curseDebuffSum','carriedItemStat',
     'playerAtk','playerDef','playerSpdRaw','playerSpd','playerPermanentStats']
@@ -80,9 +80,9 @@ test('only active artifact bonuses used by combat contribute, without mutation',
     {kind:'artifact',artifactSlot:'weapon',bonuses:{atk:1000,def:1000}}]
   ctx.player.equip.weapon = {kind:'artifact',artifactSlot:'weapon',bonuses:{atk:2.5,def:0.25}}
   const before = JSON.stringify(ctx.player)
-  // Artifact weapons currently have no ordinary weapon GRACE. Artifact SPD
-  // bonuses are not read by playerSpdRaw; ranking must not invent a bonus.
-  assert.deepEqual(plain(ctx.playerPermanentStats()), {atk:6,def:14,spd:3.5,grace:2})
+  // Legacy artifact fixtures have no weapon GRACE; an active trinket SPD
+  // enchantment must also contribute to the permanent strength score.
+  assert.deepEqual(plain(ctx.playerPermanentStats()), {atk:6,def:14,spd:102.5,grace:2})
   assert.equal(JSON.stringify(ctx.player), before)
 })
 

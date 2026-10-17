@@ -1325,6 +1325,77 @@ Enemies, prefixes, positions, tactical role, encounter-family identity, room/vau
 identity and wander state are persisted. Loading restores the exact population;
 it never regenerates tactical encounters from room metadata.
 
+### Guaranteed Throne Hall (v145, geometry, throne and last-stand defense)
+
+The deepest generated **Dwarven Ruins** floor contains exactly one reserved
+**Throne Hall** on its mandatory room-graph route, immediately before a
+separate sealed Deep Mines chamber. It is a landmark room, not one of the
+randomly selected major vault types, and occupies one of the floor's ordinary
+room slots. Earlier Ruins floors and the entrance Fort contain no throne hall.
+The artifact chest is still in a separate optional vault. The throne hall
+**replaces** the formerly guaranteed separate defensive vault: exactly one
+artifact vault remains compulsory, while a second fitted vault is an ordinary
+1–2-vault roll. The hall does not add treasure or monster budget.
+
+The floor reserves the hall's footprint **before** placing other rooms. Three
+possible interior dimensions are **9×19, 11×21, 11×23** cells, with four
+possible facings. For room capacity, the final floor extends its procedural
+half-bounds by 10 cells in both axes, targets 10–12 rooms within the existing
+8–12 room range, and uses at least two cells of separation for ordinary rooms
+(previously three on all floors). This slightly enlarges the final floor without
+increasing its treasure or enemy budget. All other floors keep their original
+bounds, room spacing and encounter rules.
+
+The hall has **two specified double-leaf ports**: a front approach and an
+onward passage. Only those ports may interrupt its walls. Corridors, loops,
+collapses and reachability repair may not tunnel through its perimeter, and
+world generation retries rather than accepting a bypass of the landmark or
+sealed continuation. The hall has a three-cell clear central aisle and
+**three paired indoor stone columns**. Near the far end, exactly one
+**blocking dwarven stone throne** occupies the center of a **3×3 ceremonial
+dais**. Its eight exposed dais cells are walkable and have no gameplay bonus.
+The throne cannot be entered or interacted with, but deliberately **does not
+block sight or projectiles**; columns retain their existing projectile
+blocking behavior. Ordinary scattered ground remains and loot are kept out of
+the hall until its encounter and decoration rules are introduced.
+
+Room metadata identifies the hall's special archetype and facing. A separate
+stable landmark record stores the recipe revision, associated room, front and
+rear ports, and the throne anchor. It is serialized alongside room/vault
+descriptors and restored without rerolling any world-generation decisions.
+Whole-world rotation transforms its rectangle, points and facing together.
+The throne graphic uses the landmark facing, with four sprites (north, east,
+south and west); the camera, animation timing and random numbers do not affect
+which sprite appears. The throne and dais are new encoded terrain types,
+using the unique current-save codes `╙` and `╜`. Both graphics are transparent
+over the recorded stone floor: dais engravings overlay marble; the throne uses
+the dais as its underlay, saved and rotated alongside other per-level overlays.
+The hall has two to three small patches of walkable rubble along its side
+edges and up to two decorative dwarven remains taken from the existing floor
+budget. Its central aisle, columns, dais, doorway landings and tactical slots
+remain clear of ambient dressing. Searchable corpses, regular chests and the
+artifact are placed in other rooms.
+
+The hall's own tactical slots are measured relative to its entrance: two
+frontline flankers near column gaps, two supporting defenders farther back,
+a far-side ranged slot when the chosen encounter family includes a shooter,
+and a position for the existing guaranteed Champion. Guards use one of the
+floor's already-selected encounter families and spend the **ordinary depth
+threat budget**; when no shooter is available, the backline is omitted rather
+than inventing a ranged species. The Champion and its existing escort may
+defend the throne instead of a fitted vault, unless the Champion must carry
+a progression key elsewhere. The floor still has exactly one guaranteed
+Champion and retains the same encounter-family count, wander/Alarmed rules,
+loot budget and rewards. Guards remain free to pursue the player; the hall
+does not lock during combat.
+
+The throne recipe is revision 2. The mandatory gate can occupy the front
+double-leaf entrance when no earlier room connection can serve as a structural
+progression gate. This remains a landmark rather than a new boss, interactive
+throne or source of additional artifacts. Landmark role positions, family assignments and enemy affiliations are
+persisted with existing room and monster records; loading never repopulates
+or rerolls the hall.
+
 ### Rooms, vaults, tactical encounters and loot (v61)
 
 Every non-entrance room receives one gameplay archetype: **Barracks, Armory,
@@ -1475,10 +1546,10 @@ scene. Decorative remains use at least a **2.5x** multiplier, yielding **5–10*
 use at least a **2.5x** multiplier, yielding **8–13** ambient searchable corpses before
 any progression-key corpse. The final floor also raises rubble to at least **1.65x**,
 ordinary breached-door pressure to at least **5x**, and multiplies barricade pressure
-by **2.2x**. It always reserves at least two major vaults: one optional artifact
-vault plus a separate fortified-barracks, barricaded-dormitory, forge-killzone,
-or collapsed-hall defensive scenario. This prevents the final floor from rolling
-an ordinary-looking treasury/tomb-only profile. The result should visibly read as
+by **2.2x**. It always guarantees two major **scenarios**: the mandatory throne hall
+last stand and a separate optional artifact vault. The former guaranteed
+fortified-barracks/barricaded-dormitory/forge-killzone/collapsed-hall selection
+has been removed; any additional fitted vault uses the normal weighted roll. The result should visibly read as
 a failed holdout: more broken defenses, bodies, rubble and improvised chokepoints,
 while the sealed lower transition still points only toward continued excavation
 in the future Deep Mines.
@@ -1517,7 +1588,8 @@ floor count, room-graph and physical entrance/exit separation, room/vault
 connectivity, trap-safe mandatory traversal, solvable key dependencies, the
 Champion guarantee, valid enemy terrain/clearance, ground-object conflicts,
 nonempty sealed prison cells with no eight-direction bypass routes,
-exactly one final-floor artifact, the lift endpoints and the sealed Deep Mines
+exactly one final-floor artifact, occupied throne-hall frontline/support slots,
+the one-Champion-per-floor budget, the lift endpoints and the sealed Deep Mines
 continuation. Structural floor failures are retried by the floor generator; a
 late population failure discards the world attempt and regenerates it, up to
 **3 configured attempts**. Enemy IDs restart for every discarded attempt so the
@@ -5886,8 +5958,29 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-66
+68
 ```
+
+Version 69 moves the guaranteed final-floor defensive encounter into the
+reserved throne hall. This changes vault selection, tactical monster positions,
+selected monster families and seeded generation ordering, so the current
+save/replay version is advanced; older saved worlds are not migrated.
+
+Version 68 adds two new Dwarven Ruins terrain encodings, the permanent stone
+throne (solid to movement but transparent to sight and missiles) and its
+walkable ceremonial dais. The throne anchor is now physically occupied by
+terrain; an 8-cell dais surrounds it. Current saves persist exact per-level
+underlays and landmark facing; orientation is resolved from saved metadata,
+without rerunning the room recipe or consuming seeded RNG. No conversion from
+earlier layouts/saves is supported.
+
+Version 67 adds a deterministic final-floor Dwarven Throne Hall layout and
+persists its landmark geometry, facing and access ports in every generated
+Ruins floor's current-save metadata. The extra generated room changes the
+initial RNG and world-generation contract; no older-save conversion is added.
+The smoke-test import fixture remains a synthetic old-layout world marked with
+the current schema only for save-import regression testing, not a sample
+newly generated Ruins stratum.
 
 Version 66 changes the seeded spell-selection rules to give eligible low-HP
 Sacrifice and Teleport fixed 30% and 20% chances on one survival roll before
