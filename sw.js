@@ -30,6 +30,8 @@ const PRECACHE_URLS = [
   './src/dungeonTraps.js',
   './src/charge.js',
   './src/enemySupport.js',
+  './src/enemyInvisibility.js',
+  './src/spiderWeb.js',
   './src/swimming.js',
   './src/ice.js',
   './img/tiles/ice.png',

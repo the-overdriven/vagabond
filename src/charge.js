@@ -28,6 +28,7 @@ function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
 function forcePlayerPosition(x, y, presentation, fromPosition = null) {
   const from = fromPosition || {x: player.x, y: player.y}
   clearAutoPath()
+  if (x !== player.x || y !== player.y) clearSpiderWeb()
   player.x = x; player.y = y
   DungeonTraps.onEntry(player, from.x, from.y)
   if (player.hp <= 0 || deathTransition) return
@@ -89,7 +90,7 @@ function tryEnemyRush(e) {
     }
   } else {
     log(`${e.name} throws a web at you and drags you closer!`, 'bad')
-    const throwMs = 420, pullMs = 360
+    const throwMs = SPIDER_WEB_THROW_MS, pullMs = SPIDER_WEB_PULL_MS
     const animated = !replayAnimationsDisabled && !replaySimulationMode
     const from = {x:player.x, y:player.y}
     if (animated) {
@@ -98,6 +99,7 @@ function tryEnemyRush(e) {
     }
     forcePlayerPosition(e.x + line.sx, e.y + line.sy,
       animated ? {kind:'pull', delay:throwMs, duration:pullMs} : undefined)
+    if (player.hp > 0 && !deathTransition) markSpiderWeb(e, animated)
     const firstDamage = damageAnims.length
     if (player.hp > 0 && !deathTransition) {
       enemyAttackPlayer(e, true)

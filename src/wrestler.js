@@ -48,6 +48,8 @@ function tryEnemyWrestle(e) {
   occupied.add(keyXY(e.x, e.y))
   // Both coordinates must be final before any entry trap fires. A projectile
   // trap would otherwise see the player and wrestler occupying one tile.
+  // Swapping counts as relocation and tears away a lingering Spider web.
+  clearSpiderWeb()
   player.x = fromEnemy.x
   player.y = fromEnemy.y
   e.wrestleReadyTurn = turnCount + WRESTLE_COOLDOWN + 1

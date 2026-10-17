@@ -2494,6 +2494,33 @@ inspection displays whether Wrestler is ready or cooling down. Its
 `wrestleReadyTurn` is an absolute turn deadline, initialized on spawn and
 included in saves and replay snapshots. The new save schema is **56**.
 
+## Monster invisibility
+
+Myrka, Skerva, Kveld and Tulla have `invisibility`. While actively pursuing or
+attacking a visible player, they have a **25% chance** on an otherwise eligible
+action to vanish instead of moving or attacking. They remain invisible through
+**three subsequent enemy turns**, and the ability is unavailable for **eight
+complete turns** after activation (including when invisibility is broken early).
+No RNG is consumed while invisible, cooling down, idle/passive, or while the
+player is protected by invisibility or the Temple sanctuary. Existing evasion
+and theft abilities remain available.
+
+Invisible monsters still occupy their physical tile, move, take damage, and
+obey ordinary AI/terrain rules. Beyond **two tiles** from the player they are
+hidden visually and cannot be inspected via tile hover/tap. Within two tiles,
+a translucent shimmer reveals their approximate position; this can be
+inspected and attacked normally. Physically bumping a hidden creature exposes
+it before combat. The monster also reveals itself before its own attack or a
+theft attempt, including unsuccessful attempts. Expiry produces a message;
+activation and revealing produce a floating text notification. Auras and
+markers are hidden with the creature when outside shimmer range.
+
+The absolute `invisibleUntilTurn` and `invisibilityReadyTurn` deadlines are
+initialized per enemy and serialized to both saves and replay snapshots.
+Visual opacity is derived from current state and distance, not wall-clock
+time or animation, so replay RNG is unchanged by rendering. Save schema **59**
+introduces these fields and the Spider web owner ID.
+
 ## Charge and Pull
 
 Boar and Minotaur have `charge`; Giant Spider has `pull`. In the code and some
@@ -2535,8 +2562,15 @@ swimming practice, or voluntary-movement quest progress, and does not collect
 items or trigger transitions. Forced water entry consumes water endurance and
 can immediately cause normal drowning damage. Combat and relocation resolve
 synchronously; animations never determine rules or RNG. Successful Pull visually
-throws the cave-web graphic toward the original player tile for 420 ms, then
-drags the player to the resolved destination over 360 ms. The melee lunge and
+throws the cave-web graphic toward the original player tile for **260 ms** (formerly 420 ms), then
+drags the player to the resolved destination over **360 ms**. Once the web lands,
+a large **1.35-tile** web graphic covers the player above the character sprite
+and surrounding canopies. It stays visible through combat and waits until the
+player actually changes tile or kills the Giant Spider responsible for the web;
+attacking, waiting, and using an item do not remove it. This overlay does not
+root or penalize the player. The source monster ID persists in saves and replay
+snapshots, so loading preserves the web and its death-based removal, while
+projectile/pull timing remains presentation-only. The melee lunge and
 damage text follow the drag. If Pull triggers after the player's own step,
 the web-and-drag presentation takes priority over the ordinary walking pan:
 the player remains visually at the web's target tile until it arrives, then

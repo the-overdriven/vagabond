@@ -1711,6 +1711,8 @@ more difficult:
 <script src="src/wrestler.js"></script>
 <script src="src/monsterStatuses.js"></script>
 <script src="src/enemySupport.js"></script>
+<script src="src/enemyInvisibility.js"></script>
+<script src="src/spiderWeb.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
@@ -2277,6 +2279,7 @@ more difficult:
     gold: 0, deaths: 0, steps: 0, kills: 0,
     trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
     invisibleTurns: 0,
+    spiderWebSourceId: null,
     godMode: false,
     godInvisible: false,
     speedPotionTurns: 0,
@@ -2753,6 +2756,8 @@ more difficult:
     enemy.hasteReadyTurn = Number.isInteger(enemy.hasteReadyTurn) ? enemy.hasteReadyTurn : 0
     enemy.healSelfReadyTurn = Number.isInteger(enemy.healSelfReadyTurn) ? enemy.healSelfReadyTurn : 0
     enemy.healSelfUsed = enemy.healSelfUsed === true
+    enemy.invisibleUntilTurn = Number.isInteger(enemy.invisibleUntilTurn) ? enemy.invisibleUntilTurn : 0
+    enemy.invisibilityReadyTurn = Number.isInteger(enemy.invisibilityReadyTurn) ? enemy.invisibilityReadyTurn : 0
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
@@ -3811,7 +3816,9 @@ more difficult:
     const candidates = player.inventory.map((item, index) => ({item, index}))
       .filter(entry => !equipped.has(entry.item) && (entry.item.count ?? 1) > 0)
     // Ineligible turns consume no theft RNG, including empty packs and corners.
-    if (!candidates.length || !chance(THIEF_CONFIG.chance)) return false
+    if (!candidates.length) return false
+    revealEnemyInvisibility(e)
+    if (!chance(THIEF_CONFIG.chance)) return false
     const stolen = pick(candidates)
     e.stolenItem = structuredClone(stolen.item)
     if ((stolen.item.count || 1) > 1) {
@@ -3873,6 +3880,8 @@ more difficult:
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
+    // Physically bumping even an unseen creature exposes its position.
+    revealEnemyInvisibility(e)
     updateMobileInfoPanel(e.x, e.y)
     showDesktopCombatTooltip(e)
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
@@ -3973,6 +3982,7 @@ more difficult:
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null) {
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
+    revealEnemyInvisibility(e)
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
       ? e.equipment : null
@@ -4171,6 +4181,11 @@ more difficult:
       spawnDamageNumber(e.x,e.y,'Aura fades!','#dfd7ad')
     }
     clearBansheeConfusion(e)
+    if (player.spiderWebSourceId === e.id) {
+      clearSpiderWeb()
+      log(`The ${e.name}'s web falls away.`, 'good')
+      spawnDamageNumber(player.x, player.y, 'Freed!', '#9fe3bf')
+    }
     if (playerCredit) player.kills++
     spawnDeathAnim(e)
     occupied.delete(keyXY(e.x, e.y))
@@ -4217,6 +4232,7 @@ more difficult:
     undergroundDiscovered = undergroundDiscoveredL1
     player.x = spawnPoint.x
     player.y = spawnPoint.y
+    clearSpiderWeb()
     if (wasDead) {
       player.hp = playerMaxHp()
       checkPlayerHealthWarning()
@@ -4322,6 +4338,7 @@ more difficult:
       kills: 0,
       trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
       invisibleTurns: 0,
+    spiderWebSourceId: null,
       godMode: false,
       godInvisible: false,
       speedPotionTurns: 0,
@@ -5362,6 +5379,7 @@ more difficult:
     for (const e of enemies.slice()) {
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      expireEnemyInvisibility(e)
       if (enemyInsideSanctuary(e)) {
         if (!e.fleeingHoly && enemyIsVisibleOnMainView(e)) log(`The ${e.name} retreats from the sacred ground.`, 'info')
         e.fleeingHoly = true; e.aware = false
@@ -5449,6 +5467,7 @@ more difficult:
         }
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
+        if (tryEnemyVanish(e)) continue
         if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
@@ -5462,6 +5481,7 @@ more difficult:
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
+        if (tryEnemyVanish(e)) continue
         if (tryEnemySummon(e)) continue
         if (tryEnemyRush(e)) {
           if (player.hp <= 0 || deathTransition) return
@@ -6745,6 +6765,11 @@ more difficult:
     if (isWalkableForPlayer(nx, ny)) {
       player.x = nx
       player.y = ny
+      if (player.spiderWebSourceId) {
+        clearSpiderWeb()
+        log('You tear free of the spider web!', 'good')
+        spawnDamageNumber(nx, ny, 'Freed!', '#9fe3bf')
+      }
       DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       completeFishermanLesson(fromPos)
@@ -8692,18 +8717,21 @@ more difficult:
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
       if (haste && !hastening) e.hasteAnim = undefined
       if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
+      if (!enemyCanBeSeen(e)) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       visibleEnemies.push({e, vx, vy})
     }
-    for (const {e} of visibleEnemies) drawEnemyPrefixArea(
+    for (const {e} of visibleEnemies) if (!enemyInvisibleActive(e)) drawEnemyPrefixArea(
       Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
       e.x, e.y, e.prefix, undergroundVisible)
     const drawVisibleEnemy = ({e, vx, vy}) => {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over. Flying enemies
       // stay fully above water; only non-fliers use the submerged-water clipping.
-      const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+      const shimmers = enemyInvisibleShimmer(e)
+      if (shimmers) { ctx.save(); ctx.globalAlpha = 0.28 }
+      const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), shimmers ? '#d8caef' : enemyColor(e))
       if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
       if (inspiringChampionFor(e)) {
@@ -8758,12 +8786,13 @@ more difficult:
         ctx.restore()
       }
 
-      if (e.aware) {
+      if (shimmers) ctx.restore()
+      if (!shimmers && e.aware) {
         ctx.strokeStyle = RENDER_STYLE.overlays.enemyAwareOutline
         ctx.lineWidth = 2
         ctx.strokeRect(vx + 2, vy + 2, TILE_PX - 4, TILE_PX - 4)
       }
-      if (enemyIsEnraged(e)) {
+      if (!shimmers && enemyIsEnraged(e)) {
         ctx.save()
         ctx.strokeStyle = '#e0473f'
         ctx.lineWidth = 3
@@ -8963,6 +8992,8 @@ more difficult:
     for (const visibleEnemy of visibleEnemies) {
       if (enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
+    // Draw after the player and enemies, above their sprites and tree canopy.
+    drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     if (currentZ < 0) {
       const depthRect = depthLabelRect()
       ctx.save()
@@ -9078,7 +9109,7 @@ more difficult:
 
   function enemyIsVisibleOnMainView(e) {
     if (!e || !e.alive) return false
-    if (!undergroundTileVisible(e.x, e.y)) return false
+    if (!undergroundTileVisible(e.x, e.y) || !enemyCanBeSeen(e)) return false
     const vx = e.x - camX, vy = e.y - camY
     return vx >= 0 && vy >= 0 && vx < VIEW_W && vy < VIEW_H
   }
@@ -9181,7 +9212,7 @@ more difficult:
       </div>`
       }
     }
-    const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my) || null
+    const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && enemyCanBeSeen(en)) || null
     if (e) {
       const hpPct = Math.max(0, e.hp / e.maxHp * 100)
       const aggroRange = effectiveAggroRange(e)
@@ -9220,6 +9251,7 @@ more difficult:
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
       ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
       ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
       ${e.prefix === 'Champion' ? `<div class="pfx" style="color:#ebcc69">Inspired aura · +2 ATK / +1 DEF to ${inspiredAllyCount(e)} nearby allies</div>` : inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}

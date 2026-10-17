@@ -159,6 +159,7 @@ function buildSaveObject() {
       killsBySpecies: {...player.killsBySpecies},
       strongestEnemyKilled: player.strongestEnemyKilled ? structuredClone(player.strongestEnemyKilled) : null,
       invisibleTurns: player.invisibleTurns,
+      spiderWebSourceId: player.spiderWebSourceId,
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       speedPotionTurns: player.speedPotionTurns,
@@ -211,6 +212,7 @@ function buildSaveObject() {
       rootReadyTurn: e.rootReadyTurn, gazeReadyTurn: e.gazeReadyTurn, wailReadyTurn: e.wailReadyTurn,
       hasteReadyTurn: e.hasteReadyTurn, healSelfReadyTurn: e.healSelfReadyTurn,
       healSelfUsed: e.healSelfUsed === true,
+      invisibleUntilTurn: e.invisibleUntilTurn, invisibilityReadyTurn: e.invisibilityReadyTurn,
       summonedTurn: e.summonedTurn,
       grace: e.grace ?? null,
       humanoid: !!e.humanoid,
@@ -727,6 +729,8 @@ function loadGameFromObject(data, opts = {}) {
     addInventoryItem('blackkey')
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
+  player.spiderWebSourceId = typeof player.spiderWebSourceId === 'string' ? player.spiderWebSourceId : null
+  spiderWebOverlayStart = 0
   player.godMode = !!data.player.godMode
   player.highscoresDisqualified = data.player.highscoresDisqualified
   Highscores.reconcileExclusion(player, isReplayInit || !!opts.isReplayRestore)
@@ -799,6 +803,7 @@ function loadGameFromObject(data, opts = {}) {
       rootReadyTurn: e.rootReadyTurn, gazeReadyTurn: e.gazeReadyTurn, wailReadyTurn: e.wailReadyTurn,
       hasteReadyTurn: e.hasteReadyTurn, healSelfReadyTurn: e.healSelfReadyTurn,
       healSelfUsed: e.healSelfUsed === true,
+      invisibleUntilTurn: e.invisibleUntilTurn, invisibilityReadyTurn: e.invisibilityReadyTurn,
       summonedTurn: e.summonedTurn,
       grace: e.grace ?? null,
       humanoid: typeof e.humanoid === 'boolean' ? e.humanoid : !!(tmpl && tmpl.humanoid),
