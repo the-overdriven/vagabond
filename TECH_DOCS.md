@@ -2180,6 +2180,18 @@ including an explicitly empty array. Replay initial states use the same save
 format; shooter role and remaining ammo continue to be separate instance state.
 Saves from previous formats are rejected; no old boolean conversion is added.
 
+## Swimming monsters
+
+Murkspawn has the `swim` ability. In addition to its ordinary walkable terrain,
+this lets it enter and pathfind through deep `water` while chasing, wandering,
+or returning home. Swimming never grants flight, ethereal movement, or access
+to walls, boulders, lava, and other blocked tiles. Rivers retain their ordinary
+terrain rules. No swimming progress or drowning status applies to monsters.
+A visible Murkspawn entering deep water logs its plunge and shows a brief
+**Swimming!** popup; continued swimming does not spam the log. Monster
+inspection identifies Swimming. The ability is part of the saved enemy ability
+list, including replay snapshots.
+
 ## Flying
 
 Flying enemies can traverse terrain that includes:
@@ -2389,6 +2401,30 @@ Forced water entry applies normal drowning immediately and grants no swimming
 practice or walking progress. Visibility and camera position refresh immediately.
 The ability uses existing enemy ability serialization and replay, with no new
 persistent flag or save-version change.
+
+## Wrestler
+
+Sasquatch, Yeti, and Owlbear have `wrestler`. When they could otherwise melee
+an adjacent, visible player, they have a **25%** chance to exchange tiles with
+the player instead of attacking; both cardinal and diagonal adjacency count.
+A successful swap starts a **five-turn cooldown**: the next five enemy turns
+cannot activate Wrestler. Failed rolls do not start cooldown. The ability
+cannot activate against an invisible/holy-ground-protected player, during
+passive or summoned-inactive turns, or when a valid two-way swap is impossible.
+The displaced player must be allowed onto the monster's tile; in particular,
+non-swimmers cannot be wrestled into deep water. The monster must be able to
+traverse onto the player's tile. NPCs, obstructing trees, forbidden sanctuary,
+and blocked diagonal corners also prevent a swap. Invalid attempts consume no
+RNG, and normal melee remains available.
+
+A successful swap takes exactly one enemy action, deals no direct damage,
+clears automatic travel, and does not award steps, swimming practice, items or
+transitions. Both actors enter their new tile for trap and water/endurance
+rules. It produces a combat log and **Swapped!** floating text, with crossing
+movement animation resolved after the deterministic position change. Its
+inspection displays whether Wrestler is ready or cooling down. Its
+`wrestleReadyTurn` is an absolute turn deadline, initialized on spawn and
+included in saves and replay snapshots. The new save schema is **56**.
 
 ## Charge and Pull
 
@@ -5577,10 +5613,16 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-55
+56
 ```
 
 Saves are JSON files.
+
+Version 56 adds the absolute `wrestleReadyTurn` deadline to saved monsters,
+including replay initial states. Wrestler activation is deterministic and its
+five-turn cooldown remains intact after loading. Murkspawn's Swimming is stored
+in the existing monster abilities array. Older versions are rejected rather
+than converted.
 
 NPC restoration preserves the saved list exactly, including a valid empty list.
 Loading does not generate replacement NPCs or consume NPC-placement RNG; a

@@ -50,8 +50,6 @@ more difficult:
 !3 [items] 🎒 Gaudy item: aggro +1
 !3 [loot] 💰 feat: individual monster loot table, outside of tier logic
 !3 [mining] ⛏️ feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
-!3 [monster abilities] 👹 - monster ability: wrestler: swaps places with enemy. lifesteal: probably quickest to implement. coward: runs away at low HP.
-!3 [monsters] 👹 add deers. passive but run away
 !3 [mysteriando] ❓ the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 !3 [npc] 🧙 herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards. (or cousin instead of brother), + !1 [npc] 🧙 witch is a crazy niece of hunter
 !3 [npc] 🧙 feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
@@ -67,11 +65,9 @@ more difficult:
 !3 [worldgen] 🌍 volcanos shouldnt spawn in the cold north
 !3 [worldgen] 🌍 water in the north should turn to ice. but not all
 !3 [worldgen] 🌍 add torches on the wall
-!4 [enemy abilities] 👹 monster ability: cry for help (on low hp?)
 !4 [enemy affixes] ✨ new monster affixes: scrawny - atk, - def, clumsy/graceful - grace modifiers, sleepy, vigilant
 !4 [enemy AI] 🤖 wandering monsters that dont have snow biome dont go to snow tiles
 !4 [enemy AI] 🤖 optimize: set up far wandering enemy destination on world gen before player makes a move?
-!4 [items] 🎒 - items: scroll of chaos (teleports everyone in 8 radius to random tiles)
 !4 [monster abilities] 👹 dreadling: root
 !4 [monster abilities] 👹 gravehound and white tiger: haste
 !4 [monster abilities] 👹 Petrifying GazeBrief severe SPD/GRACE penalty rather than lost turn (gorgon)
@@ -79,6 +75,13 @@ more difficult:
 !4 [monster abilities] 👹 healer monsters, heal others of same type
 !4 [monster abilities] 👹 mummy: curse
 !4 [monster abilities] 👹 add monsters that can swim, murkspawn will be first
+!5 [monster abilities] 👹 monster invisibility
+!5 [monster abilities] 👹 banshee: wail (confuse)
+!3 feat: more monster abilities, i.e. lich dispel, spider can shoot web, banshee can heal or confuse, lich can dispell invisibility.
+
+!4 [enemy abilities] 👹 monster ability: cry for help (on low hp?)
+!3 [monster abilities] 👹 - monster ability: wrestler: swaps places with enemy. lifesteal: probably quickest to implement. coward: runs away at low HP.
+!3 [monsters] 👹 add deers. passive but run away
 !4 [pathfinding] 🧭 autopath should take your swimming skill into account
 !4 [permadeath] ☠️ starting a second game on permadeath world should respawn enemies underground?
 !4 [rendering] 🎨 - animation refresh rate on mobile is too slow. when walking I see fungus some item or unmoving creature glyph blinking
@@ -97,8 +100,6 @@ more difficult:
 !5 [fishing] 🎣 catch fish in river, stones or biting fish in river
 !5 [foraging] 🌿 when foraging, you can find some brushwood, needed for setting up a camp, you also need flint, can be found by digging
 !5 [fov] 🔦 - fov: add light sources (like torches to increase pov, or light scrolls)
-!5 [monster abilities] 👹 monster invisibility
-!5 [monster abilities] 👹 banshee: wail (confuse)
 !5 [stealth] feat: add steal/stealth mechanic?
 !5 [terrain] 🏞️ poison fields
 !5 [worldgen] 🌍 guarantee some islands with treasure chests?
@@ -108,7 +109,6 @@ more difficult:
 !7 [enemy AI] 🤖 monster fight each other (only when player near? they leave bodies?)
 !7 [skills] 📚 skill: butchering
 !8 [architecture] 🏗️ refactor index.html (extract more files: render.js, combat.js, enemyAI.js, trade.js, mapView.js, hunterQuests.js)
-!3 feat: more monster abilities, i.e. lich dispel, spider can shoot web, banshee can heal or confuse, lich can dispell invisibility.
 !4 feat: unidentified scrolls/potions
 !4 feat: add traps, once we have proper dungeons
 !3 feat: grottos eventually found via dwarven fort
@@ -1713,6 +1713,7 @@ more difficult:
 <script src="src/swimming.js"></script>
 <script src="src/ice.js"></script>
 <script src="src/charge.js"></script>
+<script src="src/wrestler.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
@@ -2743,6 +2744,8 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.summonUsed = enemy.summonUsed === true
+    // Absolute enemy-turn deadline: five complete turns after a successful swap.
+    enemy.wrestleReadyTurn = Number.isInteger(enemy.wrestleReadyTurn) ? enemy.wrestleReadyTurn : 0
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
@@ -4614,6 +4617,7 @@ more difficult:
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (enemyHasAbility(e, 'ethereal')) return true
     if (isWalkable(x, y)) return true
+    if (e && enemyHasAbility(e, 'swim') && map[y]?.[x] === 'water') return true
     if (!(e && enemyHasAbility(e, 'fly'))) return false
     const tile = map[y][x]
     return tile === 'boulder' || tile === 'water'
@@ -5416,6 +5420,7 @@ more difficult:
         if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemySummon(e)) continue
+        if (tryEnemyWrestle(e)) continue
         if (enemyAttackPlayer(e)) return
         continue
       }
@@ -6751,7 +6756,7 @@ more difficult:
     // replace it with the ordinary 140 ms walking pan when the spider reacts
     // to this movement in the same turn (the normal pan would snap the player
     // to the pulled destination before the web arrives).
-    if (moved && moveAnim?.kind !== 'pull' && moveAnim?.kind !== 'charge-knockback') animateCameraToPlayer(fromPos)
+    if (moved && !['pull', 'charge-knockback', 'wrestle'].includes(moveAnim?.kind)) animateCameraToPlayer(fromPos)
     else {
       render()
       runAnimationLoop()
@@ -7993,6 +7998,13 @@ more difficult:
   function finishEnemyMove(e, fromX, fromY) {
     DungeonTraps.onEntry(e, fromX, fromY)
     if (!e.alive) return
+    // Passive swimming is announced only when entering deep water, not on
+    // each subsequent water tile. No RNG or persistent entry flag is needed.
+    if (enemyHasAbility(e, 'swim') && map[fromY]?.[fromX] !== 'water' &&
+        map[e.y]?.[e.x] === 'water' && enemyIsVisibleOnMainView(e)) {
+      log(`The ${e.name} slips into deep water and begins swimming!`, 'bad')
+      spawnDamageNumber(e.x, e.y, 'Swimming!', '#7fd0d8')
+    }
     if (enemyWanderMode(e) === 'far') {
       e.farPrevX = fromX
       e.farPrevY = fromY
@@ -9109,6 +9121,8 @@ more difficult:
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}

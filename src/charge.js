@@ -25,8 +25,8 @@ function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
   return {sx, sy, distance}
 }
 
-function forcePlayerPosition(x, y, presentation) {
-  const from = {x: player.x, y: player.y}
+function forcePlayerPosition(x, y, presentation, fromPosition = null) {
+  const from = fromPosition || {x: player.x, y: player.y}
   clearAutoPath()
   player.x = x; player.y = y
   DungeonTraps.onEntry(player, from.x, from.y)
