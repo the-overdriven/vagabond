@@ -29,6 +29,7 @@ const PRECACHE_URLS = [
   './src/worldGen.js',
   './src/dungeonTraps.js',
   './src/charge.js',
+  './src/enemySupport.js',
   './src/swimming.js',
   './src/ice.js',
   './img/tiles/ice.png',

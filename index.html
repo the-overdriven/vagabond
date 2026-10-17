@@ -1710,6 +1710,7 @@ more difficult:
 <script src="src/charge.js"></script>
 <script src="src/wrestler.js"></script>
 <script src="src/monsterStatuses.js"></script>
+<script src="src/enemySupport.js"></script>
 <script src="src/npcFisherman.js"></script>
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
@@ -2438,7 +2439,7 @@ more difficult:
   }
 
   function enemyDef(e) {
-    return Math.max(0, e.def + enemyTileEffects(e).defense)
+    return Math.max(0, e.def + enemyTileEffects(e).defense + (inspiringChampionFor(e) ? INSPIRED_DEF : 0))
   }
 
   function enemySpd(e) {
@@ -2749,6 +2750,9 @@ more difficult:
     enemy.rootReadyTurn = Number.isInteger(enemy.rootReadyTurn) ? enemy.rootReadyTurn : 0
     enemy.gazeReadyTurn = Number.isInteger(enemy.gazeReadyTurn) ? enemy.gazeReadyTurn : 0
     enemy.wailReadyTurn = Number.isInteger(enemy.wailReadyTurn) ? enemy.wailReadyTurn : 0
+    enemy.hasteReadyTurn = Number.isInteger(enemy.hasteReadyTurn) ? enemy.hasteReadyTurn : 0
+    enemy.healSelfReadyTurn = Number.isInteger(enemy.healSelfReadyTurn) ? enemy.healSelfReadyTurn : 0
+    enemy.healSelfUsed = enemy.healSelfUsed === true
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
     if (!Object.prototype.hasOwnProperty.call(enemy, 'wander')) {
       enemy.wander = tmpl && Object.prototype.hasOwnProperty.call(tmpl, 'wander')
@@ -3847,7 +3851,7 @@ more difficult:
   }
 
   function enemyAtk(e) {
-    return (e.atk + enemyGangPower(e)) * (enemyIsEnraged(e) ? 1.25 : 1) *
+    return (e.atk + enemyGangPower(e) + (inspiringChampionFor(e) ? INSPIRED_ATK : 0)) * (enemyIsEnraged(e) ? 1.25 : 1) *
       (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.attackMultiplier : 1)
   }
 
@@ -4147,6 +4151,8 @@ more difficult:
   }
 
   function killEnemy(e, playerCredit = true) {
+    const visibleAtDeath = enemyIsVisibleOnMainView(e)
+    const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
     worldKilledSpecies.add(trackSpecies(e))
     if (playerCredit) {
@@ -4160,6 +4166,10 @@ more difficult:
       onOldHunterEnemyKilled(e)
     } else log(`The ${e.name} is killed by a trap.`, 'info')
     e.alive = false
+    if (inspiredNearby && visibleAtDeath) {
+      log(`The ${e.name} falls; its followers lose their inspiration!`, 'good')
+      spawnDamageNumber(e.x,e.y,'Aura fades!','#dfd7ad')
+    }
     clearBansheeConfusion(e)
     if (playerCredit) player.kills++
     spawnDeathAnim(e)
@@ -5435,7 +5445,9 @@ more difficult:
           e.forestConcealY = null
           alarmEnemy(e)
           logEnemySpotting(e)
+          announceInspiredLeader(e)
         }
+        if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemyTheft(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
@@ -5448,6 +5460,7 @@ more difficult:
           (dist <= 2 || enemyHasAbility(e, 'ethereal')))) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryWoundedEnemyFlee(e)) continue
+        if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemySummon(e)) continue
         if (tryEnemyRush(e)) {
@@ -5476,7 +5489,9 @@ more difficult:
           alarmEnemy(e)
           aggroRange = effectiveAggroRange(e)
           logEnemySpotting(e)
+          announceInspiredLeader(e)
         }
+        if (tryEnemyHaste(e, dist)) continue
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
         if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
         let pursuitActions = hasExtraPursuitTurn ? 2 : 1
@@ -5513,6 +5528,7 @@ more difficult:
             e.forestConcealY = null
             alarmEnemy(e)
             logEnemySpotting(e, true)
+            announceInspiredLeader(e)
             if (tryEnemySummon(e)) continue
           }
         }
@@ -8644,8 +8660,14 @@ more difficult:
       if (!e.alive) continue
       let ex = e.x, ey = e.y
       const charge = e.chargeAnim
+      const haste = e.hasteAnim
       const charging = charge && now < charge.start + charge.duration
-      if (charging) {
+      const hastening = haste && now < haste.start + haste.duration
+      if (hastening) {
+        const t = Math.max(0,(now-haste.start)/(haste.duration/2))
+        if (t < 1) { ex = haste.fromX + (haste.midX-haste.fromX)*t; ey=haste.fromY+(haste.midY-haste.fromY)*t }
+        else { ex = haste.midX + (haste.toX-haste.midX)*(t-1); ey=haste.midY+(haste.toY-haste.midY)*(t-1) }
+      } else if (charging) {
         // Show a real tile-by-tile rush with a short beat between steps.
         const pos = chargeVisualPosition(charge, now)
         ex = pos.x
@@ -8668,6 +8690,7 @@ more difficult:
         if (t >= 1) e.attackStart = undefined
       }
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
+      if (haste && !hastening) e.hasteAnim = undefined
       if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
@@ -8683,6 +8706,15 @@ more difficult:
       const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
       if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
+      if (inspiringChampionFor(e)) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(11,Math.round(TILE_PX*0.40))}px Consolas, monospace`
+        ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+        ctx.lineWidth = 2; ctx.strokeStyle = '#21170e'; ctx.fillStyle = '#f4d176'
+        ctx.strokeText('✦',vx+1,vy+TILE_PX-1)
+        ctx.fillText('✦',vx+1,vy+TILE_PX-1)
+        ctx.restore()
+      }
       if (e.stolenItem) drawThiefBag(vx + TILE_PX * 0.78, vy + 1, TILE_PX * 0.42)
       if (e.victoryLevel) {
         ctx.save()
@@ -9186,6 +9218,9 @@ more difficult:
       ${enemyHasAbility(e, 'wail') ? `<div class="pfx">Wail · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
+      ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
+      ${e.prefix === 'Champion' ? `<div class="pfx" style="color:#ebcc69">Inspired aura · +2 ATK / +1 DEF to ${inspiredAllyCount(e)} nearby allies</div>` : inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}

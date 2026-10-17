@@ -1,0 +1,88 @@
+'use strict'
+
+// Champion buffs are derived from live positions, not stored on recipients.
+// Losing or moving the source removes both bonuses immediately, and two auras never stack.
+const INSPIRED_RADIUS = 2
+const INSPIRED_ATK = 2
+const INSPIRED_DEF = 1
+const HASTE_CHANCE = 0.20
+const HASTE_COOLDOWN = 5
+const HEAL_SELF_CHANCE = 0.25
+const HEAL_SELF_FRACTION = 0.25
+
+function inspiringChampionFor(e) {
+  if (!e || !e.alive || e.hp <= 0 || e.prefix === 'Champion' || !onCurrentLevel(e)) return null
+  return enemies.find(leader => leader !== e && leader.alive && leader.hp > 0 &&
+    leader.prefix === 'Champion' && onCurrentLevel(leader) &&
+    Math.max(Math.abs(leader.x-e.x), Math.abs(leader.y-e.y)) <= INSPIRED_RADIUS) || null
+}
+
+function inspiredAllyCount(leader) {
+  if (!leader || !leader.alive || leader.hp <= 0 || leader.prefix !== 'Champion' || !onCurrentLevel(leader)) return 0
+  return enemies.filter(other => other !== leader && other.alive && other.hp > 0 &&
+    other.prefix !== 'Champion' && onCurrentLevel(other) &&
+    Math.max(Math.abs(leader.x-other.x),Math.abs(leader.y-other.y)) <= INSPIRED_RADIUS).length
+}
+
+// One-time self heal. The cooldown is persisted like other ability deadlines,
+// though its one-use limit means it cannot proc twice even after the cooldown.
+function tryEnemyHealSelf(e) {
+  if (!enemyHasAbility(e,'healSelf') || !e.alive || e.hp <= 0 || e.healSelfUsed ||
+      turnCount < e.healSelfReadyTurn || e.hp >= e.maxHp*0.5 ||
+      enemyIsPassive(e) || e.sleeping || enemyInsideSanctuary(e) ||
+      playerInsideSanctuary() || playerHiddenFromEnemy(e) || !enemyHasSight(e)) return false
+  if (!chance(HEAL_SELF_CHANCE)) return false
+  const healed = Math.min(e.maxHp-e.hp, Math.max(1,Math.ceil(e.maxHp*HEAL_SELF_FRACTION)))
+  e.hp += healed
+  e.healSelfUsed = true
+  e.healSelfReadyTurn = turnCount + 6
+  log(`The ${e.name} restores ${healed} HP with healing magic!`, 'bad')
+  spawnDamageNumber(e.x,e.y,`+${healed} HP`,'#81df98')
+  return true
+}
+
+// Haste is movement-only: no strike can occur between or after its steps.
+// Normal natural-speed pursuit remains a separate rule (max two actions).
+function tryEnemyHaste(e, distance) {
+  if (!enemyHasAbility(e,'haste') || turnCount < e.hasteReadyTurn ||
+      !e.alive || e.hp <= 0 || distance < 3 || enemyIsPassive(e) ||
+      enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
+  const step = enemyFindStep(e)
+  if (!step) return false
+  if (isClosedDungeonDoorTile(map[step.y]?.[step.x]) || isLockedDungeonDoorTile(map[step.y]?.[step.x])) return false
+  if (!chance(HASTE_CHANCE)) return false
+  const fromX=e.x, fromY=e.y
+  if (!enemyStepTowardPlayer(e)) return false
+  // Doors count as the action they require to open; do not bypass them.
+  const moved = e.x !== fromX || e.y !== fromY
+  e.hasteReadyTurn = turnCount + HASTE_COOLDOWN + 1
+  if (moved && e.alive) {
+    const midX=e.x, midY=e.y
+    const remaining = Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
+    if (remaining > ATTACK_RANGE) {
+      const next = enemyFindStep(e)
+      if (next && !isClosedDungeonDoorTile(map[next.y]?.[next.x]) &&
+          !isLockedDungeonDoorTile(map[next.y]?.[next.x])) enemyStepTowardPlayer(e)
+    }
+    if (e.alive && !replayAnimationsDisabled && (e.x !== midX || e.y !== midY)) {
+      // Multiple tile moves are already resolved; only the presentation slides
+      // tile-by-tile. No gameplay or RNG depends on this clock.
+      e.animStart = undefined
+      e.hasteAnim = {fromX,fromY,midX,midY,toX:e.x,toY:e.y,
+        start:performance.now(), duration:MOVE_ANIM_MS*2}
+    }
+  }
+  if (e.alive) {
+    log(`The ${e.name} bursts forward with unnatural haste!`, 'bad')
+    spawnDamageNumber(e.x,e.y,'Haste!','#f5cd63')
+  }
+  return true
+}
+
+// A successful nearby aura activation displays one readable event, rather than
+// repeatedly announcing the same continuous buff on every turn.
+function announceInspiredLeader(leader) {
+  if (leader.prefix !== 'Champion' || !inspiredAllyCount(leader) || !enemyIsVisibleOnMainView(leader)) return
+  log(`The ${leader.name} inspires its nearby allies! (+2 ATK, +1 DEF)`, 'bad')
+  spawnDamageNumber(leader.x,leader.y,'Inspired!','#f4d176')
+}

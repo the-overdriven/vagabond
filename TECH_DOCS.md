@@ -2214,6 +2214,40 @@ combat logs, with floating text on their most important effects. Active effects
 are visible on the player status strip. Both the player's counters and the
 monsters' absolute ready-turn deadlines are persisted by save schema **57**.
 
+## Enemy support abilities: Haste, Inspired and HealSelf
+
+These monster abilities resolve during the normal deterministic combat turn. They
+cannot add bonus attacks, and their feedback is logged with brief floating text.
+
+| Source | Activation | Result | Restriction |
+|---|---|---|---|
+| Gravehound, White Tiger — `haste` | 20% on eligible pursuit turns at least 3 tiles from the visible player | Move up to **2 tiles**, replacing normal chase and any same-turn attack | **5 complete turns** cooldown. Never exceeds two movement steps, cannot bypass closed doors, does not trigger while invisible/safe in sanctuary |
+| Champion prefix — **Inspired** | Continuous while alive | Every living **non-Champion** ally within 2 Chebyshev tiles gains **+2 ATK, +1 DEF** | Champion does not buff itself or other Champions. Multiple Champions do not stack; moving out of range or killing the source immediately removes the bonus |
+| Nymph — `healSelf` | 25% on eligible combat turns below **50% maximum HP** | Instead of an attack or chase, restore **25% max HP** (rounded up, capped at max HP): ordinary 28-HP Nymph heals 7 HP | **Once per lifetime**; successful use starts a 5-turn cooldown, but the one-use limit remains in force even afterward. Cannot heal while passive, asleep, concealed from the player, or in sanctuary |
+
+Haste uses the existing walkable pathfinder, and opening a door takes the normal
+separate action; a sprint cannot open a door and then run through it. The two
+steps are animated in sequence, but movement and any hazards resolve before
+presentation. Naturally fast enemies retain their existing **25% chance** of
+an extra pursuit action where SPD exceeds player SPD; Haste replaces that roll
+on its activation turn, so neither effect can produce three actions. A Haste
+activation can finish adjacent to the player, but never attacks on that turn.
+
+Inspired modifies *effective* combat stats, after spawning/prefixes, rather
+than permanently adding ATK or DEF to monsters. It uses the same radius as the
+Champion's gold visual aura; buffed allies have a small golden star on the tile
+and an Inspired tooltip. The Champion can announce its inspiration upon
+spotting the player. Defeating a visible Champion with followers gives a log
+and fading-aura popup. Nymph healing shows its exact HP gained; its spent use
+and Haste cooldown appear in monster inspection.
+
+`hasteReadyTurn`, `healSelfReadyTurn`, and `healSelfUsed` belong to each enemy
+instance and are initialized for new spawns and serialized/restored in **save
+schema 58**, including replay snapshots. Inspired needs no per-recipient status
+flag: it is recalculated directly from living Champion positions, so save/load
+and replays cannot preserve a stale aura. Animations never advance or change
+combat state.
+
 ## Swimming monsters
 
 Murkspawn has the `swim` ability. In addition to its ordinary walkable terrain,
@@ -2782,6 +2816,9 @@ AGGRO +1
 ```
 
 ### Champion
+
+Champions also inspire non-Champion allies within a two-tile radius, granting
++2 ATK and +1 DEF while the Champion remains alive and nearby (see §20).
 
 ```text
 HP ×1.6
@@ -5659,10 +5696,17 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-56
+58
 ```
 
 Saves are JSON files.
+
+Version 58 adds the per-monster `hasteReadyTurn`, `healSelfReadyTurn` and
+`healSelfUsed` fields to current saves and replay snapshots. The Champion's
+Inspired buff is derived from living, nearby allies and adds no saved flag.
+Version 57 adds the monster-applied player status counters and the Root,
+Petrifying Gaze and Wail ready-turn deadlines; Berserk frenzy resolves from
+the saved Berserk duration and the replay's seeded RNG.
 
 Version 56 adds the absolute `wrestleReadyTurn` deadline to saved monsters,
 including replay initial states. Wrestler activation is deterministic and its
