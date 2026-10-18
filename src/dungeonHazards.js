@@ -393,58 +393,105 @@ const DungeonHazards = (() => {
     }
   }
 
-  // Advance one tile of solid masonry from EACH wall per consumed action.
-  // Damage is resolved against the advancing tiles and can strike monsters
-  // just as reliably as the hero. Newly inserted masonry blocks movement,
-  // sight and projectiles until it retracts, independently of animation.
+  // Advance both jaws one cell per action. Before the terminal pinch, stone
+  // displaces corporeal actors inward; merely being touched is not damage.
+  // Only the collision which seals the two jaws inflicts HP damage. This is
+  // simulation logic (no animation/frame timing or RNG) and survives replay.
   function advanceCrusher(hazard) {
     const cfg=crusherConfig(),stage=hazard.geometry.jawStages[hazard.step] || []
     const level=activeLevel()
-    const caught=actor=>contains(stage,actor.x,actor.y)
-    // Monsters still standing on masonry from an earlier step are hit again
-    // on this advancing action. One hit per monster per step, not per tile
-    // or per Crusher lifetime; a trapped enemy can actually be killed.
-    const monsterCaught=actor=>caught(actor)||level.map[actor.y]?.[actor.x]==='dwarvencrusherjaw'
-    if (caught(player)) {
-      const damage=player.godMode?0:Math.ceil(playerMaxHp()*cfg.playerDamageMaxHpFraction)
-      if (damage) {player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()}
-      log(`The advancing stone walls crush you for ${damage} HP!`,'bad')
-      spawnDamageNumber(player.x,player.y,damage||'Immune!',RENDER_STYLE.damage.playerHit)
-      if(player.hp<=0) die(null,'dwarven crusher')
+    const finalStep=hazard.step===hazard.geometry.jawStages.length-1
+    const footprint=hazard.geometry.dangerTiles
+    const inFootprint=(x,y)=>contains(footprint,x,y)
+    const advancing=new Set(stage.map(encode))
+    const triggers=hazard.geometry.triggerTiles
+    const alongX=triggers.every(p=>p.x===triggers[0].x)
+    const low=Math.min(...footprint.map(p=>alongX?p.x:p.y))
+    const high=Math.max(...footprint.map(p=>alongX?p.x:p.y))
+    const middle=(low+high)/2
+    const coord=actor=>alongX?actor.x:actor.y
+    const inward=actor=>coord(actor)<middle?1:coord(actor)>middle?-1:0
+    const actors=[player,...enemies.filter(e=>e.alive && onCurrentLevel(e) && !enemyHasAbility(e,'ethereal'))]
+    const movable=actor=>actor===player || actor.alive && onCurrentLevel(actor) && !enemyHasAbility(actor,'ethereal')
+    const actorAt=(x,y,except)=>actors.find(a=>a!==except && movable(a) && a.x===x && a.y===y)
+    const moveTo=(actor,x,y)=>{
+      const fromX=actor.x,fromY=actor.y
+      if(actor!==player) occupied.delete(keyXY(fromX,fromY))
+      actor.x=x;actor.y=y
+      if(actor!==player) {
+        occupied.add(keyXY(x,y))
+        actor.farPath=null
+        beginEnemyMoveAnim(actor,fromX,fromY)
+      } else {
+        clearAutoPath()
+        stopCameraAnimation();snapCameraToPlayer()
+      }
     }
+    // An occupied destination may be moved along the same direction first,
+    // but never through solid stone, out of the crusher, or past the midline.
+    // If there is no space, leave the actors pinned until the final squeeze.
+    const push=(actor,chain=new Set())=>{
+      if(chain.has(actor))return false
+      chain.add(actor)
+      const dir=inward(actor)
+      if(!dir)return false
+      const nx=actor.x+(alongX?dir:0),ny=actor.y+(alongX?0:dir)
+      if(!inFootprint(nx,ny) || Math.abs((alongX?nx:ny)-middle)>=Math.abs(coord(actor)-middle))return false
+      if(!['marble','dwarvencrusherplate','dwarvencrushertrack'].includes(level.map[ny]?.[nx]))return false
+      const blocker=actorAt(nx,ny,actor)
+      if(blocker && !push(blocker,chain))return false
+      // An ethereal creature can share this space; it never blocks stone.
+      moveTo(actor,nx,ny)
+      return true
+    }
+    if(!finalStep) {
+      // Process the closest actors first. Previous jaw cells count, so actors
+      // pinned by a crowded corridor can be moved on a subsequent step.
+      const displaced=actors.filter(a=>movable(a) && inFootprint(a.x,a.y) &&
+        (advancing.has(encode(a)) || level.map[a.y]?.[a.x]==='dwarvencrusherjaw'))
+        .sort((a,b)=>Math.abs(coord(a)-middle)-Math.abs(coord(b)-middle) ||
+          a.y-b.y || a.x-b.x || String(a.id||'').localeCompare(String(b.id||'')))
+      for(const actor of displaced) if(movable(actor))push(actor)
+    }
+    // The final contact is the only damaging phase. Actors that could not
+    // advance due to overcrowding are compressed too, not left immune in an
+    // already-solid jaw tile. Free actors outside the strip are always safe.
     let monsterHits=0
-    for (const e of [...enemies]) {
-      if (!e.alive || !onCurrentLevel(e) || enemyHasAbility(e, 'ethereal') || !monsterCaught(e)) continue
-      if (enemyImmunityActive(e)) {
-        // Immunity protects this step only. A later jaw step or activation
-        // may still damage the same monster if its protection expires.
-        if(enemyIsVisibleOnMainView(e)) spawnDamageNumber(e.x,e.y,'Immune!',RENDER_STYLE.damage.miss)
-        continue
+    if(finalStep) {
+      const crushed=actor=>inFootprint(actor.x,actor.y) &&
+        (advancing.has(encode(actor)) || level.map[actor.y]?.[actor.x]==='dwarvencrusherjaw')
+      if(crushed(player)) {
+        const damage=player.godMode?0:Math.ceil(playerMaxHp()*cfg.playerDamageMaxHpFraction)
+        if(damage){player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()}
+        log(`The opposing stone jaws crush you for ${damage} HP!`,'bad')
+        spawnDamageNumber(player.x,player.y,damage||'Immune!',RENDER_STYLE.damage.playerHit)
+        if(player.hp<=0)die(null,'dwarven crusher')
       }
-      const boss=e.prefix==='Champion'||e.isBoss===true||e.boss===true
-      const cap=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
-      const damage=Math.max(1,Math.ceil(e.maxHp*cap))
-      const enraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
-      e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,enraged)
-      if(visible) {
-        monsterHits++
-        spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
-        log(`The dwarven Crusher hits the ${e.name} for ${damage} HP!`,'info')
+      for(const e of [...enemies]) {
+        if(!e.alive || !onCurrentLevel(e) || enemyHasAbility(e,'ethereal') || !crushed(e))continue
+        if(enemyImmunityActive(e)) {
+          if(enemyIsVisibleOnMainView(e))spawnDamageNumber(e.x,e.y,'Immune!',RENDER_STYLE.damage.miss)
+          continue
+        }
+        const boss=e.prefix==='Champion'||e.isBoss===true||e.boss===true
+        const fraction=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
+        const damage=Math.max(1,Math.ceil(e.maxHp*fraction))
+        const enraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
+        e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,enraged)
+        if(visible) {
+          monsterHits++
+          spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
+          log(`The dwarven Crusher hits the ${e.name} for ${damage} HP!`,'info')
+        }
+        if(e.hp<=0){if(visible)log(`The ${e.name} is crushed between the dwarven walls!`,'info');killEnemy(e,false,'dwarven crusher')}
       }
-      if(e.hp<=0) {if(visible)log(`The ${e.name} is crushed between the dwarven walls!`,'info');killEnemy(e,false,'dwarven crusher')}
     }
-    // All advancing tiles become temporarily impassable. An actor struck on
-    // a newly-solid tile may move OFF on the next action (as with gas doors).
-    for(const p of stage) level.map[p.y][p.x]='dwarvencrusherjaw'
+    for(const p of stage)level.map[p.y][p.x]='dwarvencrusherjaw'
     hazard.step++
     minimapDirty=true;invalidateUndergroundFov();clearAutoPath()
-    if(hazard.step>=hazard.geometry.jawStages.length) {
-      // Hold the terminal strike for one consumed action so the pressure
-      // plate visibly becomes opposing stone faces separated by a crack.
-      // Damage is already resolved; the held frame never hits twice.
-      const middle = new Set(hazard.geometry.triggerTiles.map(encode))
-      for(const p of stage) if(middle.has(encode(p)))
-        level.map[p.y][p.x]='dwarvencrusherpinch'
+    if(finalStep) {
+      const center=new Set(hazard.geometry.triggerTiles.map(encode))
+      for(const p of stage)if(center.has(encode(p)))level.map[p.y][p.x]='dwarvencrusherpinch'
       hazard.state='impact';hazard.stateEnteredTurn=hazard.localTurn
       log(monsterHits?'The stone jaws slam together around the crushed creatures!':
         'The opposing stone jaws slam shut!','info')

@@ -1704,10 +1704,15 @@ The triggering action is safe. On each **subsequent consumed player action**,
 the masonry emerges one tile from **each opposing wall**, becomes temporarily
 impassable and blocks projectiles and sight. For a five-tile passage, both
 walls meet on the **third action after triggering**; wider passages take a
-proportionate number of actions. A hero or monster on a newly occupied wall
-tile takes damage immediately, so the player should retreat beyond the
-five-tile strip rather than wait in the middle. A survivor may step off a
-tile that became solid beneath them, as with the gas-chamber door rule.
+proportionate number of actions. Before the last step, a physical hero or
+monster touched by the advancing masonry is **pushed inward by one tile in
+the wall's direction of travel**, without losing HP. The player can still
+escape by moving lengthwise out of the five-tile strip during their turns;
+a stone push does not consume an extra action. Forced motion updates enemy
+occupancy, player camera/FOV, and auto-travel consistently. Pushing never
+moves through stone or stacks corporeal actors: a blocking actor is first
+pushed inward if possible. Actors who cannot be pushed (e.g. a crowded
+center) remain trapped and are hurt at the final squeeze, never earlier.
 At the last step, a terminal strike state holds for one consumed player action
 so the center pressure plates visibly become two opposed wall faces with a
 narrow seam (the real stone-wall artwork is cropped horizontally or vertically
@@ -1717,16 +1722,16 @@ restored to their recorded pre-compression
 tiles; opening the inventory, animations, enemy bonus actions, reloading,
 and time spent on other z-levels never advance the mechanism.
 
-A caught player takes `ceil(0.80 × maximum HP)`, ignoring numerical DEF,
-dodge and glancing, but retaining God Mode and fatal-hit shields. Ordinary
-monsters take **80% max HP**, and Champions/bosses **20% max HP**, **per advancing
-action while occupying either newly advancing stone or masonry left from a
-previous step**. Each monster can be struck at most once per advancing action,
-but can be hit repeatedly by the same mechanism and killed if it stays caught.
-The 80% figure is **80% of maximum HP as a flat subtraction**
+Only the **terminal collision**, when the opposing jaws seal the central
+squishing zone, causes damage. A caught player takes `ceil(0.80 × maximum HP)`,
+ignoring numerical DEF, dodge and glancing, but retaining God Mode and
+fatal-hit shields. Ordinary monsters take **80% max HP**, and Champions/bosses
+**20% max HP**, once per final collision. The same monster may be injured on
+future activations of that Crusher (no permanent one-hit immunity), including
+lethal repeated activations. The 80% figure is **80% of maximum HP as a flat subtraction**
 (not 80% of current HP and not a floor at 20% HP), so a previously wounded
 monster can die from the hit. Temporary fatal-hit protection remains effective.
-Ethereal monsters completely ignore the Crusher and its repeated damage.
+Ethereal monsters completely ignore Crusher displacement and damage.
 They also ignore spike traps, wall arrows, and room gas.
 Monster environmental deaths grant no XP.
 Triggers and damage are deterministic turn events; wall progress, original
@@ -1734,11 +1739,16 @@ tile records and geometry persist in deep-floor save state and rotate with the
 map. There is no persistent per-monster hit list. Auto-travel considers the *entire*
 danger strip known and refuses to traverse it automatically.
 
-**Repeated collisions and safe monster wandering (v174 / save schema 95):**
-A physical monster caught in an advancing jaw is hit on each subsequent
-advancing action while standing on the new or already-emerged stone; it may
-die on the second hit. Returning on a later activation is equally dangerous.
-There is no per-monster hit-ID history. Unaware monsters avoid Crusher trigger
+**Crusher push/squeeze redesign (v175 / save schema 96):**
+This supersedes v174's early-step collision damage: intermediate advancing
+jaws only shove physical actors inward one square, and only terminal contact
+inflicts damage. No RNG draws are consumed by shoving. Occupied destinations
+are resolved deterministically by pushing blockers inward first; if the
+remaining center has no vacancy, actors are held in place until final
+compression. A single closing event never damages the same monster twice,
+but a subsequent Crusher activation can injure or kill the same monster.
+Ethereal monsters phase through both movement and damage, unchanged.
+Unaware monsters avoid Crusher trigger
 plates while roaming randomly, walking far routes, and returning home; far
 route searches treat the triggers as blocked and reject stale cached routes.
 If no safe idle step exists, the monster waits. Monsters actively chasing the
@@ -1756,13 +1766,13 @@ and a depth-appropriate tier, capped by the Ruins loot-tier limit. A Crusher
 chest consumes one ordinary floor chest allowance before discretionary
 chests are placed, without changing the guaranteed artifact or royal chest.
 The chest coordinate and association are saved with the hazard and item and
-rotate with the room. Monsters that contact an advancing jaw show visible
+rotate with the room. Monsters damaged by the terminal pinch show visible
 damage and an explanatory log if seen. Temporary magical immunity only
 protects the current collision: a protected monster is not marked as already
 injured, so a later real hit can still affect it. Ordinary monster damage
 was raised from **50% to 80% maximum HP** in v171; the **20%**
-Champion/boss fraction is unchanged. As of v174, both damage values apply
-again on subsequent jaw contact rather than only once per monster.
+Champion/boss fraction is unchanged. As of v175, these damage values apply
+on terminal compression only, and are repeatable on later activations.
 
 **Game version v164 / save schema 85:** new gallery geometry/enemy allocation,
 solid advancing Crusher tile and jaw step/base-tile state change the
