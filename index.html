@@ -5072,7 +5072,7 @@ more difficult:
   function enemyFarCanTraverse(e, x, y, search) {
     const i = y * MAP_W + x
     if (!search.traversable[i])
-      search.traversable[i] = enemyCanPathThrough(e, x, y) ? 1 : 2
+      search.traversable[i] = !DungeonHazards.isCrusherTrigger(x, y) && enemyCanPathThrough(e, x, y) ? 1 : 2
     return search.traversable[i] === 1
   }
 
@@ -5173,7 +5173,7 @@ more difficult:
         const x = e.x + dx, y = e.y + dy
         if (x === e.farPrevX && y === e.farPrevY) continue
         if (avoidingVillage && enemyFarVillageDistance(x, y) < currentVillageDist) continue
-        if (enemyTileOpen(e, x, y)) options.push({x, y})
+        if (!DungeonHazards.isCrusherTrigger(x, y) && enemyTileOpen(e, x, y)) options.push({x, y})
       }
       if (!options.length) return false
       const destination = options[randInt(0, options.length - 1)]
@@ -5194,7 +5194,8 @@ more difficult:
     }
 
     const targetValid = Number.isInteger(e.farTargetX) && Number.isInteger(e.farTargetY) &&
-      enemyCanPathThrough(e, e.farTargetX, e.farTargetY)
+      enemyCanPathThrough(e, e.farTargetX, e.farTargetY) &&
+      !DungeonHazards.isCrusherTrigger(e.farTargetX, e.farTargetY)
     if (!targetValid || (e.x === e.farTargetX && e.y === e.farTargetY)) {
       e.farTargetX = null
       e.farTargetY = null
@@ -5204,6 +5205,7 @@ more difficult:
 
     if (!Array.isArray(e.farPath) || !e.farPath.length ||
       Math.max(Math.abs(e.farPath[0].x - e.x), Math.abs(e.farPath[0].y - e.y)) !== 1 ||
+      DungeonHazards.isCrusherTrigger(e.farPath[0].x, e.farPath[0].y) ||
       (avoidingVillage && enemyFarVillageDistance(e.farPath[0].x, e.farPath[0].y) < enemyFarVillageDistance(e.x, e.y))) {
       e.farPath = enemyBuildFarPath(e, e.farTargetX, e.farTargetY, avoidingVillage)
       if (!e.farPath || !e.farPath.length) {
@@ -5215,10 +5217,10 @@ more difficult:
     }
 
     let step = e.farPath[0]
-    if (!enemyTileOpen(e, step.x, step.y)) {
+    if (DungeonHazards.isCrusherTrigger(step.x, step.y) || !enemyTileOpen(e, step.x, step.y)) {
       e.farPath = enemyBuildFarPath(e, e.farTargetX, e.farTargetY, avoidingVillage)
       step = e.farPath && e.farPath[0]
-      if (!step || !enemyTileOpen(e, step.x, step.y)) return false
+      if (!step || DungeonHazards.isCrusherTrigger(step.x, step.y) || !enemyTileOpen(e, step.x, step.y)) return false
     }
     if (Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) !== 1) return false
     if (enemyOpenDoorInsteadOfMove(e, step.x, step.y)) return true
@@ -5264,7 +5266,7 @@ more difficult:
       Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > homeRadius) {
       const pathHome = enemyBuildFarPath(e, e.homeX, e.homeY)
       const stepHome = pathHome && pathHome[0]
-      if (stepHome && enemyTileOpen(e, stepHome.x, stepHome.y)) {
+      if (stepHome && !DungeonHazards.isCrusherTrigger(stepHome.x, stepHome.y) && enemyTileOpen(e, stepHome.x, stepHome.y)) {
         if (enemyOpenDoorInsteadOfMove(e, stepHome.x, stepHome.y)) return true
         occupied.delete(keyXY(e.x, e.y))
         const fromX = e.x, fromY = e.y
@@ -5285,7 +5287,7 @@ more difficult:
         if (leashed &&
           Math.max(Math.abs(nx - e.homeX), Math.abs(ny - e.homeY)) > homeRadius) continue
         if (nx === player.x && ny === player.y) continue
-        if (!enemyCanPathThrough(e, nx, ny)) continue
+        if (!enemyCanPathThrough(e, nx, ny) || DungeonHazards.isCrusherTrigger(nx, ny)) continue
         if (occupied.has(keyXY(nx, ny))) continue
         options.push({x: nx, y: ny})
       }

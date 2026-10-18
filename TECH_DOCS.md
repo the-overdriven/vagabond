@@ -1719,18 +1719,32 @@ and time spent on other z-levels never advance the mechanism.
 
 A caught player takes `ceil(0.80 × maximum HP)`, ignoring numerical DEF,
 dodge and glancing, but retaining God Mode and fatal-hit shields. Ordinary
-monsters take at most **80% max HP**, and Champions/bosses **20% max HP**;
-each monster ID can be damaged only once by each mechanism, regardless of
-how many jaw steps touch it. This is **80% of maximum HP as a flat subtraction**
+monsters take **80% max HP**, and Champions/bosses **20% max HP**, **per advancing
+action while occupying either newly advancing stone or masonry left from a
+previous step**. Each monster can be struck at most once per advancing action,
+but can be hit repeatedly by the same mechanism and killed if it stays caught.
+The 80% figure is **80% of maximum HP as a flat subtraction**
 (not 80% of current HP and not a floor at 20% HP), so a previously wounded
 monster can die from the hit. Temporary fatal-hit protection remains effective.
-Ethereal monsters completely ignore the Crusher: no damage and no consumed
-once-per-monster hit. They also ignore spike traps, wall arrows, and room gas.
+Ethereal monsters completely ignore the Crusher and its repeated damage.
+They also ignore spike traps, wall arrows, and room gas.
 Monster environmental deaths grant no XP.
-Triggers and damage are deterministic turn events; wall progress, already-hit
-IDs, original tile records and geometry persist in deep-floor save state and
-rotate with the map. Auto-travel considers the *entire* danger strip known
-and refuses to traverse it automatically.
+Triggers and damage are deterministic turn events; wall progress, original
+tile records and geometry persist in deep-floor save state and rotate with the
+map. There is no persistent per-monster hit list. Auto-travel considers the *entire*
+danger strip known and refuses to traverse it automatically.
+
+**Repeated collisions and safe monster wandering (v174 / save schema 95):**
+A physical monster caught in an advancing jaw is hit on each subsequent
+advancing action while standing on the new or already-emerged stone; it may
+die on the second hit. Returning on a later activation is equally dangerous.
+There is no per-monster hit-ID history. Unaware monsters avoid Crusher trigger
+plates while roaming randomly, walking far routes, and returning home; far
+route searches treat the triggers as blocked and reject stale cached routes.
+If no safe idle step exists, the monster waits. Monsters actively chasing the
+player, pushed by other abilities, or otherwise deliberately moved onto
+plates may still activate them. Players can therefore bait or push opponents
+onto a trigger; ethereal monsters remain immune to environmental damage.
 
 **Crusher reward (v171):** Every functional Crusher room holds exactly one
 unopened chest beyond the far end of its five-tile crushing strip, farther
@@ -1746,8 +1760,9 @@ rotate with the room. Monsters that contact an advancing jaw show visible
 damage and an explanatory log if seen. Temporary magical immunity only
 protects the current collision: a protected monster is not marked as already
 injured, so a later real hit can still affect it. Ordinary monster damage
-was raised from **50% to 80% maximum HP**; the **20%** Champion/boss cap
-and one-hit-per-monster rule remain unchanged.
+was raised from **50% to 80% maximum HP** in v171; the **20%**
+Champion/boss fraction is unchanged. As of v174, both damage values apply
+again on subsequent jaw contact rather than only once per monster.
 
 **Game version v164 / save schema 85:** new gallery geometry/enemy allocation,
 solid advancing Crusher tile and jaw step/base-tile state change the

@@ -247,7 +247,7 @@ const DungeonHazards = (() => {
       roomId:placed.room.id,geometry:{triggerTiles:placed.triggerTiles,dangerTiles:placed.dangerTiles,
         jawStages:placed.stages,baseTiles,rewardChest:placed.rewardChest},
       state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,step:0,
-      impactedMonsterIds:[],exhausted:false})
+      exhausted:false})
     return true
   }
 
@@ -401,6 +401,10 @@ const DungeonHazards = (() => {
     const cfg=crusherConfig(),stage=hazard.geometry.jawStages[hazard.step] || []
     const level=activeLevel()
     const caught=actor=>contains(stage,actor.x,actor.y)
+    // Monsters still standing on masonry from an earlier step are hit again
+    // on this advancing action. One hit per monster per step, not per tile
+    // or per Crusher lifetime; a trapped enemy can actually be killed.
+    const monsterCaught=actor=>caught(actor)||level.map[actor.y]?.[actor.x]==='dwarvencrusherjaw'
     if (caught(player)) {
       const damage=player.godMode?0:Math.ceil(playerMaxHp()*cfg.playerDamageMaxHpFraction)
       if (damage) {player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()}
@@ -410,15 +414,13 @@ const DungeonHazards = (() => {
     }
     let monsterHits=0
     for (const e of [...enemies]) {
-      if (!e.alive || !onCurrentLevel(e) || enemyHasAbility(e, 'ethereal') || !caught(e) ||
-        hazard.impactedMonsterIds.includes(e.id)) continue
+      if (!e.alive || !onCurrentLevel(e) || enemyHasAbility(e, 'ethereal') || !monsterCaught(e)) continue
       if (enemyImmunityActive(e)) {
-        // Immunity protects this contact, not every future cycle. In
-        // particular, do not mark an uninjured monster as already crushed.
+        // Immunity protects this step only. A later jaw step or activation
+        // may still damage the same monster if its protection expires.
         if(enemyIsVisibleOnMainView(e)) spawnDamageNumber(e.x,e.y,'Immune!',RENDER_STYLE.damage.miss)
         continue
       }
-      hazard.impactedMonsterIds.push(e.id)
       const boss=e.prefix==='Champion'||e.isBoss===true||e.boss===true
       const cap=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
       const damage=Math.max(1,Math.ceil(e.maxHp*cap))
@@ -494,6 +496,11 @@ const DungeonHazards = (() => {
     }
   }
 
+  function isCrusherTrigger(x,y) {
+    return (activeLevel()?.hazards || []).some(h =>
+      h.type==='crusher' && contains(h.geometry.triggerTiles,x,y))
+  }
+
   function knownDanger(x,y) {
     return (activeLevel()?.hazards || []).some(h =>
       h.type==='crusher' && contains(h.geometry.dangerTiles,x,y))
@@ -523,7 +530,7 @@ const DungeonHazards = (() => {
       }
       if (h.type!=='crusher' || h.geometry.dangerTiles.length<15 ||
         h.geometry.triggerTiles.length!==Math.max(5,Math.floor(crusherConfig().stripLength || 5)|1) || !['idle','warning','impact','cooldown'].includes(h.state) ||
-        !Array.isArray(h.impactedMonsterIds) || !Number.isInteger(h.localTurn) ||
+        !Number.isInteger(h.localTurn) ||
         !Number.isInteger(h.step) || h.step<0 || h.step>h.geometry.jawStages?.length ||
         !Array.isArray(h.geometry.jawStages) ||
         !Array.isArray(h.geometry.baseTiles) || h.geometry.dangerTiles.length!==h.geometry.baseTiles.length ||
@@ -538,5 +545,5 @@ const DungeonHazards = (() => {
     return true
   }
   return {generate,onActorEntered,onPlayerTurnConsumed,onChestOpened,onDoorInteraction,onValveInteraction,
-    doorHazard,valveHazard,gasAt,activeGasStatus,knownDanger,activeCrusherStatus,validate}
+    doorHazard,valveHazard,gasAt,activeGasStatus,knownDanger,isCrusherTrigger,activeCrusherStatus,validate}
 })()

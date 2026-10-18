@@ -26,7 +26,7 @@ describe('Dwarven wall Crusher',()=>{
         level.hazards=[{id:'crusher:-5:test',type:'crusher',z:-5,roomId:'test',
           geometry:{triggerTiles,dangerTiles,jawStages,baseTiles,rewardChest:{x:17,y:15}},
           state:'idle',stateEnteredTurn:0,step:0,localTurn:0,lastProcessedTurn:-1,
-          impactedMonsterIds:[],exhausted:false}]
+          exhausted:false}]
         player.x=9;player.y=12;player.hp=player.maxHp=200;player.godMode=false
         turnCount=20;replayAnimationsDisabled=true;enemies=[]
       })()`)
@@ -69,16 +69,16 @@ describe('Dwarven wall Crusher',()=>{
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       check(enemies[0].hp===20 && enemies[1].hp===80,'real hits on both sides, 80%/20% caps')
-      check(h.impactedMonsterIds.length===2 && h.step===1,'one hit per monster ID')
+      check(h.impactedMonsterIds===undefined && h.step===1,'Crusher has no permanent hit immunity')
       const save=buildSaveObject(),rngBefore=rngState
       loadGameFromObject(save,{isReplayInit:true})
       const restored=deepLevels[3].hazards[0]
       check(restored.step===1 && rngState===rngBefore && DungeonHazards.validate(deepLevels[3]),
-        'save restores jaw tiles, timing and hit IDs')
+        'save restores jaw tiles and timing without hit-ID state')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       check(player.hp===40 && restored.state==='impact','center eventually crushed for 80%')
-      check(enemies[0].hp===20 && enemies[1].hp===80,'no repeated monster damage')
+      check(!enemies[0].alive && enemies[1].hp===40,'pinned monsters receive repeated fatal step damage')
       return true
     })()`))
   })
@@ -92,7 +92,7 @@ describe('Dwarven wall Crusher',()=>{
       DungeonHazards.onActorEntered(player,11,12)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      if(ghost.hp!==100 || h.impactedMonsterIds.includes(ghost.id))
+      if(ghost.hp!==100 || h.impactedMonsterIds!==undefined)
         throw Error('ethereal monster harmed or marked by Crusher')
     })()`))
   })
@@ -108,7 +108,7 @@ describe('Dwarven wall Crusher',()=>{
       DungeonHazards.onActorEntered(e,11,12)
       check(h.state==='warning','monster activates a real pressure plate')
       for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
-      check(e.hp===20 && h.impactedMonsterIds.includes(e.id),'monster hit once at center')
+      check(e.hp===20 && h.impactedMonsterIds===undefined,'monster hit when closing jaws reach center')
       return true
     })()`))
   })
