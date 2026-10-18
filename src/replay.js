@@ -99,7 +99,7 @@ let replayRngCallers = []
        path (movement/combat/loot/etc.) reproduces the exact same run. */
 // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
 // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
-const REPLAY_VERSION = 2
+const REPLAY_VERSION = 3
 const REPLAY_ACTION_DELAY_MS = 99
 // const REPLAY_ACTION_DELAY_MS = 169
 
@@ -172,6 +172,23 @@ function findReplayItemIndex(list, replayId, fallbackIdx) {
 // Called at the exact point an action is accepted by the game - never from
 // raw keydown, so held modifier keys and UI-only input are not recorded.
 let skipPreRecordedItemAction = false
+let recordingAction = null
+let recordingActionSerial = 0
+// For synchronous services/foraging, close the scope after the calling event
+// handler. Async movement/wait close explicitly in finally (see index.html).
+function finishRecordedReplayAction(expectedAction) {
+  // A queued movement can begin from flushPendingMove before the previous
+  // async tryMove finally runs. Never let that older finally close the newer
+  // action's scope.
+  if (expectedAction !== undefined && recordingAction !== expectedAction) return
+  if (!replayRecording || !recordingAction || replayPlaying) return
+  recordingAction._rngEnd = replayData.rng.length
+  if (RNG_DEBUG) {
+    if (!Array.isArray(replayData._rngCallers)) replayData._rngCallers = []
+    replayData._rngCallers[recordingAction._recordedActionIndex] = replayRngCallers.slice()
+  }
+  recordingAction = null
+}
 function recordReplayAction(action) {
   if (skipPreRecordedItemAction && action.type === 'useItem') {
     skipPreRecordedItemAction = false
@@ -179,20 +196,26 @@ function recordReplayAction(action) {
   }
   if (!replayRecording || replayPlaying) return
   ensureReplayItemIds()
-  const previous = replayData.actions.at(-1)
-  if (previous && previous._rngEnd === undefined) {
-    previous._rngEnd = replayData.rng.length
-    if (RNG_DEBUG) {
-      if (!Array.isArray(replayData._rngCallers)) replayData._rngCallers = []
-      replayData._rngCallers[previous._recordedActionIndex] = replayRngCallers.slice()
-    }
-  }
+  // No gameplay RNG belongs to the previous action simply because the user
+  // has not pressed a key yet. The previous scope should have been closed.
+  finishRecordedReplayAction()
   replayRngCallers = []
-  replayData.actions.push({
+  const entry = {
     ...action,
     _recordedActionIndex: replayData.actions.length,
     _rngStart: replayData.rng.length
-  })
+  }
+  replayData.actions.push(entry)
+  recordingAction = entry
+  const serial = ++recordingActionSerial
+  if (action.type !== 'move' && action.type !== 'skipTurn') {
+    // Synchronous event handlers have completed when this callback runs.
+    Promise.resolve().then(() => {
+      if (recordingAction === entry && recordingActionSerial === serial)
+        finishRecordedReplayAction()
+    })
+  }
+  return entry
 }
 
 function startReplayRecording() {
@@ -204,7 +227,8 @@ function startReplayRecording() {
   // starting state now; otherwise inventory/equipment/enemy objects mutate while
   // the recording continues and playback may start from a later-run state.
   const initialState = JSON.parse(JSON.stringify(snapshot))
-  replayData = {version: REPLAY_VERSION, initialState, actions: [], rng: []}
+  replayData = {version: REPLAY_VERSION, initialState, actions: [], rng: [], idleRng: []}
+  recordingAction = null
   if (RNG_DEBUG) replayData._rngCallers = []
   replayRngCallers = []
   replayRecording = true
@@ -213,8 +237,8 @@ function startReplayRecording() {
 function replayForSave() {
   if (!replayData) return undefined
   if (RNG_DEBUG) return replayData
-  const {version, initialState, actions, rng} = replayData
-  return {version, initialState, actions, rng}
+  const {version, initialState, actions, rng, idleRng} = replayData
+  return {version, initialState, actions, rng, idleRng}
 }
 
 function updateReplayButton() {
@@ -492,9 +516,11 @@ async function playNextReplayAction() {
     const rngAfter = replayRngIndex
     const expectedStart = Number.isInteger(action._rngStart) ? action._rngStart : null
     const expectedEnd = expectedStart !== null
-      ? (Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart)
-        ? activeReplay.actions[actionIndex + 1]._rngStart
-        : activeReplay.rng.length)
+      ? (activeReplay.version >= 3 && Number.isInteger(action._rngEnd)
+        ? action._rngEnd
+        : Number.isInteger(activeReplay.actions[actionIndex + 1]?._rngStart)
+          ? activeReplay.actions[actionIndex + 1]._rngStart
+          : activeReplay.rng.length)
       : null
     const expectedRng = expectedStart !== null ? (expectedEnd - expectedStart) : null
     const actualRng = rngAfter - rngBefore
@@ -589,6 +615,30 @@ async function playNextReplayAction() {
       return
     }
 
+    // v3 stores RNG consumed BETWEEN player actions as explicit idle spans.
+    // Skip only those recorded spans; never silently correct a gameplay RNG
+    // mismatch, and never consume an unrecorded value to fix a desync.
+    if (activeReplay.version >= 3) {
+      const nextStart = activeReplay.actions[actionIndex + 1]?._rngStart ?? activeReplay.rng.length
+      const idle = (activeReplay.idleRng || []).filter(span => span.afterAction === actionIndex)
+      let pos = replayRngIndex
+      for (const span of idle) {
+        if (span.start !== pos || span.end > nextStart || span.end < span.start) {
+          replayDesync(`Replay desynchronized: malformed idle RNG span after action #${actionIndex + 1}.`)
+          replayActionRunning = false
+          restoreLiveAfterReplay()
+          return
+        }
+        pos = span.end
+      }
+      if (pos !== nextStart) {
+        replayDesync(`Replay desynchronized: ${nextStart - pos} unclassified RNG call(s) between actions.`)
+        replayActionRunning = false
+        restoreLiveAfterReplay()
+        return
+      }
+      replayRngIndex = pos
+    }
     replayCurrentActionIndex = null
     replayNextActionAt += REPLAY_ACTION_DELAY_MS
     processed++
@@ -636,6 +686,19 @@ function startReplayPlayback() {
   activeReplay = replayToPlay
   replayActionIndex = 0
   replayRngIndex = 0
+  if (activeReplay.version >= 3) {
+    // RNG before the first accepted action is classified explicitly, too.
+    const firstStart = activeReplay.actions[0]?._rngStart ?? 0
+    const beforeFirst = (activeReplay.idleRng || []).filter(span => span.afterAction === -1)
+    let pos = 0
+    for (const span of beforeFirst) {
+      if (span.start !== pos || span.end > firstStart || span.end < span.start)
+        throw new Error('Replay contains malformed pre-action idle RNG spans.')
+      pos = span.end
+    }
+    if (pos !== firstStart) throw new Error('Replay has unclassified pre-action RNG calls.')
+    replayRngIndex = pos
+  }
   replayPlaying = true
   skipLogTypingForReplay()
   replayPaused = false

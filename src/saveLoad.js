@@ -957,11 +957,15 @@ function loadGameFromObject(data, opts = {}) {
       version: data.replay.version,
       initialState: data.replay.initialState,
       actions: data.replay.actions,
-      rng: data.replay.rng
+      rng: data.replay.rng,
+      idleRng: Array.isArray(data.replay.idleRng) ? data.replay.idleRng : []
     }
+    // Action scope is an in-flight runtime reference, not serialized metadata.
+    recordingAction = null
     replayRecording = true
   } else {
     replayData = null
+    recordingAction = null
     replayRecording = false
   }
   replayRngCallers = []

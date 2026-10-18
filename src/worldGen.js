@@ -2101,6 +2101,11 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
       const [x,y] = key.split(',').map(Number)
       if (cm[y]?.[x] !== 'marble') continue
       if (x > room.x && x < room.x + room.w - 1 && y > room.y && y < room.y + room.h - 1) continue
+      // Internal prison-cell keys share the floor's ordinary key budget, but
+      // must obey the same plain-transit-hall rule as structural-door keys.
+      if (roomMetas.some(candidate => candidate.stairRoom &&
+          x > candidate.x && x < candidate.x + candidate.w - 1 &&
+          y > candidate.y && y < candidate.y + candidate.h - 1)) continue
       candidates.push({x,y,distance})
     }
     if (!candidates.length) return false
@@ -3129,7 +3134,12 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const structuralByRoom = new Map(structuralDoors.filter(d => d.leaves !== gateDoorway).map(d => [d.room, d]))
     const entranceSideRooms = roomMetas.filter(room => !room.stairRoom &&
       entranceSideReach.has(keyXY(room.cx, room.cy)) && room._source !== structuralDoors.find(d => d.leaves === gateDoorway)?.room)
-    const sideRooms = entranceSideRooms.filter(room => room.optional && structuralByRoom.has(room._source))
+    // Progression-key side chambers must not themselves contain barred prison
+    // cells: a random key position behind a second internal lock can make the
+    // primary gate unsolvable even though the room centre was initially reachable.
+    const sideRooms = entranceSideRooms.filter(room => room.optional &&
+      room.archetype !== 'Prison' && !room.crusherReserved && !room.gallery &&
+      structuralByRoom.has(room._source))
     const unlockedSideRooms = sideRooms.filter(room =>
       (vaultCfg[room.vaultType]?.doorRequirement || 'any') !== 'locked')
     const eligibleModes = []

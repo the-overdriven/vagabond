@@ -110,8 +110,9 @@ describe('Dwarven Ruins encounter progression', () => {
             const minDepth = Number(cfg.minDepthByTier[String(enemy.tier)])
             check(Number.isFinite(minDepth) && Math.abs(z) >= minDepth, 'enemy satisfies tier depth gate')
             check(level.caves[0].entrances.every(p =>
-              Math.max(Math.abs(p.x - enemy.x), Math.abs(p.y - enemy.y)) > cfg.entranceClearance),
-              'enemy spawn stays outside transition safety clearance')
+              Math.max(Math.abs(p.x - enemy.x), Math.abs(p.y - enemy.y)) >
+                (['prisonShooter','gallery0','gallery1'].includes(enemy.dungeonRole) ? 1 : cfg.entranceClearance)),
+              'open-floor enemies stay clear of stairs; barred prison guards avoid the immediate landing')
           }
         }
 

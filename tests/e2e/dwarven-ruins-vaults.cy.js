@@ -89,8 +89,11 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
           }
           check(rooms.length >= 2, 'floor persists room descriptors')
           check(vaults.length >= 1, 'every floor has at least one major vault')
-          check(rooms.filter(room => room.index !== 0 && !room.landmark).every(room => expectedRooms.has(room.archetype)),
-            'every non-entrance room has a known gameplay archetype')
+          check(rooms.every(room => room.stairRoom
+            ? ['Entrance Hall','Stair Hall'].includes(room.archetype)
+            : room.crusherReserved ? room.archetype === 'Crusher Chamber'
+            : room.landmark || expectedRooms.has(room.archetype)),
+            'special-purpose rooms and plain stair halls use their declared archetypes')
           check(new Set(rooms.map(room => room.id)).size === rooms.length, 'room IDs are stable and unique within floor')
           check(new Set(vaults.map(vault => vault.id)).size === vaults.length, 'vault IDs are stable and unique within floor')
           check((level.encounterFamilies || []).length >= 2 && (level.encounterFamilies || []).length <= 4,

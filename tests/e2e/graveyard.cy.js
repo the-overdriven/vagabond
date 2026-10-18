@@ -2,8 +2,9 @@ function beginNewGame(name = 'E2E Tester') {
   cy.visit('/')
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type(name)
+  cy.get('#worldSizeSelect').select('XS')
   cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+  cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 
@@ -265,6 +266,7 @@ describe('Graveyard', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Final Tester')
     cy.get('#permadeathToggle').check()
+    cy.get('#worldSizeSelect').select('XS')
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     const rows = []

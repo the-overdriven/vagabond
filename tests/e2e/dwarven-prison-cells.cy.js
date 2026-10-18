@@ -29,7 +29,7 @@ describe('Dwarven Ruins populated prison cells', () => {
             const r = room.prisonCellRegion
             return r && p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2
           })
-          const roomSlots = (level.rooms || []).filter(r => r.index > 0 && !r.landmark)
+          const roomSlots = (level.rooms || []).filter(r => !r.stairRoom && !r.landmark)
           const fraction = i / (deepLevels.length - 3)
           const quota = Math.max(1, Math.ceil(roomSlots.length * (0.20 + fraction * (0.30 - 0.20))))
           check(cells.length >= quota, 'z ' + z + ': required prison share ' + quota + ' of ' + roomSlots.length)

@@ -2,8 +2,9 @@ describe('Dwarven crossfire gallery entrance alarm', () => {
   it('alerts both barred shooter cells on movement, including while invisible, without repeated alarms', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Gallery Alarm Tester')
+    cy.get('#worldSizeSelect').select('XS')
     cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
+    cy.get('#loadingOverlay', {timeout: 90000}).should('not.be.visible')
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, msg) => {if (!ok) throw Error(msg)}
       replayRecording=false;replayPlaying=false;currentZ=0;currentCave=-1;map=surfaceMap

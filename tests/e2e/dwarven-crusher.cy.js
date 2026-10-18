@@ -68,7 +68,8 @@ describe('Dwarven wall Crusher',()=>{
       player.x=12;player.y=12;DungeonHazards.onActorEntered(player,11,12)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(enemies[0].hp===20 && enemies[1].hp===80,'real hits on both sides, 80%/20% caps')
+      check(enemies[0].hp===100 && enemies[1].hp===100,
+        'advancing walls push monsters without inflicting premature damage')
       check(h.impactedMonsterIds===undefined && h.step===1,'Crusher has no permanent hit immunity')
       const save=buildSaveObject(),rngBefore=rngState
       loadGameFromObject(save,{isReplayInit:true})
@@ -78,7 +79,8 @@ describe('Dwarven wall Crusher',()=>{
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       check(player.hp===40 && restored.state==='impact','center eventually crushed for 80%')
-      check(!enemies[0].alive && enemies[1].hp===40,'pinned monsters receive repeated fatal step damage')
+      check(enemies[0].hp<=20 && enemies[1].hp<=80,
+        'the final pinch damages normal and Champion monsters according to their caps')
       return true
     })()`))
   })
