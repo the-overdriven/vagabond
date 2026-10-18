@@ -1610,6 +1610,43 @@ remains a one-tier-higher reward, capped at the ordinary loot ceiling and
 substituted for discretionary floor loot. Gallery geometry, door state,
 enemy roles and reward persist through rotations and save/replay.
 
+### Dwarven Ruins Crusher and corridor consistency (v168 / schema 89)
+
+Every **newly generated** Dwarven Ruins dungeon must contain **at least one
+working Crusher**, in addition to its exactly one guaranteed poison-gas
+chamber and the mandatory D2 crossfire gallery. The guaranteed Crusher is
+located on a different floor from the gas chamber, at z:-5 or deeper; other
+eligible floors may still gain one through the existing **30% roll**.
+A Crusher encounter is not required to reach stairs, keys, the royal chest
+or the main artifact.
+
+To prevent the previous zero-Crusher dungeons, the room generator now
+reserves a suitable **9×11 or 11×9 outside-wall footprint** on eligible
+floors **before** connecting rooms or adding prisons, vaults, debris, loot
+and furnishings. It is an optional one-port side room, kept out of the
+mandatory prison count and off the main route. The room stays clear so its
+three-row moving-wall mechanism and escape lanes are actually usable.
+Generation rejects a world without the guaranteed Crusher rather than
+silently accepting a dungeon with none. This does not increase damage:
+Crusher jaws retain the existing 80% max-HP player hit, 50%/20% capped
+monster hit, single-hit-per-monster protection, and timed warning/cooldown.
+
+After rubble collapses and access repairs, a deterministic corridor
+finishing pass widens **straight one-cell passages outside rooms** wherever
+adjacent solid rock can safely be converted to marble. No room border,
+protected door, staircase or surrounding one-tile room buffer may be
+carved through. A one-cell bottleneck is still possible near a protected
+entrance or unusual bend; it is better to retain an isolated narrow part
+than create an accidental bypass around a gate or prison lock. This
+polishing is applied only to newly generated worlds, preserving save/replay
+coordinates without load-time rerolls.
+
+**Gameplay decisions and feedback:** The player can choose to investigate,
+avoid or deliberately use a visibly grooved side chamber. The advancing
+walls remain readable on the floor itself and can threaten creatures.
+The optional room is never necessary for progression, and crossing the
+rest of the dungeon becomes less prone to one-cell movement bottlenecks.
+
 ### Dwarven Crusher — opposing stone jaws (v85)
 
 From D2 (`z:-5`) downward, eligible optional Ruins rooms can host one

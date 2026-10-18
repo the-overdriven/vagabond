@@ -1986,7 +1986,7 @@ function planDwarvenPrisonPartition(cm, room, reserved = new Set()) {
 }
 
 function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false, stairs = []) {
-  if (!room || room.archetype === 'Entrance Hall' || room.landmark === 'throneHall') return
+  if (!room || room.archetype === 'Entrance Hall' || room.landmark === 'throneHall' || room.crusherReserved) return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
   const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
   const doorwayKeys = new Set((room.doorways || []).flat().map(p => keyXY(p.x, p.y)))
@@ -2231,7 +2231,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
 
   let artifactRoom = null
   if (finalFloor) {
-    const optional = selectable.filter(room => room.optional && !room.prisonReserved && !room.galleryReserved)
+    const optional = selectable.filter(room => room.optional && !room.prisonReserved && !room.galleryReserved && !room.crusherReserved)
       .sort((a, b) => (Math.abs(b.cx - roomMetas[0].cx) + Math.abs(b.cy - roomMetas[0].cy)) -
         (Math.abs(a.cx - roomMetas[0].cx) + Math.abs(a.cy - roomMetas[0].cy)))
     const configuredArtifactTypes = Array.isArray(cfg.artifactTypes) ? cfg.artifactTypes : []
@@ -2259,7 +2259,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
   let guard = 0
   const selectionGuardLimit = Math.max(1, Math.floor(cfg.selectionGuardLimit ?? 50))
   while (selected.length < target && guard++ < selectionGuardLimit) {
-    const rooms = selectable.filter(room => !usedRooms.has(room.id) && !room.prisonReserved && !room.galleryReserved)
+    const rooms = selectable.filter(room => !usedRooms.has(room.id) && !room.prisonReserved && !room.galleryReserved && !room.crusherReserved)
     if (!rooms.length) break
     const room = pick(rooms)
     let types = Object.keys(defs).filter(type => !defs[type]?.fallbackOnly && !usedTypes.has(type) && definitionFits(type, room, false))
@@ -2425,6 +2425,35 @@ function repairDwarvenCorridorSafely(cm, from, connected, rooms, doorways, bound
   return true
 }
 
+// Remove long one-tile STRAIGHT bottlenecks left by collapses/route repair.
+// Never expand into room rectangles, stairs, authored doorway leaves or the
+// one-tile buffer around a room: widening there could bypass a real lock.
+// Use a snapshot so new tiles cannot cascade an accidental widening chain.
+function widenDwarvenStraightCorridors(cm, rooms, bounds) {
+  const insideRoomBuffer = (x,y) => rooms.some(r => x>=r.x-1 && x<r.x+r.w+1 &&
+    y>=r.y-1 && y<r.y+r.h+1)
+  const floor=(x,y)=>cm[y]?.[x]==='marble'
+  const candidates=[]
+  for(let y=bounds.minY+2;y<bounds.maxY-1;y++) for(let x=bounds.minX+2;x<bounds.maxX-1;x++) {
+    if(!floor(x,y)||insideRoomBuffer(x,y)) continue
+    const vertical=floor(x,y-1)&&floor(x,y+1)&&!floor(x-1,y)&&!floor(x+1,y)
+    const horizontal=floor(x-1,y)&&floor(x+1,y)&&!floor(x,y-1)&&!floor(x,y+1)
+    if(!vertical&&!horizontal) continue
+    // Widen only a continuous safe side; keep the other side solid if no
+    // room-safe two-wide solution exists rather than puncturing a wall.
+    for(const [dx,dy] of (vertical?[[-1,0],[1,0]]:[[0,-1],[0,1]])) {
+      const nx=x+dx,ny=y+dy
+      if(insideRoomBuffer(nx,ny) || !['dwarvenwall','cavewall'].includes(cm[ny]?.[nx])) continue
+      candidates.push({x:nx,y:ny});break
+    }
+  }
+  for(const p of candidates) cm[p.y][p.x]='marble'
+  // Refresh exposed cave rock to match the fort's stone-wall rendering.
+  for(const p of candidates) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) {
+    if(cm[p.y+dy]?.[p.x+dx]==='cavewall') cm[p.y+dy][p.x+dx]='dwarvenwall'
+  }
+}
+
 // Room walls have exactly their authored openings. Test walkability, not
 // just marble: breached doors are passable but must still occupy a known port.
 function dwarvenRoomPerimeterSealed(cm,room,doorways) {
@@ -2457,10 +2486,14 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const hasSideLandmark = sideLandmarkIndex > 0 && sideLandmarkIndex < rooms.length
   const gallerySideIndex = Number.isInteger(cfg.gallerySideRoomIndex) ? cfg.gallerySideRoomIndex : -1
   const hasSideGallery = gallerySideIndex > 0 && gallerySideIndex < rooms.length && gallerySideIndex !== sideLandmarkIndex
-  if (branchTarget < Number(hasSideLandmark) + Number(hasSideGallery)) return null
+  const crusherSideIndex = Number.isInteger(cfg.crusherSideRoomIndex) ? cfg.crusherSideRoomIndex : -1
+  const hasSideCrusher = crusherSideIndex > 0 && crusherSideIndex < rooms.length &&
+    crusherSideIndex !== sideLandmarkIndex && crusherSideIndex !== gallerySideIndex
+  if (branchTarget < Number(hasSideLandmark) + Number(hasSideGallery) + Number(hasSideCrusher)) return null
   const unused = new Set(rooms.map((_, index) => index).slice(1)
     .filter(index => (!hasSideLandmark || index !== sideLandmarkIndex) &&
-      (!hasSideGallery || index !== gallerySideIndex)))
+      (!hasSideGallery || index !== gallerySideIndex) &&
+      (!hasSideCrusher || index !== crusherSideIndex)))
   const mainRoute = [0]
   const treeEdges = []
   const distanceBetween = (a, b) => Math.abs(rooms[a].cx - rooms[b].cx) + Math.abs(rooms[a].cy - rooms[b].cy)
@@ -2499,6 +2532,14 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
     treeEdges.push({a:parents[0].index,b:gallerySideIndex,kind:'branch'})
     branchRoots.push({root:parents[0].index,room:gallerySideIndex})
   }
+  if (hasSideCrusher) {
+    // A Crusher is an optional side encounter, never the staircase route.
+    const parents = mainRoute.slice(1,-1).map(index => ({index,distance:distanceBetween(index,crusherSideIndex)}))
+      .sort((a,b)=>a.distance-b.distance || a.index-b.index)
+    if (!parents.length) return null
+    treeEdges.push({a:parents[0].index,b:crusherSideIndex,kind:'branch'})
+    branchRoots.push({root:parents[0].index,room:crusherSideIndex})
+  }
   for (const index of [...unused]) {
     const candidates = mainRoute.slice(0, -1)
       .map(parent => ({parent, distance: distanceBetween(parent, index)}))
@@ -2521,7 +2562,8 @@ function buildDungeonRoomGraph(rooms, cfg = {}) {
   const loopPairs = []
   for (let a = 0; a < rooms.length; a++) for (let b = a + 1; b < rooms.length; b++) {
     if ((hasSideLandmark && (a === sideLandmarkIndex || b === sideLandmarkIndex)) ||
-        (hasSideGallery && (a === gallerySideIndex || b === gallerySideIndex))) continue
+        (hasSideGallery && (a === gallerySideIndex || b === gallerySideIndex)) ||
+        (hasSideCrusher && (a === crusherSideIndex || b === crusherSideIndex))) continue
     if (existing.has(`${a}:${b}`)) continue
     loopPairs.push({a, b, distance: distanceBetween(a, b)})
   }
@@ -2668,6 +2710,27 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
   }
   if (floorIndex === 1 && !gallerySource) return null
+  // Reserve a clean Crusher chamber before the room graph, walls or props.
+  // Candidate rooms are built on every eligible depth: the guaranteed gas
+  // chamber can occupy one floor, but another must still support the Crusher.
+  let crusherSource = null
+  const crusherCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.timedHazards || {}
+  if (floorIndex + 4 >= Math.abs(crusherCfg.minimumZ ?? -5) && rooms.length < roomCount) {
+    const options = []
+    for (const [w,h] of [[9,11],[11,9]]) {
+      for(let y=minY+cfg.roomBoundsMargin;y<=maxY-h-cfg.roomBoundsMargin;y+=2)
+        for(let x=minX+cfg.roomBoundsMargin;x<=maxX-w-cfg.roomBoundsMargin;x+=2) {
+          const candidate={x,y,w,h,cx:x+Math.floor(w/2),cy:y+Math.floor(h/2),crusherReserved:true}
+          if(dungeonRoomHasSeparation(rooms,candidate,hall ? Math.max(1,cfg.roomSeparation-1):cfg.roomSeparation))
+            options.push(candidate)
+        }
+    }
+    if (options.length) {
+      const salt=(WORLD_SEED ^ Math.imul(floorIndex+4,0x5bd1e995)) >>> 0
+      crusherSource=options[salt % options.length]
+      rooms.push(crusherSource)
+    }
+  }
   // Reserve larger room footprints BEFORE the graph is built. These are not
   // automatically counted as prisons: their doors and cells must pass preflight.
   const prisonReserveTarget = Math.min(predictedOrdinarySlots, expectedQuota + 2)
@@ -2703,6 +2766,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     ? {...cfg, landmarkSideRoomIndex:1,
         optionalBranchCountRange: hallCfg.optionalBranchCountRange || cfg.optionalBranchCountRange} : {...cfg}
   if (gallerySource) roomGraphOptions.gallerySideRoomIndex = rooms.indexOf(gallerySource)
+  if (crusherSource) roomGraphOptions.crusherSideRoomIndex = rooms.indexOf(crusherSource)
   const roomGraph = buildDungeonRoomGraph(rooms,roomGraphOptions)
   if (!roomGraph) return null
 
@@ -2855,6 +2919,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if (hall && x >= hall.x-1 && x <= hall.x+hall.w && y >= hall.y-1 && y <= hall.y+hall.h) continue
     if (gallerySource && x >= gallerySource.x-1 && x <= gallerySource.x+gallerySource.w &&
         y >= gallerySource.y-1 && y <= gallerySource.y+gallerySource.h) continue
+    if (crusherSource && x >= crusherSource.x-1 && x <= crusherSource.x+crusherSource.w &&
+        y >= crusherSource.y-1 && y <= crusherSource.y+crusherSource.h) continue
     if (Math.abs(x - entry.x) + Math.abs(y - entry.y) <= cfg.collapseMinEntranceDistance) continue
     const rubble = chance(cfg.rubbleChance)
     if (rubble) overlayUnderlays[keyXY(x, y)] = cm[y][x]
@@ -2878,6 +2944,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     distances=reachable()
   }
   if(rooms.some(room=>!distances.has(keyXY(room.cx,room.cy)))) return null
+  widenDwarvenStraightCorridors(cm,rooms,{minX,minY,maxX,maxY})
+  distances=reachable()
   // A one-cell corner breach can be traversed diagonally. Check the entire
   // perimeter, not merely the two-leaf door's four-way reachability.
   for(const room of rooms.slice(1)) {
@@ -2952,7 +3020,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     h: room.h,
     cx: room.cx,
     cy: room.cy,
-    archetype: index === 0 ? 'Entrance Hall' : room === hall ? 'Throne Hall' : dwarvenRoomArchetypeForProgress(progress, finalFloor),
+    archetype: index === 0 ? 'Entrance Hall' : room === hall ? 'Throne Hall' : room.crusherReserved ? 'Crusher Chamber' : dwarvenRoomArchetypeForProgress(progress, finalFloor),
     ...(room === hall ? {landmark:'throneHall',facing:room.facing} : {}),
     doorways: doorwayByRoom.get(room) || [],
     connectionCount: dungeonRoomGraphDegree(roomGraph, index),
@@ -2963,6 +3031,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     tacticalSlots: null,
     prisonReserved: !!room.prisonReserved,
     galleryReserved: !!room.galleryReserved,
+    crusherReserved: !!room.crusherReserved,
     _source: room
   }))
   const roomMetaBySource = new Map(roomMetas.map(room => [room._source, room]))
@@ -2999,7 +3068,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
   }
   let validPrisons = ordinarySlots.filter(room => room.archetype === 'Prison').length
-  const ranked = ordinarySlots.filter(room => room.archetype !== 'Prison' && !room.vaultType && prisonViable(room))
+  const ranked = ordinarySlots.filter(room => room.archetype !== 'Prison' && !room.crusherReserved && !room.vaultType && prisonViable(room))
     .sort((a,b) => Number(b.prisonReserved)-Number(a.prisonReserved) || a.index-b.index)
   for (const room of ranked) {
     if (validPrisons >= requiredPrisons) break
@@ -5436,7 +5505,7 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     : remainsProgress
   const remainsTarget = Math.max(1, Math.round(remainsBase * remainsMultiplier))
   for (let n = 0; n < remainsTarget; n++) {
-    const candidates = rooms.filter(room => !room.gallery && (n < 2 || !room.landmark) && roomSpots(room, true).length)
+    const candidates = rooms.filter(room => !room.gallery && !room.crusherReserved && (n < 2 || !room.landmark) && roomSpots(room, true).length)
     if (!candidates.length) break
     const room = hall && n < 2 && candidates.includes(hall) ? hall : pick(candidates)
     addProp(room, 'dwarvenremains', level.progress >= 1
@@ -5454,7 +5523,7 @@ function spawnDwarvenRuinsRoomProps(level, z) {
   // rather than raising expected floor loot whenever the prison quota rises.
   const skeletonTarget = Math.max(0, Math.round(skeletonBase * skeletonMultiplier) - cellPrisonerRemains)
   for (let n = 0; n < skeletonTarget; n++) {
-    const candidates = rooms.filter(room => !room.landmark && !room.gallery && roomSpots(room, true).length)
+    const candidates = rooms.filter(room => !room.landmark && !room.gallery && !room.crusherReserved && roomSpots(room, true).length)
     if (!candidates.length) break
     const room = pick(candidates)
     addProp(room, 'skeleton', level.progress >= 1
@@ -5715,6 +5784,10 @@ function validateDwarvenRuinsStratum() {
     (level.hazards || []).filter(h => h.type === 'gas').length, 0)
   if (gasCount !== (cfg.timedHazards?.guaranteedGasChambersPerStratum ?? 1))
     issues.push(`Dwarven Ruins: expected exactly one functional poison-gas chamber, found ${gasCount}`)
+  const crusherCount = eligible.reduce((total,{level}) => total +
+    (level.hazards || []).filter(h => h.type === 'crusher').length, 0)
+  if (crusherCount < (cfg.timedHazards?.guaranteedCrushersPerStratum ?? 1))
+    issues.push(`Dwarven Ruins: expected at least one functional Crusher, found ${crusherCount}`)
 
   for (const context of base.contexts) {
     const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context

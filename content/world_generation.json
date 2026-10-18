@@ -1250,6 +1250,7 @@
         "minimumZ": -5,
         "maxMajorHazardsPerFloor": 1,
         "guaranteedGasChambersPerStratum": 1,
+        "guaranteedCrushersPerStratum": 1,
         "crusherFloorChance": 0.3,
         "crusher": {
           "warningTurns": 1,

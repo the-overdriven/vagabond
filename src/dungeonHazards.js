@@ -127,6 +127,85 @@ const DungeonHazards = (() => {
     return false
   }
 
+  // A guaranteed Crusher is placed from a pre-reserved empty side room.
+  // Gas gets priority on its floor; no ordinary door/loot/prison is removed.
+  function placeCrusher(level,z) {
+    const banned = new Set((level.caves?.[0]?.entrances || []).map(encode))
+    for (const trap of level.traps || []) banned.add(encode(trap.trigger))
+    for (const p of groundItems) if (p.level === z) banned.add(encode(p))
+    const rooms = (level.rooms || []).filter(r => r.optional && !r.onMainRoute && !r.gallery &&
+      !r.landmark && r.archetype !== 'Prison' && !r.prisonCell &&
+      !(level.vaults || []).some(v => v.roomId === r.id) &&
+      // Between two opposing original room walls, never a tiny isolated tile.
+      ((r.w>=7 && r.w<=10 && r.h>=9) || (r.h>=7 && r.h<=10 && r.w>=9)))
+    const candidates=[]
+    for (const room of rooms) {
+      const acrossX = room.w <= room.h
+      const width = acrossX ? room.w-2 : room.h-2
+      const long = acrossX ? room.h-2 : room.w-2
+      if (width < 5 || width > 8 || long < 7) continue
+      for (let centerLong=3; centerLong<=long-4; centerLong++) {
+      const footprint=[], stages=[], triggerTiles=[]
+      for(let offset=0; offset<Math.ceil(width/2); offset++) {
+        const stage=[]
+        for(let row=centerLong-1; row<=centerLong+1; row++)
+          for(const transverse of [offset,width-1-offset]) {
+            const p= acrossX ? {x:room.x+1+transverse,y:room.y+1+row} :
+              {x:room.x+1+row,y:room.y+1+transverse}
+            if (!stage.some(q=>q.x===p.x&&q.y===p.y)) stage.push(p)
+          }
+        stages.push(stage)
+      }
+      for(let row=centerLong-1;row<=centerLong+1;row++) {
+        const center=Math.floor(width/2)
+        const p=acrossX ? {x:room.x+1+center,y:room.y+1+row} :
+          {x:room.x+1+row,y:room.y+1+center}
+        triggerTiles.push(p)
+        for(let col=0;col<width;col++)
+          footprint.push(acrossX?{x:room.x+1+col,y:room.y+1+row}:
+            {x:room.x+1+row,y:room.y+1+col})
+      }
+      // The center trigger must have an unobstructed way OUT of the
+      // three-row strip; a solid prop cannot turn its warning into a trap.
+      const escape= [-2,2].some(delta=>{
+        const p=acrossX ? {x:triggerTiles[1].x,y:triggerTiles[1].y+delta} :
+          {x:triggerTiles[1].x+delta,y:triggerTiles[1].y}
+        return level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p))
+      })
+      if (!escape) continue
+      const replaceable=new Set(['dwarvenbed','dwarvenbedbarricade','dwarvencrate',
+        'dwarvencratepieces','dwarvenrubble','dwarventable','dwarvenshelf'])
+      const furniture=footprint.filter(p=>replaceable.has(level.map[p.y]?.[p.x]))
+      if (furniture.length>3 || footprint.some(p=>
+        (level.map[p.y]?.[p.x]!=='marble' && !replaceable.has(level.map[p.y]?.[p.x])) ||
+        banned.has(encode(p)) ||
+        (room.doorways||[]).flat().some(d=>p.x===d.x && p.y===d.y))) continue
+      // At both ends of the strike strip there are at least two intact
+      // walkable rows for retreat. Other mandatory routes never use it.
+      candidates.push({room,trigger:triggerTiles[1],triggerTiles,dangerTiles:footprint,stages,width,furniture})
+      }
+    }
+    if (!candidates.length) return false
+    const ordered = candidates.map(c => ({...c,score:hash(z,0xc3dd72a1,c.trigger.x,c.trigger.y)}))
+      .sort((a,b)=>Number(b.room.crusherReserved)-Number(a.room.crusherReserved) ||
+        a.furniture.length-b.furniture.length || a.score-b.score || a.trigger.y-b.trigger.y || a.trigger.x-b.trigger.x)
+    const placed=ordered[0]
+    const baseTiles=[]
+    const triggerKeys=new Set(placed.triggerTiles.map(encode))
+    for(const p of placed.dangerTiles) {
+      const col = placed.stages[0].some(q=>q.x===p.x&&q.y===p.y)
+      const tile=triggerKeys.has(encode(p))?'dwarvencrusherplate':col?'dwarvencrushertrack':'marble'
+      baseTiles.push({...p,tile})
+      level.map[p.y][p.x]=tile
+    }
+    level.hazards.push({id:`dwarven-crusher:${z}:${placed.room.id}`,type:'crusher',z,
+      roomId:placed.room.id,geometry:{triggerTiles:placed.triggerTiles,dangerTiles:placed.dangerTiles,
+        jawStages:placed.stages,baseTiles},
+      state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,step:0,
+      impactedMonsterIds:[],exhausted:false})
+    return true
+  }
+
   function generate() {
     const cfg = config()
     if (!cfg) return false
@@ -149,83 +228,20 @@ const DungeonHazards = (() => {
     // The caller rejects and regenerates a whole candidate world on failure.
     // Never accept a Ruins dungeon with no chamber or fabricate a bad room.
     if (!chamberFloor) return false
-    for (const {level,z} of levels) {
-      if (level === chamberFloor.level) continue // one major hazard per floor
-      // Crusher keeps its independent 30% chance on other eligible floors.
-      if (hash(z, 0x48a9b35f) / 0x100000000 >= cfg.crusherFloorChance) continue
-      const banned = new Set((level.caves?.[0]?.entrances || []).map(encode))
-      for (const trap of level.traps || []) banned.add(encode(trap.trigger))
-      for (const p of groundItems) if (p.level === z) banned.add(encode(p))
-      const rooms = (level.rooms || []).filter(r => r.optional && !r.onMainRoute && !r.gallery &&
-        !r.landmark && r.archetype !== 'Prison' && !r.prisonCell &&
-        !(level.vaults || []).some(v => v.roomId === r.id) &&
-        // Between two opposing original room walls, never a tiny isolated tile.
-        ((r.w>=7 && r.w<=10 && r.h>=9) || (r.h>=7 && r.h<=10 && r.w>=9)))
-      const candidates=[]
-      for (const room of rooms) {
-        const acrossX = room.w <= room.h
-        const width = acrossX ? room.w-2 : room.h-2
-        const long = acrossX ? room.h-2 : room.w-2
-        if (width < 5 || width > 8 || long < 7) continue
-        for (let centerLong=3; centerLong<=long-4; centerLong++) {
-        const footprint=[], stages=[], triggerTiles=[]
-        for(let offset=0; offset<Math.ceil(width/2); offset++) {
-          const stage=[]
-          for(let row=centerLong-1; row<=centerLong+1; row++)
-            for(const transverse of [offset,width-1-offset]) {
-              const p= acrossX ? {x:room.x+1+transverse,y:room.y+1+row} :
-                {x:room.x+1+row,y:room.y+1+transverse}
-              if (!stage.some(q=>q.x===p.x&&q.y===p.y)) stage.push(p)
-            }
-          stages.push(stage)
-        }
-        for(let row=centerLong-1;row<=centerLong+1;row++) {
-          const center=Math.floor(width/2)
-          const p=acrossX ? {x:room.x+1+center,y:room.y+1+row} :
-            {x:room.x+1+row,y:room.y+1+center}
-          triggerTiles.push(p)
-          for(let col=0;col<width;col++)
-            footprint.push(acrossX?{x:room.x+1+col,y:room.y+1+row}:
-              {x:room.x+1+row,y:room.y+1+col})
-        }
-        // The center trigger must have an unobstructed way OUT of the
-        // three-row strip; a solid prop cannot turn its warning into a trap.
-        const escape= [-2,2].some(delta=>{
-          const p=acrossX ? {x:triggerTiles[1].x,y:triggerTiles[1].y+delta} :
-            {x:triggerTiles[1].x+delta,y:triggerTiles[1].y}
-          return level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p))
-        })
-        if (!escape) continue
-        const replaceable=new Set(['dwarvenbed','dwarvenbedbarricade','dwarvencrate',
-          'dwarvencratepieces','dwarvenrubble','dwarventable','dwarvenshelf'])
-        const furniture=footprint.filter(p=>replaceable.has(level.map[p.y]?.[p.x]))
-        if (furniture.length>3 || footprint.some(p=>
-          (level.map[p.y]?.[p.x]!=='marble' && !replaceable.has(level.map[p.y]?.[p.x])) ||
-          banned.has(encode(p)) ||
-          (room.doorways||[]).flat().some(d=>p.x===d.x && p.y===d.y))) continue
-        // At both ends of the strike strip there are at least two intact
-        // walkable rows for retreat. Other mandatory routes never use it.
-        candidates.push({room,trigger:triggerTiles[1],triggerTiles,dangerTiles:footprint,stages,width,furniture})
-        }
-      }
-      if (!candidates.length) continue
-      const ordered = candidates.map(c => ({...c,score:hash(z,0xc3dd72a1,c.trigger.x,c.trigger.y)}))
-        .sort((a,b)=>a.furniture.length-b.furniture.length || a.score-b.score || a.trigger.y-b.trigger.y || a.trigger.x-b.trigger.x)
-      const placed=ordered[0]
-      const baseTiles=[]
-      const triggerKeys=new Set(placed.triggerTiles.map(encode))
-      for(const p of placed.dangerTiles) {
-        const col = placed.stages[0].some(q=>q.x===p.x&&q.y===p.y)
-        const tile=triggerKeys.has(encode(p))?'dwarvencrusherplate':col?'dwarvencrushertrack':'marble'
-        baseTiles.push({...p,tile})
-        level.map[p.y][p.x]=tile
-      }
-      level.hazards.push({id:`dwarven-crusher:${z}:${placed.room.id}`,type:'crusher',z,
-        roomId:placed.room.id,geometry:{triggerTiles:placed.triggerTiles,dangerTiles:placed.dangerTiles,
-          jawStages:placed.stages,baseTiles},
-        state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,step:0,
-        impactedMonsterIds:[],exhausted:false})
+    // Guarantee a visible Crusher in each dungeon, not merely a chance to
+    // attempt one. Reserve candidate rooms early on all eligible floors so a
+    // gas room on one floor cannot remove the only possible Crusher.
+    const eligible = levels.filter(pair => pair.level !== chamberFloor.level)
+    const orderedCrusherFloors = eligible.slice().sort((a,b) =>
+      hash(a.z,0x48a9b35f)-hash(b.z,0x48a9b35f))
+    const requiredCrusher = cfg.guaranteedCrushersPerStratum ?? 1
+    let placedCrushers=0
+    for (const {level,z} of orderedCrusherFloors) {
+      const guaranteed = placedCrushers < requiredCrusher
+      if (!guaranteed && hash(z,0x48a9b35f) / 0x100000000 >= cfg.crusherFloorChance) continue
+      if (placeCrusher(level,z)) placedCrushers++
     }
+    if (placedCrushers < requiredCrusher) return false
     return true
   }
 
