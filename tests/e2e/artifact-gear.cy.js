@@ -40,6 +40,12 @@ describe('Gear bases on procedural artifacts', () => {
         if(slot==='armor')check(item.speedPenalty===(base.speedPenalty||0) &&
           (item.gracePenalty||0)===(base.gracePenalty||0),'armor penalties '+base.name)
       }
+      const previousPick=pick, previousRng=rng
+      try {
+        rng=()=>.9
+        pick=pool=>pool.includes('Amulet')?'Amulet':previousPick(pool)
+        check(/^The Amulet of /.test(makeArtifactItem(3).name),'non-gear artifacts keep The')
+      } finally {pick=previousPick;rng=previousRng}
       const eligible=[...WEAPONS,...SHIELDS,...ARMORS].filter(base=>base.tier<=3).map(base=>base.name)
       check(!eligible.includes('Titan Warpick') && eligible.includes('Brigandine'),'tier limit')
     })()`))
@@ -118,11 +124,11 @@ describe('Gear bases on procedural artifacts', () => {
   for (const width of [1440,390]) it('shows artifact stats in inventory at '+width+'px', () => {
     cy.viewport(width,900)
     cy.window().then(win => win.eval(`(() => {
-      const item={kind:'artifact',name:'The Brigandine of Ingvar',noun:'Brigandine',base:'Brigandine',
+      const item={kind:'artifact',name:'Brigandine of Ingvar',noun:'Brigandine',base:'Brigandine',
         tier:3,artifactSlot:'armor',identified:true,def:12,speedPenalty:2,bonuses:{def:4}}
       player.inventory=[item];invTab='armor';toggleInv(true)
     })()`))
-    cy.get('#invList').should('contain.text','The Brigandine of Ingvar')
+    cy.get('#invList').should('contain.text','Brigandine of Ingvar')
     cy.get('#invList').should('contain.text','DEF 12')
     cy.get('#invList').should('contain.text','DEF +4')
     cy.get('#invList').should('contain.text','SPD -2')

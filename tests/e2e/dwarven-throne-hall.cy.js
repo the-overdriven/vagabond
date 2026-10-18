@@ -83,6 +83,16 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         check(guards.some(enemy => enemy.dungeonRole === 'frontline') &&
           guards.some(enemy => enemy.dungeonRole === 'group'), 'frontline and supporting guards defend the hall')
         check(guards.every(enemy => !enemy.dungeonVaultId), 'no hall guard is tagged as belonging to artifact vault')
+        const royalGuards = guards.filter(enemy => enemy.dungeonRole === 'royalGuard')
+        check(royalGuards.length >= 2 && royalGuards.length <= 3 &&
+          royalGuards.every(enemy => enemy.tier === 4), 'additional tier-4 royal defenders')
+        const royalChests = groundItems.filter(item => item.level === z && item.royalThroneChest)
+        const forward = [[0,-1],[1,0],[0,1],[-1,0]][hall.facing]
+        check(royalChests.length === 1 && royalChests[0].tier === 5 &&
+          !royalChests[0].artifactGuaranteed &&
+          royalChests[0].x === hall.thronePosition.x + 2*forward[0] &&
+          royalChests[0].y === hall.thronePosition.y + 2*forward[1],
+          'royal chest behind throne is independent of separate artifact')
         check(enemies.filter(enemy => enemy.alive && enemy.level === z && enemy.prefix === 'Champion').length === 1,
           'the hall does not duplicate the floor Champion')
 
@@ -92,6 +102,8 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         const restored = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
         check(JSON.stringify({landmarks:restored.landmarks,rooms:restored.rooms,route:restored.roomGraph}) === before,
           'save/replay restores landmark and graph exactly')
+        check(JSON.stringify(groundItems.filter(item => item.royalThroneChest)) === JSON.stringify(royalChests),
+          'royal chest remains intact after save/restore')
         check(JSON.stringify(restored.caves[0].landmarks) === JSON.stringify(restored.landmarks),
           'descriptor and authoritative level landmark copies agree')
       })()`))
@@ -104,6 +116,9 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
       const old = structuredClone(final.landmarks[0])
       const oldRoom = structuredClone(final.rooms.find(r => r.id === old.roomId))
+      const z = chainZForDepth(deepLevels.length+1)
+      const oldChest = groundItems.find(g => g.royalThroneChest && g.level === z)
+      check(!!oldChest, 'royal chest exists before rotation')
       const height = MAP_H
       const rotated = p => ({x:height - 1 - p.y, y:p.x})
       rotateGeneratedWorld(1)
@@ -116,6 +131,9 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       check(!('onward' in hall), 'back wall stays sealed after rotation')
       check(JSON.stringify(hall.thronePosition) === JSON.stringify(rotated(old.thronePosition)), 'throne anchor rotates')
       check(now.map[hall.thronePosition.y]?.[hall.thronePosition.x] === 'dwarventhrone', 'throne follows rotation')
+      const chest = groundItems.find(g => g.royalThroneChest && g.level === z)
+      check(chest.x === rotated(oldChest).x && chest.y === rotated(oldChest).y,
+        'royal chest rotates with its throne hall')
       currentZ=chainZForDepth(deepLevels.length+1)
       map=now.map
       check(terrainVisual('dwarventhrone',hall.thronePosition.x,hall.thronePosition.y).image ===

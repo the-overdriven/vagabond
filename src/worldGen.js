@@ -3061,6 +3061,17 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   const serializableArtifactRoom = artifactRoom
     ? serializableRooms.find(room => room.id === artifactRoom.id) || null
     : null
+  // The royal cache is against the rear wall, two cells behind the throne.
+  // Both side approaches remain open; it is never on the mandatory route.
+  const royalChestSpot = hall ? {
+    x:thronePosition.x + hallGeometry.forward[0]*2,
+    y:thronePosition.y + hallGeometry.forward[1]*2
+  } : null
+  if (royalChestSpot && (cm[royalChestSpot.y]?.[royalChestSpot.x] !== 'marble' ||
+      !eventualReach.has(keyXY(royalChestSpot.x,royalChestSpot.y)) ||
+      reserved.has(keyXY(royalChestSpot.x,royalChestSpot.y)) ||
+      Object.values(roomMetas.find(room=>room.landmark==='throneHall')?.tacticalSlots || {})
+        .flat().some(p=>p.x===royalChestSpot.x && p.y===royalChestSpot.y))) return null
   let artifactSpot = null
   if (artifactRoom) {
     const tacticalKeys = new Set(Object.values(artifactRoom.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y)))
@@ -3126,6 +3137,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     artifactRoomId: serializableArtifactRoom?.id || null,
     _artifactRoom: serializableArtifactRoom,
     _artifactSpot: artifactSpot,
+    _royalChestSpot: royalChestSpot,
     // Local, visual-only underlays; committed only after this generated floor
     // has passed validation (failed generation retries must not leak entries).
     _overlayUnderlays: overlayUnderlays,
@@ -3279,6 +3291,17 @@ function buildDwarvenRuinsStratum() {
         ordinaryDoorKey: true
       })
     }
+    if (level._royalChestSpot) {
+      const royalCfg = cfg.landmarks.throneHall.royalTreasury
+      groundItems.push({
+        x: level._royalChestSpot.x, y: level._royalChestSpot.y,
+        level: chainZForDepth(floorIndex + 4), levelKind:'chain', caveIndex:-1,
+        kind:'chest', opened:false, tier:royalCfg.rewardTier,
+        royalThroneChest:true,
+        dungeonRoomId:level.landmarks[0].roomId
+      })
+    }
+    delete level._royalChestSpot
     if (level._artifactSpot) {
       const lootCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.loot
       groundItems.push({
@@ -4794,6 +4817,35 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         if (!spot) continue
         if (spawnTemplate(template,spot,null,role,throneFamily.id,throneRoom.id,null)) spent += cost
       }
+      // Royal guards are an explicit additional encounter, not a hidden tax
+      // on ordinary room/corridor populations or an extra Champion. Selecting
+      // only eligible common tier-4 species preserves the rarity exclusion.
+      const royalCfg = packageCfg.landmarks?.throneHall?.royalTreasury || {}
+      const royalPool = eligible.filter(tmpl => tmpl.tier === 4 &&
+        (tmpl.rarity ?? 1) > (cfg.dominantRarityCutoff ?? .1))
+      const chest = groundItems.find(item => item.level === z && item.royalThroneChest)
+      if (!royalPool.length || !chest) continue // Final validator will reject and retry this populated world
+      const guardCount = randInt(royalCfg.guardCountRange?.[0] ?? 2, royalCfg.guardCountRange?.[1] ?? 3)
+      const tacticalKeys = new Set(Object.values(throneRoom.tacticalSlots || {}).flat()
+        .map(p => keyXY(p.x,p.y)))
+      const candidates = safeTiles.filter(p =>
+        p.x > throneRoom.x && p.x < throneRoom.x+throneRoom.w-1 &&
+        p.y > throneRoom.y && p.y < throneRoom.y+throneRoom.h-1 &&
+        !tacticalKeys.has(keyXY(p.x,p.y)) &&
+        // Leave the chest, the throne's dais and the flank approaches empty.
+        Math.max(Math.abs(p.x-chest.x),Math.abs(p.y-chest.y)) >= 2)
+        .sort((a,b) => {
+          const da=Math.max(Math.abs(a.x-chest.x),Math.abs(a.y-chest.y))
+          const db=Math.max(Math.abs(b.x-chest.x),Math.abs(b.y-chest.y))
+          return da-db || a.y-b.y || a.x-b.x
+        })
+      for (let n=0;n<guardCount;n++) {
+        const spot = candidates.find(p => validSpot(p,true))
+        if (!spot) break // Too few guards is rejected by final population validation
+        const tmpl = pickWeighted(royalPool, template => Math.max(.0001,template.rarity ?? 1))
+        const claimed = claimSpot(spot)
+        spawnTemplate(tmpl,claimed,null,'royalGuard',null,throneRoom.id,null)
+      }
     }
     // Vaults spend their most tactical slots first. A backline slot is not a
     // cosmetic label: where the selected family has a ranged-capable member,
@@ -5458,6 +5510,23 @@ function validateDwarvenRuinsStratum() {
       }
       for (const slots of Object.values(room.tacticalSlots || {})) for (const p of slots)
         if (level.map[p.y]?.[p.x] !== 'marble') issues.push(`${tag}: damaged throne guard position`)
+      const royalCfg = cfg.landmarks?.throneHall?.royalTreasury || {}
+      const royalGuards = hallGuards.filter(enemy => enemy.dungeonRole === 'royalGuard')
+      if (royalGuards.length < (royalCfg.guardCountRange?.[0] ?? 2) ||
+          royalGuards.length > (royalCfg.guardCountRange?.[1] ?? 3) ||
+          royalGuards.some(enemy => enemy.tier !== 4 || enemy.prefix === 'Champion' ||
+            (ENEMY_TEMPLATES.find(t=>t.name === enemy.baseName)?.rarity ?? 1) <=
+              (cfg.encounters?.dominantRarityCutoff ?? .1)))
+        issues.push(`${tag}: royal guard count, tier or rarity is invalid`)
+      const royalChests = (floorGround || []).filter(item => item.royalThroneChest)
+      const forward = [[0,-1],[1,0],[0,1],[-1,0]][hallRecord.facing]
+      const expectedChest = {x:throne.x+2*forward[0],y:throne.y+2*forward[1]}
+      if (royalChests.length !== 1 || royalChests[0].x !== expectedChest.x ||
+          royalChests[0].y !== expectedChest.y ||
+          royalChests[0].kind !== 'chest' || royalChests[0].artifactGuaranteed ||
+          royalChests[0].dwarvenRuinsArtifact ||
+          level.map[expectedChest.y]?.[expectedChest.x] !== 'marble')
+        issues.push(`${tag}: royal treasury chest missing or misplaced`)
       const columns = dwarvenRoomInterior(room).filter(p => level.map[p.y]?.[p.x] === 'dwarvenstatue')
       if (columns.length !== 6) issues.push(`${tag}: throne hall requires six indoor columns`)
     }

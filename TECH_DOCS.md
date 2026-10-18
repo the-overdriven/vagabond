@@ -1387,7 +1387,7 @@ room slots. Earlier Ruins floors and the entrance Fort contain no throne hall.
 The artifact chest is still in a separate optional vault. The throne hall
 **replaces** the formerly guaranteed separate defensive vault: exactly one
 artifact vault remains compulsory, while a second fitted vault is an ordinary
-1–2-vault roll. The hall does not add treasure or monster budget.
+1–2-vault roll. The ordinary room and Champion budgets are unchanged; the royal treasury and its extra guards are the only explicit additional rewards and foes.
 
 The floor reserves the hall's footprint **before** placing other rooms. Three
 possible interior dimensions are **9×19, 11×21, 11×23** cells, with four
@@ -1416,8 +1416,10 @@ connections, an unreachable throne hall or a compromised progression gate. The h
 dais**. Its eight exposed dais cells are walkable and have no gameplay bonus.
 The throne cannot be entered or interacted with, but deliberately **does not
 block sight or projectiles**; columns retain their existing projectile
-blocking behavior. Ordinary scattered ground remains and loot are kept out of
-the hall until its encounter and decoration rules are introduced.
+blocking behavior. Ordinary ambient chests are kept out of the hall. The throne
+has one dedicated royal treasure chest two cells behind it against the back
+wall, reachable from both flanking lanes without passing through the throne.
+The chest does not create another entrance or affect mine progression.
 
 Room metadata identifies the hall's special archetype and facing. A separate
 stable landmark record stores recipe revision 3, associated room, sole front
@@ -1447,14 +1449,24 @@ than inventing a ranged species. The Champion and its existing escort may
 defend the throne instead of a fitted vault, unless the Champion must carry
 a progression key elsewhere. The floor still has exactly one guaranteed
 Champion and retains the same encounter-family count, wander/Alarmed rules,
-loot budget and rewards. Guards remain free to pursue the player; the hall
+ordinary chest budget. In addition, the royal treasury is protected by
+**2–3 extra Tier-4 enemies** taken from the current depth-eligible, common
+monster pool (`rarity > 0.1`). They spawn around the rear portion of the hall,
+without taking ordinary floor threat points or introducing an extra Champion.
+Their ordinary XP and loot drops still apply. Guards remain free to pursue the player; the hall
 does not lock during combat.
 
 The throne recipe is revision 3. The progression gate **cannot** occupy the
 throne entrance: it belongs on the mandatory route to the sealed mine.
 The throne hall can still have an ordinary closed or locked door under the
-normal doorway rules. This remains a landmark rather than a new boss, interactive
-throne or source of additional artifacts. Landmark role positions, family assignments and enemy affiliations are
+normal doorway rules. The royal chest guarantees **one item plus 300–600 gold** (before the
+world-gold multiplier): **70%** chance of equipment with a Tier-4 or Tier-5
+base, or **30%** chance of a tier-5-source artifact. It is separate from the
+existing guaranteed artifact chest and therefore sometimes gives a second
+artifact. The outcome is rolled by the seeded gameplay RNG when opened, just
+like ordinary chests; no respawning or reward reroll on save/load. This
+remains a landmark rather than a new boss or interactive throne.
+Landmark role positions, family assignments and enemy affiliations are
 persisted with existing room and monster records; loading never repopulates
 or rerolls the hall.
 
@@ -4366,17 +4378,21 @@ MF 10 gives a 30% chance to use the next source tier's distribution.
 Non-cursed artifacts use a dwarven-owner naming pattern such as:
 
 ```text
-<noun> of <Dwarf Name>
+The <noun> of <Dwarf Name>     (non-gear artifacts)
+<noun> of <Dwarf Name>         (weapon, shield and armor artifacts)
 ```
 
 Cursed artifacts use a cursed prefix directly before the artifact noun and do
 not receive a dwarven-owner name:
 
 ```text
-<Cursed Prefix> <noun>
+The <Cursed Prefix> <noun>    (non-gear artifacts)
+<Cursed Prefix> <noun>        (gear artifacts)
 ```
 
-For example, a cursed artifact might be named `Forgotten Amulet`. If no cursed
+For example, a cursed non-gear artifact might be named `The Forgotten Amulet`,
+while gear artifacts omit the leading `The` so attack logs never say
+`your The Flail of ...`. If no cursed
 prefix is available, the naming code falls back to the normal epithet pattern
 (`<noun> of <Epithet>`) or simply `<noun>`.
 
@@ -6030,8 +6046,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-72
+77
 ```
+
+Version 77 adds a guaranteed royal cache and 2–3 Tier-4 defenders to the
+optional final-floor throne hall. Its unopened chest persists with the floor's
+other ground objects; opening uses seeded RNG and cannot be repeated after a
+save/load. The additional guard rolls alter world-generation and replay RNG.
+Only gear artifact names omit the leading `The`; non-gear names retain it.
+Current-version save fixtures are refreshed without old-save compatibility.
 
 Version 72 increases the Death Bolt selection weight within ordinary spell
 choices, altering replay RNG outcomes. Trap fatality messages now follow the

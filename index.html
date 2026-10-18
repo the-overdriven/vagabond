@@ -2007,6 +2007,11 @@ more difficult:
       name = noun
     }
 
+    // Only equipment artifacts drop the article. Non-gear artifacts keep
+    // their ceremonial "The ..." names, including cursed variants.
+    if (gear) name = name.replace(/^The\s+/i, '')
+    else if (!/^The\s+/i.test(name)) name = 'The ' + name
+
     // Preserve the existing curse behaviour as a pool of possible curse
     // templates, but apply one only to the 10% of artifacts that roll cursed.
     let curse = null
@@ -6418,6 +6423,36 @@ more difficult:
         const mf = playerMf()
         const chestTier = Math.max(1, g.tier)
 
+        if (g.royalThroneChest) {
+          const royalCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.landmarks.throneHall.royalTreasury
+          const isArtifact = chance(royalCfg.artifactChance)
+          let item
+          if (isArtifact) item = makeArtifactItem(chestTier, mf)
+          else {
+            const eligible = [...WEAPONS, ...SHIELDS, ...ARMORS].filter(base =>
+              base.tier >= royalCfg.gearMinTier && base.tier <= chestTier)
+            const base = pick(eligible)
+            if (WEAPONS.includes(base)) item = {kind:'weapon',base:base.name,name:base.name,
+              atk:base.atk,grace:base.grace,tier:base.tier,baseValue:base.baseValue,twoHanded:!!base.twoHanded}
+            else if (SHIELDS.includes(base)) item = {kind:'shield',base:base.name,name:base.name,
+              def:base.def,tier:base.tier,baseValue:base.baseValue}
+            else item = {kind:'armor',base:base.name,name:base.name,def:base.def,tier:base.tier,
+              baseValue:base.baseValue,speedPenalty:base.speedPenalty||0,
+              ...(base.gracePenalty ? {gracePenalty:base.gracePenalty} : {})}
+            item = rollModifier(base.name,item,mf,base.tier)
+          }
+          const gold = Math.max(1,Math.round(randInt(...royalCfg.goldRange) *
+            WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
+          player.gold += gold
+          const name = item.kind === 'artifact' ? artifactDisplayName(item) : item.name
+          lastLootResult = `${name} and ${gold} gold.`
+          lastLootHighlights = itemLogHighlight(item,name)
+          if (!suppressLootLog) lootLog(`You open the royal treasury chest and find ${name} and ${gold} gold!`,item,name)
+          if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item,true))) player.inventory.push(item)
+          spawnPickupAnim(g)
+          groundItems.splice(i,1)
+          continue
+        }
         if (g.artifactGuaranteed) {
           const art = makeArtifactItem(chestTier, mf)
           player.inventory.push(art)

@@ -69,6 +69,26 @@ test('generated artifacts inherit the stats of every available gear base', async
   }
 })
 
+test('non-gear artifacts keep The, equipment artifacts do not', async () => {
+  await ready()
+  const amulet = artifact('Amulet', 3)
+  const hauberk = artifact('Hauberk', 3)
+  assert.match(amulet.name, /^The Amulet of /)
+  assert.doesNotMatch(hauberk.name, /^The\s/)
+  assert.equal(amulet.artifactSlot, 'trinket')
+  assert.equal(hauberk.artifactSlot, 'armor')
+  const cursed = clone(run(`(() => {
+    const savedPick = pick, savedRng = rng
+    try {
+      rng=()=>0
+      pick=list => list.includes('Amulet') ? 'Amulet' : savedPick(list)
+      return makeArtifactItem(3)
+    } finally {pick=savedPick;rng=savedRng}
+  })()`))
+  assert.match(cursed.name, /^The /, 'cursed non-gear artifacts keep The as well')
+  assert(cursed.curse, 'cursed non-gear artifact retains its curse')
+})
+
 test('non-equipment artifacts retain the generic icon', async () => {
   await ready()
   const icon = run('itemIconHTML({kind:"artifact",artifactSlot:"trinket",noun:"Amulet",name:"Amulet of Ermis"})')

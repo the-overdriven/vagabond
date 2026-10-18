@@ -518,7 +518,14 @@
           "floorSelector": "final",
           "count": 1,
           "interiorSizes": [[9,19],[11,21],[11,23]],
-          "extraHalfBounds": 10
+          "extraHalfBounds": 10,
+          "royalTreasury": {
+            "rewardTier": 5,
+            "gearMinTier": 4,
+            "artifactChance": 0.3,
+            "goldRange": [300,600],
+            "guardCountRange": [2,3]
+          }
         }
       },
       "vaults": {
