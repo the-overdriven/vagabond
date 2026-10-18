@@ -6914,7 +6914,6 @@ more difficult:
       const result = strikeDwarvenCrateAt(nx, ny)
       if (result) alarmEnemiesFromCrateStrike(nx, ny)
       if (result?.broken) {
-        spawnCrateDeathAnim(nx, ny)
         log('You smash dwarven crate into pieces.', 'good')
       } else if (result) log(`You strike the dwarven crate with your ${weapon.name}.`, 'info')
       enemyTurn()
@@ -8224,17 +8223,6 @@ more difficult:
     spawnFxAnim(e.x, e.y, enemyGlyph(e), enemyColor(e), 1)
   }
 
-  function spawnCrateDeathAnim(x, y) {
-    if (replayAnimationsDisabled || replaySimulationMode) return
-    // Rules have already removed the crate. Keep only its visual until the
-    // player's lunge finishes, then use the monster-death sink/fade effect.
-    const start = attackAnim ? attackAnim.start + attackAnim.duration : performance.now()
-    fxAnims.push({x, y, level: currentZ, tileKey: 'dwarvencrate',
-      ch: TILE.dwarvencrate.ch, color: TILE.dwarvencrate.color,
-      dir: 1, start, duration: FX_ANIM_MS})
-    runAnimationLoop()
-  }
-
   function spawnHornSoundAnim() {
     if (replayAnimationsDisabled) return
     soundAnims.push({x: player.x, y: player.y, start: performance.now(), duration: SOUND_ANIM_MS})
@@ -8664,13 +8652,7 @@ more difficult:
           drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
-        // Destruction is already saved as debris. Hide only its presentation
-        // until the old crate's lunge/death effect has finished.
-        const storedTileKey = map[my]?.[mx] || 'crypt2floor'
-        const crateFading = storedTileKey === 'dwarvencratepieces' && fxAnims.some(p =>
-          p.tileKey === 'dwarvencrate' && p.level === currentZ && p.x === mx && p.y === my &&
-          now < p.start + p.duration)
-        const tileKey = crateFading ? 'marble' : storedTileKey
+        const tileKey = map[my]?.[mx] || 'crypt2floor'
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
@@ -8769,10 +8751,6 @@ more difficult:
       const vy = Math.round((g.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       if (g.kind === 'chest' && g.opened) continue
-      // Loot exists immediately for deterministic saves/replays, but must not
-      // show through a crate that is still finishing its destruction animation.
-      if (fxAnims.some(p => p.tileKey === 'dwarvencrate' && p.level === currentZ &&
-        p.x === g.x && p.y === g.y && now < p.start + p.duration)) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
         if (g.kind === 'stolenloot') {
@@ -8807,13 +8785,11 @@ more difficult:
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
         const p = fxAnims[i]
-        // A dying crate remains fully visible throughout the player's lunge.
         const t = Math.max(0, Math.min(1, (now - p.start) / p.duration))
         if (t >= 1) {
           fxAnims.splice(i, 1)
           continue
         }
-        if (p.tileKey && p.level !== currentZ) continue
         if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
         const vx = Math.round((p.x - camX) * TILE_PX)
         const vy = Math.round((p.y - camY) * TILE_PX)
@@ -8823,19 +8799,15 @@ more difficult:
         ctx.globalAlpha = 1 - t
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2 + bump)
         ctx.scale(scale, scale)
-        const drawnCrate = p.tileKey && USE_TILE_IMAGES &&
-          drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, terrainVisual(p.tileKey, p.x, p.y))
-        if (!drawnCrate) {
-          ctx.fillStyle = p.color
-          const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
-          if (p.label) {
-            ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
-            ctx.lineWidth = 3
-            ctx.strokeStyle = '#0b0906'
-            ctx.strokeText(p.ch, 0, textY)
-          }
-          ctx.fillText(p.ch, 0, textY)
+        ctx.fillStyle = p.color
+        const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
+        if (p.label) {
+          ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
+          ctx.lineWidth = 3
+          ctx.strokeStyle = '#0b0906'
+          ctx.strokeText(p.ch, 0, textY)
         }
+        ctx.fillText(p.ch, 0, textY)
         ctx.restore()
       }
     }

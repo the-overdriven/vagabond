@@ -1574,13 +1574,12 @@ monsters are alerted silently. Both the guaranteed radius and the distant
 chance are independently editable as `alarmNearbyRadius` and
 `alarmDistantChance` in `content/world_generation.json` under
 `dungeons.dwarvenRuins.crates`. Crate noise is resolved before enemies take
-their turn, regardless of attack and destruction animations.
+their turn, regardless of the player's attack animation.
 A destroyed crate immediately becomes **walkable crate debris**
-(`dwarvencratepieces`) for game rules and save/replay, but its intact sprite stays visible until the
-**220 ms lunge** finishes, then sinks, shrinks, and fades over **420 ms**, like
-a dying monster. This is presentation-only in tile and ASCII modes: loot is not
-shown beneath the crate until the effect ends, and neither gameplay nor replay
-waits on animation timing. After the effect, broken boards and iron bands remain
+(`dwarvencratepieces`) for game rules and save/replay. Broken boards, iron bands
+and any pre-rolled loot appear immediately, including during the player's
+**220 ms attack lunge**. Crates have no sinking, shrinking or fading death effect;
+monster death effects are unchanged. Debris remains
 over the marble floor; ASCII uses `;`. Debris does not block movement, sight,
 projectiles or auto-travel, cannot be smashed again, and remains beneath dropped
 loot and actors. Its unique terrain code persists in the existing floor map,

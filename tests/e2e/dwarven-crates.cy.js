@@ -147,37 +147,23 @@ describe('Dwarven crate destruction, loot and persistence', () => {
     cy.window().then(win => win.eval('(' + crateConsumablesPersistenceChecks.toString() + ')()'))
   })
   for (const tileGraphics of [true, false]) {
-    it(`finishes the player lunge before the crate death effect in ${tileGraphics ? 'tile' : 'ASCII'} mode`, () => {
+    it(`shows debris immediately without a crate death effect in ${tileGraphics ? 'tile' : 'ASCII'} mode`, () => {
       cy.window().then(win => win.eval(`(async () => {
         const check=(ok,msg)=>{if(!ok)throw Error(msg)}
         replayAnimationsDisabled=false;replaySimulationMode=false;USE_TILE_IMAGES=${tileGraphics};
         deepLevels[2].crates[0].hp=1
         deepLevels[2].crates[0].lootKind='potion'
+        fxAnims=[]
         await tryMove(1,0)
-        const effect=fxAnims.find(p=>p.tileKey==='dwarvencrate'&&p.x===101&&p.y===100)
-        check(map[100][101]==='dwarvencratepieces','gameplay resolves before animation')
+        check(map[100][101]==='dwarvencratepieces','debris replaces crate immediately')
         check(groundItems.filter(g=>g.kind==='potion'&&g.x===101).length===1,
-          'loot generated immediately and only once')
-        check(effect&&attackAnim,'crate effect queued during player lunge')
-        check(effect.start===attackAnim.start+attackAnim.duration,
-          'crate holds until attack animation finishes')
-        check(effect.duration===FX_ANIM_MS&&effect.dir===1,
-          'crate uses monster sinking/fading effect')
-        check(effect.level===currentZ,'death effect belongs to current floor')
+          'loot appears immediately and only once')
+        check(attackAnim && attackAnim.duration===220,'player attack lunge remains')
+        check(fxAnims.length===0,'no crate death effect queued')
         const rngBeforeRender=rngState
-        check(!Object.hasOwn(buildSaveObject(),'fxAnims'),
-          'save does not contain transient effects')
-        render(effect.start-1)
-        check(rngState===rngBeforeRender,'rendering does not roll RNG; attack noise may')
-        check(fxAnims.includes(effect),'crate remains rendered while lunge runs')
-      })()`))
-      cy.wait(700)
-      cy.window().then(win => win.eval(`(() => {
-        render(performance.now())
-        if (fxAnims.some(p=>p.tileKey==='dwarvencrate')) throw Error('crate death effect did not finish')
-        if (map[100][101]!=='dwarvencratepieces') throw Error('crate did not remain destroyed')
-        if (groundItems.filter(g=>g.kind==='potion'&&g.x===101).length!==1)
-          throw Error('crate drop changed during animation')
+        render(attackAnim.start+1)
+        check(rngState===rngBeforeRender,'rendering does not roll RNG')
+        check(map[100][101]==='dwarvencratepieces','rendering retains debris during the lunge')
       })()`))
     })
   }

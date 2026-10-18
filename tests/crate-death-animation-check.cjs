@@ -34,67 +34,31 @@ async function setup(animated, imageMode) {
 async function main() {
   await run('loadContent()')
   for (const imageMode of [true, false]) {
-    await setup(true, imageMode)
-    assert.equal(run('fxAnims.length'), 1, 'one death effect per broken crate')
-    assert.equal(run('fxAnims[0].start'), 1220, 'crate stays until lunge ends')
-    assert.equal(run('fxAnims[0].duration'), run('FX_ANIM_MS'), 'uses the monster death duration')
-    assert.equal(run('fxAnims[0].dir'), 1, 'sinks like a dying monster')
-    assert.equal(run("fxAnims[0].tileKey==='dwarvencrate'"), true, 'renders the actual crate')
-    assert.equal(run('fxAnims[0].level'), run('currentZ'), 'effect scoped to floor')
-    assert.equal(run('fxAnims[0].start - 1 < fxAnims[0].start'), true)
-    assert.equal(run('fxAnims[0].start + FX_ANIM_MS'), 1640)
-    assert.equal(JSON.stringify(run('buildSaveObject()')).includes('fxAnims'), false,
-      'presentation is not serialized')
-
-    // The pre-rolled drop must not appear underneath the dying crate.
-    run(`var potionDraws=0;var originalGroundVisualDraw=drawImageVisualWithShadow;
-      drawImageVisualWithShadow=(x,y,visual,alpha)=>{
-        if(visual===RENDER_STYLE.groundItems.potion) potionDraws++;
-        return originalGroundVisualDraw(x,y,visual,alpha)
-      }`)
-    // Spy on the actual canvas drawing branch, not only the animation queue.
-    if (imageMode) {
-      run(`var crateImageDraws=0;var debrisImageDraws=0;var originalVisualDraw=drawImageVisual;
+    for (const animated of [true, false]) {
+      await setup(animated, imageMode)
+      assert.equal(run('fxAnims.length'), 0, 'breaking crates never queues a death effect')
+      if (animated) assert.equal(run('attackAnim.duration'), 220, 'player lunge retained')
+      run(`var potionDraws=0,debrisDraws=0;var oldGroundDraw=drawImageVisualWithShadow;
+        var oldTileDraw=drawImageVisual;var oldGlyphDraw=drawTile;
+        drawImageVisualWithShadow=(x,y,visual,alpha)=>{
+          if(visual===RENDER_STYLE.groundItems.potion)potionDraws++;
+          return oldGroundDraw(x,y,visual,alpha)
+        };
         drawImageVisual=(x,y,visual,alpha)=>{
-          if(visual?.image===RENDER_STYLE.terrainTiles.dwarvencratepieces.image) debrisImageDraws++;
-          if(x===-TILE_PX/2 && y===-TILE_PX/2 &&
-            visual?.image===RENDER_STYLE.terrainTiles.dwarvencrate.image) crateImageDraws++;
-          return originalVisualDraw(x,y,visual,alpha)
-        }`)
-    } else {
-      const ctx = context.document.getElementById('canvas').getContext('2d')
-      let crateGlyphDraws = 0, debrisGlyphDraws = 0
-      const oldFill = ctx.fillText
-      ctx.fillText = function(char,x,y) {
-        if (char === '□' && x === 0) crateGlyphDraws++
-        if (char === ';') debrisGlyphDraws++
-        return oldFill.call(this,char,x,y)
-      }
-      context.crateGlyphCounter = () => crateGlyphDraws
-      context.debrisGlyphCounter = () => debrisGlyphDraws
+          if(visual?.image===RENDER_STYLE.terrainTiles.dwarvencratepieces.image)debrisDraws++;
+          return oldTileDraw(x,y,visual,alpha)
+        };
+        drawTile=(x,y,ch,...rest)=>{if(ch===';')debrisDraws++;return oldGlyphDraw(x,y,ch,...rest)}`)
+      const rngBefore=run('rngState')
+      run('renderScene(1001)')
+      assert.ok(run('debrisDraws')>0, 'debris drawn on first frame, including during lunge')
+      assert.ok(run('potionDraws')>0, 'loot drawn immediately without waiting for animation')
+      assert.equal(run('rngState'),rngBefore,'rendering consumes no gameplay RNG')
+      run('drawImageVisualWithShadow=oldGroundDraw;drawImageVisual=oldTileDraw;drawTile=oldGlyphDraw')
+      run(`var monsterEffect={x:102,y:100,name:'Goblin',baseName:'Goblin',tier:1};spawnDeathAnim(monsterEffect)`)
+      assert.equal(run('fxAnims.length'),1,'ordinary monster death effects unchanged')
+      console.log('PASS immediate debris and loot, no crate death effect, monster effects retained:',imageMode?'tiles':'ASCII',animated?'animated':'replay')
     }
-    run('renderScene(1219)')
-    assert.equal(run('potionDraws'), 0, 'loot stays hidden during the lunge')
-    if (imageMode) assert.ok(run('crateImageDraws') > 0, 'crate sprite drawn through the lunge')
-    else assert.ok(context.crateGlyphCounter() > 0, 'ASCII crate glyph drawn through the lunge')
-    run('renderScene(1320)')
-    assert.equal(run('potionDraws'), 0, 'loot stays hidden while the crate fades')
-    assert.equal(run('fxAnims.length'), 1, 'crate remains throughout the sink/fade')
-    assert.equal(imageMode ? run('debrisImageDraws') : context.debrisGlyphCounter(), 0,
-      'debris is hidden throughout the intact-crate effect')
-    run('renderScene(1641)')
-    assert.ok((imageMode ? run('debrisImageDraws') : context.debrisGlyphCounter()) > 0,
-      'debris appears after the effect in tile and ASCII modes')
-    assert.ok(run('potionDraws') > 0, 'loot appears when the effect finishes')
-    assert.equal(run('fxAnims.length'), 0, 'effect expires after its fade')
-    assert.equal(run("groundItems.filter(g=>g.kind==='potion'&&g.x===101).length"), 1,
-      'rendered frames never change drops')
-    run('drawImageVisualWithShadow=originalGroundVisualDraw')
-    if (imageMode) run('drawImageVisual=originalVisualDraw')
-    console.log('PASS crate lunge, death timing and drawing in', imageMode ? 'tile mode' : 'ASCII mode')
   }
-  await setup(false, true)
-  assert.equal(run('fxAnims.length'), 0, 'simulation/replay-disabled mode produces no cosmetic delay')
-  console.log('PASS immediate deterministic destruction and loot in replay mode')
 }
 main().catch(error => {console.error(error.stack);process.exitCode = 1})
