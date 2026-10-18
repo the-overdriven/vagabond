@@ -1275,7 +1275,13 @@ trigger needs at least two cardinal exits (closed/locked doors count as exits).
 With exactly two perpendicular exits, their shared diagonal must be blocked:
 this preserves narrow corridor bends but excludes the corner of an open area.
 The check applies to the final pressure-plate position, not just its emitter
-candidate. Triggers stay at least four Chebyshev tiles from entrances, 
+candidate. **Arrow emitters also require solid stone or cave rock directly
+behind the emitting wall**, in the opposite direction from the shot. A thin
+wall separating a corridor from walkable room flooring is never eligible:
+otherwise the `!` mechanism can appear to cap a pointless dead-end corridor
+while the hidden plate passes the separate route check. The check applies
+before the emitter replaces the wall and to every candidate direction; a
+rejected candidate consumes no placement slot. Triggers stay at least four Chebyshev tiles from entrances, 
 generated keys and lift platforms. 
 Every staircase, Dwarven key source (including key-bearing searchable remains) 
 and lift endpoint retains a route avoiding all triggers; keys reachable

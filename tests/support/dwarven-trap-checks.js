@@ -18,6 +18,26 @@ function trapCornerChecks() {
     check(DungeonTraps.usefulTriggerTile(terrain,3,3),'closed-door exit retained')
     terrain[3+b[1]][3+b[0]] = 'marble'
     check(DungeonTraps.usefulTriggerTile(terrain,3,3),'junction retained')
+
+    // A second, independent check protects the emitter. An arrow wall in a
+    // one-tile room partition turns a corridor into a false dead end even
+    // though its pressure plate has multiple legal exits (save seed 1334870591).
+    const wall = Array.from({length:9}, () => Array(9).fill('cavewall'))
+    const x=4,y=4, dx=a[0],dy=a[1]
+    wall[y][x]='dwarvenwall'
+    wall[y+dx][x-dy]='dwarvenwall'
+    wall[y-dx][x+dy]='dwarvenwall'
+    wall[y+dy][x+dx]='marble'
+    wall[y+2*dy][x+2*dx]='marble'
+    wall[y-dy][x-dx]='marble'
+    check(!DungeonTraps.usefulProjectileEmitterTile(wall,x,y,dx,dy),
+      'arrow emitter cannot terminate a corridor against a walkable room')
+    wall[y-dy][x-dx]='cavewall'
+    check(DungeonTraps.usefulProjectileEmitterTile(wall,x,y,dx,dy),
+      'properly backed perimeter-wall emitter remains eligible')
+    wall[y-dy][x-dx]='dwarvenwall'
+    check(DungeonTraps.usefulProjectileEmitterTile(wall,x,y,dx,dy),
+      'thick stone-backed emitter remains eligible')
   }
   return true
 }
@@ -126,7 +146,14 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
       check(DungeonTraps.usefulTriggerTile(l.map,t.trigger.x,t.trigger.y),'final trigger is not a skippable corner or dead end')
       check(!groundItems.some(g=>g.level===z&&g.x===t.trigger.x&&g.y===t.trigger.y),'no ground object on trigger')
       check(enemies.filter(e=>e.level===z).every(e=>DungeonTraps.safeSpawn(e.x,e.y,z)),'no monster starts near trap')
-      if(t.emitter)check(l.map[t.emitter.y][t.emitter.x]==='dwarvenarrowwall','projectile mechanism retains emitter')
+      if(t.emitter){
+        check(l.map[t.emitter.y][t.emitter.x]==='dwarvenarrowwall','projectile mechanism retains emitter')
+        // On the committed map the emitter has replaced the original wall;
+        // test its backing separately without changing that tile.
+        const {x,y}=t.emitter,{dx,dy}=t.direction
+        check(['dwarvenwall','cavewall'].includes(l.map[y-dy]?.[x-dx]),
+          'projectile emitter cannot point from a thin wall into a corridor dead end')
+      }
     }
   }
   WORLD_SEED=seed;rngState=seed;await generateNewWorld();check(summarize()===original,'same seed reproduces mechanisms and terrain')

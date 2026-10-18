@@ -29,6 +29,17 @@ const DungeonTraps = (() => {
     return !passable(x + a[0] + b[0], y + a[1] + b[1])
   }
 
+  // A wall arrow must come from a backed stone face, not from a thin
+  // partition between a corridor and another walkable space. A partition
+  // emitter looks like a trap at the end of a passage and covers no proper
+  // wall: the incident reproduced at z:-5, emitter (123,56), has a room
+  // floor directly behind it. Check the emitter separately from the plate.
+  function usefulProjectileEmitterTile(terrain, x, y, dx, dy) {
+    if (terrain[y]?.[x] !== 'dwarvenwall') return false
+    const backing = terrain[y - dy]?.[x - dx]
+    return backing === 'dwarvenwall' || backing === 'cavewall'
+  }
+
   function safeSpawn(x, y, z, levelKind = 'chain') {
     if (levelKind !== 'chain' || z >= 0) return true
     const level = deepLevels[chainDepthForZ(z) - 2]
@@ -107,7 +118,8 @@ const DungeonTraps = (() => {
         let trigger = {x:candidate.x, y:candidate.y}, emitter = null, direction = null
         if (type === 'projectile') {
           const wall = candidate.walls.find(([dx,dy]) =>
-            [1,2].every(n => terrain[candidate.y-dy*n]?.[candidate.x-dx*n] === 'marble'))
+            [1,2].every(n => terrain[candidate.y-dy*n]?.[candidate.x-dx*n] === 'marble') &&
+            usefulProjectileEmitterTile(terrain, candidate.x+dx, candidate.y+dy, -dx, -dy))
           if (!wall) continue
           emitter = {x:candidate.x+wall[0], y:candidate.y+wall[1]}
           direction = {dx:-wall[0], dy:-wall[1]}
@@ -211,5 +223,5 @@ const DungeonTraps = (() => {
     if (trap) triggerTrap(trap, actor)
   }
 
-  return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile}
+  return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile, usefulProjectileEmitterTile}
 })()
