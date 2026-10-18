@@ -1609,6 +1609,23 @@ entire connected cell. The one guaranteed treasure chest sits immediately
 wooden/stone reward door across the aisle. Eight-way movement cannot bypass
 the closed gate into the cells.
 
+The first row of the three-tile-wide exposed aisle is a **visible gallery
+alarm threshold**. Every square in that row carries a small, 70%-scale, 50%-transparent
+`dwarven-dais.png` floor engraving (ASCII: `◇`) on the ordinary stone floor.
+Stepping onto **any** of these three squares immediately applies the existing
+**Alarmed** status to all living ranged guards *currently inside that
+gallery*, including its connected rear aisle. It happens before the next enemy turn, needs no
+LOS or RNG check, and works when the hero is invisible (without revealing
+an invisible hero or bypassing normal targeting rules). The ordinary AGGRO
++2, expiry, movement, and ranged firing rules stay unchanged. Guards outside
+the barred bays and unrelated prisoners are not affected; already Alarmed
+guards are not re-alarmed and do not create repeated log messages. The event
+has one concise log message when at least one new guard is alerted. The
+threshold itself remains passable, blocks neither projectiles nor vision,
+and does not consume an extra action beyond walking onto it. Its positions
+are saved within gallery geometry and rotate with the dungeon; individual
+enemy Alarmed states already persist via the regular save/replay mechanism.
+
 Every side cell contains **at least one genuine ranged monster for each six
 walkable cell squares (rounded up per side)**. With the current 15×2-tile
 bays this means **five shooters per side, ten total** rather than the former

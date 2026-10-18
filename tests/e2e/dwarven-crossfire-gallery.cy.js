@@ -28,6 +28,8 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
               'gallery is an optional deep dead-end')
             check(room.archetype === 'Prison' && gallery.width >= 9 && gallery.length >= 13,
               'gallery counts as a prison with full firing-lane footprint')
+            check(gallery.alarmTiles.length===3 && gallery.alarmTiles.every(p=>level.map[p.y][p.x]==='dwarvengalleryalarm'),
+              'three-wide visible alarm threshold at gallery entrance')
             check([...gallery.bars,...gallery.farBars].every(p=>level.map[p.y][p.x]==='dwarvenprisonbars'),
               'continuous side and rear bars; no side prison doors')
             check(level.map[gallery.farDoor.y][gallery.farDoor.x]==='dwarvenprisondoorclosed' &&

@@ -549,6 +549,14 @@
       "bg": "#302d2a",
       "walk": true
     },
+    "dwarvengalleryalarm": {
+      "ch": "◇",
+      "color": "#b6a079",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
     "dwarventhrone": {
       "ch": "♛",
       "color": "#aaa092",
@@ -685,6 +693,7 @@
     "dwarvenpressureplate": "┱",
     "dwarvenarrowwall": "┲",
     "dwarvendais": "╜",
+    "dwarvengalleryalarm": "◈",
     "dwarventhrone": "╙",
     "dwarvencrusherplate": "╞",
     "dwarvencrushertrack": "╟",
@@ -770,6 +779,7 @@
     "dwarvenpressureplate": "a hidden pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
     "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane",
     "dwarvendais": "a worn ceremonial stone dais, etched with fading dwarven symbols",
+    "dwarvengalleryalarm": "a faded dwarven alarm sigil, set into the entrance to a barred shooting gallery",
     "dwarventhrone": "a massive dwarven stone throne, empty and silent beneath the ruined halls",
     "dwarvencrusherplate": "a conspicuous dwarven pressure plate linked to stone jaws in the opposing walls; stepping on it may start the mechanism",
     "dwarvencrushertrack": "deep scored tracks in the marble where opposing stone walls may advance",

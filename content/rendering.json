@@ -804,6 +804,12 @@
       "scale": 1,
       "baseTileKey": "marble"
     },
+    "dwarvengalleryalarm": {
+      "image": "img/tiles/dwarven-dais.png",
+      "scale": 0.7,
+      "baseTileKey": "marble",
+      "opacity": 0.5
+    },
     "dwarventhrone": {
       "image": "img/tiles/dwarven-throne-north.png",
       "scale": 1,

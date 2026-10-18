@@ -1754,6 +1754,9 @@ function planDwarvenCrossfireGallery(cm, room, protectedPoints = []) {
       for (let w=3;w<=4;w++) bays[flank === -1 ? 0 : 1].push(at(d,flank*w))
     }
   }
+  // One visible alarm threshold across the entire three-wide aisle.
+  // Crossing any marked square alerts both barred shooting bays.
+  const alarmTiles = [-1,0,1].map(offset => at(1,offset))
   const farDoor = at(interiorLength-1,0)
   const farBars = [at(interiorLength-1,-1),at(interiorLength-1,1)]
   const chest = at(interiorLength,0)
@@ -1772,12 +1775,13 @@ function planDwarvenCrossfireGallery(cm, room, protectedPoints = []) {
   if (!shooterSpots.flat().every(p => fireTargets.some(t => dungeonClearProjectileLine(cm,p,t)))) return null
   if (!leaves.every(p => Math.abs((p.x-near.x)*cross[0]+(p.y-near.y)*cross[1]) <= 1)) return null
   return {variant:'crossfire',entrance:leaves.map(p=>({...p})),length:interiorLength,width:interiorWidth,
-    aisle,bars,bays,farDoor,farBars,chest,shooterSpots,fireTargets}
+    aisle,alarmTiles,bars,bays,farDoor,farBars,chest,shooterSpots,fireTargets}
 }
 
 function buildDwarvenCrossfireGallery(cm, room) {
   const gallery = room.gallery
   if (!gallery) return
+  for (const p of gallery.alarmTiles) cm[p.y][p.x] = 'dwarvengalleryalarm'
   for (const p of [...gallery.bars,...gallery.farBars]) cm[p.y][p.x] = 'dwarvenprisonbars'
   cm[gallery.farDoor.y][gallery.farDoor.x] = 'dwarvenprisondoorclosed'
   room.internalDoors = [{leaves:[{...gallery.farDoor}],kind:'galleryPrison',locked:false}]
@@ -3387,6 +3391,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const g = galleryRoom.gallery
     if (g.length < (galleryCfg.minimumInteriorLength ?? 13) || g.width < (galleryCfg.minimumInteriorWidth ?? 9) ||
         !g.aisle.every(p => cm[p.y]?.[p.x] === 'marble' ||
+          (g.alarmTiles.some(w => w.x===p.x && w.y===p.y) && cm[p.y][p.x]==='dwarvengalleryalarm') ||
           (p.x === g.farDoor.x && p.y === g.farDoor.y && cm[p.y][p.x] === 'dwarvenprisondoorclosed') ||
           g.farBars.some(w=>w.x===p.x&&w.y===p.y)) ||
         ![...g.bars,...g.farBars].every(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars') ||
@@ -5926,6 +5931,7 @@ function validateDwarvenRuinsStratum() {
             g.bays.some((bay,i)=>shooters.filter(e=>e.dungeonRole===`gallery${i}`).length !== Math.ceil(bay.length/6)) ||
             reward.length !== 1 || !['dwarvenprisondoorclosed','dwarvenprisondooropen',
               'dwarvenprisondoorbreached'].includes(level.map[g.farDoor.y]?.[g.farDoor.x]) ||
+            g.alarmTiles?.length !== 3 || !g.alarmTiles.every(p=>level.map[p.y]?.[p.x] === 'dwarvengalleryalarm') ||
             ![...g.bars,...g.farBars].every(p=>level.map[p.y]?.[p.x] === 'dwarvenprisonbars') ||
             !g.shooterSpots.flat().every(p=>g.fireTargets.some(t=>dungeonClearProjectileLine(level.map,p,t))))
           issues.push(`${tag}: invalid crossfire gallery ${room.id}`)

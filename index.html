@@ -4680,6 +4680,27 @@ more difficult:
     }
   }
 
+  // Crossing the marked gallery threshold alerts every shooter physically
+  // inside the gallery (including its rear connecting aisle). This is a
+  // positional event, not an animation/timer or
+  // detection roll: invisibility does not prevent hearing the alarm.
+  function alarmGalleryShootersAt(x, y) {
+    if (map[y]?.[x] !== 'dwarvengalleryalarm' || currentZ > -5) return 0
+    const level = deepLevels[chainDepthForZ(currentZ)-2]
+    const room = level?.rooms?.find(r => r.gallery?.alarmTiles?.some(p => p.x === x && p.y === y))
+    if (!room) return 0
+    const galleryTiles = new Set([...room.gallery.bays.flat(),...room.gallery.aisle,...room.gallery.entrance]
+      .map(p => keyXY(p.x,p.y)))
+    let alarmed = 0
+    for (const enemy of enemies) {
+      if (!enemy.alive || !onCurrentLevel(enemy) || !enemyIsShooter(enemy) ||
+          !galleryTiles.has(keyXY(enemy.x,enemy.y))) continue
+      if (alarmEnemy(enemy)) alarmed++
+    }
+    if (alarmed) log('The engraved floor clicks. The gallery guards are alerted!', 'bad')
+    return alarmed
+  }
+
   function updateAlarmedEnemies() {
     const levelKind = currentLevelKind()
     for (const e of enemies) {
@@ -6962,6 +6983,7 @@ more difficult:
       }
       DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
       DungeonHazards.onActorEntered(player, fromPos.x, fromPos.y)
+      alarmGalleryShootersAt(player.x, player.y)
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       completeFishermanLesson(fromPos)
       advanceSwimming(true, fromPos)
@@ -8106,7 +8128,7 @@ more difficult:
       ctx.fillRect(px, py, TILE_PX, TILE_PX)
       drewBase = true
     }
-    const drewMain = drawImageVisual(px, py, visual)
+    const drewMain = drawImageVisual(px, py, visual, visual.opacity)
     if (drewMain && visual.overlayImage) {
       drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
     }
