@@ -110,6 +110,10 @@ describe('Once-only monster summoning', () => {
   it('summons while chasing, saves the spent flag and delay, and replays the same creatures', () => {
     cy.window().then(win => win.eval(`(async () => {
       const caster=makeSummoner('Lich',3)
+      // Isolate the once-only summon path: ordinary Lich spells now compete
+      // for the same turn, so relying on their weighted selection makes this
+      // replay test unrelated to the summoning contract.
+      caster.abilities=['summon']
       rngState=7
       startReplayRecording()
       const hp=player.hp

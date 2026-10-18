@@ -52,8 +52,11 @@ describe('Dwarven Ruins encounter progression', () => {
               defenders.some(e => e.dungeonRole === 'group'),
               'final-floor throne hall has a frontline and supporting guard without extra Champions')
             check(defenders.every(e => !e.dungeonVaultId), 'landmark guards do not belong to fitted vaults')
-            check(defenders.every(e => e.encounterFamily === hall.encounterFamily),
-              'throne guard family and room metadata remain coherent')
+            check(defenders.filter(e => e.dungeonRole !== 'royalGuard')
+              .every(e => e.encounterFamily === hall.encounterFamily) &&
+              defenders.filter(e => e.dungeonRole === 'royalGuard')
+              .every(e => e.encounterFamily === null && e.tier === 4),
+              'themed defenders keep their family; extra royal guards use independent tier-4 picks')
           }
           check(mobs.some(e => e !== champions[0] && e.baseName === champions[0].baseName),
             'Champion leads at least one same-species guard')

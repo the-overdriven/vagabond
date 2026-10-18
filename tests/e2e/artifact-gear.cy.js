@@ -57,13 +57,15 @@ describe('Gear bases on procedural artifacts', () => {
       replayRecording=false;replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=true
       enemies=[];npcs=[];occupied=new Set();oldHunterQuest=null
       player.equip={weapon:null,shield:null,armor:null};player.inventory=[]
-      const brigandine={kind:'artifact',name:'The Brigandine',noun:'Brigandine',base:'Brigandine',
+      const brigandine={kind:'artifact',name:'Brigandine of Ermis',noun:'Brigandine',base:'Brigandine',
         tier:3,artifactSlot:'armor',identified:true,def:12,speedPenalty:2,
         bonuses:{def:4,spd:3},maxHpPct:0,curse:null,curseTimer:0}
       const initial=playerPermanentStats()
       player.inventory=[brigandine]
-      const beforeItem=JSON.stringify(brigandine)
       startReplayRecording();equipItem(0)
+      // Recording assigns a stable replayId to equipment. Compare the resulting
+      // equipped item, not the pre-recording inventory object.
+      const beforeItem=JSON.stringify(player.equip.armor)
       check(player.equip.armor?.base==='Brigandine','equip armor')
       const after=playerPermanentStats()
       check(after.def===initial.def+16,'12 base + 4 enchanted DEF')

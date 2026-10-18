@@ -154,6 +154,7 @@ describe('Ranged shooter monster variants', () => {
         rangedAssert(before-player.hp === 3, 'stone uses fixed 3 ATK')
 
         resetRangedArena(); e=makeShooter('Skeleton',3)
+        player.baseSpd=enemySpd(e) - (playerSpd()-player.baseSpd)
         rangedAssert(Math.abs(rangedDodgeChance(e) - 0.30) < 1e-9, 'equal-speed ranged dodge is 2x melee 15%')
         player.baseSpd = 100; rangedAssert(rangedDodgeChance(e) === 1, 'ranged dodge respects cap')
 

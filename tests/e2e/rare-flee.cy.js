@@ -265,6 +265,9 @@ describe('Rare monster sightings and flight', () => {
     cy.window().then(win => win.eval(`(() => {
       resetFleeArena()
       const e=makeFleeEnemy('DRUSK',4)
+      // Startled only adds SPD below the minimum; grass already gives this
+      // DRUSK enough effective speed at its default template stats.
+      e.spd=Math.max(1,RARE_FLEE.startledMinSpd-enemyTileEffects(e).speed-1)
       rareStartFlee(e,4,true)
       const info=tileInspectInfo(e.x,e.y)
       fleeAssert(info.html.includes('Fleeing') && !info.html.includes('Fleeing (') && info.html.includes('Startled (+'+rareStartledBonus(e)+' SPD)') && rareStartledBonus(e)>0, 'flight status explains SPD bonus')

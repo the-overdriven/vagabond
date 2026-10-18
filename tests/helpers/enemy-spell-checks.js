@@ -23,9 +23,11 @@ function setupEnemySpellArena() {
 
 function makeSpellTestEnemy(name, abilities, x=38, y=40) {
   const template=ENEMY_TEMPLATE_BY_NAME[name]
-  const enemy=addEnemy({...template,baseName:name,abilities:abilities??template.abilities,
+  // Cypress serializes this helper with Function#toString before injecting it into
+  // window.eval. Keep the function self-contained (no transpiler object-spread helpers).
+  const enemy=addEnemy(Object.assign({},template,{baseName:name,abilities:abilities??template.abilities,
     x,y,hp:template.hp,maxHp:template.hp,alive:true,aware:true,level:0,
-    homeX:x,homeY:y,homeTileType:'grass',prefix:null,equipment:null,shooterAbility:null,shotsRemaining:0})
+    homeX:x,homeY:y,homeTileType:'grass',prefix:null,equipment:null,shooterAbility:null,shotsRemaining:0}))
   occupied.add(keyXY(x,y))
   return enemy
 }
@@ -86,7 +88,7 @@ function enemyDisarmChecks() {
       player.equip[slot]=item;player.equip.blackkey=key;player.inventory=[other]
       player.hp=playerMaxHp()
       chance=()=>true;pick=choices=>choices[0]
-      equipmentLog=(message,...args)=>{lastDisarmMessage=message;original.equipmentLog(message,...args)}
+      equipmentLog=function(message){lastDisarmMessage=message;return original.equipmentLog.apply(this,arguments)}
       check(tryEnemySpell(e),'disarms '+slot)
       check(lastDisarmMessage.startsWith(`The ${e.name} casts a disarming spell!`),
         'spell wording names magical cause of disarm')

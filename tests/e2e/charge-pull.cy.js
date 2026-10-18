@@ -228,7 +228,7 @@ describe('Charge and Pull terrain rules', () => {
         rushCheck(!!web && web.path[1].x===40 && web.path[1].y===40,'web targets tile after walking')
         rushCheck(moveAnim?.kind==='pull' && moveAnim.fromX===40 && moveAnim.toX===38,
           'ordinary walking pan must not overwrite delayed drag')
-        rushCheck(moveAnim.start>=web.start+420 && moveAnim.duration===360,
+        rushCheck(moveAnim.start>=web.start+SPIDER_WEB_THROW_MS && moveAnim.duration===360,
           'drag begins only after web impact')
         render(web.start+180)
         rushCheck(camX===targetCamX(40) && camY===targetCamY(40),
@@ -239,7 +239,7 @@ describe('Charge and Pull terrain rules', () => {
         render(moveAnim.start+360)
         rushCheck(moveAnim===null && camX===targetCamX(38),
           'drag ends at resolved player position')
-        rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=780),
+        rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=SPIDER_WEB_THROW_MS+SPIDER_WEB_PULL_MS),
           'melee feedback follows the completed drag')
 
         // Ordinary walking without a Pull must retain its usual short pan.
@@ -270,12 +270,12 @@ describe('Charge and Pull terrain rules', () => {
           outcomes.push([player.x,player.y,player.hp,player.steps-steps,turnCount-turn])
           if(animated) {
             const web=projectileAnims[0]
-            rushCheck(web.projectile==='web' && web.duration===420,'slower thrown web')
+            rushCheck(web.projectile==='web' && web.duration===SPIDER_WEB_THROW_MS,'faster thrown web')
             rushCheck(web.path[0].x===37 && web.path[1].x===40,'web targets original tile')
             rushCheck(moveAnim.fromX===40 && moveAnim.toX===38 && moveAnim.duration===360,'visual drag')
-            rushCheck(moveAnim.start>=web.start+420,'drag waits for web')
-            rushCheck(damageAnims.some(effect=>effect.amount==='Web!' && effect.delay===420),'web impact text')
-            rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=780),'melee follows drag')
+            rushCheck(moveAnim.start>=web.start+SPIDER_WEB_THROW_MS,'drag waits for web')
+            rushCheck(damageAnims.some(effect=>effect.amount==='Web!' && effect.delay===SPIDER_WEB_THROW_MS),'web impact text')
+            rushCheck(damageAnims.some(effect=>typeof effect.amount==='number' && effect.delay>=SPIDER_WEB_THROW_MS+SPIDER_WEB_PULL_MS),'melee follows drag')
             render(web.start)
             rushCheck(moveAnim!==null,'pre-start rendering does not finish drag')
           } else rushCheck(!projectileAnims.length && !moveAnim,'simulation skips web and drag')
