@@ -5453,6 +5453,12 @@ more difficult:
     }
   }
 
+  // Compare effective SPD after terrain, equipment, potions and temporary effects.
+  // A positive advantage adds 5 percentage points per SPD, capped at 50%.
+  function speedChaseChance(speedAdvantage) {
+    return Math.min(0.50, Math.max(0, speedAdvantage) * 0.05)
+  }
+
   function enemyTurn(reactedEnemy = null, playerMovement = null) {
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
@@ -5610,13 +5616,13 @@ more difficult:
         }
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
-        const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
+        const loseInterestChance = speedChaseChance(playerSpeed - effectiveEnemySpeed)
         if (e.aware && !e.alarmed && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
           e.aware = false
           log(`The ${e.name} gives up the chase.`, 'info')
           continue
         }
-        if (e.aware && !e.alarmed && slowEnough && chance(0.25)) {
+        if (e.aware && !e.alarmed && dist > ATTACK_RANGE && loseInterestChance > 0 && chance(loseInterestChance)) {
           e.aware = false
           log(justEvaded
             ? `The ${e.name} hesitates after its dodge, giving you a moment to act.`
@@ -5637,7 +5643,8 @@ more difficult:
           }
         }
         if (tryEnemyHaste(e, dist)) continue
-        const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
+        const extraPursuitChance = speedChaseChance(effectiveEnemySpeed - playerSpeed)
+        const hasExtraPursuitTurn = extraPursuitChance > 0 && chance(extraPursuitChance)
         if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
         let pursuitActions = hasExtraPursuitTurn ? 2 : 1
         while (pursuitActions > 0 && e.alive && map === turnMap) {

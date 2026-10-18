@@ -2439,9 +2439,10 @@ cannot add bonus attacks, and their feedback is logged with brief floating text.
 Haste uses the existing walkable pathfinder, and opening a door takes the normal
 separate action; a sprint cannot open a door and then run through it. The two
 steps are animated in sequence, but movement and any hazards resolve before
-presentation. Naturally fast enemies retain their existing **25% chance** of
-an extra pursuit action where SPD exceeds player SPD; Haste replaces that roll
-on its activation turn, so neither effect can produce three actions. A Haste
+presentation. Naturally faster enemies can still earn **one extra pursuit action**, with a
+chance of 5 percentage points per point of effective SPD advantage (maximum
+50%). Haste replaces that roll on its activation turn, so neither effect can
+produce three actions. A Haste
 activation can finish adjacent to the player, but never attacks on that turn.
 
 Inspired modifies *effective* combat stats, after spawning/prefixes, rather
@@ -3366,21 +3367,35 @@ An already-aware **non-Alarmed** enemy standing on the outermost tile of its eff
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
 with a more transparent red than the rest of the aggro overlay.
 
-**Non-Alarmed** enemies can also lose interest in the chase with a 25% chance per eligible
-response if the player's speed is at least twice as high. A successful dodge
-immediately before that roll changes only the log text, not the 25% chance or
-the existing awareness and turn behavior. Other losses of interest retain
-`The <enemy> loses interest in the chase.`
+**Non-Alarmed**, already-aware enemies can also lose interest in a chase
+when the player has higher effective SPD, provided they are **more than one tile
+away**. The chance is 5 percentage points per SPD advantage, capped at 50%.
+A successful dodge immediately before that roll changes only the log text,
+not the chance or normal turn behavior. Other losses of interest retain
+`The <enemy> loses interest in the chase.` The separate 30% outer-AGGRO
+check above remains unchanged and is evaluated first.
 
 Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
 
-If:
+Both chase modifiers use effective SPD (including terrain, equipment, potions,
+status effects and monster speed bonuses) and the same formula:
 
 ```text
-enemy SPD > player SPD
+speedChance = min(50%, max(0, fasterSPD - slowerSPD) × 5%)
 ```
 
-there is a 25% chance for an additional pursuit action (enemy gets closer to victim or gets an attack turn if it's already close).
+| Effective SPD advantage | 0 or less | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10+ |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Chance | 0% | 5% | 10% | 15% | 20% | 25% | 30% | 35% | 40% | 45% | 50% |
+
+For **extra pursuit**, `fasterSPD` is the enemy's SPD and `slowerSPD` is
+the player's SPD. A successful roll permits at most one additional movement
+step or an attack after closing to melee range; it does not grant a second
+spell, haste, rush, or ranged attack roll. Adjacent enemies use their normal
+single melee action. For **losing interest**, the advantage runs in the
+opposite direction (player minus enemy), but Alarmed enemies and adjacent
+enemies cannot lose interest due to speed. Neither modifier consumes RNG when
+its chance is zero; the remaining eligible rolls use seeded RNG as usual.
 
 Idle enemies can wander.
 
@@ -6093,8 +6108,13 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-78
+79
 ```
+
+Version 79 replaces the binary 25% chase/escape thresholds with a capped 5%
+chance per effective SPD point of advantage. This changes seeded enemy-turn RNG
+and replay outcomes; no new gameplay state is saved, and older save/replay
+schema versions are not supported.
 
 Version 78 adds the persistent smashed-crate terrain code and changes seeded
 trap placement to exclude dead ends and skippable corners. Current saves and
