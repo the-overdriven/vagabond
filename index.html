@@ -11824,6 +11824,10 @@ more difficult:
 
   function useGodModeKey(disable = false) {
     const turningOff = disable || player.godMode
+    // Only an accepted live activation can disqualify a character. Playback
+    // replays recorded actions without opening a browser confirmation dialog.
+    if (!turningOff && !replayPlaying && !replaySimulationMode &&
+        !window.confirm('Enable God Mode?\n\nThis will PERMANENTLY disqualify this character from Highscores, even if you turn God Mode off or reload an earlier save.\n\nThis cannot be undone.')) return
     recordReplayAction({type: 'godMode', disable: turningOff})
     if (turningOff) {
       player.godMode = false

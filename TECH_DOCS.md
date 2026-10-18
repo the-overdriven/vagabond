@@ -7034,7 +7034,15 @@ There is currently no mobile button for waiting (skipping the turn).
 
 # 71. Debug Mode
 
-`G` activates a developer/debug mode and makes the player invisible. Pressing
+`G` requests activation of a developer/debug mode. In live play, enabling
+it first opens a confirmation explaining that the current character will be
+**permanently disqualified from Highscores**, even after disabling God Mode,
+refreshing, or loading a save from before its activation. Cancelling does not
+change the world, character, leaderboard eligibility, replay actions, turns,
+or RNG. Acceptance disqualifies the character before applying the debug buffs.
+Recorded God Mode actions are replayed without a confirmation or browser-ledger
+writes. Disabling an active God Mode needs no confirmation and cannot undo the
+exclusion. Once enabled, God Mode makes the player invisible. Pressing
 `G` again turns god mode and its invisibility off, restoring normal movement
 restrictions and drowning. Revealed maps and granted stats/gold remain.
 Holding the key does not trigger repeated toggles. The key press is a replay
@@ -8048,6 +8056,10 @@ work and again before a pending insert. No gameplay RNG, turns or rules depend
 on network timing. The shared transport and Highscores scripts are precached
 for offline play. Extracting the client changes no database schema or save format.
 
+God-mode activation is gated by an explicit live-play confirmation warning
+that Highscores eligibility is permanently lost, including across rollback to
+earlier saves. Declining does not record a replay action or set the exclusion
+flag. Replay playback skips the prompt but applies previously accepted actions.
 God-mode activation sets `highscoresDisqualified` before its stat grants. It
 survives disabling god mode, death and saves. A browser-local ledger also blocks
 earlier live saves of the same character, with an in-memory fallback when
