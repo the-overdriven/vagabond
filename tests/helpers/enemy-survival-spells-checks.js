@@ -124,7 +124,7 @@ async function enemySurvivalReplayCheck() {
   // Keep the player reasonably safe while recording attacks against the Lich.
   player.baseAtk=1;player.hp=5000;player.maxHp=5000
   for(let y=19;y<=61;y++)for(let x=19;x<=61;x++)map[y][x]='grass'
-  rngState=5
+  rngState=3
   const state=()=>JSON.stringify({turn:turnCount,hp:player.hp,kills:player.kills,
     monsters:enemies.map(e=>[e.id,e.x,e.y,e.hp,e.alive,e.lowHpTeleportUsed,e.homeX,e.homeY])})
   startReplayRecording()

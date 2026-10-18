@@ -86,7 +86,13 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         const royalGuards = guards.filter(enemy => enemy.dungeonRole === 'royalGuard')
         check(royalGuards.length >= 2 && royalGuards.length <= 3 &&
           royalGuards.every(enemy => enemy.tier === 4), 'additional tier-4 royal defenders')
-        const royalChests = groundItems.filter(item => item.level === z && item.royalThroneChest)
+        // Compare the gameplay contract, not incidental generated-item metadata.
+        // The rule-level royal treasury test separately checks complete save data.
+        const chestState = item => ({x:item.x,y:item.y,level:item.level,
+          levelKind:item.levelKind,caveIndex:item.caveIndex,kind:item.kind,
+          opened:item.opened,tier:item.tier,royalThroneChest:item.royalThroneChest,
+          dungeonRoomId:item.dungeonRoomId})
+        const royalChests = groundItems.filter(item => item.level === z && item.royalThroneChest).map(chestState)
         const forward = [[0,-1],[1,0],[0,1],[-1,0]][hall.facing]
         check(royalChests.length === 1 && royalChests[0].tier === 5 &&
           !royalChests[0].artifactGuaranteed &&
@@ -102,8 +108,9 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         const restored = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
         check(JSON.stringify({landmarks:restored.landmarks,rooms:restored.rooms,route:restored.roomGraph}) === before,
           'save/replay restores landmark and graph exactly')
-        check(JSON.stringify(groundItems.filter(item => item.royalThroneChest)) === JSON.stringify(royalChests),
-          'royal chest remains intact after save/restore')
+        const restoredRoyalChests = groundItems.filter(item => item.level === z && item.royalThroneChest)
+        check(JSON.stringify(restoredRoyalChests.map(chestState)) === JSON.stringify(royalChests),
+          'royal chest remains intact after save/restore: ' + JSON.stringify({before:royalChests,after:restoredRoyalChests}))
         check(JSON.stringify(restored.caves[0].landmarks) === JSON.stringify(restored.landmarks),
           'descriptor and authoritative level landmark copies agree')
       })()`))

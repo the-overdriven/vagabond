@@ -51,6 +51,9 @@ describe('One-time monster theft', () => {
         for(const name of ['Imp','Nymph','Tokka','Wretchling']) {
           resetTheftArena();const e=makeThief(name)
           theftCheck(e.abilities.includes('thief') && !e.theftUsed && !e.stolenItem && !e.stolenItemEquipped,'spawn defaults '+name)
+          // Isolate theft for this test: Nymph also has healSelf, which takes
+          // priority when the test forces every ability chance to succeed.
+          e.abilities = ['thief']
           const equipped={kind:'weapon',name:'Equipped Blade',atk:3};player.equip.weapon=equipped
           player.inventory=[equipped,createItem('potion',{count:3,hunterQuestId:'quest-theft'})]
           const hp=player.hp,shots=e.shotsRemaining;enemyTurn()

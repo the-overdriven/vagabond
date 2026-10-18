@@ -52,11 +52,21 @@ describe('Dwarven Ruins encounter progression', () => {
               defenders.some(e => e.dungeonRole === 'group'),
               'final-floor throne hall has a frontline and supporting guard without extra Champions')
             check(defenders.every(e => !e.dungeonVaultId), 'landmark guards do not belong to fitted vaults')
-            check(defenders.filter(e => e.dungeonRole !== 'royalGuard')
-              .every(e => e.encounterFamily === hall.encounterFamily) &&
+            // A Champion and its same-species escort may be assigned to the
+            // hall from the independently rolled Champion family.
+            const hallChampion = defenders.find(e => e.dungeonRole === 'champion')
+            const themed = defenders.filter(e => e.dungeonRole !== 'royalGuard' &&
+              e.dungeonRole !== 'champion' &&
+              !(hallChampion && e.dungeonRole === 'group' &&
+                e.encounterFamily === hallChampion.encounterFamily &&
+                e.baseName === hallChampion.baseName))
+            check(themed.every(e => e.encounterFamily === hall.encounterFamily) &&
               defenders.filter(e => e.dungeonRole === 'royalGuard')
-              .every(e => e.encounterFamily === null && e.tier === 4),
-              'themed defenders keep their family; extra royal guards use independent tier-4 picks')
+                .every(e => e.encounterFamily === null && e.tier === 4) &&
+              (!hallChampion || defenders.some(e => e !== hallChampion &&
+                e.baseName === hallChampion.baseName &&
+                e.encounterFamily === hallChampion.encounterFamily)),
+              'hall defenders retain their families, Champion has an escort and royal guards use independent tier-4 picks')
           }
           check(mobs.some(e => e !== champions[0] && e.baseName === champions[0].baseName),
             'Champion leads at least one same-species guard')
