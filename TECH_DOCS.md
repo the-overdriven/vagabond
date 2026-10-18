@@ -1503,7 +1503,19 @@ or rerolls the hall.
 
 ### Rooms, vaults, tactical encounters and loot (v61)
 
-Every non-entrance room receives one gameplay archetype: **Barracks, Armory,
+Every room containing a Ruins staircase is an **unthemed transit hall**: the
+upstairs room is the Entrance Hall and the downstairs (or sealed-mine-stair)
+room is a Stair Hall. Neither room is eligible for a gameplay archetype,
+vault, prison cell, Crusher, gas chamber, authored room defenders, keys or
+chests/remains. Their interiors remain plain walkable marble with the staircase;
+ambient roaming monsters can still walk through. This applies to the whole
+room, not merely a three-tile clearance around the stairs. Transit halls are
+excluded from the 20–30% prison-quota denominator; the room graph prefers an
+unreserved ordinary destination rather than using a prison-reserved footprint.
+Stair halls have no separate persistent status: their roles live in existing
+room metadata and their terrain in the saved floor map.
+
+Every other eligible room receives one gameplay archetype: **Barracks, Armory,
 Dining Hall, Library, Forge, Workshop, Dormitory, Burial Chamber, Temple,
 Prison, or Storage**. Normalized floor progress changes their weights from early
 habitation toward military/industrial rooms. On the final floor, Barracks,
@@ -1635,9 +1647,9 @@ After rubble collapses and access repairs, a deterministic corridor
 finishing pass widens **straight one-cell passages outside rooms** wherever
 adjacent solid rock can safely be converted to marble. No room border,
 protected door, staircase or surrounding one-tile room buffer may be
-carved through. A one-cell bottleneck is still possible near a protected
-entrance or unusual bend; it is better to retain an isolated narrow part
-than create an accidental bypass around a gate or prison lock. This
+carved through. A one-cell bottleneck is still possible immediately against an authored
+door jamb; it is better to retain an isolated narrow part than create an
+accidental bypass around a gate or prison lock. This
 polishing is applied only to newly generated worlds, preserving save/replay
 coordinates without load-time rerolls.
 
@@ -1657,9 +1669,9 @@ Only a limited number of non-critical furnishings may be displaced to create
 a clear, legible crushing passage.
 
 **The Crusher is no longer a single-tile slab trap.** Two opposing original
-room walls contain **moving stone jaws**. Its whole threat strip is three
-rows long and five to eight tiles wide, extending **all the way between
-those opposing walls** (at least 15 threatened floor squares). Visible
+room walls contain **moving stone jaws**. Its whole threat strip is **five
+tiles long** and five to eight tiles wide, extending **all the way between
+those opposing walls** (at least 25 threatened floor squares). Visible
 pressure plates in the central lane and grooved entry tracks on the walls
 mark the mechanism. Any creature stepping on a plate arms it. A log and
 small active-status countdown warn the player; the former large
@@ -1671,10 +1683,14 @@ impassable and blocks projectiles and sight. For a five-tile passage, both
 walls meet on the **third action after triggering**; wider passages take a
 proportionate number of actions. A hero or monster on a newly occupied wall
 tile takes damage immediately, so the player should retreat beyond the
-three-row strip rather than wait in the middle. A survivor may step off a
+five-tile strip rather than wait in the middle. A survivor may step off a
 tile that became solid beneath them, as with the gas-chamber door rule.
-After the last step the jaws retract immediately and the three-turn cooldown
-begins. All temporary walls are restored to their recorded pre-compression
+At the last step, a terminal strike state holds for one consumed player action
+so the center pressure plates visibly become two opposed wall faces with a
+narrow seam (the real stone-wall artwork is cropped horizontally or vertically
+based on jaw direction). This final held frame does **not** hit again. Then
+the jaws retract and the three-turn cooldown begins. All temporary walls are
+restored to their recorded pre-compression
 tiles; opening the inventory, animations, enemy bonus actions, reloading,
 and time spent on other z-levels never advance the mechanism.
 
@@ -1838,9 +1854,12 @@ hard-coding a Goblin or Skeleton to a coordinate.
 
 Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
 use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
-crates, and prisons use bars. Beds (including improvised bed barricades) must remain at least four Chebyshev tiles from **both** the up and down Ruins stair positions on every floor, while the mechanically clear 3×3 landing rule remains unchanged. A valid layout may have fewer beds rather than crowd the stairs. Dwarven crates remain solid to movement and
-projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
-and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
+crates, and prisons use bars. Beds (including bed barricades) and all other room-specific furniture are
+forbidden **anywhere inside a Ruins stair room**. The additional mechanically
+clear 3×3 stair landing rule remains unchanged. Other rooms may contain their
+normal furniture, even when they happen to be close to a staircase. 
+Dwarven crates remain solid to movement and projectiles until destroyed by equipped-weapon strikes. 
+Every crate has **8 HP** and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
 Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
 player's cosmetic melee lunge. Every successful weapon strike against a crate,
 including the final blow, immediately Alarms all eligible nonpassive monsters

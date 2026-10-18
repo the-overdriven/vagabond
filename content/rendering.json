@@ -821,6 +821,12 @@
       "image": "img/tiles/dwarven-stone-wall.png",
       "scale": 1
     },
+    "dwarvencrusherpinch": {
+      "image": "img/tiles/dwarven-stone-wall.png",
+      "baseTileKey": "marble",
+      "opposingStoneFaces": true,
+      "scale": 1
+    },
     "dwarvencrushertrack": {
       "image": "img/tiles/dwarven-crusher-track.png",
       "baseTileKey": "marble",

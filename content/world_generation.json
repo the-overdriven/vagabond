@@ -329,12 +329,12 @@
       11
     ],
     "roomBoundsMargin": 4,
-    "roomSeparation": 3,
+    "roomSeparation": 4,
     "entranceRoomSize": [
       9,
       9
     ],
-    "corridorWideChance": 0.35,
+    "corridorWideChance": 0.70,
     "collapseAttempts": 45,
     "collapseMinGateDistance": 8,
     "rubbleChance": 0.65,
@@ -360,18 +360,18 @@
       ],
       "layout": {
         "boundsXRange": [
-          34,
-          40
+          40,
+          46
         ],
         "boundsYRange": [
-          26,
-          30
+          32,
+          36
         ],
         "roomCountRange": [
           11,
           15
         ],
-        "roomPlacementAttempts": 320,
+        "roomPlacementAttempts": 400,
         "roomWidthRange": [
           7,
           14
@@ -1259,8 +1259,7 @@
           "normalMonsterDamageCapFraction": 0.5,
           "bossDamageCapFraction": 0.2,
           "monsterOncePerCrusher": true,
-          "footprintMin": 2,
-          "footprintMax": 3
+          "stripLength": 5
         },
         "gas": {
           "durationTurns": 15,

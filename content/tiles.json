@@ -573,6 +573,14 @@
       "projectileBlock": true,
       "blocksSight": true
     },
+    "dwarvencrusherpinch": {
+      "ch": "╫",
+      "color": "#aba399",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
     "dwarvencrushertrack": {
       "ch": "≡",
       "color": "#c5a67a",
@@ -681,6 +689,7 @@
     "dwarvencrusherplate": "╞",
     "dwarvencrushertrack": "╟",
     "dwarvencrusherjaw": "█",
+    "dwarvencrusherpinch": "╫",
     "dwarvengasvalve": "╢",
     "dwarvengasvent": "╣"
   },
@@ -765,6 +774,7 @@
     "dwarvencrusherplate": "a conspicuous dwarven pressure plate linked to a crushing stone slab; stepping on it may start the mechanism",
     "dwarvencrushertrack": "deep scored tracks in the marble: a giant slab can descend over this ground",
     "dwarvencrusherjaw": "a solid advancing jaw of ancient dwarven masonry",
+    "dwarvencrusherpinch": "two massive jaws of dwarven stone have closed with a narrow crack between them",
     "dwarvengasvalve": "a conspicuous corroded emergency pressure-release valve connected to the poison-gas vents; it takes two turns to fully open",
     "dwarvengasvent": "a dwarven vent with green residue around its grate; something dangerous may be piped into the room"
   },

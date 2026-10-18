@@ -28,7 +28,7 @@ const DungeonHazards = (() => {
     const entryPoints = (level.caves?.[0]?.entrances || [])
     const occupied = new Set(groundItems.filter(g => g.level === z).map(encode))
     for (const e of enemies) if (e.alive && e.level === z) occupied.add(encode(e))
-    const rooms = (level.rooms || []).filter(r => r.optional && !r.onMainRoute && !r.gallery &&
+    const rooms = (level.rooms || []).filter(r => !r.stairRoom && r.optional && !r.onMainRoute && !r.gallery &&
       !r.landmark && !r.vaultType && r.archetype !== 'Prison' && !r.prisonCell &&
       r.w >= 8 && r.h >= 8 && r.doorways?.length === 1 && r.doorways[0].length === 2 &&
       !(level.vaults || []).some(v => v.roomId === r.id))
@@ -133,7 +133,7 @@ const DungeonHazards = (() => {
     const banned = new Set((level.caves?.[0]?.entrances || []).map(encode))
     for (const trap of level.traps || []) banned.add(encode(trap.trigger))
     for (const p of groundItems) if (p.level === z) banned.add(encode(p))
-    const rooms = (level.rooms || []).filter(r => r.optional && !r.onMainRoute && !r.gallery &&
+    const rooms = (level.rooms || []).filter(r => !r.stairRoom && r.optional && !r.onMainRoute && !r.gallery &&
       !r.landmark && r.archetype !== 'Prison' && !r.prisonCell &&
       !(level.vaults || []).some(v => v.roomId === r.id) &&
       // Between two opposing original room walls, never a tiny isolated tile.
@@ -143,12 +143,16 @@ const DungeonHazards = (() => {
       const acrossX = room.w <= room.h
       const width = acrossX ? room.w-2 : room.h-2
       const long = acrossX ? room.h-2 : room.w-2
-      if (width < 5 || width > 8 || long < 7) continue
-      for (let centerLong=3; centerLong<=long-4; centerLong++) {
+      // An odd, at-least-five-tile crushing strip along the passage. The
+      // jaw travel width stays untouched and both ends have retreat space.
+      const stripLength=Math.max(5,Math.floor(crusherConfig().stripLength || 5)|1)
+      const halfStrip=Math.floor(stripLength/2)
+      if (width < 5 || width > 8 || long < stripLength+4) continue
+      for (let centerLong=halfStrip+2; centerLong<=long-halfStrip-3; centerLong++) {
       const footprint=[], stages=[], triggerTiles=[]
       for(let offset=0; offset<Math.ceil(width/2); offset++) {
         const stage=[]
-        for(let row=centerLong-1; row<=centerLong+1; row++)
+        for(let row=centerLong-halfStrip; row<=centerLong+halfStrip; row++)
           for(const transverse of [offset,width-1-offset]) {
             const p= acrossX ? {x:room.x+1+transverse,y:room.y+1+row} :
               {x:room.x+1+row,y:room.y+1+transverse}
@@ -156,7 +160,7 @@ const DungeonHazards = (() => {
           }
         stages.push(stage)
       }
-      for(let row=centerLong-1;row<=centerLong+1;row++) {
+      for(let row=centerLong-halfStrip;row<=centerLong+halfStrip;row++) {
         const center=Math.floor(width/2)
         const p=acrossX ? {x:room.x+1+center,y:room.y+1+row} :
           {x:room.x+1+row,y:room.y+1+center}
@@ -165,11 +169,10 @@ const DungeonHazards = (() => {
           footprint.push(acrossX?{x:room.x+1+col,y:room.y+1+row}:
             {x:room.x+1+row,y:room.y+1+col})
       }
-      // The center trigger must have an unobstructed way OUT of the
-      // three-row strip; a solid prop cannot turn its warning into a trap.
-      const escape= [-2,2].some(delta=>{
-        const p=acrossX ? {x:triggerTiles[1].x,y:triggerTiles[1].y+delta} :
-          {x:triggerTiles[1].x+delta,y:triggerTiles[1].y}
+      // The central plate must have room to retreat past either end.
+      const escape= [-(halfStrip+1),halfStrip+1].some(delta=>{
+        const p=acrossX ? {x:triggerTiles[halfStrip].x,y:triggerTiles[halfStrip].y+delta} :
+          {x:triggerTiles[halfStrip].x+delta,y:triggerTiles[halfStrip].y}
         return level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p))
       })
       if (!escape) continue
@@ -182,7 +185,7 @@ const DungeonHazards = (() => {
         (room.doorways||[]).flat().some(d=>p.x===d.x && p.y===d.y))) continue
       // At both ends of the strike strip there are at least two intact
       // walkable rows for retreat. Other mandatory routes never use it.
-      candidates.push({room,trigger:triggerTiles[1],triggerTiles,dangerTiles:footprint,stages,width,furniture})
+      candidates.push({room,trigger:triggerTiles[halfStrip],triggerTiles,dangerTiles:footprint,stages,width,furniture})
       }
     }
     if (!candidates.length) return false
@@ -383,10 +386,15 @@ const DungeonHazards = (() => {
     hazard.step++
     minimapDirty=true;invalidateUndergroundFov();clearAutoPath()
     if(hazard.step>=hazard.geometry.jawStages.length) {
-      for(const p of hazard.geometry.baseTiles) level.map[p.y][p.x]=p.tile
-      hazard.state='cooldown';hazard.stateEnteredTurn=hazard.localTurn
-      log(monsterHits?'The jaws collide, then retreat from the crushed creatures.':
-        'The stone jaws collide and withdraw into the walls.','info')
+      // Hold the terminal strike for one consumed action so the pressure
+      // plate visibly becomes opposing stone faces separated by a crack.
+      // Damage is already resolved; the held frame never hits twice.
+      const middle = new Set(hazard.geometry.triggerTiles.map(encode))
+      for(const p of stage) if(middle.has(encode(p)))
+        level.map[p.y][p.x]='dwarvencrusherpinch'
+      hazard.state='impact';hazard.stateEnteredTurn=hazard.localTurn
+      log(monsterHits?'The stone jaws slam together around the crushed creatures!':
+        'The opposing stone jaws slam shut!','info')
     }
   }
 
@@ -424,6 +432,10 @@ const DungeonHazards = (() => {
       if (hazard.type !== 'crusher') continue
       if (hazard.state === 'warning') {
         advanceCrusher(hazard)
+      } else if (hazard.state === 'impact') {
+        for (const p of hazard.geometry.baseTiles) level.map[p.y][p.x]=p.tile
+        hazard.state='cooldown';hazard.stateEnteredTurn=hazard.localTurn
+        minimapDirty=true;invalidateUndergroundFov();clearAutoPath()
       } else if (hazard.state === 'cooldown' && hazard.localTurn-hazard.stateEnteredTurn >= crusherConfig().cooldownTurns) {
         hazard.state='idle'
         hazard.stateEnteredTurn=hazard.localTurn
@@ -459,14 +471,15 @@ const DungeonHazards = (() => {
         continue
       }
       if (h.type!=='crusher' || h.geometry.dangerTiles.length<15 ||
-        h.geometry.triggerTiles.length!==3 || !['idle','warning','cooldown'].includes(h.state) ||
+        h.geometry.triggerTiles.length!==Math.max(5,Math.floor(crusherConfig().stripLength || 5)|1) || !['idle','warning','impact','cooldown'].includes(h.state) ||
         !Array.isArray(h.impactedMonsterIds) || !Number.isInteger(h.localTurn) ||
         !Number.isInteger(h.step) || h.step<0 || h.step>h.geometry.jawStages?.length ||
         !Array.isArray(h.geometry.jawStages) ||
         !Array.isArray(h.geometry.baseTiles) || h.geometry.dangerTiles.length!==h.geometry.baseTiles.length) return false
-      const advanced=new Set((h.state==='warning'?h.geometry.jawStages.slice(0,h.step):[]).flat().map(encode))
+      const advanced=new Set((['warning','impact'].includes(h.state)?h.geometry.jawStages.slice(0,h.step):[]).flat().map(encode))
+      const terminal=h.state==='impact' ? new Set(h.geometry.triggerTiles.map(encode)) : new Set()
       if(!h.geometry.baseTiles.every(p=>level.map[p.y]?.[p.x]===
-        (advanced.has(encode(p))?'dwarvencrusherjaw':p.tile))) return false
+        (advanced.has(encode(p)) ? terminal.has(encode(p)) ? 'dwarvencrusherpinch' : 'dwarvencrusherjaw' : p.tile))) return false
     }
     return true
   }

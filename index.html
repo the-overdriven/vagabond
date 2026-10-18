@@ -7736,6 +7736,23 @@ more difficult:
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
     const cached = scaledVisualCanvas(image, scale, visual.filter || '')
+    // The terminal Crusher frame reuses the actual dwarven wall texture:
+    // roughly 44% masonry from each side with a narrow dark seam between.
+    // This is cosmetic; collision and damage already resolved on the turn.
+    if (visual.opposingStoneFaces) {
+      const band=Math.floor(TILE_PX*0.44)
+      ctx.save()
+      ctx.globalAlpha = alpha === undefined ? 1 : alpha
+      if (visual.stoneFacesAxis === 'y') {
+        ctx.drawImage(cached,0,0,TILE_PX,band,px,py,TILE_PX,band)
+        ctx.drawImage(cached,0,TILE_PX-band,TILE_PX,band,px,py+TILE_PX-band,TILE_PX,band)
+      } else {
+        ctx.drawImage(cached,0,0,band,TILE_PX,px,py,band,TILE_PX)
+        ctx.drawImage(cached,TILE_PX-band,0,band,TILE_PX,px+TILE_PX-band,py,band,TILE_PX)
+      }
+      ctx.restore()
+      return true
+    }
     const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
@@ -7907,6 +7924,14 @@ more difficult:
     // A spike trap is raised while someone occupies its tile. This is a
     // presentation-only state: trap damage still resolves on entry, and no
     // animation frame or saved flag affects gameplay or replay.
+    if (tileKey === 'dwarvencrusherpinch') {
+      const level = deepLevels[chainDepthForZ(currentZ)-2]
+      const hazard = level?.hazards?.find(h => h.type === 'crusher' &&
+        h.geometry?.triggerTiles?.some(p => p.x === x && p.y === y))
+      const triggers = hazard?.geometry?.triggerTiles || []
+      return {...visual, stoneFacesAxis: triggers.length > 1 &&
+        triggers.every(p => p.y === triggers[0].y) ? 'y' : 'x'}
+    }
     if (tileKey === 'dwarvencrusherplate' || tileKey === 'dwarvencrushertrack') {
       const warning = DungeonHazards.activeCrusherStatus()
       if (warning && DungeonHazards.knownDanger(x,y)) return {...visual, filter:'brightness(1.5)'}
