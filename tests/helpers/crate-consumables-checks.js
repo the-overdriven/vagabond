@@ -52,7 +52,7 @@ async function crateConsumablesPersistenceChecks() {
     check(deepLevels[2].crates[0].lootKind === kind, `${kind}: pre-rolled intact contents restore`)
     startReplayRecording()
     await tryMove(1,0)
-    check(map[100][101] === 'marble', `${kind}: crate destroyed`)
+    check(map[100][101] === 'dwarvencratepieces', `${kind}: crate destroyed`)
     check(groundItems.filter(g => g.x === 101 && g.y === 100 && g.kind === kind).length === 1,
       `${kind}: exactly one drop`)
     const dropped = clone(buildSaveObject()), savedRng = rngState|0

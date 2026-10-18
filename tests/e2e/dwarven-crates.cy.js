@@ -40,12 +40,15 @@ describe('Dwarven crate destruction, loot and persistence', () => {
       replayAnimationsDisabled=true
       check(deepLevels[2].crates[0].hp===8-damage && rngState===rng,'partial crate HP survives save/load')
       for(let i=0;i<8&&map[100][101]==='dwarvencrate';i++)await tryMove(1,0)
-      check(map[100][101]==='marble' && isWalkable(101,100),'empty crate becomes walkable marble')
+      check(map[100][101]==='dwarvencratepieces' && isWalkable(101,100),'empty crate leaves walkable debris')
+      check(!TILE.dwarvencratepieces.projectileBlock && !TILE.dwarvencratepieces.blocksSight &&
+        playerPathCanTraverse(101,100),'debris does not block shots, sight or automatic travel')
+      check(CODE_TILE[TILE_CODE.dwarvencratepieces]==='dwarvencratepieces','debris has its own save code')
       check(!groundItems.some(g=>g.x===101&&g.y===100),'empty crate drops nothing')
       const emptySave=JSON.parse(JSON.stringify(buildSaveObject()))
       loadGameFromObject(emptySave,{isReplayInit:true})
       replayAnimationsDisabled=true
-      check(map[100][101]==='marble'&&!deepLevels[2].crates.some(c=>c.x===101&&c.y===100),
+      check(map[100][101]==='dwarvencratepieces'&&!deepLevels[2].crates.some(c=>c.x===101&&c.y===100),
         'destroyed crate never respawns')
     })()`))
   })
@@ -89,7 +92,7 @@ describe('Dwarven crate destruction, loot and persistence', () => {
       const originalRng=rngState
       startReplayRecording()
       await tryMove(1,0)
-      check(map[100][101]==='marble','crate was smashed')
+      check(map[100][101]==='dwarvencratepieces','crate was smashed')
       check(groundItems.filter(g=>g.x===101&&g.y===100&&g.kind==='potion').length===1,
         'pre-rolled potion drops exactly once')
       const dropped=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -103,13 +106,14 @@ describe('Dwarven crate destruction, loot and persistence', () => {
       replayRecording=false;replayRngIndex=0
       try {
         for(const action of actions.actions)await runReplayAction(action)
-        check(map[100][101]==='marble' && groundItems.some(g=>g.x===101&&g.y===100&&g.kind==='potion'),
+        check(map[100][101]==='dwarvencratepieces' && groundItems.some(g=>g.x===101&&g.y===100&&g.kind==='potion'),
           'replay recreates the same crate destruction and potion')
         check(replayRngIndex===actions.rng.length,'crate playback consumes identical RNG')
       } finally {replayPlaying=false;replaySimulationMode=false;activeReplay=null}
       await tryMove(1,0)
       check(player.x===101 && !groundItems.some(g=>g.x===101&&g.y===100), 'loot is picked up normally')
       check(player.inventory.some(i=>i.kind==='potion'),'loot goes into inventory')
+      check(map[100][101]==='dwarvencratepieces','debris remains after loot pickup')
     })()`))
   })
   it('respects scroll loot and persists lock inspection without an attack turn', () => {
@@ -151,7 +155,7 @@ describe('Dwarven crate destruction, loot and persistence', () => {
         deepLevels[2].crates[0].lootKind='potion'
         await tryMove(1,0)
         const effect=fxAnims.find(p=>p.tileKey==='dwarvencrate'&&p.x===101&&p.y===100)
-        check(map[100][101]==='marble','gameplay resolves before animation')
+        check(map[100][101]==='dwarvencratepieces','gameplay resolves before animation')
         check(groundItems.filter(g=>g.kind==='potion'&&g.x===101).length===1,
           'loot generated immediately and only once')
         check(effect&&attackAnim,'crate effect queued during player lunge')
@@ -171,7 +175,7 @@ describe('Dwarven crate destruction, loot and persistence', () => {
       cy.window().then(win => win.eval(`(() => {
         render(performance.now())
         if (fxAnims.some(p=>p.tileKey==='dwarvencrate')) throw Error('crate death effect did not finish')
-        if (map[100][101]!=='marble') throw Error('crate did not remain destroyed')
+        if (map[100][101]!=='dwarvencratepieces') throw Error('crate did not remain destroyed')
         if (groundItems.filter(g=>g.kind==='potion'&&g.x===101).length!==1)
           throw Error('crate drop changed during animation')
       })()`))

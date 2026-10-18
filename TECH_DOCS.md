@@ -1269,10 +1269,16 @@ format is listed in §66; older saves are rejected.
 **corridors outside room footprints**, after stairs, locks, keys and the shortcut
 lift are generated. Each floor targets
 2–4 traps, stopping early if no safe placement remains. Placement uses seeded
-RNG once; entering or loading a floor never regenerates mechanisms. Triggers
-stay at least four Chebyshev tiles from entrances, generated keys and lift
-platforms. Every staircase, Dwarven key source (including key-bearing searchable
-remains) and lift endpoint retains a route avoiding all triggers; keys reachable
+RNG once; entering or loading a floor never regenerates mechanisms. Both spike
+and pressure-plate triggers reject dead ends and skippable inside corners. A
+trigger needs at least two cardinal exits (closed/locked doors count as exits).
+With exactly two perpendicular exits, their shared diagonal must be blocked:
+this preserves narrow corridor bends but excludes the corner of an open area.
+The check applies to the final pressure-plate position, not just its emitter
+candidate. Triggers stay at least four Chebyshev tiles from entrances, 
+generated keys and lift platforms. 
+Every staircase, Dwarven key source (including key-bearing searchable remains) 
+and lift endpoint retains a route avoiding all triggers; keys reachable
 before unlocking also retain their original accessibility. Optional loot and
 non-key searchable/decorative remains are not mandatory safe-route targets and may
 sit beyond a trap. Trap triggers are separated by more than three tiles. Existing monsters cannot
@@ -1569,12 +1575,17 @@ chance are independently editable as `alarmNearbyRadius` and
 `alarmDistantChance` in `content/world_generation.json` under
 `dungeons.dwarvenRuins.crates`. Crate noise is resolved before enemies take
 their turn, regardless of attack and destruction animations.
-A destroyed crate immediately becomes walkable
-marble for game rules and save/replay, but its sprite stays visible until the
+A destroyed crate immediately becomes **walkable crate debris**
+(`dwarvencratepieces`) for game rules and save/replay, but its intact sprite stays visible until the
 **220 ms lunge** finishes, then sinks, shrinks, and fades over **420 ms**, like
 a dying monster. This is presentation-only in tile and ASCII modes: loot is not
 shown beneath the crate until the effect ends, and neither gameplay nor replay
-waits on animation timing. Destruction logs
+waits on animation timing. After the effect, broken boards and iron bands remain
+over the marble floor; ASCII uses `;`. Debris does not block movement, sight,
+projectiles or auto-travel, cannot be smashed again, and remains beneath dropped
+loot and actors. Its unique terrain code persists in the existing floor map,
+including replay snapshots; no separate timer or destruction flag is needed.
+Destruction logs
 `You smash dwarven crate into pieces.` Each generated crate
 rolls its contents **once during accepted world generation** and persists its
 remaining HP and pre-rolled contents per dungeon floor. Empty crates yield
@@ -1688,8 +1699,10 @@ and progression gates. The bars beside a prison cell use
 `dwarven-prison-door-locked.png`, with `dwarven-gate-open.png` reserved for their
 open state. The pulled lever has dedicated `dwarven-lever-pulled.png` art.
 Room furniture/barricades are mechanical terrain with dedicated ASCII glyphs,
-colors, inspect strings, and 40×40 tile art for beds, dragged-bed barricades,
-bookshelves, tables, crates, and prison bars. These images are precached for
+colors, inspect strings, and tile art displayed at 40×40 for beds, dragged-bed barricades,
+bookshelves, tables, crates, and prison bars. The bed barricade and smashed-crate
+pieces use transparent 100×100 source sprites; the barricade keeps a recognizable
+headboard, mattress and legs with simple shapes. These images are precached for
 offline play alongside the prison-door and pulled-lever sprites. The
 Dwarven Key uses `img/tiles/dwarven-key.png` consistently on the ground and in
 inventory.
@@ -6059,8 +6072,13 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-77
+78
 ```
+
+Version 78 adds the persistent smashed-crate terrain code and changes seeded
+trap placement to exclude dead ends and skippable corners. Current saves and
+replay snapshots restore debris directly; older versions are rejected without
+migration.
 
 Version 77 adds a guaranteed royal cache and 2–3 Tier-4 defenders to the
 optional final-floor throne hall. Its unopened chest persists with the floor's

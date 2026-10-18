@@ -503,6 +503,14 @@
       "walk": false,
       "projectileBlock": true
     },
+    "dwarvencratepieces": {
+      "ch": ";",
+      "color": "#9a7449",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
     "dwarvenprisonbars": {
       "ch": "╫",
       "color": "#8f8a80",
@@ -623,6 +631,7 @@
     "dwarvenshelf": "╔",
     "dwarventable": "╕",
     "dwarvencrate": "╖",
+    "dwarvencratepieces": "╚",
     "dwarvenprisonbars": "╘",
     "dwarvenspikes": "┰",
     "dwarvenpressureplate": "┱",
@@ -701,6 +710,7 @@
     "dwarvenshelf": "a tall dwarven shelf that breaks movement, sight and projectile lines",
     "dwarventable": "a heavy dwarven table left where the settlement fell silent",
     "dwarvencrate": "a reinforced storage crate too heavy to shift",
+    "dwarvencratepieces": "broken boards and iron bands from a smashed dwarven crate",
     "dwarvenprisonbars": "iron prison bars dividing the old cell block",
     "dwarvenspikes": "small holes in the marble conceal reusable spikes; any creature stepping here triggers them",
     "dwarvenpressureplate": "a hidden pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",

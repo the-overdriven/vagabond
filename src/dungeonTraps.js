@@ -13,6 +13,22 @@ const DungeonTraps = (() => {
     return tile === tiles?.spikes || tile === tiles?.pressurePlate
   })
 
+  // A useful trigger lies on a route, not in a dead end or a skippable
+  // inside corner. Doors count as routes even while closed/locked. Keep
+  // narrow L-bends: their two exits cannot bypass the bend diagonally.
+  function usefulTriggerTile(terrain, x, y) {
+    const passable = (tx, ty) => {
+      const tile = terrain[ty]?.[tx]
+      return !!TILE[tile]?.walk || isClosedDungeonDoorTile(tile) || isLockedDungeonDoorTile(tile)
+    }
+    const exits = directions.filter(([dx, dy]) => passable(x + dx, y + dy))
+    if (exits.length < 2) return false
+    if (exits.length > 2) return true
+    const [a, b] = exits
+    if (a[0] + b[0] === 0 && a[1] + b[1] === 0) return true
+    return !passable(x + a[0] + b[0], y + a[1] + b[1])
+  }
+
   function safeSpawn(x, y, z, levelKind = 'chain') {
     if (levelKind !== 'chain' || z >= 0) return true
     const level = deepLevels[chainDepthForZ(z) - 2]
@@ -97,7 +113,7 @@ const DungeonTraps = (() => {
           direction = {dx:-wall[0], dy:-wall[1]}
           trigger = {x:candidate.x+direction.dx, y:candidate.y+direction.dy}
         }
-        if (terrain[trigger.y]?.[trigger.x] !== 'marble' || inRoom(trigger.x, trigger.y) ||
+        if (terrain[trigger.y]?.[trigger.x] !== 'marble' || !usefulTriggerTile(terrain, trigger.x, trigger.y) || inRoom(trigger.x, trigger.y) ||
             (emitter && inLandmark(emitter.x,emitter.y)) ||
             required.some(p => distance(p, trigger) <= cfg.entranceClearance)) continue
         if (level.traps.some(t => distance(t.trigger, trigger) <= cfg.minimumSeparation)) continue
@@ -195,5 +211,5 @@ const DungeonTraps = (() => {
     if (trap) triggerTrap(trap, actor)
   }
 
-  return {generate, onEntry, safeSpawn, isTrigger, safeReachable}
+  return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile}
 })()

@@ -5,7 +5,6 @@ highest prio: deeper dungeons for endgame
 !1 [graphics] 🎨 boxes/crates should be more square
 !1 [text] 📝 "dwarven remains. Dwarven remains lie amid the abandoned settlement."
 !1 [text] 📝 old dwarven remains -> too generic sometimes
-!2 [graphics] 🎨 we need different indoor column tiles (statues)
 !2 [graphics] 🎨 new background for dwarven ruins
 !2 [graphics] 🎨 there are no tiles for fortifications (ruined defensive positions) and broken-down door on floor
 !2 [worldgen] 🌍 dwarven columns on surface should remove tree tiles if they are rendered over them
@@ -61,21 +60,15 @@ more difficult:
 !3 [ui] 🖥️ move log to side and expand canvas?
 !3 [ui] 🖥️ small health bars above enemies?
 !3 [ui] 🖥️ tooltips on desktop should appear on the left side above canvas and also when fighting
-!3 [ui] 🖥️ feat: check different z levels on the map
 !3 [worldgen] 🌍 volcanos shouldnt spawn in the cold north
-!3 [worldgen] 🌍 water in the north should turn to ice. but not all
 !3 [worldgen] 🌍 add torches on the wall
 !4 [enemy affixes] ✨ new monster affixes: scrawny - atk, - def, clumsy/graceful - grace modifiers, sleepy, vigilant
 !4 [enemy AI] 🤖 wandering monsters that dont have snow biome dont go to snow tiles
 !4 [enemy AI] 🤖 optimize: set up far wandering enemy destination on world gen before player makes a move?
-!4 [monster abilities] 👹 gravehound and white tiger: haste
-!4 [monster abilities] 👹 champion aura: inspired (+ atk/def)
 !4 [monster abilities] 👹 healer monsters, heal others of same type
-!5 [monster abilities] 👹 monster invisibility
-!3 feat: more monster abilities, i.e. lich dispel, spider can shoot web, banshee can heal or confuse, lich can dispell invisibility.
+!3 [monster abilities] 👹 banshee can heal
 
 !4 [enemy abilities] 👹 monster ability: cry for help (on low hp?)
-!3 [monster abilities] 👹 - monster ability: coward: runs away at low HP.
 !3 [monsters] 👹 add deers. passive but run away
 !4 [pathfinding] 🧭 autopath should take your swimming skill into account
 !4 [permadeath] ☠️ starting a second game on permadeath world should respawn enemies underground?
@@ -91,7 +84,6 @@ more difficult:
 !4 [worldgen] 🌍 feat: special locations? akin to H3, i.e. special tree, cave with passage to vast grotto (!), shipwreck, dwarven ruined fort, pyramid, witch hut, observatory, abandoned campfire, dead body
 !4 [xp] ⭐ how is xp for monsters calculated? maybe the formula should use enemy base xp + final HP/DEF/ATK/SPD/GRACE stats + xp calculations should take not only stats into account but also each ability
 !5 [combat] ⚔️ some weapons (only two-handed weapons?) should deal AoE dmg, think of name
-!5 [combat] ⚔️ fleeing mechanic: either on very strong hit, or % of life
 !5 [fishing] 🎣 catch fish in river, stones or biting fish in river
 !5 [foraging] 🌿 when foraging, you can find some brushwood, needed for setting up a camp, you also need flint, can be found by digging
 !5 [fov] 🔦 - fov: add light sources (like torches to increase pov, or light scrolls)
@@ -105,18 +97,15 @@ more difficult:
 !7 [skills] 📚 skill: butchering
 !8 [architecture] 🏗️ refactor index.html (extract more files: render.js, combat.js, enemyAI.js, trade.js, mapView.js, hunterQuests.js)
 !4 feat: unidentified scrolls/potions
-!4 feat: add traps, once we have proper dungeons
 !3 feat: grottos eventually found via dwarven fort
 !3 feat: Monsters can fight monsters when they walk into each other aggro range (only when player is within radius), if one is killed they drop loot on the ground
 !4 feat: randomly appearing ghost (far away) to freak player out (in mysteriando)
 !3 feat: add physical wounds / states:
   - bleeding: lose 1 HP per turn until healed
-  - poisoned: lose 1 HP per turn until cured
   - cursed: random stat is halved until cured
   - burned: lose 1 HP per turn until healed, ATK halved until healed
   - frozen: cannot move or attack for a few turns, SPD halved until healed
   - paralyzed/webbed
-  - confused, walking in random direction
 
 -----------------ARTIFACTS-------------------
 - !2 [artifacts] feat: change ATK/DEF knowledge artifacts + their descriptions
@@ -1719,7 +1708,7 @@ more difficult:
     target.crate.hp = Math.max(0, target.crate.hp - damage)
     const broken = target.crate.hp === 0
     if (broken) {
-      map[y][x] = 'marble'
+      map[y][x] = 'dwarvencratepieces'
       target.level.crates.splice(target.index, 1)
       if (target.crate.lootKind) {
         groundItems.push({x, y, level: currentZ, levelKind: 'chain', caveIndex: -1,
@@ -8675,7 +8664,13 @@ more difficult:
           drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
-        const tileKey = map[my]?.[mx] || 'crypt2floor'
+        // Destruction is already saved as debris. Hide only its presentation
+        // until the old crate's lunge/death effect has finished.
+        const storedTileKey = map[my]?.[mx] || 'crypt2floor'
+        const crateFading = storedTileKey === 'dwarvencratepieces' && fxAnims.some(p =>
+          p.tileKey === 'dwarvencrate' && p.level === currentZ && p.x === mx && p.y === my &&
+          now < p.start + p.duration)
+        const tileKey = crateFading ? 'marble' : storedTileKey
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)

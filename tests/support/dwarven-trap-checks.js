@@ -1,3 +1,27 @@
+function trapCornerChecks() {
+  const check = (ok, msg) => { if (!ok) throw Error(msg) }
+  const dirs = [[0,-1],[1,0],[0,1],[-1,0]]
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const a = dirs[rotation], b = dirs[(rotation + 1) % 4]
+    const terrain = Array.from({length:7}, () => Array(7).fill('dwarvenwall'))
+    terrain[3][3] = 'marble'
+    terrain[3+a[1]][3+a[0]] = 'marble'
+    check(!DungeonTraps.usefulTriggerTile(terrain,3,3),'dead-end alcove rejected')
+    terrain[3+b[1]][3+b[0]] = 'marble'
+    check(DungeonTraps.usefulTriggerTile(terrain,3,3),'narrow corridor bend retained')
+    terrain[3+a[1]+b[1]][3+a[0]+b[0]] = 'marble'
+    check(!DungeonTraps.usefulTriggerTile(terrain,3,3),'skippable inside corner rejected in every rotation')
+    terrain[3+b[1]][3+b[0]] = 'dwarvenwall'
+    terrain[3-a[1]][3-a[0]] = 'dwarvendoorlocked'
+    check(DungeonTraps.usefulTriggerTile(terrain,3,3),'straight corridor with locked-door exit retained')
+    terrain[3-a[1]][3-a[0]] = 'dwarvendoorclosed'
+    check(DungeonTraps.usefulTriggerTile(terrain,3,3),'closed-door exit retained')
+    terrain[3+b[1]][3+b[0]] = 'marble'
+    check(DungeonTraps.usefulTriggerTile(terrain,3,3),'junction retained')
+  }
+  return true
+}
+
 function trapFixture() {
   replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
   raceOpen=invOpen=tradeOpen=mapOpen=false;stopAttackAnimation();stopCameraAnimation()
@@ -99,6 +123,7 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
     check(required.every(p=>reachable.has(keyXY(p.x,p.y))),'stairs, keys, lift accessible while avoiding every trap')
     for(const t of l.traps){
       check(DungeonTraps.isTrigger(l.map[t.trigger.y][t.trigger.x]),'mechanism has readable trigger')
+      check(DungeonTraps.usefulTriggerTile(l.map,t.trigger.x,t.trigger.y),'final trigger is not a skippable corner or dead end')
       check(!groundItems.some(g=>g.level===z&&g.x===t.trigger.x&&g.y===t.trigger.y),'no ground object on trigger')
       check(enemies.filter(e=>e.level===z).every(e=>DungeonTraps.safeSpawn(e.x,e.y,z)),'no monster starts near trap')
       if(t.emitter)check(l.map[t.emitter.y][t.emitter.x]==='dwarvenarrowwall','projectile mechanism retains emitter')
@@ -109,4 +134,4 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
   cfg.levelCountRange=range
   return {seed,count,traps:deepLevels.slice(2).map(l=>l.traps.length)}
 }
-module.exports={trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks}
+module.exports={trapCornerChecks,trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks}

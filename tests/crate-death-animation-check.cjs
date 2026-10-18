@@ -24,7 +24,10 @@ async function setup(animated, imageMode) {
       return Promise.resolve();
     }`)
   await run('tryMove(1,0)')
-  assert.equal(run("map[100][101]"), 'marble', 'crate collision resolves immediately')
+  assert.equal(run("map[100][101]"), 'dwarvencratepieces', 'crate collision resolves immediately')
+  assert.equal(run("isWalkable(101,100) && playerPathCanTraverse(101,100) && !TILE.dwarvencratepieces.projectileBlock && !TILE.dwarvencratepieces.blocksSight"), true,
+    'debris leaves movement, auto-travel, shots and sight open')
+  assert.equal(run("CODE_TILE[TILE_CODE.dwarvencratepieces]"), 'dwarvencratepieces', 'debris has its own save terrain code')
   assert.equal(run("groundItems.filter(g=>g.kind==='potion'&&g.x===101).length"), 1, 'loot is rolled only once')
 }
 
@@ -51,21 +54,24 @@ async function main() {
       }`)
     // Spy on the actual canvas drawing branch, not only the animation queue.
     if (imageMode) {
-      run(`var crateImageDraws=0;var originalVisualDraw=drawImageVisual;
+      run(`var crateImageDraws=0;var debrisImageDraws=0;var originalVisualDraw=drawImageVisual;
         drawImageVisual=(x,y,visual,alpha)=>{
+          if(visual?.image===RENDER_STYLE.terrainTiles.dwarvencratepieces.image) debrisImageDraws++;
           if(x===-TILE_PX/2 && y===-TILE_PX/2 &&
             visual?.image===RENDER_STYLE.terrainTiles.dwarvencrate.image) crateImageDraws++;
           return originalVisualDraw(x,y,visual,alpha)
         }`)
     } else {
       const ctx = context.document.getElementById('canvas').getContext('2d')
-      let crateGlyphDraws = 0
+      let crateGlyphDraws = 0, debrisGlyphDraws = 0
       const oldFill = ctx.fillText
       ctx.fillText = function(char,x,y) {
         if (char === '□' && x === 0) crateGlyphDraws++
+        if (char === ';') debrisGlyphDraws++
         return oldFill.call(this,char,x,y)
       }
       context.crateGlyphCounter = () => crateGlyphDraws
+      context.debrisGlyphCounter = () => debrisGlyphDraws
     }
     run('renderScene(1219)')
     assert.equal(run('potionDraws'), 0, 'loot stays hidden during the lunge')
@@ -74,7 +80,11 @@ async function main() {
     run('renderScene(1320)')
     assert.equal(run('potionDraws'), 0, 'loot stays hidden while the crate fades')
     assert.equal(run('fxAnims.length'), 1, 'crate remains throughout the sink/fade')
+    assert.equal(imageMode ? run('debrisImageDraws') : context.debrisGlyphCounter(), 0,
+      'debris is hidden throughout the intact-crate effect')
     run('renderScene(1641)')
+    assert.ok((imageMode ? run('debrisImageDraws') : context.debrisGlyphCounter()) > 0,
+      'debris appears after the effect in tile and ASCII modes')
     assert.ok(run('potionDraws') > 0, 'loot appears when the effect finishes')
     assert.equal(run('fxAnims.length'), 0, 'effect expires after its fade')
     assert.equal(run("groundItems.filter(g=>g.kind==='potion'&&g.x===101).length"), 1,

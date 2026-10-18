@@ -1,4 +1,4 @@
-const {trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks} = require('../support/dwarven-trap-checks')
+const {trapCornerChecks,trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks} = require('../support/dwarven-trap-checks')
 
 describe('Dwarven Ruins reusable traps', () => {
   beforeEach(() => {
@@ -18,6 +18,10 @@ describe('Dwarven Ruins reusable traps', () => {
         win.eval(trapFixture.toString())
       })
     })
+  })
+
+  it('rejects corners and dead ends while preserving corridor bends and door routes', () => {
+    cy.window().then(win => win.eval(`(${trapCornerChecks.toString()})()`))
   })
 
   it('resolves movement, blocking, safe paths, and uncredited deaths', () => {
@@ -102,7 +106,7 @@ describe('Dwarven Ruins reusable traps', () => {
     cy.window().then(win => win.eval(`(${trapPersistenceChecks.toString()})()`))
   })
 
-  for (const [seed,count,traits] of [[12345,3,[]],[24680,4,['hollow_world']],[67890,5,['grand_delving']]]) {
+  for (const [seed,count,traits] of [[12345,3,[]],[24680,4,['hollow_world','grand_delving']],[67890,5,['grand_delving']]]) {
     it(`preserves safe routes and seeded generation across ${count} floors`, () => {
       cy.window().then({timeout:120000}, win => win.eval(`(${trapGenerationChecks.toString()})(${seed},${count},${JSON.stringify(traits)})`))
     })

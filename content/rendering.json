@@ -768,6 +768,11 @@
       "baseTileKey": "marble",
       "scale": 1
     },
+    "dwarvencratepieces": {
+      "image": "img/tiles/dwarven-crate-pieces.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
     "dwarvenprisonbars": {
       "image": "img/tiles/dwarven-prison-bars.png",
       "baseTileKey": "marble",
