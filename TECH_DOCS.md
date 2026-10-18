@@ -2788,7 +2788,7 @@ included in saves and replay snapshots. The new save schema is **56**.
 
 ## Monster invisibility
 
-Myrka, Skerva, Kveld and Tulla have `invisibility`. While actively pursuing or
+Myrka, Skerva, Kveld, Tulla and Nymph have `invisibility`. While actively pursuing or
 attacking a visible player, they have a **25% chance** on an otherwise eligible
 action to vanish instead of moving or attacking. They remain invisible through
 **three subsequent enemy turns**, and the ability is unavailable for **eight
@@ -3211,7 +3211,7 @@ The default aggro range is:
 4
 ```
 
-On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target also needs a clear line of sight through walls; an alerted enemy may keep chasing around a corner within two tiles.
+On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary or due to a large speed disadvantage. Losing range ends active pursuit; the existing Alarmed status expires independently under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
 Any enemy that attacks the player becomes aggroed (shown as a red border
 around the enemy) in the same turn, even if the enemy's aggro range is very
@@ -3296,8 +3296,9 @@ they spot the player, including when they wander into detection range or first
 attack from an adjacent tile. Passive AGGRO 0 enemies remain unaffected.
 
 Alarmed temporarily adds 2 to the monster's effective AGGRO range without
-changing its saved base AGGRO. Existing visibility, invisibility, Temple,
-pathfinding, and chase rules still apply. A bystander newly Alarmed by the
+changing its saved base AGGRO. Alarmed monsters may pursue around sight-blocking
+corners while in range, but they still respect invisibility, concealment,
+sanctuary, and terrain/pathfinding rules. A bystander newly Alarmed by the
 sound of a hit logs `<name> is alarmed by the sounds of the battle.` only when
 visible in the main view at activation. The struck monster and a monster that
 first spots the player do not log a separate Alarmed message. Monsters obscured
@@ -3316,11 +3317,11 @@ Alarmed state and its originating level; older schema versions are rejected.
 Both alarm ranges have explicit runtime bindings initialized by `loadContent()`
 before gameplay starts; a missing binding prevents content loading in strict mode.
 
-An already-aware enemy standing on the outermost tile of its effective aggro
+An already-aware **non-Alarmed** enemy standing on the outermost tile of its effective aggro
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
 with a more transparent red than the rest of the aggro overlay.
 
-Enemies can also lose interest in the chase with a 25% chance per eligible
+**Non-Alarmed** enemies can also lose interest in the chase with a 25% chance per eligible
 response if the player's speed is at least twice as high. A successful dodge
 immediately before that roll changes only the log text, not the 25% chance or
 the existing awareness and turn behavior. Other losses of interest retain
@@ -6377,6 +6378,13 @@ map, field of view, side minimap, save state, or replay RNG. Reopening the map
 starts on the current level.
 The active minimap cache also checks the map and discovery-grid identities,
 because generic and Crypt z:-2 maps can have the same depth and cave index.
+
+The desktop side minimap follows the player by default, but dragging directly
+on it pans its view of the currently active floor with mouse or touch. Panning
+is clamped to map bounds; double-clicking the side minimap recenters on the
+player and resumes following. Changing the active floor or map also resumes
+following. Side-map panning is UI-only and does not move the character, reveal
+unexplored terrain, affect world-map browsing, or consume replay RNG.
 
 The hidden desktop side minimap is not repainted on mobile. Its dirty flag and
 player coordinates remain pending until it is visible again; opening the world

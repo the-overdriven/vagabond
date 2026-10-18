@@ -221,7 +221,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261008-2">
+  <link rel="stylesheet" href="css/style.css?v=20261018-minimap-pan">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -5576,8 +5576,10 @@ more difficult:
         if (enemyAttackPlayer(e)) return
         continue
       }
-      if (dist <= aggroRange && (enemyHasSight(e) || (e.aware && currentZ < 0 &&
-          (dist <= 2 || enemyHasAbility(e, 'ethereal')))) &&
+      // Once aware or Alarmed, monsters path around opaque corners while the
+      // player is still in effective aggro range. First acquisition still needs
+      // ordinary sight, and invisibility/sanctuary are handled above.
+      if (dist <= aggroRange && (enemyHasSight(e) || e.aware || e.alarmed) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemyHealSelf(e)) continue
@@ -5592,12 +5594,12 @@ more difficult:
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const slowEnough = effectiveEnemySpeed * 2 <= playerSpeed
-        if (e.aware && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
+        if (e.aware && !e.alarmed && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
           e.aware = false
           log(`The ${e.name} gives up the chase.`, 'info')
           continue
         }
-        if (e.aware && slowEnough && chance(0.25)) {
+        if (e.aware && !e.alarmed && slowEnough && chance(0.25)) {
           e.aware = false
           log(justEvaded
             ? `The ${e.name} hesitates after its dodge, giving you a moment to act.`
@@ -5610,8 +5612,12 @@ more difficult:
           e.forestConcealY = null
           alarmEnemy(e)
           aggroRange = effectiveAggroRange(e)
-          logEnemySpotting(e)
-          announceInspiredLeader(e)
+          // An Alarmed monster may start chasing after hearing noise through
+          // walls; don't claim it saw the player until it actually has sight.
+          if (enemyHasSight(e)) {
+            logEnemySpotting(e)
+            announceInspiredLeader(e)
+          }
         }
         if (tryEnemyHaste(e, dist)) continue
         const hasExtraPursuitTurn = effectiveEnemySpeed > playerSpeed && chance(0.25)
@@ -10228,10 +10234,18 @@ more difficult:
     if (treasureMapOpen) renderTreasureMapCanvas()
   }
 
+  // Side-map panning is presentation-only. It follows the player until dragged;
+  // changing the active level/map restores normal following automatically.
+  let sideMiniPanX = null, sideMiniPanY = null, sideMiniPanMap = null
+
   function sideMiniOrigin() {
+    if (sideMiniPanMap !== map) {
+      sideMiniPanX = sideMiniPanY = null
+      sideMiniPanMap = map
+    }
     return {
-      x: Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, player.x - (SIDE_VIEW_W >> 1))),
-      y: Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, player.y - (SIDE_VIEW_H >> 1)))
+      x: Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, sideMiniPanX ?? (player.x - (SIDE_VIEW_W >> 1)))),
+      y: Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, sideMiniPanY ?? (player.y - (SIDE_VIEW_H >> 1))))
     }
   }
 
@@ -11224,6 +11238,52 @@ more difficult:
   })
   document.getElementById('btnMapLevelUp').addEventListener('click', () => changeMapLevel(-1))
   document.getElementById('btnMapLevelDown').addEventListener('click', () => changeMapLevel(1))
+  let sideMiniDrag = null
+  sideMini.title = 'Drag to pan. Double-click to follow your character again.'
+  sideMini.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0 || sideMiniDrag) return
+    const origin = sideMiniOrigin()
+    sideMiniDrag = {id: ev.pointerId, x: ev.clientX, y: ev.clientY,
+      originX: origin.x, originY: origin.y, moved: false}
+    sideMini.setPointerCapture(ev.pointerId)
+    ev.preventDefault()
+  })
+  sideMini.addEventListener('pointermove', ev => {
+    if (!sideMiniDrag || ev.pointerId !== sideMiniDrag.id) return
+    if (!sideMiniDrag.moved) {
+      if (Math.abs(ev.clientX - sideMiniDrag.x) + Math.abs(ev.clientY - sideMiniDrag.y) < 3) return
+      sideMiniDrag.moved = true
+      sideMiniPanX = sideMiniDrag.originX
+      sideMiniPanY = sideMiniDrag.originY
+      sideMini.classList.add('dragging')
+    }
+    const bounds = sideMini.getBoundingClientRect()
+    if (bounds.width && bounds.height) {
+      // CSS scales this canvas, so convert screen deltas to world tiles.
+      sideMiniPanX -= (ev.clientX - sideMiniDrag.x) * SIDE_VIEW_W / bounds.width
+      sideMiniPanY -= (ev.clientY - sideMiniDrag.y) * SIDE_VIEW_H / bounds.height
+      sideMiniPanX = Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, sideMiniPanX))
+      sideMiniPanY = Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, sideMiniPanY))
+    }
+    sideMiniDrag.x = ev.clientX
+    sideMiniDrag.y = ev.clientY
+    renderMinimap()
+    ev.preventDefault()
+  })
+  function finishSideMiniDrag(ev) {
+    if (!sideMiniDrag || ev.pointerId !== sideMiniDrag.id) return
+    sideMiniDrag = null
+    sideMini.classList.remove('dragging')
+    if (sideMini.hasPointerCapture(ev.pointerId)) sideMini.releasePointerCapture(ev.pointerId)
+  }
+  sideMini.addEventListener('pointerup', finishSideMiniDrag)
+  sideMini.addEventListener('pointercancel', finishSideMiniDrag)
+  sideMini.addEventListener('lostpointercapture', finishSideMiniDrag)
+  sideMini.addEventListener('dblclick', () => {
+    sideMiniPanX = sideMiniPanY = null
+    renderMinimap()
+  })
+
   mini.style.touchAction = 'none'
   mini.addEventListener('wheel', (ev) => {
     if (!mapOpen) return

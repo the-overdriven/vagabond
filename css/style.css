@@ -520,6 +520,12 @@ body.hint-collapsed #hint .panel-toggle {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: #050403;
+  touch-action: none;
+  cursor: grab;
+}
+
+#sideMinimap.dragging {
+  cursor: grabbing;
 }
 
 .mini-actions {
