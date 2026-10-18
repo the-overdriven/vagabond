@@ -4,6 +4,9 @@
 function activePlayerStatuses() {
   if (player.hp <= 0) return []
   const statuses = []
+  const gas = DungeonHazards.activeGasStatus()
+  if (gas) statuses.push({id:'gas',icon:'☠',label:'Poison gas',counter:`${gas.remainingTurns}t`,
+    detail:`The chamber vents in ${gas.remainingTurns} turns. The emergency valve takes two turns; alternatively breach the exit with a weapon.`})
   const crusher = DungeonHazards.activeCrusherStatus()
   if (crusher) statuses.push({id:'crusher',icon:'⚠',label:'Crusher!',counter:'1t',
     detail:'The slab will fall after your next action. Step off the marked tracks now.'})

@@ -1260,6 +1260,13 @@
           "monsterOncePerCrusher": true,
           "footprintMin": 2,
           "footprintMax": 3
+        },
+        "gas": {
+          "durationTurns": 15,
+          "damageMaxHpFraction": 0.08,
+          "breachSuccessfulHits": 2,
+          "breachChanceCap": 0.5,
+          "valveActionTurns": 2
         }
       }
     }

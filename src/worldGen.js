@@ -5453,7 +5453,7 @@ function spawnDwarvenRuinsChests() {
     const safeRoute = DungeonTraps.safeReachable(level.map, entry,
       new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
     const rooms = (level.rooms || level._encounterRooms || []).filter(room =>
-      room.index !== 0 && room.archetype !== 'Entrance Hall' && !room.landmark && !room.gallery)
+      room.index !== 0 && room.archetype !== 'Entrance Hall' && !room.landmark && !room.gallery && !room.gasChamber)
     const vaultByRoom = new Map((level.vaults || []).map(vault => [vault.roomId, vault]))
     const candidatesForRoom = room => {
       const spots = []
@@ -5480,7 +5480,8 @@ function spawnDwarvenRuinsChests() {
       prisonIds.has(item.dungeonRoomId) && !item.vaultId).length
     // Prison caches replace discretionary treasury chests rather than adding
     // free rewards. Guaranteed royal and artifact chests remain untouched.
-    const chestCount = Math.max(0, dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length) - prisonCellChests)
+    const gasChamberChests = groundItems.filter(item => item.level === z && item.gasChamberId).length
+    const chestCount = Math.max(0, dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length) - prisonCellChests - gasChamberChests)
     const roomUse = new Map()
     for (let n = 0; n < chestCount; n++) {
       const available = rooms.map(room => ({room, spots:candidatesForRoom(room)})).filter(entry => entry.spots.length)

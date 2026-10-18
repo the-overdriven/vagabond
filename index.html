@@ -6452,6 +6452,7 @@ more difficult:
       if (g.kind === 'chest') {
         if (g.opened) continue
         g.opened = true
+        DungeonHazards.onChestOpened(g)
 
         const mf = playerMf()
         const chestTier = Math.max(1, g.tier)
@@ -6776,7 +6777,7 @@ more difficult:
       flushPendingMove()
       return
     }
-    if (player.rootTurns > 0 && (dx !== 0 || dy !== 0)) {
+    if (player.rootTurns > 0 && (dx !== 0 || dy !== 0) && map[ny]?.[nx] !== 'dwarvengasvalve') {
       clearAutoPath()
       log('You struggle against the Dreadling’s roots.', 'bad')
       spawnDamageNumber(player.x, player.y, 'Rooted!', '#afdf88')
@@ -6826,6 +6827,11 @@ more difficult:
     let moved = false
     const fromPos = {x: player.x, y: player.y}
     const fromTile = map[player.y]?.[player.x]
+    if (map[ny]?.[nx] === 'dwarvengasvalve' && DungeonHazards.onValveInteraction(nx,ny)) {
+      clearAutoPath();consecutiveWaitTurns=0
+      enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return
+    }
     if (['dwarvenlever', 'dwarvenleverpulled'].includes(map[ny]?.[nx]) && activateDwarvenLiftLeverAt(nx, ny)) return
     if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
       const openingGate = map[ny]?.[nx] === 'dwarvengateclosed'
@@ -6844,6 +6850,17 @@ more difficult:
         flushPendingMove()
         return
       }
+    }
+    if (DungeonHazards.doorHazard(nx,ny)?.state === 'active' && map[ny]?.[nx] === 'dwarvendoorlocked') {
+      clearAutoPath()
+      const armed = isWeaponItem(player.equip.weapon)
+      DungeonHazards.onDoorInteraction(nx,ny,armed)
+      if (armed) {
+        consecutiveWaitTurns = 0
+        if (!replayAnimationsDisabled && !replaySimulationMode) void animateAttackLunge(player.x,player.y,nx,ny)
+        enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      } else {render();updateTooltip();flushPendingMove()}
+      return
     }
     if (isLockedDungeonDoorTile(map[ny]?.[nx])) {
       const lockInfo = DUNGEON_LOCK_STATE[map[ny][nx]]
@@ -8731,6 +8748,16 @@ more difficult:
             ctx.restore()
           }
         }
+        if (undergroundVisible && undergroundVisible.has(keyXY(mx,my)) &&
+          DungeonHazards.gasAt(mx,my)) {
+          ctx.fillStyle='rgba(92, 174, 62, 0.24)'
+          ctx.fillRect(px, py, TILE_PX, TILE_PX)
+          if (!USE_TILE_IMAGES) {
+            ctx.fillStyle='#a4ed80'
+            ctx.font=`${Math.max(10,Math.round(TILE_PX*.28))}px monospace`
+            ctx.fillText('≈',px+TILE_PX*.67,py+TILE_PX*.32)
+          }
+        }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
             ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
@@ -9491,6 +9518,10 @@ more difficult:
     }
     const g = groundItems.find(gi => onCurrentLevel(gi) && gi.kind !== 'gear' && gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' && gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
     if (g) {
+      if (g.kind === 'chest' && g.gasChamberId) return {
+        mini: true, enemy: null,
+        html: '<div class="nm">Dwarven Chest</div><div>Strange pipes lead toward this chest. An emergency valve stands nearby.</div>'
+      }
       if (g.kind === 'campfire') return {
         mini: true,
         enemy: null,
@@ -9522,6 +9553,14 @@ more difficult:
     }
     if (mx >= 0 && my >= 0 && mx < MAP_W && my < MAP_H && map[my][mx] === 'bigbell') {
       return {mini: true, enemy: null, html: `<div class="nm">Big Bell</div>`}
+    }
+    if (map[my]?.[mx] === 'dwarvengasvalve') return {
+      mini: true, enemy: null,
+      html: '<div class="nm">Emergency Valve</div><div>Two turns to release the pressure. Bump or tap it from an adjacent tile.</div>'
+    }
+    if (map[my]?.[mx] === 'dwarvengasvent') return {
+      mini: true, enemy: null,
+      html: '<div class="nm">Dwarven Vent</div><div>The grating bears suspicious green stains.</div>'
     }
     if (beastTrackAt(mx, my) && discovered[my]?.[mx]) {
       return {mini: true, enemy: null, html: '<div class="nm">foot tracks?</div>'}
@@ -9649,6 +9688,13 @@ more difficult:
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
     updateMobileInfoPanel(mx, my)
+    // Valve use is the same replayable movement interaction on desktop/mobile.
+    if (map[my]?.[mx] === 'dwarvengasvalve' &&
+      Math.max(Math.abs(mx-player.x),Math.abs(my-player.y))===1) {
+      clearAutoPath()
+      void tryMove(mx-player.x,my-player.y)
+      return
+    }
     // A tap on an adjacent open door is an interaction, not a path request.
     // Occupied/open-but-ineligible doors are left unchanged without a turn.
     if (DUNGEON_DOOR_CLOSED_STATE[map[my]?.[mx]] &&

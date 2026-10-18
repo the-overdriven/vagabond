@@ -1627,6 +1627,72 @@ terrain tiles. No conversion from old saved worlds is supported. The existing
 hidden wall-arrow plate remains disguised as marble; only Crusher plates are
 visibly marked with `dwarven-pressure-plate.png`.
 
+### Sealed poison-gas treasure chambers (v83)
+
+From **z:-5 downward**, one major hazard per floor remains the upper limit:
+Crusher has a **30% floor-selection weight**, gas chamber **25%**, and no
+major hazard **45%**. Each option is selected by a feature-scoped seed/depth
+roll; an invalid optional placement is **skipped**, not rerolled into another
+hazard. A gas chamber can occupy only a non-Prison, optional **single-doorway
+side room** without mandatory progression, vaults, keys, stairs or royal/artifact
+loot. The room must fit two linked entrance leaves, a reachable ordinary chest
+and a separate walkable approach to a visible valve. Existing prisons retain
+their guaranteed quotas. A chamber chest replaces discretionary dungeon loot
+rather than adding unlimited extra rewards.
+
+Even before opening the chest, distinctive **vent grates and a pressure-release
+valve** signal danger; the chest itself is the trigger. Bumping or tapping an
+adjacent valve operates it with the same deterministic player-action system as
+movement. The first turn of valve operation is saved and persists if the player
+steps away or fights before finishing. **Two valve interaction turns** fully
+open it. The valve works without a weapon or matching key. Normal dungeon locks,
+breaching, entrance keys and ordinary door behavior are unchanged.
+
+Opening the marked chest awards its loot exactly once, closes any intact
+owned entrance leaves under an **emergency seal**, then begins a **15-action
+gas window**. The opening action is free of gas damage. Thereafter, each
+consumed player action while inside the room (including failed breach attempts
+and waiting) deals `max(1, ceil(0.08 × current maximum HP))`, bypassing
+numerical DEF, dodge and armor glancing. The exposure test is performed
+**after** movement or an interaction, so stepping onto a broken/open doorway,
+opening the valve, or leaving the room ends damage for that action. There is
+no poison-status timer to cure. God Mode and one-use fatal-hit protection still
+apply. Monsters remaining inside also take environmental max-HP damage; deaths
+award no player XP or kill credit. The room vents by itself after **15 active
+turns**, leaving no permanent lock.
+
+A sealed entrance can alternatively be broken with an equipped weapon. It
+requires **two successful hits** across the pair of leaves with independent
+success per attempted action `P = min(0.50, playerBreachAtk() / 100)`.
+Failures consume a turn and use ordinary door-breach Alarm rolls. The two
+leaves share progress, so alternating them does not reset or duplicate work;
+no key can unlock the emergency seal. Fists can never breach it, so the visible
+valve is always the weapon-independent response. A pre-breached leaf stays
+broken even if the chest triggers later. A creature occupying a leaf does not
+prevent sealing: it may move **off** the occupied tile on its next action but
+no new actor may move onto a sealed leaf. Items on door tiles remain present
+for recovery; they do not jam the mechanism.
+
+Gas chambers use two **100×100 object-only transparent PNGs** placed over the
+normal marble background (`dwarven-gas-valve.png` and
+`dwarven-gas-vent.png`). Gas inside the chamber has a readable green floor
+overlay in tiles and a supplementary `≈` mark in ASCII, and while exposed the
+player's status strip displays the active timer. The chamber's authoritative
+`hazards[]` entry contains immutable post-rotation world-space geometry,
+valve progress, door successful-hit progress, remaining turns, and the
+`dormant → active → vented` state. All values persist across save/load and
+replay; no render frame or inventory redraw advances the gas clock, and other
+z-level turns do not advance it. A fatal hit records **`poison gas`**
+separately from `dwarven crusher` or `dungeon trap` in death payloads.
+**Save/replay schema 83, game v161** introduces the gas tiles and chamber
+state; old save compatibility is intentionally not provided.
+
+The browser client supports these death cause strings, but a deployed Graveyard
+or Highscores database may separately constrain `cause_of_death`. Confirm that
+its constraint includes `poison gas` and `dwarven crusher` before deploying;
+otherwise the server may reject those death submissions even when the game
+shows the correct local cause.
+
 The four throne-facing sprites are supplied as **100×100 transparent PNGs**,
 with the original artwork scaled proportionally. The Death Bolt projectile
 uses the standalone `img/projectiles/death-bolt.png` sprite and preloads through

@@ -821,6 +821,16 @@
       "image": "img/tiles/dwarven-crusher-track.png",
       "baseTileKey": "marble",
       "scale": 1
+    },
+    "dwarvengasvalve": {
+      "image": "img/tiles/dwarven-gas-valve.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvengasvent": {
+      "image": "img/tiles/dwarven-gas-vent.png",
+      "baseTileKey": "marble",
+      "scale": 1
     }
   },
   "projectiles": {

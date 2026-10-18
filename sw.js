@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-hotfix-20261018';
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -39,6 +39,8 @@ const PRECACHE_URLS = [
   './src/ice.js',
   './img/tiles/ice.png',
   './img/tiles/cracking-ice-overlay.svg',
+  './img/tiles/dwarven-gas-valve.png',
+  './img/tiles/dwarven-gas-vent.png',
   './src/npcFisherman.js',
   './src/fov.js',
   './src/replay.js',

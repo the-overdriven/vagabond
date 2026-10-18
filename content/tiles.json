@@ -572,6 +572,22 @@
       "walk": true,
       "projectileBlock": false,
       "blocksSight": false
+    },
+    "dwarvengasvalve": {
+      "ch": "⚙",
+      "color": "#b78649",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvengasvent": {
+      "ch": "⊞",
+      "color": "#738c63",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
     }
   },
   "tileCode": {
@@ -655,7 +671,9 @@
     "dwarvendais": "╜",
     "dwarventhrone": "╙",
     "dwarvencrusherplate": "╞",
-    "dwarvencrushertrack": "╟"
+    "dwarvencrushertrack": "╟",
+    "dwarvengasvalve": "╢",
+    "dwarvengasvent": "╣"
   },
   "tileDesc": {
     "ice": "lake ice",
@@ -736,7 +754,9 @@
     "dwarvendais": "a worn ceremonial stone dais, etched with fading dwarven symbols",
     "dwarventhrone": "a massive dwarven stone throne, empty and silent beneath the ruined halls",
     "dwarvencrusherplate": "a conspicuous dwarven pressure plate linked to a crushing stone slab; stepping on it may start the mechanism",
-    "dwarvencrushertrack": "deep scored tracks in the marble: a giant slab can descend over this ground"
+    "dwarvencrushertrack": "deep scored tracks in the marble: a giant slab can descend over this ground",
+    "dwarvengasvalve": "a conspicuous corroded emergency pressure-release valve connected to the poison-gas vents; it takes two turns to fully open",
+    "dwarvengasvent": "a dwarven vent with green residue around its grate; something dangerous may be piped into the room"
   },
   "terrainSpeed": {
     "grass": 1,
