@@ -23,14 +23,36 @@ describe('Dwarven Ruins ordinary doors', () => {
 
       const ruins = deepLevels.slice(2)
       const doors = []
+      let galleryEndDoors = 0
       for (let floorIndex = 0; floorIndex < ruins.length; floorIndex++) {
-        const grid = ruins[floorIndex].map
+        const level = ruins[floorIndex]
+        const grid = level.map
+        const special = new Set(level.rooms.filter(r => r.gallery)
+          .map(r => keyXY(r.gallery.farDoor.x, r.gallery.farDoor.y)))
+        galleryEndDoors += special.size
+        const paired = new Set()
+        for (const room of level.rooms) for (const doorway of room.doorways || []) {
+          check(doorway.length === 2, 'structural room entrance has two leaves')
+          for (const p of doorway) {
+            if (grid[p.y]?.[p.x] === 'dwarvendoorclosed') paired.add(keyXY(p.x, p.y))
+          }
+        }
+        // A crossfire gallery has one additional, deliberately single-leaf
+        // door between its firing aisle and its optional reward alcove.
         for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-          if (grid[y]?.[x] === 'dwarvendoorclosed') doors.push({floorIndex, x, y})
+          if (grid[y]?.[x] !== 'dwarvendoorclosed') continue
+          const key = keyXY(x, y)
+          check(paired.has(key) || special.has(key), 'closed door belongs to a structural entrance or gallery alcove')
+          if (!special.has(key)) doors.push({floorIndex, x, y})
+        }
+        for (const key of special) {
+          const gallery = level.rooms.find(r => r.gallery && keyXY(r.gallery.farDoor.x, r.gallery.farDoor.y) === key)
+          check(!!gallery && grid[gallery.gallery.farDoor.y]?.[gallery.gallery.farDoor.x] === 'dwarvendoorclosed',
+            'gallery reward door remains a closed single-leaf entrance')
         }
       }
       check(doors.length >= 2, 'fixed seed generates ordinary doors')
-      check(doors.length % 2 === 0, 'ordinary doors are generated as two-leaf entrances')
+      check(galleryEndDoors > 0, 'fixed seed also exercises the separate gallery-door rule')
       check(TILE.dwarvendoorclosed.walk === false, 'closed door blocks movement')
       check(TILE.dwarvendoorclosed.blocksSight === true, 'closed door blocks sight')
       check(TILE.dwarvendoorclosed.projectileBlock === true, 'closed door blocks projectiles')

@@ -1693,6 +1693,50 @@ its constraint includes `poison gas` and `dwarven crusher` before deploying;
 otherwise the server may reject those death submissions even when the game
 shows the correct local cause.
 
+### Dwarven Ruins integration rules and verification (v162)
+
+Ordinary room entrances remain **two-leaf doorways**. A crossfire gallery has
+one additional **single-leaf reward-alcove door** at the far end; it is not an
+ordinary room entrance and must not be counted when testing ordinary-door
+pairing. Tests identify both door categories from the generated room metadata
+rather than making assumptions about the parity of all closed-door tiles.
+Bumping an ordinary closed door still opens it in one consumed action; opened
+state persists through save/replay, and normal door closing remains available.
+The two leaves of an *active gas-chamber emergency seal* are a different
+mechanism and still share breach progress, as described above.
+
+Both dangerous room types remain **optional and visibly telegraphed**:
+Crusher pressure plates and tracks mark impact tiles, while gas vents and the
+emergency valve identify suspicious treasure chambers before opening a chest.
+The Crusher provides one spent-action reaction window with no temporary
+blocking terrain; gas can be escaped via the two-turn valve or weapon strikes.
+Neither introduces unavoidable progression locks. Environmental monster deaths
+grant no XP. Timers depend on consumed actions on the active floor rather than
+animation time, and state restores without additional random rolls.
+
+The deterministic Ruins survey (`node tests/dwarven-ruins-hazard-survey.cjs`)
+uses the actual generator and validates floor-count range, prison quotas,
+registered door geometry, optional galleries and their shooters, hazard placement,
+progression topology and selected save/restoration states. Its short fixed-seed
+sample found **42/42 valid floors in 12 worlds** (7 three-floor, 4 four-floor,
+1 five-floor), with **116 functional prison rooms against 113 required**, 12
+galleries, 9 Crushers and 4 gas chambers. These are *sample outcomes*, not the
+intended global spawn rates. For release statistics, run `node tests/dwarven-ruins-hazard-survey.cjs --full` (500 seeds), then inspect actual
+spawn frequencies, key/loot density and recovery cost for different player
+builds. The short survey does **not** establish stable long-run frequencies,
+unmodified loot economics or expected crossing damage.
+
+Rule-level checks additionally cover real bump/open/close actions, prison cell
+quotas, crossfire shooter geometry, trapped doors, hazard damage, valve/breach,
+traps' DEF bypass, throne rotation and Death Bolt. Browser Cypress execution,
+mobile/tile/ASCII visual inspection and Supabase death-cause constraints are
+separate release gates; headless rule checks are not substitutes. The currently
+supported death labels are `dwarven crusher`, `poison gas` and `dungeon trap`.
+
+**Game v162** ships regression and survey improvements without changing game
+mechanics, serialized state or the deterministic action contract. The
+**save/replay schema stays 83**. No older-save compatibility is introduced.
+
 The four throne-facing sprites are supplied as **100×100 transparent PNGs**,
 with the original artwork scaled proportionally. The Death Bolt projectile
 uses the standalone `img/projectiles/death-bolt.png` sprite and preloads through
