@@ -3984,6 +3984,19 @@ function keyXY(x, y) {
   return x + ',' + y
 }
 
+// Ultra-rare species are individual encounters in a world, not recurring mobs.
+// The existing enemy roster and world-level kill history are already saved and
+// replayed, so no extra persistent flag or random roll is needed here.
+function naturalSpawnEligible(tmpl) {
+  if (!tmpl) return false
+  if (Number(tmpl.rarity ?? 1) > 0.02) return true
+  // Vampire has its own guaranteed distant underground placement, after
+  // ordinary surface/cave/Ruins populations have been generated.
+  if (tmpl.name === 'Vampire') return false
+  return !worldKilledSpecies.has(tmpl.name) &&
+    !enemies.some(e => (e.baseName || e.name) === tmpl.name)
+}
+
 function spawnEnemies() {
   const cfg = WORLD_GEN_CONFIG.surfaceEnemies
   const weights = cfg.tierWeights // tier 1..5
@@ -4033,6 +4046,7 @@ function spawnEnemies() {
   }
 
   function spawnOneFromTemplate(tmpl, preferredPool = null) {
+    if (!naturalSpawnEligible(tmpl)) return false
     const pool = preferredPool || poolFor(tmpl)
     if (!pool.length) return false
     let x = 0, y = 0, tries = 0, placed = false
@@ -4089,7 +4103,8 @@ function spawnEnemies() {
         break
       }
     }
-    const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier)
+    const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier && naturalSpawnEligible(e))
+    if (!templates.length) continue
     const tmpl = pickWeighted(templates, t => (t.rarity ?? 1) * (t.humanoid ? 1 : cfg.nonHumanoidRarityMultiplier))
     spawnOneFromTemplate(tmpl)
   }
@@ -4373,6 +4388,7 @@ function spawnCaveScenarios() {
       ;[roomOrder[i], roomOrder[j]] = [roomOrder[j], roomOrder[i]]
     }
     const makeEnemy = (tmpl, spot, prefix = null) => {
+      if (!naturalSpawnEligible(tmpl)) return
       const e = {name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level,
         levelKind: 'chain', caveIndex, hp: tmpl.hp, maxHp: tmpl.hp, atk: tmpl.atk,
         def: tmpl.def, spd: tmpl.spd, abilities: [...tmpl.abilities], humanoid: !!tmpl.humanoid,
@@ -4723,7 +4739,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     // Do not override wandering for tactical roles: addEnemy applies each
     // species mode and home radius, including underground far -> roam.
     const spawnTemplate = (tmpl, spot, prefix = null, role = 'any', familyId = null, roomId = null, vaultId = null) => {
-      if (!tmpl || !spot) return false
+      if (!spot || !naturalSpawnEligible(tmpl)) return false
       const enemy = {
         name: tmpl.name,
         baseName: tmpl.name,
@@ -4991,10 +5007,10 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     // Corridors are unthemed wandering encounters, like ambient roamers.
     // Select globally so 0.02 retains its weight relative to all other
     // eligible species, including those outside the selected room families.
-    const corridorPool = eligible
+    const corridorPool = roamerPool
     let corridorSpent = 0, corridorAttempts = 0
     while (corridorSpent < corridorTarget && spent < threatBudget && corridorAttempts++ < 100) {
-      const affordable = corridorPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
+      const affordable = corridorPool.filter(tmpl => naturalSpawnEligible(tmpl) && Math.max(1, tmpl.tier) <= threatBudget - spent)
       if (!affordable.length) break
       const candidates = corridorSites.filter(p => validSpot(p))
       if (!candidates.length) break
@@ -5011,7 +5027,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     // but all encounter roles now share normal species wandering behavior.
     let guard = 0
     while (spent < threatBudget && guard++ < 100) {
-      const affordable = roamerPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)
+      const affordable = roamerPool.filter(tmpl => naturalSpawnEligible(tmpl) && Math.max(1, tmpl.tier) <= threatBudget - spent)
       if (!affordable.length) break
       const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
       const spot = takeSpot(null)

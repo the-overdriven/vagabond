@@ -47,6 +47,30 @@ describe('Ultra-rare enemy templates', () => {
     })
   })
 
+  it('spawns ultra-rare species at most once across surface and underground for the DRUSK regression seed', () => {
+    cy.visit('/')
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.window().then(win => win.eval(`(async () => {
+      const check = (ok, msg) => {if (!ok) throw new Error(msg)}
+      replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
+      applyWorldTraits([], 'M');WORLD_SEED=1318026413;rngState=WORLD_SEED
+      await generateNewWorld()
+      const ultra=enemies.filter(e=>Number(ENEMY_TEMPLATE_BY_NAME[e.baseName]?.rarity??1)<=0.02)
+      const species=ultra.map(e=>e.baseName)
+      check(new Set(species).size===species.length,'ultra-rare species are unique world-wide')
+      check(!enemies.some(e=>e.ordinarySurface&&e.baseName==='Vampire'),'Vampire is reserved for underground')
+      check(enemies.filter(e=>e.baseName==='Vampire').length===1,'one guaranteed Vampire')
+      check(enemies.filter(e=>e.ordinarySurface).length>=100,'surface population is not reduced by rare exclusions')
+      check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME['Giant Toad']),'rarity 0.1 remains repeatable')
+      const before=JSON.stringify({rngState,ultra:ultra.map(e=>({name:e.baseName,id:e.id,level:e.level,x:e.x,y:e.y}))})
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(saved,{isReplayInit:true})
+      const restored=enemies.filter(e=>Number(ENEMY_TEMPLATE_BY_NAME[e.baseName]?.rarity??1)<=0.02)
+      check(JSON.stringify({rngState,ultra:restored.map(e=>({name:e.baseName,id:e.id,level:e.level,x:e.x,y:e.y}))})===before,
+        'rare species and RNG persist unchanged on replay-style load')
+    })()`))
+  })
+
   it('gives ordinary and prefixed surface rares two sightings regardless of wander mode or humanoid type', () => {
     cy.visit('/')
     cy.get('#raceOverlay .panelbox').should('be.visible')

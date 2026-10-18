@@ -6695,7 +6695,7 @@ more difficult:
       candidates.push({x: nx, y: ny})
     }
     if (!candidates.length) return
-    const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest'))
+    const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest') && naturalSpawnEligible(t))
     if (!templates.length) return
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
     const spot = pick(candidates)

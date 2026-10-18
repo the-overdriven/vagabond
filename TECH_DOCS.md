@@ -1363,8 +1363,12 @@ wanderers. Both roaming selections use the **full depth-eligible species pool**,
 not just the selected dominant families or their leftovers, and use each
 species' configured rarity as a direct relative weight. Thus a `0.02` species
 has one fiftieth of the selection weight of an otherwise eligible `1.0` species
-in these global draws. This is a relative weight, not a 2% spawn chance or a
-promise of one rare encounter per floor. Themed room populations remain
+in these global draws. This is a relative weight, not a 2% spawn chance.
+All naturally spawned ultra-rare species (`rarity <= 0.02`) have a shared,
+**world-wide limit of one individual per species** across surface and underground.
+After one is spawned, subsequent weighted selections exclude that species;
+other eligible monsters fill the population instead. Rare species with higher
+rarity (such as `0.1`) can still repeat. Themed room populations remain
 predictable while wandering encounters can occasionally be exceptional.
 **All** Ruins enemies use their species' normal idle wandering mode and home radius,
 including Champions, escorts, ranged backliners and other tactical room/vault guards.
@@ -2192,7 +2196,17 @@ After the tier is chosen, the species inside that tier is selected by its
 `rarity` weight. `rarity` is a **relative weight**, not an absolute spawn
 percentage: a template with `rarity: 0.02` receives one fiftieth of the weight
 of a same-tier `rarity: 1.0` template. Surface world traits may further adjust
-non-humanoid weighting.
+non-humanoid weighting. An ultra-rare species (`rarity <= 0.02`) can spawn
+**only once naturally in an entire world** (surface, dungeon encounters and
+forest ambushes combined): after its first spawn, it is excluded from further
+natural selection and other eligible monsters fill the slot. 
+This is a per-species limit, not a limit on how many different rare species can exist. 
+The Vampire is reserved for its guaranteed distant underground encounter instead 
+of the ordinary weighted pools.
+Species at `0.1` are uncommon but are not subject to the single-spawn limit.
+No additional persistent state is required: the game checks the existing
+world enemy roster and saved world-wide killed-species history. This limit
+applies when generating new monsters and does not delete existing save enemies.
 
 Higher-tier enemies are placed farther from the Temple during normal surface
 enemy spawning.
@@ -2251,8 +2265,9 @@ Spawned enemies receive approximately 95%–105% random variance from template s
 # 19. Enemy Roster
 
 Current templates contain **75 enemies**. The all-uppercase species are the
-ultra-rare additions; each uses `rarity: 0.02` and otherwise participates in
-the normal tier, biome, distance, prefix, wandering, and stat-variance rules.
+ultra-rare additions; each uses `rarity: 0.02` and follows the normal
+tier, biome, distance, prefix, wandering, and stat-variance rules, subject to
+the world-wide one-per-species natural-spawn limit described above.
 
 ### Tier 1
 
