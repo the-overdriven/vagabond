@@ -1364,11 +1364,12 @@ not just the selected dominant families or their leftovers, and use each
 species' configured rarity as a direct relative weight. Thus a `0.02` species
 has one fiftieth of the selection weight of an otherwise eligible `1.0` species
 in these global draws. This is a relative weight, not a 2% spawn chance.
-All naturally spawned ultra-rare species (`rarity <= 0.02`) have a shared,
-**world-wide limit of one individual per species** across surface and underground.
-After one is spawned, subsequent weighted selections exclude that species;
-other eligible monsters fill the population instead. Rare species with higher
-rarity (such as `0.1`) can still repeat. Themed room populations remain
+Only species explicitly marked `"ultraRare": true` in `enemy_templates.json`
+are limited to **one individual per species per world**, across surface,
+underground and forest ambush generation. A low `rarity` weight by itself does
+not imply uniqueness. After an ultra-rare species spawns, subsequent weighted
+selections exclude it and other eligible monsters fill those slots. Unflagged
+species, including Myrka (`0.02`) and Vampire (`0.01`), can repeat. Themed room populations remain
 predictable while wandering encounters can occasionally be exceptional.
 **All** Ruins enemies use their species' normal idle wandering mode and home radius,
 including Champions, escorts, ranged backliners and other tactical room/vault guards.
@@ -2196,17 +2197,19 @@ After the tier is chosen, the species inside that tier is selected by its
 `rarity` weight. `rarity` is a **relative weight**, not an absolute spawn
 percentage: a template with `rarity: 0.02` receives one fiftieth of the weight
 of a same-tier `rarity: 1.0` template. Surface world traits may further adjust
-non-humanoid weighting. An ultra-rare species (`rarity <= 0.02`) can spawn
-**only once naturally in an entire world** (surface, dungeon encounters and
-forest ambushes combined): after its first spawn, it is excluded from further
-natural selection and other eligible monsters fill the slot. 
-This is a per-species limit, not a limit on how many different rare species can exist. 
-The Vampire is reserved for its guaranteed distant underground encounter instead 
-of the ordinary weighted pools.
-Species at `0.1` are uncommon but are not subject to the single-spawn limit.
-No additional persistent state is required: the game checks the existing
-world enemy roster and saved world-wide killed-species history. This limit
-applies when generating new monsters and does not delete existing save enemies.
+non-humanoid weighting. The independent `"ultraRare": true` template flag,
+not the numeric rarity, enforces **at most one spawned individual of that
+species per world** across surface, caves, Dwarven Ruins and forest ambushes.
+Currently only NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN have
+this flag. An absent flag is `false`. Once one of these species spawns, even if
+it later dies, it cannot spawn again in the same world; a different eligible
+monster fills subsequent ordinary weighted slots. Other species are unaffected.
+In particular, Myrka (`0.02`) and Vampire (`0.01`) may spawn multiple times.
+At least one Vampire is still guaranteed in a distant eligible underground
+crypt or bat cave; this does not prevent other natural Vampire spawns.
+No additional persistent state is required: the existing saved enemy roster
+and world-wide killed-species history enforce uniqueness, including across
+permadeath characters. Existing saved enemies are never removed.
 
 Higher-tier enemies are placed farther from the Temple during normal surface
 enemy spawning.
@@ -2242,6 +2245,7 @@ SPD
 GRACE
 Tier
 Rarity weight
+Optional `ultraRare: true` (one spawned individual of that species per world)
 Aggro
 Biomes
 Evade capability
@@ -2264,10 +2268,12 @@ Spawned enemies receive approximately 95%–105% random variance from template s
 
 # 19. Enemy Roster
 
-Current templates contain **75 enemies**. The all-uppercase species are the
-ultra-rare additions; each uses `rarity: 0.02` and follows the normal
-tier, biome, distance, prefix, wandering, and stat-variance rules, subject to
-the world-wide one-per-species natural-spawn limit described above.
+Current templates contain **75 enemies**. The seven all-uppercase species
+NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN use `rarity: 0.02`
+and `ultraRare: true`. They follow the normal tier, biome, distance, prefix,
+wandering and stat-variance rules, but each is limited to one spawned
+individual per world. Other rare creatures, including Myrka and Vampire,
+do not have this limit.
 
 ### Tier 1
 
@@ -5388,8 +5394,9 @@ so the Hunter can offer a fresh quest in the surviving world.
 ## Rare monster sightings and flight
 
 `src/rareFlee.js` applies to living, unalarmed surface enemies whose **base template**
-has `rarity <= 0.02`, independent of quest membership, prefix, humanoid type, and
-wander mode. Current species: Myrka, Vampire, NULK, SKELD, DRUSK, GAUR, ASHFANG,
+has `rarity <= 0.02`, independent of the `ultraRare` uniqueness flag, quest
+membership, prefix, humanoid type and wander mode. Current species: Myrka,
+Vampire, NULK, SKELD, DRUSK, GAUR, ASHFANG,
 MIREHOWL, NHALUUN. Kveld and other more common templates retain normal AI.
 Underground encounters use normal AI; an off-level flight pauses until returning.
 

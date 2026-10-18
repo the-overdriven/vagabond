@@ -3984,15 +3984,13 @@ function keyXY(x, y) {
   return x + ',' + y
 }
 
-// Ultra-rare species are individual encounters in a world, not recurring mobs.
-// The existing enemy roster and world-level kill history are already saved and
-// replayed, so no extra persistent flag or random roll is needed here.
+// Only explicitly flagged ultra-rare species are limited to one world-wide
+// encounter. Rarity weights are independent: Myrka and Vampire can repeat.
+// The saved enemy roster and world kill history enforce the limit, including
+// after the first individual dies or a new permadeath character begins.
 function naturalSpawnEligible(tmpl) {
   if (!tmpl) return false
-  if (Number(tmpl.rarity ?? 1) > 0.02) return true
-  // Vampire has its own guaranteed distant underground placement, after
-  // ordinary surface/cave/Ruins populations have been generated.
-  if (tmpl.name === 'Vampire') return false
+  if (tmpl.ultraRare !== true) return true
   return !worldKilledSpecies.has(tmpl.name) &&
     !enemies.some(e => (e.baseName || e.name) === tmpl.name)
 }

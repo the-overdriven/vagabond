@@ -1,4 +1,4 @@
-describe('Ultra-rare enemy templates', () => {
+describe('Rare monster templates and ultra-rare uniqueness', () => {
   const expected = {
     'Vampire': {tier:4, rarity:0.01},
     'Tokka': {tier:2, rarity:0.1},
@@ -26,6 +26,11 @@ describe('Ultra-rare enemy templates', () => {
     cy.request('/content/enemy_templates.json').then(({body}) => {
       expect(new Set(body.map(template => template.name)).size, 'enemy names remain unique').to.equal(body.length)
       const byName = new Map(body.map(template => [template.name, template]))
+      const unique=['NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
+      expect(body.filter(t=>t.ultraRare===true).map(t=>t.name).sort(),
+        'only the requested seven species have the explicit flag').to.deep.equal(unique.sort())
+      expect(body.every(t=>t.ultraRare===undefined || t.ultraRare===true),
+        'other templates omit the flag').to.equal(true)
       const validBiomes = new Set(['grass', 'forest', 'hill', 'sand', 'snow', 'river', 'lava', 'cave'])
       const surfaceBiomes = new Set(['grass', 'forest', 'hill', 'sand', 'snow', 'river', 'lava'])
 
@@ -55,17 +60,18 @@ describe('Ultra-rare enemy templates', () => {
       replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
       applyWorldTraits([], 'M');WORLD_SEED=1318026413;rngState=WORLD_SEED
       await generateNewWorld()
-      const ultra=enemies.filter(e=>Number(ENEMY_TEMPLATE_BY_NAME[e.baseName]?.rarity??1)<=0.02)
+      const ultra=enemies.filter(e=>ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare===true)
       const species=ultra.map(e=>e.baseName)
       check(new Set(species).size===species.length,'ultra-rare species are unique world-wide')
-      check(!enemies.some(e=>e.ordinarySurface&&e.baseName==='Vampire'),'Vampire is reserved for underground')
-      check(enemies.filter(e=>e.baseName==='Vampire').length===1,'one guaranteed Vampire')
+      check(enemies.some(e=>e.baseName==='Vampire' && e.level<0),'guaranteed underground Vampire')
+      check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME.Vampire),'Vampire can spawn again')
+      check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME.Myrka),'Myrka can spawn again')
       check(enemies.filter(e=>e.ordinarySurface).length>=100,'surface population is not reduced by rare exclusions')
       check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME['Giant Toad']),'rarity 0.1 remains repeatable')
       const before=JSON.stringify({rngState,ultra:ultra.map(e=>({name:e.baseName,id:e.id,level:e.level,x:e.x,y:e.y}))})
       const saved=JSON.parse(JSON.stringify(buildSaveObject()))
       loadGameFromObject(saved,{isReplayInit:true})
-      const restored=enemies.filter(e=>Number(ENEMY_TEMPLATE_BY_NAME[e.baseName]?.rarity??1)<=0.02)
+      const restored=enemies.filter(e=>ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare===true)
       check(JSON.stringify({rngState,ultra:restored.map(e=>({name:e.baseName,id:e.id,level:e.level,x:e.x,y:e.y}))})===before,
         'rare species and RNG persist unchanged on replay-style load')
     })()`))
