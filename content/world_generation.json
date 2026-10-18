@@ -1256,7 +1256,7 @@
           "warningTurns": 1,
           "playerDamageMaxHpFraction": 0.8,
           "cooldownTurns": 3,
-          "normalMonsterDamageCapFraction": 0.5,
+          "normalMonsterDamageCapFraction": 0.8,
           "bossDamageCapFraction": 0.2,
           "monsterOncePerCrusher": true,
           "stripLength": 5

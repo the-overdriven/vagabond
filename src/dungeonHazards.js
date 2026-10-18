@@ -183,9 +183,42 @@ const DungeonHazards = (() => {
         (level.map[p.y]?.[p.x]!=='marble' && !replaceable.has(level.map[p.y]?.[p.x])) ||
         banned.has(encode(p)) ||
         (room.doorways||[]).flat().some(d=>p.x===d.x && p.y===d.y))) continue
+      // A reward sits beyond the entire crush strip, opposite the room's
+      // doorway. It must be on clean, walkable ground and never under a jaw.
+      // Existing room geometry is authoritative; never fabricate an exit or
+      // hide a chest beneath a wall/door to satisfy the reward requirement.
+      const doors=(room.doorways || []).flat()
+      if (doors.length !== 2) continue
+      const farEnd = [1,long-2].sort((a,b) => {
+        const distance=row=>Math.min(...doors.map(d => {
+          const p=acrossX?{x:room.x+1+Math.floor(width/2),y:room.y+1+row}:
+            {x:room.x+1+row,y:room.y+1+Math.floor(width/2)}
+          return Math.abs(p.x-d.x)+Math.abs(p.y-d.y)
+        }))
+        return distance(b)-distance(a)
+      })
+      const rewardSpots=[]
+      for(const row of farEnd) {
+        // Consider only a far end strictly beyond the danger strip.
+        if (Math.abs(row-centerLong)<=halfStrip) continue
+        for (let offset=0;offset<width;offset++) {
+          const col=Math.floor(width/2) + (offset%2 ? -1 : 1)*Math.ceil(offset/2)
+          if (col<0||col>=width) continue
+          const p=acrossX?{x:room.x+1+col,y:room.y+1+row}:
+            {x:room.x+1+row,y:room.y+1+col}
+          if (level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p)) &&
+              !footprint.some(t => t.x===p.x && t.y===p.y)) rewardSpots.push(p)
+        }
+        if(rewardSpots.length) break
+      }
+      if(!rewardSpots.length) continue
+      const rewardChest=rewardSpots[0]
+      const doorDistance=p=>Math.min(...doors.map(d=>Math.abs(p.x-d.x)+Math.abs(p.y-d.y)))
+      if(doorDistance(rewardChest)<=doorDistance(triggerTiles[halfStrip])) continue
       // At both ends of the strike strip there are at least two intact
       // walkable rows for retreat. Other mandatory routes never use it.
-      candidates.push({room,trigger:triggerTiles[halfStrip],triggerTiles,dangerTiles:footprint,stages,width,furniture})
+      candidates.push({room,trigger:triggerTiles[halfStrip],triggerTiles,dangerTiles:footprint,
+        stages,width,furniture,rewardChest})
       }
     }
     if (!candidates.length) return false
@@ -201,9 +234,18 @@ const DungeonHazards = (() => {
       baseTiles.push({...p,tile})
       level.map[p.y][p.x]=tile
     }
-    level.hazards.push({id:`dwarven-crusher:${z}:${placed.room.id}`,type:'crusher',z,
+    const rewardId=`dwarven-crusher:${z}:${placed.room.id}`
+    // This reward is allocated before ordinary floor chests. The ambient
+    // chest budget subtracts it, keeping the new encounter from multiplying
+    // normal treasure. It is never a second royal/artifact chest.
+    const tierCap=Math.max(...Object.keys(WORLD_GEN_CONFIG.dungeons.dwarvenRuins.loot?.tierWeights || {'5':1}).map(Number))
+    groundItems.push({x:placed.rewardChest.x,y:placed.rewardChest.y,level:z,
+      levelKind:'chain',caveIndex:-1,kind:'chest',opened:false,
+      tier:Math.min(tierCap,2+Math.floor((level.dungeonFloor||1)/2)+1),
+      dungeonRoomId:placed.room.id,crusherReward:rewardId})
+    level.hazards.push({id:rewardId,type:'crusher',z,
       roomId:placed.room.id,geometry:{triggerTiles:placed.triggerTiles,dangerTiles:placed.dangerTiles,
-        jawStages:placed.stages,baseTiles},
+        jawStages:placed.stages,baseTiles,rewardChest:placed.rewardChest},
       state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,step:0,
       impactedMonsterIds:[],exhausted:false})
     return true
@@ -370,14 +412,23 @@ const DungeonHazards = (() => {
     for (const e of [...enemies]) {
       if (!e.alive || !onCurrentLevel(e) || !caught(e) ||
         hazard.impactedMonsterIds.includes(e.id)) continue
+      if (enemyImmunityActive(e)) {
+        // Immunity protects this contact, not every future cycle. In
+        // particular, do not mark an uninjured monster as already crushed.
+        if(enemyIsVisibleOnMainView(e)) spawnDamageNumber(e.x,e.y,'Immune!',RENDER_STYLE.damage.miss)
+        continue
+      }
       hazard.impactedMonsterIds.push(e.id)
-      if (enemyImmunityActive(e)) continue
       const boss=e.prefix==='Champion'||e.isBoss===true||e.boss===true
       const cap=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
       const damage=Math.max(1,Math.ceil(e.maxHp*cap))
       const enraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
       e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,enraged)
-      if(visible) {monsterHits++;spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)}
+      if(visible) {
+        monsterHits++
+        spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
+        log(`The dwarven Crusher hits the ${e.name} for ${damage} HP!`,'info')
+      }
       if(e.hp<=0) {if(visible)log(`The ${e.name} is crushed between the dwarven walls!`,'info');killEnemy(e,false,'dwarven crusher')}
     }
     // All advancing tiles become temporarily impassable. An actor struck on
@@ -475,7 +526,10 @@ const DungeonHazards = (() => {
         !Array.isArray(h.impactedMonsterIds) || !Number.isInteger(h.localTurn) ||
         !Number.isInteger(h.step) || h.step<0 || h.step>h.geometry.jawStages?.length ||
         !Array.isArray(h.geometry.jawStages) ||
-        !Array.isArray(h.geometry.baseTiles) || h.geometry.dangerTiles.length!==h.geometry.baseTiles.length) return false
+        !Array.isArray(h.geometry.baseTiles) || h.geometry.dangerTiles.length!==h.geometry.baseTiles.length ||
+        !h.geometry.rewardChest || contains(h.geometry.dangerTiles,h.geometry.rewardChest.x,h.geometry.rewardChest.y) ||
+        !groundItems.some(g=>g.kind==='chest' && g.level===h.z && g.crusherReward===h.id &&
+          g.x===h.geometry.rewardChest.x && g.y===h.geometry.rewardChest.y)) return false
       const advanced=new Set((['warning','impact'].includes(h.state)?h.geometry.jawStages.slice(0,h.step):[]).flat().map(encode))
       const terminal=h.state==='impact' ? new Set(h.geometry.triggerTiles.map(encode)) : new Set()
       if(!h.geometry.baseTiles.every(p=>level.map[p.y]?.[p.x]===

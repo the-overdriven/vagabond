@@ -5603,7 +5603,7 @@ function spawnDwarvenRuinsChests() {
     const safeRoute = DungeonTraps.safeReachable(level.map, entry,
       new Set((level.traps || []).map(t => keyXY(t.trigger.x, t.trigger.y))))
     const rooms = (level.rooms || level._encounterRooms || []).filter(room =>
-      !room.stairRoom && !room.landmark && !room.gallery && !room.gasChamber)
+      !room.stairRoom && !room.landmark && !room.gallery && !room.gasChamber && !room.crusherReserved)
     const vaultByRoom = new Map((level.vaults || []).map(vault => [vault.roomId, vault]))
     const candidatesForRoom = room => {
       const spots = []
@@ -5631,7 +5631,8 @@ function spawnDwarvenRuinsChests() {
     // Prison caches replace discretionary treasury chests rather than adding
     // free rewards. Guaranteed royal and artifact chests remain untouched.
     const gasChamberChests = groundItems.filter(item => item.level === z && item.gasChamberId).length
-    const chestCount = Math.max(0, dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length) - prisonCellChests - gasChamberChests)
+    const crusherChests = groundItems.filter(item => item.level === z && item.crusherReward).length
+    const chestCount = Math.max(0, dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length) - prisonCellChests - gasChamberChests - crusherChests)
     const roomUse = new Map()
     for (let n = 0; n < chestCount; n++) {
       const available = rooms.map(room => ({room, spots:candidatesForRoom(room)})).filter(entry => entry.spots.length)
@@ -5831,6 +5832,17 @@ function validateDwarvenRuinsStratum() {
   for (const context of base.contexts) {
     const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context
     if (!entry || !exit) continue
+    for (const crusher of (level.hazards || []).filter(h=>h.type==='crusher')) {
+      const reward=crusher.geometry.rewardChest
+      const chests=floorGround.filter(g=>g.kind==='chest' && g.crusherReward===crusher.id)
+      const room=level.rooms.find(r=>r.id===crusher.roomId)
+      if (!room || !reward || chests.length!==1 ||
+          chests[0].x!==reward.x || chests[0].y!==reward.y ||
+          crusher.geometry.dangerTiles.some(p=>p.x===reward.x && p.y===reward.y) ||
+          level.map[reward.y]?.[reward.x]!=='marble' ||
+          !dungeonWalkDistancesWithDoorTraversal(level.map,entry).has(keyXY(reward.x,reward.y)))
+        issues.push(`${tag}: Crusher ${crusher.id} has no safe guaranteed far-end chest`)
+    }
     const prisonCfg = cfg.rooms?.prisonGeneration || {}
     const progress = base.contexts.length <= 1 ? 1 : floorIndex / (base.contexts.length-1)
     const share = Number(prisonCfg.targetShareEarly ?? 0.20) + progress *

@@ -1640,8 +1640,9 @@ mandatory prison count and off the main route. The room stays clear so its
 three-row moving-wall mechanism and escape lanes are actually usable.
 Generation rejects a world without the guaranteed Crusher rather than
 silently accepting a dungeon with none. This does not increase damage:
-Crusher jaws retain the existing 80% max-HP player hit, 50%/20% capped
-monster hit, single-hit-per-monster protection, and timed warning/cooldown.
+Crusher jaws deal 80% max HP to the hero and ordinary monsters, but
+only 20% to Champions/bosses. The once-per-monster anti-farming cap and
+warning/cooldown remain in place.
 
 After rubble collapses and access repairs, a deterministic corridor
 finishing pass widens **straight one-cell passages outside rooms** wherever
@@ -1696,13 +1697,30 @@ and time spent on other z-levels never advance the mechanism.
 
 A caught player takes `ceil(0.80 × maximum HP)`, ignoring numerical DEF,
 dodge and glancing, but retaining God Mode and fatal-hit shields. Ordinary
-monsters take at most **50% max HP**, and Champions/bosses **20% max HP**;
+monsters take at most **80% max HP**, and Champions/bosses **20% max HP**;
 each monster ID can be damaged only once by each mechanism, regardless of
 how many jaw steps touch it. Monster environmental deaths grant no XP.
 Triggers and damage are deterministic turn events; wall progress, already-hit
 IDs, original tile records and geometry persist in deep-floor save state and
 rotate with the map. Auto-travel considers the *entire* danger strip known
 and refuses to traverse it automatically.
+
+**Crusher reward (v171):** Every functional Crusher room holds exactly one
+unopened chest beyond the far end of its five-tile crushing strip, farther
+from the room entrance than the pressure plates. The chest lies on safe
+floor, never beneath a moving jaw; reaching it means deciding whether to
+cross the visible mechanism, retreat when the walls advance or lure enemies
+into the danger zone. It uses the normal chest opening/one-time loot rules
+and a depth-appropriate tier, capped by the Ruins loot-tier limit. A Crusher
+chest consumes one ordinary floor chest allowance before discretionary
+chests are placed, without changing the guaranteed artifact or royal chest.
+The chest coordinate and association are saved with the hazard and item and
+rotate with the room. Monsters that contact an advancing jaw show visible
+damage and an explanatory log if seen. Temporary magical immunity only
+protects the current collision: a protected monster is not marked as already
+injured, so a later real hit can still affect it. Ordinary monster damage
+was raised from **50% to 80% maximum HP**; the **20%** Champion/boss cap
+and one-hit-per-monster rule remain unchanged.
 
 **Game version v164 / save schema 85:** new gallery geometry/enemy allocation,
 solid advancing Crusher tile and jaw step/base-tile state change the
@@ -1857,9 +1875,9 @@ use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
 crates, and prisons use bars. Beds (including bed barricades) and all other room-specific furniture are
 forbidden **anywhere inside a Ruins stair room**. The additional mechanically
 clear 3×3 stair landing rule remains unchanged. Other rooms may contain their
-normal furniture, even when they happen to be close to a staircase. 
-Dwarven crates remain solid to movement and projectiles until destroyed by equipped-weapon strikes. 
-Every crate has **8 HP** and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
+normal furniture, even when they happen to be close to a staircase. Dwarven crates remain solid to movement and
+projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
+and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
 Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
 player's cosmetic melee lunge. Every successful weapon strike against a crate,
 including the final blow, immediately Alarms all eligible nonpassive monsters
