@@ -29,6 +29,7 @@ const PRECACHE_URLS = [
   './icon-512-maskable.png',
   './src/worldGen.js',
   './src/dungeonTraps.js',
+  './src/dungeonHazards.js',
   './src/charge.js',
   './src/enemySupport.js',
   './src/enemySpells.js',
@@ -80,7 +81,9 @@ const PRECACHE_URLS = [
   './img/tiles/dwarven-floor-trap-0.png',
   './img/tiles/dwarven-floor-trap-1.png',
   './img/tiles/dwarven-traps-atlas.png',
-  './img/tiles/dwarven-pressure-plate.png'
+  './img/tiles/dwarven-pressure-plate.png',
+  './img/tiles/dwarven-crusher-track.png',
+  './img/projectiles/death-bolt.png'
 ];
 
 // Ask the server every time (cheap conditional request, 304 if unchanged)

@@ -1583,6 +1583,55 @@ and replay do not reroll the encounter. Gallery feature placement uses a
 seed-derived, depth-specific deterministic roll. Galleries do not introduce
 new timed effects, persistent statuses or animation-dependent rules.
 
+### Dwarven Crusher (v82)
+
+D2 (`z:-5`) and deeper Ruins may contain **at most one optional major
+hazard per floor**, with **30% initial Crusher selection weight**. The other
+weights are reserved for a later gas chamber (25%) and no hazard (45%);
+unsuitable layouts simply have no Crusher rather than rerolling. The
+seed/depth-derived hazard selector does not consume the main gameplay RNG.
+Placement is limited to suitable optional side rooms, never the main stairs,
+royal/artifact treasure, Prison partitions, mandatory keys or existing traps.
+The mechanism spans three adjacent walkable marked cells, with a visible
+**pressure plate** in the middle and **scored crusher tracks** at the sides.
+All threatened cells have a safe cardinal neighbour and can be inspected
+before risking entry. Automatic travel avoids the entire marked footprint;
+manual movement and monster movement can still enter it.
+
+Entering the plate arms the Crusher and logs a warning. **The triggering
+player action deals no Crusher damage.** On the following *consumed player
+action* it slams down once; staying on a threatened cell costs
+`ceil(0.8 × player's current maximum HP)` with no numerical DEF, dodge or
+armor glancing. God Mode and single-use fatal-hit shields still protect as
+normal. Stepping to an ordinary adjacent safe cell avoids damage completely.
+The stone does not change collision/FOV or block terrain. It then cools for
+**three consumed actions**, after which a new entry onto the plate can arm it.
+The warning is visible in tile/ASCII art and in the active-status strip.
+Animation frames cannot advance the timer or roll gameplay damage.
+
+Monsters can arm the same mechanism and are hit on its danger cells. Each
+monster ID can suffer damage **once for the lifetime of that Crusher**, capped
+at **50% of its max HP** for ordinary enemies and **20%** for Champions/bosses,
+so repeated luring cannot trivially delete elite targets. Environmental kills
+give no player XP or personal kill credit; existing loot-drop rules still
+apply. The death cause shown locally and passed in Graveyard/score records is
+`dwarven crusher`, independent of ordinary `dungeon trap` attribution.
+
+Each Ruins level stores `hazards[]` with stable ID, world-space trigger/danger
+coordinates, phase (`idle`, `warning` or `cooldown`), local floor-action counter,
+last global tick, phase entry action and the impacted monster-ID ledger. The array is restored unchanged for
+save/replay and rotated together with the level. Switching to another z-level
+pauses the mechanism; loading, redrawing and animations do not tick it.
+**Save schema 82** adds this runtime state and two uniquely encoded Crusher
+terrain tiles. No conversion from old saved worlds is supported. The existing
+hidden wall-arrow plate remains disguised as marble; only Crusher plates are
+visibly marked with `dwarven-pressure-plate.png`.
+
+The four throne-facing sprites are supplied as **100×100 transparent PNGs**,
+with the original artwork scaled proportionally. The Death Bolt projectile
+uses the standalone `img/projectiles/death-bolt.png` sprite and preloads through
+the normal image pipeline before its 650 ms purely visual flight.
+
 Vault entrance limits are measured from the actual room graph, including loop
 connections, so a one-entrance archive/tomb cannot silently gain a second route.
 Vault internal zones are oriented from the room entrance and actively drive
@@ -6156,8 +6205,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-81
+82
 ```
+
+Version 82 introduces optional Crusher mechanisms in Dwarven Ruins,
+including their pressure-plate and scored-track terrain codes, warning and
+cooldown state, and the persistent already-impacted monster IDs. The hazard
+ticks only on the game's authoritative action count. Existing traps keep their
+numerical-DEF bypass, and saves/replays from earlier schemas are rejected.
 
 Version 81 introduces optional two-sided crossfire prison galleries in deep
 Dwarven Ruins. Geometry, shooters, and guarded treasure are generated in the
@@ -7322,7 +7377,7 @@ save.replay = {
 }
 ```
 
-The replay tape format version is independent of the current game save schema version (80).
+The replay tape format version is independent of the current game save schema version (82).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

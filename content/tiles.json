@@ -556,6 +556,22 @@
       "walk": false,
       "projectileBlock": false,
       "blocksSight": false
+    },
+    "dwarvencrusherplate": {
+      "ch": "▣",
+      "color": "#c5a67a",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
+    },
+    "dwarvencrushertrack": {
+      "ch": "≡",
+      "color": "#c5a67a",
+      "bg": "#302d2a",
+      "walk": true,
+      "projectileBlock": false,
+      "blocksSight": false
     }
   },
   "tileCode": {
@@ -637,7 +653,9 @@
     "dwarvenpressureplate": "┱",
     "dwarvenarrowwall": "┲",
     "dwarvendais": "╜",
-    "dwarventhrone": "╙"
+    "dwarventhrone": "╙",
+    "dwarvencrusherplate": "╞",
+    "dwarvencrushertrack": "╟"
   },
   "tileDesc": {
     "ice": "lake ice",
@@ -716,7 +734,9 @@
     "dwarvenpressureplate": "a hidden pressure plate connected to wall arrow slits; any creature stepping here fires the mechanism",
     "dwarvenarrowwall": "arrow slits cut into the dwarven wall; a nearby pressure plate fires down their lane",
     "dwarvendais": "a worn ceremonial stone dais, etched with fading dwarven symbols",
-    "dwarventhrone": "a massive dwarven stone throne, empty and silent beneath the ruined halls"
+    "dwarventhrone": "a massive dwarven stone throne, empty and silent beneath the ruined halls",
+    "dwarvencrusherplate": "a conspicuous dwarven pressure plate linked to a crushing stone slab; stepping on it may start the mechanism",
+    "dwarvencrushertrack": "deep scored tracks in the marble: a giant slab can descend over this ground"
   },
   "terrainSpeed": {
     "grass": 1,

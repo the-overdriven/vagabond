@@ -417,7 +417,10 @@
             "maxPerFloor": 1,
             "minimumInteriorLength": 13,
             "minimumInteriorWidth": 9,
-            "preferredExteriorSize": [17,11]
+            "preferredExteriorSize": [
+              17,
+              11
+            ]
           }
         },
         "finalFloorDefensiveWeightMultiplier": 1.45,
@@ -532,14 +535,33 @@
           "enabled": true,
           "floorSelector": "final",
           "count": 1,
-          "interiorSizes": [[9,19],[11,21],[11,23]],
+          "interiorSizes": [
+            [
+              9,
+              19
+            ],
+            [
+              11,
+              21
+            ],
+            [
+              11,
+              23
+            ]
+          ],
           "extraHalfBounds": 10,
           "royalTreasury": {
             "rewardTier": 5,
             "gearMinTier": 4,
             "artifactChance": 0.3,
-            "goldRange": [300,600],
-            "guardCountRange": [2,3]
+            "goldRange": [
+              300,
+              600
+            ],
+            "guardCountRange": [
+              2,
+              3
+            ]
           }
         }
       },
@@ -1011,14 +1033,38 @@
         "alarmNearbyRadius": 5,
         "alarmDistantChance": 0.25,
         "loot": [
-          {"kind": null,"weight": 84},
-          {"kind": "potion","weight": 6},
-          {"kind": "scrollOfInvisibility","weight": 4},
-          {"kind": "stoneSkinPotion","weight": 1.8},
-          {"kind": "berserkPotion","weight": 1.8},
-          {"kind": "scrollOfFear","weight": 1.2},
-          {"kind": "scrollOfChaos","weight": 0.9},
-          {"kind": "scrollOfDeathShield","weight": 0.3}
+          {
+            "kind": null,
+            "weight": 84
+          },
+          {
+            "kind": "potion",
+            "weight": 6
+          },
+          {
+            "kind": "scrollOfInvisibility",
+            "weight": 4
+          },
+          {
+            "kind": "stoneSkinPotion",
+            "weight": 1.8
+          },
+          {
+            "kind": "berserkPotion",
+            "weight": 1.8
+          },
+          {
+            "kind": "scrollOfFear",
+            "weight": 1.2
+          },
+          {
+            "kind": "scrollOfChaos",
+            "weight": 0.9
+          },
+          {
+            "kind": "scrollOfDeathShield",
+            "weight": 0.3
+          }
         ]
       },
       "shortcut": {
@@ -1198,6 +1244,23 @@
       },
       "validation": {
         "postPopulationWorldRetries": 3
+      },
+      "timedHazards": {
+        "minimumZ": -5,
+        "maxMajorHazardsPerFloor": 1,
+        "gasChamberFloorWeight": 0.25,
+        "crusherFloorWeight": 0.3,
+        "noneWeight": 0.45,
+        "crusher": {
+          "warningTurns": 1,
+          "playerDamageMaxHpFraction": 0.8,
+          "cooldownTurns": 3,
+          "normalMonsterDamageCapFraction": 0.5,
+          "bossDamageCapFraction": 0.2,
+          "monsterOncePerCrusher": true,
+          "footprintMin": 2,
+          "footprintMax": 3
+        }
       }
     }
   },
@@ -1358,8 +1421,14 @@
     "ordinaryChestBaseTier": 1,
     "ordinaryChestMaxTier": 5,
     "submergedChests": {
-      "countRange": [15, 30],
-      "shoreDistanceRange": [4, 8],
+      "countRange": [
+        15,
+        30
+      ],
+      "shoreDistanceRange": [
+        4,
+        8
+      ],
       "lakeShare": 0.35,
       "placementEdgeMargin": 2
     },

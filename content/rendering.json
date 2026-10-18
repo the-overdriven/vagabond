@@ -811,6 +811,16 @@
       "eastImage": "img/tiles/dwarven-throne-east.png",
       "southImage": "img/tiles/dwarven-throne-south.png",
       "westImage": "img/tiles/dwarven-throne-west.png"
+    },
+    "dwarvencrusherplate": {
+      "image": "img/tiles/dwarven-pressure-plate.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "dwarvencrushertrack": {
+      "image": "img/tiles/dwarven-crusher-track.png",
+      "baseTileKey": "marble",
+      "scale": 1
     }
   },
   "projectiles": {

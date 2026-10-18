@@ -126,6 +126,8 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       const z = chainZForDepth(deepLevels.length+1)
       const oldChest = groundItems.find(g => g.royalThroneChest && g.level === z)
       check(!!oldChest, 'royal chest exists before rotation')
+      // World rotation mutates ground items in place: preserve the original coordinates.
+      const chestBeforeRotation = {x:oldChest.x,y:oldChest.y}
       const height = MAP_H
       const rotated = p => ({x:height - 1 - p.y, y:p.x})
       rotateGeneratedWorld(1)
@@ -139,7 +141,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       check(JSON.stringify(hall.thronePosition) === JSON.stringify(rotated(old.thronePosition)), 'throne anchor rotates')
       check(now.map[hall.thronePosition.y]?.[hall.thronePosition.x] === 'dwarventhrone', 'throne follows rotation')
       const chest = groundItems.find(g => g.royalThroneChest && g.level === z)
-      check(chest.x === rotated(oldChest).x && chest.y === rotated(oldChest).y,
+      check(chest.x === rotated(chestBeforeRotation).x && chest.y === rotated(chestBeforeRotation).y,
         'royal chest rotates with its throne hall')
       currentZ=chainZForDepth(deepLevels.length+1)
       map=now.map

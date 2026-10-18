@@ -32,6 +32,9 @@ describe('Dwarven Ruins reusable traps', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const level=trapFixture()
+      // Keep the player out of the arrow's path: otherwise the first hit
+      // lands on the player, not on the DEF comparison target.
+      player.x=10; player.y=14
       const originalRng=rng
       rng=()=>0.5
       try {

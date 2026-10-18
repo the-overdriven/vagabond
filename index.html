@@ -1758,6 +1758,7 @@ more difficult:
 </script>
 <script src="src/worldGen.js"></script>
 <script src="src/dungeonTraps.js"></script>
+<script src="src/dungeonHazards.js"></script>
 <script src="src/swimming.js"></script>
 <script src="src/ice.js"></script>
 <script src="src/charge.js"></script>
@@ -5463,6 +5464,8 @@ more difficult:
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    DungeonHazards.onPlayerTurnConsumed(turnCount)
+    if (player.hp <= 0 || deathTransition) return
     try {
       return resolveEnemyTurn(reactedEnemy, playerMovement)
     } finally {
@@ -6617,7 +6620,7 @@ more difficult:
   }
 
   function playerPathCanTraverse(x, y) {
-    if (DungeonTraps.isTrigger(map[y]?.[x])) return false
+    if (DungeonTraps.isTrigger(map[y]?.[x]) || DungeonHazards.knownDanger(x,y)) return false
     if (isWalkableForPlayer(x, y) || isClosedDungeonDoorTile(map[y]?.[x])) return true
     // Auto-travel may spend a key it already carries, but it never starts
     // noisy weapon breaching on the player's behalf.
@@ -6941,6 +6944,7 @@ more difficult:
         spawnDamageNumber(nx, ny, 'Freed!', '#9fe3bf')
       }
       DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
+      DungeonHazards.onActorEntered(player, fromPos.x, fromPos.y)
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       completeFishermanLesson(fromPos)
       advanceSwimming(true, fromPos)
@@ -7886,6 +7890,10 @@ more difficult:
     // A spike trap is raised while someone occupies its tile. This is a
     // presentation-only state: trap damage still resolves on entry, and no
     // animation frame or saved flag affects gameplay or replay.
+    if (tileKey === 'dwarvencrusherplate' || tileKey === 'dwarvencrushertrack') {
+      const warning = DungeonHazards.activeCrusherStatus()
+      if (warning && DungeonHazards.knownDanger(x,y)) return {...visual, filter:'brightness(1.5)'}
+    }
     if (tileKey === 'dwarvenspikes') {
       const occupiedByPlayer = player.x === x && player.y === y
       const occupiedByEnemy = enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y)
@@ -8295,6 +8303,7 @@ more difficult:
   // camera pan, so a turn reads as one continuous motion rather than a snap.
   function finishEnemyMove(e, fromX, fromY) {
     DungeonTraps.onEntry(e, fromX, fromY)
+    DungeonHazards.onActorEntered(e, fromX, fromY)
     if (!e.alive) return
     // Passive swimming is announced only when entering deep water, not on
     // each subsequent water tile. No RNG or persistent entry flag is needed.

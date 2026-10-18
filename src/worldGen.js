@@ -3550,6 +3550,7 @@ function buildDwarvenRuinsStratum() {
   }
   if (!placeDwarvenRuinsLift(levelCount)) return false
   if (!DungeonTraps.generate()) return false
+  DungeonHazards.generate()
   return true
 }
 

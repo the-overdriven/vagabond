@@ -127,6 +127,7 @@ function applyChaosScroll(effect) {
     if (actor !== player) occupied.delete(keyXY(fromX, fromY))
     spawnDamageNumber(fromX, fromY, 'Chaos!', '#d9a9ff')
     actor.x = x; actor.y = y
+    DungeonHazards.onActorEntered(actor, fromX, fromY)
     actor.animStart = undefined; actor.attackStart = undefined; actor.chargeAnim = null
     if (actor !== player) {
       occupied.add(keyXY(x, y)); actor.farPath = null

@@ -4,6 +4,9 @@
 function activePlayerStatuses() {
   if (player.hp <= 0) return []
   const statuses = []
+  const crusher = DungeonHazards.activeCrusherStatus()
+  if (crusher) statuses.push({id:'crusher',icon:'⚠',label:'Crusher!',counter:'1t',
+    detail:'The slab will fall after your next action. Step off the marked tracks now.'})
   if (isDrowning()) statuses.push({id: 'drowning', icon: '≈', label: 'Drowning', counter: '',
     detail: 'Drowning: lose 5% of maximum HP (at least 1) each swimming step or wait. Reach shore to recover.'})
   const turns = n => `${n} turn${n === 1 ? '' : 's'}`

@@ -31,6 +31,7 @@ function forcePlayerPosition(x, y, presentation, fromPosition = null) {
   if (x !== player.x || y !== player.y) clearSpiderWeb()
   player.x = x; player.y = y
   DungeonTraps.onEntry(player, from.x, from.y)
+  DungeonHazards.onActorEntered(player, from.x, from.y)
   if (player.hp <= 0 || deathTransition) return
   // Forced movement spends water endurance, but never earns swimming practice.
   advanceSwimming(false, from)

@@ -110,6 +110,7 @@ function buildSaveObject() {
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
       dungeonPackage: lvl.dungeonPackage || lvl.caves?.[0]?.dungeonPackage || null,
       traps: structuredClone(lvl.traps || []),
+      hazards: structuredClone(lvl.hazards || []),
       crates: structuredClone(lvl.crates || []),
       caves: lvl.caves,
       rooms: structuredClone(lvl.rooms || []),
@@ -522,6 +523,7 @@ function loadGameFromObject(data, opts = {}) {
     return {
       map: lvlMap,
       traps: structuredClone(lvlData.traps),
+      hazards: structuredClone(lvlData.hazards),
       crates: structuredClone(lvlData.crates),
       caveMaps: lvlCaveMaps,
       caves: lvlCaves,

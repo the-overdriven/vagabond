@@ -129,6 +129,8 @@ const Graveyard = (() => {
       freezing: 'Frozen to death',
       poison: 'Poisoned to death',
       'dungeon trap': 'Dungeon trap',
+      'dwarven crusher': 'Dwarven crusher',
+      'poison gas': 'Poison gas',
       dungeon_trap: 'Dungeon trap',
       environment: 'Unknown environmental cause'
     }[String(row.cause_of_death || '').trim().toLowerCase()] || 'Unknown cause'

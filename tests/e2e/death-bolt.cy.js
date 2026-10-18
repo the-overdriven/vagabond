@@ -31,6 +31,9 @@ describe('Generic Death Bolt and skull projectile', () => {
   ]) it('loads and draws the skull projectile on '+name, () => {
     cy.viewport(width,height)
     cy.request('img/projectiles/death-bolt.png').its('status').should('eq',200)
+    // Full asset warming is background/async; explicitly load the projectile
+    // before testing the draw path instead of racing startup preloading.
+    cy.window().then(win => win.eval('preloadImages(["img/projectiles/death-bolt.png"])'))
     cy.window().then(win => win.eval(`(() => {
       setupEnemySpellArena()
       const caster = makeSpellTestEnemy('Skeleton',['deathBolt'],38,40)
