@@ -7407,6 +7407,15 @@ existing and new databases before deploying the poison client. The current
 `supabase-graveyard.sql` and the drowning migration allow `drowning` but not
 `poison`; a poison migration is not present in this repository.
 
+For Dwarven Ruins trap deaths, apply `supabase-graveyard-dungeon-traps.sql`
+to existing databases. It extends `death_cause_check` to allow the existing
+`dungeon trap` cause (used by wall arrows and spikes) and extends
+`death_position_check` from the original shallow levels (z:0 through -3) to
+chain floors down to z:-32, while retaining JSON shape, coordinates, level
+kind and payload-length checks. This is a database migration; the client
+continues to send the real cause and z level. Without the migration,
+PostgREST returns HTTP 400 for trap fatalities in the deeper ruins.
+
 The browser's `vagabond_online_player_id` localStorage entry is a random UUID
 created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
 reused on this browser, not a verified identity. If storage or secure randomness
@@ -7442,6 +7451,7 @@ Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
 `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
 `drowning` (shown as Drown), `poison` (shown as Poisoned to death),
+`dungeon trap` (shown as Dungeon trap),
 or legacy/unknown `environment`), `max_hp`, `atk`,
 `def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
 names), `equipment` (JSONB equipped-item snapshots with base/name, actual

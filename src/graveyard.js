@@ -128,6 +128,7 @@ const Graveyard = (() => {
       poisonous_mushroom: 'Ate poisonous mushroom',
       freezing: 'Frozen to death',
       poison: 'Poisoned to death',
+      'dungeon trap': 'Dungeon trap',
       environment: 'Unknown environmental cause'
     }[row.cause_of_death] || 'Unknown cause'
   }
