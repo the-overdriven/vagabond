@@ -1555,19 +1555,36 @@ searchable skeleton that would otherwise be scattered elsewhere on that
 floor; prison chests likewise substitute for ordinary floor-budget chests.
 The guaranteed royal and artifact rewards are unaffected. This makes the
 higher Prison frequency a change in *where loot is found*, not a chest farm.
-Separately, a cell has a **65% target chance** to receive a real ranged-capable
-enemy if an eligible species, a safe position **and enough remaining floor
-threat budget** exist. Cell shooters are paid for from the existing budget
-before roaming monsters and cannot overdraw it. Shooters retain normal ammo,
-wandering and combat rules and can fire through bars.
+Every ordinary barred Prison instead guarantees **one actual ranged guard per six
+walkable cell-floor tiles**, rounded up per cell. These are armed, ammunition-
+limited monsters that shoot through bars, not decorative prisoners or a 65%
+chance of one guard. The same staffing ratio applies to ordinary prison cells
+and gallery bays; galleries round their two sides independently. Guards are
+placed before ambient encounters and use a special placement exception for
+enclosed cells: they may be closer to stairs than roaming monsters, but cannot
+occupy the protected 3×3 landing. Spike/arrow trap placement avoids occupying
+the cells' potential guard positions. All guard state, ammunition and roles
+survive rotation and save/replay without an extra generation roll.
 
-From **D2 (z:-5) onward**, a floor has a **30% attempt chance** to reserve
-one special **crossfire Prison gallery** before the room graph is built. It is
-optional: inadequate floor geometry or remaining encounter budget can prevent
-its construction, but cannot lower the mandatory Prison quota. A gallery
-counts as **one Prison room** toward that quota, not as one room per cell or
-shooter. This branch is a dead end off the main route, never a mandatory path
-to stairs, progression keys, the throne or the guaranteed artifact.
+The fixed cell-density rule has a substantial **combat and balance cost**:
+more guaranteed archers means more arrows, danger and potential XP in prison-
+heavy dungeons. Worldgen enlarges its encounter funding when necessary so the
+prison quota, gallery guards, throne and champion encounters can all coexist;
+it does not silently abandon promised cell occupants. This may increase total
+monster counts rather than only substituting one enemy role for another.
+Dungeon-wide balance and loot/XP exposure need separate measurement before
+release; the player can still avoid optional cells or shoot through their bars.
+
+From **D2 (z:-5) onward**, the dungeon guarantees a full **crossfire Prison
+gallery on D2**. That signature room's special 17×11 footprint is reserved
+**before** ordinary prisons claim rectangular space, while preserving the
+mandatory Prison quota. Other eligible depths independently have a **70%
+reservation-attempt chance** to build an additional gallery, capped at one
+per floor. A failed optional attempt may be skipped, but failure to place or
+validate the guaranteed D2 gallery rejects that floor candidate instead of
+quietly producing a dungeon without the feature. A gallery counts as **one
+Prison room** toward the quota, and remains a dead-end optional branch that
+does not gate stairs, progression keys, throne or artifact.
 
 A crossfire gallery occupies a reserved **17×11 exterior** room footprint
 (**15×9 interior**), rotated so the main doorway faces down its length.

@@ -2640,28 +2640,12 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     (Number(prisonCfg.targetShareLate ?? 0.30) - Number(prisonCfg.targetShareEarly ?? 0.20))
   const predictedOrdinarySlots = Math.max(1, roomCount - 1 - (hall ? 1 : 0))
   const expectedQuota = Math.max(Number(prisonCfg.guaranteedMinimum ?? 1), Math.ceil(predictedOrdinarySlots * prisonShare))
-  // Reserve larger room footprints BEFORE the graph is built. These are not
-  // automatically counted as prisons: their doors and cells must pass preflight.
-  const prisonReserveTarget = Math.min(predictedOrdinarySlots, expectedQuota + 2)
-  const reserveSearchLimit = Math.max(1, Math.floor(prisonCfg.prisonCandidateSearchLimit ?? 128))
-  let prisonReservedCount = 0
-  for (let attempt = 0; attempt < reserveSearchLimit && prisonReservedCount < prisonReserveTarget && rooms.length < roomCount; attempt++) {
-    const w = randInt(Math.max(10, cfg.roomWidthRange[0]), cfg.roomWidthRange[1])
-    const h = randInt(Math.max(9, cfg.roomHeightRange[0]), cfg.roomHeightRange[1])
-    const minRoomX = minX + cfg.roomBoundsMargin, maxRoomX = maxX - w - cfg.roomBoundsMargin
-    const minRoomY = minY + cfg.roomBoundsMargin, maxRoomY = maxY - h - cfg.roomBoundsMargin
-    if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
-    const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
-    const candidate = {x:rx,y:ry,w,h,cx:rx+Math.floor(w/2),cy:ry+Math.floor(h/2),prisonReserved:true}
-    if (!dungeonRoomHasSeparation(rooms,candidate,hall ? Math.max(1,cfg.roomSeparation-1) : cfg.roomSeparation)) continue
-    rooms.push(candidate)
-    prisonReservedCount++
-  }
-  if (prisonReservedCount < expectedQuota) return null
   const galleryCfg = prisonCfg.crossfire || {}
   const galleryEligible = -(floorIndex+4) <= (galleryCfg.minimumZ ?? -5) &&
     (galleryCfg.maxPerFloor ?? 1) > 0 &&
-    dwarvenGalleryRoll(-(floorIndex+4),0) < (galleryCfg.floorAttemptChance ?? 0)
+    (floorIndex === 1 || dwarvenGalleryRoll(-(floorIndex+4),0) < (galleryCfg.floorAttemptChance ?? 0))
+  // Reserve the signature branch before prisons claim the limited floor area.
+  // D2 is mandatory; other eligible depths make extra attempts.
   let gallerySource = null
   if (galleryEligible && rooms.length < roomCount) {
     const footprint = galleryCfg.preferredExteriorSize || [17,11]
@@ -2683,6 +2667,25 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       rooms.push(gallerySource)
     }
   }
+  if (floorIndex === 1 && !gallerySource) return null
+  // Reserve larger room footprints BEFORE the graph is built. These are not
+  // automatically counted as prisons: their doors and cells must pass preflight.
+  const prisonReserveTarget = Math.min(predictedOrdinarySlots, expectedQuota + 2)
+  const reserveSearchLimit = Math.max(1, Math.floor(prisonCfg.prisonCandidateSearchLimit ?? 128))
+  let prisonReservedCount = 0
+  for (let attempt = 0; attempt < reserveSearchLimit && prisonReservedCount < prisonReserveTarget && rooms.length < roomCount; attempt++) {
+    const w = randInt(Math.max(10, cfg.roomWidthRange[0]), cfg.roomWidthRange[1])
+    const h = randInt(Math.max(9, cfg.roomHeightRange[0]), cfg.roomHeightRange[1])
+    const minRoomX = minX + cfg.roomBoundsMargin, maxRoomX = maxX - w - cfg.roomBoundsMargin
+    const minRoomY = minY + cfg.roomBoundsMargin, maxRoomY = maxY - h - cfg.roomBoundsMargin
+    if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
+    const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
+    const candidate = {x:rx,y:ry,w,h,cx:rx+Math.floor(w/2),cy:ry+Math.floor(h/2),prisonReserved:true}
+    if (!dungeonRoomHasSeparation(rooms,candidate,hall ? Math.max(1,cfg.roomSeparation-1) : cfg.roomSeparation)) continue
+    rooms.push(candidate)
+    prisonReservedCount++
+  }
+  if (prisonReservedCount < expectedQuota) return null
   for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts * (hall ? 3 : 1); attempt++) {
     const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1])
     const h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
@@ -3271,6 +3274,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if ((slots || []).some(p => cm[p.y]?.[p.x] !== 'marble')) return null
   }
 
+  if (floorIndex === 1 && !galleryRoom?.gallery) return null
   if (galleryRoom?.gallery) {
     const g = galleryRoom.gallery
     if (g.length < (galleryCfg.minimumInteriorLength ?? 13) || g.width < (galleryCfg.minimumInteriorWidth ?? 9) ||
@@ -4922,8 +4926,31 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const guaranteedShooterCost = needsShooterFamily && shooterFamilies.length
       ? Math.min(...shooterFamilies.flatMap(family => family.commonMembers.filter(isShooterTemplate).map(tmpl => Math.max(1, tmpl.tier))))
       : 0
+    // Shooter density is a real staffing requirement in *all* barred Prisons,
+    // not a 65% chance for only one cell guard. Fund it before allocating
+    // ambient enemies so gallery and normal Prison quotas cannot be crowded out.
+    const shooterTilesPerEnemy = Math.max(1, Math.floor(packageCfg.rooms?.prisonGeneration?.shooterTilesPerEnemy ?? 6))
+    const ordinaryPrisonRooms = rooms.filter(r => r.archetype === 'Prison' && !r.gallery && r.prisonCellRegion)
+    const prisonShootersRequired = new Map(ordinaryPrisonRooms.map(room => [room.id,
+      Math.ceil(dwarvenPrisonCellPoints(room).filter(p => level.map[p.y]?.[p.x] === 'marble').length / shooterTilesPerEnemy)]))
+    const shooterTemplates = eligible.filter(t => isShooterTemplate(t) && naturalSpawnEligible(t))
+      .sort((a,b) => Math.max(1,a.tier)-Math.max(1,b.tier) || a.name.localeCompare(b.name))
+    const cheapestShooter = shooterTemplates.length ? Math.max(1,shooterTemplates[0].tier) : Infinity
+    const galleryShooterCount = rooms.filter(r => r.gallery).reduce((sum,r)=>sum+r.gallery.shooterSpots.flat().length,0)
+    const reservedShooterCount = galleryShooterCount + [...prisonShootersRequired.values()].reduce((a,b)=>a+b,0)
+    // Prison guards do not consume the minimum non-prison encounters: the
+    // final throne guard, champion escort, and corridor roamers remain real.
+    const throneReserveCost = floorIndex === ruins.length-1
+      ? 5 * Math.max(...dominant.map(f => Math.min(...f.commonMembers.map(t=>Math.max(1,t.tier))))) : 0
+    const championReserveCost = Math.max(1, championTemplate.tier) * 2 * championCount
+    const ambientReserveCost = Math.max(10, cheapestDominant + cheapestRoamer + 4)
     threatBudget = Math.max(threatBudget,
-      Math.max(1, championTemplate.tier) * 2 * championCount + cheapestDominant + cheapestRoamer + guaranteedShooterCost)
+      championReserveCost + cheapestDominant + cheapestRoamer + guaranteedShooterCost,
+      reservedShooterCount * cheapestShooter + championReserveCost + throneReserveCost + ambientReserveCost)
+    if (!Number.isFinite(threatBudget)) {
+      for (const room of ordinaryPrisonRooms) room.prisonPopulationFailed = true
+      continue
+    }
 
     const spawned = []
     const spawnedFamilies = new Set()
@@ -5052,7 +5079,47 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         spent += Math.max(1,tmpl.tier)
       }
     }
-    const organizedBudget = Math.max(1, Math.floor(threatBudget * Math.min(1, Math.max(0, cfg.dominantFamilyShare ?? 0.82))))
+    // Mandatory ordinary Prison archers spawn BEFORE other organized fights.
+    // Distribute them across cell depth, with clear lines through the bars.
+    for (const room of ordinaryPrisonRooms) {
+      const needed = prisonShootersRequired.get(room.id) || 0
+      const cell = room.prisonCellRegion
+      const inside = p => p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2
+      const door = room.prisonCellDoorCandidate
+      // Prison bays are physically separated by bars; they can staff a cell
+      // slightly nearer a stair than ambient roamers without occupying its
+      // 3x3 safe landing. This exception is limited to locked cell geometry.
+      const candidates = dwarvenPrisonCellPoints(room).filter(p =>
+        level.map[p.y]?.[p.x] === 'marble' &&
+        entrances.every(e=>Math.max(Math.abs(p.x-e.x),Math.abs(p.y-e.y))>1) &&
+        !groundItems.some(g=>g.level===z && g.x===p.x && g.y===p.y) &&
+        DungeonTraps.safeSpawn(p.x,p.y,z))
+      let placed = 0
+      while (placed < needed) {
+        const available = candidates.filter(p => !usedPositions.has(keyXY(p.x,p.y)) && isSpaced(p,true))
+        if (!available.length || !shooterTemplates.length) { room.prisonPopulationFailed = true; break }
+        // Pick the farthest still-available position from the previous guards;
+        // ties prefer a shorter path through the cell's actual barred divider.
+        available.sort((a,b)=>{
+          const distance=p => spawned.filter(e=>inside(e)).length ?
+            Math.min(...spawned.filter(e=>inside(e)).map(e=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y)))) : 0
+          return Number(dungeonClearProjectileLine(level.map,b,door))-Number(dungeonClearProjectileLine(level.map,a,door)) ||
+            distance(b)-distance(a) ||
+            (Math.abs(a.x-door.x)+Math.abs(a.y-door.y))-(Math.abs(b.x-door.x)+Math.abs(b.y-door.y)) ||
+            a.y-b.y || a.x-b.x
+        })
+        const tmpl = shooterTemplates.find(t => Math.max(1,t.tier) <= threatBudget-spent)
+        if (!tmpl) { room.prisonPopulationFailed = true; break }
+        const spot = claimSpot(available[0])
+        const enemy = spawnTemplate(tmpl,spot,null,'backline',null,room.id,null)
+        if (!enemy || !enemyIsShooter(enemy)) { room.prisonPopulationFailed = true; break }
+        enemy.dungeonRole = 'prisonShooter'
+        spent += Math.max(1,tmpl.tier)
+        placed++
+      }
+    }
+    const organizedBudget = Math.max(spent + throneReserveCost,
+      Math.max(1, Math.floor(threatBudget * Math.min(1, Math.max(0, cfg.dominantFamilyShare ?? 0.82)))))
     const nonEntranceRooms = rooms.filter(room => room.index !== 0 && room.archetype !== 'Entrance Hall')
     const ordinaryEncounterRooms = nonEntranceRooms.filter(room => !room.landmark && !room.gallery)
     const farthestRoom = ordinaryEncounterRooms.length && entrances[0]
@@ -5216,32 +5283,6 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         if (!spot) break
         if (spawnTemplate(tmpl, spot, null, role, family.id, room.id, null)) spent += cost
       }
-    }
-
-    // Some cells still have an armed prisoner. Use a real ranged-capable
-    // species and the ordinary ammo/wandering rules, not a stationary turret.
-    const cellShooterChance = 0.65
-    const cellShooterPool = eligible.filter(isShooterTemplate)
-    for (const room of nonEntranceRooms.filter(room => room.archetype === 'Prison' && !room.gallery)) {
-      const cell = room.prisonCellRegion
-      if (!cell || !cellShooterPool.length) continue
-      const inCell = p => p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2
-      if (enemies.some(e => e.alive && e.level === z && inCell(e) && enemyIsShooter(e))) continue
-      if (!chance(cellShooterChance)) continue
-      const candidates = safeTiles.filter(p => inCell(p) && validSpot(p, true))
-      if (!candidates.length) continue
-      // Prefer a clear lane toward the bars, with the shooter in front of any
-      // stored loot/remains rather than stuck firing through those objects.
-      const door = room.prisonCellDoorCandidate
-      candidates.sort((a,b) =>
-        Number(dungeonClearProjectileLine(level.map, b, door)) - Number(dungeonClearProjectileLine(level.map, a, door)) ||
-        (Math.abs(a.x-door.x)+Math.abs(a.y-door.y)) - (Math.abs(b.x-door.x)+Math.abs(b.y-door.y)))
-      const affordable = cellShooterPool.filter(t => naturalSpawnEligible(t) && Math.max(1,t.tier) <= threatBudget - spent)
-      if (!affordable.length) continue
-      const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
-      const spot = claimSpot(candidates[0])
-      if (spawnTemplate(tmpl, spot, null, 'backline', null, room.id,
-        vaults.find(vault => vault.roomId === room.id)?.id || null)) spent += Math.max(1, tmpl.tier)
     }
 
     // Reserve some of the increased population for actual corridors. Room
@@ -5748,6 +5789,13 @@ function validateDwarvenRuinsStratum() {
       const hasCellDoor = (room.internalLocks || []).some(lock => lock.kind === 'prisonCell') ||
         (room.internalDoors || []).some(door => door.kind === 'prisonCell')
       if (!hasBars || !hasCellDoor) issues.push(`${tag}: Prison room ${room.id} lacks a functional barred side cell`)
+      if (room.prisonPopulationFailed) issues.push(`${tag}: Prison shooter staffing failed: ${room.id}`)
+      const requiredShooters = Math.ceil(dwarvenPrisonCellPoints(room).filter(p => level.map[p.y]?.[p.x]==='marble').length /
+        Math.max(1, Math.floor(cfg.rooms?.prisonGeneration?.shooterTilesPerEnemy ?? 6)))
+      const cellShooters = (context.floorEnemies || []).filter(e => e.alive && e.dungeonRoomId===room.id &&
+        e.dungeonRole==='prisonShooter' && enemyIsShooter(e) && (e.shotsRemaining||0)>0)
+      if (cellShooters.length < requiredShooters)
+        issues.push(`${tag}: prison ${room.id} has ${cellShooters.length}/${requiredShooters} shooters`)
       const cell = room.prisonCellRegion, door = room.prisonCellDoorCandidate
       if (!cell || !door) { issues.push(`${tag}: Prison room ${room.id} is missing cell geometry`); continue }
       const cells = dwarvenPrisonCellPoints(room)

@@ -411,9 +411,10 @@
           "targetShareLate": 0.3,
           "extraWeightedPrisonsAllowed": true,
           "prisonCandidateSearchLimit": 128,
+          "shooterTilesPerEnemy": 6,
           "crossfire": {
             "minimumZ": -5,
-            "floorAttemptChance": 0.3,
+            "floorAttemptChance": 0.7,
             "maxPerFloor": 1,
             "minimumInteriorLength": 13,
             "minimumInteriorWidth": 9,

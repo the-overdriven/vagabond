@@ -88,6 +88,18 @@ const DungeonTraps = (() => {
       const progressionGuard = level.progressionKey?.mode === 'trapGuardedSideRoom'
         ? level.progressionKey.guardPoint || null : null
       const trapGuardRadius = dungeonPackageConfig(level.dungeonPackage)?.progressionKeys?.trapGuardRadius ?? 4
+      // Mandatory prison garrisons reserve their cell floor for real shooters.
+      // A later corridor trap must not eliminate every safe spawn position by
+      // putting its pressure plate or emitter within trap-spawn clearance.
+      const prisonCells = level.dungeonPackage === 'dwarvenRuins' ? rooms
+        .filter(r=>r.archetype==='Prison' && !r.gallery && r.prisonCellRegion)
+        .flatMap(r=>{
+          const c=r.prisonCellRegion,points=[]
+          for(let y=c.y1;y<=c.y2;y++) for(let x=c.x1;x<=c.x2;x++)
+            if(terrain[y]?.[x]==='marble') points.push({x,y})
+          return points
+        }) : []
+      const nearPrison = p => !!p && prisonCells.some(q => distance(p,q) <= cfg.spawnClearance)
       const blocked = new Set(), candidates = []
       for (let y = 2; y < MAP_H - 2; y++) for (let x = 2; x < MAP_W - 2; x++) {
         if (terrain[y][x] !== 'marble' || inRoom(x, y) ||
@@ -125,6 +137,7 @@ const DungeonTraps = (() => {
           direction = {dx:-wall[0], dy:-wall[1]}
           trigger = {x:candidate.x+direction.dx, y:candidate.y+direction.dy}
         }
+        if (nearPrison(trigger) || nearPrison(emitter)) continue
         if (terrain[trigger.y]?.[trigger.x] !== 'marble' || !usefulTriggerTile(terrain, trigger.x, trigger.y) || inRoom(trigger.x, trigger.y) ||
             (emitter && inLandmark(emitter.x,emitter.y)) ||
             required.some(p => distance(p, trigger) <= cfg.entranceClearance)) continue
