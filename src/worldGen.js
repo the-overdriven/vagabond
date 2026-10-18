@@ -4536,7 +4536,10 @@ function dungeonEncounterFamilies(eligible, cfg) {
     families.push({id, weight: Number(def.weight ?? 1), members, commonMembers: common})
   }
   if (!families.length) {
-    for (const tmpl of eligible || []) families.push({id: tmpl.name, weight: Math.max(0.0001, tmpl.rarity ?? 1), members: [tmpl], commonMembers: [tmpl]})
+    for (const tmpl of eligible || []) {
+      if ((tmpl.rarity ?? 1) <= (cfg?.dominantRarityCutoff ?? 0.1)) continue
+      families.push({id: tmpl.name, weight: Math.max(0.0001, tmpl.rarity ?? 1), members: [tmpl], commonMembers: [tmpl]})
+    }
   }
   return families
 }
@@ -4572,8 +4575,11 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     }
     return chosen
   }
+  // Dominant family encounters use only common members. Rare species remain
+  // possible through the globally weighted corridor/ambient encounter pools;
+  // choosing a themed family must not multiply their spawn opportunities.
   const chooseMember = (family, role = 'any') => {
-    let pool = family?.members?.slice() || []
+    let pool = family?.commonMembers?.slice() || []
     if (!pool.length) return null
     if (role === 'backline') {
       const shooters = pool.filter(isShooterTemplate)
@@ -4617,17 +4623,16 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       (1 + floorIndex * densityGrowth)
     ))
 
-    let dominantPool = families.filter(family => family.commonMembers.length)
-    if (dominantPool.length < 2) dominantPool = families.slice()
+    const dominantPool = families.filter(family => family.commonMembers.length)
     const requestedFamilies = randInt(cfg.dominantFamilyCountRange?.[0] ?? 2, cfg.dominantFamilyCountRange?.[1] ?? 4)
     let dominant = weightedWithoutReplacement(dominantPool, Math.min(requestedFamilies, dominantPool.length), family =>
-      family.weight * family.members.reduce((sum, tmpl) => sum + Math.max(0.0001, tmpl.rarity ?? 1), 0))
+      family.weight * family.commonMembers.reduce((sum, tmpl) => sum + Math.max(0.0001, tmpl.rarity ?? 1), 0))
     if (!dominant.length) continue
 
     const vaults = Array.isArray(level.vaults) ? level.vaults : []
     const needsShooterFamily = vaults.some(vault => (vault.roles?.backline || 0) > 0 && (vault.slots?.backline || []).length)
-    const shooterFamilies = families.filter(family => family.members.some(isShooterTemplate))
-    if (needsShooterFamily && shooterFamilies.length && !dominant.some(family => family.members.some(isShooterTemplate))) {
+    const shooterFamilies = dominantPool.filter(family => family.commonMembers.some(isShooterTemplate))
+    if (needsShooterFamily && shooterFamilies.length && !dominant.some(family => family.commonMembers.some(isShooterTemplate))) {
       const shooterFamily = pickWeighted(shooterFamilies, family => Math.max(0.0001, family.weight))
       if (dominant.length >= Math.max(1, requestedFamilies)) dominant[dominant.length - 1] = shooterFamily
       else dominant.push(shooterFamily)
@@ -4637,16 +4642,17 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     level.encounterFamilies = dominant.map(family => family.id)
     if (descriptor) descriptor.encounterFamilies = level.encounterFamilies.slice()
 
-    const dominantMemberNames = new Set(dominant.flatMap(family => family.members.map(tmpl => tmpl.name)))
-    const outsiderPool = eligible.filter(tmpl => !dominantMemberNames.has(tmpl.name))
-    const roamerPool = outsiderPool.length ? outsiderPool : eligible
+    // Avoid an outsider-only pool: it can contain almost exclusively rare
+    // species when all ordinary families are represented on this floor.
+    // Every ambient roll compares rarity against the full eligible pool.
+    const roamerPool = eligible
     const championCount = Math.max(1, Math.floor(cfg.championsPerFloor ?? 1))
     const championFamily = pickWeighted(dominant, family => Math.max(0.0001, family.weight))
-    const championTemplate = chooseMember(championFamily, 'champion') || eligible[0]
-    const cheapestDominant = dominant.reduce((sum, family) => sum + Math.min(...family.members.map(tmpl => Math.max(1, tmpl.tier))), 0)
+    const championTemplate = chooseMember(championFamily, 'champion') || championFamily.commonMembers[0]
+    const cheapestDominant = dominant.reduce((sum, family) => sum + Math.min(...family.commonMembers.map(tmpl => Math.max(1, tmpl.tier))), 0)
     const cheapestRoamer = Math.min(...roamerPool.map(tmpl => Math.max(1, tmpl.tier)))
     const guaranteedShooterCost = needsShooterFamily && shooterFamilies.length
-      ? Math.min(...shooterFamilies.flatMap(family => family.members.filter(isShooterTemplate).map(tmpl => Math.max(1, tmpl.tier))))
+      ? Math.min(...shooterFamilies.flatMap(family => family.commonMembers.filter(isShooterTemplate).map(tmpl => Math.max(1, tmpl.tier))))
       : 0
     threatBudget = Math.max(threatBudget,
       Math.max(1, championTemplate.tier) * 2 * championCount + cheapestDominant + cheapestRoamer + guaranteedShooterCost)
@@ -4774,7 +4780,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       // This is the final-floor defensive encounter, not a bonus population.
       // Favor a family with a ranged member when one is already selected, but
       // never force a ranged species into a non-shooter family.
-      const shooterDominant = dominant.filter(family => family.members.some(isShooterTemplate))
+      const shooterDominant = dominant.filter(family => family.commonMembers.some(isShooterTemplate))
       const throneFamily = pickWeighted(shooterDominant.length ? shooterDominant : dominant,
         family => Math.max(0.0001,family.weight))
       throneRoom.encounterFamily = throneFamily.id
@@ -4798,7 +4804,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       if (!room) continue
       let familyChoices = dominant
       if ((vault.roles?.backline || 0) > 0) {
-        const shooterDominant = dominant.filter(family => family.members.some(isShooterTemplate))
+        const shooterDominant = dominant.filter(family => family.commonMembers.some(isShooterTemplate))
         if (shooterDominant.length) familyChoices = shooterDominant
       }
       const family = familyChoices[vaultFamilyCursor++ % familyChoices.length]
@@ -4823,12 +4829,13 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       const family = championIndex === 0
         ? championFamily
         : pickWeighted(dominant, candidate => Math.max(0.0001, candidate.weight))
-      let tmpl = chooseMember(family, 'champion') || eligible[0]
+      let tmpl = chooseMember(family, 'champion') || family.commonMembers[0]
       // Progression keys must never be carried into impassable terrain.
       // Ethereal champions can phase into walls before the player kills them.
       if (championIndex === 0 && keyCarrierPlan && tmpl?.abilities?.includes('ethereal')) {
-        tmpl = (family.members || []).find(member => !member.abilities?.includes('ethereal')) ||
-          eligible.find(member => !member.abilities?.includes('ethereal')) || null
+        tmpl = (family.commonMembers || []).find(member => !member.abilities?.includes('ethereal')) ||
+          eligible.find(member => (member.rarity ?? 1) > (cfg.dominantRarityCutoff ?? 0.1) &&
+            !member.abilities?.includes('ethereal')) || null
       }
       const championRoom = championIndex === 0
         ? (keyCarrierRoom || throneRoom || roomById.get(championVault?.roomId) || farthestRoom)
@@ -4929,8 +4936,10 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const corridorShare = Math.max(0, Math.min(0.5,
       (cfg.corridorBudgetShare ?? 0) + floorIndex * (cfg.corridorBudgetGrowthPerFloor ?? 0)))
     const corridorTarget = Math.round(threatBudget * corridorShare)
-    const corridorPool = [...new Map(dominant.flatMap(family => family.members)
-      .map(tmpl => [tmpl.name, tmpl])).values()]
+    // Corridors are unthemed wandering encounters, like ambient roamers.
+    // Select globally so 0.02 retains its weight relative to all other
+    // eligible species, including those outside the selected room families.
+    const corridorPool = eligible
     let corridorSpent = 0, corridorAttempts = 0
     while (corridorSpent < corridorTarget && spent < threatBudget && corridorAttempts++ < 100) {
       const affordable = corridorPool.filter(tmpl => Math.max(1, tmpl.tier) <= threatBudget - spent)

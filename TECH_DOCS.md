@@ -1333,10 +1333,18 @@ trap safety, terrain eligibility, spawn spacing and obstacle rules. Corridor
 placements reuse the existing wandering and persistence rules with the tactical role label `corridor`; they do not create new tile or status types.
 
 A floor selects **2–4 dominant encounter families** (goblinoids, undead,
-marauders, or cave predators when their members are depth-eligible). Template
-rarity still weights members inside the family, while rarity 0.1 or lower is
-excluded from choosing a family as a dominant population. Organized rooms draw
-from one family at a time; a broader eligible pool supplies occasional roamers.
+marauders, or cave predators when their members are depth-eligible). Organized
+rooms, Champions and their escorts select only common family members, whose
+`rarity` is **greater than 0.1** (`dominantRarityCutoff`). Rarity still weights
+those common members relative to one another. Species at or below that cutoff,
+including `rarity: 0.02`, may instead appear among unthemed corridor and ambient
+wanderers. Both roaming selections use the **full depth-eligible species pool**,
+not just the selected dominant families or their leftovers, and use each
+species' configured rarity as a direct relative weight. Thus a `0.02` species
+has one fiftieth of the selection weight of an otherwise eligible `1.0` species
+in these global draws. This is a relative weight, not a 2% spawn chance or a
+promise of one rare encounter per floor. Themed room populations remain
+predictable while wandering encounters can occasionally be exceptional.
 **All** Ruins enemies use their species' normal idle wandering mode and home radius,
 including Champions, escorts, ranged backliners and other tactical room/vault guards.
 Roles determine initial positions and shooter selection, not stationary behavior;

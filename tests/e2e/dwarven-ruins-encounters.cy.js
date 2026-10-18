@@ -84,6 +84,9 @@ describe('Dwarven Ruins encounter progression', () => {
           for (const enemy of mobs) {
             const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName]
             check(!!tmpl, 'every Ruins encounter has a species template')
+            if ((tmpl.rarity ?? 1) <= cfg.dominantRarityCutoff && enemy.dungeonRole)
+              check(['corridor','roamer'].includes(enemy.dungeonRole),
+                'rare monsters only enter through globally weighted wandering encounters')
             const templateMode = Object.prototype.hasOwnProperty.call(tmpl, 'wander')
               ? tmpl.wander : defaultEnemyWanderMode()
             check(enemyWanderMode(enemy) === enemyWanderForLevel(templateMode, z),
