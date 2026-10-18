@@ -8,8 +8,8 @@ function activePlayerStatuses() {
   if (gas) statuses.push({id:'gas',icon:'☠',label:'Poison gas',counter:`${gas.remainingTurns}t`,
     detail:`The chamber vents in ${gas.remainingTurns} turns. The emergency valve takes two turns; alternatively breach the exit with a weapon.`})
   const crusher = DungeonHazards.activeCrusherStatus()
-  if (crusher) statuses.push({id:'crusher',icon:'⚠',label:'Crusher!',counter:'1t',
-    detail:'The slab will fall after your next action. Step off the marked tracks now.'})
+  if (crusher) statuses.push({id:'crusher',icon:'⚠',label:'Moving walls',counter:`${crusher.geometry.jawStages.length-crusher.step}t`,
+    detail:'Stone walls advance inward by one tile per action. Escape beyond the pressure-plate row before they meet.'})
   if (isDrowning()) statuses.push({id: 'drowning', icon: '≈', label: 'Drowning', counter: '',
     detail: 'Drowning: lose 5% of maximum HP (at least 1) each swimming step or wait. Reach shore to recover.'})
   const turns = n => `${n} turn${n === 1 ? '' : 's'}`

@@ -1720,9 +1720,9 @@ function dwarvenGalleryRoll(z, salt) {
   return (n >>> 0) / 4294967296
 }
 
-// Axis-aligned prison gallery: a 3-tile-wide central aisle with two 2-tile
-// shooter bays behind projectile-transparent barred partitions. The single
-// outside entrance must be on a short side of the elongated footprint.
+// A connected U-shaped prison: long barred shooting bays along both sides
+// meet behind ONE central barred door at the far end of the exposed aisle.
+// Shooter density is one per six usable tiles in each bay, rounded up.
 function planDwarvenCrossfireGallery(cm, room, protectedPoints = []) {
   if (!room?.optional || room.connectionCount !== 1 || room.doorways?.length !== 1 || room.vaultType) return null
   const leaves = room.doorways[0]
@@ -1747,38 +1747,41 @@ function planDwarvenCrossfireGallery(cm, room, protectedPoints = []) {
   const aisle = [], bars = [], bays = [[],[]]
   for (let d=1;d<=interiorLength;d++) {
     for (let w=-1;w<=1;w++) aisle.push(at(d,w))
-    for (const side of [-1,1]) {
-      bars.push(at(d,side*2))
-      for (let w=3;w<=4;w++) bays[side === -1 ? 0 : 1].push(at(d,side*w))
+    for (const flank of [-1,1]) {
+      // At the last depth the bar stops, connecting BOTH side prisons to
+      // the rear passage and to the sole central prison door.
+      if (d < interiorLength) bars.push(at(d,flank*2))
+      for (let w=3;w<=4;w++) bays[flank === -1 ? 0 : 1].push(at(d,flank*w))
     }
   }
-  const shooterSpots = [at(Math.min(7,interiorLength-4),-3),at(Math.min(7,interiorLength-4),3)]
-  const fireTargets = [at(Math.min(7,interiorLength-4),0),at(Math.min(10,interiorLength-3),0)]
-  const cellDoors = [at(3,-2),at(3,2)]
   const farDoor = at(interiorLength-1,0)
-  const farWalls = [at(interiorLength-1,-1),at(interiorLength-1,1)]
+  const farBars = [at(interiorLength-1,-1),at(interiorLength-1,1)]
   const chest = at(interiorLength,0)
-  const owned = [...aisle,...bars,...bays.flat(),...cellDoors,...farWalls]
+  // Five shooters per 30-tile bay; distribute them along the full length,
+  // with their front rank one tile behind the bars. No extra free monsters.
+  const shooterSpots = bays.map((bay, sideIndex) => {
+    const count = Math.ceil(bay.length / 6)
+    const flank = sideIndex === 0 ? -1 : 1
+    return Array.from({length:count},(_,i) => at(Math.max(2,Math.min(interiorLength-2,
+      2+Math.round(i*(interiorLength-4)/Math.max(1,count-1)))), flank*3))
+  })
+  const fireTargets = [at(Math.min(7,interiorLength-4),0),at(Math.min(10,interiorLength-3),0)]
+  const owned = [...aisle,...bars,...bays.flat(),...farBars]
   const forbidden = new Set(protectedPoints.map(p => keyXY(p.x,p.y)))
   if (owned.some(p => cm[p.y]?.[p.x] !== 'marble' || forbidden.has(keyXY(p.x,p.y)))) return null
-  if (!shooterSpots.every((p,i) => fireTargets.every(t => dungeonClearProjectileLine(cm,p,t)))) return null
-  // Port leaves enter the aisle; a second door through a side wall would
-  // defeat the flanking bays even if the room graph was a leaf.
+  if (!shooterSpots.flat().every(p => fireTargets.some(t => dungeonClearProjectileLine(cm,p,t)))) return null
   if (!leaves.every(p => Math.abs((p.x-near.x)*cross[0]+(p.y-near.y)*cross[1]) <= 1)) return null
   return {variant:'crossfire',entrance:leaves.map(p=>({...p})),length:interiorLength,width:interiorWidth,
-    aisle,bars,bays,cellDoors,shooterSpots,fireTargets,farDoor,farWalls,chest}
+    aisle,bars,bays,farDoor,farBars,chest,shooterSpots,fireTargets}
 }
 
 function buildDwarvenCrossfireGallery(cm, room) {
   const gallery = room.gallery
   if (!gallery) return
-  for (const p of gallery.bars) cm[p.y][p.x] = 'dwarvenprisonbars'
-  for (const p of gallery.cellDoors) cm[p.y][p.x] = 'dwarvenprisondoorclosed'
-  for (const p of gallery.farWalls) cm[p.y][p.x] = 'dwarvenwall'
-  cm[gallery.farDoor.y][gallery.farDoor.x] = 'dwarvendoorclosed'
-  room.internalDoors = gallery.cellDoors.map(p => ({leaves:[{...p}],kind:'galleryCell',locked:false}))
-  room.internalDoors.push({leaves:[{...gallery.farDoor}],kind:'galleryReward',locked:false})
-  room.tacticalSlots = {backline:gallery.shooterSpots.map(p=>({...p})),frontline:[],group:[],champion:[],any:[]}
+  for (const p of [...gallery.bars,...gallery.farBars]) cm[p.y][p.x] = 'dwarvenprisonbars'
+  cm[gallery.farDoor.y][gallery.farDoor.x] = 'dwarvenprisondoorclosed'
+  room.internalDoors = [{leaves:[{...gallery.farDoor}],kind:'galleryPrison',locked:false}]
+  room.tacticalSlots = {backline:gallery.shooterSpots.flat().map(p=>({...p})),frontline:[],group:[],champion:[],any:[]}
 }
 
 function dwarvenRoomArchetypeForProgress(progress, finalFloor = false) {
@@ -3268,10 +3271,10 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const g = galleryRoom.gallery
     if (g.length < (galleryCfg.minimumInteriorLength ?? 13) || g.width < (galleryCfg.minimumInteriorWidth ?? 9) ||
         !g.aisle.every(p => cm[p.y]?.[p.x] === 'marble' ||
-          (p.x === g.farDoor.x && p.y === g.farDoor.y && cm[p.y][p.x] === 'dwarvendoorclosed') ||
-          g.farWalls.some(w=>w.x===p.x&&w.y===p.y)) ||
-        !g.bars.every(p => g.cellDoors.some(d=>d.x===p.x && d.y===p.y) || cm[p.y]?.[p.x] === 'dwarvenprisonbars') ||
-        !g.shooterSpots.every(p => g.fireTargets.some(t => dungeonClearProjectileLine(cm,p,t)))) return null
+          (p.x === g.farDoor.x && p.y === g.farDoor.y && cm[p.y][p.x] === 'dwarvenprisondoorclosed') ||
+          g.farBars.some(w=>w.x===p.x&&w.y===p.y)) ||
+        ![...g.bars,...g.farBars].every(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars') ||
+        !g.shooterSpots.flat().every(p => g.fireTargets.some(t => dungeonClearProjectileLine(cm,p,t)))) return null
   }
   const serializableRooms = roomMetas.map(({_source, ...room}) => room)
   const serializableArtifactRoom = artifactRoom
@@ -5028,25 +5031,19 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     }
 
     let spent = 0
-    // Pay the two genuine flank archers before filling the normal floor
-    // population. Any budget reserved here is unavailable to later spawns.
-    // Rarity still uses the ordinary eligible shooter species pool.
+    // One real shooter for each six usable bay tiles. They are funded FIRST,
+    // before the ordinary floor population; never place decorative stand-ins.
     for (const room of galleryRooms) {
       const pool = eligible.filter(t => isShooterTemplate(t) && naturalSpawnEligible(t) &&
         (t.rarity ?? 1) > (cfg.dominantRarityCutoff ?? 0.1))
         .sort((a,b)=>a.tier-b.tier || a.name.localeCompare(b.name))
       if (!pool.length) {room.galleryPopulationFailed = true;continue}
-      for (let side=0;side<2;side++) {
+      for (let side=0;side<2;side++) for (const spot of room.gallery.shooterSpots[side]) {
         const tmpl = pool.find(t => Math.max(1,t.tier) <= threatBudget-spent)
-        const spot = room.gallery.shooterSpots[side]
-        if (!tmpl || !spot || !level.map[spot.y]?.[spot.x] ||
-            level.map[spot.y][spot.x] !== 'marble' || usedPositions.has(keyXY(spot.x,spot.y)))
+        if (!tmpl || level.map[spot.y]?.[spot.x] !== 'marble' || usedPositions.has(keyXY(spot.x,spot.y)))
           {room.galleryPopulationFailed = true;break}
-        const spawnedSpot = claimSpot(spot)
-        const enemy = spawnTemplate(tmpl,spawnedSpot,null,'backline',null,room.id,null)
+        const enemy = spawnTemplate(tmpl,claimSpot(spot),null,'backline',null,room.id,null)
         if (!enemy || !enemyIsShooter(enemy)) {room.galleryPopulationFailed = true;break}
-        // Reuse the serialized dungeonRole for each flank, rather than
-        // adding a new enemy flag that replay/save could accidentally drop.
         enemy.dungeonRole = `gallery${side}`
         spent += Math.max(1,tmpl.tier)
       }
@@ -5734,10 +5731,12 @@ function validateDwarvenRuinsStratum() {
           ['gallery0','gallery1'].includes(e.dungeonRole) && enemyIsShooter(e) && (e.shotsRemaining || 0) > 0)
         const reward = floorGround.filter(item => item.galleryReward && item.dungeonRoomId === room.id)
         if (!room.optional || room.onMainRoute || room.connectionCount !== 1 || g.length < 13 || g.width < 9 ||
-            room.vaultType || shooters.length !== 2 || new Set(shooters.map(e=>e.dungeonRole)).size !== 2 ||
-            reward.length !== 1 || !g.bars.every(p => g.cellDoors.some(d=>d.x===p.x&&d.y===p.y) ||
-              level.map[p.y]?.[p.x] === 'dwarvenprisonbars') ||
-            !g.shooterSpots.every(p => g.fireTargets.some(t=>dungeonClearProjectileLine(level.map,p,t))))
+            room.vaultType || room.galleryPopulationFailed || shooters.length !== g.shooterSpots.flat().length ||
+            g.bays.some((bay,i)=>shooters.filter(e=>e.dungeonRole===`gallery${i}`).length !== Math.ceil(bay.length/6)) ||
+            reward.length !== 1 || !['dwarvenprisondoorclosed','dwarvenprisondooropen',
+              'dwarvenprisondoorbreached'].includes(level.map[g.farDoor.y]?.[g.farDoor.x]) ||
+            ![...g.bars,...g.farBars].every(p=>level.map[p.y]?.[p.x] === 'dwarvenprisonbars') ||
+            !g.shooterSpots.flat().every(p=>g.fireTargets.some(t=>dungeonClearProjectileLine(level.map,p,t))))
           issues.push(`${tag}: invalid crossfire gallery ${room.id}`)
         continue
       }

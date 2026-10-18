@@ -817,6 +817,10 @@
       "baseTileKey": "marble",
       "scale": 1
     },
+    "dwarvencrusherjaw": {
+      "image": "img/tiles/dwarven-stone-wall.png",
+      "scale": 1
+    },
     "dwarvencrushertrack": {
       "image": "img/tiles/dwarven-crusher-track.png",
       "baseTileKey": "marble",

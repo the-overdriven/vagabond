@@ -159,35 +159,72 @@ const DungeonHazards = (() => {
       const rooms = (level.rooms || []).filter(r => r.optional && !r.onMainRoute && !r.gallery &&
         !r.landmark && r.archetype !== 'Prison' && !r.prisonCell &&
         !(level.vaults || []).some(v => v.roomId === r.id) &&
-        r.w >= 7 && r.h >= 6)
+        // Between two opposing original room walls, never a tiny isolated tile.
+        ((r.w>=7 && r.w<=10 && r.h>=9) || (r.h>=7 && r.h<=10 && r.w>=9)))
       const candidates=[]
       for (const room of rooms) {
-        const doorLeaves = (room.doorways || []).flat()
-        for (let y=room.y+2; y<room.y+room.h-2; y++)
-          for (let x=room.x+2; x<room.x+room.w-2; x++) {
-            if (level.map[y]?.[x] !== 'marble' || banned.has(keyXY(x,y))) continue
-            if (doorLeaves.some(p => Math.max(Math.abs(x-p.x),Math.abs(y-p.y)) <= 2)) continue
-            for (const [dx,dy] of [[1,0],[0,1]]) {
-              const dangerTiles=[{x,y},{x:x+dx,y:y+dy},{x:x-dx,y:y-dy}]
-              if (!dangerTiles.every(p => p.x>room.x+1 && p.y>room.y+1 &&
-                p.x<room.x+room.w-2 && p.y<room.y+room.h-2 &&
-                level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p)))) continue
-              if (!dangerTiles.every(p => around.some(([vx,vy]) =>
-                level.map[p.y+vy]?.[p.x+vx] === 'marble' &&
-                !contains(dangerTiles,p.x+vx,p.y+vy)))) continue
-              candidates.push({room,trigger:{x,y},dangerTiles})
+        const acrossX = room.w <= room.h
+        const width = acrossX ? room.w-2 : room.h-2
+        const long = acrossX ? room.h-2 : room.w-2
+        if (width < 5 || width > 8 || long < 7) continue
+        for (let centerLong=3; centerLong<=long-4; centerLong++) {
+        const footprint=[], stages=[], triggerTiles=[]
+        for(let offset=0; offset<Math.ceil(width/2); offset++) {
+          const stage=[]
+          for(let row=centerLong-1; row<=centerLong+1; row++)
+            for(const transverse of [offset,width-1-offset]) {
+              const p= acrossX ? {x:room.x+1+transverse,y:room.y+1+row} :
+                {x:room.x+1+row,y:room.y+1+transverse}
+              if (!stage.some(q=>q.x===p.x&&q.y===p.y)) stage.push(p)
             }
-          }
+          stages.push(stage)
+        }
+        for(let row=centerLong-1;row<=centerLong+1;row++) {
+          const center=Math.floor(width/2)
+          const p=acrossX ? {x:room.x+1+center,y:room.y+1+row} :
+            {x:room.x+1+row,y:room.y+1+center}
+          triggerTiles.push(p)
+          for(let col=0;col<width;col++)
+            footprint.push(acrossX?{x:room.x+1+col,y:room.y+1+row}:
+              {x:room.x+1+row,y:room.y+1+col})
+        }
+        // The center trigger must have an unobstructed way OUT of the
+        // three-row strip; a solid prop cannot turn its warning into a trap.
+        const escape= [-2,2].some(delta=>{
+          const p=acrossX ? {x:triggerTiles[1].x,y:triggerTiles[1].y+delta} :
+            {x:triggerTiles[1].x+delta,y:triggerTiles[1].y}
+          return level.map[p.y]?.[p.x]==='marble' && !banned.has(encode(p))
+        })
+        if (!escape) continue
+        const replaceable=new Set(['dwarvenbed','dwarvenbedbarricade','dwarvencrate',
+          'dwarvencratepieces','dwarvenrubble','dwarventable','dwarvenshelf'])
+        const furniture=footprint.filter(p=>replaceable.has(level.map[p.y]?.[p.x]))
+        if (furniture.length>3 || footprint.some(p=>
+          (level.map[p.y]?.[p.x]!=='marble' && !replaceable.has(level.map[p.y]?.[p.x])) ||
+          banned.has(encode(p)) ||
+          (room.doorways||[]).flat().some(d=>p.x===d.x && p.y===d.y))) continue
+        // At both ends of the strike strip there are at least two intact
+        // walkable rows for retreat. Other mandatory routes never use it.
+        candidates.push({room,trigger:triggerTiles[1],triggerTiles,dangerTiles:footprint,stages,width,furniture})
+        }
       }
       if (!candidates.length) continue
       const ordered = candidates.map(c => ({...c,score:hash(z,0xc3dd72a1,c.trigger.x,c.trigger.y)}))
-        .sort((a,b)=>a.score-b.score || a.trigger.y-b.trigger.y || a.trigger.x-b.trigger.x)
+        .sort((a,b)=>a.furniture.length-b.furniture.length || a.score-b.score || a.trigger.y-b.trigger.y || a.trigger.x-b.trigger.x)
       const placed=ordered[0]
-      for (const p of placed.dangerTiles) level.map[p.y][p.x] =
-        p.x===placed.trigger.x && p.y===placed.trigger.y ? 'dwarvencrusherplate' : 'dwarvencrushertrack'
+      const baseTiles=[]
+      const triggerKeys=new Set(placed.triggerTiles.map(encode))
+      for(const p of placed.dangerTiles) {
+        const col = placed.stages[0].some(q=>q.x===p.x&&q.y===p.y)
+        const tile=triggerKeys.has(encode(p))?'dwarvencrusherplate':col?'dwarvencrushertrack':'marble'
+        baseTiles.push({...p,tile})
+        level.map[p.y][p.x]=tile
+      }
       level.hazards.push({id:`dwarven-crusher:${z}:${placed.room.id}`,type:'crusher',z,
-        roomId:placed.room.id,geometry:{triggerTiles:[placed.trigger],dangerTiles:placed.dangerTiles},
-        state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,impactedMonsterIds:[],exhausted:false})
+        roomId:placed.room.id,geometry:{triggerTiles:placed.triggerTiles,dangerTiles:placed.dangerTiles,
+          jawStages:placed.stages,baseTiles},
+        state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,step:0,
+        impactedMonsterIds:[],exhausted:false})
     }
     return true
   }
@@ -284,52 +321,57 @@ const DungeonHazards = (() => {
       if (hazard.type !== 'crusher' || hazard.state !== 'idle' ||
           !contains(hazard.geometry.triggerTiles,actor.x,actor.y)) continue
       hazard.state = 'warning'
+      hazard.step = 0
       // Player enters before the action is counted. Monsters enter during
       // enemy resolution, after the action's count has already advanced.
       hazard.stateEnteredTurn = hazard.localTurn + (actor === player ? 1 : 0)
       if (actor === player || enemyIsVisibleOnMainView(actor)) {
         clearAutoPath()
-        log('The dwarven pressure plate sinks! A stone crusher groans overhead!', 'bad')
-        spawnDamageNumber(actor.x,actor.y,'CRUSHER!', '#eeaa62')
+        log('Stone jaws grind out of the opposite walls. Get clear of the passage!', 'bad')
       }
     }
   }
 
-  function impact(hazard) {
-    const cfg = crusherConfig(), danger = hazard.geometry.dangerTiles
-    if (!replayAnimationsDisabled && !replaySimulationMode)
-      for (const p of danger) spawnFxAnim(p.x,p.y,'▰','#d5bba1',-1)
-    if (contains(danger,player.x,player.y)) {
-      const damage = player.godMode ? 0 : Math.ceil(playerMaxHp() * cfg.playerDamageMaxHpFraction)
-      if (damage) {
-        player.hp -= damage
-        absorbPlayerFatalDamage()
-        checkPlayerHealthWarning()
-      }
-      log(`The dwarven crusher slams down! You take ${damage} damage.`, 'bad')
-      spawnDamageNumber(player.x,player.y,damage || 'Immune!',RENDER_STYLE.damage.playerHit)
-      if (player.hp<=0) die(null,'dwarven crusher')
-    } else log('The stone crusher slams into empty floor, then rises.', 'info')
+  // Advance one tile of solid masonry from EACH wall per consumed action.
+  // Damage is resolved against the advancing tiles and can strike monsters
+  // just as reliably as the hero. Newly inserted masonry blocks movement,
+  // sight and projectiles until it retracts, independently of animation.
+  function advanceCrusher(hazard) {
+    const cfg=crusherConfig(),stage=hazard.geometry.jawStages[hazard.step] || []
+    const level=activeLevel()
+    const caught=actor=>contains(stage,actor.x,actor.y)
+    if (caught(player)) {
+      const damage=player.godMode?0:Math.ceil(playerMaxHp()*cfg.playerDamageMaxHpFraction)
+      if (damage) {player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()}
+      log(`The advancing stone walls crush you for ${damage} HP!`,'bad')
+      spawnDamageNumber(player.x,player.y,damage||'Immune!',RENDER_STYLE.damage.playerHit)
+      if(player.hp<=0) die(null,'dwarven crusher')
+    }
+    let monsterHits=0
     for (const e of [...enemies]) {
-      if (!e.alive || !onCurrentLevel(e) || !contains(danger,e.x,e.y) ||
-          hazard.impactedMonsterIds.includes(e.id)) continue
+      if (!e.alive || !onCurrentLevel(e) || !caught(e) ||
+        hazard.impactedMonsterIds.includes(e.id)) continue
       hazard.impactedMonsterIds.push(e.id)
       if (enemyImmunityActive(e)) continue
-      const boss = e.prefix === 'Champion' || e.isBoss === true || e.boss === true
-      const cap = boss ? cfg.bossDamageCapFraction : cfg.normalMonsterDamageCapFraction
-      const damage = Math.max(1,Math.ceil(e.maxHp*cap))
-      const wasEnraged = enemyIsEnraged(e)
-      const visible = enemyIsVisibleOnMainView(e)
-      e.hp -= damage
-      absorbEnemyFatalHit(e)
-      logEnemyEnrageTransition(e,wasEnraged)
-      if (visible) spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
-      if (e.hp<=0) {
-        if (visible) log(`The ${e.name} is crushed beneath the dwarven slab!`, 'info')
-        killEnemy(e,false,'dwarven crusher')
-      }
+      const boss=e.prefix==='Champion'||e.isBoss===true||e.boss===true
+      const cap=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
+      const damage=Math.max(1,Math.ceil(e.maxHp*cap))
+      const enraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
+      e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,enraged)
+      if(visible) {monsterHits++;spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)}
+      if(e.hp<=0) {if(visible)log(`The ${e.name} is crushed between the dwarven walls!`,'info');killEnemy(e,false,'dwarven crusher')}
     }
-    minimapDirty = true
+    // All advancing tiles become temporarily impassable. An actor struck on
+    // a newly-solid tile may move OFF on the next action (as with gas doors).
+    for(const p of stage) level.map[p.y][p.x]='dwarvencrusherjaw'
+    hazard.step++
+    minimapDirty=true;invalidateUndergroundFov();clearAutoPath()
+    if(hazard.step>=hazard.geometry.jawStages.length) {
+      for(const p of hazard.geometry.baseTiles) level.map[p.y][p.x]=p.tile
+      hazard.state='cooldown';hazard.stateEnteredTurn=hazard.localTurn
+      log(monsterHits?'The jaws collide, then retreat from the crushed creatures.':
+        'The stone jaws collide and withdraw into the walls.','info')
+    }
   }
 
   function onPlayerTurnConsumed(tick) {
@@ -365,9 +407,7 @@ const DungeonHazards = (() => {
       }
       if (hazard.type !== 'crusher') continue
       if (hazard.state === 'warning') {
-        impact(hazard)
-        hazard.state='cooldown'
-        hazard.stateEnteredTurn=hazard.localTurn
+        advanceCrusher(hazard)
       } else if (hazard.state === 'cooldown' && hazard.localTurn-hazard.stateEnteredTurn >= crusherConfig().cooldownTurns) {
         hazard.state='idle'
         hazard.stateEnteredTurn=hazard.localTurn
@@ -402,10 +442,15 @@ const DungeonHazards = (() => {
           !h.geometry.doors.every(p=> ['dwarvendoorclosed','dwarvendooropen','dwarvendoorlocked','dwarvendoorbreached'].includes(level.map[p.y]?.[p.x]))) return false
         continue
       }
-      if (h.type !== 'crusher' || h.geometry.dangerTiles.length < 2 ||
-        h.geometry.triggerTiles.length !== 1 || !['idle','warning','cooldown'].includes(h.state) ||
-        !Array.isArray(h.impactedMonsterIds) || !Number.isInteger(h.localTurn)) return false
-      if (!h.geometry.dangerTiles.every(p => ['dwarvencrusherplate','dwarvencrushertrack'].includes(level.map[p.y]?.[p.x]))) return false
+      if (h.type!=='crusher' || h.geometry.dangerTiles.length<15 ||
+        h.geometry.triggerTiles.length!==3 || !['idle','warning','cooldown'].includes(h.state) ||
+        !Array.isArray(h.impactedMonsterIds) || !Number.isInteger(h.localTurn) ||
+        !Number.isInteger(h.step) || h.step<0 || h.step>h.geometry.jawStages?.length ||
+        !Array.isArray(h.geometry.jawStages) ||
+        !Array.isArray(h.geometry.baseTiles) || h.geometry.dangerTiles.length!==h.geometry.baseTiles.length) return false
+      const advanced=new Set((h.state==='warning'?h.geometry.jawStages.slice(0,h.step):[]).flat().map(encode))
+      if(!h.geometry.baseTiles.every(p=>level.map[p.y]?.[p.x]===
+        (advanced.has(encode(p))?'dwarvencrusherjaw':p.tile))) return false
     }
     return true
   }

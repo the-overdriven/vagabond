@@ -1,93 +1,98 @@
-const {trapFixture} = require('../support/dwarven-trap-checks')
+const {trapFixture}=require('../support/dwarven-trap-checks')
 
-describe('Dwarven Crusher', () => {
-  beforeEach(() => {
+describe('Dwarven wall Crusher',()=>{
+  beforeEach(()=>{
     cy.visit('/')
     cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
-    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
-      win.__crusherBootstrap = save
-      win.eval('loadGameFromObject(window.__crusherBootstrap,{isReplayInit:true})')
-      delete win.__crusherBootstrap
-      win.eval(`window.crusherFixture = ${trapFixture.toString()}`)
-      win.eval(`(() => {
+    cy.readFile('tests/saves/Tester_start.json').then(save=>cy.window().then(win=>{
+      win.__fixtureSave=save
+      win.eval('loadGameFromObject(window.__fixtureSave,{isReplayInit:true})')
+      delete win.__fixtureSave
+      win.eval(`window.crusherFixture=${trapFixture.toString()}`)
+      win.eval(`(()=>{
         const level=crusherFixture()
         currentZ=-5;deepLevels[3]=level;level.dungeonPackage='dwarvenRuins'
         map=level.map;undergroundDiscovered=level.discovered
+        const dangerTiles=[],baseTiles=[],jawStages=[],triggerTiles=[]
+        for(let y=11;y<=13;y++) for(let x=10;x<=14;x++) {
+          const tile=x===12?'dwarvencrusherplate':(x===10||x===14)?'dwarvencrushertrack':'marble'
+          level.map[y][x]=tile;dangerTiles.push({x,y});baseTiles.push({x,y,tile})
+          if(x===12)triggerTiles.push({x,y})
+        }
+        for(let offset=0;offset<3;offset++) jawStages.push(
+          Array.from({length:3},(_,r)=>[{x:10+offset,y:11+r},{x:14-offset,y:11+r}]).flat()
+            .filter((p,i,a)=>a.findIndex(q=>q.x===p.x&&q.y===p.y)===i))
         level.hazards=[{id:'crusher:-5:test',type:'crusher',z:-5,roomId:'test',
-          geometry:{triggerTiles:[{x:11,y:12}],dangerTiles:[{x:10,y:12},{x:11,y:12},{x:12,y:12}]},
-          state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,impactedMonsterIds:[],exhausted:false}]
-        map[12][11]='dwarvencrusherplate'
-        map[12][10]=map[12][12]='dwarvencrushertrack'
-        player.x=9;player.y=12;player.hp=player.maxHp=200
+          geometry:{triggerTiles,dangerTiles,jawStages,baseTiles},
+          state:'idle',stateEnteredTurn:0,step:0,localTurn:0,lastProcessedTurn:-1,
+          impactedMonsterIds:[],exhausted:false}]
+        player.x=9;player.y=12;player.hp=player.maxHp=200;player.godMode=false
         turnCount=20;replayAnimationsDisabled=true;enemies=[]
       })()`)
     }))
   })
 
-  it('shows the physical warning and offers one consumed action to escape', () => {
-    cy.window().then(win => win.eval(`(() => {
+  it('pushes solid walls inward tile by tile and lets the hero escape the strike lane',()=>{
+    cy.window().then(win=>win.eval(`(()=>{
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const h=deepLevels[3].hazards[0]
-      check(DungeonHazards.validate(deepLevels[3]),'crusher geometry and state valid')
-      check(DungeonHazards.knownDanger(10,12) && !playerPathCanTraverse(11,12) &&
-        !playerPathCanTraverse(12,12),'autopath excludes all threatened tiles')
-      player.x=11;DungeonHazards.onActorEntered(player,9,12)
-      check(h.state==='warning' && DungeonHazards.activeCrusherStatus()===h,'plate arms')
-      check(activePlayerStatuses().some(s=>s.id==='crusher'),'warning in status strip')
+      check(DungeonHazards.validate(deepLevels[3]),'valid wall jaw geometry')
+      check(h.geometry.dangerTiles.length===15 && !playerPathCanTraverse(12,12),'five-by-three area marked')
+      player.x=12;DungeonHazards.onActorEntered(player,9,12)
+      check(h.state==='warning' && activePlayerStatuses().some(s=>s.id==='crusher'),'pressure warning')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===200 && h.state==='warning','triggering action does not cause damage')
-      player.x=11;player.y=13
+      check(player.hp===200 && h.step===0,'triggering action grants reaction time')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===200 && h.state==='cooldown','a sidestep escapes impact')
-      for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
-      check(h.state==='idle','mechanism rearms after three actions')
-      player.x=11;player.y=12;DungeonHazards.onActorEntered(player,11,13)
+      check(h.step===1 && map[12][10]==='dwarvencrusherjaw' && map[12][14]==='dwarvencrusherjaw',
+        'wall jaws move one tile from BOTH sides')
+      check(DungeonHazards.validate(deepLevels[3]),'in-progress terrain agrees with hazard')
+      player.x=12;player.y=14
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===40,'80% max HP impact ignores armor and DEF')
+      check(h.state==='cooldown' && player.hp===200,'retreat escapes all damage')
+      check(h.geometry.baseTiles.every(p=>map[p.y][p.x]===p.tile),'walls fully retract')
       return true
     })()`))
   })
 
-  it('caps monster and Champion damage once each, persisting hit IDs through save', () => {
-    cy.window().then(win => win.eval(`(() => {
+  it('crushes monsters and Champions, honors caps, and persists the moving walls',()=>{
+    cy.window().then(win=>win.eval(`(()=>{
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const h=deepLevels[3].hazards[0]
-      player.x=9;player.y=12
-      const creature=(id,x,prefix)=>({id,name:'Skeleton',baseName:'Skeleton',alive:true,
-        level:-5,levelKind:'chain',x,y:12,hp:100,maxHp:100,atk:1,def:1,spd:1,
-        grace:1,tier:2,abilities:[],prefix:prefix||null,immunityUntilTurn:0})
-      const normal=creature('normal',10),champion=creature('champion',12,'Champion')
-      enemies=[normal,champion]
-      h.state='warning';h.stateEnteredTurn=h.localTurn
+      const monster=(id,x,prefix)=>({id,name:'Skeleton',baseName:'Skeleton',prefix,
+        alive:true,level:-5,levelKind:'chain',x,y:12,hp:100,maxHp:100,atk:1,def:1,
+        spd:1,grace:1,tier:2,abilities:[],equipment:{weapon:null,armor:null,shield:null},immunityUntilTurn:0})
+      enemies=[monster('normal',10,null),monster('champion',14,'Champion')]
+      player.x=12;player.y=12;DungeonHazards.onActorEntered(player,11,12)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(normal.hp===50 && champion.hp===80,'50% ordinary and 20% Champion caps')
-      check(h.impactedMonsterIds.length===2,'both affected IDs recorded')
-      const saved=buildSaveObject(),hp=[normal.hp,champion.hp],ids=[...h.impactedMonsterIds]
-      loadGameFromObject(saved,{isReplayInit:true})
-      const restored=deepLevels[3].hazards[0]
-      check(JSON.stringify(restored.impactedMonsterIds)===JSON.stringify(ids),'hit IDs restored')
-      restored.state='warning';restored.stateEnteredTurn=restored.localTurn
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      const actors=enemies.filter(e=>ids.includes(e.id))
-      check(actors.every(e=>e.hp===hp[ids.indexOf(e.id)]),'repeat impact cannot farm Champion HP')
-      return true
-    })()`))
-  })
-
-  it('keeps warning and cooldown state across restore, without a load-time hit', () => {
-    cy.window().then(win => win.eval(`(() => {
-      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
-      const h=deepLevels[3].hazards[0]
-      player.x=11;DungeonHazards.onActorEntered(player,9,12)
-      const rngBefore=rngState,save=buildSaveObject()
+      check(enemies[0].hp===50 && enemies[1].hp===80,'real hits on both sides, 50%/20% caps')
+      check(h.impactedMonsterIds.length===2 && h.step===1,'one hit per monster ID')
+      const save=buildSaveObject(),rngBefore=rngState
       loadGameFromObject(save,{isReplayInit:true})
-      check(player.hp===200 && rngState===rngBefore && deepLevels[3].hazards[0].state==='warning',
-        'restore warning without advancing state or RNG')
+      const restored=deepLevels[3].hazards[0]
+      check(restored.step===1 && rngState===rngBefore && DungeonHazards.validate(deepLevels[3]),
+        'save restores jaw tiles, timing and hit IDs')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===200,'first action completes warning')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===40,'next action deals damage once')
+      check(player.hp===40 && restored.state==='cooldown','center eventually crushed for 80%')
+      check(enemies[0].hp===50 && enemies[1].hp===80,'no repeated monster damage')
+      return true
+    })()`))
+  })
+  it('allows monsters to activate the plate and damages one that remains between the walls',()=>{
+    cy.window().then(win=>win.eval(`(()=>{
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const h=deepLevels[3].hazards[0]
+      const e={id:'self-activated',name:'Skeleton',baseName:'Skeleton',prefix:null,
+        alive:true,level:-5,levelKind:'chain',x:12,y:12,hp:100,maxHp:100,
+        atk:1,def:1,spd:1,grace:1,tier:2,abilities:[],immunityUntilTurn:0,
+        equipment:{weapon:null,armor:null,shield:null}}
+      enemies=[e];player.x=9;player.y=14
+      DungeonHazards.onActorEntered(e,11,12)
+      check(h.state==='warning','monster activates a real pressure plate')
+      for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
+      check(e.hp===50 && h.impactedMonsterIds.includes(e.id),'monster hit once at center')
       return true
     })()`))
   })

@@ -28,19 +28,19 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
               'gallery is an optional deep dead-end')
             check(room.archetype === 'Prison' && gallery.width >= 9 && gallery.length >= 13,
               'gallery counts as a prison with full firing-lane footprint')
-            check(gallery.bars.every(p => gallery.cellDoors.some(d => d.x === p.x && d.y === p.y) ||
-              level.map[p.y][p.x] === 'dwarvenprisonbars'), 'each shooter bay is barred')
-            check(gallery.cellDoors.every(p => level.map[p.y][p.x] === 'dwarvenprisondoorclosed'),
-              'shooter bays have closed prison doors')
-            check(level.map[gallery.farDoor.y][gallery.farDoor.x] === 'dwarvendoorclosed',
-              'the reward is behind a real door')
+            check([...gallery.bars,...gallery.farBars].every(p=>level.map[p.y][p.x]==='dwarvenprisonbars'),
+              'continuous side and rear bars; no side prison doors')
+            check(level.map[gallery.farDoor.y][gallery.farDoor.x]==='dwarvenprisondoorclosed' &&
+              room.internalDoors.filter(d=>d.kind==='galleryPrison').length===1,
+              'exactly one central prison door guards both connected bays and chest')
             const monsters = enemies.filter(e => e.alive && e.level === z &&
               e.dungeonRoomId === room.id && ['gallery0','gallery1'].includes(e.dungeonRole))
-            check(monsters.length === 2 && new Set(monsters.map(e => e.dungeonRole)).size === 2,
-              'one real shooter on each flank')
+            check(monsters.length === gallery.shooterSpots.flat().length &&
+              gallery.bays.every((bay,i)=>monsters.filter(e=>e.dungeonRole==='gallery'+i).length===Math.ceil(bay.length/6)),
+              'one real shooter per six bay cells on both sides')
             check(monsters.every(e => enemyIsShooter(e) && e.shotsRemaining > 0),
-              'both shooters can attack with ammunition')
-            check(gallery.shooterSpots.every(p => gallery.fireTargets.some(t =>
+              'all gallery shooters can attack with ammunition')
+            check(gallery.shooterSpots.flat().every(p => gallery.fireTargets.some(t =>
               dungeonClearProjectileLine(level.map,p,t))), 'clear lanes through bars')
             const reward = groundItems.filter(g => g.level === z && g.galleryReward && g.dungeonRoomId === room.id)
             check(reward.length === 1 && reward[0].kind === 'chest' && !reward[0].opened,

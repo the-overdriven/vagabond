@@ -36,7 +36,7 @@ describe('Dwarven Ruins populated prison cells', () => {
           for (const room of cells) {
             testedCells++
             if (room.gallery) {
-              check(room.gallery.shooterSpots.length === 2 && room.gallery.bars.length >= 26,
+              check(room.gallery.shooterSpots.length === 2 && room.gallery.shooterSpots.flat().length >= 10 && room.gallery.bars.length >= 26,
                 'crossfire gallery has two barred shooter bays')
               continue
             }

@@ -1561,71 +1561,74 @@ counts as **one Prison room** toward that quota, not as one room per cell or
 shooter. This branch is a dead end off the main route, never a mandatory path
 to stairs, progression keys, the throne or the guaranteed artifact.
 
-A crossfire gallery has a dedicated **17×11 exterior room footprint**
-(**15×9 walkable interior**), rotated as needed. The long center aisle is
-three tiles wide, with barred flanking bays on both sides. It guarantees
-**one real ranged enemy with ammunition on each flank**, firing across the
-aisle through sight/projectile-transparent bars. Each bay has an ordinary
-operable prison door; the far-end alcove has an ordinary closed door and
-**one guaranteed unopened chest**, upgraded by **one loot tier** over the
-ordinary same-floor room roll, capped at the existing tier maximum. The
-shooters consume the existing floor **threat budget** before optional
-encounters are placed, and the chest substitutes for discretionary treasure:
-this is a positional challenge and reward choice, not a free increase to
-monsters or loot. The player can retreat, counter-shoot through bars, avoid
-the branch, or open the bays. Bars, prison doors and chests reuse their
-existing graphics; the Crusher's visible pressure plate and gas chamber's
-valve are separate later features.
+A crossfire gallery occupies a reserved **17×11 exterior** room footprint
+(**15×9 interior**), rotated so the main doorway faces down its length.
+The middle aisle is three tiles wide. Continuous iron bars divide it from
+**two long ranged-guard cells**, which connect to each other along the far
+wall in a U-shape. No side doors interrupt the bars. Instead, **one central
+iron-barred prison door** at the end of the aisle controls entry into the
+entire connected cell. The one guaranteed treasure chest sits immediately
+**behind that prison door**; there is no ordinary stone wall or ordinary
+wooden/stone reward door across the aisle. Eight-way movement cannot bypass
+the closed gate into the cells.
 
-The room's bar and door geometry is rotated and serialized along with the
-floor; gallery defenders use persisted ordinary monster roles, so save/load
-and replay do not reroll the encounter. Gallery feature placement uses a
-seed-derived, depth-specific deterministic roll. Galleries do not introduce
-new timed effects, persistent statuses or animation-dependent rules.
+Every side cell contains **at least one genuine ranged monster for each six
+walkable cell squares (rounded up per side)**. With the current 15×2-tile
+bays this means **five shooters per side, ten total** rather than the former
+one per side. Shooters are distributed along the length, have real ammunition,
+use existing LOS and ranged-combat AI through the bars, and count fully
+against the normal floor encounter budget before roaming enemies. This is
+an intentionally dangerous optional branch, not a progression requirement.
+If the floor cannot fund the promised archers, generation must not substitute
+fake archers or quietly accept a less-populated gallery. The far-end chest
+remains a one-tier-higher reward, capped at the ordinary loot ceiling and
+substituted for discretionary floor loot. Gallery geometry, door state,
+enemy roles and reward persist through rotations and save/replay.
 
-### Dwarven Crusher (v82)
+### Dwarven Crusher — opposing stone jaws (v85)
 
-D2 (`z:-5`) and deeper Ruins may contain **at most one optional major
-hazard per floor**, with **30% initial Crusher selection weight**. The other
-weights are reserved for a later gas chamber (25%) and no hazard (45%);
-unsuitable layouts simply have no Crusher rather than rerolling. The
-seed/depth-derived hazard selector does not consume the main gameplay RNG.
-Placement is limited to suitable optional side rooms, never the main stairs,
-royal/artifact treasure, Prison partitions, mandatory keys or existing traps.
-The mechanism spans three adjacent walkable marked cells, with a visible
-**pressure plate** in the middle and **scored crusher tracks** at the sides.
-All threatened cells have a safe cardinal neighbour and can be inspected
-before risking entry. Automatic travel avoids the entire marked footprint;
-manual movement and monster movement can still enter it.
+From D2 (`z:-5`) downward, eligible optional Ruins rooms can host one
+Crusher. The **30% floor selection chance** applies only to eligible floors
+not containing the dungeon's guaranteed gas chamber. Crusher encounters
+are placed away from mandatory progression, keys, stairs and protected vaults.
+Only a limited number of non-critical furnishings may be displaced to create
+a clear, legible crushing passage.
 
-Entering the plate arms the Crusher and logs a warning. **The triggering
-player action deals no Crusher damage.** On the following *consumed player
-action* it slams down once; staying on a threatened cell costs
-`ceil(0.8 × player's current maximum HP)` with no numerical DEF, dodge or
-armor glancing. God Mode and single-use fatal-hit shields still protect as
-normal. Stepping to an ordinary adjacent safe cell avoids damage completely.
-The stone does not change collision/FOV or block terrain. It then cools for
-**three consumed actions**, after which a new entry onto the plate can arm it.
-The warning is visible in tile/ASCII art and in the active-status strip.
-Animation frames cannot advance the timer or roll gameplay damage.
+**The Crusher is no longer a single-tile slab trap.** Two opposing original
+room walls contain **moving stone jaws**. Its whole threat strip is three
+rows long and five to eight tiles wide, extending **all the way between
+those opposing walls** (at least 15 threatened floor squares). Visible
+pressure plates in the central lane and grooved entry tracks on the walls
+mark the mechanism. Any creature stepping on a plate arms it. A log and
+small active-status countdown warn the player; the former large
+`CRUSHER!` popup was removed.
 
-Monsters can arm the same mechanism and are hit on its danger cells. Each
-monster ID can suffer damage **once for the lifetime of that Crusher**, capped
-at **50% of its max HP** for ordinary enemies and **20%** for Champions/bosses,
-so repeated luring cannot trivially delete elite targets. Environmental kills
-give no player XP or personal kill credit; existing loot-drop rules still
-apply. The death cause shown locally and passed in Graveyard/score records is
-`dwarven crusher`, independent of ordinary `dungeon trap` attribution.
+The triggering action is safe. On each **subsequent consumed player action**,
+the masonry emerges one tile from **each opposing wall**, becomes temporarily
+impassable and blocks projectiles and sight. For a five-tile passage, both
+walls meet on the **third action after triggering**; wider passages take a
+proportionate number of actions. A hero or monster on a newly occupied wall
+tile takes damage immediately, so the player should retreat beyond the
+three-row strip rather than wait in the middle. A survivor may step off a
+tile that became solid beneath them, as with the gas-chamber door rule.
+After the last step the jaws retract immediately and the three-turn cooldown
+begins. All temporary walls are restored to their recorded pre-compression
+tiles; opening the inventory, animations, enemy bonus actions, reloading,
+and time spent on other z-levels never advance the mechanism.
 
-Each Ruins level stores `hazards[]` with stable ID, world-space trigger/danger
-coordinates, phase (`idle`, `warning` or `cooldown`), local floor-action counter,
-last global tick, phase entry action and the impacted monster-ID ledger. The array is restored unchanged for
-save/replay and rotated together with the level. Switching to another z-level
-pauses the mechanism; loading, redrawing and animations do not tick it.
-**Save schema 82** adds this runtime state and two uniquely encoded Crusher
-terrain tiles. No conversion from old saved worlds is supported. The existing
-hidden wall-arrow plate remains disguised as marble; only Crusher plates are
-visibly marked with `dwarven-pressure-plate.png`.
+A caught player takes `ceil(0.80 × maximum HP)`, ignoring numerical DEF,
+dodge and glancing, but retaining God Mode and fatal-hit shields. Ordinary
+monsters take at most **50% max HP**, and Champions/bosses **20% max HP**;
+each monster ID can be damaged only once by each mechanism, regardless of
+how many jaw steps touch it. Monster environmental deaths grant no XP.
+Triggers and damage are deterministic turn events; wall progress, already-hit
+IDs, original tile records and geometry persist in deep-floor save state and
+rotate with the map. Auto-travel considers the *entire* danger strip known
+and refuses to traverse it automatically.
+
+**Game version v164 / save schema 85:** new gallery geometry/enemy allocation,
+solid advancing Crusher tile and jaw step/base-tile state change the
+world-generation and replay contracts; old saves are not migrated.
 
 ### Sealed poison-gas treasure chambers (v83)
 

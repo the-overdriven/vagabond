@@ -47,8 +47,8 @@ describe('Dwarven Ruins ordinary doors', () => {
         }
         for (const key of special) {
           const gallery = level.rooms.find(r => r.gallery && keyXY(r.gallery.farDoor.x, r.gallery.farDoor.y) === key)
-          check(!!gallery && grid[gallery.gallery.farDoor.y]?.[gallery.gallery.farDoor.x] === 'dwarvendoorclosed',
-            'gallery reward door remains a closed single-leaf entrance')
+          check(!!gallery && grid[gallery.gallery.farDoor.y]?.[gallery.gallery.farDoor.x] === 'dwarvenprisondoorclosed',
+            'gallery gate remains a closed single-leaf prison entrance')
         }
       }
       check(doors.length >= 2, 'fixed seed generates ordinary doors')
