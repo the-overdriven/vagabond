@@ -1985,7 +1985,7 @@ function planDwarvenPrisonPartition(cm, room, reserved = new Set()) {
     return line.length >= 3 && cellRegion ? {line, cellRegion, horizontalApproach, door:line[0]} : null
 }
 
-function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false) {
+function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false, stairs = []) {
   if (!room || room.archetype === 'Entrance Hall' || room.landmark === 'throneHall') return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
   const finalBarricadeMultiplier = finalFloor ? (story.finalFloorBarricadeMultiplier ?? 1) : 1
@@ -2014,6 +2014,10 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
     let placed = 0
     for (const p of shuffle(pool)) {
       if (cm[p.y]?.[p.x] !== 'marble' || protectedTile(p)) continue
+      // A bed should not visually crowd either staircase, even outside the
+      // required 3x3 mechanically walkable stair landing.
+      if (tile.startsWith('dwarvenbed') && stairs.some(stair =>
+        Math.max(Math.abs(p.x-stair.x),Math.abs(p.y-stair.y)) <= 3)) continue
       if (tile === 'dwarvenrubble' || tile === 'dwarvenstatue')
         overlayUnderlays[keyXY(p.x, p.y)] = cm[p.y][p.x]
       cm[p.y][p.x] = tile
@@ -3168,7 +3172,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   for (const room of roomMetas) {
     if (room.gallery) {buildDwarvenCrossfireGallery(cm, room); continue}
     decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved, overlayUnderlays,
-      finalFloor && room.index === roomGraph.exitRoom)
+      finalFloor && room.index === roomGraph.exitRoom, [entry, exit])
     if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
   }
   if (hall) {

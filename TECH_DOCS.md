@@ -1457,8 +1457,10 @@ descriptors and restored without rerolling any world-generation decisions.
 Whole-world rotation transforms its rectangle, points and facing together.
 The landmark direction runs from its single entrance toward the throne; the
 **throne sprite faces the opposite direction, back toward the entrance**. Sprite
-filenames indicate the direction the monarch faces (north, east, south, west); the camera, animation timing and random numbers do not affect
-which sprite appears. The throne and dais are new encoded terrain types,
+filenames indicate the direction the monarch faces (north, east, south, west); 
+east/west art matches the ruler's actual facing, not the hall's approach vector. The camera, 
+animation timing and random numbers do not affect which sprite appears. 
+The throne and dais are new encoded terrain types,
 using the unique current-save codes `╙` and `╜`. Both graphics are transparent
 over the recorded stone floor: dais engravings overlay marble; the throne uses
 the dais as its underlay, saved and rotated alongside other per-level overlays.
@@ -1693,7 +1695,7 @@ for recovery; they do not jam the mechanism.
 Gas chambers use two **100×100 object-only transparent PNGs** placed over the
 normal marble background (`dwarven-gas-valve.png` and
 `dwarven-gas-vent.png`). Gas inside the chamber has a readable green floor
-overlay in tiles and a supplementary `≈` mark in ASCII, and while exposed the
+overlay in tiles and a supplementary `≈` mark in ASCII. The green haze draws above all floor props, including decorative dwarven remains and searchable corpses, but below living actors; it does not obscure combatants. While exposed the
 player's status strip displays the active timer. The chamber's authoritative
 `hazards[]` entry contains immutable post-rotation world-space geometry,
 valve progress, door successful-hit progress, remaining turns, and the
@@ -1782,7 +1784,7 @@ hard-coding a Goblin or Skeleton to a coordinate.
 
 Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
 use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
-crates, and prisons use bars. Dwarven crates remain solid to movement and
+crates, and prisons use bars. Beds (including improvised bed barricades) must remain at least four Chebyshev tiles from **both** the up and down Ruins stair positions on every floor, while the mechanically clear 3×3 landing rule remains unchanged. A valid layout may have fewer beds rather than crowd the stairs. Dwarven crates remain solid to movement and
 projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
 and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
 Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the

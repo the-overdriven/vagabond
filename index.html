@@ -7890,7 +7890,7 @@ more difficult:
       if (!landmark || !Number.isInteger(landmark.facing) || landmark.facing < 0 || landmark.facing > 3)
         throw new Error('Dwarven throne requires saved landmark position and facing')
       // Landmark facing points from entrance toward throne; the ruler faces back toward the entrance.
-      const direction = ['south','west','north','east'][landmark.facing]
+      const direction = ['south','east','north','west'][landmark.facing]
       return {...visual,image:visual[direction + 'Image']}
     }
 
@@ -8748,16 +8748,6 @@ more difficult:
             ctx.restore()
           }
         }
-        if (undergroundVisible && undergroundVisible.has(keyXY(mx,my)) &&
-          DungeonHazards.gasAt(mx,my)) {
-          ctx.fillStyle='rgba(92, 174, 62, 0.24)'
-          ctx.fillRect(px, py, TILE_PX, TILE_PX)
-          if (!USE_TILE_IMAGES) {
-            ctx.fillStyle='#a4ed80'
-            ctx.font=`${Math.max(10,Math.round(TILE_PX*.28))}px monospace`
-            ctx.fillText('≈',px+TILE_PX*.67,py+TILE_PX*.32)
-          }
-        }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
             ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
@@ -8823,6 +8813,24 @@ more difficult:
           ctx.restore()
         })
       } else drawGroundItem()
+    }
+    // Gas belongs above ground items (including dwarven remains), but under
+    // living actors. A saved active chamber has exactly the same visual layer
+    // in tile and ASCII modes; drawing order never affects gas damage.
+    if (undergroundVisible) {
+      for (let my = Math.max(0, Math.floor(camY)); my < Math.min(map.length, Math.ceil(camY + canvas.height / TILE_PX) + 1); my++) {
+        for (let mx = Math.max(0, Math.floor(camX)); mx < Math.min(map[my].length, Math.ceil(camX + canvas.width / TILE_PX) + 1); mx++) {
+          if (!undergroundVisible.has(keyXY(mx,my)) || !DungeonHazards.gasAt(mx,my)) continue
+          const px = Math.round((mx - camX) * TILE_PX), py = Math.round((my - camY) * TILE_PX)
+          ctx.fillStyle = 'rgba(92, 174, 62, 0.24)'
+          ctx.fillRect(px, py, TILE_PX, TILE_PX)
+          if (!USE_TILE_IMAGES) {
+            ctx.fillStyle = '#a4ed80'
+            ctx.font = `${Math.max(10,Math.round(TILE_PX*.28))}px monospace`
+            ctx.fillText('≈',px+TILE_PX*.67,py+TILE_PX*.32)
+          }
+        }
+      }
     }
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {
