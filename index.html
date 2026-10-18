@@ -4115,7 +4115,6 @@ more difficult:
     if (glancing) dmg = Math.floor(dmg / 3)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
-    absorbPlayerFatalDamage()
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
     if (glancing) {
@@ -4135,6 +4134,9 @@ more difficult:
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} hits you${weaponText} for ${dmg}.`, 'bad')
     }
+    // Report the lethal hit first, then its Death Shield resolution.
+    // Both occur synchronously before poison, knockback, death or a bonus hit.
+    absorbPlayerFatalDamage()
     checkPlayerHealthWarning()
     applyEnemyLifesteal(e, effectiveDamage)
     if (dmg > 0 && player.hp > 0) {
@@ -4228,7 +4230,6 @@ more difficult:
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
-    absorbPlayerFatalDamage()
 
     spawnProjectileAnim(projectilePath, projectile, animationDelay)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
@@ -4239,6 +4240,8 @@ more difficult:
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${shot.label || projectile} at you for ${dmg} damage.`, 'bad')
     }
+    // Ranged hits use the same cause-before-shield log order as melee.
+    absorbPlayerFatalDamage()
     checkPlayerHealthWarning()
     updateHud()
     if (player.hp <= 0) {

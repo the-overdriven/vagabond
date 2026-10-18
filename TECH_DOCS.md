@@ -5388,6 +5388,9 @@ Ordinary Ruins warnings from moving fleeing monsters still apply.
 **Death Shield:** protects against melee, ranged attacks, poison, freezing,
 drowning, poisonous mushrooms and dungeon traps. The charge is consumed immediately
 at damage resolution; another hit or hazard in the same turn can kill the player.
+Melee and ranged combat logs show the triggering hit **before** the shield-shatter
+message, even when a faster weapon earns a follow-up strike. Shield resolution
+still occurs synchronously before status effects, knockback and that next hit.
 It neither heals further nor cures poison. There is no expiry and healing does not
 recharge it. Reading another while ready consumes neither item nor turn. Its ready
 status stays visible, with a distinct shield-breaking message and floating effect.
