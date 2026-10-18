@@ -1486,14 +1486,17 @@ more difficult:
 
   const DUNGEON_DOOR_OPEN_STATE = Object.freeze({
     dwarvendoorclosed: 'dwarvendooropen',
-    dwarvenprisondoorclosed: 'dwarvenprisondooropen'
+    dwarvenprisondoorclosed: 'dwarvenprisondooropen',
+    dwarvengateclosed: 'dwarvengateopen'
   })
 
-  // Only intact, unlocked door leaves can be pulled shut. The two-leaf
-  // progression gate is deliberately excluded: closing never recreates locks.
+  // Intact, unlocked leaves may be shut again without restoring their locks.
+  // Both progression-gate leaves share a single interaction. Breached gates
+  // remain permanently open.
   const DUNGEON_DOOR_CLOSED_STATE = Object.freeze({
     dwarvendooropen: 'dwarvendoorclosed',
-    dwarvenprisondooropen: 'dwarvenprisondoorclosed'
+    dwarvenprisondooropen: 'dwarvenprisondoorclosed',
+    dwarvengateopen: 'dwarvengateclosed'
   })
 
   const DUNGEON_LOCK_STATE = Object.freeze({
@@ -1539,25 +1542,44 @@ more difficult:
     return !!DUNGEON_LOCK_STATE[tileKey]
   }
 
+  // Intact progression gates are two adjacent leaves. Changing either one
+  // changes its matching partner (only when both have the same current state).
+  function intactDungeonGateLeavesAt(x, y, state) {
+    const leaves = [{x, y}]
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const px = x + dx, py = y + dy
+      if (map[py]?.[px] === state) { leaves.push({x:px, y:py}); break }
+    }
+    return leaves
+  }
+
   function openDungeonDoorAt(x, y) {
     const tileKey = map[y]?.[x]
     const openTile = DUNGEON_DOOR_OPEN_STATE[tileKey]
     if (!openTile) return false
-    map[y][x] = openTile
+    const leaves = tileKey === 'dwarvengateclosed'
+      ? intactDungeonGateLeavesAt(x, y, tileKey) : [{x, y}]
+    for (const leaf of leaves) map[leaf.y][leaf.x] = openTile
     minimapDirty = true
     invalidateUndergroundFov()
     return true
   }
 
   function closeDungeonDoorAt(x, y) {
-    const closedTile = DUNGEON_DOOR_CLOSED_STATE[map[y]?.[x]]
+    const tileKey = map[y]?.[x]
+    const closedTile = DUNGEON_DOOR_CLOSED_STATE[tileKey]
     if (!closedTile) return false
     // Eight-direction adjacency matches ordinary melee/interaction reach.
-    // A creature standing in the doorway must never be embedded in a wall.
+    // A creature on EITHER gate leaf blocks the entire closing operation.
     const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
-    if (distance !== 1 || enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) ||
-      (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) return false
-    map[y][x] = closedTile
+    if (distance !== 1) return false
+    const leaves = tileKey === 'dwarvengateopen'
+      ? intactDungeonGateLeavesAt(x, y, tileKey) : [{x, y}]
+    if (leaves.some(leaf =>
+      (leaf.x === player.x && leaf.y === player.y) ||
+      enemies.some(e => e.alive && onCurrentLevel(e) && e.x === leaf.x && e.y === leaf.y) ||
+      (currentZ === 0 && npcs.some(n => n.x === leaf.x && n.y === leaf.y)))) return false
+    for (const leaf of leaves) map[leaf.y][leaf.x] = closedTile
     minimapDirty = true
     invalidateUndergroundFov()
     return true
@@ -1566,12 +1588,13 @@ more difficult:
   function tryCloseDungeonDoorAt(x, y) {
     if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return false
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending())) return false
+    const closingGate = map[y]?.[x] === 'dwarvengateopen'
     if (!closeDungeonDoorAt(x, y)) return false
     clearAutoPath()
     hoveredAutoPath = null
     consecutiveWaitTurns = 0
     recordReplayAction({type: 'closeDoor', x, y})
-    log('You close the dwarven door.', 'info')
+    log(closingGate ? 'You close the dwarven gate.' : 'You close the dwarven door.', 'info')
     enemyTurn()
     npcTurn()
     updateHud()
@@ -2750,7 +2773,8 @@ more difficult:
   }
 
   function logEnemySpotting(enemy, wandered = false) {
-    if (!undergroundTileVisible(enemy.x, enemy.y)) return
+    // An unseen/invisible creature must not announce that it spotted the player.
+    if (enemyInvisibleActive(enemy) || !undergroundTileVisible(enemy.x, enemy.y)) return
     log(wandered
       ? `The ${enemy.name} wanders right into you and spots you! It's not too late to retreat!`
       : `The ${enemy.name} has spotted you!`, 'bad')
@@ -3967,8 +3991,9 @@ more difficult:
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? (player.equip.weapon.kind === 'artifact' ? player.equip.weapon.name.replace(/^The\s+/i, '') : player.equip.weapon.name) : 'bare fists'
-    // Physically bumping even an unseen creature exposes its position.
-    revealEnemyInvisibility(e)
+    // The player can swing at the last known tile of an invisible enemy.
+    // A miss does not expose it; a successful hit breaks its invisibility.
+    const targetWasInvisible = enemyInvisibleActive(e)
     updateMobileInfoPanel(e.x, e.y)
     showDesktopCombatTooltip(e)
     // The lunge is cosmetic. Never let a replay action wait for rAF while the
@@ -4013,7 +4038,9 @@ more difficult:
         return false
       }
     }
-    if (chance(missChance(playerSpd(), enemySpd(e)))) {
+    if (chance(targetWasInvisible
+      ? Math.max(MONSTER_INVISIBILITY_MISS_CHANCE, missChance(playerSpd(), enemySpd(e)))
+      : missChance(playerSpd(), enemySpd(e)))) {
       spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
@@ -4030,6 +4057,7 @@ more difficult:
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
+    if (targetWasInvisible) revealEnemyInvisibility(e)
     if (dmg > 0) breakEnemyFear(e)
     absorbEnemyFatalHit(e)
     alarmEnemy(e)
@@ -6801,9 +6829,10 @@ more difficult:
     const fromTile = map[player.y]?.[player.x]
     if (['dwarvenlever', 'dwarvenleverpulled'].includes(map[ny]?.[nx]) && activateDwarvenLiftLeverAt(nx, ny)) return
     if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
+      const openingGate = map[ny]?.[nx] === 'dwarvengateclosed'
       if (openDungeonDoorAt(nx, ny)) {
         consecutiveWaitTurns = 0
-        log('You open the dwarven door.', 'info')
+        log(openingGate ? 'You open the dwarven gate.' : 'You open the dwarven door.', 'info')
         // Auto-travel already shifted this step before tryMove(). Reinsert the
         // now-open doorway so the next action actually moves through it.
         if (autoPath) autoPath.unshift({x: nx, y: ny})
@@ -9364,7 +9393,7 @@ more difficult:
 
   function showDesktopCombatTooltip(e) {
     if (!desktopUsesHoverTooltips()) return
-    if (!e || !e.alive) {
+    if (!e || !e.alive || !enemyCanBeSeen(e)) {
       if (desktopCombatTooltipEnemy === e) hideDesktopCombatTooltip()
       return
     }

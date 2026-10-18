@@ -688,6 +688,11 @@
       "baseTileKey": "marble",
       "scale": 1
     },
+    "dwarvengateclosed": {
+      "image": "img/tiles/dwarven-door-closed.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
     "dwarvengateopen": {
       "image": "img/tiles/dwarven-door-open.png",
       "baseTileKey": "marble",

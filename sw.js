@@ -11,7 +11,8 @@
 // ---------------------------------------------------------------------------
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION;
+// Refresh patched game scripts without changing the displayed game version.
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-hotfix-20261018';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 

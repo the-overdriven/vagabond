@@ -32,7 +32,10 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
       invisibilityAssert(tileInspectInfo(36,40)?.enemy!==e,'no secret tooltip');
       e.x=38;occupied.clear();occupied.add(keyXY(38,40));
       invisibilityAssert(enemyInvisibleShimmer(e),'shimmer within two tiles');
-      invisibilityAssert(tileInspectInfo(38,40)?.enemy===e,'near shimmer inspectable');
+      invisibilityAssert(tileInspectInfo(38,40)?.enemy===e,'activation shimmer inspectable');
+      turnCount=2;
+      invisibilityAssert(!enemyCanBeSeen(e),'fully invisible next turn');
+      invisibilityAssert(tileInspectInfo(38,40)?.enemy!==e,'no tooltip when fully hidden');
       render();
       revealEnemyInvisibility(e);
       invisibilityAssert(!enemyInvisibleActive(e),'reveal clears invisibility');

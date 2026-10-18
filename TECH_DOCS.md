@@ -1166,6 +1166,17 @@ also moving the player. Key-opened gates use a distinct persistent **intact open
 terrain state; only gates generated pre-breached use the ruined/breached state.
 Mandatory gates cannot be breached with a weapon.
 
+### Closing the Dwarven progression gate
+
+Clicking/tapping either leaf of an adjacent **intact open** two-leaf Dwarven
+progression gate closes **both leaves in one turn** only if neither is occupied.
+It uses `dwarvengateclosed` (an unlocked, opaque, impassable tile) rather than
+`dwarvengatelocked`, so the original key is never required again. Bumping
+either leaf opens both in one turn. Humanoid enemies can open it as well.
+Breached gates are never closable. The new terrain tile is included in
+`content/tiles.json` save codes and uses the existing closed-gate art.
+
+
 Closed wooden doors (including ordinary locks and mandatory progression gates)
 block movement, sight and projectiles. Barred prison doors instead block only movement
 while allowing sight and projectiles through the bars, even when locked. Their
@@ -1711,12 +1722,11 @@ normally generated fort receives eight Ghosts as long as at least eight valid
 candidate tiles exist.
 
 The guaranteed artifact chest is created as a tier-5 chest with
-`artifactGuaranteed: true` on the fort's z:-3 chain map. During save loading,
-the loader also repairs current-schema fort data with transitional fields: it reconstructs the
-fort's `caveIndex` from the z:-3 deep-level cave data, normalizes a matching
-unopened fort chest to `level: -3` / `levelKind: 'chain'`, restores the
-guaranteed-artifact flag, or recreates the chest on a marble fort tile when no
-matching unopened chest can be recovered.
+`artifactGuaranteed: true` on the fort's z:-3 chain map. When looted, it is
+removed from `groundItems`, and loading **must not recreate it**. The loader
+may correct old location metadata only for an existing unopened chest already
+marked `artifactGuaranteed`; it never converts an unrelated fort chest into an
+artifact chest, nor treats the absence of a chest as corrupted data.
 
 When these props (and other named ground objects such as skeletons,
 campfires, dwarven remains, or a wheelbarrow) are picked up by the
@@ -2798,14 +2808,16 @@ player is protected by invisibility or the Temple sanctuary. Existing evasion
 and theft abilities remain available.
 
 Invisible monsters still occupy their physical tile, move, take damage, and
-obey ordinary AI/terrain rules. Beyond **two tiles** from the player they are
-hidden visually and cannot be inspected via tile hover/tap. Within two tiles,
-a translucent shimmer reveals their approximate position; this can be
-inspected and attacked normally. Physically bumping a hidden creature exposes
-it before combat. The monster also reveals itself before its own attack or a
-theft attempt, including unsuccessful attempts. Expiry produces a message;
-activation and revealing produce a floating text notification. Auras and
-markers are hidden with the creature when outside shimmer range.
+obey ordinary AI/terrain rules. Only on the **activation turn**, a monster within two tiles can show a
+translucent shimmer. On subsequent invisible turns it is entirely hidden,
+regardless of distance, and cannot be inspected via hover/tap. Players may
+still bump its occupied tile to attempt an attack; invisible targets have at
+least **80% miss chance**, regardless of relative SPD. A miss does not reveal
+the monster, while a successful hit breaks its invisibility. Invisible
+monsters do not generate the "has spotted you" log. The monster also reveals
+itself before its own attack or a theft attempt, including unsuccessful ones.
+Expiry produces a message; activation and revealing produce a floating text
+notification. Auras and markers are hidden while fully invisible.
 
 The absolute `invisibleUntilTurn` and `invisibilityReadyTurn` deadlines are
 initialized per enemy and serialized to both saves and replay snapshots.
@@ -7416,6 +7428,10 @@ kind and payload-length checks. This is a database migration; the client
 continues to send the real cause and z level. Without the migration,
 PostgREST returns HTTP 400 for trap fatalities in the deeper ruins.
 
+The client maps accepted `dungeon trap` records to the display label
+**Dungeon trap**. The hotfix refreshes the service-worker asset cache so
+clients load the corrected `src/graveyard.js` without a game version bump.
+
 The browser's `vagabond_online_player_id` localStorage entry is a random UUID
 created with `crypto.randomUUID()` (secure random-bytes UUID fallback). It is
 reused on this browser, not a verified identity. If storage or secure randomness
@@ -7848,3 +7864,4 @@ small maps should be exercised across many seeds before treating balance or
 generation success as stable. Drought can remove safe forage while arming a
 larger share of humanoids; its exclusions prevent the strongest resource
 contradictions, but other dangerous combinations remain possible.
+

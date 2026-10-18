@@ -417,6 +417,14 @@
       "projectileBlock": true,
       "blocksSight": true
     },
+    "dwarvengateclosed": {
+      "ch": "H",
+      "color": "#d7a552",
+      "bg": "#302d2a",
+      "walk": false,
+      "projectileBlock": true,
+      "blocksSight": true
+    },
     "dwarvengateopen": {
       "ch": "/",
       "color": "#d7a552",
@@ -603,6 +611,7 @@
     "dwarvenprisondoorbreached": "╦",
     "dwarvendoorbreached": "H",
     "dwarvengatelocked": "I",
+    "dwarvengateclosed": "♮",
     "dwarvengateopen": "Q",
     "dwarvengatebreached": "J",
     "dwarvenliftoff": "K",
@@ -680,6 +689,7 @@
     "dwarvenprisondoorbreached": "a broken dwarven prison gate that no longer blocks the cell",
     "dwarvendoorbreached": "a dwarven door smashed open by force",
     "dwarvengatelocked": "a heavy locked dwarven gate barring the way deeper into the ruins",
+    "dwarvengateclosed": "an intact dwarven gate pulled shut; its lock has already been opened",
     "dwarvengateopen": "an intact dwarven progression gate standing open",
     "dwarvengatebreached": "a ruined dwarven gate whose broken leaves no longer bar passage",
     "dwarvenliftoff": "an old dwarven lift platform, dark and without power",

@@ -6,6 +6,7 @@ const MONSTER_INVISIBILITY_CHANCE = 0.25
 const MONSTER_INVISIBILITY_TURNS = 3
 const MONSTER_INVISIBILITY_COOLDOWN = 8
 const MONSTER_SHIMMER_RADIUS = 2
+const MONSTER_INVISIBILITY_MISS_CHANCE = 0.80
 
 function enemyInvisibleActive(e) {
   return !!e && enemyHasAbility(e, 'invisibility') &&
@@ -13,7 +14,10 @@ function enemyInvisibleActive(e) {
 }
 
 function enemyInvisibleShimmer(e) {
+  // The activation turn is the only turn with a nearby translucent outline.
+  // Derive it from the existing saved deadline; no additional state or RNG.
   return enemyInvisibleActive(e) &&
+    turnCount < e.invisibleUntilTurn - MONSTER_INVISIBILITY_TURNS &&
     Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= MONSTER_SHIMMER_RADIUS
 }
 

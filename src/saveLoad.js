@@ -933,43 +933,16 @@ function loadGameFromObject(data, opts = {}) {
   clearGroundItemsUnderMerchant()
   if (dwarvenRuin && dwarvenRuin.caveIndex >= 0 && deepLevels[1]) {
     const fortMap = deepLevels[1].caveMaps[dwarvenRuin.caveIndex]
-    // Repair saves made while the fort transition was being changed: locate
-    // an unopened chest that is actually on this fort's marble floor, then
-    // normalize its level metadata and restore the guaranteed artifact flag.
-    let chest = groundItems.find(g =>
-      g.kind === 'chest' && !g.opened && g.level === -3 && g.levelKind === 'chain' &&
-      g.caveIndex === dwarvenRuin.caveIndex
-    )
-    if (!chest && fortMap) {
-      chest = groundItems.find(g =>
-        g.kind === 'chest' && !g.opened && fortMap[g.y]?.[g.x] === 'marble' &&
-        (g.level === -3 || g.level === -1)
-      )
-    }
+    // Correct transitional metadata ONLY on the actual guaranteed chest.
+    // Looting removes it from groundItems; absence means it was already taken,
+    // not permission to recreate it or promote an ordinary fort chest.
+    const chest = groundItems.find(g => g.kind === 'chest' && !g.opened &&
+      g.artifactGuaranteed === true && fortMap?.[g.y]?.[g.x] === 'marble' &&
+      (g.level === -3 || g.level === -1))
     if (chest) {
       chest.level = -3
       chest.levelKind = 'chain'
       chest.caveIndex = dwarvenRuin.caveIndex
-      chest.artifactGuaranteed = true
-    } else {
-      const spots = []
-      if (fortMap) for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-        if (fortMap[y][x] === 'marble') spots.push({x, y})
-      }
-      if (spots.length) {
-        const p = spots[Math.floor(spots.length / 2)]
-        groundItems.push({
-          x: p.x,
-          y: p.y,
-          kind: 'chest',
-          tier: 5,
-          artifactGuaranteed: true,
-          opened: false,
-          level: -3,
-          levelKind: 'chain',
-          caveIndex: dwarvenRuin.caveIndex
-        })
-      }
     }
   }
 
