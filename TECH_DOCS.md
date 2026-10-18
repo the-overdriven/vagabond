@@ -1629,16 +1629,24 @@ visibly marked with `dwarven-pressure-plate.png`.
 
 ### Sealed poison-gas treasure chambers (v83)
 
-From **z:-5 downward**, one major hazard per floor remains the upper limit:
-Crusher has a **30% floor-selection weight**, gas chamber **25%**, and no
-major hazard **45%**. Each option is selected by a feature-scoped seed/depth
-roll; an invalid optional placement is **skipped**, not rerolled into another
-hazard. A gas chamber can occupy only a non-Prison, optional **single-doorway
-side room** without mandatory progression, vaults, keys, stairs or royal/artifact
-loot. The room must fit two linked entrance leaves, a reachable ordinary chest
-and a separate walkable approach to a visible valve. Existing prisons retain
-their guaranteed quotas. A chamber chest replaces discretionary dungeon loot
-rather than adding unlimited extra rewards.
+Every newly generated Dwarven Ruins dungeon contains **exactly one guaranteed
+poison-gas chamber** from **z:-5 downward**, regardless of whether the dungeon
+has 3, 4 or 5 Ruins floors. Generation chooses an eligible depth from a
+seed-derived ordering and tries the other eligible floors when the first cannot
+fit a legal chamber. A failed candidate does **not** silently omit the chamber:
+the whole world candidate is rejected for bounded world regeneration. The
+requirement is not one chamber *per floor*: the chamber takes the single major
+hazard slot on its own floor, leaving other eligible floors with an independent
+**30% Crusher chance**. Gas placement is no longer a 25% selection roll.
+
+A chamber must occupy an optional non-Prison **single-doorway side room** without
+mandatory progression, vaults, keys, stairs or royal/artifact loot. It must fit
+two linked entrance leaves, a reachable chest and a separate walkable approach
+to a visible valve. Prisons retain the required 20–30% quota. The chest is
+funded by removing an optional Prison or ordinary reward chest when the floor
+budget is already spent; guaranteed gallery, vault, throne and artifact loot
+is not sacrificed. Inability to preserve these rules rejects the world rather
+than producing a softlock or missing signature room.
 
 Even before opening the chest, distinctive **vent grates and a pressure-release
 valve** signal danger; the chest itself is the trigger. Bumping or tapping an
@@ -1732,10 +1740,6 @@ traps' DEF bypass, throne rotation and Death Bolt. Browser Cypress execution,
 mobile/tile/ASCII visual inspection and Supabase death-cause constraints are
 separate release gates; headless rule checks are not substitutes. The currently
 supported death labels are `dwarven crusher`, `poison gas` and `dungeon trap`.
-
-**Game v162** ships regression and survey improvements without changing game
-mechanics, serialized state or the deterministic action contract. The
-**save/replay schema stays 83**. No older-save compatibility is introduced.
 
 The four throne-facing sprites are supplied as **100×100 transparent PNGs**,
 with the original artwork scaled proportionally. The Death Bolt projectile

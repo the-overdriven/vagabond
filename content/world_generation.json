@@ -1248,9 +1248,8 @@
       "timedHazards": {
         "minimumZ": -5,
         "maxMajorHazardsPerFloor": 1,
-        "gasChamberFloorWeight": 0.25,
-        "crusherFloorWeight": 0.3,
-        "noneWeight": 0.45,
+        "guaranteedGasChambersPerStratum": 1,
+        "crusherFloorChance": 0.3,
         "crusher": {
           "warningTurns": 1,
           "playerDamageMaxHpFraction": 0.8,

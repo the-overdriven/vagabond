@@ -1,8 +1,8 @@
 'use strict'
 
 // State changes are bound to consumed actions, never frame callbacks.
-// Optional hazards have a dedicated seed/z derived placement roll, so adding
-// visual effects cannot perturb other dungeon-generation RNG streams.
+// Major hazards have dedicated seed/z derived placement decisions, so adding
+// visual effects cannot perturb the ordinary dungeon-generation RNG stream.
 const DungeonHazards = (() => {
   const around = [[1,0],[-1,0],[0,1],[0,-1]]
   const encode = p => keyXY(p.x,p.y)
@@ -87,9 +87,16 @@ const DungeonHazards = (() => {
         const allocated=groundItems.filter(g=>g.level===z && g.kind==='chest' &&
           !g.royalThroneChest && !g.artifactGuaranteed && !g.vaultId).length
         const funding=allocated>=allowance ? groundItems.filter(g=>g.level===z && g.kind==='chest' &&
-          !g.galleryReward && !g.royalThroneChest && !g.artifactGuaranteed && !g.vaultId &&
-          (level.rooms||[]).some(r=>r.id===g.dungeonRoomId && r.archetype==='Prison'))
-          .sort((a,b)=>hash(z,0x72b19a23,a.x,a.y)-hash(z,0x72b19a23,b.x,b.y))[0] : null
+          !g.galleryReward && !g.gasChamberId && !g.royalThroneChest &&
+          !g.artifactGuaranteed && !g.vaultId)
+          .sort((a,b)=>{
+            // Prefer consuming a Prison bonus chest, then an ordinary bonus
+            // chest. Progression, gallery and royal rewards are untouchable.
+            const priority=g=>Number(!(level.rooms||[]).some(r=>
+              r.id===g.dungeonRoomId && r.archetype==='Prison'))
+            return priority(a)-priority(b) ||
+              hash(z,0x72b19a23,a.x,a.y)-hash(z,0x72b19a23,b.x,b.y)
+          })[0] : null
         if(allocated>=allowance && !funding) continue
         for(const d of doors) if(level.map[d.y][d.x]==='marble') level.map[d.y][d.x]='dwarvendoorclosed'
         level.map[valve.y][valve.x]='dwarvengasvalve'
@@ -122,18 +129,30 @@ const DungeonHazards = (() => {
 
   function generate() {
     const cfg = config()
-    if (!cfg) return
+    if (!cfg) return false
+    const levels = []
     for (let depth = 4; depth <= deepLevels.length + 1; depth++) {
       const level = deepLevels[depth-2], z = chainZForDepth(depth)
       if (level?.dungeonPackage !== 'dwarvenRuins') continue
       level.hazards = []
-      if (z > cfg.minimumZ) continue
-      // One feature-scoped roll; no reallocation when a candidate cannot fit.
-      const roll = hash(z, 0x48a9b35f) / 0x100000000
-      if (roll >= cfg.crusherFloorWeight) {
-        if (roll < cfg.crusherFloorWeight + cfg.gasChamberFloorWeight) placeGasChamber(level,z)
-        continue
-      }
+      if (z <= cfg.minimumZ) levels.push({level,z})
+    }
+    // A chamber is a guaranteed encounter somewhere in the Ruins, never a
+    // per-floor probability. Choose a seed-derived starting floor and try
+    // the others if geometry/loot makes the first choice impossible. No extra
+    // random draws, no dropping mandatory Prison/vault/progression invariants.
+    const required = cfg.guaranteedGasChambersPerStratum ?? 1
+    if (required !== 1 || !levels.length) return false
+    const start = hash(-4,0x6a5c3a18) % levels.length
+    const ordered = [...levels.slice(start),...levels.slice(0,start)]
+    const chamberFloor = ordered.find(({level,z}) => placeGasChamber(level,z))
+    // The caller rejects and regenerates a whole candidate world on failure.
+    // Never accept a Ruins dungeon with no chamber or fabricate a bad room.
+    if (!chamberFloor) return false
+    for (const {level,z} of levels) {
+      if (level === chamberFloor.level) continue // one major hazard per floor
+      // Crusher keeps its independent 30% chance on other eligible floors.
+      if (hash(z, 0x48a9b35f) / 0x100000000 >= cfg.crusherFloorChance) continue
       const banned = new Set((level.caves?.[0]?.entrances || []).map(encode))
       for (const trap of level.traps || []) banned.add(encode(trap.trigger))
       for (const p of groundItems) if (p.level === z) banned.add(encode(p))
@@ -170,6 +189,7 @@ const DungeonHazards = (() => {
         roomId:placed.room.id,geometry:{triggerTiles:[placed.trigger],dangerTiles:placed.dangerTiles},
         state:'idle',stateEnteredTurn:0,localTurn:0,lastProcessedTurn:-1,impactedMonsterIds:[],exhausted:false})
     }
+    return true
   }
 
   function doorHazard(x,y) {

@@ -3550,7 +3550,7 @@ function buildDwarvenRuinsStratum() {
   }
   if (!placeDwarvenRuinsLift(levelCount)) return false
   if (!DungeonTraps.generate()) return false
-  DungeonHazards.generate()
+  if (!DungeonHazards.generate()) return false
   return true
 }
 
@@ -5668,6 +5668,11 @@ function validateDwarvenRuinsStratum() {
   const base = validateDungeonStratumBasics('dwarvenRuins')
   const issues = base.issues.slice()
   let artifactCount = 0
+  const eligible = base.contexts.filter(({z}) => z <= (cfg.timedHazards?.minimumZ ?? -5))
+  const gasCount = eligible.reduce((total,{level}) => total +
+    (level.hazards || []).filter(h => h.type === 'gas').length, 0)
+  if (gasCount !== (cfg.timedHazards?.guaranteedGasChambersPerStratum ?? 1))
+    issues.push(`Dwarven Ruins: expected exactly one functional poison-gas chamber, found ${gasCount}`)
 
   for (const context of base.contexts) {
     const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context
