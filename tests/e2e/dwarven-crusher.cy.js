@@ -14,16 +14,17 @@ describe('Dwarven wall Crusher',()=>{
         currentZ=-5;deepLevels[3]=level;level.dungeonPackage='dwarvenRuins'
         map=level.map;undergroundDiscovered=level.discovered
         const dangerTiles=[],baseTiles=[],jawStages=[],triggerTiles=[]
-        for(let y=11;y<=13;y++) for(let x=10;x<=14;x++) {
+        for(let y=11;y<=15;y++) for(let x=10;x<=14;x++) {
           const tile=x===12?'dwarvencrusherplate':(x===10||x===14)?'dwarvencrushertrack':'marble'
           level.map[y][x]=tile;dangerTiles.push({x,y});baseTiles.push({x,y,tile})
           if(x===12)triggerTiles.push({x,y})
         }
         for(let offset=0;offset<3;offset++) jawStages.push(
-          Array.from({length:3},(_,r)=>[{x:10+offset,y:11+r},{x:14-offset,y:11+r}]).flat()
+          Array.from({length:5},(_,r)=>[{x:10+offset,y:11+r},{x:14-offset,y:11+r}]).flat()
             .filter((p,i,a)=>a.findIndex(q=>q.x===p.x&&q.y===p.y)===i))
+        groundItems.push({x:17,y:15,kind:'chest',level:-5,levelKind:'chain',opened:false,crusherReward:'crusher:-5:test'})
         level.hazards=[{id:'crusher:-5:test',type:'crusher',z:-5,roomId:'test',
-          geometry:{triggerTiles,dangerTiles,jawStages,baseTiles},
+          geometry:{triggerTiles,dangerTiles,jawStages,baseTiles,rewardChest:{x:17,y:15}},
           state:'idle',stateEnteredTurn:0,step:0,localTurn:0,lastProcessedTurn:-1,
           impactedMonsterIds:[],exhausted:false}]
         player.x=9;player.y=12;player.hp=player.maxHp=200;player.godMode=false
@@ -37,7 +38,7 @@ describe('Dwarven wall Crusher',()=>{
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const h=deepLevels[3].hazards[0]
       check(DungeonHazards.validate(deepLevels[3]),'valid wall jaw geometry')
-      check(h.geometry.dangerTiles.length===15 && !playerPathCanTraverse(12,12),'five-by-three area marked')
+      check(h.geometry.dangerTiles.length===25 && !playerPathCanTraverse(12,12),'five-by-three area marked')
       player.x=12;DungeonHazards.onActorEntered(player,9,12)
       check(h.state==='warning' && activePlayerStatuses().some(s=>s.id==='crusher'),'pressure warning')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
@@ -46,7 +47,8 @@ describe('Dwarven wall Crusher',()=>{
       check(h.step===1 && map[12][10]==='dwarvencrusherjaw' && map[12][14]==='dwarvencrusherjaw',
         'wall jaws move one tile from BOTH sides')
       check(DungeonHazards.validate(deepLevels[3]),'in-progress terrain agrees with hazard')
-      player.x=12;player.y=14
+      player.x=12;player.y=17
+      turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       check(h.state==='cooldown' && player.hp===200,'retreat escapes all damage')
@@ -66,7 +68,7 @@ describe('Dwarven wall Crusher',()=>{
       player.x=12;player.y=12;DungeonHazards.onActorEntered(player,11,12)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(enemies[0].hp===50 && enemies[1].hp===80,'real hits on both sides, 50%/20% caps')
+      check(enemies[0].hp===20 && enemies[1].hp===80,'real hits on both sides, 80%/20% caps')
       check(h.impactedMonsterIds.length===2 && h.step===1,'one hit per monster ID')
       const save=buildSaveObject(),rngBefore=rngState
       loadGameFromObject(save,{isReplayInit:true})
@@ -75,9 +77,23 @@ describe('Dwarven wall Crusher',()=>{
         'save restores jaw tiles, timing and hit IDs')
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
-      check(player.hp===40 && restored.state==='cooldown','center eventually crushed for 80%')
-      check(enemies[0].hp===50 && enemies[1].hp===80,'no repeated monster damage')
+      check(player.hp===40 && restored.state==='impact','center eventually crushed for 80%')
+      check(enemies[0].hp===20 && enemies[1].hp===80,'no repeated monster damage')
       return true
+    })()`))
+  })
+  it('lets ethereal monsters phase through moving walls without consuming a hit',()=>{
+    cy.window().then(win=>win.eval(`(()=>{
+      const h=deepLevels[3].hazards[0]
+      const ghost={id:'ghost-crusher',name:'Ghost',baseName:'Ghost',alive:true,level:-5,levelKind:'chain',
+        x:10,y:12,hp:100,maxHp:100,atk:1,def:1,spd:1,grace:1,tier:2,
+        abilities:['ethereal'],immunityUntilTurn:0,equipment:{weapon:null,armor:null,shield:null}}
+      enemies=[ghost];player.x=12;player.y=12
+      DungeonHazards.onActorEntered(player,11,12)
+      turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
+      turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
+      if(ghost.hp!==100 || h.impactedMonsterIds.includes(ghost.id))
+        throw Error('ethereal monster harmed or marked by Crusher')
     })()`))
   })
   it('allows monsters to activate the plate and damages one that remains between the walls',()=>{
@@ -92,7 +108,7 @@ describe('Dwarven wall Crusher',()=>{
       DungeonHazards.onActorEntered(e,11,12)
       check(h.state==='warning','monster activates a real pressure plate')
       for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
-      check(e.hp===50 && h.impactedMonsterIds.includes(e.id),'monster hit once at center')
+      check(e.hp===20 && h.impactedMonsterIds.includes(e.id),'monster hit once at center')
       return true
     })()`))
   })

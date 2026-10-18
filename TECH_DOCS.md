@@ -1291,12 +1291,18 @@ sit beyond a trap. Trap triggers are separated by more than three tiles. Existin
 start within two tiles of either a trigger or emitter. Summoning uses the same
 `DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement. Triggers
 and emitters also keep that clearance from authored room tactical slots, so
-traps cannot displace their intended encounters.
+traps cannot displace their intended encounters. Floor and wall-arrow triggers must also have meaningful
+walkable continuation at least three steps on each apparent exit: a two-wide
+cul-de-sac is not a valid through-route just because its end-cap has three
+walkable neighbours. This check applies before placing either trap type;
+wall-arrow emitters must also be backed by solid stone.
 
-Spikes trigger on entry by players and enemies, including flying and ethereal
-creatures. Forced movement also triggers them. Remaining on a trigger or
-restoring a save does not. A pressure plate fires a cardinal wall arrow toward
-the first creature in its lane, regardless of who stepped on it. Closed doors,
+Spikes trigger on entry by players and ordinary/flying enemies, while
+ethereal creatures pass through unharmed. Forced movement also triggers them. Remaining on a trigger or
+restoring a save does not. A pressure plate, placed a seeded random **1–5 floor squares** from its
+backed wall emitter where corridor geometry permits, fires a cardinal arrow
+toward the first non-ethereal creature in its lane, regardless of who stepped
+on it. Ethereal creatures do not intercept arrows. Closed doors,
 projectile-blocking terrain and ground items stop the arrow; an item on a
 creature's tile intercepts before that creature. The emitter remains a wall.
 Automatic player travel excludes all trigger tiles; manual movement is allowed.
@@ -1313,8 +1319,9 @@ the same game action. Resolution and RNG finish before presentation; projectile
 animation never determines a hit.
 
 Each deep level saves its `traps` array, including stable ID, trigger, type and
-optional emitter, direction and range. Schema 35 restores it directly alongside
-terrain, including replay initial snapshots.
+optional emitter, direction and range. Save and replay restoration use the
+recorded positions rather than rerolling distances; v173/schema 94 also
+revises deterministic generation and is not compatible with older saves.
 
 ASCII glyphs are `^` for spikes and `!` for wall-arrow emitters. Wall-arrow
 pressure plates are disguised as ordinary `marble` flooring in both tile and
@@ -1419,7 +1426,7 @@ artifact vault remains compulsory, while a second fitted vault is an ordinary
 1–2-vault roll. The ordinary room and Champion budgets are unchanged; the royal treasury and its extra guards are the only explicit additional rewards and foes.
 
 The floor reserves the hall's footprint **before** placing other rooms. Three
-possible interior dimensions are **9×19, 11×21, 11×23** cells, with four
+possible interior dimensions are **9×19, 9×21, 9×23** cells, with four
 possible facings. All Dwarven Ruins floors now **target 11–15 rooms**
 (previously 8–12), with **4–6 guaranteed optional room-graph branches**
 (previously 2–4); physical room-placement constraints can reduce the final
@@ -1457,10 +1464,8 @@ descriptors and restored without rerolling any world-generation decisions.
 Whole-world rotation transforms its rectangle, points and facing together.
 The landmark direction runs from its single entrance toward the throne; the
 **throne sprite faces the opposite direction, back toward the entrance**. Sprite
-filenames indicate the direction the monarch faces (north, east, south, west); 
-east/west art matches the ruler's actual facing, not the hall's approach vector. The camera, 
-animation timing and random numbers do not affect which sprite appears. 
-The throne and dais are new encoded terrain types,
+filenames indicate the direction the monarch faces (north, east, south, west); east/west art matches the ruler's actual facing, not the hall's approach vector. The camera, animation timing and random numbers do not affect
+which sprite appears. The throne and dais are new encoded terrain types,
 using the unique current-save codes `╙` and `╜`. Both graphics are transparent
 over the recorded stone floor: dais engravings overlay marble; the throne uses
 the dais as its underlay, saved and rotated alongside other per-level overlays.
@@ -1716,7 +1721,12 @@ A caught player takes `ceil(0.80 × maximum HP)`, ignoring numerical DEF,
 dodge and glancing, but retaining God Mode and fatal-hit shields. Ordinary
 monsters take at most **80% max HP**, and Champions/bosses **20% max HP**;
 each monster ID can be damaged only once by each mechanism, regardless of
-how many jaw steps touch it. Monster environmental deaths grant no XP.
+how many jaw steps touch it. This is **80% of maximum HP as a flat subtraction**
+(not 80% of current HP and not a floor at 20% HP), so a previously wounded
+monster can die from the hit. Temporary fatal-hit protection remains effective.
+Ethereal monsters completely ignore the Crusher: no damage and no consumed
+once-per-monster hit. They also ignore spike traps, wall arrows, and room gas.
+Monster environmental deaths grant no XP.
 Triggers and damage are deterministic turn events; wall progress, already-hit
 IDs, original tile records and geometry persist in deep-floor save state and
 rotate with the map. Auto-travel considers the *entire* danger strip known
@@ -8272,4 +8282,3 @@ small maps should be exercised across many seeds before treating balance or
 generation success as stable. Drought can remove safe forage while arming a
 larger share of humanoids; its exclusions prevent the strongest resource
 contradictions, but other dangerous combinations remain possible.
-

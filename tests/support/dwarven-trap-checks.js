@@ -39,6 +39,13 @@ function trapCornerChecks() {
     check(DungeonTraps.usefulProjectileEmitterTile(wall,x,y,dx,dy),
       'thick stone-backed emitter remains eligible')
   }
+  // Exact shape of the saved z:-5 incident: two corridor rows end in
+  // a two-cell stone cap. Three local exits are not three useful routes.
+  const culdesac=Array.from({length:13},()=>Array(17).fill('dwarvenwall'))
+  for(let y=5;y<=6;y++)for(let x=2;x<=12;x++)culdesac[y][x]='marble'
+  check(DungeonTraps.usefulTriggerTile(culdesac,11,5),'old validator accepts shallow pocket')
+  check(!DungeonTraps.usefulThroughRoute(culdesac,11,5),'new validator rejects the dead end')
+  check(DungeonTraps.usefulThroughRoute(culdesac,7,5),'middle of through-like passage remains available')
   return true
 }
 
@@ -67,8 +74,12 @@ async function trapRuleChecks() {
   const route=findPlayerPath(12,12);check(route&&route.every(p=>p.x!==11||p.y!==12),'auto-travel routes around trap')
   const monster=abilities=>({id:'enemy_1',name:'Goblin',baseName:'Goblin',hp:100,maxHp:100,atk:2,def:1,spd:1,grace:2,aggro:2,tier:2,abilities,level:-4,levelKind:'chain',x:11,y:12,alive:true,wander:false,humanoid:true})
   for(const abilities of [[],['fly'],['ethereal']]){
-    const e=monster(abilities);enemies=[e];finishEnemyMove(e,10,12);check(e.hp<100,'all movement abilities trigger spikes')
+    const e=monster(abilities);enemies=[e];finishEnemyMove(e,10,12)
+    check(abilities.includes('ethereal') ? e.hp===100 : e.hp<100,
+      'ethereal creatures ignore spikes; ordinary and flying enemies are hit')
   }
+  // The arrow must phase through a ghost and continue to a physical target.
+  // Do this below using the normal projectile path, not a direct hit shortcut.
   const e=monster([]);e.hp=1;e.stolenItem={kind:'potion',count:1};enemies=[e]
   const xp=player.xp,kills=player.kills,species=JSON.stringify(player.killsBySpecies),strongest=JSON.stringify(player.strongestEnemyKilled)
   finishEnemyMove(e,10,12)
@@ -90,6 +101,11 @@ async function trapRuleChecks() {
   const impact=messages.findIndex(text=>text.includes('damage from a wall arrow'))
   const death=messages.findIndex(text=>text.includes('is killed by a trap'))
   check(impact>=0&&death>impact,'wall arrow damage precedes trap death message')
+  const ghost=monster(['ethereal']);ghost.id='ghost-arrow';ghost.x=11;ghost.hp=100
+  const physicalBehind=monster([]);physicalBehind.id='behind-ghost';physicalBehind.x=12
+  enemies=[ghost,physicalBehind];DungeonTraps.onEntry(player,14,12)
+  check(ghost.hp===100 && physicalBehind.hp<100,
+    'ethereal ghosts do not intercept arrows; the next physical monster is hit')
   const freshBlocker=monster([]);freshBlocker.x=12;enemies=[freshBlocker]
   const blockedHp=freshBlocker.hp;groundItems=[{kind:'potion',x:11,y:12,level:-4,levelKind:'chain'}]
   DungeonTraps.onEntry(player,14,12);check(freshBlocker.hp===blockedHp,'ground item blocks arrow')
@@ -98,7 +114,7 @@ async function trapRuleChecks() {
   check(!UndergroundFov.canSee(map,8,12,10,12),'emitter retains wall sight blocking')
   check(!DungeonTraps.safeSpawn(15,12,-4)&&!DungeonTraps.safeSpawn(17,12,-4)&&DungeonTraps.safeSpawn(18,12,-4),'spawn exclusion radius')
   rng=oldRng
-  return {movement:true,forced:true,flyAndEthereal:true,noKillCredit:true,projectileBlocking:true,pathfinding:true,fov:true}
+  return {movement:true,forced:true,flyingHitEtherealImmune:true,noKillCredit:true,projectileBlocking:true,pathfinding:true,fov:true}
 }
 
 async function trapPersistenceChecks() {
@@ -143,11 +159,14 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
     check(required.every(p=>reachable.has(keyXY(p.x,p.y))),'stairs, keys, lift accessible while avoiding every trap')
     for(const t of l.traps){
       check(DungeonTraps.isTrigger(l.map[t.trigger.y][t.trigger.x]),'mechanism has readable trigger')
-      check(DungeonTraps.usefulTriggerTile(l.map,t.trigger.x,t.trigger.y),'final trigger is not a skippable corner or dead end')
+      check(DungeonTraps.usefulThroughRoute(l.map,t.trigger.x,t.trigger.y),'final trigger is on a meaningful through-route')
       check(!groundItems.some(g=>g.level===z&&g.x===t.trigger.x&&g.y===t.trigger.y),'no ground object on trigger')
       check(enemies.filter(e=>e.level===z).every(e=>DungeonTraps.safeSpawn(e.x,e.y,z)),'no monster starts near trap')
       if(t.emitter){
         check(l.map[t.emitter.y][t.emitter.x]==='dwarvenarrowwall','projectile mechanism retains emitter')
+        check(Math.abs(t.emitter.x-t.trigger.x)+Math.abs(t.emitter.y-t.trigger.y)>=1 &&
+          Math.abs(t.emitter.x-t.trigger.x)+Math.abs(t.emitter.y-t.trigger.y)<=5,
+          'wall-arrow plate is one to five tiles from emitter')
         // On the committed map the emitter has replaced the original wall;
         // test its backing separately without changing that tile.
         const {x,y}=t.emitter,{dx,dy}=t.direction

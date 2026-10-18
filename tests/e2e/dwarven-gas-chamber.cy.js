@@ -58,6 +58,21 @@ describe('Sealed Dwarven gas chambers', () => {
     })()`))
   })
 
+  it('damages physical monsters but never ethereal creatures', () => {
+    cy.window().then(win=>win.eval(`(()=>{
+      const h=deepLevels[3].hazards[0]
+      const template={name:'Ghost',baseName:'Ghost',alive:true,level:-5,levelKind:'chain',
+        x:13,y:13,hp:100,maxHp:100,atk:1,def:1,spd:1,grace:1,tier:2,
+        immunityUntilTurn:0,equipment:{weapon:null,armor:null,shield:null}}
+      enemies=[{...template,id:'gas-ghost',abilities:['ethereal']},
+        {...template,id:'gas-physical',name:'Goblin',baseName:'Goblin',abilities:[]}]
+      player.x=1;player.y=1
+      h.state='active';h.stateEnteredTurn=0;h.localTurn=2
+      turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)
+      if(enemies[0].hp!==100 || enemies[1].hp>=100)
+        throw Error('ethereal gas immunity or physical gas damage broken')
+    })()`))
+  })
   it('shares two-hit seal progress, handles occupied leaves and expires after 15 turns', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

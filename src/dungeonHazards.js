@@ -410,7 +410,7 @@ const DungeonHazards = (() => {
     }
     let monsterHits=0
     for (const e of [...enemies]) {
-      if (!e.alive || !onCurrentLevel(e) || !caught(e) ||
+      if (!e.alive || !onCurrentLevel(e) || enemyHasAbility(e, 'ethereal') || !caught(e) ||
         hazard.impactedMonsterIds.includes(e.id)) continue
       if (enemyImmunityActive(e)) {
         // Immunity protects this contact, not every future cycle. In
@@ -470,7 +470,7 @@ const DungeonHazards = (() => {
           if (player.hp<=0) {die(null,'poison gas');return}
         }
         for(const e of [...enemies]) {
-          if (!e.alive || !onCurrentLevel(e) || !exposed(hazard,e.x,e.y) || enemyImmunityActive(e)) continue
+          if (!e.alive || !onCurrentLevel(e) || !exposed(hazard,e.x,e.y) || enemyHasAbility(e, 'ethereal') || enemyImmunityActive(e)) continue
           const damage=damageFor(e),wasEnraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
           e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,wasEnraged)
           if(visible) spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)

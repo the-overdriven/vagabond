@@ -542,11 +542,11 @@
               19
             ],
             [
-              11,
+              9,
               21
             ],
             [
-              11,
+              9,
               23
             ]
           ],
@@ -1084,6 +1084,7 @@
         "projectileAtk": 10,
         "speed": 5,
         "projectileRange": 12,
+        "triggerDistanceRange": [1, 5],
         "spawnClearance": 2,
         "entranceClearance": 3,
         "minimumSeparation": 3,

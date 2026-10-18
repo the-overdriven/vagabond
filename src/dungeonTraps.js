@@ -29,6 +29,42 @@ const DungeonTraps = (() => {
     return !passable(x + a[0] + b[0], y + a[1] + b[1])
   }
 
+  // Ordinary corridor traps should sit on a meaningful through-route, not
+  // on the last squares of a capped spur. This is a directional lookahead:
+  // each available exit must reach at least three steps away without
+  // reversing across the trigger. It also handles two-wide corridors,
+  // whose dead-end caps incorrectly look like 3-way intersections.
+  function usefulThroughRoute(terrain, x, y, minimumSteps = 3) {
+    if (!usefulTriggerTile(terrain, x, y)) return false
+    const passable = (tx, ty) => {
+      const tile = terrain[ty]?.[tx]
+      return !!TILE[tile]?.walk || isClosedDungeonDoorTile(tile) || isLockedDungeonDoorTile(tile)
+    }
+    const sides = directions.filter(([dx, dy]) => passable(x + dx, y + dy))
+    const reaches = ([dx, dy]) => {
+      const start = {x:x+dx,y:y+dy,steps:1}
+      const seen = new Set([keyXY(x,y),keyXY(start.x,start.y)])
+      const queue = [start]
+      for (let i=0; i<queue.length; i++) {
+        const p=queue[i]
+        if (p.steps >= minimumSteps) return true
+        for(const [sx,sy] of directions) {
+          const nx=p.x+sx,ny=p.y+sy
+          // Stay ahead of the original trigger; this prevents a wide but
+          // shallow pocket from appearing to have a through-route.
+          if ((nx-x)*dx+(ny-y)*dy <= 0 || !passable(nx,ny)) continue
+          const key=keyXY(nx,ny)
+          if (seen.has(key)) continue
+          seen.add(key);queue.push({x:nx,y:ny,steps:p.steps+1})
+        }
+      }
+      return false
+    }
+    // On wide passages, a 2x2 capped pocket may have three local exits.
+    // Every apparent forward exit must genuinely continue.
+    return sides.every(reaches)
+  }
+
   // A wall arrow must come from a backed stone face, not from a thin
   // partition between a corridor and another walkable space. A partition
   // emitter looks like a trap at the end of a passage and covers no proper
@@ -129,16 +165,27 @@ const DungeonTraps = (() => {
         const type = allowedTypes[level.traps.length % allowedTypes.length]
         let trigger = {x:candidate.x, y:candidate.y}, emitter = null, direction = null
         if (type === 'projectile') {
-          const wall = candidate.walls.find(([dx,dy]) =>
-            [1,2].every(n => terrain[candidate.y-dy*n]?.[candidate.x-dx*n] === 'marble') &&
-            usefulProjectileEmitterTile(terrain, candidate.x+dx, candidate.y+dy, -dx, -dy))
-          if (!wall) continue
-          emitter = {x:candidate.x+wall[0], y:candidate.y+wall[1]}
-          direction = {dx:-wall[0], dy:-wall[1]}
-          trigger = {x:candidate.x+direction.dx, y:candidate.y+direction.dy}
+          // A single wall emitter may serve a plate 1–5 squares away. Draw
+          // the distance with seeded RNG, but only among feasible distances.
+          const [minDistance,maxDistance] = cfg.triggerDistanceRange || [1,5]
+          const placements = []
+          for (const [dx,dy] of candidate.walls) {
+            const ex=candidate.x+dx,ey=candidate.y+dy
+            if (!usefulProjectileEmitterTile(terrain,ex,ey,-dx,-dy)) continue
+            for (let n=minDistance;n<=maxDistance;n++) {
+              const tx=ex-dx*n,ty=ey-dy*n
+              if (!Array.from({length:n},(_,i)=>i+1).every(k=>
+                terrain[ey-dy*k]?.[ex-dx*k] === 'marble')) continue
+              if (!usefulThroughRoute(terrain,tx,ty)) continue
+              placements.push({emitter:{x:ex,y:ey},trigger:{x:tx,y:ty},direction:{dx:-dx,dy:-dy}})
+            }
+          }
+          if (!placements.length) continue
+          const selected=placements[randInt(0,placements.length-1)]
+          emitter=selected.emitter;trigger=selected.trigger;direction=selected.direction
         }
         if (nearPrison(trigger) || nearPrison(emitter)) continue
-        if (terrain[trigger.y]?.[trigger.x] !== 'marble' || !usefulTriggerTile(terrain, trigger.x, trigger.y) || inRoom(trigger.x, trigger.y) ||
+        if (terrain[trigger.y]?.[trigger.x] !== 'marble' || !usefulThroughRoute(terrain, trigger.x, trigger.y) || inRoom(trigger.x, trigger.y) ||
             (emitter && inLandmark(emitter.x,emitter.y)) ||
             required.some(p => distance(p, trigger) <= cfg.entranceClearance)) continue
         if (level.traps.some(t => distance(t.trigger, trigger) <= cfg.minimumSeparation)) continue
@@ -168,7 +215,8 @@ const DungeonTraps = (() => {
     const cfg = configForLevel(level), isPlayer = target === player
     if (!cfg) return {damage:0, missed:false}
     if (isPlayer && player.godMode) return {damage:0, missed:false}
-    if (!isPlayer && enemyImmunityActive(target)) return {damage:0, missed:false, immune:true}
+    if (!isPlayer && (enemyHasAbility(target, 'ethereal') || enemyImmunityActive(target)))
+      return {damage:0, missed:false, immune:true}
     const speed = isPlayer ? playerSpd() : enemySpd(target)
     const missed = trap.type === 'projectile' && chance(Math.min(1,
       missChance(cfg.speed, speed) * RANGED_CONFIG.dodgeMultiplier))
@@ -208,6 +256,8 @@ const DungeonTraps = (() => {
         if (groundItems.some(g => onCurrentLevel(g) && g.x === x && g.y === y)) break
         target = player.x === x && player.y === y ? player :
           enemies.find(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y)
+        // Arrows phase through ethereal creatures instead of being stopped.
+        if (target && target !== player && enemyHasAbility(target, 'ethereal')) target=null
         if (target) break
       }
     }
@@ -236,5 +286,5 @@ const DungeonTraps = (() => {
     if (trap) triggerTrap(trap, actor)
   }
 
-  return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile, usefulProjectileEmitterTile}
+  return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile, usefulThroughRoute, usefulProjectileEmitterTile}
 })()
