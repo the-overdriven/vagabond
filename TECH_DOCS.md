@@ -1296,9 +1296,10 @@ creature's tile intercepts before that creature. The emitter remains a wall.
 Automatic player travel excludes all trigger tiles; manual movement is allowed.
 
 Balance lives in `dungeons.dwarvenRuins.traps` in `world_generation.json`:
-spike ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Damage uses normal
-DEF reduction, armor glancing and base critical rules; arrows also use the
-ranged dodge multiplier. Traps grant no player XP, kill count, bestiary entry,
+spike ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Both
+mechanisms **ignore numerical DEF**, including temporary DEF bonuses and monster
+DEF. Separate armor glancing and critical rolls still apply; arrows retain
+their ranged dodge multiplier. Ordinary weapon attacks still use DEF. Traps grant no player XP, kill count, bestiary entry,
 strongest-kill record or immediate quest-kill credit. Normal loot and stolen
 items still drop, and enemy fatal-hit protection still applies. A trap's damage
 message appears before its fatality message; deaths and drops still resolve in
@@ -1525,15 +1526,32 @@ partition's orientation and bounds, preserving the complete divider and its
 single doorway after generation and save/restore. Closed bars and prison doors block
 movement but do **not** block sight or projectiles.
 
-Each prison cell contains an additional seeded object: a **75% chance** of a
-searchable prisoner's skeleton (with the usual independent **10%** loot chance)
-or otherwise a chest, on an unoccupied cell floor tile. This guarantees a
-visible reason to investigate every cell. Separately, a cell has a **65% chance**
-to receive a real ranged-capable enemy, provided an eligible species and safe
-spawn tile exist; one already present counts toward this purpose. Prison
-shooters retain normal ammo, wandering and combat rules and can fire through
-their bars. These cell objects are **in addition to** normal room loot and
-floor-wide remains, not replacements for them.
+Every Ruins floor now guarantees a **functional barred Prison in at least 20%
+of ordinary room slots on D1**, rising linearly to **30% on the deepest floor**
+(rounded up and never fewer than one). All non-entrance, non-throne ordinary
+room slots count toward that denominator, including rooms that cannot fit a
+cell; invalid cells never count. The generator reserves additional suitably
+sized room footprints before connecting the room graph. After the layout,
+structural doorways and vaults are chosen, the same pure partition planner
+checks geometry both for the quota and the actual cell build. Unsatisfied
+floors are retried within the existing 12-attempt cap, rather than silently
+lowering the prison target. Throne and guaranteed artifact rooms remain
+protected from Prison assignment.
+
+Each prison cell contains a seeded reward prop: a **75% chance** of a
+searchable prisoner's skeleton (with its independent **10%** loot chance),
+or a **25% chance** of a chest, subject to the existing non-guaranteed
+floor chest allowance (an excess chest becomes another prisoner skeleton).
+A prisoner's skeleton substitutes for a
+searchable skeleton that would otherwise be scattered elsewhere on that
+floor; prison chests likewise substitute for ordinary floor-budget chests.
+The guaranteed royal and artifact rewards are unaffected. This makes the
+higher Prison frequency a change in *where loot is found*, not a chest farm.
+Separately, a cell has a **65% target chance** to receive a real ranged-capable
+enemy if an eligible species, a safe position **and enough remaining floor
+threat budget** exist. Cell shooters are paid for from the existing budget
+before roaming monsters and cannot overdraw it. Shooters retain normal ammo,
+wandering and combat rules and can fire through bars.
 
 Vault entrance limits are measured from the actual room graph, including loop
 connections, so a one-entrance archive/tomb cannot silently gain a second route.
@@ -6108,8 +6126,15 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-79
+80
 ```
+
+Version 80 enforces the depth-scaled functional Prison quota when generating
+new Dwarven Ruins and makes existing spike/arrow trap hits bypass numeric DEF.
+Prison cell rewards and ranged occupants now draw from the same floor-level
+loot and enemy budgets as ordinary features. The changes alter seeded
+world-generation and combat outcomes, so old replay/save formats are not
+supported. No new runtime hazard flags or timers are introduced in this batch.
 
 Version 79 replaces the binary 25% chase/escape thresholds with a capped 5%
 chance per effective SPD point of advantage. This changes seeded enemy-turn RNG
@@ -7261,7 +7286,7 @@ save.replay = {
 }
 ```
 
-The replay `version` is independent of the game's `SAVE_VERSION` (currently 55).
+The replay tape format version is independent of the current game save schema version (80).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

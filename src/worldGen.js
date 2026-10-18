@@ -1859,6 +1859,57 @@ function deriveDwarvenThroneHallSlots(cm, room, stairEntrances = []) {
   return {backline,frontline,group,champion,any}
 }
 
+// The exact same dry-run partition is used for quota planning and actual
+// construction. It must never mutate terrain, room metadata or seeded RNG.
+function planDwarvenPrisonPartition(cm, room, reserved = new Set()) {
+  const doorwayKeys = new Set((room.doorways || []).flat().map(p => keyXY(p.x, p.y)))
+  const allInterior = dwarvenRoomInterior(room)
+    const entry = dwarvenRoomEntryPoint(cm, room)
+    const zones = room.vaultZones?.length ? room.vaultZones : dungeonInternalZones(room, ['guard','cells'], entry)
+    const cell = zones.find(zone => zone.id === 'cells')
+    const horizontalApproach = Math.abs(entry.x - room.cx) >= Math.abs(entry.y - room.cy)
+    const split = horizontalApproach
+      ? (entry.x <= room.cx ? cell?.x1 : cell?.x2)
+      : (entry.y <= room.cy ? cell?.y1 : cell?.y2)
+    const towardCell = horizontalApproach
+      ? (entry.x <= room.cx ? 1 : -1)
+      : (entry.y <= room.cy ? 1 : -1)
+    const dividerCoords = [...new Set([split,
+      Number.isFinite(split) ? split + towardCell : null,
+      horizontalApproach ? room.cx : room.cy].filter(Number.isFinite))]
+    const doorwayNear = p => [...doorwayKeys].some(key => {
+      const [x,y] = key.split(',').map(Number)
+      return Math.max(Math.abs(p.x-x),Math.abs(p.y-y)) <= 1
+    })
+    let line = [], cellRegion = null
+    for (const divider of dividerCoords) {
+      const candidateLine = allInterior.filter(p => horizontalApproach ? p.x === divider : p.y === divider)
+        .sort((a,b) => Math.abs((horizontalApproach ? a.y : a.x) - (horizontalApproach ? room.cy : room.cx)) -
+          Math.abs((horizontalApproach ? b.y : b.x) - (horizontalApproach ? room.cy : room.cx)))
+      const expectedLength = horizontalApproach ? room.h - 2 : room.w - 2
+      // A partial partition is worse than no cell: actors can walk around a
+      // missing end bar (including diagonally) and bypass its locked door.
+      if (candidateLine.length !== expectedLength || candidateLine.some(p =>
+        cm[p.y]?.[p.x] !== 'marble' || reserved.has(keyXY(p.x,p.y)) || doorwayNear(p))) continue
+      const far = horizontalApproach
+        ? {x1: towardCell > 0 ? divider + 1 : room.x + 1,
+          x2: towardCell > 0 ? room.x + room.w - 2 : divider - 1,
+          y1: room.y + 1, y2: room.y + room.h - 2}
+        : {x1: room.x + 1, x2: room.x + room.w - 2,
+          y1: towardCell > 0 ? divider + 1 : room.y + 1,
+          y2: towardCell > 0 ? room.y + room.h - 2 : divider - 1}
+      const depth = horizontalApproach ? far.x2 - far.x1 + 1 : far.y2 - far.y1 + 1
+      if (depth < 2) continue
+      const viable = allInterior.filter(p => p.x >= far.x1 && p.x <= far.x2 &&
+        p.y >= far.y1 && p.y <= far.y2 && cm[p.y]?.[p.x] === 'marble' && !reserved.has(keyXY(p.x,p.y)))
+      if (viable.length < 3) continue
+      line = candidateLine
+      cellRegion = far
+      break
+    }
+    return line.length >= 3 && cellRegion ? {line, cellRegion, horizontalApproach, door:line[0]} : null
+}
+
 function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, reserved = new Set(), overlayUnderlays = {}, sealedWorkStairRoom = false) {
   if (!room || room.archetype === 'Entrance Hall' || room.landmark === 'throneHall') return
   const story = dungeonPackageConfig('dwarvenRuins')?.story || {}
@@ -1918,56 +1969,13 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
   // Vault prison blocks always lock it; ordinary Prison rooms can lock it via
   // the archetype's configured internalLockedCellChance.
   if (room.archetype === 'Prison') {
-    const entry = dwarvenRoomEntryPoint(cm, room)
-    const zones = room.vaultZones?.length ? room.vaultZones : dungeonInternalZones(room, ['guard','cells'], entry)
-    if (!room.vaultZones?.length) room.internalZones = structuredClone(zones)
-    const cell = zones.find(zone => zone.id === 'cells')
-    const horizontalApproach = Math.abs(entry.x - room.cx) >= Math.abs(entry.y - room.cy)
-    const split = horizontalApproach
-      ? (entry.x <= room.cx ? cell?.x1 : cell?.x2)
-      : (entry.y <= room.cy ? cell?.y1 : cell?.y2)
-    const towardCell = horizontalApproach
-      ? (entry.x <= room.cx ? 1 : -1)
-      : (entry.y <= room.cy ? 1 : -1)
-    const dividerCoords = [...new Set([split,
-      Number.isFinite(split) ? split + towardCell : null,
-      horizontalApproach ? room.cx : room.cy].filter(Number.isFinite))]
-    const doorwayNear = p => [...doorwayKeys].some(key => {
-      const [x,y] = key.split(',').map(Number)
-      return Math.max(Math.abs(p.x-x),Math.abs(p.y-y)) <= 1
-    })
-    let line = [], cellRegion = null
-    for (const divider of dividerCoords) {
-      const candidateLine = allInterior.filter(p => horizontalApproach ? p.x === divider : p.y === divider)
-        .sort((a,b) => Math.abs((horizontalApproach ? a.y : a.x) - (horizontalApproach ? room.cy : room.cx)) -
-          Math.abs((horizontalApproach ? b.y : b.x) - (horizontalApproach ? room.cy : room.cx)))
-      const expectedLength = horizontalApproach ? room.h - 2 : room.w - 2
-      // A partial partition is worse than no cell: actors can walk around a
-      // missing end bar (including diagonally) and bypass its locked door.
-      if (candidateLine.length !== expectedLength || candidateLine.some(p =>
-        cm[p.y]?.[p.x] !== 'marble' || reserved.has(keyXY(p.x,p.y)) || doorwayNear(p))) continue
-      const far = horizontalApproach
-        ? {x1: towardCell > 0 ? divider + 1 : room.x + 1,
-          x2: towardCell > 0 ? room.x + room.w - 2 : divider - 1,
-          y1: room.y + 1, y2: room.y + room.h - 2}
-        : {x1: room.x + 1, x2: room.x + room.w - 2,
-          y1: towardCell > 0 ? divider + 1 : room.y + 1,
-          y2: towardCell > 0 ? room.y + room.h - 2 : divider - 1}
-      const depth = horizontalApproach ? far.x2 - far.x1 + 1 : far.y2 - far.y1 + 1
-      if (depth < 2) continue
-      const viable = allInterior.filter(p => p.x >= far.x1 && p.x <= far.x2 &&
-        p.y >= far.y1 && p.y <= far.y2 && cm[p.y]?.[p.x] === 'marble' && !reserved.has(keyXY(p.x,p.y)))
-      if (viable.length < 3) continue
-      line = candidateLine
-      cellRegion = far
-      break
-    }
-    if (line.length < 3 || !cellRegion) {
-      room.prisonCellGenerationFailed = true
-    } else {
-      const door = line[0]
-      for (const p of line) if (!(p.x === door.x && p.y === door.y) && cm[p.y]?.[p.x] === 'marble') cm[p.y][p.x] = 'dwarvenprisonbars'
-      room.prisonCellDoorCandidate = {x:door.x,y:door.y}
+    const partition = planDwarvenPrisonPartition(cm, room, reserved)
+    if (!partition) room.prisonCellGenerationFailed = true
+    else {
+      if (!room.vaultZones?.length) room.internalZones = dungeonInternalZones(room, ['guard','cells'], dwarvenRoomEntryPoint(cm, room))
+      const {line, door, cellRegion, horizontalApproach} = partition
+      for (const p of line) if (p.x !== door.x || p.y !== door.y) cm[p.y][p.x] = 'dwarvenprisonbars'
+      room.prisonCellDoorCandidate = {...door}
       room.prisonCellAxis = horizontalApproach ? 'vertical' : 'horizontal'
       room.prisonCellRegion = cellRegion
     }
@@ -2144,7 +2152,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
 
   let artifactRoom = null
   if (finalFloor) {
-    const optional = selectable.filter(room => room.optional)
+    const optional = selectable.filter(room => room.optional && !room.prisonReserved)
       .sort((a, b) => (Math.abs(b.cx - roomMetas[0].cx) + Math.abs(b.cy - roomMetas[0].cy)) -
         (Math.abs(a.cx - roomMetas[0].cx) + Math.abs(a.cy - roomMetas[0].cy)))
     const configuredArtifactTypes = Array.isArray(cfg.artifactTypes) ? cfg.artifactTypes : []
@@ -2172,7 +2180,7 @@ function selectDungeonVaults(packageId, cm, roomMetas, structuralDoors, gateDoor
   let guard = 0
   const selectionGuardLimit = Math.max(1, Math.floor(cfg.selectionGuardLimit ?? 50))
   while (selected.length < target && guard++ < selectionGuardLimit) {
-    const rooms = selectable.filter(room => !usedRooms.has(room.id))
+    const rooms = selectable.filter(room => !usedRooms.has(room.id) && !room.prisonReserved)
     if (!rooms.length) break
     const room = pick(rooms)
     let types = Object.keys(defs).filter(type => !defs[type]?.fallbackOnly && !usedTypes.has(type) && definitionFits(type, room, false))
@@ -2536,6 +2544,29 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     if (!hall) return null
   }
   const roomCount = randInt(cfg.roomCountRange[0], cfg.roomCountRange[1])
+  const prisonCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.rooms?.prisonGeneration || {}
+  const prisonShare = Number(prisonCfg.targetShareEarly ?? 0.20) + progress *
+    (Number(prisonCfg.targetShareLate ?? 0.30) - Number(prisonCfg.targetShareEarly ?? 0.20))
+  const predictedOrdinarySlots = Math.max(1, roomCount - 1 - (hall ? 1 : 0))
+  const expectedQuota = Math.max(Number(prisonCfg.guaranteedMinimum ?? 1), Math.ceil(predictedOrdinarySlots * prisonShare))
+  // Reserve larger room footprints BEFORE the graph is built. These are not
+  // automatically counted as prisons: their doors and cells must pass preflight.
+  const prisonReserveTarget = Math.min(predictedOrdinarySlots, expectedQuota + 2)
+  const reserveSearchLimit = Math.max(1, Math.floor(prisonCfg.prisonCandidateSearchLimit ?? 128))
+  let prisonReservedCount = 0
+  for (let attempt = 0; attempt < reserveSearchLimit && prisonReservedCount < prisonReserveTarget && rooms.length < roomCount; attempt++) {
+    const w = randInt(Math.max(10, cfg.roomWidthRange[0]), cfg.roomWidthRange[1])
+    const h = randInt(Math.max(9, cfg.roomHeightRange[0]), cfg.roomHeightRange[1])
+    const minRoomX = minX + cfg.roomBoundsMargin, maxRoomX = maxX - w - cfg.roomBoundsMargin
+    const minRoomY = minY + cfg.roomBoundsMargin, maxRoomY = maxY - h - cfg.roomBoundsMargin
+    if (maxRoomX < minRoomX || maxRoomY < minRoomY) continue
+    const rx = randInt(minRoomX, maxRoomX), ry = randInt(minRoomY, maxRoomY)
+    const candidate = {x:rx,y:ry,w,h,cx:rx+Math.floor(w/2),cy:ry+Math.floor(h/2),prisonReserved:true}
+    if (!dungeonRoomHasSeparation(rooms,candidate,hall ? Math.max(1,cfg.roomSeparation-1) : cfg.roomSeparation)) continue
+    rooms.push(candidate)
+    prisonReservedCount++
+  }
+  if (prisonReservedCount < expectedQuota) return null
   for (let attempt = 0; rooms.length < roomCount && attempt < cfg.roomPlacementAttempts * (hall ? 3 : 1); attempt++) {
     const w = randInt(cfg.roomWidthRange[0], cfg.roomWidthRange[1])
     const h = randInt(cfg.roomHeightRange[0], cfg.roomHeightRange[1])
@@ -2787,6 +2818,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     vaultType: null,
     vaultLabel: null,
     tacticalSlots: null,
+    prisonReserved: !!room.prisonReserved,
     _source: room
   }))
   const roomMetaBySource = new Map(roomMetas.map(room => [room._source, room]))
@@ -2798,6 +2830,28 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (!vaultSelection) return null
   const vaults = vaultSelection.vaults
   const artifactRoom = vaultSelection.artifactRoom
+  // Quota is based on ALL ordinary-room slots, not only rooms whose geometry
+  // happens to accommodate a partition. Vaults cannot silently shrink it.
+  const ordinarySlots = roomMetas.filter(room => room.index > 0 && !room.landmark)
+  const requiredPrisons = Math.max(Number(prisonCfg.guaranteedMinimum ?? 1), Math.ceil(ordinarySlots.length * prisonShare))
+  // Preflight after final structural door/vault choice, but before rolling
+  // furniture/keys. This uses precisely the construction planner below.
+  const prisonViable = room => !!planDwarvenPrisonPartition(cm, room)
+  for (const room of ordinarySlots) {
+    if (room.archetype === 'Prison' && !prisonViable(room)) {
+      if (room.vaultType === 'prisonBlock') return null
+      room.archetype = 'Storage'
+    }
+  }
+  let validPrisons = ordinarySlots.filter(room => room.archetype === 'Prison').length
+  const ranked = ordinarySlots.filter(room => room.archetype !== 'Prison' && !room.vaultType && prisonViable(room))
+    .sort((a,b) => Number(b.prisonReserved)-Number(a.prisonReserved) || a.index-b.index)
+  for (const room of ranked) {
+    if (validPrisons >= requiredPrisons) break
+    room.archetype = 'Prison'
+    validPrisons++
+  }
+  if (validPrisons < requiredPrisons) return null
   const roomCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.rooms?.archetypes || {}
   const vaultCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.vaults?.definitions || {}
   const keyCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.progressionKeys || {}
@@ -3013,6 +3067,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
   }
   if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
+  if (roomMetas.filter(room => room.archetype === 'Prison').length < requiredPrisons) return null
   for (const room of roomMetas.filter(room => room.archetype === 'Prison')) {
     const hasBars = dwarvenRoomInterior(room).some(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars')
     const hasCellDoor = (room.internalLocks || []).some(lock => lock.kind === 'prisonCell') ||
@@ -4982,7 +5037,9 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       candidates.sort((a,b) =>
         Number(dungeonClearProjectileLine(level.map, b, door)) - Number(dungeonClearProjectileLine(level.map, a, door)) ||
         (Math.abs(a.x-door.x)+Math.abs(a.y-door.y)) - (Math.abs(b.x-door.x)+Math.abs(b.y-door.y)))
-      const tmpl = pickWeighted(cellShooterPool, t => Math.max(0.0001, t.rarity ?? 1))
+      const affordable = cellShooterPool.filter(t => naturalSpawnEligible(t) && Math.max(1,t.tier) <= threatBudget - spent)
+      if (!affordable.length) continue
+      const tmpl = pickWeighted(affordable, t => Math.max(0.0001, t.rarity ?? 1))
       const spot = claimSpot(candidates[0])
       if (spawnTemplate(tmpl, spot, null, 'backline', null, room.id,
         vaults.find(vault => vault.roomId === room.id)?.id || null)) spent += Math.max(1, tmpl.tier)
@@ -5092,9 +5149,13 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     occupied.add(keyXY(spot.x, spot.y))
     return true
   }
-  // Each prison cell gets its own occupant or cache. This is *additional* to
-  // the floor's original scattered decorative and searchable remains rolls.
-  // A body in a cell does not reduce the number of bodies elsewhere.
+  // Every cell has a visible prisoner or cache, but these count toward the
+  // floor's existing searchable-remains and ordinary-chest budgets.
+  const lootConfig = dungeonPackageConfig(level.dungeonPackage)?.loot || {}
+  const floorIndex = Math.max(0, (level.dungeonFloor || 1) - 1)
+  const baseChestAllowance = Math.max(1, Math.round((lootConfig.baseBudget ?? 1) *
+    (1 + floorIndex * (lootConfig.growthPerFloor ?? 0))))
+  let cellPrisonerRemains = 0, cellChestCount = 0
   for (const room of rooms.filter(room => room.archetype === 'Prison')) {
     const cell = room.prisonCellRegion
     if (!cell) continue
@@ -5106,14 +5167,16 @@ function spawnDwarvenRuinsRoomProps(level, z) {
       level.map[p.y]?.[p.x] === 'marble' && !occupied.has(keyXY(p.x, p.y)))
     if (!spots.length) continue
     const spot = pick(spots)
-    if (chance(0.75)) {
+    if (chance(0.75) || cellChestCount >= baseChestAllowance) {
       groundItems.push({x:spot.x,y:spot.y,level:z,levelKind:'chain',caveIndex:-1,
         kind:'skeleton',looted:false,hasLoot:chance(0.10),
         description:'A dead prisoner lies behind the old dwarven bars.'})
+      cellPrisonerRemains++
     } else {
       groundItems.push({x:spot.x,y:spot.y,level:z,levelKind:'chain',caveIndex:-1,
         kind:'chest',opened:false,tier:dungeonLootTier('dwarvenRuins', Math.max(0, (level.dungeonFloor || 1)-1), room),
         dungeonRoomId:room.id})
+      cellChestCount++
     }
     occupied.add(keyXY(spot.x, spot.y))
   }
@@ -5147,7 +5210,9 @@ function spawnDwarvenRuinsRoomProps(level, z) {
   const skeletonMultiplier = level.progress >= 1
     ? Math.max(skeletonProgress, Number(story.finalFloorSearchableSkeletonsMultiplier ?? 1))
     : skeletonProgress
-  const skeletonTarget = Math.max(1, Math.round(skeletonBase * skeletonMultiplier))
+  // A visible prisoner skeleton replaces an ambient searchable skeleton,
+  // rather than raising expected floor loot whenever the prison quota rises.
+  const skeletonTarget = Math.max(0, Math.round(skeletonBase * skeletonMultiplier) - cellPrisonerRemains)
   for (let n = 0; n < skeletonTarget; n++) {
     const candidates = rooms.filter(room => !room.landmark && roomSpots(room, true).length)
     if (!candidates.length) break
@@ -5210,7 +5275,12 @@ function spawnDwarvenRuinsChests() {
     // so props, traps, and encounters all treat its tile as occupied. Ordinary
     // depth-scaled loot is added here afterward.
 
-    const chestCount = dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length)
+    const prisonIds = new Set(rooms.filter(room => room.archetype === 'Prison').map(room => room.id))
+    const prisonCellChests = groundItems.filter(item => item.level === z && item.kind === 'chest' &&
+      prisonIds.has(item.dungeonRoomId) && !item.vaultId).length
+    // Prison caches replace discretionary treasury chests rather than adding
+    // free rewards. Guaranteed royal and artifact chests remain untouched.
+    const chestCount = Math.max(0, dungeonLootBudget(packageId, floorIndex, !!(level.vaults || []).length) - prisonCellChests)
     const roomUse = new Map()
     for (let n = 0; n < chestCount; n++) {
       const available = rooms.map(room => ({room, spots:candidatesForRoom(room)})).filter(entry => entry.spots.length)
@@ -5401,6 +5471,15 @@ function validateDwarvenRuinsStratum() {
   for (const context of base.contexts) {
     const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context
     if (!entry || !exit) continue
+    const prisonCfg = cfg.rooms?.prisonGeneration || {}
+    const progress = base.contexts.length <= 1 ? 1 : floorIndex / (base.contexts.length-1)
+    const share = Number(prisonCfg.targetShareEarly ?? 0.20) + progress *
+      (Number(prisonCfg.targetShareLate ?? 0.30) - Number(prisonCfg.targetShareEarly ?? 0.20))
+    const ordinarySlots = (level.rooms || []).filter(room => room.index > 0 && !room.landmark)
+    const requiredPrisons = Math.max(Number(prisonCfg.guaranteedMinimum ?? 1), Math.ceil(ordinarySlots.length * share))
+    const prisonCount = ordinarySlots.filter(room => room.archetype === 'Prison').length
+    if (prisonCount < requiredPrisons)
+      issues.push(`${tag}: only ${prisonCount} Prisons for ${ordinarySlots.length} slots; require ${requiredPrisons}`)
     if (level.progressionKey && Number.isInteger(level.progressionKey.x) && Number.isInteger(level.progressionKey.y) &&
         !trapSafe.has(keyXY(level.progressionKey.x,level.progressionKey.y)))
       issues.push(`${tag}: traps make the progression key unavoidable/unreachable`)

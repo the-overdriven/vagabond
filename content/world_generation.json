@@ -405,6 +405,13 @@
         "exitFarCandidateBand": 8
       },
       "rooms": {
+        "prisonGeneration": {
+          "guaranteedMinimum": 1,
+          "targetShareEarly": 0.2,
+          "targetShareLate": 0.3,
+          "extraWeightedPrisonsAllowed": true,
+          "prisonCandidateSearchLimit": 128
+        },
         "finalFloorDefensiveWeightMultiplier": 1.45,
         "archetypes": {
           "Barracks": {

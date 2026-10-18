@@ -28,6 +28,32 @@ describe('Dwarven Ruins reusable traps', () => {
     cy.window().then(win => win.eval(`(${trapRuleChecks.toString()})()`))
   })
 
+  it('ignores numerical DEF without suppressing normal trap damage rolls', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const level=trapFixture()
+      const originalRng=rng
+      rng=()=>0.5
+      try {
+        const template={id:'def-test',name:'Enemy',baseName:'Enemy',alive:true,level:-4,
+          x:11,y:12,spd:4,grace:4,tier:2,def:0,atk:1,hp:1000,maxHp:1000,
+          abilities:[],equipment:{weapon:null,armor:null,shield:null},wander:false}
+        const damage=(type,def)=>{
+          const actor={...template,def}
+          enemies=[actor]
+          level.traps=[{id:'def',type,trigger:{x:11,y:12},emitter:{x:9,y:12},
+            direction:{dx:1,dy:0},range:12}]
+          DungeonTraps.onEntry(actor,10,12)
+          return 1000-actor.hp
+        }
+        for (const type of ['spikes','projectile']) {
+          const unarmored=damage(type,0), protectedTarget=damage(type,100)
+          check(unarmored>0 && unarmored===protectedTarget,type+' must ignore numeric DEF')
+        }
+      } finally {rng=originalRng}
+    })()`))
+  })
+
   it('shows raised spikes only while a living creature occupies the trap', () => {
     cy.window().then(win => win.eval(`(() => {
       const check = (ok, msg) => { if (!ok) throw Error(msg) }

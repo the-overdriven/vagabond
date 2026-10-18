@@ -150,8 +150,8 @@ const DungeonTraps = (() => {
     if (missed) return {damage:0, missed:true}
     const armor = equippedArmor(isPlayer ? player.equip.armor : target.equipment)
     const glancing = !!armor && chance(missChance(cfg.speed, speed))
-    let damage = damageRoll(trap.type === 'spikes' ? cfg.spikeAtk : cfg.projectileAtk,
-      isPlayer ? playerDef() : enemyDef(target))
+    // Mechanical hazards ignore numeric DEF, not armor glancing/dodge/crit.
+    let damage = damageRoll(trap.type === 'spikes' ? cfg.spikeAtk : cfg.projectileAtk, 0)
     const critical = chance(BASE_CRIT_CHANCE)
     if (glancing) damage = Math.floor(damage / 3)
     else if (critical) damage *= 2
