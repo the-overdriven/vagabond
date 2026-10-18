@@ -161,7 +161,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
               check((vault.slots?.frontline || []).some(p => inZone(p,zones.frontline)), 'frontline zone influences melee slots')
             }
           }
-          for (const room of rooms.filter(room => room.archetype === 'Prison')) {
+          for (const room of rooms.filter(room => room.archetype === 'Prison' && !room.gallery)) {
             check(dwarvenRoomInterior(room).some(p => level.map[p.y]?.[p.x] === 'dwarvenprisonbars'),
               'ordinary Prison room contains a barred side-cell subdivision')
             const lock = (room.internalLocks || []).find(lock => lock.kind === 'prisonCell')

@@ -1553,6 +1553,36 @@ threat budget** exist. Cell shooters are paid for from the existing budget
 before roaming monsters and cannot overdraw it. Shooters retain normal ammo,
 wandering and combat rules and can fire through bars.
 
+From **D2 (z:-5) onward**, a floor has a **30% attempt chance** to reserve
+one special **crossfire Prison gallery** before the room graph is built. It is
+optional: inadequate floor geometry or remaining encounter budget can prevent
+its construction, but cannot lower the mandatory Prison quota. A gallery
+counts as **one Prison room** toward that quota, not as one room per cell or
+shooter. This branch is a dead end off the main route, never a mandatory path
+to stairs, progression keys, the throne or the guaranteed artifact.
+
+A crossfire gallery has a dedicated **17×11 exterior room footprint**
+(**15×9 walkable interior**), rotated as needed. The long center aisle is
+three tiles wide, with barred flanking bays on both sides. It guarantees
+**one real ranged enemy with ammunition on each flank**, firing across the
+aisle through sight/projectile-transparent bars. Each bay has an ordinary
+operable prison door; the far-end alcove has an ordinary closed door and
+**one guaranteed unopened chest**, upgraded by **one loot tier** over the
+ordinary same-floor room roll, capped at the existing tier maximum. The
+shooters consume the existing floor **threat budget** before optional
+encounters are placed, and the chest substitutes for discretionary treasure:
+this is a positional challenge and reward choice, not a free increase to
+monsters or loot. The player can retreat, counter-shoot through bars, avoid
+the branch, or open the bays. Bars, prison doors and chests reuse their
+existing graphics; the Crusher's visible pressure plate and gas chamber's
+valve are separate later features.
+
+The room's bar and door geometry is rotated and serialized along with the
+floor; gallery defenders use persisted ordinary monster roles, so save/load
+and replay do not reroll the encounter. Gallery feature placement uses a
+seed-derived, depth-specific deterministic roll. Galleries do not introduce
+new timed effects, persistent statuses or animation-dependent rules.
+
 Vault entrance limits are measured from the actual room graph, including loop
 connections, so a one-entrance archive/tomb cannot silently gain a second route.
 Vault internal zones are oriented from the room entrance and actively drive
@@ -6126,8 +6156,14 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version:
 
 ```text
-80
+81
 ```
+
+Version 81 introduces optional two-sided crossfire prison galleries in deep
+Dwarven Ruins. Geometry, shooters, and guarded treasure are generated in the
+seeded world and restored in normal room/monster/ground-item state; there
+are no new runtime statuses. The changed world-generation results require
+the current save/replay schema; no old-save compatibility layer is added.
 
 Version 80 enforces the depth-scaled functional Prison quota when generating
 new Dwarven Ruins and makes existing spike/arrow trap hits bypass numeric DEF.

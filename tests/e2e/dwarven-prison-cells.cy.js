@@ -35,6 +35,11 @@ describe('Dwarven Ruins populated prison cells', () => {
           check(cells.length >= quota, 'z ' + z + ': required prison share ' + quota + ' of ' + roomSlots.length)
           for (const room of cells) {
             testedCells++
+            if (room.gallery) {
+              check(room.gallery.shooterSpots.length === 2 && room.gallery.bars.length >= 26,
+                'crossfire gallery has two barred shooter bays')
+              continue
+            }
             const cell = room.prisonCellRegion, door = room.prisonCellDoorCandidate
             check(!!cell && !!door, 'room has bounded cell and one door')
             const inCell = p => p.x >= cell.x1 && p.x <= cell.x2 && p.y >= cell.y1 && p.y <= cell.y2
@@ -60,7 +65,7 @@ describe('Dwarven Ruins populated prison cells', () => {
           }
         }
         const cellsBeforeRotation = deepLevels.slice(2).flatMap(level => (level.rooms || [])
-          .filter(room => room.archetype === 'Prison').map(room => ({room, axis:room.prisonCellAxis})))
+          .filter(room => room.archetype === 'Prison' && !room.gallery).map(room => ({room, axis:room.prisonCellAxis})))
         // Force an additional quarter turn even when the seeded world was
         // initially generated unrotated or upside down.
         rotateGeneratedWorld(1)
@@ -70,7 +75,7 @@ describe('Dwarven Ruins populated prison cells', () => {
         }
         const checkRotatedCells = phase => {
           for (const level of deepLevels.slice(2)) for (const room of level.rooms || []) {
-            if (room.archetype !== 'Prison') continue
+            if (room.archetype !== 'Prison' || room.gallery) continue
             const door = room.prisonCellDoorCandidate
             for (const p of dwarvenRoomInterior(room)) {
               if (room.prisonCellAxis === 'vertical' ? p.x !== door.x : p.y !== door.y) continue
@@ -89,7 +94,7 @@ describe('Dwarven Ruins populated prison cells', () => {
         checkRotatedCells('after quarter-turn')
         const snapshot = () => deepLevels.slice(2).map(level => (level.rooms || [])
           .filter(room => room.archetype === 'Prison')
-          .map(room => ({axis:room.prisonCellAxis, region:room.prisonCellRegion, door:room.prisonCellDoorCandidate})))
+          .map(room => ({axis:room.prisonCellAxis, region:room.prisonCellRegion, door:room.prisonCellDoorCandidate, gallery:room.gallery})))
         const before = snapshot()
         loadGameFromObject(JSON.parse(JSON.stringify(buildSaveObject())), {isReplayInit:true})
         check(JSON.stringify(before) === JSON.stringify(snapshot()), 'cell geometry and axis survive save/restore')
