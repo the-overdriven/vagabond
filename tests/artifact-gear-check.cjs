@@ -52,6 +52,9 @@ test('generated artifacts inherit the stats of every available gear base', async
       assert.equal(item.noun, base.name)
       assert.equal(item.artifactSlot, slot)
       assert.equal(item.base, base.name)
+      assert(!/^The\s/i.test(item.name), 'generated artifact names omit the leading article')
+      assert(run(`itemIconHTML(${JSON.stringify(item)})`).includes('img/icons/' + base.name + '.svg'),
+        `artifact ${base.name} uses its specific gear SVG`)
       assert.equal(item.tier, Math.max(3, base.tier))
       if (slot === 'weapon') {
         assert.equal(item.atk, base.atk)
@@ -64,6 +67,13 @@ test('generated artifacts inherit the stats of every available gear base', async
       }
     }
   }
+})
+
+test('non-equipment artifacts retain the generic icon', async () => {
+  await ready()
+  const icon = run('itemIconHTML({kind:"artifact",artifactSlot:"trinket",noun:"Amulet",name:"Amulet of Ermis"})')
+  assert(icon.includes('img/icons/artifact.svg'))
+  assert(!icon.includes('img/icons/Amulet.svg'))
 })
 
 test('artifact base stats and enchantments stack; penalties, GRACE, inventory and save/load work', async () => {

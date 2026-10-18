@@ -2000,11 +2000,11 @@ more difficult:
     if (isCursed && ARTIFACT_PREFIXES.length) {
       name = pick(ARTIFACT_PREFIXES) + ' ' + noun
     } else if (possessor) {
-      name = 'The ' + noun + ' of ' + possessor
+      name = noun + ' of ' + possessor
     } else if (ARTIFACT_EPITHETS.length) {
-      name = 'The ' + noun + ' of ' + pick(ARTIFACT_EPITHETS)
+      name = noun + ' of ' + pick(ARTIFACT_EPITHETS)
     } else {
-      name = 'The ' + noun
+      name = noun
     }
 
     // Preserve the existing curse behaviour as a pool of possible curse
@@ -3961,7 +3961,7 @@ more difficult:
 
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
-    const weaponName = player.equip.weapon ? player.equip.weapon.name : 'bare fists'
+    const weaponName = player.equip.weapon ? (player.equip.weapon.kind === 'artifact' ? player.equip.weapon.name.replace(/^The\s+/i, '') : player.equip.weapon.name) : 'bare fists'
     // Physically bumping even an unseen creature exposes its position.
     revealEnemyInvisibility(e)
     updateMobileInfoPanel(e.x, e.y)
@@ -5902,7 +5902,8 @@ more difficult:
     if (!itemIconKinds().includes(kind)) return ''
     const fallbackPath = itemIconPath(kind)
     const fallback = imageSrc(fallbackPath)
-    const base = ['weapon', 'armor', 'shield'].includes(kind) ? (item.base || item.name) : null
+    const gearKind = kind === 'artifact' ? item.artifactSlot : kind
+    const base = ['weapon', 'armor', 'shield'].includes(gearKind) ? (item.base || (kind === 'artifact' ? item.noun : item.name)) : null
     // Gear keeps its unmodified base name even when it has a magic prefix.
     // Remember missing specific SVGs so repeated inventory redraws use the
     // generic kind icon immediately instead of flashing a broken image first.
@@ -7802,7 +7803,8 @@ more difficult:
         hall.thronePosition?.x === x && hall.thronePosition?.y === y)
       if (!landmark || !Number.isInteger(landmark.facing) || landmark.facing < 0 || landmark.facing > 3)
         throw new Error('Dwarven throne requires saved landmark position and facing')
-      const direction = ['north','east','south','west'][landmark.facing]
+      // Landmark facing points from entrance toward throne; the ruler faces back toward the entrance.
+      const direction = ['south','west','north','east'][landmark.facing]
       return {...visual,image:visual[direction + 'Image']}
     }
 

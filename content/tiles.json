@@ -151,21 +151,21 @@
       "ch": "^",
       "color": "#e8b85b",
       "bg": "#302d2a",
-      "mini": "#e8b85b",
+      "mini": "#ff4747",
       "walk": true
     },
     "dwarvenstairsdown": {
       "ch": ">",
       "color": "#e8b85b",
       "bg": "#302d2a",
-      "mini": "#e8b85b",
+      "mini": "#ff4747",
       "walk": true
     },
     "dwarvenstairsup": {
       "ch": "<",
       "color": "#e8b85b",
       "bg": "#302d2a",
-      "mini": "#e8b85b",
+      "mini": "#ff4747",
       "walk": true
     },
     "dwarvenminessealed": {
@@ -201,13 +201,14 @@
       "color": "#e8b85b",
       "bg": "#241b12",
       "walk": true,
-      "projectileBlock": true
+      "projectileBlock": true,
+      "mini": "#ff4747"
     },
     "dwarvenstatue": {
       "ch": "♜",
       "color": "#817769",
       "bg": "#171514",
-      "walk": true,
+      "walk": false,
       "projectileBlock": true
     },
     "dwarvenwall": {

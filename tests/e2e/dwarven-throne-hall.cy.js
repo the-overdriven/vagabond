@@ -119,7 +119,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       currentZ=chainZForDepth(deepLevels.length+1)
       map=now.map
       check(terrainVisual('dwarventhrone',hall.thronePosition.x,hall.thronePosition.y).image ===
-        'img/tiles/dwarven-throne-' + ['north','east','south','west'][hall.facing] + '.png',
+        'img/tiles/dwarven-throne-' + ['south','west','north','east'][hall.facing] + '.png',
         'sprite matches rotated direction')
     })()`))
   })

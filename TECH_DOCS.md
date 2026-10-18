@@ -688,7 +688,9 @@ use existing transition or coffin images over the appropriate floor. The regular
 `img/tiles/dwarven-column-indoor.png`; the two surface Fort entrance columns
 keep `img/tiles/ancient-stone-column.png`. Dwarven rubble and all columns are
 transparent props composited over **the underlying floor at their exact map
-coordinate**. The surface entrance columns also clear mountains
+coordinate**. Both surface and indoor Dwarven columns **block walking**, while preserving
+their existing projectile-blocking behavior and transparent visual underlays.
+The surface entrance columns also clear mountains
 and tree cover beneath them, exposing grass, sand or snow as appropriate for
 the surrounding terrain. No tree may occupy a column tile. The underlay is
 recorded during generation, rotates with the world and persists in saves;
@@ -701,6 +703,8 @@ and background.
 The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
 gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the
 generic ascent tile inside caves and retains its cave-floor background.
+The surface Fort gate, its underground exit and the Dwarven Ruins up/down
+staircases have bright red minimap markers, distinct from their original gold ASCII/tile presentation.
 The fort exit reuses the existing cave-up image with `baseTileKey: marble` and
 the marble ASCII background; no `marblefloor` terrain key or new image is
 needed. `content/tiles.json` defines its walkable `^` glyph, gold color,
@@ -1420,8 +1424,9 @@ stable landmark record stores recipe revision 3, associated room, sole front
 entrance and the throne anchor. It is serialized alongside room/vault
 descriptors and restored without rerolling any world-generation decisions.
 Whole-world rotation transforms its rectangle, points and facing together.
-The throne graphic uses the landmark facing, with four sprites (north, east,
-south and west); the camera, animation timing and random numbers do not affect
+The landmark direction runs from its single entrance toward the throne; the
+**throne sprite faces the opposite direction, back toward the entrance**. Sprite
+filenames indicate the direction the monarch faces (north, east, south, west); the camera, animation timing and random numbers do not affect
 which sprite appears. The throne and dais are new encoded terrain types,
 using the unique current-save codes `╙` and `╜`. Both graphics are transparent
 over the recorded stone floor: dais engravings overlay marble; the throne uses
@@ -4321,7 +4326,11 @@ starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield
 and weapon artifacts retain normal physical gear behavior (including weapon
 attacks on doors/crates). Trinkets have no inherent equipment stats and remain
 passive in inventory. An identified gear artifact appears in its corresponding
-inventory tab and compares with normal gear for upgrade suggestions.
+inventory tab and compares with normal gear for upgrade suggestions. Gear-based
+artifacts use their base weapon, shield or armor SVG icon rather than the
+generic artifact icon; trinkets retain the generic icon, and missing gear
+SVGs fall back to the generic icon. Artifact combat messages use names without
+a leading `The`, including for already-named equipped artifact weapons.
 
 These percentages apply only after an enemy has already rolled an artifact
 drop. They do not describe the chance of getting an artifact in the first
@@ -4354,10 +4363,10 @@ MF 10 gives a 30% chance to use the next source tier's distribution.
 
 # 39. Artifact Naming
 
-Non-cursed artifacts can use a dwarven-owner naming pattern such as:
+Non-cursed artifacts use a dwarven-owner naming pattern such as:
 
 ```text
-The <noun> of <Dwarf Name>
+<noun> of <Dwarf Name>
 ```
 
 Cursed artifacts use a cursed prefix directly before the artifact noun and do
@@ -4369,7 +4378,7 @@ not receive a dwarven-owner name:
 
 For example, a cursed artifact might be named `Forgotten Amulet`. If no cursed
 prefix is available, the naming code falls back to the normal epithet pattern
-(`The <noun> of <Epithet>`) or simply `The <noun>`.
+(`<noun> of <Epithet>`) or simply `<noun>`.
 
 Unidentified artifacts display:
 
