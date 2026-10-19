@@ -2571,6 +2571,19 @@ Primary cave locations must be sufficiently separated.
 
 The first cave may receive a second entrance.
 
+On z:-1, passages between a cave's two surface entrances follow a seeded,
+winding digger trail rather than a direct diagonal/straight line. The digger
+favours the destination but can turn and make local detours; connections remain
+one tile wide and cardinally connected, so diagonal corner contacts are never
+required. A six-tile margin around the endpoints bounds the wandering area.
+Wandering has a finite budget, followed by guaranteed progress to the target.
+The route avoids the crypt exclusion zone and the mausoleum's underground
+safety margin. If no safe route exists, that cave placement is rejected.
+Both entrance tiles are preserved. This changes only the links between paired
+entrances, not chamber generation or the z:-2 silhouette caves. Trails are
+created during world generation and stored as ordinary cave floor; loading a
+save or replay restores the stored map. Save version remains 97.
+
 Initial z:-1 caves choose independently between a compact cardinal random walk
 (90–300 steps, radius 5–11) and three to six linked irregular chambers
 (radius 9–15). They all retain the ordinary cave floor. On generic z:-2, the

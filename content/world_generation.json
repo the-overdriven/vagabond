@@ -187,7 +187,8 @@
       "corridorHorizontalBias": 0.5,
       "entranceCarveWidth": 1,
       "entranceCarveDepth": 2,
-      "extraEntranceChance": 0
+      "extraEntranceChance": 0,
+      "entranceTrail": {"margin":6,"wanderStepsFactor":2,"goalBias":0.6,"persistence":0.65}
     },
     "deep": {
       "generationTrials": 6,

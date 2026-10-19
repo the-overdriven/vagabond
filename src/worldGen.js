@@ -948,6 +948,50 @@ function carveShallowCave(cm, spot, style) {
   }
 }
 
+// A goal-biased digger wanders during generation; a distance field bounds its
+// work and guarantees a dry cardinal route without crossing protected regions.
+function carveShallowEntranceTrail(cm, from, to) {
+  const cfg = WORLD_GEN_CONFIG.caves.shallow.entranceTrail
+  const hut = villageHuts.find(h => h.mausoleum)
+  const x1=Math.max(1,Math.min(from.x,to.x)-cfg.margin),x2=Math.min(MAP_W-2,Math.max(from.x,to.x)+cfg.margin)
+  const y1=Math.max(1,Math.min(from.y,to.y)-cfg.margin),y2=Math.min(MAP_H-2,Math.max(from.y,to.y)+cfg.margin)
+  const allowed=(x,y)=>x>=x1&&x<=x2&&y>=y1&&y<=y2&&!isInsideCryptCaveExclusion(x,y)&&
+    !(hut&&x>=hut.x-4&&x<=hut.x+4&&y>=hut.y-7&&y<=hut.y+1)
+  if(!allowed(from.x,from.y)||!allowed(to.x,to.y))return false
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]],queue=[to],distance=new Map([[keyXY(to.x,to.y),0]])
+  for(let i=0;i<queue.length;i++)for(const [dx,dy] of dirs){
+    const p={x:queue[i].x+dx,y:queue[i].y+dy},key=keyXY(p.x,p.y)
+    if(!allowed(p.x,p.y)||distance.has(key))continue
+    distance.set(key,distance.get(keyXY(queue[i].x,queue[i].y))+1);queue.push(p)
+  }
+  const initial=distance.get(keyXY(from.x,from.y))
+  if(initial===undefined)return false
+  let path=[{...from}],positions=new Map([[keyXY(from.x,from.y),0]]),lastDirection=-1
+  const wanderSteps=Math.ceil(initial*cfg.wanderStepsFactor)
+  for(let step=0;step<wanderSteps+queue.length;step++){
+    const p=path[path.length-1],d=distance.get(keyXY(p.x,p.y))
+    if(d===0)break
+    let options=dirs.map(([dx,dy],direction)=>({x:p.x+dx,y:p.y+dy,direction}))
+      .filter(q=>distance.has(keyXY(q.x,q.y)))
+    // Once the wandering budget is spent, every step gets closer to the goal.
+    const advancing=step>=wanderSteps||chance(cfg.goalBias)
+    if(advancing)options=options.filter(q=>distance.get(keyXY(q.x,q.y))===d-1)
+    const fresh=options.filter(q=>!positions.has(keyXY(q.x,q.y)))
+    if(fresh.length)options=fresh
+    const forward=options.find(q=>q.direction===lastDirection)
+    const next=forward&&chance(cfg.persistence)?forward:pick(options)
+    lastDirection=next.direction
+    const key=keyXY(next.x,next.y),old=positions.get(key)
+    if(old!==undefined){
+      for(const q of path.slice(old+1))positions.delete(keyXY(q.x,q.y))
+      path.length=old+1
+    }else{positions.set(key,path.length);path.push({x:next.x,y:next.y})}
+  }
+  if(path[path.length-1].x!==to.x||path[path.length-1].y!==to.y)return false
+  for(const p of path)if(cm[p.y][p.x]!=='caveentrance')cm[p.y][p.x]='cavefloor'
+  return true
+}
+
 function generateCaves() {
   dungeonShortcuts = []
   const cfg = WORLD_GEN_CONFIG.caves.shallow
@@ -997,15 +1041,7 @@ function generateCaves() {
       }
       cm[entrance.y][entrance.x] = 'caveentrance'
     }
-    if (entrances.length > 1) {
-      let cx = entrances[0].x, cy = entrances[0].y
-      while (cx !== entrances[1].x || cy !== entrances[1].y) {
-        cm[cy][cx] = 'cavefloor'
-        cx += Math.sign(entrances[1].x - cx)
-        cy += Math.sign(entrances[1].y - cy)
-      }
-      cm[entrances[1].y][entrances[1].x] = 'caveentrance'
-    }
+    if (entrances.length > 1 && !carveShallowEntranceTrail(cm, entrances[0], entrances[1])) continue
     for (const entrance of entrances) cm[entrance.y][entrance.x] = 'caveentrance'
     if (isCaveMapTouchingCryptExclusion(cm)) continue
     for (const entrance of entrances) map[entrance.y][entrance.x] = 'caveentrance'
