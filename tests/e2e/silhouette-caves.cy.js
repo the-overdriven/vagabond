@@ -1,4 +1,5 @@
 const checks=require('../helpers/silhouette-cave-checks.js')
+const sizeChecks=require('../helpers/silhouette-size-checks.js')
 const extractionChecks=require('../helpers/silhouette-extraction-checks.js')
 const outlineChecks=require('../helpers/silhouette-outline-checks.js')
 const rockChecks=require('../helpers/silhouette-rock-checks.js')
@@ -16,6 +17,7 @@ describe('Monster silhouette caves',()=>{
         (${extractionChecks.toString()})();
         (${outlineChecks.toString()})();
         (${rockChecks.toString()})();
+        (${sizeChecks.toString()})();
         await generateNewWorld();(${checks.toString()})();
         if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.3)throw Error('30% water configuration');
         const prototype=CAVE_SILHOUETTES[0], rngBefore=rngState;

@@ -2226,7 +2226,24 @@ cave receives normal scenario population, so this adds exploration and potential
 rewards as well as terrain variety.
 
 The alpha silhouette becomes dry ordinary cave floor, surrounded by rock. The
-prototype is fitted into a reserved footprint from 60×52 down to 28×26 tiles.
+prototype receives a uniformly world-seeded target of **700–2,800 dry floor
+tiles**, independent of whether it combines two, three or four sources. Size
+selection is stable across placement retries. Sampling compensates for the
+prototype's fraction of solid pixels, so sparse shapes are enlarged instead of
+receiving much less usable floor. The estimate allows 15% of sampled floor for
+later rock/water separators. This is an approximate target, not an exact quota:
+connectivity repairs, contour changes and separators affect the final count.
+
+The maximum reserved footprint is **112×100 tiles** (previously 60×52). If the
+chosen size cannot fit, placement tries 85%, 70% and 55% of the target area,
+subject to the same footprint cap. Every accepted layout must retain at least
+**500 dry floor tiles after all separators** (previously only 90 sampled tiles
+before repairs). A smaller result is rejected and another placement is tried.
+This makes exploration area comparable to the other z:-2 cave styles, while
+allowing substantially smaller and larger examples. Larger caves retain the
+existing population rules: area-based monster counts can increase within their
+normal limits; fixed rewards and encounter guarantees are not multiplied.
+
 Detached fragments and diagonal-only limbs receive short cardinal connections;
 the staircase has a clear 3×3 landing. After dry connectivity repairs, a light
 contour pass softens straight exterior edges of **8 tiles or longer**. Small,
@@ -2242,8 +2259,7 @@ obstructions are placed afterwards, so smoothing cannot bypass the 15-tile
 limit or turn swimming into a requirement. Other cave generators are unchanged.
 The resulting map is saved directly; save format remains **97**.
 
-A footprint must have at least 90 sampled
-floor tiles before repairs. Horizontal and vertical uninterrupted **dry-floor**
+Horizontal and vertical uninterrupted **dry-floor**
 runs are capped at **15 tiles** inside silhouette caves. Each obstruction uses a
 seeded **30% chance of water** (previously **60%**) and **70% chance of rock**
 (previously **40%**). This is a per-obstruction probability, not a fixed ratio

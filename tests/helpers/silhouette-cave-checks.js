@@ -23,6 +23,7 @@ module.exports = function silhouetteCaveChecks() {
       check(level.map[y][x]===cm[y][x],'shared map matches local cave')
     }
     if(cave.style==='silhouette') {
+      check(cm.reduce((sum,row)=>sum+row.filter(t=>TILE[t]?.walk).length,0)>=WORLD_GEN_CONFIG.caves.deep.silhouette.minFloorTiles,'silhouette retains at least 500 dry tiles after separators')
       check(Array.isArray(cave.silhouetteIds)&&[2,3,4].includes(cave.silhouetteIds.length)&&new Set(cave.silhouetteIds).size===cave.silhouetteIds.length,'two to four distinct source silhouettes')
       check(cave.silhouetteIds.every(id=>CAVE_SILHOUETTE_SOURCES.some(p=>p.id===id)),'real image sources')
       check(cave.silhouetteId===cave.silhouetteIds.join('+'),'combined prototype identity')

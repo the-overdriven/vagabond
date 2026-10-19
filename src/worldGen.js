@@ -4113,13 +4113,36 @@ function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
   return false
 }
 
+// Choose size independently of source count and placement retries. Compensate
+// for empty pixels so sparse silhouettes do not become tiny playable caves.
+function silhouetteSizePlan(prototype) {
+  const cfg=WORLD_GEN_CONFIG.caves.deep.silhouette
+  let value=(WORLD_SEED>>>0)^0x73a9b51d
+  value=Math.imul(value^(value>>>16),0x45d9f3b)
+  value=Math.imul(value^(value>>>16),0x45d9f3b)
+  const roll=(value^(value>>>16))>>>0
+  const [min,max]=cfg.targetDryFloorRange,targetFloor=min+roll%(max-min+1)
+  const rows=prototype.rows,pw=rows[0].length,ph=rows.length
+  const solid=rows.reduce((sum,row)=>sum+Array.from(row).filter(c=>c==='1').length,0)
+  if(!solid)return {targetFloor,sizes:[]}
+  const density=solid/(pw*ph),aspect=cfg.maxFootprint[0]/cfg.maxFootprint[1],sizes=[]
+  for(const fraction of cfg.placementScaleFractions){
+    const area=targetFloor*fraction/(density*cfg.dryFloorRetention)
+    const width=Math.sqrt(area*aspect),height=Math.sqrt(area/aspect)
+    const scale=Math.min(1,(cfg.maxFootprint[0]-4)/width,(cfg.maxFootprint[1]-4)/height)
+    const size=[Math.min(cfg.maxFootprint[0],Math.ceil(width*scale)+4),Math.min(cfg.maxFootprint[1],Math.ceil(height*scale)+4)]
+    if(!sizes.some(s=>s[0]===size[0]&&s[1]===size[1]))sizes.push(size)
+  }
+  return {targetFloor,sizes}
+}
+
 // Integer prototype sampling keeps geometry independent of browser image decoding.
 function carveSilhouetteDungeon(spot, floorTile, reserved) {
   const cfg = WORLD_GEN_CONFIG.caves.deep.silhouette
   const prototype = pick(CAVE_SILHOUETTES)
   const rows = prototype.rows, ph = rows.length, pw = rows[0].length
   const mirror = chance(.5)
-  for (const [w, h] of cfg.sizes) {
+  for (const [w, h] of silhouetteSizePlan(prototype).sizes) {
     const cells = []
     for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
       const sx = Math.floor((x - 2) * pw / (w - 4))
@@ -4163,6 +4186,9 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
       }
       softenSilhouetteOutline(cm,bounds,spot,floorTile)
       if (!breakLongSilhouetteRuns(cm,bounds,spot,floorTile)) continue
+      let dryFloor=0
+      for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)dryFloor++
+      if(dryFloor<cfg.minFloorTiles)continue
       return {cm,bounds,rooms:[],hasWater:cm.some(row=>row.includes('water')),silhouetteId:prototype.id,silhouetteIds:prototype.sourceIds}
     }
   }
