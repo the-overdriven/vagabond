@@ -692,11 +692,16 @@ function startReplayPlayback() {
     const beforeFirst = (activeReplay.idleRng || []).filter(span => span.afterAction === -1)
     let pos = 0
     for (const span of beforeFirst) {
-      if (span.start !== pos || span.end > firstStart || span.end < span.start)
-        throw new Error('Replay contains malformed pre-action idle RNG spans.')
+      if (span.start !== pos || span.end > firstStart || span.end < span.start) {
+        replayDesync('Replay contains malformed pre-action idle RNG spans.')
+        return
+      }
       pos = span.end
     }
-    if (pos !== firstStart) throw new Error('Replay has unclassified pre-action RNG calls.')
+    if (pos !== firstStart) {
+      replayDesync('Replay has unclassified pre-action RNG calls.')
+      return
+    }
     replayRngIndex = pos
   }
   replayPlaying = true

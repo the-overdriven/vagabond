@@ -128,7 +128,10 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
             for (const [role, slots] of Object.entries(vault.slots || {})) for (const slot of slots) {
               check(slot.x > room.x && slot.x < room.x + room.w - 1 && slot.y > room.y && slot.y < room.y + room.h - 1,
                 'tactical slot stays inside its room')
-              check(level.map[slot.y]?.[slot.x] === 'marble', 'tactical slot remains usable floor terrain')
+              check(level.map[slot.y]?.[slot.x] === 'marble',
+                'tactical slot remains usable floor terrain: seed ' + fixture.seed + ', D' + (i + 1) +
+                ', ' + vault.type + ' ' + role + ' at ' + slot.x + ',' + slot.y +
+                ' has ' + level.map[slot.y]?.[slot.x])
             }
             const vaultMobs = mobs.filter(e => e.dungeonVaultId === vault.id)
             if ((vault.roles?.backline || 0) > 0 && (vault.slots?.backline || []).length) {

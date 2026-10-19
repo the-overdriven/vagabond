@@ -1921,6 +1921,8 @@ roll as a shooter. Champion placement cannot consume a backline slot, and room
 props are kept out of the clear firing lane from backline to entrance. This lets
 the same fortified architecture produce different species compositions without
 hard-coding a Goblin or Skeleton to a coordinate.
+The later lift placement also leaves every authored tactical slot as ordinary
+floor, so its platform cannot replace a defender's planned position.
 
 Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
 use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
@@ -7787,6 +7789,9 @@ the current save. Clicking it:
 6. executes the recorded actions in order through the normal gameplay functions;
 7. restores the live state, RNG state, and recording when playback finishes or
    desynchronizes. Loading another save during playback replaces that state.
+
+Malformed RNG boundaries before the first action abort playback with a visible
+desync message and restore the live recording, as do later replay mismatches.
 
 The current inter-action playback delay is **12 ms**. The delay is between
 whole actions, not individual RNG calls: an action's movement/combat/loot and its

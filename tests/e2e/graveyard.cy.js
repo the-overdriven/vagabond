@@ -166,7 +166,7 @@ describe('Graveyard', () => {
       expect(records).to.have.length(1)
       const record=records[0]
       expect(record.dropped_item).to.include({kind:'herb',name:'Healing Herb',count:1})
-      expect(record.world_size).to.equal('L')
+      expect(record.world_size).to.equal('XS')
       expect(record.world_traits).to.have.length(1)
       expect(record.world_traits[0].name).to.be.a('string')
       expect(record.world_traits[0].effects).to.be.an('array')

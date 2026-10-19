@@ -3545,10 +3545,13 @@ function placeDwarvenRuinsLift(levelCount) {
   const endpointCandidates = (level, ground, requireWall, reachable = null) => {
     const out = []
     const reservedRooms = (level.rooms || []).filter(room => room.stairRoom || room.landmark || room.gallery)
+    const tacticalSlots = new Set((level.rooms || []).flatMap(room =>
+      Object.values(room.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y))))
     const reserved = (x,y) => reservedRooms.some(room =>
       x >= room.x-2 && x <= room.x+room.w+1 && y >= room.y-2 && y <= room.y+room.h+1)
     for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
-      if (reserved(x,y) || level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y))) continue
+      if (reserved(x,y) || level.map[y]?.[x] !== 'marble' || ground.has(keyXY(x, y)) ||
+          tacticalSlots.has(keyXY(x, y))) continue
       // Leave the stair landings unobstructed, including when the lift is
       // generated after the floor furniture and stair locations.
       if ((level.caves?.[0]?.entrances || []).some(stair =>
