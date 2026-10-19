@@ -3907,23 +3907,89 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
   return null
 }
 
+function silhouetteDryFloorConnected(cm,bounds,spot,floorTile) {
+  const seen=new Set([keyXY(spot.x,spot.y)]),queue=[spot]
+  for(let i=0;i<queue.length;i++)for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+    const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
+    if(cm[y]?.[x]!==floorTile||seen.has(k))continue
+    seen.add(k);queue.push({x,y})
+  }
+  let floor=0
+  for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)floor++
+  return seen.size===floor
+}
+
+// Soften long, cut-looking exterior edges without blurring thin silhouette limbs.
+function softenSilhouetteOutline(cm,bounds,spot,floorTile) {
+  const cfg=WORLD_GEN_CONFIG.caves.deep.silhouette
+  const original=cm.map(row=>row.slice()),dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+  const inside=p=>p.x>bounds.x1&&p.x<bounds.x2&&p.y>bounds.y1&&p.y<bounds.y2
+  const safe=p=>Math.max(Math.abs(p.x-spot.x),Math.abs(p.y-spot.y))<=1
+  const hash=(x,y,salt)=>{
+    let value=(WORLD_SEED>>>0)^Math.imul(x+1,73856093)^Math.imul(y+1,19349663)^Math.imul(salt+1,83492791)
+    value=Math.imul(value^(value>>>16),0x45d9f3b)
+    return (value^(value>>>16))>>>0
+  }
+  // Exterior rock is connected to the reserved boundary; enclosed holes stay intact.
+  const outside=new Set([keyXY(bounds.x1,bounds.y1)]),queue=[{x:bounds.x1,y:bounds.y1}]
+  for(let i=0;i<queue.length;i++)for(const [dx,dy] of dirs) {
+    const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
+    if(x<bounds.x1||x>bounds.x2||y<bounds.y1||y>bounds.y2||outside.has(k)||original[y][x]!=='cavewall')continue
+    outside.add(k);queue.push({x,y})
+  }
+  let floor=0
+  for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(original[y][x]===floorTile)floor++
+  const budget=Math.floor(floor*cfg.outlineChangeFraction),proposals=[]
+  for(let side=0;side<dirs.length;side++) {
+    const [dx,dy]=dirs[side],tx=dy===0?0:1,ty=dx===0?0:1
+    const edge=(x,y)=>original[y]?.[x]===floorTile&&outside.has(keyXY(x+dx,y+dy))&&original[y-dy]?.[x-dx]===floorTile
+    for(let y=bounds.y1+1;y<bounds.y2;y++)for(let x=bounds.x1+1;x<bounds.x2;x++) {
+      if(!edge(x,y)||edge(x-tx,y-ty))continue
+      const run=[]
+      for(let xx=x,yy=y;edge(xx,yy);xx+=tx,yy+=ty)run.push({x:xx,y:yy})
+      if(run.length<cfg.outlineMinStraightRun)continue
+      const seed=hash(x,y,side)
+      for(let start=2;start+4<run.length-1;start+=7+(seed%3)) {
+        const base=run.slice(start,start+4),order=hash(base[0].x,base[0].y,side+4)
+        proposals.push({base,dx,dy,order,expand:!!(order&1)})
+      }
+    }
+  }
+  proposals.sort((a,b)=>a.order-b.order)
+  let changed=0
+  const touched=new Set()
+  for(const {base,dx,dy,expand} of proposals) {
+    const baseKeys=new Set(base.map(p=>keyXY(p.x,p.y))),patch=[]
+    const heights=[1,2,2,1]
+    for(let i=0;i<base.length;i++)for(let depth=1;depth<=heights[i];depth++) {
+      const p=base[i]
+      const q=expand?{x:p.x+dx*depth,y:p.y+dy*depth}:{x:p.x-dx*(depth-1),y:p.y-dy*(depth-1)}
+      if(!inside(q))break
+      patch.push(q)
+    }
+    if(!patch.length||changed+patch.length>budget||patch.some(p=>safe(p)||touched.has(keyXY(p.x,p.y))))continue
+    const expected=expand?'cavewall':floorTile,replacement=expand?floorTile:'cavewall'
+    if(patch.some(p=>cm[p.y][p.x]!==expected))continue
+    // Bulges may extend a local edge, but must not bridge another cave lobe.
+    if(expand&&patch.some(p=>dirs.some(([nx,ny])=>original[p.y+ny]?.[p.x+nx]===floorTile&&!baseKeys.has(keyXY(p.x+nx,p.y+ny)))))continue
+    for(const p of patch)cm[p.y][p.x]=replacement
+    if(!silhouetteDryFloorConnected(cm,bounds,spot,floorTile)) {
+      for(const p of patch)cm[p.y][p.x]=expected
+      continue
+    }
+    for(const p of patch)touched.add(keyXY(p.x,p.y))
+    changed+=patch.length
+  }
+  return changed
+}
+
 // Break long dry-floor runs with rock or water, preserving one dry component.
 function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
   const limit = WORLD_GEN_CONFIG.caves.deep.silhouette.maxStraightRun
   const pillars = new Set(), directions = [[1,0],[0,1]]
   const safe = p => Math.max(Math.abs(p.x-spot.x),Math.abs(p.y-spot.y)) <= 1
   const inside = p => p.x>bounds.x1 && p.x<bounds.x2 && p.y>bounds.y1 && p.y<bounds.y2
-  const connected = () => {
-    const seen=new Set([keyXY(spot.x,spot.y)]),queue=[spot]
-    for(let i=0;i<queue.length;i++) for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
-      const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
-      if(cm[y]?.[x]!==floorTile||seen.has(k))continue
-      seen.add(k);queue.push({x,y})
-    }
-    let floor=0
-    for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)floor++
-    return seen.size===floor
-  }
+  const connected=()=>silhouetteDryFloorConnected(cm,bounds,spot,floorTile)
   // Every accepted iteration reserves another obstruction permanently, so this terminates.
   for(let iteration=0;iteration<(bounds.x2-bounds.x1+1)*(bounds.y2-bounds.y1+1);iteration++) {
     const runs=[]
@@ -4033,6 +4099,7 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
         }
         seen.clear();queue.length=0;queue.push(spot);flood()
       }
+      softenSilhouetteOutline(cm,bounds,spot,floorTile)
       if (!breakLongSilhouetteRuns(cm,bounds,spot,floorTile)) continue
       return {cm,bounds,rooms:[],hasWater:cm.some(row=>row.includes('water')),silhouetteId:prototype.id,silhouetteIds:prototype.sourceIds}
     }

@@ -2228,9 +2228,23 @@ rewards as well as terrain variety.
 The alpha silhouette becomes dry ordinary cave floor, surrounded by rock. The
 prototype is fitted into a reserved footprint from 60×52 down to 28×26 tiles.
 Detached fragments and diagonal-only limbs receive short cardinal connections;
-the staircase has a clear 3×3 landing. A footprint must have at least 90 sampled
-floor tiles before repairs. Horizontal and vertical uninterrupted **dry-floor**
-runs are capped at **15 tiles** inside silhouette caves. Each obstruction uses a
+the staircase has a clear 3×3 landing. After dry connectivity repairs, a light
+contour pass softens straight exterior edges of **8 tiles or longer**. Small,
+seed-derived tapered bulges and insets move the outline by at most **2 tiles**,
+within its reserved bounds. This breaks the cut-off appearance inherited from
+flat image borders or sampled outlines without globally blurring the monster
+shapes. The pass changes at most **6% of the initial dry-floor cells**.
+Only rock connected to the exterior boundary counts as outside: enclosed rock
+holes, the 3×3 landing and one-tile limbs are preserved. Insets that disconnect
+dry floor and bulges that bridge another lobe are rejected. Proposals use a
+stable coordinate/seed hash and do not consume gameplay RNG. Water/rock
+obstructions are placed afterwards, so smoothing cannot bypass the 15-tile
+limit or turn swimming into a requirement. Other cave generators are unchanged.
+The resulting map is saved directly; save format remains **97**.
+
+A footprint must have at least 90 sampled floor tiles before repairs. 
+Horizontal and vertical uninterrupted **dry-floor** runs are capped at 
+**15 tiles** inside silhouette caves. Each obstruction uses a
 seeded **60% chance of water** (previously **0%**) and **40% chance of rock**
 (previously **100%**). This is a per-obstruction probability, not a fixed ratio
 of tiles or a chance to flood an entire cave. The roll is made once and retained

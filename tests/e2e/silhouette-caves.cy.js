@@ -1,5 +1,6 @@
 const checks=require('../helpers/silhouette-cave-checks.js')
 const extractionChecks=require('../helpers/silhouette-extraction-checks.js')
+const outlineChecks=require('../helpers/silhouette-outline-checks.js')
 describe('Monster silhouette caves',()=>{
   for(const [seed,names] of [[12345,[]],[1420044060,[]],[67893,['hollow_world','things_below']]]) {
     it('keeps connected deep layouts and save/replay state for '+seed,()=>{
@@ -12,6 +13,7 @@ describe('Monster silhouette caves',()=>{
         const traits=${JSON.stringify(names)}.map(name=>WORLD_TRAITS.find(t=>t.name===name));
         applyWorldTraits(traits,'XS');WORLD_SEED=${seed};rngState=WORLD_SEED;
         (${extractionChecks.toString()})();
+        (${outlineChecks.toString()})();
         await generateNewWorld();(${checks.toString()})();
         if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.6)throw Error('60% water configuration');
         const waterCave=deepLevels[0].caves.find(c=>c.style==='silhouette');
