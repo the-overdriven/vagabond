@@ -3983,6 +3983,39 @@ function softenSilhouetteOutline(cm,bounds,spot,floorTile) {
   return changed
 }
 
+// Compact, connected obstacle outlines. The candidate's center always remains occupied.
+function silhouetteObstacleCells(center,size,kind,shape) {
+  const cells=[]
+  const rockCorners=[[0,8],[2,6],[0,2,6],[0,2,8],[0,6,8],[2,6,8],[0,2,6,8],[0]]
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++) {
+    if(size===3) {
+      const omit=kind==='water'?(shape%2===0?[0,8]:[2,6]):rockCorners[shape%rockCorners.length]
+      if(omit.includes(y*3+x))continue
+    } else if(size===2 && y*2+x===[0,1,2][shape%3])continue
+    cells.push({x:center.x+x-Math.floor(size/2),y:center.y+y-Math.floor(size/2)})
+  }
+  return cells
+}
+
+// Stop neighboring placements from rebuilding the same conspicuous square island.
+function silhouetteRockIsRectangle(cm,start) {
+  if(cm[start.y]?.[start.x]!=='cavewall')return false
+  const queue=[start],seen=new Set([keyXY(start.x,start.y)])
+  let x1=start.x,x2=start.x,y1=start.y,y2=start.y
+  for(let i=0;i<queue.length;i++) {
+    const p=queue[i]
+    x1=Math.min(x1,p.x);x2=Math.max(x2,p.x);y1=Math.min(y1,p.y);y2=Math.max(y2,p.y)
+    for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const x=p.x+dx,y=p.y+dy,k=keyXY(x,y)
+      if(cm[y]?.[x]!=='cavewall'||seen.has(k))continue
+      seen.add(k);queue.push({x,y})
+      // The surrounding rock mass is not an isolated generated outcrop.
+      if(queue.length>64)return false
+    }
+  }
+  return queue.length>=4&&x2>x1&&y2>y1&&queue.length===(x2-x1+1)*(y2-y1+1)
+}
+
 // Break long dry-floor runs with rock or water, preserving one dry component.
 function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
   const limit = WORLD_GEN_CONFIG.caves.deep.silhouette.maxStraightRun
@@ -4003,7 +4036,7 @@ function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
     runs.sort((a,b)=>b.cells.length-a.cells.length)
     // One seeded roll per obstruction, shared by all of its placement attempts.
     const obstacleTile=chance(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance)?'water':'cavewall'
-    const shape=obstacleTile==='water'?randInt(0,3):0
+    const shape=randInt(0,obstacleTile==='water'?3:7)
     let changed=false
     for(const {cells,dx,dy} of runs) {
       const candidates=cells.slice(1,-1).sort((a,b)=>
@@ -4012,25 +4045,18 @@ function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
         if(safe(p))continue
         // Prefer clustered rocks or notched, connected pools over single-tile pinholes.
         for(const size of [3,2]) {
-          let block=[]
-          for(let yy=0;yy<size;yy++)for(let xx=0;xx<size;xx++) {
-            if(obstacleTile==='water') {
-              if(size===3 && (shape%2===0 ? (xx===0&&yy===0)||(xx===2&&yy===2) : (xx===2&&yy===0)||(xx===0&&yy===2)))continue
-              if(size===2 && yy*2+xx===[0,1,2][shape%3])continue
-            }
-            block.push({x:p.x+xx-Math.floor(size/2),y:p.y+yy-Math.floor(size/2)})
-          }
+          let block=silhouetteObstacleCells(p,size,obstacleTile,shape)
           // Preserve earlier obstructions and the silhouette's original rock boundary.
           block=block.filter(q=>inside(q)&&cm[q.y][q.x]===floorTile)
           if(block.some(q=>!inside(q)||safe(q)))continue
           const old=block.map(q=>cm[q.y][q.x])
           for(const q of block)cm[q.y][q.x]=obstacleTile
-          if(connected()){for(const q of block)pillars.add(keyXY(q.x,q.y));changed=true;break}
+          if(connected() && (obstacleTile!=='cavewall'||!silhouetteRockIsRectangle(cm,p))){for(const q of block)pillars.add(keyXY(q.x,q.y));changed=true;break}
           block.forEach((q,i)=>{cm[q.y][q.x]=old[i]})
         }
         if(changed)break
         cm[p.y][p.x]=obstacleTile
-        if(connected()) { pillars.add(keyXY(p.x,p.y));changed=true;break }
+        if(connected() && (obstacleTile!=='cavewall'||!silhouetteRockIsRectangle(cm,p))) { pillars.add(keyXY(p.x,p.y));changed=true;break }
         // A one-tile-wide limb needs a dry bend around its new obstruction.
         for(const side of [1,-1]) {
           const nx=-dy*side,ny=dx*side
@@ -4038,7 +4064,7 @@ function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
           if(detour.some(q=>!inside(q)||pillars.has(keyXY(q.x,q.y))))continue
           const old=detour.map(q=>cm[q.y][q.x])
           for(const q of detour)cm[q.y][q.x]=floorTile
-          if(connected()) { pillars.add(keyXY(p.x,p.y));changed=true;break }
+          if(connected() && (obstacleTile!=='cavewall'||!silhouetteRockIsRectangle(cm,p))) { pillars.add(keyXY(p.x,p.y));changed=true;break }
           detour.forEach((q,i)=>{cm[q.y][q.x]=old[i]})
         }
         if(changed)break

@@ -2242,17 +2242,25 @@ obstructions are placed afterwards, so smoothing cannot bypass the 15-tile
 limit or turn swimming into a requirement. Other cave generators are unchanged.
 The resulting map is saved directly; save format remains **97**.
 
-A footprint must have at least 90 sampled floor tiles before repairs. 
-Horizontal and vertical uninterrupted **dry-floor** runs are capped at 
-**15 tiles** inside silhouette caves. Each obstruction uses a
-seeded **60% chance of water** (previously **0%**) and **40% chance of rock**
-(previously **100%**). This is a per-obstruction probability, not a fixed ratio
+A footprint must have at least 90 sampled
+floor tiles before repairs. Horizontal and vertical uninterrupted **dry-floor**
+runs are capped at **15 tiles** inside silhouette caves. Each obstruction uses a
+seeded **30% chance of water** (previously **60%**) and **70% chance of rock**
+(previously **40%**). This is a per-obstruction probability, not a fixed ratio
 of tiles or a chance to flood an entire cave. The roll is made once and retained
 through that obstruction's placement attempts.
 
-Rock prefers small 3×3 or 2×2 clusters. Water instead uses irregular, notched
-seven-cell or L-shaped three-cell patches, clipped to existing cave floor;
-constrained passages may require smaller pools. Existing rock boundaries and
+Rock uses seeded, asymmetric outlines instead of solid square blocks: chipped
+corners, notched boulders, L-shaped pieces and compact cross-shaped clusters.
+Larger pieces occupy **5–8 cells in a 3×3 footprint** (previously a solid
+**9-cell square**); smaller pieces use **3-cell L shapes** (previously solid
+**4-cell squares**). Outlines are clipped to existing floor. A rock placement
+that forms or completes a small isolated solid rectangle is rejected, including
+rectangles formed by adjoining clusters. The surrounding
+rock mass and pre-existing holes are not reshaped by this rule. Narrow passages
+retain a single-tile fallback where a larger shape would break connectivity.
+Water keeps its existing irregular seven-cell or three-cell outlines; the
+**30% water / 70% rock** chance applies to each obstruction. Existing rock boundaries and
 earlier obstructions are preserved. Placement keeps every dry floor reachable
 from the clear 3×3 stair landing; if an obstruction cuts a narrow passage, a
 short dry bend reconnects it. Swimming is never required to explore the cave.
@@ -2278,9 +2286,9 @@ two, three or four distinct sources, without consuming gameplay RNG:
 
 | Source count | Chance per world |
 | --- | --- |
-| 2 | 60% (previously 100%) |
-| 3 | 30% (previously 0%) |
-| 4 | 10% (previously 0%) |
+| 2 | 30% (previously 60%) |
+| 3 | 40% (previously 30%) |
+| 4 | 30% (previously 10%) |
 
 Only the selected images are
 fetched concurrently and extracted, rather than loading the full image collection. Generation waits for
@@ -2322,7 +2330,7 @@ These connections make distinct lobes and branches rather than a central stack.
 The combined outline is still fitted to the same reserved cave footprint.
 More sources do not create more caves, larger bounds, additional inhabitants or
 extra loot. Raster fitting can narrow limbs; the existing dry connectivity,
-clear stairs, 15-tile dry-floor limit and 60% water-obstruction rules still
+clear stairs, 15-tile dry-floor limit and 30% water-obstruction rules still
 apply. This provides more route and pursuit choices while preserving the
 existing balance envelope. Source choice still has no monster affinity.
 

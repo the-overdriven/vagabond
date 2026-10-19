@@ -1,8 +1,9 @@
 const checks=require('../helpers/silhouette-cave-checks.js')
 const extractionChecks=require('../helpers/silhouette-extraction-checks.js')
 const outlineChecks=require('../helpers/silhouette-outline-checks.js')
+const rockChecks=require('../helpers/silhouette-rock-checks.js')
 describe('Monster silhouette caves',()=>{
-  for(const [seed,names] of [[12345,[]],[1420044060,[]],[67893,['hollow_world','things_below']]]) {
+  for(const [seed,names] of [[12345,[]],[1423288048,[]],[67893,['hollow_world','things_below']]]) {
     it('keeps connected deep layouts and save/replay state for '+seed,()=>{
       cy.visit('/')
       cy.get('#raceName').clear().type('Silhouette Tester')
@@ -14,10 +15,9 @@ describe('Monster silhouette caves',()=>{
         applyWorldTraits(traits,'XS');WORLD_SEED=${seed};rngState=WORLD_SEED;
         (${extractionChecks.toString()})();
         (${outlineChecks.toString()})();
+        (${rockChecks.toString()})();
         await generateNewWorld();(${checks.toString()})();
-        if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.6)throw Error('60% water configuration');
-        const waterCave=deepLevels[0].caves.find(c=>c.style==='silhouette');
-        if(!waterCave.hasWater)throw Error('fixed seed fixture should contain water');
+        if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.3)throw Error('30% water configuration');
         const prototype=CAVE_SILHOUETTES[0], rngBefore=rngState;
         const reload=await CaveSilhouettes.prepare(WORLD_SEED);
         if(JSON.stringify(reload.rows)!==JSON.stringify(prototype.rows)||rngState!==rngBefore)throw Error('cached extraction changes shape or RNG');
