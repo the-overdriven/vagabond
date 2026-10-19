@@ -7929,6 +7929,16 @@ current server files and network-response fixtures. Graveyard and startup
 response-fixture tests also bypass browser/service-worker caches through CDP,
 including workers left by earlier runs.
 
+Cypress world-generation diagnostics record the seed, configured dimensions
+and active trait names before each call to `generateNewWorld()`, including
+calls that fail before a map is produced. The global support file shows each
+seed in the Cypress Command Log and prints `[worldgen]` JSON lines to the
+terminal/GitHub Actions job log after each test, including failed tests. Each
+line identifies the spec, test and result. Multiple generation calls retain
+separate entries, so tests that change the seed report the seed actually used.
+The notification is test-only, consumes no RNG and adds no save/replay fields.
+These diagnostics do not pin seeds or retry failed generation.
+
 E2E tests that start a world through Begin must wait for the loading overlay
 to close before reading or modifying generated map state. Mechanics fixtures
 use controlled terrain; procedural-generation tests check generated terrain

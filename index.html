@@ -12226,6 +12226,11 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    // Test-only notification precedes all generation work, including failures.
+    if (window.Cypress) window.dispatchEvent(new CustomEvent('vagabond:world-generation', {
+      detail: {seed: WORLD_SEED, width: unrotatedWorldWidth, height: unrotatedWorldHeight,
+        traits: activeWorldTraits.map(trait => trait.name)}
+    }))
     await CaveSilhouettes.prepare(WORLD_SEED)
     inspectedDungeonLocks = new Set()
     merchantFortHintGiven = false
