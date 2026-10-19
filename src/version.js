@@ -1,5 +1,6 @@
-// Central version source. Bump the game version for each deployed release and the save
-// version whenever the persisted schema or deterministic replay contract changes. The page/service worker use
-// the game version; save/load and replay snapshots use the save version.
-self.VAGABOND_GAME_VERSION = 'v181'
+// Central version source. Bump the game version for each deployed release.
+// Bump the save version for incompatible save data or replay action/turn-rule changes.
+// Generation-only changes keep the save version: saves and replay initial states
+// restore complete generated worlds instead of rerunning world generation.
+self.VAGABOND_GAME_VERSION = 'v183'
 self.VAGABOND_SAVE_VERSION = 97

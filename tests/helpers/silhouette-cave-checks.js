@@ -23,9 +23,10 @@ module.exports = function silhouetteCaveChecks() {
       check(level.map[y][x]===cm[y][x],'shared map matches local cave')
     }
     if(cave.style==='silhouette') {
-      check(Array.isArray(cave.silhouetteIds)&&cave.silhouetteIds.length===2&&cave.silhouetteIds[0]!==cave.silhouetteIds[1],'two distinct source silhouettes')
+      check(Array.isArray(cave.silhouetteIds)&&[2,3,4].includes(cave.silhouetteIds.length)&&new Set(cave.silhouetteIds).size===cave.silhouetteIds.length,'two to four distinct source silhouettes')
       check(cave.silhouetteIds.every(id=>CAVE_SILHOUETTE_SOURCES.some(p=>p.id===id)),'real image sources')
       check(cave.silhouetteId===cave.silhouetteIds.join('+'),'combined prototype identity')
+      check(cave.silhouetteIds.length===CaveSilhouettes.sourceCountForSeed(WORLD_SEED),'seeded silhouette count')
       check(cave.hasWater===cm.some(row=>row.includes('water')),'water metadata matches map')
       for(const [dx,dy] of [[1,0],[0,1]])for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
         if(!TILE[cm[y][x]]?.walk||TILE[cm[y-dy]?.[x-dx]]?.walk)continue

@@ -76,12 +76,16 @@ const CaveSilhouettes = (() => {
     return rows
   }
 
+  function hashSeed(seed) {
+    let value=Number(seed)>>>0
+    value=Math.imul(value^(value>>>16),0x45d9f3b)
+    value=Math.imul(value^(value>>>16),0x45d9f3b)
+    return (value^(value>>>16))>>>0
+  }
+
   function sourceForSeed(seed, sources) {
-    if (!sources.length) throw new Error('No cave silhouette sources configured')
-    let value = Number(seed) >>> 0
-    value = Math.imul(value ^ (value >>> 16), 0x45d9f3b)
-    value = Math.imul(value ^ (value >>> 16), 0x45d9f3b)
-    return sources[((value ^ (value >>> 16)) >>> 0) % sources.length]
+    if(!sources.length)throw new Error('No cave silhouette sources configured')
+    return sources[hashSeed(seed)%sources.length]
   }
 
   async function load(source) {
@@ -105,18 +109,102 @@ const CaveSilhouettes = (() => {
     return [first,sourceForSeed((Number(seed) ^ 0x6d2b79f5) >>> 0,others)]
   }
 
+  function sourceCountForSeed(seed) {
+    const weights=WORLD_GEN_CONFIG.caves.deep.silhouette.sourceCountWeights
+    const entries=Object.entries(weights).map(([count,weight])=>[Number(count),weight])
+    const total=entries.reduce((sum,[count,weight])=>{
+      if(![2,3,4].includes(count)||!Number.isFinite(weight)||weight<0)throw new Error('Invalid silhouette count weights')
+      return sum+weight
+    },0)
+    if(total<=0)throw new Error('Silhouette count weights are empty')
+    let roll=hashSeed((Number(seed)^0xa511e9b3)>>>0)%total
+    for(const [count,weight] of entries) {if(roll<weight)return count;roll-=weight}
+    throw new Error('Invalid silhouette count roll')
+  }
+
+  function sourcesForSeed(seed,sources) {
+    const count=sourceCountForSeed(seed)
+    if(sources.length<count)throw new Error('Not enough distinct silhouette sources')
+    const selected=pairForSeed(seed,sources)
+    while(selected.length<count) {
+      const remaining=sources.filter(source=>!selected.some(s=>s.id===source.id))
+      selected.push(sourceForSeed((hashSeed(seed)^Math.imul(selected.length,0x9e3779b9))>>>0,remaining))
+    }
+    return selected
+  }
+
+  function maskPoints(rows,rotate,flip) {
+    const cells=[],h=rows.length,w=rows[0].length
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(rows[y][x]==='1') {
+      let px=(flip?w-1-x:x)-Math.floor(w/2),py=y-Math.floor(h/2)
+      for(let n=0;n<rotate;n++)[px,py]=[-py,px]
+      cells.push({x:px,y:py})
+    }
+    return cells
+  }
+
+  function combinedRows(combined) {
+    const x1=Math.min(...combined.map(p=>p.x)),y1=Math.min(...combined.map(p=>p.y))
+    const width=Math.max(...combined.map(p=>p.x))-x1+1,height=Math.max(...combined.map(p=>p.y))-y1+1
+    const grid=Array.from({length:height},()=>Array(width).fill('0'))
+    for(const p of combined)grid[p.y-y1][p.x-x1]='1'
+    return grid.map(r=>r.join(''))
+  }
+
+  // Three/four-source caves attach at their edges instead of stacking centrally.
+  function blendMany(prototypes,seed) {
+    if(prototypes.length===2)return blend(prototypes[0],prototypes[1],seed)
+    if(![3,4].includes(prototypes.length))throw new Error('Expected two, three or four silhouettes')
+    const cfg=WORLD_GEN_CONFIG.caves.deep.silhouette
+    const groups=[maskPoints(prototypes[0].rows,0,false)],owners=new Map(),attachments=[]
+    const key=p=>p.x+','+p.y
+    for(const p of groups[0])owners.set(key(p),1)
+    for(let index=1;index<prototypes.length;index++) {
+      const salt=hashSeed((Number(seed)^Math.imul(index,0x85ebca6b))>>>0)
+      const quarterTurns=1+(salt%3),mirror=!!(salt&8)
+      const incoming=maskPoints(prototypes[index].rows,quarterTurns,mirror)
+      const existing=groups.flat()
+      const exclusive=groups.map((cells,i)=>cells.reduce((sum,p)=>sum+Number(owners.get(key(p))===(1<<i)),0))
+      const ax1=Math.min(...existing.map(p=>p.x)),ax2=Math.max(...existing.map(p=>p.x))
+      const ay1=Math.min(...existing.map(p=>p.y)),ay2=Math.max(...existing.map(p=>p.y))
+      const bx1=Math.min(...incoming.map(p=>p.x)),bx2=Math.max(...incoming.map(p=>p.x))
+      const by1=Math.min(...incoming.map(p=>p.y)),by2=Math.max(...incoming.map(p=>p.y))
+      const minOverlap=Math.max(1,Math.ceil(incoming.length*cfg.lightOverlapMin))
+      const maxOverlap=Math.floor(incoming.length*cfg.lightOverlapMax)
+      let placement=null
+      for(const step of [4,1]) {
+        const offsets=[]
+        for(let dy=ay1-by2;dy<=ay2-by1;dy+=step)
+          for(let dx=ax1-bx2;dx<=ax2-bx1;dx+=step)offsets.push({dx,dy})
+        const start=salt%offsets.length
+        for(let n=0;n<offsets.length;n++) {
+          const {dx,dy}=offsets[(start+n)%offsets.length],lost=new Array(16).fill(0)
+          let overlap=0
+          for(const p of incoming) {
+            const owner=owners.get((p.x+dx)+','+(p.y+dy))||0
+            if(owner) {overlap++;if((owner&(owner-1))===0)lost[owner]++}
+            if(overlap>maxOverlap)break
+          }
+          if(overlap<minOverlap||overlap>maxOverlap)continue
+          if(groups.some((cells,i)=>exclusive[i]-lost[1<<i]<Math.ceil(cells.length*cfg.minimumExclusiveFraction)))continue
+          placement={dx,dy,overlap};break
+        }
+        if(placement)break
+      }
+      if(!placement)throw new Error('Cannot lightly overlap silhouette '+prototypes[index].id)
+      const placed=incoming.map(p=>({x:p.x+placement.dx,y:p.y+placement.dy}))
+      groups.push(placed)
+      for(const p of placed)owners.set(key(p),(owners.get(key(p))||0)|(1<<index))
+      attachments.push({id:prototypes[index].id,quarterTurns,mirror,...placement,countNew:incoming.length})
+    }
+    return {id:prototypes.map(p=>p.id).join('+'),sourceIds:prototypes.map(p=>p.id),rows:combinedRows(groups.flat()),
+      mix:{mode:'edge',attachments,counts:groups.map(cells=>cells.length),
+        exclusiveCounts:groups.map((cells,i)=>cells.filter(p=>owners.get(key(p))===(1<<i)).length)}}
+  }
+
   function blend(first, second, seed) {
     const turns=1+((Number(seed)>>>3)%3), mirror=!!((Number(seed)>>>6)&1)
-    const points=(rows,rotate,flip)=>{
-      const cells=[],h=rows.length,w=rows[0].length
-      for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(rows[y][x]==='1') {
-        let px=(flip?w-1-x:x)-Math.floor(w/2),py=y-Math.floor(h/2)
-        for(let n=0;n<rotate;n++) [px,py]=[-py,px]
-        cells.push({x:px,y:py})
-      }
-      return cells
-    }
-    const a=points(first.rows,0,false),b=points(second.rows,turns,mirror)
+    const a=maskPoints(first.rows,0,false),b=maskPoints(second.rows,turns,mirror)
     const occupied=new Set(a.map(p=>p.x+','+p.y))
     const candidates=[]
     for(let dy=-24;dy<=24;dy+=4)for(let dx=-24;dx<=24;dx+=4)candidates.push({dx,dy})
@@ -134,23 +222,19 @@ const CaveSilhouettes = (() => {
     }
     if(!best || best.score<.1)throw new Error('Silhouette pair cannot form a useful overlap')
     const combined=[...a,...b.map(p=>({x:p.x+best.dx,y:p.y+best.dy}))]
-    const x1=Math.min(...combined.map(p=>p.x)),y1=Math.min(...combined.map(p=>p.y))
-    const width=Math.max(...combined.map(p=>p.x))-x1+1,height=Math.max(...combined.map(p=>p.y))-y1+1
-    const grid=Array.from({length:height},()=>Array(width).fill('0'))
-    for(const p of combined)grid[p.y-y1][p.x-x1]='1'
-    return {id:first.id+'+'+second.id,sourceIds:[first.id,second.id],rows:grid.map(r=>r.join('')),
+    return {id:first.id+'+'+second.id,sourceIds:[first.id,second.id],rows:combinedRows(combined),
       mix:{quarterTurns:turns,mirror,dx:best.dx,dy:best.dy,overlap:best.overlap,
         uniqueA:best.uniqueA,uniqueB:best.uniqueB,countA:a.length,countB:b.length}}
   }
 
   async function prepare(seed) {
-    const sources = pairForSeed(seed, CAVE_SILHOUETTE_SOURCES)
+    const sources = sourcesForSeed(seed, CAVE_SILHOUETTE_SOURCES)
     // Promise.all preserves source order regardless of download/decompression timing.
-    const [first,second] = await Promise.all(sources.map(load))
-    const prototype = blend(first,second,seed)
+    const prototypes = await Promise.all(sources.map(load))
+    const prototype = blendMany(prototypes,seed)
     CAVE_SILHOUETTES = [prototype]
     return prototype
   }
-  return {decodeAlpha, extract, sourceForSeed, pairForSeed, blend, load, prepare,
-    idForSeed:seed=>pairForSeed(seed,CAVE_SILHOUETTE_SOURCES).map(s=>s.id).join('+')}
+  return {decodeAlpha, extract, sourceForSeed, pairForSeed, sourceCountForSeed, sourcesForSeed, blend, blendMany, load, prepare,
+    idForSeed:seed=>sourcesForSeed(seed,CAVE_SILHOUETTE_SOURCES).map(s=>s.id).join('+')}
 })()

@@ -1,7 +1,7 @@
 const checks=require('../helpers/silhouette-cave-checks.js')
 const extractionChecks=require('../helpers/silhouette-extraction-checks.js')
 describe('Monster silhouette caves',()=>{
-  for(const [seed,names] of [[12345,[]],[24680,[]],[67890,['hollow_world','things_below']]]) {
+  for(const [seed,names] of [[12345,[]],[1420044060,[]],[67893,['hollow_world','things_below']]]) {
     it('keeps connected deep layouts and save/replay state for '+seed,()=>{
       cy.visit('/')
       cy.get('#raceName').clear().type('Silhouette Tester')

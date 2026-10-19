@@ -2260,7 +2260,15 @@ static hosting cannot enumerate a directory. No Python or image tooling is
 required to run or update the game.
 
 Before world generation starts, a fixed integer hash of the world seed selects
-two distinct sources, without consuming gameplay RNG. Only those images are
+two, three or four distinct sources, without consuming gameplay RNG:
+
+| Source count | Chance per world |
+| --- | --- |
+| 2 | 60% (previously 100%) |
+| 3 | 30% (previously 0%) |
+| 4 | 10% (previously 0%) |
+
+Only the selected images are
 fetched concurrently and extracted, rather than loading the full image collection. Generation waits for
 completion and uses the same extracted prototype throughout placement retries.
 Image loading order, rendering and animation timing cannot change selection or
@@ -2280,28 +2288,37 @@ Python/Pillow sampling rule.
 Completed prototypes are reused in memory during the session. Versioned source
 image requests use the existing service-worker runtime cache, allowing reuse
 offline once that image has been fetched. Starting a new world offline still
-requires both selected images to have been cached; loading an existing save or
+requires all selected images to have been cached; loading an existing save or
 replay does not require the source image. Deploy changed art with the normal
 game-version bump so clients fetch the new source bytes.
 
-The two extracted masks are combined by union. The second is rotated by a
-seed-selected 90°, 180° or 270° and may be mirrored, then offset before overlap.
-The search requires overlap of at least 5% of the smaller mask and unique floor
-contributions of at least 10% from each source, preferring 25% or more. This
-prevents one silhouette from being swallowed by the other. The combined outline
-is cropped and fitted to the usual reserved cave footprint, so blending does
-not double the cave footprint or add extra caves or loot. The existing dry
-connections and safe stair landing still apply. Irregular lobes, narrow links
-and sightlines affect route choice, pursuit and ranged positioning; no monster
-affinity is introduced. The result disguises recognizable heads, legs and body
-outlines, although some individual features can remain visible.
+Two-source caves keep the existing union blend: the second source is rotated,
+may be mirrored, and is offset while retaining meaningful contributions from
+both shapes. Two-source overlap rules remain unchanged.
 
-Cave style, both source IDs, combined prototype ID and complete generated geometry use the existing
-cave descriptor and map save fields. Loading and replay initialization restore
-them directly without fetching source images or regenerating layouts. Release
-v181 uses save version **100** (previously **99**) because water placement changes
-the seeded generation contract; no older-save
-compatibility is added. The former Python compiler is obsolete.
+For **three- and four-source caves**, every added silhouette, including the
+second, attaches at the cluster's edges with only **5–15% of its floor cells
+overlapping** the existing cluster. Thus **85–95% of each incoming shape** stays
+outside the cluster at placement. Each addition is rotated and may be mirrored.
+The search also preserves at least **25% exclusive floor from every earlier
+source** after all additions, so a later shape cannot erase an earlier one.
+Overlap is measured on the extracted masks before fitting and cave repairs.
+These connections make distinct lobes and branches rather than a central stack.
+
+The combined outline is still fitted to the same reserved cave footprint.
+More sources do not create more caves, larger bounds, additional inhabitants or
+extra loot. Raster fitting can narrow limbs; the existing dry connectivity,
+clear stairs, 15-tile dry-floor limit and 60% water-obstruction rules still
+apply. This provides more route and pursuit choices while preserving the
+existing balance envelope. Source choice still has no monster affinity.
+
+Cave style, all source IDs, combined prototype ID and complete generated
+geometry use the existing cave descriptor and map save fields. Loading and
+replay initialization restore them directly without fetching source images or
+regenerating layouts. These cave changes keep save format **97**: altering how
+new worlds are generated does not invalidate already-generated maps or the
+saved gameplay RNG stream. No older-save conversion is added. The former
+Python compiler is obsolete.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
@@ -6560,11 +6577,23 @@ Loading a save therefore continues the random sequence rather than resetting it.
 
 # 66. Save System
 
-Current save version:
+Current save version (defined in `src/version.js`):
 
 ```text
-82
+97
 ```
+
+The game release version changes for each deployment. The save format changes
+only when stored data or replay action/turn rules become incompatible.
+Generation-only changes keep the format: saves store the complete generated
+world and current RNG state, and replays load their complete initial snapshot
+rather than rerunning generation. Optional cave metadata stored in existing
+cave descriptors does not require a new format. Incompatible required fields,
+terrain encodings or gameplay/RNG changes during recorded turns still require
+review and, when incompatible, a save-version bump.
+
+The loader retains its exact-version check; this does not introduce migration
+or acceptance of differently numbered saves.
 
 Version 82 introduces optional Crusher mechanisms in Dwarven Ruins,
 including their pressure-plate and scored-track terrain codes, warning and
@@ -7736,14 +7765,15 @@ The replay payload is stored inside the normal save as:
 
 ```text
 save.replay = {
-  version: 2,
+  version: 3,
   initialState,
   actions: [],
-  rng: []
+  rng: [],
+  idleRng: []
 }
 ```
 
-The replay tape format version is independent of the current game save schema version (82).
+The replay tape format version is independent of the current game save schema version (97).
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in

@@ -253,6 +253,10 @@
         "passageWideSteps": 3,
         "extraConnections": 5,
         "waterChance": 0.6,
+        "sourceCountWeights": {"2":60,"3":30,"4":10},
+        "lightOverlapMin": 0.05,
+        "lightOverlapMax": 0.15,
+        "minimumExclusiveFraction": 0.25,
         "waterCenterJitter": 2,
         "waterRadiusX": 4,
         "waterRadiusY": 3,
@@ -308,7 +312,11 @@
         "sizes": [[60,52],[48,42],[36,32],[28,26]],
         "minFloorTiles": 90,
         "maxStraightRun": 15,
-        "waterChance": 0.6
+        "waterChance": 0.6,
+        "sourceCountWeights": {"2":60,"3":30,"4":10},
+        "lightOverlapMin": 0.05,
+        "lightOverlapMax": 0.15,
+        "minimumExclusiveFraction": 0.25
       }
     }
   },
