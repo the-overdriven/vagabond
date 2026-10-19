@@ -2174,7 +2174,11 @@ with the final connectivity test retained as a defensive validation.
 
 Crypt coffins use their own four crypt inscriptions. These are unrelated to the
 mysterious tombstone inscriptions dropped by Liches. Each of the four lines is
-assigned to one coffin only.
+assigned to one coffin only. Whole-world rotation moves the crypt's stored
+coffin coordinates and inscription keys with its terrain. Saving/loading and
+replay initialization preserve both the exact coffin positions and each
+coffin's generated inscription; they do not create coffins at pre-rotation
+coordinates or reassign the inscriptions. No save-format change is needed.
 
 If the crypt contains more coffins than the four stored inscriptions:
 

@@ -418,17 +418,12 @@ function loadGameFromObject(data, opts = {}) {
       if (tile === 'grave') caveMaps[cryptCaveIndex][y][x] = 'coffin'
       else if (tile === 'cavefloor') caveMaps[cryptCaveIndex][y][x] = 'cryptfloor'
     }
-    // Re-stamp all declared crypt burial positions from the current world
-    // descriptor so the merged map always matches the generated layout.
-    const cryptInscriptions = {}
-    for (let i = 0; i < (crypt.graves || []).length; i++) {
-      const key = crypt.graves[i], [x, y] = key.split(',').map(Number)
+    // Current saves retain the generated inscription-to-coffin assignment.
+    // Re-stamp declared burial tiles without reassigning those inscriptions.
+    for (const key of crypt.graves) {
+      const [x, y] = key.split(',').map(Number)
       if (caveMaps[cryptCaveIndex][y]?.[x] !== undefined) caveMaps[cryptCaveIndex][y][x] = 'coffin'
-      if (i < CRYPT_INSCRIPTIONS.length) cryptInscriptions[key] = CRYPT_INSCRIPTIONS[i]
-      else if (i === CRYPT_INSCRIPTIONS.length) cryptInscriptions[key] = 'Stone coffin. It\'s empty.'
-      else cryptInscriptions[key] = 'Stone coffin. The slab is heavy.'
     }
-    crypt.inscriptions = cryptInscriptions
   }
   for (let i = 0; i < caveMaps.length; i++) {
     const entrances = caves[i] && caves[i].entrances ? caves[i].entrances : []

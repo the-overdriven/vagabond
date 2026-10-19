@@ -18,12 +18,21 @@ describe('Whole-world rotation and Dwarven Key floors', () => {
       const descent=deepLevels[1].caves[0].entrances[0]
       const oldEntrance={x:descent.x,y:descent.y}
       const oldSpawn={...spawnPoint}
+      const cryptBefore=structuredClone(caves.find(c=>c.crypt))
       const [w,h]=dims()
       const oldItems=groundItems.filter(g=>g.kind==='dwarvenkey')
         .map(g=>({x:g.x,y:g.y,level:g.level,keyId:g.keyId}))
       const originalPosition=(x,y)=>({x:h-1-y,y:x})
       const rotateGrid=g=>g[0].map((_,x)=>g.slice().reverse().map(row=>row[x]))
       rotateGeneratedWorld(1)
+      const crypt=caves.find(c=>c.crypt)
+      for(const key of cryptBefore.graves){
+        const [x,y]=key.split(',').map(Number),p=originalPosition(x,y),rotatedKey=keyXY(p.x,p.y)
+        check(crypt.graves.includes(rotatedKey),'crypt burial coordinates rotate')
+        check(crypt.inscriptions[rotatedKey]===cryptBefore.inscriptions[key],'inscriptions remain attached to their coffin')
+        check(caveMaps[cryptCaveIndex][p.y][p.x]==='coffin','burial metadata matches coffin tiles')
+      }
+      const cryptSnapshot=JSON.stringify(crypt)
       check(MAP_W===h&&MAP_H===w, 'rotated dimensions')
       check(JSON.stringify(map)===JSON.stringify(rotateGrid(surfaceBefore)), 'entire surface rotated')
       check(JSON.stringify(undergroundMap)===JSON.stringify(rotateGrid(undergroundBefore)), 'z:-1 rotated')
@@ -46,6 +55,8 @@ describe('Whole-world rotation and Dwarven Key floors', () => {
       loadGameFromObject(state,{isReplayInit:true})
       check(JSON.stringify(map)===JSON.stringify(rotateGrid(surfaceBefore)),'save restores rotated surface')
       check(JSON.stringify(deepLevels[1].map)===JSON.stringify(rotateGrid(fortBefore)),'save restores rotated fort')
+      check(JSON.stringify(undergroundMap)===JSON.stringify(rotateGrid(undergroundBefore)),'save restores rotated shallow map without extra coffins')
+      check(JSON.stringify(caves.find(c=>c.crypt))===cryptSnapshot,'save preserves rotated crypt metadata and inscriptions')
       check(state.mapWidth===MAP_W&&state.mapHeight===MAP_H,'saved rotation dimensions')
     })()`))
   })

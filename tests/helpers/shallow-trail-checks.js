@@ -14,6 +14,11 @@ module.exports=function shallowTrailChecks(){
   }
   const crypt=caves.find(c=>c.crypt),start=crypt?.entrances?.[0]
   if(start){
+    const cm=caveMaps[caves.indexOf(crypt)],graves=new Set(crypt.graves)
+    check(graves.size===crypt.graves.length,'distinct crypt burial coordinates')
+    check(crypt.graves.every(key=>{const [x,y]=key.split(',').map(Number);return cm[y]?.[x]==='coffin'&&undergroundMap[y]?.[x]==='coffin'}),'crypt burial references match rotated local/shared tiles')
+    for(let y=0;y<cm.length;y++)for(let x=0;x<cm[y].length;x++)if(cm[y][x]==='coffin')check(graves.has(keyXY(x,y)),'every coffin has a burial reference')
+    check(Object.keys(crypt.inscriptions).length===graves.size&&Object.keys(crypt.inscriptions).every(key=>graves.has(key)),'crypt inscriptions follow burial coordinates')
     const seen=new Set([keyXY(start.x,start.y)]),queue=[start]
     for(let i=0;i<queue.length;i++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
       if(!dx&&!dy)continue

@@ -747,6 +747,12 @@ function rotateGeneratedWorld(quarterTurns) {
   }
   // The local mausoleum template is not a full-world grid. Its playable cells
   // already belong to the rotated z:-1 map; keep the template as a local sketch.
+  // Crypt burial references are coordinate strings, not x/y objects.
+  // Rotate them with the tiles so save restoration cannot stamp old locations.
+  for (const cave of caves.filter(cave => cave.crypt)) {
+    cave.graves = cave.graves.map(coordsFromKey)
+    cave.inscriptions = rekeyObject(cave.inscriptions)
+  }
   positions(caves); positions(deepLevels); positions(dungeonShortcuts)
   positions(villageHuts); positions(enemies); positions(groundItems)
   positions(npcs); positions(caveDecorations)

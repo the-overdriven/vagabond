@@ -14,9 +14,9 @@ describe('Winding links between shallow cave entrances',()=>{
         if(!caves.some(c=>!c.crypt&&c.entrances?.length>1))throw Error('missing paired-entrance cave');
         if(!isBigBellReachableFromTemple()||!isSurfacePointReachableFromTemple(dwarvenRuin.x,dwarvenRuin.y))throw Error('surface reachability');
         const saved=structuredClone(buildSaveObject());
-        const before=JSON.stringify({map:undergroundMap,caves:caves.filter(c=>!c.crypt),caveMaps,rng:rngState});
+        const before=JSON.stringify({map:undergroundMap,caves,caveMaps,rng:rngState});
         loadGameFromObject(saved,{isReplayInit:true});
-        if(JSON.stringify({map:undergroundMap,caves:caves.filter(c=>!c.crypt),caveMaps,rng:rngState})!==before)throw Error('save/replay changes trails');
+        if(JSON.stringify({map:undergroundMap,caves,caveMaps,rng:rngState})!==before)throw Error('save/replay changes trails');
         (${checks.toString()})();
       })()`))
     })
