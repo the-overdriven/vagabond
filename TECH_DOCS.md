@@ -2200,23 +2200,108 @@ mountain air.
 
 Some z:-1 caves receive a downward connection.
 
-The generator requires **two separate generic z:-2 caves**. The first uses
-connected irregular chambers and winding passages (the grotto algorithm); the
-second uses branching random-walk tunnels and small pockets (the burrow
-algorithm). Their reserved footprints cannot overlap, and each staircase is
-stamped into both maps. Placement is retried on clean map copies; if both required layouts still
-cannot be placed, the world is regenerated. The final fallback never silently
-accepts a world with fewer than two generic z:-2 caves. Additional parent caves have a 50% chance of a branch using either
-algorithm.
+The generator requires **three separate generic z:-2 caves**: one monster
+silhouette, one grotto with connected irregular chambers and winding passages,
+and one branching burrow. Both existing generators remain in use. Footprints
+cannot overlap. Multiple descents may belong to the same shallow cave, but each
+staircase is paired at identical coordinates and has its own deep cave. Failed
+placement trials use clean map copies; if any required style is missing, the
+world is regenerated. The final fallback enforces the same requirement.
+Additional unused parent caves retain their 50% chance of a grotto or burrow.
 
 Grotto footprints vary from 92×72 down to 42×36 tiles, with an area-scaled
 chamber count, possible loops, and an optional water pocket. Burrows vary from
-68×52 down to 28×24 tiles; their narrow paths branch from earlier tunnels and
-end in scattered pockets. Both styles keep traversable floors connected to the
-staircase. The smaller burrow footprints let two independent caves fit even
-when the mountain entrances are clustered. One complete burrow cave on z:-2
-uses the darker brown floor asset; the other cave floors keep the normal tile.
-The crypt's separate second map and the Dwarven Fort remain independent.
+68×52 down to 28×24 tiles, with branching tunnels and scattered pockets. One
+complete burrow retains the darker brown floor. All dry floor tiles remain
+connected to their own staircase; crypt maps and the Dwarven Fort are separate.
+
+### Monster silhouette cave prototype
+
+Only generic **z:-2** receives silhouette caves. A world-seeded selection from
+`content/cave_silhouettes.json` determines the shape, with optional horizontal
+mirroring. Transparent enemy images provide geometry only: the selected monster
+has **no influence on inhabitants, rewards, tiers or scenario selection**.
+Normal deep-cave population and entrance safety rules still apply. The extra
+cave receives normal scenario population, so this adds exploration and potential
+rewards as well as terrain variety.
+
+The alpha silhouette becomes dry ordinary cave floor, surrounded by rock. The
+prototype is fitted into a reserved footprint from 60×52 down to 28×26 tiles.
+Detached fragments and diagonal-only limbs receive short cardinal connections;
+the staircase has a clear 3×3 landing. A footprint must have at least 90 sampled
+floor tiles before repairs. Horizontal and vertical uninterrupted **dry-floor**
+runs are capped at **15 tiles** inside silhouette caves. Each obstruction uses a
+seeded **60% chance of water** (previously **0%**) and **40% chance of rock**
+(previously **100%**). This is a per-obstruction probability, not a fixed ratio
+of tiles or a chance to flood an entire cave. The roll is made once and retained
+through that obstruction's placement attempts.
+
+Rock prefers small 3×3 or 2×2 clusters. Water instead uses irregular, notched
+seven-cell or L-shaped three-cell patches, clipped to existing cave floor;
+constrained passages may require smaller pools. Existing rock boundaries and
+earlier obstructions are preserved. Placement keeps every dry floor reachable
+from the clear 3×3 stair landing; if an obstruction cuts a narrow passage, a
+short dry bend reconnects it. Swimming is never required to explore the cave.
+A layout that cannot satisfy both the limit and connectivity is retried rather
+than accepted with blocked or oversized passages. Diagonals are not capped.
+Rock blocks movement, visibility and projectiles under the existing cave-wall
+rules. Pools use ordinary deep `water`: they interrupt dry runs but remain
+transparent to sight and projectiles. Swimmers and Merlings may cross them under
+normal swimming/drowning rules; non-swimmers can always use the dry route.
+Thus the 15-tile rule limits continuous dry floor, not swimmers' travel distance
+or ranged sightlines. No freezing or special water status is introduced. Other cave styles retain their previous generation rules.
+No special terrain, monster affinity or new status is introduced. Tile mode and ASCII mode use the existing cave terrain rules.
+
+The browser extracts prototypes directly from transparent PNGs. The JSON at
+`content/cave_silhouettes.json` contains only the ordered source IDs and image
+paths (72 entries), not precomputed shapes. Changing an existing source PNG
+requires no build step; a newly added image needs an entry in this list because
+static hosting cannot enumerate a directory. No Python or image tooling is
+required to run or update the game.
+
+Before world generation starts, a fixed integer hash of the world seed selects
+two distinct sources, without consuming gameplay RNG. Only those images are
+fetched concurrently and extracted, rather than loading the full image collection. Generation waits for
+completion and uses the same extracted prototype throughout placement retries.
+Image loading order, rendering and animation timing cannot change selection or
+geometry. A missing or invalid selected image stops generation with an error;
+the game never substitutes another shape based on network timing.
+
+Extraction reads the PNG's original alpha bytes directly, without canvas or
+browser resizing. Sources must be non-interlaced 8-bit RGBA PNGs (all 72 current
+images meet this format). PNG filtering and decompression recover the original
+pixels exactly. Pixels with alpha below 128 are discarded. The visible shape
+is cropped to its bounding box, then reduced to a grid whose longest dimension
+is 48 cells. Each cell uses fixed integer pixel boundaries and becomes floor
+when at least one quarter of its source pixels are solid. Fully transparent or
+fully opaque sources are rejected. This deliberately replaces the previous
+Python/Pillow sampling rule.
+
+Completed prototypes are reused in memory during the session. Versioned source
+image requests use the existing service-worker runtime cache, allowing reuse
+offline once that image has been fetched. Starting a new world offline still
+requires both selected images to have been cached; loading an existing save or
+replay does not require the source image. Deploy changed art with the normal
+game-version bump so clients fetch the new source bytes.
+
+The two extracted masks are combined by union. The second is rotated by a
+seed-selected 90°, 180° or 270° and may be mirrored, then offset before overlap.
+The search requires overlap of at least 5% of the smaller mask and unique floor
+contributions of at least 10% from each source, preferring 25% or more. This
+prevents one silhouette from being swallowed by the other. The combined outline
+is cropped and fitted to the usual reserved cave footprint, so blending does
+not double the cave footprint or add extra caves or loot. The existing dry
+connections and safe stair landing still apply. Irregular lobes, narrow links
+and sightlines affect route choice, pursuit and ranged positioning; no monster
+affinity is introduced. The result disguises recognizable heads, legs and body
+outlines, although some individual features can remain visible.
+
+Cave style, both source IDs, combined prototype ID and complete generated geometry use the existing
+cave descriptor and map save fields. Loading and replay initialization restore
+them directly without fetching source images or regenerating layouts. Release
+v181 uses save version **100** (previously **99**) because water placement changes
+the seeded generation contract; no older-save
+compatibility is added. The former Python compiler is obsolete.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as

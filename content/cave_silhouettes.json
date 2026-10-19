@@ -1,0 +1,292 @@
+{
+  "sources": [
+    {
+      "id": "bog_spitter",
+      "source": "img/enemies-no-bg/bog_spitter.png"
+    },
+    {
+      "id": "centaur",
+      "source": "img/enemies-no-bg/centaur.png"
+    },
+    {
+      "id": "chupacabra",
+      "source": "img/enemies-no-bg/chupacabra.png"
+    },
+    {
+      "id": "cobra",
+      "source": "img/enemies-no-bg/cobra.png"
+    },
+    {
+      "id": "cyclops",
+      "source": "img/enemies-no-bg/cyclops.png"
+    },
+    {
+      "id": "dreadling",
+      "source": "img/enemies-no-bg/dreadling.png"
+    },
+    {
+      "id": "drusk",
+      "source": "img/enemies-no-bg/drusk.png"
+    },
+    {
+      "id": "fungus",
+      "source": "img/enemies-no-bg/fungus.png"
+    },
+    {
+      "id": "gargoyle",
+      "source": "img/enemies-no-bg/gargoyle.png"
+    },
+    {
+      "id": "gaur",
+      "source": "img/enemies-no-bg/gaur.png"
+    },
+    {
+      "id": "ghost",
+      "source": "img/enemies-no-bg/ghost.png"
+    },
+    {
+      "id": "ghoul",
+      "source": "img/enemies-no-bg/ghoul.png"
+    },
+    {
+      "id": "giant_bat",
+      "source": "img/enemies-no-bg/giant_bat.png"
+    },
+    {
+      "id": "giant_bug",
+      "source": "img/enemies-no-bg/giant_bug.png"
+    },
+    {
+      "id": "giant_crab",
+      "source": "img/enemies-no-bg/giant_crab.png"
+    },
+    {
+      "id": "giant_rat",
+      "source": "img/enemies-no-bg/giant_rat.png"
+    },
+    {
+      "id": "giant_spider",
+      "source": "img/enemies-no-bg/giant_spider.png"
+    },
+    {
+      "id": "giant_toad",
+      "source": "img/enemies-no-bg/giant_toad.png"
+    },
+    {
+      "id": "goblin",
+      "source": "img/enemies-no-bg/goblin.png"
+    },
+    {
+      "id": "gorgon",
+      "source": "img/enemies-no-bg/gorgon.png"
+    },
+    {
+      "id": "gravehound",
+      "source": "img/enemies-no-bg/gravehound.png"
+    },
+    {
+      "id": "grivel",
+      "source": "img/enemies-no-bg/grivel.png"
+    },
+    {
+      "id": "grivkin",
+      "source": "img/enemies-no-bg/grivkin.png"
+    },
+    {
+      "id": "harpy",
+      "source": "img/enemies-no-bg/harpy.png"
+    },
+    {
+      "id": "hogwyrm",
+      "source": "img/enemies-no-bg/hogwyrm.png"
+    },
+    {
+      "id": "hyena",
+      "source": "img/enemies-no-bg/hyena.png"
+    },
+    {
+      "id": "imp",
+      "source": "img/enemies-no-bg/imp.png"
+    },
+    {
+      "id": "jackal",
+      "source": "img/enemies-no-bg/jackal.png"
+    },
+    {
+      "id": "kobold",
+      "source": "img/enemies-no-bg/kobold.png"
+    },
+    {
+      "id": "kveld",
+      "source": "img/enemies-no-bg/kveld.png"
+    },
+    {
+      "id": "lich",
+      "source": "img/enemies-no-bg/lich.png"
+    },
+    {
+      "id": "lion",
+      "source": "img/enemies-no-bg/lion.png"
+    },
+    {
+      "id": "lizard_man",
+      "source": "img/enemies-no-bg/lizard_man.png"
+    },
+    {
+      "id": "manticore",
+      "source": "img/enemies-no-bg/manticore.png"
+    },
+    {
+      "id": "minotaur",
+      "source": "img/enemies-no-bg/minotaur.png"
+    },
+    {
+      "id": "mirehowl",
+      "source": "img/enemies-no-bg/mirehowl.png"
+    },
+    {
+      "id": "monkey",
+      "source": "img/enemies-no-bg/monkey.png"
+    },
+    {
+      "id": "mummy",
+      "source": "img/enemies-no-bg/mummy.png"
+    },
+    {
+      "id": "murkspawn",
+      "source": "img/enemies-no-bg/murkspawn.png"
+    },
+    {
+      "id": "myrka",
+      "source": "img/enemies-no-bg/myrka.png"
+    },
+    {
+      "id": "nhaluun",
+      "source": "img/enemies-no-bg/nhaluun.png"
+    },
+    {
+      "id": "nulk",
+      "source": "img/enemies-no-bg/nulk.png"
+    },
+    {
+      "id": "nymph",
+      "source": "img/enemies-no-bg/nymph.png"
+    },
+    {
+      "id": "oculus",
+      "source": "img/enemies-no-bg/oculus.png"
+    },
+    {
+      "id": "ogre",
+      "source": "img/enemies-no-bg/ogre.png"
+    },
+    {
+      "id": "orc",
+      "source": "img/enemies-no-bg/orc.png"
+    },
+    {
+      "id": "owlbear",
+      "source": "img/enemies-no-bg/owlbear.png"
+    },
+    {
+      "id": "ratling",
+      "source": "img/enemies-no-bg/ratling.png"
+    },
+    {
+      "id": "sasquatch",
+      "source": "img/enemies-no-bg/sasquatch.png"
+    },
+    {
+      "id": "scarab",
+      "source": "img/enemies-no-bg/scarab.png"
+    },
+    {
+      "id": "scorpion",
+      "source": "img/enemies-no-bg/scorpion.png"
+    },
+    {
+      "id": "serpent",
+      "source": "img/enemies-no-bg/serpent.png"
+    },
+    {
+      "id": "serpent_queen",
+      "source": "img/enemies-no-bg/serpent_queen.png"
+    },
+    {
+      "id": "skeld",
+      "source": "img/enemies-no-bg/skeld.png"
+    },
+    {
+      "id": "skeleton",
+      "source": "img/enemies-no-bg/skeleton.png"
+    },
+    {
+      "id": "skerva",
+      "source": "img/enemies-no-bg/skerva.png"
+    },
+    {
+      "id": "skink",
+      "source": "img/enemies-no-bg/skink.png"
+    },
+    {
+      "id": "slurper",
+      "source": "img/enemies-no-bg/slurper.png"
+    },
+    {
+      "id": "snake",
+      "source": "img/enemies-no-bg/snake.png"
+    },
+    {
+      "id": "spineback",
+      "source": "img/enemies-no-bg/spineback.png"
+    },
+    {
+      "id": "thornmaw",
+      "source": "img/enemies-no-bg/thornmaw.png"
+    },
+    {
+      "id": "tokka",
+      "source": "img/enemies-no-bg/tokka.png"
+    },
+    {
+      "id": "tulla",
+      "source": "img/enemies-no-bg/tulla.png"
+    },
+    {
+      "id": "vampire",
+      "source": "img/enemies-no-bg/vampire.png"
+    },
+    {
+      "id": "vulture",
+      "source": "img/enemies-no-bg/vulture.png"
+    },
+    {
+      "id": "wasp",
+      "source": "img/enemies-no-bg/wasp.png"
+    },
+    {
+      "id": "white_tiger",
+      "source": "img/enemies-no-bg/white_tiger.png"
+    },
+    {
+      "id": "witherpod",
+      "source": "img/enemies-no-bg/witherpod.png"
+    },
+    {
+      "id": "wolf",
+      "source": "img/enemies-no-bg/wolf.png"
+    },
+    {
+      "id": "wretchling",
+      "source": "img/enemies-no-bg/wretchling.png"
+    },
+    {
+      "id": "wyvern",
+      "source": "img/enemies-no-bg/wyvern.png"
+    },
+    {
+      "id": "yeti",
+      "source": "img/enemies-no-bg/yeti.png"
+    }
+  ]
+}

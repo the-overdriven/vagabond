@@ -282,7 +282,8 @@ async function worldgen() {
       applyWorldTraits(traitNames.map(name=>{
         const trait=WORLD_TRAITS.find(t=>t.name===name);
         return {...trait,effects:trait.effects.map(e=>({...e,value:Array.isArray(e.value)?(e.value[0]+e.value[1])/2:e.value}))}
-      }), 'XS');MAP_W=unrotatedWorldWidth;MAP_H=unrotatedWorldHeight;generateMap();initDiscovered()`)
+      }), 'XS');MAP_W=unrotatedWorldWidth;MAP_H=unrotatedWorldHeight;`);
+    await run('CaveSilhouettes.prepare(WORLD_SEED)');run('generateMap();initDiscovered()')
     const result=plain(run(`(() => {
       let south=0,northWater=0,ice=0,coldWater=0,frozenRiver=0
       for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){

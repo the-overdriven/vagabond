@@ -36,6 +36,8 @@ describe('Decorative caves and deep threat rarity', () => {
         check(selections===deepLevels[0].caves.filter(c=>c.scenario).length,
           'each deep cave receives its weighted threat: '+selections+' selections for '+
           deepLevels[0].caves.filter(c=>c.scenario).length+' scenarios')
+        check(['silhouette','grotto','burrow'].every(style=>deepLevels[0].caves.some(c=>c.style===style)),
+          'required silhouette, grotto and burrow layouts retained')
         const lootCells=new Set()
         const nonHealingKinds=new Set(['speedpotion','scrollOfInvisibility',...TACTICAL_CONSUMABLE_KINDS])
         for(const g of groundItems.filter(g=>g.kind==='chest'||g.kind==='potion'||nonHealingKinds.has(g.kind)||g.kind.startsWith('scroll'))) {

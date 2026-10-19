@@ -767,6 +767,8 @@ function rotateGeneratedWorld(quarterTurns) {
 }
 
 function generateMap() {
+  if (!CAVE_SILHOUETTES.length || CAVE_SILHOUETTES[0].id !== CaveSilhouettes.idForSeed(WORLD_SEED))
+    throw new Error('Prepare the world silhouette before generating its map')
   const worldAttempts = MAX_WORLD_ATTEMPTS
   for (let attempt = 1; attempt <= worldAttempts; attempt++) {
     generateSurface()
@@ -784,7 +786,7 @@ function generateMap() {
         console.warn(`World generation failed to connect the Temple to a map edge in ${MAX_WORLD_ATTEMPTS} attempts; keeping the last world.`)
         surfaceMap = map.map(row => row.slice())
         if (!generateCaves() || deepLevels[0]?.caves?.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves)
-          throw new Error('Could not generate two distinct second-level caves.')
+          throw new Error('Could not generate the required second-level cave layouts.')
         if (!isBigBellReachableFromTemple())
           throw new Error('Cave generation left the Big Bell unreachable from the Temple.')
         // Cave generation stamps entrances onto `map`; keep the canonical
@@ -1041,7 +1043,7 @@ function generateCaves() {
     const trialMaps = caveMaps.map(cm => cm.map(row => row.slice()))
     const trialMap = undergroundMap.map(row => row.slice())
     const candidate = generateDeepLevel(caves, trialMaps, trialMap, 'cavefloor', 'cavefloor2', 'cavedown', 'caveup')
-    if (candidate.caves.length < 2) continue
+    if (candidate.caves.length < WORLD_GEN_CONFIG.caves.deep.minimumCaves || !candidate.caves.some(c => c.style === 'silhouette')) continue
     caveMaps = trialMaps
     undergroundMap = trialMap
     deep = candidate
@@ -3905,7 +3907,140 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
   return null
 }
 
-// Each world needs a broad grotto and a compact burrow at z:-2. Other
+// Break long dry-floor runs with rock or water, preserving one dry component.
+function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
+  const limit = WORLD_GEN_CONFIG.caves.deep.silhouette.maxStraightRun
+  const pillars = new Set(), directions = [[1,0],[0,1]]
+  const safe = p => Math.max(Math.abs(p.x-spot.x),Math.abs(p.y-spot.y)) <= 1
+  const inside = p => p.x>bounds.x1 && p.x<bounds.x2 && p.y>bounds.y1 && p.y<bounds.y2
+  const connected = () => {
+    const seen=new Set([keyXY(spot.x,spot.y)]),queue=[spot]
+    for(let i=0;i<queue.length;i++) for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
+      if(cm[y]?.[x]!==floorTile||seen.has(k))continue
+      seen.add(k);queue.push({x,y})
+    }
+    let floor=0
+    for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)floor++
+    return seen.size===floor
+  }
+  // Every accepted iteration reserves another obstruction permanently, so this terminates.
+  for(let iteration=0;iteration<(bounds.x2-bounds.x1+1)*(bounds.y2-bounds.y1+1);iteration++) {
+    const runs=[]
+    for(const [dx,dy] of directions) for(let y=bounds.y1+1;y<bounds.y2;y++)for(let x=bounds.x1+1;x<bounds.x2;x++) {
+      if(cm[y][x]!==floorTile||cm[y-dy]?.[x-dx]===floorTile)continue
+      const cells=[]
+      for(let xx=x,yy=y;cm[yy]?.[xx]===floorTile;xx+=dx,yy+=dy)cells.push({x:xx,y:yy})
+      if(cells.length>limit)runs.push({cells,dx,dy})
+    }
+    if(!runs.length)return true
+    runs.sort((a,b)=>b.cells.length-a.cells.length)
+    // One seeded roll per obstruction, shared by all of its placement attempts.
+    const obstacleTile=chance(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance)?'water':'cavewall'
+    const shape=obstacleTile==='water'?randInt(0,3):0
+    let changed=false
+    for(const {cells,dx,dy} of runs) {
+      const candidates=cells.slice(1,-1).sort((a,b)=>
+        Math.abs(cells.indexOf(a)-(cells.length-1)/2)-Math.abs(cells.indexOf(b)-(cells.length-1)/2))
+      for(const p of candidates) {
+        if(safe(p))continue
+        // Prefer clustered rocks or notched, connected pools over single-tile pinholes.
+        for(const size of [3,2]) {
+          let block=[]
+          for(let yy=0;yy<size;yy++)for(let xx=0;xx<size;xx++) {
+            if(obstacleTile==='water') {
+              if(size===3 && (shape%2===0 ? (xx===0&&yy===0)||(xx===2&&yy===2) : (xx===2&&yy===0)||(xx===0&&yy===2)))continue
+              if(size===2 && yy*2+xx===[0,1,2][shape%3])continue
+            }
+            block.push({x:p.x+xx-Math.floor(size/2),y:p.y+yy-Math.floor(size/2)})
+          }
+          // Preserve earlier obstructions and the silhouette's original rock boundary.
+          block=block.filter(q=>inside(q)&&cm[q.y][q.x]===floorTile)
+          if(block.some(q=>!inside(q)||safe(q)))continue
+          const old=block.map(q=>cm[q.y][q.x])
+          for(const q of block)cm[q.y][q.x]=obstacleTile
+          if(connected()){for(const q of block)pillars.add(keyXY(q.x,q.y));changed=true;break}
+          block.forEach((q,i)=>{cm[q.y][q.x]=old[i]})
+        }
+        if(changed)break
+        cm[p.y][p.x]=obstacleTile
+        if(connected()) { pillars.add(keyXY(p.x,p.y));changed=true;break }
+        // A one-tile-wide limb needs a dry bend around its new obstruction.
+        for(const side of [1,-1]) {
+          const nx=-dy*side,ny=dx*side
+          const detour=[{x:p.x-dx+nx,y:p.y-dy+ny},{x:p.x+nx,y:p.y+ny},{x:p.x+dx+nx,y:p.y+dy+ny}]
+          if(detour.some(q=>!inside(q)||pillars.has(keyXY(q.x,q.y))))continue
+          const old=detour.map(q=>cm[q.y][q.x])
+          for(const q of detour)cm[q.y][q.x]=floorTile
+          if(connected()) { pillars.add(keyXY(p.x,p.y));changed=true;break }
+          detour.forEach((q,i)=>{cm[q.y][q.x]=old[i]})
+        }
+        if(changed)break
+        cm[p.y][p.x]=floorTile
+      }
+      if(changed)break
+    }
+    if(!changed)return false
+  }
+  return false
+}
+
+// Integer prototype sampling keeps geometry independent of browser image decoding.
+function carveSilhouetteDungeon(spot, floorTile, reserved) {
+  const cfg = WORLD_GEN_CONFIG.caves.deep.silhouette
+  const prototype = pick(CAVE_SILHOUETTES)
+  const rows = prototype.rows, ph = rows.length, pw = rows[0].length
+  const mirror = chance(.5)
+  for (const [w, h] of cfg.sizes) {
+    const cells = []
+    for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
+      const sx = Math.floor((x - 2) * pw / (w - 4))
+      const sy = Math.floor((y - 2) * ph / (h - 4))
+      if (rows[sy][mirror ? pw - 1 - sx : sx] === '1') cells.push({x, y})
+    }
+    if (cells.length < cfg.minFloorTiles) continue
+    // Different solid anchors let the same shape fit beside nearby caves.
+    const targets = [[w/2,h/2],[w/4,h/4],[3*w/4,h/4],[w/4,3*h/4],[3*w/4,3*h/4]]
+    for (const [tx,ty] of targets) {
+      const anchor = cells.reduce((a,b) => (b.x-tx)**2+(b.y-ty)**2 < (a.x-tx)**2+(a.y-ty)**2 ? b : a)
+      const bounds = {x1:spot.x-anchor.x,y1:spot.y-anchor.y}
+      bounds.x2=bounds.x1+w-1; bounds.y2=bounds.y1+h-1
+      if (bounds.x1<2 || bounds.y1<2 || bounds.x2>=MAP_W-2 || bounds.y2>=MAP_H-2) continue
+      if (reserved.some(r => bounds.x1<=r.x2+2 && bounds.x2>=r.x1-2 && bounds.y1<=r.y2+2 && bounds.y2>=r.y1-2)) continue
+      const cm=blankCaveMap()
+      const floors=cells.map(p=>({x:bounds.x1+p.x,y:bounds.y1+p.y}))
+      for (const p of floors) cm[p.y][p.x]=floorTile
+      for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) cm[spot.y+dy][spot.x+dx]=floorTile
+      const seen=new Set(), queue=[spot], dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+      const flood=()=>{
+        for(let i=0;i<queue.length;i++) {
+          const p=queue[i];seen.add(keyXY(p.x,p.y))
+          for(const [dx,dy] of dirs) {
+            const x=p.x+dx,y=p.y+dy,k=keyXY(x,y)
+            if(cm[y]?.[x]!==floorTile || seen.has(k)) continue
+            seen.add(k);queue.push({x,y})
+          }
+        }
+      }
+      flood()
+      // Detached horns, weapons and thin diagonal limbs get short dry links.
+      for(const p of floors) if(!seen.has(keyXY(p.x,p.y))) {
+        const near=queue.reduce((a,b)=>Math.abs(b.x-p.x)+Math.abs(b.y-p.y)<Math.abs(a.x-p.x)+Math.abs(a.y-p.y)?b:a)
+        let x=p.x,y=p.y
+        while(x!==near.x || y!==near.y) {
+          cm[y][x]=floorTile
+          if(x!==near.x)x+=Math.sign(near.x-x);else y+=Math.sign(near.y-y)
+        }
+        seen.clear();queue.length=0;queue.push(spot);flood()
+      }
+      if (!breakLongSilhouetteRuns(cm,bounds,spot,floorTile)) continue
+      return {cm,bounds,rooms:[],hasWater:cm.some(row=>row.includes('water')),silhouetteId:prototype.id,silhouetteIds:prototype.sourceIds}
+    }
+  }
+  return null
+}
+
+// Each world needs a silhouette, a broad grotto and a compact burrow at z:-2. Other
 // branches are optional and use either generator, with reserved nonoverlap.
 function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile) {
   const cfg = WORLD_GEN_CONFIG.caves.deep
@@ -3924,7 +4059,7 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
         !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
-    const carve = style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
+    const carve = style === 'silhouette' ? carveSilhouetteDungeon : style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
     let spot = null, layout = null
     for (let tries = 0; tries < cfg.placementTriesPerBranch && open.length; tries++) {
       const candidate = open.splice(randInt(0, open.length - 1), 1)[0]
@@ -3939,16 +4074,17 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     levelCaveMaps.push(layout.cm)
     levelCaves.push({x: spot.x, y: spot.y, entrances: [{x: spot.x, y: spot.y}],
       rooms: layout.rooms, hasWater: layout.hasWater, style,
+      ...(layout.silhouetteId ? {silhouetteId: layout.silhouetteId, silhouetteIds: layout.silhouetteIds} : {}),
       brownFloor: style === 'burrow' && !levelCaves.some(c => c.brownFloor)})
     used.add(i)
     return true
   }
-  for (const style of ['grotto', 'burrow']) {
+  for (const style of ['silhouette', 'grotto', 'burrow']) {
     for (const i of eligible) {
-      if (!used.has(i) && addBranch(i, style)) break
+      if (addBranch(i, style)) break
     }
   }
-  if (levelCaves.length >= 2) for (const i of eligible) {
+  if (levelCaves.length >= cfg.minimumCaves) for (const i of eligible) {
     if (used.has(i) || !chance(cfg.optionalBranchChance)) continue
     addBranch(i, chance(cfg.optionalGrottoChance) ? 'grotto' : 'burrow')
   }

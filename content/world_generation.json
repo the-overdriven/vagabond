@@ -303,7 +303,13 @@
         "roomHalfSize": 3,
         "minFloorTiles": 120
       },
-      "minimumCaves": 2
+      "minimumCaves": 3,
+      "silhouette": {
+        "sizes": [[60,52],[48,42],[36,32],[28,26]],
+        "minFloorTiles": 90,
+        "maxStraightRun": 15,
+        "waterChance": 0.6
+      }
     }
   },
   "dwarvenFort": {

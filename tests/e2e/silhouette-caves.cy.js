@@ -1,0 +1,30 @@
+const checks=require('../helpers/silhouette-cave-checks.js')
+const extractionChecks=require('../helpers/silhouette-extraction-checks.js')
+describe('Monster silhouette caves',()=>{
+  for(const [seed,names] of [[12345,[]],[24680,[]],[67890,['hollow_world','things_below']]]) {
+    it('keeps connected deep layouts and save/replay state for '+seed,()=>{
+      cy.visit('/')
+      cy.get('#raceName').clear().type('Silhouette Tester')
+      cy.get('#btnBegin').click()
+      cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
+      cy.window().then(win=>win.eval(`(async()=>{
+        replayRecording=false;replayPlaying=false;currentZ=0;currentCave=-1;map=surfaceMap;
+        const traits=${JSON.stringify(names)}.map(name=>WORLD_TRAITS.find(t=>t.name===name));
+        applyWorldTraits(traits,'XS');WORLD_SEED=${seed};rngState=WORLD_SEED;
+        (${extractionChecks.toString()})();
+        await generateNewWorld();(${checks.toString()})();
+        if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.6)throw Error('60% water configuration');
+        const waterCave=deepLevels[0].caves.find(c=>c.style==='silhouette');
+        if(!waterCave.hasWater)throw Error('fixed seed fixture should contain water');
+        const prototype=CAVE_SILHOUETTES[0], rngBefore=rngState;
+        const reload=await CaveSilhouettes.prepare(WORLD_SEED);
+        if(JSON.stringify(reload.rows)!==JSON.stringify(prototype.rows)||rngState!==rngBefore)throw Error('cached extraction changes shape or RNG');
+        const saved=structuredClone(buildSaveObject());
+        const before=JSON.stringify({map:deepLevels[0].map,caves:deepLevels[0].caves,rng:rngState});
+        loadGameFromObject(saved,{isReplayInit:true});
+        if(JSON.stringify({map:deepLevels[0].map,caves:deepLevels[0].caves,rng:rngState})!==before)throw Error('save/replay init changes cave');
+        (${checks.toString()})();
+      })()`))
+    })
+  }
+})

@@ -713,6 +713,8 @@ more difficult:
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
   let unrotatedWorldWidth, unrotatedWorldHeight
+  let CAVE_SILHOUETTE_SOURCES = []
+  let CAVE_SILHOUETTES = []
   let WORLD_GEN_CONFIG = {}
   let BASE_WORLD_GEN_CONFIG = {}
   let WORLD_TRAITS = []
@@ -883,6 +885,7 @@ more difficult:
       items: 'items.json',
       mapConfig: 'map_config.json',
       worldGeneration: 'world_generation.json',
+      caveSilhouettes: 'cave_silhouettes.json',
       worldTraits: 'world_traits.json',
       merchantStockConfig: 'merchant_stock.json',
       rendering: 'rendering.json',
@@ -984,6 +987,8 @@ more difficult:
     MIN_LICHES = content.mapConfig.spawning.minLiches
     SURFACE_TILES_PER_ENEMY = content.mapConfig.spawning.surfaceTilesPerEnemy
     SURFACE_TILES_PER_CHEST = content.mapConfig.spawning.surfaceTilesPerChest
+    CAVE_SILHOUETTE_SOURCES = content.caveSilhouettes.sources
+    if (!CAVE_SILHOUETTE_SOURCES.length) throw new Error('No cave silhouettes available')
     BASE_WORLD_GEN_CONFIG = content.worldGeneration
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
     WORLD_TRAITS = content.worldTraits.traits
@@ -1765,6 +1770,7 @@ more difficult:
   }
 
 </script>
+<script src="src/caveSilhouettes.js"></script>
 <script src="src/worldGen.js"></script>
 <script src="src/dungeonTraps.js"></script>
 <script src="src/dungeonHazards.js"></script>
@@ -12220,6 +12226,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    await CaveSilhouettes.prepare(WORLD_SEED)
     inspectedDungeonLocks = new Set()
     merchantFortHintGiven = false
     worldKilledSpecies = new Set()

@@ -16,7 +16,7 @@ const document = {getElementById: id => {
   return elements.get(id)
 }, querySelector: () => element(), querySelectorAll: () => [], createElement: () => element(),
   documentElement:element(),body:element(),head:element(),addEventListener(){},hidden:false}
-const context = {document, console, URL, Blob, structuredClone, TextEncoder, TextDecoder,
+const context = {document, console, URL, Blob, Response, DecompressionStream, structuredClone, TextEncoder, TextDecoder,
   performance:{now:()=>0}, innerWidth:1280, innerHeight:800, devicePixelRatio:1,
   navigator:{userAgent:'node rules check',maxTouchPoints:0}, location:{protocol:'http:',hostname:'localhost',search:'',href:'http://localhost/'},
   localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
@@ -24,7 +24,11 @@ const context = {document, console, URL, Blob, structuredClone, TextEncoder, Tex
   addEventListener(){},getComputedStyle:()=>({getPropertyValue:()=> '0'}),
   setTimeout:()=>0,clearTimeout(){},setInterval:()=>0,clearInterval(){},requestAnimationFrame:()=>0,cancelAnimationFrame(){},
   Image: class {constructor(){this.complete=false} addEventListener(){}},
-  fetch: async url => ({ok:true,json:async()=>JSON.parse(fs.readFileSync(path.join(root,url),'utf8'))}),
+  fetch: async url => {
+    const file=path.join(root,String(url).split('?')[0]);
+    return {ok:fs.existsSync(file),json:async()=>JSON.parse(fs.readFileSync(file,'utf8')),
+      arrayBuffer:async()=>{const b=fs.readFileSync(file);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)}}
+  },
   alert: msg => {throw Error(msg)}, confirm:()=>true}
 context.window=context;context.self=context
 vm.createContext(context)
