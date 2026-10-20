@@ -380,7 +380,11 @@ describe('Fisherman and swimming', () => {
         currentZ=0; map=surfaceMap
         player.race='human'; player.godMode=false; player.maxHp=100; player.hp=100
         player.x=40; player.y=40; resetSwimming()
-        for(let y=38;y<44;y++) for(let x=38;x<65;x++) map[y][x]='grass'
+        player.poisonTurns=0; player.freezing={active:false,turns:0}
+        for(let y=38;y<44;y++) for(let x=38;x<65;x++) {
+          map[y][x]='grass'
+          delete tileUnderlays[keyXY(x,y)]
+        }
         for(let x=41;x<62;x++) map[40][x]='water'
         const before=turnCount
         await tryMove(1,0)
