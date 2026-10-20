@@ -2213,11 +2213,21 @@ placement trials use clean map copies; if any required style is missing, the
 world is regenerated. The final fallback enforces the same requirement.
 Additional unused parent caves retain their 50% chance of a grotto or burrow.
 
-Grotto footprints vary from 92×72 down to 42×36 tiles, with an area-scaled
-chamber count, possible loops, and an optional water pocket. Burrows vary from
-68×52 down to 28×24 tiles, with branching tunnels and scattered pockets. One
-complete burrow retains the darker brown floor. All dry floor tiles remain
-connected to their own staircase; crypt maps and the Dwarven Fort are separate.
+Grotto footprints vary from 92×72 down to 42×36 tiles, with irregular
+rooms linked into a connected chamber network. Burrows vary from 68×52 down to
+28×24 tiles and retain their branching, narrow-tunnel identity. One burrow
+retains its distinct brown floor. **Topology variation (Deep Caves 2.0,
+geometry batch)** now samples connectivity and shape parameters separately
+for each grotto or burrow: the cave may have few or many meaningful loops,
+small or large chambers/pockets, narrow or wider passages, shorter or longer
+branches and up to three water pockets in a grotto or two in a burrow.
+Water is optional and may not cut off any dry-floor route. Burrows stay below
+63% dry-footprint coverage, with usual tunnels just one or three tiles wide;
+large room networks remain the domain of grottos. All dry floor tiles remain
+connected to their own staircase. This geometry-only batch **does not yet link
+different deep caves into shared complexes**, change their populations or
+loot budgets, or change the silhouette extraction and layout algorithm.
+Crypt maps and the Dwarven Fort remain separate.
 
 ### Monster silhouette cave prototype
 
@@ -2456,6 +2466,37 @@ structures, including sarcophagi, burial niches, rubble, and the crypt trap.
 # 15. Cave Generation
 
 Up to six initial caves are attempted.
+
+## Deep grotto and burrow route variety
+
+For each generic **z:-2** grotto, the generator samples a chamber density
+(divisor 235–410), chamber-count bonus (2–6, adjusted by world traits),
+chamber radii (3–10 horizontally, 2–9 vertically), center separation,
+ragged edges, passage widths (typically 1–4), midpoint detours and **0–9
+optional loop attempts**. A loop is carved only if it provides a meaningful
+shorter route between previously connected chambers (the existing path must
+be at least 1.7 times the direct Manhattan distance). Some generated grotto
+networks deliberately have no extra loop. Water has a configurable 60% base
+chance, with **1–3 attempted pockets** when selected; each pocket is accepted
+only if every remaining dry tile is still reachable from the stair.
+
+Burrows vary their turning chance (**8–40%** before world-trait adjustments),
+branch count (**4–15**, area-limited), path lengths, segment widths, narrow
+pockets and **0–7 optional narrow shortcuts**. The shortcuts need a genuine
+detour to shorten, using an existing dry-path / direct-distance ratio of at
+least **1.8**. Burrows can optionally receive **0–2 small water pockets**,
+subject to the same dry reachability guarantee. Their dry footprint must cover
+less than **63%** of the reserved rectangle, retaining meaningful tunnel space
+instead of becoming another irregular grotto.
+
+Both styles retain their **original maximum footprint choices** (modulo Cursed
+World modifiers), existing paired stairs and deterministic worldgen. Cursed
+World effects on room bonus, radius caps, link attempts, turn rates, minimum
+branches/steps, water odds and pool radii are applied on top of the newly
+sampled ranges. Generated maps persist as ordinary underground tiles; no new
+runtime state, save flag, replay action or monster mechanic is introduced.
+The silhouette-cave algorithm and its source imagery are unchanged.
+
 
 ## Decorative cave props
 

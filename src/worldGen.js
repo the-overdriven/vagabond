@@ -3735,9 +3735,85 @@ function buildDwarvenRuinsStratum() {
   return true
 }
 
+// Deep Caves 2.0, batch 1: topology variation is sampled once per layout
+// attempt. Everything is resolved during seeded worldgen and stored as tiles;
+// there is no runtime or save-only topology flag to desynchronize a replay.
+function caveTopologyRoll(range) { return randInt(range[0], range[1]) }
+function caveTopologyCenterRoll(range) {
+  return Math.round((caveTopologyRoll(range) + caveTopologyRoll(range)) / 2)
+}
+function caveDryReachable(cm, start, floorTile) {
+  if (cm[start.y]?.[start.x] !== floorTile && cm[start.y]?.[start.x] !== 'caveup') return new Set()
+  const seen = new Set([keyXY(start.x, start.y)]), queue = [start]
+  for (let i = 0; i < queue.length; i++) for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const x = queue[i].x + dx, y = queue[i].y + dy, key = keyXY(x, y)
+    if (cm[y]?.[x] !== floorTile || seen.has(key)) continue
+    seen.add(key); queue.push({x,y})
+  }
+  return seen
+}
+// Returns walking distance without altering the map. Used to avoid carving
+// cosmetic 'loops' between two ends which are already connected nearby.
+function caveDryPathLength(cm, start, target, floorTile) {
+  const queue = [{x:start.x, y:start.y, d:0}], seen = new Set([keyXY(start.x,start.y)])
+  for (let i = 0; i < queue.length; i++) {
+    const p = queue[i]
+    if (p.x === target.x && p.y === target.y) return p.d
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const x=p.x+dx,y=p.y+dy,key=keyXY(x,y)
+      if (cm[y]?.[x]!==floorTile || seen.has(key)) continue
+      seen.add(key);queue.push({x,y,d:p.d+1})
+    }
+  }
+  return Infinity
+}
+
+// Water is optional, never blocks stairs or disconnects a formerly connected
+// dry cave. An unsuccessful pool is discarded, not repaired with new corridors.
+function carveDeepWaterPockets(cm, rooms, bounds, entrance, floorTile, config, count, radiusX, radiusY) {
+  let hasWater = false, accepted = 0
+  const candidates = rooms.slice(1)
+  for (let i=candidates.length-1;i>0;i--) { const j=randInt(0,i);[candidates[i],candidates[j]]=[candidates[j],candidates[i]] }
+  for (const room of candidates) {
+    if (accepted >= count) break
+    const wx = room.cx + randInt(-config.waterCenterJitter, config.waterCenterJitter)
+    const wy = room.cy + randInt(-config.waterCenterJitter, config.waterCenterJitter)
+    const cells=[]
+    for (let dy=-radiusY;dy<=radiusY;dy++) for (let dx=-radiusX;dx<=radiusX;dx++) {
+      const x=wx+dx,y=wy+dy
+      if (cm[y]?.[x]!==floorTile || (Math.abs(x-entrance.x)<=2 && Math.abs(y-entrance.y)<=2) ||
+        dx*dx/(radiusX*radiusX)+dy*dy/(radiusY*radiusY) >= config.waterEllipseThreshold) continue
+      cells.push({x,y});cm[y][x]='water'
+    }
+    if (cells.length < config.minWaterCells) { for (const p of cells) cm[p.y][p.x]=floorTile;continue }
+    let remaining=0
+    for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)remaining++
+    if (caveDryReachable(cm,entrance,floorTile).size !== remaining) {
+      for (const p of cells) cm[p.y][p.x]=floorTile
+      continue
+    }
+    hasWater=true;accepted++
+  }
+  return hasWater
+}
+
 // Organic grotto chambers and winding passages, using the world seed.
 function carveDeepDungeon(spot, floorTile, reserved) {
   const cfg = WORLD_GEN_CONFIG.caves.deep.grotto
+  const variation = cfg.topologyVariation
+  const densityDivisor = caveTopologyCenterRoll(variation.roomDensityDivisorRange)
+  const countBonus = caveTopologyCenterRoll(variation.roomCountBonusRange) +
+    (cfg.roomCountBonus - variation.baselineRoomCountBonus)
+  const separationSquared = caveTopologyCenterRoll(variation.centerSeparationSquaredRange)
+  const jitter = caveTopologyCenterRoll(variation.passageJitterRange)
+  const loopTarget = Math.max(0,caveTopologyRoll(variation.extraLoopCountRange) +
+    cfg.extraConnections - variation.baselineExtraConnections)
+  const narrowChance = variation.singleWidthChance
+  const edgeMin = caveTopologyRoll(variation.edgeVarianceMinRange)
+  const edgeMax = caveTopologyRoll(variation.edgeVarianceMaxRange)
+  const waterPockets = chance(cfg.waterChance) ? caveTopologyCenterRoll(variation.waterPocketCountRange) : 0
+  const radiusXMax = variation.radiusXRange[1] + cfg.roomRadiusXRange[1] - variation.baselineRoomRadiusX
+  const radiusYMax = variation.radiusYRange[1] + cfg.roomRadiusYRange[1] - variation.baselineRoomRadiusY
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   const sizes = cfg.sizes.map(size => size.slice())
   for (let i = sizes.length - 1; i > 0; i--) {
@@ -3763,25 +3839,29 @@ function carveDeepDungeon(spot, floorTile, reserved) {
 
       // Choose separated centers first. Chambers can meet at their ragged
       // edges; this makes open caverns without square room boundaries.
-      const targetRooms = Math.max(cfg.minRooms, Math.round(w * h / cfg.roomDensityDivisor) + cfg.roomCountBonus)
+      const targetRooms = Math.max(cfg.minRooms, Math.round(w * h / densityDivisor) + countBonus)
       const rooms = [{cx: spot.x, cy: spot.y}]
       for (let tries = 0; tries < cfg.roomPlacementTries && rooms.length < targetRooms; tries++) {
         const cx = randInt(bounds.x1 + cfg.roomCenterMargin, bounds.x2 - cfg.roomCenterMargin)
         const cy = randInt(bounds.y1 + cfg.roomCenterMargin, bounds.y2 - cfg.roomCenterMargin)
-        if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < cfg.minCenterDistanceSquared)) continue
+        if (rooms.some(r => (r.cx - cx) ** 2 + (r.cy - cy) ** 2 < separationSquared)) continue
         rooms.push({cx, cy})
       }
-      if (rooms.length < Math.max(cfg.minAcceptedRooms, targetRooms - cfg.acceptedRoomShortfall)) continue
+      // Topology targets are preferences: a densely sampled target must not
+      // reject every feasible cave when a large room/spacing combination fits
+      // fewer centers. Retain a genuine minimum number of chambers.
+      if (rooms.length < Math.max(cfg.minRooms, Math.round(targetRooms * .66))) continue
       const cm = blankCaveMap()
       for (const room of rooms) {
-        const rx = randInt(cfg.roomRadiusXRange[0], cfg.roomRadiusXRange[1]), ry = randInt(cfg.roomRadiusYRange[0], cfg.roomRadiusYRange[1])
+        const rx = randInt(variation.radiusXRange[0], radiusXMax),
+          ry = randInt(variation.radiusYRange[0], radiusYMax)
         room.x1 = Math.max(bounds.x1 + 1, room.cx - rx)
         room.x2 = Math.min(bounds.x2 - 1, room.cx + rx)
         room.y1 = Math.max(bounds.y1 + 1, room.cy - ry)
         room.y2 = Math.min(bounds.y2 - 1, room.cy + ry)
         // Angular radius changes every few tiles; the center always stays
         // open, while the wall becomes lobed rather than rectangular.
-        const edge = Array.from({length: cfg.edgeSamples}, () => randInt(cfg.edgeVariancePercentRange[0], cfg.edgeVariancePercentRange[1]) / 100)
+        const edge = Array.from({length: cfg.edgeSamples}, () => randInt(edgeMin, edgeMax) / 100)
         for (let y = room.y1; y <= room.y2; y++) for (let x = room.x1; x <= room.x2; x++) {
           const dx = (x - room.cx) / rx, dy = (y - room.cy) / ry
           const angle = Math.floor((Math.atan2(dy, dx) + Math.PI) * cfg.edgeSamples / (2 * Math.PI)) % cfg.edgeSamples
@@ -3793,39 +3873,59 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       // Step toward an offset midpoint and then the target; varied passage
       // widths and turns keep the links from reading as grid-aligned halls.
       const passage = (from, to) => {
-        const mid = {x: Math.round((from.cx + to.cx) / 2) + randInt(-cfg.passageMidpointJitter, cfg.passageMidpointJitter),
-          y: Math.round((from.cy + to.cy) / 2) + randInt(-cfg.passageMidpointJitter, cfg.passageMidpointJitter)}
-        const brush = (x, y, width) => {
-          for (let yy = y - 1; yy <= y + width - 2; yy++)
-            for (let xx = x - 1; xx <= x + width - 2; xx++)
-              if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
-                cm[yy][xx] = floorTile
+        const mid = {
+          x: Math.max(bounds.x1 + 2, Math.min(bounds.x2 - 2,
+            Math.round((from.cx + to.cx) / 2) + randInt(-jitter, jitter))),
+          y: Math.max(bounds.y1 + 2, Math.min(bounds.y2 - 2,
+            Math.round((from.cy + to.cy) / 2) + randInt(-jitter, jitter)))
         }
+        const brush = (x, y, width) => {
+          const left = Math.floor((width - 1) / 2), right = Math.ceil((width - 1) / 2)
+          for (let yy=y-left; yy<=y+right; yy++) for (let xx=x-left; xx<=x+right; xx++)
+            if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
+              cm[yy][xx] = floorTile
+        }
+        const baseWidth = chance(narrowChance) ? 1 : caveTopologyCenterRoll(variation.passageWidthRange)
         let x = from.cx, y = from.cy, step = 0
         for (const goal of [mid, {x: to.cx, y: to.cy}]) {
           while (x !== goal.x || y !== goal.y) {
             const moveX = x !== goal.x && (y === goal.y || chance(cfg.passageHorizontalChance))
             if (moveX) x += Math.sign(goal.x - x)
             else y += Math.sign(goal.y - y)
-            brush(x, y, step++ % cfg.passageWideCycle < cfg.passageWideSteps ? 3 : 2)
+            brush(x, y, step++ % cfg.passageWideCycle < cfg.passageWideSteps ?
+              Math.min(4, baseWidth + 1) : baseWidth)
           }
         }
       }
-      const connected = [rooms[0]]
+      const connected = [rooms[0]], edges = new Set()
       const remaining = rooms.slice(1)
+      const edgeKey = (a,b) => [rooms.indexOf(a), rooms.indexOf(b)].sort((x,y)=>x-y).join(':')
       while (remaining.length) {
         let best = null, score = Infinity
         for (const r of remaining) for (const parent of connected) {
-          const d = (r.cx - parent.cx) ** 2 + (r.cy - parent.cy) ** 2
-          if (d < score) { score = d; best = {r, parent} }
+          const d = (r.cx-parent.cx)**2 + (r.cy-parent.cy)**2
+          if (d < score) { score=d;best={r,parent} }
         }
-        passage(best.parent, best.r)
+        passage(best.parent,best.r)
+        edges.add(edgeKey(best.parent,best.r))
         connected.push(best.r)
-        remaining.splice(remaining.indexOf(best.r), 1)
+        remaining.splice(remaining.indexOf(best.r),1)
       }
-      for (let i = 0; i < cfg.extraConnections; i++) {
-        const a = pick(rooms), b = pick(rooms)
-        if (a !== b) passage(a, b)
+      // Choose genuine alternative routes. A nearby shortcut already reachable
+      // in approximately the same walking distance is not a meaningful loop.
+      const candidates=[]
+      for(let a=0;a<rooms.length;a++)for(let b=a+1;b<rooms.length;b++){
+        const from=rooms[a],to=rooms[b],direct=Math.abs(from.cx-to.cx)+Math.abs(from.cy-to.cy)
+        if(edges.has(edgeKey(from,to)) || direct<variation.minLoopEndpointDistance ||
+          direct>variation.maxLoopEndpointDistance)continue
+        candidates.push({from,to,direct})
+      }
+      for(let i=candidates.length-1;i>0;i--){const j=randInt(0,i);[candidates[i],candidates[j]]=[candidates[j],candidates[i]]}
+      let loops=0
+      for(const pair of candidates){
+        if(loops>=loopTarget)break
+        if(caveDryPathLength(cm,pair.from,pair.to,floorTile) < pair.direct*variation.loopDetourFactor)continue
+        passage(pair.from,pair.to);edges.add(edgeKey(pair.from,pair.to));loops++
       }
       // Jagged chamber edges can leave tiny isolated floor fragments. Keep
       // only the continuous grotto reached from the staircase.
@@ -3839,41 +3939,13 @@ function carveDeepDungeon(spot, floorTile, reserved) {
       for (let y = bounds.y1; y <= bounds.y2; y++)
         for (let x = bounds.x1; x <= bounds.x2; x++)
           if (cm[y][x] === floorTile && !reachable.has(keyXY(x, y))) cm[y][x] = 'cavewall'
-      // A water pocket is only accepted if all dry tiles remain reachable.
-      let hasWater = false
-      if (chance(cfg.waterChance)) {
-        const candidates = rooms.slice(1)
-        for (let i = candidates.length - 1; i > 0; i--) {
-          const j = randInt(0, i)
-          ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
-        }
-        for (const r of candidates) {
-          const wx = r.cx + randInt(-cfg.waterCenterJitter, cfg.waterCenterJitter), wy = r.cy + randInt(-cfg.waterCenterJitter, cfg.waterCenterJitter)
-          const cells = []
-          for (let dy = -cfg.waterRadiusY; dy <= cfg.waterRadiusY; dy++) for (let dx = -cfg.waterRadiusX; dx <= cfg.waterRadiusX; dx++) {
-            const x = wx + dx, y = wy + dy
-            if (cm[y]?.[x] === floorTile && dx * dx / (cfg.waterRadiusX ** 2) + dy * dy / (cfg.waterRadiusY ** 2) < cfg.waterEllipseThreshold &&
-              !(x === spot.x && y === spot.y)) { cells.push({x, y}); cm[y][x] = 'water' }
-          }
-          if (cells.length < cfg.minWaterCells) { for (const p of cells) cm[p.y][p.x] = floorTile; continue }
-          const seen = new Set([keyXY(spot.x, spot.y)]), queue = [spot]
-          for (let i = 0; i < queue.length; i++) {
-            const p = queue[i]
-            for (const [dx, dy] of DIRS4) {
-              const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
-              if (cm[y]?.[x] !== floorTile || seen.has(key)) continue
-              seen.add(key)
-              queue.push({x, y})
-            }
-          }
-          let dryFloor = 0
-          for (let y = bounds.y1; y <= bounds.y2; y++)
-            for (let x = bounds.x1; x <= bounds.x2; x++)
-              if (cm[y][x] === floorTile) dryFloor++
-          if (seen.size === dryFloor) { hasWater = true; break }
-          for (const p of cells) cm[p.y][p.x] = floorTile
-        }
-      }
+      // Several independent pockets may be accepted; each must preserve
+      // cardinal dry access to every other part of the cave.
+      const hasWater = waterPockets > 0 && carveDeepWaterPockets(cm,rooms,bounds,spot,floorTile,
+        cfg,waterPockets,Math.max(1,caveTopologyCenterRoll(variation.waterRadiusXRange) +
+          cfg.waterRadiusX - variation.baselineWaterRadiusX),
+        Math.max(1,caveTopologyCenterRoll(variation.waterRadiusYRange) +
+          cfg.waterRadiusY - variation.baselineWaterRadiusY))
       let dryFloor = 0
       for (let y = bounds.y1; y <= bounds.y2; y++)
         for (let x = bounds.x1; x <= bounds.x2; x++)
@@ -3889,6 +3961,20 @@ function carveDeepDungeon(spot, floorTile, reserved) {
 // It can fit around crowded surface entrances where a broad grotto cannot.
 function carveBurrowDungeon(spot, floorTile, reserved) {
   const cfg = WORLD_GEN_CONFIG.caves.deep.burrow
+  const variation = cfg.topologyVariation
+  const turnChance = Math.max(0, Math.min(.85,
+    caveTopologyRoll(variation.turnPercentRange) / 100 + cfg.turnChance - variation.baselineTurnChance))
+  const branchCountBonus = caveTopologyCenterRoll(variation.branchCountBonusRange)
+  const stepBonus = caveTopologyCenterRoll(variation.stepLengthBonusRange) +
+    (cfg.stepLengthBonus - variation.baselineStepLengthBonus)
+  const normalRadius = caveTopologyRoll(variation.normalBrushRadiusRange)
+  const wideRadius = Math.max(normalRadius, caveTopologyRoll(variation.wideBrushRadiusRange))
+  const widePeriod = caveTopologyCenterRoll(variation.widePeriodRange)
+  const wideSteps = caveTopologyRoll(variation.wideStepsRange)
+  const pocketHalfSize = caveTopologyCenterRoll(variation.pocketHalfSizeRange)
+  const extraLinks = caveTopologyRoll(variation.extraLoopCountRange)
+  const continueLastBranchChance = caveTopologyRoll(variation.continueLastBranchPercentRange) / 100
+  const waterPockets = chance(variation.waterChance) ? caveTopologyRoll(variation.waterPocketCountRange) : 0
   const sizes = cfg.sizes
   const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   for (const [w, h] of sizes) {
@@ -3909,7 +3995,7 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
         bounds.y1 <= r.y2 + cfg.reservedPadding && bounds.y2 >= r.y1 - cfg.reservedPadding)) continue
       const cm = blankCaveMap(), rooms = []
       const brush = (x, y, wide) => {
-        const radius = wide ? cfg.wideBrushRadius : cfg.brushRadius
+        const radius = wide ? wideRadius : normalRadius
         for (let yy = y - radius; yy <= y + radius; yy++)
           for (let xx = x - radius; xx <= x + radius; xx++)
             if (xx > bounds.x1 && xx < bounds.x2 && yy > bounds.y1 && yy < bounds.y2)
@@ -3917,14 +4003,18 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
       }
       brush(spot.x, spot.y, true)
       const tips = [{x: spot.x, y: spot.y}]
-      const branches = Math.max(cfg.minBranches, Math.round(w * h / cfg.branchDensityDivisor))
+      const branches = Math.min(variation.maxBranches, Math.max(variation.minBranches +
+        cfg.minBranches - variation.baselineMinBranches,
+        Math.round(w * h / cfg.branchDensityDivisor) + branchCountBonus))
       for (let branch = 0; branch < branches; branch++) {
-        const origin = pick(tips)
+        const origin = chance(continueLastBranchChance) ? tips[tips.length-1] : pick(tips)
         let x = origin.x, y = origin.y
         let [dx, dy] = pick(dirs)
-        const steps = randInt(Math.max(cfg.minSteps, Math.round((w + h) / 2)), w + h + cfg.stepLengthBonus)
+        const steps = randInt(Math.max(variation.minSteps + cfg.minSteps - variation.baselineMinSteps,
+          Math.round((w + h) / 3)),
+          w + h + stepBonus)
         for (let step = 0; step < steps; step++) {
-          if (chance(cfg.turnChance)) [dx, dy] = pick(dirs)
+          if (chance(turnChance)) [dx, dy] = pick(dirs)
           const nx = x + dx, ny = y + dy
           if (nx <= bounds.x1 + cfg.boundsMargin || nx >= bounds.x2 - cfg.boundsMargin ||
             ny <= bounds.y1 + cfg.boundsMargin || ny >= bounds.y2 - cfg.boundsMargin) {
@@ -3932,18 +4022,44 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
             continue
           }
           x = nx; y = ny
-          brush(x, y, step % cfg.wideCycle < cfg.wideSteps)
+          brush(x, y, step % widePeriod < wideSteps)
         }
         brush(x, y, true)
         tips.push({x, y})
-        rooms.push({cx: x, cy: y, x1: x - cfg.roomHalfSize, x2: x + cfg.roomHalfSize, y1: y - cfg.roomHalfSize, y2: y + cfg.roomHalfSize})
+        rooms.push({cx:x,cy:y,x1:x-pocketHalfSize,x2:x+pocketHalfSize,
+          y1:y-pocketHalfSize,y2:y+pocketHalfSize})
       }
-      let floor = 0
-      for (let y = bounds.y1; y <= bounds.y2; y++)
-        for (let x = bounds.x1; x <= bounds.x2; x++)
-          if (cm[y][x] === floorTile) floor++
-      if (floor < cfg.minFloorTiles) continue
-      return {cm, rooms, bounds, hasWater: false, style: 'burrow'}
+      // Burrow shortcuts are short, narrow connectors across nearby branches;
+      // unlike grotto loops, they never carve new broad chambers.
+      const candidates=[]
+      for(let a=0;a<tips.length;a++)for(let b=a+1;b<tips.length;b++){
+        const from=tips[a],to=tips[b],direct=Math.abs(from.x-to.x)+Math.abs(from.y-to.y)
+        if(direct>=variation.minLoopEndpointDistance && direct<=variation.maxLoopEndpointDistance)
+          candidates.push({from,to,direct})
+      }
+      for(let i=candidates.length-1;i>0;i--){const j=randInt(0,i);[candidates[i],candidates[j]]=[candidates[j],candidates[i]]}
+      let made=0
+      for(const p of candidates){
+        if(made>=extraLinks)break
+        if(caveDryPathLength(cm,p.from,p.to,floorTile)<p.direct*variation.loopDetourFactor)continue
+        let x=p.from.x,y=p.from.y
+        const horizontalFirst=chance(.5)
+        for(const axis of (horizontalFirst?['x','y']:['y','x']))while((axis==='x'?x:y)!==(axis==='x'?p.to.x:p.to.y)){
+          if(axis==='x')x+=Math.sign(p.to.x-x);else y+=Math.sign(p.to.y-y)
+          if(x>bounds.x1 && x<bounds.x2 && y>bounds.y1 && y<bounds.y2)cm[y][x]=floorTile
+        }
+        made++
+      }
+      let floor=0
+      for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)floor++
+      if(floor<cfg.minFloorTiles || floor/(w*h)>variation.maxDryFootprintFraction)continue
+      const hasWater = waterPockets>0 && carveDeepWaterPockets(cm,
+        [{cx:spot.x,cy:spot.y},...rooms],bounds,spot,floorTile,
+        {waterCenterJitter:variation.waterCenterJitter,
+          minWaterCells:variation.minWaterCells,waterEllipseThreshold:.88},
+        waterPockets,variation.waterRadiusX,variation.waterRadiusY)
+      // Water can only remove dry cells, never sever mandatory paths.
+      return {cm,rooms,bounds,hasWater,style:'burrow'}
     }
   }
   return null
