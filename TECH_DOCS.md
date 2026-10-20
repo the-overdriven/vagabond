@@ -2216,11 +2216,9 @@ Links are generated **after source cave carving** and exist only on the shared
 map. The original source masks, silhouette shapes and the brown burrow's local
 floor region are not altered. For each complex the generator stores sorted
 source membership and entrances, and partitions the reachable dry floor into
-irregular **territories** using walking-distance seeds. Territories currently
-record generation topology only: they do not constrain monster movement,
-change AI or add faction rules. Population and loot still use the older
-per-source scenario behavior until the following ecosystem batch; merging
-creates no additional scenario, extra chest allocation or extra monster quota.
+irregular **territories** using walking-distance seeds. Territories guide initial enemy placement but do not constrain monster
+movement, change AI or add faction rules. Loot remains per source cave in
+the current population batch; merging gives no additional reward.
 
 Connector cells and territory/complex metadata are saved and restored directly;
 the shared map is reconstructed by overlaying saved connectors after the source
@@ -2248,9 +2246,9 @@ branches and up to three water pockets in a grotto or two in a burrow.
 Water is optional and may not cut off any dry-floor route. Burrows stay below
 63% dry-footprint coverage, with usual tunnels just one or three tiles wide;
 large room networks remain the domain of grottos. All dry floor tiles remain
-connected to their own staircase. This geometry-only batch **does not yet link
-different deep caves into shared complexes**, change their populations or
-loot budgets, or change the silhouette extraction and layout algorithm.
+connected to their own staircase. Subsequent Deep Caves 2.0 batches allow optional connecting corridors and
+territory-based populations, but do not change the silhouette extraction
+or source layout algorithm. The later loot-budget work is still pending.
 Crypt maps and the Dwarven Fort remain separate.
 
 ### Monster silhouette cave prototype
@@ -2258,7 +2256,7 @@ Crypt maps and the Dwarven Fort remain separate.
 Only generic **z:-2** receives silhouette caves. A world-seeded selection from
 `content/cave_silhouettes.json` determines the shape, with optional horizontal
 mirroring. Transparent enemy images provide geometry only: the selected monster
-has **no influence on inhabitants, rewards, tiers or scenario selection**.
+has **no influence on inhabitants, rewards or tier preferences**.
 Normal deep-cave population and entrance safety rules still apply. The extra
 cave receives normal scenario population, so this adds exploration and potential
 rewards as well as terrain variety.
@@ -2576,79 +2574,89 @@ replaying a saved world restores its Vampire without spawning a replacement.
 
 ## Ordinary cave scenarios
 
-Ordinary z:-1 caves draw from **eight surface scenarios** during the initial
-population pass. Generic z:-2 caves draw from a separate, stronger pool of
-**five deep scenarios**. The story crypt, mausoleum, and Dwarven Fort retain
-their dedicated contents. Surface scenarios are:
+Ordinary z:-1 caves retain their **eight seeded scenarios** and entrance clues.
+The generic z:-2 population is no longer scenario-based; it uses the
+**Deep Caves 2.0 parametric ecosystem** detailed below. Crypt, mausoleum and
+Dwarven Fort encounters remain separate.
 
-| Scenario | Encounter and distinguishing features |
+| Shallow scenario | Encounter and distinctive features |
 |---|---|
-| Abandoned camp | A few bats and rats, a campfire, chest, and Life Potion |
-| Bat roost | A larger group of bats placed deeper inside, plus a chest |
-| Rat warren | Many rats, chest, and searchable remains at z:-1 |
-| Goblin cache | Goblins guarding a chest; better chest at z:-2 |
-| Bone hollow | Skeletons near the chest and searchable remains at z:-1 |
-| Chitin nest | Giant Bugs deeper inside the cave |
-| Beast den | A pack of Wolves |
-| Smugglers' refuge | Goblins and another creature, a campfire, chest, and Scroll of Invisibility |
+| Abandoned camp | Bats, rats, campfire, chest and Life Potion |
+| Bat roost | Bats gathered deeper inside and a chest |
+| Rat warren | Giant Rats, chest and remains |
+| Goblin cache | Goblins guarding a chest |
+| Bone hollow | Skeletons near loot and remains |
+| Chitin nest | Giant Bugs deeper inside |
+| Beast den | A Wolf pack |
+| Smugglers' refuge | Goblins, another creature, campfire and supplies |
 
-The z:-2 scenarios retain **one Tier-2 species per cave**, chosen from
-Goblins, Skeletons, Kobolds, Skinks, or Ratlings. Their ordinary population is
-24–36 enemies before other cave spawns. The **Things Below** trait raises this
-range to 30–44. Ordinary enemies prefer positions beyond an eight-tile
-Manhattan clearance from every staircase and at least three tiles apart
-(Chebyshev distance), using other open positions only when space runs out.
-Grottos spread them among side rooms; burrows use the same clearance and
-spacing on open passages rather than the scenario's chest-guard placement.
-Eight to twelve chests are distributed
-through the cave, alternating tier 3 and tier 2; there are also four loose
-supplies (two potions and two scrolls). No Giant Rats, Giant Bats,
-Wolves, Boars, or Giant Bugs are selected for new z:-2 cave scenario groups.
-Each populated generic z:-2 cave also gets one guaranteed Champion of its
-scenario species, surrounded by four unprefixed guards of the same type, and
-one rarity-weighted tier-3 or tier-4 enemy. Species with rarity ≤ 0.1 are
-excluded from this extra-threat pool; missing rarity means weight 1. The
-remaining species use their configured relative rarity weights. This replaces
-uniform selection, and applies to every ordinary deep scenario, including
-Ratling burrows. Scenario groups, Champion guards, and dedicated story spawns
-retain their own rules. The group is reserved before normal
-spawns in a chamber far from the staircase; the stronger enemy is also placed
-away from it. These are in addition to the normal 11% prefix
-rolls and carry the same level and cave identity as the group.
+### Deep Caves 2.0 — territory-based populations (v192 / schema 99)
 
-Fungus can spawn naturally in ordinary caves on **z:-1 and z:-2**. Each
-populated cave gets an independent **35% chance for one Fungus** and a further
-**15% chance for a second**. After all ordinary caves are populated, the game
-counts underground Fungus across both levels and tops up random valid cave-floor
-positions until there are at least **3 Fungus total in the whole world's ordinary
-underground network**. This is a world-wide minimum, not a per-cave minimum.
-Crypts, mausoleums, and the Dwarven Fort are not used for this guarantee.
+On z:-2 the generator populates **connected complexes**, not a predefined
+cave-type deck. Each source cave still retains its style, entrance coordinates,
+source tile mask and `caveIndex`. Complexes and irregular territories use the
+stored topology from the previous generation stage; they do **not** introduce
+new movement or territorial AI. Monsters can travel across linked caves.
 
-| Deep scenario | Enemy group | Distinctive contents |
-|---|---|---|
-| Goblin cache | Goblins | Chests spread through guarded rooms |
-| Bone hollow | Skeletons | Chests spread through guarded rooms |
-| Kobold outpost | Kobolds | Chests and campfire |
-| Skink den | Skinks | Chests and Potion of Speed |
-| Ratling burrow | Ratlings | Chests and Life Potion |
+The ecosystem parameters live under `cavePopulation.ecosystem` in
+`content/world_generation.json`. For each complex, the generator samples a
+center-weighted population density between **6 and 43 monsters per 1000 source
+dry-floor tiles**, scaled by the existing `deepMonsterMin` and `deepMonsterMax`
+world-trait modifiers. Population is capped at **70 monsters per source component**,
+not at 105 per merged complex. A separate threat budget limits effective
+population strength; stronger encounters consume more of that budget.
 
-Each depth shuffles its own scenario deck and avoids repeats within that depth
-until its pool is exhausted. Rewards use existing chest and consumable rules;
-the scenario controls placement, not the contents of a normal chest. There may
-be fewer eligible caves than scenario types in a world, so one world need not
-contain every scenario.
+Each territory receives a randomized population share weighted by its usable
+area and local density, with a **16% initial chance of being empty**. Actual
+occupancy depends on stair clearance, terrain, available positions and the
+shared budget. Species selection uses template `rarity`, tier weights, a
+randomized complex-wide preference, and additional local preference to
+repeat species within a territory. Consequently one territory can contain
+multiple species while another may have entirely different inhabitants.
+The maximum across a complex is 18 species and at most 7 preferred species
+per territory. These are limits, not quotas.
 
-The cave descriptor stores its scenario ID alongside its entrances. That
-descriptor is already persisted in saves. The entrance clue appears when the
-player steps onto a surface cave entrance or a downward passage, and the
-scenario introduction appears upon descent. Current-schema data without scenario IDs
-retains its original caves and generic entrance text; loading does not
-retroactively repopulate them. Scenario enemies and ground items are generated
-once, then persist through the existing enemy and ground-item save fields.
-Saves generated by the first scenario implementation may still contain weaker
-z:-2 populations; loading does not replace their enemies or rewards. Their
-existing scenario IDs and clues remain recognized. The z:-3 Dwarven Fort is
-excluded from ordinary scenario population.
+**Eligibility:** new ordinary z:-2 populations use the explicit approved
+species lists in `cavePopulation.ecosystem.allowedSpecies` and
+`conditionalSpecies`. The entire tier 5, `ultraRare` species, Nymph,
+Centaur, Sasquatch, Yeti, White Tiger, Myrka and Skerva are excluded.
+Tokka is allowed at its existing rarity. Slurper, Giant Crab, Murkspawn,
+Lizard Man and Giant Toad require water within eight Manhattan tiles of their
+spawn location and begin on ordinary dry cave floor; Slurper does not receive
+Swimming. A natural Vampire still uses the existing special guaranteed
+crypt-or-bat-cave placement, not the new ordinary selection pool. Generic
+z:-2 scenarios never rewrite an enemy template's stats, abilities or AI.
+Existing `far`-wander species use the ordinary underground `roam` conversion.
+
+Every existing staircase retains **at least eight Chebyshev tiles** of
+monster clearance for ordinary ecosystem spawns. Ordinary monsters prefer
+at least three tiles between recent spawns, with spacing relaxed when space
+is limited. Source cave floors are owned by their original descriptors, and
+carved connector tiles are left clear. Optional Champions are attempted with
+**40% chance per complex**; their escort is 0–6 same-species creatures near
+them (subject to space and the remaining threat budget). A separate 10% roll
+may add one tier-4 enemy; neither encounter is guaranteed, and both may fail
+when no safe position or budget remains. Tier-4 choices exclude `ultraRare`
+and tier-5 species. Ordinary prefix rolls use the existing deep-cave prefix
+chance, preserving `champions_age`, `mundane_age`, `things_below` and other
+world traits that modify it. Champions have their normal existing properties.
+
+For this **population batch**, the previous **8–12 tier-2/3 chests** and four
+loose supplies are still allocated per **source cave**, rather than per
+combined complex. No additional rewards appear just because cave components
+join. Variable loot budgets, permanent Tracking clues and decoration-density
+reweighting belong to the later reward/presentation batch. Natural Fungus
+rolls remain at 35% for the first and 15% for the second per source cave,
+with the existing world-wide minimum of three across z:-1 and z:-2.
+
+There are **no content-revealing named scenario clues or introductory messages**
+for z:-2. Shallow scenario clues continue to work. Each deep-cave descriptor
+saves `populated: true` instead of a scenario ID. The existing world-level
+state preserves complex ecosystem statistics, local territory population and
+species summaries, enemies, equipment, ground items, cave membership and
+all seeded RNG outcomes. Save/replay restore this stored state; loading never
+reruns generation. The new schema 99 requires newly generated worlds and does
+not migrate earlier saves.
 
 Cave entrances are selected from mountain edges.
 
@@ -8461,7 +8469,7 @@ are the current behavior, not future proposals.
 | Deep cave character | `wormways`, `halls_below`, `flooded_depths`, `fungal_bloom`, `deep_bounty` | Optional branches favor burrows or grottos, more grotto water forms, Fungus is more common, or supplies and threats increase together. Wormways and Halls Below conflict; guaranteed distinct z:-2 caves remain. |
 | Forest and wildlife | `ancient_wilderness`, `eyes_in_the_trees`, `wild_frontier`, `migration_season`, `restless_wilds`, `great_migration`, `watchful_world`, `beast_kingdom` | Ancient forest/ambush/rough terrain vary; mobile enemies promote to roam/far; grouped migrants start near edges; enemy aggro reach grows by one. Beast Kingdom increases the share of non-humanoid surface spawns without raising their total count. Forest and migration themes each have a conflict group. |
 | Surface water | `drowned_lands` | More inland lakes and river sources; more submerged chests, biased toward inland lakes when suitable water tiles exist. Drought excludes this trait. Swimming rules and ice mechanics are unchanged. |
-| Enemy quality | `champions_age`, `mundane_age`, `wild_blood`, `uncertain_blood`, `things_below` | Random prefixes rise or fall; Mundane Age raises ordinary surface density; variance broadens; Things Below shifts density underground. The guaranteed deep champion and guards are never removed by lower random prefix odds. Elite ages conflict. |
+| Enemy quality | `champions_age`, `mundane_age`, `wild_blood`, `uncertain_blood`, `things_below` | Random prefixes rise or fall; Mundane Age raises ordinary surface density; variance broadens; Things Below shifts density underground. The optional deep Champion encounter is independent of random prefix odds. Elite ages conflict. |
 | Equipment and money | `treasure_age`, `age_of_rust`, `relic_world`, `cursed_riches`, `poor_kingdom` | Better modifier rolls carry more elite enemies, common tier-one junk weapons offset weaker modifiers, artifacts rise alongside danger, richer gear brings more curses, or chest gold shrinks. Merchant prices do not change. These five share a wealth conflict group. |
 | Supplies and digging | `herbal_bloom`, `blighted_harvest`, `buried_age`, `treasure_at_the_edges`, `far_fortune`, `strange_fortune` | Herbs/mushrooms and Fungus rise while loose life potions fall; forage yields less and mushrooms poison more often; loot moves underground, toward edges, or farther from the village; supply composition changes. Herbal/Blighted/Fungal themes conflict as harvest traits. Drought excludes all three to avoid contradictory or near-empty forage. |
 | Dwarven fort | `underkings_legacy`, `haunted_hold`, `grand_delving` | A larger intact fort, a ghost-heavy fort, or a wider mountain excavation. They conflict as fort variants. |
@@ -8472,7 +8480,7 @@ by `underkings_legacy`. *No Safe Woods* is folded into `eyes_in_the_trees`;
 *Rich and Cruel* into `cursed_riches`. This avoids duplicate effects and
 reduces extreme combinations. The unrelated `surfaceEnemies.prefixChance`
 and cave prefix chances remain separate; `champions_age` and `wild_blood`
-affect the random rolls, not the mandatory deep cave champion.
+affect the random rolls, not the optional deep cave Champion encounter.
 
 The generation code reads neutral values from `world_generation.json` on every
 world. `caves.shallow.extraEntranceChance` controls optional second entrances
@@ -8502,10 +8510,9 @@ The first two conflict as forest traits, but either can stack with Drought,
 giving 20% or 15%, respectively. These are roll chances before checking for
 an available adjacent spawn tile.
 `surfaceLoot.looseHerbs/looseMushrooms` control additional loose supplies.
-`cavePopulation.deepMobEntranceClearance` and `deepMobMinSpacing` govern the
-ordinary deep-cave placement preference described under Ordinary cave
-scenarios. The guaranteed Champion, its four adjacent guards, and the extra
-high-tier threat retain their dedicated positions.
+`cavePopulation.ecosystem.stairClearance` and `spacing` control ordinary
+z:-2 ecosystem spawn safety and crowding. Champion escorts and tier-4 threats
+are optional and draw from the same population threat budget.
 
 Foraging uses a single `rng() × 100` roll and cumulative percentage thresholds
 in `loot_tables.json`: 9 for berries, 17 for herbs, and 25 for mushrooms.

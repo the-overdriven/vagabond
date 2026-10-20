@@ -16,26 +16,15 @@ describe('Decorative caves and deep threat rarity', () => {
         const traits=names.map(name=>WORLD_TRAITS.find(t=>t.name===name))
         check(traits.every(Boolean),'requested trait fixtures exist')
         applyWorldTraits(traits);WORLD_SEED=${seed};rngState=WORLD_SEED
-        let selections=0,inCaveScenarios=false;const originalPickWeighted=pickWeighted
-        const originalSpawnCaveScenarios=spawnCaveScenarios
-        spawnCaveScenarios=()=>{
-          selections=0;inCaveScenarios=true
-          try{return originalSpawnCaveScenarios()}finally{inCaveScenarios=false}
-        }
-        pickWeighted=(pool,weight)=>{
-          if(inCaveScenarios && pool.length && pool.every(t=>deepCaveThreatTemplates().includes(t))) {
-            selections++;check(pool.every(t=>(t.rarity??1)>.1),'rare species excluded from actual bonus spawns')
-            check(pool.every(t=>weight(t)===(t.rarity??1)),'actual bonus spawn uses rarity weights')
-          }
-          return originalPickWeighted(pool,weight)
-        }
-        try {await generateNewWorld()} finally {
-          pickWeighted=originalPickWeighted
-          spawnCaveScenarios=originalSpawnCaveScenarios
-        }
-        check(selections===deepLevels[0].caves.filter(c=>c.scenario).length,
-          'each deep cave receives its weighted threat: '+selections+' selections for '+
-          deepLevels[0].caves.filter(c=>c.scenario).length+' scenarios')
+        await generateNewWorld()
+        const population=deepLevels[0].caves
+        check(population.every(c=>c.populated && !c.scenario),
+          'all ordinary deep caves are populated without named scenarios')
+        const disallowed=new Set(WORLD_GEN_CONFIG.cavePopulation.ecosystem.excludedSpecies)
+        check(enemies.filter(e=>e.level===-2 && e.levelKind==='chain')
+          .every(e=>!disallowed.has(e.baseName) && e.tier<=4 &&
+            !ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare),
+          'only permitted species inhabit ordinary deep caves')
         check(['silhouette','grotto','burrow'].every(style=>deepLevels[0].caves.some(c=>c.style===style)),
           'required silhouette, grotto and burrow layouts retained')
         const lootCells=new Set()
@@ -69,7 +58,7 @@ describe('Decorative caves and deep threat rarity', () => {
           }
           for(const p of caveDecorations.filter(p=>p.level===level)) {
             const descriptor=descriptors[p.caveIndex],k=keyXY(p.x,p.y),id=level+':'+k
-            check(p.levelKind==='chain' && descriptor.scenario && !descriptor.crypt,'ordinary cave scope')
+            check(p.levelKind==='chain' && (descriptor.scenario || descriptor.populated) && !descriptor.crypt,'ordinary cave scope')
             check(reachable.has(k) && TILE[shared[p.y][p.x]].walk,'reachable, walkable decoration')
             check(!occupiedProps.has(id),'no overlapping decorations');occupiedProps.add(id)
             check(entries.every(e=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y))>2),'entrance clearance')

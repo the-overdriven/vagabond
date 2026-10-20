@@ -5123,30 +5123,10 @@ const CAVE_SCENARIOS = [
     surface: {mobs: [['Goblin', 2], ['Giant Rat', 1]], tier: 2, camp: true, supply: 'scrollOfInvisibility'}}
 ]
 
-// Preserve the stronger, single-species z:-2 cave population. The five
-// original deep-cave templates now each receive a distinct scenario.
-const DEEP_CAVE_SCENARIOS = [
-  {id: 'deep_goblin_cache', clue: 'Small armored footsteps echo below.',
-    intro: 'Goblins guard a stolen cache in this lower cavern.',
-    deep: {mobs: [['Goblin', 4]], tier: 3, placement: 'guard'}},
-  {id: 'deep_bone_hollow', clue: 'A dry rattle sounds beneath the stone.',
-    intro: 'The lower cavern is occupied by the dead.',
-    deep: {mobs: [['Skeleton', 4]], tier: 3, placement: 'guard'}},
-  {id: 'kobold_outpost', clue: 'Tiny tools clatter far below.',
-    intro: 'Kobolds have built a cramped outpost around their cache.',
-    deep: {mobs: [['Kobold', 4]], tier: 3, placement: 'guard', camp: true}},
-  {id: 'skink_den', clue: 'The passage smells of damp scales.',
-    intro: 'Skinks have made a den deep within the rock.',
-    deep: {mobs: [['Skink', 4]], tier: 3, placement: 'far', supply: 'speedpotion'}},
-  {id: 'ratling_burrow', clue: 'Small claws scrape against the stone below.',
-    intro: 'Ratlings scurry through the lower burrow.',
-    deep: {mobs: [['Ratling', 4]], tier: 3, placement: 'far', supply: 'potion'}}
-]
-
 function scenarioAt(z, x, y) {
   const descriptors = z === -1 ? caves : z === -2 ? deepLevels[0]?.caves : null
   const cave = descriptors?.find(c => !c.crypt && c.scenario && c.entrances?.some(e => e.x === x && e.y === y))
-  return [...CAVE_SCENARIOS, ...DEEP_CAVE_SCENARIOS].find(s => s.id === cave?.scenario)
+  return CAVE_SCENARIOS.find(s => s.id === cave?.scenario)
 }
 
 function caveScenarioClue(z, x, y) {
@@ -5175,7 +5155,7 @@ function undergroundVampireAreas() {
     ...deepLevels.map((layer, i) => ({...layer, level: -2 - i}))]
   for (const layer of layers) for (let i = 0; i < layer.caveMaps.length; i++) {
     const descriptor = layer.caves[i], cm = layer.caveMaps[i]
-    if (!descriptor || descriptor.crypt || !descriptor.scenario) continue
+    if (!descriptor || descriptor.crypt || !(descriptor.scenario || descriptor.populated)) continue
     const area = {cm, shared: layer.map, level: layer.level, levelKind: 'chain',
       caveIndex: i, entries: descriptor.entrances, floor: layer.level === -1 ? 'cavefloor' : 'cavefloor2'}
     if (enemies.some(e => e.alive && (e.baseName || e.name) === 'Giant Bat' && vampireEnemyInArea(e, area))) areas.push(area)
@@ -5246,27 +5226,253 @@ function ensureUndergroundVampire() {
   addEnemy(enemy)
 }
 
+// Deep Caves 2.0: independent local ecosystems inside each connected complex.
+// Territory IDs are generation metadata; they never restrict pursuit or movement.
+// Deliberately do not alter enemy templates, the underground far-wander rule,
+// the silhouette generator, or the z:-1 scenario system.
+function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
+  const cfg = WORLD_GEN_CONFIG.cavePopulation
+  const ec = cfg.ecosystem
+  const floor = 'cavefloor2'
+  const allEntries = deep.caves.flatMap(c => c.entrances || [])
+  const excluded = new Set(ec.excludedSpecies)
+  const allowed = new Set(ec.allowedSpecies)
+  const conditional = ec.conditionalSpecies
+  const special = new Set(['Vampire']) // handled by the existing bat/crypt guarantee
+  const templates = ENEMY_TEMPLATES.filter(t => t.tier <= 3 && t.aggro > 0 &&
+    !t.ultraRare && !excluded.has(t.name) && !special.has(t.name) &&
+    (allowed.has(t.name) || Object.hasOwn(conditional, t.name)))
+  const tier4 = ENEMY_TEMPLATES.filter(t => t.tier === 4 && !t.ultraRare &&
+    !excluded.has(t.name) && (allowed.has(t.name) || Object.hasOwn(conditional, t.name)))
+  const occupied = new Set(enemies.filter(e => e.alive && e.level === -2 && e.levelKind === 'chain')
+    .map(e => keyXY(e.x,e.y)))
+  const itemCells = new Set(groundItems.filter(g => g.level === -2 && g.levelKind === 'chain')
+    .map(g => keyXY(g.x,g.y)))
+  const k = (x,y) => y * MAP_W + x
+  const dirs = [[0,-1],[-1,0],[1,0],[0,1]]
+  const center = (a,b) => (randInt(a,b) + randInt(a,b)) / 2
+  const sample = range => randInt(range[0],range[1])
+  const allPrefixNames = Object.keys(ENEMY_PREFIXES).filter(p => p !== 'Champion')
+  const maxDistance = (a,b) => Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))
+  const unoccupied = p => !occupied.has(keyXY(p.x,p.y)) && !itemCells.has(keyXY(p.x,p.y))
+  const canSpawn = p => unoccupied(p) && allEntries.every(e => maxDistance(e,p) >= ec.stairClearance)
+  const cost = t => ({1:1,2:2,3:4,4:12})[t.tier] || 20
+
+  // Every tile has a source owner (used by caveIndex) even inside a connected complex.
+  // Connector cells have no source owner and are kept clear for traversal.
+  for (const complex of deep.complexes) {
+    const sites=[], owned=new Map(), transit=new Set()
+    for (const i of complex.members) {
+      const cm = deep.caveMaps[i]
+      for (let y=1;y<MAP_H-1;y++) for (let x=1;x<MAP_W-1;x++) {
+        if (cm[y][x] === floor || cm[y][x] === 'caveup') {
+          const id=k(x,y)
+          transit.add(id)
+          if (cm[y][x] === floor && deep.map[y][x] === floor) {
+            const p={x,y,caveIndex:i,territory:-1}
+            sites.push(p);owned.set(id,p)
+          }
+        }
+      }
+    }
+    for (const link of deep.links) if (complex.members.includes(link.a))
+      for (const p of link.cells) transit.add(k(p.x,p.y))
+    const territories=deep.territories.filter(t=>t.complexId===complex.id)
+    if (!territories.length || sites.length < cfg.minOpenTilesForScenario) continue
+
+    // One cardinal multi-source BFS assigns every reachable site to its nearest
+    // territory anchor using actual walking distance across connectors.
+    const owners=new Map(),queue=[]
+    for (let i=0;i<territories.length;i++) {
+      const {anchor}=territories[i],id=k(anchor.x,anchor.y)
+      if (!transit.has(id)||owners.has(id))continue
+      owners.set(id,i);queue.push({x:anchor.x,y:anchor.y})
+    }
+    for (let q=0;q<queue.length;q++) {
+      const p=queue[q],owner=owners.get(k(p.x,p.y))
+      for (const [dx,dy] of dirs) {
+        const x=p.x+dx,y=p.y+dy,id=k(x,y)
+        if (!transit.has(id)||owners.has(id))continue
+        owners.set(id,owner);queue.push({x,y})
+      }
+    }
+    const zones=territories.map((record,i)=>({record,sites:[],available:[],
+      weight:0,count:0,spawned:0,chosen:[],speciesNames:[],isEmpty:false}))
+    for (const p of sites) {
+      p.territory=owners.get(k(p.x,p.y)) ?? 0
+      zones[p.territory].sites.push(p)
+      if (canSpawn(p)) zones[p.territory].available.push(p)
+      fungusTopUpSites.push({x:p.x,y:p.y,caveIndex:p.caveIndex,level:-2,floorTile:floor,cm:deep.caveMaps[p.caveIndex]})
+    }
+    const water=sites.filter(p=>dirs.some(([dx,dy])=>deep.map[p.y+dy]?.[p.x+dx]==='water'))
+    const nearWater=p=>water.some(w=>Math.abs(w.x-p.x)+Math.abs(w.y-p.y)<ec.waterRange)
+    const habitat=(t,p)=> {
+      if (!conditional[t.name])return true
+      return conditional[t.name] !== 'water' || nearWater(p)
+    }
+    // Build a soft coherence bias, not a named cave type or mandatory species.
+    const lead=pickWeighted(templates,t=>Math.max(0.005,t.rarity??1)/(1+Math.max(0,t.tier-2)))
+    const coherence=center(0,100)/100
+    const wantedDensity=center(ec.densityPerThousand[0],ec.densityPerThousand[1])
+    const traitFactor=0.5*((cfg.deepMonsterMin/24)+(cfg.deepMonsterMax/36))
+    const desired=Math.max(0,Math.min(Math.round(sites.length/1000*wantedDensity*traitFactor),
+      ec.maximumMonstersPerSource*complex.members.length))
+    const threatFactor=center(ec.threatPercent[0],ec.threatPercent[1])/100
+    const budget=desired * ec.baseThreatPerMonster * threatFactor
+    const maxSpecies=Math.min(ec.maxSpecies,Math.max(1,desired))
+    const introduced=new Set()
+    for (const z of zones) {
+      z.isEmpty=chance(ec.emptyTerritoryChance)
+      z.weight=z.isEmpty?0:z.available.length*(center(0,200)/100)**2
+    }
+    if (!zones.some(z=>z.weight>0)) zones.find(z=>z.available.length).weight=1
+    const sum=zones.reduce((n,z)=>n+z.weight,0)
+    for(const z of zones)z.count=sum?Math.round(desired*z.weight/sum):0
+    const deficit=desired-zones.reduce((n,z)=>n+z.count,0)
+    if(deficit && sum)zones.filter(z=>z.weight>0).sort((a,b)=>b.weight-a.weight)[0].count+=deficit
+    let spent=0,spawned=0,champions=0,tier4Count=0
+    function spawn(t,p,prefix=null) {
+      if (!p||!canSpawn(p)||!habitat(t,p)||!naturalSpawnEligible(t))return false
+      const e={name:t.name,baseName:t.name,tier:t.tier,level:-2,levelKind:'chain',caveIndex:p.caveIndex,
+        hp:t.hp,maxHp:t.hp,atk:t.atk,def:t.def,spd:t.spd,abilities:[...t.abilities],
+        humanoid:!!t.humanoid,aggro:t.aggro??AGGRO_RANGE,x:p.x,y:p.y,
+        homeX:p.x,homeY:p.y,homeTileType:floor,alive:true,prefix:null,equipment:null}
+      if(prefix){e.prefix=prefix;e.prefixBase=prefixBaseStats(e);applyEnemyPrefix(e,prefix);e.name=prefix+' '+e.name}
+      addEnemy(e);occupied.add(keyXY(p.x,p.y));spent+=cost(t)+(prefix==='Champion'?ec.championThreatCost:0)
+      if (t.name !== 'Fungus') {
+        spawned++;introduced.add(t.name);zones[p.territory].spawned++
+        if (!zones[p.territory].speciesNames.includes(t.name)) zones[p.territory].speciesNames.push(t.name)
+      }
+      return true
+    }
+    // Choose positions from local territory. Start with cardinally separated
+    // locations; groups are an intentional exception, but stairs are always safe.
+    function take(z,target=null,near=0) {
+      const options=z.available.filter(p=>canSpawn(p) && (!target||
+        Math.abs(p.x-target.x)+Math.abs(p.y-target.y)<=near))
+      if(!options.length)return null
+      const far=options.filter(p=>zones.every(zone=>zone.recent===undefined||maxDistance(zone.recent,p)>=ec.spacing))
+      return pick(far.length?far:options)
+    }
+    function chooseSpecies(z,p,forceTier4=false) {
+      const pool=(forceTier4?tier4:templates).filter(t=>habitat(t,p) &&
+        (t.tier!==3 || (spent+cost(t)<=budget*1.12)) &&
+        (introduced.has(t.name)||introduced.size<maxSpecies))
+      if(!pool.length)return null
+      const chosenSet=z.speciesNames
+      // Reuse local species more often than introducing another; each zone may
+      // have a different dominant species despite the cave-wide lead.
+      const reuse=chosenSet.length && chance(ec.localReuseChance)
+      const filtered=reuse?pool.filter(t=>chosenSet.includes(t.name)):pool
+      const candidates=filtered.length?filtered:pool
+      return pickWeighted(candidates,t=>Math.max(0.005,t.rarity??1)*
+        (t.tier===1?ec.tierWeights[0]:t.tier===2?ec.tierWeights[1]:t.tier===3?ec.tierWeights[2]:1)*
+        (t.name===lead.name?1+coherence*ec.coherenceMultiplier:1)*
+        (z.speciesNames.includes(t.name)?ec.localDominanceMultiplier:1))
+    }
+    // Optional end encounter: far from any staircase, not automatically a boss.
+    const eliteChance=chance(ec.championChance)
+    const strongChance=chance(ec.tier4Chance)
+    const sortedZones=zones.filter(z=>z.available.length>=ec.minimumEliteSites)
+      .sort((a,b)=>Math.max(...b.available.map(p=>Math.min(...allEntries.map(e=>
+        Math.abs(e.x-p.x)+Math.abs(e.y-p.y)))))-
+        Math.max(...a.available.map(p=>Math.min(...allEntries.map(e=>
+        Math.abs(e.x-p.x)+Math.abs(e.y-p.y))))))
+    if(eliteChance && sortedZones.length && spent<budget) {
+      const z=pick(sortedZones.slice(0,Math.min(2,sortedZones.length)))
+      const p=take(z)
+      const t=p&&chooseSpecies(z,p)
+      if(t && t.tier<=3 && spawn(t,p,'Champion')) {
+        champions++
+        const escorts=sample(ec.escortCount)
+        for(let i=0;i<escorts;i++){
+          if(spent+cost(t)>budget*1.35)break
+          const guard=take(z,p,ec.escortRadius)
+          if(!guard)break
+          if(spawn(t,guard))z.recent=guard
+        }
+      }
+    }
+    if(strongChance && sortedZones.length && spent+12<=budget*1.45) {
+      const z=pick(sortedZones.slice(0,Math.min(2,sortedZones.length)))
+      const p=take(z)
+      const t=p&&chooseSpecies(z,p,true)
+      if(t&&spawn(t,p)){tier4Count++;z.recent=p}
+    }
+    // Spawn per territory until count or budget is exhausted. Rebalance surplus
+    // towards neighboring territories only when a zone lacks valid sites.
+    // Elite members also consume the ordinary population cap, not just threat points.
+    let slots=Math.max(0,desired-spawned)
+    for(const z of zones) {
+      const localSpeciesLimit=Math.min(ec.localSpeciesMax,Math.max(1,Math.ceil(z.count/2)))
+      for(let n=z.spawned;n<z.count && slots>0;n++) {
+        slots--
+        if(spent>=budget)break
+        const p=take(z)
+        if(!p)break
+        let t=chooseSpecies(z,p)
+        if(!t)break
+        if(z.speciesNames.length>=localSpeciesLimit&&!z.speciesNames.includes(t.name)) {
+          const prev=templates.filter(e=>z.speciesNames.includes(e.name)&&habitat(e,p))
+          if(prev.length)t=pickWeighted(prev,e=>Math.max(0.005,e.rarity??1))
+        }
+        const projected=cost(t)*(t.abilities.includes('gangPower')?1.22:1)
+        if(spent+projected>budget*1.05)continue
+        const prefix=allPrefixNames.length&&chance(cfg.deepPrefixChance)?pick(allPrefixNames):null
+        if(spawn(t,p,prefix))z.recent=p
+      }
+    }
+    for(const i of complex.members)deep.caves[i].populated=true
+    complex.ecosystem={density:wantedDensity,threatBudget:Math.round(budget*100)/100,
+      population:spawned,champions,tier4:tier4Count,species:[...introduced].sort()}
+    for(const z of zones)Object.assign(z.record,{population:z.spawned,species:z.speciesNames.slice()})
+    // Preserve this batch's existing chest/provision value per source component.
+    // World-area reward rebudgeting is the separate rewards batch.
+    for(const caveIndex of complex.members){
+      const desc=deep.caves[caveIndex],ownedSites=sites.filter(p=>p.caveIndex===caveIndex)
+      const free=()=>ownedSites.filter(p=>unoccupied(p) && allEntries.every(e=>maxDistance(e,p)>4))
+      const chestCount=Math.min(cfg.deepChestMax,Math.max(cfg.deepChestMin,
+        Math.ceil((desc.rooms?.length||12)/2)))
+      for(let i=0;i<chestCount;i++){
+        const options=free();if(!options.length)break
+        const p=pick(options);itemCells.add(keyXY(p.x,p.y))
+        groundItems.push({x:p.x,y:p.y,kind:'chest',tier:i%2?2:3,
+          opened:false,level:-2,levelKind:'chain',caveIndex})
+      }
+      for(let i=0;i<cfg.deepProvisionCount;i++){
+        const options=free();if(!options.length)break
+        const p=pick(options);itemCells.add(keyXY(p.x,p.y))
+        groundItems.push({x:p.x,y:p.y,kind:i%2?'scrollOfInvisibility':'potion',
+          level:-2,levelKind:'chain',caveIndex})
+      }
+      // Independent natural Fungus roll, retaining world-wide top-up.
+      const fungus=ENEMY_TEMPLATE_BY_NAME.Fungus
+      const count=(chance(cfg.fungusFirstChance)?1:0)+(chance(cfg.fungusSecondChance)?1:0)
+      for(let n=0;n<count;n++){const positions=free();if(positions.length)spawn(fungus,pick(positions))}
+    }
+  }
+}
+
 function spawnCaveScenarios() {
   const cfg = WORLD_GEN_CONFIG.cavePopulation
-  let surfaceDeck = [], deepDeck = []
+  let surfaceDeck = []
   const fungusTopUpSites = []
 
   function nextScenario(level) {
-    let deck = level === -1 ? surfaceDeck : deepDeck
+    let deck = surfaceDeck
     if (!deck.length) {
-      deck = (level === -1 ? CAVE_SCENARIOS : DEEP_CAVE_SCENARIOS).slice()
+      deck = CAVE_SCENARIOS.slice()
       for (let i = deck.length - 1; i > 0; i--) {
         const j = randInt(0, i)
         ;[deck[i], deck[j]] = [deck[j], deck[i]]
       }
-      if (level === -1) surfaceDeck = deck
-      else deepDeck = deck
+      surfaceDeck = deck
     }
     return deck.pop()
   }
 
   function populate(descriptor, cm, caveIndex, level, floorTile) {
-    if (descriptor.crypt || descriptor.scenario || !descriptor.entrances?.length) return
+    if (descriptor.crypt || descriptor.scenario || !descriptor.entrances?.length || level === -2) return
     const open = []
     const entries = descriptor.entrances
     const sharedMap = level === -1 ? undergroundMap : deepLevels[0].map
@@ -5370,45 +5576,16 @@ function spawnCaveScenarios() {
         tier: level === -2 && i % 2 === 1 ? 2 : rules.tier,
         opened: false, level, levelKind: 'chain', caveIndex})
     }
-    if (level === -2) {
-      const championTemplate = ENEMY_TEMPLATES.find(t => t.name === rules.mobs[0]?.[0])
-      const threatPool = deepCaveThreatTemplates()
-      // Choose an open pocket with four immediately adjacent guard positions.
-      // Reserve the group before ordinary mobs, so none can displace it.
-      const openByPosition = new Map(open.map(p => [keyXY(p.x, p.y), p]))
-      const groupSites = open.map(p => ({p, guards: DIRS8.map(([dx, dy]) =>
-          openByPosition.get(keyXY(p.x + dx, p.y + dy))).filter(Boolean)}))
-        .filter(site => site.guards.length >= cfg.deepChampionGuardCount)
-      if (championTemplate && ENEMY_PREFIXES.Champion && groupSites.length) {
-        const farthest = Math.max(...groupSites.map(site => distance(site.p)))
-        const remote = groupSites.filter(site => distance(site.p) >= Math.max(cfg.deepChampionMinDistance, farthest - cfg.deepChampionDistanceSlack))
-        const site = pick(remote)
-        const guards = site.guards.slice()
-        for (let n = guards.length - 1; n > 0; n--) {
-          const j = randInt(0, n)
-          ;[guards[n], guards[j]] = [guards[j], guards[n]]
-        }
-        for (const pos of [site.p, ...guards.slice(0, cfg.deepChampionGuardCount)]) open.splice(open.indexOf(pos), 1)
-        makeEnemy(championTemplate, site.p, 'Champion')
-        for (const pos of guards.slice(0, cfg.deepChampionGuardCount)) makeEnemy(championTemplate, pos)
-      }
-      if (threatPool.length) {
-        const spot = takeSpot('far')
-        if (spot) makeEnemy(pickWeighted(threatPool, t => t.rarity ?? 1), spot)
-      }
-    }
     for (const [name, count] of rules.mobs) {
       const tmpl = ENEMY_TEMPLATES.find(t => t.name === name)
       if (!tmpl) continue
-      const total = level === -2 ? Math.min(cfg.deepMonsterMax, Math.max(cfg.deepMonsterMin, Math.round(open.length / cfg.deepMonsterTilesPerEnemy))) : count
+      const total = count
       for (let n = 0; n < total; n++) {
-        const spot = level === -2
-          ? takeSpot('deepMob', roomOrder.length ? roomOrder[n % roomOrder.length] : null)
-          : takeSpot(rules.placement || 'random', chest)
+        const spot = takeSpot(rules.placement || 'random', chest)
         if (!spot) break
-        if (level === -2) ordinaryMobSpots.push(spot)
+        
         let prefix = null
-        if (chance(level === -2 ? cfg.deepPrefixChance : cfg.shallowPrefixChance)) {
+        if (chance(cfg.shallowPrefixChance)) {
           const names = Object.keys(ENEMY_PREFIXES)
           if (names.length) prefix = pick(names)
         }
@@ -5452,8 +5629,7 @@ function spawnCaveScenarios() {
     populate(caves[i], caveMaps[i], i, -1, 'cavefloor')
   // z:-2 has ordinary caves; z:-3 is the purpose-built Dwarven Fort.
   const deep = deepLevels[0]
-  if (deep) for (let i = 0; i < deep.caveMaps.length; i++)
-    populate(deep.caves[i], deep.caveMaps[i], i, -2, 'cavefloor2')
+  if (deep) populateDeepCaveEcosystems(deep, fungusTopUpSites)
 
   // Guarantee at least three Fungus across the whole ordinary underground
   // network, not three per cave. Natural cave rolls above may already satisfy
@@ -7163,12 +7339,6 @@ function spawnNpcs() {
   ensureGravediggerGrave()
 }
 
-function deepCaveThreatTemplates() {
-  const cfg = WORLD_GEN_CONFIG.cavePopulation
-  return ENEMY_TEMPLATES.filter(t => cfg.deepThreatTiers.includes(t.tier) &&
-    (t.rarity ?? 1) > cfg.deepThreatRarityCutoff)
-}
-
 // Surface spider nests are cosmetic only: generate after the final map rotation,
 // from final coordinates without advancing the replay-sensitive RNG stream.
 function spawnSurfaceSpiderWebs(roll) {
@@ -7222,7 +7392,7 @@ function spawnCaveDecorations() {
       .filter(e => e.level === layer.level).map(e => keyXY(e.x, e.y)))
     for (let caveIndex = 0; caveIndex < layer.maps.length; caveIndex++) {
       const descriptor = layer.descriptors[caveIndex], cm = layer.maps[caveIndex]
-      if (!descriptor || descriptor.crypt || !descriptor.scenario) continue
+      if (!descriptor || descriptor.crypt || !(descriptor.scenario || descriptor.populated)) continue
       for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
         const floor = layer.level === -1 ? 'cavefloor' : 'cavefloor2'
         const key = `${layer.level}:${x},${y}`
