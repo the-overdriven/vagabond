@@ -228,12 +228,24 @@ const CaveSilhouettes = (() => {
   }
 
   async function prepare(seed) {
-    const sources = sourcesForSeed(seed, CAVE_SILHOUETTE_SOURCES)
-    // Promise.all preserves source order regardless of download/decompression timing.
-    const prototypes = await Promise.all(sources.map(load))
-    const prototype = blendMany(prototypes,seed)
-    CAVE_SILHOUETTES = [prototype]
-    return prototype
+    const config=WORLD_GEN_CONFIG.caves.deep.silhouette
+    const sourceGroups=[]
+    let available=CAVE_SILHOUETTE_SOURCES.slice()
+    for(let index=0;index<config.preloadedVariants;index++){
+      const salt=index===0 ? Number(seed) : hashSeed((Number(seed)^Math.imul(index,0x9e3779b9))>>>0)
+      const sources=sourcesForSeed(salt,available)
+      // Source pools are disjoint, so extra caves do not reuse the same images.
+      available=available.filter(candidate=>!sources.some(s=>s.id===candidate.id))
+      sourceGroups.push({salt,sources})
+    }
+    // Fetch all selected PNGs concurrently. Promise.all preserves the seeded
+    // source order regardless of network completion and image decoding timing.
+    const groups=await Promise.all(sourceGroups.map(async group=>({
+      salt:group.salt,prototypes:await Promise.all(group.sources.map(load))
+    })))
+    const variants=groups.map(group=>blendMany(group.prototypes,group.salt))
+    CAVE_SILHOUETTES=variants
+    return variants[0]
   }
   return {decodeAlpha, extract, sourceForSeed, pairForSeed, sourceCountForSeed, sourcesForSeed, blend, blendMany, load, prepare,
     idForSeed:seed=>sourcesForSeed(seed,CAVE_SILHOUETTE_SOURCES).map(s=>s.id).join('+')}

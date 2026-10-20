@@ -2205,6 +2205,16 @@ mountain air.
 Some z:-1 caves receive a downward connection.
 
 The second-level source caves can now form **optional connected complexes**.
+Each original cave keeps its own floor material: the brown burrow retains the
+brown tile/ASCII background inside its source footprint, ordinary grotto and
+silhouette regions retain their normal cave floor, and shared connectors use
+ordinary cave floor. At generation time each accepted connector has a **30%**
+chance to acquire a short water-lined section (up to 9 flank water tiles,
+requiring at least 3 dry connector tiles). Water replaces only rock **alongside**
+the connector; a continuous dry causeway always remains, so Swimming is never
+required to reach another cave. If there are no suitable flank cells, the
+connector stays completely dry. Water pockets are not drawn inside or over
+source cave maps, entrances, or special dungeons.
 Nearby source components may be joined by short, carved dry corridors (**2–12
 rock tiles**). For two previously separate source caves, the baseline chance now
 varies by rock gap: **85–70%** across 2–4 tiles, **60–40%** across 5–8 tiles,
@@ -2227,20 +2237,34 @@ movement, change AI or add faction rules. Loot is allocated from a shared
 world budget by playable area; merging gives no additional reward.
 
 Connector cells and territory/complex metadata are saved and restored directly;
-the shared map is reconstructed by overlaying saved connectors after the source
-maps. Rotation transforms the saved connectors and territory anchors along
-with all stairs and source caves. Connector probability changes only newly
-generated worlds and requires no new saved fields or replay logic. Save schema
-**101** remains unchanged; existing saves restore their original links.
+the shared map is reconstructed by overlaying saved **dry connector cells and
+optional water flank cells** after the source maps. Rotation transforms both
+sets of connector cells and territory anchors along with all stairs and source
+caves. The new flank-water field is persistent link metadata: save schema
+**101 → 102**. Neither cave connections nor silhouette choices are rerolled on
+save/load or replay. No compatibility code is added for older saves.
 
-The generator requires **three separate generic z:-2 caves**: one monster
+The generator requires **at least three generic z:-2 source caves**: one
 silhouette, one grotto with connected irregular chambers and winding passages,
-and one branching burrow. Both existing generators remain in use. Footprints
-cannot overlap. Multiple descents may belong to the same shallow cave, but each
-staircase is paired at identical coordinates and has its own deep cave. Failed
-placement trials use clean map copies; if any required style is missing, the
-world is regenerated. The final fallback enforces the same requirement.
-Additional unused parent caves retain their 50% chance of a grotto or burrow.
+and one branching burrow. The three required components are generated first;
+none can be replaced. Footprints cannot overlap. Multiple descents may belong
+to the same shallow cave, but each staircase is paired at identical coordinates
+and retains its source cave identity. Failed placement trials use clean map
+copies; if any required style is missing, the world is regenerated.
+
+**Additional silhouettes are possible but never guaranteed.** After placing
+the three required styles, the generator makes a **70%** world-seeded attempt
+to place a second silhouette on an unused parent cave. Each remaining unused
+parent has a **65%** chance to receive an optional descent; an accepted
+optional descent selects silhouette with **45%** probability (until the
+**three-silhouette maximum**), otherwise grotto/burrow according to the current
+`optionalGrottoChance`, which remains affected by Cursed World traits. If a
+large optional silhouette fails to fit, the generator may try a smaller grotto
+or burrow instead. Placement limits and empty parent availability mean these
+are attempt probabilities, not guaranteed counts. A connected complex may hold
+several distinct silhouette sources, but joining them never merges their
+original source masks. Each component adds its ordinary area-weighted threat
+and loot capacity; simply choosing silhouette instead of burrow adds no reward.
 
 Grotto footprints vary from 92×72 down to 42×36 tiles, with irregular
 rooms linked into a connected chamber network. Burrows vary from 68×52 down to
@@ -2261,12 +2285,14 @@ Crypt maps and the Dwarven Fort remain separate.
 ### Monster silhouette cave prototype
 
 Only generic **z:-2** receives silhouette caves. A world-seeded selection from
-`content/cave_silhouettes.json` determines the shape, with optional horizontal
-mirroring. Transparent enemy images provide geometry only: the selected monster
+`content/cave_silhouettes.json` determines each preloaded composite shape, with
+optional horizontal mirroring. Transparent enemy images provide geometry only:
+the selected monster
 has **no influence on inhabitants, rewards or tier preferences**.
-Normal deep-cave population and entrance safety rules still apply. The extra
-cave receives normal scenario population, so this adds exploration and potential
-rewards as well as terrain variety.
+Normal deep-cave population and entrance safety rules still apply. Each
+silhouette component is populated by the same parametric ecosystem rules as
+other z:-2 source caves. More silhouettes increase shape variety rather than
+creating separate fixed scenarios.
 
 The alpha silhouette becomes dry ordinary cave floor, surrounded by rock. The
 prototype receives a uniformly world-seeded target of **700–2,800 dry floor
@@ -2320,8 +2346,8 @@ that forms or completes a small isolated solid rectangle is rejected, including
 rectangles formed by adjoining clusters. The surrounding
 rock mass and pre-existing holes are not reshaped by this rule. Narrow passages
 retain a single-tile fallback where a larger shape would break connectivity.
-Water keeps its existing irregular seven-cell or three-cell outlines; the
-**30% water / 70% rock** chance applies to each obstruction. Existing rock boundaries and
+Water keeps its existing irregular seven-cell or three-cell outlines; each
+obstruction uses its cave's independently sampled **0–25% water** chance. Existing rock boundaries and
 earlier obstructions are preserved. Placement keeps every dry floor reachable
 from the clear 3×3 stair landing; if an obstruction cuts a narrow passage, a
 short dry bend reconnects it. Swimming is never required to explore the cave.
@@ -2351,12 +2377,19 @@ two, three or four distinct sources, without consuming gameplay RNG:
 | 3 | 40% (previously 30%) |
 | 4 | 30% (previously 10%) |
 
-Only the selected images are
-fetched concurrently and extracted, rather than loading the full image collection. Generation waits for
-completion and uses the same extracted prototype throughout placement retries.
-Image loading order, rendering and animation timing cannot change selection or
-geometry. A missing or invalid selected image stops generation with an error;
-the game never substitutes another shape based on network timing.
+The browser prepares **three independently blended prototypes** per new
+world. The first uses the original world-seed source selection; the second and
+third use deterministic salted seeds and **disjoint source images** from the
+same 72-image catalog. This allows 1–3 silhouette caves to have distinct shapes,
+not just rotated copies of a single composite. Only the images selected for
+these three potential caves (6–12 unique source PNGs) are fetched, rather than
+the entire catalog. Preparation completes before any gameplay worldgen starts;
+each successful silhouette cave uses the next preloaded prototype, and placement
+retries reuse that exact prototype. Loading order, rendering and animation
+timing never affect source choice. A missing or invalid required image is a
+world-generation error, not an excuse to select a timing-dependent substitute.
+Preloading more images may increase new-world startup time, but saved worlds and
+replays never need to fetch the original source PNGs.
 
 Extraction reads the PNG's original alpha bytes directly, without canvas or
 browser resizing. Sources must be non-interlaced 8-bit RGBA PNGs (all 72 current
@@ -2388,19 +2421,20 @@ source** after all additions, so a later shape cannot erase an earlier one.
 Overlap is measured on the extracted masks before fitting and cave repairs.
 These connections make distinct lobes and branches rather than a central stack.
 
-The combined outline is still fitted to the same reserved cave footprint.
-More sources do not create more caves, larger bounds, additional inhabitants or
+Each combined outline is still fitted to the same per-cave footprint bounds.
+A different source composition does not multiply that cave's inhabitants or
 extra loot. Raster fitting can narrow limbs; the existing dry connectivity,
-clear stairs, 15-tile dry-floor limit and 30% water-obstruction rules still
-apply. This provides more route and pursuit choices while preserving the
+clear stairs, 15-tile dry-floor limit and per-cave **0–25% water** separator
+rules still apply. This provides more route and pursuit choices while preserving the
 existing balance envelope. Source choice still has no monster affinity.
 
 Cave style, all source IDs, combined prototype ID and complete generated
 geometry use the existing cave descriptor and map save fields. Loading and
 replay initialization restore them directly without fetching source images or
-regenerating layouts. These cave changes keep save format **97**: altering how
-new worlds are generated does not invalidate already-generated maps or the
-saved gameplay RNG stream. No older-save conversion is added. The former
+regenerating layouts. These shape-selection changes introduce no persistent per-actor status; the
+complete result remains stored in the existing cave descriptors and map data.
+Save schema **102** is required by new water-lined connectors. Older-save
+conversion is not provided. The former
 Python compiler is obsolete.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and

@@ -4291,9 +4291,9 @@ function silhouetteSizePlan(prototype) {
 }
 
 // Integer prototype sampling keeps geometry independent of browser image decoding.
-function carveSilhouetteDungeon(spot, floorTile, reserved) {
+function carveSilhouetteDungeon(spot, floorTile, reserved, chosenPrototype = CAVE_SILHOUETTES[0]) {
   const cfg = WORLD_GEN_CONFIG.caves.deep.silhouette
-  const prototype = pick(CAVE_SILHOUETTES)
+  const prototype = chosenPrototype
   const rows = prototype.rows, ph = rows.length, pw = rows[0].length
   const mirror = chance(.5)
   // Roll once per silhouette cave, not once per long run. A dry cave has
@@ -4450,7 +4450,29 @@ function deepCaveComplexes(level) {
     }
     if(!cells)continue
     for(const point of cells)tiles[point.y][point.x]='cavefloor2'
-    links.push({a,b,cells})
+    // Sometimes the connector runs through a small water-filled cleft.
+    // Only carve water into unowned rock flanking a dry causeway; nobody
+    // needs Swimming to move between the source caves.
+    const waterCells=[]
+    if(cells.length>=cfg.waterPassageMinLength && chance(cfg.waterPassageChance)){
+      const middle=cells[Math.floor(cells.length/2)]
+      const span=Math.min(cfg.waterPassageSpan,cells.length)
+      const ordered=cells.slice().sort((u,v)=>
+        (Math.abs(u.x-middle.x)+Math.abs(u.y-middle.y))-
+        (Math.abs(v.x-middle.x)+Math.abs(v.y-middle.y)))
+      const pathSet=new Set(cells.map(p=>k(p.x,p.y)))
+      const candidates=new Map()
+      for(const p of ordered.slice(0,span))for(const [dx,dy] of dirs){
+        const x=p.x+dx,y=p.y+dy,key=k(x,y)
+        if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2||pathSet.has(key)||nearStairs(x,y))continue
+        if(tiles[y][x]==='cavewall')candidates.set(key,{x,y})
+      }
+      // No extra land or water is created if the link is too tightly enclosed.
+      for(const p of [...candidates.values()].slice(0,cfg.waterPassageMaxTiles)){
+        tiles[p.y][p.x]='water';waterCells.push(p)
+      }
+    }
+    links.push({a,b,cells,waterCells})
     degree[a]++;degree[b]++
     parent[rb]=ra;sizes[ra]+=sizes[rb];areaTotals[ra]+=areaTotals[rb]+cells.length
   }
@@ -4550,7 +4572,13 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
       if (cm[y][x] === parentFloorTile && parentMap[y]?.[x] === parentFloorTile &&
         !entrances.some(e => e.x === x && e.y === y)) open.push({x, y})
     }
-    const carve = style === 'silhouette' ? carveSilhouetteDungeon : style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
+    const silhouetteOrdinal=levelCaves.filter(c=>c.style==='silhouette').length
+    // Each silhouette cave uses another preloaded, independently blended
+    // prototype. Never choose a shape based on asynchronous image load order.
+    const carve = style === 'silhouette'
+      ? (spot,tile,claims)=>carveSilhouetteDungeon(spot,tile,claims,
+        CAVE_SILHOUETTES[silhouetteOrdinal%CAVE_SILHOUETTES.length])
+      : style === 'burrow' ? carveBurrowDungeon : carveDeepDungeon
     let spot = null, layout = null
     for (let tries = 0; tries < cfg.placementTriesPerBranch && open.length; tries++) {
       const candidate = open.splice(randInt(0, open.length - 1), 1)[0]
@@ -4577,9 +4605,20 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
       if (addBranch(i, style)) break
     }
   }
-  if (levelCaves.length >= cfg.minimumCaves) for (const i of eligible) {
-    if (used.has(i) || !chance(cfg.optionalBranchChance)) continue
-    addBranch(i, chance(cfg.optionalGrottoChance) ? 'grotto' : 'burrow')
+  if (levelCaves.length >= cfg.minimumCaves) {
+    // A second silhouette is a genuine possibility rather than the old
+    // hard-coded ceiling of one; the mandatory grotto/burrow never disappear.
+    if(chance(cfg.extraSilhouetteChance))for(const i of eligible){
+      if(!used.has(i) && addBranch(i,'silhouette'))break
+    }
+    for (const i of eligible) {
+      if (used.has(i) || !chance(cfg.optionalBranchChance)) continue
+      const canSilhouette=levelCaves.filter(c=>c.style==='silhouette').length<cfg.maxSilhouetteCaves
+      const style=canSilhouette && chance(cfg.optionalSilhouetteChance)
+        ? 'silhouette' : chance(cfg.optionalGrottoChance) ? 'grotto' : 'burrow'
+      // A failed large silhouette attempt may still fit as a smaller layout.
+      if(!addBranch(i,style) && style==='silhouette')addBranch(i,chance(.5)?'burrow':'grotto')
+    }
   }
   const levelMap = blankCaveMap()
   for (const cm of levelCaveMaps)

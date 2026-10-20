@@ -42,7 +42,7 @@ describe('Deep Caves 2.0 — rewards and permanent clues', () => {
       const before=JSON.stringify({items:drops,spoor:caveSpoor,complexes:level.complexes,
         decorations:caveDecorations,rng:rngState})
       const save=structuredClone(buildSaveObject())
-      assert(save.version===101,'new permanent-spoor save schema')
+      assert(save.version===102,'new permanent-spoor save schema')
       loadGameFromObject(save,{isReplayInit:true})
       const after=JSON.stringify({items:groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'&&
         ['chest','potion','scrollOfInvisibility'].includes(g.kind)),spoor:caveSpoor,

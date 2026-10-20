@@ -25,7 +25,7 @@ describe('Deep Caves 2.0 randomized topology and encounter budgets', () => {
       const before=JSON.stringify({caves:deep.caves,complexes:deep.complexes,
         territories:deep.territories,rng:rngState})
       const save=structuredClone(buildSaveObject())
-      check(save.version===101,'current save schema')
+      check(save.version===102,'current save schema')
       loadGameFromObject(save,{isReplayInit:true})
       const restored=deepLevels[0]
       check(before===JSON.stringify({caves:restored.caves,complexes:restored.complexes,

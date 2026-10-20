@@ -198,8 +198,7 @@
     "deep": {
       "generationTrials": 6,
       "placementTriesPerBranch": 64,
-      "optionalBranchChance": 0.5,
-      "optionalGrottoChance": 0.5,
+      "optionalBranchChance": 0.65,
       "grotto": {
         "topologyVariation": {
           "roomDensityDivisorRange": [
@@ -502,7 +501,8 @@
         "waterChancePercentRange": [
           0,
           25
-        ]
+        ],
+        "preloadedVariants": 3
       },
       "merging": {
         "affinity": [
@@ -518,10 +518,29 @@
         "mergeDecay": 0.6,
         "areaScale": 15000,
         "distanceBands": [
-          { "minRock": 2, "maxRock": 4, "nearChance": 0.85, "farChance": 0.70 },
-          { "minRock": 5, "maxRock": 8, "nearChance": 0.60, "farChance": 0.40 },
-          { "minRock": 9, "maxRock": 12, "nearChance": 0.30, "farChance": 0.16 }
-        ]
+          {
+            "minRock": 2,
+            "maxRock": 4,
+            "nearChance": 0.85,
+            "farChance": 0.7
+          },
+          {
+            "minRock": 5,
+            "maxRock": 8,
+            "nearChance": 0.6,
+            "farChance": 0.4
+          },
+          {
+            "minRock": 9,
+            "maxRock": 12,
+            "nearChance": 0.3,
+            "farChance": 0.16
+          }
+        ],
+        "waterPassageChance": 0.3,
+        "waterPassageMinLength": 3,
+        "waterPassageSpan": 5,
+        "waterPassageMaxTiles": 9
       },
       "territories": {
         "maxCount": 11,
@@ -535,7 +554,11 @@
         "minimumRouteLength": 12,
         "emptyBranchMinimumLength": 3,
         "minimumAlternateUniqueTiles": 8
-      }
+      },
+      "extraSilhouetteChance": 0.7,
+      "maxSilhouetteCaves": 3,
+      "optionalGrottoChance": 0.5,
+      "optionalSilhouetteChance": 0.45
     }
   },
   "dwarvenFort": {
