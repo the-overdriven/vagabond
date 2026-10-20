@@ -11,7 +11,7 @@ module.exports=function silhouetteSizeChecks(){
       check(JSON.stringify(plan)===JSON.stringify(again),'repeatable size plan')
       check(plan.targetFloor>=700&&plan.targetFloor<=2800,'target range')
       check(plan.targetFloor===thin.targetFloor,'source density does not choose target')
-      check(plan.targetFloor===silhouetteSizePlan({...dense,sourceIds:['a','b','c','d']}).targetFloor,'source count does not choose target')
+      check(plan.targetFloor===silhouetteSizePlan(Object.assign({},dense,{sourceIds:['a','b','c','d']})).targetFloor,'source count does not choose target')
       check(thin.sizes[0][0]*thin.sizes[0][1]>plan.sizes[0][0]*plan.sizes[0][1],'sparse silhouettes get larger footprints')
       check(plan.sizes.every(([w,h])=>w<=cfg.maxFootprint[0]&&h<=cfg.maxFootprint[1]),'footprint cap')
       targets.add(plan.targetFloor)
