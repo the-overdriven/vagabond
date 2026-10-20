@@ -20,7 +20,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       brownFloor:i===2,entrances:[{x:sx+7,y:sy+7}]}))
     const before=maps.map(cm=>JSON.stringify(cm))
     const cfg=WORLD_GEN_CONFIG.caves.deep.merging
-    Object.assign(cfg,{affinity:[100,100],nearChance:1,farChance:1,mergeDecay:1,areaScale:1e12})
+    Object.assign(cfg,{affinity:[100,100],distanceBands:cfg.distanceBands.map(b=>({...b,nearChance:1,farChance:1})),mergeDecay:1,areaScale:1e12})
     const level=deepCaveComplexes({map:shared,caveMaps:maps,caves:componentCaves})
     const after=maps.map(cm=>JSON.stringify(cm))
     // Exercise the production whole-world rotation path on this merged map.

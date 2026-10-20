@@ -506,20 +506,22 @@
       },
       "merging": {
         "affinity": [
-          0,
-          100
+          85,
+          115
         ],
         "minRock": 2,
         "maxRock": 12,
-        "detour": 12,
         "pairCandidates": 8,
         "stairClearance": 3,
         "maxDegree": 3,
         "maxMembers": 6,
         "mergeDecay": 0.6,
-        "areaScale": 2500,
-        "nearChance": 0.85,
-        "farChance": 0.05
+        "areaScale": 15000,
+        "distanceBands": [
+          { "minRock": 2, "maxRock": 4, "nearChance": 0.85, "farChance": 0.70 },
+          { "minRock": 5, "maxRock": 8, "nearChance": 0.60, "farChance": 0.40 },
+          { "minRock": 9, "maxRock": 12, "nearChance": 0.30, "farChance": 0.16 }
+        ]
       },
       "territories": {
         "maxCount": 11,

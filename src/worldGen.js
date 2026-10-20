@@ -4355,6 +4355,16 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
 
 // Each world needs a silhouette, a broad grotto and a compact burrow at z:-2. Other
 // branches are optional and use either generator, with reserved nonoverlap.
+// Distance affects the first link between two source caves independently of
+// the world affinity and the separate penalty for already-large complexes.
+// The bands describe source-to-source rock gaps, not the carved detour length.
+function deepCaveMergeDistanceChance(cfg,rockDistance) {
+  const band=cfg.distanceBands.find(b=>rockDistance>=b.minRock&&rockDistance<=b.maxRock)
+  if(!band)return 0
+  const t=band.minRock===band.maxRock?0:(rockDistance-band.minRock)/(band.maxRock-band.minRock)
+  return band.nearChance+(band.farChance-band.nearChance)*t
+}
+
 // Deep Caves 2.0: optional, bounded links between the existing source caves.
 // Links belong only to the shared z:-2 map: a silhouette's source mask and
 // the brown-burrow source mask are deliberately never modified.
@@ -4385,7 +4395,7 @@ function deepCaveComplexes(level) {
     let best=[]
     for(const e of ends[a])for(const f of ends[b]){
       const d=Math.abs(e.x-f.x)+Math.abs(e.y-f.y)-1
-      if(d<cfg.minRock || d>cfg.maxRock+cfg.detour)continue
+      if(d<cfg.minRock || d>cfg.maxRock)continue
       best.push({a,b,e,f,d})
     }
     best.sort((p,q)=>p.d-q.d || p.e.y-q.e.y || p.e.x-q.e.x || p.f.y-q.f.y || p.f.x-q.f.x)
@@ -4428,8 +4438,7 @@ function deepCaveComplexes(level) {
     const rockDistance=Math.max(cfg.minRock,d)
     const decay=Math.pow(cfg.mergeDecay,sizes[ra]+sizes[rb]-2)
     const areaDecay=Math.pow(1+(areaTotals[ra]+areaTotals[rb])/cfg.areaScale,-.5)
-    const distanceChance=cfg.nearChance*Math.pow(cfg.farChance/cfg.nearChance,
-      (rockDistance-cfg.minRock)/(cfg.maxRock-cfg.minRock))
+    const distanceChance=deepCaveMergeDistanceChance(cfg,rockDistance)
     const p=Math.min(1,affinity*distanceChance*decay*areaDecay)
     if(!chance(p))continue
     // Different near-equal coastline pairs are allowed if the closest one

@@ -2205,10 +2205,16 @@ mountain air.
 Some z:-1 caves receive a downward connection.
 
 The second-level source caves can now form **optional connected complexes**.
-Nearby source components may be joined by short, carved dry corridors (2–12
-rock tiles). Links are less likely as a complex acquires additional members
-or becomes larger, and remain entirely optional; all original entrances,
-source cave identities and staircase pairs remain in place. A complex may
+Nearby source components may be joined by short, carved dry corridors (**2–12
+rock tiles**). For two previously separate source caves, the baseline chance now
+varies by rock gap: **85–70%** across 2–4 tiles, **60–40%** across 5–8 tiles,
+and **30–16%** across 9–12 tiles (previously an exponential falloff from 85%
+to 5%). A world-seeded affinity of **85–115%** and a mild dry-area modifier
+(1 + combined dry area / 15,000)^−0.5 adjust these chances; large complexes
+retain the stronger **0.6 multiplier per already joined extra component**.
+The resulting chances are typically about **60–80%**, **35–55%**, and **10–25%**
+for small separate caves in the respective bands, and are not guarantees.
+All original entrances, source cave identities and staircase pairs remain in place. A complex may
 contain a grotto, burrow and silhouette cave, while other caves remain
 independent. Connected layouts are still navigated as one shared z:-2 map.
 
@@ -2217,14 +2223,15 @@ map. The original source masks, silhouette shapes and the brown burrow's local
 floor region are not altered. For each complex the generator stores sorted
 source membership and entrances, and partitions the reachable dry floor into
 irregular **territories** using walking-distance seeds. Territories guide initial enemy placement but do not constrain monster
-movement, change AI or add faction rules. Loot remains per source cave in
-the current population batch; merging gives no additional reward.
+movement, change AI or add faction rules. Loot is allocated from a shared
+world budget by playable area; merging gives no additional reward.
 
 Connector cells and territory/complex metadata are saved and restored directly;
 the shared map is reconstructed by overlaying saved connectors after the source
 maps. Rotation transforms the saved connectors and territory anchors along
-with all stairs and source caves. Save schema **98** requires newly generated
-worlds and does not convert older saves.
+with all stairs and source caves. Connector probability changes only newly
+generated worlds and requires no new saved fields or replay logic. Save schema
+**101** remains unchanged; existing saves restore their original links.
 
 The generator requires **three separate generic z:-2 caves**: one monster
 silhouette, one grotto with connected irregular chambers and winding passages,

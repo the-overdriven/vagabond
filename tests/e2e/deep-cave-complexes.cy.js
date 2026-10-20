@@ -12,6 +12,12 @@ describe('Deep cave complexes and persistent topology',()=>{
       if(level.caves.length<3||!level.caves.some(c=>c.style==='silhouette'))throw Error('missing source cave');
       if(!Array.isArray(level.links)||!Array.isArray(level.complexes)||!Array.isArray(level.territories))
         throw Error('deep cave complex metadata missing');
+      const merging=WORLD_GEN_CONFIG.caves.deep.merging;
+      const chanceAt=distance=>deepCaveMergeDistanceChance(merging,distance);
+      if(!(chanceAt(2)>chanceAt(4)&&chanceAt(4)>chanceAt(5)&&
+        chanceAt(5)>chanceAt(8)&&chanceAt(8)>chanceAt(9)&&
+        chanceAt(9)>chanceAt(12)&&chanceAt(13)===0))
+        throw Error('cave merging distance bands invalid');
       const dry=t=>t==='cavefloor2'||t==='caveup';
       const ownership=new Set(level.complexes.flatMap(c=>c.members));
       if(ownership.size!==level.caves.length)throw Error('complex membership mismatch');

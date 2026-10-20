@@ -19,7 +19,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       masks.forEach(cm=>cm.forEach((row,y)=>row.forEach((t,x)=>{if(t!=='cavewall')shared[y][x]=t})))
       const descriptors=spots.map(([sx,sy],i)=>({style:['silhouette','grotto','burrow'][i],entrances:[{x:sx+12,y:sy+12}],rooms:[]}))
       const linkConfig=WORLD_GEN_CONFIG.caves.deep.merging
-      Object.assign(linkConfig,{affinity:[100,100],nearChance:1,farChance:1,mergeDecay:1,areaScale:1e12})
+      Object.assign(linkConfig,{affinity:[100,100],distanceBands:linkConfig.distanceBands.map(b=>({...b,nearChance:1,farChance:1})),mergeDecay:1,areaScale:1e12})
       const layer=deepCaveComplexes({map:shared,caveMaps:masks,caves:descriptors})
       deepLevels=[layer]
       spawnCaveScenarios()
