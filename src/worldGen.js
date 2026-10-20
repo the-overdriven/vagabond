@@ -3808,8 +3808,9 @@ function carveDeepDungeon(spot, floorTile, reserved) {
     (cfg.roomCountBonus - variation.baselineRoomCountBonus)
   const separationSquared = caveTopologyCenterRoll(variation.centerSeparationSquaredRange)
   const jitter = caveTopologyCenterRoll(variation.passageJitterRange)
-  const loopTarget = Math.max(0,caveTopologyRoll(variation.extraLoopCountRange) +
-    cfg.extraConnections - variation.baselineExtraConnections)
+  const alternativeRouteTarget=caveTopologyCenterRoll(variation.alternativeRouteTargetPercentRange)/100
+  const loopLimit=Math.max(0,variation.extraLoopCountRange[1]+
+    cfg.extraConnections-variation.baselineExtraConnections)
   const narrowChance = variation.singleWidthChance
   const edgeMin = caveTopologyRoll(variation.edgeVarianceMinRange)
   const edgeMax = caveTopologyRoll(variation.edgeVarianceMaxRange)
@@ -3923,6 +3924,7 @@ function carveDeepDungeon(spot, floorTile, reserved) {
         candidates.push({from,to,direct})
       }
       for(let i=candidates.length-1;i>0;i--){const j=randInt(0,i);[candidates[i],candidates[j]]=[candidates[j],candidates[i]]}
+      const loopTarget=Math.min(loopLimit,Math.round(alternativeRouteTarget*Math.max(1,rooms.length-1)))
       let loops=0
       for(const pair of candidates){
         if(loops>=loopTarget)break
@@ -3953,7 +3955,8 @@ function carveDeepDungeon(spot, floorTile, reserved) {
         for (let x = bounds.x1; x <= bounds.x2; x++)
           if (cm[y][x] === floorTile) dryFloor++
       if (dryFloor < Math.round(w * h * cfg.minDryFloorFraction)) continue
-      return {cm, rooms, bounds, hasWater}
+      return {cm, rooms, bounds, hasWater, topology:{alternativeRouteTarget,
+        attemptedLoops:loopTarget,acceptedLoops:loops}}
     }
   }
   return null
@@ -3974,7 +3977,8 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
   const widePeriod = caveTopologyCenterRoll(variation.widePeriodRange)
   const wideSteps = caveTopologyRoll(variation.wideStepsRange)
   const pocketHalfSize = caveTopologyCenterRoll(variation.pocketHalfSizeRange)
-  const extraLinks = caveTopologyRoll(variation.extraLoopCountRange)
+  const alternativeRouteTarget=caveTopologyCenterRoll(variation.alternativeRouteTargetPercentRange)/100
+  const extraLinkLimit=variation.extraLoopCountRange[1]
   const continueLastBranchChance = caveTopologyRoll(variation.continueLastBranchPercentRange) / 100
   const waterPockets = chance(variation.waterChance) ? caveTopologyRoll(variation.waterPocketCountRange) : 0
   const sizes = cfg.sizes
@@ -4040,6 +4044,7 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
           candidates.push({from,to,direct})
       }
       for(let i=candidates.length-1;i>0;i--){const j=randInt(0,i);[candidates[i],candidates[j]]=[candidates[j],candidates[i]]}
+      const extraLinks=Math.min(extraLinkLimit,Math.round(alternativeRouteTarget*Math.max(1,tips.length-1)))
       let made=0
       for(const p of candidates){
         if(made>=extraLinks)break
@@ -4061,7 +4066,8 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
           minWaterCells:variation.minWaterCells,waterEllipseThreshold:.88},
         waterPockets,variation.waterRadiusX,variation.waterRadiusY)
       // Water can only remove dry cells, never sever mandatory paths.
-      return {cm,rooms,bounds,hasWater,style:'burrow'}
+      return {cm,rooms,bounds,hasWater,style:'burrow',topology:{alternativeRouteTarget,
+        attemptedLoops:extraLinks,acceptedLoops:made}}
     }
   }
   return null
@@ -4522,6 +4528,8 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
     levelCaveMaps.push(layout.cm)
     levelCaves.push({x: spot.x, y: spot.y, entrances: [{x: spot.x, y: spot.y}],
       rooms: layout.rooms, hasWater: layout.hasWater, style,
+      // Silhouette shapes stay untouched; their actual route share is measured later.
+      topology: layout.topology || {alternativeRouteTarget:null,attemptedLoops:0,acceptedLoops:0},
       ...(layout.silhouetteId ? {silhouetteId: layout.silhouetteId, silhouetteIds: layout.silhouetteIds} : {}),
       brownFloor: style === 'burrow' && !levelCaves.some(c => c.brownFloor)})
     used.add(i)
@@ -5228,6 +5236,43 @@ function ensureUndergroundVampire() {
   addEnemy(enemy)
 }
 
+// v194: deterministic generation-only threat accounting. Costs describe both
+// single-creature abilities and nearby *combinations* (not raw tier alone).
+// The extra cost belongs to the newer spawn so existing enemies are never
+// rescored or made dependent on the order in which animations play.
+function deepCaveThreatCost(t, pos, prefix, nearby, ec) {
+  const abilities = new Set(t.abilities || [])
+  const weights = ec.synergy.abilityCosts
+  const tierCost = ({1:1,2:2,3:4,4:12})[t.tier] || 20
+  let result = tierCost + [...abilities].reduce((a,b)=>a+(weights[b]||0),0)
+  if(prefix==='Champion')result+=ec.championThreatCost
+  const ranged=a=>a.has('shooterArrows')||a.has('shooterStones')
+  const control=a=>a.has('root')||a.has('wail')||a.has('pull')||a.has('mummyCurse')||a.has('petrifyingGaze')
+  for (const e of nearby) {
+    if(!e.alive || e.level!==-2 || e.levelKind!=='chain' ||
+       Math.max(Math.abs(e.x-pos.x),Math.abs(e.y-pos.y))>ec.synergy.nearbyRadius)continue
+    const other = new Set(e.abilities||[])
+    if(abilities.has('gangPower')&&other.has('gangPower')&&e.baseName===t.name)
+      result+=ec.synergy.gangPairCost
+    if(ranged(abilities)&&ranged(other))result+=ec.synergy.rangedPairCost
+    if((ranged(abilities)&&other.has('pull'))||(abilities.has('pull')&&ranged(other)))
+      result+=ec.synergy.pullShooterCost
+    if(control(abilities)&&control(other))result+=ec.synergy.controlComboCost
+    if(abilities.has('summon')||other.has('summon'))result+=ec.synergy.summonSupportCost
+    if((abilities.has('healSelf')&&other.has('wrestler'))||
+       (other.has('healSelf')&&abilities.has('wrestler')))result+=ec.synergy.healerFrontlineCost
+    if((abilities.has('knockback')&&ranged(other))||
+       (other.has('knockback')&&ranged(abilities)))result+=ec.synergy.knockbackRangedCost
+    if((abilities.has('haste')&&ranged(other))||
+       (other.has('haste')&&ranged(abilities)))result+=ec.synergy.fastRangedCost
+    if((abilities.has('invisibility')&&control(other))||
+       (other.has('invisibility')&&control(abilities)))result+=ec.synergy.ambushControlCost
+    if(Math.max(Math.abs(e.x-pos.x),Math.abs(e.y-pos.y))<=2 &&
+       (prefix==='Champion'||e.prefix==='Champion'))result+=ec.synergy.championSupportCost
+  }
+  return Math.round(result*100)/100
+}
+
 // Deep Caves 2.0: independent local ecosystems inside each connected complex.
 // Territory IDs are generation metadata; they never restrict pursuit or movement.
 // Deliberately do not alter enemy templates, the underground far-wander rule,
@@ -5258,11 +5303,23 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
   const maxDistance = (a,b) => Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))
   const unoccupied = p => !occupied.has(keyXY(p.x,p.y)) && !itemCells.has(keyXY(p.x,p.y))
   const canSpawn = p => unoccupied(p) && allEntries.every(e => maxDistance(e,p) >= ec.stairClearance)
-  const cost = t => ({1:1,2:2,3:4,4:12})[t.tier] || 20
+  let currentComplexMembers = new Set()
+  const cost = (t,p,prefix=null) => deepCaveThreatCost(t,p,prefix,
+    enemies.filter(e=>e.alive && e.level===-2 && e.levelKind==='chain' &&
+      currentComplexMembers.has(e.caveIndex)),ec)
+  const pickChampionCount = () => {
+    let roll=rng()
+    for(let i=0;i<ec.championCountWeights.length;i++){
+      roll-=ec.championCountWeights[i]
+      if(roll<0)return i
+    }
+    return ec.championCountWeights.length-1
+  }
 
   // Every tile has a source owner (used by caveIndex) even inside a connected complex.
   // Connector cells have no source owner and are kept clear for traversal.
   for (const complex of deep.complexes) {
+    currentComplexMembers=new Set(complex.members)
     const sites=[], owned=new Map(), transit=new Set()
     for (const i of complex.members) {
       const cm = deep.caveMaps[i]
@@ -5279,6 +5336,16 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
     }
     for (const link of deep.links) if (complex.members.includes(link.a))
       for (const p of link.cells) transit.add(k(p.x,p.y))
+    // Each source cave has independent tier proportions, even if joined by a
+    // corridor. This is a worldgen roll, never recomputed on cave entry.
+    for(const i of complex.members){
+      const weights=[1,2,3].map(t=>{
+        const [lo,hi]=ec.tierWeightRanges[t]
+        return lo + rng()*(hi-lo)
+      })
+      const sum=weights.reduce((a,b)=>a+b,0)
+      deep.caves[i].tierWeights=weights.map(w=>Math.round(w/sum*10000)/10000)
+    }
     const territories=deep.territories.filter(t=>t.complexId===complex.id)
     if (!territories.length || sites.length < cfg.minOpenTilesForScenario) continue
 
@@ -5332,6 +5399,28 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
     for(const z of zones)z.count=sum?Math.round(desired*z.weight/sum):0
     const deficit=desired-zones.reduce((n,z)=>n+z.count,0)
     if(deficit && sum)zones.filter(z=>z.weight>0).sort((a,b)=>b.weight-a.weight)[0].count+=deficit
+    // Independently sampled local difficulty, normalized back to the shared
+    // complex budget. Empty and tiny territories cannot acquire free elites.
+    const threatShares=zones.map(z=>z.count*center(...ec.territoryThreatMultiplier))
+    const threatSum=threatShares.reduce((a,b)=>a+b,0)
+    for(let zi=0;zi<zones.length;zi++){
+      const z=zones[zi]
+      z.budget=threatSum?budget*threatShares[zi]/threatSum:0
+      z.spent=0
+      const clusterLimit=Math.min(ec.territoryClusterCount[1],Math.floor(z.count/2),z.available.length)
+      const requested=clusterLimit?randInt(ec.territoryClusterCount[0],clusterLimit):0
+      z.clusterRadius=sample(ec.territoryClusterRadius)
+      z.clusterPreference=ec.territoryClusterPreference[0]+rng()*
+        (ec.territoryClusterPreference[1]-ec.territoryClusterPreference[0])
+      z.clusters=[]
+      const possibles=z.available.slice()
+      for(let j=0;j<requested&&possibles.length;j++){
+        const pickIndex=randInt(0,possibles.length-1),p=possibles[pickIndex]
+        z.clusters.push({x:p.x,y:p.y})
+        for(let q=possibles.length-1;q>=0;q--)
+          if(maxDistance(p,possibles[q])<z.clusterRadius)possibles.splice(q,1)
+      }
+    }
     let spent=0,spawned=0,champions=0,tier4Count=0
     function spawn(t,p,prefix=null) {
       if (!p||!canSpawn(p)||!habitat(t,p)||!naturalSpawnEligible(t))return false
@@ -5340,9 +5429,13 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
         humanoid:!!t.humanoid,aggro:t.aggro??AGGRO_RANGE,x:p.x,y:p.y,
         homeX:p.x,homeY:p.y,homeTileType:floor,alive:true,prefix:null,equipment:null}
       if(prefix){e.prefix=prefix;e.prefixBase=prefixBaseStats(e);applyEnemyPrefix(e,prefix);e.name=prefix+' '+e.name}
-      addEnemy(e);occupied.add(keyXY(p.x,p.y));spent+=cost(t)+(prefix==='Champion'?ec.championThreatCost:0)
+      const z=zones[p.territory]
+      const effectiveCost=t.name==='Fungus'?0:cost(t,p,prefix)
+      if(t.name!=='Fungus' && (spent+effectiveCost>budget*1.05 ||
+         z.spent+effectiveCost>z.budget*1.15))return false
+      addEnemy(e);occupied.add(keyXY(p.x,p.y));spent+=effectiveCost;z.spent+=effectiveCost
       if (t.name !== 'Fungus') {
-        spawned++;introduced.add(t.name);zones[p.territory].spawned++
+        spawned++;introduced.add(t.name);z.spawned++
         if (!zones[p.territory].speciesNames.includes(t.name)) zones[p.territory].speciesNames.push(t.name)
       }
       return true
@@ -5354,11 +5447,17 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
         Math.abs(p.x-target.x)+Math.abs(p.y-target.y)<=near))
       if(!options.length)return null
       const far=options.filter(p=>zones.every(zone=>zone.recent===undefined||maxDistance(zone.recent,p)>=ec.spacing))
-      return pick(far.length?far:options)
+      const pool=far.length?far:options
+      if(!target && z.clusters.length && chance(z.clusterPreference)) {
+        const center=pick(z.clusters)
+        const grouped=pool.filter(p=>Math.abs(p.x-center.x)+Math.abs(p.y-center.y)<=z.clusterRadius)
+        if(grouped.length)return pick(grouped)
+      }
+      return pick(pool)
     }
     function chooseSpecies(z,p,forceTier4=false) {
       const pool=(forceTier4?tier4:templates).filter(t=>habitat(t,p) &&
-        (t.tier!==3 || (spent+cost(t)<=budget*1.12)) &&
+        (t.tier!==3 || (spent+cost(t,p)<=budget*1.12)) &&
         (introduced.has(t.name)||introduced.size<maxSpecies))
       if(!pool.length)return null
       const chosenSet=z.speciesNames
@@ -5367,37 +5466,41 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
       const reuse=chosenSet.length && chance(ec.localReuseChance)
       const filtered=reuse?pool.filter(t=>chosenSet.includes(t.name)):pool
       const candidates=filtered.length?filtered:pool
+      const tierWeights=deep.caves[p.caveIndex].tierWeights
       return pickWeighted(candidates,t=>Math.max(0.005,t.rarity??1)*
-        (t.tier===1?ec.tierWeights[0]:t.tier===2?ec.tierWeights[1]:t.tier===3?ec.tierWeights[2]:1)*
+        (tierWeights[t.tier-1]||1)*
         (t.name===lead.name?1+coherence*ec.coherenceMultiplier:1)*
         (z.speciesNames.includes(t.name)?ec.localDominanceMultiplier:1))
     }
-    // Optional end encounter: far from any staircase, not automatically a boss.
-    const eliteChance=chance(ec.championChance)
+    // 0..5 Champion *candidates* per complex, centered on zero. Candidates
+    // consume the real territory budget; a rolled five is never five free elites.
+    const candidateChampions=pickChampionCount()
     const strongChance=chance(ec.tier4Chance)
     const sortedZones=zones.filter(z=>z.available.length>=ec.minimumEliteSites)
       .sort((a,b)=>Math.max(...b.available.map(p=>Math.min(...allEntries.map(e=>
-        Math.abs(e.x-p.x)+Math.abs(e.y-p.y)))))-
+        Math.abs(e.x-p.x)+Math.abs(e.y-p.y))))) -
         Math.max(...a.available.map(p=>Math.min(...allEntries.map(e=>
         Math.abs(e.x-p.x)+Math.abs(e.y-p.y))))))
-    if(eliteChance && sortedZones.length && spent<budget) {
-      const z=pick(sortedZones.slice(0,Math.min(2,sortedZones.length)))
+    for(let attempt=0;attempt<candidateChampions && sortedZones.length;attempt++){
+      const candidates=sortedZones.filter(z=>z.spent<z.budget*.85 && z.spawned<z.count)
+      if(!candidates.length)break
+      const z=pick(candidates.slice(0,Math.min(3,candidates.length)))
       const p=take(z)
       const t=p&&chooseSpecies(z,p)
       if(t && t.tier<=3 && spawn(t,p,'Champion')) {
-        champions++
+        champions++;z.recent=p
         const escorts=sample(ec.escortCount)
         for(let i=0;i<escorts;i++){
-          if(spent+cost(t)>budget*1.35)break
           const guard=take(z,p,ec.escortRadius)
-          if(!guard)break
-          if(spawn(t,guard))z.recent=guard
+          if(!guard || !spawn(t,guard))break
+          z.recent=guard
         }
       }
     }
-    if(strongChance && sortedZones.length && spent+12<=budget*1.45) {
-      const z=pick(sortedZones.slice(0,Math.min(2,sortedZones.length)))
-      const p=take(z)
+    if(strongChance && sortedZones.length && spent+12<=budget*1.05) {
+      const eligible=sortedZones.filter(z=>z.spent+12<=z.budget*1.15 && z.spawned<z.count)
+      const z=eligible.length?pick(eligible.slice(0,Math.min(2,eligible.length))):null
+      const p=z&&take(z)
       const t=p&&chooseSpecies(z,p,true)
       if(t&&spawn(t,p)){tier4Count++;z.recent=p}
     }
@@ -5418,16 +5521,17 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
           const prev=templates.filter(e=>z.speciesNames.includes(e.name)&&habitat(e,p))
           if(prev.length)t=pickWeighted(prev,e=>Math.max(0.005,e.rarity??1))
         }
-        const projected=cost(t)*(t.abilities.includes('gangPower')?1.22:1)
-        if(spent+projected>budget*1.05)continue
         const prefix=allPrefixNames.length&&chance(cfg.deepPrefixChance)?pick(allPrefixNames):null
         if(spawn(t,p,prefix))z.recent=p
       }
     }
     for(const i of complex.members)deep.caves[i].populated=true
     complex.ecosystem={density:wantedDensity,threatBudget:Math.round(budget*100)/100,
+      spentThreat:Math.round(spent*100)/100,championCandidates:candidateChampions,
       population:spawned,champions,tier4:tier4Count,species:[...introduced].sort()}
-    for(const z of zones)Object.assign(z.record,{population:z.spawned,species:z.speciesNames.slice()})
+    for(const z of zones)Object.assign(z.record,{population:z.spawned,species:z.speciesNames.slice(),
+      threatBudget:Math.round(z.budget*100)/100,threatUsed:Math.round(z.spent*100)/100,
+      clusterCenters:z.clusters,clusterRadius:z.clusterRadius})
     for(const caveIndex of complex.members){
       const ownedSites=sites.filter(p=>p.caveIndex===caveIndex)
       const free=()=>ownedSites.filter(p=>unoccupied(p) && allEntries.every(e=>maxDistance(e,p)>4))
@@ -5532,6 +5636,135 @@ function populateDeepCaveRewards(deep) {
   for(let i=0;i<totalSupplies;i++)place('supply')
   for(const e of entries)e.complex.rewards={chests:e.chests,provisions:e.provisions,
     dryArea:e.area}
+}
+
+// v194: observe the topology and exploration workload AFTER inhabitants and
+// treasure are placed. Metrics are deterministic diagnostics, not secret
+// gameplay changes or RNG draws. A non-trivial alternate route must survive
+// closing a 3x3 segment of the original shortest route (open-room wiggles do
+// not count as a corridor bypass).
+function measureDeepCaveExploration(deep) {
+  const cfg=WORLD_GEN_CONFIG.caves.deep.explorationMetrics
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+  const id=(x,y)=>y*MAP_W+x
+  const pos=q=>({x:q%MAP_W,y:Math.floor(q/MAP_W)})
+  const isDry=t=>t==='cavefloor2'||t==='caveup'
+  for(const complex of deep.complexes){
+    const walkable=new Set()
+    for(const index of complex.members){
+      const cm=deep.caveMaps[index]
+      for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++)
+        if(isDry(cm[y][x]))walkable.add(id(x,y))
+    }
+    for(const link of deep.links)if(complex.members.includes(link.a))
+      for(const p of link.cells)walkable.add(id(p.x,p.y))
+    if(!walkable.size)continue
+    const neighbors=q=>{
+      const x=q%MAP_W,y=Math.floor(q/MAP_W),out=[]
+      for(const [dx,dy] of dirs){const next=id(x+dx,y+dy);if(walkable.has(next))out.push(next)}
+      return out
+    }
+    const entrances=complex.entrances.map(e=>id(e.x,e.y)).filter(q=>walkable.has(q))
+    if(!entrances.length)continue
+    const sources=new Set([...entrances])
+    const events=new Set()
+    for(const e of enemies)if(e.alive&&e.level===-2&&e.levelKind==='chain'&&
+       complex.members.includes(e.caveIndex)&&walkable.has(id(e.x,e.y)))events.add(id(e.x,e.y))
+    for(const item of groundItems)if(item.level===-2&&item.levelKind==='chain'&&
+       complex.members.includes(item.caveIndex)&&walkable.has(id(item.x,item.y)))events.add(id(item.x,item.y))
+    const bfs=(start,blocked=null,goal=null)=>{
+      const dist=new Map(),prev=new Map(),q=[]
+      for(const seed of start)if(walkable.has(seed)&&!(blocked&&blocked.has(seed))&&!dist.has(seed)){
+        dist.set(seed,0);q.push(seed)
+      }
+      for(let at=0;at<q.length;at++){
+        const here=q[at],nextDist=dist.get(here)+1
+        if(here===goal)break
+        for(const nxt of neighbors(here))if(!dist.has(nxt)&&!(blocked&&blocked.has(nxt))){
+          dist.set(nxt,nextDist);prev.set(nxt,here);q.push(nxt)
+        }
+      }
+      return {dist,prev}
+    }
+    const fromEntrance=bfs(sources)
+    const maxEntranceDist=Math.max(0,...fromEntrance.dist.values())
+    let firstEncounter=null
+    for(const e of events){const d=fromEntrance.dist.get(e)
+      if(d!==undefined&&(firstEncounter===null||d<firstEncounter))firstEncounter=d
+    }
+    const fromEvents=bfs(events.size?events:sources)
+    let longestEmptyStretch=0
+    for(const [cell,d] of fromEvents.dist)
+      if(d>longestEmptyStretch)longestEmptyStretch=d
+    // An empty branch counts only if all intermediate corridor cells lack
+    // encounters or treasure. Its return cost is twice the walking distance.
+    let longestEmptyDeadEnd=0,totalEmptyDeadEndReturnCost=0,emptyDeadEnds=0
+    const marked=new Set()
+    for(const cell of walkable){
+      if(neighbors(cell).length!==1||marked.has(cell)||sources.has(cell))continue
+      let at=cell,prev=-1,len=0,isEmpty=true
+      const branch=[]
+      while(true){
+        branch.push(at);if(events.has(at))isEmpty=false
+        const next=neighbors(at).filter(q=>q!==prev)
+        if(next.length!==1)break
+        const step=next[0]
+        if(neighbors(step).length!==2 || sources.has(step))break
+        len++;prev=at;at=step
+        if(len>walkable.size)break
+      }
+      if(isEmpty&&len>=cfg.emptyBranchMinimumLength){
+        emptyDeadEnds++;longestEmptyDeadEnd=Math.max(longestEmptyDeadEnd,len)
+        totalEmptyDeadEndReturnCost+=2*(len+1)
+        branch.forEach(q=>marked.add(q))
+      }
+    }
+    // Candidate destinations are rewards and distant extremities, not every
+    // tile of a wide room. No RNG: deterministic distance and tile ordering.
+    const targets=[...new Set([...events,...walkable].filter(q=>
+      fromEntrance.dist.get(q)>=cfg.minimumRouteLength &&
+      (events.has(q)||neighbors(q).length<=2)))].sort((a,b)=>
+        fromEntrance.dist.get(b)-fromEntrance.dist.get(a)||a-b)
+    const stride=Math.max(1,Math.floor(targets.length/cfg.destinationSampleLimit))
+    let tested=0,alternateRoutes=0
+    for(let ti=0;ti<targets.length&&tested<cfg.destinationSampleLimit;ti+=stride){
+      const target=targets[ti],length=fromEntrance.dist.get(target)
+      const path=[]
+      let cur=target
+      for(let k=0;k<=length;k++){
+        path.push(cur)
+        if(sources.has(cur))break
+        cur=fromEntrance.prev.get(cur)
+        if(cur===undefined)break
+      }
+      if(path.length<cfg.minimumRouteLength)continue
+      const middle=pos(path[Math.floor(path.length/2)])
+      const blocked=new Set()
+      for(let dy=-cfg.alternativeBlockRadius;dy<=cfg.alternativeBlockRadius;dy++)
+        for(let dx=-cfg.alternativeBlockRadius;dx<=cfg.alternativeBlockRadius;dx++)
+          blocked.add(id(middle.x+dx,middle.y+dy))
+      if(blocked.has(target)||[...sources].some(q=>blocked.has(q)))continue
+      const alt=bfs(sources,blocked,target),detour=alt.dist.get(target)
+      tested++
+      if(detour!==undefined&&detour<=length*cfg.alternativeDetourMultiplier){
+        const original=new Set(path)
+        let current=target,unique=0
+        for(let k=0;k<=detour;k++){
+          if(!original.has(current))unique++
+          if(sources.has(current))break
+          current=alt.prev.get(current)
+          if(current===undefined)break
+        }
+        if(unique>=cfg.minimumAlternateUniqueTiles)alternateRoutes++
+      }
+    }
+    complex.exploration={dryTiles:walkable.size,events:events.size,stairs:entrances.length,
+      maximumEntranceDistance:maxEntranceDist,firstEncounterDistance:firstEncounter,
+      longestEmptyStretch,emptyDeadEnds,longestEmptyDeadEnd,
+      emptyDeadEndReturnCost:totalEmptyDeadEndReturnCost,
+      alternativeDestinationsTested:tested,alternativeDestinations:alternateRoutes,
+      alternativeRouteShare:tested?Math.round(100*alternateRoutes/tested)/100:0}
+  }
 }
 
 function spawnCaveScenarios() {

@@ -263,6 +263,10 @@
           "waterRadiusYRange": [
             2,
             6
+          ],
+          "alternativeRouteTargetPercentRange": [
+            0,
+            70
           ]
         },
         "sizes": [
@@ -392,7 +396,11 @@
           "waterCenterJitter": 1,
           "waterRadiusX": 2,
           "waterRadiusY": 2,
-          "minWaterCells": 3
+          "minWaterCells": 3,
+          "alternativeRouteTargetPercentRange": [
+            0,
+            70
+          ]
         },
         "sizes": [
           [
@@ -487,6 +495,14 @@
         "maxCount": 11,
         "minTilesPerTerritory": 120,
         "minAnchorSeparation": 6
+      },
+      "explorationMetrics": {
+        "destinationSampleLimit": 12,
+        "alternativeDetourMultiplier": 2.2,
+        "alternativeBlockRadius": 1,
+        "minimumRouteLength": 12,
+        "emptyBranchMinimumLength": 3,
+        "minimumAlternateUniqueTiles": 8
       }
     }
   },
@@ -1608,7 +1624,6 @@
       "stairClearance": 8,
       "spacing": 3,
       "waterRange": 8,
-      "championChance": 0.4,
       "tier4Chance": 0.1,
       "minimumEliteSites": 10,
       "championThreatCost": 7,
@@ -1617,11 +1632,6 @@
         6
       ],
       "escortRadius": 4,
-      "tierWeights": [
-        0.45,
-        1.0,
-        0.48
-      ],
       "allowedSpecies": [
         "Giant Rat",
         "Giant Bat",
@@ -1701,7 +1711,97 @@
         "ASHFANG",
         "MIREHOWL",
         "NHALUUN"
-      ]
+      ],
+      "tierWeightRanges": {
+        "1": [
+          0.12,
+          0.9
+        ],
+        "2": [
+          0.55,
+          1.5
+        ],
+        "3": [
+          0.2,
+          1.25
+        ]
+      },
+      "championCountWeights": [
+        0.6,
+        0.24,
+        0.1,
+        0.04,
+        0.015,
+        0.005
+      ],
+      "territoryThreatMultiplier": [
+        0.55,
+        1.6
+      ],
+      "territoryClusterCount": [
+        0,
+        8
+      ],
+      "territoryClusterRadius": [
+        2,
+        7
+      ],
+      "territoryClusterPreference": [
+        0.35,
+        0.85
+      ],
+      "synergy": {
+        "abilityCosts": {
+          "gangPower": 0.9,
+          "shooterArrows": 1.4,
+          "shooterStones": 1.1,
+          "invisibility": 1.3,
+          "pull": 2.0,
+          "charge": 1.5,
+          "root": 1.5,
+          "wail": 2.5,
+          "petrifyingGaze": 2.5,
+          "mummyCurse": 1.0,
+          "thief": 1.3,
+          "summon": 2.4,
+          "deathShield": 1.6,
+          "ethereal": 2.0,
+          "lifesteal": 1.6,
+          "poison": 1.0,
+          "haste": 1.0,
+          "inspired": 1.2,
+          "fly": 0.4,
+          "evades": 0.9,
+          "flee": 0.4,
+          "carrionInstinct": 0.6,
+          "healSelf": 1.8,
+          "swim": 0.25,
+          "enrage": 1.0,
+          "wrestler": 1.5,
+          "knockback": 1.1,
+          "trueSight": 0.3,
+          "weaken": 1.2,
+          "slow": 1.1,
+          "disarm": 1.5,
+          "dispel": 0.9,
+          "deathBolt": 2.5,
+          "immunity": 2.3,
+          "lowHpTeleport": 1.7,
+          "sacrifice": 2.1
+        },
+        "nearbyRadius": 5,
+        "gangPairCost": 1.65,
+        "rangedPairCost": 1.3,
+        "championSupportCost": 1.5,
+        "controlComboCost": 1.6,
+        "pullShooterCost": 1.5,
+        "summonSupportCost": 1.0,
+        "sameTileThreatMultiplier": 1.0,
+        "healerFrontlineCost": 1.2,
+        "knockbackRangedCost": 0.8,
+        "fastRangedCost": 0.7,
+        "ambushControlCost": 0.9
+      }
     },
     "rewards": {
       "referenceDryTilesPerSource": 1700,

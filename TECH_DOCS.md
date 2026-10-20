@@ -2641,14 +2641,79 @@ Every existing staircase retains **at least eight Chebyshev tiles** of
 monster clearance for ordinary ecosystem spawns. Ordinary monsters prefer
 at least three tiles between recent spawns, with spacing relaxed when space
 is limited. Source cave floors are owned by their original descriptors, and
-carved connector tiles are left clear. Optional Champions are attempted with
-**40% chance per complex**; their escort is 0–6 same-species creatures near
-them (subject to space and the remaining threat budget). A separate 10% roll
-may add one tier-4 enemy; neither encounter is guaranteed, and both may fail
-when no safe position or budget remains. Tier-4 choices exclude `ultraRare`
+carved connector tiles are left clear. Champions remain **optional**; the
+current number of attempts, escort and territory budget rules are specified
+in the v194 section below. A separate **10%** roll may add one tier-4 enemy;
+neither encounter is guaranteed and attempts may fail if no safe space or
+budget remains. Tier-4 choices exclude `ultraRare`
 and tier-5 species. Ordinary prefix rolls use the existing deep-cave prefix
 chance, preserving `champions_age`, `mundane_age`, `things_below` and other
 world traits that modify it. Champions have their normal existing properties.
+
+### Deep Caves 2.0 — per-cave tiers, clusters, synergies and route measurements (v194 / schema 101)
+
+The z:-2 generator now varies **tier probabilities independently for every
+source cave** even when several caves belong to one connected complex. Tier 1
+weights sample from **0.12–0.90**, tier 2 from **0.55–1.50**, and tier 3 from
+**0.20–1.25**, then normalize to sum to 1. Existing species rarity,
+water-based eligibility, bans on tier 5 and `ultraRare` creatures and world
+traits remain in force. Tier 4 continues to use its separate **10% attempt per
+complex**; the tier ratios do not allow mass tier-4 spawns. The sampled weights
+are stored on each source cave descriptor.
+
+The old **40% single-Champion attempt** becomes a count of **0–5 Champion
+candidates per complex**, with probabilities **60%, 24%, 10%, 4%, 1.5%, 0.5%**
+respectively. The overall chance to attempt at least one remains **40%**.
+Champions and their existing **0–6** potential escorts consume the same complex
+and territory population/threat budgets as all other monsters. Their actual
+count may be less than sampled or zero where space or danger budgets prohibit
+placement. Champion support costs more when its **Inspired** radius overlaps
+allies. The optional tier-4 encounter remains separate; no end boss is assured.
+
+Every territory receives a distinct threat share based on its target
+population and a center-weighted **0.55–1.60** multiplier. Those shares are
+normalized to the complex-wide budget; a joined cave does not obtain extra
+budget. Costs include base tier, the monster's existing abilities, the Champion
+prefix and proximity-based synergy with previously placed allies. The model
+charges extra for cooperating Gang Power users of the same species, multiple
+ranged attackers, Pull with shooters, stacked crowd control, summons with
+support, Champion auras and other mobility/control combinations. It is an
+**approximate placement-time risk model**, not a replacement for combat rules
+or a guarantee that every possible tactical combination has the same strength.
+There are no additional monster abilities or runtime debuffs.
+
+Each territory independently samples **0–8 spawn-cluster centers**, subject to
+its target population and valid dry floor. Cluster radii are **2–7 walking
+steps** as a placement preference (checked by Manhattan distance) and each
+spawn has **35–85%** chance to prefer a cluster instead of the dispersed
+placement. The normal entrance clearance still applies. Territory metadata
+stores target and actual budgets, cluster centers, cluster radius and actual
+population. Cluster centers only influence worldgen, not later monster movement.
+
+For **grotto** and **burrow** a seed-sampled alternative-route target is chosen
+from **0–70%**, center-weighted. The generator tries to reach its goal by
+creating a limited number of useful shortcuts between chambers or branch tips.
+Cave width, shape, dry connectivity and the separate identity of burrow and
+grotto remain protected. Silhouette geometry is unchanged; it does not try to
+fulfill this target. Targets are not guarantees: unsuitable geometry may yield
+fewer alternative routes. Actual attempted/accepted loops are stored in the
+source cave topology metadata.
+
+After population and rewards, a deterministic **read-only exploration audit**
+measures each complex's dry area, number of staircase entries and encounter/
+loot sites, distance from stairs to first event, the longest geodesic distance
+to an event, lengths and out-and-back travel costs of empty dead-end branches,
+and actual route alternatives. An alternate route is counted if one of up to
+**12** sampled distant destinations remains accessible within **2.2×** its
+original shortest route after blocking a **3×3** middle section **and** its path differs from the
+original by at least **8 distinct tiles**. This rejects superficial detours
+around an isolated tile in a room. All metrics use stored
+terrain, inhabitants and rewards and **consume no RNG**. They are diagnostics
+for balancing world generation, not random values themselves or gameplay rules.
+The finished metadata persists through world rotation, save/load and replay.
+
+Deep Caves 2.0 still excludes new `far` wandering underground and does not
+change the z:-1 scenarios, crypt, dwarven dungeons or silhouette extraction.
 
 ### Deep Caves 2.0 — world-budget rewards and permanent spoor (v193 / schema 100)
 
@@ -6771,7 +6836,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version (defined in `src/version.js`):
 
 ```text
-97
+101
 ```
 
 The game release version changes for each deployment. The save format changes

@@ -12297,6 +12297,9 @@ more difficult:
       // not consume IDs or create persistent side effects unnecessarily.
       ensureUndergroundVampire()
       spawnDeepCaveSpoor()
+      // Assess the final accepted ecosystem, including guaranteed creatures.
+      // Read-only: never consumes RNG or changes encounters.
+      if (deepLevels[0]) measureDeepCaveExploration(deepLevels[0])
       spawnNpcs()
       clearGroundItemsUnderMerchant()
       spawnEdgeHighTierChests()
