@@ -188,7 +188,12 @@
       "entranceCarveWidth": 1,
       "entranceCarveDepth": 2,
       "extraEntranceChance": 0,
-      "entranceTrail": {"margin":6,"wanderStepsFactor":2,"goalBias":0.6,"persistence":0.65}
+      "entranceTrail": {
+        "margin": 6,
+        "wanderStepsFactor": 2,
+        "goalBias": 0.6,
+        "persistence": 0.65
+      }
     },
     "deep": {
       "generationTrials": 6,
@@ -197,29 +202,68 @@
       "optionalGrottoChance": 0.5,
       "grotto": {
         "topologyVariation": {
-          "roomDensityDivisorRange": [235, 410],
-          "roomCountBonusRange": [2, 6],
+          "roomDensityDivisorRange": [
+            235,
+            410
+          ],
+          "roomCountBonusRange": [
+            2,
+            6
+          ],
           "baselineRoomCountBonus": 4,
           "baselineExtraConnections": 5,
           "baselineRoomRadiusX": 8,
           "baselineRoomRadiusY": 7,
           "baselineWaterRadiusX": 4,
           "baselineWaterRadiusY": 3,
-          "centerSeparationSquaredRange": [105, 210],
-          "passageJitterRange": [1, 7],
-          "passageWidthRange": [1, 4],
-          "singleWidthChance": 0.20,
-          "extraLoopCountRange": [0, 9],
+          "centerSeparationSquaredRange": [
+            105,
+            210
+          ],
+          "passageJitterRange": [
+            1,
+            7
+          ],
+          "passageWidthRange": [
+            1,
+            4
+          ],
+          "singleWidthChance": 0.2,
+          "extraLoopCountRange": [
+            0,
+            9
+          ],
           "minLoopEndpointDistance": 8,
           "maxLoopEndpointDistance": 52,
           "loopDetourFactor": 1.7,
-          "radiusXRange": [3, 10],
-          "radiusYRange": [2, 9],
-          "edgeVarianceMinRange": [-32, -18],
-          "edgeVarianceMaxRange": [12, 28],
-          "waterPocketCountRange": [1, 3],
-          "waterRadiusXRange": [2, 7],
-          "waterRadiusYRange": [2, 6]
+          "radiusXRange": [
+            3,
+            10
+          ],
+          "radiusYRange": [
+            2,
+            9
+          ],
+          "edgeVarianceMinRange": [
+            -32,
+            -18
+          ],
+          "edgeVarianceMaxRange": [
+            12,
+            28
+          ],
+          "waterPocketCountRange": [
+            1,
+            3
+          ],
+          "waterRadiusXRange": [
+            2,
+            7
+          ],
+          "waterRadiusYRange": [
+            2,
+            6
+          ]
         },
         "sizes": [
           [
@@ -289,29 +333,62 @@
       },
       "burrow": {
         "topologyVariation": {
-          "turnPercentRange": [8, 40],
-          "branchCountBonusRange": [-2, 5],
+          "turnPercentRange": [
+            8,
+            40
+          ],
+          "branchCountBonusRange": [
+            -2,
+            5
+          ],
           "minBranches": 4,
           "maxBranches": 15,
           "minSteps": 18,
-          "stepLengthBonusRange": [20, 80],
+          "stepLengthBonusRange": [
+            20,
+            80
+          ],
           "baselineStepLengthBonus": 40,
           "baselineTurnChance": 0.19,
           "baselineMinBranches": 5,
           "baselineMinSteps": 25,
-          "normalBrushRadiusRange": [0, 1],
-          "wideBrushRadiusRange": [1, 2],
-          "widePeriodRange": [10, 26],
-          "wideStepsRange": [1, 5],
-          "pocketHalfSizeRange": [1, 4],
-          "extraLoopCountRange": [0, 7],
+          "normalBrushRadiusRange": [
+            0,
+            1
+          ],
+          "wideBrushRadiusRange": [
+            1,
+            2
+          ],
+          "widePeriodRange": [
+            10,
+            26
+          ],
+          "wideStepsRange": [
+            1,
+            5
+          ],
+          "pocketHalfSizeRange": [
+            1,
+            4
+          ],
+          "extraLoopCountRange": [
+            0,
+            7
+          ],
           "minLoopEndpointDistance": 5,
           "maxLoopEndpointDistance": 28,
           "loopDetourFactor": 1.8,
-          "continueLastBranchPercentRange": [5, 75],
+          "continueLastBranchPercentRange": [
+            5,
+            75
+          ],
           "maxDryFootprintFraction": 0.63,
           "waterChance": 0.35,
-          "waterPocketCountRange": [0, 2],
+          "waterPocketCountRange": [
+            0,
+            2
+          ],
           "waterCenterJitter": 1,
           "waterRadiusX": 2,
           "waterRadiusY": 2,
@@ -360,19 +437,56 @@
       },
       "minimumCaves": 3,
       "silhouette": {
-        "targetDryFloorRange": [700,2800],
-        "maxFootprint": [112,100],
+        "targetDryFloorRange": [
+          700,
+          2800
+        ],
+        "maxFootprint": [
+          112,
+          100
+        ],
         "dryFloorRetention": 0.85,
-        "placementScaleFractions": [1,0.85,0.7,0.55],
+        "placementScaleFractions": [
+          1,
+          0.85,
+          0.7,
+          0.55
+        ],
         "minFloorTiles": 500,
         "maxStraightRun": 15,
         "waterChance": 0.3,
-        "sourceCountWeights": {"2":30,"3":40,"4":30},
+        "sourceCountWeights": {
+          "2": 30,
+          "3": 40,
+          "4": 30
+        },
         "lightOverlapMin": 0.05,
         "lightOverlapMax": 0.15,
         "minimumExclusiveFraction": 0.25,
         "outlineMinStraightRun": 8,
         "outlineChangeFraction": 0.06
+      },
+      "merging": {
+        "affinity": [
+          0,
+          100
+        ],
+        "minRock": 2,
+        "maxRock": 12,
+        "detour": 12,
+        "pairCandidates": 8,
+        "stairClearance": 3,
+        "maxDegree": 3,
+        "maxMembers": 6,
+        "mergeDecay": 0.6,
+        "areaScale": 2500,
+        "nearChance": 0.85,
+        "farChance": 0.05
+      },
+      "territories": {
+        "maxCount": 11,
+        "minTilesPerTerritory": 120,
+        "minAnchorSeparation": 6
       }
     }
   },
@@ -404,7 +518,7 @@
       9,
       9
     ],
-    "corridorWideChance": 0.70,
+    "corridorWideChance": 0.7,
     "collapseAttempts": 45,
     "collapseMinGateDistance": 8,
     "rubbleChance": 0.65,
@@ -1154,7 +1268,10 @@
         "projectileAtk": 10,
         "speed": 5,
         "projectileRange": 12,
-        "triggerDistanceRange": [1, 5],
+        "triggerDistanceRange": [
+          1,
+          5
+        ],
         "spawnClearance": 2,
         "entranceClearance": 3,
         "minimumSeparation": 3,

@@ -113,6 +113,9 @@ function buildSaveObject() {
       hazards: structuredClone(lvl.hazards || []),
       crates: structuredClone(lvl.crates || []),
       caves: lvl.caves,
+      links: structuredClone(lvl.links || []),
+      complexes: structuredClone(lvl.complexes || []),
+      territories: structuredClone(lvl.territories || []),
       rooms: structuredClone(lvl.rooms || []),
       roomGraph: structuredClone(lvl.roomGraph || lvl.caves?.[0]?.roomGraph || null),
       progressionKey: structuredClone(lvl.progressionKey || null),
@@ -498,6 +501,16 @@ function loadGameFromObject(data, opts = {}) {
           if (cm[y][x] !== 'cavewall') lvlMap[y][x] = cm[y][x]
         }
       }
+      // Optional connectors are shared-map floor cells only. Do not paint
+      // them into source caveMaps: silhouette geometry and burrow color identity
+      // must survive save/load unchanged.
+      if (levelIndex === 0) for (const link of lvlData.links) {
+        for (const p of link.cells) {
+          if (lvlMap[p.y]?.[p.x] !== 'cavewall')
+            throw new Error('Invalid saved deep-cave connector overlap')
+          lvlMap[p.y][p.x] = 'cavefloor2'
+        }
+      }
       if (!isDwarvenRuins) {
         for (const cave of lvlCaves) {
           for (const entrance of cave.entrances || []) {
@@ -522,6 +535,9 @@ function loadGameFromObject(data, opts = {}) {
       crates: structuredClone(lvlData.crates),
       caveMaps: lvlCaveMaps,
       caves: lvlCaves,
+      links: structuredClone(lvlData.links || []),
+      complexes: structuredClone(lvlData.complexes || []),
+      territories: structuredClone(lvlData.territories || []),
       discovered: lvlDiscovered,
       kind: isDwarvenRuins ? 'dwarvenRuins' : levelIndex === 1 ? 'dwarvenFort' : 'caves',
       dungeonPackage: lvlData.dungeonPackage || lvlCaves[0]?.dungeonPackage || null,

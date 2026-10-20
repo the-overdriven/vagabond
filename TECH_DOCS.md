@@ -2204,6 +2204,30 @@ mountain air.
 
 Some z:-1 caves receive a downward connection.
 
+The second-level source caves can now form **optional connected complexes**.
+Nearby source components may be joined by short, carved dry corridors (2–12
+rock tiles). Links are less likely as a complex acquires additional members
+or becomes larger, and remain entirely optional; all original entrances,
+source cave identities and staircase pairs remain in place. A complex may
+contain a grotto, burrow and silhouette cave, while other caves remain
+independent. Connected layouts are still navigated as one shared z:-2 map.
+
+Links are generated **after source cave carving** and exist only on the shared
+map. The original source masks, silhouette shapes and the brown burrow's local
+floor region are not altered. For each complex the generator stores sorted
+source membership and entrances, and partitions the reachable dry floor into
+irregular **territories** using walking-distance seeds. Territories currently
+record generation topology only: they do not constrain monster movement,
+change AI or add faction rules. Population and loot still use the older
+per-source scenario behavior until the following ecosystem batch; merging
+creates no additional scenario, extra chest allocation or extra monster quota.
+
+Connector cells and territory/complex metadata are saved and restored directly;
+the shared map is reconstructed by overlaying saved connectors after the source
+maps. Rotation transforms the saved connectors and territory anchors along
+with all stairs and source caves. Save schema **98** requires newly generated
+worlds and does not convert older saves.
+
 The generator requires **three separate generic z:-2 caves**: one monster
 silhouette, one grotto with connected irregular chambers and winding passages,
 and one branching burrow. Both existing generators remain in use. Footprints

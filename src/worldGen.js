@@ -4319,6 +4319,175 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
 
 // Each world needs a silhouette, a broad grotto and a compact burrow at z:-2. Other
 // branches are optional and use either generator, with reserved nonoverlap.
+// Deep Caves 2.0: optional, bounded links between the existing source caves.
+// Links belong only to the shared z:-2 map: a silhouette's source mask and
+// the brown-burrow source mask are deliberately never modified.
+function deepCaveComplexes(level) {
+  const cfg = WORLD_GEN_CONFIG.caves.deep.merging
+  const tiles = level.map, sources = level.caveMaps, n = sources.length
+  const dry = t => t === 'cavefloor2' || t === 'caveup'
+  const k = (x,y) => y * MAP_W + x
+  const dirs = [[0,-1],[-1,0],[1,0],[0,1]]
+  const parent = Array.from({length:n}, (_,i)=>i)
+  const sizes = new Array(n).fill(1)
+  const areas = sources.map(cm => cm.reduce((v,row)=>v+row.filter(dry).length,0))
+  const areaTotals = areas.slice()
+  const degree = new Array(n).fill(0)
+  const root = i => {while(parent[i]!==i)i=parent[i];return i}
+  const blockedStairs = level.caves.flatMap(c => c.entrances || [])
+  const nearStairs = (x,y) => blockedStairs.some(e=>Math.max(Math.abs(x-e.x),Math.abs(y-e.y))<=cfg.stairClearance)
+  const ends = sources.map(cm => {
+    const pts=[]
+    for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++){
+      if(!dry(cm[y][x]) || nearStairs(x,y))continue
+      if(dirs.some(([dx,dy])=>tiles[y+dy][x+dx]==='cavewall'))pts.push({x,y})
+    }
+    return pts
+  })
+  const candidates=[]
+  for(let a=0;a<n;a++)for(let b=a+1;b<n;b++){
+    let best=[]
+    for(const e of ends[a])for(const f of ends[b]){
+      const d=Math.abs(e.x-f.x)+Math.abs(e.y-f.y)-1
+      if(d<cfg.minRock || d>cfg.maxRock+cfg.detour)continue
+      best.push({a,b,e,f,d})
+    }
+    best.sort((p,q)=>p.d-q.d || p.e.y-q.e.y || p.e.x-q.e.x || p.f.y-q.f.y || p.f.x-q.f.x)
+    // Bounded options prevent a large coastline from dominating worldgen time.
+    candidates.push(...best.slice(0,cfg.pairCandidates))
+  }
+  candidates.sort((a,b)=>a.d-b.d || a.a-b.a || a.b-b.b || a.e.y-b.e.y || a.e.x-b.e.x)
+  const affinity=(randInt(cfg.affinity[0],cfg.affinity[1]))/100
+  const links=[]
+  const findRockConnector = ({e,f}) => {
+    const queue=[{x:e.x,y:e.y,n:0,prev:-1}]
+    const visited=new Set([k(e.x,e.y)])
+    for(let at=0;at<queue.length;at++){
+      const here=queue[at]
+      if(here.x===f.x && here.y===f.y && here.n>=cfg.minRock && here.n<=cfg.maxRock){
+        const path=[]
+        for(let q=here.prev;q>0;q=queue[q].prev)path.push({x:queue[q].x,y:queue[q].y})
+        return path.reverse()
+      }
+      if(here.n>cfg.maxRock || Math.abs(here.x-f.x)+Math.abs(here.y-f.y)>cfg.maxRock+1-here.n)continue
+      for(const [dx,dy] of dirs){
+        const x=here.x+dx,y=here.y+dy
+        if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2||visited.has(k(x,y)))continue
+        const ending=x===f.x && y===f.y
+        if(!ending && (tiles[y][x]!=='cavewall' || nearStairs(x,y)))continue
+        if(ending && !dry(tiles[y][x]))continue
+        visited.add(k(x,y));queue.push({x,y,n:here.n+(!ending?1:0),prev:at})
+      }
+    }
+    return null
+  }
+  const attempted = new Set()
+  for(const entry of candidates){
+    const {a,b,d}=entry, ra=root(a),rb=root(b)
+    if(ra===rb || degree[a]>=cfg.maxDegree || degree[b]>=cfg.maxDegree)continue
+    if(sizes[ra]+sizes[rb]>cfg.maxMembers)continue
+    const pair=`${a}:${b}`
+    if(attempted.has(pair))continue
+    attempted.add(pair)
+    const rockDistance=Math.max(cfg.minRock,d)
+    const decay=Math.pow(cfg.mergeDecay,sizes[ra]+sizes[rb]-2)
+    const areaDecay=Math.pow(1+(areaTotals[ra]+areaTotals[rb])/cfg.areaScale,-.5)
+    const distanceChance=cfg.nearChance*Math.pow(cfg.farChance/cfg.nearChance,
+      (rockDistance-cfg.minRock)/(cfg.maxRock-cfg.minRock))
+    const p=Math.min(1,affinity*distanceChance*decay*areaDecay)
+    if(!chance(p))continue
+    // Different near-equal coastline pairs are allowed if the closest one
+    // cannot be linked. No replacement rolls after a failed optional link.
+    let cells=null
+    for(const option of candidates.filter(v=>v.a===a&&v.b===b).slice(0,cfg.pairCandidates)){
+      cells=findRockConnector(option)
+      if(cells)break
+    }
+    if(!cells)continue
+    for(const point of cells)tiles[point.y][point.x]='cavefloor2'
+    links.push({a,b,cells})
+    degree[a]++;degree[b]++
+    parent[rb]=ra;sizes[ra]+=sizes[rb];areaTotals[ra]+=areaTotals[rb]+cells.length
+  }
+  const groups=new Map()
+  for(let i=0;i<n;i++){
+    const r=root(i)
+    if(!groups.has(r))groups.set(r,[])
+    groups.get(r).push(i)
+  }
+  const complexes=[...groups.values()].map(members=>({
+    id:members[0],members,
+    entrances:members.flatMap(i=>level.caves[i].entrances || []),
+    dryTiles:members.reduce((sum,i)=>sum+areas[i],0)+links.filter(l=>members.includes(l.a)).reduce((s,l)=>s+l.cells.length,0)
+  })).sort((a,b)=>a.id-b.id)
+  for(const complex of complexes)for(const index of complex.members)level.caves[index].complexId=complex.id
+  level.links=links
+  level.complexes=complexes
+  level.territories=deepCaveTerritories(level)
+  return level
+}
+
+// Territory seeds use geodesic distance over the final shared topology,
+// including carved links. They are spatial generation metadata; there are no
+// permanent faction borders and no changes to monster AI or wandering.
+function deepCaveTerritories(level) {
+  const cfg=WORLD_GEN_CONFIG.caves.deep.territories
+  const dry=t=>t==='cavefloor2'||t==='caveup'
+  const dirs=[[0,-1],[-1,0],[1,0],[0,1]]
+  const encode=(x,y)=>y*MAP_W+x
+  const out=[]
+  for(const complex of level.complexes){
+    const owned=new Set()
+    for(const index of complex.members){
+      const cm=level.caveMaps[index]
+      for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++)if(dry(cm[y][x]))owned.add(encode(x,y))
+    }
+    for(const link of level.links)if(complex.members.includes(link.a))for(const p of link.cells)owned.add(encode(p.x,p.y))
+    const first=complex.entrances[0]
+    if(!first||!owned.has(encode(first.x,first.y)))continue
+    const cells=[]
+    const reachable=new Set([encode(first.x,first.y)])
+    const queue=[{x:first.x,y:first.y}]
+    for(let at=0;at<queue.length;at++){
+      const p=queue[at];cells.push(p)
+      for(const [dx,dy] of dirs){const x=p.x+dx,y=p.y+dy,id=encode(x,y)
+        if(!reachable.has(id)&&owned.has(id)){reachable.add(id);queue.push({x,y})}
+      }
+    }
+    // Root both sampling and tie-breaking in topology rather than rectangles.
+    const maxCount=Math.min(cfg.maxCount,Math.max(1,Math.floor(cells.length/cfg.minTilesPerTerritory)))
+    const count=randInt(1,maxCount)
+    const anchors=[{x:first.x,y:first.y}]
+    const dist=new Map(), owner=new Map()
+    const grow=()=>{
+      dist.clear();owner.clear()
+      const q=[]
+      anchors.forEach((p,i)=>{const id=encode(p.x,p.y);dist.set(id,0);owner.set(id,i);q.push(p)})
+      for(let at=0;at<q.length;at++){
+        const p=q[at],key=encode(p.x,p.y),d=dist.get(key)
+        for(const [dx,dy] of dirs){const x=p.x+dx,y=p.y+dy,id=encode(x,y)
+          if(!reachable.has(id)||dist.has(id))continue
+          dist.set(id,d+1);owner.set(id,owner.get(key));q.push({x,y})
+        }
+      }
+    }
+    for(let i=1;i<count;i++){
+      grow()
+      let far=null,best=-1
+      for(const p of cells){const d=dist.get(encode(p.x,p.y))
+        if(d>best){best=d;far=p}
+      }
+      if(!far||best<cfg.minAnchorSeparation)break
+      anchors.push({...far})
+    }
+    grow()
+    const records=anchors.map((anchor,i)=>({id:`${complex.id}:${i}`,complexId:complex.id,anchor,area:0}))
+    for(const p of cells)records[owner.get(encode(p.x,p.y))].area++
+    out.push(...records)
+  }
+  return out
+}
+
 function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTile, floorTile, downTile, upTile) {
   const cfg = WORLD_GEN_CONFIG.caves.deep
   const levelCaves = [], levelCaveMaps = [], reserved = []
@@ -4372,8 +4541,8 @@ function generateDeepLevel(parentCaves, parentCaveMaps, parentMap, parentFloorTi
   for (const cave of levelCaves)
     for (const entrance of cave.entrances)
       levelMap[entrance.y][entrance.x] = upTile
-  return {map: levelMap, caveMaps: levelCaveMaps, caves: levelCaves,
-    discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))}
+  return deepCaveComplexes({map: levelMap, caveMaps: levelCaveMaps, caves: levelCaves,
+    discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))})
 }
 
 let bigBellPos = null
