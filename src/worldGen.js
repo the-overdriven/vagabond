@@ -238,6 +238,7 @@ function generateSurface() {
   enemies = []
   groundItems = []
   caveDecorations = []
+  caveSpoor = []
   occupied = new Set()
   const elevationNoiseFunctions = cfg.elevationNoise.layers.map(([x, y]) => makeNoise(x, y))
   const elevationNoiseWeights = cfg.elevationNoise.weights
@@ -755,7 +756,8 @@ function rotateGeneratedWorld(quarterTurns) {
   }
   positions(caves); positions(deepLevels); positions(dungeonShortcuts)
   positions(villageHuts); positions(enemies); positions(groundItems)
-  positions(npcs); positions(caveDecorations)
+  positions(npcs); positions(caveDecorations); positions(caveSpoor)
+  for(const spoor of caveSpoor)spoor.direction=(spoor.direction+quarterTurns*2)%8
   for (const value of [spawnPoint, villageCenter, mausoleumHutPos,
     dwarvenRuin, bigBellPos, blackPillarPos, cryptCaveExclusionCenter,
     treasureMapSpot, fishermanHut, fishermanQuest, oldHunterQuest]) positions(value)
@@ -5426,31 +5428,110 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
     complex.ecosystem={density:wantedDensity,threatBudget:Math.round(budget*100)/100,
       population:spawned,champions,tier4:tier4Count,species:[...introduced].sort()}
     for(const z of zones)Object.assign(z.record,{population:z.spawned,species:z.speciesNames.slice()})
-    // Preserve this batch's existing chest/provision value per source component.
-    // World-area reward rebudgeting is the separate rewards batch.
     for(const caveIndex of complex.members){
-      const desc=deep.caves[caveIndex],ownedSites=sites.filter(p=>p.caveIndex===caveIndex)
+      const ownedSites=sites.filter(p=>p.caveIndex===caveIndex)
       const free=()=>ownedSites.filter(p=>unoccupied(p) && allEntries.every(e=>maxDistance(e,p)>4))
-      const chestCount=Math.min(cfg.deepChestMax,Math.max(cfg.deepChestMin,
-        Math.ceil((desc.rooms?.length||12)/2)))
-      for(let i=0;i<chestCount;i++){
-        const options=free();if(!options.length)break
-        const p=pick(options);itemCells.add(keyXY(p.x,p.y))
-        groundItems.push({x:p.x,y:p.y,kind:'chest',tier:i%2?2:3,
-          opened:false,level:-2,levelKind:'chain',caveIndex})
-      }
-      for(let i=0;i<cfg.deepProvisionCount;i++){
-        const options=free();if(!options.length)break
-        const p=pick(options);itemCells.add(keyXY(p.x,p.y))
-        groundItems.push({x:p.x,y:p.y,kind:i%2?'scrollOfInvisibility':'potion',
-          level:-2,levelKind:'chain',caveIndex})
-      }
       // Independent natural Fungus roll, retaining world-wide top-up.
       const fungus=ENEMY_TEMPLATE_BY_NAME.Fungus
       const count=(chance(cfg.fungusFirstChance)?1:0)+(chance(cfg.fungusSecondChance)?1:0)
       for(let n=0;n<count;n++){const positions=free();if(positions.length)spawn(fungus,pick(positions))}
     }
   }
+}
+
+// One shared, area-derived world budget, allocated once after all ecosystems.
+// Connected members are never each rewarded again when they share a complex.
+function populateDeepCaveRewards(deep) {
+  const cfg=WORLD_GEN_CONFIG.cavePopulation.rewards
+  if (!deep?.complexes?.length || !cfg) return
+  const entrances=deep.caves.flatMap(c=>c.entrances||[])
+  const members=new Map()
+  const occupied=new Set([...groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'),
+    ...enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')].map(e=>keyXY(e.x,e.y)))
+  const distance=new Map(),queue=[]
+  for(const e of entrances){const k=keyXY(e.x,e.y);if(!distance.has(k)){distance.set(k,0);queue.push(e)}}
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+  for(let i=0;i<queue.length;i++){
+    const p=queue[i],d=distance.get(keyXY(p.x,p.y))
+    for(const [dx,dy] of dirs){const x=p.x+dx,y=p.y+dy,k=keyXY(x,y)
+      if(distance.has(k)||!['cavefloor2','caveup'].includes(deep.map[y]?.[x]))continue
+      distance.set(k,d+1);queue.push({x,y})
+    }
+  }
+  for (const complex of deep.complexes) {
+    const sourceOwners=new Set(complex.members)
+    const cells=[]
+    for(const ci of complex.members){const cm=deep.caveMaps[ci]
+      for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++)
+        if(cm[y][x]==='cavefloor2'&&deep.map[y]?.[x]==='cavefloor2')cells.push({x,y,caveIndex:ci})
+    }
+    if(cells.length)members.set(complex.id,{complex,cells,area:cells.length,
+      focus:pick(cells),chests:0,provisions:0})
+  }
+  const entries=[...members.values()]
+  if(!entries.length)return
+  const areaTotal=entries.reduce((n,e)=>n+e.area,0)
+  // Expected value stays near the previous ten ordinary chests per source.
+  // A large world can differ by its real explorable area, but merging alone
+  // neither duplicates rewards nor removes a component's original allowance.
+  const sourceCount=deep.caves.filter(c=>!c.crypt).length
+  const areaFactor=Math.max(.75,Math.min(1.35,areaTotal/Math.max(1,sourceCount*cfg.referenceDryTilesPerSource)))
+  const totalChests=Math.max(0,Math.round(sourceCount*cfg.referenceChestsPerSource*areaFactor*
+    (cfg.worldChestMultiplier[0]+rng()*(cfg.worldChestMultiplier[1]-cfg.worldChestMultiplier[0]))))
+  const totalSupplies=Math.max(0,Math.round(sourceCount*cfg.referenceProvisionsPerSource*
+    (cfg.worldSupplyMultiplier[0]+rng()*(cfg.worldSupplyMultiplier[1]-cfg.worldSupplyMultiplier[0]))))
+  // Correlation is usually neutral, sometimes favors dangerous complexes,
+  // and only rarely weakly disfavors them. A difficult cave is not doomed to be poor.
+  const correlationRoll=rng()
+  const correlation=correlationRoll<.65 ? 0 : correlationRoll<.90 ? .5 : -.2
+  const weight=e=>Math.pow(e.area,.82)*e.randomWeight*
+    (1+correlation*Math.max(-.65,Math.min(.65,(e.complex.ecosystem?.threatBudget||0)/Math.max(1,e.area)*15-1)))
+  for(const e of entries)e.randomWeight=.4+rng()*1.2
+  function rewardSpot(e,tier) {
+    if(!e.cells.length)return null
+    const nearby=enemies.filter(m=>m.alive&&m.level===-2&&m.levelKind==='chain'&&e.complex.members.includes(m.caveIndex))
+    let chosen=null,best=-Infinity
+    // Select from bounded samples rather than iterating all tiles for each chest.
+    for(let attempt=0;attempt<Math.min(72,e.cells.length*2);attempt++){
+      const p=e.cells[randInt(0,e.cells.length-1)],k=keyXY(p.x,p.y)
+      if(occupied.has(k))continue
+      const d=distance.get(k)
+      if(d===undefined||d<cfg.minimumStairDistance)continue
+      const near=nearby.reduce((m,enemy)=>Math.min(m,Math.max(Math.abs(enemy.x-p.x),Math.abs(enemy.y-p.y))),9999)
+      const early=d<cfg.earlyTier3Distance
+      // Tier-3 chests can be found early, but exceptionally rarely without
+      // nearby encounter pressure. Tier-2 supplies need no such gate.
+      if(tier===3 && early && near>cfg.earlySafeEnemyDistance && rng()<cfg.earlySafeTier3Reject)continue
+      const remoteness=Math.min(1,d/65),concentration=1/(1+Math.hypot(p.x-e.focus.x,p.y-e.focus.y)/24)
+      const score=rng()*1.3 + remoteness*cfg.remotenessBias*(tier===3?1.4:.5) +
+        concentration*cfg.concentrationBias + (tier===3?1/(1+near)*.8:0)
+      if(score>best){best=score;chosen=p}
+    }
+    return chosen
+  }
+  function place(kind){
+    // Spend the world budget against connected complexes, never source indices.
+    const options=entries.filter(e=>e.cells.length>e.chests+e.provisions+2)
+    if(!options.length)return false
+    const e=pickWeighted(options,weight)
+    const tier=kind==='chest'?(rng()<cfg.tier3Chance?3:2):0
+    const p=rewardSpot(e,tier)
+    if(!p)return false
+    occupied.add(keyXY(p.x,p.y))
+    if(kind==='chest'){
+      groundItems.push({x:p.x,y:p.y,kind:'chest',tier,opened:false,level:-2,levelKind:'chain',caveIndex:p.caveIndex})
+      e.chests++
+    }else{
+      const supply=kind==='supply'?(rng()<.5?'potion':'scrollOfInvisibility'):kind
+      groundItems.push({x:p.x,y:p.y,kind:supply,level:-2,levelKind:'chain',caveIndex:p.caveIndex})
+      e.provisions++
+    }
+    return true
+  }
+  for(let i=0;i<totalChests;i++)place('chest')
+  for(let i=0;i<totalSupplies;i++)place('supply')
+  for(const e of entries)e.complex.rewards={chests:e.chests,provisions:e.provisions,
+    dryArea:e.area}
 }
 
 function spawnCaveScenarios() {
@@ -5629,7 +5710,10 @@ function spawnCaveScenarios() {
     populate(caves[i], caveMaps[i], i, -1, 'cavefloor')
   // z:-2 has ordinary caves; z:-3 is the purpose-built Dwarven Fort.
   const deep = deepLevels[0]
-  if (deep) populateDeepCaveEcosystems(deep, fungusTopUpSites)
+  if (deep) {
+    populateDeepCaveEcosystems(deep, fungusTopUpSites)
+    populateDeepCaveRewards(deep)
+  }
 
   // Guarantee at least three Fungus across the whole ordinary underground
   // network, not three per cave. Natural cave rolls above may already satisfy
@@ -7372,6 +7456,69 @@ function spawnSurfaceSpiderWebs(roll) {
   }
 }
 
+// One-time old spoor: never consumes turn RNG, never expires or enforces
+// wandering behavior. Direction points toward the original source beast only.
+function spawnDeepCaveSpoor(){
+  caveSpoor=[]
+  const layer=deepLevels[0],cfg=WORLD_GEN_CONFIG.cavePopulation.spoor
+  if(!layer?.complexes?.length||!cfg)return
+  const occupied=new Set([...groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'),
+    ...enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')].map(e=>keyXY(e.x,e.y)))
+  const directions=[[0,-1],[1,0],[0,1],[-1,0]]
+  for(const complex of layer.complexes){
+    const living=enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain'&&
+      complex.members.includes(e.caveIndex)&&e.baseName!=='Fungus')
+    if(!living.length)continue
+    const entrances=complex.members.flatMap(i=>layer.caves[i]?.entrances||[])
+    const samples=[]
+    // Multi-source walks stay entirely within the already connected complex.
+    const visited=new Set(),queue=[]
+    for(const entry of entrances){const k=keyXY(entry.x,entry.y)
+      if(!visited.has(k)){visited.add(k);queue.push({...entry,d:0,origin:entry})}}
+    for(let head=0;head<queue.length;head++){
+      const p=queue[head]
+      if(p.d>=cfg.distanceRange[1])continue
+      for(const [dx,dy] of directions){const x=p.x+dx,y=p.y+dy,k=keyXY(x,y)
+        if(visited.has(k)||!['caveup','cavefloor2'].includes(layer.map[y]?.[x]))continue
+        visited.add(k);queue.push({x,y,d:p.d+1,origin:p.origin})
+      }
+    }
+    const chanceForEntrance=cfg.entranceChanceRange[0]+rng()*(cfg.entranceChanceRange[1]-cfg.entranceChanceRange[0])
+    const candidates=queue.filter(p=>p.d>=cfg.distanceRange[0]&&p.d<=cfg.distanceRange[1]&&
+      layer.map[p.y]?.[p.x]==='cavefloor2'&&!occupied.has(keyXY(p.x,p.y)))
+    function lay(pool,source){
+      if(!pool.length||caveSpoor.filter(s=>s.complexId===complex.id).length>=cfg.maxPerComplex)return false
+      const p=pick(pool),beast=source||pick(living)
+      const direction=trackDirection(beast.x-p.x,beast.y-p.y)
+      if(direction===null)return false
+      const owner=complex.members.find(i=>layer.caveMaps[i][p.y]?.[p.x]==='cavefloor2')
+      caveSpoor.push({x:p.x,y:p.y,level:-2,levelKind:'chain',caveIndex:owner??complex.members[0],
+        species:beast.baseName||beast.name,direction,complexId:complex.id})
+      occupied.add(keyXY(p.x,p.y))
+      return true
+    }
+    for(const entry of entrances)if(chance(chanceForEntrance)){
+      const pool=candidates.filter(p=>p.origin.x===entry.x&&p.origin.y===entry.y&&
+        !occupied.has(keyXY(p.x,p.y)))
+      if(!pool.length)continue
+      const count=randInt(1,cfg.maxPerEntrance)
+      for(let i=0;i<count;i++){
+        const options=pool.filter(p=>!occupied.has(keyXY(p.x,p.y)))
+        if(!options.length)break
+        const local=living.filter(e=>Math.abs(e.x-entry.x)+Math.abs(e.y-entry.y)<=32)
+        const source=local.length&&chance(cfg.nearbySpeciesBias)?pick(local):pick(living)
+        lay(options,source)
+      }
+    }
+    for(const territory of layer.territories.filter(t=>t.complexId===complex.id)){
+      if(!chance(cfg.territoryChance))continue
+      const pool=candidates.filter(p=>!occupied.has(keyXY(p.x,p.y))&&
+        Math.abs(p.x-territory.anchor.x)+Math.abs(p.y-territory.anchor.y)<=15)
+      lay(pool)
+    }
+  }
+}
+
 function spawnCaveDecorations() {
   caveDecorations = []
   const cfg = WORLD_GEN_CONFIG.caveDecorations
@@ -7388,11 +7535,17 @@ function spawnCaveDecorations() {
   ]) {
     if (!layer.shared) continue
     const entrances = layer.descriptors.flatMap(c => c.entrances || [])
-    const occupiedProps = new Set([...groundItems, ...enemies.filter(e => e.alive)]
+    const occupiedProps = new Set([...groundItems, ...enemies.filter(e => e.alive), ...caveSpoor]
       .filter(e => e.level === layer.level).map(e => keyXY(e.x, e.y)))
     for (let caveIndex = 0; caveIndex < layer.maps.length; caveIndex++) {
       const descriptor = layer.descriptors[caveIndex], cm = layer.maps[caveIndex]
       if (!descriptor || descriptor.crypt || !(descriptor.scenario || descriptor.populated)) continue
+      const variation = layer.level === -2 ? cfg.deepVariation : null
+      const componentRoll = roll(caveIndex * 37 + 11, caveIndex * 13 + 29, layer.level)
+      const componentFactor = variation ? Math.min(variation.maximumMultiplier,
+        variation.minimumMultiplier + componentRoll * componentRoll * 3.3 + .15) : 1
+      const localSpiders=variation ? enemies.filter(e=>e.alive&&e.level===-2&&
+        e.caveIndex===caveIndex&&e.baseName==='Giant Spider') : []
       for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
         const floor = layer.level === -1 ? 'cavefloor' : 'cavefloor2'
         const key = `${layer.level}:${x},${y}`
@@ -7401,10 +7554,20 @@ function spawnCaveDecorations() {
         const wall = (dx, dy) => layer.shared[y+dy]?.[x+dx] === 'cavewall'
         const corner = (wall(0,-1) || wall(0,1)) && (wall(-1,0) || wall(1,0))
         const r = roll(x,y,layer.level)
+        const patchRoll=roll(Math.floor(x/9)*17+caveIndex*31,Math.floor(y/9)*23,layer.level)
+        const localFactor=variation ? Math.max(.05,Math.min(4,componentFactor*(1+
+          variation.territoryUnevenness*(patchRoll*2-1)))) : 1
+        const spiderClue=variation && corner && localSpiders.some(e=>
+          Math.max(Math.abs(e.x-x),Math.abs(e.y-y))<=8) ? variation.spiderCorrelation : 0
+        const nearWater=variation && [[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>
+          layer.shared[y+dy]?.[x+dx]==='water')
+        // Separate independent hashes avoid suppressing mushrooms whenever
+        // a different decoration's threshold grows past its old band.
         let kind = null
-        if (corner && r < cfg.webChance) kind = 'web'
-        else if (r >= cfg.webChance && r < cfg.webChance + cfg.stalagmiteChance) kind = 'stalagmites'
-        else if (r >= cfg.webChance + cfg.stalagmiteChance && r < cfg.webChance + cfg.stalagmiteChance + cfg.mushroomChance) kind = 'mushrooms'
+        if (corner && r < Math.min(.9,cfg.webChance*localFactor*(1+spiderClue))) kind = 'web'
+        else if (roll(x+751,y+199,layer.level)<cfg.stalagmiteChance*localFactor) kind = 'stalagmites'
+        else if (roll(x+423,y+997,layer.level)<cfg.mushroomChance*localFactor*
+          (nearWater?1+variation.wetMushroomCorrelation:1)) kind = 'mushrooms'
         if (kind) {
           caveDecorations.push({x,y,kind,level:layer.level,levelKind:'chain',caveIndex,
             ...(kind === 'web' ? {rotation: wall(0,-1) ? (wall(-1,0) ? 0 : 1) : (wall(1,0) ? 2 : 3)} : {})})

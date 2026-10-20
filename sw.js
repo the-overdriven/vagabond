@@ -46,6 +46,7 @@ const PRECACHE_URLS = [
   './src/fov.js',
   './src/replay.js',
   './src/saveLoad.js',
+  './src/tracking.js',
   './src/version.js',
   './src/supabase.js',
   './src/graveyard.js',

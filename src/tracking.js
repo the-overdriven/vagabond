@@ -2,6 +2,7 @@
 
 // Surface evidence is independent of actors/items and never participates in collision.
 let beastTracks = new Map()
+let caveSpoor = [] // Permanent, static z:-2 evidence, not aged surface tracks.
 let TRACK_CONFIG
 const TRACK_DIRECTIONS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest']
 const TRACK_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
@@ -76,5 +77,33 @@ function drawBeastTracks() {
       ctx.fillText(TRACK_ARROWS[track.direction], px + TILE_PX / 2, py + TILE_PX / 2)
       ctx.restore()
     }
+  }
+}
+
+// Static cave clues record a species that was actually generated in the
+// connected complex. They do not track moving monsters or reveal their position.
+function caveSpoorAt(x,y) {
+  if(currentZ!==-2 || currentLevelKind()!=='chain')return null
+  return caveSpoor.find(p=>p.x===x&&p.y===y) || null
+}
+function inspectCaveSpoor(spoor) {
+  if(!player.trackingLearned)return 'You find old tracks in the stone dust, but cannot make sense of them.'
+  const known=(player.killsBySpecies[spoor.species]||0)>0
+  return `Old ${known ? spoor.species.toLowerCase()+' ' : ''}tracks point ${TRACK_DIRECTIONS[spoor.direction]}.`+
+    (known?'':" You've never seen tracks like these before.")
+}
+function drawCaveSpoor(visible) {
+  if(currentZ!==-2||currentLevelKind()!=='chain')return
+  for(const track of caveSpoor) {
+    if(!discovered[track.y]?.[track.x] || (visible&&!visible.has(keyXY(track.x,track.y))))continue
+    const px=Math.round((track.x-camX)*TILE_PX),py=Math.round((track.y-camY)*TILE_PX)
+    if(px< -TILE_PX||py< -TILE_PX||px>=canvas.width||py>=canvas.height)continue
+    ctx.save();ctx.translate(px+TILE_PX/2,py+TILE_PX/2)
+    ctx.rotate(track.direction*Math.PI/4);ctx.scale(.72,.72)
+    const drawn=drawImageVisual(-TILE_PX/2,-TILE_PX/2,RENDER_STYLE.specialTiles.beastTracks)
+    ctx.restore()
+    if(!drawn){ctx.save();ctx.font=`${Math.round(TILE_PX*.46)}px monospace`
+      ctx.fillStyle='#8c8370';ctx.textAlign='center';ctx.textBaseline='middle'
+      ctx.fillText(TRACK_ARROWS[track.direction],px+TILE_PX/2,py+TILE_PX/2);ctx.restore()}
   }
 }

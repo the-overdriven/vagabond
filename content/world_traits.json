@@ -940,22 +940,17 @@
     {
       "name": "deep_bounty",
       "flavor_text": "Those who return from beneath the hills often return carrying something.",
-      "_note": "Raises deep cave chest range from 8-12 to 11-16 and provisions from 4 to 6, but also raises deep monster range from 24-36 to 29-43.",
+      "_note": "Raises reference chest allowance for deep caves from 10 to 13 and loose supplies from 4 to 6 per source, allocated by area across complexes; also increases monster density.",
       "exclusiveGroup": "population",
       "direction": "one_way",
       "effects": [
         {
-          "param": "cavePopulation.deepChestMin",
+          "param": "cavePopulation.rewards.referenceChestsPerSource",
           "type": "additive",
           "value": 3
         },
         {
-          "param": "cavePopulation.deepChestMax",
-          "type": "additive",
-          "value": 4
-        },
-        {
-          "param": "cavePopulation.deepProvisionCount",
+          "param": "cavePopulation.rewards.referenceProvisionsPerSource",
           "type": "additive",
           "value": 2
         },
@@ -1288,7 +1283,7 @@
     {
       "name": "world_beneath_the_world",
       "flavor_text": "Every hill seems to have a hollow sound beneath it.",
-      "_note": "Attempts 8 rather than 6 shallow caves, raises optional deep branch chance from 50% to 72%, lengthens grotto/burrow layouts, and raises deep monster and chest ranges from 24-36/8-12 to 29-43/10-15.",
+      "_note": "Increases cave count and size, deep population and deep-chest reference allowance from 10 to 12 per source. Final world loot stays area-weighted across complexes.",
       "exclusiveGroup": "cave_scale",
       "direction": "one_way",
       "effects": [
@@ -1323,14 +1318,9 @@
           "value": 7
         },
         {
-          "param": "cavePopulation.deepChestMin",
+          "param": "cavePopulation.rewards.referenceChestsPerSource",
           "type": "additive",
           "value": 2
-        },
-        {
-          "param": "cavePopulation.deepChestMax",
-          "type": "additive",
-          "value": 3
         }
       ]
     },

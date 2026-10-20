@@ -140,6 +140,7 @@ function buildSaveObject() {
     oldHunterQuestSerial,
     turnCount, consecutiveWaitTurns,
     beastTracks: [...beastTracks.values()].map(track => ({...track})),
+    caveSpoor: caveSpoor.map(track=>({...track})),
     fishermanQuest,
     fishermanHut,
     bellReturnedToChapel: bellReturnedToChapel,
@@ -639,6 +640,7 @@ function loadGameFromObject(data, opts = {}) {
   if (Number.isInteger(data.worldSeed)) WORLD_SEED = data.worldSeed
   Object.assign(worldEdgesReached, data.worldEdgesReached || {})
   beastTracks = new Map(data.beastTracks.map(track => [keyXY(track.x, track.y), {...track}]))
+  caveSpoor = data.caveSpoor.map(track=>({...track}))
   turnCount = data.turnCount
   consecutiveWaitTurns = data.consecutiveWaitTurns
   oldHunterQuestSerial = data.oldHunterQuestSerial

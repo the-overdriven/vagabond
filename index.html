@@ -7343,6 +7343,8 @@ more difficult:
       inspectedGround = true
     }
     if (inspectedGround) return
+    const oldSpoor = caveSpoorAt(player.x, player.y)
+    if (oldSpoor) {log(inspectCaveSpoor(oldSpoor), 'info');return}
     const track = beastTrackAt(player.x, player.y)
     if (track) {
       log(inspectBeastTrack(track), 'info')
@@ -8828,6 +8830,7 @@ more difficult:
       }
     }
     drawBeastTracks()
+    drawCaveSpoor(undergroundVisible)
     // Decorative overlays never enter the loot, collision or inspection systems.
     for (const prop of caveDecorations) {
       if (!onCurrentLevel(prop) || (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y)))) continue
@@ -9640,6 +9643,9 @@ more difficult:
     if (map[my]?.[mx] === 'dwarvengasvent') return {
       mini: true, enemy: null,
       html: '<div class="nm">Dwarven Vent</div><div>The grating bears suspicious green stains.</div>'
+    }
+    if (caveSpoorAt(mx, my) && discovered[my]?.[mx]) {
+      return {mini:true, enemy:null, html:'<div class="nm">old tracks?</div>'}
     }
     if (beastTrackAt(mx, my) && discovered[my]?.[mx]) {
       return {mini: true, enemy: null, html: '<div class="nm">foot tracks?</div>'}
@@ -12240,6 +12246,7 @@ more difficult:
     MAP_W = unrotatedWorldWidth
     MAP_H = unrotatedWorldHeight
     beastTracks.clear()
+    caveSpoor = []
     const validationCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.validation || {}
     const populationAttempts = Math.max(1, Math.floor(validationCfg.postPopulationWorldRetries ?? 1))
     let acceptedValidation = null
@@ -12289,6 +12296,7 @@ more difficult:
       // generated after the world has been accepted, so rejected attempts do
       // not consume IDs or create persistent side effects unnecessarily.
       ensureUndergroundVampire()
+      spawnDeepCaveSpoor()
       spawnNpcs()
       clearGroundItemsUnderMerchant()
       spawnEdgeHighTierChests()

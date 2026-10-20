@@ -1702,6 +1702,40 @@
         "MIREHOWL",
         "NHALUUN"
       ]
+    },
+    "rewards": {
+      "referenceDryTilesPerSource": 1700,
+      "referenceChestsPerSource": 10,
+      "referenceProvisionsPerSource": 4,
+      "worldChestMultiplier": [
+        0.8,
+        1.2
+      ],
+      "worldSupplyMultiplier": [
+        0.7,
+        1.3
+      ],
+      "minimumStairDistance": 4,
+      "earlyTier3Distance": 14,
+      "earlySafeEnemyDistance": 7,
+      "earlySafeTier3Reject": 0.86,
+      "tier3Chance": 0.5,
+      "remotenessBias": 0.65,
+      "concentrationBias": 0.45
+    },
+    "spoor": {
+      "entranceChanceRange": [
+        0.2,
+        0.35
+      ],
+      "maxPerEntrance": 4,
+      "distanceRange": [
+        3,
+        16
+      ],
+      "maxPerComplex": 12,
+      "territoryChance": 0.18,
+      "nearbySpeciesBias": 0.8
     }
   },
   "surfaceLoot": {
@@ -1801,6 +1835,13 @@
     "entranceClearance": 2,
     "webChance": 0.18,
     "stalagmiteChance": 0.018,
-    "mushroomChance": 0.025
+    "mushroomChance": 0.025,
+    "deepVariation": {
+      "minimumMultiplier": 0.0,
+      "maximumMultiplier": 4.0,
+      "territoryUnevenness": 0.7,
+      "spiderCorrelation": 0.55,
+      "wetMushroomCorrelation": 0.45
+    }
   }
 }

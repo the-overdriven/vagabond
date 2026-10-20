@@ -2546,6 +2546,15 @@ same seeded coordinate-hash method, not combat RNG. They remain in place if
 the spider wanders or dies. As with cave webs, they confer no status, hazard,
 loot, or obstruction, and render behind items and creatures.
 
+On generic z:-2 each source cave now samples a stable seed-derived
+**0–4× decoration-density multiplier**, with additional nine-tile local
+variation and probabilistic correlations: webs are somewhat likelier near
+existing Giant Spiders, and decorative mushrooms somewhat likelier beside
+water. Neither association is guaranteed, so decorations are clues, not
+species detectors. The original z:-1 and Dwarven decoration probabilities
+remain unchanged. No decoration consumes gameplay RNG or overlaps a static
+Tracking clue.
+
 One position holds at most one decoration. The generated placement is saved
 and restored directly, survives normal deaths and reused-world characters, and
 is cleared and regenerated for a new world. Props draw below items and actors
@@ -2641,13 +2650,56 @@ and tier-5 species. Ordinary prefix rolls use the existing deep-cave prefix
 chance, preserving `champions_age`, `mundane_age`, `things_below` and other
 world traits that modify it. Champions have their normal existing properties.
 
-For this **population batch**, the previous **8–12 tier-2/3 chests** and four
-loose supplies are still allocated per **source cave**, rather than per
-combined complex. No additional rewards appear just because cave components
-join. Variable loot budgets, permanent Tracking clues and decoration-density
-reweighting belong to the later reward/presentation batch. Natural Fungus
-rolls remain at 35% for the first and 15% for the second per source cave,
-with the existing world-wide minimum of three across z:-1 and z:-2.
+### Deep Caves 2.0 — world-budget rewards and permanent spoor (v193 / schema 100)
+
+Ordinary z:-2 chests and loose supplies are now allocated **once for the
+whole explorable deep-cave network**, after monster population and before
+optional underground clues. The previous 8–12 chests and 4 supplies per
+source are replaced by reference allowances of **10 chests and 4 loose
+supplies per source component**, adjusted by the total playable dry-floor
+area. Chest allowance uses an area factor clamped to **0.75–1.35** relative
+to **1,700 dry floor tiles per source**, and an independent world multiplier
+**0.8–1.2**. Loose supplies use a **0.7–1.3** multiplier. This preserves
+approximately the old world-wide economy without enforcing equal rewards
+per cave. Connecting cave components neither creates extra allowances nor
+removes a component's budget; rewards are divided across **complexes** with
+area-weighted, random allocations. Allocation is subject to usable space and
+never overlaps other ground items or living monsters.
+
+Chests retain their existing normal tier-2/tier-3 loot tables (**50/50**
+selection); no tier-4 chest is introduced. Reward positioning uses the
+shortest dry walk from any staircase, randomized spatial concentration and
+nearby monster pressure. Tier-3 chests within **14 dry steps** of a stair
+and more than **7 tiles** from enemies reject **86%** of otherwise valid
+early-safe placement attempts; occasional lucky finds remain possible.
+Difficulty/reward correlation is sampled **65% neutral, 25% mildly positive,
+10% weakly negative**. The resulting distribution is deliberately uneven,
+but does not systematically penalize dangerous complexes with poor loot.
+New-world budgeting only runs during generation; reopening a merged complex
+never recalculates its rewards.
+
+Each connected deep complex may also contain **static old tracks** placed
+after actual inhabitants (including the guaranteed Vampire) are generated.
+Each stair has a **20–35% seeded chance** to receive **1–4** clues on suitable
+floor tiles **3–16 cardinal walking steps** away. Territories have an
+independent **18%** chance for an additional clue; no complex exceeds **12**.
+Tracks identify a species that genuinely existed in that same connected
+complex at generation, usually from the entrance's vicinity; the bearing
+points toward that original individual at generation time, not its current
+location. Clues persist if the creature moves or dies, do not expire, and
+do **not** cause underground `far` wandering or participate in the surface
+track-aging system. They never reveal the existence of a Champion or exact
+coordinates. Untrained characters cannot interpret them; trained Tracking
+reveals direction and reveals species only after at least one normal kill of
+that species. They render as small, permanent paw/arrow marks in discovered,
+currently visible generic z:-2 cave terrain, and are inspectable without
+consuming a turn. The old tracks are persisted as `caveSpoor`, rotated with
+the world (including their eight-direction bearing), restored on save/replay,
+and retained when a new character reuses the same world.
+
+Natural Fungus still uses its previous independent per-source rolls and the
+world-wide minimum of three across z:-1 and z:-2. These changes never
+regenerate cave loot, clues or Fungus on level entry.
 
 There are **no content-revealing named scenario clues or introductory messages**
 for z:-2. Shallow scenario clues continue to work. Each deep-cave descriptor
@@ -5384,6 +5436,11 @@ movement is only visual: loot coordinates, swimming turns, RNG, pickup, save,
 and replay rules are unchanged. They are created at world generation and
 persist with the normal ground item save/replay state.
 
+Generic z:-2 ordinary caves now use the **world-wide, area-derived reward
+budget** in §15 instead of one fixed chest quota per source cave. Tier-2 and
+tier-3 chests preserve the same loot selection described below. Shallow caves,
+surface loot and special dungeon package chests are unaffected.
+
 Chest loot can include:
 
 - gold
@@ -6144,6 +6201,12 @@ bearing, species and age, learned Tracking, and per-species kill counts. Tracks
 remain environmental evidence across a permadeath character change; only the new
 character's knowledge resets. Tracks are clues to an earlier destination, not a
 guarantee that a living beast still occupies or is heading toward that location.
+
+**Generic z:-2 static spoor** is separate from these dynamic surface trails.
+It is permanent, has no freshness stages, uses the same eight directions and
+Tracking knowledge rules, and hints at a species actually generated within the
+connected cave complex. It never implies the creature still occupies the
+indicated direction; see the Deep Caves 2.0 population rules in §15.
 
 The first Old Hunter quest excludes enemies whose current wandering mode is
 `far`, including trait-promoted wanderers. The later rare hunt deliberately
