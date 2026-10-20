@@ -2296,11 +2296,13 @@ limit or turn swimming into a requirement. Other cave generators are unchanged.
 The resulting map is saved directly; save format remains **97**.
 
 Horizontal and vertical uninterrupted **dry-floor**
-runs are capped at **15 tiles** inside silhouette caves. Each obstruction uses a
-seeded **30% chance of water** (previously **60%**) and **70% chance of rock**
-(previously **40%**). This is a per-obstruction probability, not a fixed ratio
-of tiles or a chance to flood an entire cave. The roll is made once and retained
-through that obstruction's placement attempts.
+runs are capped at **15 tiles** inside silhouette caves. Water is chosen
+individually for each cave: a **40% chance of exactly 0% water** (rock-only
+separators); otherwise the water probability is sampled from **0–25%**
+(previously **30% for every cave**). Every long-run separator then selects
+water or rock using that cave's probability. Its choice is retained throughout
+placement retries. The original silhouette shape, 15-tile cap and mandatory
+dry reachability remain unchanged.
 
 Rock uses seeded, asymmetric outlines instead of solid square blocks: chipped
 corners, notched boulders, L-shaped pieces and compact cross-shaped clusters.
@@ -2498,16 +2500,21 @@ ragged edges, passage widths (typically 1–4), midpoint detours and **0–9
 optional loop attempts**. A loop is carved only if it provides a meaningful
 shorter route between previously connected chambers (the existing path must
 be at least 1.7 times the direct Manhattan distance). Some generated grotto
-networks deliberately have no extra loop. Water has a configurable 60% base
-chance, with **1–3 attempted pockets** when selected; each pocket is accepted
-only if every remaining dry tile is still reachable from the stair.
+networks deliberately have no extra loop. Each grotto now has a **35% dry
+roll**; otherwise its water-pocket chance is sampled from **0–40%** (previously
+fixed at **60%**), attempting **1–3 pockets** only on success. The
+`flooded_depths` trait adds its existing **25 percentage points** to the sampled
+chance and continues to enlarge pools. Every accepted pool preserves dry
+reachability from the stair.
 
 Burrows vary their turning chance (**8–40%** before world-trait adjustments),
 branch count (**4–15**, area-limited), path lengths, segment widths, narrow
 pockets and **0–7 optional narrow shortcuts**. The shortcuts need a genuine
 detour to shorten, using an existing dry-path / direct-distance ratio of at
-least **1.8**. Burrows can optionally receive **0–2 small water pockets**,
-subject to the same dry reachability guarantee. Their dry footprint must cover
+least **1.8**. Burrows have a **55% dry roll**; otherwise the chance of
+attempting **0–2 small water pockets** is sampled from **0–25%** (previously
+fixed at **35%**), preserving the same dry reachability guarantee. Their dry
+footprint must cover
 less than **63%** of the reserved rectangle, retaining meaningful tunnel space
 instead of becoming another irregular grotto.
 
@@ -2518,6 +2525,15 @@ branches/steps, water odds and pool radii are applied on top of the newly
 sampled ranges. Generated maps persist as ordinary underground tiles; no new
 runtime state, save flag, replay action or monster mechanic is introduced.
 The silhouette-cave algorithm and its source imagery are unchanged.
+
+**Deep Caves 2.0 v195 — organic walls.** Grotto and burrow layouts now also
+use the silhouette cave's exterior-outline softener. They add only small,
+deterministic outward bulges, never remove floor, cut stairs or merge cave
+components. Grottos modify up to **1–3%** of dry area along eligible exterior
+runs of **9–13 tiles**; burrows use **0–2%** on **10–14-tile** runs, preserving
+their narrow, branching identity. Silhouette smoothing retains its original
+6% budget and geometry rules. Changes are stored as ordinary generated tiles;
+no new runtime or replay status is needed.
 
 
 ## Decorative cave props
@@ -2740,8 +2756,17 @@ early-safe placement attempts; occasional lucky finds remain possible.
 Difficulty/reward correlation is sampled **65% neutral, 25% mildly positive,
 10% weakly negative**. The resulting distribution is deliberately uneven,
 but does not systematically penalize dangerous complexes with poor loot.
-New-world budgeting only runs during generation; reopening a merged complex
-never recalculates its rewards.
+
+The total world budget and tier chances stay unchanged. 
+An unguarded candidate is rejected when **two other rewards are
+already within 7 Chebyshev tiles**; a candidate within **7 tiles of any enemy**
+allows at most **four rewards** in that radius, including the candidate.
+Chests must be separated by at least **5 Chebyshev tiles**. Crowded positions
+also score lower and the old concentration preference drops from **0.45 to
+0.20**. If space is exhausted, the generator skips optional rewards rather
+than depositing a large pile. A rich complex remains possible, but rewards
+are distributed across exploration space. Existing saves keep their already
+placed loot; generation does not rearrange it on entry or loading.
 
 Each connected deep complex may also contain **static old tracks** placed
 after actual inhabitants (including the guaranteed Vampire) are generated.

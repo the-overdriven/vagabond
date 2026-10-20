@@ -14,6 +14,16 @@ describe('Deep Caves 2.0 — rewards and permanent clues', () => {
         ['chest','potion','scrollOfInvisibility'].includes(g.kind))
       assert(drops.length>0,'deep floor has rewards')
       assert(new Set(drops.map(g=>keyXY(g.x,g.y))).size===drops.length,'no overlapping rewards')
+      const rc=WORLD_GEN_CONFIG.cavePopulation.rewards
+      const near=(a,b,r)=>Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))<=r
+      assert(drops.every(g=>{
+        const guarded=enemies.some(e=>e.alive&&e.level===-2&&e.levelKind==='chain'&&
+          near(e,g,rc.guardedEnemyDistance))
+        const count=drops.filter(q=>near(g,q,rc.localRewardRadius)).length
+        return count<=(guarded?rc.maxGuardedLocalRewards:rc.maxUnguardedLocalRewards)
+      }),'no densely piled rewards in guarded or unguarded cave rooms')
+      assert(drops.filter(g=>g.kind==='chest').every(g=>drops.filter(q=>q!==g&&q.kind==='chest').every(q=>
+        !near(g,q,rc.minimumChestSpacing-1))),'chests are adequately spaced')
       assert(level.complexes.every(c=>c.rewards&&Number.isInteger(c.rewards.chests)&&
         Number.isInteger(c.rewards.provisions)),'every complex has a settled reward allocation')
       assert(level.complexes.reduce((sum,c)=>sum+c.rewards.chests+c.rewards.provisions,0)===drops.length,

@@ -3814,7 +3814,13 @@ function carveDeepDungeon(spot, floorTile, reserved) {
   const narrowChance = variation.singleWidthChance
   const edgeMin = caveTopologyRoll(variation.edgeVarianceMinRange)
   const edgeMax = caveTopologyRoll(variation.edgeVarianceMaxRange)
-  const waterPockets = chance(cfg.waterChance) ? caveTopologyCenterRoll(variation.waterPocketCountRange) : 0
+  // A cave can roll a true 0% water probability. Flooded Depths still adds
+  // its usual +25 percentage points to the randomized grotto baseline.
+  const baseWaterChance = chance(variation.dryChance) ? 0 :
+    caveTopologyRoll(variation.waterChancePercentRange) / 100
+  const waterChance = Math.max(0, Math.min(1,
+    baseWaterChance + cfg.waterChance - variation.baselineWaterChance))
+  const waterPockets = chance(waterChance) ? caveTopologyCenterRoll(variation.waterPocketCountRange) : 0
   const radiusXMax = variation.radiusXRange[1] + cfg.roomRadiusXRange[1] - variation.baselineRoomRadiusX
   const radiusYMax = variation.radiusYRange[1] + cfg.roomRadiusYRange[1] - variation.baselineRoomRadiusY
   const DIRS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]
@@ -3945,6 +3951,13 @@ function carveDeepDungeon(spot, floorTile, reserved) {
           if (cm[y][x] === floorTile && !reachable.has(keyXY(x, y))) cm[y][x] = 'cavewall'
       // Several independent pockets may be accepted; each must preserve
       // cardinal dry access to every other part of the cave.
+      // Reuse the silhouette's contour softener conservatively: add small
+      // exterior bulges, never cut away narrow escape routes or room entrances.
+      softenSilhouetteOutline(cm,bounds,spot,floorTile,{
+        outlineMinStraightRun:caveTopologyRoll(variation.smoothingMinRunRange),
+        outlineChangeFraction:caveTopologyRoll(variation.smoothingPercentRange)/100,
+        expandOnly:true
+      })
       const hasWater = waterPockets > 0 && carveDeepWaterPockets(cm,rooms,bounds,spot,floorTile,
         cfg,waterPockets,Math.max(1,caveTopologyCenterRoll(variation.waterRadiusXRange) +
           cfg.waterRadiusX - variation.baselineWaterRadiusX),
@@ -3980,7 +3993,9 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
   const alternativeRouteTarget=caveTopologyCenterRoll(variation.alternativeRouteTargetPercentRange)/100
   const extraLinkLimit=variation.extraLoopCountRange[1]
   const continueLastBranchChance = caveTopologyRoll(variation.continueLastBranchPercentRange) / 100
-  const waterPockets = chance(variation.waterChance) ? caveTopologyRoll(variation.waterPocketCountRange) : 0
+  const waterChance = chance(variation.dryChance) ? 0 :
+    caveTopologyRoll(variation.waterChancePercentRange) / 100
+  const waterPockets = chance(waterChance) ? caveTopologyRoll(variation.waterPocketCountRange) : 0
   const sizes = cfg.sizes
   const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]]
   for (const [w, h] of sizes) {
@@ -4060,6 +4075,13 @@ function carveBurrowDungeon(spot, floorTile, reserved) {
       let floor=0
       for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)floor++
       if(floor<cfg.minFloorTiles || floor/(w*h)>variation.maxDryFootprintFraction)continue
+      // Very light exterior smoothing keeps long straight tunnel walls from
+      // looking machine-cut, without broadening the burrow into a grotto.
+      softenSilhouetteOutline(cm,bounds,spot,floorTile,{
+        outlineMinStraightRun:caveTopologyRoll(variation.smoothingMinRunRange),
+        outlineChangeFraction:caveTopologyRoll(variation.smoothingPercentRange)/100,
+        expandOnly:true
+      })
       const hasWater = waterPockets>0 && carveDeepWaterPockets(cm,
         [{cx:spot.x,cy:spot.y},...rooms],bounds,spot,floorTile,
         {waterCenterJitter:variation.waterCenterJitter,
@@ -4086,8 +4108,8 @@ function silhouetteDryFloorConnected(cm,bounds,spot,floorTile) {
 }
 
 // Soften long, cut-looking exterior edges without blurring thin silhouette limbs.
-function softenSilhouetteOutline(cm,bounds,spot,floorTile) {
-  const cfg=WORLD_GEN_CONFIG.caves.deep.silhouette
+function softenSilhouetteOutline(cm,bounds,spot,floorTile,options=null) {
+  const cfg=options || WORLD_GEN_CONFIG.caves.deep.silhouette
   const original=cm.map(row=>row.slice()),dirs=[[0,-1],[1,0],[0,1],[-1,0]]
   const inside=p=>p.x>bounds.x1&&p.x<bounds.x2&&p.y>bounds.y1&&p.y<bounds.y2
   const safe=p=>Math.max(Math.abs(p.x-spot.x),Math.abs(p.y-spot.y))<=1
@@ -4117,7 +4139,7 @@ function softenSilhouetteOutline(cm,bounds,spot,floorTile) {
       const seed=hash(x,y,side)
       for(let start=2;start+4<run.length-1;start+=7+(seed%3)) {
         const base=run.slice(start,start+4),order=hash(base[0].x,base[0].y,side+4)
-        proposals.push({base,dx,dy,order,expand:!!(order&1)})
+        proposals.push({base,dx,dy,order,expand:cfg.expandOnly||!!(order&1)})
       }
     }
   }
@@ -4139,7 +4161,9 @@ function softenSilhouetteOutline(cm,bounds,spot,floorTile) {
     // Bulges may extend a local edge, but must not bridge another cave lobe.
     if(expand&&patch.some(p=>dirs.some(([nx,ny])=>original[p.y+ny]?.[p.x+nx]===floorTile&&!baseKeys.has(keyXY(p.x+nx,p.y+ny)))))continue
     for(const p of patch)cm[p.y][p.x]=replacement
-    if(!silhouetteDryFloorConnected(cm,bounds,spot,floorTile)) {
+    // Exterior-only expansions can never disconnect a dry cave. The full
+    // flood check remains necessary for the silhouette's inward notches.
+    if(!cfg.expandOnly && !silhouetteDryFloorConnected(cm,bounds,spot,floorTile)) {
       for(const p of patch)cm[p.y][p.x]=expected
       continue
     }
@@ -4183,7 +4207,7 @@ function silhouetteRockIsRectangle(cm,start) {
 }
 
 // Break long dry-floor runs with rock or water, preserving one dry component.
-function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
+function breakLongSilhouetteRuns(cm, bounds, spot, floorTile, waterChance) {
   const limit = WORLD_GEN_CONFIG.caves.deep.silhouette.maxStraightRun
   const pillars = new Set(), directions = [[1,0],[0,1]]
   const safe = p => Math.max(Math.abs(p.x-spot.x),Math.abs(p.y-spot.y)) <= 1
@@ -4201,7 +4225,7 @@ function breakLongSilhouetteRuns(cm, bounds, spot, floorTile) {
     if(!runs.length)return true
     runs.sort((a,b)=>b.cells.length-a.cells.length)
     // One seeded roll per obstruction, shared by all of its placement attempts.
-    const obstacleTile=chance(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance)?'water':'cavewall'
+    const obstacleTile=chance(waterChance)?'water':'cavewall'
     const shape=randInt(0,obstacleTile==='water'?3:7)
     let changed=false
     for(const {cells,dx,dy} of runs) {
@@ -4272,6 +4296,10 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
   const prototype = pick(CAVE_SILHOUETTES)
   const rows = prototype.rows, ph = rows.length, pw = rows[0].length
   const mirror = chance(.5)
+  // Roll once per silhouette cave, not once per long run. A dry cave has
+  // exclusively rock separators; others may still roll any ratio up to 25%.
+  const waterChance = chance(cfg.dryChance) ? 0 :
+    caveTopologyRoll(cfg.waterChancePercentRange) / 100
   for (const [w, h] of silhouetteSizePlan(prototype).sizes) {
     const cells = []
     for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
@@ -4315,7 +4343,7 @@ function carveSilhouetteDungeon(spot, floorTile, reserved) {
         seen.clear();queue.length=0;queue.push(spot);flood()
       }
       softenSilhouetteOutline(cm,bounds,spot,floorTile)
-      if (!breakLongSilhouetteRuns(cm,bounds,spot,floorTile)) continue
+      if (!breakLongSilhouetteRuns(cm,bounds,spot,floorTile,waterChance)) continue
       let dryFloor=0
       for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++)if(cm[y][x]===floorTile)dryFloor++
       if(dryFloor<cfg.minFloorTiles)continue
@@ -5552,6 +5580,9 @@ function populateDeepCaveRewards(deep) {
   const members=new Map()
   const occupied=new Set([...groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'),
     ...enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')].map(e=>keyXY(e.x,e.y)))
+  // Spatial crowding is evaluated across the whole connected complex.
+  // This prevents a rich complex from placing nearly all rewards in one room.
+  const rewardLocations=[]
   const distance=new Map(),queue=[]
   for(const e of entrances){const k=keyXY(e.x,e.y);if(!distance.has(k)){distance.set(k,0);queue.push(e)}}
   const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
@@ -5591,7 +5622,7 @@ function populateDeepCaveRewards(deep) {
   const weight=e=>Math.pow(e.area,.82)*e.randomWeight*
     (1+correlation*Math.max(-.65,Math.min(.65,(e.complex.ecosystem?.threatBudget||0)/Math.max(1,e.area)*15-1)))
   for(const e of entries)e.randomWeight=.4+rng()*1.2
-  function rewardSpot(e,tier) {
+  function rewardSpot(e,tier,kind) {
     if(!e.cells.length)return null
     const nearby=enemies.filter(m=>m.alive&&m.level===-2&&m.levelKind==='chain'&&e.complex.members.includes(m.caveIndex))
     let chosen=null,best=-Infinity
@@ -5602,13 +5633,25 @@ function populateDeepCaveRewards(deep) {
       const d=distance.get(k)
       if(d===undefined||d<cfg.minimumStairDistance)continue
       const near=nearby.reduce((m,enemy)=>Math.min(m,Math.max(Math.abs(enemy.x-p.x),Math.abs(enemy.y-p.y))),9999)
+      const closeRewards=q=>Math.max(Math.abs(q.x-p.x),Math.abs(q.y-p.y))<=cfg.localRewardRadius
+      const local=rewardLocations.filter(closeRewards)
+      const guardedAt=q=>nearby.some(enemy=>
+        Math.max(Math.abs(enemy.x-q.x),Math.abs(enemy.y-q.y))<=cfg.guardedEnemyDistance)
+      const rewardLimit=q=>guardedAt(q)?cfg.maxGuardedLocalRewards:cfg.maxUnguardedLocalRewards
+      // Check both the proposed point and earlier reward centers. Otherwise a
+      // new guarded reward could overcrowd a nearby unguarded treasure spot.
+      if(local.length >= rewardLimit(p) || local.some(q=>
+        rewardLocations.filter(r=>Math.max(Math.abs(r.x-q.x),Math.abs(r.y-q.y))<=cfg.localRewardRadius).length >= rewardLimit(q)))continue
+      if(kind==='chest'&&rewardLocations.some(q=>q.kind==='chest'&&
+        Math.max(Math.abs(q.x-p.x),Math.abs(q.y-p.y))<cfg.minimumChestSpacing))continue
       const early=d<cfg.earlyTier3Distance
       // Tier-3 chests can be found early, but exceptionally rarely without
       // nearby encounter pressure. Tier-2 supplies need no such gate.
       if(tier===3 && early && near>cfg.earlySafeEnemyDistance && rng()<cfg.earlySafeTier3Reject)continue
       const remoteness=Math.min(1,d/65),concentration=1/(1+Math.hypot(p.x-e.focus.x,p.y-e.focus.y)/24)
       const score=rng()*1.3 + remoteness*cfg.remotenessBias*(tier===3?1.4:.5) +
-        concentration*cfg.concentrationBias + (tier===3?1/(1+near)*.8:0)
+        concentration*cfg.concentrationBias + (tier===3?1/(1+near)*.8:0) -
+        local.length*cfg.localCrowdingPenalty
       if(score>best){best=score;chosen=p}
     }
     return chosen
@@ -5619,9 +5662,10 @@ function populateDeepCaveRewards(deep) {
     if(!options.length)return false
     const e=pickWeighted(options,weight)
     const tier=kind==='chest'?(rng()<cfg.tier3Chance?3:2):0
-    const p=rewardSpot(e,tier)
+    const p=rewardSpot(e,tier,kind)
     if(!p)return false
     occupied.add(keyXY(p.x,p.y))
+    rewardLocations.push({x:p.x,y:p.y,kind})
     if(kind==='chest'){
       groundItems.push({x:p.x,y:p.y,kind:'chest',tier,opened:false,level:-2,levelKind:'chain',caveIndex:p.caveIndex})
       e.chests++

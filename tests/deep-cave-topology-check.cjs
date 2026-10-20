@@ -43,10 +43,15 @@ const {run} = require('./helpers/node-game-runtime.cjs')
     const rooms=new Set(samples.map(r=>r.result[styleIndex].rooms))
     assert(rooms.size>=3,'seed should vary chamber/branch count')
   }
-  assert(results.some(r=>r.result[0].water>0),'grotto pools possible')
-  assert(results.some(r=>r.result[1].water>0),'burrow pools possible')
-  assert.equal(run('WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance'),.3,
-    'silhouette obstruction chance remains unchanged')
+  assert(results.some(r=>r.result[0].water>0),'grotto pools still possible')
+  assert(results.some(r=>r.result[0].water===0),'grotto can be completely dry')
+  assert(results.some(r=>r.result[1].water===0),'burrow can be completely dry')
+  assert.equal(run('WORLD_GEN_CONFIG.caves.deep.silhouette.waterChancePercentRange[0]'),0,
+    'silhouette water chance may be 0%')
+  assert.equal(run('WORLD_GEN_CONFIG.caves.deep.silhouette.waterChancePercentRange[1]'),25,
+    'silhouette water chance has a reduced upper bound')
+  assert.equal(run('WORLD_GEN_CONFIG.caves.deep.burrow.topologyVariation.waterChancePercentRange[1]'),25,
+    'burrow water probability is variable and intentionally uncommon')
   // Integration without the PNG assets absent from the source-only upload:
   // feed the unchanged silhouette carver a synthetic valid mask, then exercise
   // its real neighbor placement and all three local/shared map styles.
