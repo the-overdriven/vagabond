@@ -387,7 +387,9 @@ describe('Fisherman and swimming', () => {
         const blocked=player.x===40 && turnCount===before
         player.swimming=5
         for(let i=0;i<5;i++) await tryMove(1,0)
-        const safe=player.hp===100 && player.swimTurns===5 && player.swimmingPractice===5
+        const safeState={hp:player.hp,swimTurns:player.swimTurns,swimmingPractice:player.swimmingPractice,x:player.x,y:player.y,swimming:player.swimming}
+        const safe=safeState.hp===100 && safeState.swimTurns===5 && safeState.swimmingPractice===5
+        if(!safe)throw Error('Swimming safety: '+JSON.stringify(safeState))
         await tryMove(1,0)
         const damage=player.hp===95 && isDrowning()
         skipTurn()
@@ -487,7 +489,7 @@ describe('Fisherman and swimming', () => {
             !player.fishermanRewardClaimed && !player.fishermanLessonPending && !player.drowning
           return {identity,persisted,staticNpc,closest,lethal,reset,toggle}
         })()`)
-        for(const [key,value] of Object.entries(result)) expect(value,key).to.equal(true)
+        for (const [key,value] of Object.entries(result)) expect(value,key).to.equal(true)
       })
     })
 
