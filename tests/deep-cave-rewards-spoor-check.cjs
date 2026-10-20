@@ -48,7 +48,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     assert.equal(summary.clueOverlap,false,'spoor does not obscure rewards')
     const before=JSON.parse(summary.snapshot),save=JSON.parse(JSON.stringify(run('buildSaveObject()')))
     assert.equal(JSON.stringify(save.caveSpoor),JSON.stringify(summary.spoors),'current save serializes static spoor')
-    assert.equal(save.version,102,'save schema updated for permanent clue data')
+    assert.equal(save.version,103,'save schema updated for permanent clue data')
     run('loadGameFromObject('+JSON.stringify(save)+',{isReplayInit:true})')
     const after=run(`JSON.stringify({rewards:groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'&&
       ['chest','potion','scrollOfInvisibility'].includes(g.kind)),caveSpoor,

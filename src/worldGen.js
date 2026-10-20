@@ -4450,9 +4450,10 @@ function deepCaveComplexes(level) {
     }
     if(!cells)continue
     for(const point of cells)tiles[point.y][point.x]='cavefloor2'
-    // Sometimes the connector runs through a small water-filled cleft.
-    // Only carve water into unowned rock flanking a dry causeway; nobody
-    // needs Swimming to move between the source caves.
+    // Most water-lined connectors retain a dry causeway. On 15% of water
+    // passages, flood 1-3 *central* connector tiles instead: this optional
+    // shortcut then requires Swimming (or the Merling racial ability).
+    // Both source caves retain their independent stairs and dry landing tiles.
     const waterCells=[]
     if(cells.length>=cfg.waterPassageMinLength && chance(cfg.waterPassageChance)){
       const middle=cells[Math.floor(cells.length/2)]
@@ -4467,9 +4468,19 @@ function deepCaveComplexes(level) {
         if(x<2||y<2||x>=MAP_W-2||y>=MAP_H-2||pathSet.has(key)||nearStairs(x,y))continue
         if(tiles[y][x]==='cavewall')candidates.set(key,{x,y})
       }
-      // No extra land or water is created if the link is too tightly enclosed.
       for(const p of [...candidates.values()].slice(0,cfg.waterPassageMaxTiles)){
         tiles[p.y][p.x]='water';waterCells.push(p)
+      }
+      if(chance(cfg.waterPassageFloodChance)){
+        // At least one dry connector tile survives at both ends. A swimmer
+        // starting at level 5 can cross at most three contiguous wet steps
+        // without drowning. Do not change either source map or its stairs.
+        const maxFlood=Math.min(3,cells.length-2)
+        const floodLength=randInt(Math.min(2,maxFlood),maxFlood)
+        const first=Math.floor((cells.length-floodLength)/2)
+        for(const p of cells.slice(first,first+floodLength)){
+          tiles[p.y][p.x]='water';waterCells.push(p)
+        }
       }
     }
     links.push({a,b,cells,waterCells})
@@ -4485,7 +4496,8 @@ function deepCaveComplexes(level) {
   const complexes=[...groups.values()].map(members=>({
     id:members[0],members,
     entrances:members.flatMap(i=>level.caves[i].entrances || []),
-    dryTiles:members.reduce((sum,i)=>sum+areas[i],0)+links.filter(l=>members.includes(l.a)).reduce((s,l)=>s+l.cells.length,0)
+    dryTiles:members.reduce((sum,i)=>sum+areas[i],0)+links.filter(l=>members.includes(l.a)).reduce((s,l)=>
+      s+l.cells.filter(p=>tiles[p.y][p.x]==='cavefloor2').length,0)
   })).sort((a,b)=>a.id-b.id)
   for(const complex of complexes)for(const index of complex.members)level.caves[index].complexId=complex.id
   level.links=links
@@ -5749,7 +5761,7 @@ function measureDeepCaveExploration(deep) {
         if(isDry(cm[y][x]))walkable.add(id(x,y))
     }
     for(const link of deep.links)if(complex.members.includes(link.a))
-      for(const p of link.cells)walkable.add(id(p.x,p.y))
+      for(const p of link.cells)if(deep.map[p.y][p.x]==='cavefloor2')walkable.add(id(p.x,p.y))
     if(!walkable.size)continue
     const neighbors=q=>{
       const x=q%MAP_W,y=Math.floor(q/MAP_W),out=[]

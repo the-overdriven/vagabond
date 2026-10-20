@@ -538,6 +538,7 @@
           }
         ],
         "waterPassageChance": 0.3,
+        "waterPassageFloodChance": 0.15,
         "waterPassageMinLength": 3,
         "waterPassageSpan": 5,
         "waterPassageMaxTiles": 9

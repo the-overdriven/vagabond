@@ -511,8 +511,10 @@ function loadGameFromObject(data, opts = {}) {
             throw new Error('Invalid saved deep-cave connector overlap')
           lvlMap[p.y][p.x] = 'cavefloor2'
         }
+        const connectorKeys=new Set(link.cells.map(p=>`${p.x},${p.y}`))
         for(const p of link.waterCells || []){
-          if(lvlMap[p.y]?.[p.x] !== 'cavewall')
+          const tile=lvlMap[p.y]?.[p.x]
+          if(tile!=='cavewall' && !(tile==='cavefloor2' && connectorKeys.has(`${p.x},${p.y}`)))
             throw new Error('Invalid saved deep-cave connector water overlap')
           lvlMap[p.y][p.x]='water'
         }

@@ -71,7 +71,7 @@ const {run} = require('./helpers/node-game-runtime.cjs')
     const before=JSON.stringify(maps)
     const cfg=WORLD_GEN_CONFIG.caves.deep.merging
     Object.assign(cfg,{affinity:[100,100],distanceBands:cfg.distanceBands.map(b=>({...b,nearChance:1,farChance:1})),
-      mergeDecay:1,areaScale:1e12,waterPassageChance:1})
+      mergeDecay:1,areaScale:1e12,waterPassageChance:1,waterPassageFloodChance:0})
     const level=deepCaveComplexes({map:shared,caveMaps:maps,caves:spots.map(([sx,sy],i)=>({
       style:i?'burrow':'silhouette',brownFloor:!!i,entrances:[{x:sx+6,y:sy+6}]}))})
     const link=level.links[0]

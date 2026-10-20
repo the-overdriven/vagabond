@@ -2210,11 +2210,19 @@ brown tile/ASCII background inside its source footprint, ordinary grotto and
 silhouette regions retain their normal cave floor, and shared connectors use
 ordinary cave floor. At generation time each accepted connector has a **30%**
 chance to acquire a short water-lined section (up to 9 flank water tiles,
-requiring at least 3 dry connector tiles). Water replaces only rock **alongside**
-the connector; a continuous dry causeway always remains, so Swimming is never
-required to reach another cave. If there are no suitable flank cells, the
-connector stays completely dry. Water pockets are not drawn inside or over
-source cave maps, entrances, or special dungeons.
+requiring at least 3 connector tiles). **15% of these water-passage rolls**
+also flood the middle **1–3 tiles of the connector**, leaving at least one dry
+connector tile at either end. Such a link has **no continuous dry causeway**:
+non-Merlings must learn Swimming (level 5 is enough for the crossing). All
+other water-lined links retain a dry causeway. The effective probability of
+attempting a flooded shortcut is **4.5% per eligible accepted connector**
+(30% × 15%), not 15% of all cave links. Flooded connectors remain optional:
+all source caves keep their own independently accessible stairs and dry interior;
+Swimming never gates mandatory story progression or the only exit. Flank water
+replaces only unowned rock, and flood water replaces only the central carved
+connector cells. No water overwrites source cave maps, entrances, or special
+dungeons. Water-lined links without suitable flanks stay dry unless their
+central segment is selected for flooding.
 Nearby source components may be joined by short, carved dry corridors (**2–12
 rock tiles**). For two previously separate source caves, the baseline chance now
 varies by rock gap: **85–70%** across 2–4 tiles, **60–40%** across 5–8 tiles,
@@ -2231,17 +2239,21 @@ independent. Connected layouts are still navigated as one shared z:-2 map.
 Links are generated **after source cave carving** and exist only on the shared
 map. The original source masks, silhouette shapes and the brown burrow's local
 floor region are not altered. For each complex the generator stores sorted
-source membership and entrances, and partitions the reachable dry floor into
-irregular **territories** using walking-distance seeds. Territories guide initial enemy placement but do not constrain monster
+source membership and entrances, and partitions its traversable topology into irregular **territories** using
+walking-distance seeds. Flooded connector cells are included as potential
+Swimming routes in territory assignment, while dry-only exploration diagnostics
+exclude them. Territories guide initial enemy placement but do not constrain monster
 movement, change AI or add faction rules. Loot is allocated from a shared
 world budget by playable area; merging gives no additional reward.
 
 Connector cells and territory/complex metadata are saved and restored directly;
-the shared map is reconstructed by overlaying saved **dry connector cells and
-optional water flank cells** after the source maps. Rotation transforms both
+the shared map is reconstructed by overlaying saved **connector cells, then
+water cells (which may overlap the connector's own central cells)** after the
+source maps. Rotation transforms both
 sets of connector cells and territory anchors along with all stairs and source
 caves. The new flank-water field is persistent link metadata: save schema
-**101 → 102**. Neither cave connections nor silhouette choices are rerolled on
+**101 → 102** for flank water and **102 → 103** for the new flooded-connector
+semantics. Neither cave connections nor silhouette choices are rerolled on
 save/load or replay. No compatibility code is added for older saves.
 
 The generator requires **at least three generic z:-2 source caves**: one
@@ -2433,9 +2445,6 @@ geometry use the existing cave descriptor and map save fields. Loading and
 replay initialization restore them directly without fetching source images or
 regenerating layouts. These shape-selection changes introduce no persistent per-actor status; the
 complete result remains stored in the existing cave descriptors and map data.
-Save schema **102** is required by new water-lined connectors. Older-save
-conversion is not provided. The former
-Python compiler is obsolete.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
