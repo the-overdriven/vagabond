@@ -6911,7 +6911,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version (defined in `src/version.js`):
 
 ```text
-101
+103
 ```
 
 The game release version changes for each deployment. The save format changes

@@ -19,7 +19,9 @@ describe('Monster silhouette caves',()=>{
         (${rockChecks.toString()})();
         (${sizeChecks.toString()})();
         await generateNewWorld();(${checks.toString()})();
-        if(WORLD_GEN_CONFIG.caves.deep.silhouette.waterChance!==.3)throw Error('30% water configuration');
+        const silhouetteCfg=WORLD_GEN_CONFIG.caves.deep.silhouette;
+        if(JSON.stringify(silhouetteCfg.waterChancePercentRange)!=='[0,25]' || silhouetteCfg.dryChance!==.4)
+          throw Error('silhouette water configuration must permit completely dry caves');
         const prototype=CAVE_SILHOUETTES[0], rngBefore=rngState;
         const reload=await CaveSilhouettes.prepare(WORLD_SEED);
         if(JSON.stringify(reload.rows)!==JSON.stringify(prototype.rows)||rngState!==rngBefore)throw Error('cached extraction changes shape or RNG');

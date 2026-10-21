@@ -27,7 +27,11 @@ module.exports = function silhouetteCaveChecks() {
       check(Array.isArray(cave.silhouetteIds)&&[2,3,4].includes(cave.silhouetteIds.length)&&new Set(cave.silhouetteIds).size===cave.silhouetteIds.length,'two to four distinct source silhouettes')
       check(cave.silhouetteIds.every(id=>CAVE_SILHOUETTE_SOURCES.some(p=>p.id===id)),'real image sources')
       check(cave.silhouetteId===cave.silhouetteIds.join('+'),'combined prototype identity')
-      check(cave.silhouetteIds.length===CaveSilhouettes.sourceCountForSeed(WORLD_SEED),'seeded silhouette count')
+      // Different silhouette caves use independently salted, disjoint source groups.
+      // The unsalted world seed describes only the first prototype.
+      const prototype=CAVE_SILHOUETTES.find(p=>p.id===cave.silhouetteId)
+      check(!!prototype,'every silhouette cave uses a preloaded seeded prototype')
+      check(JSON.stringify(cave.silhouetteIds)===JSON.stringify(prototype.sourceIds),'silhouette source IDs match its own prototype')
       check(cave.hasWater===cm.some(row=>row.includes('water')),'water metadata matches map')
       for(const [dx,dy] of [[1,0],[0,1]])for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
         if(!TILE[cm[y][x]]?.walk||TILE[cm[y-dy]?.[x-dx]]?.walk)continue

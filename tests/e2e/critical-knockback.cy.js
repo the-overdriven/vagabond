@@ -1,10 +1,14 @@
 describe('Critical melee knockback', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Rush Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    // These tests replace the entire local combat scene. Loading the stable
+    // current-format fixture avoids an unnecessary, randomly slow worldgen.
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__rushFixture=save
+      win.eval('loadGameFromObject(window.__rushFixture,{isReplayInit:true})')
+      delete win.__rushFixture
+    }))
     cy.window().then(win => win.eval(`(() => {
       window.rushCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}
       replayRecording=false; replayPlaying=false; replayData=null; replayAnimationsDisabled=true
