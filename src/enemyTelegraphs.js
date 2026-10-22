@@ -12,6 +12,8 @@ function enemyAbilityCooldown(e, type) {
 
 function beginEnemyAbilityCooldown(e, type) {
   const turns = Math.max(0, enemyTelegraphConfig(type)?.cooldownTurns || 0)
+  e.abilityCooldowns ||= {}
+  e.abilityCooldownStartedTurn ||= {}
   e.abilityCooldowns[type] = turns
   e.abilityCooldownStartedTurn[type] = turnCount
 }
@@ -19,8 +21,9 @@ function beginEnemyAbilityCooldown(e, type) {
 function tickEnemyAbilityCooldowns() {
   for (const e of enemies) {
     if (!e.alive || !onCurrentLevel(e)) continue
-    for (const type of Object.keys(e.abilityCooldowns)) {
-      if (turnCount <= (e.abilityCooldownStartedTurn[type] ?? -1)) continue
+    // Legacy/test-created enemies may not have mine ability state yet.
+    for (const type of Object.keys(e.abilityCooldowns || {})) {
+      if (turnCount <= (e.abilityCooldownStartedTurn?.[type] ?? -1)) continue
       if (e.abilityCooldowns[type] > 0) e.abilityCooldowns[type]--
     }
   }

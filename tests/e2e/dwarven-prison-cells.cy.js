@@ -19,8 +19,8 @@ describe('Dwarven Ruins populated prison cells', () => {
         await generateNewWorld()
         const validation = validateDwarvenRuinsStratum()
         check(validation.ok, 'seed ' + seed + ' Ruins validator: ' + validation.issues.join('; '))
-        for (let i = 0; i < deepLevels.length - 2; i++) {
-          const level = deepLevels[i + 2]
+        for (let i = 0; i < deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').length; i++) {
+          const level = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')[i]
           const z = chainZForDepth(i + 4)
           const items = groundItems.filter(g => (g.level ?? 0) === z)
           const mobs = enemies.filter(e => e.alive && e.level === z)
@@ -30,7 +30,7 @@ describe('Dwarven Ruins populated prison cells', () => {
             return r && p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2
           })
           const roomSlots = (level.rooms || []).filter(r => !r.stairRoom && !r.landmark)
-          const fraction = i / (deepLevels.length - 3)
+          const fraction = i / ((deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').length - 1))
           const quota = Math.max(1, Math.ceil(roomSlots.length * (0.20 + fraction * (0.30 - 0.20))))
           check(cells.length >= quota, 'z ' + z + ': required prison share ' + quota + ' of ' + roomSlots.length)
           for (const room of cells) {
@@ -64,7 +64,7 @@ describe('Dwarven Ruins populated prison cells', () => {
               'prison shooters have ammunition')
           }
         }
-        const cellsBeforeRotation = deepLevels.slice(2).flatMap(level => (level.rooms || [])
+        const cellsBeforeRotation = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').flatMap(level => (level.rooms || [])
           .filter(room => room.archetype === 'Prison' && !room.gallery).map(room => ({room, axis:room.prisonCellAxis})))
         // Force an additional quarter turn even when the seeded world was
         // initially generated unrotated or upside down.
@@ -74,7 +74,7 @@ describe('Dwarven Ruins populated prison cells', () => {
           check(room.prisonCellAxis === expectedAxis, 'quarter-turn rotates the prison divider axis')
         }
         const checkRotatedCells = phase => {
-          for (const level of deepLevels.slice(2)) for (const room of level.rooms || []) {
+          for (const level of deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')) for (const room of level.rooms || []) {
             if (room.archetype !== 'Prison' || room.gallery) continue
             const door = room.prisonCellDoorCandidate
             for (const p of dwarvenRoomInterior(room)) {
@@ -92,7 +92,7 @@ describe('Dwarven Ruins populated prison cells', () => {
           }
         }
         checkRotatedCells('after quarter-turn')
-        const snapshot = () => deepLevels.slice(2).map(level => (level.rooms || [])
+        const snapshot = () => deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => (level.rooms || [])
           .filter(room => room.archetype === 'Prison')
           .map(room => ({axis:room.prisonCellAxis, region:room.prisonCellRegion, door:room.prisonCellDoorCandidate, gallery:room.gallery})))
         const before = snapshot()

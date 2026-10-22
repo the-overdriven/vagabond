@@ -271,7 +271,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       let level = null, floorZ = null, locked = []
       for (let i = 2; i < deepLevels.length && !level; i++) {
         const candidate = deepLevels[i]
-        const found = candidate.rooms.flatMap(room => room.doorways || [])
+        const found = (candidate.rooms || []).flatMap(room => room.doorways || [])
           .filter(leaves => leaves.length === 2 && leaves.every(p => candidate.map[p.y]?.[p.x] === 'dwarvendoorlocked'))
           .flat()
         if (found.length) { level = candidate; floorZ = chainZForDepth(i + 2); locked = found }
@@ -434,8 +434,8 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         rngState = WORLD_SEED
         await generateNewWorld()
 
-        for (let i = 0; i < deepLevels.slice(2).length; i++) {
-          const level = deepLevels[i + 2]
+        for (let i = 0; i < deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').length; i++) {
+          const level = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')[i]
           const z = chainZForDepth(i + 4)
           check(level.progressionKey?.mode === mode, mode + ': intact floor uses forced progression-key mode')
           const clearance = activeCfg.traps.spawnClearance

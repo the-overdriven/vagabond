@@ -51,7 +51,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         check(!TILE.dwarventhrone.walk && !TILE.dwarventhrone.projectileBlock &&
           !TILE.dwarventhrone.blocksSight && TILE.dwarvendais.walk,
           'throne collision does not create unexpected sight or projectile cover')
-        check(tileUnderlays[chainZForDepth(deepLevels.length+1) + ':' + keyXY(hall.thronePosition.x,hall.thronePosition.y)] === 'dwarvendais',
+        check(tileUnderlays[chainZForDepth(deepLevels.indexOf(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1))+2) + ':' + keyXY(hall.thronePosition.x,hall.thronePosition.y)] === 'dwarvendais',
           'throne sits transparently on actual dais floor')
         const ports = hall.entrance
         check(hall.entrance.length === 2 && !('onward' in hall) && room.doorways.length === 1,
@@ -76,7 +76,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
         check(final.vaults.filter(v => v.artifactReserved).length === 1, 'preserves optional artifact vault')
         check(final.vaults.length >= 1 && final.vaults.length <= 2,
           'throne hall replaces the extra compulsory defensive vault')
-        const z = chainZForDepth(deepLevels.length+1)
+        const z = chainZForDepth(deepLevels.indexOf(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1))+2)
         const guards = enemies.filter(enemy => enemy.alive && enemy.level === z && enemy.dungeonRoomId === room.id)
         check(guards.filter(enemy => ['frontline','group','backline'].includes(enemy.dungeonRole)).length >= 2,
           'throne hall contains at least two defensive creatures from the existing budget')
@@ -123,7 +123,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
       const old = structuredClone(final.landmarks[0])
       const oldRoom = structuredClone(final.rooms.find(r => r.id === old.roomId))
-      const z = chainZForDepth(deepLevels.length+1)
+      const z = chainZForDepth(deepLevels.indexOf(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1))+2)
       const oldChest = groundItems.find(g => g.royalThroneChest && g.level === z)
       check(!!oldChest, 'royal chest exists before rotation')
       // World rotation mutates ground items in place: preserve the original coordinates.
@@ -143,7 +143,7 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
       const chest = groundItems.find(g => g.royalThroneChest && g.level === z)
       check(chest.x === rotated(chestBeforeRotation).x && chest.y === rotated(chestBeforeRotation).y,
         'royal chest rotates with its throne hall')
-      currentZ=chainZForDepth(deepLevels.length+1)
+      currentZ=chainZForDepth(deepLevels.indexOf(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1))+2)
       map=now.map
       check(terrainVisual('dwarventhrone',hall.thronePosition.x,hall.thronePosition.y).image ===
         'img/tiles/dwarven-throne-' + ['south','east','north','west'][hall.facing] + '.png',

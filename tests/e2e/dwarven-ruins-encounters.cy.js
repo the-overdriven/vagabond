@@ -35,7 +35,7 @@ describe('Dwarven Ruins encounter progression', () => {
         await generateNewWorld()
 
         const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.encounters
-        const ruins = deepLevels.slice(2)
+        const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(ruins.length === fixture.count, 'configured floor count generated')
         for (let i = 0; i < ruins.length; i++) {
           const level = ruins[i]

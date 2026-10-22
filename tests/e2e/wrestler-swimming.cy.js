@@ -40,7 +40,7 @@ describe('Wrestler and monster swimming', () => {
       wrestleCheck(ENEMY_TEMPLATE_BY_NAME.Owlbear.abilities.includes('enrage'),'keep Owlbear enrage')
       const murk=wrestleEnemy('Murkspawn')
       wrestleCheck(enemyHasAbility(murk,'swim'),'Murkspawn swims')
-      for(const t of ENEMY_TEMPLATES) if(t.name!=='Murkspawn')
+      for(const t of ENEMY_TEMPLATES) if(!['Murkspawn','Xibal'].includes(t.name))
         wrestleCheck(!t.abilities.includes('swim'),'no other new swimmer: '+t.name)
     })()`))
   })

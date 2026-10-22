@@ -31,7 +31,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         rngState = WORLD_SEED
         await generateNewWorld()
 
-        const ruins = deepLevels.slice(2)
+        const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(ruins.length >= 3 && ruins.length <= 5, 'Dwarven Ruins floor count is 3-5')
         check(deepLevels[0]?.kind === 'caves', 'z:-2 remains the cave layer')
         check(deepLevels[1]?.kind === 'dwarvenFort', 'z:-3 remains the Dwarven Fort')
@@ -250,7 +250,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(save.deepLevels.length === deepLevels.length, 'all deep levels are serialized')
 
         loadGameFromObject(save, {isReplayInit: true})
-        const restored = deepLevels.slice(2)
+        const restored = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(restored.length === mapsBefore.length, 'save/replay restore keeps floor count')
         for (let i = 0; i < restored.length; i++) {
           check(JSON.stringify(restored[i].map) === mapsBefore[i], 'save/replay restore keeps exact terrain')
@@ -274,9 +274,9 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(enterCave() === true && currentZ === chainZForDepth(3) && map === deepLevels[1].map,
           'first-floor stair returns to the fort')
 
-        const finalLevel = deepLevels.at(-1)
+        const finalLevel = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
         const finalSealed = positions(finalLevel.map, 'dwarvenminessealed')[0]
-        const finalDepth = deepLevels.length + 1
+        const finalDepth = deepLevels.indexOf(finalLevel) + 2
         currentZ = chainZForDepth(finalDepth)
         map = finalLevel.map
         undergroundDiscovered = finalLevel.discovered
@@ -396,12 +396,12 @@ describe('Persistent Dwarven Ruins stratum', () => {
         rngState = WORLD_SEED
         await generateNewWorld()
         return JSON.stringify({
-          maps: deepLevels.slice(2).map(level => level.map),
-          rooms: deepLevels.slice(2).map(level => level.rooms),
-          roomGraphs: deepLevels.slice(2).map(level => level.roomGraph),
-          progressionKeys: deepLevels.slice(2).map(level => level.progressionKey),
-          vaults: deepLevels.slice(2).map(level => level.vaults),
-          families: deepLevels.slice(2).map(level => level.encounterFamilies),
+          maps: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.map),
+          rooms: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.rooms),
+          roomGraphs: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.roomGraph),
+          progressionKeys: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.progressionKey),
+          vaults: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.vaults),
+          families: deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => level.encounterFamilies),
           ruinsEnemies: enemies.filter(e => e.alive && e.level <= -4).map(e => ({
             name:e.name,baseName:e.baseName,level:e.level,x:e.x,y:e.y,prefix:e.prefix,
             dungeonRole:e.dungeonRole,encounterFamily:e.encounterFamily,dungeonRoomId:e.dungeonRoomId,dungeonVaultId:e.dungeonVaultId,

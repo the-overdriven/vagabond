@@ -49,7 +49,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         rngState = WORLD_SEED
         await generateNewWorld()
 
-        const ruins = deepLevels.slice(2)
+        const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(ruins.length === fixture.count, 'forced fixture floor count generated')
         for (let i = 0; i < ruins.length; i++) {
           const level = ruins[i]
@@ -222,7 +222,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         })))
         const save = JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(save, {isReplayInit:true})
-        const after = JSON.stringify(deepLevels.slice(2).map(level => ({
+        const after = JSON.stringify(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').map(level => ({
           rooms: level.rooms,
           vaults: level.vaults,
           encounterFamilies: level.encounterFamilies,
@@ -274,7 +274,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         }
       }
 
-      const final = deepLevels.at(-1)
+      const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
       const vault = (final.vaults || []).find(v => v.type === 'barricadedDormitory')
       check(!!vault, 'optional fitted vault can still select barricaded dormitory')
       const room = final.rooms.find(r => r.id === vault.roomId)
@@ -312,7 +312,7 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
       cfg.levelCountRange = oldRange
       for (const [type,value] of Object.entries(saved)) { defs[type].minSize = value.minSize; defs[type].maxSize = value.maxSize }
 
-      const final = deepLevels.at(-1)
+      const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
       const fallback = (final.vaults || []).find(vault => vault.type === 'guardedArtifactChamber' && vault.artifactReserved)
       check(!!fallback, 'final floor promotes an optional branch into the guarded artifact fallback chamber')
       const room = final.rooms.find(candidate => candidate.id === fallback.roomId)

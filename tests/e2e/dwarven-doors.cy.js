@@ -21,7 +21,7 @@ describe('Dwarven Ruins ordinary doors', () => {
       rngState = WORLD_SEED
       await generateNewWorld()
 
-      const ruins = deepLevels.slice(2)
+      const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
       const doors = []
       let galleryEndDoors = 0
       for (let floorIndex = 0; floorIndex < ruins.length; floorIndex++) {
