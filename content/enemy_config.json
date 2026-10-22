@@ -41,10 +41,11 @@
       "range": 4,
       "maxPathSteps": 4,
       "targetAdjacentDistance": 1,
+      "undergroundTurns": 2,
       "cooldownTurns": 6,
-      "warningMessage": "The <enemy> sinks into the earth. Something moves beneath the marked ground!",
+      "warningMessage": "The <enemy> sinks into the earth!",
       "emergeMessage": "The <enemy> bursts from the ground!",
-      "failedMessage": "The ground settles. The <enemy> resurfaces where it vanished."
+      "failedMessage": "The ground settles. The <enemy> resurfaces near where it vanished."
     },
     "rupture": {
       "activationChance": 0.25,

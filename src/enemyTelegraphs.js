@@ -32,11 +32,14 @@ function tickEnemyAbilityCooldowns() {
 function cancelPreparedEnemyAbility(e) {
   if (!e?.pendingAbility) return false
   const pending = e.pendingAbility
-  e.pendingAbility = null
   if (pending.type === 'burrow' && pending.origin) {
-    e.x = pending.origin.x
-    e.y = pending.origin.y
+    const landing = onCurrentLevel(e) ? enemyBurrowReturnTile(e,pending) : pending.origin
+    // A transition/death must never leave a monster stranded outside the map.
+    e.x = (landing || pending.origin).x
+    e.y = (landing || pending.origin).y
+    occupied.add(keyXY(e.x,e.y))
   }
+  e.pendingAbility = null
   beginEnemyAbilityCooldown(e, pending.type)
   return true
 }
@@ -100,6 +103,15 @@ function enemyBurrowDestinations(e) {
   return goals.filter(p=>p.steps===shortest)
 }
 
+function enemyBurrowReturnTile(e,pending) {
+  const origin=pending.origin
+  if (!origin) return null
+  const options=[origin,...DIRS8.map(([dx,dy])=>({x:origin.x+dx,y:origin.y+dy}))]
+  return options.find(tile=>enemyAbilityLandingOpen(e,tile.x,tile.y) &&
+    enemyAbilityDiagonalCanPass(origin.x,origin.y,tile.x-origin.x,tile.y-origin.y,
+      enemyAbilityTerrainOpen)) || null
+}
+
 function enemyTelegraphCommonEligible(e, type, options={}) {
   return !!enemyTelegraphConfig(type) && enemyHasAbility(e,type) && e.alive && e.hp>0 &&
     !e.pendingAbility && !enemyAbilityCooldown(e,type) && !e.sleeping &&
@@ -116,28 +128,37 @@ function tryPrepareEnemyBurrow(e) {
   if(!options.length || !chance(cfg.activationChance))return false
   const destination=pick(options)
   const origin={x:e.x,y:e.y}
-  markEnemyAbility(e,'burrow',[destination],{origin,destination:{x:destination.x,y:destination.y}})
-  if(undergroundTileVisible(e.x,e.y))log(cfg.warningMessage.replace(/<enemy>/g,e.name),'bad')
+  const visible=undergroundTileVisible(origin.x,origin.y)
+  // Burrowed monsters occupy no tile. Their origin and private destination
+  // remain simulation state; no destination telegraph is exposed to the player.
+  markEnemyAbility(e,'burrow',[],{origin,destination:{x:destination.x,y:destination.y}})
+  occupied.delete(keyXY(origin.x,origin.y))
+  e.x=-1;e.y=-1
+  e.animStart=undefined
+  if(visible) {
+    log(cfg.warningMessage.replace(/<enemy>/g,e.name),'bad')
+    spawnDamageNumber(origin.x,origin.y,'Burrow!','#e8b98c')
+  }
   return true
 }
 
 function resolveEnemyBurrow(e,pending) {
   const cfg=enemyTelegraphConfig('burrow')
   const destination=pending.destination
-  if (!destination || !enemyAbilityLandingOpen(e,destination.x,destination.y)) {
-    if(undergroundTileVisible(e.x,e.y))log(cfg.failedMessage.replace(/<enemy>/g,e.name),'info')
-    return
-  }
-  occupied.delete(keyXY(e.x,e.y))
-  e.x=destination.x;e.y=destination.y
+  const reachedDestination=destination && enemyAbilityLandingOpen(e,destination.x,destination.y)
+  const landing=reachedDestination ? destination : enemyBurrowReturnTile(e,pending)
+  if (!landing) return false // Remain underground until there is a legal tile.
+  e.x=landing.x;e.y=landing.y
   occupied.add(keyXY(e.x,e.y))
   e.animStart=undefined
   if(undergroundTileVisible(e.x,e.y)) {
-    log(cfg.emergeMessage.replace(/<enemy>/g,e.name),'bad')
+    log((reachedDestination ? cfg.emergeMessage : cfg.failedMessage).replace(/<enemy>/g,e.name),
+      reachedDestination ? 'bad' : 'info')
     spawnDamageNumber(e.x,e.y,'Burrow!','#e8b98c')
   }
-  if(Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y))<=ATTACK_RANGE)
+  if(reachedDestination && Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y))<=ATTACK_RANGE)
     enemyAttackPlayer(e,true) // suppress weapon-speed follow-up: at most one attack
+  return true
 }
 
 function jumpPathPassable(e, x, y) {
@@ -322,12 +343,23 @@ function resolveEnemyRupture(e, pending) {
 function resolveEnemyTelegraphIfPending(e) {
   const pending=e.pendingAbility
   if (!pending || pending.preparedTurn>=turnCount) return false
+  if (pending.type==='burrow') {
+    // Each of the two full player responses passes with the monster hidden.
+    if (turnCount<=pending.preparedTurn+enemyTelegraphConfig('burrow').undergroundTurns) return true
+    if (!resolveEnemyBurrow(e,pending)) return true
+    e.pendingAbility=null
+    beginEnemyAbilityCooldown(e,'burrow')
+    return true
+  }
   e.pendingAbility=null
   beginEnemyAbilityCooldown(e,pending.type)
   if (pending.type==='rupture') resolveEnemyRupture(e,pending)
-  else if (pending.type==='burrow') resolveEnemyBurrow(e,pending)
   else if (pending.type==='jump') resolveEnemyJump(e,pending)
-  else if (pending.type==='wallAmbush') revealEnemyWallAmbush(e)
+  else if (pending.type==='wallAmbush') {
+    if (revealEnemyWallAmbush(e) &&
+        Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y))<=ATTACK_RANGE)
+      enemyAttackPlayer(e,true) // one ambush strike, no weapon-speed follow-up
+  }
   return true
 }
 
@@ -339,6 +371,23 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
     if (!e.alive || !onCurrentLevel(e) || !e.pendingAbility) continue
     const type=e.pendingAbility.type
     if (type==='jump') continue // Leap is positioning only: no floor warning overlay.
+    if (type==='burrow') {
+      // Show disturbed earth at the abandoned origin, never at the secret
+      // destination. The clue is drawn beneath actors in tile and ASCII modes.
+      const origin=e.pendingAbility.origin
+      if (foreground || !origin || (undergroundVisible && !undergroundVisible.has(keyXY(origin.x,origin.y)))) continue
+      const px=Math.round((origin.x-camX)*TILE_PX),py=Math.round((origin.y-camY)*TILE_PX)
+      if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) continue
+      ctx.save()
+      ctx.fillStyle='rgba(123,83,48,0.32)'
+      ctx.strokeStyle='#b18a62'
+      ctx.lineWidth=Math.max(2,Math.round(TILE_PX*0.05))
+      ctx.beginPath()
+      ctx.ellipse(px+TILE_PX/2,py+TILE_PX/2,TILE_PX*0.33,TILE_PX*0.17,0,0,Math.PI*2)
+      ctx.fill();ctx.stroke()
+      ctx.restore()
+      continue
+    }
     for (const tile of e.pendingAbility.tiles || []) {
       const key=keyXY(tile.x,tile.y)
       if (warned.has(key) || (undergroundVisible && !undergroundVisible.has(key))) continue

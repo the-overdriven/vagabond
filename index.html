@@ -4891,8 +4891,11 @@ more difficult:
     const levelKind = currentLevelKind()
     for (const e of enemies) {
       if (!e.alarmed) continue
+      // A burrowed monster has no occupied map tile; sense from its last
+      // surface position until it emerges, not its off-map sentinel.
+      const location=e.pendingAbility?.type==='burrow' ? e.pendingAbility.origin : e
       if (e.alarmedZ !== currentZ || e.alarmedLevelKind !== levelKind ||
-        Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ALARM_CLEAR_RANGE) {
+        Math.max(Math.abs(location.x - player.x), Math.abs(location.y - player.y)) > ALARM_CLEAR_RANGE) {
         e.alarmed = false
         e.alarmedZ = null
         e.alarmedLevelKind = null

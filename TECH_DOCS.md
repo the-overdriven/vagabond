@@ -2537,8 +2537,8 @@ every middle species on floor 2, and every late species on floor 3. These
 encounters count toward each floor's normal population budget; remaining slots
 still use the usual weighted groups and packs. Monster stats, rarity, existing
 abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
-generic Exposed, Shell Retreat, Rupture, Burrow, Jump, Wall Ambush and Collective
-Mind abilities are active. No species receives an unimplemented ability string.
+abilities listed in **Enemy Special Properties** are active. No species
+receives an unimplemented ability string.
 All 19 are classified as non-humanoid, so they follow normal XP, rare artifact
 loot and Bestiary kill-count rules, but do not carry humanoid equipment drops.
 
@@ -2561,66 +2561,6 @@ replay. Settings and messages are in `content/world_generation.json`.
 The mine-specific monster abilities use the generic handlers documented in
 **Enemy Special Properties**. Mine terrain and stair geometry constrain their
 legal moves and target tiles.
-
-**Burrow** is a generic repositioning action, currently used by Marsutal.
-On an eligible chase turn within **four tiles**, Blind hesitation is checked
-first; there is then a **25% chance** to retreat underground. The destination
-must be a free tile adjacent to the player's position at preparation time,
-reachable from the monster's original tile in at most **four terrain-traversable
-steps**, ignoring creatures but never bypassing solid walls, gates or closed
-doors. The origin remains reserved while the monster cannot be targeted;
-the fixed destination is visibly marked. On the next enemy turn after one player
-response the monster emerges, possibly making **one ordinary melee attack** if
-adjacent. A blocked landing returns it to the original spot without attacking.
-Cooldown: **six complete active-floor turns** after resolution or cancellation.
-
-**Jump** is generic fast positioning, currently used by Naledi. It prepares a
-straight leap of **two to four tiles** when that avoids creatures/low cover or
-improves pursuit by at least two tiles. It may cross creatures, dwarven beds,
-tables and crates, but not boulders, walls, doors, shelves or gates. The
-landing tile is fixed during the player's response action, but no floor
-warning overlay is drawn. The next enemy phase moves the jumper to an
-available legal landing tile without any landing
-damage or same-turn melee. A blocked landing leaves the jumper at the origin.
-Cooldown: **four complete active-floor turns**. Blind hesitation is checked
-before a pursuit Jump. Landing on dungeon transitions is prohibited for both
-Burrow and Jump so monsters cannot unexpectedly block the only staircase.
-
-**Wall Ambush** is a generic one-time concealment rule, initially used by
-Trogloraptor. Concealed monsters spawn in ordinary legal spaces beside a solid
-wall, never within protected stair approaches; without a valid site they spawn
-visibly instead. The monster remains in place and cannot be inspected or
-attacked while concealed. When the player comes within **two tiles** and has
-line of sight to its location, a wall-movement warning appears. On the next
-player action the monster reveals itself; revelation consumes its enemy action,
-so ordinary combat begins later. Walking into the concealed monster instead
-reveals it and uses the attempted movement action without a free counterattack.
-Once revealed it cannot hide again. Its concealment, warning and spent state
-persist across saves/replay. All three mechanics share the configurable warning
-renderer and deterministic turn/cooldown state.
-
-**Collective Mind** is a generic one-time group alert, currently used by
-Naledi. When the first member on a generated floor normally detects the
-player, every living ally of the configured species with this ability on that
-floor becomes **Alarmed**. Alarmed monsters retain their existing sensory
-chase rules, including following around corners within aggro range; they do
-not teleport, share a forced path, or receive a permanent tracking target.
-The floor alert remains spent after leaving and returning, even when ordinary
-Alarmed states expire.
-
-The detecting member becomes the designated scout. It chooses a reachable
-**different pack**, preferring packs with **at least two other surviving
-members**, then the shortest legal travel path; an isolated surviving ally is
-an acceptable fallback. Equal choices use stable identifiers. When a group
-is available, the scout spends its actions moving toward an adjacent reachable
-space near those allies instead of attacking the player. Normal movement or
-an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
-and never grants a landing attack. A blocked route or loss of the chosen group
-ends the single retreat attempt without selecting another target. The scout
-resumes ordinary behavior after regrouping or cancellation. Floor alert,
-initial pack identity, chosen ally IDs and ongoing retreat are saved and
-replayed without animation-dependent decisions. Parameters and messages are
-configured in `enemy_config.json`.
 
 Outside the Mines, the normal encounter pools are unchanged. The two approved
 exceptions are: an independent **10% per-world chance** to add one Cave Troll
@@ -3340,6 +3280,73 @@ monster's action and starts **five complete subsequent active-floor turns**
 of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
 disappear on the caster's death or the player's departure. Thresholds and
 messages are configurable in `enemy_config.json`.
+
+**Burrow** is a generic repositioning action, currently used by Marsutal.
+On an eligible chase turn within **four tiles**, Blind hesitation is checked
+first; there is then a **25% chance** to retreat underground. It vanishes
+immediately, freeing its original tile and leaving a disturbance where it
+disappeared. No destination marker is shown. The destination is selected at
+preparation time from free tiles adjacent to the player's position, reachable
+from the monster's origin within **four terrain-traversable steps** without
+crossing solid walls, gates or closed doors. The monster remains hidden and
+untargetable for **two complete player actions**, then emerges on the following
+enemy action. If its chosen tile is still free, it may make **one ordinary
+melee attack** when adjacent; it cannot gain an extra weapon-speed attack.
+If that tile is blocked, it emerges at its original position or a free adjacent
+tile without attacking. If every return tile is blocked, it stays buried until
+one becomes available. A successful emergence or canceled Burrow begins
+**six complete active-floor turns** of cooldown. Origin, destination, remaining
+wait time, and cooldown are deterministic save/replay state.
+
+**Jump** is a generic fast repositioning action, currently used by Naledi.
+It prepares a straight leap of **two to four tiles** when it can bypass
+creatures or low cover, or improve pursuit by at least two tiles. It may cross
+creatures, dwarven beds, tables and crates, but not boulders, walls, doors,
+shelves or gates. The landing tile is fixed during the player's response
+action, but no floor warning overlay appears. The next enemy phase moves the
+jumper to an available landing tile without damage or same-turn melee. A
+blocked landing leaves it at the origin. Cooldown: **four complete active-floor
+turns**. Blind hesitation is checked before pursuit Jumps. Neither Jump nor
+Burrow can land on dungeon transitions, protecting staircase access.
+
+**Wall Ambush** is a generic one-time concealment rule, currently used by
+Trogloraptor. Concealed monsters spawn in ordinary legal spaces beside a solid
+wall, never in protected stair approaches; without a valid site they start
+visible. They cannot be seen, inspected or attacked while concealed. When
+the player comes within **two tiles** and has line of sight to the location,
+disturbed stones provide a visible warning and **one player action** to
+respond. On the next enemy action the monster reveals itself and makes **one
+immediate ordinary melee attack if adjacent**, without a weapon-speed follow-up.
+Walking into a concealed monster instead reveals it and spends the attempted
+movement action, with no free counterattack. Revealed monsters cannot hide
+again. Concealment, warning and spent state persist through saves/replay.
+All three actions use deterministic preparation and resolution independent
+of their warning visuals.
+
+## Monster group awareness
+
+**Collective Mind** is a generic one-time group alert, currently used by
+Naledi. When the first member on a generated floor normally detects the
+player, every living ally of the configured species with this ability on that
+floor becomes **Alarmed**. Alarmed monsters retain their existing sensory
+chase rules, including following around corners within aggro range; they do
+not teleport, share a forced path, or receive a permanent tracking target.
+The floor alert remains spent after leaving and returning, even when ordinary
+Alarmed states expire.
+
+The detecting member becomes the designated scout. It chooses a reachable
+**different pack**, preferring packs with **at least two other surviving
+members**, then the shortest legal travel path; an isolated surviving ally is
+an acceptable fallback. Equal choices use stable identifiers. When a group
+is available, the scout spends its actions moving toward an adjacent reachable
+space near those allies instead of attacking the player. Normal movement or
+an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
+and never grants a landing attack. A blocked route or loss of the chosen group
+ends the single retreat attempt without selecting another target. The scout
+resumes ordinary behavior after regrouping or cancellation. Floor alert,
+initial pack identity, chosen ally IDs and ongoing retreat are saved and
+replayed without animation-dependent decisions. Parameters and messages are
+configured in `enemy_config.json`.
 
 ## Monster-applied status effects
 

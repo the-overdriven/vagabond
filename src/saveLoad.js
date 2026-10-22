@@ -925,7 +925,9 @@ function loadGameFromObject(data, opts = {}) {
   nextEnemyId = 1
   hunterEnsureIds()
   nextEnemyId = Math.max(nextEnemyId, data.nextEnemyId || 1)
-  for (const e of enemies) occupied.add(keyXY(e.x, e.y))
+  // Burrowed monsters exist only in their pending ability state until they
+  // emerge. Loading a save must not reserve their former or off-map tile.
+  for (const e of enemies) if (e.pendingAbility?.type !== 'burrow') occupied.add(keyXY(e.x, e.y))
 
   if (Array.isArray(data.npcs)) {
     npcs = data.npcs.map(n => {
