@@ -2516,7 +2516,13 @@ The initial mine layout uses a narrow winding excavated spine, side branches,
 short pockets, and at least one alternate route. Generation checks a single
 connected walkable component and a minimum 30-step stair-to-stair route. Floor
 count, geometry, retries, encounter density, pack sizes, group weights, and
-spacing are configured in `content/world_generation.json`. The haulage cage
+spacing are configured in `content/world_generation.json`. A flooded side
+chamber is guaranteed on mine floor 3 and may appear on floors 2 or 4
+(**35% each**). Each chamber branches from a dry passage, has a dry shoreline
+around a pool of deep water, and never cuts through existing corridors,
+staircases or cage landings. Swimming is optional for reaching all dungeon
+stairs. **Xibal spawns inside the flooded pools**, not on dry mine floors;
+its Swimming ability lets it leave the water to pursue the player. The haulage cage
 occupies the **same x/y position on every mine floor**: reachable cage landings
 on the first and final floors, and an **open shaft with a dangling rope** on
 intermediate floors. The exposed shaft cannot be crossed or climbed, but all
@@ -3351,16 +3357,18 @@ dies. Each floor can trigger Collective Mind only once.
 The detecting member becomes the designated scout. It chooses a reachable
 **different pack**, preferring packs with **at least two other surviving
 members**, then the shortest legal travel path; an isolated surviving ally is
-an acceptable fallback. Equal choices use stable identifiers. When a group
-is available, the scout spends its actions moving toward an adjacent reachable
-space near those allies instead of attacking the player. Normal movement or
+an acceptable fallback. Equal choices use stable identifiers. The scout
+spends its actions moving toward an adjacent reachable space near those allies
+instead of attacking the player. If no separate group is reachable, it **flees
+away from the player and searches** instead, never attacking merely because
+it lacks a destination. A cornered scout waits and can be slain before
+reaching its kin. Normal movement or
 an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
 and never grants a landing attack. A blocked route or loss of the chosen group
-ends the single retreat attempt without selecting another target. The scout
-resumes ordinary behavior after regrouping or cancellation. Floor alert,
-its permanent-regrouped state, initial pack identity, chosen ally IDs and ongoing retreat are saved and
-replayed without animation-dependent decisions. Parameters and messages are
-configured in `enemy_config.json`.
+ends that route; the scout searches for another reachable pack instead of
+fighting. Regrouping ends its flight. Floor alert, permanent-regrouped state,
+pack identity, destination and retreat are saved and replayed independently
+of animation. Parameters and messages are configured in `enemy_config.json`.
 
 ## Monster-applied status effects
 

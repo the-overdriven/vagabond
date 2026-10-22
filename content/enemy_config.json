@@ -14,6 +14,7 @@
     "allowRetreatJump": true,
     "alertMessage": "The <enemy> sends a silent warning through its kin!",
     "retreatMessage": "The <enemy> withdraws to join its kin!",
+    "searchMessage": "The <enemy> withdraws, searching for its kin!",
     "regroupMessage": "The <enemy> rejoins its kin.",
     "fallbackMessage": "The <enemy> abandons its regrouping attempt."
   },

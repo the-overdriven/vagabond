@@ -104,6 +104,45 @@ function collectiveMindChooseGroup(e) {
   return candidates[0] || null
 }
 
+function collectiveMindSearchingScout(e) {
+  const state=collectiveMindFloors[collectiveMindFloorKey(e)]
+  return e.alive && state?.scoutId===e.id && !state.secured &&
+    collectiveMindAlertActive(e)
+}
+
+function collectiveMindSearchTurn(e) {
+  // No group is reachable. The scout stays a scout, never changing straight
+  // back into melee AI. Search movement is deterministic and consumes no RNG.
+  const currentDistance=Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
+  const moves=[]
+  const canEnter=(x,y)=>enemyTileOpen(e,x,y) && !DungeonHazards.isCrusherTrigger(x,y)
+  for(const [dx,dy] of DIRS8) {
+    const x=e.x+dx,y=e.y+dy
+    if(!canEnter(x,y) || !enemyAbilityDiagonalCanPass(e.x,e.y,dx,dy,canEnter))continue
+    const distance=Math.max(Math.abs(x-player.x),Math.abs(y-player.y))
+    if(distance<=currentDistance)continue
+    const squared=(x-player.x)**2+(y-player.y)**2
+    moves.push({x,y,distance,squared})
+  }
+  moves.sort((a,b)=>b.distance-a.distance || b.squared-a.squared || a.y-b.y || a.x-b.x)
+  if(moves.length) {
+    const step=moves[0],fromX=e.x,fromY=e.y
+    occupied.delete(keyXY(fromX,fromY))
+    e.x=step.x;e.y=step.y
+    occupied.add(keyXY(e.x,e.y))
+    e.farPath=null
+    finishEnemyMove(e,fromX,fromY)
+    if(enemyIsVisibleOnMainView(e) && !e.collectiveMindRetreatAnnounced) {
+      log((COLLECTIVE_MIND_CONFIG.searchMessage || 'The <enemy> retreats, seeking its kin!')
+        .replace(/<enemy>/g,e.name),'info')
+      e.collectiveMindRetreatAnnounced=true
+    }
+  }
+  // Cornered scouts wait rather than attack: cutting off an escape creates
+  // the promised opportunity to kill them before they reach another pack.
+  return true
+}
+
 // Called by ordinary target acquisition, including nonvisual sensing.
 function tryTriggerCollectiveMind(e) {
   if(!e.alive || !enemyHasAbility(e,'collectiveMind') ||
@@ -144,18 +183,26 @@ function endCollectiveMindRetreat(e,succeeded) {
 // True means the scout spent its action on regrouping. False means the target
 // became invalid before any action and regular AI may resume immediately.
 function takeCollectiveMindRetreatTurn(e) {
-  if(!e.collectiveMindRetreat)return false
+  if(!collectiveMindSearchingScout(e))return false
+  if(!e.collectiveMindRetreat) {
+    const target=collectiveMindAllies(e).some(ally=>collectiveMindPackId(ally)!==collectiveMindPackId(e))
+      ? collectiveMindChooseGroup(e) : null
+    if(target) {
+      e.collectiveMindRetreat={groupId:target.groupId,
+        allyIds:target.allies.map(ally=>ally.id).sort(),startedTurn:turnCount}
+    } else return collectiveMindSearchTurn(e)
+  }
   const selected=new Set(e.collectiveMindRetreat.allyIds)
   const allies=collectiveMindAllies(e).filter(other=>selected.has(other.id) &&
     collectiveMindPackId(other)===e.collectiveMindRetreat.groupId)
   if(allies.length<(COLLECTIVE_MIND_CONFIG.minimumGroupAllies || 1)) {
     endCollectiveMindRetreat(e,false)
-    return false
+    return collectiveMindSearchTurn(e)
   }
   const goal=collectiveMindBestArrival(e,allies,collectiveMindRoutes(e))
   if(!goal) {
     endCollectiveMindRetreat(e,false)
-    return false
+    return collectiveMindSearchTurn(e)
   }
   if(goal.distance===0) {
     endCollectiveMindRetreat(e,true)
@@ -166,7 +213,7 @@ function takeCollectiveMindRetreatTurn(e) {
   const step=goal.first
   if(!step || !enemyTileOpen(e,step.x,step.y)) {
     endCollectiveMindRetreat(e,false)
-    return false
+    return collectiveMindSearchTurn(e)
   }
   if(enemyOpenDoorInsteadOfMove(e,step.x,step.y))return true
   const fromX=e.x,fromY=e.y

@@ -206,6 +206,51 @@ function mineAlignCageShaft(mine) {
   return false
 }
 
+// A flooded excavation is a side chamber carved out of previously solid rock:
+// one dry doorway, a dry ring, and deep water in the middle. It never replaces
+// an existing corridor, stair approach or haulage-shaft landing.
+function mineFloodSideChambers(mine) {
+  const cfg=minePackageConfig().layout.floodedSideChambers
+  if(!cfg)return true
+  const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
+  for(let floorIndex=0;floorIndex<mine.length;floorIndex++) {
+    const mandatory=floorIndex+1===cfg.guaranteedFloor
+    if(!mandatory && (floorIndex===0 || !chance(cfg.optionalChance)))continue
+    const level=mine[floorIndex],cm=level.map
+    const protectedSites=[level.mineUpstairs,level.mineDownstairs,level.mineCagePad].filter(Boolean)
+    const sites=[]
+    for(let y=cfg.roomRadius+2;y<MAP_H-cfg.roomRadius-2;y++)
+      for(let x=cfg.roomRadius+2;x<MAP_W-cfg.roomRadius-2;x++){
+        if(cm[y][x]!=='cavefloor2')continue
+        for(const [dx,dy] of dirs) {
+          const cx=x+dx*(cfg.roomRadius+1),cy=y+dy*(cfg.roomRadius+1)
+          if(cx-cfg.roomRadius<2 || cy-cfg.roomRadius<2 ||
+             cx+cfg.roomRadius>=MAP_W-2 || cy+cfg.roomRadius>=MAP_H-2)continue
+          let untouched=true
+          for(let yy=cy-cfg.roomRadius;yy<=cy+cfg.roomRadius && untouched;yy++)
+            for(let xx=cx-cfg.roomRadius;xx<=cx+cfg.roomRadius;xx++){
+              if(cm[yy][xx]!=='cavewall' || protectedSites.some(p=>
+                Math.max(Math.abs(xx-p.x),Math.abs(yy-p.y))<=cfg.protectedClearance)){
+                untouched=false;break
+              }
+            }
+          if(untouched)sites.push({cx,cy})
+        }
+      }
+    if(!sites.length) {
+      if(mandatory)return false
+      continue
+    }
+    const {cx,cy}=pick(sites)
+    for(let y=cy-cfg.roomRadius;y<=cy+cfg.roomRadius;y++)
+      for(let x=cx-cfg.roomRadius;x<=cx+cfg.roomRadius;x++)
+        cm[y][x]=Math.max(Math.abs(x-cx),Math.abs(y-cy))<=cfg.waterRadius
+          ? 'water' : 'cavefloor2'
+    level.mineFloorTiles=cm.flat().filter(tile=>tile==='cavefloor2').length
+  }
+  return true
+}
+
 function placeDwarvenMinePickaxe(ruins) {
   const floor=ruins[Math.max(0,ruins.length-2)]
   if(!floor)return false
@@ -247,6 +292,7 @@ function buildDwarvenMinesStratum() {
     mine.push(level)
   }
   if(!mineAlignCageShaft(mine))return false
+  if(!mineFloodSideChambers(mine))return false
   // 3- or 4-floor Ruins jump to z:-9 from their actual final floor.
   while(deepLevels.length<Math.abs(cfg.firstZ)-2)deepLevels.push(mineUnusedChainLevel())
   for(const level of mine)deepLevels.push(level)
@@ -274,12 +320,14 @@ function spawnDwarvenMinesEncounters() {
   for(let floorIndex=0;floorIndex<mine.length;floorIndex++){
     const {level,z}=mine[floorIndex]
     const entrances=[level.mineUpstairs,...(level.mineDownstairs?[level.mineDownstairs]:[])]
-    const candidates=[]
+    const candidates=[],floodedCandidates=[]
     for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
-      if(level.map[y][x]!=='cavefloor2'||entrances.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<=ec.entranceClearance)||
+      const terrain=level.map[y][x]
+      if(!['cavefloor2','water'].includes(terrain) || entrances.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<=ec.entranceClearance)||
          (level.mineCagePad&&Math.max(Math.abs(x-level.mineCagePad.x),
            Math.abs(y-level.mineCagePad.y))<=1))continue
-      candidates.push({x,y})
+      if(terrain==='water')floodedCandidates.push({x,y})
+      else candidates.push({x,y})
     }
     const occupiedSpots=[]
     const target=Math.min(ec.maxMonstersPerFloor,Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex]))
@@ -288,7 +336,7 @@ function spawnDwarvenMinesEncounters() {
     const placePack=(tmpl,count)=>{
       let leader=null,placed=0,coordinationPackId=null
       for(let member=0;member<count;member++){
-        const available=candidates.filter(p=>{
+        const available=(tmpl.name==='Xibal'?floodedCandidates:candidates).filter(p=>{
           if(occupiedSpots.some(o=>o.x===p.x&&o.y===p.y))return false
           if(leader&&Math.max(Math.abs(leader.x-p.x),Math.abs(leader.y-p.y))>3)return false
           if(tmpl.name==='Wyrdhag'&&occupiedSpots.some(o=>Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<ec.wyrdhagSeparation))return false
@@ -307,7 +355,7 @@ function spawnDwarvenMinesEncounters() {
           level:z,levelKind:'chain',caveIndex:-1,hp:tmpl.hp,maxHp:tmpl.hp,
           atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,grace:tmpl.grace,
           abilities:[...tmpl.abilities],humanoid:!!tmpl.humanoid,aggro:tmpl.aggro,
-          x:spot.x,y:spot.y,homeX:spot.x,homeY:spot.y,homeTileType:'cavefloor2',
+          x:spot.x,y:spot.y,homeX:spot.x,homeY:spot.y,homeTileType:level.map[spot.y][spot.x],
           alive:true,prefix:null,equipment:null,
           collectiveMindPackId:tmpl.abilities?.includes('collectiveMind') ? coordinationPackId : null,
           wallAmbushHidden:concealed,
@@ -324,7 +372,14 @@ function spawnDwarvenMinesEncounters() {
     // late creatures first appear together on floor 3, even in four-floor mines.
     let populated=0
     const guaranteedGroup=groupKeys[floorIndex]
-    if(ec.guaranteeEachSpecies && guaranteedGroup) for(const name of ec.groups[guaranteedGroup]) {
+    const required=(ec.groups[guaranteedGroup]||[]).slice()
+    // Xibal must claim a water tile before unrelated shoreline encounters can
+    // occupy every legal approach to the guaranteed flood chamber.
+    if(required.includes('Xibal')) {
+      required.splice(required.indexOf('Xibal'),1)
+      required.unshift('Xibal')
+    }
+    if(ec.guaranteeEachSpecies && guaranteedGroup) for(const name of required) {
       const tmpl=ENEMY_TEMPLATE_BY_NAME[name]
       if(!tmpl?.biomes?.includes(`z-${Math.abs(z)}`) || placePack(tmpl,1)!==1)
         throw new Error(`Dwarven Mines could not place guaranteed species: ${name} at ${z}`)
@@ -332,7 +387,11 @@ function spawnDwarvenMinesEncounters() {
     }
     while(populated<target){
       const group=selectGroup()
-      const pool=ec.groups[group].map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(t=>t&&t.biomes.includes(`z-${Math.abs(z)}`))
+      const pool=ec.groups[group].map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(t=>
+        t && t.biomes.includes(`z-${Math.abs(z)}`) && (t.name!=='Xibal'||
+          floodedCandidates.some(p=>!occupiedSpots.some(o=>
+            Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<ec.minimumSpacing ||
+            (o.name==='Wyrdhag'&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<ec.wyrdhagSeparation)))))
       if(!pool.length)break
       const tmpl=pickWeighted(pool,t=>t.rarity??1)
       const sizes=ec.packSizes[tmpl.name]

@@ -83,22 +83,22 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   assert.equal(run('enemies.filter(e=>e.collectiveMindRetreat).length'),1)
   assert.equal(run('enemies.filter(e=>e.collectiveMindPackId==="distant_pair").length'),2)
 
-  // A destroyed target pack cancels the one attempt; it cannot reselect
-  // another pack or spend the floor alert a second time.
+  // Losing the target pack stops that particular route, but the scout
+  // continues to flee and search instead of attacking immediately.
   run(`scout=enemies.find(e=>e.id===saved.enemies[0].id);
     enemies.filter(e=>e.collectiveMindPackId==='distant_pair').forEach(e=>e.alive=false);
     occupied=new Set(enemies.filter(e=>e.alive).map(e=>keyXY(e.x,e.y)))`)
-  assert.equal(run('takeCollectiveMindRetreatTurn(scout)'),false)
+  assert.equal(run('takeCollectiveMindRetreatTurn(scout)'),true)
   assert.equal(run('scout.collectiveMindRetreat'),null)
   assert.equal(run('tryTriggerCollectiveMind(scout)'),false)
 
-  // An invalid route also ends the intention. No new target group is chosen.
+  // An invalid route cancels the destination, never the scout's flight.
   run(`scout.collectiveMindRetreat={groupId:'near_solo',allyIds:[solo.id]};
     solo=enemies.find(e=>e.collectiveMindPackId==='near_solo');
     for(const [dx,dy] of DIRS8)map[solo.y+dy][solo.x+dx]='cavewall';
     map[solo.y][solo.x]='grass';
     occupied=new Set(enemies.filter(e=>e.alive).map(e=>keyXY(e.x,e.y)))`)
-  assert.equal(run('takeCollectiveMindRetreatTurn(scout)'),false)
+  assert.equal(run('takeCollectiveMindRetreatTurn(scout)'),true)
   assert.equal(run('scout.collectiveMindRetreat'),null)
 
   // A separate floor retains its own independent once-only alert flag.

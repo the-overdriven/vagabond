@@ -68,5 +68,26 @@ const snapshot=value=>JSON.parse(JSON.stringify(value))
   assert.equal(run('allyA.alarmed'),true,'returning restores a permanent alert')
   assert.equal(run('rngState'),securedRng)
   assert.equal(run('collectiveMindFloors[collectiveMindFloorKey(allyA)].secured'),true)
+
+  // A singleton scout has no group to seek. It must flee rather than attack;
+  // a new, reachable pack can later become its regrouping destination.
+  run(`loadGameFromObject(fixture,{isReplayInit:true});
+    collectiveMindFloors={};enemies=[];occupied=new Set();
+    player.x=40;player.y=40;
+    for(let y=30;y<=65;y++)for(let x=30;x<=65;x++)map[y][x]='grass';
+    scout=createNaledi(42,40,'loner-pack');
+    occupied=new Set([keyXY(scout.x,scout.y)]);
+    tryTriggerCollectiveMind(scout);
+    previousDistance=Math.max(Math.abs(scout.x-player.x),Math.abs(scout.y-player.y));
+    moved=takeCollectiveMindRetreatTurn(scout)`)
+  assert.equal(run('moved'),true,'a scout with no target spends its action fleeing')
+  assert.equal(run('scout.collectiveMindRetreat'),null)
+  assert(run('Math.max(Math.abs(scout.x-player.x),Math.abs(scout.y-player.y))>previousDistance'),
+    'search movement must increase distance from the player')
+  run(`allyA=createNaledi(55,44,'new-pack');
+    occupied.add(keyXY(allyA.x,allyA.y));
+    takeCollectiveMindRetreatTurn(scout)`)
+  assert.equal(run('scout.collectiveMindRetreat.groupId'),'new-pack',
+    'a lone scout can choose a pack that becomes reachable later')
   console.log('PASS Collective Mind persistence: scout alive, pre-regroup death, secure regroup, travel, save/replay')
 })().catch(err=>{console.error(err.stack);process.exitCode=1})

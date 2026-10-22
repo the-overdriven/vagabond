@@ -5777,7 +5777,7 @@ more difficult:
         if (takeFearTurn(e)) return
         continue
       }
-      if (e.collectiveMindRetreat && takeCollectiveMindRetreatTurn(e)) continue
+      if (collectiveMindSearchingScout(e) && takeCollectiveMindRetreatTurn(e)) continue
       const hiddenFromEnemy = playerHiddenFromEnemy(e)
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue

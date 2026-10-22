@@ -42,6 +42,24 @@ describe('Naledi scout alert lifecycle',()=>{
           currentZ=-1;updateAlarmedEnemies()
           currentZ=0;updateAlarmedEnemies()
           check(ally.alarmed,'secured floor alert survives scout death and level travel')
+
+          // A lone scout also spends its turns fleeing, not attacking, and
+          // can adopt a newly reachable group later.
+          enemies=[];occupied=new Set();collectiveMindFloors={}
+          player.x=40;player.y=40
+          const lone=create(42,40,'alone')
+          occupied.add(keyXY(lone.x,lone.y))
+          check(tryTriggerCollectiveMind(lone),'lone scout starts a broadcast')
+          const before=Math.max(Math.abs(lone.x-player.x),Math.abs(lone.y-player.y))
+          check(takeCollectiveMindRetreatTurn(lone),'lone scout consumes a searching turn')
+          check(Math.max(Math.abs(lone.x-player.x),Math.abs(lone.y-player.y))>before,
+            'scout runs away from the player')
+          check(!lone.collectiveMindRetreat,'no non-existent group was invented')
+          const group=create(55,44,'new-group')
+          occupied.add(keyXY(group.x,group.y))
+          check(takeCollectiveMindRetreatTurn(lone),'a new group can be pursued')
+          check(lone.collectiveMindRetreat?.groupId==='new-group',
+            'searching changes to real group retreat when reachable')
         })()`)
         delete win.__nalediAlertSave
       })

@@ -1562,7 +1562,14 @@
         "minAlternateRouteSaving": 8,
         "minStairWalkingDistance": 30,
         "floorGenerationRetries": 12,
-        "edgeMargin": 4
+        "edgeMargin": 4,
+        "floodedSideChambers": {
+          "guaranteedFloor": 3,
+          "optionalChance": 0.35,
+          "roomRadius": 3,
+          "waterRadius": 1,
+          "protectedClearance": 6
+        }
       },
       "encounters": {
         "guaranteeEachSpecies": true,
