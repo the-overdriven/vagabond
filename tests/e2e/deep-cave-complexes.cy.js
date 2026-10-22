@@ -38,7 +38,7 @@ describe('Deep cave complexes and persistent topology',()=>{
       const before=JSON.stringify({map:level.map,caves:level.caves,links:level.links,
         complexes:level.complexes,territories:level.territories,rng:rngState});
       const save=structuredClone(buildSaveObject());
-      if(save.version!==103)throw Error('expected current water-connector save schema');
+      if(save.version!==self.VAGABOND_SAVE_VERSION)throw Error('expected current water-connector save schema');
       loadGameFromObject(save,{isReplayInit:true});
       const after=deepLevels[0];
       if(before!==JSON.stringify({map:after.map,caves:after.caves,links:after.links,

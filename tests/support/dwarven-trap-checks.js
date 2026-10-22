@@ -143,10 +143,11 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
   applyWorldTraits(traits.map(name=>{const t=structuredClone(WORLD_TRAITS.find(t=>t.name===name));t.effects.forEach(e=>{if(Array.isArray(e.value))e.value=(e.value[0]+e.value[1])/2});return t}))
   const cfg=WORLD_GEN_CONFIG.dungeons.dwarvenRuins,range=cfg.levelCountRange
   cfg.levelCountRange=[count,count];WORLD_SEED=seed;rngState=seed;await generateNewWorld()
-  const summarize=()=>JSON.stringify(deepLevels.slice(2).map(l=>({terrain:encodeTileGrid(l.map,'#'),traps:l.traps})))
+  const ruins=()=>deepLevels.filter(l=>l.dungeonPackage==='dwarvenRuins')
+  const summarize=()=>JSON.stringify(ruins().map(l=>({terrain:encodeTileGrid(l.map,'#'),traps:l.traps})))
   const original=summarize()
-  check(deepLevels.length-2===count,'requested ruins floor count')
-  for(let i=2;i<deepLevels.length;i++){
+  check(ruins().length===count,'requested ruins floor count')
+  for(let i=2;i<2+ruins().length;i++){
     const l=deepLevels[i],z=chainZForDepth(i+2),entry=l.caves[0].entrances[0]
     check(l.traps.length>=2&&l.traps.length<=4,'configured trap count')
     check(new Set(l.traps.map(t=>t.type)).size===2,'both trap types generated')
@@ -178,6 +179,6 @@ async function trapGenerationChecks(seed=12345,count=3,traits=[]) {
   WORLD_SEED=seed;rngState=seed;await generateNewWorld();check(summarize()===original,'same seed reproduces mechanisms and terrain')
   const save=JSON.parse(JSON.stringify(buildSaveObject()));loadGameFromObject(save,{isReplayInit:true});check(summarize()===original,'all mechanisms survive save')
   cfg.levelCountRange=range
-  return {seed,count,traps:deepLevels.slice(2).map(l=>l.traps.length)}
+  return {seed,count,traps:ruins().map(l=>l.traps.length)}
 }
 module.exports={trapCornerChecks,trapFixture,trapRuleChecks,trapPersistenceChecks,trapGenerationChecks}

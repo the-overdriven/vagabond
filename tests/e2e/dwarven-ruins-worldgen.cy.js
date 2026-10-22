@@ -286,7 +286,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(TILE_DESC.dwarvenminessealed.includes('collapsed mine stairway'), 'renamed mine stairway description')
         check(enterCave() === true && currentZ === sealedZ && map === finalLevel.map,
           'sealed Deep Mines continuation is inspectable but does not change depth')
-        check(document.getElementById('logpanel').textContent.includes('collapsed mine stairway'), 'renamed mine stairway inspection')
+        check(document.getElementById('logpanel').textContent.includes('A pickaxe might clear the way.'), 'sealed mine passage requires a pickaxe')
 
         check(TILE.dwarvenstairsup.ch === '<' && TILE.dwarvenstairsdown.ch === '>', 'ASCII stair glyphs')
         check(TILE.dwarvenminessealed.ch === 'X', 'ASCII sealed-continuation glyph')
