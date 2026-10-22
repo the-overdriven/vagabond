@@ -316,9 +316,11 @@ function buildDwarvenMinesStratum() {
 function spawnDwarvenMinesEncounters() {
   const cfg=minePackageConfig(),ec=cfg.encounters
   const groupKeys=['early','middle','late']
+  const prefixNames=Object.keys(ENEMY_PREFIXES).filter(name=>name!=='Champion')
   const mine=dungeonPackageLevels('dwarvenMines')
   for(let floorIndex=0;floorIndex<mine.length;floorIndex++){
     const {level,z}=mine[floorIndex]
+    const prefixChance=Math.min(ec.prefixChanceCap,ec.prefixBaseChance+floorIndex*ec.prefixGrowthPerFloor)
     const entrances=[level.mineUpstairs,...(level.mineDownstairs?[level.mineDownstairs]:[])]
     const candidates=[],floodedCandidates=[]
     for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
@@ -351,7 +353,7 @@ function spawnDwarvenMinesEncounters() {
         const spot=pick(wallSites.length?wallSites:available)
         leader||=spot
         const concealed=wallSites.length>0
-        const enemy=addEnemy({name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier,
+        const enemy={name:tmpl.name,baseName:tmpl.name,tier:tmpl.tier,
           level:z,levelKind:'chain',caveIndex:-1,hp:tmpl.hp,maxHp:tmpl.hp,
           atk:tmpl.atk,def:tmpl.def,spd:tmpl.spd,grace:tmpl.grace,
           abilities:[...tmpl.abilities],humanoid:!!tmpl.humanoid,aggro:tmpl.aggro,
@@ -359,7 +361,16 @@ function spawnDwarvenMinesEncounters() {
           alive:true,prefix:null,equipment:null,
           collectiveMindPackId:tmpl.abilities?.includes('collectiveMind') ? coordinationPackId : null,
           wallAmbushHidden:concealed,
-          wallAmbushSpent:tmpl.abilities?.includes('wallAmbush') && !concealed})
+          wallAmbushSpent:tmpl.abilities?.includes('wallAmbush') && !concealed}
+        prepareEnemyEquipment(enemy)
+        if(prefixNames.length && chance(prefixChance)){
+          const prefix=pick(prefixNames)
+          enemy.prefix=prefix
+          enemy.prefixBase=prefixBaseStats(enemy)
+          applyEnemyPrefix(enemy,prefix)
+          enemy.name=prefix+' '+enemy.name
+        }
+        addEnemy(enemy)
         if(tmpl.abilities?.includes('collectiveMind') && !coordinationPackId)
           coordinationPackId=enemy.id
         occupiedSpots.push({...spot,name:tmpl.name,id:enemy.id})

@@ -2548,8 +2548,12 @@ still use the usual weighted groups and packs. Monster stats, rarity, existing
 abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
 abilities listed in **Enemy Special Properties** are active. No species
 receives an unimplemented ability string.
-All 19 are classified as non-humanoid, so they follow normal XP, rare artifact
-loot and Bestiary kill-count rules, but do not carry humanoid equipment drops.
+Mine encounters use the ordinary non-Champion prefix and humanoid-equipment
+systems. Among the mine roster, **Wyrdhag, Naledi, Troglodyte, and Cave Troll**
+are humanoids; the others remain non-humanoid. Equipped humanoids gain normal
+gear stat effects and drop their worn gear on death. All retain normal XP,
+artifact-loot, and Bestiary rules. The ordinary surface and cave spawn pools
+are unaffected.
 
 **Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower
 cage is directly below it on the final generated floor (z:-11 or z:-12). Both begin locked. The
@@ -4117,7 +4121,10 @@ Approximately **5% of normal enemy spawns** receive a prefix. Scenario-spawned
 z:-1 cave enemies use the same **5%** chance. Scenario-spawned generic z:-2 cave
 enemies use an increased **11%** prefix chance. Dedicated story/fort population
 keeps its own spawn rules unless explicitly routed through the normal prefix
-roll.
+roll. Dwarven Mines use their own random non-Champion prefix chance: **11%**
+on mine floor 1, increasing by **2.5 percentage points per floor** (13.5%,
+16%, then 18.5% on an optional fourth floor), capped at **28%**. They do not
+receive the Ruins' guaranteed Champions.
 
 Current prefixes:
 
@@ -5512,6 +5519,11 @@ A Scroll of Identification reveals:
 - stats
 - description
 - owner/lore information
+
+While God Mode is active, the player can identify artifacts without consuming
+or possessing a Scroll of Identification. Identification otherwise follows the
+ordinary item-use turn and replay rules. The bypass ends when God Mode is
+disabled; identified items stay identified.
 
 ---
 
@@ -7770,6 +7782,8 @@ exclusion. Once enabled, God Mode makes the player invisible. Pressing
 restrictions and drowning. Revealed maps and granted stats/gold remain.
 Enabling God Mode also permanently teaches the character **Tracking** using
 the same learned-skill flag as the Old Hunter. This persists in saves/replay.
+It also permits artifact identification without a Scroll of Identification,
+while preserving the ordinary identification turn and saved item state.
 Holding the key does not trigger repeated toggles. The key press is a replay
 action; older recordings that toggled only god-mode invisibility still replay
 with their original behavior. The visibility flag is saved; older god mode

@@ -1,10 +1,13 @@
 describe('Guaranteed Dwarven Throne Hall geometry', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Throne Hall Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
-    cy.get('#raceOverlay', {timeout: 90000}).should('not.have.class', 'show')
+    // Each case below generates and validates its own fixed-seed world.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__throneBootstrapSave=save
+      win.eval(`loadGameFromObject(window.__throneBootstrapSave,{isReplayInit:true})`)
+      delete win.__throneBootstrapSave
+      win.eval(`raceOpen=false;document.getElementById('raceOverlay').classList.remove('show')`)
+    }))
   })
 
   for (const seed of [610061, 610062, 610063]) {

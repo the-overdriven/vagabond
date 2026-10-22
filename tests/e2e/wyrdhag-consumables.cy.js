@@ -13,7 +13,7 @@ describe('Wyrdhag consumable healing and individual monster loot', () => {
       for(let yy=35;yy<=45;yy++)for(let xx=35;xx<=45;xx++)map[yy][xx]='grass'
       player.x=40;player.y=40;player.invisibleTurns=0;player.godMode=false
       spawnPoint={x:4,y:4}
-      const e=addEnemy({...t,name:t.name,baseName:t.name,x,y,level:0,levelKind:'chain',
+      const e=addEnemy({...t,name:t.name,baseName:t.name,x,y,level:0,levelKind:null,
         caveIndex:-1,hp:30,maxHp:68,alive:true,aware:true,homeX:x,homeY:y})
       occupied.add(keyXY(x,y))
       check(enemyHasAbility(e,'flee') && enemyHasAbility(e,'consumeHealingItem'),'both abilities present')

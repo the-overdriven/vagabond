@@ -56,7 +56,7 @@
       "extraTiles": 2,
       "damageMultiplier": 1.25,
       "cooldownTurns": 5,
-      "warningMessage": "The ground buckles around you! Move away from the marked stones!",
+      "warningMessage": "The ground buckles around you! Mind the cracks!",
       "hitMessage": "The <enemy>'s eruption hits you for <damage> damage!",
       "missMessage": "The <enemy>'s eruption tears through empty ground."
     },

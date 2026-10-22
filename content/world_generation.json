@@ -1573,6 +1573,9 @@
       },
       "encounters": {
         "guaranteeEachSpecies": true,
+        "prefixBaseChance": 0.11,
+        "prefixGrowthPerFloor": 0.025,
+        "prefixChanceCap": 0.28,
         "tilesPerMonster": [80, 60, 50, 45],
         "entranceClearance": 8,
         "minimumSpacing": 2,

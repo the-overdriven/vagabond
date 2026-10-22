@@ -1,10 +1,12 @@
 describe('Low-HP enrage', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Rush Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__enrageBootstrapSave=save
+      win.eval(`loadGameFromObject(window.__enrageBootstrapSave,{isReplayInit:true})`)
+      delete win.__enrageBootstrapSave
+      win.eval(`raceOpen=false;document.getElementById('raceOverlay').classList.remove('show')`)
+    }))
     cy.window().then(win => win.eval(`(() => {
       window.rushCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}
       replayRecording=false; replayPlaying=false; replayData=null; replayAnimationsDisabled=true

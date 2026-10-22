@@ -75,8 +75,8 @@ async function trapRuleChecks() {
   const monster=abilities=>({id:'enemy_1',name:'Goblin',baseName:'Goblin',hp:100,maxHp:100,atk:2,def:1,spd:1,grace:2,aggro:2,tier:2,abilities,level:-4,levelKind:'chain',x:11,y:12,alive:true,wander:false,humanoid:true})
   for(const abilities of [[],['fly'],['ethereal']]){
     const e=monster(abilities);enemies=[e];finishEnemyMove(e,10,12)
-    check(abilities.includes('ethereal') ? e.hp===100 : e.hp<100,
-      'ethereal creatures ignore spikes; ordinary and flying enemies are hit')
+    check(abilities.includes('ethereal') || abilities.includes('fly') ? e.hp===100 : e.hp<100,
+      'ethereal and flying creatures ignore spikes; ground-bound enemies are hit')
   }
   // The arrow must phase through a ghost and continue to a physical target.
   // Do this below using the normal projectile path, not a direct hit shortcut.
@@ -114,7 +114,7 @@ async function trapRuleChecks() {
   check(!UndergroundFov.canSee(map,8,12,10,12),'emitter retains wall sight blocking')
   check(!DungeonTraps.safeSpawn(15,12,-4)&&!DungeonTraps.safeSpawn(17,12,-4)&&DungeonTraps.safeSpawn(18,12,-4),'spawn exclusion radius')
   rng=oldRng
-  return {movement:true,forced:true,flyingHitEtherealImmune:true,noKillCredit:true,projectileBlocking:true,pathfinding:true,fov:true}
+  return {movement:true,forced:true,airborneAndEtherealImmune:true,noKillCredit:true,projectileBlocking:true,pathfinding:true,fov:true}
 }
 
 async function trapPersistenceChecks() {

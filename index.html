@@ -2229,16 +2229,18 @@ more difficult:
     if (!it || it.kind !== 'artifact' || it.identified) return
     if (!canUseItemsWhileSwimming()) return
     const scroll = player.inventory.find(i => i.kind === 'idscroll')
-    if (!scroll) {
+    if (!scroll && !player.godMode) {
       log(`The moment you take it in your hands, you can tell this isn't an ordinary ${it.noun.toLowerCase()}. It feels different somehow, but you can't tell why. You'll need a Scroll of Identification to make sense of this.`, 'info')
       return
     }
     ensureReplayItemIds()
     recordReplayAction({type:'useItem', action:'identifyArtifact', idx, replayId:it.replayId})
-    scroll.count = (scroll.count || 1) - 1
-    if (scroll.count <= 0) {
-      const scrollIdx = player.inventory.indexOf(scroll)
-      if (scrollIdx >= 0) player.inventory.splice(scrollIdx, 1)
+    if (!player.godMode) {
+      scroll.count = (scroll.count || 1) - 1
+      if (scroll.count <= 0) {
+        const scrollIdx = player.inventory.indexOf(scroll)
+        if (scrollIdx >= 0) player.inventory.splice(scrollIdx, 1)
+      }
     }
     it.identified = true
     // Identification itself must not regenerate already-created artifact lore.
@@ -10948,7 +10950,7 @@ more difficult:
         if (!it.identified) {
           const btn = document.createElement('button')
           btn.textContent = '?'
-          btn.title = 'Identify (requires a Scroll of Identification)'
+          btn.title = player.godMode ? 'Identify (free in God Mode)' : 'Identify (requires a Scroll of Identification)'
           btn.onclick = () => {
             identifyArtifact(idx)
           }

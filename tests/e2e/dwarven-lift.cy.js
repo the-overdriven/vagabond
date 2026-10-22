@@ -1,11 +1,14 @@
 describe('Dwarven Ruins shortcut lift', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Dwarven Lift Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
-    cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
+    // This spec generates its own fixed-seed worlds. Bootstrap the runtime from
+    // the fixture without generating an unrelated random world first.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__liftBootstrapSave=save
+      win.eval(`loadGameFromObject(window.__liftBootstrapSave,{isReplayInit:true})`)
+      delete win.__liftBootstrapSave
+      win.eval(`raceOpen=false;document.getElementById('raceOverlay').classList.remove('show')`)
+    }))
   })
 
   it('places a seeded D1-to-deeper lift in the configured range and powers it from the deeper lever', () => {
