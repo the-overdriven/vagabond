@@ -4282,6 +4282,12 @@ The default aggro range is:
 
 On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary or due to a large speed disadvantage. Losing range ends active pursuit; the existing Alarmed status expires independently under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
+Movement occupancy is scoped to the currently active map (current z level), 
+including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
+blocking each other's paths; same-floor creatures still block movement. 
+The active occupancy set is rebuilt after world generation, floor changes, and
+save/replay restoration without consuming RNG.
+
 Any enemy that attacks the player becomes aggroed (shown as a red border
 around the enemy) in the same turn, even if the enemy's aggro range is very
 low (e.g. 1) and it was already standing adjacent to the player before ever
@@ -4720,7 +4726,7 @@ Every successful player or monster attack has a chance to become a critical hit.
 Current chances:
 
 ```text
-Player: 5% normally; 25% when invisible against a non-Alarmed enemy without trueSight
+Player: 5% normally; 25% when invisible against a non-Alarmed enemy without trueSight or blind
 Normal monster: 5%
 Fierce monster: 10%
 Deadly monster: 15%
@@ -4731,7 +4737,7 @@ Deadly monster: 15%
 (the last remains the Deadly-specialist chance).
 
 The invisibility bonus is **+20 percentage points**, assessed before the hit alarms
-the target. TrueSight enemies are immune. After Alarmed resets, an invisible
+the target. Enemies with `trueSight` or `blind` are immune. After Alarmed resets, an invisible
 attacker can gain the bonus again. Misses and glancing blows retain their usual
 rules; successful criticals use the existing feedback.
 
@@ -5957,9 +5963,9 @@ Wyrdling increases the duration by 25%: 20 turns become 25 turns. Reading
 the scroll consumes the first turn, leaving 19 or 24 subsequent turns,
 respectively.
 
-While invisible, enemies without `trueSight` never acquire or chase the player and continue to
-wander normally. The following hit reactions apply to those enemies; Oculus
-uses ordinary combat. A hit on a surviving enemy, even a zero-damage glancing hit,
+While invisible, enemies without `trueSight` or `blind` never acquire or chase the player and continue to
+wander normally. The following hit reactions apply to those enemies; Oculus and
+blind monsters use ordinary combat. A hit on a surviving enemy, even a zero-damage glancing hit,
 provokes exactly one immediate reaction instead of that enemy's wander action
 for the turn. A miss causes no reaction; evasive enemies cannot use their
 special dodge against an invisible attacker. An enemy killed by the attack

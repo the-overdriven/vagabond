@@ -927,7 +927,6 @@ function loadGameFromObject(data, opts = {}) {
   nextEnemyId = Math.max(nextEnemyId, data.nextEnemyId || 1)
   // Burrowed monsters exist only in their pending ability state until they
   // emerge. Loading a save must not reserve their former or off-map tile.
-  for (const e of enemies) if (e.pendingAbility?.type !== 'burrow') occupied.add(keyXY(e.x, e.y))
 
   if (Array.isArray(data.npcs)) {
     npcs = data.npcs.map(n => {
@@ -955,10 +954,12 @@ function loadGameFromObject(data, opts = {}) {
         talkFreezeTurns: Number.isFinite(n.talkFreezeTurns) ? Math.max(0, n.talkFreezeTurns | 0) : 0,
       }
     })
-    for (const n of npcs) occupied.add(keyXY(n.x, n.y))
   } else {
     throw new Error('Save data is missing NPC state.')
   }
+  // Restore occupancy from the active map only; an enemy on another floor
+  // must not block pathfinding here simply because it shares coordinates.
+  rebuildActiveLevelOccupancy()
   if (treasureMapUnearthed) completeTreasureMapBurial()
   if (bellRung) {
     const lich = npcs.find(n => n.name === 'Ancient Lich')

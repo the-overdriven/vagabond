@@ -74,7 +74,7 @@
   {"name": "ASHFANG",       "rarity": 0.02, "ultraRare": true, "hp": 160, "atk": 10, "def": 3, "spd": 6, "grace": 4, "tier": 4, "aggro": 4, "biomes": ["sand","hill","cave","lava"],    "humanoid": false, "wander": "far",            "abilities": []},
   {"name": "MIREHOWL",      "rarity": 0.02, "ultraRare": true, "hp": 150, "atk": 9,  "def": 2, "spd": 7, "grace": 4, "tier": 4, "aggro": 4, "biomes": ["river","forest"],               "humanoid": false, "wander": "far",            "abilities": []},
   {"name": "NHALUUN",       "rarity": 0.02, "ultraRare": true, "hp": 185, "atk": 15, "def": 3, "spd": 6, "grace": 4, "tier": 4, "aggro": 3, "biomes": ["snow","cave"],                  "humanoid": false, "wander": "far",            "abilities": ["evades"]},
-  {"name":"Glaber","rarity":1.0,"hp":100,"atk":12,"def":5,"spd":5,"grace":2,"tier":3,"aggro":3,"biomes":["z-9"],"humanoid":false,"wander":"homeReanchored","abilities":["enrage"]},
+  {"name":"Glaber","rarity":1.0,"hp":100,"atk":12,"def":5,"spd":5,"grace":2,"tier":3,"aggro":3,"biomes":["z-9"],"humanoid":false,"wander":"homeReanchored","abilities":["blind","enrage"]},
   {"name":"Marsutal","rarity":1.0,"hp":95,"atk":14,"def":6,"spd":5,"grace":2,"tier":4,"aggro":2,"biomes":["z-9"],"humanoid":false,"wander":"homeReanchored","abilities":["blind","burrow"]},
   {"name":"Duiwel","rarity":0.5,"hp":150,"atk":16,"def":6,"spd":2,"grace":1,"tier":5,"aggro":2,"biomes":["z-9"],"humanoid":false,"wander":"homeReanchored","abilities":["blind","rupture"]},
   {"name":"Trogloraptor","rarity":1.0,"hp":90,"atk":15,"def":4,"spd":7,"grace":5,"tier":4,"aggro":4,"biomes":["z-9"],"humanoid":false,"wander":"homeReanchored","abilities":["wallAmbush"]},

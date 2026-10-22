@@ -1417,6 +1417,19 @@ more difficult:
     return level === 0 ? currentZ === 0 : currentZ === level
   }
 
+  // World generation temporarily uses `occupied` across its placement passes.
+  // During play it must describe only actors on the active map: two creatures
+  // on different floors may legitimately stand at the same x/y coordinates.
+  function rebuildActiveLevelOccupancy() {
+    const active = new Set()
+    for (const e of enemies) {
+      if (e.alive && onCurrentLevel(e) && e.pendingAbility?.type !== 'burrow')
+        active.add(keyXY(e.x,e.y))
+    }
+    if (currentZ === 0) for (const n of npcs) active.add(keyXY(n.x,n.y))
+    occupied = active
+  }
+
   function enterMausoleum() {
     const hut = villageHuts.find(h => h.mausoleum)
     if (currentZ === 0 && isMausoleumDiscovered && hut && player.x === hut.x && player.y === hut.y) {
@@ -1589,8 +1602,10 @@ more difficult:
     updateHud()
     return true
     } finally {
-      if(currentZ!==departureZ || currentLevelKind()!==departureKind)
+      if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
         cancelPreparedEnemyAbilitiesOutsideFloor()
+        rebuildActiveLevelOccupancy()
+      }
     }
   }
 
@@ -4534,6 +4549,7 @@ more difficult:
     currentCave = -1
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
+    rebuildActiveLevelOccupancy()
     player.x = spawnPoint.x
     player.y = spawnPoint.y
     clearSpiderWeb()
@@ -4617,6 +4633,7 @@ more difficult:
     currentCave = -1
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
+    rebuildActiveLevelOccupancy()
     reusingWorldAfterPermadeath = true
     oldHunterQuest = null
 
@@ -12209,6 +12226,7 @@ more difficult:
     invalidateUndergroundFov()
     minimapDirty = true
     cancelPreparedEnemyAbilitiesOutsideFloor()
+    rebuildActiveLevelOccupancy()
     render()
     updateHud()
     updateTooltip()
@@ -12641,6 +12659,7 @@ more difficult:
       invalidateUndergroundFov()
       rebuildMinimapBases()
       ensureMerchantStock()
+      rebuildActiveLevelOccupancy()
       stopDeathTransition()
       stopAttackAnimation()
       snapCameraToPlayer()
