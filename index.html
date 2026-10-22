@@ -218,17 +218,19 @@ more difficult:
     @keyframes loading-spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .loading-skull { animation-duration: 12s; } }
 
-    /* Rupture shakes the whole playfield when the warned ground erupts. */
-    #stage.rupture-shake { animation: rupture-shake 300ms ease-out; }
-    @keyframes rupture-shake {
-      0%, 100% { transform: translate(0, 0); }
-      15% { transform: translate(4px, -2px); }
-      32% { transform: translate(-5px, 3px); }
-      50% { transform: translate(3px, 2px); }
-      68% { transform: translate(-2px, -2px); }
-      85% { transform: translate(1px, 1px); }
+    /* Move the actual game canvas, not the full-screen stage behind the HUD.
+       CSS translate composes with the canvas's desktop centering transform. */
+    #stage.rupture-shake > canvas#game { animation: rupture-canvas-shake 520ms linear; }
+    @keyframes rupture-canvas-shake {
+      0%, 100% { translate: 0 0; }
+      14% { translate: 12px -6px; }
+      28% { translate: -14px 8px; }
+      44% { translate: 10px 5px; }
+      60% { translate: -8px -5px; }
+      78% { translate: 5px 3px; }
+      90% { translate: -2px 1px; }
     }
-    @media (prefers-reduced-motion: reduce) { #stage.rupture-shake { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { #stage.rupture-shake > canvas#game { animation: none; } }
 
     .invitem .item-icon {
       flex: 0 0 auto;
@@ -9812,10 +9814,10 @@ more difficult:
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'lowHpTeleport') ? `<div class="pfx">Low-HP Teleport · ${e.lowHpTeleportUsed ? 'used' : 'ready below 25% HP'}</div>` : ''}
-      ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP, nearby monster</div>' : ''}
+      ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP</div>' : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
-      ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind · senses invisible targets · hesitant pursuit</div>' : ''}
+      ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind</div>' : ''}
       ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
@@ -12151,6 +12153,7 @@ more difficult:
     player.baseSpd = 50
     player.baseMf = 25
     player.godMode = true
+    player.trackingLearned = true
     resetSwimming()
     player.godInvisible = true
     player.gold = 500

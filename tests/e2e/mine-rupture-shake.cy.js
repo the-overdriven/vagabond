@@ -1,5 +1,5 @@
 describe('Duiwel Rupture presentation',()=>{
-  it('shakes the playfield on eruption but not during replay simulation',()=>{
+  it('shakes the visible game canvas on eruption but not during replay simulation',()=>{
     cy.visit('/')
     cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
     cy.readFile('tests/saves/Tester_start.json').then(save=>{
@@ -9,6 +9,7 @@ describe('Duiwel Rupture presentation',()=>{
           loadGameFromObject(window.__ruptureSave,{isReplayInit:true})
           const check=(ok,msg)=>{if(!ok)throw Error(msg)}
           const stage=document.getElementById('stage')
+          const gameCanvas=stage.querySelector('canvas#game')
           const originalVisible=enemyIsVisibleOnMainView
           try {
             enemyIsVisibleOnMainView=()=>false
@@ -17,8 +18,9 @@ describe('Duiwel Rupture presentation',()=>{
             const hp=player.hp,random=rngState
             resolveEnemyRupture({name:'Duiwel'},{tiles:[{x:39,y:39}]})
             check(stage.classList.contains('rupture-shake'),'miss triggers shake')
-            check(getComputedStyle(stage).animationName.includes('rupture-shake'),
-              'playfield has the shake animation in the browser')
+            if(!matchMedia('(prefers-reduced-motion: reduce)').matches)
+              check(getComputedStyle(gameCanvas).animationName.includes('rupture-canvas-shake'),
+                'visible game canvas has the shake animation in the browser')
             check(player.hp===hp && rngState===random,'cosmetic miss changes no rules')
             replayAnimationsDisabled=true
             stage.classList.remove('rupture-shake')

@@ -42,8 +42,16 @@ const {run,context} = require('./helpers/node-game-runtime.cjs')
   run('ordinary={abilities:[],alarmed:false}')
   assert(run('playerHiddenFromEnemy(ordinary)'),'ordinary monster remains blind to invisibility')
   assert.equal(run('playerCriticalHitChance(ordinary)'),run('BASE_CRIT_CHANCE+0.20'))
-  run('enemyFindStep=()=>({x:38,y:40});enemyIsVisibleOnMainView=()=>false;chance=()=>true')
+  run(`for(let y=39;y<=41;y++)for(let x=39;x<=41;x++)map[y][x]='grass';
+    enemyFindStep=()=>({x:38,y:40});enemyIsVisibleOnMainView=()=>false;chance=()=>true`)
   assert(run('blindPursuitHesitates(blind,3)'),'blind hesitation is reused by any monster with the ability')
+  run(`for(const [dx,dy] of DIRS8)map[40+dy][40+dx]='dwarvenwall';
+    map[40][39]='grass';map[41][40]='grass'`)
+  assert(!run('blindPursuitHesitates(blind,3)'),
+    'blind pursuit never hesitates when only two adjacent player tiles are walkable')
+  run("map[39][40]='grass'")
+  assert(run('blindPursuitHesitates(blind,3)'),
+    'blind pursuit can hesitate again when three adjacent tiles are walkable')
   assert(!run('blindPursuitHesitates(ordinary,3)'),'ordinary pursuit does not use blind hesitation')
   console.log('PASS generic mine abilities: root flavors/cooldown/save/replay, blind sensing/crit/hesitation')
 })().catch(error=>{console.error(error.stack);process.exitCode=1})

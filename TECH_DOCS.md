@@ -3274,7 +3274,7 @@ without an initially unoccupied one-step escape, although other hazards,
 rooting or moving actors can subsequently block it. A caught player takes an
 ordinary damage roll with **125% of the monster's effective ATK** against the
 player's DEF, without a separate miss/critical/glancing roll. Eruption gives
-the playfield a brief visual shake whether it hits or misses; the animation
+the game canvas a pronounced visual shake whether it hits or misses; the animation
 does not affect turns, damage or replay outcomes. Resolution consumes the
 monster's action and starts **five complete subsequent active-floor turns**
 of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
@@ -3387,10 +3387,12 @@ in `content/enemy_config.json`. The active root's source and flavor persist in
 current saves and replay so struggle feedback is consistent after restoration.
 The reusable `blind` ability senses invisible players without granting a
 critical-hit bonus against them, and can hesitate instead of taking an ordinary
-pursuit step at a configurable rate outside melee range. The existing Pull
+pursuit step at a configurable rate outside melee range. Hesitation is disabled
+when **at most two** of the eight tiles adjacent to the player are walkable;
+blind monsters pursue normally in narrow passages. The existing Pull
 mechanic now supports configurable messages and visuals: a non-web grasp can
 move a player without showing spider webs or applying their separate status.
-Blind enemies are identified in inspection, and their spotting and hesitation
+Blind enemies show only the **Blind** ability label in inspection; their spotting and hesitation
 messages describe sensing rather than seeing the player.
 
 ## Defensive mine abilities (generic)
@@ -7733,6 +7735,8 @@ writes. Disabling an active God Mode needs no confirmation and cannot undo the
 exclusion. Once enabled, God Mode makes the player invisible. Pressing
 `G` again turns god mode and its invisibility off, restoring normal movement
 restrictions and drowning. Revealed maps and granted stats/gold remain.
+Enabling God Mode also permanently teaches the character **Tracking** using
+the same learned-skill flag as the Old Hunter. This persists in saves/replay.
 Holding the key does not trigger repeated toggles. The key press is a replay
 action; older recordings that toggled only god-mode invisibility still replay
 with their original behavior. The visibility flag is saved; older god mode
