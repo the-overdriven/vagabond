@@ -34,6 +34,8 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   `)
   assert(run('ENEMY_TEMPLATE_BY_NAME.Naledi.abilities.includes("collectiveMind")'))
   assert.equal(run('Object.keys(collectiveMindFloors).length'),0)
+  assert.equal(run(`collectiveMindSearchingScout({alive:true,hp:10,id:undefined,level:0,levelKind:null,caveIndex:-1})`),false,
+    'ordinary enemies without a Collective Mind floor record never become searching scouts')
   const chosen=copy(run('collectiveMindChooseGroup(scout)'))
   assert.equal(chosen.groupId,'distant_pair','a reachable two-member group beats a closer singleton')
   assert(chosen.arrival.distance>0)
@@ -135,5 +137,34 @@ const copy=value=>JSON.parse(JSON.stringify(value))
     enemyTurn()`)
   assert(run('nonvisualChases>0'),
     'a blind ally alerted by Collective Mind retains normal around-corner pursuit')
+
+  // A cornered lone scout must not spend every turn waiting while adjacent.
+  // Its alert remains unsecured, and the ordinary combat action resumes.
+  run(`loadGameFromObject(fixture,{isReplayInit:true});enemies=[];
+    occupied=new Set();collectiveMindFloors={};turnCount=500;
+    player.x=41;player.y=40;player.hp=1000;player.invisibleTurns=0;
+    for(let y=36;y<=44;y++)for(let x=37;x<=46;x++)map[y][x]='cavewall';
+    map[40][41]='grass';map[40][42]='grass';
+    cornered=makeCollective(42,40,'trapped_scout');
+    occupied=new Set([keyXY(cornered.x,cornered.y)]);
+    enemyHasSight=()=>true;enemyWander=()=>false;
+    enemyInsideSanctuary=()=>false;playerInsideSanctuary=()=>false;
+    meleeAttempts=0;enemyAttackPlayer=e=>{if(e===cornered)meleeAttempts++;return false};
+    tryTriggerCollectiveMind(cornered)`)
+  assert.equal(run('collectiveMindSearchTurn(cornered)'),false,'adjacent scout with no escape may defend itself')
+  run('enemyTurn()')
+  assert.equal(run('meleeAttempts'),1,'the normal enemy turn performs one melee attack')
+  assert.equal(run('collectiveMindFloors[collectiveMindFloorKey(cornered)].secured'),false)
+  context.corneredSave=copy(run('buildSaveObject()'))
+  const corneredRng=run('rngState')
+  run('loadGameFromObject(corneredSave,{isReplayInit:true});cornered=enemies.find(e=>e.id===corneredSave.enemies[0].id)')
+  assert.equal(run('rngState'),corneredRng,'restoring a cornered scout consumes no RNG')
+  assert.equal(run('collectiveMindSearchingScout(cornered)'),true)
+  assert.equal(run('collectiveMindSearchTurn(cornered)'),false,'cornered combat fallback survives save/replay')
+
+  // Once an escape opens, the scout resumes fleeing instead of attacking.
+  run(`map[40][43]='grass';meleeAttempts=0;enemyAttackPlayer=e=>{meleeAttempts++;return false};enemyTurn()`)
+  assert.equal(run('meleeAttempts'),0,'a mobile scout still favors escape')
+  assert.equal(run('cornered.x'),43,'search moves away through the newly opened tile')
   console.log('PASS Batch D Collective Mind: alert scope, sensory Alarmed, group preference, Jump, invalidation, save/replay')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

@@ -1,11 +1,16 @@
 describe('Vampire lifesteal and underground guarantee', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Vampire Tester')
-    cy.get('#replayToggle').check()
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.get('#loadingOverlay').should('not.be.visible')
+    // The first two tests only exercise combat formulas. Load a stable game
+    // snapshot and let the underground guarantee case generate its own seed.
+    cy.window().should(win => expect(win.eval('!!BASE_MAP_CONFIG.world?.defaultSize')).to.equal(true))
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__vampireBootstrap=save
+      win.eval('loadGameFromObject(window.__vampireBootstrap,{isReplayInit:true})')
+      delete win.__vampireBootstrap
+    }))
   })
 
   it('heals from damaging melee hits, respects rounding and missing HP', () => {
@@ -62,8 +67,13 @@ describe('Vampire lifesteal and underground guarantee', () => {
   })
 
   it('places a reachable distant underground Vampire and restores it without respawning', () => {
-    cy.window().then(win => win.eval(`(() => {
+    cy.window().then(win => win.eval(`(async () => {
       const check = (ok, message) => {if (!ok) throw new Error(message)}
+      replayRecording=false;replayPlaying=false;replayData=null
+      currentZ=0;currentCave=-1;map=surfaceMap
+      applyWorldTraits([]);WORLD_SEED=1706598071;rngState=WORLD_SEED
+      await generateNewWorld()
+      startReplayRecording()
       const areas = undergroundVampireAreas()
       const vampires = enemies.filter(e => e.alive && (e.baseName || e.name) === 'Vampire' &&
         areas.some(area => vampireEnemyInArea(e, area)))

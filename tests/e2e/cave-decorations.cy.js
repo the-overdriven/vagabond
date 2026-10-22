@@ -28,7 +28,7 @@ describe('Decorative caves and deep threat rarity', () => {
         check(['silhouette','grotto','burrow'].every(style=>deepLevels[0].caves.some(c=>c.style===style)),
           'required silhouette, grotto and burrow layouts retained')
         const lootCells=new Set()
-        const nonHealingKinds=new Set(['speedpotion','scrollOfInvisibility',...TACTICAL_CONSUMABLE_KINDS])
+        const nonHealingKinds=new Set(['speedpotion','scrollOfInvisibility','idscroll',...TACTICAL_CONSUMABLE_KINDS])
         for(const g of groundItems.filter(g=>g.kind==='chest'||g.kind==='potion'||nonHealingKinds.has(g.kind)||g.kind.startsWith('scroll'))) {
           const k=(g.level??0)+':'+(g.levelKind||((g.level??0)<0?'chain':'surface'))+':'+g.x+','+g.y
           check(!lootCells.has(k),'chests, potions and scrolls occupy distinct tiles');lootCells.add(k)

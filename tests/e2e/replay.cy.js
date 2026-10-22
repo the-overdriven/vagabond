@@ -54,9 +54,10 @@ function beginDeterministicReplayGame(name = 'Replay E2E Tester') {
         npc.talkFreezeTurns = 0
       }
 
-      occupied = new Set()
-      for (const e of enemies) if (e.alive) occupied.add(keyXY(e.x, e.y))
-      for (const npc of npcs) occupied.add(keyXY(npc.x, npc.y))
+      // Match the live game's occupancy rules: actors on other floors must
+      // not block an NPC here. Loading the snapshot rebuilds active-floor
+      // occupancy, so an all-floor test setup would replay different turns.
+      rebuildActiveLevelOccupancy()
 
       oldHunterQuest = null
       oldHunterQuestSerial = 0
@@ -135,7 +136,9 @@ function playReplayAndAssertClean() {
   cy.window({timeout: 20000}).should(win => {
     const diagnostic = win.lastReplayDiagnostic
     expect(diagnostic, 'replay diagnostic').to.be.an('object')
-    expect(diagnostic.message, 'desync marker').not.to.equal('First replay action with different RNG consumption')
+    expect(diagnostic.message,
+      `replay action ${diagnostic.actionIndex ?? '?'}: expected ${diagnostic.expectedRng ?? '?'} RNG calls, got ${diagnostic.actualRng ?? '?'}`)
+      .not.to.equal('First replay action with different RNG consumption')
     expect(diagnostic.completedActions, 'completed replay actions').to.equal(diagnostic.totalActions)
     expect(diagnostic.consumedRng, 'consumed replay RNG').to.equal(diagnostic.recordedRng)
     expect(diagnostic.remainingActions, 'remaining replay actions').to.deep.equal([])

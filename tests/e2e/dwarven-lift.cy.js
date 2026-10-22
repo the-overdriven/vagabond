@@ -1,8 +1,11 @@
 describe('Dwarven Ruins shortcut lift', () => {
   beforeEach(() => {
     cy.visit('/')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.get('#loadingOverlay').should('not.be.visible')
     // This spec generates its own fixed-seed worlds. Bootstrap the runtime from
     // the fixture without generating an unrelated random world first.
+    cy.window().should(win => expect(win.eval('!!BASE_MAP_CONFIG.world?.defaultSize')).to.equal(true))
     cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
       win.__liftBootstrapSave=save
       win.eval(`loadGameFromObject(window.__liftBootstrapSave,{isReplayInit:true})`)

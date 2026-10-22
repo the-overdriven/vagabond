@@ -106,13 +106,14 @@ function collectiveMindChooseGroup(e) {
 
 function collectiveMindSearchingScout(e) {
   const state=collectiveMindFloors[collectiveMindFloorKey(e)]
-  return e.alive && state?.scoutId===e.id && !state.secured &&
+  return !!e.alive && !!state?.spent && state.scoutId===e.id && !state.secured &&
     collectiveMindAlertActive(e)
 }
 
 function collectiveMindSearchTurn(e) {
-  // No group is reachable. The scout stays a scout, never changing straight
-  // back into melee AI. Search movement is deterministic and consumes no RNG.
+  // No group is reachable. Keep searching for one while retreat is possible;
+  // a cornered scout may defend itself through the ordinary adjacent melee AI.
+  // Search movement is deterministic and consumes no RNG.
   const currentDistance=Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
   const moves=[]
   const canEnter=(x,y)=>enemyTileOpen(e,x,y) && !DungeonHazards.isCrusherTrigger(x,y)
@@ -138,9 +139,9 @@ function collectiveMindSearchTurn(e) {
       e.collectiveMindRetreatAnnounced=true
     }
   }
-  // Cornered scouts wait rather than attack: cutting off an escape creates
-  // the promised opportunity to kill them before they reach another pack.
-  return true
+  // No legal step away from the player: allow normal combat only when the
+  // scout is adjacent. Otherwise wait and look for a group on the next turn.
+  return moves.length>0 || currentDistance>1
 }
 
 // Called by ordinary target acquisition, including nonvisual sensing.

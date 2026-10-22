@@ -12652,6 +12652,10 @@ more difficult:
       spawnEdgeHighTierChests()
       placeFisherman()
       rotateGeneratedWorld(randInt(0, 3))
+      // Some generation steps paint the active surface after its early
+      // snapshot. Keep one canonical grid even when rotation was skipped:
+      // leaving and returning to z:0 must preserve those terrain changes.
+      surfaceMap = map
       initializeDwarvenCrates()
       player.x = spawnPoint.x
       player.y = spawnPoint.y

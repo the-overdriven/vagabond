@@ -12,6 +12,7 @@ describe('Hidden god travel and Chaos across prison bars', () => {
       replayRecording=false
       const position={x:player.x,y:player.y},time=turnCount,seed=rngState
       const startingMap=map
+      check(startingMap===surfaceMap,'fresh world uses its canonical surface map')
       window.dispatchEvent(new KeyboardEvent('keydown',{key:'PageDown'}))
       check(currentZ===0,'PageDown has no effect without god mode')
       player.godMode=true
@@ -21,6 +22,7 @@ describe('Hidden god travel and Chaos across prison bars', () => {
       window.dispatchEvent(new KeyboardEvent('keydown',{key:'PageDown'}))
       check(currentZ===-2 && map===deepLevels[0].map,'second depth is z:-2')
       window.dispatchEvent(new KeyboardEvent('keydown',{key:'PageUp'}))
+      check(currentZ===-1 && map===undergroundMap,'first PageUp returns to z:-1')
       window.dispatchEvent(new KeyboardEvent('keydown',{key:'PageUp'}))
       check(currentZ===0 && map===startingMap,'PageUp returns to the surface')
       check(turnCount===time && rngState===seed,'navigation spends no turns or RNG')

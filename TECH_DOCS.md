@@ -3364,13 +3364,13 @@ members**, then the shortest legal travel path; an isolated surviving ally is
 an acceptable fallback. Equal choices use stable identifiers. The scout
 spends its actions moving toward an adjacent reachable space near those allies
 instead of attacking the player. If no separate group is reachable, it **flees
-away from the player and searches** instead, never attacking merely because
-it lacks a destination. A cornered scout waits and can be slain before
-reaching its kin. Normal movement or
+away from the player and searches** instead. If trapped adjacent to the
+player with no legal step farther away, it fights back using normal melee;
+otherwise it keeps searching rather than pursuing the player. Normal movement or
 an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
 and never grants a landing attack. A blocked route or loss of the chosen group
-ends that route; the scout searches for another reachable pack instead of
-fighting. Regrouping ends its flight. Floor alert, permanent-regrouped state,
+ends that route; the scout searches for another reachable pack, defending
+itself only if cornered. Regrouping ends its flight. Floor alert, permanent-regrouped state,
 pack identity, destination and retreat are saved and replayed independently
 of animation. Parameters and messages are configured in `enemy_config.json`.
 
@@ -7793,7 +7793,9 @@ While God Mode is active, hidden **Page Down / Page Up** controls instantly
 move to the next generated lower / higher z level without a turn or RNG roll,
 skipping non-playable depths. For example, Page Down on the surface goes from
 z:0 to z:-1. The player retains the exact same x/y coordinates, even inside
-solid rock, and can walk out through it using God Mode movement. Debug travel
+solid rock, and can walk out through it using God Mode movement. Returning to
+the surface retains the world's current terrain, including changes made while
+generating landmarks and by subsequent gameplay. Debug travel
 uses the generic depth chain, not the separate crypt map; pending warnings
 on the departed level are canceled. The action is recorded for replay, but
 does not appear in the in-game control hints.

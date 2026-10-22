@@ -1,7 +1,10 @@
 describe('Guaranteed Dwarven Throne Hall geometry', () => {
   beforeEach(() => {
     cy.visit('/')
+    cy.get('#raceOverlay .panelbox').should('be.visible')
+    cy.get('#loadingOverlay').should('not.be.visible')
     // Each case below generates and validates its own fixed-seed world.
+    cy.window().should(win => expect(win.eval('!!BASE_MAP_CONFIG.world?.defaultSize')).to.equal(true))
     cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
       win.__throneBootstrapSave=save
       win.eval(`loadGameFromObject(window.__throneBootstrapSave,{isReplayInit:true})`)

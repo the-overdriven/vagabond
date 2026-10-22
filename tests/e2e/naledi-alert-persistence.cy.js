@@ -65,4 +65,53 @@ describe('Naledi scout alert lifecycle',()=>{
       })
     })
   })
+
+  it('lets a cornered Naledi defend itself and resume fleeing when an exit opens',()=>{
+    cy.visit('/')
+    cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save=>{
+      cy.window().then(win=>{
+        win.__nalediCornerSave=save
+        win.eval(`(()=>{
+          const check=(condition,message)=>{if(!condition)throw Error(message)}
+          loadGameFromObject(window.__nalediCornerSave,{isReplayInit:true})
+          enemies=[];occupied=new Set();collectiveMindFloors={}
+          player.x=41;player.y=40;player.hp=1000;player.invisibleTurns=0
+          player.godInvisible=false;turnCount=400
+          for(let y=36;y<=44;y++)for(let x=37;x<=46;x++)map[y][x]='cavewall'
+          map[40][41]='grass';map[40][42]='grass'
+          const template=ENEMY_TEMPLATE_BY_NAME.Naledi
+          let scout=addEnemy({...template,baseName:template.name,x:42,y:40,
+            level:0,levelKind:null,hp:template.hp,maxHp:template.hp,
+            homeX:42,homeY:40,homeTileType:'grass',alive:true,
+            collectiveMindPackId:'isolated'})
+          occupied=new Set([keyXY(scout.x,scout.y)])
+          check(tryTriggerCollectiveMind(scout),'isolated scout raises the alert')
+          check(takeCollectiveMindRetreatTurn(scout)===false,
+            'adjacent scout cannot spend a turn waiting when cornered')
+          const originalAttack=enemyAttackPlayer
+          let attacks=0
+          try {
+            enemyAttackPlayer=e=>{if(e===scout)attacks++;return false}
+            enemyTurn()
+            check(attacks===1,'cornered scout attempts ordinary melee')
+            check(!collectiveMindFloors[collectiveMindFloorKey(scout)].secured,
+              'fighting back does not secure the shared alert')
+            const saved=structuredClone(buildSaveObject())
+            const randomBefore=rngState
+            loadGameFromObject(saved,{isReplayInit:true})
+            scout=enemies.find(e=>e.id===saved.enemies[0].id)
+            check(rngState===randomBefore,'save restoration consumes no RNG')
+            check(takeCollectiveMindRetreatTurn(scout)===false,
+              'saved cornered scout still defends itself')
+            map[40][43]='grass';attacks=0
+            enemyTurn()
+            check(attacks===0,'escaping scout does not attack')
+            check(scout.x===43,'scout takes an open escape route')
+          } finally { enemyAttackPlayer=originalAttack }
+        })()`)
+        delete win.__nalediCornerSave
+      })
+    })
+  })
 })
