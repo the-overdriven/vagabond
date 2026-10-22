@@ -289,9 +289,20 @@ function tryPrepareEnemyRupture(e) {
   return true
 }
 
+// Rupture feedback is presentation-only: never advance turns or consume game RNG.
+function shakeRuptureScreen() {
+  if (replayAnimationsDisabled || replaySimulationMode) return
+  const stage = document.getElementById('stage')
+  if (!stage) return
+  stage.classList.remove('rupture-shake')
+  void stage.offsetWidth // Restart the effect when several eruptions happen together.
+  stage.classList.add('rupture-shake')
+}
+
 function resolveEnemyRupture(e, pending) {
   const cfg=enemyTelegraphConfig('rupture')
   if (!cfg) return false
+  shakeRuptureScreen()
   const struck=pending.tiles.some(tile=>tile.x===player.x && tile.y===player.y)
   if (!struck) {
     if (enemyIsVisibleOnMainView(e))log(cfg.missMessage.replace(/<enemy>/g,e.name),'good')

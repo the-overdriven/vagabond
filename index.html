@@ -218,6 +218,18 @@ more difficult:
     @keyframes loading-spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .loading-skull { animation-duration: 12s; } }
 
+    /* Rupture shakes the whole playfield when the warned ground erupts. */
+    #stage.rupture-shake { animation: rupture-shake 300ms ease-out; }
+    @keyframes rupture-shake {
+      0%, 100% { transform: translate(0, 0); }
+      15% { transform: translate(4px, -2px); }
+      32% { transform: translate(-5px, 3px); }
+      50% { transform: translate(3px, 2px); }
+      68% { transform: translate(-2px, -2px); }
+      85% { transform: translate(1px, 1px); }
+    }
+    @media (prefers-reduced-motion: reduce) { #stage.rupture-shake { animation: none; } }
+
     .invitem .item-icon {
       flex: 0 0 auto;
       width: 20px;

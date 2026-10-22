@@ -2558,21 +2558,9 @@ have distinct directional tile and ASCII visuals. The endpoint coordinates,
 both tile states and the **one shared unlock flag** persist through saves and
 replay. Settings and messages are in `content/world_generation.json`.
 
-TODO: move to monster abilities
-**Rupture** is a generic telegraphed attack, currently used by Duiwel. On an
-eligible turn it has a **25%** chance to mark the player's tile and up to two
-nearby legal floor tiles, at most **four tiles** from a normally detected target.
-The marked floor is visible in tile and ASCII modes and interrupts auto-travel.
-The monster then waits for **one complete player action** before erupting;
-moving off every marked tile prevents the hit. A player is never deliberately
-left without an initially unoccupied one-step escape, although other hazards,
-rooting or moving actors can subsequently block it. A caught player takes an
-ordinary damage roll with **125% of the monster's effective ATK** against the
-player's DEF, without a separate miss/critical/glancing roll. Resolution
-consumes the monster's action and starts **five complete subsequent active-floor
-turns** of cooldown. Warnings and remaining cooldowns persist in saves/replay;
-pending attacks disappear on the caster's death or the player's departure.
-These thresholds and log messages are configurable in `enemy_config.json`.
+The mine-specific monster abilities use the generic handlers documented in
+**Enemy Special Properties**. Mine terrain and stair geometry constrain their
+legal moves and target tiles.
 
 **Burrow** is a generic repositioning action, currently used by Marsutal.
 On an eligible chase turn within **four tiles**, Blind hesitation is checked
@@ -3333,6 +3321,25 @@ Save format **25** stores each monster's abilities and restores them exactly,
 including an explicitly empty array. Replay initial states use the same save
 format; shooter role and remaining ammo continue to be separate instance state.
 Saves from previous formats are rejected; no old boolean conversion is added.
+
+## Telegraphed mine abilities
+
+**Rupture** is a generic telegraphed attack, currently used by Duiwel. On an
+eligible turn it has a **25%** chance to mark the player's tile and up to two
+nearby legal floor tiles, at most **four tiles** from a normally detected target.
+The marked floor is visible in tile and ASCII modes and interrupts auto-travel.
+The monster waits for **one complete player action** before erupting; moving
+off every marked tile prevents the hit. A player is never deliberately left
+without an initially unoccupied one-step escape, although other hazards,
+rooting or moving actors can subsequently block it. A caught player takes an
+ordinary damage roll with **125% of the monster's effective ATK** against the
+player's DEF, without a separate miss/critical/glancing roll. Eruption gives
+the playfield a brief visual shake whether it hits or misses; the animation
+does not affect turns, damage or replay outcomes. Resolution consumes the
+monster's action and starts **five complete subsequent active-floor turns**
+of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
+disappear on the caster's death or the player's departure. Thresholds and
+messages are configurable in `enemy_config.json`.
 
 ## Monster-applied status effects
 
