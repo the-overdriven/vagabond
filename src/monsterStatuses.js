@@ -3,11 +3,14 @@
 // Each status starts on the monster's action and ticks at the start of the
 // following world turns. Absolute cooldown deadlines avoid animation races.
 function applyEnemyContactStatuses(e) {
-  if (enemyHasAbility(e, 'root') && turnCount >= e.rootReadyTurn && chance(0.25)) {
-    player.rootTurns = 3
-    e.rootReadyTurn = turnCount + 6
+  if (enemyHasAbility(e, 'root') && turnCount >= e.rootReadyTurn && chance(ROOT_CONFIG.hitChance ?? 0.25)) {
+    player.rootTurns = ROOT_CONFIG.durationTurns ?? 3
+    player.rootSourceId = e.id
+    player.rootFlavor = ENEMY_TEMPLATE_BY_NAME[e.baseName || e.name]?.rootFlavor || 'generic'
+    e.rootReadyTurn = turnCount + (ROOT_CONFIG.cooldownTurns ?? 5) + 1
     clearAutoPath()
-    log(`The ${e.name}'s tendrils bind your feet!`, 'bad')
+    const messages = ROOT_CONFIG.flavors?.[player.rootFlavor] || ROOT_CONFIG.flavors?.generic
+    log((messages?.applied || 'You are immobilized!').replace(/<enemy>/g,e.name), 'bad')
     spawnDamageNumber(player.x, player.y, 'Rooted!', '#a4cf70')
   }
   if (enemyHasAbility(e, 'mummyCurse') && chance(0.25)) {
@@ -53,7 +56,8 @@ function clearBansheeConfusion(e) {
 
 function tickMonsterStatuses() {
   for (const [key, message] of [
-    ['rootTurns','The roots release your feet.'],
+    ['rootTurns',ROOT_CONFIG.flavors?.[player.rootFlavor]?.release ||
+      ROOT_CONFIG.flavors?.generic?.release || 'You can move again.'],
     ['gazeTurns','Your limbs regain their flexibility.'],
     ['mummyCurseTurns','The Mummy’s curse fades.'],
     ['confusionTurns','The Banshee’s wail fades from your mind.'],
@@ -61,6 +65,7 @@ function tickMonsterStatuses() {
     ['slowTurns','The slowing spell fades.']
   ]) if (player[key] > 0 && --player[key] === 0) {
     if (key === 'confusionTurns') player.confusionSourceId = null
+    if (key === 'rootTurns') {player.rootFlavor=null;player.rootSourceId=null}
     log(message, 'good')
   }
 }

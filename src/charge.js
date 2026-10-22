@@ -90,17 +90,21 @@ function tryEnemyRush(e) {
         effect.delay += Math.max(0, impactAt - effect.start)
     }
   } else {
-    log(`${e.name} throws a web at you and drags you closer!`, 'bad')
-    const throwMs = SPIDER_WEB_THROW_MS, pullMs = SPIDER_WEB_PULL_MS
+    const flavorId=ENEMY_TEMPLATE_BY_NAME[e.baseName || e.name]?.pullFlavor || 'web'
+    const flavor=PULL_CONFIG.flavors?.[flavorId] || PULL_CONFIG.flavors?.web || {}
+    log((flavor.message || '<enemy> drags you closer!').replace(/<enemy>/g, e.name), 'bad')
+    const throwMs=flavor.projectile ? SPIDER_WEB_THROW_MS : 0, pullMs=SPIDER_WEB_PULL_MS
     const animated = !replayAnimationsDisabled && !replaySimulationMode
     const from = {x:player.x, y:player.y}
     if (animated) {
-      spawnProjectileAnim([{x:e.x,y:e.y}, from], 'web', throwMs)
-      spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs)
+      if(flavor.projectile) {
+        spawnProjectileAnim([{x:e.x,y:e.y}, from], flavor.projectile, throwMs)
+        spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs)
+      }
     }
     forcePlayerPosition(e.x + line.sx, e.y + line.sy,
       animated ? {kind:'pull', delay:throwMs, duration:pullMs} : undefined)
-    if (player.hp > 0 && !deathTransition) markSpiderWeb(e, animated)
+    if (player.hp > 0 && !deathTransition && flavor.overlay === 'web') markSpiderWeb(e, animated)
     const firstDamage = damageAnims.length
     if (player.hp > 0 && !deathTransition) {
       enemyAttackPlayer(e, true)

@@ -477,7 +477,7 @@ const DungeonHazards = (() => {
         const fraction=boss?cfg.bossDamageCapFraction:cfg.normalMonsterDamageCapFraction
         const damage=Math.max(1,Math.ceil(e.maxHp*fraction))
         const enraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
-        e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,enraged)
+        e.hp-=damage;absorbEnemyFatalHit(e);triggerEnemyShellRetreat(e);logEnemyEnrageTransition(e,enraged)
         if(visible) {
           monsterHits++
           spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
@@ -521,7 +521,7 @@ const DungeonHazards = (() => {
         for(const e of [...enemies]) {
           if (!e.alive || !onCurrentLevel(e) || !exposed(hazard,e.x,e.y) || enemyHasAbility(e, 'ethereal') || enemyImmunityActive(e)) continue
           const damage=damageFor(e),wasEnraged=enemyIsEnraged(e),visible=enemyIsVisibleOnMainView(e)
-          e.hp-=damage;absorbEnemyFatalHit(e);logEnemyEnrageTransition(e,wasEnraged)
+          e.hp-=damage;absorbEnemyFatalHit(e);triggerEnemyShellRetreat(e);logEnemyEnrageTransition(e,wasEnraged)
           if(visible) spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
           if(e.hp<=0) {if(visible) log(`The ${e.name} falls to poison gas.`, 'info');killEnemy(e,false,'poison gas')}
         }

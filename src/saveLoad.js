@@ -89,6 +89,7 @@ function buildSaveObject() {
     savedAt: new Date().toISOString(),
     worldSeed: WORLD_SEED,
     worldTraits: activeWorldTraits,
+    collectiveMindFloors: structuredClone(collectiveMindFloors),
     rngState: rngState,
     nextEnemyId,
     inspectedDungeonLocks: [...inspectedDungeonLocks],
@@ -107,6 +108,14 @@ function buildSaveObject() {
     // Generic chain levels (z:-2 and z:-3). An array so adding more
     // levels later never needs another save-format field - just another entry.
     deepLevels: deepLevels.map(lvl => ({
+      kind: lvl.kind || null,
+      dungeonFloor: lvl.dungeonFloor ?? null,
+      floorCount: lvl.floorCount ?? null,
+      progress: lvl.progress ?? null,
+      mineUpstairs: structuredClone(lvl.mineUpstairs || null),
+      mineDownstairs: structuredClone(lvl.mineDownstairs || null),
+      mineCagePad: structuredClone(lvl.mineCagePad || null),
+      mineTransitions: structuredClone(lvl.mineTransitions || null),
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
       dungeonPackage: lvl.dungeonPackage || lvl.caves?.[0]?.dungeonPackage || null,
       traps: structuredClone(lvl.traps || []),
@@ -172,7 +181,8 @@ function buildSaveObject() {
       speedPotionBonus: player.speedPotionBonus,
       stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,
       berserkTurns: player.berserkTurns, berserkBonus: player.berserkBonus,
-      rootTurns: player.rootTurns, gazeTurns: player.gazeTurns, mummyCurseTurns: player.mummyCurseTurns,
+      rootTurns: player.rootTurns, rootFlavor: player.rootFlavor, rootSourceId: player.rootSourceId,
+      gazeTurns: player.gazeTurns, mummyCurseTurns: player.mummyCurseTurns,
       confusionTurns: player.confusionTurns, confusionSourceId: player.confusionSourceId,
       weakenTurns: player.weakenTurns, slowTurns: player.slowTurns,
       deathShieldReady: player.deathShieldReady,
@@ -215,6 +225,19 @@ function buildSaveObject() {
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
       carriedDungeonKey: e.carriedDungeonKey ? structuredClone(e.carriedDungeonKey) : null,
       summonUsed: e.summonUsed === true,
+      exposedUntilTurn: Number.isInteger(e.exposedUntilTurn) ? e.exposedUntilTurn : 0,
+      shellRetreatTurns: Number.isInteger(e.shellRetreatTurns) ? Math.max(0,e.shellRetreatTurns) : 0,
+      shellRetreatUsed: e.shellRetreatUsed === true,
+      regenPhase: Number.isInteger(e.regenPhase) ? Math.max(0,e.regenPhase) : 0,
+      pendingAbility: e.pendingAbility ? structuredClone(e.pendingAbility) : null,
+      abilityCooldowns: {...(e.abilityCooldowns || {})},
+      abilityCooldownStartedTurn: {...(e.abilityCooldownStartedTurn || {})},
+      wallAmbushHidden: e.wallAmbushHidden === true,
+      wallAmbushSpent: e.wallAmbushSpent === true,
+      wallAmbushNoActionTurn: Number.isInteger(e.wallAmbushNoActionTurn) ? e.wallAmbushNoActionTurn : 0,
+      collectiveMindPackId: e.collectiveMindPackId,
+      collectiveMindRetreat: e.collectiveMindRetreat ? structuredClone(e.collectiveMindRetreat) : null,
+      collectiveMindRetreatAnnounced: e.collectiveMindRetreatAnnounced === true,
       wrestleReadyTurn: e.wrestleReadyTurn,
       rootReadyTurn: e.rootReadyTurn, gazeReadyTurn: e.gazeReadyTurn, wailReadyTurn: e.wailReadyTurn,
       hasteReadyTurn: e.hasteReadyTurn, healSelfReadyTurn: e.healSelfReadyTurn,
@@ -331,6 +354,7 @@ function loadGameFromObject(data, opts = {}) {
   // always supersedes whatever playback might currently be running.
   stopReplayPlayback()
   inspectedDungeonLocks = new Set(data.inspectedDungeonLocks)
+  collectiveMindFloors = structuredClone(data.collectiveMindFloors || {})
   applyWorldTraits(Array.isArray(data.worldTraits) ? data.worldTraits : data.worldTrait ? [data.worldTrait] : [])
   if (!isReplayInit && !opts.isReplayRestore) {
     preReplaySnapshot = null
@@ -467,7 +491,8 @@ function loadGameFromObject(data, opts = {}) {
   // (doors, mechanisms, traps) then serialize through the existing caveMaps
   // field without a parallel copy drifting out of sync.
   deepLevels = (Array.isArray(data.deepLevels) ? data.deepLevels : []).map((lvlData, levelIndex, allLevels) => {
-    const isDwarvenRuins = levelIndex >= 2
+    const isDwarvenRuins = lvlData.dungeonPackage === 'dwarvenRuins'
+    const isMine = lvlData.dungeonPackage === 'dwarvenMines'
     const entranceTile = (x, y) => levelIndex === 1 && dwarvenRuin &&
       x === dwarvenRuin.x && y === dwarvenRuin.y ? 'dwarvenfortexit' : 'caveup'
     const lvlCaveMaps = (lvlData.caveMaps || []).map(cm => decodeTileGrid(cm, 'cavewall') || blankCaveMap())
@@ -481,7 +506,7 @@ function loadGameFromObject(data, opts = {}) {
     // tiles in their descriptors, so their declared entrances are still
     // re-stamped. New Ruins floors already encode dwarven stairs exactly and
     // must not have those tiles replaced with generic cave stairs.
-    if (!isDwarvenRuins) {
+    if (!isDwarvenRuins && !isMine && lvlData.kind !== 'unused') {
       for (let i = 0; i < lvlCaveMaps.length; i++) {
         const entrances = lvlCaves[i] ? lvlCaves[i].entrances : []
         for (const entrance of entrances) {
@@ -493,7 +518,7 @@ function loadGameFromObject(data, opts = {}) {
     }
 
     let lvlMap
-    if (isDwarvenRuins && lvlCaveMaps.length === 1) {
+    if ((isDwarvenRuins || isMine || lvlData.kind === 'unused') && lvlCaveMaps.length === 1) {
       lvlMap = lvlCaveMaps[0]
     } else {
       lvlMap = blankCaveMap()
@@ -519,7 +544,7 @@ function loadGameFromObject(data, opts = {}) {
           lvlMap[p.y][p.x]='water'
         }
       }
-      if (!isDwarvenRuins) {
+      if (!isDwarvenRuins && !isMine && lvlData.kind !== 'unused') {
         for (const cave of lvlCaves) {
           for (const entrance of cave.entrances || []) {
             if (lvlMap[entrance.y] && lvlMap[entrance.y][entrance.x] !== undefined) {
@@ -531,11 +556,9 @@ function loadGameFromObject(data, opts = {}) {
     }
 
     const lvlDiscovered = decodeBoolGrid(lvlData.discovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
-    const dungeonFloor = isDwarvenRuins ? levelIndex - 1 : levelIndex === 1 ? 0 : null
-    const floorCount = Math.max(0, allLevels.length - 2)
-    const progress = isDwarvenRuins
-      ? (floorCount <= 1 ? 1 : (dungeonFloor - 1) / (floorCount - 1))
-      : 0
+    const dungeonFloor = Number.isInteger(lvlData.dungeonFloor) ? lvlData.dungeonFloor : null
+    const floorCount = Number.isInteger(lvlData.floorCount) ? lvlData.floorCount : null
+    const progress = Number.isFinite(lvlData.progress) ? lvlData.progress : 0
     return {
       map: lvlMap,
       traps: structuredClone(lvlData.traps),
@@ -547,8 +570,12 @@ function loadGameFromObject(data, opts = {}) {
       complexes: structuredClone(lvlData.complexes || []),
       territories: structuredClone(lvlData.territories || []),
       discovered: lvlDiscovered,
-      kind: isDwarvenRuins ? 'dwarvenRuins' : levelIndex === 1 ? 'dwarvenFort' : 'caves',
+      kind: lvlData.kind || (isDwarvenRuins ? 'dwarvenRuins' : isMine ? 'dwarvenMines' : levelIndex === 1 ? 'dwarvenFort' : 'caves'),
       dungeonPackage: lvlData.dungeonPackage || lvlCaves[0]?.dungeonPackage || null,
+      mineUpstairs: structuredClone(lvlData.mineUpstairs || null),
+      mineDownstairs: structuredClone(lvlData.mineDownstairs || null),
+      mineCagePad: structuredClone(lvlData.mineCagePad || null),
+      mineTransitions: structuredClone(lvlData.mineTransitions || null),
       rooms: structuredClone(lvlData.rooms || lvlCaves[0]?.rooms || []),
       roomGraph: structuredClone(lvlData.roomGraph || lvlCaves[0]?.roomGraph || null),
       progressionKey: structuredClone(lvlData.progressionKey || null),
@@ -576,6 +603,10 @@ function loadGameFromObject(data, opts = {}) {
       leverMap[shortcut.lever.y][shortcut.lever.x] = 'dwarvenleverpulled'
     }
   }
+  // Cage platform artwork is derived from the single saved unlock flag; it
+  // must not depend on which floor was active when the save was written.
+  if (dwarvenMinesCageShortcut())
+    setDwarvenMinesCageUnlocked(dwarvenMinesCageShortcut().unlocked)
 
   if (dwarvenRuin && deepLevels[1]) {
     const fortCaveIndex = deepLevels[1].caves.findIndex(c =>
@@ -829,6 +860,19 @@ function loadGameFromObject(data, opts = {}) {
       stolenItem: e.stolenItem ? structuredClone(e.stolenItem) : null,
       carriedDungeonKey: e.carriedDungeonKey ? structuredClone(e.carriedDungeonKey) : null,
       summonUsed: e.summonUsed === true,
+      exposedUntilTurn: Number.isInteger(e.exposedUntilTurn) ? Math.max(0,e.exposedUntilTurn) : 0,
+      shellRetreatTurns: Number.isInteger(e.shellRetreatTurns) ? Math.max(0,e.shellRetreatTurns) : 0,
+      shellRetreatUsed: e.shellRetreatUsed === true,
+      regenPhase: Number.isInteger(e.regenPhase) ? Math.max(0,e.regenPhase) : 0,
+      pendingAbility: e.pendingAbility ? structuredClone(e.pendingAbility) : null,
+      abilityCooldowns: {...(e.abilityCooldowns || {})},
+      abilityCooldownStartedTurn: {...(e.abilityCooldownStartedTurn || {})},
+      wallAmbushHidden: e.wallAmbushHidden === true,
+      wallAmbushSpent: e.wallAmbushSpent === true,
+      wallAmbushNoActionTurn: Number.isInteger(e.wallAmbushNoActionTurn) ? e.wallAmbushNoActionTurn : 0,
+      collectiveMindPackId: e.collectiveMindPackId,
+      collectiveMindRetreat: e.collectiveMindRetreat ? structuredClone(e.collectiveMindRetreat) : null,
+      collectiveMindRetreatAnnounced: e.collectiveMindRetreatAnnounced === true,
       wrestleReadyTurn: e.wrestleReadyTurn,
       rootReadyTurn: e.rootReadyTurn, gazeReadyTurn: e.gazeReadyTurn, wailReadyTurn: e.wailReadyTurn,
       hasteReadyTurn: e.hasteReadyTurn, healSelfReadyTurn: e.healSelfReadyTurn,

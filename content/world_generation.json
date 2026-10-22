@@ -1529,6 +1529,49 @@
           "valveActionTurns": 2
         }
       }
+    },
+    "dwarvenMines": {
+      "firstZ": -9,
+      "floorCounts": [3, 4],
+      "floorCountWeights": [0.5, 0.5],
+      "shortcut": {
+        "id": "dwarven-mines-haulage-cage-1",
+        "lockedMessage": "The haulage cage is locked. Its release mechanism is in the lowest mine.",
+        "unlockMessage": "You release the haulage cage. The counterweight stirs above.",
+        "descendMessage": "The haulage cage lowers you to the deepest mine workings.",
+        "ascendMessage": "The haulage cage lifts you to the upper mine workings."
+      },
+      "layout": {
+        "widthRange": [58, 68],
+        "heightRange": [44, 52],
+        "straightRunRange": [12, 25],
+        "passageWidthRange": [1, 2],
+        "widePassageChance": 0.15,
+        "branchesRange": [5, 9],
+        "pocketsRange": [3, 6],
+        "loopCountRange": [1, 3],
+        "additionalLoopRetries": 40,
+        "minAlternateRouteSaving": 8,
+        "minStairWalkingDistance": 30,
+        "floorGenerationRetries": 12,
+        "edgeMargin": 4
+      },
+      "encounters": {
+        "tilesPerMonster": [80, 60, 50, 45],
+        "entranceClearance": 8,
+        "minimumSpacing": 2,
+        "wyrdhagSeparation": 8,
+        "maxMonstersPerFloor": 70,
+        "groupWeights": [[85, 12, 3], [0, 88, 12], [0, 0, 100], [0, 0, 100]],
+        "groups": {
+          "early": ["Glaber", "Marsutal", "Duiwel", "Trogloraptor", "Sifulian", "Vrakeber", "Tmusapod"],
+          "middle": ["Akravis", "Adelocosa", "Bellroach", "Barolg", "Alacran", "Amplyg"],
+          "late": ["Wyrdhag", "Tholosum", "Xibal", "Naledi", "Troglodyte", "Cave Troll"]
+        },
+        "packSizes": {"Naledi": [1, 3], "Troglodyte": [1, 4]},
+        "caveTrollZ2Chance": 0.1,
+        "caveTrollZ2Max": 1
+      }
     }
   },
   "landmarks": {

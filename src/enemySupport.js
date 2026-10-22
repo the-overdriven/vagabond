@@ -10,6 +10,17 @@ const HASTE_COOLDOWN = 5
 const HEAL_SELF_CHANCE = 0.25
 const HEAL_SELF_FRACTION = 0.25
 
+// Blind creatures sense invisible adjacent targets, but often hesitate during
+// pursuit. This runs after an actual path option exists and before Haste.
+function blindPursuitHesitates(e, distance) {
+  if (!enemyHasAbility(e,'blind') || distance <= ATTACK_RANGE || !enemyFindStep(e)) return false
+  if (!chance(BLIND_CONFIG.pursuitHesitationChance ?? 0.5)) return false
+  if (enemyIsVisibleOnMainView(e))
+    log((BLIND_CONFIG.hesitationMessage || '<enemy> senses you, but is reluctant about the direction')
+      .replace(/<enemy>/g, `The ${e.name}`), 'info')
+  return true
+}
+
 function inspiringChampionFor(e) {
   if (!e || !e.alive || e.hp <= 0 || e.prefix === 'Champion' || !onCurrentLevel(e)) return null
   return enemies.find(leader => leader !== e && leader.alive && leader.hp > 0 &&

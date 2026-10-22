@@ -84,6 +84,12 @@ async function main() {
   assert.equal(run('player.x'),37,'drag occurs in resolved rules')
   assert.equal(run('player.spiderWebSourceId'),run('spider.id'),'web bound to spider')
   assert(run('spiderWebSource()===spider'))
+  reset();run('amplyg=addInvisEnemy("Amplyg",38,40);chance=p=>p===0.70;turnCount=1')
+  assert(run('tryEnemyRush(amplyg)'),'generic Pull supports grasp flavor')
+  assert.equal(run('player.x'),39,'non-web Pull uses the same forced movement')
+  assert.equal(run('player.spiderWebSourceId'),null,'grasp does not apply a spider web')
+  reset();run('spider=addInvisEnemy("Giant Spider",36,40);chance=p=>p===0.70;turnCount=1')
+  assert(run('tryEnemyRush(spider)'),'ordinary spider Pull remains available')
   const webSave=JSON.parse(JSON.stringify(run('buildSaveObject()')))
   assert.equal(webSave.player.spiderWebSourceId,webSave.enemies[0].id)
   context.saved=webSave

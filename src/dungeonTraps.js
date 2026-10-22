@@ -237,6 +237,7 @@ const DungeonTraps = (() => {
     } else {
       if (damage > 0) breakEnemyFear(target)
       absorbEnemyFatalHit(target)
+      triggerEnemyShellRetreat(target)
       logEnemyEnrageTransition(target, wasEnraged)
       // Defer removal until the hit's damage message has been logged.
     }

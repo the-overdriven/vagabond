@@ -314,6 +314,16 @@
     ],
     "baseValue": 0
   },
+  "pickaxe": {
+    "name": "Pickaxe",
+    "icon": "img/tiles/pickaxe.png",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 20,
+    "baseValue": 40,
+    "description": "A sturdy iron pickaxe, suited to clearing rocks.",
+    "actions": [{"label": "?", "handler": "inspect"}]
+  },
   "dwarvenkey": {
     "name": "Dwarven Key",
     "icon": "img/tiles/dwarven-key.png",

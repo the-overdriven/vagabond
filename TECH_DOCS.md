@@ -2136,7 +2136,7 @@ z:-3 Dwarven Fort / D0
   ↓
 z:-4 ... z:-6/-8 Dwarven Ruins (3–5 floors)
   ↓
-sealed continuation toward the Deep Mines
+z:-9 ... z:-11/-12 Dwarven Mines (3–4 floors)
 ```
 
 The **Crypt is a separate map/structure**, but its first level shares the z:-1
@@ -2375,7 +2375,7 @@ No special terrain, monster affinity or new status is introduced. Tile mode and 
 
 The browser extracts prototypes directly from transparent PNGs. The JSON at
 `content/cave_silhouettes.json` contains only the ordered source IDs and image
-paths (72 entries), not precomputed shapes. Changing an existing source PNG
+paths (91 entries; previously 72), not precomputed shapes. Changing an existing source PNG
 requires no build step; a newly added image needs an entry in this list because
 static hosting cannot enumerate a directory. No Python or image tooling is
 required to run or update the game.
@@ -2392,7 +2392,7 @@ two, three or four distinct sources, without consuming gameplay RNG:
 The browser prepares **three independently blended prototypes** per new
 world. The first uses the original world-seed source selection; the second and
 third use deterministic salted seeds and **disjoint source images** from the
-same 72-image catalog. This allows 1–3 silhouette caves to have distinct shapes,
+same 91-image catalog. This allows 1–3 silhouette caves to have distinct shapes,
 not just rotated copies of a single composite. Only the images selected for
 these three potential caves (6–12 unique source PNGs) are fetched, rather than
 the entire catalog. Preparation completes before any gameplay worldgen starts;
@@ -2404,7 +2404,7 @@ Preloading more images may increase new-world startup time, but saved worlds and
 replays never need to fetch the original source PNGs.
 
 Extraction reads the PNG's original alpha bytes directly, without canvas or
-browser resizing. Sources must be non-interlaced 8-bit RGBA PNGs (all 72 current
+browser resizing. Sources must be non-interlaced 8-bit RGBA PNGs (all 91 current
 images meet this format). PNG filtering and decompression recover the original
 pixels exactly. Pixels with alpha below 128 are discarded. The visible shape
 is cropped to its bounding box, then reduced to a grid whose longest dimension
@@ -2476,8 +2476,10 @@ stone stair art rather than cave-stair artwork. Every Dwarven stair has a full
 props, and initially placed occupants. The Fort descent and later Ruins exits
 are selected only at valid clear landings; decoration and loot placement protect
 them on both ends of each paired stair. The sealed Deep Mines
-continuation uses `X` in ASCII and its own collapsed-shaft image. Inspecting the
-sealed continuation describes the old excavation but does not change z-level.
+continuation uses `X` in ASCII and its own collapsed-shaft image. A Pickaxe is
+needed to clear it; excavation costs one turn and permanently opens the passage
+without immediately changing floors. Inspecting the cleared entrance descends
+to the Mines.
 The world-map level selector derives arbitrary chain depths instead of assuming
 that z:-3 is the deepest possible level, and labels discovered Ruins floors by
 their generated floor number.
@@ -2490,6 +2492,139 @@ open state, and the lift lever changing to its pulled state, therefore use the e
 representation without a second copy drifting out of sync. Closed doors also use
 the same opacity rule for player FOV and enemy sight and the same terrain blocker
 rule used by ranged projectiles. Each floor has its own discovery grid.
+
+## z:-9 and deeper: first Dwarven Mines package
+
+Dwarven Mines form a separate **3- or 4-floor** dungeon with equal probability,
+always starting at **z:-9**. The established 3–5-floor Dwarven Ruins generator
+is unchanged. If the Ruins end at z:-6 or z:-7, a direct staircase leads to
+z:-9; unused depths are not accessible play areas. When the Ruins end at z:-8,
+they connect directly to z:-9. Mines extend through z:-11 or z:-12 and contain
+paired up/down stairs, allowing the player to return along the same route.
+
+The initial mine layout uses a narrow winding excavated spine, side branches,
+short pockets, and at least one alternate route. Generation checks a single
+connected walkable component and a minimum 30-step stair-to-stair route. Floor
+count, geometry, retries, encounter density, pack sizes, group weights, and
+spacing are configured in `content/world_generation.json`. A separate, reachable
+haulage cage landing is reserved on the first and final mine floors; intermediate
+floors have no cage stop. Its placement never replaces an ordinary staircase.
+
+Exactly one Pickaxe is placed in reachable space on the penultimate Dwarven
+Ruins floor. It is a normal inventory item, **40 gold** base value and **20 gold**
+sell value, and is not consumed by clearing the mine entrance. The opened
+entrance, every mine floor and transition, monster positions, discovery, and
+inventory state persist through current saves and replay. Gameplay transitions
+and excavation resolve on the turn; animations never determine their outcomes.
+
+The separate mine encounter generator uses **19 new species** grouped into
+early, middle, and late threats. Floor 1 favors early threats, with occasional
+middle or late intruders; floor 2 favors middle threats, with occasional late
+intruders; floor 3 and optional floor 4 use late threats. Earlier-floor species
+do not naturally appear on later mine floors. Monster stats, rarity, existing
+abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
+generic Exposed, Shell Retreat, Rupture, Burrow, Jump, Wall Ambush and Collective
+Mind abilities are active. No species receives an unimplemented ability string.
+All 19 are classified as non-humanoid, so they follow normal XP, rare artifact
+loot and Bestiary kill-count rules, but do not carry humanoid equipment drops.
+
+**Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower
+cage is on the final generated floor (z:-11 or z:-12). Both begin locked. The
+player must reach the **lower cage** by ordinary stairs and Inspect it to release
+the counterweight. This consumes **one gameplay turn** and does not also move
+the player. The single unlocked state then enables travel in **both directions**
+between those two floors. Inspecting the upper cage while locked consumes no
+turn; riding a released cage uses the existing dungeon-stair transition turn
+rules, with no resource cost or simulation of skipped floors. As on other mine
+transitions, pending monster warnings are canceled when changing floors.
+Arrival uses the ordinary safe-landing search: a creature occupying the cage
+cannot be overwritten, and travel is denied if no legal arrival exists.
+Locked platforms use a muted cage graphic; the released upper and lower cages
+have distinct directional tile and ASCII visuals. The endpoint coordinates,
+both tile states and the **one shared unlock flag** persist through saves and
+replay. Settings and messages are in `content/world_generation.json`.
+
+TODO: move to monster abilities
+**Rupture** is a generic telegraphed attack, currently used by Duiwel. On an
+eligible turn it has a **25%** chance to mark the player's tile and up to two
+nearby legal floor tiles, at most **four tiles** from a normally detected target.
+The marked floor is visible in tile and ASCII modes and interrupts auto-travel.
+The monster then waits for **one complete player action** before erupting;
+moving off every marked tile prevents the hit. A player is never deliberately
+left without an initially unoccupied one-step escape, although other hazards,
+rooting or moving actors can subsequently block it. A caught player takes an
+ordinary damage roll with **125% of the monster's effective ATK** against the
+player's DEF, without a separate miss/critical/glancing roll. Resolution
+consumes the monster's action and starts **five complete subsequent active-floor
+turns** of cooldown. Warnings and remaining cooldowns persist in saves/replay;
+pending attacks disappear on the caster's death or the player's departure.
+These thresholds and log messages are configurable in `enemy_config.json`.
+
+**Burrow** is a generic repositioning action, currently used by Marsutal.
+On an eligible chase turn within **four tiles**, Blind hesitation is checked
+first; there is then a **25% chance** to retreat underground. The destination
+must be a free tile adjacent to the player's position at preparation time,
+reachable from the monster's original tile in at most **four terrain-traversable
+steps**, ignoring creatures but never bypassing solid walls, gates or closed
+doors. The origin remains reserved while the monster cannot be targeted;
+the fixed destination is visibly marked. On the next enemy turn after one player
+response the monster emerges, possibly making **one ordinary melee attack** if
+adjacent. A blocked landing returns it to the original spot without attacking.
+Cooldown: **six complete active-floor turns** after resolution or cancellation.
+
+**Jump** is generic fast positioning, currently used by Naledi. It prepares a
+straight leap of **two to four tiles** when that avoids creatures/low cover or
+improves pursuit by at least two tiles. It may cross creatures, dwarven beds,
+tables and crates, but not boulders, walls, doors, shelves or gates. A visible
+landing marker stays fixed during the player's response action. The next enemy
+phase moves the jumper to an available legal landing tile without any landing
+damage or same-turn melee. A blocked landing leaves the jumper at the origin.
+Cooldown: **four complete active-floor turns**. Blind hesitation is checked
+before a pursuit Jump. Landing on dungeon transitions is prohibited for both
+Burrow and Jump so monsters cannot unexpectedly block the only staircase.
+
+**Wall Ambush** is a generic one-time concealment rule, initially used by
+Trogloraptor. Concealed monsters spawn in ordinary legal spaces beside a solid
+wall, never within protected stair approaches; without a valid site they spawn
+visibly instead. The monster remains in place and cannot be inspected or
+attacked while concealed. When the player comes within **two tiles** and has
+line of sight to its location, a wall-movement warning appears. On the next
+player action the monster reveals itself; revelation consumes its enemy action,
+so ordinary combat begins later. Walking into the concealed monster instead
+reveals it and uses the attempted movement action without a free counterattack.
+Once revealed it cannot hide again. Its concealment, warning and spent state
+persist across saves/replay. All three mechanics share the configurable warning
+renderer and deterministic turn/cooldown state.
+
+**Collective Mind** is a generic one-time group alert, currently used by
+Naledi. When the first member on a generated floor normally detects the
+player, every living ally of the configured species with this ability on that
+floor becomes **Alarmed**. Alarmed monsters retain their existing sensory
+chase rules, including following around corners within aggro range; they do
+not teleport, share a forced path, or receive a permanent tracking target.
+The floor alert remains spent after leaving and returning, even when ordinary
+Alarmed states expire.
+
+The detecting member becomes the designated scout. It chooses a reachable
+**different pack**, preferring packs with **at least two other surviving
+members**, then the shortest legal travel path; an isolated surviving ally is
+an acceptable fallback. Equal choices use stable identifiers. When a group
+is available, the scout spends its actions moving toward an adjacent reachable
+space near those allies instead of attacking the player. Normal movement or
+an eligible, warned **Jump** may be used; Jump follows its ordinary cooldown
+and never grants a landing attack. A blocked route or loss of the chosen group
+ends the single retreat attempt without selecting another target. The scout
+resumes ordinary behavior after regrouping or cancellation. Floor alert,
+initial pack identity, chosen ally IDs and ongoing retreat are saved and
+replayed without animation-dependent decisions. Parameters and messages are
+configured in `enemy_config.json`.
+
+Outside the Mines, the normal encounter pools are unchanged. The two approved
+exceptions are: an independent **10% per-world chance** to add one Cave Troll
+on the ordinary z:-2 cave map away from cave entrances, and the 19 new
+transparent monster silhouettes becoming eligible sources for ordinary z:-2
+silhouette cave generation. No mine monster is included in the Old Hunter's
+normal quarry selection by this addition.
 
 ## Cave/crypt/mausoleum separation
 
@@ -3191,7 +3326,7 @@ status reapplications refresh the duration and never stack with themselves.
 
 | Monster / ability | Trigger | Effect | Duration | Cooldown after success |
 |---|---|---|---|---|
-| Dreadling — Root | 25% of damaging melee hits | Walking is blocked, but attacks and item use remain available. An attempted move spends a turn. | 3 player turns | 5 complete turns |
+| Root — Dreadling and other configured monsters | 25% of damaging melee hits by default | Walking is blocked, but attacks and item use remain available. An attempted move spends a turn. | 3 player turns | 5 complete turns |
 | Gorgon — Petrifying Gaze | 25% per eligible enemy action; line of sight and ≤3 tiles | −3 SPD and −3 GRACE, respecting the normal stat floors | 3 player turns | 5 complete turns |
 | Mummy — Curse | 25% of damaging melee hits | −2 ATK | 4 player turns | None |
 | Banshee — Wail | 25% per eligible enemy action; line of sight and ≤4 tiles | Confusion: every movement attempt has a 40% chance to choose a different, currently walkable, unoccupied adjacent tile | 5 player turns | 7 complete turns |
@@ -3213,6 +3348,33 @@ all application, struggle, misstep, expiration, and caster-death events have
 combat logs, with floating text on their most important effects. Active effects
 are visible on the player status strip. Both the player's counters and the
 monsters' absolute ready-turn deadlines are persisted by save schema **57**.
+
+Root's chance, duration, cooldown, and source-dependent messages are defined
+in `content/enemy_config.json`. The active root's source and flavor persist in
+current saves and replay so struggle feedback is consistent after restoration.
+The reusable `blind` ability senses invisible players without granting a
+critical-hit bonus against them, and can hesitate instead of taking an ordinary
+pursuit step at a configurable rate outside melee range. The existing Pull
+mechanic now supports configurable messages and visuals: a non-web grasp can
+move a player without showing spider webs or applying their separate status.
+
+## Defensive mine abilities (generic)
+
+Three additional ability IDs share handlers and tuning in
+`content/enemy_config.json`; assigning an ability to a different monster needs
+no species-specific code. Effects change effective combat stats without
+permanently changing base values, and active states are visible in tile/ASCII
+rendering and enemy inspection.
+
+| Ability / initial user | Rule | Player response |
+|---|---|---|
+| `exposed` — Vrakeber | Each attempted melee attack, including a miss, reduces its base DEF **12 → 3** through the next complete player action. Spawn variation and ordinary prefix, equipment, terrain, and ally modifiers apply after selecting the appropriate base. Subsequent attacks refresh the opening. | Strike while its exposed marker is visible. |
+| `shellRetreat` — Tholosum | The first surviving hit leaving it **below 40% max HP** activates a one-time shell state: **+12 DEF**, no attacks or moves for **two subsequent complete player actions**. The triggering action does not count, and lethal hits do not activate the shell. | Heal, retreat, wait, or attack the shell; its marker and duration are visible. |
+| `regen` — Cave Troll | Heals **2 HP every 3 active-floor gameplay turns**, capped at max HP. The phase pauses off-floor without catch-up and never revives a dead monster. This also applies to the optional z:-2 cave encounter. | Deal sustained damage before recovery offsets weaker strikes. |
+
+Exposure deadline, shell duration/spent flag, and regeneration phase initialize
+per enemy and persist through current saves and replay. Monster regeneration
+does not alter the player Troll race's separate healing mechanics.
 
 ## Enemy support abilities: Haste, Inspired and HealSelf
 

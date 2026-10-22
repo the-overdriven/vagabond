@@ -176,6 +176,27 @@
       "walk": true,
       "projectileBlock": true
     },
+    "dwarvenminesopen": {
+      "ch": ">", "color": "#cba260", "bg": "#302d2a", "mini": "#ff4747", "walk": true
+    },
+    "minestairsup": {
+      "ch": "<", "color": "#cba260", "bg": "#272320", "mini": "#ff4747", "walk": true
+    },
+    "minestairsdown": {
+      "ch": ">", "color": "#cba260", "bg": "#272320", "mini": "#ff4747", "walk": true
+    },
+    "minecageupperoff": {
+      "ch": "▽", "color": "#827f79", "bg": "#272320", "mini": "#827f79", "walk": true
+    },
+    "minecageloweroff": {
+      "ch": "△", "color": "#827f79", "bg": "#272320", "mini": "#827f79", "walk": true
+    },
+    "minecageupperon": {
+      "ch": "⇓", "color": "#d1ba73", "bg": "#272320", "mini": "#e6c467", "walk": true
+    },
+    "minecageloweron": {
+      "ch": "⇑", "color": "#d1ba73", "bg": "#272320", "mini": "#e6c467", "walk": true
+    },
     "dwarvendoorclosed": {
       "ch": "+",
       "color": "#c58a45",
@@ -652,6 +673,13 @@
     "dwarvenstairsdown": "A",
     "dwarvenstairsup": "B",
     "dwarvenminessealed": "C",
+    "dwarvenminesopen": "☷",
+    "minestairsup": "☵",
+    "minestairsdown": "☶",
+    "minecageupperoff": "◀",
+    "minecageloweroff": "▶",
+    "minecageupperon": "◁",
+    "minecageloweron": "▷",
     "dwarvendoorclosed": "D",
     "dwarvendooropen": "O",
     "marble": "=",
@@ -728,6 +756,13 @@
     "dwarvenstairsdown": "a broad dwarven staircase descending deeper into the ruined settlement",
     "dwarvenstairsup": "a broad dwarven staircase leading back toward the upper ruins",
     "dwarvenminessealed": "a collapsed mine stairway descending toward the old Deep Mines",
+    "dwarvenminesopen": "the cleared entrance to the Dwarven Mines",
+    "minestairsup": "an excavated stair ascending toward the upper mine workings",
+    "minestairsdown": "an excavated stair descending into deeper mine workings",
+    "minecageupperoff": "the upper haulage cage, locked until released from below",
+    "minecageloweroff": "the lower haulage cage and its unreleased counterweight mechanism",
+    "minecageupperon": "the unlocked upper haulage cage, leading down to the deepest mine",
+    "minecageloweron": "the unlocked lower haulage cage, leading to the upper mine",
     "dwarvendoorclosed": "a closed dwarven door of iron-bound timber",
     "dwarvendooropen": "an open dwarven door of iron-bound timber",
     "temple": "the sacred ground of the Temple",

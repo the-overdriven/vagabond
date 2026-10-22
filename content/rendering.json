@@ -164,6 +164,9 @@
       "image": "img/tiles/dwarven-key.png",
       "scale": 0.72
     },
+    "pickaxe": {
+      "glyph": "⚒", "color": "#b3ad9f", "image": "img/tiles/pickaxe.png", "scale": 0.8
+    },
     "scrollOfFear": {
       "glyph": "?",
       "color": "#d99bff",
@@ -275,6 +278,10 @@
     "rangeOwnerOutline": "rgba(232,162,79,0.9)",
     "aggroRangeBoundary": "rgba(224,71,63,0.82)",
     "thiefBagImage": "img/overlays/thief-bag.svg",
+    "ruptureWarningImage": "img/tiles/rupture-warning.png",
+    "burrowWarningImage": "img/tiles/burrow-warning.png",
+    "jumpWarningImage": "img/tiles/jump-warning.png",
+    "wallAmbushWarningImage": "img/tiles/wall-ambush-warning.png",
     "pathFootstepImage": "img/icons/bootmarks.svg",
     "pathFootstepScale": 0.56,
     "pathFootstepAlpha": 0.88
@@ -455,6 +462,29 @@
       "image": "img/tiles/dwarven-mineshaft-sealed.png",
       "baseTileKey": "marble",
       "scale": 1
+    },
+    "dwarvenminesopen": {
+      "image": "img/tiles/dwarven-stairs-down.png", "baseTileKey": "marble", "scale": 1
+    },
+    "minestairsup": {
+      "image": "img/tiles/dwarven-stairs-up.png", "baseTileKey": "cavefloor2", "scale": 1
+    },
+    "minestairsdown": {
+      "image": "img/tiles/dwarven-stairs-down.png", "baseTileKey": "cavefloor2", "scale": 1
+    },
+    "minecageupperoff": {
+      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloor2", "scale": 1,
+      "filter": "brightness(0.62) saturate(0.25)"
+    },
+    "minecageloweroff": {
+      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloor2", "scale": 1,
+      "filter": "brightness(0.62) saturate(0.25)"
+    },
+    "minecageupperon": {
+      "image": "img/tiles/haulage-cage-upper.png", "baseTileKey": "cavefloor2", "scale": 1
+    },
+    "minecageloweron": {
+      "image": "img/tiles/haulage-cage-lower.png", "baseTileKey": "cavefloor2", "scale": 1
     },
     "dwarvendoorclosed": {
       "image": "img/tiles/dwarven-door-closed.png",

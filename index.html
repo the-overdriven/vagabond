@@ -830,6 +830,8 @@ more difficult:
   let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let RANGED_CONFIG = {}, DEATH_BOLT_CONFIG = {}
+  let BLIND_CONFIG = {}, ROOT_CONFIG = {}, PULL_CONFIG = {}, ENEMY_DEFENSE_CONFIG = {}, ENEMY_TELEGRAPH_CONFIG = {}, COLLECTIVE_MIND_CONFIG = {}
+  let collectiveMindFloors = {}
   let CARRION_CONFIG, WYVERN_SLEEP_CONFIG
   let THIEF_CONFIG
   let bellReturnedToChapel = false, bellRung = false, ancientBellLichSpawned = false
@@ -929,6 +931,12 @@ more difficult:
     RARE_FLEE = content.enemyConfig.rareFlee
     TRACK_CONFIG = content.enemyConfig.tracking
     RANGED_CONFIG = content.enemyConfig.ranged || {}
+    BLIND_CONFIG = content.enemyConfig.blind || {}
+    ROOT_CONFIG = content.enemyConfig.root || {}
+    PULL_CONFIG = content.enemyConfig.pull || {}
+    ENEMY_DEFENSE_CONFIG = content.enemyConfig.defensiveAbilities || {}
+    ENEMY_TELEGRAPH_CONFIG = content.enemyConfig.telegraphedAbilities || {}
+    COLLECTIVE_MIND_CONFIG = content.enemyConfig.collectiveMind || {}
     DEATH_BOLT_CONFIG = content.enemyConfig.deathBolt || {}
     PREFIX_STATS = content.enemyConfig.prefixStats
     ARTIFACT_NOUNS = content.artifactNouns
@@ -1222,7 +1230,9 @@ more difficult:
   // connect the fort and persistent Dwarven Ruins floors.
   const CAVE_TRANSITION_TILES = new Set([
     'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup',
-    'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton',
+    'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenminesopen',
+    'minestairsup', 'minestairsdown', 'minecageupperoff', 'minecageloweroff',
+    'minecageupperon', 'minecageloweron', 'dwarvenliftoff', 'dwarvenlifton',
     'cryptstairsdown', 'cryptstairsup', 'mausoleumtrapdoor', 'mausoleumstairsup'
   ])
 
@@ -1318,6 +1328,74 @@ more difficult:
     return true
   }
 
+  function setDwarvenMinesCageUnlocked(unlocked) {
+    const cage=dwarvenMinesCageShortcut()
+    if(!cage)return false
+    cage.unlocked=!!unlocked
+    for(const [endpoint,position] of [['upper',cage.upper],['lower',cage.lower]]) {
+      const levelMap=depthUndergroundMap(chainDepthForZ(position.z))
+      if(levelMap?.[position.y]?.[position.x] !== undefined)
+        levelMap[position.y][position.x]=`minecage${endpoint}${unlocked?'on':'off'}`
+    }
+    minimapDirty=true
+    return true
+  }
+
+  function travelDwarvenMinesCage() {
+    const cage=dwarvenMinesCageShortcut()
+    if(!cage)return false
+    const atUpper=currentZ===cage.upper.z && player.x===cage.upper.x && player.y===cage.upper.y
+    const atLower=currentZ===cage.lower.z && player.x===cage.lower.x && player.y===cage.lower.y
+    if(!atUpper&&!atLower)return false
+    const config=minePackageConfig().shortcut
+    if(!cage.unlocked) {
+      if(atUpper) {
+        log(config.lockedMessage,'info')
+        return true
+      }
+      setDwarvenMinesCageUnlocked(true)
+      consecutiveWaitTurns=0
+      log(config.unlockMessage,'good')
+      enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return true
+    }
+    const destination=atUpper?cage.lower:cage.upper
+    return travelDwarvenMineStair(destination,atUpper?'down':'up',
+      atUpper?config.descendMessage:config.ascendMessage)
+  }
+
+  function mineTransitionArrival(destination, destinationMap) {
+    const allowed = (x,y) => TILE[destinationMap[y]?.[x]]?.walk &&
+      !enemies.some(e => e.alive && e.level === destination.z && e.levelKind === 'chain' && e.x === x && e.y === y)
+    const queue=[{x:destination.x,y:destination.y}],seen=new Set([keyXY(destination.x,destination.y)])
+    const directions=[[0,-1],[1,0],[0,1],[-1,0]]
+    for(let i=0;i<queue.length;i++) {
+      const spot=queue[i]
+      if(allowed(spot.x,spot.y))return spot
+      for(const [dx,dy] of directions){
+        const x=spot.x+dx,y=spot.y+dy,k=keyXY(x,y)
+        if(seen.has(k)||!TILE[destinationMap[y]?.[x]]?.walk)continue
+        seen.add(k);queue.push({x,y})
+      }
+    }
+    return null
+  }
+
+  function travelDwarvenMineStair(destination, direction, travelMessage=null) {
+    if(!destination || !Number.isInteger(destination.z))return false
+    const depth=chainDepthForZ(destination.z),nextMap=depthUndergroundMap(depth)
+    if(!nextMap)return false
+    const arrival=mineTransitionArrival(destination,nextMap)
+    if(!arrival){log('There is no safe space to use this passage.', 'info');return true}
+    currentZ=destination.z
+    currentCave=-1
+    map=nextMap
+    undergroundDiscovered=depthUndergroundDiscovered(depth)
+    player.x=arrival.x;player.y=arrival.y
+    log(travelMessage || (direction==='down'?'You descend into the abandoned Dwarven Mines.':'You climb toward the upper workings.'), 'info')
+    return true
+  }
+
   function onCurrentLevel(entity) {
     if (entity?.levelKind && entity.levelKind !== currentLevelKind()) return false
     const level = entity.level || 0
@@ -1360,6 +1438,8 @@ more difficult:
   }
 
   function enterCave() {
+    const departureZ=currentZ,departureKind=currentLevelKind()
+    try {
     if (enterMausoleum()) return true
     const tile = map[player.y] && map[player.y][player.x]
     if (currentZ === 0) {
@@ -1452,8 +1532,29 @@ more difficult:
     } else if (tile === 'dwarvenliftoff' || tile === 'dwarvenlifton') {
       return travelDwarvenLift()
     } else if (tile === 'dwarvenminessealed') {
-      log('A collapsed mine stairway descends toward the old Deep Mines, but a cave-in blocks the way. Broken braces and mining debris show that the excavation once continued beyond it.', 'info')
+      if(!player.inventory.some(item=>item.kind==='pickaxe')){
+        log('The passage is buried beneath collapsed stone. A pickaxe might clear the way.', 'info')
+        return true
+      }
+      map[player.y][player.x]='dwarvenminesopen'
+      log('You clear the collapsed passage with your pickaxe.', 'good')
+      consecutiveWaitTurns=0
+      enemyTurn()
+      npcTurn()
+      updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
       return true
+    } else if (tile === 'dwarvenminesopen') {
+      const level=deepLevels[chainDepthForZ(currentZ)-2]
+      if(!travelDwarvenMineStair(level?.mineTransitions?.down,'down'))return false
+    } else if (tile === 'minestairsup' || tile === 'minestairsdown') {
+      const level=deepLevels[chainDepthForZ(currentZ)-2]
+      const down=tile==='minestairsdown'
+      if(!travelDwarvenMineStair(level?.mineTransitions?.[down?'down':'up'],down?'down':'up'))return false
+    } else if (tile === 'minecageupperoff' || tile === 'minecageloweroff' ||
+               tile === 'minecageupperon' || tile === 'minecageloweron') {
+      const beforeCageZ=currentZ
+      if(!travelDwarvenMinesCage())return false
+      if(currentZ===beforeCageZ)return true
     } else if (tile === 'caveup') {
       const depth = chainDepthForZ(currentZ), prevDepth = depth - 1
       const prevMap = depthUndergroundMap(prevDepth)
@@ -1472,6 +1573,10 @@ more difficult:
     render()
     updateHud()
     return true
+    } finally {
+      if(currentZ!==departureZ || currentLevelKind()!==departureKind)
+        cancelPreparedEnemyAbilitiesOutsideFloor()
+    }
   }
 
   function isWalkable(x, y) {
@@ -1772,6 +1877,7 @@ more difficult:
 </script>
 <script src="src/caveSilhouettes.js"></script>
 <script src="src/worldGen.js"></script>
+<script src="src/dwarvenMines.js"></script>
 <script src="src/dungeonTraps.js"></script>
 <script src="src/dungeonHazards.js"></script>
 <script src="src/swimming.js"></script>
@@ -1781,6 +1887,9 @@ more difficult:
 <script src="src/monsterStatuses.js"></script>
 <script src="src/enemySpells.js"></script>
 <script src="src/enemySupport.js"></script>
+<script src="src/enemyDefenses.js"></script>
+<script src="src/enemyTelegraphs.js"></script>
+<script src="src/collectiveMind.js"></script>
 <script src="src/enemyInvisibility.js"></script>
 <script src="src/spiderWeb.js"></script>
 <script src="src/npcFisherman.js"></script>
@@ -2390,7 +2499,7 @@ more difficult:
     speedPotionBonus: 0,
     stoneSkinTurns: 0, stoneSkinBonus: 0,
     berserkTurns: 0, berserkBonus: 0,
-    rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
+    rootTurns: 0, rootFlavor: null, rootSourceId: null, gazeTurns: 0, mummyCurseTurns: 0,
     confusionTurns: 0, confusionSourceId: null,
     weakenTurns: 0, slowTurns: 0,
     deathShieldReady: false,
@@ -2549,7 +2658,7 @@ more difficult:
   }
 
   function enemyDef(e) {
-    return Math.max(0, e.def + enemyTileEffects(e).defense + (inspiringChampionFor(e) ? INSPIRED_DEF : 0))
+    return Math.max(0, enemyDefensiveBase(e) + enemyTileEffects(e).defense + (inspiringChampionFor(e) ? INSPIRED_DEF : 0))
   }
 
   function enemySpd(e) {
@@ -2774,7 +2883,8 @@ more difficult:
   function playerHiddenFromEnemy(enemy) {
     // Holy ground hides a protected player from all enemy targeting, including
     // true sight. This does not grant invisibility to a player outside it.
-    return playerInsideSanctuary() || (playerIsInvisible() && !enemyHasAbility(enemy, 'trueSight'))
+    return playerInsideSanctuary() || (playerIsInvisible() &&
+      !enemyHasAbility(enemy, 'trueSight') && !enemyHasAbility(enemy, 'blind'))
   }
 
   function logEnemySpotting(enemy, wandered = false) {
@@ -2863,6 +2973,24 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.summonUsed = enemy.summonUsed === true
+    enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
+    enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
+    enemy.shellRetreatTurns = Number.isInteger(enemy.shellRetreatTurns) ? Math.max(0, enemy.shellRetreatTurns) : 0
+    enemy.regenPhase = Number.isInteger(enemy.regenPhase) ? Math.max(0, enemy.regenPhase) : 0
+    enemy.pendingAbility = enemy.pendingAbility && typeof enemy.pendingAbility.type === 'string' &&
+      Array.isArray(enemy.pendingAbility.tiles) ? structuredClone(enemy.pendingAbility) : null
+    enemy.abilityCooldowns = {...(enemy.abilityCooldowns || {})}
+    enemy.abilityCooldownStartedTurn = {...(enemy.abilityCooldownStartedTurn || {})}
+    enemy.wallAmbushHidden = enemyHasAbility(enemy,'wallAmbush') && enemy.wallAmbushHidden === true
+    enemy.wallAmbushSpent = enemy.wallAmbushSpent === true
+    enemy.wallAmbushNoActionTurn = Number.isInteger(enemy.wallAmbushNoActionTurn)
+      ? enemy.wallAmbushNoActionTurn : 0
+    enemy.collectiveMindPackId = typeof enemy.collectiveMindPackId === 'string'
+      ? enemy.collectiveMindPackId : (enemyHasAbility(enemy,'collectiveMind') ? enemy.id : null)
+    enemy.collectiveMindRetreat = enemy.collectiveMindRetreat &&
+      Array.isArray(enemy.collectiveMindRetreat.allyIds)
+      ? structuredClone(enemy.collectiveMindRetreat) : null
+    enemy.collectiveMindRetreatAnnounced = enemy.collectiveMindRetreatAnnounced === true
     // Absolute enemy-turn deadline: five complete turns after a successful swap.
     enemy.wrestleReadyTurn = Number.isInteger(enemy.wrestleReadyTurn) ? enemy.wrestleReadyTurn : 0
     enemy.rootReadyTurn = Number.isInteger(enemy.rootReadyTurn) ? enemy.rootReadyTurn : 0
@@ -3990,7 +4118,8 @@ more difficult:
   }
 
   function playerCriticalHitChance(e) {
-    return BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed && !enemyHasAbility(e, 'trueSight') ? 0.20 : 0)
+    return BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed &&
+      !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : 0)
   }
 
   async function playerAttackEnemy(e, isExtraAttack = false) {
@@ -4065,6 +4194,7 @@ more difficult:
     if (targetWasInvisible) revealEnemyInvisibility(e)
     if (dmg > 0) breakEnemyFear(e)
     absorbEnemyFatalHit(e)
+    triggerEnemyShellRetreat(e)
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
     if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
@@ -4115,6 +4245,7 @@ more difficult:
       ? e.equipment : null
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     beginEnemyAttackAnim(e)
+    exposeEnemyAfterMelee(e)
     if (chance(charge ? missChance(enemySpd(e), playerSpd()) / 2
       : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
@@ -4297,6 +4428,7 @@ more difficult:
     const visibleAtDeath = enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
+    cancelPreparedEnemyAbility(e)
     worldKilledSpecies.add(trackSpecies(e))
     if (playerCredit) {
       recordStrongestEnemyKill(e)
@@ -4358,6 +4490,7 @@ more difficult:
 
   function returnPlayerToTemple() {
     resetSwimming()
+    cancelAllPreparedEnemyAbilities()
     const wasDead = player.hp <= 0
     currentZ = 0
     currentCave = -1
@@ -4438,6 +4571,7 @@ more difficult:
 
   function resetForNewCharacter() {
     clearLevelUpPopup()
+    cancelAllPreparedEnemyAbilities()
     inspectedDungeonLocks = new Set()
     // A permadeath always starts the next character back on the surface at
     // the Temple, even when the previous character died underground.
@@ -4478,7 +4612,7 @@ more difficult:
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
       berserkTurns: 0, berserkBonus: 0,
-    rootTurns: 0, gazeTurns: 0, mummyCurseTurns: 0,
+    rootTurns: 0, rootFlavor: null, rootSourceId: null, gazeTurns: 0, mummyCurseTurns: 0,
     confusionTurns: 0, confusionSourceId: null,
     weakenTurns: 0, slowTurns: 0,
       deathShieldReady: false,
@@ -4549,6 +4683,7 @@ more difficult:
 
   function die(killer = null, cause = 'environment') {
     if (deathTransition) return
+    cancelAllPreparedEnemyAbilities()
     toggleInv(false)
     const shore = cause === 'drowning' ? drowningShore() : null
     resetSwimming()
@@ -4593,7 +4728,8 @@ more difficult:
     player.speedPotionBonus = 0
     player.stoneSkinTurns = 0; player.stoneSkinBonus = 0
     player.berserkTurns = 0; player.berserkBonus = 0
-    player.rootTurns = 0; player.gazeTurns = 0; player.mummyCurseTurns = 0
+    player.rootTurns = 0; player.rootFlavor = null; player.rootSourceId = null
+    player.gazeTurns = 0; player.mummyCurseTurns = 0
     player.confusionTurns = 0; player.confusionSourceId = null
     player.weakenTurns = 0; player.slowTurns = 0
     player.deathShieldReady = false
@@ -4843,7 +4979,7 @@ more difficult:
 
   function reactToInvisibleAttack(e, damage) {
     if (e.fearTurns > 0) return // Zero-damage hits leave Fear in control of its action.
-    if (enemyHasAbility(e, 'trueSight')) return
+    if (enemyHasAbility(e, 'trueSight') || enemyHasAbility(e, 'blind')) return
     if (enemyIsPassive(e)) return
     const roll = rng()
     if (roll < 0.10) {
@@ -5513,6 +5649,8 @@ more difficult:
       // Fear stays active through its last action and damage can cancel it
       // immediately, including when a trap hits a monster later in turn order.
       for (const e of enemies) if (e.fearTurns > 0) e.fearTurns--
+      tickEnemyDefensiveTimers()
+      tickEnemyAbilityCooldowns()
     }
   }
 
@@ -5528,6 +5666,7 @@ more difficult:
     tickBerryRegen()
     tickArtifactCurses()
     tickMonsterStatuses()
+    tickEnemyRegeneration()
     expireEnemyImmunities()
     if (player.speedPotionTurns > 0) {
       player.speedPotionTurns--
@@ -5547,6 +5686,16 @@ more difficult:
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       expireEnemyInvisibility(e)
+      if (e.wallAmbushNoActionTurn === turnCount) continue
+      if (resolveEnemyTelegraphIfPending(e)) {
+        if(player.hp<=0 || deathTransition)return
+        continue
+      }
+      if (e.wallAmbushHidden) {
+        tryPrepareEnemyWallAmbush(e)
+        continue
+      }
+      if (enemyShellRetreating(e)) continue
       if (enemyInsideSanctuary(e)) {
         if (!e.fleeingHoly && enemyIsVisibleOnMainView(e)) log(`The ${e.name} retreats from the sacred ground.`, 'info')
         e.fleeingHoly = true; e.aware = false
@@ -5578,6 +5727,7 @@ more difficult:
         if (takeFearTurn(e)) return
         continue
       }
+      if (e.collectiveMindRetreat && takeCollectiveMindRetreatTurn(e)) continue
       const hiddenFromEnemy = playerHiddenFromEnemy(e)
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       if (sleepingEnemyTurn(e, hiddenFromEnemy, rareDistance)) continue
@@ -5607,12 +5757,14 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      if (enemyHasAbility(e,'rupture') && !forestConcealsPlayer(e,dist) && tryPrepareEnemyRupture(e)) continue
       let aggroRange = effectiveAggroRange(e)
       // Wail reaches four tiles even when the Banshee's normal chase radius
       // remains three. Do not roll twice on a single enemy action.
       if (dist > aggroRange && dist <= 4 && enemyHasAbility(e, 'wail') &&
           !forestConcealsPlayer(e, dist) && tryEnemyGazeOrWail(e)) {
         if (!e.aware) { e.aware = true; alarmEnemy(e); logEnemySpotting(e) }
+        tryTriggerCollectiveMind(e)
         continue
       }
       if (!playerHasForestCover() ||
@@ -5632,6 +5784,7 @@ more difficult:
           logEnemySpotting(e)
           announceInspiredLeader(e)
         }
+        if (tryTriggerCollectiveMind(e) && takeCollectiveMindRetreatTurn(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemySpell(e)) continue
@@ -5648,6 +5801,7 @@ more difficult:
       // ordinary sight, and invisibility/sanctuary are handled above.
       if (dist <= aggroRange && (enemyHasSight(e) || e.aware || e.alarmed) &&
           !forestConcealsPlayer(e, dist)) {
+        if (tryTriggerCollectiveMind(e) && takeCollectiveMindRetreatTurn(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
@@ -5686,6 +5840,9 @@ more difficult:
             announceInspiredLeader(e)
           }
         }
+        if (blindPursuitHesitates(e, dist)) continue
+        if (tryPrepareEnemyBurrow(e)) continue
+        if (tryPrepareEnemyJump(e)) continue
         if (tryEnemyHaste(e, dist)) continue
         const extraPursuitChance = speedChaseChance(effectiveEnemySpeed - playerSpeed)
         const hasExtraPursuitTurn = extraPursuitChance > 0 && chance(extraPursuitChance)
@@ -5725,6 +5882,7 @@ more difficult:
             alarmEnemy(e)
             logEnemySpotting(e, true)
             announceInspiredLeader(e)
+            tryTriggerCollectiveMind(e)
             if (tryEnemySummon(e)) continue
           }
         }
@@ -6580,6 +6738,11 @@ more difficult:
         log(`You pick up a Dwarven Key.`, 'loot')
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
+      } else if (g.kind === 'pickaxe') {
+        addInventoryItem('pickaxe')
+        log('You pick up a Pickaxe.', 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
       }
     }
   }
@@ -6798,6 +6961,21 @@ more difficult:
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
     if (target) {
       clearAutoPath()
+      if (target.wallAmbushHidden || target.pendingAbility?.type === 'burrow') {
+        if (player.rootTurns > 0 && (dx !== 0 || dy !== 0)) {
+          log(ROOT_CONFIG.flavors?.[player.rootFlavor]?.struggle ||
+            ROOT_CONFIG.flavors?.generic?.struggle || 'You struggle to move.', 'bad')
+          spawnDamageNumber(player.x,player.y,'Rooted!','#afdf88')
+          consecutiveWaitTurns=0
+          enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+          return
+        }
+        if (target.wallAmbushHidden) revealEnemyWallAmbush(target,true)
+        else log('The disturbed ground gives way beneath your feet. You cannot step there yet.', 'info')
+        consecutiveWaitTurns=0
+        enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+        return
+      }
       if (playerInsideSanctuary()) {
         log('You cannot attack from sacred ground. Step beyond its protection.', 'info')
         render()
@@ -6821,7 +6999,8 @@ more difficult:
     }
     if (player.rootTurns > 0 && (dx !== 0 || dy !== 0) && map[ny]?.[nx] !== 'dwarvengasvalve') {
       clearAutoPath()
-      log('You struggle against the Dreadling’s roots.', 'bad')
+      log(ROOT_CONFIG.flavors?.[player.rootFlavor]?.struggle ||
+        ROOT_CONFIG.flavors?.generic?.struggle || 'You struggle to move.', 'bad')
       spawnDamageNumber(player.x, player.y, 'Rooted!', '#afdf88')
       consecutiveWaitTurns = 0
       enemyTurn(); npcTurn(); updateHud(); render(); runAnimationLoop(); updateTooltip(); flushPendingMove()
@@ -7052,6 +7231,19 @@ more difficult:
           log('A broad dwarven stair leads back toward the upper ruins. Press "inspect" to climb up.', 'info')
         } else if (onto === 'dwarvenminessealed') {
           log('A collapsed mine stairway leads toward the old Deep Mines. Press "inspect" to examine it.', 'info')
+        } else if (onto === 'dwarvenminesopen') {
+          log('The cleared mine entrance leads downward. Press "inspect" to descend.', 'info')
+        } else if (onto === 'minestairsup' || onto === 'minestairsdown') {
+          log(onto === 'minestairsup' ? 'An excavated stair leads upward. Press "inspect" to climb.' :
+            'An excavated stair leads deeper into the mines. Press "inspect" to descend.', 'info')
+        } else if (onto === 'minecageupperoff') {
+          log('The upper haulage cage is locked. Press "inspect" to examine it.', 'info')
+        } else if (onto === 'minecageloweroff') {
+          log('The lower haulage cage has a release mechanism. Press "inspect" to unlock it.', 'info')
+        } else if (onto === 'minecageupperon' || onto === 'minecageloweron') {
+          log(onto === 'minecageupperon'
+            ? 'The unlocked haulage cage descends to the deepest mine. Press "inspect" to ride.'
+            : 'The unlocked haulage cage ascends to the upper mine. Press "inspect" to ride.', 'info')
         } else if (onto === 'caveup') {
           log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
         } else if (onto === 'cryptstairsdown') {
@@ -8906,6 +9098,7 @@ more difficult:
         }
       }
     }
+    drawEnemyTelegraphWarnings(undergroundVisible)
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
@@ -9040,6 +9233,25 @@ more difficult:
       const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), shimmers ? '#d8caef' : enemyColor(e))
       if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
+      // Status marks stay above the sprite in both tile and ASCII modes.
+      // A defensive pause and an exposed opening must be readable without logs.
+      if (enemyExposed(e) || enemyShellRetreating(e)) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.43))}px Consolas, monospace`
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+        ctx.lineWidth = 3; ctx.strokeStyle = '#1a1010'
+        if (enemyExposed(e)) {
+          ctx.fillStyle = '#ffbb71'
+          ctx.strokeText('↓', vx + TILE_PX * 0.23, vy + TILE_PX)
+          ctx.fillText('↓', vx + TILE_PX * 0.23, vy + TILE_PX)
+        }
+        if (enemyShellRetreating(e)) {
+          ctx.fillStyle = '#b2d4e8'
+          ctx.strokeText('▣', vx + TILE_PX * 0.77, vy + TILE_PX)
+          ctx.fillText('▣', vx + TILE_PX * 0.77, vy + TILE_PX)
+        }
+        ctx.restore()
+      }
       if (inspiringChampionFor(e)) {
         ctx.save()
         ctx.font = `bold ${Math.max(11,Math.round(TILE_PX*0.40))}px Consolas, monospace`
@@ -9311,6 +9523,7 @@ more difficult:
     }
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
+    drawEnemyTelegraphWarnings(undergroundVisible,true)
     if (currentZ < 0) {
       const depthRect = depthLabelRect()
       ctx.save()
@@ -9565,12 +9778,20 @@ more difficult:
       ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP, nearby monster</div>' : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'wallAmbush') ? `<div class="pfx">Wall Ambush · ${e.wallAmbushSpent ? 'revealed' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'collectiveMind') ? `<div class="pfx">Collective Mind · ${e.collectiveMindRetreat ? 'regrouping' : collectiveMindFloors[collectiveMindFloorKey(e)]?.spent ? 'alert sent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'wail') ? `<div class="pfx">Wail · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
       ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
       ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'exposed') ? `<div class="pfx" style="color:#ffbb71">Exposed · ${enemyExposed(e) ? 'DEF reduced until next action' : 'after melee attack'}</div>` : ''}
+      ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">Shell Retreat · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'regen') ? `<div class="pfx" style="color:#82e49b">Regen · +${ENEMY_DEFENSE_CONFIG.regen.healAmount} HP every ${ENEMY_DEFENSE_CONFIG.regen.intervalTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
       ${e.prefix !== 'Champion' && inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
@@ -10021,9 +10242,12 @@ more difficult:
     for (let i = 0; i < deepLevels.length; i++) {
       const depth = i + 2
       const z = chainZForDepth(depth)
+      if (deepLevels[i].kind === 'unused') continue
       const label = i === 0 ? `Caves (${z})`
         : i === 1 ? `Dwarven Fort (${z})`
-          : `Dwarven Ruins ${i - 1} (${z})`
+          : deepLevels[i].dungeonPackage === 'dwarvenMines'
+            ? `Dwarven Mines ${deepLevels[i].dungeonFloor} (${z})`
+            : `Dwarven Ruins ${deepLevels[i].dungeonFloor} (${z})`
       levels.push({key: `chain:${depth}`, label, z,
         terrain: deepLevels[i].map, seen: deepLevels[i].discovered})
       if (z === -2 && cryptLevel2) levels.push({key: 'crypt2', label: 'Crypt (−2)', z: -2,
@@ -12257,6 +12481,7 @@ more difficult:
       // accepted entity IDs are independent of how many rejected attempts came
       // before it.
       nextEnemyId = 1
+      collectiveMindFloors = {}
       npcs = []
       generateMap()
       const weaponHuts = villageHuts.filter(h => h.startingWeapon && !h.startingWeaponTaken)
@@ -12281,6 +12506,7 @@ more difficult:
       spawnGroundStuff()
       spawnCaveScenarios()
       spawnDwarvenRuinsEncounters()
+      spawnDwarvenMinesEncounters()
       spawnDwarvenRuinsChests()
 
       acceptedValidation = validateDwarvenRuinsStratum()
@@ -12296,6 +12522,7 @@ more difficult:
       // generated after the world has been accepted, so rejected attempts do
       // not consume IDs or create persistent side effects unnecessarily.
       ensureUndergroundVampire()
+      maybeSpawnCaveTrollInDeepCaves()
       spawnDeepCaveSpoor()
       // Assess the final accepted ecosystem, including guaranteed creatures.
       // Read-only: never consumes RNG or changes encounters.

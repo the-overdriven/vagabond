@@ -3,6 +3,115 @@
     "chance": 0.1,
     "maxEscapeSteps": 40
   },
+  "blind": {
+    "pursuitHesitationChance": 0.5,
+    "hesitationMessage": "<enemy> senses you, but is reluctant about the direction"
+  },
+  "collectiveMind": {
+    "requireSameSpecies": true,
+    "preferredGroupAllies": 2,
+    "minimumGroupAllies": 1,
+    "allowRetreatJump": true,
+    "alertMessage": "The <enemy> sends a silent warning through its kin!",
+    "retreatMessage": "The <enemy> withdraws to join its kin!",
+    "regroupMessage": "The <enemy> rejoins its kin.",
+    "fallbackMessage": "The <enemy> abandons its regrouping attempt."
+  },
+  "defensiveAbilities": {
+    "exposed": {
+      "baseDef": 3,
+      "durationActions": 1,
+      "message": "The <enemy> leaves an opening after its attack!"
+    },
+    "shellRetreat": {
+      "healthThreshold": 0.4,
+      "defBonus": 12,
+      "durationTurns": 2,
+      "message": "The <enemy> withdraws into its shell!"
+    },
+    "regen": {
+      "healAmount": 2,
+      "intervalTurns": 3
+    }
+  },
+  "telegraphedAbilities": {
+    "forbiddenLandingTiles": ["caveentrance","caveup","cavedown","cryptstairsup","cryptstairsdown","dwarvenfortexit","dwarvenstairsup","dwarvenstairsdown","dwarvenlifton","dwarvenliftoff","dwarvenminesopen","dwarvenminessealed","minestairsup","minestairsdown"],
+    "burrow": {
+      "activationChance": 0.25,
+      "range": 4,
+      "maxPathSteps": 4,
+      "targetAdjacentDistance": 1,
+      "cooldownTurns": 6,
+      "warningMessage": "The <enemy> sinks into the earth. Something moves beneath the marked ground!",
+      "emergeMessage": "The <enemy> bursts from the ground!",
+      "failedMessage": "The ground settles. The <enemy> resurfaces where it vanished."
+    },
+    "rupture": {
+      "activationChance": 0.25,
+      "range": 4,
+      "extraTiles": 2,
+      "damageMultiplier": 1.25,
+      "cooldownTurns": 5,
+      "warningMessage": "The ground buckles around you! Move away from the marked stones!",
+      "hitMessage": "The <enemy>'s eruption hits you for <damage> damage!",
+      "missMessage": "The <enemy>'s eruption tears through empty ground."
+    },
+    "jump": {
+      "maxDistance": 4,
+      "cooldownTurns": 4,
+      "minimumPursuitGain": 2,
+      "crossableTiles": ["dwarvenbed","dwarventable","dwarvencrate"],
+      "warningMessage": "The <enemy> crouches to leap toward the marked ground!",
+      "landMessage": "The <enemy> lands after a long leap!",
+      "failedMessage": "The <enemy> cannot land its leap!"
+    },
+    "wallAmbush": {
+      "triggerRange": 2,
+      "solidWallTiles": ["cavewall","dwarvenwall","mountain","snowmountain"],
+      "warningMessage": "Something shifts behind the stones of the wall!",
+      "revealMessage": "The <enemy> emerges from its hiding place!",
+      "bumpMessage": "Something alive blocks your path! The <enemy> emerges!"
+    }
+  },
+  "pull": {
+    "flavors": {
+      "web": {
+        "message": "<enemy> throws a web at you and drags you closer!",
+        "projectile": "web", "overlay": "web"
+      },
+      "grasp": {
+        "message": "<enemy> catches you in its grasp and drags you closer!",
+        "projectile": null, "overlay": null
+      }
+    }
+  },
+  "root": {
+    "hitChance": 0.25,
+    "durationTurns": 3,
+    "cooldownTurns": 5,
+    "flavors": {
+      "dreadling": {
+        "applied": "The <enemy>'s tendrils bind your feet!",
+        "struggle": "You struggle against the Dreadling’s roots.",
+        "release": "The roots release your feet."
+      },
+      "akravis": {
+        "applied": "The <enemy> clamps its pincers around you!",
+        "struggle": "You struggle against the crushing grip.",
+        "release": "The grip loosens. You can move again."
+      },
+      "sifulian": {
+        "applied": "The <enemy> coils around you, trapping you!",
+        "struggle": "You struggle against the tightening coils.",
+        "release": "The coils loosen. You can move again."
+      },
+      "generic": {
+        "applied": "You are immobilized!",
+        "struggle": "You struggle to move.",
+        "release": "You can move again."
+      }
+    }
+  },
   "combat": {
     "attackRange": 1,
     "defaultAggroRange": 4,

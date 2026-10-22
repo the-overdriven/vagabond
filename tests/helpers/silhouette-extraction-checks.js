@@ -14,7 +14,7 @@ module.exports=function silhouetteExtractionChecks(){
     check(rejected,'empty/opaque image rejected')
   }
   const sources=CAVE_SILHOUETTE_SOURCES
-  check(sources.length===72&&sources.every(s=>s.source==='img/enemies-no-bg/'+s.id+'.png'),'source manifest contains real image paths')
+  check(sources.length===91&&sources.every(s=>s.source==='img/enemies-no-bg/'+s.id+'.png'),'source manifest contains real image paths')
   for(const seed of [0,1,12345,24680,67890,0xffffffff]) {
     check(CaveSilhouettes.sourceForSeed(seed,sources)===CaveSilhouettes.sourceForSeed(seed,sources),'stable seeded image selection')
   }

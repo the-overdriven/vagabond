@@ -1113,6 +1113,7 @@ function generateCaves() {
     Math.max(Math.abs(e.x - dwarvenRuin.x), Math.abs(e.y - dwarvenRuin.y)) <= 15))
   if (fortTooClose) return false
   if (!buildDwarvenRuinsStratum()) return false
+  if (!buildDwarvenMinesStratum()) return false
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid

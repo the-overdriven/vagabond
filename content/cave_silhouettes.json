@@ -287,6 +287,82 @@
     {
       "id": "yeti",
       "source": "img/enemies-no-bg/yeti.png"
+    },
+    {
+      "id": "adelocosa",
+      "source": "img/enemies-no-bg/adelocosa.png"
+    },
+    {
+      "id": "akravis",
+      "source": "img/enemies-no-bg/akravis.png"
+    },
+    {
+      "id": "alacran",
+      "source": "img/enemies-no-bg/alacran.png"
+    },
+    {
+      "id": "amplyg",
+      "source": "img/enemies-no-bg/amplyg.png"
+    },
+    {
+      "id": "barolg",
+      "source": "img/enemies-no-bg/barolg.png"
+    },
+    {
+      "id": "bellroach",
+      "source": "img/enemies-no-bg/bellroach.png"
+    },
+    {
+      "id": "cave_troll",
+      "source": "img/enemies-no-bg/cave_troll.png"
+    },
+    {
+      "id": "duiwel",
+      "source": "img/enemies-no-bg/duiwel.png"
+    },
+    {
+      "id": "glaber",
+      "source": "img/enemies-no-bg/glaber.png"
+    },
+    {
+      "id": "marsutal",
+      "source": "img/enemies-no-bg/marsutal.png"
+    },
+    {
+      "id": "naledi",
+      "source": "img/enemies-no-bg/naledi.png"
+    },
+    {
+      "id": "sifulian",
+      "source": "img/enemies-no-bg/sifulian.png"
+    },
+    {
+      "id": "tholosum",
+      "source": "img/enemies-no-bg/tholosum.png"
+    },
+    {
+      "id": "tmusapod",
+      "source": "img/enemies-no-bg/tmusapod.png"
+    },
+    {
+      "id": "troglodyte",
+      "source": "img/enemies-no-bg/troglodyte.png"
+    },
+    {
+      "id": "trogloraptor",
+      "source": "img/enemies-no-bg/trogloraptor.png"
+    },
+    {
+      "id": "vrakeber",
+      "source": "img/enemies-no-bg/vrakeber.png"
+    },
+    {
+      "id": "wyrdhag",
+      "source": "img/enemies-no-bg/wyrdhag.png"
+    },
+    {
+      "id": "xibal",
+      "source": "img/enemies-no-bg/xibal.png"
     }
   ]
 }
