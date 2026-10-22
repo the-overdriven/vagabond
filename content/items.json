@@ -156,7 +156,7 @@
         "handler": "homecomingscroll"
       }
     ],
-    "baseValue": 100
+    "baseValue": 70
   },
   "idscroll": {
     "name": "Scroll of Identification",

@@ -39,7 +39,7 @@
     "homecomingScroll": {
       "kind": "homecomingscroll",
       "count": 9,
-      "merchantPrice": 100
+      "merchantPrice": 70
     },
     "invisibilityScroll": {
       "kind": "scrollOfInvisibility",

@@ -225,13 +225,7 @@ function spawnDwarvenMinesEncounters() {
     const target=Math.min(ec.maxMonstersPerFloor,Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex]))
     const selectGroup=()=>pickWeighted(groupKeys.map((key,i)=>({key,weight:ec.groupWeights[floorIndex][i]}))
       .filter(v=>v.weight>0),v=>v.weight).key
-    for(let n=0;n<target;){
-      const group=selectGroup()
-      const pool=ec.groups[group].map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(t=>t&&t.biomes.includes(`z-${Math.abs(z)}`))
-      if(!pool.length)break
-      const tmpl=pickWeighted(pool,t=>t.rarity??1)
-      const sizes=ec.packSizes[tmpl.name]
-      const count=Math.min(target-n,sizes?randInt(...sizes):1)
+    const placePack=(tmpl,count)=>{
       let leader=null,placed=0,coordinationPackId=null
       for(let member=0;member<count;member++){
         const available=candidates.filter(p=>{
@@ -263,8 +257,29 @@ function spawnDwarvenMinesEncounters() {
         occupiedSpots.push({...spot,name:tmpl.name,id:enemy.id})
         placed++
       }
+      return placed
+    }
+    // Reserve one encounter per species before the weighted population fills
+    // the remaining budget. Early and middle creatures stay on their own floor;
+    // late creatures first appear together on floor 3, even in four-floor mines.
+    let populated=0
+    const guaranteedGroup=groupKeys[floorIndex]
+    if(ec.guaranteeEachSpecies && guaranteedGroup) for(const name of ec.groups[guaranteedGroup]) {
+      const tmpl=ENEMY_TEMPLATE_BY_NAME[name]
+      if(!tmpl?.biomes?.includes(`z-${Math.abs(z)}`) || placePack(tmpl,1)!==1)
+        throw new Error(`Dwarven Mines could not place guaranteed species: ${name} at ${z}`)
+      populated++
+    }
+    while(populated<target){
+      const group=selectGroup()
+      const pool=ec.groups[group].map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(t=>t&&t.biomes.includes(`z-${Math.abs(z)}`))
+      if(!pool.length)break
+      const tmpl=pickWeighted(pool,t=>t.rarity??1)
+      const sizes=ec.packSizes[tmpl.name]
+      const count=Math.min(target-populated,sizes?randInt(...sizes):1)
+      const placed=placePack(tmpl,count)
       if(!placed)break
-      n+=placed
+      populated+=placed
     }
   }
 }

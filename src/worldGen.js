@@ -5037,6 +5037,12 @@ function naturalSpawnEligible(tmpl) {
     !enemies.some(e => (e.baseName || e.name) === tmpl.name)
 }
 
+// Depth-only templates are not surface wanderers. In particular, the surface
+// biome fallback must never place a mine-exclusive species on grass or snow.
+function surfaceSpawnEligible(tmpl) {
+  return !!tmpl && enemyBiomes(tmpl).some(biome => !/^z-\d+$/.test(biome))
+}
+
 function spawnEnemies() {
   const cfg = WORLD_GEN_CONFIG.surfaceEnemies
   const weights = cfg.tierWeights // tier 1..5
@@ -5086,7 +5092,7 @@ function spawnEnemies() {
   }
 
   function spawnOneFromTemplate(tmpl, preferredPool = null) {
-    if (!naturalSpawnEligible(tmpl)) return false
+    if (!surfaceSpawnEligible(tmpl) || !naturalSpawnEligible(tmpl)) return false
     const pool = preferredPool || poolFor(tmpl)
     if (!pool.length) return false
     let x = 0, y = 0, tries = 0, placed = false
@@ -5143,7 +5149,7 @@ function spawnEnemies() {
         break
       }
     }
-    const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier && naturalSpawnEligible(e))
+    const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier && surfaceSpawnEligible(e) && naturalSpawnEligible(e))
     if (!templates.length) continue
     const tmpl = pickWeighted(templates, t => (t.rarity ?? 1) * (t.humanoid ? 1 : cfg.nonHumanoidRarityMultiplier))
     spawnOneFromTemplate(tmpl)
@@ -5158,7 +5164,7 @@ function spawnEnemies() {
       const x = allSpawnTiles[i], y = allSpawnTiles[i + 1]
       if (Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) <= edgeWidth) edgeSpots.push({x, y})
     }
-    const migrants = ENEMY_TEMPLATES.filter(t => t.tier <= cfg.migrationMaxTier && t.wander !== false)
+    const migrants = ENEMY_TEMPLATES.filter(t => t.tier <= cfg.migrationMaxTier && t.wander !== false && surfaceSpawnEligible(t))
     for (let group = 0; group < cfg.migrationGroups && edgeSpots.length && migrants.length; group++) {
       const anchor = pick(edgeSpots)
       const matching = migrants.filter(t => enemyBiomes(t).includes(map[anchor.y][anchor.x]))

@@ -1532,6 +1532,7 @@
     },
     "dwarvenMines": {
       "firstZ": -9,
+      "visibilityRadius": 5,
       "floorCounts": [3, 4],
       "floorCountWeights": [0.5, 0.5],
       "shortcut": {
@@ -1557,6 +1558,7 @@
         "edgeMargin": 4
       },
       "encounters": {
+        "guaranteeEachSpecies": true,
         "tilesPerMonster": [80, 60, 50, 45],
         "entranceClearance": 8,
         "minimumSpacing": 2,

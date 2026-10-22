@@ -2521,7 +2521,11 @@ The separate mine encounter generator uses **19 new species** grouped into
 early, middle, and late threats. Floor 1 favors early threats, with occasional
 middle or late intruders; floor 2 favors middle threats, with occasional late
 intruders; floor 3 and optional floor 4 use late threats. Earlier-floor species
-do not naturally appear on later mine floors. Monster stats, rarity, existing
+do not naturally appear on later mine floors. When `guaranteeEachSpecies` is
+enabled, generation reserves at least one of every early species on mine floor 1,
+every middle species on floor 2, and every late species on floor 3. These
+encounters count toward each floor's normal population budget; remaining slots
+still use the usual weighted groups and packs. Monster stats, rarity, existing
 abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
 generic Exposed, Shell Retreat, Rupture, Burrow, Jump, Wall Ambush and Collective
 Mind abilities are active. No species receives an unimplemented ability string.
@@ -3131,6 +3135,10 @@ monster fills subsequent ordinary weighted slots. Other species are unaffected.
 In particular, Myrka (`0.02`) and Vampire (`0.01`) may spawn multiple times.
 At least one Vampire is still guaranteed in a distant eligible underground
 crypt or bat cave; this does not prevent other natural Vampire spawns.
+Templates listing only depth biomes such as `z-9` are ineligible for surface
+population, including migration groups; the missing-surface-biome fallback
+cannot spawn mine-exclusive monsters on the overworld. A template with an
+explicit surface biome remains eligible under its normal surface rules.
 No additional persistent state is required: the existing saved enemy roster
 and world-wide killed-species history enforce uniqueness, including across
 permadeath characters. Existing saved enemies are never removed.
@@ -5890,7 +5898,7 @@ load; selling a scroll back to the merchant makes it available again.
 Returns the player to the Temple. Temple healing follows the same level 1
 exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
 and replay action are `homecomingscroll`, and
-its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 100g, with
+its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 70g, with
 nine in stock at world creation. This stock is finite and never automatically
 replenished after purchases, save/load, or replay restoration. Selling a scroll
 back adds exactly one scroll to the available stock. The stock config key is `scrolls.homecomingScroll`.
@@ -6722,7 +6730,7 @@ Values are independent of merchant stock and saved `merchantPrice` fields.
 | Seashell | 10g |
 
 Fresh Fish, Potato, tools, and quest/readable objects have a sell value of 0g
-and cannot be sold. Homecoming costs 100g to buy; its nine-scroll initial stock
+and cannot be sold. Homecoming costs 70g to buy; its nine-scroll initial stock
 and purchase price remain configured in `merchant_stock.json`.
 
 ### Base purchase values
@@ -7396,9 +7404,10 @@ There are separate discovery structures for:
 
 ## Underground field of view
 
-`src/fov.js` computes a circular eight-tile sight radius around the player on
-every underground map: ordinary caves, grottos, the crypt, mausoleum, and
-Dwarven Fort. The game has no facing direction, so sight extends in all
+`src/fov.js` computes a circular **eight-tile** sight radius around the player
+in ordinary underground areas and **five tiles** in the Dwarven Mines; the
+mine radius is configured by `dwarvenMines.visibilityRadius` in
+`content/world_generation.json`. The game has no facing direction, so sight extends in all
 directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
 crypt niches, boulders, the Black Pillar, and closed/locked solid Dwarven doors.
 Prison bars and closed/locked barred prison doors allow sight and projectiles

@@ -10387,7 +10387,10 @@ more difficult:
     if (!undergroundFovCache || undergroundFovCache.map !== map ||
       undergroundFovCache.discovered !== undergroundDiscovered ||
       undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
-      const visible = UndergroundFov.compute(map, player.x, player.y)
+      const radius = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines'
+        ? (WORLD_GEN_CONFIG.dungeons?.dwarvenMines?.visibilityRadius ?? UndergroundFov.RADIUS)
+        : UndergroundFov.RADIUS
+      const visible = UndergroundFov.compute(map, player.x, player.y, radius)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
       for (const pos of visible) {
