@@ -60,28 +60,28 @@ const plain = value => JSON.parse(JSON.stringify(value))
   run('chance=originalChance;vrakeber.alive=false')
 
   // Successful player attack crosses the health threshold but cannot prevent
-  // lethal damage. The triggering action is not one of the two response turns.
+  // lethal damage. The triggering action is not one of the four response turns.
   run('chance=()=>false;originalDamageRoll=damageRoll;damageRoll=()=>91')
   await run('playerAttackEnemy(tholosum)')
   assert.equal(run('tholosum.hp'),49)
   assert.equal(run('tholosum.shellRetreatUsed'),true)
-  assert.equal(run('tholosum.shellRetreatTurns'),3)
+  assert.equal(run('tholosum.shellRetreatTurns'),5)
   const shelledDef=run('enemyDef(tholosum)')
   run('tholosum.shellRetreatTurns=0')
   assert.equal(shelledDef-run('enemyDef(tholosum)'),12)
-  run('tholosum.shellRetreatTurns=3')
+  run('tholosum.shellRetreatTurns=5')
   assert(run('tileInspectInfo(tholosum.x,tholosum.y).html.includes("Shell Retreat")'))
 
   run('enemyActions=0;enemyAttackPlayer=()=>{enemyActions++;return false};'
     +'caveTroll.alive=false;player.x=41;player.y=40')
-  for(let i=0;i<3;i++){
+  for(let i=0;i<5;i++){
     run('enemyTurn()')
     assert.equal(run('enemyActions'),0,'shell creature cannot attack during triggering/following turns')
-    assert.equal(run('tholosum.shellRetreatTurns'),Math.max(0,2-i))
+    assert.equal(run('tholosum.shellRetreatTurns'),Math.max(0,4-i))
   }
   assert.equal(run('tholosum.shellRetreatUsed'),true)
   run('enemyTurn()')
-  assert.equal(run('enemyActions'),1,'enemy resumes after two complete following player actions')
+  assert.equal(run('enemyActions'),1,'enemy resumes after four complete following player actions')
   assert.equal(run('tholosum.shellRetreatTurns'),0)
   run('tholosum.hp=1;triggerEnemyShellRetreat(tholosum)')
   assert.equal(run('tholosum.shellRetreatTurns'),0,'never reactivates after healing or damage')

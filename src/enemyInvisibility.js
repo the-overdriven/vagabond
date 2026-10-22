@@ -22,7 +22,8 @@ function enemyInvisibleShimmer(e) {
 }
 
 function enemyCanBeSeen(e) {
-  return !enemyInvisibleActive(e) || enemyInvisibleShimmer(e)
+  return !e.wallAmbushHidden && e.pendingAbility?.type !== 'burrow' &&
+    (!enemyInvisibleActive(e) || enemyInvisibleShimmer(e))
 }
 
 function tryEnemyVanish(e) {

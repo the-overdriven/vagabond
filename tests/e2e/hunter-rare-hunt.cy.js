@@ -113,7 +113,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
           newEnemyIds,
           targetId:q.targetEnemyId,
           type:q.type,
-          qualifies: tmpl.wander === 'far' && tmpl.humanoid === false && Number(tmpl.rarity ?? 1) <= 0.1,
+          qualifies: tmpl.wander === 'far' && tmpl.humanoid === false && tmpl.ultraRare === true,
           targetName:target.baseName,
           targetMatches:q.targetName === target.baseName,
           initialDirectionFrozen: hunterDirection(q) === TRACK_DIRECTIONS[q.targetDirection],

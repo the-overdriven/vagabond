@@ -2889,7 +2889,14 @@ more difficult:
 
   function logEnemySpotting(enemy, wandered = false) {
     // An unseen/invisible creature must not announce that it spotted the player.
-    if (enemyInvisibleActive(enemy) || !undergroundTileVisible(enemy.x, enemy.y)) return
+    if (enemyInvisibleActive(enemy) || enemy.wallAmbushHidden ||
+        !undergroundTileVisible(enemy.x, enemy.y)) return
+    if (enemyHasAbility(enemy, 'blind')) {
+      log(wandered
+        ? `The blind ${enemy.name} senses you nearby! It's not too late to retreat!`
+        : `The blind ${enemy.name} has sensed you!`, 'bad')
+      return
+    }
     log(wandered
       ? `The ${enemy.name} wanders right into you and spots you! It's not too late to retreat!`
       : `The ${enemy.name} has spotted you!`, 'bad')
@@ -3092,7 +3099,7 @@ more difficult:
     const unavailable = new Set(worldKilledSpecies)
     for (const e of enemies) if (e.alive) unavailable.add(trackSpecies(e))
     return ENEMY_TEMPLATES.filter(t => t && t.wander === 'far' && t.humanoid === false &&
-      Number(t.rarity ?? 1) <= 0.1 && !unavailable.has(t.name))
+      t.ultraRare === true && !unavailable.has(t.name))
   }
 
   function hunterReachableSurfaceTiles() {
@@ -4314,7 +4321,7 @@ more difficult:
     }
     if (!isExtraAttack && Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y)) <= ATTACK_RANGE &&
         canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
-      const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : 'The enemy'
+      const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : e.name
       log(`${enemyTimingText} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
       return enemyAttackPlayer(e, true)
     }
@@ -9793,6 +9800,7 @@ more difficult:
       ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP, nearby monster</div>' : ''}
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind · senses invisible targets · hesitant pursuit</div>' : ''}
       ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}

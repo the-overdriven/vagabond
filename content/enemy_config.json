@@ -5,7 +5,7 @@
   },
   "blind": {
     "pursuitHesitationChance": 0.5,
-    "hesitationMessage": "<enemy> senses you, but is reluctant about the direction"
+    "hesitationMessage": "<enemy> senses you, but is reluctant about the direction."
   },
   "collectiveMind": {
     "requireSameSpecies": true,
@@ -26,7 +26,7 @@
     "shellRetreat": {
       "healthThreshold": 0.4,
       "defBonus": 12,
-      "durationTurns": 2,
+      "durationTurns": 4,
       "message": "The <enemy> withdraws into its shell!"
     },
     "regen": {

@@ -16,8 +16,8 @@ function blindPursuitHesitates(e, distance) {
   if (!enemyHasAbility(e,'blind') || distance <= ATTACK_RANGE || !enemyFindStep(e)) return false
   if (!chance(BLIND_CONFIG.pursuitHesitationChance ?? 0.5)) return false
   if (enemyIsVisibleOnMainView(e))
-    log((BLIND_CONFIG.hesitationMessage || '<enemy> senses you, but is reluctant about the direction')
-      .replace(/<enemy>/g, `The ${e.name}`), 'info')
+    log((BLIND_CONFIG.hesitationMessage || '<enemy> senses you, but is reluctant about the direction.')
+      .replace(/<enemy>/g, `The blind ${e.name}`).replace(/([^.!?])$/, '$1.'), 'info')
   return true
 }
 

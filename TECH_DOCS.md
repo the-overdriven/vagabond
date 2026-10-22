@@ -1297,8 +1297,10 @@ cul-de-sac is not a valid through-route just because its end-cap has three
 walkable neighbours. This check applies before placing either trap type;
 wall-arrow emitters must also be backed by solid stone.
 
-Spikes trigger on entry by players and ordinary/flying enemies, while
-ethereal creatures pass through unharmed. Forced movement also triggers them. Remaining on a trigger or
+Spikes and arrow pressure plates trigger on entry by players and grounded,
+corporeal enemies. **Flying and ethereal enemies do not activate either floor
+mechanism**, including when moved by force. Forced movement of other creatures
+still triggers them. Remaining on a trigger or
 restoring a save does not. A pressure plate, placed a seeded random **1–5 floor squares** from its
 backed wall emitter where corridor geometry permits, fires a cardinal arrow
 toward the first non-ethereal creature in its lane, regardless of who stepped
@@ -1759,7 +1761,10 @@ route searches treat the triggers as blocked and reject stale cached routes.
 If no safe idle step exists, the monster waits. Monsters actively chasing the
 player, pushed by other abilities, or otherwise deliberately moved onto
 plates may still activate them. Players can therefore bait or push opponents
-onto a trigger; ethereal monsters remain immune to environmental damage.
+onto a trigger; flying and ethereal monsters do not depress the Crusher plates.
+Ethereal monsters remain immune to Crusher damage and displacement. A flying
+monster can still be struck by jaws activated by another actor, since the
+walls close across the passage rather than rising from the floor.
 
 **Crusher reward (v171):** Every functional Crusher room holds exactly one
 unopened chest beyond the far end of its five-tile crushing strip, farther
@@ -3371,6 +3376,8 @@ critical-hit bonus against them, and can hesitate instead of taking an ordinary
 pursuit step at a configurable rate outside melee range. The existing Pull
 mechanic now supports configurable messages and visuals: a non-web grasp can
 move a player without showing spider webs or applying their separate status.
+Blind enemies are identified in inspection, and their spotting and hesitation
+messages describe sensing rather than seeing the player.
 
 ## Defensive mine abilities (generic)
 
@@ -3383,7 +3390,7 @@ rendering and enemy inspection.
 | Ability / initial user | Rule | Player response |
 |---|---|---|
 | `exposed` — Vrakeber | Each attempted melee attack, including a miss, reduces its base DEF **12 → 3** through the next complete player action. Spawn variation and ordinary prefix, equipment, terrain, and ally modifiers apply after selecting the appropriate base. Subsequent attacks refresh the opening. | Strike while its exposed marker is visible. |
-| `shellRetreat` — Tholosum | The first surviving hit leaving it **below 40% max HP** activates a one-time shell state: **+12 DEF**, no attacks or moves for **two subsequent complete player actions**. The triggering action does not count, and lethal hits do not activate the shell. | Heal, retreat, wait, or attack the shell; its marker and duration are visible. |
+| `shellRetreat` — Tholosum | The first surviving hit leaving it **below 40% max HP** activates a one-time shell state: **+12 DEF**, no attacks or moves for **four subsequent complete player actions**. The triggering action does not count, and lethal hits do not activate the shell. | Heal, retreat, wait, or attack the shell; its marker and duration are visible. |
 | `regen` — Cave Troll | Heals **2 HP every 3 active-floor gameplay turns**, capped at max HP. The phase pauses off-floor without catch-up and never revives a dead monster. This also applies to the optional z:-2 cave encounter. | Deal sustained damage before recovery offsets weaker strikes. |
 
 Exposure deadline, shell duration/spent flag, and regeneration phase initialize
@@ -6383,7 +6390,7 @@ that satisfy all three rules:
 
 - `wander: "far"`
 - `humanoid: false`
-- `rarity <= 0.1`
+- `ultraRare: true`
 
 Species already represented by a living monster anywhere in the world, including
 underground, are excluded. Species previously killed in this world are also

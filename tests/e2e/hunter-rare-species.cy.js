@@ -26,6 +26,9 @@ describe('World-wide rare hunt species exclusions', () => {
       const reachable=hunterReachableSurfaceTiles()
       const pool=hunterRareTemplates().filter(t=>hunterRareSpawnSites(t,reachable).length)
       huntCheck(pool.length>=3,'fixture has multiple spawnable rare species')
+      huntCheck(pool.every(t=>t.ultraRare===true) &&
+        !hunterRareTemplates().some(t=>t.ultraRare!==true),
+        'only explicitly unique-world creatures are rare hunt candidates')
       const live=huntEnemy(pool[0],'existing-rare',-1)
       const dead=huntEnemy(pool[1],'killed-rare')
       killEnemy(dead)

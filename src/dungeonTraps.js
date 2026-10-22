@@ -283,6 +283,8 @@ const DungeonTraps = (() => {
   function onEntry(actor, fromX, fromY) {
     if (actor.x === fromX && actor.y === fromY) return
     if (actor !== player && !actor.alive) return
+    // Neither an incorporeal body nor a flying one depresses a floor trigger.
+    if (actor !== player && (enemyHasAbility(actor, 'ethereal') || enemyHasAbility(actor, 'fly'))) return
     const trap = activeLevel()?.traps?.find(t => t.trigger.x === actor.x && t.trigger.y === actor.y)
     if (trap) triggerTrap(trap, actor)
   }

@@ -376,6 +376,7 @@ const DungeonHazards = (() => {
   }
   function onActorEntered(actor, fromX, fromY) {
     if (actor.x === fromX && actor.y === fromY || (actor !== player && !actor.alive)) return
+    if (actor !== player && (enemyHasAbility(actor, 'ethereal') || enemyHasAbility(actor, 'fly'))) return
     const level = activeLevel()
     if (!level) return
     for (const hazard of level.hazards || []) {
