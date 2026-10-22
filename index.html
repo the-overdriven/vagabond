@@ -2999,6 +2999,7 @@ more difficult:
     enemy.hasteReadyTurn = Number.isInteger(enemy.hasteReadyTurn) ? enemy.hasteReadyTurn : 0
     enemy.healSelfReadyTurn = Number.isInteger(enemy.healSelfReadyTurn) ? enemy.healSelfReadyTurn : 0
     enemy.healSelfUsed = enemy.healSelfUsed === true
+    enemy.consumableHealUsed = enemy.consumableHealUsed === true
     enemy.invisibleUntilTurn = Number.isInteger(enemy.invisibleUntilTurn) ? enemy.invisibleUntilTurn : 0
     enemy.invisibilityReadyTurn = Number.isInteger(enemy.invisibilityReadyTurn) ? enemy.invisibilityReadyTurn : 0
     enemy.summonedTurn = Number.isInteger(enemy.summonedTurn) ? enemy.summonedTurn : null
@@ -3873,6 +3874,18 @@ more difficult:
 
   function lootFromEnemy(e) {
     const mf = playerMf()
+
+    // Optional per-species drops are independent of artifact/equipment loot.
+    // Their total chance is rolled once, then a weighted item is selected.
+    const drop = enemyTemplateForSavedEnemy(e)?.lootTable
+    if (drop?.items?.length && chance(drop.chance ?? 0)) {
+      const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
+      if (choices.length) {
+        const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
+        addInventoryItem(entry.kind)
+        log(`The ${e.name} dropped a ${itemDefinition(entry.kind).name}.`,'loot')
+      }
+    }
 
     // Fungus always yields ordinary unidentified mushrooms. Keep this separate
     // from normal humanoid/equipment loot so the guaranteed biological drop
@@ -5785,6 +5798,7 @@ more difficult:
           announceInspiredLeader(e)
         }
         if (tryTriggerCollectiveMind(e) && takeCollectiveMindRetreatTurn(e)) continue
+        if (tryEnemyConsumableHealing(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
         if (tryEnemySpell(e)) continue
@@ -5802,6 +5816,7 @@ more difficult:
       if (dist <= aggroRange && (enemyHasSight(e) || e.aware || e.alarmed) &&
           !forestConcealsPlayer(e, dist)) {
         if (tryTriggerCollectiveMind(e) && takeCollectiveMindRetreatTurn(e)) continue
+        if (tryEnemyConsumableHealing(e)) continue
         if (tryWoundedEnemyFlee(e)) continue
         if (tryEnemyHealSelf(e)) continue
         if (tryEnemyGazeOrWail(e)) continue
@@ -9788,6 +9803,7 @@ more difficult:
       ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
       ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'consumeHealingItem') ? `<div class="pfx">Consumable healing · ${e.consumableHealUsed ? 'spent' : 'ready below 50% HP'}</div>` : ''}
       ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
       ${enemyHasAbility(e, 'exposed') ? `<div class="pfx" style="color:#ffbb71">Exposed · ${enemyExposed(e) ? 'DEF reduced until next action' : 'after melee attack'}</div>` : ''}
       ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">Shell Retreat · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
@@ -12123,6 +12139,43 @@ more difficult:
     log('God mode: every map revealed. SPD 50. MF 25.', 'good')
   }
 
+  // Hidden debug navigation changes only the active layer. It deliberately
+  // retains the player's coordinates, even inside solid rock, because god
+  // mode permits wall traversal. No turn, enemy phase or RNG is consumed.
+  function useGodModeTravel(direction) {
+    if (!player.godMode || ![-1, 1].includes(direction)) return false
+    let destination = currentZ + direction
+    let nextMap = null
+    while (destination <= 0 && destination >= -deepLevels.length - 1) {
+      if (destination === 0) nextMap = surfaceMap
+      else {
+        const depth = chainDepthForZ(destination)
+        const level = deepLevels[depth-2]
+        if (depth <= 1 || level?.kind !== 'unused') nextMap = depthUndergroundMap(depth)
+      }
+      if (nextMap) break
+      destination += direction
+    }
+    if (!nextMap || !nextMap[player.y]?.[player.x]) return false
+    recordReplayAction({type: 'godTravel', direction})
+    currentZ = destination
+    currentCave = -1
+    map = nextMap
+    undergroundDiscovered = destination === 0 ? null : depthUndergroundDiscovered(chainDepthForZ(destination))
+    resetSwimming()
+    clearAutoPath()
+    pendingMove = null
+    stopCameraAnimation()
+    snapCameraToPlayer()
+    invalidateUndergroundFov()
+    minimapDirty = true
+    cancelPreparedEnemyAbilitiesOutsideFloor()
+    render()
+    updateHud()
+    updateTooltip()
+    return true
+  }
+
   window.addEventListener('keydown', (ev) => {
     if (Highscores.isOpen()) {
       Highscores.handleKeydown(ev)
@@ -12194,6 +12247,11 @@ more difficult:
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()) return
+    if (player.godMode && (k === 'PageUp' || k === 'PageDown')) {
+      ev.preventDefault()
+      if (!ev.repeat) useGodModeTravel(k === 'PageDown' ? -1 : 1)
+      return
+    }
     if (!ev.ctrlKey && !ev.metaKey && !ev.altKey &&
       (k === '+' || ev.code === 'NumpadAdd' || k === '-' || ev.code === 'NumpadSubtract')) {
       ev.preventDefault()

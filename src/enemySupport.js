@@ -52,6 +52,38 @@ function tryEnemyHealSelf(e) {
   return true
 }
 
+// A species may carry one emergency consumable. A successful roll spends its
+// action and its lifetime charge; eligibility and healing are template-driven.
+function tryEnemyConsumableHealing(e) {
+  if (!enemyHasAbility(e,'consumeHealingItem') || !e.alive || e.hp <= 0 ||
+      e.consumableHealUsed || enemyIsPassive(e) || e.sleeping ||
+      enemyInsideSanctuary(e) || playerInsideSanctuary() ||
+      playerHiddenFromEnemy(e) || !enemyHasSight(e)) return false
+  const cfg = enemyTemplateForSavedEnemy(e)?.consumableHealing
+  if (!cfg?.items?.length) return false
+  const hpFraction = e.hp / e.maxHp
+  const options = cfg.items.filter(item => hpFraction < item.belowHp &&
+    Number(item.weight ?? 1) > 0)
+  if (!options.length || !chance(cfg.chance ?? 0)) return false
+  const selected = pickWeighted(options, item => Number(item.weight ?? 1))
+  const def = itemDefinition(selected.kind)
+  if (!def?.effect) return false
+  const effect = def.effect
+  let amount = effect.fullHeal ? e.maxHp-e.hp :
+    Math.max(1,Math.round(e.maxHp * (effect.maxHpFraction || 0)))
+  if (!effect.fullHeal && selected.kind === 'herb') amount = Math.max(20,Math.min(50,amount))
+  if (!effect.fullHeal && effect.consumableBonus)
+    amount = Math.max(1,Math.round(amount * (cfg.bonusMultiplier ?? 1)))
+  const healed = Math.min(e.maxHp-e.hp,amount)
+  if (healed <= 0) return false
+  e.hp += healed
+  e.consumableHealUsed = true
+  const verb = selected.kind === 'potion' ? 'drinks' : 'eats'
+  log(`The ${e.name} ${verb} a ${def.name} and recovers ${healed} HP!`,'bad')
+  spawnDamageNumber(e.x,e.y,`+${healed} HP`,'#81df98')
+  return true
+}
+
 // Haste is movement-only: no strike can occur between or after its steps.
 // Normal natural-speed pursuit remains a separate rule (max two actions).
 function tryEnemyHaste(e, distance) {

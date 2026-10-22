@@ -672,6 +672,8 @@
             "minimumZ": -5,
             "floorAttemptChance": 0.7,
             "maxPerFloor": 1,
+            "giantSpiderChance": 0.2,
+            "bonusChestChance": 0.2,
             "minimumInteriorLength": 13,
             "minimumInteriorWidth": 9,
             "preferredExteriorSize": [
@@ -1440,6 +1442,11 @@
       },
       "loot": {
         "baseBudget": 2,
+        "lifePotionsPerFortFloor": [1, 2],
+        "libraryScrolls": {
+          "chance": 0.3,
+          "kinds": ["scrollOfFear", "scrollOfChaos", "scrollOfDeathShield"]
+        },
         "growthPerFloor": 0.1,
         "tierBiasGrowth": 0.12,
         "tierBiasCap": 0.55,

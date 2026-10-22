@@ -280,7 +280,6 @@
     "thiefBagImage": "img/overlays/thief-bag.svg",
     "ruptureWarningImage": "img/tiles/rupture-warning.png",
     "burrowWarningImage": "img/tiles/burrow-warning.png",
-    "jumpWarningImage": "img/tiles/jump-warning.png",
     "wallAmbushWarningImage": "img/tiles/wall-ambush-warning.png",
     "pathFootstepImage": "img/icons/bootmarks.svg",
     "pathFootstepScale": 0.56,

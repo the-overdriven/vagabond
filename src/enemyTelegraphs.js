@@ -327,6 +327,7 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
   for (const e of enemies) {
     if (!e.alive || !onCurrentLevel(e) || !e.pendingAbility) continue
     const type=e.pendingAbility.type
+    if (type==='jump') continue // Leap is positioning only: no floor warning overlay.
     for (const tile of e.pendingAbility.tiles || []) {
       const key=keyXY(tile.x,tile.y)
       if (warned.has(key) || (undergroundVisible && !undergroundVisible.has(key))) continue

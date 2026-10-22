@@ -1638,6 +1638,11 @@ one per side. Shooters are distributed along the length, have real ammunition,
 use existing LOS and ranged-combat AI through the bars, and count fully
 against the normal floor encounter budget before roaming enemies. This is
 an intentionally dangerous optional branch, not a progression requirement.
+Each gallery also has two independent **20%** optional rolls. One places a
+Giant Spider in the unobstructed central aisle, never inside a barred shooter
+cell. The other places one additional chest on a free, trap-safe aisle tile;
+the guaranteed chest behind the prison door is never replaced. These optional
+encounters and rewards are rolled during seeded generation and survive saves.
 If the floor cannot fund the promised archers, generation must not substitute
 fake archers or quietly accept a less-populated gallery. The far-end chest
 remains a one-tier-higher reward, capped at the ordinary loot ceiling and
@@ -2579,9 +2584,10 @@ Cooldown: **six complete active-floor turns** after resolution or cancellation.
 **Jump** is generic fast positioning, currently used by Naledi. It prepares a
 straight leap of **two to four tiles** when that avoids creatures/low cover or
 improves pursuit by at least two tiles. It may cross creatures, dwarven beds,
-tables and crates, but not boulders, walls, doors, shelves or gates. A visible
-landing marker stays fixed during the player's response action. The next enemy
-phase moves the jumper to an available legal landing tile without any landing
+tables and crates, but not boulders, walls, doors, shelves or gates. The
+landing tile is fixed during the player's response action, but no floor
+warning overlay is drawn. The next enemy phase moves the jumper to an
+available legal landing tile without any landing
 damage or same-turn melee. A blocked landing leaves the jumper at the origin.
 Cooldown: **four complete active-floor turns**. Blind hesitation is checked
 before a pursuit Jump. Landing on dungeon transitions is prohibited for both
@@ -2615,7 +2621,7 @@ members**, then the shortest legal travel path; an isolated surviving ally is
 an acceptable fallback. Equal choices use stable identifiers. When a group
 is available, the scout spends its actions moving toward an adjacent reachable
 space near those allies instead of attacking the player. Normal movement or
-an eligible, warned **Jump** may be used; Jump follows its ordinary cooldown
+an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
 and never grants a landing attack. A blocked route or loss of the chosen group
 ends the single retreat attempt without selecting another target. The scout
 resumes ordinary behavior after regrouping or cancellation. Floor alert,
@@ -3394,6 +3400,18 @@ cannot add bonus attacks, and their feedback is logged with brief floating text.
 | Gravehound, White Tiger — `haste` | 20% on eligible pursuit turns at least 3 tiles from the visible player | Move up to **2 tiles**, replacing normal chase and any same-turn attack | **5 complete turns** cooldown. Never exceeds two movement steps, cannot bypass closed doors, does not trigger while invisible/safe in sanctuary |
 | Champion prefix — **Inspired** | Continuous while alive | Every living **non-Champion** ally within 2 Chebyshev tiles gains **+2 ATK, +1 DEF** | Champion does not buff itself or other Champions. Multiple Champions do not stack; moving out of range or killing the source immediately removes the bonus |
 | Nymph — `healSelf` | 25% on eligible combat turns below **50% maximum HP** | Instead of an attack or chase, restore **25% max HP** (rounded up, capped at max HP): ordinary 28-HP Nymph heals 7 HP | **Once per lifetime**; successful use starts a 5-turn cooldown, but the one-use limit remains in force even afterward. Cannot heal while passive, asleep, concealed from the player, or in sanctuary |
+| Wyrdhag — `consumeHealingItem` | 10% on eligible combat turns below **50% maximum HP** | Consume one randomly chosen eligible item and spend the entire action: Healing Herb or Mushroom below 50% HP, Life Potion also eligible below 20% HP | **Once per lifetime**; cannot heal while passive, asleep, unable to see the player, or in sanctuary. Healing takes priority over wounded Flee on a successful roll |
+
+Wyrdhag's herbs and mushrooms heal as if used by a **Wyrdling** (25% bonus,
+rounded to whole HP). Herb base healing is 25% of maximum HP, clamped to
+20–50 HP before the bonus; mushrooms restore 25% maximum HP before the bonus
+and are **never poisonous** to Wyrdhag. A Life Potion fully restores its HP.
+At under 20% HP, all three eligible items are equally likely; from 20% up to
+50%, herb and mushroom are equally likely. Which items are available, their
+thresholds, chance, and bonus are configured per species in
+`enemy_templates.json` under `consumableHealing`. Its spent charge persists
+through saves and replay, and the ability does not create supplies on demand
+for the player.
 
 Haste uses the existing walkable pathfinder, and opening a door takes the normal
 separate action; a sprint cannot open a door and then run through it. The two
@@ -3413,7 +3431,8 @@ the Inspired status remains visible on affected followers. Defeating a visible C
 and fading-aura popup. Nymph healing shows its exact HP gained; its spent use
 and Haste cooldown appear in monster inspection.
 
-`hasteReadyTurn`, `healSelfReadyTurn`, and `healSelfUsed` belong to each enemy
+`hasteReadyTurn`, `healSelfReadyTurn`, `healSelfUsed`, and
+`consumableHealUsed` belong to each enemy
 instance and are initialized for new spawns and serialized/restored in **save
 schema 58**, including replay snapshots. Inspired needs no per-recipient status
 flag: it is recalculated directly from living Champion positions, so save/load
@@ -5536,6 +5555,28 @@ random(1–5) × enemy tier, modified by Magic Find
 Chests and Magic Find still grant gold normally; only the per-kill enemy gold
 was removed.
 
+Monster templates may define an independent `lootTable` containing a total
+drop probability and a weighted list of ordinary item kinds. A successful
+roll awards **one** item directly to the inventory, in addition to any
+normal artifact or equipment drops. The weights choose which item drops;
+they do not multiply the total drop probability. **Wyrdhag** has a **20%**
+total chance to drop a Life Potion, Healing Herb or Mushroom, each with equal
+conditional probability (about **6⅔%** of kills per item). This loot chance
+does not increase with Magic Find. Using its own healing item in combat does
+not alter the separate death-drop roll.
+
+Each generated Dwarven Fort/Ruins floor from **z:-3 through the deepest Ruins
+floor** contains **1–2 loose Life Potions**, selected from reachable, safe,
+unoccupied marble. The count is configured under
+`dwarvenRuins.loot.lifePotionsPerFortFloor`; the separate Dwarven Mines are not
+included. These supplies are ordinary ground items, not refillable containers.
+
+Each ordinary **Library** room in the Ruins has a **30%** chance to contain
+one loose rare scroll on its floor, chosen with equal weight from Fear, Chaos,
+and Death Shield. Rooms get independent rolls; a successful room receives at
+most one additional scroll on an accessible unoccupied floor tile. Both chance
+and item kinds are configurable in `dwarvenRuins.loot.libraryScrolls`.
+
 Artifact drop chance by enemy tier:
 
 | Tier | Base chance |
@@ -5945,6 +5986,14 @@ that describes its rules without consuming it.
 
 Radii use Chebyshev distance (eight-direction tile distance) on the current map
 and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
+Chaos can teleport creatures from one side of iron prison bars or a closed
+barred prison door to the other, but cannot land on an impassable bar or pass
+through opaque walls and ordinary shut doors. Safe landing, terrain, and
+occupancy rules remain unchanged.
+Chaos can teleport creatures from one side of iron prison bars or a closed
+barred prison door to the other, but cannot land on an impassable bar or pass
+through opaque walls and ordinary shut doors. Safe landing, terrain, and
+occupancy rules remain unchanged.
 It also multiplies each combat potion's entire positive stat bonus by 1.25,
 rounded to the nearest integer after adding the flat and scaling portions:
 
@@ -7667,6 +7716,15 @@ Holding the key does not trigger repeated toggles. The key press is a replay
 action; older recordings that toggled only god-mode invisibility still replay
 with their original behavior. The visibility flag is saved; older god mode
 saves load with invisibility on.
+
+While God Mode is active, hidden **Page Down / Page Up** controls instantly
+move to the next generated lower / higher z level without a turn or RNG roll,
+skipping non-playable depths. For example, Page Down on the surface goes from
+z:0 to z:-1. The player retains the exact same x/y coordinates, even inside
+solid rock, and can walk out through it using God Mode movement. Debug travel
+uses the generic depth chain, not the separate crypt map; pending warnings
+on the departed level are canceled. The action is recorded for replay, but
+does not appear in the in-game control hints.
 
 It:
 

@@ -79,7 +79,6 @@ const PRECACHE_URLS = [
   './img/tiles/haulage-cage-lower.png',
   './img/tiles/rupture-warning.png',
   './img/tiles/burrow-warning.png',
-  './img/tiles/jump-warning.png',
   './img/tiles/wall-ambush-warning.png',
   './img/tiles/dwarven-gate-open.png',
   './img/tiles/dwarven-lever-pulled.png',

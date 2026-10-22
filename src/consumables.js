@@ -77,6 +77,12 @@ function applyFearScroll(effect) {
 
 // Flood each movement class's connected component once per cast. Occupants do
 // not disconnect terrain; reservations are checked separately for safe landings.
+// Chaos can teleport through barred partitions and barred doors (but never
+// land on them), while solid walls and ordinary shut doors still divide space.
+function chaosPassesBars(tile) {
+  return ['dwarvenprisonbars','dwarvenprisondoorclosed','dwarvenprisondoorlocked'].includes(tile)
+}
+
 function chaosReachable(actor, cache) {
   const type = actor === player ? 'player' : enemyHasAbility(actor, 'ethereal') ? 'ethereal'
     : enemyHasAbility(actor, 'fly') ? 'fly' : 'walk'
@@ -87,9 +93,9 @@ function chaosReachable(actor, cache) {
   const seen = new Set([startKey]), queue = [{x: actor.x, y: actor.y}]
   for (let i = 0; i < queue.length; i++) for (const [dx, dy] of DIRS8) {
     const x = queue[i].x + dx, y = queue[i].y + dy, tile = map[y]?.[x], key = keyXY(x, y)
-    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || !tile || seen.has(key) ||
-        isClosedDungeonDoorTile(tile) || isLockedDungeonDoorTile(tile)) continue
-    if (!(actor === player ? isWalkableForPlayer(x, y) : enemyCanTraverse(actor, x, y))) continue
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H || !tile || seen.has(key)) continue
+    if (!chaosPassesBars(tile) && (isClosedDungeonDoorTile(tile) || isLockedDungeonDoorTile(tile) ||
+        !(actor === player ? isWalkableForPlayer(x, y) : enemyCanTraverse(actor, x, y)))) continue
     seen.add(key); queue.push({x, y})
   }
   cached.push(seen); cache.set(type, cached)

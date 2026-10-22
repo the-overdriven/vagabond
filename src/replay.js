@@ -316,6 +316,10 @@ function finishReplayPlayback() {
 
 async function runReplayAction(action) {
   switch (action.type) {
+    case 'godTravel':
+      if (!useGodModeTravel(action.direction))
+        return replayDesync(`Replay desynchronized: cannot travel by ${action.direction} in god mode.`)
+      break
     case 'godMode':
       if (!action.disable && player.godMode) {
         player.godInvisible = !player.godInvisible

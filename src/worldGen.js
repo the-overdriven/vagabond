@@ -6391,6 +6391,21 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         spent += Math.max(1,tmpl.tier)
       }
     }
+    // This bonus threat is in the unbarred three-wide aisle, never in the
+    // shooter bays. It leaves the guaranteed ranged staffing unchanged.
+    const crossfireCfg = packageCfg.rooms?.prisonGeneration?.crossfire || {}
+    const spiderTemplate = ENEMY_TEMPLATE_BY_NAME['Giant Spider']
+    for (const room of galleryRooms) {
+      if (!spiderTemplate || !chance(crossfireCfg.giantSpiderChance ?? 0)) continue
+      const possible = room.gallery.aisle.filter(p => level.map[p.y]?.[p.x] === 'marble' &&
+        !usedPositions.has(keyXY(p.x,p.y)) &&
+        DungeonTraps.safeSpawn(p.x,p.y,z) &&
+        !groundItems.some(g => g.level === z && g.x === p.x && g.y === p.y) &&
+        room.gallery.alarmTiles.every(a => a.x !== p.x || a.y !== p.y) &&
+        Math.max(Math.abs(p.x-room.gallery.chest.x),Math.abs(p.y-room.gallery.chest.y)) >= 3)
+      if (!possible.length) continue
+      spawnTemplate(spiderTemplate,claimSpot(pick(possible)),null,'gallerySpider',null,room.id)
+    }
     // Mandatory ordinary Prison archers spawn BEFORE other organized fights.
     // Distribute them across cell depth, with clear lines through the bars.
     for (const room of ordinaryPrisonRooms) {
@@ -6855,6 +6870,64 @@ function spawnDwarvenRuinsChests() {
         tier:dungeonLootTier(packageId, floorIndex, room, vault),opened:false,
         dungeonRoomId:room.id,vaultId:vault?.id || null})
       roomUse.set(room.id, (roomUse.get(room.id) || 0) + 1)
+    }
+    const crossfireCfg = packageCfg.rooms?.prisonGeneration?.crossfire || {}
+    for (const room of (level.rooms || []).filter(room => room.gallery)) {
+      if (!chance(crossfireCfg.bonusChestChance ?? 0)) continue
+      const spots = room.gallery.aisle.filter(p => level.map[p.y]?.[p.x] === 'marble' &&
+        safeRoute.has(keyXY(p.x,p.y)) && !stairLandings.has(keyXY(p.x,p.y)) &&
+        DungeonTraps.safeSpawn(p.x,p.y,z) &&
+        !enemies.some(e => e.alive && e.level === z && e.x === p.x && e.y === p.y) &&
+        !groundItems.some(g => g.level === z && g.x === p.x && g.y === p.y) &&
+        room.gallery.alarmTiles.every(a => a.x !== p.x || a.y !== p.y) &&
+        Math.max(Math.abs(p.x-room.gallery.chest.x),Math.abs(p.y-room.gallery.chest.y)) >= 3)
+      if (!spots.length) continue
+      const p = pick(spots)
+      groundItems.push({x:p.x,y:p.y,level:z,levelKind:'chain',caveIndex:-1,
+        kind:'chest',opened:false,tier:dungeonLootTier(packageId,floorIndex,room),
+        dungeonRoomId:room.id,galleryBonusChest:true})
+    }
+    const libraryCfg = cfg.libraryScrolls || {}
+    for (const room of rooms.filter(room => room.archetype === 'Library')) {
+      if (!chance(libraryCfg.chance ?? 0)) continue
+      const spots = candidatesForRoom(room)
+      if (!spots.length || !libraryCfg.kinds?.length) continue
+      const p = pick(spots)
+      groundItems.push({x:p.x,y:p.y,level:z,levelKind:'chain',caveIndex:-1,
+        kind:pick(libraryCfg.kinds),dungeonRoomId:room.id,libraryScroll:true})
+    }
+  }
+  spawnDwarvenFortLifePotions()
+}
+
+function spawnDwarvenFortLifePotions() {
+  const range = dungeonPackageConfig('dwarvenRuins')?.loot?.lifePotionsPerFortFloor || [1,2]
+  const floors = [{level:deepLevels[1],z:-3,entry:dwarvenRuin},
+    ...dungeonPackageLevels('dwarvenRuins').map(({level,z})=>({level,z,entry:level.caves?.[0]?.entrances?.[0]}))]
+  for (const {level,z,entry} of floors) {
+    if (!level?.map || !entry) throw new Error(`Missing Dwarven Fort floor at ${z}`)
+    const reachable = DungeonTraps.safeReachable(level.map,entry,
+      new Set((level.traps || []).map(t => keyXY(t.trigger.x,t.trigger.y))))
+    const occupiedTiles = new Set([
+      ...enemies.filter(e => e.alive && e.level === z),
+      ...groundItems.filter(item => item.level === z)
+    ].map(item => keyXY(item.x,item.y)))
+    const spots=[]
+    for (const xy of reachable) {
+      const [x,y] = xy.split(',').map(Number)
+      if (x<1 || y<1 || x>=MAP_W-1 || y>=MAP_H-1 ||
+        level.map[y]?.[x]!=='marble' ||
+        Math.max(Math.abs(x-entry.x),Math.abs(y-entry.y)) < 5 ||
+        !DungeonTraps.safeSpawn(x,y,z) ||
+        occupiedTiles.has(xy)) continue
+      spots.push({x,y})
+    }
+    const count=randInt(range[0],range[1])
+    if(spots.length<count) throw new Error(`No safe positions for ${count} Dwarven Fort Life Potions at ${z}`)
+    for(let n=0;n<count;n++) {
+      const index=randInt(0,spots.length-1),p=spots.splice(index,1)[0]
+      groundItems.push({x:p.x,y:p.y,level:z,levelKind:'chain',caveIndex:-1,
+        kind:'potion',fortSupply:true})
     }
   }
 }
