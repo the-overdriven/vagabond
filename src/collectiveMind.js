@@ -23,6 +23,16 @@ function collectiveMindAllies(e) {
       (other.baseName || other.name) === (e.baseName || e.name)))
 }
 
+// The broadcast continues while its scout lives. Once the scout reaches a
+// separate pack, the floor remembers that the warning cannot be undone by
+// killing it or leaving the level. An uncompleted broadcast ends on death.
+function collectiveMindAlertActive(e) {
+  const state=collectiveMindFloors[collectiveMindFloorKey(e)]
+  if(!state?.spent)return false
+  if(state.secured)return true
+  return enemies.some(other=>other.id===state.scoutId && other.alive && other.hp>0)
+}
+
 // Build one deterministic shortest-path search. Occupied cells, the player,
 // solid terrain and forbidden corners block ordinary retreat movement.
 // Treat doors using the regular enemy path permission: opening a legal door
@@ -100,7 +110,7 @@ function tryTriggerCollectiveMind(e) {
      playerHiddenFromEnemy(e))return false
   const key=collectiveMindFloorKey(e)
   if(collectiveMindFloors[key]?.spent)return false
-  collectiveMindFloors[key]={spent:true,scoutId:e.id}
+  collectiveMindFloors[key]={spent:true,scoutId:e.id,secured:false}
   const members=[e,...collectiveMindAllies(e)]
   // Alarmed intentionally retains the existing short-range sensing/chase AI,
   // even around a corner. No separate follow-target coordinates are stored.
@@ -121,6 +131,10 @@ function tryTriggerCollectiveMind(e) {
 
 function endCollectiveMindRetreat(e,succeeded) {
   if(!e.collectiveMindRetreat)return
+  if(succeeded) {
+    const state=collectiveMindFloors[collectiveMindFloorKey(e)]
+    if(state?.scoutId===e.id)state.secured=true
+  }
   e.collectiveMindRetreat=null
   if(enemyIsVisibleOnMainView(e))log(
     (succeeded?COLLECTIVE_MIND_CONFIG.regroupMessage:COLLECTIVE_MIND_CONFIG.fallbackMessage)

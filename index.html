@@ -218,19 +218,18 @@ more difficult:
     @keyframes loading-spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .loading-skull { animation-duration: 12s; } }
 
-    /* Move the actual game canvas, not the full-screen stage behind the HUD.
-       CSS translate composes with the canvas's desktop centering transform. */
-    #stage.rupture-shake > canvas#game { animation: rupture-canvas-shake 520ms linear; }
+    /* Fallback for browsers without Web Animations. Normal eruptions animate
+       the visible canvas directly while keeping its desktop centering. */
+    #stage.rupture-shake > canvas#game { animation: rupture-canvas-shake 650ms linear; }
     @keyframes rupture-canvas-shake {
       0%, 100% { translate: 0 0; }
-      14% { translate: 12px -6px; }
-      28% { translate: -14px 8px; }
-      44% { translate: 10px 5px; }
-      60% { translate: -8px -5px; }
-      78% { translate: 5px 3px; }
-      90% { translate: -2px 1px; }
+      14% { translate: -22px 12px; }
+      28% { translate: 24px -14px; }
+      44% { translate: -21px -11px; }
+      60% { translate: 18px 12px; }
+      78% { translate: -13px 8px; }
+      90% { translate: 9px -5px; }
     }
-    @media (prefers-reduced-motion: reduce) { #stage.rupture-shake > canvas#game { animation: none; } }
 
     .invitem .item-icon {
       flex: 0 0 auto;
@@ -4897,6 +4896,15 @@ more difficult:
   function updateAlarmedEnemies() {
     const levelKind = currentLevelKind()
     for (const e of enemies) {
+      if (onCurrentLevel(e) && enemyHasAbility(e,'collectiveMind') &&
+          collectiveMindAlertActive(e)) {
+        // Restore the broadcast on re-entry and preserve it across distance
+        // checks. No animation, time source or additional RNG is involved.
+        if(!e.alarmed)alarmEnemy(e)
+        e.alarmedZ=currentZ
+        e.alarmedLevelKind=levelKind
+        continue
+      }
       if (!e.alarmed) continue
       // A burrowed monster has no occupied map tile; sense from its last
       // surface position until it emerges, not its off-map sentinel.
@@ -9827,7 +9835,7 @@ more difficult:
       ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'wallAmbush') ? `<div class="pfx">Wall Ambush · ${e.wallAmbushSpent ? 'revealed' : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'collectiveMind') ? `<div class="pfx">Collective Mind · ${e.collectiveMindRetreat ? 'regrouping' : collectiveMindFloors[collectiveMindFloorKey(e)]?.spent ? 'alert sent' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'collectiveMind') ? `<div class="pfx">Collective Mind · ${e.collectiveMindRetreat ? 'regrouping' : collectiveMindFloors[collectiveMindFloorKey(e)]?.secured ? 'alert secured' : collectiveMindAlertActive(e) ? 'alert sent' : collectiveMindFloors[collectiveMindFloorKey(e)]?.spent ? 'alert canceled' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'wail') ? `<div class="pfx">Wail · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}

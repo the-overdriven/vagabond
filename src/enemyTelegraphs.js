@@ -358,10 +358,28 @@ function tryPrepareEnemyRupture(e) {
 // Rupture feedback is presentation-only: never advance turns or consume game RNG.
 function shakeRuptureScreen() {
   if (replayAnimationsDisabled || replaySimulationMode) return
-  const stage = document.getElementById('stage')
+  const canvas = document.getElementById('game')
+  if (!canvas) return
+  // Animate the visible canvas directly. Independent `translate` preserves
+  // desktop centering and mobile sizing, without changing game coordinates.
+  if (typeof canvas.animate === 'function') {
+    canvas.ruptureShakeAnimation?.cancel()
+    const animation=canvas.animate([
+      {translate:'0 0'}, {translate:'-22px 12px'},
+      {translate:'24px -14px'}, {translate:'-21px -11px'},
+      {translate:'18px 12px'}, {translate:'-13px 8px'},
+      {translate:'9px -5px'}, {translate:'-4px 3px'}, {translate:'0 0'}
+    ],{duration:650,easing:'linear',iterations:1})
+    canvas.ruptureShakeAnimation=animation
+    animation.onfinish=()=>{
+      if(canvas.ruptureShakeAnimation===animation)canvas.ruptureShakeAnimation=null
+    }
+    return
+  }
+  const stage=document.getElementById('stage')
   if (!stage) return
   stage.classList.remove('rupture-shake')
-  void stage.offsetWidth // Restart the effect when several eruptions happen together.
+  void canvas.offsetWidth // Restart CSS fallback for consecutive eruptions.
   stage.classList.add('rupture-shake')
 }
 
@@ -440,6 +458,30 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
       const px=Math.round((tile.x-camX)*TILE_PX),py=Math.round((tile.y-camY)*TILE_PX)
       if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) continue
       ctx.save()
+      if (type==='rupture') {
+        // Cracks are the whole warning: no yellow frame, marker or tint.
+        if (!foreground) {
+          const image=RENDER_STYLE.overlays?.ruptureWarningImage
+          if (USE_TILE_IMAGES && image) drawImageVisual(px,py,{image,scale:1},0.9)
+          else {
+            const s=TILE_PX
+            ctx.strokeStyle='#bd7043'
+            ctx.lineWidth=Math.max(2,Math.round(s*0.045))
+            ctx.beginPath()
+            ctx.moveTo(px+s*0.24,py+s*0.12)
+            ctx.lineTo(px+s*0.45,py+s*0.37)
+            ctx.lineTo(px+s*0.35,py+s*0.58)
+            ctx.lineTo(px+s*0.58,py+s*0.83)
+            ctx.moveTo(px+s*0.45,py+s*0.37)
+            ctx.lineTo(px+s*0.76,py+s*0.29)
+            ctx.moveTo(px+s*0.35,py+s*0.58)
+            ctx.lineTo(px+s*0.13,py+s*0.76)
+            ctx.stroke()
+          }
+        }
+        ctx.restore()
+        continue
+      }
       if (!foreground) {
         ctx.fillStyle='rgba(229,88,44,0.25)'
         ctx.fillRect(px,py,TILE_PX,TILE_PX)

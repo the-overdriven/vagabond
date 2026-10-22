@@ -3277,7 +3277,7 @@ without an initially unoccupied one-step escape, although other hazards,
 rooting or moving actors can subsequently block it. A caught player takes an
 ordinary damage roll with **125% of the monster's effective ATK** against the
 player's DEF, without a separate miss/critical/glancing roll. Eruption gives
-the game canvas a pronounced visual shake whether it hits or misses; the animation
+the visible game canvas a pronounced **650 ms** visual shake whether it hits or misses; the animation
 does not affect turns, damage or replay outcomes. Resolution consumes the
 monster's action and starts **five complete subsequent active-floor turns**
 of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
@@ -3308,7 +3308,7 @@ it stays buried until an opening appears. A successful emergence or canceled Bur
 **six complete active-floor turns** of cooldown. Origin, destination, remaining
 wait time, and cooldown are deterministic save/replay state.
 
-**Jump** is a generic fast repositioning action, currently used by Naledi.
+**Jump** is a generic fast repositioning action, used by Naledi and Giant Toad.
 It prepares a straight leap of **two to four tiles** when it can bypass
 creatures or low cover, or improve pursuit by at least two tiles. It may cross
 creatures, dwarven beds, tables and crates, but not boulders, walls, doors,
@@ -3341,8 +3341,12 @@ player, every living ally of the configured species with this ability on that
 floor becomes **Alarmed**. Alarmed monsters retain their existing sensory
 chase rules, including following around corners within aggro range; they do
 not teleport, share a forced path, or receive a permanent tracking target.
-The floor alert remains spent after leaving and returning, even when ordinary
-Alarmed states expire.
+The shared Alarmed state does not fade with distance or when the player leaves
+and returns to the floor. Before the scout reaches another group, killing that
+scout cancels the collective alert; survivors then follow ordinary Alarmed
+expiration rules. Successfully reaching the other group makes the broadcast
+**permanent** for surviving members on that floor, even if the scout later
+dies. Each floor can trigger Collective Mind only once.
 
 The detecting member becomes the designated scout. It chooses a reachable
 **different pack**, preferring packs with **at least two other surviving
@@ -3354,7 +3358,7 @@ an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
 and never grants a landing attack. A blocked route or loss of the chosen group
 ends the single retreat attempt without selecting another target. The scout
 resumes ordinary behavior after regrouping or cancellation. Floor alert,
-initial pack identity, chosen ally IDs and ongoing retreat are saved and
+its permanent-regrouped state, initial pack identity, chosen ally IDs and ongoing retreat are saved and
 replayed without animation-dependent decisions. Parameters and messages are
 configured in `enemy_config.json`.
 
