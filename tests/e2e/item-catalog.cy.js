@@ -128,7 +128,7 @@ describe('Non-gear item catalog', () => {
     })
   })
 
-  it('creates stacks and distinct inscriptions and keeps Homecoming at 100g', () => {
+  it('creates stacks and distinct inscriptions and sells Homecoming for 70g', () => {
     beginNewGame('Catalog Tester')
     cy.window().then(win => {
       const result = win.eval(`(() => {
@@ -151,7 +151,7 @@ describe('Non-gear item catalog', () => {
         return result
       })()`)
       expect(result).to.deep.equal({herbs: 2, fishName: 'Fresh Fish', inscriptions: ['First', 'Second'],
-        homePrice: 100, homeSell: 50, gold: 0, homeCount: 8, potatoValue: 0, amberValue: 20, shellValue: 10})
+        homePrice: 70, homeSell: 50, gold: 30, homeCount: 8, potatoValue: 0, amberValue: 20, shellValue: 10})
     })
   })
 
