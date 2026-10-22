@@ -723,6 +723,7 @@ more difficult:
   let ITEM_BASE_VALUES
   let ITEM_DEFINITIONS = {}
   let LOOSE_CONSUMABLE_VARIANTS = null
+  let LOOSE_SCROLL_VARIANTS = null
   let FORAGE_TABLE = {}
   let CHEST_LOOT_TABLE = {}
   let MAP_W, MAP_H, MAX_WORLD_ATTEMPTS
@@ -994,6 +995,7 @@ more difficult:
     validateItemDefinitions(content.items)
     ITEM_DEFINITIONS = content.items
     LOOSE_CONSUMABLE_VARIANTS = content.lootTables.looseConsumableVariants
+    LOOSE_SCROLL_VARIANTS = content.lootTables.looseScrollVariants
     FORAGE_TABLE = content.lootTables.forage
     CHEST_LOOT_TABLE = content.lootTables.chestLoot
     BASE_MAP_CONFIG = content.mapConfig
@@ -4270,7 +4272,7 @@ more difficult:
     return true
   }
 
-  function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null) {
+  function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null, options = null) {
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
     revealEnemyInvisibility(e)
@@ -4280,7 +4282,8 @@ more difficult:
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     beginEnemyAttackAnim(e)
     exposeEnemyAfterMelee(e)
-    if (chance(charge ? missChance(enemySpd(e), playerSpd()) / 2
+    if (chance(options?.fixedHitChance != null ? 1 - options.fixedHitChance
+      : charge ? missChance(enemySpd(e), playerSpd()) / 2
       : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
@@ -4323,12 +4326,14 @@ more difficult:
       applyEnemyPoison(e)
       applyEnemyContactStatuses(e)
     }
+    if (player.hp > 0 && options?.onHit) options.onHit()
     updateHud()
     if (player.hp <= 0) {
       die(e)
       return true
     }
-    if (effectiveDamage > 0 && (charge || (critical && enemyHasAbility(e, 'knockback')))) {
+    if (!options?.suppressKnockback && effectiveDamage > 0 &&
+        (charge || (critical && enemyHasAbility(e, 'knockback')))) {
       const line = charge?.line ?? {sx: Math.sign(player.x - e.x), sy: Math.sign(player.y - e.y)}
       enemyKnockback(e, line, !!charge)
       if (player.hp <= 0 || deathTransition) return true

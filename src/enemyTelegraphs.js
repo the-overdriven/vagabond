@@ -112,6 +112,18 @@ function enemyBurrowReturnTile(e,pending) {
       enemyAbilityTerrainOpen)) || null
 }
 
+function enemyBurrowShoveTiles(e) {
+  const from={x:player.x,y:player.y}
+  const open=(x,y)=> (isWalkable(x,y) || deepSwimmingWater(x,y)) &&
+    !grasslandTrees.has(keyXY(x,y))
+  return DIRS8.map(([dx,dy])=>({x:from.x+dx,y:from.y+dy,dx,dy}))
+    .filter(tile=>open(tile.x,tile.y) &&
+      enemyAbilityDiagonalCanPass(from.x,from.y,tile.dx,tile.dy,open) &&
+      !(currentZ===0 && npcs.some(n=>n.x===tile.x && n.y===tile.y)) &&
+      !enemies.some(other=>other!==e && other.alive && onCurrentLevel(other) &&
+        other.x===tile.x && other.y===tile.y))
+}
+
 function enemyTelegraphCommonEligible(e, type, options={}) {
   return !!enemyTelegraphConfig(type) && enemyHasAbility(e,type) && e.alive && e.hp>0 &&
     !e.pendingAbility && !enemyAbilityCooldown(e,type) && !e.sleeping &&
@@ -145,7 +157,40 @@ function tryPrepareEnemyBurrow(e) {
 function resolveEnemyBurrow(e,pending) {
   const cfg=enemyTelegraphConfig('burrow')
   const destination=pending.destination
-  const reachedDestination=destination && enemyAbilityLandingOpen(e,destination.x,destination.y)
+  // The disturbed origin is an intentional bait tile, while the other tile
+  // is secret. Occupying either cannot neutralize the emerging monster.
+  const collision=[pending.origin,destination].find(tile=>tile &&
+    player.x===tile.x && player.y===tile.y && enemyAbilityTerrainOpen(tile.x,tile.y) &&
+    !(ENEMY_TELEGRAPH_CONFIG.forbiddenLandingTiles || []).includes(map[tile.y][tile.x]) &&
+    !enemies.some(other=>other!==e && other.alive && onCurrentLevel(other) &&
+      other.x===tile.x && other.y===tile.y))
+  let triedCollision=false
+  if(collision && !playerInsideSanctuary()) {
+    const shoves=enemyBurrowShoveTiles(e)
+    if(!shoves.length)return false // Never push into a wall or overlap another actor.
+    triedCollision=true
+    e.x=collision.x;e.y=collision.y
+    let pushed=false
+    enemyAttackPlayer(e,true,1,null,{
+      fixedHitChance:cfg.collisionHitChance,suppressKnockback:true,
+      onHit:()=>{
+        pushed=true
+        const tile=pick(shoves)
+        log(cfg.collisionMessage.replace(/<enemy>/g,e.name),'bad')
+        forcePlayerPosition(tile.x,tile.y)
+      }
+    })
+    if(pushed || player.hp<=0 || deathTransition) {
+      occupied.add(keyXY(e.x,e.y))
+      e.animStart=undefined
+      return true
+    }
+    // A missed collision is still the monster's one attack this action.
+    // Find a free return point; do not perform a second ordinary attack.
+    e.x=-1;e.y=-1
+  }
+  const reachedDestination=!triedCollision && destination &&
+    enemyAbilityLandingOpen(e,destination.x,destination.y)
   const landing=reachedDestination ? destination : enemyBurrowReturnTile(e,pending)
   if (!landing) return false // Remain underground until there is a legal tile.
   e.x=landing.x;e.y=landing.y

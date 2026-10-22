@@ -77,6 +77,7 @@ const PRECACHE_URLS = [
   './img/tiles/haulage-cage.png',
   './img/tiles/haulage-cage-upper.png',
   './img/tiles/haulage-cage-lower.png',
+  './img/tiles/mine-shaft-rope.svg',
   './img/tiles/rupture-warning.png',
   './img/tiles/burrow-warning.png',
   './img/tiles/wall-ambush-warning.png',

@@ -7526,6 +7526,18 @@ function spawnOrdinarySurfaceChests() {
   }
 }
 
+function rollLooseSupplyKind(kind) {
+  if (!['scrollOfInvisibility','speedpotion'].includes(kind)) return kind
+  const variants=kind==='scrollOfInvisibility' ? LOOSE_SCROLL_VARIANTS : LOOSE_CONSUMABLE_VARIANTS
+  if (!chance(variants.chance)) return kind
+  let roll=rng()*variants.table.reduce((sum,entry)=>sum+entry.weight,0)
+  for(const entry of variants.table) {
+    roll-=entry.weight
+    if(roll<0)return entry.kind
+  }
+  return kind
+}
+
 function spawnGroundStuff() {
   const cfg = WORLD_GEN_CONFIG.surfaceLoot
   spawnOrdinarySurfaceChests()
@@ -7543,15 +7555,7 @@ function spawnGroundStuff() {
     for (let i=0;i<count && spots.length;i++) {
       const index=randInt(0,spots.length-1), spot=spots[index]
       spots[index]=spots[spots.length-1];spots.pop()
-      let dropKind = kind
-      const variants = LOOSE_CONSUMABLE_VARIANTS
-      if (['scrollOfInvisibility', 'speedpotion'].includes(kind) && chance(variants.chance)) {
-        let roll = rng() * variants.table.reduce((sum, entry) => sum + entry.weight, 0)
-        for (const entry of variants.table) {
-          roll -= entry.weight
-          if (roll < 0) { dropKind = entry.kind; break }
-        }
-      }
+      const dropKind=rollLooseSupplyKind(kind)
       groundItems.push({...spot,kind:dropKind})
     }
   }

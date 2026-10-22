@@ -28,6 +28,18 @@ const copy=value=>JSON.parse(JSON.stringify(value))
     {x:endpoints.upper.x,y:endpoints.upper.y})
   assert.deepEqual(copy(run('dungeonPackageLevels("dwarvenMines").at(-1).level.mineCagePad')),
     {x:endpoints.lower.x,y:endpoints.lower.y})
+  assert.deepEqual([endpoints.upper.x,endpoints.upper.y],[endpoints.lower.x,endpoints.lower.y],
+    'the haulage cage remains in one vertical column')
+  const middle=copy(run(`dungeonPackageLevels("dwarvenMines").slice(1,-1).map(({level})=>({
+    x:level.mineCagePad.x,y:level.mineCagePad.y,tile:level.map[level.mineCagePad.y][level.mineCagePad.x]
+  }))`))
+  assert.equal(middle.length,endpoints.lower.floor-2)
+  assert(middle.every(p=>p.x===endpoints.upper.x&&p.y===endpoints.upper.y&&p.tile==='mineshaftrope'),
+    'every skipped floor exposes the rope opening at the same coordinates')
+  assert.equal(run('TILE.mineshaftrope.walk'),false)
+  assert.equal(run('RENDER_STYLE.terrainTiles.mineshaftrope.image'),'img/tiles/mine-shaft-rope.svg')
+  assert(fs.existsSync(path.resolve(__dirname,'../img/tiles/mine-shaft-rope.svg')),
+    'intermediate shaft tile has an installed sprite')
 
   // Art and ASCII semantics are different for the inactive pad, active upper
   // carriage and active lower carriage; every tile has a unique save code.
@@ -62,6 +74,9 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   run('loadGameFromObject(beforeUnlock,{isReplayInit:true})')
   assert.equal(run('rngState'),beforeRng)
   assert.equal(run('dwarvenMinesCageShortcut().unlocked'),false)
+  assert.deepEqual(copy(run(`dungeonPackageLevels("dwarvenMines").slice(1,-1).map(({level})=>({
+    x:level.mineCagePad.x,y:level.mineCagePad.y,tile:level.map[level.mineCagePad.y][level.mineCagePad.x]
+  }))`)),middle,'shaft alignment and its distinct tile survive save initialization')
   assert.equal(run('map[player.y][player.x]'),'minecageupperoff')
   run('placeOnCage(dwarvenMinesCageShortcut().lower)')
   assert.equal(run('map[player.y][player.x]'),'minecageloweroff')

@@ -43,8 +43,10 @@
       "targetAdjacentDistance": 1,
       "undergroundTurns": 2,
       "cooldownTurns": 6,
+      "collisionHitChance": 0.9,
       "warningMessage": "The <enemy> sinks into the earth!",
       "emergeMessage": "The <enemy> bursts from the ground!",
+      "collisionMessage": "The <enemy> erupts beneath you and hurls you aside!",
       "failedMessage": "The ground settles. The <enemy> resurfaces near where it vanished."
     },
     "rupture": {

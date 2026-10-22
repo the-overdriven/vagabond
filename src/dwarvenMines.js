@@ -146,6 +146,66 @@ function minePlacedStair(level, tile) {
   return null
 }
 
+// The two cages occupy one vertical shaft. Floors without a cage have a
+// visible, impassable opening instead, surrounded by a connected landing.
+// Choose the position after every floor exists so it is safe on all of them.
+function mineAlignCageShaft(mine) {
+  const original=mine[0].mineCagePad
+  const positions=[]
+  for(let y=3;y<MAP_H-3;y++)for(let x=3;x<MAP_W-3;x++)
+    if(mine[0].map[y][x]==='cavefloor2')positions.push({x,y})
+  positions.sort((a,b)=>
+    (Math.abs(a.x-original.x)+Math.abs(a.y-original.y))-
+    (Math.abs(b.x-original.x)+Math.abs(b.y-original.y)) || a.y-b.y || a.x-b.x)
+  for(const anchor of positions){
+    if(mine.some(level=>[level.mineUpstairs,level.mineDownstairs].filter(Boolean).some(stair=>
+      Math.max(Math.abs(stair.x-anchor.x),Math.abs(stair.y-anchor.y))<=8)))continue
+    const staged=[]
+    for(let index=0;index<mine.length;index++){
+      const level=mine[index],cm=level.map.map(row=>row.slice())
+      let nearest=null,distance=Infinity
+      for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
+        if(cm[y][x]!=='cavefloor2')continue
+        const delta=Math.max(0,Math.abs(x-anchor.x)-1)+Math.max(0,Math.abs(y-anchor.y)-1)
+        if(delta<distance){distance=delta;nearest={x,y}}
+      }
+      if(!nearest){staged.length=0;break}
+      const rim={x:Math.min(anchor.x+1,Math.max(anchor.x-1,nearest.x)),
+        y:Math.min(anchor.y+1,Math.max(anchor.y-1,nearest.y))}
+      mineCarveLine(cm,rim,nearest,{x1:1,y1:1,x2:MAP_W-2,y2:MAP_H-2})
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)
+        cm[anchor.y+dy][anchor.x+dx]='cavefloor2'
+      cm[anchor.y][anchor.x]=index===0?'minecageupperoff':
+        index===mine.length-1?'minecageloweroff':'mineshaftrope'
+      // A new approach must not overwrite either ordinary mine stair.
+      cm[level.mineUpstairs.y][level.mineUpstairs.x]='minestairsup'
+      if(level.mineDownstairs)cm[level.mineDownstairs.y][level.mineDownstairs.x]='minestairsdown'
+      const reachable=dungeonWalkDistances(cm,level.mineUpstairs)
+      let traversable=0,floorTiles=0
+      for(const row of cm)for(const tile of row){
+        if(TILE[tile]?.walk)traversable++
+        if(tile==='cavefloor2')floorTiles++
+      }
+      if(reachable.size!==traversable ||
+        (level.mineDownstairs && (reachable.get(keyXY(level.mineDownstairs.x,level.mineDownstairs.y))??Infinity)<
+          minePackageConfig().layout.minStairWalkingDistance)){
+        staged.length=0;break
+      }
+      staged.push({cm,floorTiles})
+    }
+    if(staged.length!==mine.length)continue
+    for(let index=0;index<mine.length;index++){
+      const level=mine[index]
+      level.map=staged[index].cm
+      level.caveMaps[0]=level.map
+      level.mineCagePad={x:anchor.x,y:anchor.y}
+      level.mineFloorTiles=staged[index].floorTiles
+    }
+    return true
+  }
+  return false
+}
+
 function placeDwarvenMinePickaxe(ruins) {
   const floor=ruins[Math.max(0,ruins.length-2)]
   if(!floor)return false
@@ -186,6 +246,7 @@ function buildDwarvenMinesStratum() {
     if(!level)return false
     mine.push(level)
   }
+  if(!mineAlignCageShaft(mine))return false
   // 3- or 4-floor Ruins jump to z:-9 from their actual final floor.
   while(deepLevels.length<Math.abs(cfg.firstZ)-2)deepLevels.push(mineUnusedChainLevel())
   for(const level of mine)deepLevels.push(level)
@@ -198,8 +259,6 @@ function buildDwarvenMinesStratum() {
     below.mineTransitions.up={z:aboveZ,...above.mineDownstairs}
   }
   const upper=mine[0].mineCagePad,lower=mine[count-1].mineCagePad
-  mine[0].map[upper.y][upper.x]='minecageupperoff'
-  mine[count-1].map[lower.y][lower.x]='minecageloweroff'
   dungeonShortcuts.push({
     id:cfg.shortcut.id,packageId:'dwarvenMines',kind:'haulageCage',unlocked:false,
     upper:{floor:1,z:cfg.firstZ,x:upper.x,y:upper.y},
@@ -218,7 +277,8 @@ function spawnDwarvenMinesEncounters() {
     const candidates=[]
     for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
       if(level.map[y][x]!=='cavefloor2'||entrances.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<=ec.entranceClearance)||
-         (level.mineCagePad&&x===level.mineCagePad.x&&y===level.mineCagePad.y))continue
+         (level.mineCagePad&&Math.max(Math.abs(x-level.mineCagePad.x),
+           Math.abs(y-level.mineCagePad.y))<=1))continue
       candidates.push({x,y})
     }
     const occupiedSpots=[]

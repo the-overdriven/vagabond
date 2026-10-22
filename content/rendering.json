@@ -485,6 +485,9 @@
     "minecageloweron": {
       "image": "img/tiles/haulage-cage-lower.png", "baseTileKey": "cavefloor2", "scale": 1
     },
+    "mineshaftrope": {
+      "image": "img/tiles/mine-shaft-rope.svg", "baseTileKey": "cavefloor2", "scale": 1
+    },
     "dwarvendoorclosed": {
       "image": "img/tiles/dwarven-door-closed.png",
       "baseTileKey": "marble",

@@ -2516,9 +2516,12 @@ The initial mine layout uses a narrow winding excavated spine, side branches,
 short pockets, and at least one alternate route. Generation checks a single
 connected walkable component and a minimum 30-step stair-to-stair route. Floor
 count, geometry, retries, encounter density, pack sizes, group weights, and
-spacing are configured in `content/world_generation.json`. A separate, reachable
-haulage cage landing is reserved on the first and final mine floors; intermediate
-floors have no cage stop. Its placement never replaces an ordinary staircase.
+spacing are configured in `content/world_generation.json`. The haulage cage
+occupies the **same x/y position on every mine floor**: reachable cage landings
+on the first and final floors, and an **open shaft with a dangling rope** on
+intermediate floors. The exposed shaft cannot be crossed or climbed, but all
+eight surrounding tiles are walkable and connected to the passages. The shaft
+remains clear of stair approaches and never replaces an ordinary staircase.
 
 Exactly one Pickaxe is placed in reachable space on the penultimate Dwarven
 Ruins floor. It is a normal inventory item, **40 gold** base value and **20 gold**
@@ -2543,7 +2546,7 @@ All 19 are classified as non-humanoid, so they follow normal XP, rare artifact
 loot and Bestiary kill-count rules, but do not carry humanoid equipment drops.
 
 **Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower
-cage is on the final generated floor (z:-11 or z:-12). Both begin locked. The
+cage is directly below it on the final generated floor (z:-11 or z:-12). Both begin locked. The
 player must reach the **lower cage** by ordinary stairs and Inspect it to release
 the counterweight. This consumes **one gameplay turn** and does not also move
 the player. The single unlocked state then enables travel in **both directions**
@@ -3292,9 +3295,16 @@ crossing solid walls, gates or closed doors. The monster remains hidden and
 untargetable for **two complete player actions**, then emerges on the following
 enemy action. If its chosen tile is still free, it may make **one ordinary
 melee attack** when adjacent; it cannot gain an extra weapon-speed attack.
-If that tile is blocked, it emerges at its original position or a free adjacent
-tile without attacking. If every return tile is blocked, it stays buried until
-one becomes available. A successful emergence or canceled Burrow begins
+If the player is standing on the disturbed origin or the secret landing tile,
+the monster instead attempts **one 90%-accuracy collision attack** from that
+tile. A successful hit uses ordinary melee damage, armor, critical and status
+rules, then shoves the player onto one randomly selected adjacent walkable
+tile (including hazardous tiles, which trigger normally); no second attack or
+critical knockback occurs. If the collision misses, the monster emerges at its
+origin or a free adjacent tile without attacking again. If an ordinary landing
+is blocked, it uses the same harmless fallback. If there is nowhere to push a
+player occupying its landing, or no safe return space exists after a miss,
+it stays buried until an opening appears. A successful emergence or canceled Burrow begins
 **six complete active-floor turns** of cooldown. Origin, destination, remaining
 wait time, and cooldown are deterministic save/replay state.
 
@@ -5582,7 +5592,9 @@ Monster templates may define an independent `lootTable` containing a total
 drop probability and a weighted list of ordinary item kinds. A successful
 roll awards **one** item directly to the inventory, in addition to any
 normal artifact or equipment drops. The weights choose which item drops;
-they do not multiply the total drop probability. **Wyrdhag** has a **20%**
+they do not multiply the total drop probability. **Nymph** has a **20%**
+chance to drop one Healing Herb, independently of its healing magic or
+ordinary humanoid gear. **Wyrdhag** has a **20%**
 total chance to drop a Life Potion, Healing Herb or Mushroom, each with equal
 conditional probability (about **6⅔%** of kills per item). This loot chance
 does not increase with Magic Find. Using its own healing item in combat does
@@ -6091,11 +6103,14 @@ pay less of a timing cost. Expiry or actual death removes the modifiers. Highsco
 uses permanent stats, excluding both potions and their GRACE penalties.
 
 Ordinary chests use the percentages above; guaranteed-artifact chests keep their
-artifact rule. On the surface, 40% of existing loose Invisibility/Speed slots become
-one tactical consumable, using relative weights Stone Skin 3, Berserk 3, Fear 2,
-Chaos 1.5, Death Shield 0.5. This changes composition without increasing loose-item
-counts or replacing loose Life Potions. The chance and weights are editable in
-`content/loot_tables.json` under `looseConsumableVariants`.
+artifact rule. On the surface, **75%** of the nine loose Invisibility-scroll
+slots instead become Identification, Fear or Chaos scrolls with respective
+relative weights **3:2:1**; 25% remain Invisibility. Expected Invisibility
+scrolls from these slots fall from **5.4 to 2.25 per world**. The separate
+loose Speed-Potion slots keep their **40%** chance to become a tactical
+consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5).
+Total loose-item counts, Life Potions, chest/crate loot and merchant stock are
+unchanged. Both replacement tables are editable in `content/loot_tables.json`.
 
 Player potion timers, exact sampled bonuses and ready shield charge, plus each
 monster's remaining fear timer, initialize on new actors, persist in current saves

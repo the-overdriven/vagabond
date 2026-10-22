@@ -14,7 +14,10 @@ const plain=value=>JSON.parse(JSON.stringify(value))
     playerHiddenFromEnemy=()=>false;playerInsideSanctuary=()=>false;
     enemyInsideSanctuary=()=>false;enemyHasSight=()=>true;
     undergroundTileVisible=()=>true;
-    enemyAttackPlayer=(e,oneOnly)=>{globalThis.attacks.push({name:e.name,oneOnly})};
+    enemyAttackPlayer=(e,oneOnly,multiplier,charge,options)=>{
+      globalThis.attacks.push({name:e.name,oneOnly,accuracy:options?.fixedHitChance});
+      options?.onHit?.();
+    };
     globalThis.attacks=[];
     for(let y=35;y<=45;y++)for(let x=35;x<=45;x++)map[y][x]='grass';
     const t=ENEMY_TEMPLATE_BY_NAME.Marsutal;
@@ -66,8 +69,8 @@ const plain=value=>JSON.parse(JSON.stringify(value))
   assert.equal(plain(run('globalThis.attacks')).length,1,'successful emergence strikes once')
   assert.equal(plain(run('globalThis.attacks'))[0].oneOnly,true)
 
-  // Player can use the vacated origin. If both origin and target are occupied,
-  // the hidden monster returns to a stable nearby tile without attacking.
+  // Occupying the visible origin does not disarm the Burrow, even if another
+  // enemy simultaneously blocks its secret destination.
   run(`occupied.delete(keyXY(burrower.x,burrower.y));
     burrower.x=42;burrower.y=40;occupied.add(keyXY(42,40));
     burrower.abilityCooldowns.burrow=0;turnCount=80;
@@ -82,8 +85,26 @@ const plain=value=>JSON.parse(JSON.stringify(value))
     turnCount=83;resolveEnemyTelegraphIfPending(burrower)`)
   assert.equal(run('burrower.pendingAbility'),null)
   assert.equal(run('Math.max(Math.abs(burrower.x-42),Math.abs(burrower.y-40))<=1'),true)
+  assert.equal(run('burrower.x===42 && burrower.y===40'),true,
+    'monster takes back the marked origin after pushing the player away')
   assert.equal(run('burrower.x===player.x && burrower.y===player.y'),false)
-  assert.deepEqual(plain(run('globalThis.attacks')),[],'blocked landing never grants a hit')
+  assert.deepEqual(plain(run('globalThis.attacks')),[{name:'Marsutal',oneOnly:true,accuracy:0.9}],
+    'standing on the disturbance triggers exactly one fixed-accuracy strike')
+
+  // A player on the unmarked destination is displaced in exactly the same
+  // way; the destination is never exposed at preparation time.
+  run(`enemies=[burrower];occupied=new Set([keyXY(42,40)]);
+    burrower.x=42;burrower.y=40;burrower.abilityCooldowns.burrow=0;
+    turnCount=85;player.x=40;player.y=40;globalThis.attacks=[];`)
+  assert.equal(run('tryPrepareEnemyBurrow(burrower)'),true)
+  const secret=plain(run('burrower.pendingAbility.destination'))
+  context.secret=secret
+  run(`player.x=burrower.pendingAbility.destination.x;
+    player.y=burrower.pendingAbility.destination.y;
+    turnCount=88;resolveEnemyTelegraphIfPending(burrower)`)
+  assert.equal(run('burrower.x===secret.x && burrower.y===secret.y'),true)
+  assert.equal(run('burrower.x===player.x && burrower.y===player.y'),false)
+  assert.equal(plain(run('globalThis.attacks')).length,1,'secret collision attacks once')
 
   // There must be no forced overlap if both the destination and every
   // fallback tile close at once. Retrying later must not reroll a destination.

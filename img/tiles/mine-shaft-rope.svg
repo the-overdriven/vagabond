@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" shape-rendering="crispEdges">
+  <!-- A deep rectangular void with a heavy stone lip and one hanging rope. -->
+  <path d="M4 18h12V9h65v9h14v65H83v10H16v-9H4z" fill="#5b4b3a"/>
+  <path d="M11 22h10V15h57v7h11v56H78v9H21v-9H11z" fill="#29231e"/>
+  <path d="M18 25h9v-3h47v4h8v47h-8v8H27v-7h-9z" fill="#080808"/>
+  <path d="M8 18h13v6H8zM21 12h19v6H21zM61 13h19v6H61zM83 21h9v18h-9zM83 63h9v16h-9zM64 82h16v9H64zM20 82h18v8H20zM8 59h9v18H8z" fill="#816b4d"/>
+  <path d="M30 20h40v4H30zM16 30h4v34h-4zM80 30h4v34h-4zM29 78h42v4H29z" fill="#4a3a2b"/>
+  <!-- The rope recedes into the dark; short knots stay legible at 40 px. -->
+  <path d="M47 0h7v91h-7z" fill="#8a633a"/>
+  <path d="M49 0h3v91h-3z" fill="#dfbb74"/>
+  <path d="M45 28h12v4H45zM45 49h12v4H45zM45 71h12v4H45z" fill="#ad864f"/>
+  <path d="M48 91h5v6h-5z" fill="#655033"/>
+</svg>

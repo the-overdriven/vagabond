@@ -91,7 +91,7 @@
     "commonStartingWeapon": 30
   },
   "looseConsumableVariants": {
-    "_note": "Surface loose invisibility/speed slots have this chance to become one weighted tactical consumable. Life Potion and total supply counts stay unchanged.",
+    "_note": "Surface loose speed-potion slots have this chance to become one weighted tactical consumable. Life Potion and total supply counts stay unchanged.",
     "chance": 0.4,
     "table": [
       {
@@ -114,6 +114,15 @@
         "kind": "scrollOfDeathShield",
         "weight": 0.5
       }
+    ]
+  },
+  "looseScrollVariants": {
+    "_note": "Each loose surface Invisibility scroll slot becomes an Identification, Fear, or Chaos scroll with this chance. Total scroll count is unchanged.",
+    "chance": 0.75,
+    "table": [
+      {"kind":"idscroll","weight":3},
+      {"kind":"scrollOfFear","weight":2},
+      {"kind":"scrollOfChaos","weight":1}
     ]
   }
 }

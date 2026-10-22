@@ -48,6 +48,10 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert.equal(cageShortcut.lower.z,floors.at(-1).z)
     assert.deepEqual({x:cageShortcut.upper.x,y:cageShortcut.upper.y},floors[0].cage)
     assert.deepEqual({x:cageShortcut.lower.x,y:cageShortcut.lower.y},floors.at(-1).cage)
+    assert.deepEqual({x:cageShortcut.upper.x,y:cageShortcut.upper.y},
+      {x:cageShortcut.lower.x,y:cageShortcut.lower.y},'cage endpoints are vertically aligned')
+    assert(floors.every(f=>f.cage.x===cageShortcut.upper.x && f.cage.y===cageShortcut.upper.y),
+      'middle floors reserve the same shaft position')
     assert(floors[0].up.z===ruins.at(-1), 'Mines lead directly back to the last Ruins floor')
     for (let i=0; i<floors.length; i++) {
       const f=floors[i]
@@ -58,8 +62,15 @@ const plain = value => JSON.parse(JSON.stringify(value))
         assert.deepEqual([f.down.x,f.down.y],[floors[i+1].upstairs.x,floors[i+1].upstairs.y])
       } else assert(!f.downstairs && !f.down,'bottom mine has no downward stair')
       assert.equal(f.map[f.cage.y][f.cage.x],
-        i===0?'minecageupperoff':i===floors.length-1?'minecageloweroff':'cavefloor2',
-        'only first and last mine floors have a locked cage endpoint')
+        i===0?'minecageupperoff':i===floors.length-1?'minecageloweroff':'mineshaftrope',
+        'intermediate floors show a separate, impassable rope shaft')
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue
+        assert.equal(f.map[f.cage.y+dy][f.cage.x+dx],'cavefloor2',
+          `seed ${seed}: mine ${i+1} shaft has eight surrounding floor tiles`)
+      }
+      if(i>0 && i<floors.length-1)
+        assert.equal(run('TILE.mineshaftrope.walk'),false,'rope is decorative, not another lift')
       const reachable = plain(run(`(()=>{
         const f=dungeonPackageLevels('dwarvenMines')[${i}].level
         return dungeonWalkDistances(f.map,f.mineUpstairs).size
@@ -67,6 +78,14 @@ const plain = value => JSON.parse(JSON.stringify(value))
       const total=f.map.flat().filter(tile=>['cavefloor2','minestairsup','minestairsdown',
         'minecageupperoff','minecageloweroff'].includes(tile)).length
       assert.equal(reachable,total,`seed ${seed}: mine floor ${i+1} is all accessible on foot`)
+      if(f.downstairs){
+        const path=run(`(()=>{
+          const f=dungeonPackageLevels('dwarvenMines')[${i}].level
+          return dungeonWalkDistances(f.map,f.mineUpstairs).get(keyXY(f.mineDownstairs.x,f.mineDownstairs.y))
+        })()`)
+        assert(path>=run('WORLD_GEN_CONFIG.dungeons.dwarvenMines.layout.minStairWalkingDistance'),
+          `seed ${seed}: shaft does not shortcut below minimum stair path distance`)
+      }
     }
     const monsters=plain(run(`enemies.filter(e=>e.alive && e.level<=-9).map(e=>({name:e.baseName,z:e.level}))`))
     assert(monsters.length>10,`seed ${seed}: mines populated`)

@@ -26,6 +26,22 @@ describe('Dwarven Mines haulage cage', () => {
       check(!cage.unlocked && mine.length>=3 && mine.length<=4,'cage starts locked')
       check(mine[0].level.map[cage.upper.y][cage.upper.x]==='minecageupperoff','top sprite is locked')
       check(mine.at(-1).level.map[cage.lower.y][cage.lower.x]==='minecageloweroff','bottom sprite is locked')
+      check(cage.upper.x===cage.lower.x && cage.upper.y===cage.lower.y,
+        'shaft stays at same map coordinates through the mine')
+      for(let i=0;i<mine.length;i++){
+        const level=mine[i].level,p=level.mineCagePad
+        check(p.x===cage.upper.x && p.y===cage.upper.y,'every floor shares the shaft position')
+        check(level.map[p.y][p.x]===
+          (i===0?'minecageupperoff':i===mine.length-1?'minecageloweroff':'mineshaftrope'),
+          'only endpoints contain a cage')
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)
+          if(dx||dy)check(TILE[level.map[p.y+dy][p.x+dx]].walk,
+            'shaft is surrounded by walkable landing space')
+        check(dungeonWalkDistances(level.map,level.mineUpstairs).has(keyXY(p.x+1,p.y)),
+          'each landing is connected to the main mine passages')
+      }
+      check(!TILE.mineshaftrope.walk && !!RENDER_STYLE.terrainTiles.mineshaftrope.image,
+        'intermediate shaft cannot be crossed but has tile artwork')
 
       enemies=[];npcs=[];occupied=new Set();player.hp=playerMaxHp()
       const placeAt=p=>{
@@ -58,6 +74,9 @@ describe('Dwarven Mines haulage cage', () => {
       loadGameFromObject(saved,{isReplayInit:true})
       check(dwarvenMinesCageShortcut().unlocked && map[player.y][player.x]==='minecageloweron',
         'current save restores shared unlocked flag and endpoint art')
+      check(dungeonPackageLevels('dwarvenMines').slice(1,-1).every(({level})=>
+        level.map[cage.upper.y][cage.upper.x]==='mineshaftrope'),
+        'rope shaft tiles remain aligned after restoring the saved world')
       const beforeTravel=turnCount
       inspect()
       check(currentZ===-9 && turnCount===beforeTravel,'lower cage skips all intermediate mine floors')

@@ -197,6 +197,9 @@
     "minecageloweron": {
       "ch": "⇑", "color": "#d1ba73", "bg": "#272320", "mini": "#e6c467", "walk": true
     },
+    "mineshaftrope": {
+      "ch": "│", "color": "#d5b16c", "bg": "#100e0c", "mini": "#3c2d20", "walk": false
+    },
     "dwarvendoorclosed": {
       "ch": "+",
       "color": "#c58a45",
@@ -680,6 +683,7 @@
     "minecageloweroff": "▶",
     "minecageupperon": "◁",
     "minecageloweron": "▷",
+    "mineshaftrope": "∥",
     "dwarvendoorclosed": "D",
     "dwarvendooropen": "O",
     "marble": "=",
@@ -763,6 +767,7 @@
     "minecageloweroff": "the lower haulage cage and its unreleased counterweight mechanism",
     "minecageupperon": "the unlocked upper haulage cage, leading down to the deepest mine",
     "minecageloweron": "the unlocked lower haulage cage, leading to the upper mine",
+    "mineshaftrope": "an open vertical mine shaft with a dangling rope, too dangerous to cross",
     "dwarvendoorclosed": "a closed dwarven door of iron-bound timber",
     "dwarvendooropen": "an open dwarven door of iron-bound timber",
     "temple": "the sacred ground of the Temple",
