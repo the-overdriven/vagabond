@@ -665,7 +665,9 @@ Grassland tree decoration:
   central hole. The overlay is clipped to the inner half of the tile, so all
   outer edges remain pixel-identical to the original sand/connector image.
   ASCII mode retains the darker `specialTiles.dugSand.bg` background. The
-  existing `dugSandTiles` set persists the state across save/load.
+  existing `dugSandTiles` set persists the state across save/load. Restoring a
+  game immediately restores every previously dug tile's appearance on the
+  main view, side minimap and full-world map without requiring another dig.
 
 Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
 

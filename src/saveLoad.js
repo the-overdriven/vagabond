@@ -669,9 +669,10 @@ function loadGameFromObject(data, opts = {}) {
     currentCave = -1
     undergroundDiscovered = undergroundDiscoveredL1
   }
-  // Foraged forest tiles affect minimap colors, so restore them before
-  // rebuilding the cached minimap bases.
+  // Foraged forest and dug sand both affect minimap colors. Restore their
+  // saved state before rebuilding the cached minimap bases.
   foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : [])
+  dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : [])
   rebuildMinimapBases()
 
   spawnPoint = {x: data.spawnPoint.x, y: data.spawnPoint.y}
@@ -822,8 +823,6 @@ function loadGameFromObject(data, opts = {}) {
   // what the recorded buy/sell actions expect. Only genuine save-file
   // loads (pre-this-field saves) need this.
   if (!isReplayInit) ensureMerchantStock()
-  dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : [])
-
   enemies = (data.enemies || []).map(e => {
     const tmpl = enemyTemplateForSavedEnemy(e)
     let level = e.level || 0
