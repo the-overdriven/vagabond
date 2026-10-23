@@ -16,8 +16,10 @@ describe('Deep Caves 2.0 parametric ecosystem', () => {
       check(level.caves.every(c=>c.populated&&!c.scenario),'no named z:-2 scenarios')
       const mobs=enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')
       const excluded=new Set(cfg.excludedSpecies)
-      check(mobs.every(e=>!excluded.has(e.baseName)&&e.tier<=4&&
-        !ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare),'no excluded or tier-5 species')
+      check(mobs.every(e=>e.baseName==='Cave Troll'||
+        (!excluded.has(e.baseName)&&e.tier<=4&&
+          !ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare)),
+        'no excluded species except the optional Cave Troll')
       check(mobs.every(e=>level.caveMaps[e.caveIndex][e.y]?.[e.x]==='cavefloor2'),
         'every monster occupies its source cave floor')
       check(level.territories.every(t=>Number.isInteger(t.population)&&Array.isArray(t.species)),

@@ -108,6 +108,8 @@ describe('Dwarven wall Crusher',()=>{
         equipment:{weapon:null,armor:null,shield:null}}
       enemies=[e];player.x=9;player.y=14
       const messages=[];const originalLog=log;log=(message,...args)=>{messages.push(message);return originalLog(message,...args)}
+      const originalVisibility=enemyIsVisibleOnMainView
+      enemyIsVisibleOnMainView=()=>true // Verify wording even when the fixture's walls obscure the monster.
       DungeonHazards.onActorEntered(e,11,12)
       check(h.state==='warning','monster activates a real pressure plate')
       for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
@@ -115,6 +117,7 @@ describe('Dwarven wall Crusher',()=>{
       check(messages.some(message=>message.includes('Crusher squeezes the Skeleton')) &&
         !messages.some(message=>message.includes('Crusher hits the Skeleton')),
         'Crusher damage uses squeezing rather than melee hit wording')
+      enemyIsVisibleOnMainView=originalVisibility;log=originalLog
       return true
     })()`))
   })
