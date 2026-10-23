@@ -501,6 +501,53 @@ god-mode stat grants and revealed exploration are not rolled back.
 The character sheet displays Swimming as **Unknown**, its numeric value, or
 **Natural** for Merlings, refreshing when skill or race state changes.
 
+## Mining
+
+Mining is a **0–100** numerical skill that improves through extracting minerals
+and opening mineable stone. A carried Pickaxe is required, but does not need to be
+equipped. Attempting to move into an adjacent cracked wall, a crystal formation,
+or an overworld boulder initiates mining; all eight directions work. The first
+mining attempt in a playthrough displays a one-time warning and costs no turn,
+even when the wall looks solid. Every subsequent attempt, including one aimed
+at a new target, immediately strikes once per turn. The tutorial state persists
+through saves and replay. In normal play, hitting genuinely solid rock costs a
+turn and creates noise, but earns no Mining progress or XP.
+In God Mode, ordinary solid mine walls are traversable without a mining strike,
+as with other impassable terrain; marked mineable walls and crystals retain
+their normal mining interactions.
+Most mine walls are unbreakable. Each generated weak seam or mineral deposit is
+finite and keeps its identity even while concealed from an inexperienced miner.
+Partial damage persists across interruptions. Opening a mine wall leaves gray
+excavated floor; extracting a crystal already exposed on a mine floor leaves
+its original brown floor. Overworld boulders can be cleared to open shortcuts.
+
+Mining level determines the number of strikes and the ability to **recognize**
+concealed geological features. A wall may be mineable even before its clue is
+perceptible; improving Mining reveals additional cracks and mineral traces,
+without changing the world or rolling random checks during inspection.
+
+| Mining | Geological recognition | Weak / hard / very hard strikes |
+| --- | --- | --- |
+| 0–24 | Obvious cracks, exposed formations and most mineral-bearing walls | 2 / 4 / 6 |
+| 25–49 | Fine cracks and clues that a known entrance leads to a hollow | 2 / 3 / 5 |
+| 50–74 | Subtle ore-bearing seams and vein traces | 1 / 3 / 4 |
+| 75–99 | Faint seams visible farther away along valid sightlines | 1 / 2 / 3 |
+| 100 | Full geological proficiency | 1 / 2 / 2 |
+
+Mining costs a material-dependent amount of HP **once at completion**; higher
+skill reduces the cost, and a finishing strike is refused if its strain would
+leave the character at zero HP. All strike counts, strain, awareness thresholds,
+mineral rewards, and XP are configurable in `content/mining_config.json`.
+
+For skill value `s`, the next level costs `1 + floor(s / 25)` Mining XP; cumulative
+requirements are **25 / 75 / 150 / 250 XP** at levels **25 / 50 / 75 / 100**.
+Normal underground walls and minerals grant XP only once when completed.
+Overworld boulder removal gives 1 XP for each of the first five stones, then
+`1 / n` XP for the *n*th stone. Fractional XP is accumulated in deterministic
+integer units, so endlessly mining surface stones barely advances the skill.
+Mining has no stamina meter, tool durability or item refining. Extracted gems
+stack in inventory and can be sold to the village merchant.
+
 ---
 
 # 7. Turn Structure
@@ -2602,6 +2649,40 @@ The mine-specific monster abilities use the generic handlers documented in
 **Enemy Special Properties**. Mine terrain and stair geometry constrain their
 legal moves and target tiles.
 
+**Mining pockets and minerals.** Each mine floor contains **3–10** generated,
+irregular hidden cavities, never larger than an 8×8 bounding box. Their contents
+are drawn from empty hollows, minerals, limited water, nonhumanoid nests, caches
+and rare glowing geodes. Pockets are enclosed until mineable weak seams are
+opened; larger pockets can have multiple marked approaches, sometimes requiring
+several walls to be excavated; nearby pockets may rarely connect through another
+mineable seam. Most ordinary mine walls remain solid. Mineral
+deposits may be embedded in walls or exposed in corridor alcoves, widened
+corridor floors and pockets; veins contain 1–4 connected deposits of a single
+mineral. Floor-level crystals require a locally connected bypass, so they never
+obstruct a narrow passage or its only exit. Until extracted, they are obstacles
+for ordinary monster movement and player auto-travel; monsters do not spawn on
+them. Players still mine a formation by attempting to step into it.
+Extracting an exposed crystal yields exactly one gem. Gem
+values, veins, pocket content weights and floor budgets are data-driven.
+The respite floor includes an obvious low-risk seam near its entrance to teach
+mining through exploration rather than a mandatory tutorial.
+
+The seven initial minerals are **Quartz, Amethyst, Topaz, Aquamarine, Emerald,
+Sapphire, and Ruby**. Only fully exposed crystal formations cast colored light.
+Their fixed mineral-specific radii illuminate unobstructed tiles and creatures
+beyond the normal mine sight radius, regardless of how far the formation is
+from the player, provided each lit tile is in the player's line of sight and
+the light reaches it from its source. The formation itself need not be visible
+to illuminate a tile around a corner. Lit terrain is visible and explorable
+even outside ordinary FOV; solid walls block the light and sight, and
+extraction removes the light.
+Color is blended as a visible brightening of the illuminated terrain. Its
+visual pulse does not alter gameplay rules or RNG.
+Breaking into a water pocket can fill 2–5 nearby tiles only when the pocket's
+interior is actually breached, reusing the existing
+Swimming, drowning and shore-escape behavior. Flooding must preserve safe
+access to mandatory routes.
+
 Outside the Mines, the normal encounter pools are unchanged. The two approved
 exceptions are: an independent **10% per-world chance** to add one Cave Troll
 on the ordinary z:-2 cave map away from cave entrances, and the 19 new
@@ -4327,6 +4408,20 @@ The default aggro range is:
 ```text
 4
 ```
+
+**Mining noise.** Each confirmed Pickaxe strike can be heard by non-passive
+monsters within **25 Euclidean tiles** on the same floor. Walls do not attenuate
+the sound. For distance `d`, base hearing chance is
+`max(0.03, 0.90 × (1 − d / 25)²)` up to the 25-tile limit; Blind monsters
+receive a 25% relative bonus, capped at 90%. Hearing causes Alarmed status.
+Independently, 40% of successful listeners investigate the **strike location**
+for a seeded random **2–6 ordinary movement turns**, one tile per normal
+turn and only along legal paths. Repeated sounds may replace that destination
+but do not accumulate unlimited investigation steps. Sight and ordinary combat
+take precedence; sound alone does not grant knowledge of the player's location
+or trigger Collective Mind. A monster trapped behind a sealed pocket wall may
+respond to the sound but cannot cross the wall. Noise-induced pursuit is visible
+when it actually enters view, without revealing offscreen listeners in the log.
 
 On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary or due to a large speed disadvantage. Losing range ends active pursuit; the existing Alarmed status expires independently under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
@@ -7256,7 +7351,7 @@ Loading a save therefore continues the random sequence rather than resetting it.
 Current save version (defined in `src/version.js`):
 
 ```text
-103
+114
 ```
 
 The game release version changes for each deployment. The save format changes
@@ -7843,7 +7938,10 @@ exclusion. Once enabled, God Mode makes the player invisible. Pressing
 `G` again turns god mode and its invisibility off, restoring normal movement
 restrictions and drowning. Revealed maps and granted stats/gold remain.
 Enabling God Mode also permanently teaches the character **Tracking** using
-the same learned-skill flag as the Old Hunter. This persists in saves/replay.
+the same learned-skill flag as the Old Hunter. If the character does not already
+carry a Pickaxe, enabling God Mode grants one; toggling God Mode off does not
+remove it, and enabling it again never duplicates it. These effects persist in
+saves/replay.
 It also permits artifact identification without a Scroll of Identification,
 while preserving the ordinary identification turn and saved item state.
 Holding the key does not trigger repeated toggles. The key press is a replay
@@ -7930,7 +8028,8 @@ Mysteries often progress through actual interactions and world state rather than
 Do not infer a general system from a specific implemented mechanic:
 
 - general crafting (the Herbalist brews potions; there is no general crafting system)
-- general mining (shovel digging is restricted to sand; see section 79)
+- unrestricted tunneling (Mining excavates only generated weak mine walls,
+  mineral deposits and overworld boulders; ordinary cave and Fort walls remain solid)
 - skill tree (Tracking and Swimming are learned individually; there is no tree)
 - generic cross-NPC quest framework (the Old Hunter and Fisherman Hermit have NPC-specific quests)
 - generic wound system (wounded enemies can flee, but there are no persistent wounds)
@@ -7983,7 +8082,6 @@ Ideas not implemented as general systems or named locations include:
 
 - blacksmith
 - player-applied enchantment
-- general mining
 - general crafting
 
 ### Exploration

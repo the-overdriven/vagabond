@@ -48,7 +48,9 @@ more difficult:
 !3 [immersion] 👂 wolves howl in distance before they show up on screen
 !3 [items] 🎒 Gaudy item: aggro +1
 !3 [loot] 💰 feat: individual monster loot table, outside of tier logic
-!3 [mining] ⛏️ feat: add pick axe and mining and ores (to be able to dig through boulders, costs HP), must be obtainable in dwarven fort
+✅ [mining] ⛏️ feat: mining skill, diggable boulders and ore, concealed mine pockets, luminous crystals and sound-driven encounters
+!2 [ai] 👂 make monsters blocked by sealed mine walls pace or shift position impatiently instead of forming straight queues
+!2 [lighting] 💎 let sighted monsters detect a player more easily when standing in exposed crystal light
 !3 [mysteriando] ❓ the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 !3 [npc] 🧙 herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards. (or cousin instead of brother), + !1 [npc] 🧙 witch is a crazy niece of hunter
 !3 [npc] 🧙 feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
@@ -731,6 +733,7 @@ more difficult:
   let CAVE_SILHOUETTES = []
   let WORLD_GEN_CONFIG = {}
   let BASE_WORLD_GEN_CONFIG = {}
+  let MINING_CONFIG = {}
   let WORLD_TRAITS = []
   let TRAITS_PER_WORLD = {count: 'random', min: 3, max: 6}
   let BASE_MAP_CONFIG = {}
@@ -901,6 +904,7 @@ more difficult:
       items: 'items.json',
       mapConfig: 'map_config.json',
       worldGeneration: 'world_generation.json',
+      miningConfig: 'mining_config.json',
       caveSilhouettes: 'cave_silhouettes.json',
       worldTraits: 'world_traits.json',
       merchantStockConfig: 'merchant_stock.json',
@@ -1014,6 +1018,8 @@ more difficult:
     if (!CAVE_SILHOUETTE_SOURCES.length) throw new Error('No cave silhouettes available')
     BASE_WORLD_GEN_CONFIG = content.worldGeneration
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
+    MINING_CONFIG = content.miningConfig
+    Mining.validateConfig()
     WORLD_TRAITS = content.worldTraits.traits
     TRAITS_PER_WORLD = content.worldTraits.traits_per_world
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
@@ -1128,6 +1134,10 @@ more difficult:
         if (visual?.image) paths.push(visual.image)
         if (Array.isArray(visual?.variants)) paths.push(...visual.variants)
       }
+      for (const path of ['mining-crack-small.png', 'mining-crack-medium.png', 'mining-crack-large.png',
+        'mining-hollow-wall-clue.png', 'mining-concealed-mineral-trace.png',
+        ...Object.keys(MINING_CONFIG.minerals || {}).flatMap(name => [
+          `cave-wall-${name}.png`, `mineral-${name}-exposed.png`])]) paths.push('img/tiles/' + path)
       for (const [k, v] of Object.entries(RENDER_STYLE?.overlays || {})) {
         if (typeof v === 'string' && k.toLowerCase().endsWith('image')) paths.push(v)
       }
@@ -1908,6 +1918,7 @@ more difficult:
 <script src="src/caveSilhouettes.js"></script>
 <script src="src/worldGen.js"></script>
 <script src="src/dwarvenMines.js"></script>
+<script src="src/mining.js"></script>
 <script src="src/dungeonTraps.js"></script>
 <script src="src/dungeonHazards.js"></script>
 <script src="src/swimming.js"></script>
@@ -2539,6 +2550,8 @@ more difficult:
     poisonTurns: 0,
     lowHpWarningActive: false,
     swimming: 0,
+    mining: 0, miningXpUnits: 0, minedSurfaceStones: 0, miningArmedTarget: null,
+    miningTutorialSeen: false,
     fishermanRewardClaimed: false,
     fishermanLessonPending: false,
     fishermanFishGiftGiven: false,
@@ -4677,6 +4690,8 @@ more difficult:
       poisonTurns: 0,
       lowHpWarningActive: false,
       swimming: 0,
+      mining: 0, miningXpUnits: 0, minedSurfaceStones: 0, miningArmedTarget: null,
+      miningTutorialSeen: false,
       fishermanRewardClaimed: false,
       fishermanLessonPending: false,
       fishermanFishGiftGiven: false,
@@ -4929,7 +4944,8 @@ more difficult:
       // surface position until it emerges, not its off-map sentinel.
       const location=e.pendingAbility?.type==='burrow' ? e.pendingAbility.origin : e
       if (e.alarmedZ !== currentZ || e.alarmedLevelKind !== levelKind ||
-        Math.max(Math.abs(location.x - player.x), Math.abs(location.y - player.y)) > ALARM_CLEAR_RANGE) {
+        (Math.max(Math.abs(location.x - player.x), Math.abs(location.y - player.y)) > ALARM_CLEAR_RANGE &&
+          !e.miningInvestigation)) {
         e.alarmed = false
         e.alarmedZ = null
         e.alarmedLevelKind = null
@@ -5015,6 +5031,7 @@ more difficult:
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (enemyHasAbility(e, 'ethereal')) return true
+    if (Mining.blocksPathAt(x, y)) return false
     if (isWalkable(x, y)) return true
     if (e && enemyHasAbility(e, 'swim') && map[y]?.[x] === 'water') return true
     if (!(e && enemyHasAbility(e, 'fly'))) return false
@@ -5814,6 +5831,11 @@ more difficult:
         e.aware = false
         continue
       }
+      // Mining draws investigators toward the *fixed strike coordinate*.
+      // Actual player acquisition, ordinary ability turns and combat outrank
+      // this transient goal; invisibility does not erase an audible location.
+      if (e.miningInvestigation && (hiddenFromEnemy || (!e.aware && !enemyHasSight(e))) &&
+          Mining.investigate(e)) continue
       if (hiddenFromEnemy) {
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
@@ -6904,6 +6926,7 @@ more difficult:
 
   function playerPathCanTraverse(x, y) {
     if (DungeonTraps.isTrigger(map[y]?.[x]) || DungeonHazards.knownDanger(x,y)) return false
+    if (Mining.blocksPathAt(x, y)) return false
     if (isWalkableForPlayer(x, y) || isClosedDungeonDoorTile(map[y]?.[x])) return true
     // Auto-travel may spend a key it already carries, but it never starts
     // noisy weapon breaching on the player's behalf.
@@ -7251,7 +7274,21 @@ more difficult:
       flushPendingMove()
       return
     }
+    if (Mining.canTarget(nx, ny)) {
+      clearAutoPath()
+      const mined = Mining.strike(nx, ny)
+      if (mined === 'strike') {
+        consecutiveWaitTurns = 0
+        if (!replayAnimationsDisabled && !replaySimulationMode)
+          void animateAttackLunge(player.x, player.y, nx, ny)
+        enemyTurn()
+        npcTurn()
+      }
+      updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return
+    }
     if (isWalkableForPlayer(nx, ny)) {
+      player.miningArmedTarget = null
       player.x = nx
       player.y = ny
       if (player.spiderWebSourceId) {
@@ -7902,7 +7939,7 @@ more difficult:
 
   function brownDeepCaveAt(x, y) {
     if (currentZ < 0 && deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines')
-      return map[y]?.[x] === 'cavefloor2'
+      return map[y]?.[x] === 'cavefloor2' && !Mining.excavatedAt(Mining.activeLevel(), x, y)
     if (currentZ !== -2 || currentLevelKind() !== 'chain') return false
     const deep = deepLevels[0]
     return !!deep?.caves?.some((cave, i) => cave.brownFloor &&
@@ -9092,6 +9129,49 @@ more difficult:
             ctx.restore()
           }
         }
+        if (currentZ < 0 && undergroundVisible?.has(keyXY(mx, my))) {
+          const miningLevel = Mining.activeLevel()
+          if (miningLevel) {
+            const sources = miningLevel.mineExcavations || []
+            for (const source of sources) {
+              if (source.removed || source.kind !== 'exposed' || !source.mineral) continue
+              const mineral = MINING_CONFIG.minerals[source.mineral]
+              const dx = mx - source.x, dy = my - source.y
+              if (dx * dx + dy * dy > mineral.radius * mineral.radius ||
+                  !UndergroundFov.canSee(map, source.x, source.y, mx, my)) continue
+              ctx.save()
+              // Screen blending brightens the underlying stone instead of
+              // merely tinting it; the pulse stays purely visual.
+              ctx.globalCompositeOperation = 'screen'
+              ctx.globalAlpha = (0.35 + 0.045 * Math.sin(now / 650)) *
+                (1 - Math.hypot(dx, dy) / (mineral.radius + 1))
+              ctx.fillStyle = mineral.glow
+              ctx.fillRect(px, py, TILE_PX, TILE_PX)
+              ctx.restore()
+            }
+            const mineralTile = Mining.clue(miningLevel, mx, my)
+            if (mineralTile) {
+              const mineral = mineralTile.mineral && MINING_CONFIG.minerals[mineralTile.mineral]
+              if (USE_TILE_IMAGES) {
+                let picture = null
+                if (mineralTile.kind === 'exposed') picture = `mineral-${mineralTile.mineral}-exposed.png`
+                else if (mineralTile.kind === 'embedded' && mineralTile.threshold === 0)
+                  picture = `cave-wall-${mineralTile.mineral}.png`
+                else if (mineralTile.kind === 'embedded') picture = 'mining-concealed-mineral-trace.png'
+                else picture = `mining-crack-${mineralTile.progress > 1 ? 'large' : mineralTile.progress ? 'medium' : 'small'}.png`
+                const miningImage = preloadedImages.get('img/tiles/' + picture)
+                if (miningImage) ctx.drawImage(miningImage, px, py, TILE_PX, TILE_PX)
+                if (mineralTile.pocketId && player.mining >= 25 && mineralTile.kind === 'wall' &&
+                    preloadedImages.has('img/tiles/mining-hollow-wall-clue.png'))
+                  ctx.drawImage(preloadedImages.get('img/tiles/mining-hollow-wall-clue.png'), px, py, TILE_PX, TILE_PX)
+              } else {
+                ctx.fillStyle = mineral?.glow || '#d2c7ae'
+                ctx.fillText(mineralTile.kind === 'exposed' ? '♦' : mineralTile.kind === 'embedded' ? '✧' : '╳',
+                  px + TILE_PX / 2, py + 3)
+              }
+            }
+          }
+        }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
             ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
@@ -9900,6 +9980,24 @@ more difficult:
       </div>`
       }
     }
+    if (currentZ === 0 && map[my]?.[mx] === 'boulder') return {
+      mini: true, enemy: null,
+      html: '<div class="nm">Stone Boulder</div><div>A Pickaxe could open a way through it.</div>'
+    }
+    const miningClue = Mining.clue(Mining.activeLevel(), mx, my)
+    if (miningClue) {
+      const exposed = miningClue.kind === 'exposed'
+      const obviousOre = !!miningClue.mineral && (exposed || miningClue.threshold === 0)
+      const name = obviousOre ? MINING_CONFIG.minerals[miningClue.mineral].name :
+        miningClue.kind === 'embedded' ? 'Mineral-bearing Wall' : 'Cracked Wall'
+      const note = exposed ? 'An exposed crystal formation glows in the darkness.' :
+        miningClue.kind === 'embedded' ? 'A vein runs through this rock. The Pickaxe may extract it.' :
+        miningClue.pocketId && player.mining >= 25
+          ? 'These fractures sound hollow. There may be a cavity beyond.' :
+          'The stone has a weak seam. Strike it with a Pickaxe to excavate.'
+      return {mini: true, enemy: null,
+        html: `<div class="nm">${name}</div><div>${note}</div>`}
+    }
     const g = groundItems.find(gi => onCurrentLevel(gi) && gi.kind !== 'gear' && gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' && gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
     if (g) {
       if (g.kind === 'chest' && g.gasChamberId) return {
@@ -10103,6 +10201,12 @@ more difficult:
     const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
     if (e) {
       clearAutoPath()
+      return
+    }
+    if (Math.max(Math.abs(mx - player.x), Math.abs(my - player.y)) === 1 &&
+      (currentZ === 0 || undergroundTileVisible(mx, my)) && Mining.canTarget(mx, my)) {
+      clearAutoPath()
+      void tryMove(mx - player.x, my - player.y)
       return
     }
     if (startAutoPath(mx, my)) {
@@ -10428,7 +10532,8 @@ more difficult:
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
     const brownCave = tileKey === 'cavefloor2' && (view
-      ? deepLevels[chainDepthForZ(view.z)-2]?.kind === 'dwarvenMines' ||
+      ? (deepLevels[chainDepthForZ(view.z)-2]?.kind === 'dwarvenMines' &&
+          !Mining.excavatedAt(deepLevels[chainDepthForZ(view.z)-2], x, y)) ||
         (view.key === 'chain:2' && deepLevels[0]?.caves?.some((cave, i) => cave.brownFloor &&
           deepLevels[0].caveMaps[i]?.[y]?.[x] !== 'cavewall' && deepLevels[0].caveMaps[i]?.[y]?.[x] !== undefined))
       : brownDeepCaveAt(x, y))
@@ -10473,7 +10578,8 @@ more difficult:
       const radius = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines'
         ? (WORLD_GEN_CONFIG.dungeons?.dwarvenMines?.visibilityRadius ?? UndergroundFov.RADIUS)
         : UndergroundFov.RADIUS
-      const visible = UndergroundFov.compute(map, player.x, player.y, radius)
+      const ordinary = UndergroundFov.compute(map, player.x, player.y, radius)
+      const visible = Mining.lightVisible(map, player.x, player.y, ordinary)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
       for (const pos of visible) {
@@ -10883,6 +10989,7 @@ more difficult:
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
       ['🤺 Grace', playerGrace()],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
+      ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
       ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
       ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],
@@ -12202,6 +12309,7 @@ more difficult:
     player.baseMf = 25
     player.godMode = true
     player.trackingLearned = true
+    if (!player.inventory.some(item => item.kind === 'pickaxe')) addInventoryItem('pickaxe')
     resetSwimming()
     player.godInvisible = true
     player.gold = 500
@@ -12599,6 +12707,8 @@ more difficult:
     }))
     await CaveSilhouettes.prepare(WORLD_SEED)
     inspectedDungeonLocks = new Set()
+    miningSurfaceProgress = {}
+    miningLastEchoTurn = -100000
     merchantFortHintGiven = false
     worldKilledSpecies = new Set()
     // A prior world may have rotated 90/270 degrees; start every new world

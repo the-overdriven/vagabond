@@ -1,0 +1,76 @@
+{
+  "skill": {
+    "max": 100,
+    "experienceDivisor": 25,
+    "surfaceFullXpCount": 5,
+    "surfaceFractionScale": 1000000,
+    "awarenessThresholds": [0, 25, 50, 75],
+    "strikeMilestones": [0, 25, 50, 75, 100],
+    "recognitionWeights": {
+      "crack": [55, 25, 12, 8],
+      "mineral": [75, 8, 12, 5]
+    },
+    "discoveryRadius": [1, 1, 2, 4],
+    "xp": {"weak": 1, "hard": 2, "veryHard": 2, "common": 3, "precious": 4, "rare": 5},
+    "strikes": {
+      "weak": [2, 2, 1, 1, 1],
+      "hard": [4, 3, 3, 2, 2],
+      "veryHard": [6, 5, 4, 3, 2]
+    },
+    "strain": {"weak": 0, "hard": 3, "veryHard": 7, "skillReductionEvery": 25, "skillReductionAmount": 1},
+    "blindProbeConfirm": true
+  },
+  "generation": {
+    "pocketsPerFloor": [3, 10],
+    "pocketRetries": 350,
+    "pocketRadiusX": [1, 4],
+    "pocketRadiusY": [1, 4],
+    "pocketShapeJitter": 0.18,
+    "pocketMaxDiameter": 8,
+    "pocketSpacing": 4,
+    "borderClearance": 5,
+    "sizeThresholds": [10, 22],
+    "pocketEntranceCounts": {"small": [1, 2], "medium": [2, 3], "large": [3, 4]},
+    "secondApproachChance": 0.15,
+    "chainLength": [1, 5],
+    "hardShortApproachChance": 0.15,
+    "interPocketLinkChance": 0.06,
+    "pocketTypes": {"empty": 25, "minerals": 25, "water": 15, "precious": 12, "nest": 10, "cache": 8, "geode": 5},
+    "deeperEmptyWeightFactor": 0.85,
+    "geodeCrystals": [2, 4],
+    "waterReleaseTiles": [2, 5],
+    "nestSize": [1, 3],
+    "exposedDepositChance": 0.35,
+    "exposedWideCorridorChance": 0.6,
+    "exposedWideCorridorMinNeighbors": 5,
+    "exposedWideCorridorSpacing": 3,
+    "veinLength": [1, 4],
+    "veinPlacementAttempts": 360,
+    "preciousPoolBonusPerFloor": 0.08,
+    "respiteTrainingDistance": 9,
+    "minEntranceClearance": 5,
+    "exposedPocketClearance": 2,
+    "maxDepositsPerFloor": 60,
+    "budgets": [[50, 150], [250, 450], [350, 650], [500, 900], [700, 1000]]
+  },
+  "minerals": {
+    "quartz": {"name": "Quartz", "price": 8, "weight": 42, "hardness": "weak", "tier": "common", "glow": "#e1e4ff", "radius": 2},
+    "amethyst": {"name": "Amethyst", "price": 16, "weight": 24, "hardness": "hard", "tier": "common", "glow": "#ae70ef", "radius": 2},
+    "topaz": {"name": "Topaz", "price": 28, "weight": 14, "hardness": "hard", "tier": "precious", "glow": "#ffb52d", "radius": 2},
+    "aquamarine": {"name": "Aquamarine", "price": 38, "weight": 10, "hardness": "hard", "tier": "precious", "glow": "#35d9df", "radius": 3},
+    "emerald": {"name": "Emerald", "price": 52, "weight": 6, "hardness": "veryHard", "tier": "precious", "glow": "#34e389", "radius": 3},
+    "sapphire": {"name": "Sapphire", "price": 72, "weight": 3, "hardness": "veryHard", "tier": "rare", "glow": "#407bff", "radius": 3},
+    "ruby": {"name": "Ruby", "price": 94, "weight": 1, "hardness": "veryHard", "tier": "rare", "glow": "#f24b75", "radius": 4}
+  },
+  "sound": {
+    "radius": 25,
+    "maximumHearingChance": 0.9,
+    "minimumHearingChance": 0.03,
+    "blindMultiplier": 1.25,
+    "investigationChance": 0.4,
+    "investigationSteps": [2, 6],
+    "rareMineralLoudness": 1.2,
+    "ambientMessageChance": 0.07,
+    "ambientMessageCooldown": 10
+  }
+}

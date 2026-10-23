@@ -321,9 +321,16 @@
     "stackable": false,
     "sellValue": 20,
     "baseValue": 40,
-    "description": "A sturdy iron pickaxe, suited to clearing rocks.",
+    "description": "A sturdy iron pickaxe. Strike fractured stone, boulders, and exposed crystals to mine them; subtle seams become easier to notice as Mining improves.",
     "actions": [{"label": "?", "handler": "inspect"}]
   },
+  "quartz": {"name":"Quartz","category":"other","stackable":true,"sellValue":8,"baseValue":8,"icon":"img/tiles/mineral-quartz-exposed.png","actions":[]},
+  "amethyst": {"name":"Amethyst","category":"other","stackable":true,"sellValue":16,"baseValue":16,"icon":"img/tiles/mineral-amethyst-exposed.png","actions":[]},
+  "topaz": {"name":"Topaz","category":"other","stackable":true,"sellValue":28,"baseValue":28,"icon":"img/tiles/mineral-topaz-exposed.png","actions":[]},
+  "aquamarine": {"name":"Aquamarine","category":"other","stackable":true,"sellValue":38,"baseValue":38,"icon":"img/tiles/mineral-aquamarine-exposed.png","actions":[]},
+  "emerald": {"name":"Emerald","category":"other","stackable":true,"sellValue":52,"baseValue":52,"icon":"img/tiles/mineral-emerald-exposed.png","actions":[]},
+  "sapphire": {"name":"Sapphire","category":"other","stackable":true,"sellValue":72,"baseValue":72,"icon":"img/tiles/mineral-sapphire-exposed.png","actions":[]},
+  "ruby": {"name":"Ruby","category":"other","stackable":true,"sellValue":94,"baseValue":94,"icon":"img/tiles/mineral-ruby-exposed.png","actions":[]},
   "dwarvenkey": {
     "name": "Dwarven Key",
     "icon": "img/tiles/dwarven-key.png",

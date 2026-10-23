@@ -92,11 +92,15 @@ const plain = value => JSON.parse(JSON.stringify(value))
         assert.equal(run('TILE.mineshaftrope.walk'),false,'rope is decorative, not another lift')
       const reachable = plain(run(`(()=>{
         const f=dungeonPackageLevels('dwarvenMines')[${i}].level
-        return dungeonWalkDistances(f.map,f.mineUpstairs).size
+        return [...dungeonWalkDistances(f.map,f.mineUpstairs).keys()]
       })()`))
-      const total=f.map.flat().filter(tile=>['cavefloor2','minestairsup','minestairsdown',
-        'minecageupperoff','minecageloweroff'].includes(tile)).length
-      assert.equal(reachable,total,`seed ${seed}: mine floor ${i+1} is all accessible on foot`)
+      const sealed=new Set(plain(run(`dungeonPackageLevels('dwarvenMines')[${i}].level.minePockets`))
+        .flatMap(p=>p.cells.map(c=>`${c.x},${c.y}`)))
+      const originalFloor=plain(run(`dungeonPackageLevels('dwarvenMines')[${i}].level.map`))
+      assert(originalFloor.every((row,y)=>row.every((tile,x)=>
+        !['cavefloor2','minestairsup','minestairsdown','minecageupperoff','minecageloweroff'].includes(tile)||
+        sealed.has(`${x},${y}`)||reachable.includes(`${x},${y}`))),
+        `seed ${seed}: original corridors remain reachable; mining pockets begin sealed`)
       if(f.downstairs){
         const path=run(`(()=>{
           const f=dungeonPackageLevels('dwarvenMines')[${i}].level

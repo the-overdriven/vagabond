@@ -293,6 +293,7 @@ function buildDwarvenMinesStratum() {
   }
   if(!mineAlignCageShaft(mine))return false
   if(!mineFloodSideChambers(mine))return false
+  Mining.generate(mine)
   // The Ruins jump to the fixed first mine depth from their actual final floor.
   while(deepLevels.length<Math.abs(cfg.firstZ)-2)deepLevels.push(mineUnusedChainLevel())
   for(const level of mine)deepLevels.push(level)
@@ -324,9 +325,14 @@ function spawnDwarvenMinesEncounters() {
       Math.min(ec.prefixChanceCap,ec.prefixBaseChance+(floorIndex-1)*ec.prefixGrowthPerFloor)
     const entrances=[level.mineUpstairs,...(level.mineDownstairs?[level.mineDownstairs]:[])]
     const candidates=[],floodedCandidates=[]
+    const pocketTiles=new Set((level.minePockets||[]).flatMap(p=>p.cells.map(c=>keyXY(c.x,c.y))))
+    const exposedCrystals=new Set((level.mineExcavations||[])
+      .filter(t=>t.kind==='exposed'&&!t.removed).map(t=>keyXY(t.x,t.y)))
     for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
       const terrain=level.map[y][x]
-      if(!['cavefloor2','water'].includes(terrain) || entrances.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<=ec.entranceClearance)||
+      if(!['cavefloor2','water'].includes(terrain) || pocketTiles.has(keyXY(x,y)) ||
+         exposedCrystals.has(keyXY(x,y)) ||
+         entrances.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<=ec.entranceClearance)||
          (level.mineCagePad&&Math.max(Math.abs(x-level.mineCagePad.x),
            Math.abs(y-level.mineCagePad.y))<=1))continue
       if(terrain==='water')floodedCandidates.push({x,y})
@@ -393,6 +399,7 @@ function spawnDwarvenMinesEncounters() {
         const spider=ENEMY_TEMPLATE_BY_NAME['Giant Spider']
         if(spider)placePack(spider,1)
       }
+      Mining.spawnNests(level,z,floorIndex+1)
       continue
     }
     // Guaranteed rosters begin on mine floors 2, 3 and 4. Weaker groups
@@ -427,6 +434,7 @@ function spawnDwarvenMinesEncounters() {
       if(!placed)break
       populated+=placed
     }
+    Mining.spawnNests(level,z,floorIndex+1)
   }
 }
 

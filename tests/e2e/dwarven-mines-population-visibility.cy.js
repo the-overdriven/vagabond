@@ -64,11 +64,96 @@ describe('Mine-only encounters and darkness', () => {
       invalidateUndergroundFov()
       const shown=currentUndergroundFov()
       const expected=UndergroundFov.compute(map,player.x,player.y,5)
-      check(shown.size===expected.size && [...shown].every(p=>expected.has(p)),
-        'mine visibility is exactly the radius-five FOV')
+      check([...expected].every(p=>shown.has(p)),
+        'mine visibility always includes the ordinary radius-five FOV')
       check(UndergroundFov.RADIUS===8,'other underground FOV remains eight tiles')
+      const originalExcavations=first.level.mineExcavations
+      const lightMap=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
+      first.level.mineExcavations=[{x:12,y:10,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
+      try {
+        const normal=UndergroundFov.compute(lightMap,2,10,5)
+        const distant=Mining.lightVisible(lightMap,2,10,normal)
+        check(!normal.has('12,10')&&distant.has('12,10')&&distant.has('15,10'),
+          'a distant crystal lights unobstructed terrain beyond normal sight radius')
+        lightMap[10][8]='cavewall'
+        const blocked=Mining.lightVisible(lightMap,2,10,normal)
+        check(!blocked.has('12,10')&&blocked.has('12,8'),
+          'walls hide blocked light but visible tiles still glow around a corner')
+      } finally {first.level.mineExcavations=originalExcavations}
       check(MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.merchantPrice===70 &&
         itemDefinition('homecomingscroll').baseValue===70,'Homecoming costs 70g')
+
+      let wideCorridorCrystals=0
+      for(const [i,{level,z}] of mine.entries()) {
+        check(level.minePockets.length>=3 && level.minePockets.length<=10,
+          'floor '+(i+1)+' has three to ten sealed mining pockets')
+        check(level.minePockets.every(p=>{
+          const xs=p.cells.map(c=>c.x),ys=p.cells.map(c=>c.y)
+          return Math.max(...xs)-Math.min(...xs)<8 && Math.max(...ys)-Math.min(...ys)<8
+        }), 'pockets fit in eight-by-eight bounding boxes')
+        const [min,max]=MINING_CONFIG.generation.budgets[i]
+        check(level.mineMineralValue>=min&&level.mineMineralValue<=max,
+          'mine minerals respect the complete floor gold budget')
+        const pocketTiles=new Set(level.minePockets.flatMap(p=>p.cells.map(c=>keyXY(c.x,c.y))))
+        const formations=level.mineExcavations.filter(t=>t.kind==='exposed'&&!t.removed)
+        const crystalPositions=new Set(formations.map(t=>keyXY(t.x,t.y)))
+        check(enemies.filter(e=>e.alive&&e.level===z).every(e=>!crystalPositions.has(keyXY(e.x,e.y))),
+          'monsters do not spawn inside exposed crystal formations')
+        for(const p of formations.filter(t=>!pocketTiles.has(keyXY(t.x,t.y)))) {
+          const open=DIRS8.filter(([dx,dy])=>level.map[p.y+dy]?.[p.x+dx]==='cavefloor2').length
+          if(open>=MINING_CONFIG.generation.exposedWideCorridorMinNeighbors)wideCorridorCrystals++
+        }
+      }
+      check(wideCorridorCrystals>0,'exposed formations sometimes grow on wider corridor floors')
+      const seams=first.level.mineExcavations.filter(d=>d.kind==='wall'&&d.threshold===0)
+      check(seams.some(d=>Math.max(Math.abs(d.x-first.level.mineUpstairs.x),
+        Math.abs(d.y-first.level.mineUpstairs.y))<=MINING_CONFIG.generation.respiteTrainingDistance),
+        'respite introduces mining with an obvious weak wall near the entrance')
+      const reachable=dungeonWalkDistances(map,first.level.mineUpstairs)
+      const seam=seams.find(d=>[[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>
+        reachable.has(keyXY(d.x+dx,d.y+dy))))
+      check(seam,'obvious mineable wall has a traversable approach')
+      const from=[[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dy])=>({x:seam.x+dx,y:seam.y+dy}))
+        .find(p=>reachable.has(keyXY(p.x,p.y)))
+      enemies=enemies.filter(e=>e.level!==-9) // isolate the mining turn path from ordinary combat
+      player.x=from.x;player.y=from.y
+      player.miningTutorialSeen=false
+      addInventoryItem('pickaxe')
+      const turns=turnCount
+      await tryMove(seam.x-from.x,seam.y-from.y)
+      check(turnCount===turns&&player.miningTutorialSeen,'the one-time mining warning takes no turn')
+      await tryMove(seam.x-from.x,seam.y-from.y)
+      check(turnCount===turns+1&&seam.progress===1,'a confirmed mining strike takes a regular turn')
+      const partial=JSON.parse(JSON.stringify(buildSaveObject())),partialRng=rngState
+      loadGameFromObject(partial,{isReplayInit:true})
+      replayAnimationsDisabled=true
+      check(rngState===partialRng,'partial mining restoration consumes no RNG')
+      check(Mining.find(Mining.activeLevel(),seam.x,seam.y).progress===1&&player.miningTutorialSeen,
+        'partial excavation and the one-time mining warning survive save and replay initialization')
+      await tryMove(seam.x-from.x,seam.y-from.y)
+      check(map[seam.y][seam.x]==='cavefloor2'&&player.mining>0,
+        'finishing the weak wall opens a route and earns Mining XP')
+      const floor=Mining.activeLevel(),open=dungeonWalkDistances(map,{x:player.x,y:player.y})
+      let solid=null
+      for(const position of open.keys()) {
+        const [x,y]=position.split(',').map(Number)
+        for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+          const tx=x+dx,ty=y+dy
+          if(map[ty]?.[tx]==='cavewall'&&!Mining.find(floor,tx,ty)) {
+            solid={x,y,tx,ty};break
+          }
+        }
+        if(solid)break
+      }
+      check(solid,'respite has an ordinary solid wall next to a corridor')
+      player.x=solid.x;player.y=solid.y;player.godMode=true
+      const godTurn=turnCount
+      check(!Mining.canTarget(solid.tx,solid.ty),'god mode does not trigger futile mining on solid walls')
+      await tryMove(solid.tx-solid.x,solid.ty-solid.y)
+      check(player.x===solid.tx&&player.y===solid.ty&&turnCount===godTurn+1&&
+        map[solid.ty][solid.tx]==='cavewall','god mode walks through solid mine walls without excavation')
+      player.godMode=false;player.x=solid.x;player.y=solid.y
+      invalidateUndergroundFov()
 
       const roster=monsters.map(e=>[e.id,e.baseName,e.level,e.x,e.y,e.prefix,e.prefixBase,e.equipment,e.gearScale,e.gearBonuses])
       const saved=JSON.parse(JSON.stringify(buildSaveObject())),rng=rngState

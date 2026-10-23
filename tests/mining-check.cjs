@@ -1,0 +1,243 @@
+const assert = require('node:assert/strict')
+const {run, context} = require('./helpers/node-game-runtime.cjs')
+const plain = value => JSON.parse(JSON.stringify(value))
+
+;(async () => {
+  await run('loadContent()')
+  run(`WORLD_SEED=610061;rngState=WORLD_SEED;applyWorldTraits([],'XS');
+    MAP_W=260;MAP_H=260;enemies=[];groundItems=[];occupied=new Set();
+    replayAnimationsDisabled=true;replayRecording=false;raceOpen=false;log=()=>{};
+    let miningTrial=null;for(let attempt=0;attempt<16&&!miningTrial;attempt++)
+      miningTrial=mineFloorCandidate(0,4);
+    if(!miningTrial)throw Error('mine floor candidate failed');
+    Mining.generate([miningTrial]);
+    deepLevels=Array.from({length:7},()=>mineUnusedChainLevel()).concat(miningTrial);
+    surfaceMap=blankCaveMap();caveMaps=[blankCaveMap()];caves=[];
+    discovered=Array.from({length:MAP_H},()=>Array(MAP_W).fill(false));
+    undergroundDiscoveredL1=Array.from({length:MAP_H},()=>Array(MAP_W).fill(false));
+    spawnPoint={x:5,y:5};currentZ=-9;currentCave=-1;map=miningTrial.map;
+    undergroundDiscovered=miningTrial.discovered;addInventoryItem('pickaxe');
+    const routes=dungeonWalkDistances(map,miningTrial.mineUpstairs);
+    let testSeam=null,testApproach=null;
+    for(const seam of miningTrial.mineExcavations.filter(d=>d.kind==='wall'&&d.threshold===0)){
+      for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+        if(routes.has(keyXY(seam.x+dx,seam.y+dy))){testSeam=seam;testApproach={x:seam.x+dx,y:seam.y+dy};break}
+      }
+      if(testSeam)break
+    }
+    if(!testSeam)throw Error('missing safe obvious seam');
+    player.x=testApproach.x;player.y=testApproach.y;player.hp=playerMaxHp();
+    invalidateUndergroundFov()`)
+  assert.equal(run('miningTrial.minePockets.length>=3&&miningTrial.minePockets.length<=10'), true)
+  assert.equal(run('miningTrial.minePockets.every(p=>p.cells.length>0&&p.entrances.length>0)'), true)
+  assert.equal(run('miningTrial.mineMineralValue>=50&&miningTrial.mineMineralValue<=150'), true)
+  const initialCrystal = plain(run('miningTrial.mineExcavations.find(t=>t.kind===\'exposed\')'))
+  assert(initialCrystal,'the test mine includes an exposed crystal')
+  context.initialCrystal = initialCrystal
+  assert.equal(run('Mining.blocksPathAt(initialCrystal.x,initialCrystal.y)'),true,
+    'exposed formations block ordinary paths until extracted')
+  assert.equal(run('playerPathCanTraverse(initialCrystal.x,initialCrystal.y)'),false,
+    'auto-travel routes around exposed corridor crystals')
+  assert.equal(run('enemyCanTraverse({abilities:[]},initialCrystal.x,initialCrystal.y)'),false,
+    'monsters do not walk through an exposed formation')
+  const initialTurn = run('turnCount')
+  await run('tryMove(testSeam.x-player.x,testSeam.y-player.y)')
+  assert.equal(run('turnCount'),initialTurn,'mining warning is free')
+  assert.equal(run('player.miningTutorialSeen'),true,'the one-time mining warning is marked seen')
+  await run('tryMove(testSeam.x-player.x,testSeam.y-player.y)')
+  assert.equal(run('turnCount'),initialTurn+1,'each mining strike consumes exactly one turn')
+  assert.equal(run('testSeam.progress'),1)
+  const saved = plain(run('buildSaveObject()'))
+  assert.equal(saved.player.miningTutorialSeen,true,'the one-time tutorial flag is saved')
+  context.testSaved = saved
+  const rngBefore = run('rngState')
+  const firstProgress = saved.deepLevels.at(-1).mineExcavations
+    .find(t => t.x === run('testSeam.x') && t.y === run('testSeam.y')).progress
+  assert.equal(firstProgress,1,'partial mining recorded in current save')
+  run('loadGameFromObject(testSaved,{isReplayInit:true})')
+  run('replayAnimationsDisabled=true;attackAnim=null;cameraAnimating=false;pendingMove=null')
+  // A full mine save is used as a replay initial snapshot; restoration must
+  // preserve both excavation progress and the current deterministic RNG state.
+  assert.equal(run('rngState'),rngBefore)
+  assert.equal(run('player.miningTutorialSeen'),true,'loading never shows the tutorial again')
+  assert.equal(run('Mining.find(Mining.activeLevel(),testSeam.x,testSeam.y).progress'),1)
+  await run('tryMove(testSeam.x-player.x,testSeam.y-player.y)')
+  assert.equal(run('map[testSeam.y][testSeam.x]'),'cavefloor2')
+  assert.equal(run('Mining.excavatedAt(Mining.activeLevel(),testSeam.x,testSeam.y)'),true)
+  assert.equal(run('player.mining'),1)
+  const bareRock = plain(run(`(()=>{
+    const level=Mining.activeLevel()
+    for(const p of level.minePockets.flatMap(p=>p.entrances)){
+      for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+        const x=p.x+dx,y=p.y+dy
+        if(map[y]?.[x]!=='cavefloor2')continue
+        for(const [ax,ay] of [[0,-1],[1,0],[0,1],[-1,0]]){
+          const tx=x+ax,ty=y+ay
+          if(map[ty]?.[tx]==='cavewall'&&!Mining.find(level,tx,ty))return {x,y,tx,ty}
+        }
+      }
+    }
+    return null
+  })()`))
+  assert(bareRock,'an ordinary unmineable wall remains beside the mine path')
+  context.bareRock = bareRock
+  run('player.x=bareRock.x;player.y=bareRock.y;player.miningArmedTarget=null')
+  const solidTurn = run('turnCount'), skillBefore = run('player.mining'), xpBefore = run('player.miningXpUnits')
+  await run('tryMove(bareRock.tx-player.x,bareRock.ty-player.y)')
+  assert.equal(run('turnCount'),solidTurn+1,'subsequent rock probes immediately consume a turn')
+  await run('tryMove(bareRock.tx-player.x,bareRock.ty-player.y)')
+  assert.equal(run('turnCount'),solidTurn+2,'solid rock still resists repeated mining')
+  assert.equal(run('player.mining'),skillBefore)
+  assert.equal(run('player.miningXpUnits'),xpBefore)
+  const godTurn = run('turnCount')
+  run('player.godMode=true')
+  assert.equal(run('Mining.canTarget(bareRock.tx,bareRock.ty)'),false,
+    'god mode bypasses futile mining against solid mine walls')
+  await run('tryMove(bareRock.tx-player.x,bareRock.ty-player.y)')
+  assert.equal(run('player.x===bareRock.tx&&player.y===bareRock.ty'),true,
+    'god mode walks into otherwise solid mine rock')
+  assert.equal(run('map[bareRock.ty][bareRock.tx]'),'cavewall',
+    'god mode wall traversal does not modify permanent terrain')
+  assert.equal(run('turnCount'),godTurn+1,'god mode wall traversal uses a normal movement turn')
+  run('player.godMode=false;player.x=bareRock.x;player.y=bareRock.y;invalidateUndergroundFov()')
+  const illumination = plain(run(`(()=>{
+    const level=Mining.activeLevel(),original=level.mineExcavations
+    const terrain=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
+    level.mineExcavations=[{x:12,y:10,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
+    try {
+      const ordinary=UndergroundFov.compute(terrain,2,10,5)
+      const lit=Mining.lightVisible(terrain,2,10,ordinary)
+      terrain[10][14]='cavewall'
+      const behindCrystal=Mining.lightVisible(terrain,2,10,ordinary)
+      terrain[10][14]='cavefloor2';terrain[10][8]='cavewall'
+      const behindPlayerWall=Mining.lightVisible(terrain,2,10,ordinary)
+      level.mineExcavations[0].removed=true
+      const exhausted=Mining.lightVisible(terrain,2,10,ordinary)
+      return {ordinary:ordinary.has('12,10'),distant:lit.has('12,10'),
+        litTile:lit.has('15,10'),outOfGlow:lit.has('17,10'),
+        blockedBehindCrystal:behindCrystal.has('15,10'),
+        blockedBehindPlayer:behindPlayerWall.has('12,10'),
+        spillAroundCorner:behindPlayerWall.has('12,8'),
+        removedStillLit:exhausted.has('12,10')}
+    } finally {level.mineExcavations=original}
+  })()`))
+  assert.equal(illumination.ordinary,false,'distant ruby lies outside the normal five-tile FOV')
+  assert.equal(illumination.distant,true,'crystal itself remains visible beyond the combined sight and glow range')
+  assert.equal(illumination.litTile,true,'distant illuminated terrain is visible')
+  assert.equal(illumination.outOfGlow,false,'crystal only lights its configured radius')
+  assert.equal(illumination.blockedBehindCrystal,false,'solid rock blocks crystal light')
+  assert.equal(illumination.blockedBehindPlayer,false,'solid rock blocks the player’s view of distant light')
+  assert.equal(illumination.spillAroundCorner,true,'light can reveal visible tiles when the source is around a corner')
+  assert.equal(illumination.removedStillLit,false,'mined crystals no longer illuminate terrain')
+  run(`(()=>{
+    const target=keyXY(bareRock.tx,bareRock.ty)
+    const approaches=dungeonWalkDistances(map,{x:bareRock.x,y:bareRock.y})
+    const place=[...approaches].find(([position,steps])=>steps>=4&&steps<=8&&position!==target)
+    if(!place)throw Error('no nearby ordinary traversal site for sound investigator')
+    const [x,y]=place[0].split(',').map(Number),tmpl=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+    addEnemy({name:tmpl.name,baseName:tmpl.name,level:-9,levelKind:'chain',
+      caveIndex:-1,x,y,hp:tmpl.hp,maxHp:tmpl.hp,atk:tmpl.atk,def:tmpl.def,
+      spd:tmpl.spd,grace:tmpl.grace,abilities:[...tmpl.abilities],alive:true})
+    MINING_CONFIG.sound.minimumHearingChance=1
+    MINING_CONFIG.sound.maximumHearingChance=1
+    MINING_CONFIG.sound.investigationChance=1
+    MINING_CONFIG.sound.investigationSteps=[2,2]
+    player.miningArmedTarget='-9:'+bareRock.tx+','+bareRock.ty
+    Mining.strike(bareRock.tx,bareRock.ty)
+  })()`)
+  assert.equal(run('enemies.at(-1).alarmed'),true,'nearby monster becomes Alarmed after hearing the strike')
+  assert.equal(run('enemies.at(-1).miningInvestigation.steps'),2,
+    'hearing and the independent investigation roll produce a finite movement budget')
+  const heardSaved=plain(run('buildSaveObject()')),heardRng=run('rngState')
+  context.heardSaved=heardSaved
+  run('loadGameFromObject(heardSaved,{isReplayInit:true})')
+  run('replayAnimationsDisabled=true;attackAnim=null;cameraAnimating=false;pendingMove=null')
+  assert.equal(run('rngState'),heardRng)
+  assert.equal(run('enemies.at(-1).miningInvestigation.steps'),2,'sound investigation survives save restoration')
+  for (let n = 1; n <= 6; n++) {
+    run(`currentZ=0;map=surfaceMap;player.x=${10+n};player.y=10;
+      surfaceMap[10][${11+n}]='boulder';player.miningArmedTarget=null`)
+    await run('tryMove(1,0)')
+    await run('tryMove(1,0)')
+    assert.equal(run(`surfaceMap[10][${11+n}]`),'grass','overworld stone is permanently removed')
+  }
+  assert.equal(run('player.minedSurfaceStones'),6)
+  assert(run('player.miningXpUnits')>0 && run('player.miningXpUnits')<1000000,
+    'the sixth overworld stone grants only fractional fixed-point experience')
+  for (const [seed, count] of [[610061, 4], [610063, 5], [554433, 4]]) {
+    const survey = plain(run(`(()=>{
+      WORLD_SEED=${seed};rngState=WORLD_SEED;
+      const levels=Array.from({length:${count}},(_,i)=>{
+        let level=null;for(let n=0;n<24&&!level;n++)level=mineFloorCandidate(i,${count});
+        return level
+      });
+      if(levels.some(l=>!l))throw Error('unable to construct mine level');
+      if(!mineAlignCageShaft(levels))throw Error('unaligned cage');
+      Mining.generate(levels);
+      return levels.map(level=>({pockets:level.minePockets,tiles:level.map,
+        crystals:level.mineExcavations.filter(t=>t.kind==='exposed').map(t=>({x:t.x,y:t.y})),
+        entrances:[level.mineUpstairs,level.mineDownstairs,level.mineCagePad],
+        mineralValue:level.mineMineralValue,up:level.mineUpstairs,
+        availableXp:level.mineExcavations.reduce((total,t)=>total+(t.mineral?
+          MINING_CONFIG.skill.xp[MINING_CONFIG.minerals[t.mineral].tier]:
+          MINING_CONFIG.skill.xp[t.hardness]),0),
+        stairDistance:level.mineDownstairs?
+          dungeonWalkDistances(level.map,level.mineUpstairs).get(keyXY(level.mineDownstairs.x,level.mineDownstairs.y)):null,
+        budget:level.mineMineralBudget}))
+    })()`))
+    assert.equal(survey.length,count)
+    let wideCorridorCrystals=0
+    console.log(`seed ${seed}: ${count} floors, ${survey.reduce((n,f)=>n+f.availableXp,0)} available mining XP`)
+    for (let i = 0; i < survey.length; i++) {
+      const floor=survey[i], limits=[[50,150],[250,450],[350,650],[500,900],[700,1000]][i]
+      assert(floor.pockets.length>=3&&floor.pockets.length<=10,`${seed}: pocket count on floor ${i+1}`)
+      assert(floor.mineralValue>=limits[0]&&floor.mineralValue<=limits[1],
+        `${seed}: floor ${i+1} generated mineral value remains in budget`)
+      const queue=[floor.up], visited=new Set([`${floor.up.x},${floor.up.y}`])
+      for(let head=0;head<queue.length;head++)for(const [dx,dy] of
+        [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[-1,1],[1,-1],[1,1]]){
+        const x=queue[head].x+dx,y=queue[head].y+dy
+        if(!['cavefloor2','minestairsup','minestairsdown','minecageupperoff','minecageloweroff'].includes(floor.tiles[y]?.[x])||visited.has(`${x},${y}`))continue
+        visited.add(`${x},${y}`);queue.push({x,y})
+      }
+      for(const p of floor.pockets){
+        const xs=p.cells.map(c=>c.x),ys=p.cells.map(c=>c.y)
+        assert(Math.max(...xs)-Math.min(...xs)<8&&Math.max(...ys)-Math.min(...ys)<8,
+          `${seed}: pocket bounding box`)
+        assert(p.entrances.length>=1,`${seed}: pocket has a mineable approach`)
+        assert(p.cells.every(c=>!visited.has(`${c.x},${c.y}`)),
+          `${seed}: floor ${i+1} pocket ${p.id} must remain sealed until mining opens its wall`)
+      }
+      for(const stair of floor.entrances.filter(Boolean))
+        if(floor.tiles[stair.y]?.[stair.x]!=='mineshaftrope')
+          assert(visited.has(`${stair.x},${stair.y}`),`${seed}: mandatory mine transit remains reachable`)
+      const pocketCells=new Set(floor.pockets.flatMap(p=>p.cells.map(c=>`${c.x},${c.y}`)))
+      const blockedCrystals=new Set(floor.crystals.map(c=>`${c.x},${c.y}`))
+      for(const crystal of floor.crystals){
+        const neighbours=[[0,-1],[1,0],[0,1],[-1,0],[-1,-1],[-1,1],[1,-1],[1,1]]
+          .filter(([dx,dy])=>floor.tiles[crystal.y+dy]?.[crystal.x+dx]==='cavefloor2').length
+        if(!pocketCells.has(`${crystal.x},${crystal.y}`)&&neighbours>=5)wideCorridorCrystals++
+      }
+      const open=[floor.up],route=new Set([`${floor.up.x},${floor.up.y}`])
+      for(let head=0;head<open.length;head++)for(const [dx,dy] of
+        [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[-1,1],[1,-1],[1,1]]){
+        const x=open[head].x+dx,y=open[head].y+dy,k=`${x},${y}`
+        if(blockedCrystals.has(k)||route.has(k)||
+          !['cavefloor2','minestairsup','minestairsdown','minecageupperoff','minecageloweroff'].includes(floor.tiles[y]?.[x]))continue
+        route.add(k);open.push({x,y})
+      }
+      for(const site of visited){
+        if(!blockedCrystals.has(site))assert(route.has(site),
+          `${seed}: exposed crystals must never isolate open corridor floor ${site}`)
+      }
+      if(floor.entrances[1]){
+        const down=floor.entrances[1]
+        assert(visited.has(`${down.x},${down.y}`) && floor.stairDistance>=30,
+          `${seed}: the lower mine staircase remains open with a 30-tile route`)
+      }
+    }
+    assert(wideCorridorCrystals>0,`${seed}: some exposed crystals should grow in wider corridors`)
+    console.log(`seed ${seed}: ${wideCorridorCrystals} exposed crystals on wider corridor floors`)
+  }
+  console.log('PASS Mining generation, turn cost, persistence and skill progression')
+})().catch(err => { console.error(err.stack); process.exitCode = 1 })

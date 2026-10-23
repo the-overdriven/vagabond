@@ -90,6 +90,8 @@ function buildSaveObject() {
     worldSeed: WORLD_SEED,
     worldTraits: activeWorldTraits,
     collectiveMindFloors: structuredClone(collectiveMindFloors),
+    miningSurfaceProgress: {...miningSurfaceProgress},
+    miningLastEchoTurn,
     rngState: rngState,
     nextEnemyId,
     inspectedDungeonLocks: [...inspectedDungeonLocks],
@@ -116,6 +118,10 @@ function buildSaveObject() {
       mineDownstairs: structuredClone(lvl.mineDownstairs || null),
       mineCagePad: structuredClone(lvl.mineCagePad || null),
       mineTransitions: structuredClone(lvl.mineTransitions || null),
+      mineExcavations: structuredClone(lvl.mineExcavations || []),
+      minePockets: structuredClone(lvl.minePockets || []),
+      mineMineralValue: lvl.mineMineralValue ?? null,
+      mineMineralBudget: lvl.mineMineralBudget ?? null,
       caveMaps: lvl.caveMaps.map(cm => encodeTileGrid(cm, '#')),
       dungeonPackage: lvl.dungeonPackage || lvl.caves?.[0]?.dungeonPackage || null,
       traps: structuredClone(lvl.traps || []),
@@ -190,6 +196,11 @@ function buildSaveObject() {
       poisonTurns: player.poisonTurns,
       lowHpWarningActive: player.lowHpWarningActive,
       swimming: player.swimming,
+      mining: player.mining,
+      miningXpUnits: player.miningXpUnits,
+      minedSurfaceStones: player.minedSurfaceStones,
+      miningArmedTarget: player.miningArmedTarget,
+      miningTutorialSeen: player.miningTutorialSeen,
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
       fishermanLessonPending: !!player.fishermanLessonPending,
       fishermanFishGiftGiven: !!player.fishermanFishGiftGiven,
@@ -285,6 +296,7 @@ function buildSaveObject() {
       encounterFamily: e.encounterFamily || null,
       dungeonRoomId: e.dungeonRoomId || null,
       dungeonVaultId: e.dungeonVaultId || null,
+      miningInvestigation: e.miningInvestigation ? structuredClone(e.miningInvestigation) : null,
     })),
     caveDecorations: caveDecorations.map(prop => ({...prop})),
     groundItems: groundItems.map(g => ({...g})),
@@ -577,6 +589,10 @@ function loadGameFromObject(data, opts = {}) {
       mineDownstairs: structuredClone(lvlData.mineDownstairs || null),
       mineCagePad: structuredClone(lvlData.mineCagePad || null),
       mineTransitions: structuredClone(lvlData.mineTransitions || null),
+      mineExcavations: structuredClone(lvlData.mineExcavations || []),
+      minePockets: structuredClone(lvlData.minePockets || []),
+      mineMineralValue: lvlData.mineMineralValue ?? null,
+      mineMineralBudget: lvlData.mineMineralBudget ?? null,
       rooms: structuredClone(lvlData.rooms || lvlCaves[0]?.rooms || []),
       roomGraph: structuredClone(lvlData.roomGraph || lvlCaves[0]?.roomGraph || null),
       progressionKey: structuredClone(lvlData.progressionKey || null),
@@ -735,6 +751,13 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  miningSurfaceProgress = {...data.miningSurfaceProgress}
+  miningLastEchoTurn = data.miningLastEchoTurn
+  player.mining = data.player.mining
+  player.miningXpUnits = data.player.miningXpUnits
+  player.minedSurfaceStones = data.player.minedSurfaceStones
+  player.miningArmedTarget = data.player.miningArmedTarget
+  player.miningTutorialSeen = data.player.miningTutorialSeen
   player.killsBySpecies = {...data.player.killsBySpecies}
   player.strongestEnemyKilled = data.player.strongestEnemyKilled ? structuredClone(data.player.strongestEnemyKilled) : null
   player.swimming = data.player.swimming || 0
@@ -918,6 +941,7 @@ function loadGameFromObject(data, opts = {}) {
       encounterFamily: typeof e.encounterFamily === 'string' ? e.encounterFamily : null,
       dungeonRoomId: typeof e.dungeonRoomId === 'string' ? e.dungeonRoomId : null,
       dungeonVaultId: typeof e.dungeonVaultId === 'string' ? e.dungeonVaultId : null,
+      miningInvestigation: e.miningInvestigation ? structuredClone(e.miningInvestigation) : null,
     })
   })
   occupied = new Set()
