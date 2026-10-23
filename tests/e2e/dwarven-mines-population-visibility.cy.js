@@ -67,6 +67,13 @@ describe('Mine-only encounters and darkness', () => {
       check([...expected].every(p=>shown.has(p)),
         'mine visibility always includes the ordinary radius-five FOV')
       check(UndergroundFov.RADIUS===8,'other underground FOV remains eight tiles')
+      check([0,0.25,0.5,0.75,0].every((opacity,i)=>
+        mineSightDarknessAt(player.x+[2,3,4,5,6][i],player.y)===opacity),
+        'mine distance bands darken 3/4/5 tiles by 25/50/75 percent without reducing sight')
+      check(MINING_CONFIG.lighting.exploredDarkness>MINING_CONFIG.lighting.fovDarknessByDistance[5],
+        'explored mine tiles beyond sight remain darker than the fifth visible ring')
+      check(MINING_CONFIG.skill.xpRequiredMultiplier===3,
+        'Mining progression requires three times its previous experience')
       const originalExcavations=first.level.mineExcavations
       const lightMap=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
       first.level.mineExcavations=[{x:12,y:10,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
@@ -178,8 +185,9 @@ describe('Mine-only encounters and darkness', () => {
       check(Mining.find(Mining.activeLevel(),seam.x,seam.y).progress===1&&player.miningTutorialSeen,
         'partial excavation and the one-time mining warning survive save and replay initialization')
       await tryMove(seam.x-from.x,seam.y-from.y)
-      check(map[seam.y][seam.x]==='cavefloor2'&&player.mining>0,
-        'finishing the weak wall opens a route and earns Mining XP')
+      check(map[seam.y][seam.x]==='cavefloor2'&&player.mining===0&&
+        player.miningXpUnits===MINING_CONFIG.skill.surfaceFractionScale,
+        'finishing the weak wall opens a route and earns one of three XP for the first level')
       const floor=Mining.activeLevel(),open=dungeonWalkDistances(map,{x:player.x,y:player.y})
       let solid=null
       for(const position of open.keys()) {

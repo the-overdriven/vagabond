@@ -2,6 +2,7 @@
   "skill": {
     "max": 100,
     "experienceDivisor": 25,
+    "xpRequiredMultiplier": 3,
     "surfaceFullXpCount": 5,
     "surfaceFractionScale": 1000000,
     "awarenessThresholds": [0, 25, 50, 75],
@@ -64,6 +65,8 @@
     "ruby": {"name": "Ruby", "price": 94, "weight": 1, "hardness": "veryHard", "tier": "rare", "glow": "#f24b75", "radius": 4}
   },
   "lighting": {
+    "fovDarknessByDistance": [0, 0, 0, 0.25, 0.5, 0.75],
+    "exploredDarkness": 0.85,
     "tileCenterOpacity": 0.38,
     "tileMidOpacity": 0.2,
     "tileMidpoint": 0.42,

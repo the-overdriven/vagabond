@@ -24,6 +24,12 @@ const Mining = (() => {
       v.every(n => Number.isInteger(n)) && v[0] >= minimum && v[1] <= maximum && v[0] <= v[1]
     const validOpacity = n => Number.isFinite(n) && n >= 0 && n <= 1
     if (!cfg?.skill || !cfg.generation || !cfg.sound || !cfg.minerals || !cfg.lighting ||
+      !Number.isInteger(cfg.skill.xpRequiredMultiplier) || cfg.skill.xpRequiredMultiplier < 1 ||
+      !Array.isArray(cfg.lighting.fovDarknessByDistance) ||
+      cfg.lighting.fovDarknessByDistance.length !== 6 ||
+      !cfg.lighting.fovDarknessByDistance.every(validOpacity) ||
+      !validOpacity(cfg.lighting.exploredDarkness) ||
+      cfg.lighting.exploredDarkness < cfg.lighting.fovDarknessByDistance[5] ||
       !validOpacity(cfg.lighting.tileCenterOpacity) ||
       !validOpacity(cfg.lighting.tileMidOpacity) ||
       !validOpacity(cfg.lighting.tileBloomOpacity) ||
@@ -430,8 +436,8 @@ const Mining = (() => {
     player.miningXpUnits += amount
     let improved = false
     while (player.mining < cfg.max && player.miningXpUnits >=
-      (1 + Math.floor(player.mining / cfg.experienceDivisor)) * scale) {
-      player.miningXpUnits -= (1 + Math.floor(player.mining / cfg.experienceDivisor)) * scale
+      (1 + Math.floor(player.mining / cfg.experienceDivisor)) * cfg.xpRequiredMultiplier * scale) {
+      player.miningXpUnits -= (1 + Math.floor(player.mining / cfg.experienceDivisor)) * cfg.xpRequiredMultiplier * scale
       player.mining++
       improved = true
     }

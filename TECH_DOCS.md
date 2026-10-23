@@ -539,8 +539,9 @@ skill reduces the cost, and a finishing strike is refused if its strain would
 leave the character at zero HP. All strike counts, strain, awareness thresholds,
 mineral rewards, and XP are configurable in `content/mining_config.json`.
 
-For skill value `s`, the next level costs `1 + floor(s / 25)` Mining XP; cumulative
-requirements are **25 / 75 / 150 / 250 XP** at levels **25 / 50 / 75 / 100**.
+For skill value `s`, the next level costs `3 × (1 + floor(s / 25))` Mining XP;
+cumulative requirements are **75 / 225 / 450 / 750 XP** at levels
+**25 / 50 / 75 / 100**. The experience multiplier is configurable.
 Normal underground walls and minerals grant XP only once when completed.
 Overworld boulder removal gives 1 XP for each of the first five stones, then
 `1 / n` XP for the *n*th stone. Fractional XP is accumulated in deterministic
@@ -2681,6 +2682,13 @@ the light reaches it from its source. The formation itself need not be visible
 to illuminate a tile around a corner. Lit terrain is visible and explorable
 even outside ordinary FOV; solid walls and obstructed wall corners block the light, and
 extraction removes the light.
+Within the normal **five-tile** mine sight circle, tiles three, four and five
+steps away receive **25%, 50% and 75%** darkness, respectively; the two nearest
+steps remain clear. The shading covers creatures as well as terrain but does
+not reduce visibility or monster targeting. Previously explored mine tiles
+outside current sight are **85%** dark, and crystals can illuminate and reveal
+tiles independently of the player's sight radius. These visual levels are
+configurable and do not affect turn resolution or replay.
 In tile graphics, each formation produces a continuous, softly fading colored
 glow and a brighter central halo across reachable terrain; opaque walls cast
 shadows. ASCII graphics retain cell-by-cell illumination. The light's color,

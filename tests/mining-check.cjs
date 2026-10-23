@@ -64,7 +64,43 @@ const plain = value => JSON.parse(JSON.stringify(value))
   await run('tryMove(testSeam.x-player.x,testSeam.y-player.y)')
   assert.equal(run('map[testSeam.y][testSeam.x]'),'cavefloor2')
   assert.equal(run('Mining.excavatedAt(Mining.activeLevel(),testSeam.x,testSeam.y)'),true)
-  assert.equal(run('player.mining'),1)
+  assert.equal(run('player.mining'),0,'one weak seam no longer grants an entire Mining level')
+  assert.equal(run('player.miningXpUnits'),1000000,'earned Mining XP is preserved as the level threshold increases')
+  assert.equal(run('MINING_CONFIG.skill.xpRequiredMultiplier'),3)
+  assert.equal(run('mineSightDarknessAt(player.x+2,player.y)'),0)
+  assert.equal(run('mineSightDarknessAt(player.x+3,player.y)'),0.25)
+  assert.equal(run('mineSightDarknessAt(player.x+4,player.y)'),0.5)
+  assert.equal(run('mineSightDarknessAt(player.x+5,player.y)'),0.75)
+  assert.equal(run('mineSightDarknessAt(player.x+6,player.y)'),0,
+    'crystal-lit terrain outside ordinary mine sight is not darkened by its outer ring')
+  const renderedDarkness = plain(run(`(()=>{
+    const previousMap=map,previousX=player.x,previousY=player.y
+    const previousFill=ctx.fillRect,previousTileMode=USE_TILE_IMAGES
+    const previousStatus=updatePlayerStatuses,previousAlarm=updateAlarmedEnemies
+    const previousMinimap=renderMinimap
+    const bands=new Set()
+    try {
+      map=Array.from({length:MAP_H},()=>Array(MAP_W).fill('cavefloor2'))
+      player.x=20;player.y=20;USE_TILE_IMAGES=false
+      invalidateUndergroundFov()
+      updatePlayerStatuses=()=>{};updateAlarmedEnemies=()=>{};renderMinimap=()=>{}
+      ctx.fillRect=function(x,y,w,h){
+        if(w===TILE_PX&&h===TILE_PX&&typeof this.fillStyle==='string'&&
+          this.fillStyle.startsWith('rgba(0, 0, 0, ')) bands.add(this.fillStyle)
+        return previousFill.call(this,x,y,w,h)
+      }
+      renderScene(0)
+      return [...bands]
+    } finally {
+      ctx.fillRect=previousFill;map=previousMap;player.x=previousX;player.y=previousY
+      USE_TILE_IMAGES=previousTileMode;updatePlayerStatuses=previousStatus
+      updateAlarmedEnemies=previousAlarm;renderMinimap=previousMinimap;invalidateUndergroundFov()
+    }
+  })()`))
+  for (const opacity of ['0.25','0.5','0.75']) {
+    assert(renderedDarkness.includes(`rgba(0, 0, 0, ${opacity})`),
+      `the canvas draws its ${opacity} mine darkness band`)
+  }
   const bareRock = plain(run(`(()=>{
     const level=Mining.activeLevel()
     for(const p of level.minePockets.flatMap(p=>p.entrances)){
@@ -190,8 +226,12 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert.equal(run(`surfaceMap[10][${11+n}]`),'grass','overworld stone is permanently removed')
   }
   assert.equal(run('player.minedSurfaceStones'),6)
+  assert.equal(run('player.mining'),2,
+    'the first six total Mining XP buy only two levels at three XP per level')
   assert(run('player.miningXpUnits')>0 && run('player.miningXpUnits')<1000000,
     'the sixth overworld stone grants only fractional fixed-point experience')
+  assert.equal(run('mineSightDarknessAt(player.x+5,player.y)'),0,
+    'surface exploration never inherits mine darkness')
   for (const [seed, count] of [[610061, 4], [610063, 5], [554433, 4]]) {
     const survey = plain(run(`(()=>{
       WORLD_SEED=${seed};rngState=WORLD_SEED;

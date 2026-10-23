@@ -9018,6 +9018,15 @@ more difficult:
     }
   }
 
+  // A visible mine tile gets darker toward the edge of the five-tile sight
+  // circle. Beyond that circle, crystal-lit tiles use their own illumination
+  // and do not inherit a darkness band from the player's sight radius.
+  function mineSightDarknessAt(x, y) {
+    if (!Mining.activeLevel()) return 0
+    const distance = Math.ceil(Math.hypot(x - player.x, y - player.y))
+    return MINING_CONFIG.lighting.fovDarknessByDistance[distance] || 0
+  }
+
   // Tile graphics share one smooth gradient per formation, instead of tinting
   // individual squares. Clip each glow to the same unobstructed visible cells
   // as the deterministic light/FOV rules; only appearance depends on time.
@@ -9241,13 +9250,14 @@ more difficult:
         }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my))) {
-            ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
+            ctx.fillStyle = Mining.activeLevel()
+              ? `rgba(0, 0, 0, ${MINING_CONFIG.lighting.exploredDarkness})`
+              : UndergroundFov.EXPLORED_OVERLAY
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
         } else markDiscovered(mx, my) // surface keeps its existing discovery rule
       }
     }
-    drawCrystalGlow(now, undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
     drawBeastTracks()
     drawCaveSpoor(undergroundVisible)
     // Decorative overlays never enter the loot, collision or inspection systems.
@@ -9748,6 +9758,23 @@ more difficult:
     for (const visibleEnemy of visibleEnemies) {
       if (enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
+    // Render mine darkness over *all* actors and terrain, including enemies
+    // at the fifth tile. Crystal glow follows it so illuminated pockets can
+    // still shine through; neither layer affects who the player can see.
+    if (Mining.activeLevel() && undergroundVisible) {
+      ctx.save()
+      for (let vy = 0; vy < renderRows; vy++) for (let vx = 0; vx < renderCols; vx++) {
+        const mx = baseMapX + vx, my = baseMapY + vy
+        if (!undergroundVisible.has(keyXY(mx, my))) continue
+        const darkness = mineSightDarknessAt(mx, my)
+        if (!darkness) continue
+        ctx.fillStyle = `rgba(0, 0, 0, ${darkness})`
+        ctx.fillRect(Math.round((mx - camX) * TILE_PX),
+          Math.round((my - camY) * TILE_PX), TILE_PX, TILE_PX)
+      }
+      ctx.restore()
+    }
+    drawCrystalGlow(now, undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     drawEnemyTelegraphWarnings(undergroundVisible,true)
