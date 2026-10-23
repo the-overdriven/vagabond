@@ -3,6 +3,8 @@ function beginNewGame(name = 'E2E Tester') {
   cy.get('#raceOverlay .panelbox').should('be.visible')
   cy.get('#raceName').clear().type(name)
   cy.get('#worldSizeSelect').select('XS')
+  // Graveyard assertions do not depend on a random world-generation seed.
+  cy.window().then(win => win.eval('WORLD_SEED = 67893; rngState = WORLD_SEED'))
   cy.get('#btnBegin').click()
   cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   cy.get('#raceOverlay').should('not.have.class', 'show')
@@ -267,6 +269,7 @@ describe('Graveyard', () => {
     cy.get('#raceName').clear().type('Final Tester')
     cy.get('#permadeathToggle').check()
     cy.get('#worldSizeSelect').select('XS')
+    cy.window().then(win => win.eval('WORLD_SEED = 67893; rngState = WORLD_SEED'))
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     const rows = []

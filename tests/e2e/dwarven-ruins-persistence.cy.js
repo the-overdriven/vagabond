@@ -1,10 +1,16 @@
 describe('Dwarven Ruins persistence', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Ruins Persistence Tester')
-    cy.get('#btnBegin').click()
+    cy.get('#raceOverlay .panelbox').should('be.visible')
     cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    // The tests either inspect static tile codes or generate a fixed-seed world.
+    // Restore a known start state instead of generating an unused random world.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__ruinsPersistenceBootstrap = save
+      win.eval(`loadGameFromObject(window.__ruinsPersistenceBootstrap, {isReplayInit:true});
+        raceOpen=false;document.getElementById('raceOverlay').classList.remove('show')`)
+      delete win.__ruinsPersistenceBootstrap
+    }))
     cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   })
 
