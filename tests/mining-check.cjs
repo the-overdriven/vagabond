@@ -215,6 +215,18 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(litWallFaces.unobstructedFloor,true,'unblocked floor tiles still receive light')
   assert.equal(litWallFaces.rockBlocksFloor,false,'solid rock still blocks illumination beyond itself')
   assert.equal(litWallFaces.seesWall,true,'the unlit wall remains visible to the player')
+  const diagonalLight = plain(run(`(()=>{
+    const terrain=Array.from({length:7},()=>Array(7).fill('cavefloor2'))
+    terrain[1][2]='cavewall'
+    const openSide=Mining.lightCanReach(terrain,2,2,3,1,4,2)
+    terrain[2][3]='cavewall'
+    const sealedCorner=Mining.lightCanReach(terrain,2,2,3,1,4,2)
+    return {openSide,sealedCorner}
+  })()`))
+  assert.equal(diagonalLight.openSide,true,
+    'a crystal lights diagonal floor through the one open side of a corner')
+  assert.equal(diagonalLight.sealedCorner,false,
+    'two diagonally adjacent walls continue to block light')
   const embeddedLight = plain(run(`(()=>{
     const level=Mining.activeLevel(),old=level.mineExcavations
     const terrain=Array.from({length:12},()=>Array(12).fill('cavefloor2'))

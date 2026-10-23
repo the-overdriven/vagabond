@@ -33,6 +33,8 @@ const Mining = (() => {
       !validOpacity(cfg.lighting.tileCenterOpacity) ||
       !validOpacity(cfg.lighting.tileMidOpacity) ||
       !validOpacity(cfg.lighting.darknessReliefMidOpacity) ||
+      !Number.isFinite(cfg.lighting.tileDarknessTailTiles) ||
+      cfg.lighting.tileDarknessTailTiles <= 0 || cfg.lighting.tileDarknessTailTiles > 3 ||
       !validOpacity(cfg.lighting.tileBloomOpacity) ||
       !validOpacity(cfg.lighting.pulseOpacity) ||
       !validOpacity(cfg.lighting.embeddedRadiusScale) ||
@@ -45,6 +47,9 @@ const Mining = (() => {
       cfg.lighting.tileRadiusPadding < 0 || cfg.lighting.tileRadiusPadding > 1 ||
       !Number.isInteger(cfg.lighting.tileFadeMargin) ||
       cfg.lighting.tileFadeMargin < 0 || cfg.lighting.tileFadeMargin > 2 ||
+      !Number.isFinite(cfg.lighting.tileVisibilityFeatherWidth) ||
+      cfg.lighting.tileVisibilityFeatherWidth <= 0 || cfg.lighting.tileVisibilityFeatherWidth > 1 ||
+      !validOpacity(cfg.lighting.tileVisibilityFeatherOpacity) ||
       !Number.isFinite(cfg.lighting.pulsePeriodMs) || cfg.lighting.pulsePeriodMs <= 0 ||
       !bounds(cfg.generation.pocketsPerFloor, 1, 30) ||
       !bounds(cfg.generation.waterReleaseTiles, 0, 10) ||
@@ -624,10 +629,15 @@ const Mining = (() => {
     }
     for (let i = 1; i < line.length; i++) {
       const from = line[i - 1], to = line[i]
-      // A diagonal sight ray may just touch a wall corner in the normal FOV.
-      // Emitted light needs a clear aperture, not a pinhole between two rocks.
-      if (from.x !== to.x && from.y !== to.y &&
-        (opaque(to.x, from.y) || opaque(from.x, to.y))) return false
+      // A diagonal ray can reach open floor past a single wall through the
+      // open neighboring tile. Two walls seal the aperture. Keep the stricter
+      // rule for opaque target walls to avoid lighting their hidden corners.
+      if (from.x !== to.x && from.y !== to.y) {
+        const blockedX = opaque(to.x, from.y)
+        const blockedY = opaque(from.x, to.y)
+        if ((blockedX && blockedY) ||
+          (to.x === tx && to.y === ty && opaque(tx, ty) && (blockedX || blockedY))) return false
+      }
     }
     return true
   }

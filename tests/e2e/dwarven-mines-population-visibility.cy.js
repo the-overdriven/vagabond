@@ -93,6 +93,13 @@ describe('Mine-only encounters and darkness', () => {
         check(!Mining.lightCanReach(lightMap,12,10,10,10,8,10)&&
           UndergroundFov.canSee(lightMap,8,10,10,10),
           'the same wall stays visible but receives no crystal light from its opposite side')
+        const diagonal=Array.from({length:7},()=>Array(7).fill('cavefloor2'))
+        diagonal[1][2]='cavewall'
+        check(Mining.lightCanReach(diagonal,2,2,3,1,4,2),
+          'crystal light reaches the northeast floor diagonally around one wall')
+        diagonal[2][3]='cavewall'
+        check(!Mining.lightCanReach(diagonal,2,2,3,1,4,2),
+          'two walls meeting diagonally still block crystal light')
       } finally {first.level.mineExcavations=originalExcavations}
       const originalTileMode=USE_TILE_IMAGES
       const originalGradient=ctx.createRadialGradient
@@ -128,8 +135,10 @@ describe('Mine-only encounters and darkness', () => {
       // ring must clear darkness at its center, without removing remote shade.
       const originalMap=map,originalX=player.x,originalY=player.y
       const originalCamX=camX,originalCamY=camY
+      const originalDiscovered=undergroundDiscovered
       try {
         map=Array.from({length:20},()=>Array(20).fill('cavefloor2'))
+        undergroundDiscovered=Array.from({length:20},()=>Array(20).fill(false))
         player.x=5;player.y=5;camX=0;camY=0;USE_TILE_IMAGES=true
         first.level.mineExcavations=[{x:10,y:5,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
         const visible=UndergroundFov.compute(map,5,5,5)
@@ -145,9 +154,42 @@ describe('Mine-only encounters and darkness', () => {
         drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
         check(opacityAt(8,5)>45,
           'a wall face seen opposite the crystal does not lose its darkness')
+        map[5][8]='cavefloor2'
+        first.level.mineExcavations=[]
+        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        const alphaWithinTile=part=>shadow.getImageData(
+          Math.floor((9+part)*TILE_PX),Math.floor(5.5*TILE_PX),1,1).data[3]
+        check(alphaWithinTile(0.15)+15<alphaWithinTile(0.85),
+          'tile mode gradually darkens across a tile instead of using flat distance bands')
+        check(opacityAt(11,5)>205,
+          'the uninterrupted radial shade reaches remembered-terrain darkness outside radius five')
+        undergroundDiscovered[5][8]=true
+        const hiddenTileVisible=new Set(visible)
+        hiddenTileVisible.delete('8,5')
+        drawMineSightDarkness(hiddenTileVisible,0,0,VIEW_W,VIEW_H)
+        check(opacityAt(8,5)>205,
+          'a remembered tile blocked from view stays dark despite proximity to the player')
+        undergroundDiscovered[5][8]=false
+        let featherGradients=0
+        const originalLinearGradient=ctx.createLinearGradient
+        try {
+          ctx.createLinearGradient=function(...args) {
+            featherGradients++
+            return originalLinearGradient.apply(this,args)
+          }
+          drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)
+          check(featherGradients>0,
+            'the edge of visible mine terrain is softly feathered in tile mode')
+          USE_TILE_IMAGES=false
+          const tileGradientCount=featherGradients
+          drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)
+          check(featherGradients===tileGradientCount,
+            'ASCII mode preserves its existing hard-edged tile visibility')
+        } finally {ctx.createLinearGradient=originalLinearGradient}
       } finally {
         map=originalMap;player.x=originalX;player.y=originalY
         camX=originalCamX;camY=originalCamY
+        undergroundDiscovered=originalDiscovered
         first.level.mineExcavations=originalExcavations
         USE_TILE_IMAGES=originalTileMode
         invalidateUndergroundFov()
