@@ -252,8 +252,13 @@ describe('Desktop overlay layout', () => {
   })
 
   it('keeps a right-edge inspection tooltip inside the canvas', () => {
-    cy.get('#raceName').clear().type('Layout Tester')
-    cy.get('#btnBegin').click()
+    // Tooltip positioning only needs an initialized map and camera. Avoid
+    // generating an unrelated random world, which can stall on slower CI runs.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__desktopLayoutSave = save
+      win.eval('loadGameFromObject(window.__desktopLayoutSave, {isReplayInit:true})')
+      delete win.__desktopLayoutSave
+    }))
     cy.get('#raceOverlay').should('not.have.class', 'show')
     cy.window().then(win => {
       win.eval(`
@@ -271,7 +276,7 @@ describe('Desktop overlay layout', () => {
         updateTooltip()
       `)
     })
-    cy.get('#tooltip').should($tooltip => {
+    cy.get('#tooltip').should('be.visible').and('contain.text', 'Layout Probe').should($tooltip => {
       const tooltipRect = $tooltip[0].getBoundingClientRect()
       const canvasRect = $tooltip[0].ownerDocument.getElementById('game').getBoundingClientRect()
       expect(tooltipRect.right).to.be.at.most(canvasRect.right)
