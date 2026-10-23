@@ -120,7 +120,9 @@ test('unidentified abacus hides owner and stats from public highscore snapshots'
   const f=fixture();f.init();await flush()
   const data=snapshot()
   data.artifacts=[{kind:'artifact',identified:false,noun:'Abacus',name:'Abacus of Zolgrin',
-    stat_line:'ATK +15, CURSED',bonuses:{atk:15},curse:{everyTurns:7},effectId:'secret'}]
+    stat_line:'ATK +15, CURSED',bonuses:{atk:15},curse:{everyTurns:7},effectId:'secret'},
+    {kind:'artifact',identified:false,name:'The Abacus of Secret Dwarf',stat_line:'ATK +17'},
+    {kind:'artifact',identified:false,name:'Unidentified Tea Strainer',stat_line:'DEF +22'}]
   data.equipment.armor={kind:'artifact',identified:false,noun:'Mail',name:'Mail of Glomir',
     stat_line:'DEF 15',bonuses:{def:15}}
   f.highscores.recordLevel(character(),()=>data)
@@ -128,8 +130,11 @@ test('unidentified abacus hides owner and stats from public highscore snapshots'
   const sent=f.calls.inserts[0].record
   assert.equal(sent.artifacts[0].name,'Unidentified Abacus')
   assert.equal(sent.artifacts[0].stat_line,'???')
+  assert.equal(sent.artifacts[1].name,'Unidentified Abacus')
+  assert.equal(sent.artifacts[1].stat_line,'???')
+  assert.equal(sent.artifacts[2].name,'Unidentified Tea Strainer')
   assert.equal(sent.equipment.armor.name,'Unidentified Mail')
-  for(const item of [sent.artifacts[0],sent.equipment.armor]) {
+  for(const item of [...sent.artifacts,sent.equipment.armor]) {
     for(const hidden of ['bonuses','curse','effectId','atk','def','ownerLore','possessor'])
       assert.equal(Object.hasOwn(item,hidden),false,`hidden ${hidden} absent from highscore JSON`)
   }

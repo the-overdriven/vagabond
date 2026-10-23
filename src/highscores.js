@@ -12,11 +12,22 @@ const Highscores = (() => {
 
   // The live item applies its real bonuses, but public snapshots must never
   // expose an unidentified artifact's owner or hidden rolled properties.
+  function unidentifiedName(item) {
+    if (typeof item.noun === 'string' && item.noun.trim()) return `Unidentified ${item.noun.trim()}`
+    const name = typeof item.name === 'string' ? item.name.trim() : ''
+    // Stored highscore snapshots may retain the display name without noun.
+    // Strip the owner from the game's non-cursed naming form before display.
+    const owned = /^(?:The )?(.+?) of .+$/.exec(name.replace(/^Unidentified /i, ''))
+    if (owned) return `Unidentified ${owned[1]}`
+    if (/^Unidentified \S/i.test(name)) return name
+    return 'Unidentified artifact'
+  }
+
   function publicItem(item) {
     if (!item || item.kind !== 'artifact' || item.identified !== false) return item
     return {kind:'artifact', identified:false,
       ...(typeof item.noun === 'string' ? {noun:item.noun} : {}),
-      name:typeof item.noun === 'string' && item.noun ? `Unidentified ${item.noun}` : 'Unidentified artifact',
+      name:unidentifiedName(item),
       stat_line:'???'}
   }
 
@@ -187,9 +198,7 @@ const Highscores = (() => {
 
   function gearLabel(item, fallback) {
     if (item?.kind === 'artifact' && item.identified === false)
-      return (typeof item.noun === 'string' && item.noun ? `Unidentified ${item.noun}` :
-        typeof item.name === 'string' && /^Unidentified /i.test(item.name) ? item.name :
-          'Unidentified artifact') + ' (???)'
+      return unidentifiedName(item) + ' (???)'
     const name = text(item?.name, text(fallback))
     const stats = text(item?.stat_line, '')
     return name + (stats ? ` (${stats})` : '')
