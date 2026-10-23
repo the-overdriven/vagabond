@@ -2680,15 +2680,20 @@ beyond the normal mine sight radius, regardless of how far the formation is
 from the player, provided each lit tile is in the player's line of sight and
 the light reaches it from its source. The formation itself need not be visible
 to illuminate a tile around a corner. Lit terrain is visible and explorable
-even outside ordinary FOV; solid walls and obstructed wall corners block the light, and
-extraction removes the light.
+even outside ordinary FOV; solid walls and obstructed wall corners block the
+light. An opaque wall only receives crystal light when the visible wall face
+and the light source are on the same side, preventing colored light from
+showing through the opposite face. Extraction removes the light.
 Within the normal **five-tile** mine sight circle, tiles three, four and five
 steps away receive **25%, 50% and 75%** darkness, respectively; the two nearest
 steps remain clear. The shading covers creatures as well as terrain but does
 not reduce visibility or monster targeting. Previously explored mine tiles
 outside current sight are **85%** dark, and crystals can illuminate and reveal
 tiles independently of the player's sight radius. These visual levels are
-configurable and do not affect turn resolution or replay.
+configurable and do not affect turn resolution or replay. Crystal illumination
+**overrides the distance-based darkness** wherever it reaches: the crystal tile
+is fully relieved of the overlay, and the surrounding darkness returns smoothly
+toward the edge of its light radius. Opaque walls still cast shadows.
 In tile graphics, each formation produces a continuous, softly fading colored
 glow and a brighter central halo across reachable terrain; opaque walls cast
 shadows. ASCII graphics retain cell-by-cell illumination. The light's color,

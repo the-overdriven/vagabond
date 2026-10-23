@@ -32,6 +32,7 @@ const Mining = (() => {
       cfg.lighting.exploredDarkness < cfg.lighting.fovDarknessByDistance[5] ||
       !validOpacity(cfg.lighting.tileCenterOpacity) ||
       !validOpacity(cfg.lighting.tileMidOpacity) ||
+      !validOpacity(cfg.lighting.darknessReliefMidOpacity) ||
       !validOpacity(cfg.lighting.tileBloomOpacity) ||
       !validOpacity(cfg.lighting.pulseOpacity) ||
       !validOpacity(cfg.lighting.embeddedRadiusScale) ||
@@ -601,14 +602,26 @@ const Mining = (() => {
     return null
   }
 
-  function lightCanReach(mapTiles, sx, sy, tx, ty) {
-    if (!UndergroundFov.canSee(mapTiles, sx, sy, tx, ty)) return false
+  function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {
+    if (!UndergroundFov.canSee(mapTiles, sx, sy, tx, ty) ||
+      !UndergroundFov.canSee(mapTiles, viewerX, viewerY, tx, ty)) return false
     const opaque = (x, y) => {
       const tile = mapTiles[y]?.[x]
       return !tile || ['cavewall', 'dwarvenwall', 'mountain', 'snowmountain',
         'crypt2niche', 'boulder', 'blackpillar'].includes(tile) || TILE[tile]?.blocksSight === true
     }
     const line = UndergroundFov.traceLine(sx, sy, tx, ty)
+    // Sight rays may end on an opaque wall, but a wall's *opposite face*
+    // cannot be illuminated. Both the viewer and the light must approach
+    // at least one of the wall's four faces from the same side.
+    if (opaque(tx, ty) && (sx !== tx || sy !== ty)) {
+      const fromLight = line[line.length - 2]
+      const viewerLine = UndergroundFov.traceLine(viewerX, viewerY, tx, ty)
+      const fromViewer = viewerLine[viewerLine.length - 2]
+      if (!fromLight || !fromViewer ||
+        !((fromLight.x - tx) * (fromViewer.x - tx) > 0 ||
+          (fromLight.y - ty) * (fromViewer.y - ty) > 0)) return false
+    }
     for (let i = 1; i < line.length; i++) {
       const from = line[i - 1], to = line[i]
       // A diagonal sight ray may just touch a wall corner in the normal FOV.
@@ -631,7 +644,7 @@ const Mining = (() => {
       // the player's darkness radius. Distance alone must never hide a light.
       for (let yy = t.y - radius; yy <= t.y + radius; yy++) for (let xx = t.x - radius; xx <= t.x + radius; xx++) {
         if ((xx - t.x) ** 2 + (yy - t.y) ** 2 > radius * radius || !mapTiles[yy]?.[xx]) continue
-        if (UndergroundFov.canSee(mapTiles, px, py, xx, yy) && lightCanReach(mapTiles, t.x, t.y, xx, yy))
+        if (lightCanReach(mapTiles, t.x, t.y, xx, yy, px, py))
           visibleSet.add(key(xx, yy))
       }
     }

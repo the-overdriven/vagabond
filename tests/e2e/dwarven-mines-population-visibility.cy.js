@@ -86,6 +86,13 @@ describe('Mine-only encounters and darkness', () => {
         const blocked=Mining.lightVisible(lightMap,2,10,normal)
         check(!blocked.has('12,10')&&blocked.has('12,8'),
           'walls hide blocked light but visible tiles still glow around a corner')
+        lightMap[10][8]='cavefloor2'
+        lightMap[10][10]='cavewall'
+        check(Mining.lightCanReach(lightMap,12,10,10,10,13,10),
+          'the crystal illuminates the wall face on its side')
+        check(!Mining.lightCanReach(lightMap,12,10,10,10,8,10)&&
+          UndergroundFov.canSee(lightMap,8,10,10,10),
+          'the same wall stays visible but receives no crystal light from its opposite side')
       } finally {first.level.mineExcavations=originalExcavations}
       const originalTileMode=USE_TILE_IMAGES
       const originalGradient=ctx.createRadialGradient
@@ -115,6 +122,35 @@ describe('Mine-only encounters and darkness', () => {
         ctx.createRadialGradient=originalGradient
         first.level.mineExcavations=originalExcavations
         USE_TILE_IMAGES=originalTileMode
+        render()
+      }
+      // Inspect the actual transparent shadow layer: a crystal at the fifth
+      // ring must clear darkness at its center, without removing remote shade.
+      const originalMap=map,originalX=player.x,originalY=player.y
+      const originalCamX=camX,originalCamY=camY
+      try {
+        map=Array.from({length:20},()=>Array(20).fill('cavefloor2'))
+        player.x=5;player.y=5;camX=0;camY=0;USE_TILE_IMAGES=true
+        first.level.mineExcavations=[{x:10,y:5,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
+        const visible=UndergroundFov.compute(map,5,5,5)
+        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        const shadow=mineDarknessLayer.getContext('2d')
+        const opacityAt=(x,y)=>shadow.getImageData(Math.floor((x+0.5)*TILE_PX),
+          Math.floor((y+0.5)*TILE_PX),1,1).data[3]
+        check(opacityAt(10,5)<12,
+          'crystal light removes almost all fifth-ring darkness from its center')
+        check(opacityAt(5,10)>170,
+          'an unlit tile on the fifth ring retains its 75 percent dark overlay')
+        map[5][8]='cavewall'
+        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        check(opacityAt(8,5)>45,
+          'a wall face seen opposite the crystal does not lose its darkness')
+      } finally {
+        map=originalMap;player.x=originalX;player.y=originalY
+        camX=originalCamX;camY=originalCamY
+        first.level.mineExcavations=originalExcavations
+        USE_TILE_IMAGES=originalTileMode
+        invalidateUndergroundFov()
         render()
       }
       check(MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.merchantPrice===70 &&

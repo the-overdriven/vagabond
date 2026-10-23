@@ -70,6 +70,7 @@
     "tileCenterOpacity": 0.38,
     "tileMidOpacity": 0.2,
     "tileMidpoint": 0.42,
+    "darknessReliefMidOpacity": 0.6,
     "tileBloomOpacity": 0.15,
     "tileBloomRadius": 1.15,
     "tileRadiusPadding": 0.2,

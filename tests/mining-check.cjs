@@ -101,6 +101,36 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert(renderedDarkness.includes(`rgba(0, 0, 0, ${opacity})`),
       `the canvas draws its ${opacity} mine darkness band`)
   }
+  const asciiCrystalShade = plain(run(`(()=>{
+    const level=Mining.activeLevel(),oldDeposits=level.mineExcavations
+    const oldMap=map,oldX=player.x,oldY=player.y,oldCamX=camX,oldCamY=camY
+    const oldMode=USE_TILE_IMAGES,oldFill=ctx.fillRect
+    const shades=new Map()
+    try {
+      map=Array.from({length:MAP_H},()=>Array(MAP_W).fill('cavefloor2'))
+      player.x=20;player.y=20;camX=15;camY=15;USE_TILE_IMAGES=false
+      level.mineExcavations=[{x:25,y:20,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
+      const visible=UndergroundFov.compute(map,20,20,5)
+      ctx.fillRect=function(x,y,w,h){
+        if(w===TILE_PX&&h===TILE_PX&&typeof this.fillStyle==='string'&&
+          this.fillStyle.startsWith('rgba(0, 0, 0, '))shades.set(x+','+y,this.fillStyle)
+        return oldFill.call(this,x,y,w,h)
+      }
+      drawMineSightDarkness(visible,15,15,VIEW_W,VIEW_H)
+      return {
+        source:shades.get((25-15)*TILE_PX+','+(20-15)*TILE_PX)||null,
+        unlit:shades.get((20-15)*TILE_PX+','+(25-15)*TILE_PX)||null
+      }
+    } finally {
+      ctx.fillRect=oldFill;level.mineExcavations=oldDeposits;map=oldMap
+      player.x=oldX;player.y=oldY;camX=oldCamX;camY=oldCamY;USE_TILE_IMAGES=oldMode
+      invalidateUndergroundFov()
+    }
+  })()`))
+  assert.equal(asciiCrystalShade.source,null,
+    'crystal source on the fifth ring has no FOV darkness even in ASCII mode')
+  assert.equal(asciiCrystalShade.unlit,'rgba(0, 0, 0, 0.75)',
+    'an unlit fifth-ring tile retains its normal FOV darkness')
   const bareRock = plain(run(`(()=>{
     const level=Mining.activeLevel()
     for(const p of level.minePockets.flatMap(p=>p.entrances)){
@@ -165,6 +195,26 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(illumination.blockedBehindPlayer,false,'solid rock blocks the player’s view of distant light')
   assert.equal(illumination.spillAroundCorner,true,'light can reveal visible tiles when the source is around a corner')
   assert.equal(illumination.removedStillLit,false,'mined crystals no longer illuminate terrain')
+  const litWallFaces = plain(run(`(()=>{
+    const terrain=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
+    terrain[10][10]='cavewall'
+    return {
+      fromSameSide:Mining.lightCanReach(terrain,12,10,10,10,13,10),
+      fromOppositeSide:Mining.lightCanReach(terrain,12,10,10,10,8,10),
+      sameDiagonalFace:Mining.lightCanReach(terrain,12,9,10,10,13,11),
+      oppositeDiagonalFace:Mining.lightCanReach(terrain,12,9,10,10,8,11),
+      unobstructedFloor:Mining.lightCanReach(terrain,12,10,11,10,13,10),
+      rockBlocksFloor:Mining.lightCanReach(terrain,12,10,9,10,8,10),
+      seesWall:UndergroundFov.canSee(terrain,8,10,10,10)
+    }
+  })()`))
+  assert.equal(litWallFaces.fromSameSide,true,'crystals illuminate the wall face toward their source')
+  assert.equal(litWallFaces.fromOppositeSide,false,'crystals cannot tint the opposite face of an opaque wall')
+  assert.equal(litWallFaces.sameDiagonalFace,true,'a diagonal viewer can share a lit wall face')
+  assert.equal(litWallFaces.oppositeDiagonalFace,false,'diagonal rays cannot light a hidden wall face')
+  assert.equal(litWallFaces.unobstructedFloor,true,'unblocked floor tiles still receive light')
+  assert.equal(litWallFaces.rockBlocksFloor,false,'solid rock still blocks illumination beyond itself')
+  assert.equal(litWallFaces.seesWall,true,'the unlit wall remains visible to the player')
   const embeddedLight = plain(run(`(()=>{
     const level=Mining.activeLevel(),old=level.mineExcavations
     const terrain=Array.from({length:12},()=>Array(12).fill('cavefloor2'))
@@ -181,8 +231,8 @@ const plain = value => JSON.parse(JSON.stringify(value))
       return {radius:Mining.lightInfo(deposit).radius,near:exposed.has('5,5'),
         beyond:exposed.has('4,5'),concealed:!!Mining.lightInfo({...deposit,threshold:50}),
         hiddenLight:hidden.has('5,5'),ordinaryCorner:UndergroundFov.canSee(terrain,5,5,6,4),
-        blockedCorner:Mining.lightCanReach(terrain,5,5,6,4),
-        straight:Mining.lightCanReach(terrain,6,5,7,5)}
+        blockedCorner:Mining.lightCanReach(terrain,5,5,6,4,5,5),
+        straight:Mining.lightCanReach(terrain,6,5,7,5,7,5)}
     } finally {level.mineExcavations=old}
   })()`))
   assert.equal(embeddedLight.radius,1,'wall crystals glow at a smaller radius')
