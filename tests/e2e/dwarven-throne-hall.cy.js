@@ -124,9 +124,20 @@ describe('Guaranteed Dwarven Throne Hall geometry', () => {
   }
 
   it('rotates the hall footprint, ports, throne anchor and facing together', () => {
-    cy.window().then(win => win.eval(`(() => {
+    cy.window().then(win => win.eval(`(async () => {
       const check = (ok, message) => { if (!ok) throw new Error(message) }
+      // Each Cypress case starts from the bootstrap save, not a generated world.
+      applyWorldTraits([])
+      WORLD_SEED = 610061
+      rngState = WORLD_SEED
+      currentZ = 0
+      currentCave = -1
+      map = surfaceMap
+      replayRecording = false
+      replayPlaying = false
+      await generateNewWorld()
       const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
+      check(final?.landmarks?.length === 1, 'generated final Ruins floor has a throne hall')
       const old = structuredClone(final.landmarks[0])
       const oldRoom = structuredClone(final.rooms.find(r => r.id === old.roomId))
       const z = chainZForDepth(deepLevels.indexOf(deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1))+2)
