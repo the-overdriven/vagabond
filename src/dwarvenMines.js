@@ -215,7 +215,7 @@ function mineFloodSideChambers(mine) {
   const dirs=[[0,-1],[1,0],[0,1],[-1,0]]
   for(let floorIndex=0;floorIndex<mine.length;floorIndex++) {
     const mandatory=floorIndex+1===cfg.guaranteedFloor
-    if(!mandatory && (floorIndex===0 || !chance(cfg.optionalChance)))continue
+    if(!mandatory && (!cfg.optionalFloors?.includes(floorIndex+1) || !chance(cfg.optionalChance)))continue
     const level=mine[floorIndex],cm=level.map
     const protectedSites=[level.mineUpstairs,level.mineDownstairs,level.mineCagePad].filter(Boolean)
     const sites=[]
@@ -293,7 +293,7 @@ function buildDwarvenMinesStratum() {
   }
   if(!mineAlignCageShaft(mine))return false
   if(!mineFloodSideChambers(mine))return false
-  // 3- or 4-floor Ruins jump to z:-9 from their actual final floor.
+  // The Ruins jump to the fixed first mine depth from their actual final floor.
   while(deepLevels.length<Math.abs(cfg.firstZ)-2)deepLevels.push(mineUnusedChainLevel())
   for(const level of mine)deepLevels.push(level)
   last.level.mineTransitions={...(last.level.mineTransitions||{}),down:{z:cfg.firstZ,...mine[0].mineUpstairs}}
@@ -320,7 +320,8 @@ function spawnDwarvenMinesEncounters() {
   const mine=dungeonPackageLevels('dwarvenMines')
   for(let floorIndex=0;floorIndex<mine.length;floorIndex++){
     const {level,z}=mine[floorIndex]
-    const prefixChance=Math.min(ec.prefixChanceCap,ec.prefixBaseChance+floorIndex*ec.prefixGrowthPerFloor)
+    const prefixChance=floorIndex===0 ? 0 :
+      Math.min(ec.prefixChanceCap,ec.prefixBaseChance+(floorIndex-1)*ec.prefixGrowthPerFloor)
     const entrances=[level.mineUpstairs,...(level.mineDownstairs?[level.mineDownstairs]:[])]
     const candidates=[],floodedCandidates=[]
     for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++){
@@ -378,11 +379,26 @@ function spawnDwarvenMinesEncounters() {
       }
       return placed
     }
-    // Reserve one encounter per species before the weighted population fills
-    // the remaining budget. Early and middle creatures stay on their own floor;
-    // late creatures first appear together on floor 3, even in four-floor mines.
+    // The first mine is a respite: ordinary weak animals, with at most one
+    // Giant Spider. Bypass their surface biome restrictions only on this floor.
+    if(floorIndex===0) {
+      const respite=ec.respiteSpecies.map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(Boolean)
+      if(!respite.length)throw new Error('Dwarven Mines respite creature pool is empty')
+      let populated=0
+      while(populated<target) {
+        if(!placePack(pickWeighted(respite,t=>t.rarity??1),1))break
+        populated++
+      }
+      if(chance(ec.respiteSpiderChance??0)) {
+        const spider=ENEMY_TEMPLATE_BY_NAME['Giant Spider']
+        if(spider)placePack(spider,1)
+      }
+      continue
+    }
+    // Guaranteed rosters begin on mine floors 2, 3 and 4. Weaker groups
+    // remain eligible deeper down, but stronger ones never spawn above tier.
     let populated=0
-    const guaranteedGroup=groupKeys[floorIndex]
+    const guaranteedGroup=groupKeys[floorIndex-1]
     const required=(ec.groups[guaranteedGroup]||[]).slice()
     // Xibal must claim a water tile before unrelated shoreline encounters can
     // occupy every legal approach to the guaranteed flood chamber.

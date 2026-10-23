@@ -10,6 +10,16 @@ const Highscores = (() => {
     return Number.isFinite(sum) ? sum : null
   }
 
+  // The live item applies its real bonuses, but public snapshots must never
+  // expose an unidentified artifact's owner or hidden rolled properties.
+  function publicItem(item) {
+    if (!item || item.kind !== 'artifact' || item.identified !== false) return item
+    return {kind:'artifact', identified:false,
+      ...(typeof item.noun === 'string' ? {noun:item.noun} : {}),
+      name:typeof item.noun === 'string' && item.noun ? `Unidentified ${item.noun}` : 'Unidentified artifact',
+      stat_line:'???'}
+  }
+
   function compare(a, b) {
     if (a.level !== b.level) return b.level - a.level
     if (a.strength !== b.strength) return b.strength - a.strength
@@ -135,6 +145,9 @@ const Highscores = (() => {
       record.player_id = OnlineSupabase.onlinePlayerId()
       record.game_version = self.VAGABOND_GAME_VERSION
       record.strongest_enemy_killed = Graveyard.snapshotStrongestEnemyKill(record.strongest_enemy_killed)
+      if (record.equipment && typeof record.equipment === 'object')
+        for (const slot of ['weapon','armor','shield']) record.equipment[slot] = publicItem(record.equipment[slot])
+      if (Array.isArray(record.artifacts)) record.artifacts = record.artifacts.map(publicItem)
       // Ranking score and server identity/timestamps are never client insert fields.
       delete record.strength; delete record.id; delete record.created_at
       inFlight.add(key)
@@ -173,6 +186,10 @@ const Highscores = (() => {
   }
 
   function gearLabel(item, fallback) {
+    if (item?.kind === 'artifact' && item.identified === false)
+      return (typeof item.noun === 'string' && item.noun ? `Unidentified ${item.noun}` :
+        typeof item.name === 'string' && /^Unidentified /i.test(item.name) ? item.name :
+          'Unidentified artifact') + ' (???)'
     const name = text(item?.name, text(fallback))
     const stats = text(item?.stat_line, '')
     return name + (stats ? ` (${stats})` : '')

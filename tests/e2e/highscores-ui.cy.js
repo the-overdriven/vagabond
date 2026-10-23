@@ -65,6 +65,23 @@ describe('Highscores trophy and records UI',()=>{
     cy.get('#highscoresStatus').should('have.text','Online Highscores unavailable.')
   })
 
+  it('does not reveal the dwarf owner or item stats of an unidentified abacus',()=>{
+    const rows={false:highscoreRows(false),true:highscoreRows(true)}
+    const secret={kind:'artifact',identified:false,noun:'Abacus',name:'The Abacus of Secret Dwarf',
+      stat_line:'ATK +17, DEF +22',bonuses:{atk:17,def:22}}
+    rows.false[0].artifacts=[secret]
+    rows.false[0].equipment.weapon=secret
+    visit({rows})
+    cy.get('#btnHighscores').click()
+    cy.get('#highscoresList > details:first-child summary').click()
+    cy.get('#highscoresList > details:first-child .graveyard-details')
+      .should('contain.text','Unidentified Abacus')
+      .and('contain.text','???')
+      .and('not.contain.text','Secret Dwarf')
+      .and('not.contain.text','ATK +17')
+      .and('not.contain.text','DEF +22')
+  })
+
   it('traps keyboard focus, allows details toggling, and returns focus on Escape',()=>{
     visit()
     cy.get('#btnHighscores').click()

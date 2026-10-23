@@ -4,7 +4,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
 
 ;(async()=>{
   await run('loadContent()')
-  for(const [seed,count] of [[610061,3],[610063,4],[554433,3],[224466,4]]){
+  for(const [seed,count] of [[610061,4],[610063,5],[554433,4],[224466,5]]){
     run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits([],'XS')`)
     const generated=run(`(()=>{
       const mine=[]
@@ -65,5 +65,5 @@ const {run}=require('./helpers/node-game-runtime.cjs')
   assert.equal(run('RENDER_STYLE.terrainTiles.mineshaftrope.image'),'img/tiles/mine-shaft-rope.svg')
   assert.equal(run('new Set(Object.values(TILE_CODE)).size===Object.keys(TILE_CODE).length'),true,
     'new rope tile has a unique save-grid encoding')
-  console.log('PASS aligned three-/four-floor cage shafts: fixed seeds, stair clearance, reachability, tile rendering and deterministic RNG')
+  console.log('PASS aligned four-/five-floor cage shafts: fixed seeds, stair clearance, reachability, tile rendering and deterministic RNG')
 })().catch(error=>{console.error(error.stack);process.exitCode=1})

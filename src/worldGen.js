@@ -2126,7 +2126,7 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
   }
 }
 
-function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved) {
+function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved, progressionKey) {
   const roomDefs = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.rooms?.archetypes || {}
   for (const room of roomMetas) {
     const door = room.prisonCellDoorCandidate
@@ -2146,6 +2146,9 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     for (const [key, distance] of reachable.entries()) {
       if (distance <= 0 || reserved.has(key)) continue
       const [x,y] = key.split(',').map(Number)
+      if (ordinaryKeys.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<4)) continue
+      if (Number.isInteger(progressionKey?.x) && Number.isInteger(progressionKey?.y) &&
+          Math.max(Math.abs(progressionKey.x-x),Math.abs(progressionKey.y-y))<4) continue
       if (cm[y]?.[x] !== 'marble') continue
       if (x > room.x && x < room.x + room.w - 1 && y > room.y && y < room.y + room.h - 1) continue
       // Internal prison-cell keys share the floor's ordinary key budget, but
@@ -2177,6 +2180,24 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     const withoutCellDoor = dungeonWalkDistancesWithDoorTraversal(cm, entry,
       new Set([keyXY(cellDoor.x, cellDoor.y)]), true)
     if (dwarvenPrisonCellPoints(room).some(p => withoutCellDoor.has(keyXY(p.x, p.y)))) return false
+  }
+  return true
+}
+
+// Runtime treats touching locked leaves as one double doorway. Reject room
+// combinations that accidentally put two unrelated locks beside each other;
+// this also avoids three-/four-leaf clusters with ambiguous key identities.
+function dwarvenLockLeavesAreUnambiguous(cm, ordinaryLocks, gateDoorway, gateKeyId) {
+  const ids=new Map()
+  for(const lock of ordinaryLocks)for(const leaf of lock.leaves)
+    ids.set(keyXY(leaf.x,leaf.y),lock.keyId)
+  if(gateKeyId)for(const leaf of gateDoorway)ids.set(keyXY(leaf.x,leaf.y),gateKeyId)
+  for(const [coord,keyId] of ids) {
+    const [x,y]=coord.split(',').map(Number)
+    for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const neighbor=keyXY(x+dx,y+dy)
+      if(ids.has(neighbor) && ids.get(neighbor)!==keyId)return false
+    }
   }
   return true
 }
@@ -3283,7 +3304,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     }
     if (candidates.length < ordinaryLocks.length) return null
     for (const lock of ordinaryLocks) {
-      const available = candidates.filter(p => !reservedKeys.has(keyXY(p.x, p.y)))
+      const available = candidates.filter(p => !reservedKeys.has(keyXY(p.x, p.y)) &&
+        ordinaryKeys.every(k=>Math.max(Math.abs(p.x-k.x),Math.abs(p.y-k.y))>=4))
       if (!available.length) return null
       const spot = pick(available)
       reservedKeys.add(keyXY(spot.x, spot.y))
@@ -3294,6 +3316,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   if (progressionKeyPlan) {
     const usedKeyTiles = new Set(ordinaryKeys.map(key => keyXY(key.x, key.y)))
     const validKeyTile = (x, y) => cm[y]?.[x] === 'marble' && !usedKeyTiles.has(keyXY(x, y)) &&
+      ordinaryKeys.every(k=>Math.max(Math.abs(x-k.x),Math.abs(y-k.y))>=4) &&
       (!hall || x < hall.x || x >= hall.x+hall.w || y < hall.y || y >= hall.y+hall.h) &&
       !roomMetas.some(room => room.stairRoom && x > room.x && x < room.x+room.w-1 &&
         y > room.y && y < room.y+room.h-1) &&
@@ -3397,7 +3420,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       cm[spot.y][spot.x]='dwarvenrubble'
     }
   }
-  if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved)) return null
+  if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved,progressionKey)) return null
+  if (!dwarvenLockLeavesAreUnambiguous(cm,ordinaryLocks,gateDoorway,gatePreBreached?null:gateKeyId)) return null
   if (roomMetas.filter(room => room.archetype === 'Prison').length < requiredPrisons) return null
   for (const room of roomMetas.filter(room => room.archetype === 'Prison' && !room.gallery)) {
     const hasBars = dwarvenRoomInterior(room).some(p => cm[p.y]?.[p.x] === 'dwarvenprisonbars')

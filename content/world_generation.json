@@ -1540,7 +1540,7 @@
     "dwarvenMines": {
       "firstZ": -9,
       "visibilityRadius": 5,
-      "floorCounts": [3, 4],
+      "floorCounts": [4, 5],
       "floorCountWeights": [0.5, 0.5],
       "shortcut": {
         "id": "dwarven-mines-haulage-cage-1",
@@ -1564,7 +1564,8 @@
         "floorGenerationRetries": 12,
         "edgeMargin": 4,
         "floodedSideChambers": {
-          "guaranteedFloor": 3,
+          "guaranteedFloor": 4,
+          "optionalFloors": [3, 5],
           "optionalChance": 0.35,
           "roomRadius": 3,
           "waterRadius": 1,
@@ -1576,12 +1577,14 @@
         "prefixBaseChance": 0.11,
         "prefixGrowthPerFloor": 0.025,
         "prefixChanceCap": 0.28,
-        "tilesPerMonster": [80, 60, 50, 45],
+        "tilesPerMonster": [145, 80, 60, 50, 45],
         "entranceClearance": 8,
         "minimumSpacing": 2,
         "wyrdhagSeparation": 8,
         "maxMonstersPerFloor": 70,
-        "groupWeights": [[85, 12, 3], [0, 88, 12], [0, 0, 100], [0, 0, 100]],
+        "groupWeights": [[0, 0, 0], [100, 0, 0], [12, 88, 0], [3, 12, 85], [3, 12, 85]],
+        "respiteSpecies": ["Giant Rat", "Giant Bat", "Scarab"],
+        "respiteSpiderChance": 0.25,
         "groups": {
           "early": ["Glaber", "Marsutal", "Duiwel", "Trogloraptor", "Sifulian", "Vrakeber", "Tmusapod"],
           "middle": ["Akravis", "Adelocosa", "Bellroach", "Barolg", "Alacran", "Amplyg"],

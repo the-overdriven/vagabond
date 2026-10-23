@@ -16,18 +16,19 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   assert.equal(templates.length,19)
   for(const monster of templates){
     assert(monster.tier>=3&&monster.tier<=5&&monster.hp>0&&monster.atk>0)
-    assert.equal(monster.humanoid,false,'mine fauna cannot inherit humanoid equipment')
-    assert(monster.biomes.includes('z-9'),'all mine species can spawn on the first floor')
+    assert.equal(monster.humanoid,['Wyrdhag','Naledi','Troglodyte','Cave Troll'].includes(monster.name),
+      'only the four mine humanoids carry normal gear')
+    assert(!monster.biomes.includes('z-9'),'respite does not include mine species')
     assert(monster.abilities.every(ability=>typeof ability==='string'))
     assert(fs.existsSync(path.resolve(__dirname,'../img/enemies',monster.name.toLowerCase().replace(/ /g,'_')+'.jpg')),
       `Bestiary image exists for ${monster.name}`)
   }
   assert(templates.filter(m=>m.name!=='Cave Troll').every(m=>
-    m.biomes.every(b=>['z-9','z-10','z-11','z-12'].includes(b))),
+    m.biomes.every(b=>['z-10','z-11','z-12','z-13'].includes(b))),
   'no new species enters the ordinary biome pools')
-  assert(templates.filter(m=>groups.early.includes(m.name)).every(m=>m.biomes.join() === 'z-9'))
+  assert(templates.filter(m=>groups.early.includes(m.name)).every(m=>m.biomes.join() === 'z-10,z-11,z-12,z-13'))
   assert(templates.filter(m=>groups.middle.includes(m.name)).every(m=>
-    m.biomes.join() === 'z-9,z-10'))
+    m.biomes.join() === 'z-11,z-12,z-13'))
 
   context.fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'saves/Tester_start.json'),'utf8'))
   context.fixture.version=run('SAVE_VERSION')

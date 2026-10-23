@@ -482,7 +482,7 @@ const DungeonHazards = (() => {
         if(visible) {
           monsterHits++
           spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
-          log(`The dwarven Crusher hits the ${e.name} for ${damage} HP!`,'info')
+          log(`The dwarven Crusher squeezes the ${e.name} for ${damage} HP!`,'info')
         }
         if(e.hp<=0){if(visible)log(`The ${e.name} is crushed between the dwarven walls!`,'info');killEnemy(e,false,'dwarven crusher')}
       }

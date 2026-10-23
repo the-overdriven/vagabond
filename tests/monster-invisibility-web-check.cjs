@@ -28,7 +28,7 @@ async function main() {
       }
     })()`)
   }
-  for (const name of ['Myrka', 'Skerva', 'Kveld', 'Tulla']) {
+  for (const name of ['Myrka', 'Skerva', 'Kveld', 'Tulla', 'Ghost']) {
     context.name = name
     assert(run('ENEMY_TEMPLATE_BY_NAME[name].abilities.includes("invisibility")'), `${name} has invisibility`)
   }
@@ -74,6 +74,9 @@ async function main() {
   reset();run('skerva=addInvisEnemy("Skerva",37,40);chance=p=>p===0.25;enemyTurn()')
   assert(run('enemyInvisibleActive(skerva)'),'real pursuit AI can choose invisibility')
   assert.equal(run('skerva.x'),37,'activation replaces chasing movement')
+  reset();run('ghost=addInvisEnemy("Ghost",37,40);chance=p=>p===0.25;turnCount=1')
+  assert(run('tryEnemyVanish(ghost)'),'Ghost uses the shared invisibility activation')
+  assert(run('enemyHasAbility(ghost,"ethereal")'),'Ghost remains ethereal while hidden')
   reset();run('skerva=addInvisEnemy("Skerva",37,40);player.invisibleTurns=3;chance=()=>true;enemyTurn()')
   assert(!run('enemyInvisibleActive(skerva)'),'cannot activate against invisible player')
   reset();run('skerva=addInvisEnemy("Skerva",37,40);spawnPoint={x:40,y:40};chance=()=>true;enemyTurn()')

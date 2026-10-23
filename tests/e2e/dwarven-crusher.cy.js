@@ -107,10 +107,14 @@ describe('Dwarven wall Crusher',()=>{
         atk:1,def:1,spd:1,grace:1,tier:2,abilities:[],immunityUntilTurn:0,
         equipment:{weapon:null,armor:null,shield:null}}
       enemies=[e];player.x=9;player.y=14
+      const messages=[];const originalLog=log;log=(message,...args)=>{messages.push(message);return originalLog(message,...args)}
       DungeonHazards.onActorEntered(e,11,12)
       check(h.state==='warning','monster activates a real pressure plate')
       for(let i=0;i<3;i++){turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)}
       check(e.hp===20 && h.impactedMonsterIds===undefined,'monster hit when closing jaws reach center')
+      check(messages.some(message=>message.includes('Crusher squeezes the Skeleton')) &&
+        !messages.some(message=>message.includes('Crusher hits the Skeleton')),
+        'Crusher damage uses squeezing rather than melee hit wording')
       return true
     })()`))
   })

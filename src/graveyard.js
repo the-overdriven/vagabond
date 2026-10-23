@@ -44,10 +44,10 @@ const Graveyard = (() => {
 
   function snapshotItem(item, statLine) {
     if (!item) return null
-    const {kind, base, name, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
+    const {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
       speedPenalty, xpBonus} = item
-    return {kind, base, name, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
+    return {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       atk, def, spd, grace, speedPenalty, xpBonus, stat_line: statLine(item),
       bonuses: bonuses ? {...bonuses} : undefined,
       curse: curse ? {...curse, types: curse.types?.slice()} : curse,

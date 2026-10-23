@@ -4,7 +4,12 @@
     "maxEscapeSteps": 40
   },
   "blind": {
-    "pursuitHesitationChance": 0.5,
+    "pursuitHesitationRates": {
+      "bothConstricted": 0,
+      "monsterConstricted": 0.2,
+      "playerConstricted": 0.4,
+      "bothOpen": 0.6
+    },
     "hesitationMessage": "<enemy> senses you, but is reluctant about the direction."
   },
   "collectiveMind": {

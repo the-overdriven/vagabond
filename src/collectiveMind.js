@@ -164,7 +164,6 @@ function tryTriggerCollectiveMind(e) {
   if(enemyIsVisibleOnMainView(e)) {
     log((COLLECTIVE_MIND_CONFIG.alertMessage || 'The <enemy> alerts its kin!')
       .replace(/<enemy>/g,e.name),'bad')
-    spawnDamageNumber(e.x,e.y,'Linked!','#9bc8f9')
   }
   return true
 }

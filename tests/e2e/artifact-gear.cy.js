@@ -135,4 +135,30 @@ describe('Gear bases on procedural artifacts', () => {
     cy.get('#invList').should('contain.text','DEF +4')
     cy.get('#invList').should('contain.text','SPD -2')
   })
+
+  for (const width of [1440,390]) it('equips an unidentified artifact without revealing it at '+width+'px', () => {
+    cy.viewport(width,900)
+    cy.window().then(win=>win.eval(`(() => {
+      replayRecording=false;replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=true
+      enemies=[];npcs=[];occupied=new Set();oldHunterQuest=null
+      player.equip.weapon=null
+      player.inventory=[{kind:'artifact',noun:'Dagger',name:'Dagger of Hidden Dwarf',
+        artifactSlot:'weapon',base:'Dagger',tier:3,identified:false,atk:7,grace:2,
+        bonuses:{atk:5},curse:{everyTurns:8,types:['hp']},curseTimer:0}]
+      invTab='weapon';toggleInv(true)
+    })()`))
+    cy.get('#invList').should('contain.text','Unidentified Dagger').and('contain.text','???')
+    cy.get('#invList').should('not.contain.text','Hidden Dwarf').and('not.contain.text','ATK +5')
+    cy.contains('#invList button','Equip').should('be.visible').click()
+    cy.get('#slotWeapon').should('contain.text','Unidentified Dagger').and('contain.text','???')
+    cy.get('#slotWeapon').should('not.contain.text','Hidden Dwarf').and('not.contain.text','ATK +5')
+    cy.window().then(win=>win.eval(`(() => {
+      if(player.equip.weapon?.identified!==false || player.equip.weapon?.bonuses?.atk!==5)
+        throw Error('unidentified gear effects and hidden state must survive equipping')
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(saved,{isReplayInit:true})
+      if(player.equip.weapon?.identified!==false || player.equip.weapon?.bonuses?.atk!==5)
+        throw Error('unidentified equipped gear must survive save/replay restoration')
+    })()`))
+  })
 })

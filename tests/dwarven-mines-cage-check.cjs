@@ -21,9 +21,9 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   assert(ruinsLift && ruinsLift.kind==='lift' && ruinsLift.packageId==='dwarvenRuins',
     'the existing Ruins lift remains independently registered')
   assert.equal(endpoints.upper.z,-9)
-  assert([-11,-12].includes(endpoints.lower.z))
+  assert([-12,-13].includes(endpoints.lower.z))
   assert.equal(endpoints.upper.floor,1)
-  assert([3,4].includes(endpoints.lower.floor))
+  assert([4,5].includes(endpoints.lower.floor))
   assert.deepEqual(copy(run('dungeonPackageLevels("dwarvenMines")[0].level.mineCagePad')),
     {x:endpoints.upper.x,y:endpoints.upper.y})
   assert.deepEqual(copy(run('dungeonPackageLevels("dwarvenMines").at(-1).level.mineCagePad')),
@@ -50,7 +50,7 @@ const copy=value=>JSON.parse(JSON.stringify(value))
     const asset=run(`RENDER_STYLE.terrainTiles[${JSON.stringify(name)}].image`)
     assert(asset && fs.existsSync(path.resolve(__dirname,'..',asset)),`${name} has an installed sprite`)
     assert(run(`TILE[${JSON.stringify(name)}].ch.length`)===1,`${name} has an ASCII glyph`)
-    assert.equal(run(`RENDER_STYLE.terrainTiles[${JSON.stringify(name)}].baseTileKey`),'cavefloor2')
+    assert.equal(run(`RENDER_STYLE.terrainTiles[${JSON.stringify(name)}].baseTileKey`),'cavefloorBrown')
   }
   run(`enemies=[];occupied=new Set();resolveEnemyTurn=()=>{};npcTurn=()=>{};
     player.hp=999;player.maxHp=999;deathTransition=false;player.poisonTurns=0;
@@ -162,5 +162,5 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   assert.equal(run('turnCount'),1)
   assert.equal(run('replayRngIndex'),recorded.rng.length,'identical recorded/replayed RNG use')
   run('replayPlaying=false;replaySimulationMode=false;activeReplay=null')
-  console.log('PASS Batch E mine cage: 3/4-floor endpoints, art/ASCII, lower unlock, fast return, blocked landing and save/replay')
+  console.log('PASS mine cage: 4/5-floor endpoints, art/ASCII, lower unlock, fast return, blocked landing and save/replay')
 })().catch(error=>{console.error(error.stack);process.exitCode=1})

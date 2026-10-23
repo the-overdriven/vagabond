@@ -149,3 +149,27 @@ test('artifact base stats and enchantments stack; penalties, GRACE, inventory an
   run("invTab='shield'")
   assert.equal(run('filterVisibleInventory().length'), 1)
 })
+
+test('unidentified artifact gear can be equipped without exposing its secret identity', async () => {
+  await ready()
+  run(`player.equip={weapon:null,shield:null,armor:null,blackkey:null};player.inventory=[];
+    currentZ=0;currentCave=-1;map=surfaceMap;enemies=[];npcs=[];
+    unknownGear={kind:'artifact',noun:'Dagger',name:'Dagger of Durvak',artifactSlot:'weapon',
+      base:'Dagger',atk:7,grace:3,bonuses:{atk:5},curse:{everyTurns:8,types:['hp']},curseTimer:0,
+      identified:false,tier:4,twoHanded:false};
+    player.inventory.push(unknownGear);
+    consumeItemTurn=()=>{};log=()=>{}`)
+  const before=run('playerAtk()')
+  run("invTab='weapon'")
+  assert.equal(run('filterVisibleInventory().length'),1,'unknown weapon is accessible from its equipment tab')
+  run('equipItem(0)')
+  assert.equal(run('player.equip.weapon.identified'),false,'equipping does not identify')
+  assert.equal(run('playerAtk()-' + before),12,'hidden base ATK and bonus both apply')
+  assert.equal(run('slotLabel(player.equip.weapon)'),'Unidentified Dagger • ???')
+  assert.equal(run('itemStatLine(player.equip.weapon)'),'???')
+  assert.equal(run('player.equip.weapon.curse.everyTurns'),8,'curse remains active and unidentified')
+  const snapshot=clone(run('buildSaveObject()'))
+  run(`loadGameFromObject(${JSON.stringify(snapshot)}, {isReplayInit:true})`)
+  assert.equal(run('player.equip.weapon.identified'),false,'save/replay initialization keeps identity hidden')
+  assert.equal(run('player.equip.weapon.name'),'Dagger of Durvak','true name remains stored but hidden')
+})

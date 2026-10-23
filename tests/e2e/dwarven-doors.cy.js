@@ -27,6 +27,30 @@ describe('Dwarven Ruins ordinary doors', () => {
       for (let floorIndex = 0; floorIndex < ruins.length; floorIndex++) {
         const level = ruins[floorIndex]
         const grid = level.map
+        const floorZ = chainZForDepth(floorIndex+4)
+        const keySpots = [...(level.ordinaryKeys || []),
+          ...(Number.isInteger(level.progressionKey?.x) ? [level.progressionKey] : [])]
+        for(let i=0;i<keySpots.length;i++)for(let j=i+1;j<keySpots.length;j++)
+          check(Math.max(Math.abs(keySpots[i].x-keySpots[j].x),
+            Math.abs(keySpots[i].y-keySpots[j].y))>=4,
+            'dwarven keys have a three-tile gap instead of forming clusters')
+        const lockedLeaves=new Map()
+        for(const door of (level.rooms || []).flatMap(room=>room.doorways || []))
+          if(door.some(p=>['dwarvendoorlocked','dwarvengatelocked'].includes(grid[p.y]?.[p.x]))) {
+            const isGate=door.some(p=>grid[p.y]?.[p.x]==='dwarvengatelocked')
+            const keyId=dwarvenDungeonLockId(floorZ,isGate?'gate':'door',door)
+            for(const p of door)lockedLeaves.set(keyXY(p.x,p.y),keyId)
+          }
+        for(const room of level.rooms || [])for(const lock of room.internalLocks || [])
+          for(const p of lock.leaves)lockedLeaves.set(keyXY(p.x,p.y),lock.keyId)
+        for(const [coordinate,keyId] of lockedLeaves) {
+          const [x,y]=coordinate.split(',').map(Number)
+          for(const [dx,dy] of [[0,1],[1,0]]) {
+            const adjacent=keyXY(x+dx,y+dy)
+            check(!lockedLeaves.has(adjacent)||lockedLeaves.get(adjacent)===keyId,
+              'adjacent locked door leaves must accept one shared key')
+          }
+        }
         const special = new Set(level.rooms.filter(r => r.gallery)
           .map(r => keyXY(r.gallery.farDoor.x, r.gallery.farDoor.y)))
         galleryEndDoors += special.size

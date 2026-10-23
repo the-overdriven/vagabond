@@ -15,13 +15,13 @@ describe('Mine-only encounters and darkness', () => {
       const names=[...groups.early,...groups.middle,...groups.late]
       const ec=cfg.encounters
       const chances=Array.from({length:minePackageConfig().floorCounts.at(-1)},(_,i)=>
-        Math.min(ec.prefixChanceCap,ec.prefixBaseChance+i*ec.prefixGrowthPerFloor))
-      check(JSON.stringify(chances)===JSON.stringify([0.11,0.135,0.16,0.185]),
-        'mine prefix rates rise from 11% to 18.5% by floor')
+        i===0?0:Math.min(ec.prefixChanceCap,ec.prefixBaseChance+(i-1)*ec.prefixGrowthPerFloor))
+      check(JSON.stringify(chances)===JSON.stringify([0,0.11,0.135,0.16,0.185]),
+        'mine respite has no prefixes; later floors rise from 11% to 18.5%')
       check(cfg.encounters.guaranteeEachSpecies && names.length===19 && new Set(names).size===19,
         'all 19 unique species have a guaranteed encounter')
       const mine=dungeonPackageLevels('dwarvenMines')
-      const monsters=enemies.filter(e=>e.alive && names.includes(e.baseName) && e.levelKind==='chain')
+      const monsters=enemies.filter(e=>e.alive && e.level<=-9 && names.includes(e.baseName) && e.levelKind==='chain')
       check(monsters.filter(e=>e.humanoid).every(e=>
         ['Wyrdhag','Naledi','Troglodyte','Cave Troll'].includes(e.baseName)),
         'only the four humanoid mine species can receive ordinary equipment')
@@ -32,10 +32,26 @@ describe('Mine-only encounters and darkness', () => {
       check(monsters.filter(e=>e.prefix).every(e=>e.prefix!=='Champion' &&
         e.name===e.prefix+' '+e.baseName && e.prefixBase),
         'mine prefixes follow ordinary non-Champion naming and stat rules')
-      for(const [floor,namesOnFloor] of [[0,groups.early],[1,groups.middle],[2,groups.late]]) {
+      check([4,5].includes(mine.length),'Mines occupy four or five floors')
+      check(TILE.dwarvenminessealed.mini===TILE.dwarvenminesopen.mini,
+        'sealed mine entrance uses the same red map highlight as the opened entrance')
+      check(RENDER_STYLE.terrainTiles.minestairsup.image==='img/tiles/shoddy-mine-stairs-up.png' &&
+        RENDER_STYLE.terrainTiles.minestairsdown.image==='img/tiles/shoddy-mine-stairs-down.png',
+        'the mine stairs have dedicated brownish artwork')
+      check(RENDER_STYLE.terrainTiles.minestairsup.baseTileKey==='cavefloorBrown' &&
+        RENDER_STYLE.terrainTiles.minestairsdown.baseTileKey==='cavefloorBrown',
+        'stair sprites sit on the same brown cave floor as the mine')
+      const respite=enemies.filter(e=>e.alive&&e.level===-9)
+      check(respite.length>0 && respite.every(e=>['Giant Rat','Giant Bat','Scarab','Giant Spider'].includes(e.baseName)),
+        'first floor is a respite with ordinary weak fauna')
+      check(respite.filter(e=>e.baseName==='Giant Spider').length<=1,'respite has no spider packs')
+      check(respite.every(e=>!e.prefix),'respite monsters cannot have prefixes')
+      for(const [floor,namesOnFloor] of [[1,groups.early],[2,groups.middle],[3,groups.late]]) {
         check(namesOnFloor.every(name=>monsters.some(e=>e.baseName===name && e.level===mine[floor].z)),
           'floor '+(floor+1)+' includes every assigned species')
       }
+      check(monsters.every(e=>Math.abs(e.level)>=(groups.early.includes(e.baseName)?10:
+        groups.middle.includes(e.baseName)?11:12)), 'stronger species never spawn above their intended tier')
       check(enemies.filter(e=>e.level===0).every(e=>!names.includes(e.baseName)),
         'no mine-exclusive species appears on the surface')
       check(names.every(name=>!surfaceSpawnEligible(ENEMY_TEMPLATE_BY_NAME[name])),

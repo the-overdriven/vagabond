@@ -4,6 +4,13 @@ const plain = value => JSON.parse(JSON.stringify(value))
 
 ;(async () => {
   await run('loadContent()')
+  assert.equal(run(`dwarvenLockLeavesAreUnambiguous(null,[
+    {keyId:'key-a',leaves:[{x:4,y:4}]},
+    {keyId:'key-b',leaves:[{x:5,y:4}]}
+  ],[],null)`),false,'adjacent independently locked leaves are rejected')
+  assert.equal(run(`dwarvenLockLeavesAreUnambiguous(null,[
+    {keyId:'shared-key',leaves:[{x:4,y:4},{x:5,y:4}]}
+  ],[],null)`),true,'a real double-door pair shares one key')
   // This source-only export intentionally excludes the pre-existing portrait
   // PNGs. The mine silhouettes are sufficient for a real decoded-alpha test.
   const newIds = ['glaber','marsutal','duiwel','trogloraptor','sifulian','vrakeber',
@@ -38,12 +45,18 @@ const plain = value => JSON.parse(JSON.stringify(value))
     }))`))
     const ruins = plain(run('dungeonPackageLevels("dwarvenRuins").map(({z})=>z)'))
     assert(ruins.length >= 3 && ruins.length <= 5, 'Ruins floor count remains unchanged')
+    assert(run(`dungeonPackageLevels('dwarvenRuins').every(({level})=>{
+      const keys=[...(level.ordinaryKeys||[]),
+        ...(Number.isInteger(level.progressionKey?.x)?[level.progressionKey]:[])]
+      return keys.every((a,i)=>keys.slice(i+1).every(b=>
+        Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))>=4))
+    })`),`seed ${seed}: unrelated Dwarven keys do not spawn in clusters`)
     if (seed===554433) assert.equal(ruins.length,5,'five-floor Ruins end at z:-8')
-    assert([3,4].includes(floors.length), 'Mines have 3 or 4 floors')
+    assert([4,5].includes(floors.length), 'Mines have 4 or 5 floors')
     assert(floors.every((floor,i)=>floor.z === -9-i && floor.dungeonFloor === i+1 &&
       floor.floorCount===floors.length), 'Mines occupy fixed contiguous depths beginning z:-9')
     const cageShortcut=plain(run('dwarvenMinesCageShortcut()'))
-    assert(cageShortcut && !cageShortcut.unlocked,'the cage begins locked for both 3- and 4-floor mines')
+    assert(cageShortcut && !cageShortcut.unlocked,'the cage begins locked for both 4- and 5-floor mines')
     assert.equal(cageShortcut.upper.z,-9)
     assert.equal(cageShortcut.lower.z,floors.at(-1).z)
     assert.deepEqual({x:cageShortcut.upper.x,y:cageShortcut.upper.y},floors[0].cage)
@@ -100,8 +113,8 @@ const plain = value => JSON.parse(JSON.stringify(value))
     }
     assert([...packs.values()].every(count=>count>=1 && count<=3),
       'each initial Naledi pack respects the configured 1–3 members')
-    const allowed = new Set(newIds.map(id=>id.toLowerCase()))
-    assert(monsters.every(e=>allowed.has(e.name.toLowerCase().replace(/ /g,'_'))), 'no existing ecosystem monster is drawn into mines')
+    const allowed = new Set([...newIds.map(id=>id.toLowerCase()),'giant_rat','giant_bat','scarab','giant_spider'])
+    assert(monsters.every(e=>allowed.has(e.name.toLowerCase().replace(/ /g,'_'))), 'only respite creatures and mine species are generated')
     const ambushers=plain(run(`enemies.filter(e=>e.alive && e.level<=-9 && e.abilities.includes('wallAmbush')).map(e=>({
       z:e.level,x:e.x,y:e.y,hidden:e.wallAmbushHidden,spent:e.wallAmbushSpent
     }))`))
@@ -133,7 +146,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
     run('loadGameFromObject(mineSnapshot,{isReplayInit:true})')
     assert.equal(run('rngState'),rng,'save restoration does not consume gameplay RNG')
     assert.deepEqual(plain(run('dwarvenMinesCageShortcut()')),cageShortcut,
-      'three- and four-floor cage metadata survives save/replay initialization')
+      'four- and five-floor cage metadata survives save/replay initialization')
     assert.deepEqual(plain(run(`enemies.filter(e=>e.alive && e.level<=-9 &&
       e.abilities.includes('collectiveMind')).map(e=>({id:e.id,z:e.level,pack:e.collectiveMindPackId}))`)),
       linked,`seed ${seed}: coordination pack identity survives loading`)

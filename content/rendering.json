@@ -466,27 +466,27 @@
       "image": "img/tiles/dwarven-stairs-down.png", "baseTileKey": "marble", "scale": 1
     },
     "minestairsup": {
-      "image": "img/tiles/dwarven-stairs-up.png", "baseTileKey": "cavefloor2", "scale": 1
+      "image": "img/tiles/shoddy-mine-stairs-up.png", "baseTileKey": "cavefloorBrown", "scale": 1
     },
     "minestairsdown": {
-      "image": "img/tiles/dwarven-stairs-down.png", "baseTileKey": "cavefloor2", "scale": 1
+      "image": "img/tiles/shoddy-mine-stairs-down.png", "baseTileKey": "cavefloorBrown", "scale": 1
     },
     "minecageupperoff": {
-      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloor2", "scale": 1,
+      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloorBrown", "scale": 1,
       "filter": "brightness(0.62) saturate(0.25)"
     },
     "minecageloweroff": {
-      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloor2", "scale": 1,
+      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloorBrown", "scale": 1,
       "filter": "brightness(0.62) saturate(0.25)"
     },
     "minecageupperon": {
-      "image": "img/tiles/haulage-cage-upper.png", "baseTileKey": "cavefloor2", "scale": 1
+      "image": "img/tiles/haulage-cage-upper.png", "baseTileKey": "cavefloorBrown", "scale": 1
     },
     "minecageloweron": {
-      "image": "img/tiles/haulage-cage-lower.png", "baseTileKey": "cavefloor2", "scale": 1
+      "image": "img/tiles/haulage-cage-lower.png", "baseTileKey": "cavefloorBrown", "scale": 1
     },
     "mineshaftrope": {
-      "image": "img/tiles/mine-shaft-rope.svg", "baseTileKey": "cavefloor2", "scale": 1
+      "image": "img/tiles/mine-shaft-rope.svg", "baseTileKey": "cavefloorBrown", "scale": 1
     },
     "dwarvendoorclosed": {
       "image": "img/tiles/dwarven-door-closed.png",

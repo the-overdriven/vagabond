@@ -14,14 +14,16 @@ const HEAL_SELF_FRACTION = 0.25
 // pursuit. This runs after an actual path option exists and before Haste.
 function blindPursuitHesitates(e, distance) {
   if (!enemyHasAbility(e,'blind') || distance <= ATTACK_RANGE || !enemyFindStep(e)) return false
-  // In tight passages there is too little room for directional uncertainty:
-  // blind monsters pursue normally instead of repeatedly wasting their turn.
-  let openAdjacent=0
-  for(const [dx,dy] of DIRS8) {
-    if(isWalkable(player.x+dx,player.y+dy) && ++openAdjacent>2)break
-  }
-  if(openAdjacent<=2)return false
-  if (!chance(BLIND_CONFIG.pursuitHesitationChance ?? 0.5)) return false
+  const adjacentOpen = (x,y) => DIRS8.reduce((count,[dx,dy]) =>
+    count + Number(isWalkable(x+dx,y+dy)),0)
+  const monsterOptions = adjacentOpen(e.x,e.y)
+  const playerOptions = adjacentOpen(player.x,player.y)
+  const rates = BLIND_CONFIG.pursuitHesitationRates || {}
+  const hesitation = monsterOptions >= 3 && playerOptions >= 3 ? (rates.bothOpen ?? 0.60) :
+    monsterOptions >= 3 ? (rates.playerConstricted ?? 0.40) :
+      playerOptions >= 3 ? (rates.monsterConstricted ?? 0.20) : (rates.bothConstricted ?? 0)
+  if (hesitation === 0) return false
+  if (!chance(hesitation)) return false
   if (enemyIsVisibleOnMainView(e) && BLIND_CONFIG.hesitationMessage)
     log(BLIND_CONFIG.hesitationMessage.replace(/<enemy>/g, `The blind ${e.name}`), 'info')
   return true

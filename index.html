@@ -3800,7 +3800,7 @@ more difficult:
   function equipmentLog(msg, items, cls = 'good') {
     let cursor = 0
     const highlights = items.filter(Boolean).flatMap(item => {
-      const text = item.name
+      const text = artifactDisplayName(item)
       const index = msg.indexOf(text, cursor)
       if (index < 0) return []
       cursor = index + text.length
@@ -6369,6 +6369,13 @@ more difficult:
     }
     if (options.recordReplay !== false) recordReplayAction({type:'dig'})
     dugSandTiles.add(key)
+    // The base minimap is cached, so repaint the changed pixel immediately.
+    if (typeof miniBases !== 'undefined') {
+      ensureMiniBases()
+      for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale],player.x,player.y)
+      mapPreviewBase = null
+      minimapDirty = true
+    }
     // Digging is a real action once the tile is marked dug, regardless of
     // what (if anything) it turns up, so the world gets a turn here.
     enemyTurn()
@@ -7305,8 +7312,8 @@ more difficult:
         } else if (onto === 'dwarvenminesopen') {
           log('The cleared mine entrance leads downward. Press "inspect" to descend.', 'info')
         } else if (onto === 'minestairsup' || onto === 'minestairsdown') {
-          log(onto === 'minestairsup' ? 'An excavated stair leads upward. Press "inspect" to climb.' :
-            'An excavated stair leads deeper into the mines. Press "inspect" to descend.', 'info')
+          log(onto === 'minestairsup' ? 'Shoddy Mine Stairs lead upward. Press "inspect" to climb.' :
+            'Shoddy Mine Stairs lead deeper underground. Press "inspect" to descend.', 'info')
         } else if (onto === 'minecageupperoff') {
           log('The upper haulage cage is locked. Press "inspect" to examine it.', 'info')
         } else if (onto === 'minecageloweroff') {
@@ -7758,7 +7765,7 @@ more difficult:
       log('It feels oddly out of place here. You wonder what story lies behind it...', 'info')
     }
 
-    if (villageCenter) {
+    if (currentZ === 0 && villageCenter) {
       const vdist = Math.max(Math.abs(player.x - villageCenter.x), Math.abs(player.y - villageCenter.y))
       if (vdist > 5 && vdist <= 20) {
         log('You sense a small village is nearby.', 'info')
@@ -7894,6 +7901,8 @@ more difficult:
   }
 
   function brownDeepCaveAt(x, y) {
+    if (currentZ < 0 && deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines')
+      return map[y]?.[x] === 'cavefloor2'
     if (currentZ !== -2 || currentLevelKind() !== 'chain') return false
     const deep = deepLevels[0]
     return !!deep?.caves?.some((cave, i) => cave.brownFloor &&
@@ -8663,7 +8672,6 @@ more difficult:
     if (enemyHasAbility(e, 'swim') && map[fromY]?.[fromX] !== 'water' &&
         map[e.y]?.[e.x] === 'water' && enemyIsVisibleOnMainView(e)) {
       log(`The ${e.name} slips into deep water and begins swimming!`, 'bad')
-      spawnDamageNumber(e.x, e.y, 'Swimming!', '#7fd0d8')
     }
     if (enemyWanderMode(e) === 'far') {
       e.farPrevX = fromX
@@ -10420,10 +10428,12 @@ more difficult:
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
     const brownCave = tileKey === 'cavefloor2' && (view
-      ? view.key === 'chain:2' && deepLevels[0]?.caves?.some((cave, i) => cave.brownFloor &&
-        deepLevels[0].caveMaps[i]?.[y]?.[x] !== 'cavewall' && deepLevels[0].caveMaps[i]?.[y]?.[x] !== undefined)
+      ? deepLevels[chainDepthForZ(view.z)-2]?.kind === 'dwarvenMines' ||
+        (view.key === 'chain:2' && deepLevels[0]?.caves?.some((cave, i) => cave.brownFloor &&
+          deepLevels[0].caveMaps[i]?.[y]?.[x] !== 'cavewall' && deepLevels[0].caveMaps[i]?.[y]?.[x] !== undefined))
       : brownDeepCaveAt(x, y))
-    c.fillStyle = visible && brownCave ? RENDER_STYLE.minimap.brownCave : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
+    c.fillStyle = visible && tileKey === 'sand' && (!view || view.z === 0) && dugSandTiles.has(keyXY(x,y))
+      ? RENDER_STYLE.specialTiles.dugSand.bg : visible && brownCave ? RENDER_STYLE.minimap.brownCave : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
       ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
   }
@@ -10746,7 +10756,7 @@ more difficult:
   function slotLabel(it) {
     if (!it) return '-'
     const line = itemStatLine(it)
-    return it.name + (line ? ' \u2022 ' + line : '')
+    return artifactDisplayName(it) + (line ? ' \u2022 ' + line : '')
   }
 
   function setSlotLabel(element, item, fallback = '-') {
@@ -10790,7 +10800,7 @@ more difficult:
     const visible = []
     player.inventory.forEach((it, idx) => {
       let matches = true
-      const category = it.kind === 'artifact' && it.identified ? it.artifactSlot : it.kind
+      const category = it.kind === 'artifact' ? (it.artifactSlot || it.kind) : it.kind
       if (invTab === 'weapon') matches = category === 'weapon'
       else if (invTab === 'armor') matches = category === 'armor'
       else if (invTab === 'shield') matches = category === 'shield'
@@ -10924,7 +10934,7 @@ more difficult:
     visible.forEach(({it, idx}) => {
       const row = document.createElement('div')
       row.className = 'invitem'
-      const kind = it.kind === 'artifact' && it.identified ? it.artifactSlot : it.kind
+      const kind = it.kind === 'artifact' ? (it.artifactSlot || it.kind) : it.kind
       const isBest = (kind === 'weapon' && best.weapon.has(idx)) ||
         (kind === 'shield' && best.shield.has(idx)) ||
         (kind === 'armor' && best.armor.has(idx))
@@ -10955,6 +10965,12 @@ more difficult:
             identifyArtifact(idx)
           }
           row.appendChild(btn)
+          if (['weapon','shield','armor'].includes(it.artifactSlot)) {
+            const equipBtn = document.createElement('button')
+            equipBtn.textContent = 'Equip'
+            equipBtn.onclick = () => equipItem(idx)
+            row.appendChild(equipBtn)
+          }
         } else {
           // All identified artifacts can always be inspected.
           const inspectBtn = document.createElement('button')
@@ -11393,15 +11409,15 @@ more difficult:
     player.equip[slot] = it
     player.inventory.splice(idx, 1)
     if (old) player.inventory.push(old)
-    const equipLead = old ? `You unequip the ${old.name} and equip` : 'You equip'
+    const equipLead = old ? `You unequip the ${artifactDisplayName(old)} and equip` : 'You equip'
 
     if (slot === 'weapon' && it.twoHanded && player.equip.shield) {
       const oldShield = player.equip.shield
       player.equip.shield = null
       player.inventory.push(oldShield)
-      equipmentLog(`${equipLead} the ${it.name}, removing the ${oldShield.name} because it is a two-handed weapon.${statDeltaText(before)}`, [old, it, oldShield])
+      equipmentLog(`${equipLead} the ${artifactDisplayName(it)}, removing the ${artifactDisplayName(oldShield)} because it is a two-handed weapon.${statDeltaText(before)}`, [old, it, oldShield])
     } else {
-      equipmentLog(`${equipLead} the ${it.name}.${statDeltaText(before)}`, [old, it])
+      equipmentLog(`${equipLead} the ${artifactDisplayName(it)}.${statDeltaText(before)}`, [old, it])
     }
     consumeItemTurn()
   }
@@ -11415,7 +11431,7 @@ more difficult:
     const before = statSnapshot()
     player.equip[slot] = null
     player.inventory.push(item)
-    equipmentLog(`You unequip the ${item.name}.${statDeltaText(before)}`, [item])
+    equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     consumeItemTurn()
   }
 

@@ -1201,6 +1201,11 @@ key**. This prevents a locked leaf from being bypassed simply by opening its
 sibling. Generated ordinary-door keys are placed only on marble reachable from
 the floor entrance while all generated locks are still closed, so a key cannot
 spawn behind its own lock or form a circular dependency with another lock.
+Ordinary, progression, and internal prison-door keys are spaced at least
+**four tiles apart** by Chebyshev distance. Independently generated locked
+doors may never touch orthogonally unless they use the **same key**; otherwise
+the floor is regenerated. This avoids ambiguous three- or four-leaf door
+clusters and accidental key piles without changing deliberate two-leaf gates.
 
 A matching key opens both leaves in **1 turn** and is consumed. Without the key,
 the first bump on a particular locked doorway identifies the lock without
@@ -1741,6 +1746,8 @@ monster can die from the hit. Temporary fatal-hit protection remains effective.
 Ethereal monsters completely ignore Crusher displacement and damage.
 They also ignore spike traps, wall arrows, and room gas.
 Monster environmental deaths grant no XP.
+Combat logs say the Crusher **squeezes** its victim, distinguishing
+compression damage from an ordinary weapon hit.
 Triggers and damage are deterministic turn events; wall progress, original
 tile records and geometry persist in deep-floor save state and rotate with the
 map. There is no persistent per-monster hit list. Auto-travel considers the *entire*
@@ -2146,7 +2153,7 @@ z:-3 Dwarven Fort / D0
   ↓
 z:-4 ... z:-6/-8 Dwarven Ruins (3–5 floors)
   ↓
-z:-9 ... z:-11/-12 Dwarven Mines (3–4 floors)
+z:-9 ... z:-12/-13 Dwarven Mines (4–5 floors)
 ```
 
 The **Crypt is a separate map/structure**, but its first level shares the z:-1
@@ -2503,21 +2510,25 @@ representation without a second copy drifting out of sync. Closed doors also use
 the same opacity rule for player FOV and enemy sight and the same terrain blocker
 rule used by ranged projectiles. Each floor has its own discovery grid.
 
-## z:-9 and deeper: first Dwarven Mines package
+## z:-9 and deeper: Dwarven Mines
 
-Dwarven Mines form a separate **3- or 4-floor** dungeon with equal probability,
+Dwarven Mines form a separate **4- or 5-floor** dungeon with equal probability,
 always starting at **z:-9**. The established 3–5-floor Dwarven Ruins generator
 is unchanged. If the Ruins end at z:-6 or z:-7, a direct staircase leads to
 z:-9; unused depths are not accessible play areas. When the Ruins end at z:-8,
-they connect directly to z:-9. Mines extend through z:-11 or z:-12 and contain
+they connect directly to z:-9. Mines extend through z:-12 or z:-13 and contain
 paired up/down stairs, allowing the player to return along the same route.
+The first floor offers a comparatively quiet respite after the Dwarven Fort;
+the second is a deliberate difficulty spike. Mine floors use **brown cave-floor
+tiles**, with dedicated brownish **Shoddy Mine Stairs** art for stair travel.
+The collapsed entrance is highlighted **red** on the maps like other exits.
 
 The initial mine layout uses a narrow winding excavated spine, side branches,
 short pockets, and at least one alternate route. Generation checks a single
 connected walkable component and a minimum 30-step stair-to-stair route. Floor
 count, geometry, retries, encounter density, pack sizes, group weights, and
 spacing are configured in `content/world_generation.json`. A flooded side
-chamber is guaranteed on mine floor 3 and may appear on floors 2 or 4
+chamber is guaranteed on mine floor 4 and may appear on floors 3 or 5
 (**35% each**). Each chamber branches from a dry passage, has a dry shoreline
 around a pool of deep water, and never cuts through existing corridors,
 staircases or cage landings. Swimming is optional for reaching all dungeon
@@ -2537,14 +2548,24 @@ inventory state persist through current saves and replay. Gameplay transitions
 and excavation resolve on the turn; animations never determine their outcomes.
 
 The separate mine encounter generator uses **19 new species** grouped into
-early, middle, and late threats. Floor 1 favors early threats, with occasional
-middle or late intruders; floor 2 favors middle threats, with occasional late
-intruders; floor 3 and optional floor 4 use late threats. Earlier-floor species
-do not naturally appear on later mine floors. When `guaranteeEachSpecies` is
-enabled, generation reserves at least one of every early species on mine floor 1,
-every middle species on floor 2, and every late species on floor 3. These
-encounters count toward each floor's normal population budget; remaining slots
-still use the usual weighted groups and packs. Monster stats, rarity, existing
+early, middle, and late threats. The floor-by-floor progression is:
+
+| Mine floor | Depth | Population | Random prefix chance |
+|---|---|---|---|
+| 1: respite | z:-9 | Giant Rats, Giant Bats, Scarabs; at most **one Giant Spider**, appearing with **25% chance** | **0%** |
+| 2: early | z:-10 | Predominantly early mine species | **11%** |
+| 3: middle | z:-11 | Predominantly middle species, sometimes early | **13.5%** |
+| 4: late | z:-12 | Predominantly late species, sometimes early/middle | **16%** |
+| 5: late (optional) | z:-13 | Predominantly late species, sometimes early/middle | **18.5%** |
+
+**A stronger species never appears above its intended tier.** Deeper floors may
+include a small proportion of weaker tiers, with a stronger bias toward their
+own tier. Floor 1 borrows existing basic enemies without changing their
+ordinary surface spawn pools. When `guaranteeEachSpecies` is enabled,
+generation reserves at least one of every early species on mine floor 2,
+every middle species on floor 3, and every late species on floor 4. Those
+encounters count toward the normal floor population budget; remaining slots
+use weighted groups and packs. Monster stats, rarity, existing
 abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
 abilities listed in **Enemy Special Properties** are active. No species
 receives an unimplemented ability string.
@@ -2556,7 +2577,7 @@ artifact-loot, and Bestiary rules. The ordinary surface and cave spawn pools
 are unaffected.
 
 **Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower
-cage is directly below it on the final generated floor (z:-11 or z:-12). Both begin locked. The
+cage is directly below it on the final generated floor (z:-12 or z:-13). Both begin locked. The
 player must reach the **lower cage** by ordinary stairs and Inspect it to release
 the counterweight. This consumes **one gameplay turn** and does not also move
 the player. The single unlocked state then enables travel in **both directions**
@@ -3357,6 +3378,8 @@ scout cancels the collective alert; survivors then follow ordinary Alarmed
 expiration rules. Successfully reaching the other group makes the broadcast
 **permanent** for surviving members on that floor, even if the scout later
 dies. Each floor can trigger Collective Mind only once.
+The broadcast is conveyed by its world log and the monsters' Alarmed state,
+without a separate floating "Linked!" popup.
 
 The detecting member becomes the designated scout. It chooses a reachable
 **different pack**, preferring packs with **at least two other surviving
@@ -3413,10 +3436,21 @@ in `content/enemy_config.json`. The active root's source and flavor persist in
 current saves and replay so struggle feedback is consistent after restoration.
 The reusable `blind` ability senses invisible players without granting a
 critical-hit bonus against them, and can hesitate instead of taking an ordinary
-pursuit step at a configurable rate outside melee range. Hesitation is disabled
-when **at most two** of the eight tiles adjacent to the player are walkable;
-blind monsters pursue normally in narrow passages. The existing Pull
-mechanic now supports configurable messages and visuals: a non-web grasp can
+pursuit step at a configurable rate outside melee range. It counts walkable
+tiles among all eight neighbors of both the creature and the player:
+
+| Blind monster's adjacent walkable tiles | Player's adjacent walkable tiles | Chance to hesitate |
+|---|---|---|
+| 1–2 | 1–2 | **0%** |
+| 1–2 | 3+ | **20%** |
+| 3+ | 1–2 | **40%** |
+| 3+ | 3+ | **60%** |
+
+An open monster position overrides the narrow-player exception; a blind
+creature in open space may still become uncertain even when the player is in
+a tight passage. Checks only happen with a legal pursuit step, outside melee
+range, and do not consume RNG at 0%. The existing Pull mechanic now supports
+configurable messages and visuals: a non-web grasp can
 move a player without showing spider webs or applying their separate status.
 Blind enemies show only the **Blind** ability label in inspection; their spotting and hesitation
 messages describe sensing rather than seeing the player.
@@ -3495,8 +3529,8 @@ this lets it enter and pathfind through deep `water` while chasing, wandering,
 or returning home. Swimming never grants flight, ethereal movement, or access
 to walls, boulders, lava, and other blocked tiles. Rivers retain their ordinary
 terrain rules. No swimming progress or drowning status applies to monsters.
-A visible Murkspawn entering deep water logs its plunge and shows a brief
-**Swimming!** popup; continued swimming does not spam the log. Monster
+A visible Murkspawn entering deep water logs its plunge without a floating
+text popup; continued swimming does not spam the log. Monster
 inspection identifies Swimming. The ability is part of the saved enemy ability
 list, including replay snapshots.
 
@@ -3859,7 +3893,8 @@ included in saves and replay snapshots. The new save schema is **56**.
 
 ## Monster invisibility
 
-Myrka, Skerva, Kveld, Tulla and Nymph have `invisibility`. While actively pursuing or
+Myrka, Skerva, Kveld, Tulla, Nymph and Ghost have `invisibility`. Ghost retains
+its separate Ethereal properties. While actively pursuing or
 attacking a visible player, they have a **25% chance** on an otherwise eligible
 action to vanish instead of moving or attacking. They remain invisible through
 **three subsequent enemy turns**, and the ability is unavailable for **eight
@@ -4121,9 +4156,9 @@ Approximately **5% of normal enemy spawns** receive a prefix. Scenario-spawned
 z:-1 cave enemies use the same **5%** chance. Scenario-spawned generic z:-2 cave
 enemies use an increased **11%** prefix chance. Dedicated story/fort population
 keeps its own spawn rules unless explicitly routed through the normal prefix
-roll. Dwarven Mines use their own random non-Champion prefix chance: **11%**
-on mine floor 1, increasing by **2.5 percentage points per floor** (13.5%,
-16%, then 18.5% on an optional fourth floor), capped at **28%**. They do not
+roll. Dwarven Mines use their own random non-Champion prefix chance: **0%**
+on respite floor 1, then **11%**, **13.5%**, **16%** and **18.5%** on mine
+floors 2–5 respectively, capped at **28%**. They do not
 receive the Ruins' guaranteed Champions.
 
 Current prefixes:
@@ -4991,6 +5026,16 @@ Shield
 Armor
 ```
 
+Physical artifact weapons, shields and armor can be equipped while
+**unidentified**. Their actual base stats, magic bonuses, penalties and curses
+apply immediately, but the equipped slot, inspection text and equipment logs
+continue to show `Unidentified <noun>` and `???` instead of revealing the
+hidden enchantments, curse or dwarven owner. Equipping and unequipping costs
+the usual item-action turn and **does not identify** the artifact. Players may
+infer some properties from combat or character stats; explicit identification
+remains necessary to reveal the item's true description. The identification
+flag and equipped item effects persist across saves and replay.
+
 Inventory and merchant gear icons are 24×24 transparent SVGs in `img/icons/`.
 Weapons, shields, and armor prefer a file named exactly after their base item
 (e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do
@@ -5500,12 +5545,16 @@ Unidentified <noun>
 ```
 
 Their real stats/details remain hidden, unless identified.
+This includes curse details and dwarven-owner names, even when the artifact
+is currently equipped.
 
 ---
 
 # 40. Artifact Identification
 
 Artifacts begin unidentified.
+Equipping unidentified artifact gear is allowed and applies its real effects,
+but neither equips nor ordinary stat changes identify it.
 
 Before identification, their stats are hidden as:
 
@@ -6267,6 +6316,9 @@ tile image.
 
 Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object.
+The nearby-village intuition checks the surface position **only while the
+player is on z:0**; underground inspections never claim to sense a surface
+village merely because the two positions share map coordinates.
 
 ---
 
@@ -7569,6 +7621,10 @@ tiles; undiscovered terrain stays fogged. The full-map player marker pulses
 only on the currently occupied map. Browsing does not change the active game
 map, field of view, side minimap, save state, or replay RNG. Reopening the map
 starts on the current level.
+On the surface, a discovered sand tile that has been dug shows its darker
+excavated appearance on both minimaps and the full map, matching the main
+canvas. This uses the already persisted `dugSandTiles` state; digging updates
+the active map immediately without revealing any undiscovered tiles.
 The active minimap cache also checks the map and discovery-grid identities,
 because generic and Crypt z:-2 maps can have the same depth and cave index.
 
@@ -8205,7 +8261,8 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
   You can only dig in sand.
   ```
 - The tile is recorded in `dugSandTiles` and immediately redrawn so its hole
-  becomes visible in tile-image mode (or its darker background in ASCII mode).
+  becomes visible in tile-image mode (or its darker background in ASCII mode),
+  including both minimaps and the full map once that tile is discovered.
 - Digging the same treasure-map location does not create another casket if the casket is already present in the player's inventory or on the current level.
 - The treasure-map location takes priority over the normal digging loot table.
 - A world-generated `buriedgear` or `buriedartifact` object takes priority over
@@ -8762,6 +8819,12 @@ Highscores and Graveyard are mutually exclusive. Opening during live play clears
 queued movement and hides touch controls; it consumes no turn or RNG and blocks
 live gameplay keys. Recorded replay actions continue normally if the dialog is
 opened during playback, but its unavailable state makes no online query.
+
+An unidentified artifact remains unidentified in public highscore snapshots. 
+The expanded equipment/artifact rows show only its generic `Unidentified <noun>` name and `???`, 
+never the dwarven owner's name, hidden curse or item bonuses. Secret item fields are
+removed before submission; the ordinary character-level permanent stats and
+ranking remain visible and use the item's real equipped effects.
 
 Each mode has its own top ten: permadeath and non-permadeath. Cursed and normal
 worlds share their mode board. Ranking uses level first, then exact permanent

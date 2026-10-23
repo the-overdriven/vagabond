@@ -116,6 +116,26 @@ test('unresolved startup reads do not block level-up, and snapshots are deeply c
   for(const key of ['id','created_at','strength']) assert.equal(key in sent.record,false)
 })
 
+test('unidentified abacus hides owner and stats from public highscore snapshots', async () => {
+  const f=fixture();f.init();await flush()
+  const data=snapshot()
+  data.artifacts=[{kind:'artifact',identified:false,noun:'Abacus',name:'Abacus of Zolgrin',
+    stat_line:'ATK +15, CURSED',bonuses:{atk:15},curse:{everyTurns:7},effectId:'secret'}]
+  data.equipment.armor={kind:'artifact',identified:false,noun:'Mail',name:'Mail of Glomir',
+    stat_line:'DEF 15',bonuses:{def:15}}
+  f.highscores.recordLevel(character(),()=>data)
+  await flush()
+  const sent=f.calls.inserts[0].record
+  assert.equal(sent.artifacts[0].name,'Unidentified Abacus')
+  assert.equal(sent.artifacts[0].stat_line,'???')
+  assert.equal(sent.equipment.armor.name,'Unidentified Mail')
+  for(const item of [sent.artifacts[0],sent.equipment.armor]) {
+    for(const hidden of ['bonuses','curse','effectId','atk','def','ownerLore','possessor'])
+      assert.equal(Object.hasOwn(item,hidden),false,`hidden ${hidden} absent from highscore JSON`)
+  }
+  assert.equal(data.artifacts[0].name,'Abacus of Zolgrin','no mutation of live item data')
+})
+
 test('startup failures are mode-local, unknown cutoff allows submission, no retries', async () => {
   const f=fixture({read:mode=> mode?Promise.resolve({data:[],error:null}):Promise.reject(Error('network')),
     insert:()=>Promise.reject(Error('write timeout'))})
