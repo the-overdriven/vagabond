@@ -47,10 +47,16 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert(ruins.length >= 3 && ruins.length <= 5, 'Ruins floor count remains unchanged')
     assert(run(`dungeonPackageLevels('dwarvenRuins').every(({level})=>{
       const keys=[...(level.ordinaryKeys||[]),
-        ...(Number.isInteger(level.progressionKey?.x)?[level.progressionKey]:[])]
-      return keys.every((a,i)=>keys.slice(i+1).every(b=>
-        Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))>=4))
-    })`),`seed ${seed}: unrelated Dwarven keys do not spawn in clusters`)
+        ...(level.progressionKey?[level.progressionKey]:[])]
+      const rooms=keys.map(key=>key.mode==='championCarrier'
+        ? level.rooms.find(room=>room.id===key.targetRoomId)
+        : level.rooms.find(room=>!room.stairRoom&&!room.landmark&&
+          key.x>room.x&&key.x<room.x+room.w-1&&
+          key.y>room.y&&key.y<room.y+room.h-1))
+      return rooms.every(Boolean)&&new Set(rooms.map(room=>room.id)).size===keys.length&&
+        keys.filter(key=>Number.isInteger(key.x)).every((a,i,points)=>points.slice(i+1).every(b=>
+          Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))>=4))
+    })`),`seed ${seed}: all Dwarven key sources belong to distinct actual rooms`)
     if (seed===554433) assert.equal(ruins.length,5,'five-floor Ruins end at z:-8')
     assert([4,5].includes(floors.length), 'Mines have 4 or 5 floors')
     assert(floors.every((floor,i)=>floor.z === -9-i && floor.dungeonFloor === i+1 &&

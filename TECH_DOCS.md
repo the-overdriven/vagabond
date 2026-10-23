@@ -1201,8 +1201,12 @@ key**. This prevents a locked leaf from being bypassed simply by opening its
 sibling. Generated ordinary-door keys are placed only on marble reachable from
 the floor entrance while all generated locks are still closed, so a key cannot
 spawn behind its own lock or form a circular dependency with another lock.
-Ordinary, progression, and internal prison-door keys are spaced at least
-**four tiles apart** by Chebyshev distance. Independently generated locked
+Each generated ordinary key, progression-key source (including a Champion
+carrier or searchable remains), and internal prison-door key is assigned a
+**different room**. Ground keys appear inside actual non-stair rooms, not in
+corridors or entrance/exit halls; internal cell keys cannot appear in the
+prison room they unlock. Ground keys also remain at least **four tiles apart**
+by Chebyshev distance. Independently generated locked
 doors may never touch orthogonally unless they use the **same key**; otherwise
 the floor is regenerated. This avoids ambiguous three- or four-leaf door
 clusters and accidental key piles without changing deliberate two-leaf gates.

@@ -1859,6 +1859,12 @@ function dwarvenRoomInterior(room) {
   return out
 }
 
+function dwarvenKeyRoomAt(roomMetas, x, y) {
+  return roomMetas.find(room => !room.stairRoom && !room.landmark &&
+    x > room.x && x < room.x + room.w - 1 &&
+    y > room.y && y < room.y + room.h - 1) || null
+}
+
 function dwarvenPrisonCellPoints(room) {
   const region = room?.prisonCellRegion
   if (!region) return []
@@ -2126,7 +2132,7 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
   }
 }
 
-function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved, progressionKey) {
+function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved, usedKeyRooms) {
   const roomDefs = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.rooms?.archetypes || {}
   for (const room of roomMetas) {
     const door = room.prisonCellDoorCandidate
@@ -2146,17 +2152,11 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     for (const [key, distance] of reachable.entries()) {
       if (distance <= 0 || reserved.has(key)) continue
       const [x,y] = key.split(',').map(Number)
+      const keyRoom = dwarvenKeyRoomAt(roomMetas, x, y)
+      if (!keyRoom || usedKeyRooms.has(keyRoom.id) || keyRoom.id === room.id) continue
       if (ordinaryKeys.some(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))<4)) continue
-      if (Number.isInteger(progressionKey?.x) && Number.isInteger(progressionKey?.y) &&
-          Math.max(Math.abs(progressionKey.x-x),Math.abs(progressionKey.y-y))<4) continue
       if (cm[y]?.[x] !== 'marble') continue
-      if (x > room.x && x < room.x + room.w - 1 && y > room.y && y < room.y + room.h - 1) continue
-      // Internal prison-cell keys share the floor's ordinary key budget, but
-      // must obey the same plain-transit-hall rule as structural-door keys.
-      if (roomMetas.some(candidate => candidate.stairRoom &&
-          x > candidate.x && x < candidate.x + candidate.w - 1 &&
-          y > candidate.y && y < candidate.y + candidate.h - 1)) continue
-      candidates.push({x,y,distance})
+      candidates.push({x,y,distance,roomId:keyRoom.id})
     }
     if (!candidates.length) return false
     candidates.sort((a,b) => b.distance - a.distance || a.y - b.y || a.x - b.x)
@@ -2166,6 +2166,7 @@ function addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordin
     ordinaryLocks.push({leaves:[{x:door.x,y:door.y}],keyId,roomId:room.id,
       vaultId:vaults.find(v => v.roomId === room.id)?.id || null,internalRoomLock:true})
     ordinaryKeys.push({x:keySpot.x,y:keySpot.y,keyId,internalRoomKey:true})
+    usedKeyRooms.add(keySpot.roomId)
     reserved.add(keyXY(keySpot.x,keySpot.y))
     room.internalLocks = [{keyId,leaves:[{x:door.x,y:door.y}],kind:'prisonCell'}]
     const vault = vaults.find(v => v.roomId === room.id)
@@ -3285,6 +3286,10 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   // key from spawning behind its own door or behind another locked doorway,
   // eliminating circular key dependencies.
   const ordinaryKeys = []
+  // Every generated key source has its own actual chamber. A key held by the
+  // Champion or located in a designated side room reserves that chamber even
+  // before the item (or enemy) is created.
+  const usedKeyRooms = new Set(progressionKeyPlan?.targetRoomId ? [progressionKeyPlan.targetRoomId] : [])
   if (ordinaryLocks.length) {
     const reachable = dungeonWalkDistances(cm, entry)
     const reservedKeys = new Set()
@@ -3292,6 +3297,8 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     for (const [key, distance] of reachable.entries()) {
       if (distance <= 0) continue
       const [x, y] = key.split(',').map(Number)
+      const keyRoom = dwarvenKeyRoomAt(roomMetas, x, y)
+      if (!keyRoom || usedKeyRooms.has(keyRoom.id)) continue
       if (cm[y]?.[x] !== 'marble') continue
       if (hall && x >= hall.x && x < hall.x+hall.w && y >= hall.y && y < hall.y+hall.h) continue
       if (roomMetas.some(room => room.stairRoom && x > room.x && x < room.x+room.w-1 &&
@@ -3300,16 +3307,18 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       if (doorways.some(({leaves}) => leaves.some(p => p.x === x && p.y === y))) continue
       if (galleryRoom?.gallery && [galleryRoom.gallery.chest,...galleryRoom.gallery.aisle,
           ...galleryRoom.gallery.bays.flat()].some(p => p.x === x && p.y === y)) continue
-      candidates.push({x, y})
+      candidates.push({x, y, roomId:keyRoom.id})
     }
     if (candidates.length < ordinaryLocks.length) return null
     for (const lock of ordinaryLocks) {
       const available = candidates.filter(p => !reservedKeys.has(keyXY(p.x, p.y)) &&
+        !usedKeyRooms.has(p.roomId) &&
         ordinaryKeys.every(k=>Math.max(Math.abs(p.x-k.x),Math.abs(p.y-k.y))>=4))
       if (!available.length) return null
       const spot = pick(available)
       reservedKeys.add(keyXY(spot.x, spot.y))
       ordinaryKeys.push({x: spot.x, y: spot.y, keyId: lock.keyId})
+      usedKeyRooms.add(spot.roomId)
     }
   }
 
@@ -3317,6 +3326,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     const usedKeyTiles = new Set(ordinaryKeys.map(key => keyXY(key.x, key.y)))
     const validKeyTile = (x, y) => cm[y]?.[x] === 'marble' && !usedKeyTiles.has(keyXY(x, y)) &&
       ordinaryKeys.every(k=>Math.max(Math.abs(x-k.x),Math.abs(y-k.y))>=4) &&
+      !!dwarvenKeyRoomAt(roomMetas, x, y) &&
       (!hall || x < hall.x || x >= hall.x+hall.w || y < hall.y || y >= hall.y+hall.h) &&
       !roomMetas.some(room => room.stairRoom && x > room.x && x < room.x+room.w-1 &&
         y > room.y && y < room.y+room.h-1) &&
@@ -3342,14 +3352,16 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       const reachable = dungeonWalkDistances(cm, entry)
       const candidates = [...reachable.keys()].map(key => {
         const [x, y] = key.split(',').map(Number)
-        return {x, y, distance:reachable.get(key)}
-      }).filter(p => p.distance > 0 && validKeyTile(p.x, p.y))
+        const room = dwarvenKeyRoomAt(roomMetas, x, y)
+        return {x, y, distance:reachable.get(key), roomId:room?.id}
+      }).filter(p => p.distance > 0 && p.roomId && !usedKeyRooms.has(p.roomId) && validKeyTile(p.x, p.y))
       if (!candidates.length) return null
       const maxDistance = Math.max(...candidates.map(p => p.distance))
       const farBand = Math.max(0, Math.floor(keyCfg.remainsFarCandidateBand ?? 8))
       const remote = candidates.filter(p => p.distance >= Math.max(1, maxDistance - farBand))
       const spot = pick(remote.length ? remote : candidates)
       progressionKey = {...progressionKeyPlan, x:spot.x, y:spot.y}
+      usedKeyRooms.add(spot.roomId)
     } else if (progressionKeyPlan.mode === 'championCarrier') {
       if (!progressionKeyPlan.targetRoomId) return null
       progressionKey = {...progressionKeyPlan}
@@ -3420,7 +3432,7 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
       cm[spot.y][spot.x]='dwarvenrubble'
     }
   }
-  if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved,progressionKey)) return null
+  if (!addDwarvenRoomInternalLocks(cm, roomMetas, vaults, entry, floorZ, ordinaryLocks, ordinaryKeys, reserved,usedKeyRooms)) return null
   if (!dwarvenLockLeavesAreUnambiguous(cm,ordinaryLocks,gateDoorway,gatePreBreached?null:gateKeyId)) return null
   if (roomMetas.filter(room => room.archetype === 'Prison').length < requiredPrisons) return null
   for (const room of roomMetas.filter(room => room.archetype === 'Prison' && !room.gallery)) {

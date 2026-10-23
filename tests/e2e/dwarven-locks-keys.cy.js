@@ -304,6 +304,25 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
       check(ordinaryKeys.every(k => reachable.has(keyXY(k.x, k.y))),
         'every ordinary key is reachable from the entrance with all locks closed')
 
+      const keySources = [...(level.ordinaryKeys || [])]
+      const progression = level.progressionKey
+      if (progression) keySources.push(progression.mode === 'championCarrier'
+        ? {roomId: progression.targetRoomId} : progression)
+      const roomsForKeys = keySources.map(key => key.roomId
+        ? level.rooms.find(room => room.id === key.roomId)
+        : level.rooms.find(room => !room.stairRoom && !room.landmark &&
+          key.x > room.x && key.x < room.x + room.w - 1 &&
+          key.y > room.y && key.y < room.y + room.h - 1))
+      check(roomsForKeys.every((room, i) => !!room && !room.stairRoom &&
+        (keySources[i].roomId || !room.landmark)),
+        'every generated key source belongs to a real non-stair chamber')
+      check(new Set(roomsForKeys.map(room => room.id)).size === roomsForKeys.length,
+        'ordinary, progression, and prison-cell keys occupy different rooms')
+      check((level.ordinaryKeys || []).filter(key => key.internalRoomKey).every(key =>
+        !level.rooms.some(room => room.id === roomsForKeys[keySources.indexOf(key)]?.id &&
+          (room.internalLocks || []).some(lock => lock.keyId === key.keyId))),
+        'an internal prison key is never placed in its own locked prison')
+
       map = level.map
       currentZ = floorZ
       currentCave = -1
