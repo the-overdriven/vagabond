@@ -80,6 +80,36 @@ describe('Mine-only encounters and darkness', () => {
         check(!blocked.has('12,10')&&blocked.has('12,8'),
           'walls hide blocked light but visible tiles still glow around a corner')
       } finally {first.level.mineExcavations=originalExcavations}
+      const originalTileMode=USE_TILE_IMAGES
+      const originalGradient=ctx.createRadialGradient
+      let radialGlows=0
+      ctx.createRadialGradient=function(...args) {
+        radialGlows++
+        return originalGradient.apply(this,args)
+      }
+      first.level.mineExcavations=[{x:player.x,y:player.y,kind:'exposed',
+        mineral:'aquamarine',removed:false,threshold:0}]
+      try {
+        USE_TILE_IMAGES=true
+        render()
+        check(radialGlows>=2,'tile graphics use soft radial crystal light and a central halo')
+        const exposedGlows=radialGlows
+        first.level.mineExcavations[0].kind='embedded'
+        render()
+        check(radialGlows>=exposedGlows+2,'visible embedded wall crystals cast smaller radial light')
+        const embeddedGlows=radialGlows
+        first.level.mineExcavations[0].threshold=50
+        render()
+        check(radialGlows===embeddedGlows,'concealed mineral deposits cast no visible light')
+        USE_TILE_IMAGES=false
+        render()
+        check(radialGlows===embeddedGlows,'ASCII graphics do not use tile-mode gradient lighting')
+      } finally {
+        ctx.createRadialGradient=originalGradient
+        first.level.mineExcavations=originalExcavations
+        USE_TILE_IMAGES=originalTileMode
+        render()
+      }
       check(MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.merchantPrice===70 &&
         itemDefinition('homecomingscroll').baseValue===70,'Homecoming costs 70g')
 
@@ -94,6 +124,23 @@ describe('Mine-only encounters and darkness', () => {
         const [min,max]=MINING_CONFIG.generation.budgets[i]
         check(level.mineMineralValue>=min&&level.mineMineralValue<=max,
           'mine minerals respect the complete floor gold budget')
+        const minerals=level.mineExcavations.filter(t=>t.mineral)
+        const separation=MINING_CONFIG.generation.differentMineralSeparation
+        for(let a=0;a<minerals.length;a++)for(let b=a+1;b<minerals.length;b++){
+          const left=minerals[a],right=minerals[b]
+          if(left.mineral===right.mineral)continue
+          check(Math.max(Math.abs(left.x-right.x),Math.abs(left.y-right.y))>=separation,
+            'different mineral veins stay ten tiles apart')
+        }
+        for(const pocket of level.minePockets){
+          const members=enemies.filter(e=>e.alive&&e.level===z&&
+            pocket.cells.some(p=>p.x===e.x&&p.y===e.y))
+          if(pocket.type==='nest')check(new Set(members.map(e=>e.baseName)).size<=1,
+            'a mine nest contains only one monster species')
+          if(pocket.type==='geode')check(new Set(minerals.filter(t=>
+            pocket.cells.some(p=>p.x===t.x&&p.y===t.y)).map(t=>t.mineral)).size<=1,
+            'a geode contains only one crystal type')
+        }
         const pocketTiles=new Set(level.minePockets.flatMap(p=>p.cells.map(c=>keyXY(c.x,c.y))))
         const formations=level.mineExcavations.filter(t=>t.kind==='exposed'&&!t.removed)
         const crystalPositions=new Set(formations.map(t=>keyXY(t.x,t.y)))

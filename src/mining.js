@@ -22,7 +22,23 @@ const Mining = (() => {
     const cfg = config()
     const bounds = (v, minimum, maximum) => Array.isArray(v) && v.length === 2 &&
       v.every(n => Number.isInteger(n)) && v[0] >= minimum && v[1] <= maximum && v[0] <= v[1]
-    if (!cfg?.skill || !cfg.generation || !cfg.sound || !cfg.minerals ||
+    const validOpacity = n => Number.isFinite(n) && n >= 0 && n <= 1
+    if (!cfg?.skill || !cfg.generation || !cfg.sound || !cfg.minerals || !cfg.lighting ||
+      !validOpacity(cfg.lighting.tileCenterOpacity) ||
+      !validOpacity(cfg.lighting.tileMidOpacity) ||
+      !validOpacity(cfg.lighting.tileBloomOpacity) ||
+      !validOpacity(cfg.lighting.pulseOpacity) ||
+      !validOpacity(cfg.lighting.embeddedRadiusScale) ||
+      !validOpacity(cfg.lighting.embeddedOpacityScale) ||
+      !Number.isFinite(cfg.lighting.tileMidpoint) ||
+      cfg.lighting.tileMidpoint <= 0 || cfg.lighting.tileMidpoint >= 1 ||
+      !Number.isFinite(cfg.lighting.tileBloomRadius) ||
+      cfg.lighting.tileBloomRadius <= 0 || cfg.lighting.tileBloomRadius > 3 ||
+      !Number.isFinite(cfg.lighting.tileRadiusPadding) ||
+      cfg.lighting.tileRadiusPadding < 0 || cfg.lighting.tileRadiusPadding > 1 ||
+      !Number.isInteger(cfg.lighting.tileFadeMargin) ||
+      cfg.lighting.tileFadeMargin < 0 || cfg.lighting.tileFadeMargin > 2 ||
+      !Number.isFinite(cfg.lighting.pulsePeriodMs) || cfg.lighting.pulsePeriodMs <= 0 ||
       !bounds(cfg.generation.pocketsPerFloor, 1, 30) ||
       !bounds(cfg.generation.waterReleaseTiles, 0, 10) ||
       cfg.skill.max !== 100 || cfg.skill.strikeMilestones?.length !== 5 ||
@@ -35,6 +51,8 @@ const Mining = (() => {
       !Number.isInteger(cfg.generation.exposedWideCorridorSpacing) ||
       cfg.generation.exposedWideCorridorSpacing < 2 ||
       cfg.generation.exposedWideCorridorSpacing > 8 ||
+      !Number.isInteger(cfg.generation.differentMineralSeparation) ||
+      cfg.generation.differentMineralSeparation < 1 ||
       cfg.generation.budgets?.length !== 5 ||
       !cfg.generation.budgets.every(b => bounds(b, 0, 100000)) ||
       Object.keys(cfg.minerals).length !== 7 ||
@@ -214,6 +232,10 @@ const Mining = (() => {
       if (neighbours.some(p => fertile.has(key(p.x, p.y)))) pocketWalls.push({x, y})
     }
     let earned = 0, deposits = 0, attempts = 0
+    // Nearby formations can be part of the same mineral vein, but different
+    // minerals always have space between them, including across pocket edges.
+    const compatible = (p, mineral) => level.mineExcavations.every(t => !t.mineral || t.mineral === mineral ||
+      Math.max(Math.abs(t.x - p.x), Math.abs(t.y - p.y)) >= cfg.differentMineralSeparation)
     const wideFloorKeys = new Set(wideCorridorFloors.map(p => key(p.x, p.y)))
     const placedFloorCrystals = []
     const available = pool => pool.filter(p => !used.has(key(p.x, p.y)) &&
@@ -226,12 +248,18 @@ const Mining = (() => {
         ['minerals', 'precious'].includes(pocket.type) ? 1 : 0
       if (!promised) continue
       const cells = pocket.cells.filter(p => cm[p.y]?.[p.x] === 'cavefloor2' && !used.has(key(p.x, p.y)))
+      let pocketMineral = null
       for (let i = 0; i < promised && cells.length && deposits < cfg.maxDepositsPerFloor; i++) {
-        const affordable = types().filter(t => config().minerals[t].price + earned <= budget &&
-          (pocket.type !== 'precious' || config().minerals[t].tier !== 'common'))
+        const affordable = (pocketMineral ? [pocketMineral] : types()).filter(t =>
+          config().minerals[t].price + earned <= budget &&
+          (pocket.type !== 'precious' || config().minerals[t].tier !== 'common') &&
+          cells.some(p => compatible(p, t)))
         if (!affordable.length) break
         const mineral = pickWeighted(affordable, t => config().minerals[t].weight)
-        const spot = cells.splice(randInt(0, cells.length - 1), 1)[0]
+        pocketMineral = mineral
+        const availableCells = cells.filter(p => compatible(p, mineral))
+        const spot = pick(availableCells)
+        cells.splice(cells.indexOf(spot), 1)
         if (!mark(level, spot.x, spot.y, 'exposed', {mineral,
           hardness: config().minerals[mineral].hardness, threshold: 0})) continue
         used.add(key(spot.x, spot.y))
@@ -257,20 +285,21 @@ const Mining = (() => {
       let candidates = (wantExposed
         ? (pocketPreference ? fertileFloor : corridorExposed)
         : (pocketPreference ? pocketWalls : corridorWalls))
-      candidates = available(candidates)
+      candidates = available(candidates).filter(p => compatible(p, mineral))
       if (!candidates.length) candidates = available(wantExposed
         ? (pocketPreference ? corridorExposed : fertileFloor)
-        : (pocketPreference ? corridorWalls : pocketWalls))
+        : (pocketPreference ? corridorWalls : pocketWalls)).filter(p => compatible(p, mineral))
       if (!candidates.length && wantExposed)
-        candidates = available(otherCorridorExposed)
-      if (!candidates.length) break
+        candidates = available(otherCorridorExposed).filter(p => compatible(p, mineral))
+      if (!candidates.length) continue
       const start = pick(candidates), veinCount = wantExposed ? 1 : randInt(...cfg.veinLength)
       const existingFloor = cm[start.y][start.x] === 'cavefloor2'
       const vein = [start]
       for (let n = 1; n < veinCount && deposits + vein.length < cfg.maxDepositsPerFloor; n++) {
         const neighbours = dirs4.map(([dx, dy]) => ({x: vein[vein.length - 1].x + dx, y: vein[vein.length - 1].y + dy}))
           .filter(p => cm[p.y]?.[p.x] === 'cavewall' && !used.has(key(p.x, p.y)) &&
-            !vein.some(c => c.x === p.x && c.y === p.y) && doorFree(level, p.x, p.y, cfg.minEntranceClearance))
+            !vein.some(c => c.x === p.x && c.y === p.y) &&
+            doorFree(level, p.x, p.y, cfg.minEntranceClearance) && compatible(p, mineral))
         if (!neighbours.length) break
         vein.push(pick(neighbours))
       }
@@ -297,13 +326,18 @@ const Mining = (() => {
     // A random target near the bottom of its range can leave less than one
     // Quartz of unused value. Do not let that roundoff undershoot the agreed
     // floor minimum; spend a small extra amount from the same floor budget.
-    while (earned < minimum && earned + config().minerals.quartz.price <= maximum) {
-      const spaces = corridorWalls.filter(p => !used.has(key(p.x, p.y)))
-      if (!spaces.length) break
+    while (earned < minimum && deposits < cfg.maxDepositsPerFloor) {
+      const replacement = types().sort((a, b) => config().minerals[a].price - config().minerals[b].price)
+        .find(t => earned + config().minerals[t].price <= maximum &&
+          corridorWalls.some(p => !used.has(key(p.x, p.y)) && compatible(p, t)))
+      if (!replacement) break
+      const spaces = corridorWalls.filter(p => !used.has(key(p.x, p.y)) && compatible(p, replacement))
       const p = pick(spaces)
       used.add(key(p.x, p.y))
-      mark(level, p.x, p.y, 'embedded', {mineral: 'quartz', hardness: 'weak'})
-      earned += config().minerals.quartz.price
+      mark(level, p.x, p.y, 'embedded', {mineral: replacement,
+        hardness: config().minerals[replacement].hardness})
+      earned += config().minerals[replacement].price
+      deposits++
     }
     level.mineMineralValue = earned
     level.mineMineralBudget = Math.max(budget, earned)
@@ -334,9 +368,9 @@ const Mining = (() => {
       const spots = pocket.cells.filter(p => level.map[p.y]?.[p.x] === 'cavefloor2' &&
         !enemies.some(e => e.alive && e.level === z && e.x === p.x && e.y === p.y))
       const amount = Math.min(spots.length, randInt(...cfg.nestSize))
+      const tmpl = pickWeighted(roster, t => t.rarity ?? 1)
       for (let i = 0; i < amount; i++) {
         const spot = spots.splice(randInt(0, spots.length - 1), 1)[0]
-        const tmpl = pickWeighted(roster, t => t.rarity ?? 1)
         const concealed = tmpl.abilities?.includes('wallAmbush') &&
           enemyWallAmbushWallAt(level.map, spot.x, spot.y)
         addEnemy({name: tmpl.name, baseName: tmpl.name, tier: tmpl.tier, level: z,
@@ -547,25 +581,58 @@ const Mining = (() => {
     return true
   }
 
+  function lightInfo(deposit) {
+    if (deposit.removed || !deposit.mineral) return null
+    const radius = config().minerals[deposit.mineral]?.radius
+    if (!radius) return null
+    if (deposit.kind === 'exposed') return {radius, opacity: 1}
+    // Only plainly visible crystals protruding from the wall glow. A secret
+    // ore seam does not give away its presence with an unexplained light.
+    if (deposit.kind === 'embedded' && deposit.threshold === 0) return {
+      radius: Math.max(1, Math.round(radius * config().lighting.embeddedRadiusScale)),
+      opacity: config().lighting.embeddedOpacityScale
+    }
+    return null
+  }
+
+  function lightCanReach(mapTiles, sx, sy, tx, ty) {
+    if (!UndergroundFov.canSee(mapTiles, sx, sy, tx, ty)) return false
+    const opaque = (x, y) => {
+      const tile = mapTiles[y]?.[x]
+      return !tile || ['cavewall', 'dwarvenwall', 'mountain', 'snowmountain',
+        'crypt2niche', 'boulder', 'blackpillar'].includes(tile) || TILE[tile]?.blocksSight === true
+    }
+    const line = UndergroundFov.traceLine(sx, sy, tx, ty)
+    for (let i = 1; i < line.length; i++) {
+      const from = line[i - 1], to = line[i]
+      // A diagonal sight ray may just touch a wall corner in the normal FOV.
+      // Emitted light needs a clear aperture, not a pinhole between two rocks.
+      if (from.x !== to.x && from.y !== to.y &&
+        (opaque(to.x, from.y) || opaque(from.x, to.y))) return false
+    }
+    return true
+  }
+
   function lightVisible(mapTiles, px, py, ordinarySet) {
     const level = activeLevel()
     if (!level) return ordinarySet
     const visibleSet = new Set(ordinarySet)
     for (const t of level.mineExcavations || []) {
-      if (t.kind !== 'exposed' || t.removed || !t.mineral) continue
-      const radius = config().minerals[t.mineral].radius
+      const light = lightInfo(t)
+      if (!light) continue
+      const radius = light.radius
       // Crystal light has its own range around the formation, independent of
       // the player's darkness radius. Distance alone must never hide a light.
       for (let yy = t.y - radius; yy <= t.y + radius; yy++) for (let xx = t.x - radius; xx <= t.x + radius; xx++) {
         if ((xx - t.x) ** 2 + (yy - t.y) ** 2 > radius * radius || !mapTiles[yy]?.[xx]) continue
-        if (UndergroundFov.canSee(mapTiles, px, py, xx, yy) && UndergroundFov.canSee(mapTiles, t.x, t.y, xx, yy))
+        if (UndergroundFov.canSee(mapTiles, px, py, xx, yy) && lightCanReach(mapTiles, t.x, t.y, xx, yy))
           visibleSet.add(key(xx, yy))
       }
     }
     return visibleSet
   }
 
-  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, activeLevel, visible,
+  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, lightInfo, lightCanReach, activeLevel, visible,
     config}
 })()
 

@@ -129,6 +129,34 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(illumination.blockedBehindPlayer,false,'solid rock blocks the player’s view of distant light')
   assert.equal(illumination.spillAroundCorner,true,'light can reveal visible tiles when the source is around a corner')
   assert.equal(illumination.removedStillLit,false,'mined crystals no longer illuminate terrain')
+  const embeddedLight = plain(run(`(()=>{
+    const level=Mining.activeLevel(),old=level.mineExcavations
+    const terrain=Array.from({length:12},()=>Array(12).fill('cavefloor2'))
+    const deposit={x:6,y:5,kind:'embedded',mineral:'quartz',removed:false,threshold:0}
+    terrain[5][6]='cavewall'
+    level.mineExcavations=[deposit]
+    try {
+      const ordinary=UndergroundFov.compute(terrain,2,5,1)
+      const exposed=Mining.lightVisible(terrain,2,5,ordinary)
+      deposit.threshold=50
+      const hidden=Mining.lightVisible(terrain,2,5,ordinary)
+      deposit.threshold=0
+      terrain[4][6]='cavewall'
+      return {radius:Mining.lightInfo(deposit).radius,near:exposed.has('5,5'),
+        beyond:exposed.has('4,5'),concealed:!!Mining.lightInfo({...deposit,threshold:50}),
+        hiddenLight:hidden.has('5,5'),ordinaryCorner:UndergroundFov.canSee(terrain,5,5,6,4),
+        blockedCorner:Mining.lightCanReach(terrain,5,5,6,4),
+        straight:Mining.lightCanReach(terrain,6,5,7,5)}
+    } finally {level.mineExcavations=old}
+  })()`))
+  assert.equal(embeddedLight.radius,1,'wall crystals glow at a smaller radius')
+  assert.equal(embeddedLight.near,true,'visible embedded minerals light nearby floor')
+  assert.equal(embeddedLight.beyond,false,'embedded glow does not extend to exposed crystal range')
+  assert.equal(embeddedLight.concealed,false,'concealed deposits do not announce themselves with light')
+  assert.equal(embeddedLight.hiddenLight,false,'concealed deposits cannot reveal distant tiles')
+  assert.equal(embeddedLight.ordinaryCorner,true,'normal FOV permits a diagonal corner sightline')
+  assert.equal(embeddedLight.blockedCorner,false,'crystal light cannot leak diagonally past a wall corner')
+  assert.equal(embeddedLight.straight,true,'light still reaches unobstructed corridor tiles')
   run(`(()=>{
     const target=keyXY(bareRock.tx,bareRock.ty)
     const approaches=dungeonWalkDistances(map,{x:bareRock.x,y:bareRock.y})
@@ -176,6 +204,8 @@ const plain = value => JSON.parse(JSON.stringify(value))
       Mining.generate(levels);
       return levels.map(level=>({pockets:level.minePockets,tiles:level.map,
         crystals:level.mineExcavations.filter(t=>t.kind==='exposed').map(t=>({x:t.x,y:t.y})),
+        minerals:level.mineExcavations.filter(t=>t.mineral)
+          .map(t=>({x:t.x,y:t.y,mineral:t.mineral})),
         entrances:[level.mineUpstairs,level.mineDownstairs,level.mineCagePad],
         mineralValue:level.mineMineralValue,up:level.mineUpstairs,
         availableXp:level.mineExcavations.reduce((total,t)=>total+(t.mineral?
@@ -207,6 +237,18 @@ const plain = value => JSON.parse(JSON.stringify(value))
         assert(p.entrances.length>=1,`${seed}: pocket has a mineable approach`)
         assert(p.cells.every(c=>!visited.has(`${c.x},${c.y}`)),
           `${seed}: floor ${i+1} pocket ${p.id} must remain sealed until mining opens its wall`)
+        if(p.type==='geode'){
+          const within=floor.minerals.filter(m=>p.cells.some(c=>c.x===m.x&&c.y===m.y))
+          assert(new Set(within.map(m=>m.mineral)).size<=1,
+            `${seed}: geode pocket contains only one mineral type`)
+        }
+      }
+      const separation=run('MINING_CONFIG.generation.differentMineralSeparation')
+      for(let a=0;a<floor.minerals.length;a++)for(let b=a+1;b<floor.minerals.length;b++){
+        const one=floor.minerals[a],two=floor.minerals[b]
+        if(one.mineral===two.mineral)continue
+        assert(Math.max(Math.abs(one.x-two.x),Math.abs(one.y-two.y))>=separation,
+          `${seed}: different minerals must remain at least ${separation} tiles apart`)
       }
       for(const stair of floor.entrances.filter(Boolean))
         if(floor.tiles[stair.y]?.[stair.x]!=='mineshaftrope')
@@ -239,5 +281,20 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert(wideCorridorCrystals>0,`${seed}: some exposed crystals should grow in wider corridors`)
     console.log(`seed ${seed}: ${wideCorridorCrystals} exposed crystals on wider corridor floors`)
   }
+  const nest = plain(run(`(()=>{
+    const level=miningTrial,pocket=level.minePockets.find(p=>p.cells.length>=3)
+    if(!pocket)throw Error('no pocket is large enough for a three-monster nest')
+    const oldType=pocket.type,oldSize=MINING_CONFIG.generation.nestSize,oldEnemies=enemies
+    try {
+      pocket.type='nest';MINING_CONFIG.generation.nestSize=[3,3];enemies=[]
+      Mining.spawnNests(level,-9,1)
+      const members=enemies.filter(e=>pocket.cells.some(c=>c.x===e.x&&c.y===e.y))
+      return {count:members.length,species:[...new Set(members.map(e=>e.baseName))],
+        nonhumanoid:members.every(e=>!e.humanoid)}
+    } finally {pocket.type=oldType;MINING_CONFIG.generation.nestSize=oldSize;enemies=oldEnemies}
+  })()`))
+  assert.equal(nest.count,3,'a sufficiently large pocket can hold three nest monsters')
+  assert.equal(nest.species.length,1,'all monsters in a pocket nest share one species')
+  assert.equal(nest.nonhumanoid,true,'nest inhabitants remain nonhumanoid')
   console.log('PASS Mining generation, turn cost, persistence and skill progression')
 })().catch(err => { console.error(err.stack); process.exitCode = 1 })

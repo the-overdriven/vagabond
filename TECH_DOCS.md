@@ -2652,13 +2652,16 @@ legal moves and target tiles.
 **Mining pockets and minerals.** Each mine floor contains **3–10** generated,
 irregular hidden cavities, never larger than an 8×8 bounding box. Their contents
 are drawn from empty hollows, minerals, limited water, nonhumanoid nests, caches
-and rare glowing geodes. Pockets are enclosed until mineable weak seams are
+and rare glowing geodes. A monster nest contains 1–3 members of **one**
+nonhumanoid species, selected for that floor. Pockets are enclosed until mineable weak seams are
 opened; larger pockets can have multiple marked approaches, sometimes requiring
 several walls to be excavated; nearby pockets may rarely connect through another
 mineable seam. Most ordinary mine walls remain solid. Mineral
 deposits may be embedded in walls or exposed in corridor alcoves, widened
 corridor floors and pockets; veins contain 1–4 connected deposits of a single
-mineral. Floor-level crystals require a locally connected bypass, so they never
+mineral. Different mineral types are separated by at least **10 tiles of
+Chebyshev distance**, including across adjacent pockets; crystals in a geode
+share one mineral type. Floor-level crystals require a locally connected bypass, so they never
 obstruct a narrow passage or its only exit. Until extracted, they are obstacles
 for ordinary monster movement and player auto-travel; monsters do not spawn on
 them. Players still mine a formation by attempting to step into it.
@@ -2668,16 +2671,21 @@ The respite floor includes an obvious low-risk seam near its entrance to teach
 mining through exploration rather than a mandatory tutorial.
 
 The seven initial minerals are **Quartz, Amethyst, Topaz, Aquamarine, Emerald,
-Sapphire, and Ruby**. Only fully exposed crystal formations cast colored light.
-Their fixed mineral-specific radii illuminate unobstructed tiles and creatures
+Sapphire, and Ruby**. Fully exposed crystal formations cast colored light;
+visibly embedded crystals also emit a smaller, dimmer glow. Concealed mineral
+seams do not reveal themselves by glowing. Mineral-specific light radii
+illuminate unobstructed tiles and creatures
 beyond the normal mine sight radius, regardless of how far the formation is
 from the player, provided each lit tile is in the player's line of sight and
 the light reaches it from its source. The formation itself need not be visible
 to illuminate a tile around a corner. Lit terrain is visible and explorable
-even outside ordinary FOV; solid walls block the light and sight, and
+even outside ordinary FOV; solid walls and obstructed wall corners block the light, and
 extraction removes the light.
-Color is blended as a visible brightening of the illuminated terrain. Its
-visual pulse does not alter gameplay rules or RNG.
+In tile graphics, each formation produces a continuous, softly fading colored
+glow and a brighter central halo across reachable terrain; opaque walls cast
+shadows. ASCII graphics retain cell-by-cell illumination. The light's color,
+visual intensity, spread and gentle pulse are data-driven, and its animation
+does not alter visibility rules, turns or RNG.
 Breaking into a water pocket can fill 2–5 nearby tiles only when the pocket's
 interior is actually breached, reusing the existing
 Swimming, drowning and shore-escape behavior. Flooding must preserve safe

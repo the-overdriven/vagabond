@@ -45,6 +45,7 @@
     "exposedWideCorridorMinNeighbors": 5,
     "exposedWideCorridorSpacing": 3,
     "veinLength": [1, 4],
+    "differentMineralSeparation": 10,
     "veinPlacementAttempts": 360,
     "preciousPoolBonusPerFloor": 0.08,
     "respiteTrainingDistance": 9,
@@ -61,6 +62,19 @@
     "emerald": {"name": "Emerald", "price": 52, "weight": 6, "hardness": "veryHard", "tier": "precious", "glow": "#34e389", "radius": 3},
     "sapphire": {"name": "Sapphire", "price": 72, "weight": 3, "hardness": "veryHard", "tier": "rare", "glow": "#407bff", "radius": 3},
     "ruby": {"name": "Ruby", "price": 94, "weight": 1, "hardness": "veryHard", "tier": "rare", "glow": "#f24b75", "radius": 4}
+  },
+  "lighting": {
+    "tileCenterOpacity": 0.38,
+    "tileMidOpacity": 0.2,
+    "tileMidpoint": 0.42,
+    "tileBloomOpacity": 0.15,
+    "tileBloomRadius": 1.15,
+    "tileRadiusPadding": 0.2,
+    "tileFadeMargin": 1,
+    "embeddedRadiusScale": 0.5,
+    "embeddedOpacityScale": 0.55,
+    "pulseOpacity": 0.04,
+    "pulsePeriodMs": 650
   },
   "sound": {
     "radius": 25,
