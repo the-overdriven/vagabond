@@ -1451,6 +1451,14 @@ not just the selected dominant families or their leftovers, and use each
 species' configured rarity as a direct relative weight. Thus a `0.02` species
 has one fiftieth of the selection weight of an otherwise eligible `1.0` species
 in these global draws. This is a relative weight, not a 2% spawn chance.
+**All Dwarven Ruins populations, including corridor wanderers, require an
+explicit `z-n` biome in the monster template.** The `z-n` tag is a minimum
+depth: for example, `z-5` allows spawning on z:-5 and deeper, but not z:-4.
+An ordinary `cave` biome alone never grants Ruins eligibility. Tier minimums,
+rarity and the existing encounter-role rules still apply. The Ruins package
+uses an empty `nativeBiomes` list to enforce that distinction; ordinary cave
+spawning is unaffected. Family member lists are only thematic candidates;
+listing a species there cannot override its depth-biome requirement.
 Only species explicitly marked `"ultraRare": true` in `enemy_templates.json`
 are limited to **one individual per species per world**, across surface,
 underground and forest ambush generation. A low `rarity` weight by itself does
@@ -2637,6 +2645,12 @@ use weighted groups and packs. Monster stats, rarity, existing
 abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
 abilities listed in **Enemy Special Properties** are active. No species
 receives an unimplemented ability string.
+Like the Dwarven Ruins, Mines interpret `z-n` as a **minimum eligible depth**:
+`z-10` permits a species on z:-10 and every deeper mine floor, while `z-12`
+permits it on z:-12 and z:-13 but not above. Each mine species needs only its
+first eligible depth tag. The early/middle/late encounter-group weights still
+control how often eligible species appear; depth tags do not bypass those
+weights, the first-floor respite roster, or the guaranteed tier introductions.
 Mine encounters use the ordinary non-Champion prefix and humanoid-equipment
 systems. Among the mine roster, **Wyrdhag, Naledi, Troglodyte, and Cave Troll**
 are humanoids; the others remain non-humanoid. Equipped humanoids gain normal

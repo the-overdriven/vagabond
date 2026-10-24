@@ -6129,21 +6129,35 @@ function spawnCaveScenarios() {
   }
 }
 
+// A z-n monster biome unlocks its species at depth n and every deeper floor.
+// Dwarven Ruins and Dwarven Mines share this minimum-depth interpretation.
+function enemyDepthBiomeMinimum(tmpl) {
+  const depths = (tmpl?.biomes || [])
+    .filter(b => typeof b === 'string' && /^z-\d+$/.test(b))
+    .map(b => Number(b.slice(2)))
+  return depths.length ? Math.min(...depths) : null
+}
+
+function enemyDepthBiomeEligible(tmpl, z) {
+  const minimum = enemyDepthBiomeMinimum(tmpl)
+  return minimum !== null && Math.abs(z) >= minimum
+}
+
 function dungeonEncounterTemplatesForDepth(packageId, z, cfg, hooks = {}) {
   const depth = Math.abs(z)
-  const nativeBiomes = new Set(Array.isArray(cfg?.nativeBiomes) && cfg.nativeBiomes.length ? cfg.nativeBiomes : ['cave'])
+  // An explicitly empty list disables broad biome eligibility: dungeon
+  // packages can require an explicit z-n monster biome at their depth.
+  const nativeBiomes = new Set(Array.isArray(cfg?.nativeBiomes) ? cfg.nativeBiomes : ['cave'])
   return ENEMY_TEMPLATES.filter(tmpl => {
     const minDepth = Number(cfg?.minDepthByTier?.[String(tmpl.tier)])
     if (!Number.isFinite(minDepth) || depth < minDepth) return false
     if ((tmpl.aggro ?? AGGRO_RANGE) <= 0) return false
     const biomes = tmpl.biomes || []
-    const explicitDepths = biomes
-      .map(b => typeof b === 'string' && /^z-\d+$/.test(b) ? Math.abs(Number(b.slice(1))) : null)
-      .filter(Number.isFinite)
+    const minimumBiomeDepth = enemyDepthBiomeMinimum(tmpl)
     // Dungeon packages declare which existing biome memberships count as
     // native. Other species must opt in with an explicit z-* depth tag.
-    if (!biomes.some(biome => nativeBiomes.has(biome)) && !explicitDepths.length) return false
-    if (explicitDepths.length && depth < Math.min(...explicitDepths)) return false
+    if (!biomes.some(biome => nativeBiomes.has(biome)) && minimumBiomeDepth === null) return false
+    if (minimumBiomeDepth !== null && !enemyDepthBiomeEligible(tmpl,z)) return false
     if (typeof hooks.templateEligible === 'function' && !hooks.templateEligible(tmpl, {packageId,z,depth,cfg})) return false
     return true
   })

@@ -14,6 +14,14 @@ describe('Mine-only encounters and darkness', () => {
       const cfg=minePackageConfig(),groups=cfg.encounters.groups
       const names=[...groups.early,...groups.middle,...groups.late]
       const ec=cfg.encounters
+      for(const [key,minDepth] of [['early',10],['middle',11],['late',12]])
+        check(groups[key].every(name=>{
+          const tmpl=ENEMY_TEMPLATE_BY_NAME[name]
+          return tmpl.biomes.length===1 && tmpl.biomes[0]==='z-'+minDepth &&
+            enemyDepthBiomeEligible(tmpl,-13) && !enemyDepthBiomeEligible(tmpl,-(minDepth-1))
+        }),key+' species use one minimum depth tag and remain available on deeper floors')
+      check(!names.includes('Banshee') && !names.includes('Ogre'),
+        'Fort species stay outside the mine encounter groups')
       const chances=Array.from({length:minePackageConfig().floorCounts.at(-1)},(_,i)=>
         i===0?0:Math.min(ec.prefixChanceCap,ec.prefixBaseChance+(i-1)*ec.prefixGrowthPerFloor))
       check(JSON.stringify(chances)===JSON.stringify([0,0.11,0.135,0.16,0.185]),
@@ -55,6 +63,9 @@ describe('Mine-only encounters and darkness', () => {
       }
       check(monsters.every(e=>Math.abs(e.level)>=(groups.early.includes(e.baseName)?10:
         groups.middle.includes(e.baseName)?11:12)), 'stronger species never spawn above their intended tier')
+      check(monsters.every(e=>names.includes(e.baseName) &&
+        enemyDepthBiomeEligible(ENEMY_TEMPLATE_BY_NAME[e.baseName],e.level)),
+        'actual mine encounters use only mine species at their eligible depths')
       check(enemies.filter(e=>e.level===0).every(e=>!names.includes(e.baseName)),
         'no mine-exclusive species appears on the surface')
       check(names.every(name=>!surfaceSpawnEligible(ENEMY_TEMPLATE_BY_NAME[name])),

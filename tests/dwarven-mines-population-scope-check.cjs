@@ -42,10 +42,14 @@ const plain=value=>JSON.parse(JSON.stringify(value))
     assert(first.filter(e=>e.name==='Giant Spider').length<=1,'at most one Giant Spider on respite floor')
     assert(encounters.every(e=>species.includes(e.name) || (e.z===-9 && respite.has(e.name))),
       `seed ${seed}: no unintended cross-ecosystem spawns`)
+    assert(!encounters.some(e=>['Banshee','Ogre'].includes(e.name)),
+      `seed ${seed}: Fort monsters cannot enter mine encounter groups`)
     for(const encounter of encounters.filter(e=>e.z<=-10)) {
       const group=groups.early.includes(encounter.name)?'early':groups.middle.includes(encounter.name)?'middle':'late'
       const firstDepth={early:10,middle:11,late:12}[group]
       assert(Math.abs(encounter.z)>=firstDepth,`${encounter.name} is not above its intended tier`)
+      assert(run(`enemyDepthBiomeEligible(ENEMY_TEMPLATE_BY_NAME[${JSON.stringify(encounter.name)}],${encounter.z})`),
+        `${encounter.name} satisfies its minimum-depth biome on z${encounter.z}`)
     }
   }
   assert.equal(run('WORLD_GEN_CONFIG.dungeons.dwarvenMines.visibilityRadius'),5)

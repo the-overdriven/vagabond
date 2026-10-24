@@ -415,14 +415,14 @@ function spawnDwarvenMinesEncounters() {
     }
     if(ec.guaranteeEachSpecies && guaranteedGroup) for(const name of required) {
       const tmpl=ENEMY_TEMPLATE_BY_NAME[name]
-      if(!tmpl?.biomes?.includes(`z-${Math.abs(z)}`) || placePack(tmpl,1)!==1)
+      if(!enemyDepthBiomeEligible(tmpl,z) || placePack(tmpl,1)!==1)
         throw new Error(`Dwarven Mines could not place guaranteed species: ${name} at ${z}`)
       populated++
     }
     while(populated<target){
       const group=selectGroup()
       const pool=ec.groups[group].map(name=>ENEMY_TEMPLATE_BY_NAME[name]).filter(t=>
-        t && t.biomes.includes(`z-${Math.abs(z)}`) && (t.name!=='Xibal'||
+        t && enemyDepthBiomeEligible(t,z) && (t.name!=='Xibal'||
           floodedCandidates.some(p=>!occupiedSpots.some(o=>
             Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<ec.minimumSpacing ||
             (o.name==='Wyrdhag'&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<ec.wyrdhagSeparation)))))

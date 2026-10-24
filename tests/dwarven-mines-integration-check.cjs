@@ -23,12 +23,20 @@ const copy=value=>JSON.parse(JSON.stringify(value))
     assert(fs.existsSync(path.resolve(__dirname,'../img/enemies',monster.name.toLowerCase().replace(/ /g,'_')+'.jpg')),
       `Bestiary image exists for ${monster.name}`)
   }
-  assert(templates.filter(m=>m.name!=='Cave Troll').every(m=>
-    m.biomes.every(b=>['z-10','z-11','z-12','z-13'].includes(b))),
-  'no new species enters the ordinary biome pools')
-  assert(templates.filter(m=>groups.early.includes(m.name)).every(m=>m.biomes.join() === 'z-10,z-11,z-12,z-13'))
-  assert(templates.filter(m=>groups.middle.includes(m.name)).every(m=>
-    m.biomes.join() === 'z-11,z-12,z-13'))
+  for(const [group,firstDepth] of [['early',10],['middle',11],['late',12]]) {
+    assert(templates.filter(m=>groups[group].includes(m.name)).every(m=>
+      m.biomes.length===1 && m.biomes[0]===`z-${firstDepth}`),
+      `each ${group} species uses one minimum-depth biome`)
+    for(const name of groups[group])for(const depth of [9,10,11,12,13])
+      assert.equal(run(`enemyDepthBiomeEligible(ENEMY_TEMPLATE_BY_NAME[${JSON.stringify(name)}],-${depth})`),
+        depth>=firstDepth,`${name} is eligible exactly at and below z:-${firstDepth}`)
+  }
+  assert(run('enemyDepthBiomeEligible(ENEMY_TEMPLATE_BY_NAME.Banshee,-7)'),
+    'Banshee z-6 remains eligible on deeper Fort floors')
+  assert(!run('enemyDepthBiomeEligible(ENEMY_TEMPLATE_BY_NAME.Banshee,-5)'),
+    'Banshee cannot spawn above its Fort minimum depth')
+  assert(!names.includes('Banshee')&&!names.includes('Ogre'),
+    'Fort species are not included in the separate mine population groups')
 
   context.fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'saves/Tester_start.json'),'utf8'))
   context.fixture.version=run('SAVE_VERSION')
