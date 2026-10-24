@@ -54,6 +54,17 @@ function clearBansheeConfusion(e) {
   spawnDamageNumber(player.x, player.y, 'Clear mind!', '#b9e6bc')
 }
 
+function clearDeadEnemyRoot(e) {
+  if (!e || player.rootSourceId !== e.id || player.rootTurns <= 0) return
+  const release = ROOT_CONFIG.flavors?.[player.rootFlavor]?.release ||
+    ROOT_CONFIG.flavors?.generic?.release || 'You can move again.'
+  player.rootTurns = 0
+  player.rootSourceId = null
+  player.rootFlavor = null
+  log(release, 'good')
+  spawnDamageNumber(player.x, player.y, 'Freed!', '#9fe3bf')
+}
+
 function tickMonsterStatuses() {
   for (const [key, message] of [
     ['rootTurns',ROOT_CONFIG.flavors?.[player.rootFlavor]?.release ||

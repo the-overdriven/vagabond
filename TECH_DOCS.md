@@ -521,7 +521,8 @@ Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
 its original brown floor. Overworld boulders can be cleared to open shortcuts;
 the cleared tile restores its underlying surface terrain (grass, forest, hill
-or sand), even after world rotation or save/load.
+or sand), even after world rotation or save/load. Both minimaps immediately
+reflect the cleared tile, as does the full-world map when opened.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -3449,7 +3450,7 @@ The monster waits for **one complete player action** before erupting; moving
 off every marked tile prevents the hit. A player is never deliberately left
 without an initially unoccupied one-step escape, although other hazards,
 rooting or moving actors can subsequently block it. A caught player takes an
-ordinary damage roll with **125% of the monster's effective ATK** against the
+ordinary damage roll with **375% of the monster's effective ATK** against the
 player's DEF, without a separate miss/critical/glancing roll. Eruption gives
 the visible game canvas a pronounced **650 ms** visual shake whether it hits or misses; the animation
 does not affect turns, damage or replay outcomes. Resolution consumes the
@@ -3567,6 +3568,9 @@ prevents movement even while confused.
 
 Confusion tracks the **individual Banshee's ID**. Killing that specific Banshee
 immediately removes its confusion, but killing a different Banshee does not.
+Root likewise ends immediately when its actual source monster dies, with the
+normal release message and no additional struggle turn; killing another monster
+does not free the player.
 Wails from a different caster refresh the timer and replace the source.
 Normal expiration also clears the source. Statuses survive save/load and replay;
 all application, struggle, misstep, expiration, and caster-death events have
@@ -3637,7 +3641,10 @@ At under 20% HP, all three eligible items are equally likely; from 20% up to
 thresholds, chance, and bonus are configured per species in
 `enemy_templates.json` under `consumableHealing`. Its spent charge persists
 through saves and replay, and the ability does not create supplies on demand
-for the player.
+for the player. While the result takes effect immediately for combat and
+replay, the inspected monster's HP bar fills over **600 ms** when healed.
+This is a presentation-only effect in desktop and mobile inspection, with
+the displayed HP number reflecting the true value immediately.
 
 Haste uses the existing walkable pathfinder, and opening a door takes the normal
 separate action; a sprint cannot open a door and then run through it. The two
@@ -4620,7 +4627,9 @@ For **extra pursuit**, `fasterSPD` is the enemy's SPD and `slowerSPD` is
 the player's SPD. A successful roll permits at most one additional movement
 step or an attack after closing to melee range; it does not grant a second
 spell, haste, rush, or ranged attack roll. Adjacent enemies use their normal
-single melee action. For **losing interest**, the advantage runs in the
+single melee action. The faster-pursuer log appears only while that monster
+is visible on the player's main screen; an unseen enemy still takes its earned
+extra action silently. For **losing interest**, the advantage runs in the
 opposite direction (player minus enemy), but Alarmed enemies and adjacent
 enemies cannot lose interest due to speed. Neither modifier consumes RNG when
 its chance is zero; the remaining eligible rolls use seeded RNG as usual.
@@ -7995,7 +8004,13 @@ Recorded God Mode actions are replayed without a confirmation or browser-ledger
 writes. Disabling an active God Mode needs no confirmation and cannot undo the
 exclusion. Once enabled, God Mode makes the player invisible. Pressing
 `G` again turns god mode and its invisibility off, restoring normal movement
-restrictions and drowning. Revealed maps and granted stats/gold remain.
+restrictions and drowning. Granted stats/gold remain, and discovery on other
+floors is unchanged.
+Disabling God Mode forgets only the **current map's** discovered terrain,
+including the surface or a separate dungeon map. Terrain within ordinary
+current sight (and valid underground light) is rediscovered immediately;
+other floors retain their exploration state. This takes no turn, persists
+in saves, and is reproduced by replay.
 Enabling God Mode also permanently teaches the character **Tracking** using
 the same learned-skill flag as the Old Hunter. If the character does not already
 carry a Pickaxe, enabling God Mode grants one; toggling God Mode off does not

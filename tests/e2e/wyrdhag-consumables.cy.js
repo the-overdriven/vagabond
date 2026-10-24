@@ -71,4 +71,41 @@ describe('Wyrdhag consumable healing and individual monster loot', () => {
       } finally {chance=origChance}
     })()`))
   })
+
+  it('animates the inspected HP bar after healing without delaying actual HP', () => {
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Wyrdhag Bar Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=false
+      currentZ=0;map=surfaceMap;enemies=[];occupied=new Set()
+      player.x=40;player.y=40;player.godMode=false;player.invisibleTurns=0
+      const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag
+      const e=addEnemy({...t,x:39,y:40,level:0,levelKind:null,hp:30,maxHp:68,
+        alive:true,aware:true,homeX:39,homeY:40})
+      discovered[40][39]=true
+      const panel=document.getElementById('tooltip')
+      panel.style.display='block'
+      setInspectionMarkup(panel,tileInspectInfo(e.x,e.y))
+      check(panel.querySelector('.hpbar').getBoundingClientRect().width>0,
+        'inspect bar has a measurable visual width')
+      e.hp=55
+      setInspectionMarkup(panel,tileInspectInfo(e.x,e.y))
+      const bar=panel.querySelector('.hpbar')
+      const animation=bar.getAnimations().find(a=>a.effect?.getKeyframes()?.length===2)
+      check(!!animation,'healing animates the new HP bar across tooltip refresh')
+      const frames=animation.effect.getKeyframes()
+      check(Math.abs(parseFloat(frames[0].width)-30/68*100)<2 &&
+        Math.abs(parseFloat(frames[1].width)-55/68*100)<0.1,
+        'bar animates from previous health to already-resolved new health')
+      check(e.hp===55,'animation never controls underlying healing')
+      replayAnimationsDisabled=true;e.hp=60
+      setInspectionMarkup(panel,tileInspectInfo(e.x,e.y))
+      check(panel.querySelector('.hpbar').getAnimations().length===0,
+        'replay-disabled presentation skips healing animation')
+      panel.style.display='none'
+    })()`))
+  })
 })

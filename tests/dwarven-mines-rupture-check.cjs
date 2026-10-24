@@ -30,6 +30,8 @@ const plain=value=>JSON.parse(JSON.stringify(value))
   assert.equal(run('duiwel.pendingAbility'),null,'pending ability starts clear')
   assert.equal(run('enemyAbilityCooldown(duiwel,"rupture")'),0)
   assert(run('ENEMY_TELEGRAPH_CONFIG.rupture.cooldownTurns===5'))
+  assert.equal(run('ENEMY_TELEGRAPH_CONFIG.rupture.damageMultiplier'),3.75,
+    'Duiwel eruption uses triple its former 1.25 ATK multiplier')
 
   run('enemyTurn()')
   const warning=plain(run('duiwel.pendingAbility'))

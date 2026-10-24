@@ -4514,6 +4514,7 @@ more difficult:
       spawnDamageNumber(e.x,e.y,'Aura fades!','#dfd7ad')
     }
     clearBansheeConfusion(e)
+    clearDeadEnemyRoot(e)
     if (player.spiderWebSourceId === e.id) {
       clearSpiderWeb()
       log(`The ${e.name}'s web falls away.`, 'good')
@@ -5939,7 +5940,8 @@ more difficult:
         if (tryEnemyHaste(e, dist)) continue
         const extraPursuitChance = speedChaseChance(effectiveEnemySpeed - playerSpeed)
         const hasExtraPursuitTurn = extraPursuitChance > 0 && chance(extraPursuitChance)
-        if (hasExtraPursuitTurn) log(`The ${e.name} is faster and gaining on you!`, 'bad')
+        if (hasExtraPursuitTurn && enemyIsVisibleOnMainView(e))
+          log(`The ${e.name} is faster and gaining on you!`, 'bad')
         let pursuitActions = hasExtraPursuitTurn ? 2 : 1
         while (pursuitActions > 0 && e.alive && map === turnMap) {
           const distNow = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
@@ -10085,6 +10087,28 @@ more difficult:
   const defaultTooltipParent = tooltip.parentElement
   let desktopCombatTooltipEnemy = null
 
+  // Inspection panels replace their HTML as monster statuses change. Carry
+  // the bar's *visible* width across replacements so consumable healing still
+  // fills smoothly, while actual HP and combat resolution update immediately.
+  function setInspectionMarkup(panel, info) {
+    const priorBar = panel.querySelector('.hpbar')
+    const sameEnemy = !!info.enemy && panel._inspectedEnemy === info.enemy
+    const priorWidth = sameEnemy && priorBar?.parentElement?.clientWidth > 0
+      ? priorBar.getBoundingClientRect().width / priorBar.parentElement.clientWidth * 100
+      : null
+    panel.innerHTML = info.html
+    panel._inspectedEnemy = info.enemy || null
+    const targetWidth = info.enemy && info.enemy.maxHp > 0
+      ? Math.max(0, Math.min(100, info.enemy.hp / info.enemy.maxHp * 100)) : null
+    if (priorWidth !== null && targetWidth > priorWidth + 0.5 &&
+        !replayPlaying && !replaySimulationMode && !replayAnimationsDisabled) {
+      panel.querySelector('.hpbar')?.animate?.([
+        {width: `${priorWidth}%`, filter: 'brightness(1.5)'},
+        {width: `${targetWidth}%`, filter: 'brightness(1)'}
+      ], {duration: 600, easing: 'ease-out'})
+    }
+  }
+
   function desktopUsesHoverTooltips() {
     return !window.matchMedia('(pointer: coarse)').matches
   }
@@ -10120,7 +10144,7 @@ more difficult:
       return false
     }
     tooltip.classList.toggle('mini', info.mini)
-    tooltip.innerHTML = info.html
+    setInspectionMarkup(tooltip, info)
     tooltip.style.display = 'block'
     tooltip.dataset.autoCombat = 'true'
     return true
@@ -10362,7 +10386,7 @@ more difficult:
       return
     }
     tooltip.classList.toggle('mini', info.mini)
-    tooltip.innerHTML = info.html
+    setInspectionMarkup(tooltip, info)
     tooltip.style.display = 'block'
     delete tooltip.dataset.autoCombat
     const stage = document.getElementById('stage')
@@ -10638,9 +10662,14 @@ more difficult:
     const info = tileInspectInfo(mx, my)
     if (!info) {
       mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.'
+      mobileInfoPanel._inspectedEnemy = null
       return
     }
-    mobileInfoPanel.innerHTML = info.html
+    setInspectionMarkup(mobileInfoPanel, info)
+  }
+
+  function refreshEnemyHealingInspection(e) {
+    if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
   }
 
   const mobilePortraitOverlay = document.getElementById('mobilePortraitOverlay')
@@ -12574,8 +12603,18 @@ more difficult:
         !window.confirm('Enable God Mode?\n\nThis will PERMANENTLY disqualify this character from Highscores, even if you turn God Mode off or reload an earlier save.\n\nThis cannot be undone.')) return
     recordReplayAction({type: 'godMode', disable: turningOff})
     if (turningOff) {
+      const playerWasInGodMode = player.godMode
       player.godMode = false
       player.godInvisible = false
+      // God Mode reveals every generated floor, but leaving it forgets only
+      // the currently active map. Keep each discovery grid's identity so
+      // save/replay and distinct maps at the same depth stay synchronized.
+      if (playerWasInGodMode) {
+        const seen = currentZ === 0 ? discovered : undergroundDiscovered
+        if (seen) for (const row of seen) row.fill(false)
+        invalidateUndergroundFov()
+        rebuildMinimapBases()
+      }
       player.swimming = 0
       player.swimmingPractice = 0
       player.fishermanLessonPending = false
@@ -12583,7 +12622,7 @@ more difficult:
       resetSwimming()
       updateHud()
       render()
-      log('God mode disabled. Swimming unlearned. Normal terrain restrictions restored.', 'info')
+      log('God mode disabled. Current floor unexplored. Swimming unlearned. Normal terrain restrictions restored.', 'info')
       return
     }
     Highscores.markDisqualified(player)

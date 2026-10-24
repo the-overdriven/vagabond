@@ -59,7 +59,7 @@
       "activationChance": 0.25,
       "range": 4,
       "extraTiles": 2,
-      "damageMultiplier": 1.25,
+      "damageMultiplier": 3.75,
       "cooldownTurns": 5,
       "warningMessage": "The ground buckles around you! Mind the cracks!",
       "hitMessage": "The <enemy>'s eruption hits you for <damage> damage!",

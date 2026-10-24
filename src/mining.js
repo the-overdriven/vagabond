@@ -567,6 +567,12 @@ const Mining = (() => {
           map[y][x] = tileUnderlays[surfaceKey] || 'grass'
           delete tileUnderlays[surfaceKey]
           delete miningSurfaceProgress[surfaceKey]
+          // The cached map identities do not change when a boulder clears.
+          // Repaint its pixel now, as with dug sand and foraged forest.
+          ensureMiniBases()
+          for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y)
+          mapPreviewBase = null
+          minimapDirty = true
           grantXp(0, true)
           log('You clear the boulder, opening a new route.', 'good')
         } else {

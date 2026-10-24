@@ -50,6 +50,32 @@ describe('Monster combat statuses and berserk frenzy', () => {
     })
   })
 
+  it('releases an Akravis grip immediately when its source dies, including after loading', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const source=statusMonster('Akravis'),other=statusMonster('Dreadling',38,40)
+      const oldChance=chance
+      try {
+        chance=p=>p===0.25;turnCount=1;applyEnemyContactStatuses(source)
+        statusCheck(player.rootTurns===3&&player.rootSourceId===source.id&&
+          player.rootFlavor==='akravis','Akravis owns the crushing grip')
+        const snapshot=structuredClone(buildSaveObject())
+        loadGameFromObject(snapshot,{isReplayInit:true})
+        const active=enemies.find(e=>e.id===source.id)
+        const unrelated=enemies.find(e=>e.id===other.id)
+        statusCheck(player.rootSourceId===active.id,'root source persists through save/load')
+        killEnemy(unrelated,false,'trap')
+        statusCheck(player.rootTurns===3,'unrelated monster death does not release the grip')
+        killEnemy(active,false,'trap')
+        statusCheck(player.rootTurns===0&&player.rootSourceId===null&&player.rootFlavor===null,
+          'killing the actual grappler releases the player before another action')
+        tickMonsterStatuses()
+        statusCheck(player.rootTurns===0,'expiration does not repeat after immediate release')
+        updatePlayerStatuses()
+      } finally {chance=oldChance}
+    })()`))
+    cy.get('#playerStatusList').contains('Rooted').should('not.exist')
+  })
+
   it('shows Gaze and Curse penalties as independent badges', () => {
     cy.window().then(win => win.eval(`(() => {
       const g=statusMonster('Gorgon',38,40),m=statusMonster('Mummy',39,39)

@@ -60,4 +60,34 @@ describe('Exact current-save state restoration', () => {
       }
     })()`))
   })
+
+  it('repaints a mined surface boulder on both minimaps before saving', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      currentZ=0;map=surfaceMap
+      const x=player.x+3,y=player.y+3,key=keyXY(x,y)
+      surfaceMap[y][x]='boulder'
+      tileUnderlays[key]='sand'
+      discovered[y][x]=true
+      player.miningTutorialSeen=true
+      player.mining=0
+      player.miningArmedTarget=null
+      player.inventory.push(createItem('pickaxe'))
+      rebuildMinimapBases()
+      const pixel=scale=>Array.from(miniBases[scale].ctx.getImageData(x*scale,y*scale,1,1).data)
+      const before=MINI_SCALES.map(pixel)
+      Mining.strike(x,y)
+      check(surfaceMap[y][x]==='boulder','first strike leaves the boulder intact')
+      Mining.strike(x,y)
+      check(surfaceMap[y][x]==='sand','second strike restores its sand underlay')
+      const after=MINI_SCALES.map(pixel)
+      check(after.every((p,i)=>JSON.stringify(p)!==JSON.stringify(before[i])),
+        'both cached minimap pixels change immediately without a rebuild')
+      check(minimapDirty&&mapPreviewBase===null,'world-map preview is invalidated')
+      const snapshot=structuredClone(buildSaveObject())
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      check(MINI_SCALES.every((scale,i)=>JSON.stringify(pixel(scale))===JSON.stringify(after[i])),
+        'surface excavation colors remain correct after save/replay initialization')
+    })()`))
+  })
 })

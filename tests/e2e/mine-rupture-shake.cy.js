@@ -48,6 +48,18 @@ describe('Duiwel Rupture presentation',()=>{
             resolveEnemyRupture({name:'Duiwel'},{tiles:[{x:39,y:39}]})
             check(gameCanvas.ruptureShakeAnimation===current,'replay suppresses shake')
             check(rngState===random,'replay keeps the same RNG state')
+            const originalRoll=damageRoll
+            try {
+              let attackPower=0
+              damageRoll=(atk)=>{attackPower=atk;return 0}
+              const duiwel={...ENEMY_TEMPLATE_BY_NAME.Duiwel}
+              check(enemyTelegraphConfig('rupture').damageMultiplier===3.75,
+                'Rupture multiplier triples from 1.25 to 3.75')
+              resolveEnemyRupture(duiwel,{tiles:[{x:player.x,y:player.y}]})
+              check(attackPower===enemyAtk(duiwel)*3.75,
+                'Rupture resolves using the stronger effective attack immediately')
+              check(player.hp===hp,'the intercepted damage roll does not change HP')
+            } finally {damageRoll=originalRoll}
           } finally {
             enemyIsVisibleOnMainView=originalVisible
             replayAnimationsDisabled=false

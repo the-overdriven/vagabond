@@ -89,6 +89,7 @@ function tryEnemyConsumableHealing(e) {
   const verb = selected.kind === 'potion' ? 'drinks' : 'eats'
   log(`The ${e.name} ${verb} a ${def.name} and recovers ${healed} HP!`,'bad')
   spawnDamageNumber(e.x,e.y,`+${healed} HP`,'#81df98')
+  refreshEnemyHealingInspection(e)
   return true
 }
 

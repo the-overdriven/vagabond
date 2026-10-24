@@ -54,6 +54,7 @@ describe('SPD-scaled pursuit and losing interest', () => {
   it('lets a one-SPD advantage move and attack only on a successful 5% pursuit roll', () => {
     cy.window().then(win => win.eval(`(() => {
       const originalRng=rng,originalAttack=enemyAttackPlayer,originalLog=log
+      const originalVisible=enemyIsVisibleOnMainView
       let attacks=0,messages=[]
       try {
         enemyAttackPlayer=()=>{attacks++;return false}
@@ -80,7 +81,16 @@ describe('SPD-scaled pursuit and losing interest', () => {
         rng=()=>0.51
         enemyTurn()
         speedCheck(e.x===61 && attacks===0,'even large advantage never exceeds 50%')
-      } finally {rng=originalRng;enemyAttackPlayer=originalAttack;log=originalLog}
+        e=resetPursuitTest(5,6,2);attacks=0;messages=[]
+        enemyIsVisibleOnMainView=()=>false;rng=()=>0
+        enemyTurn()
+        speedCheck(e.x===61&&attacks===1,'unseen fast enemy keeps its normal extra action')
+        speedCheck(!messages.some(m=>m.includes('faster and gaining')),
+          'unseen pursuers do not give away their presence in the log')
+      } finally {
+        rng=originalRng;enemyAttackPlayer=originalAttack;log=originalLog
+        enemyIsVisibleOnMainView=originalVisible
+      }
       return true
     })()`)).should('equal',true)
   })
