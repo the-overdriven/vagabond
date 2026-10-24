@@ -33,8 +33,10 @@ function towerPlayerInside() {
 }
 
 function towerStair(z, up) {
-  const side = up ? z % 2 : (z - 1) % 2
-  return {x: tower.x + (side ? 8 : 2), y: tower.y + 8}
+  // Alternating landings stay in the western chambers, away from internal doors.
+  // Every tile in each landing's 3x3 neighborhood is ordinary marble floor.
+  const north = up ? z % 2 : (z - 1) % 2
+  return {x: tower.x + 2, y: tower.y + (north ? 2 : 8)}
 }
 
 function generateTower() {
@@ -65,7 +67,7 @@ function generateTower() {
       const edge=dx===0||dy===0||dx===10||dy===10
       const corner=(dx===0||dx===10)&&(dy===0||dy===10)
       terrain[tower.y+dy][tower.x+dx]=edge
-        ? z===4 ? corner ? 'towerbattlementcorner':'towerbattlement'
+        ? z===4 ? corner ? 'marble':'towerbattlement'
           : !corner && ((dy===0 && (dx===3 || dx===7)) || (dy===10 && dx===5) || ((dx===0 || dx===10) && dy===5)) ? 'towerwindow':'dwarvenwall'
         : 'marble'
       if(z===0) grasslandTrees.delete(keyXY(tower.x+dx,tower.y+dy))
@@ -76,7 +78,9 @@ function generateTower() {
       const gap=randInt(2,3)
       for(let dy=1;dy<8;dy++) terrain[tower.y+dy][tower.x+5]='dwarvenwall'
       terrain[tower.y+gap][tower.x+5]='dwarvendoorclosed'
-      terrain[tower.y+7][tower.x+5]='marble'
+      // Seal the partition junction: a missing diagonal corner permits
+      // movement between chambers while both doors are still closed.
+      terrain[tower.y+7][tower.x+5]='dwarvenwall'
       for (let dx=6;dx<10;dx++) terrain[tower.y+7][tower.x+dx]='dwarvenwall'
       terrain[tower.y+7][tower.x+8]='dwarvendoorclosed'
       const p=towerStair(z,true);terrain[p.y][p.x]='towerstairsup'
@@ -98,9 +102,11 @@ function populateTower() {
   for(let z=0;z<=4;z++) {
     const terrain=z===0?surfaceMap:towerLevels[z-1].map
     const spots=[]
+    const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
     for(let dy=1;dy<=5;dy++)for(let dx=1;dx<=9;dx++) {
       const x=tower.x+dx,y=tower.y+dy
-      if(terrain[y][x]==='marble')spots.push({x,y})
+      if(terrain[y][x]==='marble' && stairs.every(p =>
+        Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>=3))spots.push({x,y})
     }
     const take=()=>spots.splice(randInt(0,spots.length-1),1)[0]
     for(const name of rosters[z]) {
@@ -136,29 +142,56 @@ function travelTowerStairs() {
   render();updateHud();return true
 }
 
+function towerBackgroundVisual(tile, x, y) {
+  const base = RENDER_STYLE.terrainTiles[tile]
+  if (!base) return null
+  // Use the same coordinate variants and rock-strip pieces as the surface.
+  // Read adjacent terrain from the surface map, not the current tower map.
+  const sameLeft = surfaceMap[y]?.[x-1] === tile
+  const sameRight = surfaceMap[y]?.[x+1] === tile
+  let image = base.variants?.length ? tileVariantImage(base.variants, x, y) : base.image
+  if (base.leftImage || base.middleImage || base.rightImage || base.singleImage) {
+    if (sameLeft && sameRight) image=base.middleImage || base.image
+    else if (sameRight) image=base.leftImage || base.middleImage || base.image
+    else if (sameLeft) image=base.rightImage || base.middleImage || base.image
+    else image=base.singleImage || base.image || base.middleImage
+  }
+  return coordinateVisualVariant({...base,image},x,y,0)
+}
+
+function towerBackgroundGround(tile,x,y) {
+  if(tile==='taiga'||tile==='snowmountain')return 'snow'
+  if(['forest','ancientForest','hill','mountain','boulder'].includes(tile)) {
+    const saved=tileUnderlays[keyXY(x,y)]
+    return saved==='snow'||saved==='sand' ? saved : 'grass'
+  }
+  return null
+}
+
 function drawTowerBackground(x,y) {
   if(!discovered[y]?.[x])return
   const tile=surfaceMap[y]?.[x],t=TILE[tile]
   if(!t)return
   const px=Math.round((x-camX)*TILE_PX),py=Math.round((y-camY)*TILE_PX)
-  // No per-tile Canvas 2D filters: they force expensive compositing on each redraw.
   ctx.fillStyle=t.bg;ctx.fillRect(px,py,TILE_PX,TILE_PX)
-  // Direct terrain sprites only: no surface creatures, items, lights or mutable
-  // interaction overlays. Never swap the active map to render the backdrop.
+  // Draw a single surface landscape for each cell. Generic saved underlays
+  // can contain forest under a rock tile, which previously stacked trees and
+  // rocks together. Only snow/sand replace the plain grass base of scenery.
   if(USE_TILE_IMAGES) {
-    const visual=coordinateVisualVariant(RENDER_STYLE.terrainTiles[tile]||{},x,y,0)
-    const overlayGround=tileUnderlays[keyXY(x,y)] ||
-      (['snowmountain','taiga'].includes(tile)?'snow':
-        ['forest','ancientForest','hill','mountain','boulder'].includes(tile)?'grass':null)
-    const base=RENDER_STYLE.terrainTiles[visual.baseTileKey||overlayGround]
-    const baseImg=base?.image&&preloadedImages.get(base.image)
-    if(baseImg)ctx.drawImage(baseImg,px,py,TILE_PX,TILE_PX)
-    const img=visual.image&&preloadedImages.get(visual.image)
-    if(img)ctx.drawImage(img,px,py,TILE_PX,TILE_PX)
-    if(tile==='grass'&&grasslandTrees.has(keyXY(x,y))) {
-      const tree=preloadedImages.get(RENDER_STYLE.specialTiles.grassTree.image)
-      if(tree)ctx.drawImage(tree,px,py,TILE_PX,TILE_PX)
+    const k=keyXY(x,y)
+    const overlayGround=towerBackgroundGround(tile,x,y)
+    const visual=towerBackgroundVisual(tile,x,y)
+    const ground=towerBackgroundVisual(visual?.baseTileKey||overlayGround,x,y)
+    if(ground?.image)drawImageVisual(px,py,ground)
+    if(visual?.image)drawImageVisual(px,py,visual)
+    if(tile==='grass'&&grasslandTrees.has(k)) {
+      // Surface trees use seven deterministic image variants, scaling/mirroring.
+      const tree=coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree,x,y,41)
+      drawImageVisual(px,py,tree)
     }
-  } else drawTile(px,py,t.ch,t.color,t.bg)
+  } else {
+    const tree=tile==='grass'&&grasslandTrees.has(keyXY(x,y))
+    drawTile(px,py,tree?RENDER_STYLE.specialTiles.grassTree.glyph:t.ch,
+      tree?RENDER_STYLE.specialTiles.grassTree.color:t.color,t.bg)
+  }
 }
-

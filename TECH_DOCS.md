@@ -970,9 +970,15 @@ updates immediately when a door opens or closes. These presentation and FOV
 rules use no randomness or additional persisted state.
 
 Upper floors align with the surface footprint. Lower floors have partitioned
-chambers with two unlocked internal doors and an open connecting passage; the
-summit is an open battlement floor.
-Stair positions alternate between the two sides of the tower. Inspecting stairs
+chambers with two unlocked internal doors: one connects the chambers directly,
+while the other connects the eastern chamber to the southern hallway. The
+partition and southern chamber wall meet at a solid masonry corner, so neither
+a straight nor a diagonal path can bypass closed doors. The summit is an open
+battlement floor, with plain stone rather than raised corner battlements.
+Stair landings alternate between the southwest and northwest chambers. Each
+stair has a clear 3×3 patch of ordinary floor (all eight adjacent tiles are
+walkable marble), and initial defenders and loot spawn at least three tiles
+away from either landing. Inspecting stairs
 uses the existing transition action and does not advance a combat turn. An
 occupied destination blocks travel rather than relocating creatures. Initial
 encounters remain at least three tiles from the stairs. No creatures, loot or
@@ -7882,7 +7888,10 @@ surface tiles. The source is the existing surface map, never a regenerated or
 separately simulated world.
 
 The renderer draws only previously explored background cells in the viewport, beneath the current floor.
-Per-tile desaturation filters are deliberately omitted to keep movement responsive.
+Surface scenery uses the same deterministic tile variants and grassland tree
+sprites as ground level. Rocky terrain overrides any stale forest underlay;
+rocks and trees are never composited on the same background tile. Per-tile
+desaturation filters are deliberately omitted to keep movement responsive.
 Tile and ASCII modes follow the same isolation rules. Minimap/floor selection
 shows the playable tower map, with stairs marked red and separate discovery per
 floor. Stair changes retain coordinates and map viewport settings.

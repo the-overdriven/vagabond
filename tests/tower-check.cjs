@@ -66,8 +66,61 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert.equal(run('towerLevels.length'),4)
   assert.equal(run("towerLevels[0].map[tower.y][tower.x+5]"),'dwarvenwall')
   assert.equal(run("towerLevels[0].map[tower.y][tower.x+3]"),'towerwindow')
+  assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+5]"),'dwarvenwall')
   assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+6]"),'dwarvenwall')
   assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+8]"),'dwarvendoorclosed')
+  // Both stair layouts have open floor on all eight neighboring cells.
+  assert.equal(run(`Array.from({length:5},(_,z)=>{
+    const terrain=z===0?surfaceMap:towerLevels[z-1].map
+    const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
+    return stairs.every(p=>[-1,0,1].every(dy=>[-1,0,1].every(dx=>
+      (dx===0&&dy===0)||terrain[p.y+dy]?.[p.x+dx]==='marble')))
+  }).every(Boolean)`),true)
+  assert.equal(run('towerStair(1,true).x'),run('tower.x+2'))
+  assert.equal(run('towerStair(1,true).y'),run('tower.y+2'))
+  assert.equal(run(`towerLevels[3].map[tower.y][tower.x]==='marble' &&
+    towerLevels[3].map[tower.y+10][tower.x+10]==='marble'`),true)
+  // Even with generous eight-direction movement, no closed-door diagonal cut exists.
+  assert.equal(run(`towerLevels.slice(0,3).every(l=>{
+    const board=l.map,start={x:tower.x+3,y:tower.y+4},goal=keyXY(tower.x+7,tower.y+4)
+    const queue=[start],seen=new Set()
+    for(let i=0;i<queue.length;i++) {
+      const {x,y}=queue[i],k=keyXY(x,y)
+      if(k===goal)return false
+      if(seen.has(k))continue
+      seen.add(k)
+      for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy
+        if(board[ny]?.[nx]==='marble'&&!seen.has(keyXY(nx,ny)))queue.push({x:nx,y:ny})}
+    }
+    return true
+  })`),true)
+  // Upper-floor backdrop ignores saved forest under rock sprites.
+  assert.equal(run(`towerBackgroundGround('hill',tower.x-1,tower.y-1)`),'grass')
+  assert.equal(run(`towerBackgroundVisual('grass',tower.x-1,tower.y-1).image ===
+    tileVariantImage(RENDER_STYLE.terrainTiles.grass.variants,tower.x-1,tower.y-1)`),true)
+  assert.equal(run(`(()=>{
+    const x=tower.x-1,y=tower.y-1,k=keyXY(x,y),oldTile=surfaceMap[y][x]
+    const oldUnder=tileUnderlays[k],oldSeen=discovered[y][x],oldDraw=drawImageVisual
+    const images=[]
+    try {
+      drawImageVisual=(px,py,v)=>{images.push(v.image);return true}
+      discovered[y][x]=true;tileUnderlays[k]='forest';surfaceMap[y][x]='hill'
+      drawTowerBackground(x,y)
+      const noDoubleLayer=images.length===2 &&
+        images[0].startsWith('img/tiles/grassland') &&
+        images[1].startsWith('img/tiles/hill') &&
+        !images.some(img=>img.includes('forest-tree'))
+      images.length=0;surfaceMap[y][x]='grass';grasslandTrees.add(k)
+      drawTowerBackground(x,y)
+      const expected=coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree,x,y,41)
+      return noDoubleLayer && images.length===2 && images[1]===expected.image
+    } finally {
+      surfaceMap[y][x]=oldTile;discovered[y][x]=oldSeen;drawImageVisual=oldDraw
+      if(oldUnder===undefined)delete tileUnderlays[k];else tileUnderlays[k]=oldUnder
+      grasslandTrees.delete(k)
+    }
+  })()`),true)
+
   assert.equal(run('surfaceReachableFromTemple().has(keyXY(tower.entrance.x,tower.entrance.y+1))'),true)
   assert.equal(run('isBigBellReachableFromTemple()'),true)
   assert.equal(run('validateDwarvenRuinsStratum().ok'),true)

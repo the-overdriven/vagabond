@@ -46,8 +46,17 @@ describe('Guaranteed elevated tower',()=>{
         // east chamber must have a proper southern wall with a door.
         expect(win.eval("towerLevels[0].map[tower.y][tower.x+5]")).to.equal('dwarvenwall')
         expect(win.eval("towerLevels[0].map[tower.y][tower.x+3]")).to.equal('towerwindow')
+        expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+5]")).to.equal('dwarvenwall')
         expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+6]")).to.equal('dwarvenwall')
         expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+8]")).to.equal('dwarvendoorclosed')
+        expect(win.eval(`Array.from({length:5},(_,z)=>{
+          const terrain=z===0?surfaceMap:towerLevels[z-1].map
+          const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
+          return stairs.every(p=>[-1,0,1].every(dy=>[-1,0,1].every(dx=>
+            (dx===0&&dy===0)||terrain[p.y+dy]?.[p.x+dx]==='marble')))
+        }).every(Boolean)`)).to.equal(true)
+        expect(win.eval("towerLevels[3].map[tower.y][tower.x]")).to.equal('marble')
+        expect(win.eval("towerLevels[3].map[tower.y+10][tower.x+10]")).to.equal('marble')
         for(const tiles of [true,false]) {
           win.eval(`USE_TILE_IMAGES=${tiles};renderScene(performance.now())`)
           expect(win.eval('tileInspectInfo(tower.x-1,tower.y)')).to.equal(null)
