@@ -38,6 +38,17 @@ describe('Mine pursuit ignores creatures on other floors',()=>{
           check(enemyFindStep(restored)?.x===38,'restored chase path stays open')
           check(ENEMY_TEMPLATE_BY_NAME.Glaber.abilities.includes('blind'),
             'the Glaber mole also senses invisible players')
+          const glaber=ENEMY_TEMPLATE_BY_NAME.Glaber
+          const blocker=addEnemy({...glaber,baseName:glaber.name,x:38,y:40,
+            level:-3,levelKind:'chain',hp:glaber.hp,maxHp:glaber.hp,alive:true,
+            homeX:38,homeY:40,homeTileType:'marble'})
+          rebuildActiveLevelOccupancy()
+          check(enemyFindStep(restored)===null,'a living monster blocks the narrow corridor')
+          blocker.alive=false
+          check(enemyFindStep(restored)===null,'the stale occupied tile initially blocks pursuit')
+          const priorChance=chance
+          try {chance=()=>false;enemyTurn()} finally {chance=priorChance}
+          check(restored.x===38,'Duiwel resumes pursuit when a ghost occupant is cleared')
         })()`)
         delete win.__crossFloorSave
       })

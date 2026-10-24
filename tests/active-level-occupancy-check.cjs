@@ -80,8 +80,13 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert(run('occupied.has(keyXY(39,40))'),'same-floor monster still occupies its tile')
   assert.equal(run('enemyFindStep(duiwel)'),null,
     'same-floor monster still physically blocks the one-tile corridor')
-  run('sameFloorBlocker.alive=false;rebuildActiveLevelOccupancy()')
-  assert.equal(run('enemyFindStep(duiwel).x'),39,
-    'removing a same-floor blocker opens the path again')
-  console.log('PASS active-floor occupancy: cross-floor pursuit, invisible sensing, save/replay, surface NPCs, same-floor blocking')
+  run('sameFloorBlocker.alive=false')
+  assert.equal(run('enemyFindStep(duiwel)'),null,
+    'a dead monster can leave an obsolete occupied tile before reconciliation')
+  run('chance=()=>false;enemyTurn()')
+  assert.equal(run('duiwel.x'),39,
+    'the next enemy turn clears ghost occupancy and resumes Duiwel pursuit')
+  assert(run('occupied.has(keyXY(39,40))'),
+    'the resumed pursuer owns its new tile in the reconciled occupancy set')
+  console.log('PASS active-floor occupancy: cross-floor pursuit, invisible sensing, save/replay, surface NPCs, ghost-blocker recovery')
 })().catch(error=>{console.error(error.stack);process.exitCode=1})

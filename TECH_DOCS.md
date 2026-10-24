@@ -4502,8 +4502,11 @@ On the surface, standing in an enemy's aggro range triggers pursuit. Underground
 Movement occupancy is scoped to the currently active map (current z level), 
 including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
 blocking each other's paths; same-floor creatures still block movement. 
-The active occupancy set is rebuilt after world generation, floor changes, and
-save/replay restoration without consuming RNG.
+The active occupancy set is rebuilt after world generation, floor changes,
+save/replay restoration, and before each enemy response. This clears any stale
+blocked coordinates after deaths, burrows or forced movement, so an aware
+monster cannot remain stranded by a creature that is no longer there. These
+reconciliations consume no RNG and need no persistent status.
 
 Any enemy that attacks the player becomes aggroed (shown as a red border
 around the enemy) in the same turn, even if the enemy's aggro range is very

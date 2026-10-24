@@ -5763,6 +5763,9 @@ more difficult:
       }
     }
     tickCombatPotions()
+    // Occupancy is derived from living actors. Repair ghost blockers before
+    // pursuit when a death, burrow or forced move left a stale occupied tile.
+    rebuildActiveLevelOccupancy()
     const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
