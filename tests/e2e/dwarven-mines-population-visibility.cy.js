@@ -136,6 +136,41 @@ describe('Mine-only encounters and darkness', () => {
         USE_TILE_IMAGES=originalTileMode
         render()
       }
+      const caveLightingState={z:currentZ,map,caves,x:player.x,y:player.y,
+        camX,camY,tileMode:USE_TILE_IMAGES}
+      try {
+        currentZ=-1
+        map=Array.from({length:25},()=>Array(25).fill('cavefloor'))
+        map[5][7]='caveentrance'
+        caves=[{entrances:[{x:7,y:5}]}]
+        player.x=5;player.y=5;camX=0;camY=0
+        const source=Mining.lightSources().find(s=>s.kind==='surfaceExit')
+        check(source&&Mining.lightInfo(source).color===MINING_CONFIG.lighting.surfaceExit.color,
+          'ordinary cave exits provide steady warm daylight')
+        const visible=Mining.lightVisible(map,5,5,UndergroundFov.compute(map,5,5,8))
+        check(visible.has('8,5'),'sunlight illuminates nearby cave tiles')
+        const createGradient=ctx.createRadialGradient
+        let radialGlows=0
+        try {
+          ctx.createRadialGradient=function(...args) {
+            radialGlows++
+            return createGradient.apply(this,args)
+          }
+          USE_TILE_IMAGES=true
+          drawCrystalGlow(0,visible,0,0,VIEW_W,VIEW_H)
+          check(radialGlows>=2,'tile mode shows soft sunlight and an exit halo')
+          const tileGlows=radialGlows
+          USE_TILE_IMAGES=false
+          drawCrystalGlow(0,visible,0,0,VIEW_W,VIEW_H)
+          check(radialGlows===tileGlows,'ASCII exit illumination keeps cell-based lighting')
+        } finally {ctx.createRadialGradient=createGradient}
+      } finally {
+        currentZ=caveLightingState.z;map=caveLightingState.map;caves=caveLightingState.caves
+        player.x=caveLightingState.x;player.y=caveLightingState.y
+        camX=caveLightingState.camX;camY=caveLightingState.camY
+        USE_TILE_IMAGES=caveLightingState.tileMode
+        invalidateUndergroundFov()
+      }
       const portable=MINING_CONFIG.lighting
       check(Mining.lightInfo({kind:'dropped',mineral:'quartz',removed:false}).radius===2 &&
         Mining.lightInfo({kind:'dropped',mineral:'ruby',removed:false}).radius===3 &&

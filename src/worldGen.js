@@ -373,7 +373,10 @@ function generateSurface() {
       const t = map[y][x]
       if (t === 'grass' || t === 'forest' || t === 'hill' || t === 'sand') {
         const b = boulderNoiseFunction(x, y, MAP_W, MAP_H)
-        if (b > cfg.boulders.noiseThreshold) map[y][x] = 'boulder'
+        if (b > cfg.boulders.noiseThreshold) {
+          tileUnderlays[keyXY(x, y)] = t
+          map[y][x] = 'boulder'
+        }
       }
     }
   }

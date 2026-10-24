@@ -39,6 +39,21 @@ describe('Desktop overlay layout', () => {
     cy.get('#btnHintCollapse').should($button => {
       expect($button[0].getBoundingClientRect().top).to.be.closeTo(335, 0.5)
     })
+    cy.window().then(win => {
+      expect(win.localStorage.getItem('vagabond_side_map_collapsed')).to.equal('1')
+      expect(win.localStorage.getItem('vagabond_keyboard_hints_collapsed')).to.equal('1')
+    })
+    cy.reload()
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.get('body').should('have.class', 'side-collapsed').and('have.class', 'hint-collapsed')
+    cy.get('#btnSideCollapse').should('have.attr', 'aria-label', 'Expand map panel')
+    cy.get('#btnHintCollapse').should('have.attr', 'aria-label', 'Expand keyboard hints')
+    cy.get('#btnSideCollapse').click({force: true})
+    cy.get('#btnHintCollapse').click({force: true})
+    cy.window().then(win => {
+      expect(win.localStorage.getItem('vagabond_side_map_collapsed')).to.equal('0')
+      expect(win.localStorage.getItem('vagabond_keyboard_hints_collapsed')).to.equal('0')
+    })
   })
 
   it('keeps race selection above gameplay-side overlays while leaving the HUD on one row', () => {

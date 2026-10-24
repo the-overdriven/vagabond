@@ -298,6 +298,36 @@ const plain = value => JSON.parse(JSON.stringify(value))
   })()`))
   assert.equal(otherFloorLight.underground,true,'portable crystal light works on other underground floors')
   assert.equal(otherFloorLight.surface,false,'a crystal does not illuminate the surface')
+  const daylight = plain(run(`(()=>{
+    const previous={z:currentZ,map,caves,x:player.x,y:player.y}
+    try {
+      currentZ=-1;map=Array.from({length:25},()=>Array(25).fill('cavefloor'))
+      map[10][12]='caveentrance';caves=[{entrances:[{x:12,y:10},{x:12,y:10}]}]
+      player.x=2;player.y=10
+      const sources=Mining.lightSources().filter(source=>source.kind==='surfaceExit')
+      const info=Mining.lightInfo(sources[0])
+      const normal=UndergroundFov.compute(map,2,10,8)
+      const lit=Mining.lightVisible(map,2,10,normal)
+      map[10][9]='cavewall'
+      const blocked=Mining.lightVisible(map,2,10,normal)
+      currentZ=-2
+      const deeper=Mining.lightSources().some(source=>source.kind==='surfaceExit')
+      return {sources:sources.length,info,normal:normal.has('12,10'),exit:lit.has('12,10'),
+        nearby:lit.has('14,10'),outside:lit.has('16,10'),blocked:blocked.has('12,10'),deeper}
+    } finally {
+      currentZ=previous.z;map=previous.map;caves=previous.caves
+      player.x=previous.x;player.y=previous.y
+    }
+  })()`))
+  assert.equal(daylight.sources,1,'a repeated entrance descriptor emits only one light source')
+  assert.deepEqual(daylight.info,{radius:3,opacity:0.8,color:'#ffe1a3',pulse:false},
+    'surface daylight is steady and configured independently of crystals')
+  assert.equal(daylight.normal,false)
+  assert.equal(daylight.exit,true,'daylight reveals a cave exit outside normal sight')
+  assert.equal(daylight.nearby,true,'sunlight brightens adjacent cave floor')
+  assert.equal(daylight.outside,false,'sunlight does not extend indefinitely')
+  assert.equal(daylight.blocked,false,'rock between player and exit blocks the daylight view')
+  assert.equal(daylight.deeper,false,'surface daylight belongs only to the first cave layer')
   const crystalSave = plain(run('buildSaveObject()'))
   context.crystalSave = crystalSave
   run('loadGameFromObject(crystalSave,{isReplayInit:true})')
@@ -337,12 +367,29 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(run('rngState'),heardRng)
   assert.equal(run('enemies.at(-1).miningInvestigation.steps'),2,'sound investigation survives save restoration')
   for (let n = 1; n <= 6; n++) {
+    const underlay = ['grass','sand','hill','forest','sand','grass'][n-1]
     run(`currentZ=0;map=surfaceMap;player.x=${10+n};player.y=10;
-      surfaceMap[10][${11+n}]='boulder';player.miningArmedTarget=null`)
+      surfaceMap[10][${11+n}]='boulder';
+      tileUnderlays[keyXY(${11+n},10)]='${underlay}';player.miningArmedTarget=null`)
+    if (n === 2) {
+      context.unminedSandBoulder = plain(run('buildSaveObject()'))
+      run('loadGameFromObject(unminedSandBoulder,{isReplayInit:true})')
+      run('replayAnimationsDisabled=true;attackAnim=null;cameraAnimating=false;pendingMove=null')
+      assert.equal(run(`tileUnderlays[keyXY(${11+n},10)]`),'sand',
+        'the hidden sand beneath a boulder survives save/replay initialization')
+    }
     await run('tryMove(1,0)')
     await run('tryMove(1,0)')
-    assert.equal(run(`surfaceMap[10][${11+n}]`),'grass','overworld stone is permanently removed')
+    assert.equal(run(`surfaceMap[10][${11+n}]`),underlay,
+      'mined boulders restore their original surface terrain')
+    assert.equal(run(`tileUnderlays[keyXY(${11+n},10)]`),undefined,
+      'the boulder-only underlay is consumed after mining')
   }
+  const clearedSurface=plain(run('buildSaveObject()'))
+  context.clearedSurface=clearedSurface
+  run('loadGameFromObject(clearedSurface,{isReplayInit:true})')
+  assert.equal(run('surfaceMap[10][13]'),'sand','mined sand persists through save/load')
+  assert.equal(run('surfaceMap[10][15]'),'forest','mined forest persists through save/load')
   assert.equal(run('player.minedSurfaceStones'),6)
   assert.equal(run('player.mining'),2,
     'the first six total Mining XP buy only two levels at three XP per level')

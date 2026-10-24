@@ -9198,7 +9198,8 @@ more difficult:
     for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
-      const mineral = MINING_CONFIG.minerals[source.mineral]
+      const colorHex = light.color || MINING_CONFIG.minerals[source.mineral]?.glow
+      if (!colorHex) continue
       const radius = light.radius
       ctx.save()
       if (!clipCrystalLight(ctx, source, radius, visible, baseX, baseY, columns, rows)) {
@@ -9206,17 +9207,18 @@ more difficult:
         continue
       }
 
-      const red = parseInt(mineral.glow.slice(1, 3), 16)
-      const green = parseInt(mineral.glow.slice(3, 5), 16)
-      const blue = parseInt(mineral.glow.slice(5, 7), 16)
+      const red = parseInt(colorHex.slice(1, 3), 16)
+      const green = parseInt(colorHex.slice(3, 5), 16)
+      const blue = parseInt(colorHex.slice(5, 7), 16)
+      const sourcePulse = light.pulse === false ? 0 : pulse
       const colorAt = alpha => `rgba(${red},${green},${blue},${Math.max(0, Math.min(1, alpha))})`
       const centerX = (source.x + 0.5 - camX) * TILE_PX
       const centerY = (source.y + 0.5 - camY) * TILE_PX
       const spread = (radius + lighting.tileRadiusPadding) * TILE_PX
       ctx.globalCompositeOperation = 'screen'
       const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
-      glow.addColorStop(0, colorAt((lighting.tileCenterOpacity + pulse) * light.opacity))
-      glow.addColorStop(lighting.tileMidpoint, colorAt((lighting.tileMidOpacity + pulse * 0.5) * light.opacity))
+      glow.addColorStop(0, colorAt((lighting.tileCenterOpacity + sourcePulse) * light.opacity))
+      glow.addColorStop(lighting.tileMidpoint, colorAt((lighting.tileMidOpacity + sourcePulse * 0.5) * light.opacity))
       glow.addColorStop(1, colorAt(0))
       ctx.fillStyle = glow
       ctx.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
@@ -9224,7 +9226,7 @@ more difficult:
       // A smaller halo makes the formation itself feel like the light source.
       const bloomRadius = lighting.tileBloomRadius * TILE_PX
       const bloom = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius)
-      bloom.addColorStop(0, colorAt((lighting.tileBloomOpacity + pulse * 0.5) * light.opacity))
+      bloom.addColorStop(0, colorAt((lighting.tileBloomOpacity + sourcePulse * 0.5) * light.opacity))
       bloom.addColorStop(1, colorAt(0))
       ctx.fillStyle = bloom
       ctx.fillRect(centerX - bloomRadius, centerY - bloomRadius, bloomRadius * 2, bloomRadius * 2)
@@ -9273,6 +9275,12 @@ more difficult:
     updatePlayerStatuses()
     updateAlarmedEnemies()
     const undergroundVisible = currentUndergroundFov()
+    // ASCII fills light per cell; resolve sources once per frame instead of
+    // rescanning cave exits and ground crystals for every visible tile.
+    const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
+      ? Mining.lightSources().map(source => ({source, light: Mining.lightInfo(source)}))
+        .filter(entry => entry.light)
+      : []
     let viewPlayerX = player.x
     let viewPlayerY = player.y
     if (moveAnim) {
@@ -9382,18 +9390,17 @@ more difficult:
         if (currentZ < 0 && undergroundVisible?.has(keyXY(mx, my))) {
           const miningLevel = Mining.activeLevel()
           if (!USE_TILE_IMAGES) {
-              for (const source of Mining.lightSources()) {
-                const light = Mining.lightInfo(source)
-                if (!light) continue
-                const mineral = MINING_CONFIG.minerals[source.mineral]
+              for (const {source, light} of asciiLights) {
+                const color = light.color || MINING_CONFIG.minerals[source.mineral]?.glow
+                if (!color) continue
                 const dx = mx - source.x, dy = my - source.y
                 if (dx * dx + dy * dy > light.radius * light.radius ||
                     !Mining.lightCanReach(map, source.x, source.y, mx, my, player.x, player.y)) continue
                 ctx.save()
                 ctx.globalCompositeOperation = 'screen'
-                ctx.globalAlpha = (0.35 + 0.045 * Math.sin(now / 650)) *
+                ctx.globalAlpha = (0.35 + (light.pulse === false ? 0 : 0.045 * Math.sin(now / 650))) *
                   (1 - Math.hypot(dx, dy) / (light.radius + 1)) * light.opacity
-                ctx.fillStyle = mineral.glow
+                ctx.fillStyle = color
                 ctx.fillRect(px, py, TILE_PX, TILE_PX)
                 ctx.restore()
               }
@@ -12322,22 +12329,40 @@ more difficult:
     mobileSafeAreaObserver.observe(document.getElementById('logpanel'))
   }
   window.addEventListener('resize', updateMobileSafeAreas)
-  document.getElementById('btnSideCollapse').addEventListener('click', () => {
-    document.body.classList.toggle('side-collapsed')
-    const collapsed = document.body.classList.contains('side-collapsed')
+  const PANEL_PREFERENCES = {
+    side: 'vagabond_side_map_collapsed',
+    hints: 'vagabond_keyboard_hints_collapsed'
+  }
+  function storedPanelCollapsed(key) {
+    try { return localStorage.getItem(key) === '1' } catch { return false }
+  }
+  function persistPanelCollapsed(key, collapsed) {
+    try { localStorage.setItem(key, collapsed ? '1' : '0') } catch { /* Browser storage may be unavailable. */ }
+  }
+  function setSidePanelCollapsed(collapsed, persist = true) {
+    document.body.classList.toggle('side-collapsed', collapsed)
     document.getElementById('btnSideCollapse').textContent = collapsed ? '‹' : '›'
     const sideLabel = collapsed ? 'Expand map panel' : 'Collapse map panel'
     document.getElementById('btnSideCollapse').setAttribute('aria-label', sideLabel)
     document.getElementById('btnSideCollapse').title = sideLabel
-  })
-  document.getElementById('btnHintCollapse').addEventListener('click', () => {
-    document.body.classList.toggle('hint-collapsed')
-    const collapsed = document.body.classList.contains('hint-collapsed')
+    if (persist) persistPanelCollapsed(PANEL_PREFERENCES.side, collapsed)
+  }
+  function setHintPanelCollapsed(collapsed, persist = true) {
+    document.body.classList.toggle('hint-collapsed', collapsed)
     document.getElementById('btnHintCollapse').textContent = collapsed ? '‹' : '›'
     const hintLabel = collapsed ? 'Expand keyboard hints' : 'Collapse keyboard hints'
     document.getElementById('btnHintCollapse').setAttribute('aria-label', hintLabel)
     document.getElementById('btnHintCollapse').title = hintLabel
+    if (persist) persistPanelCollapsed(PANEL_PREFERENCES.hints, collapsed)
     if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
+  }
+  setSidePanelCollapsed(storedPanelCollapsed(PANEL_PREFERENCES.side), false)
+  setHintPanelCollapsed(storedPanelCollapsed(PANEL_PREFERENCES.hints), false)
+  document.getElementById('btnSideCollapse').addEventListener('click', () => {
+    setSidePanelCollapsed(!document.body.classList.contains('side-collapsed'))
+  })
+  document.getElementById('btnHintCollapse').addEventListener('click', () => {
+    setHintPanelCollapsed(!document.body.classList.contains('hint-collapsed'))
   })
   window.addEventListener('resize', resizeDesktopViewport)
   resizeMobileViewport()
@@ -12566,6 +12591,7 @@ more difficult:
     player.baseSpd = 50
     player.baseMf = 25
     player.godMode = true
+    if (!replayPlaying && !replaySimulationMode) setHintPanelCollapsed(true)
     player.trackingLearned = true
     if (!player.inventory.some(item => item.kind === 'pickaxe')) addInventoryItem('pickaxe')
     resetSwimming()

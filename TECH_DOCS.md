@@ -519,7 +519,9 @@ Most mine walls are unbreakable. Each generated weak seam or mineral deposit is
 finite and keeps its identity even while concealed from an inexperienced miner.
 Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
-its original brown floor. Overworld boulders can be cleared to open shortcuts.
+its original brown floor. Overworld boulders can be cleared to open shortcuts;
+the cleared tile restores its underlying surface terrain (grass, forest, hill
+or sand), even after world rotation or save/load.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -753,6 +755,11 @@ and background.
 The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
 gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the
 generic ascent tile inside caves and retains its cave-floor background.
+Ordinary z:-1 cave exits admit steady, warm surface light over roughly three
+tiles. It uses the same smooth, wall-aware illumination as crystals, brightens
+the exit and nearby terrain in tile and ASCII modes, and can reveal lit tiles
+within the player's line of sight. Opaque rock blocks the glow. Exit locations
+are already part of the cave map, so the effect adds no saved state or RNG.
 The surface Fort gate, its underground exit and the Dwarven Ruins up/down
 staircases have bright red minimap markers, distinct from their original gold ASCII/tile presentation.
 The fort exit reuses the existing cave-up image with `baseTileKey: marble` and
@@ -7899,6 +7906,9 @@ baseline scaling and 7–50-column bounds, while the existing vertical drag stil
 controls visible rows. Pointer hit testing uses the canvas's actual
 displayed-to-buffer ratio. Zoom is presentation-only: it does not change world
 coordinates, gameplay RNG, save data, or the separate world-map zoom.
+Both panels remember their expanded/collapsed preferences in browser-local
+storage across page loads and character playthroughs, independently of the
+game save and replay. If storage is unavailable, both default to expanded.
 Rasterized terrain and item image caches are rebuilt when tile size changes.
 
 Wheel zoom listens only on the game canvas: scrolling over the message log,
@@ -7989,6 +7999,10 @@ the same learned-skill flag as the Old Hunter. If the character does not already
 carry a Pickaxe, enabling God Mode grants one; toggling God Mode off does not
 remove it, and enabling it again never duplicates it. These effects persist in
 saves/replay.
+Activating God Mode in live play automatically collapses keyboard hints and
+remembers that panel preference for future playthroughs. Turning God Mode off
+does not reopen hints; the player can expand them manually at any time.
+Replay playback never changes the browser's stored panel preferences.
 It also permits artifact identification without a Scroll of Identification,
 while preserving the ordinary identification turn and saved item state.
 Holding the key does not trigger repeated toggles. The key press is a replay

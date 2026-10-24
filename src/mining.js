@@ -78,6 +78,10 @@ const Mining = (() => {
       cfg.lighting.droppedRadiusReduction < 0 ||
       !Number.isInteger(cfg.lighting.droppedMinimumRadius) ||
       cfg.lighting.droppedMinimumRadius < 1 ||
+      !Number.isInteger(cfg.lighting.surfaceExit?.radius) ||
+      cfg.lighting.surfaceExit.radius < 1 || cfg.lighting.surfaceExit.radius > 8 ||
+      !validOpacity(cfg.lighting.surfaceExit.opacity) ||
+      !/^#[0-9a-f]{6}$/i.test(cfg.lighting.surfaceExit.color) ||
       cfg.generation.budgets?.length !== 5 ||
       !cfg.generation.budgets.every(b => bounds(b, 0, 100000)) ||
       Object.keys(cfg.minerals).length !== 7 ||
@@ -558,7 +562,8 @@ const Mining = (() => {
         player.hp -= strain
         if (strain) log(`The work strains you for ${strain} HP.`, 'bad')
         if (currentZ === 0) {
-          map[y][x] = 'grass'
+          map[y][x] = tileUnderlays[surfaceKey] || 'grass'
+          delete tileUnderlays[surfaceKey]
           delete miningSurfaceProgress[surfaceKey]
           grantXp(0, true)
           log('You clear the boulder, opening a new route.', 'good')
@@ -649,6 +654,11 @@ const Mining = (() => {
   }
 
   function lightInfo(deposit) {
+    if (deposit.kind === 'surfaceExit') {
+      const daylight = config().lighting.surfaceExit
+      return {radius: daylight.radius, opacity: daylight.opacity,
+        color: daylight.color, pulse: false}
+    }
     if (deposit.removed || !deposit.mineral) return null
     const radius = config().minerals[deposit.mineral]?.radius
     if (!radius) return null
@@ -671,7 +681,16 @@ const Mining = (() => {
     const natural = activeLevel()?.mineExcavations || []
     const carriedOntoFloor = groundItems.filter(g => onCurrentLevel(g) && isMineralKind(g.kind))
       .map(g => ({x: g.x, y: g.y, kind: 'dropped', mineral: g.kind, removed: false}))
-    return [...natural, ...carriedOntoFloor]
+    // Surface daylight enters ordinary caves through their actual z:-1 exits.
+    // Their coordinates already live in the persisted cave descriptors.
+    const exits = [], seen = new Set()
+    if (currentZ === -1) for (const cave of caves) for (const entrance of cave.entrances || [cave]) {
+      const position = key(entrance.x, entrance.y)
+      if (seen.has(position) || map[entrance.y]?.[entrance.x] !== 'caveentrance') continue
+      seen.add(position)
+      exits.push({x: entrance.x, y: entrance.y, kind: 'surfaceExit'})
+    }
+    return [...natural, ...carriedOntoFloor, ...exits]
   }
 
   function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {

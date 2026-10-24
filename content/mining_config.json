@@ -89,6 +89,7 @@
     "embeddedOpacityScale": 0.55,
     "droppedRadiusReduction": 1,
     "droppedMinimumRadius": 2,
+    "surfaceExit": {"radius": 3, "opacity": 0.8, "color": "#ffe1a3"},
     "pulseOpacity": 0.04,
     "pulsePeriodMs": 650
   },
