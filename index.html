@@ -5775,6 +5775,9 @@ more difficult:
     // Occupancy is derived from living actors. Repair ghost blockers before
     // pursuit when a death, burrow or forced move left a stale occupied tile.
     rebuildActiveLevelOccupancy()
+    // The surface stays alive under elevated floors, but its creatures never
+    // acquire the upstairs player or execute cross-floor combat abilities.
+    wanderSurfaceBelowTower()
     const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
@@ -8377,12 +8380,14 @@ more difficult:
 
   function terrainVisual(tileKey, x, y) {
     if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
-        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1}
+        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1,quarterTurns:tower.rotation||0}
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
       ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
       : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
+    if (tower && tileKey === 'towerwindow') return {...visual,
+      quarterTurns: tower.rotation || 0}
     if (tower && tileKey === 'towerbattlement') return {...visual,
       quarterTurns: y === tower.y ? 0 : x === tower.x+10 ? 1 : y === tower.y+10 ? 2 : 3}
     if (tower && tileKey === 'towerbattlementcorner') return {...visual,
@@ -9789,6 +9794,11 @@ more difficult:
         } else if (!towerRoom) markDiscovered(mx, my) // tower rooms use their FOV
       }
     }
+    // Ground-level wanderers are visible below the tower without becoming
+    // targetable actors. Shade the outside world after drawing them, but before
+    // drawing any playable-floor entities; the summit remains sunlit.
+    drawTowerSurfaceMonsters(now)
+    shadeTowerExterior()
     drawBeastTracks()
     drawCaveSpoor(undergroundVisible)
     // Decorative overlays never enter the loot, collision or inspection systems.
@@ -13546,10 +13556,10 @@ more difficult:
       clearGroundItemsUnderMerchant()
       spawnEdgeHighTierChests()
       placeFisherman()
-      rotateGeneratedWorld(randInt(0, 3))
-      // Some generation steps paint the active surface after its early
-      // snapshot. Keep one canonical grid even when rotation was skipped:
-      // leaving and returning to z:0 must preserve those terrain changes.
+      // Stamp the tower before the single whole-world rotation. Its location,
+      // level maps, landings, actors and items must all turn together.
+      // Earlier generation passes may have painted the active surface after
+      // the first snapshot; use that canonical map for placement.
       surfaceMap = map
       if (!generateTower()) {
         if (populationAttempt === populationAttempts) throw new Error('Could not generate a reachable tower site.')
@@ -13557,6 +13567,7 @@ more difficult:
         continue
       }
       populateTower()
+      rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
       player.x = spawnPoint.x
       player.y = spawnPoint.y

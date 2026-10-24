@@ -5,6 +5,55 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
  context.fixture=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'saves/Tester_start.json')))
  run('loadGameFromObject(fixture,{isReplayInit:true});replayRecording=false;replayAnimationsDisabled=true;raceOpen=false;log=()=>{}')
  assert.equal(run('towerLevels.length'),4)
+ // The above-ground surface remains alive without acquiring the player upstairs.
+ // Use a single existing surface enemy on a known explored perimeter tile.
+ const ambientSetup = run(`(()=>{
+   currentZ=1;map=towerLevels[0].map;Object.assign(player,towerStair(1,false))
+   const e=enemies.find(e=>e.alive&&(e.level??0)===0&&!towerContains(e.x,e.y))
+   e.x=tower.x-2;e.y=tower.y+4;e.homeX=e.x;e.homeY=e.y
+   e.aware=false;e.sleeping=false;e.wallAmbushHidden=false;e.pendingAbility=null;e.wander='roam'
+   e.invisibleUntilTurn=0;discovered[e.y][e.x]=true
+   ENEMY_WANDER_CHANCE=1;camX=tower.x-5;camY=tower.y-5
+   return {id:e.id,x:e.x,y:e.y,seen:discovered[e.y][e.x]}
+ })()`)
+ assert.equal(ambientSetup.seen,true)
+ assert.equal(run('towerSurfaceMonsterVisible(enemies.find(e=>e.id===' + JSON.stringify(ambientSetup.id) + '))'),true)
+ assert.equal(run('tileInspectInfo(tower.x-2,tower.y+4)'),null)
+ // No unseen/invisible surface creature may leak through the overhead view.
+ assert.equal(run(`(()=>{const e=enemies.find(e=>e.id===${JSON.stringify(ambientSetup.id)});
+   discovered[e.y][e.x]=false;const unknown=towerSurfaceMonsterVisible(e);
+   discovered[e.y][e.x]=true;e.wallAmbushHidden=true;
+   const ambush=towerSurfaceMonsterVisible(e);e.wallAmbushHidden=false;
+   currentZ=0;const sameFloor=towerSurfaceMonsterVisible(e);currentZ=1;
+   return !unknown&&!ambush&&!sameFloor})()`),true)
+ // Render uses the actual creature glyph, but not the interactive enemy list.
+ context.surfaceCreatureDraws=[]
+ run(`(()=>{const original=drawCreature;drawCreature=(...args)=>surfaceCreatureDraws.push(args);
+   try{drawTowerSurfaceMonsters(0)}finally{drawCreature=original}})()`)
+ assert.equal(context.surfaceCreatureDraws.length>0,true)
+ assert.equal(run(`(()=>{const e=enemies.find(e=>e.id===${JSON.stringify(ambientSetup.id)});
+   return surfaceCreatureDraws.some(d=>d[2]===enemyGlyph(e)&&d[3]===enemyColor(e))})()`),true)
+ // A single overlay covers both terrain and silhouettes at +1 to +3, never
+ // the summit or playable tower interior, in either tile/ASCII presentation.
+ for (const z of [1,2,3,4]) {
+   const shade=run(`(()=>{currentZ=${z};const old=ctx.fillRect;const rects=[];
+     ctx.fillRect=(...rect)=>rects.push({color:ctx.fillStyle,rect});
+     try{shadeTowerExterior()}finally{ctx.fillRect=old}
+     return rects})()`)
+   assert.equal(shade.length,z===4?0:4)
+   assert.equal(shade.every(x=>x.color==='rgba(0, 0, 0, 0.5)'),true)
+ }
+ run('currentZ=1')
+ context.ambientStartSave=JSON.parse(run('JSON.stringify(buildSaveObject())'))
+ const step=()=>run(`(()=>{wanderSurfaceBelowTower();const e=enemies.find(e=>e.id===${JSON.stringify(ambientSetup.id)});
+   return JSON.stringify({x:e.x,y:e.y,aware:e.aware,hp:e.hp,rng:rngState})})()`)
+ const firstMove=step()
+ assert.equal(JSON.parse(firstMove).aware,false)
+ assert.equal(run('enemies.find(e=>e.id===' + JSON.stringify(ambientSetup.id) + ').level'),0)
+ run('loadGameFromObject(ambientStartSave,{isReplayInit:true});ENEMY_WANDER_CHANCE=1')
+ assert.equal(step(),firstMove) // both random choices and positions match after loading
+ run('loadGameFromObject(fixture,{isReplayInit:true});replayRecording=false;replayAnimationsDisabled=true;raceOpen=false;log=()=>{}')
+ assert.equal(run('towerLevels.length'),4)
  // The surface perspective must not change the active map or consume RNG.
  const visibilityRng=run('rngState')
  run(`currentZ=0;map=surfaceMap;player.godMode=false;
@@ -57,6 +106,12 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
  assert.equal(run('currentZ'),1);assert.equal(snapshot(),before)
  for(let z=1;z<4;z++) {run(`Object.assign(player,towerStair(${z},true));enterCave()`);assert.equal(run('currentZ'),z+1)}
  for(let z=4;z>0;z--) {run(`Object.assign(player,towerStair(${z},false));enterCave()`);assert.equal(run('currentZ'),z-1)}
+ context.towerMessages=[]
+ run(`log=msg=>towerMessages.push(msg);currentZ=4;map=towerLevels[3].map;undergroundDiscovered=towerLevels[3].discovered;Object.assign(player,towerStair(4,false));enterCave()`)
+ assert.equal(context.towerMessages.at(-1),'You descend to tower floor +3.')
+ run(`Object.assign(player,towerStair(3,false));enterCave()`)
+ assert.equal(context.towerMessages.at(-1),'You descend to tower floor +2.')
+
  // The real world generator is exercised; only the missing enemy silhouette
  // artwork is replaced by a fixed alpha mask, as in the existing world tests.
  run(`CaveSilhouettes.prepare=async(seed)=>{CAVE_SILHOUETTES=[{id:CaveSilhouettes.idForSeed(seed),sourceIds:['mock-a','mock-b'],rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>((x-15)**2+(y-15)**2<212?'1':'0')).join(''))}];return CAVE_SILHOUETTES[0]};log=()=>{};renderInventory=()=>{}`)
@@ -64,11 +119,27 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits(${JSON.stringify(traits)}.map(name=>WORLD_TRAITS.find(t=>t.name===name)),'XS');player.inventory=[];player.curseDebuffs=[];player.poisonTurns=0;player.berryRegenTurns=0;enemies=[];groundItems=[];occupied=new Set()`)
   await run('generateNewWorld()')
   assert.equal(run('towerLevels.length'),4)
-  assert.equal(run("towerLevels[0].map[tower.y][tower.x+5]"),'dwarvenwall')
-  assert.equal(run("towerLevels[0].map[tower.y][tower.x+3]"),'towerwindow')
-  assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+5]"),'dwarvenwall')
-  assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+6]"),'dwarvenwall')
-  assert.equal(run("towerLevels[0].map[tower.y+7][tower.x+8]"),'dwarvendoorclosed')
+  assert.equal(run(`(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
+  assert.equal(run(`(()=>{const p=towerPoint(3,0);return towerLevels[0].map[p.y][p.x]})()`),'towerwindow')
+  assert.equal(run(`(()=>{const p=towerPoint(5,7);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
+  assert.equal(run(`(()=>{const p=towerPoint(6,7);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
+  assert.equal(run(`(()=>{const p=towerPoint(8,7);return ['dwarvendoorclosed','dwarvendooropen'].includes(towerLevels[0].map[p.y][p.x])})()`),true)
+  assert.equal(run(`(()=>{const p=towerPoint(5,10);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
+  assert.equal(run(`(()=>{
+    const doors=[surfaceMap[tower.entrance.y]?.[tower.entrance.x]]
+    for(let z=0;z<4;z++){
+      const board=z===0?surfaceMap:towerLevels[z-1].map
+      const p=towerPoint(8,7)
+      doors.push(board[p.y][p.x])
+      // Partition's randomized northern doorway is on the local x=5 line.
+      let count=0;for(let dy=2;dy<=3;dy++){
+        const d=towerPoint(5,dy)
+        if(['dwarvendooropen','dwarvendoorclosed'].includes(board[d.y][d.x]))count++
+      }
+      if(count!==1)return false
+    }
+    return doors.every(d=>d==='dwarvendoorclosed'||d==='dwarvendooropen')
+  })()`),true)
   // Both stair layouts have open floor on all eight neighboring cells.
   assert.equal(run(`Array.from({length:5},(_,z)=>{
     const terrain=z===0?surfaceMap:towerLevels[z-1].map
@@ -76,13 +147,13 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     return stairs.every(p=>[-1,0,1].every(dy=>[-1,0,1].every(dx=>
       (dx===0&&dy===0)||terrain[p.y+dy]?.[p.x+dx]==='marble')))
   }).every(Boolean)`),true)
-  assert.equal(run('towerStair(1,true).x'),run('tower.x+2'))
-  assert.equal(run('towerStair(1,true).y'),run('tower.y+2'))
+  assert.equal(run('towerStair(1,true).x'),run('towerPoint(2,2).x'))
+  assert.equal(run('towerStair(1,true).y'),run('towerPoint(2,2).y'))
   assert.equal(run(`towerLevels[3].map[tower.y][tower.x]==='marble' &&
     towerLevels[3].map[tower.y+10][tower.x+10]==='marble'`),true)
   // Even with generous eight-direction movement, no closed-door diagonal cut exists.
   assert.equal(run(`towerLevels.slice(0,3).every(l=>{
-    const board=l.map,start={x:tower.x+3,y:tower.y+4},goal=keyXY(tower.x+7,tower.y+4)
+    const board=l.map,start=towerPoint(3,4),right=towerPoint(7,4),goal=keyXY(right.x,right.y)
     const queue=[start],seen=new Set()
     for(let i=0;i<queue.length;i++) {
       const {x,y}=queue[i],k=keyXY(x,y)
@@ -121,9 +192,20 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     }
   })()`),true)
 
-  assert.equal(run('surfaceReachableFromTemple().has(keyXY(tower.entrance.x,tower.entrance.y+1))'),true)
+  assert.equal(run('(()=>{const p=towerPoint(5,11);return surfaceReachableFromTemple().has(keyXY(p.x,p.y))})()'),true)
   assert.equal(run('isBigBellReachableFromTemple()'),true)
   assert.equal(run('validateDwarvenRuinsStratum().ok'),true)
+  // Threat changes through ordinary enemy species and encounter size; the
+  // summit remains a fixed set of defenders. No floor-specific stat buffs.
+  assert.equal(run(`(()=>{
+    const ground=enemies.filter(e=>e.alive&&e.level===0&&towerInterior(e.x,e.y))
+    const upper=Array.from({length:4},(_,i)=>enemies.filter(e=>e.alive&&e.level===i+1))
+    return ground.length>=1&&ground.length<=3 &&
+      upper[0].length>=2&&upper[0].length<=4 &&
+      upper[1].length>=3&&upper[1].length<=5 &&
+      upper[2].length>=3&&upper[2].length<=6 &&
+      JSON.stringify(upper[3].map(e=>e.baseName).sort())===JSON.stringify(['Gargoyle','Lich','Gargoyle'].sort())
+  })()`),true)
   assert.equal(run(`towerLevels.every((level,i)=>{
    const stairs=[towerStair(i+1,false),...(i<3?[towerStair(i+1,true)]:[])];
    const queue=[stairs[0]],seen=new Set();
@@ -131,6 +213,23 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     for(const [dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]]){const x=p.x+dx,y=p.y+dy,t=level.map[y]?.[x];if((TILE[t]?.walk||t==='dwarvendoorclosed')&&!seen.has(keyXY(x,y)))queue.push({x,y})}}
    return stairs.every(p=>seen.has(keyXY(p.x,p.y)))&&enemies.filter(e=>e.level===i+1).every(e=>seen.has(keyXY(e.x,e.y))&&stairs.every(p=>Math.max(Math.abs(p.x-e.x),Math.abs(p.y-e.y))>=3))
   })`),true)
+  // A further cardinal rotation must carry walls, doorways, stairs, monsters,
+  // and floor grids together, including after dimensions swap.
+  const prevWidth=run('MAP_W'),prevHeight=run('MAP_H')
+  run('rotateGeneratedWorld(1)')
+  assert.equal(run('MAP_W'),prevHeight);assert.equal(run('MAP_H'),prevWidth)
+  assert.equal(run(`(()=>{const p=towerPoint(5,10);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
+  assert.equal(run(`Array.from({length:5},(_,z)=>{
+    const board=z===0?surfaceMap:towerLevels[z-1].map
+    return [z<4?towerStair(z,true):null,z>0?towerStair(z,false):null].filter(Boolean)
+      .every(p=>['towerstairsup','towerstairsdown'].includes(board[p.y]?.[p.x]))
+  }).every(Boolean)`),true)
+  assert.equal(run(`enemies.filter(e=>e.level>0).every(e=>
+    towerContains(e.x,e.y)&&towerLevels[e.level-1].map[e.y]?.[e.x]!=='towervoid')`),true)
+  const rotatedSnapshot=run('JSON.stringify({tower,towerLevels,actors:enemies.filter(e=>e.level>0).map(e=>({x:e.x,y:e.y,level:e.level})),rng:rngState})')
+  context.rotatedSave=JSON.parse(run('JSON.stringify(buildSaveObject())'))
+  run('loadGameFromObject(rotatedSave,{isReplayInit:true})')
+  assert.equal(run('JSON.stringify({tower,towerLevels,actors:enemies.filter(e=>e.level>0).map(e=>({x:e.x,y:e.y,level:e.level})),rng:rngState})'),rotatedSnapshot)
   console.log('PASS tower seed',seed,traits,run('JSON.stringify(tower)'))
  }
  console.log('PASS tower travel, boundaries, fog, persistence and world invariants')

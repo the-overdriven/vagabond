@@ -32,11 +32,21 @@ function towerPlayerInside() {
     (!!tower && player.x === tower.entrance.x && player.y === tower.entrance.y)
 }
 
+function towerPoint(dx, dy) {
+  // Local tower coordinates rotate with the generated world. Keeping this
+  // transform in one place also keeps staircase pairs aligned after rotation.
+  const turns = tower?.rotation || 0
+  if (turns === 1) [dx, dy] = [TOWER_SIZE - 1 - dy, dx]
+  else if (turns === 2) [dx, dy] = [TOWER_SIZE - 1 - dx, TOWER_SIZE - 1 - dy]
+  else if (turns === 3) [dx, dy] = [dy, TOWER_SIZE - 1 - dx]
+  return {x: tower.x + dx, y: tower.y + dy}
+}
+
 function towerStair(z, up) {
-  // Alternating landings stay in the western chambers, away from internal doors.
+  // Alternating landings stay in the western chambers of the unrotated layout.
   // Every tile in each landing's 3x3 neighborhood is ordinary marble floor.
   const north = up ? z % 2 : (z - 1) % 2
-  return {x: tower.x + 2, y: tower.y + (north ? 2 : 8)}
+  return towerPoint(2, north ? 2 : 8)
 }
 
 function generateTower() {
@@ -59,8 +69,11 @@ function generateTower() {
     if (valid && before.has(keyXY(x+5,y+11))) candidates.push({x,y})
   }
   if (!candidates.length) return false
-  tower = {...pick(candidates), size:TOWER_SIZE, floors:5}
-  tower.entrance = {x:tower.x+5,y:tower.y+10}
+  tower = {...pick(candidates), size:TOWER_SIZE, floors:5, rotation:0}
+  tower.entrance = towerPoint(5, 10)
+  // Door states are rolled during generation, never on rendering or revisits.
+  // This also applies to the outside entrance (which may reveal the foyer).
+  const randomDoor = () => chance(0.1) ? 'dwarvendooropen' : 'dwarvendoorclosed'
   for (let z = 0; z <= 4; z++) {
     const terrain = z === 0 ? surfaceMap : Array.from({length:MAP_H},()=>Array(MAP_W).fill('towervoid'))
     for (let dy=0;dy<TOWER_SIZE;dy++) for (let dx=0;dx<TOWER_SIZE;dx++) {
@@ -77,18 +90,18 @@ function generateTower() {
       // passage. The stair approach is always free of furniture and enemies.
       const gap=randInt(2,3)
       for(let dy=1;dy<8;dy++) terrain[tower.y+dy][tower.x+5]='dwarvenwall'
-      terrain[tower.y+gap][tower.x+5]='dwarvendoorclosed'
+      terrain[tower.y+gap][tower.x+5]=randomDoor()
       // Seal the partition junction: a missing diagonal corner permits
       // movement between chambers while both doors are still closed.
       terrain[tower.y+7][tower.x+5]='dwarvenwall'
       for (let dx=6;dx<10;dx++) terrain[tower.y+7][tower.x+dx]='dwarvenwall'
-      terrain[tower.y+7][tower.x+8]='dwarvendoorclosed'
+      terrain[tower.y+7][tower.x+8]=randomDoor()
       const p=towerStair(z,true);terrain[p.y][p.x]='towerstairsup'
     }
     if(z>0) {
       const p=towerStair(z,false);terrain[p.y][p.x]='towerstairsdown'
       towerLevels.push({map:terrain,discovered:Array.from({length:MAP_H},()=>Array(MAP_W).fill(false))})
-    } else terrain[tower.entrance.y][tower.entrance.x]='dwarvendoorclosed'
+    } else terrain[tower.entrance.y][tower.entrance.x]=randomDoor()
   }
   // All cells in the clear perimeter were walkable before stamping. A ring
   // gives every old ingress an egress, preserving exterior connectivity.
@@ -97,8 +110,15 @@ function generateTower() {
 }
 
 function populateTower() {
-  const rosters=[['Giant Rat','Giant Bat'],['Goblin','Skeleton','Goblin'],
-    ['Skeleton','Orc','Goblin','Orc'],['Orc','Ogre','Gargoyle','Orc'],['Gargoyle','Lich','Gargoyle']]
+  // Each ordinary floor rolls both its pack size and a power mix of existing
+  // species. The summit deliberately keeps its Lich and two Gargoyles.
+  // Weighted pools yield occasional tougher visitors without boosting stats.
+  const encounters = [
+    {min:1,max:3,roster:['Giant Rat','Giant Rat','Giant Bat','Giant Bat','Goblin']},
+    {min:2,max:4,roster:['Goblin','Goblin','Skeleton','Skeleton','Giant Bat','Orc']},
+    {min:3,max:5,roster:['Skeleton','Skeleton','Orc','Orc','Goblin','Ogre']},
+    {min:3,max:6,roster:['Orc','Orc','Ogre','Ogre','Skeleton','Gargoyle']}
+  ]
   for(let z=0;z<=4;z++) {
     const terrain=z===0?surfaceMap:towerLevels[z-1].map
     const spots=[]
@@ -109,12 +129,14 @@ function populateTower() {
         Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>=3))spots.push({x,y})
     }
     const take=()=>spots.splice(randInt(0,spots.length-1),1)[0]
-    for(const name of rosters[z]) {
+    const roster = z===4 ? ['Gargoyle','Lich','Gargoyle'] :
+      Array.from({length:randInt(encounters[z].min,encounters[z].max)},()=>pick(encounters[z].roster))
+    for(const name of roster) {
       const p=take(),tmpl=ENEMY_TEMPLATE_BY_NAME[name]
       const e={...tmpl,baseName:tmpl.name,abilities:[...tmpl.abilities],...p,level:z,
         levelKind:z===0?'surface':'tower',caveIndex:-1,homeX:p.x,homeY:p.y,
         homeTileType:'marble',maxHp:tmpl.hp,alive:true,prefix:null,equipment:null}
-      // Use the ordinary humanoid gear pipeline, without special tower stats.
+      // Existing equipment and stats retain the normal threat differences.
       prepareEnemyEquipment(e)
       addEnemy(e)
     }
@@ -138,7 +160,7 @@ function travelTowerStairs() {
   undergroundDiscovered=destination===0?undergroundDiscoveredL1:towerLevels[destination-1].discovered
   resetSwimming();clearAutoPath();pendingMove=null;hoveredEnemy=null;stopCameraAnimation()
   invalidateUndergroundFov();minimapDirty=true
-  log(destination?`You climb to tower floor +${destination}.`:'You return to the tower entrance.','info')
+  log(destination ? `${tile==='towerstairsup' ? 'You climb' : 'You descend'} to tower floor +${destination}.` : 'You descend to the tower entrance.','info')
   render();updateHud();return true
 }
 
@@ -194,4 +216,100 @@ function drawTowerBackground(x,y) {
     drawTile(px,py,tree?RENDER_STYLE.specialTiles.grassTree.glyph:t.ch,
       tree?RENDER_STYLE.specialTiles.grassTree.color:t.color,t.bg)
   }
+}
+
+
+// The surface remains a separate world while the player is upstairs. Nearby
+// outside creatures get ordinary passive wandering opportunities on gameplay
+// turns, without spotting the player, crossing a tower wall or activating AI.
+// No additional counters or saved state are required: positions use existing
+// enemy serialization and choices use the replay-recorded game RNG.
+function wanderSurfaceBelowTower() {
+  if (currentZ <= 0 || !tower) return
+  const blocked = new Set(npcs.map(n => keyXY(n.x, n.y)))
+  for (const e of enemies) if (e.alive && (e.level ?? 0) === 0) blocked.add(keyXY(e.x, e.y))
+  for (const e of enemies) {
+    if (!e.alive || (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
+        towerContains(e.x, e.y) || e.aware || e.sleeping || e.wallAmbushHidden ||
+        e.pendingAbility || enemyWanderMode(e) === false ||
+        Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ENEMY_WANDER_ACTIVE_RADIUS) continue
+    if (!chance(ENEMY_WANDER_CHANCE)) continue
+    const mode = enemyWanderMode(e)
+    const anchored = (mode === 'homeReanchored' || mode === 'homeReturn') && ENEMY_WANDER_LEASH
+    const homeX = e.homeX ?? e.x, homeY = e.homeY ?? e.y
+    const radius = enemyHomeRadius(e)
+    // If a returning creature has strayed beyond its home range, select
+    // only steps that bring it closer. Others respect their usual leash.
+    const fromHome = Math.max(Math.abs(e.x - homeX), Math.abs(e.y - homeY))
+    const returning = mode === 'homeReturn' && anchored && fromHome > radius
+    const choices = []
+    for (const [dx, dy] of DIRS8) {
+      const x = e.x + dx, y = e.y + dy
+      const key = keyXY(x, y)
+      if (towerContains(x, y) || blocked.has(key) || !TILE[surfaceMap[y]?.[x]]?.walk ||
+          (anchored && !returning && Math.max(Math.abs(x-homeX), Math.abs(y-homeY)) > radius) ||
+          (returning && Math.max(Math.abs(x-homeX), Math.abs(y-homeY)) >= fromHome)) continue
+      // Do not cut through masonry or terrain corners diagonally.
+      if (dx && dy && (!TILE[surfaceMap[e.y]?.[x]]?.walk ||
+          !TILE[surfaceMap[y]?.[e.x]]?.walk)) continue
+      choices.push({x, y})
+    }
+    if (!choices.length) continue
+    const next = choices[randInt(0, choices.length - 1)]
+    blocked.delete(keyXY(e.x, e.y))
+    const fromX = e.x, fromY = e.y
+    e.x = next.x; e.y = next.y
+    blocked.add(keyXY(e.x, e.y))
+    if (mode === 'homeReanchored' && anchored && fromHome > radius) {
+      e.homeX = fromX; e.homeY = fromY
+    }
+    beginEnemyMoveAnim(e, fromX, fromY) // presentation only; outcome already resolved
+  }
+}
+
+function towerSurfaceMonsterVisible(e) {
+  return currentZ > 0 && e.alive && (e.level ?? 0) === 0 &&
+    (!e.levelKind || e.levelKind === 'surface') && !towerContains(e.x, e.y) &&
+    map[e.y]?.[e.x] === 'towervoid' && !!discovered[e.y]?.[e.x] &&
+    !e.wallAmbushHidden && e.pendingAbility?.type !== 'burrow' && !enemyInvisibleActive(e)
+}
+
+// Purely visual. These silhouettes are not added to visibleEnemies or any
+// inspection/range/target lists, and so cannot reveal awareness or aggro.
+function drawTowerSurfaceMonsters(now) {
+  if (currentZ <= 0 || !tower) return
+  for (const e of enemies) {
+    if (!towerSurfaceMonsterVisible(e)) continue
+    let x = e.x, y = e.y
+    if (e.animStart !== undefined) {
+      const t = Math.max(0, Math.min(1, (now - e.animStart) / MOVE_ANIM_MS))
+      if (t >= 1) e.animStart = undefined
+      else {
+        const eased = 1 - (1 - t) ** 3
+        x = e.animFromX + (e.x - e.animFromX) * eased
+        y = e.animFromY + (e.y - e.animFromY) * eased
+      }
+    }
+    const vx = Math.round((x - camX) * TILE_PX)
+    const vy = Math.round((y - camY) * TILE_PX)
+    if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
+    // Use the same glyph and palette as on the surface. No Alarmed marks,
+    // awareness rectangles, health bars, prefix glows or targeting overlays.
+    drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+  }
+}
+
+// A single, inexpensive screen-space pass darkens the outside world, including
+// its moving creatures. The open summit deliberately keeps daylight.
+function shadeTowerExterior() {
+  if (currentZ <= 0 || currentZ >= 4 || !tower) return
+  const left = Math.max(0, Math.min(canvas.width, Math.round((tower.x - camX) * TILE_PX)))
+  const right = Math.max(0, Math.min(canvas.width, Math.round((tower.x + TOWER_SIZE - camX) * TILE_PX)))
+  const top = Math.max(0, Math.min(canvas.height, Math.round((tower.y - camY) * TILE_PX)))
+  const bottom = Math.max(0, Math.min(canvas.height, Math.round((tower.y + TOWER_SIZE - camY) * TILE_PX)))
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.fillRect(0, 0, canvas.width, top)
+  ctx.fillRect(0, bottom, canvas.width, canvas.height - bottom)
+  ctx.fillRect(0, top, left, bottom - top)
+  ctx.fillRect(right, top, canvas.width - right, bottom - top)
 }

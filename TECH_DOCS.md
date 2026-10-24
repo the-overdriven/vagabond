@@ -954,7 +954,10 @@ walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
 The ring preserves routes around the structure. Generation must reject a world
 rather than silently omit its tower when no valid site exists.
 
-The ground entrance is an ordinary unlocked door. From **six or more tiles**
+The ground entrance is an ordinary unlocked door, like the two internal doors
+on each of the first four floors. Each of these **nine doors** independently
+starts **open with 10% probability** (otherwise closed). Initial states are
+seeded once and persist through travel, save and replay. From **six or more tiles**
 away from the footprint (Chebyshev distance to the closest tower tile), the
 surface view presents the **darkened, terrain-only summit** (`z:+4`). At five
 tiles or less, the view switches to the **ground-floor stone exterior**. The
@@ -975,28 +978,34 @@ while the other connects the eastern chamber to the southern hallway. The
 partition and southern chamber wall meet at a solid masonry corner, so neither
 a straight nor a diagonal path can bypass closed doors. The summit is an open
 battlement floor, with plain stone rather than raised corner battlements.
-Stair landings alternate between the southwest and northwest chambers. Each
+In the tower's local layout, stair landings alternate between the southwest
+and northwest chambers, then rotate together with the rest of the world. Each
 stair has a clear 3×3 patch of ordinary floor (all eight adjacent tiles are
 walkable marble), and initial defenders and loot spawn at least three tiles
-away from either landing. Inspecting stairs
-uses the existing transition action and does not advance a combat turn. An
+away from either landing. Inspecting stairs uses the existing transition
+action and does not advance a combat turn. Ascending announces that the player
+climbs; descending announces that the player descends. An
 occupied destination blocks travel rather than relocating creatures. Initial
 encounters remain at least three tiles from the stairs. No creatures, loot or
 door states reset when revisiting a floor.
 
-| Elevation | Defenders | Chest tier |
-|-----------|-----------|------------|
-| 0 | Giant Rat, Giant Bat | None |
-| +1 | Two Goblins, Skeleton | 2 |
-| +2 | Skeleton, two Orcs, Goblin | 3 |
-| +3 | Two Orcs, Ogre, Gargoyle | 3 |
-| +4 | Two Gargoyles, Lich | 5 |
+| Elevation | Number | Weighted encounter pool | Chest tier |
+|-----------|--------|-------------------------|------------|
+| 0 | 1–3 | Giant Rats (2), Giant Bats (2), Goblin (1) | None |
+| +1 | 2–4 | Goblins (2), Skeletons (2), Giant Bat (1), Orc (1) | 2 |
+| +2 | 3–5 | Skeletons (2), Orcs (2), Goblin (1), Ogre (1) | 3 |
+| +3 | 3–6 | Orcs (2), Ogres (2), Skeleton (1), Gargoyle (1) | 3 |
+| +4 | 3 fixed | Two Gargoyles and one Lich | 5 |
 
-Defenders use existing species stats, abilities and humanoid equipment rules.
-There are no tower-specific stat multipliers, new species or new abilities.
-Each upper floor has one ordinary, persistent chest. The summit is an optional
-high-risk encounter; its Lich makes the tower unsuitable as a safe early-game
-loot route. Retreat is allowed, but collected treasure and damage persist.
+The lower four floors independently roll their pack sizes and species with
+replacement. Repeated names are possible. Higher floors draw from stronger
+existing monsters, but any particular floor may be easier or harder than its
+neighbors. Defenders retain ordinary species stats, abilities and humanoid
+equipment rules; there are no tower-specific stat multipliers, new species or
+new abilities. The summit always keeps its Lich with two Gargoyles. Each upper
+floor has one ordinary, persistent chest. The summit is an optional high-risk
+encounter, not a safe early-game loot route. Retreat is allowed, but collected
+treasure and damage persist.
 
 
 ## Temple
@@ -2319,6 +2328,11 @@ crypt, Dwarven Fort, every deeper Ruins floor, entrances, stairs, locks and thei
 keys, traps and projectile directions, and terrain underlays are transformed
 together. This includes the secondary lock ID required by a progression key
 inside a locked side room: it must continue to identify the same rotated lock.
+The stone tower, including the surface footprint, entrance, four elevated
+terrain/discovery grids, every stair and door, monsters and chests, is generated
+**before** this cardinal rotation and transforms in the same pass. Each of its
+four directions is equally likely, and its local landing coordinates are
+translated into the final rotated layout.
 On rectangular worlds, a quarter-turn swaps width and height. Each fresh
 generation restores the configured, unrotated dimensions before allocating maps,
 including when regenerating multiple worlds in the same session. Stored
@@ -7882,16 +7896,28 @@ Upper floors and the enclosed tower ground floor use the ordinary eight-tile
 line-of-sight rules and explored terrain shading; the surface outside the tower
 keeps its existing visibility rules. Outside their footprint, previously discovered surface
 terrain is drawn without per-tile color filters to avoid slow redraws. Unexplored surroundings stay
-hidden. This background shows terrain only: no surface monsters, items,
-inspection targets or light effects. Climbing does not reveal additional
-surface tiles. The source is the existing surface map, never a regenerated or
-separately simulated world.
+hidden. The backdrop also shows living surface monsters roaming on previously explored
+outside tiles. They use their ordinary species glyph and color but cannot see,
+track or attack the upstairs player; neither their Alarmed state nor their
+aggro range, status marks or inspection details are exposed. Nearby surface
+monsters receive passive, deterministic wandering opportunities on player
+turns while the player is upstairs; they respect terrain, other occupants,
+and the tower walls. They do not perform cross-floor combat or special abilities.
+Their real positions persist normally on the surface, including in saves and
+replays, and no real-time animation changes a gameplay decision. Surface loot,
+NPCs and effects remain hidden. Climbing does not reveal additional surface
+tiles. The source is the existing surface map, not a regenerated world.
 
 The renderer draws only previously explored background cells in the viewport, beneath the current floor.
 Surface scenery uses the same deterministic tile variants and grassland tree
 sprites as ground level. Rocky terrain overrides any stale forest underlay;
 rocks and trees are never composited on the same background tile. Per-tile
 desaturation filters are deliberately omitted to keep movement responsive.
+On enclosed upper floors (`z:+1` through `z:+3`), a 50% black overlay
+covers only the outside surface, including its monsters. The summit (`z:+4`)
+leaves this view undarkened. Tower walls, interiors, actors and items are never
+darkened by this overlay. Rendering uses a small number of simple rectangles
+rather than expensive per-tile canvas filters.
 Tile and ASCII modes follow the same isolation rules. Minimap/floor selection
 shows the playable tower map, with stairs marked red and separate discovery per
 floor. Stair changes retain coordinates and map viewport settings.

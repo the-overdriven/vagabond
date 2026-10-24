@@ -735,6 +735,22 @@ function rotateGeneratedWorld(quarterTurns) {
 
   map = grid(map)
   surfaceMap = map
+  // The tower is stamped before world rotation. Transform all four elevated
+  // maps and their discovery grids exactly like every other world-level grid.
+  for (const level of towerLevels) {
+    level.map = grid(level.map)
+    level.discovered = grid(level.discovered)
+  }
+  if (tower) {
+    const corners = [point(tower.x,tower.y),
+      point(tower.x+TOWER_SIZE-1,tower.y),
+      point(tower.x,tower.y+TOWER_SIZE-1),
+      point(tower.x+TOWER_SIZE-1,tower.y+TOWER_SIZE-1)]
+    positions(tower.entrance)
+    tower.x = Math.min(...corners.map(p=>p.x))
+    tower.y = Math.min(...corners.map(p=>p.y))
+    tower.rotation = (tower.rotation + turns) % 4
+  }
   undergroundMap = grid(undergroundMap)
   caveMaps = caveMaps.map(grid)
   undergroundDiscoveredL1 = grid(undergroundDiscoveredL1)

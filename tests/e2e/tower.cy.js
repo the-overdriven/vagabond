@@ -13,7 +13,22 @@ function loadTower() {
 describe('Guaranteed elevated tower',()=>{
   it('keeps floors, background boundaries and save/replay state isolated',()=>{
     loadTower()
-    cy.window().then(win=>win.eval(`(${checkTowerReplayAndIsolation.toString()})()`))
+    cy.window().then(async win=>{
+      await win.eval(`(${checkTowerReplayAndIsolation.toString()})()`)
+      // Rotate the loaded fixture rather than adding another expensive world
+      // generation case. Its doors, four maps, and matched landings must turn.
+      expect(win.eval(`(()=>{
+        currentZ=0;map=surfaceMap
+        rotateGeneratedWorld(1)
+        const p=towerPoint(5,10)
+        return tower.rotation===1 && tower.entrance.x===p.x && tower.entrance.y===p.y &&
+          Array.from({length:5},(_,z)=>{
+            const board=z===0?surfaceMap:towerLevels[z-1].map
+            return [z<4?towerStair(z,true):null,z>0?towerStair(z,false):null]
+              .filter(Boolean).every(q=>['towerstairsup','towerstairsdown'].includes(board[q.y]?.[q.x]))
+          }).every(Boolean)
+      })()`)).to.equal(true)
+    })
   })
   for(const [name,width,height] of [['desktop',1280,800],['mobile',390,844]]) {
     it(`hides the surface rooms and changes the exterior perspective on ${name}`,()=>{
@@ -44,11 +59,11 @@ describe('Guaranteed elevated tower',()=>{
           stopCameraAnimation();snapCameraToPlayer();render()`)
         // The north window must not cover the inner wall junction, and the
         // east chamber must have a proper southern wall with a door.
-        expect(win.eval("towerLevels[0].map[tower.y][tower.x+5]")).to.equal('dwarvenwall')
-        expect(win.eval("towerLevels[0].map[tower.y][tower.x+3]")).to.equal('towerwindow')
-        expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+5]")).to.equal('dwarvenwall')
-        expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+6]")).to.equal('dwarvenwall')
-        expect(win.eval("towerLevels[0].map[tower.y+7][tower.x+8]")).to.equal('dwarvendoorclosed')
+        expect(win.eval("(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
+        expect(win.eval("(()=>{const p=towerPoint(3,0);return towerLevels[0].map[p.y][p.x]})()")).to.equal('towerwindow')
+        expect(win.eval("(()=>{const p=towerPoint(5,7);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
+        expect(win.eval("(()=>{const p=towerPoint(6,7);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
+        expect(['dwarvendoorclosed','dwarvendooropen']).to.include(win.eval("(()=>{const p=towerPoint(8,7);return towerLevels[0].map[p.y][p.x]})()"))
         expect(win.eval(`Array.from({length:5},(_,z)=>{
           const terrain=z===0?surfaceMap:towerLevels[z-1].map
           const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
@@ -62,6 +77,21 @@ describe('Guaranteed elevated tower',()=>{
           expect(win.eval('tileInspectInfo(tower.x-1,tower.y)')).to.equal(null)
           expect(win.eval("currentMapViewKey() === 'tower:4'")).to.equal(true)
           expect(win.eval('canvas.width > 0 && canvas.height > 0')).to.equal(true)
+          expect(win.eval(`(()=>{const e=enemies.find(e=>e.alive&&(e.level??0)===0&&!towerContains(e.x,e.y));
+            e.x=tower.x-2;e.y=tower.y+4;e.invisibleUntilTurn=0;
+            e.wallAmbushHidden=false;e.pendingAbility=null;discovered[e.y][e.x]=true;
+            return towerSurfaceMonsterVisible(e)&&!onCurrentLevel(e)&&tileInspectInfo(e.x,e.y)===null
+          })()`)).to.equal(true)
+          expect(win.eval(`(()=>{const original=ctx.fillRect,rects=[];
+            ctx.fillRect=(...args)=>{if(ctx.fillStyle==='rgba(0, 0, 0, 0.5)')rects.push(args)};
+            try{shadeTowerExterior();return rects.length}finally{ctx.fillRect=original}
+          })()`)).to.equal(0) // summit remains bright
+          win.eval('currentZ=2;map=towerLevels[1].map;undergroundDiscovered=towerLevels[1].discovered;invalidateUndergroundFov();renderScene(performance.now())')
+          expect(win.eval(`(()=>{const original=ctx.fillRect,rects=[];
+            ctx.fillRect=(...args)=>{if(ctx.fillStyle==='rgba(0, 0, 0, 0.5)')rects.push(args)};
+            try{shadeTowerExterior();return rects.length}finally{ctx.fillRect=original}
+          })()`)).to.equal(4)
+          win.eval('currentZ=4;map=towerLevels[3].map;undergroundDiscovered=towerLevels[3].discovered;invalidateUndergroundFov()')
         }
       })
       cy.get('#game').should('be.visible').then($canvas=>{
