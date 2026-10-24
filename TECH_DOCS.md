@@ -2722,16 +2722,23 @@ configurable and do not affect turn resolution or replay. Crystal illumination
 **overrides the distance-based darkness** wherever it reaches: the crystal tile
 is fully relieved of the overlay, and the surrounding darkness returns smoothly
 toward the edge of its light radius. Opaque walls still cast shadows.
-In mine tile graphics, **all illumination and visual field-of-view falloff are
-continuous rather than drawn in tile-shaped bands**. A radial darkness field
-blends the fifth-tile darkness into the **85%** remembered-terrain shade, with
-softened line-of-sight boundaries around corners and walls. Previously explored
-tiles hidden behind walls remain dark, even close to the player. The boundary
-between known and unknown terrain follows a smoothly rounded distance fade,
-extending farther across rock faces than thin passages; it does not reveal
-additional terrain. Unexplored solid rock alongside a narrow corridor does not
-shrink its illuminated floor; the passage instead fades toward its unseen end.
-Each crystal produces a continuous colored radial glow and
+In mine tile graphics, **terrain light has a continuous radial falloff, while
+opaque walls block light into corridors and rooms behind them**. Only rock
+faces next to a directly illuminated open tile receive light; brightness fades
+smoothly across that wall tile into the rock. Further layers of solid rock and
+hidden passages remain dark, without patchy shadows across the illuminated
+faces or any glow spilling through a wall. The light's softened edge
+can reach roughly one tile past the ordinary five-tile sight boundary along an
+open sightline or around an open corner; two diagonal walls meeting at a corner
+block that passage. Several close rays from within the player's tile form a
+small, continuous penumbra for open terrain instead of a grid-shaped cutoff.
+Unexplored terrain outside this visual reach is black, while previously visited
+terrain hidden from sight remains **85%** dark. Open but unexplored terrain
+fades fully to black over **1.5 tiles** beyond the main light radius, without
+a bright seam between remembered ground and the fog. Soft lighting does not
+mark new cells explored: creatures, items, geological clues, targeting,
+exploration and the minimap continue using the ordinary wall-aware field of
+view. Each crystal produces a continuous colored radial glow and
 a brighter central halo, with softly fading wall-aware shadows instead of
 rectangular light cutoffs. The same presentation applies to portable crystal
 light on mine floors. The underlying visibility and targeting rules remain

@@ -9066,19 +9066,17 @@ more difficult:
     }
   }
 
-  // A visible mine tile gets darker toward the edge of the five-tile sight
-  // circle. Beyond that circle, crystal-lit tiles use their own illumination
-  // and do not inherit a darkness band from the player's sight radius.
+  // ASCII mines keep the fixed per-cell sight shading. Tile-mode mines instead
+  // interpolate these configured levels over one terrain-wide radial field.
   function mineSightDarknessAt(x, y) {
     if (!Mining.activeLevel()) return 0
     const distance = Math.ceil(Math.hypot(x - player.x, y - player.y))
     return MINING_CONFIG.lighting.fovDarknessByDistance[distance] || 0
   }
 
-  // Mine tile graphics turn the deterministic, cell-based LOS result into a
-  // continuous *visual* mask. Blurring a single union of reachable tiles avoids
-  // the rectangular light edges produced by canvas clip(rect) at every cell.
-  // Nothing here changes which cells may be explored, targeted or illuminated.
+  // Crystal shadows still respect the deterministic LOS geometry, with the
+  // reachable cells softened so their visual edges do not form hard squares.
+  // Terrain uses a radial field with its own continuous wall-aware shadow.
   const mineLightingCanvases = {}
   function mineLightingCanvas(name) {
     const layer = mineLightingCanvases[name] ||
@@ -9167,6 +9165,146 @@ more difficult:
     return reachesViewport
   }
 
+  const mineVisualOpaqueTiles = new Set(['cavewall', 'dwarvenwall', 'mountain',
+    'snowmountain', 'crypt2niche', 'boulder', 'blackpillar'])
+  function mineVisualOpaque(x, y) {
+    const tile = map[y]?.[x]
+    return !tile || mineVisualOpaqueTiles.has(tile) ||
+      (typeof TILE !== 'undefined' && TILE[tile]?.blocksSight === true)
+  }
+
+  // Pixel-level rays keep light from reaching walkable terrain through rock.
+  // Wall-facing cells borrow the same visibility of adjacent open terrain;
+  // the wall's light fades inward without exposing the rock behind it.
+  function mineVisualRayReaches(fromX, fromY, toX, toY) {
+    let x = Math.floor(fromX), y = Math.floor(fromY)
+    const destX = Math.floor(toX), destY = Math.floor(toY)
+    if (!map[destY]?.[destX]) return false
+    const dx = toX - fromX, dy = toY - fromY
+    const stepX = Math.sign(dx), stepY = Math.sign(dy)
+    const travelX = stepX ? 1 / Math.abs(dx) : Infinity
+    const travelY = stepY ? 1 / Math.abs(dy) : Infinity
+    let boundaryX = stepX ? (stepX > 0 ? x + 1 - fromX : fromX - x) * travelX : Infinity
+    let boundaryY = stepY ? (stepY > 0 ? y + 1 - fromY : fromY - y) * travelY : Infinity
+    for (let i = 0; i < 24; i++) {
+      if (x === destX && y === destY) return true
+      if (Math.abs(boundaryX - boundaryY) < 1e-8) {
+        // A single open side permits diagonal light; two touching walls do not.
+        if (mineVisualOpaque(x + stepX, y) && mineVisualOpaque(x, y + stepY)) return false
+        x += stepX; y += stepY
+        boundaryX += travelX; boundaryY += travelY
+      } else if (boundaryX < boundaryY) {
+        x += stepX; boundaryX += travelX
+      } else {
+        y += stepY; boundaryY += travelY
+      }
+      if (mineVisualOpaque(x, y)) return x === destX && y === destY
+    }
+    return false
+  }
+
+  let mineUnknownFogLayer = null
+  let mineWallFogCache = null
+  function drawMineWallAwareRadialFog(targetCtx, visible, fadeStartTiles) {
+    const lighting = MINING_CONFIG.lighting
+    // Surface-sized light samples soften corner shadows without admitting
+    // light through solid rock. This is strictly visual: discovery still uses
+    // the original five-tile, turn-deterministic cell FOV.
+    const step = Math.max(1, Math.round(TILE_PX / 8))
+    const width = Math.ceil(canvas.width / step)
+    const height = Math.ceil(canvas.height / step)
+    if (!mineUnknownFogLayer) mineUnknownFogLayer = document.createElement('canvas')
+    if (mineUnknownFogLayer.width !== width || mineUnknownFogLayer.height !== height) {
+      mineUnknownFogLayer.width = width
+      mineUnknownFogLayer.height = height
+    }
+    const activeTurn = typeof turnCount !== 'undefined' ? turnCount : null
+    if (mineWallFogCache?.map === map && mineWallFogCache.discovered === undergroundDiscovered &&
+        mineWallFogCache.visible === visible && mineWallFogCache.turn === activeTurn &&
+        mineWallFogCache.z === currentZ && mineWallFogCache.godMode === player.godMode &&
+        mineWallFogCache.playerX === player.x && mineWallFogCache.playerY === player.y &&
+        mineWallFogCache.camX === camX && mineWallFogCache.camY === camY &&
+        mineWallFogCache.width === width && mineWallFogCache.height === height &&
+        mineWallFogCache.canvasWidth === canvas.width &&
+        mineWallFogCache.canvasHeight === canvas.height) {
+      targetCtx.drawImage(mineUnknownFogLayer, 0, 0, canvas.width, canvas.height)
+      return
+    }
+    const fogCtx = mineUnknownFogLayer.getContext('2d')
+    const pixels = fogCtx.createImageData(width, height)
+    const centerX = player.x + 0.5, centerY = player.y + 0.5
+    const fadeTiles = lighting.tileUnknownFogFadeTiles
+    const opacityLevels = lighting.fovDarknessByDistance
+    const visibleWallFaces = new Map()
+    const wallFaceDirections = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+    const wallFaces = (x, y) => {
+      const key = keyXY(x, y)
+      if (visibleWallFaces.has(key)) return visibleWallFaces.get(key)
+      const faces = wallFaceDirections.filter(([dx, dy]) =>
+        !mineVisualOpaque(x + dx, y + dy) &&
+        mineVisualRayReaches(centerX, centerY, x + dx + 0.5, y + dy + 0.5))
+      visibleWallFaces.set(key, faces)
+      return faces
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const worldX = camX + (x + 0.5) * step / TILE_PX
+      const worldY = camY + (y + 0.5) * step / TILE_PX
+      const distance = Math.hypot(worldX - centerX, worldY - centerY)
+      const cellX = Math.floor(worldX), cellY = Math.floor(worldY)
+      const tile = map[cellY]?.[cellX]
+      const remembered = undergroundDiscovered?.[cellY]?.[cellX] || visible?.has(keyXY(cellX, cellY))
+      const blockedShade = remembered ? lighting.exploredDarkness : 1
+      const lower = Math.min(Math.floor(distance), fadeStartTiles)
+      const baseShade = distance < fadeStartTiles
+        ? opacityLevels[lower] + (opacityLevels[lower + 1] - opacityLevels[lower]) * (distance - lower)
+        : lighting.exploredDarkness - (lighting.exploredDarkness - opacityLevels[fadeStartTiles]) *
+          Math.max(0, 1 - (distance - fadeStartTiles) / lighting.tileDarknessTailTiles)
+      let reach = 0
+      if (distance < fadeStartTiles + fadeTiles) {
+        if (mineVisualOpaqueTiles.has(tile)) {
+          // Only the first rock face bordering a directly lit open tile may
+          // receive light. Fade *inside* that one wall tile toward its back;
+          // never light the next layer of rock or a hidden passage behind it.
+          const faces = wallFaces(cellX, cellY)
+          if (faces.length) {
+            let inset = 1
+            for (const [dx, dy] of faces) {
+              const depth = dx > 0 ? cellX + 1 - worldX : dx < 0 ? worldX - cellX :
+                dy > 0 ? cellY + 1 - worldY : worldY - cellY
+              inset = Math.min(inset, depth)
+            }
+            // Illuminate most of the exposed face at its original strength;
+            // soften only its back edge into the pitch-black rock beyond.
+            const t = Math.max(0, Math.min(1, (inset - 0.68) / 0.32))
+            reach = 1 - t * t * (3 - 2 * t)
+          }
+        } else {
+          const sidewaysX = distance ? (centerY - worldY) / distance * 0.3 : 0
+          const sidewaysY = distance ? (worldX - centerX) / distance * 0.3 : 0
+          if (mineVisualRayReaches(centerX, centerY, worldX, worldY)) reach++
+          if (mineVisualRayReaches(centerX + sidewaysX, centerY + sidewaysY, worldX, worldY)) reach++
+          if (mineVisualRayReaches(centerX - sidewaysX, centerY - sidewaysY, worldX, worldY)) reach++
+          reach /= 3
+        }
+        const t = Math.max(0, Math.min(1, (distance - fadeStartTiles) / fadeTiles))
+        reach *= 1 - t * t * (3 - 2 * t)
+      }
+      // Overlay only the extra darkness needed over the radial gradient.
+      // Blocked, never-seen rock is solid black; remembered rock stays dim.
+      const added = Math.max(0, (blockedShade - baseShade) * (1 - reach) / (1 - baseShade))
+      pixels.data[(y * width + x) * 4 + 3] = Math.round(255 * Math.min(1, added))
+    }
+    fogCtx.putImageData(pixels, 0, 0)
+    mineWallFogCache = {map, discovered: undergroundDiscovered, visible, turn: activeTurn,
+      z: currentZ, godMode: player.godMode,
+      playerX: player.x, playerY: player.y, camX, camY, width, height,
+      canvasWidth: canvas.width, canvasHeight: canvas.height}
+    targetCtx.save()
+    targetCtx.imageSmoothingEnabled = true
+    targetCtx.drawImage(mineUnknownFogLayer, 0, 0, canvas.width, canvas.height)
+    targetCtx.restore()
+  }
+
   let mineDarknessLayer = null
   function drawMineSightDarkness(visible, baseX, baseY, columns, rows) {
     const level = Mining.activeLevel()
@@ -9204,10 +9342,8 @@ more difficult:
       return
     }
 
-    // Build a continuous screen-space shade. The softened FOV mask blends the
-    // radial sight field into remembered darkness, including around corners.
-    // Replacing each remembered tile with a flat 85% rect produced straight
-    // light cutoffs along LOS and cave walls.
+    // A single radial intensity field, constrained by a smooth wall-aware
+    // shadow mask, avoids both rectangular cutoffs and seeing through walls.
     if (!mineDarknessLayer) mineDarknessLayer = document.createElement('canvas')
     if (mineDarknessLayer.width !== canvas.width || mineDarknessLayer.height !== canvas.height) {
       mineDarknessLayer.width = canvas.width
@@ -9215,34 +9351,19 @@ more difficult:
     }
     const shadeCtx = mineDarknessLayer.getContext('2d')
     shadeCtx.clearRect(0, 0, canvas.width, canvas.height)
-    const sightMask = mineSoftCellMask((mx, my) => visible.has(keyXY(mx, my)),
-      baseX, baseY, columns, rows, lighting.tileSightEdgeSoftness)
-    if (!sightMask) return
     const maxDistance = lighting.fovDarknessByDistance.length - 1
     const outerDistance = maxDistance + lighting.tileDarknessTailTiles
     const centerX = (player.x + 0.5 - camX) * TILE_PX
     const centerY = (player.y + 0.5 - camY) * TILE_PX
-    const radialCanvas = mineLightingCanvas('sightRadial')
-    const radialCtx = radialCanvas.getContext('2d')
-    radialCtx.clearRect(0, 0, radialCanvas.width, radialCanvas.height)
-    const darknessGradient = radialCtx.createRadialGradient(centerX, centerY, 0,
+    const darknessGradient = shadeCtx.createRadialGradient(centerX, centerY, 0,
       centerX, centerY, outerDistance * TILE_PX)
     for (let distance = 0; distance <= maxDistance; distance++) {
       darknessGradient.addColorStop(distance / outerDistance,
         `rgba(0, 0, 0, ${lighting.fovDarknessByDistance[distance]})`)
     }
     darknessGradient.addColorStop(1, `rgba(0, 0, 0, ${lighting.exploredDarkness})`)
-    radialCtx.fillStyle = darknessGradient
-    radialCtx.fillRect(0, 0, canvas.width, canvas.height)
-    radialCtx.globalCompositeOperation = 'destination-in'
-    radialCtx.drawImage(sightMask, 0, 0)
-    radialCtx.globalCompositeOperation = 'source-over'
-    shadeCtx.fillStyle = `rgba(0, 0, 0, ${lighting.exploredDarkness})`
+    shadeCtx.fillStyle = darknessGradient
     shadeCtx.fillRect(0, 0, canvas.width, canvas.height)
-    shadeCtx.globalCompositeOperation = 'destination-out'
-    shadeCtx.drawImage(sightMask, 0, 0)
-    shadeCtx.globalCompositeOperation = 'source-over'
-    shadeCtx.drawImage(radialCanvas, 0, 0)
     for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
@@ -9256,11 +9377,11 @@ more difficult:
           [lighting.tileMidpoint, `rgba(0, 0, 0, ${lighting.darknessReliefMidOpacity * light.opacity})`],
           [1, 'rgba(0, 0, 0, 0)']], shadeCtx, 'destination-out')
     }
+    drawMineWallAwareRadialFog(shadeCtx, visible, maxDistance)
     ctx.drawImage(mineDarknessLayer, 0, 0)
   }
 
-  // The same softened LOS coverage attenuates colored light and shadow relief.
-  // No tile rectangles are used as rendering clips in mine tile mode.
+  // Crystal glows use softened wall-aware masks, not tile rectangle clips.
   function drawCrystalGlow(now, visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !visible || currentZ >= 0) return
     const lighting = MINING_CONFIG.lighting
@@ -9317,77 +9438,13 @@ more difficult:
     }
   }
 
-  // Distance to the nearest unknown *area*, evaluated at sub-tile resolution,
-  // produces continuous rounded fog boundaries rather than four linear
-  // gradient strips for each tile. Unknown terrain itself is never drawn.
-  let mineVisibilityFeatherLayer = null
-  function drawMineVisibilityFeather(visible, baseX, baseY, columns, rows) {
-    if (!USE_TILE_IMAGES || !Mining.activeLevel() || !visible) return
-    const lighting = MINING_CONFIG.lighting
-    const isKnown = (x, y) => visible.has(keyXY(x, y)) || !!undergroundDiscovered?.[y]?.[x]
-    if (!mineVisibilityFeatherLayer) mineVisibilityFeatherLayer = document.createElement('canvas')
-    const feather = mineVisibilityFeatherLayer
-    const step = Math.max(1, Math.round(TILE_PX / 8))
-    const smallWidth = Math.ceil(canvas.width / step)
-    const smallHeight = Math.ceil(canvas.height / step)
-    if (feather.width !== smallWidth || feather.height !== smallHeight) {
-      feather.width = smallWidth
-      feather.height = smallHeight
-    }
-    const featherCtx = feather.getContext('2d')
-    const pixels = featherCtx.createImageData(smallWidth, smallHeight)
-    const searchRadius = Math.ceil(lighting.tileVisibilityFeatherWidth) + 1
-    // Cache LOS membership once per tile. Sampling it by string key for every
-    // sub-tile pixel would waste time during camera movement and glow pulses.
-    const minX = baseX - searchRadius, minY = baseY - searchRadius
-    const gridWidth = columns + searchRadius * 2
-    const gridHeight = rows + searchRadius * 2
-    const knownCells = new Uint8Array(gridWidth * gridHeight)
-    for (let y = 0; y < gridHeight; y++) for (let x = 0; x < gridWidth; x++)
-      knownCells[y * gridWidth + x] = isKnown(minX + x, minY + y) ? 1 : 0
-    const knownAt = (x, y) => {
-      const gx = x - minX, gy = y - minY
-      return gx >= 0 && gy >= 0 && gx < gridWidth && gy < gridHeight &&
-        !!knownCells[gy * gridWidth + gx]
-    }
-    for (let y = 0; y < smallHeight; y++) for (let x = 0; x < smallWidth; x++) {
-      const worldX = camX + (x + 0.5) * step / TILE_PX
-      const worldY = camY + (y + 0.5) * step / TILE_PX
-      const tileX = Math.floor(worldX), tileY = Math.floor(worldY)
-      if (!knownAt(tileX, tileY)) continue
-      const onRock = map[tileY]?.[tileX] === 'cavewall'
-      const width = onRock
-        ? lighting.tileVisibilityFeatherWidth : lighting.tileFloorVisibilityFeatherWidth
-      let nearestSquared = width * width
-      for (let ty = tileY - searchRadius; ty <= tileY + searchRadius; ty++) {
-        for (let tx = tileX - searchRadius; tx <= tileX + searchRadius; tx++) {
-          if (knownAt(tx, ty)) continue
-          // Unseen solid rock beside a one-tile passage must not squeeze its
-          // walkable floor into a narrow strip. Only the unseen continuation
-          // of that passage should fade; rock faces keep their own long fade.
-          if (!onRock && map[ty]?.[tx] === 'cavewall') continue
-          const dx = Math.max(tx - worldX, 0, worldX - (tx + 1))
-          const dy = Math.max(ty - worldY, 0, worldY - (ty + 1))
-          nearestSquared = Math.min(nearestSquared, dx * dx + dy * dy)
-        }
-      }
-      const amount = Math.max(0, 1 - Math.sqrt(nearestSquared) / width)
-      const opacity = amount * amount * (3 - 2 * amount)
-      pixels.data[(y * smallWidth + x) * 4 + 3] =
-        Math.round(255 * lighting.tileVisibilityFeatherOpacity * opacity)
-    }
-    featherCtx.putImageData(pixels, 0, 0)
-    ctx.save()
-    ctx.imageSmoothingEnabled = true
-    ctx.drawImage(feather, 0, 0, canvas.width, canvas.height)
-    ctx.restore()
-  }
 
   function renderScene(now, terrainCells = null) {
     if (!map.length || worldGenerating) return
     updatePlayerStatuses()
     updateAlarmedEnemies()
     const undergroundVisible = currentUndergroundFov()
+    const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
     const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
@@ -9429,7 +9486,7 @@ more difficult:
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
-        if (undergroundVisible && !undergroundVisible.has(keyXY(mx, my)) &&
+        if (undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
           !undergroundDiscovered?.[my]?.[mx]) continue
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
@@ -10057,7 +10114,6 @@ more difficult:
     // to remove the darkness smoothly wherever their light actually reaches.
     drawMineSightDarkness(undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
     drawCrystalGlow(now, undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
-    drawMineVisibilityFeather(undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     drawEnemyTelegraphWarnings(undergroundVisible,true)

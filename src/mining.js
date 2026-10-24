@@ -48,11 +48,10 @@ const Mining = (() => {
       cfg.lighting.tileRadiusPadding < 0 || cfg.lighting.tileRadiusPadding > 1 ||
       !Number.isInteger(cfg.lighting.tileFadeMargin) ||
       cfg.lighting.tileFadeMargin < 0 || cfg.lighting.tileFadeMargin > 2 ||
-      !Number.isFinite(cfg.lighting.tileVisibilityFeatherWidth) ||
-      cfg.lighting.tileVisibilityFeatherWidth <= 0 || cfg.lighting.tileVisibilityFeatherWidth > 2 ||
-      !Number.isFinite(cfg.lighting.tileFloorVisibilityFeatherWidth) ||
-      cfg.lighting.tileFloorVisibilityFeatherWidth <= 0 || cfg.lighting.tileFloorVisibilityFeatherWidth > 1 ||
-      !validOpacity(cfg.lighting.tileVisibilityFeatherOpacity) ||
+      !Number.isFinite(cfg.lighting.tileLightEdgeSoftness) ||
+      cfg.lighting.tileLightEdgeSoftness <= 0 || cfg.lighting.tileLightEdgeSoftness > 1 ||
+      !Number.isFinite(cfg.lighting.tileUnknownFogFadeTiles) ||
+      cfg.lighting.tileUnknownFogFadeTiles <= 0 || cfg.lighting.tileUnknownFogFadeTiles > 3 ||
       !Number.isFinite(cfg.lighting.pulsePeriodMs) || cfg.lighting.pulsePeriodMs <= 0 ||
       !bounds(cfg.generation.pocketsPerFloor, 1, 30) ||
       !bounds(cfg.generation.waterReleaseTiles, 0, 10) ||
