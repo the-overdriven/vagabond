@@ -62,6 +62,7 @@ describe('Desktop overlay layout', () => {
       win.eval(`
         loadGameFromObject(window.__mapLayoutSave,{isReplayInit:true})
         undergroundDiscoveredL1[player.y][player.x]=true
+        towerLevels[0].discovered[tower.y+8][tower.x+2]=true
         toggleMap(true)
         mapZoomIndex=2
         mapPanX=MAP_W*.63
@@ -85,6 +86,11 @@ describe('Desktop overlay layout', () => {
     cy.get('#btnMapLevelUp').click()
     cy.window().then(win => {
       expect(win.eval('mapViewKey')).to.equal('surface')
+      expect(win.eval('({x:mapPanX,y:mapPanY,zoom:mapZoomIndex})')).to.deep.equal(originalView)
+    })
+    cy.get('#btnMapLevelUp').click()
+    cy.window().then(win => {
+      expect(win.eval('mapViewKey')).to.equal('tower:1')
       expect(win.eval('({x:mapPanX,y:mapPanY,zoom:mapZoomIndex})')).to.deep.equal(originalView)
     })
   })

@@ -98,6 +98,9 @@ function buildSaveObject() {
     mapWidth: MAP_W,
     mapHeight: MAP_H,
     map: encodeTileGrid(surfaceMap, 'g'),
+    tower: structuredClone(tower),
+    towerLevels: towerLevels.map(level => ({map: encodeTileGrid(level.map, TILE_CODE.towervoid),
+      discovered: encodeBoolGrid(level.discovered)})),
     tileUnderlays: tileUnderlays,
     grasslandTrees: [...grasslandTrees],
     caveMaps: caveMaps.map(cm => encodeTileGrid(cm, '#')),
@@ -657,6 +660,9 @@ function loadGameFromObject(data, opts = {}) {
   }
   undergroundDiscoveredL1 = decodeBoolGrid(data.undergroundDiscovered) || Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
 
+  tower = structuredClone(data.tower)
+  towerLevels = data.towerLevels.map(level => ({map: decodeTileGrid(level.map, 'towervoid'),
+    discovered: decodeBoolGrid(level.discovered)}))
   // Resolve currentZ/map/currentCave for whatever z the save was on.
   // New saves also record currentLevelKind because z:-2 is shared by the
   // generic deep cave map and the crypt's dedicated second map. Older saves
@@ -669,7 +675,12 @@ function loadGameFromObject(data, opts = {}) {
   const savedChainDepth = chainDepthForZ(savedZ)
   const savedChainMap = savedChainDepth ? depthUndergroundMap(savedChainDepth) : null
   const loadCrypt2 = savedKind === 'crypt2' || (!savedKind && data.currentZ === -2)
-  if (loadCrypt2 && cryptLevel2) {
+  if (savedZ > 0 && towerLevels[savedZ-1]) {
+    currentZ = savedZ
+    map = towerLevels[savedZ-1].map
+    undergroundDiscovered = towerLevels[savedZ-1].discovered
+    currentCave = -1
+  } else if (loadCrypt2 && cryptLevel2) {
     currentZ = -2
     map = cryptLevel2.map
     currentCave = -1

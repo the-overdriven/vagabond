@@ -944,6 +944,55 @@ collapse. Chances are configured in `environment.iceInstantBreakChance`, `enviro
 
 # 13. World Landmarks
 
+## Stone tower
+
+Every newly generated world contains exactly **one 11×11 stone tower**, with
+five playable levels: the ground floor (`z:0`) and four upper floors (`z:+1`
+through `z:+4`). The tower is placed on a Temple-reachable patch of dry natural
+terrain, away from the starting sanctuary. Its footprint and surrounding
+walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
+The ring preserves routes around the structure. Generation must reject a world
+rather than silently omit its tower when no valid site exists.
+
+The ground entrance is an ordinary unlocked door. From **six or more tiles**
+away from the footprint (Chebyshev distance to the closest tower tile), the
+surface view presents the **darkened, terrain-only summit** (`z:+4`). At five
+tiles or less, the view switches to the **ground-floor stone exterior**. The
+summit preview never includes summit monsters, items or interaction targets and
+does not change active collision, map depth or discovery state. The near exterior
+conceals the ground-floor rooms. Opening the entrance allows the player's normal
+sight lines to reveal the interior; closed doors and solid walls prevent seeing
+through them. From inside, the ground floor uses **eight-tile dungeon FOV**:
+unexplored rooms are black and explored rooms outside current sight are dimmed.
+From outside, currently invisible interiors are fully concealed even if explored
+on a previous visit. Windows do not grant sight through their masonry. Visibility
+updates immediately when a door opens or closes. These presentation and FOV
+rules use no randomness or additional persisted state.
+
+Upper floors align with the surface footprint. Lower floors have partitioned
+chambers with two unlocked internal doors and an open connecting passage; the
+summit is an open battlement floor.
+Stair positions alternate between the two sides of the tower. Inspecting stairs
+uses the existing transition action and does not advance a combat turn. An
+occupied destination blocks travel rather than relocating creatures. Initial
+encounters remain at least three tiles from the stairs. No creatures, loot or
+door states reset when revisiting a floor.
+
+| Elevation | Defenders | Chest tier |
+|-----------|-----------|------------|
+| 0 | Giant Rat, Giant Bat | None |
+| +1 | Two Goblins, Skeleton | 2 |
+| +2 | Skeleton, two Orcs, Goblin | 3 |
+| +3 | Two Orcs, Ogre, Gargoyle | 3 |
+| +4 | Two Gargoyles, Lich | 5 |
+
+Defenders use existing species stats, abilities and humanoid equipment rules.
+There are no tower-specific stat multipliers, new species or new abilities.
+Each upper floor has one ordinary, persistent chest. The summit is an optional
+high-risk encounter; its Lich makes the tower unsuitable as a safe early-game
+loot route. Retreat is allowed, but collected treasure and damage persist.
+
+
 ## Temple
 
 The Temple:
@@ -7489,10 +7538,19 @@ Loading a save therefore continues the random sequence rather than resetting it.
 
 # 66. Save System
 
+Tower placement and all four elevated maps and their discovery grids are saved
+explicitly. Positive elevation and the `tower` floor identity restore the active
+map on load. Doors are part of the terrain; enemies, statuses and loot use the
+existing floor-tagged entity serialization. Replay initial snapshots contain
+the same data, and stairs replay through the normal inspect action. Background
+terrain is not duplicated. New-world initialization clears the tower registry;
+restoration does not generate or repopulate the tower.
+
+
 Current save version (defined in `src/version.js`):
 
 ```text
-114
+115
 ```
 
 The game release version changes for each deployment. The save format changes
@@ -7804,6 +7862,31 @@ chain maps sharing a numeric depth, and current z:-3 fort enemies stay on z:-3.
 ---
 
 # 68. Fog / Discovery
+
+## Elevated floors and scenery below
+
+Each positive elevation owns its terrain, discovery grid and floor-scoped
+actors/items. Outside the tower is impassable empty space, including for
+ethereal creatures and god-mode walking. Stairs are the normal way to leave;
+there is no falling or cross-elevation jumping. Combat, projectiles and
+inspection use only the active map. Windows and parapets block movement,
+sight and projectiles.
+
+Upper floors and the enclosed tower ground floor use the ordinary eight-tile
+line-of-sight rules and explored terrain shading; the surface outside the tower
+keeps its existing visibility rules. Outside their footprint, previously discovered surface
+terrain is drawn without per-tile color filters to avoid slow redraws. Unexplored surroundings stay
+hidden. This background shows terrain only: no surface monsters, items,
+inspection targets or light effects. Climbing does not reveal additional
+surface tiles. The source is the existing surface map, never a regenerated or
+separately simulated world.
+
+The renderer draws only previously explored background cells in the viewport, beneath the current floor.
+Per-tile desaturation filters are deliberately omitted to keep movement responsive.
+Tile and ASCII modes follow the same isolation rules. Minimap/floor selection
+shows the playable tower map, with stairs marked red and separate discovery per
+floor. Stair changes retain coordinates and map viewport settings.
+
 
 The game stores discovered tiles separately from the actual maps.
 

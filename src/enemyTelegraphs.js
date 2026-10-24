@@ -438,7 +438,7 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
       // Show disturbed earth at the abandoned origin, never at the secret
       // destination. The clue is drawn beneath actors in tile and ASCII modes.
       const origin=e.pendingAbility.origin
-      if (foreground || !origin || (undergroundVisible && !undergroundVisible.has(keyXY(origin.x,origin.y)))) continue
+      if (foreground || !origin || !undergroundTileVisible(origin.x,origin.y) || (undergroundVisible && !undergroundVisible.has(keyXY(origin.x,origin.y)))) continue
       const px=Math.round((origin.x-camX)*TILE_PX),py=Math.round((origin.y-camY)*TILE_PX)
       if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) continue
       ctx.save()
@@ -453,7 +453,7 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
     }
     for (const tile of e.pendingAbility.tiles || []) {
       const key=keyXY(tile.x,tile.y)
-      if (warned.has(key) || (undergroundVisible && !undergroundVisible.has(key))) continue
+      if (warned.has(key) || !undergroundTileVisible(tile.x,tile.y) || (undergroundVisible && !undergroundVisible.has(key))) continue
       warned.add(key)
       const px=Math.round((tile.x-camX)*TILE_PX),py=Math.round((tile.y-camY)*TILE_PX)
       if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) continue

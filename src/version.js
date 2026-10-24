@@ -3,4 +3,4 @@
 // Generation-only changes keep the save version: saves and replay initial states
 // restore complete generated worlds instead of rerunning world generation.
 self.VAGABOND_GAME_VERSION = 'v207'
-self.VAGABOND_SAVE_VERSION = 114
+self.VAGABOND_SAVE_VERSION = 115

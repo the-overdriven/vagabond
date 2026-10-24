@@ -1,5 +1,11 @@
 {
   "tiles": {
+    "towervoid": {"ch": " ", "color": "#000000", "bg": "#000000", "mini": "#000000", "walk": false, "blocksSight": true, "projectileBlock": true},
+    "towerstairsup": {"ch": "<", "color": "#eedfc0", "bg": "#4b4540", "mini": "#ff4444", "walk": true},
+    "towerstairsdown": {"ch": ">", "color": "#eedfc0", "bg": "#4b4540", "mini": "#ff4444", "walk": true},
+    "towerwindow": {"ch": "▥", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
+    "towerbattlement": {"ch": "╬", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
+    "towerbattlementcorner": {"ch": "╬", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
     "ice": {
       "ch": "=",
       "color": "#d5f2fa",
@@ -639,6 +645,12 @@
     }
   },
   "tileCode": {
+    "towervoid": "Α",
+    "towerstairsup": "Β",
+    "towerstairsdown": "Γ",
+    "towerwindow": "Δ",
+    "towerbattlement": "Ε",
+    "towerbattlementcorner": "Ζ",
     "ice": "j",
     "crackingice": "k",
     "water": "w",
@@ -735,6 +747,11 @@
     "dwarvengasvent": "╣"
   },
   "tileDesc": {
+    "towerstairsup": "stone stairs ascending the tower",
+    "towerstairsdown": "stone stairs descending the tower",
+    "towerwindow": "a narrow arrow slit in the tower wall",
+    "towerbattlement": "a stone parapet above an impassable drop",
+    "towerbattlementcorner": "the corner of the tower parapet",
     "ice": "lake ice",
     "crackingice": "cracking lake ice; 10% chance per turn to break into freezing water. Also collapses if an adjacent ice tile breaks.",
     "water": "open water",

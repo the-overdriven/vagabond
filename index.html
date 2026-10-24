@@ -1257,6 +1257,7 @@ more difficult:
   // to z:-1; cave stairs serve the natural caves; dedicated dwarven stairs
   // connect the fort and persistent Dwarven Ruins floors.
   const CAVE_TRANSITION_TILES = new Set([
+    'towerstairsup', 'towerstairsdown',
     'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup',
     'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenminesopen',
     'minestairsup', 'minestairsdown', 'minecageupperoff', 'minecageloweroff',
@@ -1271,6 +1272,7 @@ more difficult:
     return lvl ? lvl.map : null
   }
   function currentLevelKind() {
+    if (currentZ > 0) return 'tower'
     if (currentZ === 0) return 'surface'
     if (cryptLevel2 && map === cryptLevel2.map) return 'crypt2'
     return 'chain'
@@ -1481,6 +1483,7 @@ more difficult:
   function enterCave() {
     const departureZ=currentZ,departureKind=currentLevelKind()
     try {
+    if (travelTowerStairs()) return true
     if (enterMausoleum()) return true
     const tile = map[player.y] && map[player.y][player.x]
     if (currentZ === 0) {
@@ -1911,6 +1914,7 @@ more difficult:
   function isWalkableForPlayer(x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (!map[y]) return false // world not generated yet
+    if (currentZ > 0 && map[y][x] === 'towervoid') return false
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
     return (raceHas('swims') || player.swimming > 0 || deepSwimmingWater(player.x, player.y) ||
@@ -1920,6 +1924,7 @@ more difficult:
 </script>
 <script src="src/caveSilhouettes.js"></script>
 <script src="src/worldGen.js"></script>
+<script src="src/tower.js"></script>
 <script src="src/dwarvenMines.js"></script>
 <script src="src/mining.js"></script>
 <script src="src/dungeonTraps.js"></script>
@@ -5015,7 +5020,7 @@ more difficult:
   // Underground acquisition requires a clear ray through the map. Walls are
   // opaque; an already alerted monster can pursue briefly around a corner.
   function enemyHasSight(e) {
-    if (currentZ >= 0) return true
+    if (currentZ === 0) return true
     let x = e.x, y = e.y
     const dx = Math.abs(player.x - x), dy = Math.abs(player.y - y)
     const sx = x < player.x ? 1 : -1, sy = y < player.y ? 1 : -1
@@ -5034,6 +5039,7 @@ more difficult:
 
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
+    if (currentZ > 0 && map[y]?.[x] === 'towervoid') return false
     if (enemyHasAbility(e, 'ethereal')) return true
     if (Mining.blocksPathAt(x, y)) return false
     if (isWalkable(x, y)) return true
@@ -8108,7 +8114,7 @@ more difficult:
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       const mx = x + dx, my = y + dy
       if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) continue
-      if (visibleTiles && !visibleTiles.has(keyXY(mx, my))) continue
+      if ((visibleTiles && !visibleTiles.has(keyXY(mx, my))) || !undergroundTileVisible(mx, my)) continue
       const vx = px + dx * TILE_PX, vy = py + dy * TILE_PX
       if (vx <= -TILE_PX || vy <= -TILE_PX || vx >= canvas.width || vy >= canvas.height) continue
       ctx.fillStyle = champion && Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outer : style.inner
@@ -8225,6 +8231,13 @@ more difficult:
     const size = cached.width
     const x = px + (TILE_PX - size) / 2
     const y = py + (TILE_PX - size) / 2
+    if (visual.quarterTurns) {
+      ctx.save();ctx.globalAlpha=a
+      ctx.translate(px+TILE_PX/2,py+TILE_PX/2)
+      ctx.rotate(visual.quarterTurns*Math.PI/2)
+      ctx.drawImage(cached,-size/2,-size/2)
+      ctx.restore();return true
+    }
     const transformed = a !== 1 || visual.flipX || visual.flipY
     if (!transformed) { ctx.drawImage(cached, x, y); return true }
     ctx.save()
@@ -8363,11 +8376,17 @@ more difficult:
   }
 
   function terrainVisual(tileKey, x, y) {
+    if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
+        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1}
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
       ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
       : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
+    if (tower && tileKey === 'towerbattlement') return {...visual,
+      quarterTurns: y === tower.y ? 0 : x === tower.x+10 ? 1 : y === tower.y+10 ? 2 : 3}
+    if (tower && tileKey === 'towerbattlementcorner') return {...visual,
+      quarterTurns: x === tower.x ? (y === tower.y ? 0 : 3) : (y === tower.y ? 1 : 2)}
 
     if (tileKey === 'dwarventhrone') {
       const level = deepLevels[chainDepthForZ(currentZ)-2]
@@ -9083,7 +9102,7 @@ more difficult:
     if (animationsPending() || cameraAnimating || attackAnim || deathTransition || worldGenerating) return
     // Only the settled surface uses damage repainting. Full renders remain the
     // authority after movement, visibility changes, zoom and all state changes.
-    if (currentZ < 0 || !Number.isInteger(camX) || !Number.isInteger(camY)) {
+    if (currentZ !== 0 || !Number.isInteger(camX) || !Number.isInteger(camY)) {
       render(now)
       return
     }
@@ -9572,6 +9591,10 @@ more difficult:
     updatePlayerStatuses()
     updateAlarmedEnemies()
     const undergroundVisible = currentUndergroundFov()
+    // Keep the ordinary surface discovery rules outside the tower. Only the
+    // enclosed ground floor uses dungeon FOV, including closed-door occlusion.
+    currentSurfaceTowerFov()
+    const distantTowerRoof = towerShowsSummit()
     const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
@@ -9618,15 +9641,30 @@ more difficult:
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
+        if (currentZ > 0 && map[my]?.[mx] === 'towervoid') {
+          drawTowerBackground(mx, my)
+          continue
+        }
         if (undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
           !undergroundDiscovered?.[my]?.[mx]) continue
+        const surfaceTowerCell = currentZ === 0 && towerContains(mx, my)
+        const towerRoom = surfaceTowerCell && towerInterior(mx, my)
+        const towerRoomVisible = towerRoom && surfaceTowerTileVisible(mx, my)
+        if (towerRoom && !distantTowerRoof && !towerRoomVisible &&
+            (!towerPlayerInside() || !discovered[my]?.[mx])) {
+          // Closed stonework hides unvisited rooms entirely. Surface exploration
+          // and previous visits cannot leak rooms through the roof or walls.
+          ctx.fillStyle = '#151311'
+          ctx.fillRect(Math.round((mx - camX) * TILE_PX), Math.round((my - camY) * TILE_PX), TILE_PX, TILE_PX)
+          continue
+        }
         if (mx < 0 || my < 0 || mx >= mapW || my >= mapH) {
           const px = Math.round((vx + Math.floor(camX) - camX) * TILE_PX)
           const py = Math.round((vy + Math.floor(camY) - camY) * TILE_PX)
           drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
-        const tileKey = map[my]?.[mx] || 'crypt2floor'
+        const tileKey = (surfaceTowerCell && distantTowerRoof ? towerLevels[3].map[my][mx] : map[my]?.[mx]) || 'crypt2floor'
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
@@ -9729,6 +9767,17 @@ more difficult:
             }
           }
         }
+        if (surfaceTowerCell && distantTowerRoof) {
+          // The distant roof is terrain-only. The single translucent fill is
+          // cheap in both rendering modes and does not alter game geometry.
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
+          ctx.fillRect(px, py, TILE_PX, TILE_PX)
+          continue
+        }
+        if (towerRoom && !towerRoomVisible) {
+          ctx.fillStyle = UndergroundFov.EXPLORED_OVERLAY
+          ctx.fillRect(px, py, TILE_PX, TILE_PX)
+        }
         if (undergroundVisible) {
           if (!undergroundVisible.has(keyXY(mx, my)) &&
               !(USE_TILE_IMAGES && Mining.activeLevel())) {
@@ -9737,7 +9786,7 @@ more difficult:
               : UndergroundFov.EXPLORED_OVERLAY
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
-        } else markDiscovered(mx, my) // surface keeps its existing discovery rule
+        } else if (!towerRoom) markDiscovered(mx, my) // tower rooms use their FOV
       }
     }
     drawBeastTracks()
@@ -9763,7 +9812,7 @@ more difficult:
     // ground items
     for (const g of groundItems) {
       if (!onCurrentLevel(g)) continue
-      if (undergroundVisible && !undergroundVisible.has(keyXY(g.x, g.y))) continue
+      if (!undergroundTileVisible(g.x, g.y)) continue
       if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
       const vx = Math.round((g.x - camX) * TILE_PX)
       const vy = Math.round((g.y - camY) * TILE_PX)
@@ -9829,7 +9878,7 @@ more difficult:
           fxAnims.splice(i, 1)
           continue
         }
-        if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
+        if (!undergroundTileVisible(p.x, p.y)) continue
         const vx = Math.round((p.x - camX) * TILE_PX)
         const vy = Math.round((p.y - camY) * TILE_PX)
         const bump = p.dir * TILE_PX * 0.6 * Math.sin(t * Math.PI / 2) // ease-out bump, up for pickups, down for deaths
@@ -9884,7 +9933,7 @@ more difficult:
         damageAnims.splice(i, 1)
         continue
       }
-      if (undergroundVisible && !undergroundVisible.has(keyXY(p.x, p.y))) continue
+      if (!undergroundTileVisible(p.x, p.y)) continue
       const vx = Math.round((p.x - camX) * TILE_PX)
       const vy = Math.round((p.y - camY) * TILE_PX - TILE_PX * 0.85 * t)
       ctx.save()
@@ -9936,7 +9985,7 @@ more difficult:
       }
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
       if (haste && !hastening) e.hasteAnim = undefined
-      if (undergroundVisible && !undergroundVisible.has(keyXY(e.x, e.y))) continue
+      if (!undergroundTileVisible(e.x, e.y)) continue
       if (!enemyCanBeSeen(e)) continue
       const vx = Math.round((ex - camX) * TILE_PX), vy = Math.round((ey - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
@@ -10090,7 +10139,8 @@ more difficult:
       let prevStep = {x: player.x, y: player.y}
       for (let i = 0; i < previewPath.length; i++) {
         const step = previewPath[i]
-        if (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x]) {
+        if (!undergroundTileVisible(step.x, step.y) ||
+            (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x])) {
           prevStep = step
           continue
         }
@@ -10103,6 +10153,7 @@ more difficult:
         prevStep = step
       }
       const last = previewPath[previewPath.length - 1]
+      if (undergroundTileVisible(last.x, last.y)) {
       const lx = Math.round((last.x - camX) * TILE_PX)
       const ly = Math.round((last.y - camY) * TILE_PX)
       ctx.save()
@@ -10116,6 +10167,7 @@ more difficult:
       ctx.textBaseline = 'middle'
       ctx.fillText(String(previewPath.length), lx + TILE_PX * 0.78, ly + TILE_PX * 0.22)
       ctx.restore()
+      }
     }
     // Ranged projectiles are presentation-only. Gameplay, RNG, damage and
     // ammunition are already resolved before an entry is added here.
@@ -10145,7 +10197,7 @@ more difficult:
       }
       const {x, y} = position
       const visibleX = Math.round(x), visibleY = Math.round(y)
-      if (undergroundVisible && !undergroundVisible.has(keyXY(visibleX, visibleY))) continue
+      if (!undergroundTileVisible(visibleX, visibleY)) continue
       const visual = RENDER_STYLE.projectiles?.[anim.projectile]
       if (!visual) continue
       const first = anim.path[0]
@@ -10249,7 +10301,7 @@ more difficult:
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     drawEnemyTelegraphWarnings(undergroundVisible,true)
-    if (currentZ < 0) {
+    if (currentZ !== 0) {
       const depthRect = depthLabelRect()
       ctx.save()
       ctx.fillStyle = RENDER_STYLE.depthLabel.background
@@ -10471,6 +10523,7 @@ more difficult:
   // tap-to-inspect panel (touchstart) - builds the same info for whatever
   // occupies tile (mx,my), so both surfaces stay in sync automatically.
   function tileInspectInfo(mx, my) {
+    if (currentZ > 0 && map[my]?.[mx] === 'towervoid') return null
     if (!map.length || !map[my]) return null // world not generated yet
     if (!undergroundTileVisible(mx, my)) return null
     if (mx === player.x && my === player.y) {
@@ -11008,6 +11061,7 @@ more difficult:
   let mapPreviewBase = null
 
   function currentMapViewKey() {
+    if (currentZ > 0) return `tower:${currentZ}`
     if (currentZ === 0) return 'surface'
     if (currentLevelKind() === 'crypt2') return 'crypt2'
     return `chain:${chainDepthForZ(currentZ)}`
@@ -11032,6 +11086,8 @@ more difficult:
       if (z === -2 && cryptLevel2) levels.push({key: 'crypt2', label: 'Crypt (−2)', z: -2,
         terrain: cryptLevel2.map, seen: cryptLevel2.discovered})
     }
+    for (let i = 0; i < towerLevels.length; i++) levels.unshift({key: `tower:${i+1}`,
+      label: `Tower (+${i+1})`, z: i+1, terrain: towerLevels[i].map, seen: towerLevels[i].discovered})
     return levels.filter(level => level.terrain && level.seen?.some(row => row?.some(Boolean)))
   }
 
@@ -11122,7 +11178,7 @@ more difficult:
     const underKey = tileUnderlays[keyXY(x, y)] || tileKey
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
-    const visible = view ? view.seen[y]?.[x] : currentZ < 0 ? undergroundDiscovered[y][x] : discovered[y][x]
+    const visible = view ? view.seen[y]?.[x] : currentZ !== 0 ? undergroundDiscovered[y][x] : discovered[y][x]
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
     const brownCave = tileKey === 'cavefloor2' && (view
@@ -11161,11 +11217,35 @@ more difficult:
   }
 
   let undergroundFovCache = null
+  let surfaceTowerFovCache = null
   function invalidateUndergroundFov() {
     undergroundFovCache = null
+    surfaceTowerFovCache = null
+  }
+  function currentSurfaceTowerFov() {
+    if (currentZ !== 0 || !tower || towerShowsSummit() || !surfaceMap?.[player.y]?.[player.x]) return null
+    if (!surfaceTowerFovCache || surfaceTowerFovCache.map !== surfaceMap ||
+        surfaceTowerFovCache.x !== player.x || surfaceTowerFovCache.y !== player.y) {
+      const visible = UndergroundFov.compute(surfaceMap, player.x, player.y)
+      surfaceTowerFovCache = {map: surfaceMap, x: player.x, y: player.y, visible}
+      // Unexplored tower interiors stay hidden on the map until truly seen.
+      for (const point of visible) {
+        const [x, y] = point.split(',').map(Number)
+        if (towerContains(x, y)) markDiscovered(x, y)
+      }
+    }
+    return surfaceTowerFovCache.visible
+  }
+  function surfaceTowerTileVisible(x, y) {
+    if (!towerContains(x, y)) return true
+    if (towerShowsSummit()) return false
+    // Approaching from outdoors shows the exterior masonry, not far-side rooms.
+    // Once inside, every tower cell obeys the same eight-tile FOV as a dungeon.
+    if (!towerPlayerInside() && !towerInterior(x, y)) return true
+    return !!currentSurfaceTowerFov()?.has(keyXY(x, y))
   }
   function currentUndergroundFov() {
-    if (currentZ >= 0 || !map?.[player.y]?.[player.x]) return null
+    if (currentZ === 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||
       undergroundFovCache.discovered !== undergroundDiscovered ||
       undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
@@ -11178,14 +11258,16 @@ more difficult:
         x: player.x, y: player.y, visible}
       for (const pos of visible) {
         const [x, y] = pos.split(',').map(Number)
-        markDiscovered(x, y)
+        if (map[y]?.[x] !== 'towervoid') markDiscovered(x, y)
       }
     }
     return undergroundFovCache.visible
   }
 
   function undergroundTileVisible(x, y) {
-    return currentZ >= 0 || !!currentUndergroundFov()?.has(keyXY(x, y))
+    if (currentZ === 0) return surfaceTowerTileVisible(x, y)
+    return !!currentUndergroundFov()?.has(keyXY(x, y)) &&
+      !(currentZ > 0 && map[y]?.[x] === 'towervoid')
   }
 
   // Reveals a (radius*2+1) square centered on (cx,cy) on the current level's
@@ -11195,7 +11277,7 @@ more difficult:
       if (y < 0 || y >= MAP_H) continue
       for (let x = cx - radius; x <= cx + radius; x++) {
         if (x < 0 || x >= MAP_W) continue
-        markDiscovered(x, y)
+        if (map[y]?.[x] !== 'towervoid') markDiscovered(x, y)
       }
     }
   }
@@ -12963,8 +13045,9 @@ more difficult:
     if (!player.godMode || ![-1, 1].includes(direction)) return false
     let destination = currentZ + direction
     let nextMap = null
-    while (destination <= 0 && destination >= -deepLevels.length - 1) {
+    while (destination <= towerLevels.length && destination >= -deepLevels.length - 1) {
       if (destination === 0) nextMap = surfaceMap
+      else if (destination > 0) nextMap = towerLevels[destination-1]?.map
       else {
         const depth = chainDepthForZ(destination)
         const level = deepLevels[depth-2]
@@ -12978,7 +13061,8 @@ more difficult:
     currentZ = destination
     currentCave = -1
     map = nextMap
-    undergroundDiscovered = destination === 0 ? null : depthUndergroundDiscovered(chainDepthForZ(destination))
+    undergroundDiscovered = destination === 0 ? null : destination > 0
+      ? towerLevels[destination-1].discovered : depthUndergroundDiscovered(chainDepthForZ(destination))
     resetSwimming()
     clearAutoPath()
     pendingMove = null
@@ -13467,6 +13551,12 @@ more difficult:
       // snapshot. Keep one canonical grid even when rotation was skipped:
       // leaving and returning to z:0 must preserve those terrain changes.
       surfaceMap = map
+      if (!generateTower()) {
+        if (populationAttempt === populationAttempts) throw new Error('Could not generate a reachable tower site.')
+        console.warn('Discarding world: no reachable tower site.')
+        continue
+      }
+      populateTower()
       initializeDwarvenCrates()
       player.x = spawnPoint.x
       player.y = spawnPoint.y

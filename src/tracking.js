@@ -54,7 +54,7 @@ function inspectBeastTrack(track) {
 function drawBeastTracks() {
   if (currentZ !== 0) return
   for (const track of beastTracks.values()) {
-    if (!discovered[track.y]?.[track.x]) continue
+    if (!discovered[track.y]?.[track.x] || !undergroundTileVisible(track.x, track.y)) continue
     const px = Math.round((track.x - camX) * TILE_PX)
     const py = Math.round((track.y - camY) * TILE_PX)
     if (px < -TILE_PX || py < -TILE_PX || px >= canvas.width || py >= canvas.height) continue
