@@ -33,6 +33,7 @@ const Mining = (() => {
       cfg.lighting.exploredDarkness < cfg.lighting.fovDarknessByDistance[5] ||
       !validOpacity(cfg.lighting.tileCenterOpacity) ||
       !validOpacity(cfg.lighting.tileMidOpacity) ||
+      !validOpacity(cfg.lighting.tileTintStrength) ||
       !validOpacity(cfg.lighting.darknessReliefMidOpacity) ||
       !Number.isFinite(cfg.lighting.tileDarknessTailTiles) ||
       cfg.lighting.tileDarknessTailTiles <= 0 || cfg.lighting.tileDarknessTailTiles > 3 ||
@@ -82,6 +83,12 @@ const Mining = (() => {
       !Number.isInteger(cfg.lighting.surfaceExit?.radius) ||
       cfg.lighting.surfaceExit.radius < 1 || cfg.lighting.surfaceExit.radius > 8 ||
       !validOpacity(cfg.lighting.surfaceExit.opacity) ||
+      !validOpacity(cfg.lighting.surfaceExit.tileCenterOpacity) ||
+      !validOpacity(cfg.lighting.surfaceExit.tileMidOpacity) ||
+      !validOpacity(cfg.lighting.surfaceExit.tileBloomOpacity) ||
+      !Number.isFinite(cfg.lighting.surfaceExit.tileBloomRadius) ||
+      cfg.lighting.surfaceExit.tileBloomRadius <= 0 ||
+      cfg.lighting.surfaceExit.tileBloomRadius > 3 ||
       !/^#[0-9a-f]{6}$/i.test(cfg.lighting.surfaceExit.color) ||
       cfg.generation.budgets?.length !== 5 ||
       !cfg.generation.budgets.every(b => bounds(b, 0, 100000)) ||

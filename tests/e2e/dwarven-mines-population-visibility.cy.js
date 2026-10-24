@@ -79,6 +79,14 @@ describe('Mine-only encounters and darkness', () => {
         'explored mine tiles beyond sight remain darker than the fifth visible ring')
       check(MINING_CONFIG.skill.xpRequiredMultiplier===3,
         'Mining progression requires three times its previous experience')
+      const mineralLighting=MINING_CONFIG.lighting
+      check(mineralLighting.tileTintStrength<=0.2 &&
+        mineralLighting.tileCenterOpacity<=0.12 && mineralLighting.tileMidOpacity<=0.04 &&
+        mineralLighting.tileBloomOpacity<=0.08,
+        'mineral light favors clear terrain over a strong colored overlay')
+      check(mineralLighting.surfaceExit.tileCenterOpacity>mineralLighting.tileCenterOpacity*3 &&
+        mineralLighting.surfaceExit.tileBloomOpacity>mineralLighting.tileBloomOpacity,
+        'natural cave daylight retains its stronger light while crystals stay restrained')
       const originalExcavations=first.level.mineExcavations
       const lightMap=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
       first.level.mineExcavations=[{x:12,y:10,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]

@@ -9384,13 +9384,26 @@ more difficult:
     ctx.drawImage(mineDarknessLayer, 0, 0)
   }
 
-  // Crystal glows use softened wall-aware masks, not tile rectangle clips.
+  function crystalLightRgb(colorHex, daylight) {
+    const tint = daylight ? 1 : MINING_CONFIG.lighting.tileTintStrength
+    const neutral = [238, 237, 234]
+    return [1, 3, 5].map((start, channel) => Math.round(
+      neutral[channel] * (1 - tint) + parseInt(colorHex.slice(start, start + 2), 16) * tint))
+  }
+
+  // Darkness relief is the primary illumination. A faint, nearly neutral
+  // glow adds atmosphere, but never washes over the transparent crystal art.
   function drawCrystalGlow(now, visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !visible || currentZ >= 0) return
     const lighting = MINING_CONFIG.lighting
     const pulse = lighting.pulseOpacity * Math.sin(now / lighting.pulsePeriodMs)
     const inMines = !!Mining.activeLevel()
-    for (const source of Mining.lightSources()) {
+    const sources = Mining.lightSources()
+    const crystalLayer = mineLightingCanvas('crystalGlow')
+    const crystalCtx = crystalLayer.getContext('2d')
+    crystalCtx.clearRect(0, 0, crystalLayer.width, crystalLayer.height)
+    let hasCrystalGlow = false
+    for (const source of sources) {
       const light = Mining.lightInfo(source)
       if (!light) continue
       const colorHex = light.color || MINING_CONFIG.minerals[source.mineral]?.glow
@@ -9399,46 +9412,78 @@ more difficult:
       const mask = inMines
         ? mineCrystalMask(source, radius, visible, baseX, baseY, columns, rows) : null
       if (inMines && !mask) continue
-      ctx.save()
-      if (!inMines && !clipOrdinaryCrystalLight(ctx, source, radius, visible,
+      // Surface daylight keeps its stronger warm illumination. Mineral colors
+      // only tint a small fraction of an otherwise neutral light source.
+      const daylight = source.kind === 'surfaceExit'
+      const target = daylight ? ctx : crystalCtx
+      target.save()
+      if (!inMines && !clipOrdinaryCrystalLight(target, source, radius, visible,
           baseX, baseY, columns, rows)) {
-        ctx.restore()
+        target.restore()
         continue
       }
-
-      const red = parseInt(colorHex.slice(1, 3), 16)
-      const green = parseInt(colorHex.slice(3, 5), 16)
-      const blue = parseInt(colorHex.slice(5, 7), 16)
+      if (!daylight) hasCrystalGlow = true
+      const [red, green, blue] = crystalLightRgb(colorHex, daylight)
       const sourcePulse = light.pulse === false ? 0 : pulse
       const colorAt = alpha => `rgba(${red},${green},${blue},${Math.max(0, Math.min(1, alpha))})`
       const centerX = (source.x + 0.5 - camX) * TILE_PX
       const centerY = (source.y + 0.5 - camY) * TILE_PX
       const spread = (radius + lighting.tileRadiusPadding) * TILE_PX
-      const glowStops = [[0, colorAt((lighting.tileCenterOpacity + sourcePulse) * light.opacity)],
-        [lighting.tileMidpoint, colorAt((lighting.tileMidOpacity + sourcePulse * 0.5) * light.opacity)],
+      const centerOpacity = daylight ? lighting.surfaceExit.tileCenterOpacity : lighting.tileCenterOpacity
+      const midOpacity = daylight ? lighting.surfaceExit.tileMidOpacity : lighting.tileMidOpacity
+      const glowStops = [[0, colorAt((centerOpacity + sourcePulse) * light.opacity)],
+        [lighting.tileMidpoint, colorAt((midOpacity + sourcePulse * 0.5) * light.opacity)],
         [1, colorAt(0)]]
-      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, spread, glowStops, ctx, 'screen')
+      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, spread, glowStops, target, 'screen')
       else {
-        ctx.globalCompositeOperation = 'screen'
-        const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
+        target.globalCompositeOperation = 'screen'
+        const glow = target.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
         for (const [position, color] of glowStops) glow.addColorStop(position, color)
-        ctx.fillStyle = glow
-        ctx.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
+        target.fillStyle = glow
+        target.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
       }
 
-      // A smaller halo makes the formation itself feel like the light source.
-      const bloomRadius = lighting.tileBloomRadius * TILE_PX
-      const bloomStops = [[0, colorAt((lighting.tileBloomOpacity + sourcePulse * 0.5) * light.opacity)],
+      const bloomRadius = (daylight ? lighting.surfaceExit.tileBloomRadius : lighting.tileBloomRadius) * TILE_PX
+      const bloomOpacity = daylight ? lighting.surfaceExit.tileBloomOpacity : lighting.tileBloomOpacity
+      const bloomStops = [[0, colorAt((bloomOpacity + sourcePulse * 0.5) * light.opacity)],
         [1, colorAt(0)]]
-      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, bloomRadius, bloomStops, ctx, 'screen')
+      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, bloomRadius, bloomStops, target, 'screen')
       else {
-        const bloom = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius)
+        const bloom = target.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius)
         for (const [position, color] of bloomStops) bloom.addColorStop(position, color)
-        ctx.fillStyle = bloom
-        ctx.fillRect(centerX - bloomRadius, centerY - bloomRadius, bloomRadius * 2, bloomRadius * 2)
+        target.fillStyle = bloom
+        target.fillRect(centerX - bloomRadius, centerY - bloomRadius, bloomRadius * 2, bloomRadius * 2)
       }
-      ctx.restore()
+      target.restore()
     }
+    if (!hasCrystalGlow) return
+    // Subtract the *actual sprite alpha* before compositing the glow. This
+    // preserves transparent crystal details without a square cutout in light.
+    crystalCtx.save()
+    crystalCtx.globalCompositeOperation = 'destination-out'
+    for (const source of sources) {
+      if (!visible.has(keyXY(source.x, source.y))) continue
+      const x = (source.x - camX) * TILE_PX
+      const y = (source.y - camY) * TILE_PX
+      if (source.kind === 'exposed') {
+        const image = preloadedImages.get(`img/tiles/mineral-${source.mineral}-exposed.png`)
+        if (image) crystalCtx.drawImage(image, x, y, TILE_PX, TILE_PX)
+      } else if (source.kind === 'dropped') {
+        const visual = RENDER_STYLE.groundItems[source.mineral]
+        const image = resolveVisualImage(visual)
+        if (!image) continue
+        const scale = visual.scale ?? 1
+        const size = TILE_PX * scale
+        const composed = outlinedVisualCanvas(image, scale)
+        crystalCtx.drawImage(composed, x + (TILE_PX - size) / 2 - 1,
+          y + (TILE_PX - size) / 2 - 1)
+      }
+    }
+    crystalCtx.restore()
+    ctx.save()
+    ctx.globalCompositeOperation = 'screen'
+    ctx.drawImage(crystalLayer, 0, 0)
+    ctx.restore()
   }
 
 
@@ -9451,8 +9496,12 @@ more difficult:
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
     const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
-      ? Mining.lightSources().map(source => ({source, light: Mining.lightInfo(source)}))
-        .filter(entry => entry.light)
+      ? Mining.lightSources().map(source => {
+        const light = Mining.lightInfo(source)
+        const hex = light?.color || MINING_CONFIG.minerals[source.mineral]?.glow
+        return {source, light, color: hex
+          ? `rgb(${crystalLightRgb(hex, source.kind === 'surfaceExit').join(',')})` : null}
+      }).filter(entry => entry.light && entry.color)
       : []
     let viewPlayerX = player.x
     let viewPlayerY = player.y
@@ -9563,9 +9612,7 @@ more difficult:
         if (currentZ < 0 && undergroundVisible?.has(keyXY(mx, my))) {
           const miningLevel = Mining.activeLevel()
           if (!USE_TILE_IMAGES) {
-              for (const {source, light} of asciiLights) {
-                const color = light.color || MINING_CONFIG.minerals[source.mineral]?.glow
-                if (!color) continue
+              for (const {source, light, color} of asciiLights) {
                 const dx = mx - source.x, dy = my - source.y
                 if (dx * dx + dy * dy > light.radius * light.radius ||
                     !Mining.lightCanReach(map, source.x, source.y, mx, my, player.x, player.y)) continue

@@ -2687,7 +2687,7 @@ The respite floor teaches mining through exploration rather than a mandatory
 tutorial.
 
 The seven initial minerals are **Quartz, Amethyst, Topaz, Aquamarine, Emerald,
-Sapphire, and Ruby**. Fully exposed crystal formations cast colored light;
+Sapphire, and Ruby**. Fully exposed crystal formations illuminate their surroundings with nearly neutral light and a very subtle mineral-colored tint;
 visibly embedded crystals also emit a smaller, dimmer glow. Concealed mineral
 seams do not reveal themselves by glowing. Mineral-specific light radii
 illuminate unobstructed tiles and creatures
@@ -2738,14 +2738,16 @@ fades fully to black over **1.5 tiles** beyond the main light radius, without
 a bright seam between remembered ground and the fog. Soft lighting does not
 mark new cells explored: creatures, items, geological clues, targeting,
 exploration and the minimap continue using the ordinary wall-aware field of
-view. Each crystal produces a continuous colored radial glow and
-a brighter central halo, with softly fading wall-aware shadows instead of
-rectangular light cutoffs. The same presentation applies to portable crystal
-light on mine floors. The underlying visibility and targeting rules remain
-tile-based and deterministic; only the mine's tile-mode presentation is softened.
-ASCII graphics retain cell-by-cell illumination. The light's color,
-visual intensity, spread and gentle pulse are data-driven, and its animation
-does not alter visibility rules, turns or RNG.
+view. The crystal's primary effect is to reveal the terrain by relieving
+darkness; a faint, close halo adds atmosphere without covering the crystal's
+own sprite or creating a broad colored haze. Radial light and its softly fading
+wall-aware shadows have no rectangular cutoffs. Portable underground crystals
+share the restrained glow; sunlight entering cave exits remains warmer and
+brighter. The underlying visibility and targeting rules remain tile-based and
+deterministic; only the mine's tile-mode presentation is softened. ASCII
+graphics retain cell-by-cell illumination. Light tint, visual intensity,
+spread and gentle pulse are data-driven, and animation does not alter visibility
+rules, turns or RNG.
 Breaking into a water pocket can fill 2–5 nearby tiles only when the pocket's
 interior is actually breached, reusing the existing
 Swimming, drowning and shore-escape behavior. Flooding must preserve safe
