@@ -11053,9 +11053,9 @@ more difficult:
     mapViewKey = next.key
     mapPreviewBase = null
     // Center the first view on a known part of the selected level.
-    const row = next.seen.findIndex(cells => cells?.some(Boolean))
-    mapPanY = row >= 0 ? row : player.y
-    mapPanX = row >= 0 ? next.seen[row].findIndex(Boolean) : player.x
+    // const row = next.seen.findIndex(cells => cells?.some(Boolean))
+    // mapPanY = row >= 0 ? row : player.y
+    // mapPanX = row >= 0 ? next.seen[row].findIndex(Boolean) : player.x
     updateMapLevelControls()
     renderMinimap()
   }

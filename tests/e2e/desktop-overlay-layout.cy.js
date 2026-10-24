@@ -20,7 +20,7 @@ describe('Desktop overlay layout', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   })
 
-  it('keeps the desktop map and hint panels in a compact upper-right stack', () => {
+  it('keeps the desktop panels compact and preserves full-map zoom and pan while changing floors', () => {
     cy.window().then(win => {
       const side = win.document.getElementById('sidePanel').getBoundingClientRect()
       const hint = win.document.getElementById('hint').getBoundingClientRect()
@@ -53,6 +53,39 @@ describe('Desktop overlay layout', () => {
     cy.window().then(win => {
       expect(win.localStorage.getItem('vagabond_side_map_collapsed')).to.equal('0')
       expect(win.localStorage.getItem('vagabond_keyboard_hints_collapsed')).to.equal('0')
+    })
+
+    // Use a saved world to exercise the real map controls without a new
+    // world-generation run. Reveal only one cave tile so both floors are listed.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mapLayoutSave = save
+      win.eval(`
+        loadGameFromObject(window.__mapLayoutSave,{isReplayInit:true})
+        undergroundDiscoveredL1[player.y][player.x]=true
+        toggleMap(true)
+        mapZoomIndex=2
+        mapPanX=MAP_W*.63
+        mapPanY=MAP_H*.37
+        renderMinimap()
+      `)
+      delete win.__mapLayoutSave
+    }))
+    cy.get('#mapOverlay').should('have.class', 'show')
+    cy.window().then(win => {
+      expect(win.eval('mapViewKey')).to.equal('surface')
+      expect(win.eval('exploredMapLevels().some(v=>v.key===\'chain:1\')')).to.equal(true)
+    })
+    let originalView
+    cy.window().then(win => {originalView = win.eval('({x:mapPanX,y:mapPanY,zoom:mapZoomIndex})')})
+    cy.get('#btnMapLevelDown').click()
+    cy.window().then(win => {
+      expect(win.eval('mapViewKey')).to.equal('chain:1')
+      expect(win.eval('({x:mapPanX,y:mapPanY,zoom:mapZoomIndex})')).to.deep.equal(originalView)
+    })
+    cy.get('#btnMapLevelUp').click()
+    cy.window().then(win => {
+      expect(win.eval('mapViewKey')).to.equal('surface')
+      expect(win.eval('({x:mapPanX,y:mapPanY,zoom:mapZoomIndex})')).to.deep.equal(originalView)
     })
   })
 

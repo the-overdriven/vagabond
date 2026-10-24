@@ -7845,7 +7845,12 @@ despite sharing a depth. Historical views paint only their saved discovered
 tiles; undiscovered terrain stays fogged. The full-map player marker pulses
 only on the currently occupied map. Browsing does not change the active game
 map, field of view, side minimap, save state, or replay RNG. Reopening the map
-starts on the current level.
+starts on the current level at the character's position. While switching
+between explored levels in the open map, the zoom and map-center coordinates
+stay unchanged, allowing direct comparison of the same location across floors.
+An unexplored area on the selected floor remains fogged even if the same
+coordinates were explored on another floor. Only explicit zoom/pan controls
+change the shared map viewport while browsing.
 On the surface, a discovered sand tile that has been dug shows its darker
 excavated appearance on both minimaps and the full map, matching the main
 canvas. This uses the already persisted `dugSandTiles` state; digging updates
