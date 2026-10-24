@@ -2729,7 +2729,9 @@ softened line-of-sight boundaries around corners and walls. Previously explored
 tiles hidden behind walls remain dark, even close to the player. The boundary
 between known and unknown terrain follows a smoothly rounded distance fade,
 extending farther across rock faces than thin passages; it does not reveal
-additional terrain. Each crystal produces a continuous colored radial glow and
+additional terrain. Unexplored solid rock alongside a narrow corridor does not
+shrink its illuminated floor; the passage instead fades toward its unseen end.
+Each crystal produces a continuous colored radial glow and
 a brighter central halo, with softly fading wall-aware shadows instead of
 rectangular light cutoffs. The same presentation applies to portable crystal
 light on mine floors. The underlying visibility and targeting rules remain
@@ -6032,6 +6034,9 @@ and scrolls cannot occupy the same tile on the same level/map. Surface loose
 supplies sample legal, unoccupied ground-item positions without replacement,
 preserving configured counts while enough valid positions exist. Cave loot
 already reserves each selected position. Runtime drops are unaffected.
+Loose scrolls of Identification, Invisibility, Fear, Chaos and Homecoming are
+collected when the player steps onto them, just like other loose consumables;
+their inventory stacks and save/replay behavior follow the ordinary item rules.
 The surface starts with up to four remote tier-3 chests guarded by tier-3+
 monsters, ordinary chests at roughly one per **720 eligible walkable tiles**,
 and up to twelve additional edge chests. The ordinary chest density

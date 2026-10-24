@@ -113,7 +113,8 @@ describe('Non-gear item catalog', () => {
             chestKinds.push(player.inventory.at(-1).kind)
           }
           player.inventory = []
-          groundItems = ['potion', 'scrollOfInvisibility', 'speedpotion'].map(kind =>
+          groundItems = ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll',
+            'homecomingscroll'].map(kind =>
             ({kind, x: player.x, y: player.y, level: currentZ}))
           checkGroundAt(player.x, player.y)
           return {chestKinds, draws, groundKinds: player.inventory.map(it => it.kind).sort(),
@@ -123,8 +124,9 @@ describe('Non-gear item catalog', () => {
         }
       })()`)
       expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 4,
-        groundKinds: ['potion', 'scrollOfInvisibility', 'speedpotion'],
-        names: ['Life Potion', 'Potion of Speed', 'Scroll of Invisibility'], remainingGround: 0})
+        groundKinds: ['homecomingscroll', 'idscroll', 'potion', 'scrollOfInvisibility', 'speedpotion'],
+        names: ['Life Potion', 'Potion of Speed', 'Scroll of Homecoming',
+          'Scroll of Identification', 'Scroll of Invisibility'], remainingGround: 0})
     })
   })
 

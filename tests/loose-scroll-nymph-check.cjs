@@ -58,5 +58,29 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
       ['scrollOfInvisibility','idscroll','scrollOfFear','scrollOfChaos'].includes(kind)),
       'only approved scroll kinds appear in the converted slots')
   }
+  const pickup=JSON.parse(JSON.stringify(run(`(()=>{
+    const oldGround=groundItems,oldInventory=player.inventory
+    const oldX=player.x,oldY=player.y,oldZ=currentZ,oldMap=map
+    try {
+      currentZ=0;map=surfaceMap;player.x=166;player.y=17;player.inventory=[]
+      const oldTerrain=map[17][166],oldAdjacent=map[17][167]
+      map[17][166]='ice';map[17][167]='ice'
+      groundItems=[{x:166,y:17,kind:'idscroll'},
+        {x:167,y:17,kind:'homecomingscroll'}]
+      const beforeRng=rngState,beforeTurn=turnCount
+      checkGroundAt(166,17)
+      player.x=167;checkGroundAt(167,17)
+      const result={kinds:player.inventory.map(it=>it.kind).sort(),
+        remaining:groundItems.length,spentTurn:turnCount-beforeTurn,
+        spentRng:rngState!==beforeRng}
+      map[17][166]=oldTerrain;map[17][167]=oldAdjacent
+      return result
+    } finally {
+      groundItems=oldGround;player.inventory=oldInventory
+      player.x=oldX;player.y=oldY;currentZ=oldZ;map=oldMap
+    }
+  })()`)))
+  assert.deepEqual(pickup,{kinds:['homecomingscroll','idscroll'],remaining:0,
+    spentTurn:0,spentRng:false},'scrolls on surface ice can be collected without extra turns or RNG')
   console.log('PASS nymph herb loot and diversified surface scroll composition')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

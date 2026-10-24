@@ -257,6 +257,24 @@ describe('Mine-only encounters and darkness', () => {
             ctx.restore()
             for(let y=7;y<=8;y++)for(let x=4;x<=8;x++)map[y][x]='cavefloor2'
           }
+          const corridor=new Set()
+          for(let y=2;y<=10;y++) {
+            corridor.add('6,'+y)
+            map[y][5]='cavewall';map[y][7]='cavewall'
+            if(y<=6){corridor.add('5,'+y);corridor.add('7,'+y)}
+          }
+          try {
+            ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height)
+            drawMineVisibilityFeather(corridor,0,0,VIEW_W,VIEW_H)
+            const brightness=(x,y)=>ctx.getImageData(Math.floor(x*TILE_PX),
+              Math.floor(y*TILE_PX),1,1).data[0]
+            check(brightness(6.07,8.5)>220&&brightness(6.93,8.5)>220,
+              'unexplored rock alongside a narrow southern corridor does not pinch its light')
+            check(brightness(6.07,4.5)>220&&brightness(6.93,4.5)>220,
+              'northern and southern corridor floor edges stay equally readable')
+          } finally {
+            for(let y=2;y<=10;y++){map[y][5]='cavefloor2';map[y][7]='cavefloor2'}
+          }
           USE_TILE_IMAGES=false
           const before=ctx.getImageData(6*TILE_PX,8*TILE_PX,1,1).data[0]
           drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)

@@ -6871,6 +6871,16 @@ more difficult:
         log(`You pick up a Scroll of Invisibility.`, 'loot')
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
+      } else if (g.kind === 'idscroll') {
+        addIdScroll()
+        log('You pick up a Scroll of Identification.', 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
+      } else if (g.kind === 'homecomingscroll') {
+        addHomecomingScroll()
+        log('You pick up a Scroll of Homecoming.', 'loot')
+        spawnPickupAnim(g)
+        groundItems.splice(i, 1)
       } else if (g.kind === 'dwarvenkey') {
         addInventoryItem('dwarvenkey', {keyId: g.keyId})
         log(`You pick up a Dwarven Key.`, 'loot')
@@ -9345,12 +9355,17 @@ more difficult:
       const worldY = camY + (y + 0.5) * step / TILE_PX
       const tileX = Math.floor(worldX), tileY = Math.floor(worldY)
       if (!knownAt(tileX, tileY)) continue
-      const width = map[tileY]?.[tileX] === 'cavewall'
+      const onRock = map[tileY]?.[tileX] === 'cavewall'
+      const width = onRock
         ? lighting.tileVisibilityFeatherWidth : lighting.tileFloorVisibilityFeatherWidth
       let nearestSquared = width * width
       for (let ty = tileY - searchRadius; ty <= tileY + searchRadius; ty++) {
         for (let tx = tileX - searchRadius; tx <= tileX + searchRadius; tx++) {
           if (knownAt(tx, ty)) continue
+          // Unseen solid rock beside a one-tile passage must not squeeze its
+          // walkable floor into a narrow strip. Only the unseen continuation
+          // of that passage should fade; rock faces keep their own long fade.
+          if (!onRock && map[ty]?.[tx] === 'cavewall') continue
           const dx = Math.max(tx - worldX, 0, worldX - (tx + 1))
           const dy = Math.max(ty - worldY, 0, worldY - (ty + 1))
           nearestSquared = Math.min(nearestSquared, dx * dx + dy * dy)
