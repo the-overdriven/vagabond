@@ -30,6 +30,20 @@ const plain = value => JSON.parse(JSON.stringify(value))
     invalidateUndergroundFov()`)
   assert.equal(run('miningTrial.minePockets.length>=3&&miningTrial.minePockets.length<=10'), true)
   assert.equal(run('miningTrial.minePockets.every(p=>p.cells.length>0&&p.entrances.length>0)'), true)
+  const pocketDepths = plain(run('miningTrial.minePockets.map(p=>p.approachDepth)'))
+  assert(pocketDepths.every(d => Number.isInteger(d) && d >= 1 && d <= 20),
+    'every pocket has a finite mineable approach between one and twenty walls')
+  assert(pocketDepths.some(d => d >= 10),
+    'the fixed seed contains a pocket far beyond the first corridor wall')
+  assert.equal(run(`miningTrial.minePockets.every(p=>{
+    const entrance=p.entrances[0]
+    return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>
+      miningTrial.mineExcavations.filter(t=>t.kind==='wall'&&t.pocketId===p.id)
+        .every(t=>t.removed===false) &&
+      Array.from({length:p.approachDepth},(_,n)=>({x:entrance.x+dx*n,y:entrance.y+dy*n}))
+        .every(t=>miningTrial.mineExcavations.some(s=>s.kind==='wall'&&s.pocketId===p.id&&s.x===t.x&&s.y===t.y)) &&
+      p.cells.some(c=>c.x===entrance.x+dx*p.approachDepth&&c.y===entrance.y+dy*p.approachDepth))
+  })`), true, 'every pocket approach remains a continuous mineable route')
   assert.equal(run('miningTrial.mineMineralValue>=50&&miningTrial.mineMineralValue<=150'), true)
   const initialCrystal = plain(run('miningTrial.mineExcavations.find(t=>t.kind===\'exposed\')'))
   assert(initialCrystal,'the test mine includes an exposed crystal')
@@ -255,6 +269,48 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(embeddedLight.ordinaryCorner,true,'normal FOV permits a diagonal corner sightline')
   assert.equal(embeddedLight.blockedCorner,false,'crystal light cannot leak diagonally past a wall corner')
   assert.equal(embeddedLight.straight,true,'light still reaches unobstructed corridor tiles')
+  run(`(()=>{
+    player.x=testApproach.x;player.y=testApproach.y
+    const ground=groundItems.find(g=>onCurrentLevel(g)&&g.x===player.x&&g.y===player.y)
+    if(ground)throw Error('test approach unexpectedly contains a ground item')
+    addInventoryItem('ruby',{count:2})
+    dropCrystal(player.inventory.findIndex(item=>item.kind==='ruby'))
+    dropCrystal(player.inventory.findIndex(item=>item.kind==='ruby'))
+  })()`)
+  assert.equal(run('groundItems.filter(g=>onCurrentLevel(g)&&g.kind===\'ruby\').length'), 1,
+    'two dropped crystals of one type share one ground object')
+  assert.equal(run('groundItems.find(g=>onCurrentLevel(g)&&g.kind===\'ruby\').count'), 2,
+    'dropping removes exactly one unit per inventory action')
+  assert.equal(run('player.inventory.some(i=>i.kind===\'ruby\')'), false)
+  assert.equal(run('Mining.lightInfo(Mining.lightSources().find(s=>s.kind===\'dropped\')).radius'),3,
+    'a dropped ruby provides the agreed smaller light radius')
+  const otherFloorLight = plain(run(`(()=>{
+    const z=currentZ
+    const crystal={x:player.x,y:player.y,level:-1,levelKind:'chain',kind:'quartz',count:1}
+    groundItems.push(crystal)
+    try {
+      currentZ=-1
+      const underground=Mining.lightSources().some(s=>s.kind==='dropped'&&s.mineral==='quartz')
+      currentZ=0
+      const surface=Mining.lightSources().some(s=>s.kind==='dropped')
+      return {underground,surface}
+    } finally {currentZ=z;groundItems.splice(groundItems.indexOf(crystal),1)}
+  })()`))
+  assert.equal(otherFloorLight.underground,true,'portable crystal light works on other underground floors')
+  assert.equal(otherFloorLight.surface,false,'a crystal does not illuminate the surface')
+  const crystalSave = plain(run('buildSaveObject()'))
+  context.crystalSave = crystalSave
+  run('loadGameFromObject(crystalSave,{isReplayInit:true})')
+  assert.equal(run('groundItems.find(g=>onCurrentLevel(g)&&g.kind===\'ruby\').count'),2,
+    'a stack of dropped glowing crystals survives save/replay initialization')
+  assert.equal(run('Mining.lightSources().some(s=>s.kind===\'dropped\')'),true,
+    'a restored crystal is an active light source')
+  const pickupTurn = run('turnCount')
+  run('lootSkeletonOrForage()')
+  assert.equal(run('turnCount'),pickupTurn+1,'F picks up a dropped crystal stack in one turn')
+  assert.equal(run('player.inventory.find(i=>i.kind===\'ruby\').count'),2)
+  assert.equal(run('Mining.lightSources().some(s=>s.kind===\'dropped\')'),false,
+    'recovering a crystal immediately removes its light')
   run(`(()=>{
     const target=keyXY(bareRock.tx,bareRock.ty)
     const approaches=dungeonWalkDistances(map,{x:bareRock.x,y:bareRock.y})

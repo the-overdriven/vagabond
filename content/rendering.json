@@ -167,6 +167,13 @@
     "pickaxe": {
       "glyph": "⚒", "color": "#b3ad9f", "image": "img/tiles/pickaxe.png", "scale": 0.8
     },
+    "quartz": {"glyph": "♦", "color": "#e1e4ff", "image": "img/tiles/mineral-quartz-exposed.png", "scale": 0.8},
+    "amethyst": {"glyph": "♦", "color": "#ae70ef", "image": "img/tiles/mineral-amethyst-exposed.png", "scale": 0.8},
+    "topaz": {"glyph": "♦", "color": "#ffb52d", "image": "img/tiles/mineral-topaz-exposed.png", "scale": 0.8},
+    "aquamarine": {"glyph": "♦", "color": "#35d9df", "image": "img/tiles/mineral-aquamarine-exposed.png", "scale": 0.8},
+    "emerald": {"glyph": "♦", "color": "#34e389", "image": "img/tiles/mineral-emerald-exposed.png", "scale": 0.8},
+    "sapphire": {"glyph": "♦", "color": "#407bff", "image": "img/tiles/mineral-sapphire-exposed.png", "scale": 0.8},
+    "ruby": {"glyph": "♦", "color": "#f24b75", "image": "img/tiles/mineral-ruby-exposed.png", "scale": 0.8},
     "scrollOfFear": {
       "glyph": "?",
       "color": "#d99bff",

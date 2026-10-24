@@ -2655,9 +2655,16 @@ irregular hidden cavities, never larger than an 8×8 bounding box. Their content
 are drawn from empty hollows, minerals, limited water, nonhumanoid nests, caches
 and rare glowing geodes. A monster nest contains 1–3 members of **one**
 nonhumanoid species, selected for that floor. Pockets are enclosed until mineable weak seams are
-opened; larger pockets can have multiple marked approaches, sometimes requiring
-several walls to be excavated; nearby pockets may rarely connect through another
-mineable seam. Most ordinary mine walls remain solid. Mineral
+opened. Their primary approaches are fully mineable routes through otherwise
+solid rock: **15%** shallow (1–3 walls), **25%** medium (4–9), and **60%** deep
+(10–20). Each chamber's distance is also checked against the original corridor
+network, so a long route does not lead to a chamber already beside another
+tunnel. Failed long placements can fall back to shorter ones rather than
+breaking floor generation. The respite floor retains an obvious, inexpensive
+one-wall training opportunity. The routes mostly contain weak stone, with a
+**15%** chance of a hard wall at each step after the first. Larger pockets can
+have multiple marked approaches; nearby pockets may rarely connect through
+another mineable seam. Most ordinary mine walls remain solid. Mineral
 deposits may be embedded in walls or exposed in corridor alcoves, widened
 corridor floors and pockets; veins contain 1–4 connected deposits of a single
 mineral. Different mineral types are separated by at least **10 tiles of
@@ -2668,8 +2675,8 @@ for ordinary monster movement and player auto-travel; monsters do not spawn on
 them. Players still mine a formation by attempting to step into it.
 Extracting an exposed crystal yields exactly one gem. Gem
 values, veins, pocket content weights and floor budgets are data-driven.
-The respite floor includes an obvious low-risk seam near its entrance to teach
-mining through exploration rather than a mandatory tutorial.
+The respite floor teaches mining through exploration rather than a mandatory
+tutorial.
 
 The seven initial minerals are **Quartz, Amethyst, Topaz, Aquamarine, Emerald,
 Sapphire, and Ruby**. Fully exposed crystal formations cast colored light;
@@ -2685,7 +2692,18 @@ light. An opaque wall only receives crystal light when the visible wall face
 and the light source are on the same side, preventing colored light from
 showing through the opposite face. Diagonal light can pass an open corner
 beside one wall, but not squeeze between two walls meeting diagonally.
-Extraction removes the light.
+Extraction removes the light. Extracted crystals can also be dropped from their
+inventory stack, **one per action**, onto an unoccupied, walkable dry tile.
+They reuse their existing crystal artwork on the ground and emit light on any
+underground floor, including outside the Mines. Dropped crystals of the same
+mineral stack on one tile without multiplying light strength. Their light radius
+is one tile smaller than the natural formation's, but never less than two tiles
+(Quartz/Amethyst/Topaz: 2; Aquamarine/Emerald/Sapphire: 2; Ruby: 3).
+Dropping consumes a turn; standing over a dropped crystal and pressing **F**
+recovers its whole stack in one turn, extinguishing its light. The same crystal
+can be sold or retained for portable illumination. Surface drops persist but
+do not glow. Floor items and their light sources follow normal save/replay
+restoration, and player-placed crystals are exempt from natural-vein spacing.
 Within the normal **five-tile** mine sight circle, tiles three, four and five
 steps away receive **25%, 50% and 75%** darkness, respectively; the two nearest
 steps remain clear. The shading covers creatures as well as terrain but does

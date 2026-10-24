@@ -58,6 +58,11 @@ describe('Mine-only encounters and darkness', () => {
         'depth-only templates are excluded before any surface spawn roll')
 
       const first=mine[0]
+      check(mine.every(({level})=>level.minePockets.every(p=>
+        Number.isInteger(p.approachDepth)&&p.approachDepth>=1&&p.approachDepth<=20)),
+        'every pocket connects through a bounded mineable excavation route')
+      check(mine.flatMap(({level})=>level.minePockets).some(p=>p.approachDepth>=10),
+        'the mine includes genuinely distant chambers beyond the first corridor wall')
       currentZ=first.z;currentCave=-1;map=first.level.map
       undergroundDiscovered=first.level.discovered
       player.x=first.level.mineUpstairs.x;player.y=first.level.mineUpstairs.y
@@ -131,6 +136,18 @@ describe('Mine-only encounters and darkness', () => {
         USE_TILE_IMAGES=originalTileMode
         render()
       }
+      const portable=MINING_CONFIG.lighting
+      check(Mining.lightInfo({kind:'dropped',mineral:'quartz',removed:false}).radius===2 &&
+        Mining.lightInfo({kind:'dropped',mineral:'ruby',removed:false}).radius===3 &&
+        portable.droppedRadiusReduction===1,
+        'portable crystal light uses a smaller radius without losing its close-range glow')
+      const glowingGround={kind:'ruby',x:player.x,y:player.y,level:currentZ,
+        levelKind:'chain',caveIndex:-1,count:1}
+      groundItems.push(glowingGround)
+      try {
+        check(Mining.lightSources().some(source=>source.kind==='dropped'&&source.mineral==='ruby'),
+          'a crystal dropped in the mine becomes a normal light source')
+      } finally {groundItems.splice(groundItems.indexOf(glowingGround),1);invalidateUndergroundFov()}
       // Inspect the actual transparent shadow layer: a crystal at the fifth
       // ring must clear darkness at its center, without removing remote shade.
       const originalMap=map,originalX=player.x,originalY=player.y

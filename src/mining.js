@@ -7,6 +7,7 @@ const Mining = (() => {
   const key = (x, y) => x + ',' + y
   const config = () => MINING_CONFIG
   const types = () => Object.keys(config().minerals)
+  const isMineralKind = kind => Object.hasOwn(config().minerals, kind)
   const floorLevel = () => currentZ <= -9 ? deepLevels[chainDepthForZ(currentZ) - 2] : null
   const activeLevel = () => floorLevel()?.kind === 'dwarvenMines' ? floorLevel() : null
   const find = (level, x, y) => level?.mineExcavations?.find(t => t.x === x && t.y === y && !t.removed)
@@ -65,6 +66,18 @@ const Mining = (() => {
       cfg.generation.exposedWideCorridorSpacing > 8 ||
       !Number.isInteger(cfg.generation.differentMineralSeparation) ||
       cfg.generation.differentMineralSeparation < 1 ||
+      !Array.isArray(cfg.generation.pocketDepthBands) ||
+      cfg.generation.pocketDepthBands.length < 2 ||
+      cfg.generation.pocketDepthBands.some(b => !Number.isInteger(b.min) ||
+        !Number.isInteger(b.max) || b.min < 1 || b.max < b.min ||
+        !Number.isFinite(b.weight) || b.weight <= 0) ||
+      !Number.isInteger(cfg.generation.pocketDepthFallbackRetries) ||
+      cfg.generation.pocketDepthFallbackRetries < 0 ||
+      !validOpacity(cfg.generation.deepRouteHardChance) ||
+      !Number.isInteger(cfg.lighting.droppedRadiusReduction) ||
+      cfg.lighting.droppedRadiusReduction < 0 ||
+      !Number.isInteger(cfg.lighting.droppedMinimumRadius) ||
+      cfg.lighting.droppedMinimumRadius < 1 ||
       cfg.generation.budgets?.length !== 5 ||
       !cfg.generation.budgets.every(b => bounds(b, 0, 100000)) ||
       Object.keys(cfg.minerals).length !== 7 ||
@@ -91,22 +104,49 @@ const Mining = (() => {
         ? config().generation.deeperEmptyWeightFactor : 1)}))
     return pickWeighted(choices, v => v.weight).type
   }
-  function generatePocket(level, floor, preferred = false) {
+  function originalMineDistances(cm) {
+    // Multi-source Chebyshev distance: a long route must actually reach far
+    // from every original corridor, not just its chosen starting corridor.
+    const dist = Array.from({length: MAP_H}, () => Array(MAP_W).fill(Infinity))
+    const queue = []
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+      if (!TILE[cm[y][x]]?.walk) continue
+      dist[y][x] = 0
+      queue.push({x, y})
+    }
+    for (let head = 0; head < queue.length; head++) {
+      const {x, y} = queue[head], next = dist[y][x] + 1
+      for (const [dx, dy] of DIRS8) {
+        const xx = x + dx, yy = y + dy
+        if (xx < 0 || yy < 0 || xx >= MAP_W || yy >= MAP_H || dist[yy][xx] <= next) continue
+        dist[yy][xx] = next
+        queue.push({x: xx, y: yy})
+      }
+    }
+    return dist
+  }
+  function generatePocket(level, floor, originalFloor, originalDistance, preferred = false) {
     const cfg = config().generation, cm = level.map
     const candidates = []
     for (let y = 7; y < MAP_H - 7; y++) for (let x = 7; x < MAP_W - 7; x++) {
-      if (cm[y][x] !== 'cavefloor2' || !doorFree(level, x, y, preferred ? 3 : cfg.minEntranceClearance)) continue
+      if (!originalFloor.has(key(x, y)) || cm[y][x] !== 'cavefloor2' ||
+        !doorFree(level, x, y, preferred ? 3 : cfg.minEntranceClearance)) continue
       if (preferred && Math.max(Math.abs(x - level.mineUpstairs.x), Math.abs(y - level.mineUpstairs.y)) > cfg.respiteTrainingDistance) continue
       candidates.push({x, y})
     }
     if (!candidates.length) return false
-    for (let attempt = 0; attempt < cfg.pocketRetries; attempt++) {
+    const chosen = preferred ? cfg.pocketDepthBands[0] : pickWeighted(cfg.pocketDepthBands, b => b.weight)
+    const bands = preferred ? [{min: 1, max: 1}] : [chosen,
+      ...cfg.pocketDepthBands.filter(b => b.max < chosen.min).reverse()]
+    for (const [index, band] of bands.entries()) for (let attempt = 0;
+      attempt < (index ? cfg.pocketDepthFallbackRetries : cfg.pocketRetries); attempt++) {
       const start = pick(candidates), [dx, dy] = pick(dirs4)
+      const depth = preferred ? 1 : randInt(band.min, band.max)
       const maxRadius = Math.floor((cfg.pocketMaxDiameter - 1) / 2)
       const rx = Math.min(maxRadius, randInt(...cfg.pocketRadiusX))
       const ry = Math.min(maxRadius, randInt(...cfg.pocketRadiusY))
-      const cx = start.x + dx * ((dx ? rx : ry) + 2)
-      const cy = start.y + dy * ((dy ? ry : rx) + 2)
+      const cx = start.x + dx * ((dx ? rx : ry) + depth + 1)
+      const cy = start.y + dy * ((dy ? ry : rx) + depth + 1)
       if (cx - rx < cfg.borderClearance || cy - ry < cfg.borderClearance ||
         cx + rx >= MAP_W - cfg.borderClearance || cy + ry >= MAP_H - cfg.borderClearance) continue
       const cells = [], trial = new Set()
@@ -116,19 +156,28 @@ const Mining = (() => {
         cells.push({x: xx, y: yy})
         trial.add(key(xx, yy))
       }
-      const entrance = {x: start.x + dx, y: start.y + dy}
-      const roomDoor = {x: start.x + 2 * dx, y: start.y + 2 * dy}
+      const route = Array.from({length: depth}, (_, i) => ({x: start.x + dx * (i + 1), y: start.y + dy * (i + 1)}))
+      const entrance = route[0]
+      const roomDoor = {x: start.x + (depth + 1) * dx, y: start.y + (depth + 1) * dy}
       if (!trial.has(key(roomDoor.x, roomDoor.y)) || !cells.length) continue
+      if (!route.every((p, i) => cm[p.y]?.[p.x] === 'cavewall' &&
+        doorFree(level, p.x, p.y, cfg.minEntranceClearance) &&
+        !level.mineExcavations.some(t => Math.max(Math.abs(p.x - t.x), Math.abs(p.y - t.y)) <= 1) &&
+        // Avoid hidden side entrances and corridors intersecting the seam.
+        (i === 0 || originalDistance[p.y][p.x] >= Math.min(i + 1, 3)))) continue
       const clear = cells.every(p => cm[p.y][p.x] === 'cavewall' && doorFree(level, p.x, p.y, cfg.pocketSpacing) &&
+        originalDistance[p.y][p.x] >= depth &&
         !level.mineExcavations.some(t => Math.max(Math.abs(p.x - t.x), Math.abs(p.y - t.y)) <= 2) &&
         DIRS8.every(([ax, ay]) => trial.has(key(p.x + ax, p.y + ay)) ||
           !TILE[cm[p.y + ay]?.[p.x + ax]]?.walk))
-      if (!clear || cm[entrance.y]?.[entrance.x] !== 'cavewall') continue
+      if (!clear) continue
       const pocket = {id: level.minePockets.length + 1, type: preferred ? 'minerals' : choosePocketType(floor),
-        cells, entrances: [entrance]}
+        cells, entrances: [entrance], approachDepth: depth}
       for (const p of cells) cm[p.y][p.x] = 'cavefloor2'
       level.mineFloorTiles += cells.length
-      mark(level, entrance.x, entrance.y, 'wall', {hardness: 'weak', threshold: preferred ? 0 : chooseThreshold('crack'), pocketId: pocket.id})
+      for (const p of route) mark(level, p.x, p.y, 'wall', {
+        hardness: p === entrance || preferred || !chance(cfg.deepRouteHardChance) ? 'weak' : 'hard',
+        ...(p === entrance && preferred ? {threshold: 0} : {}), pocketId: pocket.id})
       level.minePockets.push(pocket)
       if (pocket.type === 'cache') {
         const p = pick(cells)
@@ -360,10 +409,16 @@ const Mining = (() => {
       const level = levels[i]
       level.mineExcavations = []
       level.minePockets = []
+      const originalFloor = new Set()
+      for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+        if (level.map[y][x] === 'cavefloor2') originalFloor.add(key(x, y))
+      }
+      const originalDistance = originalMineDistances(level.map)
       // The first seam is conspicuous, cheap and off the mandatory route.
-      if (i === 0) generatePocket(level, 1, true)
+      if (i === 0) generatePocket(level, 1, originalFloor, originalDistance, true)
       const count = randInt(...config().generation.pocketsPerFloor)
-      for (let j = level.minePockets.length; j < count; j++) generatePocket(level, i + 1)
+      for (let j = level.minePockets.length; j < count; j++)
+        generatePocket(level, i + 1, originalFloor, originalDistance)
       connectOccasionalPockets(level)
       generateMinerals(level, i + 1)
     }
@@ -598,6 +653,10 @@ const Mining = (() => {
     const radius = config().minerals[deposit.mineral]?.radius
     if (!radius) return null
     if (deposit.kind === 'exposed') return {radius, opacity: 1}
+    if (deposit.kind === 'dropped') return {
+      radius: Math.max(config().lighting.droppedMinimumRadius,
+        radius - config().lighting.droppedRadiusReduction), opacity: 1
+    }
     // Only plainly visible crystals protruding from the wall glow. A secret
     // ore seam does not give away its presence with an unexplained light.
     if (deposit.kind === 'embedded' && deposit.threshold === 0) return {
@@ -605,6 +664,14 @@ const Mining = (() => {
       opacity: config().lighting.embeddedOpacityScale
     }
     return null
+  }
+
+  function lightSources() {
+    if (currentZ >= 0) return []
+    const natural = activeLevel()?.mineExcavations || []
+    const carriedOntoFloor = groundItems.filter(g => onCurrentLevel(g) && isMineralKind(g.kind))
+      .map(g => ({x: g.x, y: g.y, kind: 'dropped', mineral: g.kind, removed: false}))
+    return [...natural, ...carriedOntoFloor]
   }
 
   function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {
@@ -643,10 +710,8 @@ const Mining = (() => {
   }
 
   function lightVisible(mapTiles, px, py, ordinarySet) {
-    const level = activeLevel()
-    if (!level) return ordinarySet
     const visibleSet = new Set(ordinarySet)
-    for (const t of level.mineExcavations || []) {
+    for (const t of lightSources()) {
       const light = lightInfo(t)
       if (!light) continue
       const radius = light.radius
@@ -661,7 +726,7 @@ const Mining = (() => {
     return visibleSet
   }
 
-  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, lightInfo, lightCanReach, activeLevel, visible,
+  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, lightInfo, lightSources, lightCanReach, isMineralKind, activeLevel, visible,
     config}
 })()
 

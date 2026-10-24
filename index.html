@@ -6006,6 +6006,7 @@ more difficult:
     openCasket: () => openTreasureCasket(),
     treasuremap: () => inspectTreasureMap(),
     dig: () => tryDig(),
+    dropCrystal: idx => dropCrystal(idx),
     inspect: idx => {
       if (!canUseItemsWhileSwimming()) return
       const item = player.inventory[idx]
@@ -6093,6 +6094,30 @@ more difficult:
     }
     player.inventory.push(item)
     return item
+  }
+
+  function dropCrystal(idx) {
+    const item = player.inventory[idx]
+    if (!item || !Mining.isMineralKind(item.kind) || !canUseItemsWhileSwimming()) return
+    if (!TILE[map[player.y]?.[player.x]]?.walk || map[player.y][player.x] === 'water') {
+      log('There is nowhere safe to place the crystal here.', 'info')
+      return
+    }
+    const existing = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y)
+    if (existing && existing.kind !== item.kind) {
+      log('The ground here is already occupied.', 'info')
+      return
+    }
+    ensureReplayItemIds()
+    recordReplayAction({type: 'useItem', action: 'dropCrystal', idx, replayId: item.replayId})
+    if (existing) existing.count = (existing.count || 1) + 1
+    else groundItems.push({x: player.x, y: player.y, level: currentZ,
+      levelKind: currentLevelKind(), caveIndex: currentCave, kind: item.kind, count: 1})
+    item.count = (item.count || 1) - 1
+    if (!item.count) player.inventory.splice(idx, 1)
+    invalidateUndergroundFov()
+    log(`You place a ${item.name} on the ground.`, 'info')
+    consumeItemTurn()
   }
 
   function itemIconPath(kind) {
@@ -6540,8 +6565,19 @@ more difficult:
 
   function lootSkeletonOrForage() {
     const tomb = cemeteryTombstones[keyXY(player.x, player.y)]
-    const sandWithShovel = map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
+    const crystal = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && Mining.isMineralKind(g.kind))
+    const sandWithShovel = !crystal && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
     if (!sandWithShovel) recordReplayAction({type: 'forage'})
+    if (crystal) {
+      const count = crystal.count || 1
+      addInventoryItem(crystal.kind, {count})
+      groundItems.splice(groundItems.indexOf(crystal), 1)
+      invalidateUndergroundFov()
+      log(`You pick up ${count > 1 ? count + ' ' : 'a '}${itemDefinition(crystal.kind).name}${count > 1 ? ' crystals' : ''}.`, 'loot')
+      spawnPickupAnim(crystal)
+      consumeItemTurn()
+      return
+    }
     if (tomb?.odd) {
       addInventoryItem('oddTombstone', {
         tombName: tomb.name,
@@ -9067,7 +9103,7 @@ more difficult:
         if (!visible.has(keyXY(mx, my))) continue
         let darkness = mineSightDarknessAt(mx, my)
         if (!darkness) continue
-        for (const source of level.mineExcavations || []) {
+        for (const source of Mining.lightSources()) {
           const light = Mining.lightInfo(source)
           if (!light) continue
           const dist = Math.hypot(mx - source.x, my - source.y)
@@ -9129,7 +9165,7 @@ more difficult:
       shadeCtx.clearRect(px, py, TILE_PX, TILE_PX)
       shadeCtx.fillRect(px, py, TILE_PX, TILE_PX)
     }
-    for (const source of level.mineExcavations || []) {
+    for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
       shadeCtx.save()
@@ -9157,11 +9193,9 @@ more difficult:
   // relief. It uses the same wall-aware clipping as the darkness cutouts.
   function drawCrystalGlow(now, visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !visible || currentZ >= 0) return
-    const level = Mining.activeLevel()
-    if (!level) return
     const lighting = MINING_CONFIG.lighting
     const pulse = lighting.pulseOpacity * Math.sin(now / lighting.pulsePeriodMs)
-    for (const source of level.mineExcavations || []) {
+    for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
       const mineral = MINING_CONFIG.minerals[source.mineral]
@@ -9347,9 +9381,8 @@ more difficult:
         }
         if (currentZ < 0 && undergroundVisible?.has(keyXY(mx, my))) {
           const miningLevel = Mining.activeLevel()
-          if (miningLevel) {
-            if (!USE_TILE_IMAGES) {
-              for (const source of miningLevel.mineExcavations || []) {
+          if (!USE_TILE_IMAGES) {
+              for (const source of Mining.lightSources()) {
                 const light = Mining.lightInfo(source)
                 if (!light) continue
                 const mineral = MINING_CONFIG.minerals[source.mineral]
@@ -9364,7 +9397,8 @@ more difficult:
                 ctx.fillRect(px, py, TILE_PX, TILE_PX)
                 ctx.restore()
               }
-            }
+          }
+          if (miningLevel) {
             const mineralTile = Mining.clue(miningLevel, mx, my)
             if (mineralTile) {
               const mineral = mineralTile.mineral && MINING_CONFIG.minerals[mineralTile.mineral]

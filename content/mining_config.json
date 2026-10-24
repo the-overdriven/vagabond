@@ -30,6 +30,13 @@
     "pocketMaxDiameter": 8,
     "pocketSpacing": 4,
     "borderClearance": 5,
+    "pocketDepthBands": [
+      {"min": 1, "max": 3, "weight": 15},
+      {"min": 4, "max": 9, "weight": 25},
+      {"min": 10, "max": 20, "weight": 60}
+    ],
+    "pocketDepthFallbackRetries": 80,
+    "deepRouteHardChance": 0.15,
     "sizeThresholds": [10, 22],
     "pocketEntranceCounts": {"small": [1, 2], "medium": [2, 3], "large": [3, 4]},
     "secondApproachChance": 0.15,
@@ -80,6 +87,8 @@
     "tileVisibilityFeatherOpacity": 0.96,
     "embeddedRadiusScale": 0.5,
     "embeddedOpacityScale": 0.55,
+    "droppedRadiusReduction": 1,
+    "droppedMinimumRadius": 2,
     "pulseOpacity": 0.04,
     "pulsePeriodMs": 650
   },
