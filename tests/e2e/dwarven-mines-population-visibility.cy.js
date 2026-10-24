@@ -232,6 +232,28 @@ describe('Mine-only encounters and darkness', () => {
           drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)
           check(featherGradients>0,
             'the edge of visible mine terrain is softly feathered in tile mode')
+          check(MINING_CONFIG.lighting.tileVisibilityFeatherWidth>1,
+            'mine discovery boundaries fade over more than one tile')
+          const knownWall=new Set()
+          for(let y=4;y<=8;y++)for(let x=4;x<=8;x++)knownWall.add(x+','+y)
+          for(let y=7;y<=8;y++)for(let x=4;x<=8;x++)map[y][x]='cavewall'
+          ctx.save()
+          try {
+            ctx.fillStyle='#fff'
+            ctx.fillRect(4*TILE_PX,4*TILE_PX,5*TILE_PX,6*TILE_PX)
+            drawMineVisibilityFeather(knownWall,0,0,VIEW_W,VIEW_H)
+            const brightness=(x,y)=>ctx.getImageData(Math.floor(x*TILE_PX),
+              Math.floor(y*TILE_PX),1,1).data[0]
+            const near=brightness(6.5,7.3),middle=brightness(6.5,8.05)
+            const edge=brightness(6.5,8.85),unknown=brightness(6.5,9.2)
+            check(near>middle+30&&middle>edge+30&&edge<60,
+              'wall terrain fades progressively across its last two visible rows')
+            check(unknown===255,
+              'the feather overlay never paints or reveals an undiscovered tile')
+          } finally {
+            ctx.restore()
+            for(let y=7;y<=8;y++)for(let x=4;x<=8;x++)map[y][x]='cavefloor2'
+          }
           USE_TILE_IMAGES=false
           const tileGradientCount=featherGradients
           drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)

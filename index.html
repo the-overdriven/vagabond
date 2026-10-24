@@ -9234,15 +9234,15 @@ more difficult:
     }
   }
 
-  // Fade the last visible part of each floor tile into the surrounding
-  // unknown space. This is visual only: no unexplored tile is drawn or
-  // added to FOV, and occluding walls still prevent light propagation.
+  // Fade explored terrain toward unknown space across neighbouring tiles,
+  // rather than ending a wall face at a straight row of pixels. The clipping
+  // mask prevents this visual softness from revealing any unknown terrain.
   function drawMineVisibilityFeather(visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !Mining.activeLevel() || !visible) return
     const lighting = MINING_CONFIG.lighting
-    const width = lighting.tileVisibilityFeatherWidth * TILE_PX
     const color = `rgba(0, 0, 0, ${lighting.tileVisibilityFeatherOpacity})`
-    const trulyUnknown = (x, y) => !visible.has(keyXY(x, y)) && !undergroundDiscovered?.[y]?.[x]
+    const isKnown = (x, y) => visible.has(keyXY(x, y)) || !!undergroundDiscovered?.[y]?.[x]
+    const trulyUnknown = (x, y) => !isKnown(x, y)
     const paintEdge = (x1, y1, x2, y2, x, y, w, h, fadeOut) => {
       const gradient = ctx.createLinearGradient(x1, y1, x2, y2)
       gradient.addColorStop(0, fadeOut ? color : 'rgba(0, 0, 0, 0)')
@@ -9251,11 +9251,24 @@ more difficult:
       ctx.fillRect(x, y, w, h)
     }
     ctx.save()
+    ctx.beginPath()
     for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
       const mx = baseX + vx, my = baseY + vy
-      if (!visible.has(keyXY(mx, my))) continue
+      if (isKnown(mx, my)) ctx.rect(Math.round((mx - camX) * TILE_PX),
+        Math.round((my - camY) * TILE_PX), TILE_PX, TILE_PX)
+    }
+    ctx.clip()
+    for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
+      const mx = baseX + vx, my = baseY + vy
+      if (!isKnown(mx, my)) continue
       const x = Math.round((mx - camX) * TILE_PX)
       const y = Math.round((my - camY) * TILE_PX)
+      // Wall faces need a long fade at their distant ends. Keep the narrower
+      // floor fade so an illuminated one-tile passage is not blacked out by
+      // its as-yet unseen side walls.
+      const width = (map[my]?.[mx] === 'cavewall'
+        ? lighting.tileVisibilityFeatherWidth
+        : lighting.tileFloorVisibilityFeatherWidth) * TILE_PX
       if (trulyUnknown(mx - 1, my))
         paintEdge(x, y, x + width, y, x, y, width, TILE_PX, true)
       if (trulyUnknown(mx + 1, my))

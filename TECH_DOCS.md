@@ -2725,8 +2725,10 @@ In tile graphics, a continuous radial darkness field covers the whole viewport,
 blending the fifth-tile darkness into the **85%** remembered-terrain shade rather
 than stopping at square tile borders. Previously explored tiles obscured by
 walls still retain their remembered darkness even when close to the player.
-The edge of visible terrain fades into entirely unknown space within its last
-visible tiles, without revealing additional terrain. Each crystal produces a
+The edge of visible and remembered terrain fades into entirely unknown space.
+Rock faces fade across more than one tile to avoid abrupt horizontal ends;
+floor edges use a narrower fade so a thin passage stays readable. This never
+reveals additional terrain. Each crystal produces a
 continuous, softly fading colored glow and a
 brighter central halo across reachable terrain; opaque walls cast shadows.
 ASCII graphics retain cell-by-cell illumination. The light's color,

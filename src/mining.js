@@ -49,7 +49,9 @@ const Mining = (() => {
       !Number.isInteger(cfg.lighting.tileFadeMargin) ||
       cfg.lighting.tileFadeMargin < 0 || cfg.lighting.tileFadeMargin > 2 ||
       !Number.isFinite(cfg.lighting.tileVisibilityFeatherWidth) ||
-      cfg.lighting.tileVisibilityFeatherWidth <= 0 || cfg.lighting.tileVisibilityFeatherWidth > 1 ||
+      cfg.lighting.tileVisibilityFeatherWidth <= 0 || cfg.lighting.tileVisibilityFeatherWidth > 2 ||
+      !Number.isFinite(cfg.lighting.tileFloorVisibilityFeatherWidth) ||
+      cfg.lighting.tileFloorVisibilityFeatherWidth <= 0 || cfg.lighting.tileFloorVisibilityFeatherWidth > 1 ||
       !validOpacity(cfg.lighting.tileVisibilityFeatherOpacity) ||
       !Number.isFinite(cfg.lighting.pulsePeriodMs) || cfg.lighting.pulsePeriodMs <= 0 ||
       !bounds(cfg.generation.pocketsPerFloor, 1, 30) ||
