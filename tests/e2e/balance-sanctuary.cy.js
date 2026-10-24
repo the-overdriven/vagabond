@@ -35,6 +35,13 @@ describe('Gear balance, racial growth, death shields and sanctuary', () => {
   })
   it('adds the racial stat at every fifth level and announces combined level gains', () => {
     cy.window().then(win=>win.eval(`(() => {
+      check(player.baseDef===2,'all new characters start with two base DEF')
+      check(ENEMY_TEMPLATE_BY_NAME['Giant Rat'].atk===1 &&
+        ENEMY_TEMPLATE_BY_NAME.Goblin.atk===6 &&
+        ENEMY_TEMPLATE_BY_NAME.Ogre.hp===108 &&
+        ENEMY_TEMPLATE_BY_NAME.Ogre.atk===16 && ENEMY_TEMPLATE_BY_NAME.Ogre.def===6 &&
+        ENEMY_TEMPLATE_BY_NAME.Lich.atk===30,
+        'tier one stays intact, tier two receives +2 ATK, and higher tiers scale before the bonus')
       const originalPopup=showLevelUpPopup;let shown
       showLevelUpPopup=g=>shown=g
       try {for(const [race,stat] of [['orc','atk'],['dwarf','def'],['catling','spd']]){

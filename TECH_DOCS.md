@@ -62,7 +62,7 @@ XP: 0
 Max HP: 50
 HP: 50
 ATK: 2
-DEF: 0
+DEF: 2
 SPD: 5
 MF: 0
 Gold: 0
@@ -237,6 +237,8 @@ Calculated from base ATK plus applicable:
 - curse debuffs
 
 ## DEF
+
+New characters start with **2 base DEF** before race, gear and terrain bonuses.
 
 Calculated from base DEF plus applicable:
 
@@ -549,6 +551,8 @@ Normal underground walls and minerals grant XP only once when completed.
 Overworld boulder removal gives 1 XP for each of the first five stones, then
 `1 / n` XP for the *n*th stone. Fractional XP is accumulated in deterministic
 integer units, so endlessly mining surface stones barely advances the skill.
+Surface boulders do not display a hover tooltip; their appearance remains the
+visual cue that a pickaxe may clear them.
 Mining has no stamina meter, tool durability or item refining. Extracted gems
 stack in inventory and can be sold to the village merchant.
 
@@ -2583,6 +2587,8 @@ paired up/down stairs, allowing the player to return along the same route.
 The first floor offers a comparatively quiet respite after the Dwarven Fort;
 the second is a deliberate difficulty spike. Mine floors use **brown cave-floor
 tiles**, with dedicated brownish **Shoddy Mine Stairs** art for stair travel.
+After a pickaxe clears the collapsed mine entrance in the Ruins, the revealed
+downward staircase uses the same shoddy artwork, against the Ruins' stone floor.
 The collapsed entrance is highlighted **red** on the maps like other exits.
 
 The initial mine layout uses a narrow winding excavated spine, side branches,
@@ -3625,7 +3631,7 @@ rendering and enemy inspection.
 
 | Ability / initial user | Rule | Player response |
 |---|---|---|
-| `exposed` — Vrakeber | Each attempted melee attack, including a miss, reduces its base DEF **12 → 3** through the next complete player action. Spawn variation and ordinary prefix, equipment, terrain, and ally modifiers apply after selecting the appropriate base. Subsequent attacks refresh the opening. | Strike while its exposed marker is visible. |
+| `exposed` — Vrakeber | Each attempted melee attack, including a miss, reduces its base DEF **14 → 3** through the next complete player action. Spawn variation and ordinary prefix, equipment, terrain, and ally modifiers apply after selecting the appropriate base. Subsequent attacks refresh the opening. | Strike while its exposed marker is visible. |
 | `shellRetreat` — Tholosum | The first surviving hit leaving it **below 40% max HP** activates a one-time shell state: **+12 DEF**, no attacks or moves for **four subsequent complete player actions**. The triggering action does not count, and lethal hits do not activate the shell. | Heal, retreat, wait, or attack the shell; its marker and duration are visible. |
 | `regen` — Cave Troll | Heals **2 HP every 3 active-floor gameplay turns**, capped at max HP. The phase pauses off-floor without catch-up and never revives a dead monster. This also applies to the optional z:-2 cave encounter. | Deal sustained damage before recovery offsets weaker strikes. |
 
@@ -5268,14 +5274,16 @@ Each definition contains a default `name`, inventory `category` (`supplies` or
 `other`), `stackable`, base `sellValue`, and ordered `actions`. Optional
 `description`, `effect`, `carryStats`, and `icon` fields describe inspection
 text, behavior parameters, carrying modifiers, and an inventory-icon override.
+The optional `droppable` flag defaults to true. The Brass Bell and Wheelbarrow
+set it to false; the same restriction can be applied to an individual item.
 Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon overrides may use either `.svg` or `.png` and may point to local `img/icons/` or `img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile (`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay consistent.
 
 Actions name approved JavaScript handlers; JSON contains no executable rules.
 Inventory buttons and replay item-use actions share that handler registry.
 Handlers retain turn costs, swimming restrictions, quest consequences, and
-replay recording. An empty actions list means no inventory button: potatoes
-are inert Supplies, valuables are Other, and Identification scrolls are used
-through an artifact's identification button. The Black Key remains in inventory
+replay recording. An empty actions list means no special inventory action beyond
+Drop: potatoes are inert Supplies, valuables are Other, and Identification
+scrolls are used through an artifact's identification button. The Black Key remains in inventory
 when equipped and uses its special Equip/Unequip action.
 
 Item creation uses the catalog's defaults. Instances retain their counts,
@@ -5284,6 +5292,18 @@ and effect definitions are not copied into saves. Stackable kinds merge by kind,
 while tombstones and other non-stackable objects retain separate identities.
 Catalog loading and item creation consume no gameplay RNG. Carried modifiers
 apply once per present kind; carrying the bell gives SPD −5.
+
+Every eligible backpack item has a **Drop** action, including gear, unidentified
+artifacts, tools and progression keys. Each action places one item or one unit
+of a stack on the player's current dry, walkable tile, consumes one turn and
+does not consume RNG. An occupied tile refuses the drop, except that matching
+stackable player-dropped items merge. The floor keeps complete item data,
+including unidentified enchantments and quest identifiers, through saves and
+replay. Dropped equipment and ordinary supplies use their inventory icons on
+the floor; the **forage key (F)** collects the dropped item or stack in one
+turn. It does not auto-pick up on movement. A dropped worn Black Key is
+automatically unequipped. Crystals retain their existing mineral floor art,
+light emission and collection rules.
 
 Drop locations and probabilities stay in `loot_tables.json` and world-generation
 configuration. Merchant quantities and purchase prices stay in
@@ -7063,6 +7083,12 @@ sell value = tier sell value + modifier amount × 5
 ```
 
 The modifier's name/stat does not change this formula; only `modAmt` matters.
+Artifact sell prices apply an additional discount **after** the tier/modifier
+calculation: **unidentified artifacts sell for half**, and **identified cursed
+artifacts for one quarter**, rounded down to whole gold. Identified artifacts
+without a curse retain the normal tier-based sell value. An unidentified cursed
+artifact receives only the unidentified discount until it is identified.
+These discounts affect selling only; merchant purchase prices are unchanged.
 
 ### Non-tiered items
 

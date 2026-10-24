@@ -15,6 +15,25 @@ function loadedGame() {
 describe('Gear bases on procedural artifacts', () => {
   beforeEach(loadedGame)
 
+  it('discounts only artifact selling when unidentified or identified as cursed', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const art={kind:'artifact',tier:3,mod:'atk',modAmt:2,baseValue:200,
+        identified:false,curse:null}
+      const normal=SELL_VALUE_BY_TIER[3]+10
+      check(itemSellValue(art)===Math.floor(normal/2),'unidentified artifact sells for half')
+      art.curse={everyTurns:10,types:['hp']}
+      check(itemSellValue(art)===Math.floor(normal/2),'hidden curse does not stack discounts')
+      art.identified=true
+      check(itemSellValue(art)===Math.floor(normal/4),'identified cursed artifact sells for quarter')
+      art.curse=null
+      check(itemSellValue(art)===normal,'identified clean artifact keeps normal sell value')
+      check(itemBaseValue(art)===220,'artifact purchase base remains unchanged')
+      check(itemSellValue({kind:'weapon',tier:3,mod:'atk',modAmt:2})===normal,
+        'ordinary equipment remains unaffected by artifact discounts')
+    })()`))
+  })
+
   it('pulls names from all gear catalogs and carries base stats on every generated gear artifact', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

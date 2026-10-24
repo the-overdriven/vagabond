@@ -2531,7 +2531,7 @@ more difficult:
     lvl: 1, xp: 0,
     totalXpEarned: 0, lastTempleHealXp: 0,
     maxHp: 50, hp: 50,
-    baseAtk: 2, baseDef: 0, baseSpd: 5, baseMf: 0,
+    baseAtk: 2, baseDef: 2, baseSpd: 5, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
     trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
     invisibleTurns: 0,
@@ -4667,7 +4667,7 @@ more difficult:
       maxHp: 50,
       hp: 50,
       baseAtk: 2,
-      baseDef: 0,
+      baseDef: 2,
       baseSpd: 5,
       baseMf: 0,
       gold: 0,
@@ -6012,6 +6012,7 @@ more difficult:
     treasuremap: () => inspectTreasureMap(),
     dig: () => tryDig(),
     dropCrystal: idx => dropCrystal(idx),
+    dropItem: idx => dropInventoryItem(idx),
     inspect: idx => {
       if (!canUseItemsWhileSwimming()) return
       const item = player.inventory[idx]
@@ -6061,6 +6062,8 @@ more difficult:
         throw new Error('Invalid item definition: ' + kind)
       if (item.icon !== undefined && (typeof item.icon !== 'string' || !/^img\/(?:icons|tiles)\/[A-Za-z0-9 _-]+\.(?:svg|png)$/.test(item.icon)))
         throw new Error('Invalid item icon: ' + kind)
+      if (item.droppable !== undefined && typeof item.droppable !== 'boolean')
+        throw new Error('Invalid droppable flag: ' + kind)
       for (const action of item.actions) {
         if (!action || typeof action.label !== 'string' || !Object.hasOwn(ITEM_ACTION_HANDLERS, action.handler))
           throw new Error('Unknown item action: ' + kind)
@@ -6101,9 +6104,48 @@ more difficult:
     return item
   }
 
+  function canDropInventoryItem(item) {
+    return !!item && item.droppable !== false && itemDefinition(item.kind)?.droppable !== false
+  }
+
+  function dropInventoryItem(idx) {
+    const item = player.inventory[idx]
+    if (!canDropInventoryItem(item) || !canUseItemsWhileSwimming()) return
+    if (Mining.isMineralKind(item.kind)) return dropCrystal(idx)
+    if (!TILE[map[player.y]?.[player.x]]?.walk || map[player.y][player.x] === 'water') {
+      log('There is nowhere safe to place that item here.', 'info')
+      return
+    }
+    const existing = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y)
+    const merges = existing?.kind === 'droppeditem' && isStackableKind(item.kind) &&
+      existing.item?.kind === item.kind
+    if (existing && !merges) {
+      log('The ground here is already occupied.', 'info')
+      return
+    }
+    ensureReplayItemIds()
+    recordReplayAction({type:'useItem', action:'dropItem', idx, replayId:item.replayId})
+    const dropped = structuredClone(item)
+    if (isStackableKind(item.kind)) {
+      dropped.count = 1
+      if ((item.count || 1) > 1) delete dropped.replayId
+    }
+    if (merges) existing.item.count = (existing.item.count || 1) + 1
+    else groundItems.push({x:player.x, y:player.y, level:currentZ,
+      levelKind:currentLevelKind(), caveIndex:currentCave, kind:'droppeditem', item:dropped})
+    if (isStackableKind(item.kind) && (item.count || 1) > 1) item.count--
+    else {
+      player.inventory.splice(idx, 1)
+      if (item.kind === 'blackkey' && (player.equip.blackkey === item ||
+        !player.inventory.some(other => other.kind === 'blackkey'))) player.equip.blackkey = null
+    }
+    log(`You place ${artifactDisplayName(item)} on the ground.`, 'info')
+    consumeItemTurn()
+  }
+
   function dropCrystal(idx) {
     const item = player.inventory[idx]
-    if (!item || !Mining.isMineralKind(item.kind) || !canUseItemsWhileSwimming()) return
+    if (!canDropInventoryItem(item) || !Mining.isMineralKind(item.kind) || !canUseItemsWhileSwimming()) return
     if (!TILE[map[player.y]?.[player.x]]?.walk || map[player.y][player.x] === 'water') {
       log('There is nowhere safe to place the crystal here.', 'info')
       return
@@ -6150,6 +6192,7 @@ more difficult:
 
   function appendItemActions(row, item, idx) {
     for (const action of itemDefinition(item.kind).actions) {
+      if ((action.handler === 'dropCrystal' || action.handler === 'dropItem') && !canDropInventoryItem(item)) continue
       const btn = document.createElement('button')
       btn.textContent = action.activeLabel && player.equip[item.kind] ? action.activeLabel : action.label
       if (action.title) btn.title = action.title
@@ -6571,8 +6614,23 @@ more difficult:
   function lootSkeletonOrForage() {
     const tomb = cemeteryTombstones[keyXY(player.x, player.y)]
     const crystal = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && Mining.isMineralKind(g.kind))
-    const sandWithShovel = !crystal && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
+    const dropped = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y &&
+      g.kind === 'droppeditem')
+    const sandWithShovel = !crystal && !dropped && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
     if (!sandWithShovel) recordReplayAction({type: 'forage'})
+    if (dropped) {
+      const item = dropped.item
+      if (isStackableKind(item.kind)) {
+        const existing = player.inventory.find(it => it.kind === item.kind)
+        if (existing) existing.count = (existing.count || 1) + (item.count || 1)
+        else player.inventory.push(item)
+      } else player.inventory.push(item)
+      groundItems.splice(groundItems.indexOf(dropped), 1)
+      log(`You pick up ${artifactDisplayName(item)}.`, 'loot')
+      spawnPickupAnim(dropped)
+      consumeItemTurn()
+      return
+    }
     if (crystal) {
       const count = crystal.count || 1
       addInventoryItem(crystal.kind, {count})
@@ -8657,6 +8715,13 @@ more difficult:
   // kinds here so a future tileset can add an `image` field to the same JSON
   // descriptors without changing gameplay/world-generation code.
   function groundGlyph(g) {
+    if (g.kind === 'droppeditem') {
+      const kind = g.item?.kind
+      const ch = kind === 'weapon' ? '⚔' : kind === 'shield' ? '◈' :
+        kind === 'armor' ? '▣' : kind === 'artifact' ? '♦' :
+          itemDefinition(kind)?.category === 'supplies' ? '!' : '¤'
+      return {ch, color:'#e5c88b'}
+    }
     const visual = RENDER_STYLE.groundItems[g.kind]
     if (!visual) return null
     return {
@@ -8664,6 +8729,18 @@ more difficult:
       color: g.searched && visual.searchedColor ? visual.searchedColor :
         (g.looted && visual.lootedColor ? visual.lootedColor : visual.color)
     }
+  }
+
+  function droppedInventoryVisual(item) {
+    if (!item) return null
+    const gearKind = item.kind === 'artifact' ? item.artifactSlot : item.kind
+    const base = ['weapon','shield','armor'].includes(gearKind)
+      ? (item.base || (item.kind === 'artifact' ? item.noun : item.name)) : null
+    const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
+      ? 'img/icons/' + base + '.svg' : null
+    const fallback = itemIconPath(item.kind)
+    const path = [specific, fallback].find(path => path && preloadedImages.has(path))
+    return path ? {image:path, scale:0.72} : null
   }
 
   function spawnFxAnim(x, y, ch, color, dir) {
@@ -9691,6 +9768,8 @@ more difficult:
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
+        if (g.kind === 'droppeditem' && drawImageVisualWithShadow(vx,vy,
+          droppedInventoryVisual(g.item))) return
         if (g.kind === 'stolenloot') {
           drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65, true)
           return
@@ -10380,6 +10459,7 @@ more difficult:
   }
 
   function groundItemLabel(g) {
+    if (g.kind === 'droppeditem') return g.item ? artifactDisplayName(g.item) : 'Dropped Item'
     return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
   }
 
@@ -10486,10 +10566,6 @@ more difficult:
       </div>`
       }
     }
-    if (currentZ === 0 && map[my]?.[mx] === 'boulder') return {
-      mini: true, enemy: null,
-      html: '<div class="nm">Stone Boulder</div><div>A Pickaxe could open a way through it.</div>'
-    }
     const miningClue = Mining.clue(Mining.activeLevel(), mx, my)
     if (miningClue) {
       const exposed = miningClue.kind === 'exposed'
@@ -10528,6 +10604,10 @@ more difficult:
         mini: true,
         enemy: null,
         html: `<div class="nm">Your Remains</div><div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Forage to recover the dropped item</div>`
+      }
+      if (g.kind === 'droppeditem') return {
+        mini: true, enemy: null,
+        html: `<div class="nm">${groundItemLabel(g)}</div><div>Press F to pick up.</div>`
       }
       if (g.kind === 'skeleton') return {
         mini: true,
@@ -11616,6 +11696,14 @@ more difficult:
         btn.onclick = () => equipItem(idx)
         row.appendChild(btn)
       }
+      if (canDropInventoryItem(it) && !Mining.isMineralKind(it.kind)) {
+        const btn = document.createElement('button')
+        btn.className = 'inventory-drop-btn'
+        btn.textContent = 'Drop'
+        btn.title = 'Drop one item on the current tile'
+        btn.onclick = () => ITEM_ACTION_HANDLERS.dropItem(idx)
+        row.appendChild(btn)
+      }
       list.appendChild(row)
     })
   }
@@ -11717,6 +11805,10 @@ more difficult:
     if (it.tier) {
       let v = SELL_VALUE_BY_TIER[it.tier] || 0
       if (it.mod) v += (it.modAmt || 1) * 5
+      if (it.kind === 'artifact') {
+        if (!it.identified) v = Math.floor(v / 2)
+        else if (it.curse) v = Math.floor(v / 4)
+      }
       return v
     }
     return 0

@@ -42,28 +42,28 @@ const plain = value => JSON.parse(JSON.stringify(value))
   run('enemyAttackPlayer(vrakeber)')
   assert.equal(run('player.hp'),hpBefore)
   assert.equal(run('vrakeber.exposedUntilTurn'),41)
-  assert.equal(run('enemyDef(vrakeber)'),ordinaryDef-9,
-    'base DEF 12 becomes 3, preserving the independent +5 modifier and terrain')
+  assert.equal(run('enemyDef(vrakeber)'),ordinaryDef-11,
+    'base DEF 14 becomes 3, preserving the independent +5 modifier and terrain')
   assert(run('tileInspectInfo(vrakeber.x,vrakeber.y).html.includes("Exposed")'),
     'inspection shows the exposure state')
   run('turnCount++')
   assert(!run('enemyExposed(vrakeber)'),'exposure expires after one complete responding action')
   assert.equal(run('enemyDef(vrakeber)'),ordinaryDef,'DEF returns without cumulative subtraction')
-  // Prefixes are applied AFTER the exposed base is chosen: Sturdy 12 -> 20,
-  // while the exposed base 3 -> 6. Equipment remains an independent +5.
-  run(`vrakeber.def=12;vrakeber.gearBonuses=null;vrakeber.prefix='Sturdy';
-    vrakeber.prefixBase={def:12};applyEnemyPrefix(vrakeber,'Sturdy');
+  // Prefixes are applied AFTER the exposed base is chosen. Equipment
+  // remains an independent +5 and does not scale with the base stat.
+  run(`vrakeber.def=14;vrakeber.gearBonuses=null;vrakeber.prefix='Sturdy';
+    vrakeber.prefixBase={def:14};applyEnemyPrefix(vrakeber,'Sturdy');
     vrakeber.def+=5;vrakeber.gearBonuses={def:5};turnCount=41;
     exposeEnemyAfterMelee(vrakeber)`)
   assert.equal(run('enemyDef(vrakeber)'),11,'prefix and equipment apply after exposed base')
-  run('vrakeber.prefix=null;vrakeber.prefixBase=null;vrakeber.def=17;vrakeber.gearBonuses={def:5}')
+  run('vrakeber.prefix=null;vrakeber.prefixBase=null;vrakeber.def=19;vrakeber.gearBonuses={def:5}')
   run('chance=originalChance;vrakeber.alive=false')
 
   // Successful player attack crosses the health threshold but cannot prevent
   // lethal damage. The triggering action is not one of the four response turns.
-  run('chance=()=>false;originalDamageRoll=damageRoll;damageRoll=()=>91')
+  run('chance=()=>false;originalDamageRoll=damageRoll;damageRoll=()=>118')
   await run('playerAttackEnemy(tholosum)')
-  assert.equal(run('tholosum.hp'),49)
+  assert.equal(run('tholosum.hp'),50)
   assert.equal(run('tholosum.shellRetreatUsed'),true)
   assert.equal(run('tholosum.shellRetreatTurns'),5)
   const shelledDef=run('enemyDef(tholosum)')
@@ -92,24 +92,24 @@ const plain = value => JSON.parse(JSON.stringify(value))
     +'enemyIsVisibleOnMainView=()=>false')
   const oldRng=run('rngState')
   run('tickEnemyRegeneration();tickEnemyRegeneration()')
-  assert.equal(run('caveTroll.hp'),205)
+  assert.equal(run('caveTroll.hp'),247)
   assert.equal(run('caveTroll.regenPhase'),2)
   run('tickEnemyRegeneration()')
-  assert.equal(run('caveTroll.hp'),207)
+  assert.equal(run('caveTroll.hp'),249)
   assert.equal(run('caveTroll.regenPhase'),0)
   assert.equal(run('rngState'),oldRng,'passive abilities consume no gameplay RNG')
   run('caveTroll.level=-2;tickEnemyRegeneration();tickEnemyRegeneration()')
   assert.equal(run('caveTroll.regenPhase'),0,'inactive floor pauses phase without catch-up')
   run('currentZ=-2;caveTroll.levelKind="chain";caveTroll.regenPhase=2;tickEnemyRegeneration()')
-  assert.equal(run('caveTroll.hp'),209,'optional z:-2 cave troll regenerates under the same generic rule')
+  assert.equal(run('caveTroll.hp'),251,'optional z:-2 cave troll regenerates under the same generic rule')
   assert.equal(run('caveTroll.regenPhase'),0)
   run('currentZ=0;caveTroll.levelKind=null')
   run('caveTroll.level=0;tickEnemyRegeneration()')
   assert.equal(run('caveTroll.regenPhase'),1)
   run('tickEnemyRegeneration();tickEnemyRegeneration();tickEnemyRegeneration()')
-  assert.equal(run('caveTroll.hp'),210,'heal clamps to maximum HP')
+  assert.equal(run('caveTroll.hp'),252,'heal clamps to maximum HP')
   run('tickEnemyRegeneration();tickEnemyRegeneration()')
-  assert.equal(run('caveTroll.hp'),210)
+  assert.equal(run('caveTroll.hp'),252)
   run('caveTroll.hp=0;tickEnemyRegeneration()')
   assert.equal(run('caveTroll.hp'),0,'regen cannot revive')
 
@@ -131,7 +131,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
       assert.deepEqual(e[key],saved[key],`${e.baseName}: ${key} restored exactly`)
   }
   assert.equal(run('enemyDef(enemies.find(e=>e.baseName==="Vrakeber"))'),
-    ordinaryDef-9,'post-load effective DEF still reflects exposure')
+    ordinaryDef-11,'post-load effective DEF still reflects exposure')
   assert.equal(run('enemyShellRetreating(enemies.find(e=>e.baseName==="Tholosum"))'),true)
   run('tickEnemyRegeneration()')
   assert.equal(run('enemies.find(e=>e.baseName==="Cave Troll").hp'),203,

@@ -470,7 +470,7 @@
       "scale": 1
     },
     "dwarvenminesopen": {
-      "image": "img/tiles/dwarven-stairs-down.png", "baseTileKey": "marble", "scale": 1
+      "image": "img/tiles/shoddy-mine-stairs-down.png", "baseTileKey": "marble", "scale": 1
     },
     "minestairsup": {
       "image": "img/tiles/shoddy-mine-stairs-up.png", "baseTileKey": "cavefloorBrown", "scale": 1

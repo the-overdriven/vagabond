@@ -1069,6 +1069,8 @@ body.hint-collapsed #hint .panel-toggle {
 
 .invitem .nm {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .invitem button {
@@ -1084,6 +1086,10 @@ body.hint-collapsed #hint .panel-toggle {
 .invitem button:hover {
   background: var(--ember);
   color: #1a0f05;
+}
+
+.invitem .inventory-drop-btn {
+  padding-inline: 5px;
 }
 
 .tier1 {

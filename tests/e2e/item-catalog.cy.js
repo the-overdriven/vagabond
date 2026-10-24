@@ -167,14 +167,17 @@ describe('Non-gear item catalog', () => {
         player.inventory = []
         addHerb(); addPotato(); addIdScroll(); addInventoryItem('amber')
         addInventoryItem('blackkey'); addInventoryItem('treasurecasket'); addInventoryItem('shovel')
+        addInventoryItem('wheelbarrow'); addInventoryItem('bigbell')
         player.hp = playerMaxHp() - 50
         invTab = 'all'; toggleInv(true)
       `))
-      cy.get('#invList .invitem').contains('Potato').parent().find('button').should('not.exist')
-      cy.get('#invList .invitem').contains('Scroll of Identification').parent().find('button').should('not.exist')
-      cy.get('#invList .invitem').contains('Amber').parent().find('button').should('not.exist')
-      cy.get('#invList .invitem').contains('Shovel').parent().find('button').should('have.text', 'Dig')
-      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().find('button').should('have.text', 'Open')
+      cy.get('#invList .invitem').contains('Potato').parent().find('button').should('have.text', 'Drop')
+      cy.get('#invList .invitem').contains('Scroll of Identification').parent().find('button').should('have.text', 'Drop')
+      cy.get('#invList .invitem').contains('Amber').parent().find('button').should('have.text', 'Drop')
+      cy.get('#invList .invitem').contains('Shovel').parent().contains('button', 'Dig').should('exist')
+      cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').should('exist')
+      cy.get('#invList .invitem').contains('Wheelbarrow').parent().contains('button', 'Drop').should('not.exist')
+      cy.get('#invList .invitem').contains('Brass Bell').parent().contains('button', 'Drop').should('not.exist')
       cy.get('#invOverlay .panelbox').should($panel => {
         expect($panel[0].clientWidth, 'dialog width independent of canvas').to.be.greaterThan(300)
       })
@@ -201,6 +204,86 @@ describe('Non-gear item catalog', () => {
       })
     })
   }
+
+  it('drops and retrieves stacked and unique items with stable save and replay state', () => {
+    beginNewGame('Drop Item Tester')
+    cy.window().then(win => win.eval(`(async()=>{
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayRecording=false;replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=true
+      enemies=[];npcs=[];occupied=new Set();groundItems=[]
+      currentZ=0;currentCave=-1;map=surfaceMap
+      map[player.y][player.x]='grass'
+      player.inventory=[createItem('amber',{count:3})]
+      player.equip.blackkey=null
+      startReplayRecording()
+      const startTurn=turnCount
+      dropInventoryItem(0);dropInventoryItem(0)
+      check(player.inventory[0].count===1&&groundItems.length===1&&
+        groundItems[0].kind==='droppeditem'&&groundItems[0].item.count===2,
+        'two amber units merge into one recoverable floor stack')
+      const groundSave=JSON.parse(JSON.stringify(buildSaveObject()))
+      check(groundSave.groundItems[0].item.count===2,'save includes the floor stack')
+      lootSkeletonOrForage()
+      check(player.inventory[0].count===3&&groundItems.length===0&&turnCount===startTurn+3,
+        'foraging recovers the whole stack and consumes one turn')
+      const recorded=JSON.parse(JSON.stringify(replayData))
+      check(recorded.actions.map(a=>a.action||a.type).join(',')==='dropItem,dropItem,forage',
+        'drop and pickup record their deterministic item actions')
+      loadGameFromObject(groundSave,{isReplayInit:true})
+      check(groundItems.length===1&&groundItems[0].item.count===2,
+        'loading restores the dropped stack on the same tile')
+      lootSkeletonOrForage()
+      check(player.inventory[0].count===3&&groundItems.length===0,
+        'foraging still works after loading the save')
+      loadGameFromObject(recorded.initialState,{isReplayInit:true})
+      replayRecording=false;replayPlaying=true;replaySimulationMode=true
+      activeReplay=recorded;replayRngIndex=0
+      try {
+        for(const action of recorded.actions)await runReplayAction(action)
+        check(player.inventory[0].count===3&&groundItems.length===0,
+          'replay reproduces the drop-and-pickup result')
+        check(replayRngIndex===recorded.rng.length,'dropping consumes no replay RNG')
+      }finally{replayPlaying=false;replaySimulationMode=false;activeReplay=null}
+
+      const artifact={kind:'artifact',name:'Unknown heirloom',noun:'Dagger',artifactSlot:'weapon',
+        tier:3,identified:false,atk:6,curse:{everyTurns:8,types:['hp']},curseTimer:3}
+      player.inventory=[artifact];groundItems=[]
+      dropInventoryItem(0)
+      check(groundItems[0].item.curseTimer===3 && !groundItems[0].item.identified &&
+        groundItems[0].item.atk===6,'unidentified artifact properties survive dropping')
+      const artSaved=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(artSaved,{isReplayInit:true})
+      lootSkeletonOrForage()
+      check(player.inventory[0].kind==='artifact' && player.inventory[0].curseTimer===3 &&
+        !player.inventory[0].identified,'unique artifact is restored intact')
+      player.inventory=[createItem('blackkey')];groundItems=[]
+      player.equip.blackkey=player.inventory[0]
+      dropInventoryItem(0)
+      check(player.equip.blackkey===null && groundItems[0].item.kind==='blackkey',
+        'dropping the worn Black Key automatically unequips it')
+      lootSkeletonOrForage()
+      check(player.inventory[0].kind==='blackkey' && !player.equip.blackkey,
+        'recovered Black Key remains available but unequipped')
+
+      player.inventory=[createItem('blackkey'),createItem('blackkey')];groundItems=[]
+      player.equip.blackkey=player.inventory[0]
+      const keySave=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(keySave,{isReplayInit:true})
+      check(player.equip.blackkey===player.inventory[0],
+        'save restores the worn Black Key as its inventory instance')
+      dropInventoryItem(1)
+      check(player.equip.blackkey===player.inventory[0] &&
+        groundItems[0].item.kind==='blackkey',
+        'dropping a different Black Key does not unequip the worn one')
+
+      player.inventory=[createItem('wheelbarrow'),createItem('bigbell')]
+      groundItems=[]
+      const beforeBlocked=turnCount
+      dropInventoryItem(0);dropInventoryItem(1)
+      check(turnCount===beforeBlocked&&groundItems.length===0,
+        'wheelbarrow and bell are the only prohibited item kinds')
+    })()`))
+  })
 
   it('clamps Healing Herb healing to 20-50 HP before the Wyrdling bonus', () => {
     beginNewGame('Herb Bounds Tester')

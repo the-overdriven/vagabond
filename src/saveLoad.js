@@ -812,6 +812,13 @@ function loadGameFromObject(data, opts = {}) {
   if (player.equip.blackkey && !player.inventory.some(i => i.kind === 'blackkey')) {
     addInventoryItem('blackkey')
   }
+  if (player.equip.blackkey) {
+    // The saved equipment and inventory are distinct JSON objects; restore
+    // the shared identity so dropping a different Black Key keeps this one worn.
+    player.equip.blackkey = player.inventory.find(i => i.kind === 'blackkey' &&
+      i.replayId && i.replayId === player.equip.blackkey.replayId) ||
+      player.inventory.find(i => i.kind === 'blackkey') || null
+  }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
   player.spiderWebSourceId = typeof player.spiderWebSourceId === 'string' ? player.spiderWebSourceId : null
   spiderWebOverlayStart = 0

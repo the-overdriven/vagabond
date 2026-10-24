@@ -7790,7 +7790,9 @@ function ensureGravediggerGrave() {
 function clearGroundItemsUnderMerchant() {
   const merchant = npcs.find(n => n.name === 'Merchant')
   if (!merchant) return
-  groundItems = groundItems.filter(g => !((g.level ?? 0) === 0 && g.x === merchant.x && g.y === merchant.y))
+  // Clear generated loot obstructing the merchant, never a player-owned drop.
+  groundItems = groundItems.filter(g => g.kind === 'droppeditem' || Mining.isMineralKind(g.kind) ||
+    !((g.level ?? 0) === 0 && g.x === merchant.x && g.y === merchant.y))
 }
 
 function npcCanTraverseSurface(x, y) {

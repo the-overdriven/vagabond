@@ -66,9 +66,11 @@ describe('Exact current-save state restoration', () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       currentZ=0;map=surfaceMap
       const x=player.x+3,y=player.y+3,key=keyXY(x,y)
+      enemies=[];npcs=[];groundItems=[]
       surfaceMap[y][x]='boulder'
       tileUnderlays[key]='sand'
       discovered[y][x]=true
+      check(tileInspectInfo(x,y)===null,'surface boulders do not open inspection tooltips')
       player.miningTutorialSeen=true
       player.mining=0
       player.miningArmedTarget=null
