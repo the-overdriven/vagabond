@@ -2722,16 +2722,18 @@ configurable and do not affect turn resolution or replay. Crystal illumination
 **overrides the distance-based darkness** wherever it reaches: the crystal tile
 is fully relieved of the overlay, and the surrounding darkness returns smoothly
 toward the edge of its light radius. Opaque walls still cast shadows.
-In tile graphics, a continuous radial darkness field covers the whole viewport,
-blending the fifth-tile darkness into the **85%** remembered-terrain shade rather
-than stopping at square tile borders. Previously explored tiles obscured by
-walls still retain their remembered darkness even when close to the player.
-The edge of visible and remembered terrain fades into entirely unknown space.
-Rock faces fade across more than one tile to avoid abrupt horizontal ends;
-floor edges use a narrower fade so a thin passage stays readable. This never
-reveals additional terrain. Each crystal produces a
-continuous, softly fading colored glow and a
-brighter central halo across reachable terrain; opaque walls cast shadows.
+In mine tile graphics, **all illumination and visual field-of-view falloff are
+continuous rather than drawn in tile-shaped bands**. A radial darkness field
+blends the fifth-tile darkness into the **85%** remembered-terrain shade, with
+softened line-of-sight boundaries around corners and walls. Previously explored
+tiles hidden behind walls remain dark, even close to the player. The boundary
+between known and unknown terrain follows a smoothly rounded distance fade,
+extending farther across rock faces than thin passages; it does not reveal
+additional terrain. Each crystal produces a continuous colored radial glow and
+a brighter central halo, with softly fading wall-aware shadows instead of
+rectangular light cutoffs. The same presentation applies to portable crystal
+light on mine floors. The underlying visibility and targeting rules remain
+tile-based and deterministic; only the mine's tile-mode presentation is softened.
 ASCII graphics retain cell-by-cell illumination. The light's color,
 visual intensity, spread and gentle pulse are data-driven, and its animation
 does not alter visibility rules, turns or RNG.

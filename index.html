@@ -9065,12 +9065,78 @@ more difficult:
     return MINING_CONFIG.lighting.fovDarknessByDistance[distance] || 0
   }
 
-  // Both the colored glow and its shadow relief use the exact same geometry,
-  // so crystal light never brightens a blocked corridor or a wall's back face.
-  function clipCrystalLight(targetCtx, source, radius, visible, baseX, baseY, columns, rows) {
-    const lighting = MINING_CONFIG.lighting
-    // The extra ring is visual falloff only; it never expands game visibility.
-    const maskRadius = radius + lighting.tileFadeMargin
+  // Mine tile graphics turn the deterministic, cell-based LOS result into a
+  // continuous *visual* mask. Blurring a single union of reachable tiles avoids
+  // the rectangular light edges produced by canvas clip(rect) at every cell.
+  // Nothing here changes which cells may be explored, targeted or illuminated.
+  const mineLightingCanvases = {}
+  function mineLightingCanvas(name) {
+    const layer = mineLightingCanvases[name] ||
+      (mineLightingCanvases[name] = document.createElement('canvas'))
+    if (layer.width !== canvas.width || layer.height !== canvas.height) {
+      layer.width = canvas.width
+      layer.height = canvas.height
+    }
+    return layer
+  }
+
+  function mineSoftCellMask(acceptCell, baseX, baseY, columns, rows, blurTiles) {
+    const shape = mineLightingCanvas('shape')
+    const shapeCtx = shape.getContext('2d')
+    shapeCtx.clearRect(0, 0, shape.width, shape.height)
+    shapeCtx.fillStyle = '#fff'
+    let hasCells = false
+    for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
+      const mx = baseX + vx, my = baseY + vy
+      if (!acceptCell(mx, my)) continue
+      shapeCtx.fillRect(Math.round((mx - camX) * TILE_PX),
+        Math.round((my - camY) * TILE_PX), TILE_PX, TILE_PX)
+      hasCells = true
+    }
+    if (!hasCells) return null
+    const softened = mineLightingCanvas('softened')
+    const softenedCtx = softened.getContext('2d')
+    softenedCtx.clearRect(0, 0, softened.width, softened.height)
+    softenedCtx.save()
+    softenedCtx.filter = `blur(${Math.max(1, blurTiles * TILE_PX)}px)`
+    softenedCtx.drawImage(shape, 0, 0)
+    softenedCtx.restore()
+    return softened
+  }
+
+  function mineCrystalMask(source, radius, visible, baseX, baseY, columns, rows) {
+    const maskRadius = radius + MINING_CONFIG.lighting.tileFadeMargin
+    return mineSoftCellMask((mx, my) => {
+      const dx = mx - source.x, dy = my - source.y
+      return dx * dx + dy * dy <= maskRadius * maskRadius &&
+        (visible.has(keyXY(mx, my)) ||
+          UndergroundFov.canSee(map, player.x, player.y, mx, my)) &&
+        Mining.lightCanReach(map, source.x, source.y, mx, my, player.x, player.y)
+    }, baseX, baseY, columns, rows, MINING_CONFIG.lighting.tileLightEdgeSoftness)
+  }
+
+  function mineMaskedRadialLight(mask, centerX, centerY, radiusPx, stops, targetCtx, blend) {
+    const lightCanvas = mineLightingCanvas('radial')
+    const lightCtx = lightCanvas.getContext('2d')
+    lightCtx.clearRect(0, 0, lightCanvas.width, lightCanvas.height)
+    const gradient = lightCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radiusPx)
+    for (const [position, color] of stops) gradient.addColorStop(position, color)
+    lightCtx.fillStyle = gradient
+    lightCtx.fillRect(centerX - radiusPx, centerY - radiusPx, radiusPx * 2, radiusPx * 2)
+    if (mask) {
+      lightCtx.globalCompositeOperation = 'destination-in'
+      lightCtx.drawImage(mask, 0, 0)
+      lightCtx.globalCompositeOperation = 'source-over'
+    }
+    targetCtx.save()
+    targetCtx.globalCompositeOperation = blend
+    targetCtx.drawImage(lightCanvas, 0, 0)
+    targetCtx.restore()
+  }
+
+  // Outside the Mines, preserve ordinary cave and surface-exit lighting.
+  function clipOrdinaryCrystalLight(targetCtx, source, radius, visible, baseX, baseY, columns, rows) {
+    const maskRadius = radius + MINING_CONFIG.lighting.tileFadeMargin
     const minX = Math.max(baseX, source.x - maskRadius)
     const maxX = Math.min(baseX + columns - 1, source.x + maskRadius)
     const minY = Math.max(baseY, source.y - maskRadius)
@@ -9128,9 +9194,10 @@ more difficult:
       return
     }
 
-    // Draw the darkness on a reusable transparent canvas, then punch smooth
-    // radial openings through that layer. Doing this on the main canvas would
-    // erase the terrain and creatures along with the darkness.
+    // Build a continuous screen-space shade. The softened FOV mask blends the
+    // radial sight field into remembered darkness, including around corners.
+    // Replacing each remembered tile with a flat 85% rect produced straight
+    // light cutoffs along LOS and cave walls.
     if (!mineDarknessLayer) mineDarknessLayer = document.createElement('canvas')
     if (mineDarknessLayer.width !== canvas.width || mineDarknessLayer.height !== canvas.height) {
       mineDarknessLayer.width = canvas.width
@@ -9138,73 +9205,69 @@ more difficult:
     }
     const shadeCtx = mineDarknessLayer.getContext('2d')
     shadeCtx.clearRect(0, 0, canvas.width, canvas.height)
-    // One uninterrupted radial field covers the whole view, including old
-    // explored terrain and crystal-lit cells beyond the player's own FOV.
-    // The black canvas already hides entirely unknown areas. Clipping the
-    // gradient to separate tiles recreated the unwanted square light bands.
+    const sightMask = mineSoftCellMask((mx, my) => visible.has(keyXY(mx, my)),
+      baseX, baseY, columns, rows, lighting.tileSightEdgeSoftness)
+    if (!sightMask) return
     const maxDistance = lighting.fovDarknessByDistance.length - 1
     const outerDistance = maxDistance + lighting.tileDarknessTailTiles
     const centerX = (player.x + 0.5 - camX) * TILE_PX
     const centerY = (player.y + 0.5 - camY) * TILE_PX
-    const darknessGradient = shadeCtx.createRadialGradient(centerX, centerY, 0,
+    const radialCanvas = mineLightingCanvas('sightRadial')
+    const radialCtx = radialCanvas.getContext('2d')
+    radialCtx.clearRect(0, 0, radialCanvas.width, radialCanvas.height)
+    const darknessGradient = radialCtx.createRadialGradient(centerX, centerY, 0,
       centerX, centerY, outerDistance * TILE_PX)
     for (let distance = 0; distance <= maxDistance; distance++) {
       darknessGradient.addColorStop(distance / outerDistance,
         `rgba(0, 0, 0, ${lighting.fovDarknessByDistance[distance]})`)
     }
     darknessGradient.addColorStop(1, `rgba(0, 0, 0, ${lighting.exploredDarkness})`)
-    shadeCtx.fillStyle = darknessGradient
-    shadeCtx.fillRect(0, 0, canvas.width, canvas.height)
-    // Remembered tiles behind walls never gain current sight merely by being
-    // close to the player. Replace their radial shade with the normal 85%
-    // remembered darkness, without stacking two dark overlays.
+    radialCtx.fillStyle = darknessGradient
+    radialCtx.fillRect(0, 0, canvas.width, canvas.height)
+    radialCtx.globalCompositeOperation = 'destination-in'
+    radialCtx.drawImage(sightMask, 0, 0)
+    radialCtx.globalCompositeOperation = 'source-over'
     shadeCtx.fillStyle = `rgba(0, 0, 0, ${lighting.exploredDarkness})`
-    for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
-      const mx = baseX + vx, my = baseY + vy
-      if (visible.has(keyXY(mx, my)) || !undergroundDiscovered?.[my]?.[mx]) continue
-      const px = Math.round((mx - camX) * TILE_PX)
-      const py = Math.round((my - camY) * TILE_PX)
-      shadeCtx.clearRect(px, py, TILE_PX, TILE_PX)
-      shadeCtx.fillRect(px, py, TILE_PX, TILE_PX)
-    }
+    shadeCtx.fillRect(0, 0, canvas.width, canvas.height)
+    shadeCtx.globalCompositeOperation = 'destination-out'
+    shadeCtx.drawImage(sightMask, 0, 0)
+    shadeCtx.globalCompositeOperation = 'source-over'
+    shadeCtx.drawImage(radialCanvas, 0, 0)
     for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
-      shadeCtx.save()
-      if (!clipCrystalLight(shadeCtx, source, light.radius, visible, baseX, baseY, columns, rows)) {
-        shadeCtx.restore()
-        continue
-      }
-      const centerX = (source.x + 0.5 - camX) * TILE_PX
-      const centerY = (source.y + 0.5 - camY) * TILE_PX
+      const mask = mineCrystalMask(source, light.radius, visible, baseX, baseY, columns, rows)
+      if (!mask) continue
+      const sourceX = (source.x + 0.5 - camX) * TILE_PX
+      const sourceY = (source.y + 0.5 - camY) * TILE_PX
       const spread = (light.radius + lighting.tileRadiusPadding) * TILE_PX
-      const relief = shadeCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
-      relief.addColorStop(0, 'rgba(0, 0, 0, 1)')
-      relief.addColorStop(lighting.tileMidpoint,
-        `rgba(0, 0, 0, ${lighting.darknessReliefMidOpacity * light.opacity})`)
-      relief.addColorStop(1, 'rgba(0, 0, 0, 0)')
-      shadeCtx.globalCompositeOperation = 'destination-out'
-      shadeCtx.fillStyle = relief
-      shadeCtx.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
-      shadeCtx.restore()
+      mineMaskedRadialLight(mask, sourceX, sourceY, spread,
+        [[0, 'rgba(0, 0, 0, 1)'],
+          [lighting.tileMidpoint, `rgba(0, 0, 0, ${lighting.darknessReliefMidOpacity * light.opacity})`],
+          [1, 'rgba(0, 0, 0, 0)']], shadeCtx, 'destination-out')
     }
     ctx.drawImage(mineDarknessLayer, 0, 0)
   }
 
-  // Colored light remains a separate screen-blended layer above the shadow
-  // relief. It uses the same wall-aware clipping as the darkness cutouts.
+  // The same softened LOS coverage attenuates colored light and shadow relief.
+  // No tile rectangles are used as rendering clips in mine tile mode.
   function drawCrystalGlow(now, visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !visible || currentZ >= 0) return
     const lighting = MINING_CONFIG.lighting
     const pulse = lighting.pulseOpacity * Math.sin(now / lighting.pulsePeriodMs)
+    const inMines = !!Mining.activeLevel()
     for (const source of Mining.lightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
       const colorHex = light.color || MINING_CONFIG.minerals[source.mineral]?.glow
       if (!colorHex) continue
       const radius = light.radius
+      const mask = inMines
+        ? mineCrystalMask(source, radius, visible, baseX, baseY, columns, rows) : null
+      if (inMines && !mask) continue
       ctx.save()
-      if (!clipCrystalLight(ctx, source, radius, visible, baseX, baseY, columns, rows)) {
+      if (!inMines && !clipOrdinaryCrystalLight(ctx, source, radius, visible,
+          baseX, baseY, columns, rows)) {
         ctx.restore()
         continue
       }
@@ -9217,71 +9280,91 @@ more difficult:
       const centerX = (source.x + 0.5 - camX) * TILE_PX
       const centerY = (source.y + 0.5 - camY) * TILE_PX
       const spread = (radius + lighting.tileRadiusPadding) * TILE_PX
-      ctx.globalCompositeOperation = 'screen'
-      const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
-      glow.addColorStop(0, colorAt((lighting.tileCenterOpacity + sourcePulse) * light.opacity))
-      glow.addColorStop(lighting.tileMidpoint, colorAt((lighting.tileMidOpacity + sourcePulse * 0.5) * light.opacity))
-      glow.addColorStop(1, colorAt(0))
-      ctx.fillStyle = glow
-      ctx.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
+      const glowStops = [[0, colorAt((lighting.tileCenterOpacity + sourcePulse) * light.opacity)],
+        [lighting.tileMidpoint, colorAt((lighting.tileMidOpacity + sourcePulse * 0.5) * light.opacity)],
+        [1, colorAt(0)]]
+      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, spread, glowStops, ctx, 'screen')
+      else {
+        ctx.globalCompositeOperation = 'screen'
+        const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, spread)
+        for (const [position, color] of glowStops) glow.addColorStop(position, color)
+        ctx.fillStyle = glow
+        ctx.fillRect(centerX - spread, centerY - spread, spread * 2, spread * 2)
+      }
 
       // A smaller halo makes the formation itself feel like the light source.
       const bloomRadius = lighting.tileBloomRadius * TILE_PX
-      const bloom = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius)
-      bloom.addColorStop(0, colorAt((lighting.tileBloomOpacity + sourcePulse * 0.5) * light.opacity))
-      bloom.addColorStop(1, colorAt(0))
-      ctx.fillStyle = bloom
-      ctx.fillRect(centerX - bloomRadius, centerY - bloomRadius, bloomRadius * 2, bloomRadius * 2)
+      const bloomStops = [[0, colorAt((lighting.tileBloomOpacity + sourcePulse * 0.5) * light.opacity)],
+        [1, colorAt(0)]]
+      if (inMines) mineMaskedRadialLight(mask, centerX, centerY, bloomRadius, bloomStops, ctx, 'screen')
+      else {
+        const bloom = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, bloomRadius)
+        for (const [position, color] of bloomStops) bloom.addColorStop(position, color)
+        ctx.fillStyle = bloom
+        ctx.fillRect(centerX - bloomRadius, centerY - bloomRadius, bloomRadius * 2, bloomRadius * 2)
+      }
       ctx.restore()
     }
   }
 
-  // Fade explored terrain toward unknown space across neighbouring tiles,
-  // rather than ending a wall face at a straight row of pixels. The clipping
-  // mask prevents this visual softness from revealing any unknown terrain.
+  // Distance to the nearest unknown *area*, evaluated at sub-tile resolution,
+  // produces continuous rounded fog boundaries rather than four linear
+  // gradient strips for each tile. Unknown terrain itself is never drawn.
+  let mineVisibilityFeatherLayer = null
   function drawMineVisibilityFeather(visible, baseX, baseY, columns, rows) {
     if (!USE_TILE_IMAGES || !Mining.activeLevel() || !visible) return
     const lighting = MINING_CONFIG.lighting
-    const color = `rgba(0, 0, 0, ${lighting.tileVisibilityFeatherOpacity})`
     const isKnown = (x, y) => visible.has(keyXY(x, y)) || !!undergroundDiscovered?.[y]?.[x]
-    const trulyUnknown = (x, y) => !isKnown(x, y)
-    const paintEdge = (x1, y1, x2, y2, x, y, w, h, fadeOut) => {
-      const gradient = ctx.createLinearGradient(x1, y1, x2, y2)
-      gradient.addColorStop(0, fadeOut ? color : 'rgba(0, 0, 0, 0)')
-      gradient.addColorStop(1, fadeOut ? 'rgba(0, 0, 0, 0)' : color)
-      ctx.fillStyle = gradient
-      ctx.fillRect(x, y, w, h)
+    if (!mineVisibilityFeatherLayer) mineVisibilityFeatherLayer = document.createElement('canvas')
+    const feather = mineVisibilityFeatherLayer
+    const step = Math.max(1, Math.round(TILE_PX / 8))
+    const smallWidth = Math.ceil(canvas.width / step)
+    const smallHeight = Math.ceil(canvas.height / step)
+    if (feather.width !== smallWidth || feather.height !== smallHeight) {
+      feather.width = smallWidth
+      feather.height = smallHeight
     }
+    const featherCtx = feather.getContext('2d')
+    const pixels = featherCtx.createImageData(smallWidth, smallHeight)
+    const searchRadius = Math.ceil(lighting.tileVisibilityFeatherWidth) + 1
+    // Cache LOS membership once per tile. Sampling it by string key for every
+    // sub-tile pixel would waste time during camera movement and glow pulses.
+    const minX = baseX - searchRadius, minY = baseY - searchRadius
+    const gridWidth = columns + searchRadius * 2
+    const gridHeight = rows + searchRadius * 2
+    const knownCells = new Uint8Array(gridWidth * gridHeight)
+    for (let y = 0; y < gridHeight; y++) for (let x = 0; x < gridWidth; x++)
+      knownCells[y * gridWidth + x] = isKnown(minX + x, minY + y) ? 1 : 0
+    const knownAt = (x, y) => {
+      const gx = x - minX, gy = y - minY
+      return gx >= 0 && gy >= 0 && gx < gridWidth && gy < gridHeight &&
+        !!knownCells[gy * gridWidth + gx]
+    }
+    for (let y = 0; y < smallHeight; y++) for (let x = 0; x < smallWidth; x++) {
+      const worldX = camX + (x + 0.5) * step / TILE_PX
+      const worldY = camY + (y + 0.5) * step / TILE_PX
+      const tileX = Math.floor(worldX), tileY = Math.floor(worldY)
+      if (!knownAt(tileX, tileY)) continue
+      const width = map[tileY]?.[tileX] === 'cavewall'
+        ? lighting.tileVisibilityFeatherWidth : lighting.tileFloorVisibilityFeatherWidth
+      let nearestSquared = width * width
+      for (let ty = tileY - searchRadius; ty <= tileY + searchRadius; ty++) {
+        for (let tx = tileX - searchRadius; tx <= tileX + searchRadius; tx++) {
+          if (knownAt(tx, ty)) continue
+          const dx = Math.max(tx - worldX, 0, worldX - (tx + 1))
+          const dy = Math.max(ty - worldY, 0, worldY - (ty + 1))
+          nearestSquared = Math.min(nearestSquared, dx * dx + dy * dy)
+        }
+      }
+      const amount = Math.max(0, 1 - Math.sqrt(nearestSquared) / width)
+      const opacity = amount * amount * (3 - 2 * amount)
+      pixels.data[(y * smallWidth + x) * 4 + 3] =
+        Math.round(255 * lighting.tileVisibilityFeatherOpacity * opacity)
+    }
+    featherCtx.putImageData(pixels, 0, 0)
     ctx.save()
-    ctx.beginPath()
-    for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
-      const mx = baseX + vx, my = baseY + vy
-      if (isKnown(mx, my)) ctx.rect(Math.round((mx - camX) * TILE_PX),
-        Math.round((my - camY) * TILE_PX), TILE_PX, TILE_PX)
-    }
-    ctx.clip()
-    for (let vy = 0; vy < rows; vy++) for (let vx = 0; vx < columns; vx++) {
-      const mx = baseX + vx, my = baseY + vy
-      if (!isKnown(mx, my)) continue
-      const x = Math.round((mx - camX) * TILE_PX)
-      const y = Math.round((my - camY) * TILE_PX)
-      // Wall faces need a long fade at their distant ends. Keep the narrower
-      // floor fade so an illuminated one-tile passage is not blacked out by
-      // its as-yet unseen side walls.
-      const width = (map[my]?.[mx] === 'cavewall'
-        ? lighting.tileVisibilityFeatherWidth
-        : lighting.tileFloorVisibilityFeatherWidth) * TILE_PX
-      if (trulyUnknown(mx - 1, my))
-        paintEdge(x, y, x + width, y, x, y, width, TILE_PX, true)
-      if (trulyUnknown(mx + 1, my))
-        paintEdge(x + TILE_PX - width, y, x + TILE_PX, y,
-          x + TILE_PX - width, y, width, TILE_PX, false)
-      if (trulyUnknown(mx, my - 1))
-        paintEdge(x, y, x, y + width, x, y, TILE_PX, width, true)
-      if (trulyUnknown(mx, my + 1))
-        paintEdge(x, y + TILE_PX - width, x, y + TILE_PX,
-          x, y + TILE_PX - width, TILE_PX, width, false)
-    }
+    ctx.imageSmoothingEnabled = true
+    ctx.drawImage(feather, 0, 0, canvas.width, canvas.height)
     ctx.restore()
   }
 

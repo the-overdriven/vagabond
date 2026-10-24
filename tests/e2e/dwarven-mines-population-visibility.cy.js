@@ -107,10 +107,11 @@ describe('Mine-only encounters and darkness', () => {
           'two walls meeting diagonally still block crystal light')
       } finally {first.level.mineExcavations=originalExcavations}
       const originalTileMode=USE_TILE_IMAGES
-      const originalGradient=ctx.createRadialGradient
+      const gradientProto=CanvasRenderingContext2D.prototype
+      const originalGradient=gradientProto.createRadialGradient
       let radialGlows=0
-      ctx.createRadialGradient=function(...args) {
-        radialGlows++
+      gradientProto.createRadialGradient=function(...args) {
+        if(this===mineLightingCanvas('radial').getContext('2d'))radialGlows++
         return originalGradient.apply(this,args)
       }
       first.level.mineExcavations=[{x:player.x,y:player.y,kind:'exposed',
@@ -131,7 +132,7 @@ describe('Mine-only encounters and darkness', () => {
         render()
         check(radialGlows===embeddedGlows,'ASCII graphics do not use tile-mode gradient lighting')
       } finally {
-        ctx.createRadialGradient=originalGradient
+        gradientProto.createRadialGradient=originalGradient
         first.level.mineExcavations=originalExcavations
         USE_TILE_IMAGES=originalTileMode
         render()
@@ -149,11 +150,11 @@ describe('Mine-only encounters and darkness', () => {
           'ordinary cave exits provide steady warm daylight')
         const visible=Mining.lightVisible(map,5,5,UndergroundFov.compute(map,5,5,8))
         check(visible.has('8,5'),'sunlight illuminates nearby cave tiles')
-        const createGradient=ctx.createRadialGradient
+        const createGradient=gradientProto.createRadialGradient
         let radialGlows=0
         try {
-          ctx.createRadialGradient=function(...args) {
-            radialGlows++
+          gradientProto.createRadialGradient=function(...args) {
+            if(this===ctx)radialGlows++
             return createGradient.apply(this,args)
           }
           USE_TILE_IMAGES=true
@@ -163,7 +164,7 @@ describe('Mine-only encounters and darkness', () => {
           USE_TILE_IMAGES=false
           drawCrystalGlow(0,visible,0,0,VIEW_W,VIEW_H)
           check(radialGlows===tileGlows,'ASCII exit illumination keeps cell-based lighting')
-        } finally {ctx.createRadialGradient=createGradient}
+        } finally {gradientProto.createRadialGradient=createGradient}
       } finally {
         currentZ=caveLightingState.z;map=caveLightingState.map;caves=caveLightingState.caves
         player.x=caveLightingState.x;player.y=caveLightingState.y
@@ -219,19 +220,21 @@ describe('Mine-only encounters and darkness', () => {
         const hiddenTileVisible=new Set(visible)
         hiddenTileVisible.delete('8,5')
         drawMineSightDarkness(hiddenTileVisible,0,0,VIEW_W,VIEW_H)
-        check(opacityAt(8,5)>205,
-          'a remembered tile blocked from view stays dark despite proximity to the player')
+        check(opacityAt(8,5)>185,
+          'a remembered tile blocked from view stays mostly dark despite proximity to the player')
         undergroundDiscovered[5][8]=false
-        let featherGradients=0
-        const originalLinearGradient=ctx.createLinearGradient
         try {
-          ctx.createLinearGradient=function(...args) {
-            featherGradients++
-            return originalLinearGradient.apply(this,args)
-          }
-          drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)
-          check(featherGradients>0,
-            'the edge of visible mine terrain is softly feathered in tile mode')
+          const lightMask=mineCrystalMask({x:10,y:5},4,visible,0,0,VIEW_W,VIEW_H)
+          check(lightMask && lightMask.getContext('2d').getImageData(
+            Math.round(16.05*TILE_PX),Math.round(5.5*TILE_PX),1,1).data[3] > 0,
+            'crystal light fades gently beyond its last reachable tile edge')
+          const fovMask=mineSoftCellMask((x,y)=>visible.has(x+','+y),
+            0,0,VIEW_W,VIEW_H,MINING_CONFIG.lighting.tileSightEdgeSoftness)
+          const maskData=fovMask.getContext('2d')
+          const at=(x,y)=>maskData.getImageData(Math.round(x*TILE_PX),
+            Math.round(y*TILE_PX),1,1).data[3]
+          check(at(10.6,5.5)>at(10.95,5.5)&&at(10.95,5.5)>at(11.2,5.5),
+            'visual sight fades gradually across its boundary, not one tile at a time')
           check(MINING_CONFIG.lighting.tileVisibilityFeatherWidth>1,
             'mine discovery boundaries fade over more than one tile')
           const knownWall=new Set()
@@ -255,11 +258,12 @@ describe('Mine-only encounters and darkness', () => {
             for(let y=7;y<=8;y++)for(let x=4;x<=8;x++)map[y][x]='cavefloor2'
           }
           USE_TILE_IMAGES=false
-          const tileGradientCount=featherGradients
+          const before=ctx.getImageData(6*TILE_PX,8*TILE_PX,1,1).data[0]
           drawMineVisibilityFeather(visible,0,0,VIEW_W,VIEW_H)
-          check(featherGradients===tileGradientCount,
+          const after=ctx.getImageData(6*TILE_PX,8*TILE_PX,1,1).data[0]
+          check(before===after,
             'ASCII mode preserves its existing hard-edged tile visibility')
-        } finally {ctx.createLinearGradient=originalLinearGradient}
+        } finally { /* restored with the surrounding mine render state */ }
       } finally {
         map=originalMap;player.x=originalX;player.y=originalY
         camX=originalCamX;camY=originalCamY
