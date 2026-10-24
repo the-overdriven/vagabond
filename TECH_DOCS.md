@@ -90,6 +90,23 @@ and duplicate Begin clicks cannot start a second world.
 XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
+On desktop, the selection overlay displays one of four terrain-only captures
+from Vagabond's surface generator and original tile renderer, with a continuous
+CSS drift. They are captured offline without the player, monsters, dropped items
+or HUD and shipped as static WebP assets, cycled on successive openings of the
+selection screen (also across page reloads when browser storage is available).
+No preview world is generated at runtime: world generation happens only after
+confirming **Begin your journey**. All four static WebPs are explicitly
+precached by the service worker; on desktop, their URLs are also loaded and
+decoded in parallel with essential game images while `Loading...` is still
+visible. The startup overlay disappears only after this preload finishes and
+a frame has been painted, preventing the initial black backdrop flash.
+The worker serves the precache copy immediately on subsequent visits and
+revalidates images in the background. On mobile/touch layouts the backdrop
+remains the original static dark background; the desktop preload is skipped.
+The 🎲 button next to the name input chooses a random name from
+`content/random_names_human.json`; this is cosmetic and does not consume the
+game's seeded RNG or affect replay.
 On desktop the character-selection overlay stays above gameplay-only overlays
 (the side minimap, keyboard hints and message log) while the top HUD remains
 visible; the form itself is kept below the HUD. On narrow windows, the character

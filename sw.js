@@ -81,6 +81,10 @@ const PRECACHE_URLS = [
   './img/tiles/haulage-cage-lower.png',
   './img/tiles/mine-shaft-rope.svg',
   './img/tiles/rupture-warning.png',
+  './img/ui/race-landscape-1.webp',
+  './img/ui/race-landscape-2.webp',
+  './img/ui/race-landscape-3.webp',
+  './img/ui/race-landscape-4.webp',
   './img/tiles/burrow-warning.png',
   './img/tiles/wall-ambush-warning.png',
   './img/tiles/dwarven-gate-open.png',
@@ -185,7 +189,12 @@ self.addEventListener('fetch', (event) => {
   // which is why updated images never showed up.
   event.respondWith(
     caches.open(RUNTIME).then(async (cache) => {
-      const cached = await cache.match(req);
+      const raceBackdrop = /\/img\/ui\/race-landscape-[1-4]\.webp$/.test(url.pathname);
+      // Precached landscape files live in PRECACHE, not RUNTIME. Consult both
+      // so character creation can use them instantly on subsequent launches.
+      const cached = await cache.match(req) || (raceBackdrop
+        ? await caches.open(PRECACHE).then((precache) => precache.match(req))
+        : null);
 
       const refresh = fresh(req).then((res) => {
         if (res && res.ok) cache.put(req, res.clone());

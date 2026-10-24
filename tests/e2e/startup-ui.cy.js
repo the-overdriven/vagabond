@@ -97,5 +97,51 @@ describe('Startup assets and character creation UI', () => {
     cy.get('.cursed-world-tip').should('not.be.visible')
     cy.get('#cursedWorldToggle').uncheck()
     cy.get('.cursed-world-mobile-note').should('not.be.visible')
+    cy.get('#raceOverlay').then($overlay => {
+      const css = getComputedStyle($overlay[0], '::before')
+      expect(css.backgroundImage).to.equal('none')
+    })
+    cy.window().then(win => {
+      expect(win.eval(`preloadedImages.has('img/ui/race-landscape-1.webp')`)).to.equal(false)
+    })
   })
+
+  it('lists all four character-selection landscapes in the service worker precache', () => {
+    cy.request('/sw.js').its('body').then(worker => {
+      for (let n = 1; n <= 4; n++) {
+        expect(worker).to.include(`./img/ui/race-landscape-${n}.webp`)
+      }
+    })
+  })
+
+  it('cycles static desktop backgrounds without generating a world and randomizes names', () => {
+    cy.viewport(1280, 900)
+    cy.visit('/')
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.window().then(win => {
+      const overlay = win.document.getElementById('raceOverlay')
+      const className = Array.from(overlay.classList).find(c => /^race-backdrop-[1-4]$/.test(c))
+      expect(className).to.be.a('string')
+      const css = win.getComputedStyle(overlay, '::before')
+      expect(css.backgroundImage).to.contain('race-landscape-')
+      expect(css.animationName).to.equal('race-backdrop-drift')
+      // All four files must be decoded before Loading... disappears, so
+      // changing the selected background never flashes the black overlay.
+      expect(win.eval(`[1, 2, 3, 4].every(n => {
+        const image = preloadedImages.get('img/ui/race-landscape-' + n + '.webp')
+        return image?.complete && image.naturalWidth > 0
+      })`)).to.equal(true)
+      expect(win.eval('surfaceMap')).to.equal(null)
+      win.eval('closeRaceSelect(); openRaceSelect()')
+      const next = Array.from(overlay.classList).find(c => /^race-backdrop-[1-4]$/.test(c))
+      expect(next).to.not.equal(className)
+      expect(win.eval('surfaceMap')).to.equal(null)
+    })
+    cy.get('#btnRaceRandomName').click()
+    cy.get('#raceName').invoke('val').then(name => {
+      expect(name).to.be.a('string').and.not.equal('')
+      cy.window().then(win => expect(win.eval('HUMAN_NAMES')).to.include(name))
+    })
+  })
+
 })

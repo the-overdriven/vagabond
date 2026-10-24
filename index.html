@@ -212,7 +212,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261018-minimap-pan">
+  <link rel="stylesheet" href="css/style.css?v=20261024-race-static">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -365,7 +365,10 @@ more difficult:
         <h2>Choose Your Blood</h2>
         <div class="race-namerow">
           <label for="raceName" class="field-label">NAME</label>
-          <input type="text" id="raceName" maxlength="18" placeholder="Vagabond" autocomplete="off" spellcheck="false">
+          <div class="race-name-controls">
+            <input type="text" id="raceName" maxlength="18" placeholder="Vagabond" autocomplete="off" spellcheck="false">
+            <button class="slbtn race-name-randomize" id="btnRaceRandomName" type="button" aria-label="Randomize character name" title="Randomize character name">🎲</button>
+          </div>
         </div>
         <div class="race-grid" id="raceGrid"></div>
         <div class="race-foot">
@@ -13245,8 +13248,57 @@ more difficult:
     }
   }
 
+  const RACE_BACKDROP_PATHS = [1, 2, 3, 4].map(n => `img/ui/race-landscape-${n}.webp`)
+
+  // Cache and decode the exact URLs used by the CSS background before hiding
+  // the Loading overlay. Service-worker precaching alone does not guarantee
+  // the images are decoded (or even controlled by a SW on the first visit).
+  // Keep this desktop-only: mobile never displays these large backgrounds.
+  async function preloadRaceBackdrops() {
+    if (!window.matchMedia('(min-width: 900px) and (pointer: fine)').matches) return
+    await Promise.all(RACE_BACKDROP_PATHS.map(async path => {
+      const image = new Image()
+      image.src = path
+      try {
+        await image.decode()
+        preloadedImages.set(path, image)
+      } catch (err) {
+        console.warn('Failed to preload race backdrop:', path, err)
+      }
+    }))
+  }
+
+  // The scene is a pre-rendered static asset, not a generated game world.
+  // Keep presentation selection independent of the replay-seeded game RNG.
+  function cycleRaceBackdrop() {
+    const overlay = document.getElementById('raceOverlay')
+    const prefix = 'race-backdrop-'
+    const count = 4
+    let index = 0
+    try {
+      const key = 'vagabond-race-backdrop-index'
+      index = Number.parseInt(localStorage.getItem(key), 10)
+      if (!Number.isInteger(index) || index < 0 || index >= count) index = 0
+      localStorage.setItem(key, String((index + 1) % count))
+    } catch (_) {
+      // Storage can be disabled. Cycle per page without affecting gameplay.
+      index = cycleRaceBackdrop.nextIndex || 0
+      cycleRaceBackdrop.nextIndex = (index + 1) % count
+    }
+    for (let n = 1; n <= count; n++) overlay.classList.remove(prefix + n)
+    overlay.classList.add(prefix + (index + 1))
+  }
+
+  function randomizeRaceName() {
+    if (!Array.isArray(HUMAN_NAMES) || !HUMAN_NAMES.length) return
+    const nameInput = document.getElementById('raceName')
+    nameInput.value = HUMAN_NAMES[Math.floor(Math.random() * HUMAN_NAMES.length)]
+    nameInput.focus()
+  }
+
   function openRaceSelect() {
     raceOpen = true
+    cycleRaceBackdrop()
     buildRaceGrid()
     document.getElementById('raceOverlay').classList.add('show')
     document.getElementById('btnBegin').disabled = false
@@ -13323,6 +13375,7 @@ more difficult:
   }
 
   document.getElementById('btnBegin').addEventListener('click', confirmRaceSelect)
+  document.getElementById('btnRaceRandomName').addEventListener('click', randomizeRaceName)
   document.getElementById('raceName').addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') {
       ev.preventDefault()
@@ -13435,6 +13488,9 @@ more difficult:
   }
 
   async function init() {
+    // Start the landscape requests alongside essential sprites, while the
+    // startup overlay still says Loading... (no runtime world generation).
+    const raceBackdropsReady = preloadRaceBackdrops()
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
     for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
@@ -13493,9 +13549,13 @@ more difficult:
     // Essential visuals load under the startup overlay. Remaining images
     // warm in the background while character creation waits for Begin.
     await preloadImages(RACES.map(race => raceSelectionImagePath(race.id)))
+    await raceBackdropsReady
     openRaceSelect()
     refreshRaceAvatars()
     ensureAmbientTileAnimationLoop()
+    // Give the browser a frame to composite the decoded CSS background
+    // underneath Loading... before revealing character creation.
+    await paintLoading()
     setLoading(null)
     preloadImages().catch(err => console.warn(err))
   }
