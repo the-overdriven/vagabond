@@ -337,6 +337,13 @@ canvas {
      behind the HUD. The overlay still covers the gameplay-side panels/log. */
   #raceOverlay {
     padding-top: calc(var(--desktop-hud-height, 52px) + 8px);
+    padding-bottom: 8px;
+  }
+
+  #raceOverlay.overlay .panelbox {
+    /* Include padding and borders in the space remaining below a wrapped HUD. */
+    box-sizing: border-box;
+    max-height: calc(100vh - var(--desktop-hud-height, 52px) - 16px);
   }
 
   /* The log no longer consumes vertical layout space on desktop. It floats

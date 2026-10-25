@@ -111,7 +111,8 @@ On desktop the character-selection overlay stays above gameplay-only overlays
 (the side minimap, keyboard hints and message log) while the top HUD remains
 visible; the form itself is kept below the HUD. On narrow windows, the character
 form scrolls within the space below the HUD so its fields remain accessible
-without covering the Load button.
+without covering the Load button. Desktop form height includes its padding and
+borders within that available space, including short windows with a wrapped HUD.
 
 There are currently **10 races**.
 
@@ -5985,7 +5986,9 @@ not alter the separate death-drop roll.
 
 Each generated Dwarven Fort/Ruins floor from **z:-3 through the deepest Ruins
 floor** contains **1–2 loose Life Potions**, selected from reachable, safe,
-unoccupied marble. The count is configured under
+unoccupied marble outside the Ruins stair halls. Both arriving and departing
+stair rooms remain empty transit spaces, including during supply placement.
+The count is configured under
 `dwarvenRuins.loot.lifePotionsPerFortFloor`; the separate Dwarven Mines are not
 included. These supplies are ordinary ground items, not refillable containers.
 

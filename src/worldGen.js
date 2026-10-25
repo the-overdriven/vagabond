@@ -6981,11 +6981,14 @@ function spawnDwarvenFortLifePotions() {
       ...enemies.filter(e => e.alive && e.level === z),
       ...groundItems.filter(item => item.level === z)
     ].map(item => keyXY(item.x,item.y)))
+    const stairRooms = (level.rooms || []).filter(room => room.stairRoom)
     const spots=[]
     for (const xy of reachable) {
       const [x,y] = xy.split(',').map(Number)
       if (x<1 || y<1 || x>=MAP_W-1 || y>=MAP_H-1 ||
         level.map[y]?.[x]!=='marble' ||
+        stairRooms.some(room => x > room.x && x < room.x+room.w-1 &&
+          y > room.y && y < room.y+room.h-1) ||
         Math.max(Math.abs(x-entry.x),Math.abs(y-entry.y)) < 5 ||
         !DungeonTraps.safeSpawn(x,y,z) ||
         occupiedTiles.has(xy)) continue

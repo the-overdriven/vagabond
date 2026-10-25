@@ -27,8 +27,8 @@ async function checkTowerReplayAndIsolation() {
   check(JSON.stringify(surfaceMap)===surfaceTerrain,'tower rendering does not rewrite the surface')
   check(currentMapViewKey()==='tower:1','map selection identifies the positive floor')
   check(exploredMapLevels().some(l=>l.key==='tower:1'),'explored tower floor appears in map controls')
-  const blocker=addEnemy({...ENEMY_TEMPLATE_BY_NAME['Giant Rat'],baseName:'Giant Rat',level:0,
-    levelKind:'surface',x:player.x,y:player.y,homeX:player.x,homeY:player.y,alive:true,maxHp:6})
+  const blocker=addEnemy(Object.assign({},ENEMY_TEMPLATE_BY_NAME['Giant Rat'],{baseName:'Giant Rat',level:0,
+    levelKind:'surface',x:player.x,y:player.y,homeX:player.x,homeY:player.y,alive:true,maxHp:6}))
   check(!onCurrentLevel(blocker),'surface creatures do not participate upstairs')
   inspect();check(currentZ===1,'an occupied stair landing blocks descent')
   blocker.alive=false;inspect();check(currentZ===0,'clearing the landing permits descent')

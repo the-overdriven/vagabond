@@ -94,6 +94,13 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
             : room.crusherReserved ? room.archetype === 'Crusher Chamber'
             : room.landmark || expectedRooms.has(room.archetype)),
             'special-purpose rooms and plain stair halls use their declared archetypes')
+          const supplies = groundItems.filter(g => g.level === z && g.fortSupply)
+          check(supplies.length >= 1 && supplies.length <= 2 && supplies.every(g => g.kind === 'potion'),
+            'each Ruins floor retains one or two loose Life Potions')
+          check(rooms.filter(room => room.stairRoom).every(room => !groundItems.some(g =>
+            g.level === z && g.x > room.x && g.x < room.x+room.w-1 &&
+            g.y > room.y && g.y < room.y+room.h-1)),
+            'supply placement leaves both stair halls empty')
           check(new Set(rooms.map(room => room.id)).size === rooms.length, 'room IDs are stable and unique within floor')
           check(new Set(vaults.map(vault => vault.id)).size === vaults.length, 'vault IDs are stable and unique within floor')
           check((level.encounterFamilies || []).length >= 2 && (level.encounterFamilies || []).length <= 4,

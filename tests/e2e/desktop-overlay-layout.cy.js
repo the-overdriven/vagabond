@@ -95,7 +95,7 @@ describe('Desktop overlay layout', () => {
     })
   })
 
-  it('keeps race selection above gameplay-side overlays while leaving the HUD on one row', () => {
+  it('keeps race selection above gameplay panels and usable below wide or wrapped HUDs', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
 
     cy.get('#hud').should($hud => {
@@ -117,6 +117,25 @@ describe('Desktop overlay layout', () => {
       const panelTop = race.querySelector('.panelbox').getBoundingClientRect().top
       expect(panelTop).to.be.greaterThan(hudBottom)
     })
+    // The default Cypress viewport wraps the HUD and used to center an
+    // oversized form underneath it. Check real hit targets after scrolling.
+    for (const [width,height] of [[1000,660],[800,600],[1440,900]]) {
+      cy.viewport(width,height)
+      cy.get('#raceName').scrollIntoView().clear().type('Layout Tester')
+      cy.window().then(win => {
+        const panel=win.document.querySelector('#raceOverlay .panelbox')
+        const rect=panel.getBoundingClientRect()
+        const hud=win.document.getElementById('hud').getBoundingClientRect()
+        expect(rect.top, 'form below the wrapped HUD').to.be.greaterThan(hud.bottom)
+        expect(rect.bottom, 'form inside the viewport').to.be.at.most(height)
+      })
+      cy.get('#btnBegin').scrollIntoView().should('be.visible').then($button => {
+        const button=$button[0],rect=button.getBoundingClientRect()
+        const top=button.ownerDocument.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)
+        expect(top===button || button.contains(top),'Begin remains clickable').to.equal(true)
+      })
+      cy.get('#btnRaceLoad').should('be.visible')
+    }
   })
 
   it('uses the full desktop viewport without reserving space for the HUD, side panels or log', () => {
