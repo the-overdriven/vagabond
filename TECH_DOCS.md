@@ -109,7 +109,8 @@ The 🎲 button next to the name input chooses a random name from
 game's seeded RNG or affect replay.
 On desktop the character-selection overlay stays above gameplay-only overlays
 (the side minimap, keyboard hints and message log) while the top HUD remains
-visible; the form itself is kept below the HUD. On narrow windows, the character
+visible; the viewport-anchored form itself stays below the HUD even when a
+field is focused or scrolled into view. On narrow windows, only the character
 form scrolls within the space below the HUD so its fields remain accessible
 without covering the Load button. Desktop form height includes its padding and
 borders within that available space, including short windows with a wrapped HUD.

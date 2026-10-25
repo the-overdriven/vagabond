@@ -336,6 +336,8 @@ canvas {
      below it. Keep that readable separation even though gameplay now renders
      behind the HUD. The overlay still covers the gameplay-side panels/log. */
   #raceOverlay {
+    /* Keep the dialog anchored when a focused field scrolls into view. */
+    position: fixed;
     padding-top: calc(var(--desktop-hud-height, 52px) + 8px);
     padding-bottom: 8px;
   }
@@ -1364,7 +1366,8 @@ body.hint-collapsed #hint .panel-toggle {
 @media (min-width: 900px) {
   #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4) {
     background: rgba(5, 4, 3, 0.78);
-    overflow: hidden;
+    /* Clip the drifting backdrop without making the overlay scrollable. */
+    overflow: clip;
   }
 
   #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4)::before {

@@ -123,9 +123,11 @@ describe('Desktop overlay layout', () => {
       cy.viewport(width,height)
       cy.get('#raceName').scrollIntoView().clear().type('Layout Tester')
       cy.window().then(win => {
-        const panel=win.document.querySelector('#raceOverlay .panelbox')
+        const overlay=win.document.getElementById('raceOverlay')
+        const panel=overlay.querySelector('.panelbox')
         const rect=panel.getBoundingClientRect()
         const hud=win.document.getElementById('hud').getBoundingClientRect()
+        expect(overlay.scrollTop, 'race overlay must not scroll with the name field').to.equal(0)
         expect(rect.top, 'form below the wrapped HUD').to.be.greaterThan(hud.bottom)
         expect(rect.bottom, 'form inside the viewport').to.be.at.most(height)
       })
