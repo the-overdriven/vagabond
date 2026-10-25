@@ -1354,7 +1354,7 @@ body.hint-collapsed #hint .panel-toggle {
   flex-wrap: wrap;
 }
 
-@media (min-width: 900px) and (pointer: fine) {
+@media (min-width: 900px) {
   #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4) {
     background: rgba(5, 4, 3, 0.78);
     overflow: hidden;
@@ -1391,7 +1391,7 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 /* Ready-made landscapes: the browser loads one file; it never generates a preview world. */
-@media (min-width: 900px) and (pointer: fine) {
+@media (min-width: 900px) {
   #raceOverlay.race-backdrop-1 { --race-background: url('../img/ui/race-landscape-1.webp'); }
   #raceOverlay.race-backdrop-2 { --race-background: url('../img/ui/race-landscape-2.webp'); }
   #raceOverlay.race-backdrop-3 { --race-background: url('../img/ui/race-landscape-3.webp'); }

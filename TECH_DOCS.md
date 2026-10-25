@@ -954,7 +954,9 @@ walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
 The ring preserves routes around the structure. Generation must reject a world
 rather than silently omit its tower when no valid site exists.
 
-The ground entrance is an ordinary unlocked door, like the two internal doors
+The ground entrance artwork retains its upright orientation regardless of
+world rotation, although the entrance position and the tower layout still
+rotate as a unit. The ground entrance is an ordinary unlocked door, like the two internal doors
 on each of the first four floors. Each of these **nine doors** independently
 starts **open with 10% probability** (otherwise closed). Initial states are
 seeded once and persist through travel, save and replay. From **six or more tiles**
@@ -7892,8 +7894,12 @@ there is no falling or cross-elevation jumping. Combat, projectiles and
 inspection use only the active map. Windows and parapets block movement,
 sight and projectiles.
 
-Upper floors and the enclosed tower ground floor use the ordinary eight-tile
-line-of-sight rules and explored terrain shading; the surface outside the tower
+The enclosed ground floor and upper floors `z:+1` to `z:+3` use the ordinary
+eight-tile line-of-sight rules and explored terrain shading. The open summit
+(`z:+4`) has **unrestricted visibility across its entire 11×11 footprint**,
+with no dungeon sight-radius cutoff or dimmed battlements. This does not
+reveal unexplored surrounding surface tiles or enable interactions below.
+The surface outside the tower
 keeps its existing visibility rules. Outside their footprint, previously discovered surface
 terrain is drawn without per-tile color filters to avoid slow redraws. Unexplored surroundings stay
 hidden. The backdrop also shows living surface monsters roaming on previously explored

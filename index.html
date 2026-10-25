@@ -8380,7 +8380,7 @@ more difficult:
 
   function terrainVisual(tileKey, x, y) {
     if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
-        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1,quarterTurns:tower.rotation||0}
+        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1}
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
       ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
       : RENDER_STYLE.specialTiles?.coffin
@@ -10578,7 +10578,7 @@ more difficult:
         : ''
       return {
         mini: false, enemy: e, html: `
-      <img src="${imageSrc(`img/enemies/${slug(e.baseName)}.jpg`)}" onerror="this.style.display='none'">
+      <img src="${imageSrc(`img/enemies/${slug(e.baseName || e.name)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
@@ -11262,8 +11262,22 @@ more difficult:
       const radius = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines'
         ? (WORLD_GEN_CONFIG.dungeons?.dwarvenMines?.visibilityRadius ?? UndergroundFov.RADIUS)
         : UndergroundFov.RADIUS
-      const ordinary = UndergroundFov.compute(map, player.x, player.y, radius)
-      const visible = Mining.lightVisible(map, player.x, player.y, ordinary)
+      // The exposed summit has no roof or enclosing rooms: all battlements,
+      // defenders and treasure are visible, even beyond dungeon sight radius.
+      // Outside scenery still uses the surface's already-explored state.
+      let visible
+      if (currentZ === 4 && tower) {
+        visible = new Set()
+        for (let dy = 0; dy < TOWER_SIZE; dy++) {
+          for (let dx = 0; dx < TOWER_SIZE; dx++) {
+            const x = tower.x + dx, y = tower.y + dy
+            if (map[y]?.[x] && map[y][x] !== 'towervoid') visible.add(keyXY(x, y))
+          }
+        }
+      } else {
+        visible = Mining.lightVisible(map, player.x, player.y,
+          UndergroundFov.compute(map, player.x, player.y, radius))
+      }
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
       for (const pos of visible) {
@@ -13349,7 +13363,7 @@ more difficult:
   // the images are decoded (or even controlled by a SW on the first visit).
   // Keep this desktop-only: mobile never displays these large backgrounds.
   async function preloadRaceBackdrops() {
-    if (!window.matchMedia('(min-width: 900px) and (pointer: fine)').matches) return
+    if (!window.matchMedia('(min-width: 900px)').matches) return
     await Promise.all(RACE_BACKDROP_PATHS.map(async path => {
       const image = new Image()
       image.src = path

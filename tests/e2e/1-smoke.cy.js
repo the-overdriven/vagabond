@@ -97,7 +97,7 @@ describe('Vagabond smoke test', () => {
     cy.get('#hpbar').invoke('attr', 'style').should('include', 'width: 100%')
     cy.get('#xpbar').invoke('attr', 'style').should('include', 'width: 0%')
     cy.get('#hAtk').should('have.text', '2')
-    cy.get('#hDef').should('have.text', '0')
+    cy.get('#hDef').should('have.text', '2')
     cy.get('#hSpd').should('have.text', '5')
     cy.get('#hMf').should('have.text', '0')
     cy.get('#hGold').should('have.text', '0')

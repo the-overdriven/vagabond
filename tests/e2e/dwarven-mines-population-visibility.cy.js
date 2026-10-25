@@ -128,6 +128,7 @@ describe('Mine-only encounters and darkness', () => {
         check(!Mining.lightCanReach(diagonal,2,2,3,1,4,2),
           'two walls meeting diagonally still block crystal light')
       } finally {first.level.mineExcavations=originalExcavations}
+      const drawFreshMineFog=(visible,...args)=>{mineWallFogCache=null;drawMineSightDarkness(visible,...args)}
       const originalTileMode=USE_TILE_IMAGES
       const gradientProto=CanvasRenderingContext2D.prototype
       const originalGradient=gradientProto.createRadialGradient
@@ -217,7 +218,7 @@ describe('Mine-only encounters and darkness', () => {
         player.x=5;player.y=5;camX=0;camY=0;USE_TILE_IMAGES=true
         first.level.mineExcavations=[{x:10,y:5,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
         const visible=UndergroundFov.compute(map,5,5,5)
-        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        drawFreshMineFog(visible,0,0,VIEW_W,VIEW_H)
         const shadow=mineDarknessLayer.getContext('2d')
         const opacityAt=(x,y)=>shadow.getImageData(Math.floor((x+0.5)*TILE_PX),
           Math.floor((y+0.5)*TILE_PX),1,1).data[3]
@@ -226,12 +227,12 @@ describe('Mine-only encounters and darkness', () => {
         check(opacityAt(5,10)>170,
           'an unlit tile on the fifth ring retains its 75 percent dark overlay')
         map[5][8]='cavewall'
-        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        drawFreshMineFog(visible,0,0,VIEW_W,VIEW_H)
         check(opacityAt(8,5)>45,
           'a wall face seen opposite the crystal does not lose its darkness')
         map[5][8]='cavefloor2'
         first.level.mineExcavations=[]
-        drawMineSightDarkness(visible,0,0,VIEW_W,VIEW_H)
+        drawFreshMineFog(visible,0,0,VIEW_W,VIEW_H)
         const alphaWithinTile=part=>shadow.getImageData(
           Math.floor((9+part)*TILE_PX),Math.floor(5.5*TILE_PX),1,1).data[3]
         check(alphaWithinTile(0.15)+15<alphaWithinTile(0.85),
@@ -242,7 +243,7 @@ describe('Mine-only encounters and darkness', () => {
         const hiddenTileVisible=new Set(visible)
         hiddenTileVisible.delete('8,5')
         const normalAlpha=opacityAt(8,5)
-        drawMineSightDarkness(hiddenTileVisible,0,0,VIEW_W,VIEW_H)
+        drawFreshMineFog(hiddenTileVisible,0,0,VIEW_W,VIEW_H)
         check(Math.abs(opacityAt(8,5)-normalAlpha)<3,
           'nearby terrain receives the same radial light even behind a corner')
         undergroundDiscovered[5][8]=false
@@ -253,7 +254,7 @@ describe('Mine-only encounters and darkness', () => {
             'crystal light fades gently beyond its last reachable tile edge')
           const beforeFog=JSON.stringify(undergroundDiscovered)
           const radialVisible=new Set(['5,5','6,5','5,6'])
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(Math.abs(opacityAt(8,5)-opacityAt(5,8))<3,
             'unexplored mine corners use the same light radius in every direction')
           check(opacityAt(10,5)<opacityAt(11,5)&&
@@ -261,18 +262,18 @@ describe('Mine-only encounters and darkness', () => {
             'unknown terrain fades continuously to black past the sight radius')
           const oldUnknown=opacityAt(13,5)
           undergroundDiscovered[5][13]=true
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(13,5)<oldUnknown,
             'remembered floor keeps its dim appearance outside radial light')
           undergroundDiscovered[5][13]=false
           check(JSON.stringify(undergroundDiscovered)===beforeFog,
             'drawing radial fog does not mark any unexplored cells as visited')
           for(let y=0;y<20;y++)map[y][7]='cavewall'
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(7,5)<180&&opacityAt(8,5)===255,
             'solid mine walls light up only on their near face, not through the wall')
           map[5][8]='cavewall';map[5][9]='cavewall'
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(8,5)===255&&opacityAt(9,5)===255,
             'rock behind the first illuminated wall remains fully obscured')
           check(opacityAt(10,5)===255,
@@ -281,23 +282,23 @@ describe('Mine-only encounters and darkness', () => {
             'the visible wall face fades consistently along both sides of a corridor')
           map[5][8]='cavefloor2';map[5][9]='cavefloor2'
           undergroundDiscovered[5][8]=true
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(8,5)>205&&opacityAt(8,5)<250,
             'previously explored rock behind an opaque wall stays dark')
           undergroundDiscovered[5][8]=false
           for(let y=0;y<20;y++)map[y][7]='cavefloor2'
           map[5][6]='cavewall';map[6][5]='cavewall'
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(6,6)===255,
             'two diagonal walls block light through their shared corner')
           map[6][5]='cavefloor2'
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(6,6)<255,
             'a single-wall diagonal opening admits a soft edge of light')
           map[5][6]='cavefloor2'
           USE_TILE_IMAGES=false
           const cachedShade=opacityAt(11,5)
-          drawMineSightDarkness(radialVisible,0,0,VIEW_W,VIEW_H)
+          drawFreshMineFog(radialVisible,0,0,VIEW_W,VIEW_H)
           check(opacityAt(11,5)===cachedShade,
             'ASCII sight uses its existing cell lighting without redrawing radial fog')
         } finally { /* restored with the surrounding mine render state */ }

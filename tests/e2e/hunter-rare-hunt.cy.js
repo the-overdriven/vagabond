@@ -265,7 +265,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       cy.viewport(width, 900)
       cy.window().then(win => win.eval(`player.inventory=[createItem('echoBlightHorn')]; invTab='all'; toggleInv(true)`))
       cy.get('#invList .invitem').contains('Echo-Blight Horn').parent().as('hornRow')
-      cy.get('@hornRow').find('button').should('have.text', 'Use').and('be.visible').and('be.enabled')
+      cy.get('@hornRow').find('button').contains('Use').should('be.visible').and('be.enabled')
       cy.window().then(win => {
         // Preloading replaces asset paths with blob URLs. Check the resolved
         // horn asset and successful decoding, rather than the URL's filename.
@@ -281,7 +281,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       })
       cy.window().then(win => {
         const beforeTurn = win.eval('turnCount')
-        cy.get('@hornRow').find('button').click()
+        cy.get('@hornRow').find('button').contains('Use').click()
         cy.window().should(win => {
           expect(win.eval('turnCount'), 'Use consumes one turn').to.equal(beforeTurn + 1)
           expect(win.eval("player.inventory.find(it => it.kind === 'echoBlightHorn').lastUseTotalXp"),

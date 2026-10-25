@@ -19,6 +19,7 @@ describe('SPD-scaled pursuit and losing interest', () => {
         for(let y=55;y<=68;y++) for(let x=55;x<=78;x++) {
           map[y][x]='grass';discovered[y][x]=true;grasslandTrees.delete(keyXY(x,y))
         }
+        snapCameraToPlayer() // fixture teleports the player; visible feedback uses the actual viewport
         player.baseSpd+=5-playerSpd()
         window.speedCheck=(condition,message)=>{if(!condition)throw Error(message)}
         window.resetPursuitTest=(playerSpeed=5,enemySpeed=6,distance=2,alarmed=true)=>{

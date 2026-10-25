@@ -26,7 +26,9 @@ describe('Guaranteed elevated tower',()=>{
             const board=z===0?surfaceMap:towerLevels[z-1].map
             return [z<4?towerStair(z,true):null,z>0?towerStair(z,false):null]
               .filter(Boolean).every(q=>['towerstairsup','towerstairsdown'].includes(board[q.y]?.[q.x]))
-          }).every(Boolean)
+          }).every(Boolean) &&
+          terrainVisual(surfaceMap[tower.entrance.y][tower.entrance.x],
+            tower.entrance.x,tower.entrance.y)?.quarterTurns === undefined
       })()`)).to.equal(true)
     })
   })
@@ -57,6 +59,11 @@ describe('Guaranteed elevated tower',()=>{
           undergroundDiscovered=towerLevels[3].discovered;
           Object.assign(player,towerStair(4,false));invalidateUndergroundFov();
           stopCameraAnimation();snapCameraToPlayer();render()`)
+        // The open roof has no dungeon FOV cutoff, including diagonal corners.
+        expect(win.eval(`(()=>{const visible=currentUndergroundFov();
+          return Array.from({length:11},(_,dy)=>Array.from({length:11},(_,dx)=>
+            visible.has(keyXY(tower.x+dx,tower.y+dy)))).flat().every(Boolean)
+        })()`)).to.equal(true)
         // The north window must not cover the inner wall junction, and the
         // east chamber must have a proper southern wall with a door.
         expect(win.eval("(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
