@@ -72,13 +72,15 @@ describe('Startup assets and character creation UI', () => {
     cy.visit('/')
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     moveMouse('.cursed-world-option')
-    cy.get('.cursed-world-tip').should('be.visible')
+    // This tooltip intentionally ignores pointer events. Hit-testing can
+    // report a race name beneath it even when the tooltip renders on top.
+    cy.get('.cursed-world-tip').should('have.css', 'display', 'block')
     cy.get('#cursedWorldToggle').click().should('be.checked').and('be.focused')
     moveMouse('#raceError')
     cy.get('#cursedWorldToggle').should('be.focused')
     cy.get('.cursed-world-tip').should('not.be.visible')
     moveMouse('.cursed-world-option')
-    cy.get('.cursed-world-tip').should('be.visible')
+    cy.get('.cursed-world-tip').should('have.css', 'display', 'block')
   })
 
   it('shows the mobile note only when cursed world is checked', () => {
@@ -106,8 +108,9 @@ describe('Startup assets and character creation UI', () => {
     })
   })
 
-  it('lists all four character-selection landscapes in the service worker precache', () => {
+  it('precaches character-selection landscapes and mine supports', () => {
     cy.request('/sw.js').its('body').then(worker => {
+      expect(worker).to.include("'./img/tiles/mine-support.png'")
       for (let n = 1; n <= 4; n++) {
         expect(worker).to.include(`./img/ui/race-landscape-${n}.webp`)
       }

@@ -2979,6 +2979,15 @@ existing ground item, or change wall collision or opacity. The ordinary cave
 props instead occupy clear floor tiles at least three tiles from entrances or
 stairs, with webs requiring cave walls on two perpendicular sides.
 
+Dwarven Mines have wooden support frames over selected dry passage tiles.
+Supports are placed **after whole-world rotation**, so their fixed upright art
+appears only in north–south, single-tile-wide corridors. The support tile and
+both immediate north/south neighbors must each have walkable exits **only north
+and south**; this requires at least five straight, tight passage tiles. Frames
+are spaced roughly eight eligible tiles apart and avoid initial creature, loot
+and exposed-crystal positions. They are visual only: the mine floor, movement,
+vision, mining and lighting rules remain unchanged.
+
 Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
 eligible floor positions have separate 1.8% stalagmite and 2.5% mushroom bands.
@@ -3004,7 +3013,7 @@ One position holds at most one decoration. The generated placement is saved
 and restored directly, survives normal deaths and reused-world characters, and
 is cleared and regenerated for a new world. Props draw below items and actors
 and respect underground visibility. Their ASCII glyphs are `%` (web), `^`
-(stalagmites) and `♣` (small mushrooms).
+(stalagmites), `♣` (small mushrooms) and `Π` (mine supports).
 
 ## Guaranteed underground Vampire
 

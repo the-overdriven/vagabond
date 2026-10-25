@@ -1469,6 +1469,8 @@ body.hint-collapsed #hint .panel-toggle {
 
 .race-foot {
   display: flex;
+  position: relative;
+  z-index: 1;
   align-items: center;
   justify-content: space-between;
   gap: 10px;

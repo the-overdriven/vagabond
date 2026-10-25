@@ -46,7 +46,8 @@ describe('Decorative caves and deep threat rarity', () => {
         for(const [kind,limit] of [['speedpotion',lootConfig.looseSpeedPotions],['scrollOfInvisibility',lootConfig.looseScrolls]])
           check(surfaceSupplies.filter(g=>g.kind===kind).length<=limit,
             'remaining original supplies do not exceed configured slots '+kind)
-        check(caveDecorations.length>0 && new Set(caveDecorations.map(p=>p.kind)).size===3,'all three decorations generated')
+        check(['web','stalagmites','mushrooms'].every(kind=>caveDecorations.some(p=>p.kind===kind)),
+          'all three ordinary cave decoration kinds generated')
         const occupiedProps=new Set()
         for(const level of [-1,-2]) {
           const descriptors=level===-1?caves:deepLevels[0].caves
@@ -83,8 +84,8 @@ describe('Decorative caves and deep threat rarity', () => {
         const terrainBefore=JSON.stringify(undergroundMap)
         resetForNewCharacter()
         check(JSON.stringify(caveDecorations)===original && JSON.stringify(undergroundMap)===terrainBefore,'reused world keeps cosmetic layout')
-        const fortWebs=caveDecorations.filter(p=>p.level<=-3)
-        check(fortWebs.length>0 && fortWebs.every(p=>p.kind==='web'), 'dwarven masonry receives webs')
+        const fortWebs=caveDecorations.filter(p=>p.level<=-3 && p.kind==='web')
+        check(fortWebs.length>0, 'dwarven masonry receives webs')
         for(const p of fortWebs) {
           const floor=deepLevels[-p.level-2]
           check(floor.map[p.y][p.x]==='dwarvenwall','dwarven web mounted on wall')
@@ -96,6 +97,23 @@ describe('Decorative caves and deep threat rarity', () => {
               return (wall(0,-1)||wall(0,1))&&(wall(-1,0)||wall(1,0))
             })
           check(cornerAdjacent,'web mounted beside a real corner')
+        }
+        const supports=caveDecorations.filter(p=>p.kind==='minesupport')
+        check(supports.length>0, 'mine corridors have supports after world rotation')
+        for(const p of supports) {
+          const floor=deepLevels[-p.level-2]
+          check(floor?.dungeonPackage==='dwarvenMines' && p.levelKind==='chain' && p.caveIndex===-1,
+            'mine supports only on mine floors')
+          const cm=floor.map
+          const tight=(x,y)=>cm[y]?.[x]==='cavefloor2' &&
+            TILE[cm[y-1]?.[x]]?.walk && TILE[cm[y+1]?.[x]]?.walk &&
+            !TILE[cm[y]?.[x-1]]?.walk && !TILE[cm[y]?.[x+1]]?.walk
+          check([-1,0,1].every(offset=>tight(p.x,p.y+offset)),
+            'support and both neighbors belong to a tight north-south passage')
+          check(!groundItems.some(g=>g.level===p.level&&g.x===p.x&&g.y===p.y),
+            'supports avoid initial loot')
+          check(!enemies.some(e=>e.alive&&e.level===p.level&&e.x===p.x&&e.y===p.y),
+            'supports avoid initial creature positions')
         }
         check(dwarvenRuin && deepLevels[1],'fort still generated')
       })()`))

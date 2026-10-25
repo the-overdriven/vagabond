@@ -8097,5 +8097,39 @@ function spawnCaveDecorations() {
       used.add(key)
     }
   }
+  // Frame art is upright only in north-south corridors in the final, rotated
+  // world. The center and both neighboring cells must each be one tile wide.
+  for (const {level: mine, z} of dungeonPackageLevels('dwarvenMines')) {
+    const cm = mine.map
+    const tight = (x, y) => cm[y]?.[x] === 'cavefloor2' &&
+      TILE[cm[y-1]?.[x]]?.walk === true && TILE[cm[y+1]?.[x]]?.walk === true &&
+      !TILE[cm[y]?.[x-1]]?.walk && !TILE[cm[y]?.[x+1]]?.walk
+    const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive)]
+      .filter(e => e.level === z).map(e => keyXY(e.x,e.y)))
+    for (const deposit of mine.mineExcavations || [])
+      if (deposit.kind === 'exposed' && !deposit.removed) occupied.add(keyXY(deposit.x,deposit.y))
+    for (let x = 2; x < MAP_W - 2; x++) {
+      let run = [], lastSupportY = -Infinity
+      const finishRun = () => {
+        if (!run.length) return
+        // One frame per eight eligible cells at most, with a stable offset
+        // per run so even short corridors can receive a frame.
+        const start = Math.floor(roll(x,run[0],z) * Math.min(8,run.length))
+        for (let i = start; i < run.length; i += 8) {
+          const y = run[i], key = `${z}:${keyXY(x,y)}`
+          if (y - lastSupportY < 6 || occupied.has(keyXY(x,y)) || used.has(key)) continue
+          caveDecorations.push({x,y,kind:'minesupport',level:z,levelKind:'chain',caveIndex:-1})
+          used.add(key)
+          lastSupportY = y
+        }
+        run = []
+      }
+      for (let y = 3; y < MAP_H - 3; y++) {
+        if (tight(x,y-1) && tight(x,y) && tight(x,y+1)) run.push(y)
+        else finishRun()
+      }
+      finishRun()
+    }
+  }
   spawnSurfaceSpiderWebs(roll)
 }

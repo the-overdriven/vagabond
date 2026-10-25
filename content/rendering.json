@@ -940,6 +940,12 @@
       "color": "#b4a37e",
       "image": "img/tiles/cave-mushrooms.png",
       "scale": 0.8
+    },
+    "minesupport": {
+      "glyph": "Π",
+      "color": "#aa7443",
+      "image": "img/tiles/mine-support.png",
+      "scale": 1
     }
   }
 }
