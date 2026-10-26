@@ -8394,7 +8394,7 @@ more difficult:
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
     if (tower && tileKey === 'towerbattlement') return {...visual,
-      quarterTurns: y === tower.y ? 0 : x === tower.x+10 ? 1 : y === tower.y+10 ? 2 : 3}
+      quarterTurns: y === tower.y ? 0 : x === tower.x+tower.size-1 ? 1 : y === tower.y+tower.size-1 ? 2 : 3}
     if (tower && tileKey === 'towerbattlementcorner') return {...visual,
       quarterTurns: x === tower.x ? (y === tower.y ? 0 : 3) : (y === tower.y ? 1 : 2)}
 
@@ -11278,8 +11278,8 @@ more difficult:
       let visible
       if (currentZ === 4 && tower) {
         visible = new Set()
-        for (let dy = 0; dy < TOWER_SIZE; dy++) {
-          for (let dx = 0; dx < TOWER_SIZE; dx++) {
+        for (let dy = 0; dy < tower.size; dy++) {
+          for (let dx = 0; dx < tower.size; dx++) {
             const x = tower.x + dx, y = tower.y + dy
             if (map[y]?.[x] && map[y][x] !== 'towervoid') visible.add(keyXY(x, y))
           }

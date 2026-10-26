@@ -743,9 +743,9 @@ function rotateGeneratedWorld(quarterTurns) {
   }
   if (tower) {
     const corners = [point(tower.x,tower.y),
-      point(tower.x+TOWER_SIZE-1,tower.y),
-      point(tower.x,tower.y+TOWER_SIZE-1),
-      point(tower.x+TOWER_SIZE-1,tower.y+TOWER_SIZE-1)]
+      point(tower.x+tower.size-1,tower.y),
+      point(tower.x,tower.y+tower.size-1),
+      point(tower.x+tower.size-1,tower.y+tower.size-1)]
     positions(tower.entrance)
     tower.x = Math.min(...corners.map(p=>p.x))
     tower.y = Math.min(...corners.map(p=>p.y))

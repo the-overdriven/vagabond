@@ -20,7 +20,7 @@ describe('Guaranteed elevated tower',()=>{
       expect(win.eval(`(()=>{
         currentZ=0;map=surfaceMap
         rotateGeneratedWorld(1)
-        const p=towerPoint(5,10)
+        const p=towerPoint(5,tower.size-1)
         return TOWER_MIN_VILLAGE_GAP===50 &&
           towerFootprintDistance(tower.x-50,tower.y,tower.x,tower.y)===50 &&
           towerFootprintDistance(tower.x-49,tower.y,tower.x,tower.y)===49 &&
@@ -62,26 +62,30 @@ describe('Guaranteed elevated tower',()=>{
           undergroundDiscovered=towerLevels[3].discovered;
           Object.assign(player,towerStair(4,false));invalidateUndergroundFov();
           stopCameraAnimation();snapCameraToPlayer();render()`)
-        // The open roof has no dungeon FOV cutoff, including diagonal corners.
+        // Every playable roof tile is visible, but chamfered void corners
+        // must remain outside the tower rather than becoming visible floor.
         expect(win.eval(`(()=>{const visible=currentUndergroundFov();
-          return Array.from({length:11},(_,dy)=>Array.from({length:11},(_,dx)=>
-            visible.has(keyXY(tower.x+dx,tower.y+dy)))).flat().every(Boolean)
+          return Array.from({length:tower.size},(_,dy)=>Array.from({length:tower.size},(_,dx)=>
+            visible.has(keyXY(tower.x+dx,tower.y+dy))===towerContains(tower.x+dx,tower.y+dy))).flat().every(Boolean)
         })()`)).to.equal(true)
         // The north window must not cover the inner wall junction, and the
         // east chamber must have a proper southern wall with a door.
         expect(win.eval("(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
         expect(win.eval("(()=>{const p=towerPoint(3,0);return towerLevels[0].map[p.y][p.x]})()")).to.equal('towerwindow')
-        expect(win.eval("(()=>{const p=towerPoint(5,7);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
-        expect(win.eval("(()=>{const p=towerPoint(6,7);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
-        expect(['dwarvendoorclosed','dwarvendooropen']).to.include(win.eval("(()=>{const p=towerPoint(8,7);return towerLevels[0].map[p.y][p.x]})()"))
+        expect(win.eval("(()=>{const p=towerPoint(5,tower.size-4);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
+        expect(win.eval("(()=>{const p=towerPoint(6,tower.size-4);return towerLevels[0].map[p.y][p.x]})()")).to.equal('dwarvenwall')
+        expect(['dwarvendoorclosed','dwarvendooropen']).to.include(win.eval("(()=>{const p=towerPoint(tower.size-3,tower.size-4);return towerLevels[0].map[p.y][p.x]})()"))
         expect(win.eval(`Array.from({length:5},(_,z)=>{
           const terrain=z===0?surfaceMap:towerLevels[z-1].map
           const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
           return stairs.every(p=>[-1,0,1].every(dy=>[-1,0,1].every(dx=>
             (dx===0&&dy===0)||terrain[p.y+dy]?.[p.x+dx]==='marble')))
         }).every(Boolean)`)).to.equal(true)
-        expect(win.eval("towerLevels[3].map[tower.y][tower.x]")).to.equal('marble')
-        expect(win.eval("towerLevels[3].map[tower.y+10][tower.x+10]")).to.equal('marble')
+        expect(win.eval(`(()=>{
+          const corners=[[0,0],[tower.size-1,0],[0,tower.size-1],[tower.size-1,tower.size-1]]
+          return corners.every(([dx,dy])=>{const p=towerPoint(dx,dy)
+            return towerLevels[3].map[p.y][p.x]===(tower.cornerCut?'towervoid':'marble')})
+        })()`)).to.equal(true)
         expect(win.eval(`(()=>{const p=towerPoint(3,0);
           return terrainVisual('towerwindow',p.x,p.y)?.quarterTurns === undefined
         })()`)).to.equal(true)
@@ -108,7 +112,7 @@ describe('Guaranteed elevated tower',()=>{
           expect(win.eval(`(()=>{const original=ctx.fillRect,rects=[];
             ctx.fillRect=(...args)=>{if(ctx.fillStyle==='rgba(0, 0, 0, 0.5)')rects.push(args)};
             try{shadeTowerExterior();return rects.length}finally{ctx.fillRect=original}
-          })()`)).to.equal(4)
+          })()`)).to.equal(win.eval('4 + (tower.cornerCut ? 4 : 0)'))
           win.eval('currentZ=4;map=towerLevels[3].map;undergroundDiscovered=towerLevels[3].discovered;invalidateUndergroundFov()')
         }
       })

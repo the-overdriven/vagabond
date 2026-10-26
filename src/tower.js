@@ -4,7 +4,7 @@
 // copied into them, so every ordinary movement/targeting API sees only this floor.
 let tower = null
 let towerLevels = []
-const TOWER_SIZE = 11
+const TOWER_SIZE = 10
 const TOWER_MIN_VILLAGE_GAP = 50
 
 // Surface perspective is derived from player position; it is never saved or
@@ -12,20 +12,23 @@ const TOWER_MIN_VILLAGE_GAP = 50
 // shows the ground masonry without revealing the enclosed rooms.
 const TOWER_NEAR_DISTANCE = 5
 function towerContains(x, y) {
-  return !!tower && x >= tower.x && x < tower.x + TOWER_SIZE &&
-    y >= tower.y && y < tower.y + TOWER_SIZE
+  if (!tower || x < tower.x || x >= tower.x + tower.size ||
+      y < tower.y || y >= tower.y + tower.size) return false
+  const dx = x - tower.x, dy = y - tower.y, cut = tower.cornerCut || 0
+  return !(cut && (dx < cut || dx >= tower.size - cut) &&
+    (dy < cut || dy >= tower.size - cut))
 }
 function towerInterior(x, y) {
-  return !!tower && x > tower.x && x < tower.x + TOWER_SIZE - 1 &&
-    y > tower.y && y < tower.y + TOWER_SIZE - 1
+  return towerContains(x, y) && x > tower.x && x < tower.x + tower.size - 1 &&
+    y > tower.y && y < tower.y + tower.size - 1
 }
-function towerFootprintDistance(x, y, left, top) {
-  const dx = Math.max(left - x, 0, x - (left + TOWER_SIZE - 1))
-  const dy = Math.max(top - y, 0, y - (top + TOWER_SIZE - 1))
+function towerFootprintDistance(x, y, left, top, size = TOWER_SIZE) {
+  const dx = Math.max(left - x, 0, x - (left + size - 1))
+  const dy = Math.max(top - y, 0, y - (top + size - 1))
   return Math.max(dx, dy)
 }
 function towerDistance(x = player.x, y = player.y) {
-  return tower ? towerFootprintDistance(x, y, tower.x, tower.y) : Infinity
+  return tower ? towerFootprintDistance(x, y, tower.x, tower.y, tower.size) : Infinity
 }
 function towerShowsSummit() {
   return currentZ === 0 && towerDistance() > TOWER_NEAR_DISTANCE
@@ -39,9 +42,10 @@ function towerPoint(dx, dy) {
   // Local tower coordinates rotate with the generated world. Keeping this
   // transform in one place also keeps staircase pairs aligned after rotation.
   const turns = tower?.rotation || 0
-  if (turns === 1) [dx, dy] = [TOWER_SIZE - 1 - dy, dx]
-  else if (turns === 2) [dx, dy] = [TOWER_SIZE - 1 - dx, TOWER_SIZE - 1 - dy]
-  else if (turns === 3) [dx, dy] = [dy, TOWER_SIZE - 1 - dx]
+  const last = tower.size - 1
+  if (turns === 1) [dx, dy] = [last - dy, dx]
+  else if (turns === 2) [dx, dy] = [last - dx, last - dy]
+  else if (turns === 3) [dx, dy] = [dy, last - dx]
   return {x: tower.x + dx, y: tower.y + dy}
 }
 
@@ -49,7 +53,7 @@ function towerStair(z, up) {
   // Alternating landings stay in the western chambers of the unrotated layout.
   // Every tile in each landing's 3x3 neighborhood is ordinary marble floor.
   const north = up ? z % 2 : (z - 1) % 2
-  return towerPoint(2, north ? 2 : 8)
+  return towerPoint(2 + (tower.cornerCut || 0), north ? 2 : tower.size - 3)
 }
 
 function generateTower() {
@@ -70,36 +74,42 @@ function generateTower() {
     for (let dy = -1; dy <= TOWER_SIZE && valid; dy++) for (let dx = -1; dx <= TOWER_SIZE; dx++) {
       if (!natural.has(map[y+dy][x+dx]) || protectedCells.has(keyXY(x+dx,y+dy))) {valid=false;break}
     }
-    if (valid && before.has(keyXY(x+5,y+11))) candidates.push({x,y})
+    if (valid && before.has(keyXY(x+5,y+TOWER_SIZE))) candidates.push({x,y})
   }
   if (!candidates.length) return false
-  tower = {...pick(candidates), size:TOWER_SIZE, floors:5, rotation:0}
-  tower.entrance = towerPoint(5, 10)
+  tower = {...pick(candidates), size:TOWER_SIZE, cornerCut:1, floors:5, rotation:0}
+  tower.entrance = towerPoint(5, TOWER_SIZE-1)
   // Door states are rolled during generation, never on rendering or revisits.
   // This also applies to the outside entrance (which may reveal the foyer).
   const randomDoor = () => chance(0.1) ? 'dwarvendooropen' : 'dwarvendoorclosed'
   for (let z = 0; z <= 4; z++) {
     const terrain = z === 0 ? surfaceMap : Array.from({length:MAP_H},()=>Array(MAP_W).fill('towervoid'))
     for (let dy=0;dy<TOWER_SIZE;dy++) for (let dx=0;dx<TOWER_SIZE;dx++) {
-      const edge=dx===0||dy===0||dx===10||dy===10
-      const corner=(dx===0||dx===10)&&(dy===0||dy===10)
+      const last=TOWER_SIZE-1, cut=tower.cornerCut
+      const corner=(dx===0||dx===last)&&(dy===0||dy===last)
+      // Cut one tile off every corner. The original surface remains there;
+      // elevated maps keep their impassable, see-through-to-surface void.
+      if (corner && cut) continue
+      const edge=dx===0||dy===0||dx===last||dy===last
+      const innerCorner=(dx===cut||dx===last-cut)&&(dy===cut||dy===last-cut)
       terrain[tower.y+dy][tower.x+dx]=edge
-        ? z===4 ? corner ? 'marble':'towerbattlement'
-          : !corner && ((dy===0 && (dx===3 || dx===7)) || (dy===10 && dx===5) || ((dx===0 || dx===10) && dy===5)) ? 'towerwindow':'dwarvenwall'
-        : 'marble'
+        ? z===4 ? 'towerbattlement'
+          : ((dy===0 && (dx===3 || dx===last-3)) || (dy===last && dx===5) ||
+            ((dx===0 || dx===last) && dy===Math.floor(last/2))) ? 'towerwindow':'dwarvenwall'
+        : z<4 && innerCorner ? 'dwarvenwall' : 'marble'
       if(z===0) grasslandTrees.delete(keyXY(tower.x+dx,tower.y+dy))
     }
     if(z<4) {
       // Two chambers, joined by a normal unlocked door and a second open
       // passage. The stair approach is always free of furniture and enemies.
-      const gap=randInt(2,3)
-      for(let dy=1;dy<8;dy++) terrain[tower.y+dy][tower.x+5]='dwarvenwall'
+      const gap=randInt(2,3), partitionY=TOWER_SIZE-4
+      for(let dy=1;dy<partitionY;dy++) terrain[tower.y+dy][tower.x+5]='dwarvenwall'
       terrain[tower.y+gap][tower.x+5]=randomDoor()
       // Seal the partition junction: a missing diagonal corner permits
       // movement between chambers while both doors are still closed.
-      terrain[tower.y+7][tower.x+5]='dwarvenwall'
-      for (let dx=6;dx<10;dx++) terrain[tower.y+7][tower.x+dx]='dwarvenwall'
-      terrain[tower.y+7][tower.x+8]=randomDoor()
+      terrain[tower.y+partitionY][tower.x+5]='dwarvenwall'
+      for (let dx=6;dx<TOWER_SIZE-1;dx++) terrain[tower.y+partitionY][tower.x+dx]='dwarvenwall'
+      terrain[tower.y+partitionY][tower.x+TOWER_SIZE-3]=randomDoor()
       const p=towerStair(z,true);terrain[p.y][p.x]='towerstairsup'
     }
     if(z>0) {
@@ -127,7 +137,7 @@ function populateTower() {
     const terrain=z===0?surfaceMap:towerLevels[z-1].map
     const spots=[]
     const stairs=[...(z<4?[towerStair(z,true)]:[]),...(z>0?[towerStair(z,false)]:[])]
-    for(let dy=1;dy<=5;dy++)for(let dx=1;dx<=9;dx++) {
+    for(let dy=1;dy<=5;dy++)for(let dx=1;dx<TOWER_SIZE-1;dx++) {
       const x=tower.x+dx,y=tower.y+dy
       if(terrain[y][x]==='marble' && stairs.every(p =>
         Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>=3))spots.push({x,y})
@@ -308,12 +318,18 @@ function drawTowerSurfaceMonsters(now) {
 function shadeTowerExterior() {
   if (currentZ <= 0 || currentZ >= 4 || !tower) return
   const left = Math.max(0, Math.min(canvas.width, Math.round((tower.x - camX) * TILE_PX)))
-  const right = Math.max(0, Math.min(canvas.width, Math.round((tower.x + TOWER_SIZE - camX) * TILE_PX)))
+  const right = Math.max(0, Math.min(canvas.width, Math.round((tower.x + tower.size - camX) * TILE_PX)))
   const top = Math.max(0, Math.min(canvas.height, Math.round((tower.y - camY) * TILE_PX)))
-  const bottom = Math.max(0, Math.min(canvas.height, Math.round((tower.y + TOWER_SIZE - camY) * TILE_PX)))
+  const bottom = Math.max(0, Math.min(canvas.height, Math.round((tower.y + tower.size - camY) * TILE_PX)))
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
   ctx.fillRect(0, 0, canvas.width, top)
   ctx.fillRect(0, bottom, canvas.width, canvas.height - bottom)
   ctx.fillRect(0, top, left, bottom - top)
   ctx.fillRect(right, top, canvas.width - right, bottom - top)
+  // Chamfered corner cells are outside the playable stone outline as well.
+  if (tower.cornerCut) for (const [dx,dy] of [[0,0],[tower.size-1,0],
+    [0,tower.size-1],[tower.size-1,tower.size-1]]) {
+    const x=Math.round((tower.x+dx-camX)*TILE_PX), y=Math.round((tower.y+dy-camY)*TILE_PX)
+    ctx.fillRect(x,y,TILE_PX,TILE_PX)
+  }
 }

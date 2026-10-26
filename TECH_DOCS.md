@@ -953,14 +953,16 @@ collapse. Chances are configured in `environment.iceInstantBreakChance`, `enviro
 
 ## Stone tower
 
-Every newly generated world contains exactly **one 11×11 stone tower**, with
+Every newly generated world contains exactly **one 10×10 stone tower**, with
 five playable levels: the ground floor (`z:0`) and four upper floors (`z:+1`
 through `z:+4`). The tower is placed on a Temple-reachable patch of dry natural
 terrain, away from the starting sanctuary. Its footprint and surrounding
 walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
 The closest distance from any village hut to the tower's outer footprint is
 **at least 50 tiles** by Chebyshev distance, measured after the tower's full
-11×11 footprint is accounted for. This rule applies equally on small worlds.
+10×10 bounding footprint is accounted for. The four outer corner tiles are cut
+away, exposing the original terrain below, with masonry at the new diagonal
+edges and inner corners. This rule applies equally on small worlds.
 The ring preserves routes around the structure. Generation must reject a world
 rather than silently omit its tower when no valid site exists.
 
@@ -984,7 +986,9 @@ on a previous visit. Windows do not grant sight through their masonry. Visibilit
 updates immediately when a door opens or closes. These presentation and FOV
 rules use no randomness or additional persisted state.
 
-Upper floors align with the surface footprint. Lower floors have partitioned
+Upper floors align with the surface footprint, including its clipped corners.
+The northern rooms are shorter and the eastern room is narrower; the southern
+stair passage and its walkable landing clearance are preserved. Lower floors have partitioned
 chambers with two unlocked internal doors: one connects the chambers directly,
 while the other connects the eastern chamber to the southern hallway. The
 partition and southern chamber wall meet at a solid masonry corner, so neither
@@ -7941,7 +7945,7 @@ sight and projectiles.
 
 The enclosed ground floor and upper floors `z:+1` to `z:+3` use the ordinary
 eight-tile line-of-sight rules and explored terrain shading. The open summit
-(`z:+4`) has **unrestricted visibility across its entire 11×11 footprint**,
+(`z:+4`) has **unrestricted visibility across its entire 10×10 stone footprint**,
 with no dungeon sight-radius cutoff or dimmed battlements. This does not
 reveal unexplored surrounding surface tiles or enable interactions below.
 The surface outside the tower

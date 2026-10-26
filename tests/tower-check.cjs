@@ -5,6 +5,8 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
  context.fixture=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'saves/Tester_start.json')))
  run('loadGameFromObject(fixture,{isReplayInit:true});replayRecording=false;replayAnimationsDisabled=true;raceOpen=false;log=()=>{}')
  assert.equal(run('towerLevels.length'),4)
+ assert.equal(run('tower.size'),11,'saved tower retains its original generated footprint')
+ assert.equal(run('tower.cornerCut || 0'),0)
  // The above-ground surface remains alive without acquiring the player upstairs.
  // Use a single existing surface enemy on a known explored perimeter tile.
  const ambientSetup = run(`(()=>{
@@ -120,19 +122,56 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits(${JSON.stringify(traits)}.map(name=>WORLD_TRAITS.find(t=>t.name===name)),'XS');player.inventory=[];player.curseDebuffs=[];player.poisonTurns=0;player.berryRegenTurns=0;enemies=[];groundItems=[];occupied=new Set()`)
   await run('generateNewWorld()')
   assert.equal(run('towerLevels.length'),4)
+  assert.equal(run('tower.size'),10,'new towers use a 10x10 bounding footprint')
+  assert.equal(run('tower.cornerCut'),1,'all four outer corners are chamfered')
+  assert.equal(run(`(()=>{
+    for(const [dx,dy] of [[0,0],[9,0],[0,9],[9,9]]){
+      const p=towerPoint(dx,dy)
+      if(towerContains(p.x,p.y)||!TILE[surfaceMap[p.y]?.[p.x]]?.walk) return false
+      for(const level of towerLevels) if(level.map[p.y]?.[p.x]!=='towervoid')return false
+    }
+    for(const [dx,dy] of [[1,0],[0,1],[8,0],[9,1],[0,8],[1,9],[9,8],[8,9]]){
+      const p=towerPoint(dx,dy)
+      if(surfaceMap[p.y]?.[p.x]!=='dwarvenwall')return false
+    }
+    for(const [dx,dy] of [[1,1],[8,1],[1,8],[8,8]]){
+      const p=towerPoint(dx,dy)
+      if(surfaceMap[p.y]?.[p.x]!=='dwarvenwall')return false
+      if(towerLevels[3].map[p.y]?.[p.x]!=='marble')return false
+    }
+    return true
+  })()`),true,'beveled corners preserve original terrain outside and sealed walls inside')
+  assert.equal(run(`(()=>{
+    const oldZ=currentZ,oldMap=map,oldDiscovered=undergroundDiscovered
+    try {
+      currentZ=4;map=towerLevels[3].map;undergroundDiscovered=towerLevels[3].discovered
+      invalidateUndergroundFov()
+      const visible=currentUndergroundFov()
+      return Array.from({length:tower.size},(_,dy)=>Array.from({length:tower.size},(_,dx)=>{
+        const x=tower.x+dx,y=tower.y+dy
+        return visible.has(keyXY(x,y))===towerContains(x,y)
+      })).flat().every(Boolean)
+    } finally {currentZ=oldZ;map=oldMap;undergroundDiscovered=oldDiscovered;invalidateUndergroundFov()}
+  })()`),true,'the summit displays all playable stone without revealing its missing corners')
+  assert.equal(run(`(()=>{
+    currentZ=1;const old=ctx.fillRect,rects=[]
+    ctx.fillRect=(...rect)=>rects.push(rect)
+    try {shadeTowerExterior();return rects.length===8}
+    finally {ctx.fillRect=old;currentZ=0}
+  })()`),true,'the exterior overlay also covers four chamfered corners')
   assert.equal(run('Math.min(...villageHuts.map(h=>towerDistance(h.x,h.y)))>=TOWER_MIN_VILLAGE_GAP'),true,
     'every village hut is at least 50 tiles from the full tower footprint')
   assert.equal(run(`(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
   assert.equal(run(`(()=>{const p=towerPoint(3,0);return towerLevels[0].map[p.y][p.x]})()`),'towerwindow')
-  assert.equal(run(`(()=>{const p=towerPoint(5,7);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
-  assert.equal(run(`(()=>{const p=towerPoint(6,7);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
-  assert.equal(run(`(()=>{const p=towerPoint(8,7);return ['dwarvendoorclosed','dwarvendooropen'].includes(towerLevels[0].map[p.y][p.x])})()`),true)
-  assert.equal(run(`(()=>{const p=towerPoint(5,10);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
+  assert.equal(run(`(()=>{const p=towerPoint(5,6);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
+  assert.equal(run(`(()=>{const p=towerPoint(6,6);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
+  assert.equal(run(`(()=>{const p=towerPoint(7,6);return ['dwarvendoorclosed','dwarvendooropen'].includes(towerLevels[0].map[p.y][p.x])})()`),true)
+  assert.equal(run(`(()=>{const p=towerPoint(5,9);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
   assert.equal(run(`(()=>{
     const doors=[surfaceMap[tower.entrance.y]?.[tower.entrance.x]]
     for(let z=0;z<4;z++){
       const board=z===0?surfaceMap:towerLevels[z-1].map
-      const p=towerPoint(8,7)
+      const p=towerPoint(7,6)
       doors.push(board[p.y][p.x])
       // Partition's randomized northern doorway is on the local x=5 line.
       let count=0;for(let dy=2;dy<=3;dy++){
@@ -150,10 +189,10 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     return stairs.every(p=>[-1,0,1].every(dy=>[-1,0,1].every(dx=>
       (dx===0&&dy===0)||terrain[p.y+dy]?.[p.x+dx]==='marble')))
   }).every(Boolean)`),true)
-  assert.equal(run('towerStair(1,true).x'),run('towerPoint(2,2).x'))
-  assert.equal(run('towerStair(1,true).y'),run('towerPoint(2,2).y'))
-  assert.equal(run(`towerLevels[3].map[tower.y][tower.x]==='marble' &&
-    towerLevels[3].map[tower.y+10][tower.x+10]==='marble'`),true)
+  assert.equal(run('towerStair(1,true).x'),run('towerPoint(3,2).x'))
+  assert.equal(run('towerStair(1,true).y'),run('towerPoint(3,2).y'))
+  assert.equal(run(`towerLevels[3].map[towerPoint(3,2).y][towerPoint(3,2).x]==='towerstairsdown' &&
+    towerLevels[3].map[towerPoint(3,7).y][towerPoint(3,7).x]==='marble'`),true)
   // Even with generous eight-direction movement, no closed-door diagonal cut exists.
   assert.equal(run(`towerLevels.slice(0,3).every(l=>{
     const board=l.map,start=towerPoint(3,4),right=towerPoint(7,4),goal=keyXY(right.x,right.y)
@@ -195,7 +234,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     }
   })()`),true)
 
-  assert.equal(run('(()=>{const p=towerPoint(5,11);return surfaceReachableFromTemple().has(keyXY(p.x,p.y))})()'),true)
+  assert.equal(run('(()=>{const p=towerPoint(5,10);return surfaceReachableFromTemple().has(keyXY(p.x,p.y))})()'),true)
   assert.equal(run('isBigBellReachableFromTemple()'),true)
   assert.equal(run('validateDwarvenRuinsStratum().ok'),true)
   // Threat changes through ordinary enemy species and encounter size; the
@@ -221,7 +260,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   const prevWidth=run('MAP_W'),prevHeight=run('MAP_H')
   run('rotateGeneratedWorld(1)')
   assert.equal(run('MAP_W'),prevHeight);assert.equal(run('MAP_H'),prevWidth)
-  assert.equal(run(`(()=>{const p=towerPoint(5,10);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
+  assert.equal(run(`(()=>{const p=towerPoint(5,9);return tower.entrance.x===p.x&&tower.entrance.y===p.y})()`),true)
   assert.equal(run(`Array.from({length:5},(_,z)=>{
     const board=z===0?surfaceMap:towerLevels[z-1].map
     return [z<4?towerStair(z,true):null,z>0?towerStair(z,false):null].filter(Boolean)
