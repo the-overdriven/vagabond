@@ -43,6 +43,45 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
     })()`))
   })
 
+  it('draws species sprites in tile mode and preserves glyph fallbacks in ASCII', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const visuals=Object.entries(RENDER_STYLE.enemies.tiles);
+      invisibilityAssert(visuals.length===29,'all supplied monster sprites are mapped');
+      invisibilityAssert(visuals.every(([name,visual]) =>
+        ENEMY_TEMPLATE_BY_NAME[name] && preloadedImages.has(visual.image)),
+        'mapped monster sprites are preloaded before play');
+      invisibilityAssert(!visuals.some(([,visual])=>visual.image.includes('dont-use')),
+        'rejected orc reference is excluded');
+
+      const goblin=spawnStealth('Goblin',41,40);
+      goblin.prefix='Champion';goblin.name='Champion Goblin';
+      const skerva=spawnStealth('Skerva',42,40);
+      const oldMode=USE_TILE_IMAGES, oldDraw=ctx.drawImage, oldText=ctx.fillText;
+      const calls=[];
+      ctx.drawImage=function(...args){calls.push('image');return oldDraw.apply(this,args)};
+      ctx.fillText=function(text,...args){calls.push(text);return oldText.call(this,text,...args)};
+      const capture=(enemy,tiles)=>{
+        USE_TILE_IMAGES=tiles;calls.length=0;
+        drawEnemyVisual(0,0,enemy);
+        return calls.slice();
+      };
+      try {
+        const sprite=capture(goblin,true);
+        invisibilityAssert(sprite.includes('image') && !sprite.includes('g'),
+          'prefixed goblin uses its base-species sprite');
+        const ascii=capture(goblin,false);
+        invisibilityAssert(!ascii.includes('image') && ascii.includes('g'),
+          'ASCII mode keeps the lowercase tier-two glyph');
+        const fallback=capture(skerva,true);
+        invisibilityAssert(!fallback.includes('image') && fallback.includes('S'),
+          'species without a supplied image retain their glyph in tile mode');
+      } finally {
+        ctx.drawImage=oldDraw;ctx.fillText=oldText;USE_TILE_IMAGES=oldMode;
+      }
+      render();
+    })()`))
+  })
+
   it('keeps the larger web over the player until movement or spider death', () => {
     cy.window().then(win => win.eval(`(() => {
       const spider=spawnStealth('Giant Spider',36,40);

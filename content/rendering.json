@@ -207,6 +207,37 @@
   },
   "enemies": {
     "lowercaseThroughTier": 2,
+    "tiles": {
+      "Boar": {"image": "img/enemies-tiles/boar.png", "scale": 1},
+      "Cobra": {"image": "img/enemies-tiles/cobra.png", "scale": 1},
+      "Fungus": {"image": "img/enemies-tiles/fungus.png", "scale": 1},
+      "Ghoul": {"image": "img/enemies-tiles/ghoul.png", "scale": 1},
+      "Giant Spider": {"image": "img/enemies-tiles/giant-spider.png", "scale": 1, "fit": "contain"},
+      "Giant Bat": {"image": "img/enemies-tiles/giant_bat.png", "scale": 1},
+      "Giant Bug": {"image": "img/enemies-tiles/giant_bug.png", "scale": 1},
+      "Giant Crab": {"image": "img/enemies-tiles/giant_crab.png", "scale": 1},
+      "Giant Rat": {"image": "img/enemies-tiles/giant_rat.png", "scale": 1},
+      "Giant Toad": {"image": "img/enemies-tiles/giant_toad.png", "scale": 1},
+      "Goblin": {"image": "img/enemies-tiles/goblin.png", "scale": 1},
+      "Hogwyrm": {"image": "img/enemies-tiles/hogwyrm.png", "scale": 1},
+      "Hyena": {"image": "img/enemies-tiles/hyena.png", "scale": 1},
+      "Jackal": {"image": "img/enemies-tiles/jackal.png", "scale": 1},
+      "Kobold": {"image": "img/enemies-tiles/kobold.png", "scale": 1},
+      "Lion": {"image": "img/enemies-tiles/lion.png", "scale": 1},
+      "Minotaur": {"image": "img/enemies-tiles/minotaur.png", "scale": 1},
+      "Monkey": {"image": "img/enemies-tiles/monkey.png", "scale": 1},
+      "Mummy": {"image": "img/enemies-tiles/mummy.png", "scale": 1},
+      "Orc": {"image": "img/enemies-tiles/orc.png", "scale": 1},
+      "Scarab": {"image": "img/enemies-tiles/scarab.png", "scale": 1},
+      "Scorpion": {"image": "img/enemies-tiles/scorpion.png", "scale": 1},
+      "Skeleton": {"image": "img/enemies-tiles/skeleton.png", "scale": 1},
+      "Snake": {"image": "img/enemies-tiles/snake.png", "scale": 1},
+      "Vulture": {"image": "img/enemies-tiles/vulture.png", "scale": 1},
+      "Wasp": {"image": "img/enemies-tiles/wasp.png", "scale": 1},
+      "White Tiger": {"image": "img/enemies-tiles/white-tiger.png", "scale": 1},
+      "Witherpod": {"image": "img/enemies-tiles/witherpod.png", "scale": 1},
+      "Wolf": {"image": "img/enemies-tiles/wolf.png", "scale": 1}
+    },
     "prefixArea": {
       "other": {
         "inner": "rgba(176,106,212,0.11)"

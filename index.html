@@ -1120,6 +1120,9 @@ more difficult:
       for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
         if (visual?.image) paths.push(visual.image)
       }
+      for (const visual of Object.values(RENDER_STYLE?.enemies?.tiles || {})) {
+        if (visual?.image) paths.push(visual.image)
+      }
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
@@ -8175,13 +8178,13 @@ more difficult:
     }
   }
 
-  function scaledVisualCanvas(image, scale, filter = '') {
+  function scaledVisualCanvas(image, scale, filter = '', contain = false) {
     let byScale = scaledVisualCache.get(image)
     if (!byScale) {
       byScale = new Map()
       scaledVisualCache.set(image, byScale)
     }
-    const key = TILE_PX + '|' + scale + '|' + filter
+    const key = TILE_PX + '|' + scale + '|' + filter + '|' + contain
     if (byScale.has(key)) return byScale.get(key)
 
     const size = Math.max(1, Math.round(TILE_PX * scale))
@@ -8191,7 +8194,10 @@ more difficult:
     const cctx = cached.getContext('2d')
     cctx.imageSmoothingEnabled = false
     if (filter) cctx.filter = filter
-    cctx.drawImage(image, 0, 0, size, size)
+    const maxDimension = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height)
+    const drawWidth = contain ? Math.max(1, Math.round(size * (image.naturalWidth || image.width) / maxDimension)) : size
+    const drawHeight = contain ? Math.max(1, Math.round(size * (image.naturalHeight || image.height) / maxDimension)) : size
+    cctx.drawImage(image, Math.round((size - drawWidth) / 2), Math.round((size - drawHeight) / 2), drawWidth, drawHeight)
     byScale.set(key, cached)
     return cached
   }
@@ -8213,7 +8219,7 @@ more difficult:
     if (!image) return false
     const a = alpha === undefined ? 1 : alpha
     const scale = visual.scale ?? 1
-    const cached = scaledVisualCanvas(image, scale, visual.filter || '')
+    const cached = scaledVisualCanvas(image, scale, visual.filter || '', visual.fit === 'contain')
     // The terminal Crusher frame reuses the actual dwarven wall texture:
     // roughly 44% masonry from each side with a narrow dark seam between.
     // This is cosmetic; collision and damage already resolved on the turn.
@@ -8628,6 +8634,11 @@ more difficult:
     const style = RENDER_STYLE.npc
     if (drawImageVisual(px, py, style.characters?.[npc.name])) return
     drawCreature(px, py, style.glyph === 'initial' ? npc.name[0] : style.glyph, style.color)
+  }
+
+  function drawEnemyVisual(px, py, enemy, shimmers = false) {
+    if (drawImageVisual(px, py, RENDER_STYLE.enemies.tiles?.[enemy.baseName || enemy.name])) return
+    drawCreature(px, py, enemyGlyph(enemy), shimmers ? '#d8caef' : enemyColor(enemy))
   }
 
   function drawPlayerVisual(px, py, color, alpha) {
@@ -10010,7 +10021,7 @@ more difficult:
       // stay fully above water; only non-fliers use the submerged-water clipping.
       const shimmers = enemyInvisibleShimmer(e)
       if (shimmers) { ctx.save(); ctx.globalAlpha = 0.28 }
-      const drawEnemyCreature = () => drawCreature(vx, vy, enemyGlyph(e), shimmers ? '#d8caef' : enemyColor(e))
+      const drawEnemyCreature = () => drawEnemyVisual(vx, vy, e, shimmers)
       if (enemyHasAbility(e, 'fly')) drawEnemyCreature()
       else drawSwimmingCreature(vx, vy, drawEnemyCreature)
       // Status marks stay above the sprite in both tile and ASCII modes.
@@ -13609,6 +13620,9 @@ more difficult:
     const initialVisuals = []
     if (RENDER_STYLE?.player?.image) initialVisuals.push(RENDER_STYLE.player.image)
     for (const visual of Object.values(RENDER_STYLE?.npc?.characters || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+    }
+    for (const visual of Object.values(RENDER_STYLE?.enemies?.tiles || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
     initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE)

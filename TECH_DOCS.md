@@ -3552,6 +3552,25 @@ and the strongest rare predators sit in Tier 4. `Bog Spitter` currently uses
 ordinary melee combat; no acid/spit projectile rule exists yet, so its name
 does not silently grant a ranged attack.
 
+### Monster tile artwork
+
+In tile-image mode, monsters with supplied artwork use transparent PNG sprites
+from `img/enemies-tiles/`. `content/rendering.json` maps each species name to
+its image and display scale under `enemies.tiles`. All **29 currently mapped
+species** use scale 1 (one map tile); the remaining species retain their
+existing glyphs until artwork is available. Enemy prefixes and other display
+names reuse the base species image. An absent or failed image falls back to the
+same tier-colored glyph used by ASCII mode. The wide Giant Spider image is
+scaled to fit without distortion.
+
+Monster sprites load before character selection to avoid switching from letters
+to images during play. The existing P toggle displays **letter glyphs for every
+monster in ASCII mode**. Portraits in inspection and the Bestiary stay separate.
+Movement, water clipping, flying draw order, invisibility, awareness/enrage
+outlines, warning/status marks, and prefixed-enemy terrain tint apply equally
+to monster sprites. Graphics have no effect on enemy identity, mechanics,
+randomness, saves, or replay.
+
 ---
 
 # 20. Enemy Special Properties
