@@ -158,7 +158,8 @@ describe('Dwarven crate destruction, loot and persistence', () => {
         check(map[100][101]==='dwarvencratepieces','debris replaces crate immediately')
         check(groundItems.filter(g=>g.kind==='potion'&&g.x===101).length===1,
           'loot appears immediately and only once')
-        check(attackAnim && attackAnim.duration===220,'player attack lunge remains')
+        check(attackAnim && attackAnim.duration===132,'player attack lunge uses the shorter duration')
+        check(ENEMY_MELEE_ANIM_MS===132,'monster lunge uses the same faster duration')
         check(fxAnims.length===0,'no crate death effect queued')
         const rngBeforeRender=rngState
         render(attackAnim.start+1)

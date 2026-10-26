@@ -17,6 +17,40 @@ describe('Decorative caves and deep threat rarity', () => {
         check(traits.every(Boolean),'requested trait fixtures exist')
         applyWorldTraits(traits);WORLD_SEED=${seed};rngState=WORLD_SEED
         await generateNewWorld()
+        const decorCfg=WORLD_GEN_CONFIG.worldDecorations
+        const fissures=[]
+        for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
+          if(surfaceMap[y][x]==='groundfissure')fissures.push({x,y})
+        check(fissures.length===decorCfg.surfaceFissures,'exactly four permanent open fissures')
+        for(const hole of fissures){
+          check(!TILE.groundfissure.walk,'surface fissures block walking in both render modes')
+          check(fissures.every(other=>other===hole||
+            Math.max(Math.abs(other.x-hole.x),Math.abs(other.y-hole.y))>=decorCfg.minFissureSpacing),
+            'fissures are separated')
+          check(DIRS8.every(([dx,dy])=>
+            TILE[surfaceMap[hole.y+dy]?.[hole.x+dx]]?.walk),
+            'fissures are placed in open terrain, not bottlenecks')
+        }
+        const surfaceProps=caveDecorations.filter(p=>p.level===0)
+        const num=(kind,props=surfaceProps)=>props.filter(p=>p.kind===kind).length
+        check(num('stone-skull-altar')===1,'one skull altar')
+        check(num('tree-cage')===1,'one remote caged tree')
+        check(num('trash-wood')===2,'exactly two wooden trash piles')
+        check(num('beast-skeleton-large')+num('beast-skeleton-small')>=decorCfg.surfaceSkeletons,
+          'surface beast skeleton minimum')
+        check(num('stone-brown')+num('stone-grey')>=decorCfg.surfaceStones,'surface stone minimum')
+        check(surfaceProps.every(p=>p.kind==='mountain-water' || TILE[surfaceMap[p.y]?.[p.x]]?.walk ||
+          ['lily-pads','lily-flowering'].includes(p.kind)),
+          'ordinary surface scenery rests on walkable ground')
+        check(surfaceProps.filter(p=>p.kind==='mountain-water').every(p=>
+          ['mountain','snowmountain'].includes(surfaceMap[p.y][p.x])),
+          'river sources remain real mountains')
+        check(surfaceProps.filter(p=>p.kind==='tree-cage').every(p=>
+          villageHuts.every(h=>Math.max(Math.abs(h.x-p.x),Math.abs(h.y-p.y))>=decorCfg.uniqueVillageClearance)),
+          'caged tree stays far away from huts')
+        check(Object.entries(RENDER_STYLE.caveDecorations).filter(([,visual])=>visual.tileOnly)
+          .every(([,visual])=>preloadedImages.has(visual.image)),
+          'tile-only props preloaded before game starts')
         const population=deepLevels[0].caves
         check(population.every(c=>c.populated && !c.scenario),
           'all ordinary deep caves are populated without named scenarios')
@@ -81,6 +115,8 @@ describe('Decorative caves and deep threat rarity', () => {
         check(saved.version===self.VAGABOND_SAVE_VERSION,'current save schema')
         loadGameFromObject(saved,{isReplayInit:true})
         check(JSON.stringify(caveDecorations)===original,'current save and replay restoration retain props')
+        check(fissures.every(p=>surfaceMap[p.y][p.x]==='groundfissure'),
+          'saved and loaded world retains impassable fissures')
         const terrainBefore=JSON.stringify(undergroundMap)
         resetForNewCharacter()
         check(JSON.stringify(caveDecorations)===original && JSON.stringify(undergroundMap)===terrainBefore,'reused world keeps cosmetic layout')
@@ -110,10 +146,30 @@ describe('Decorative caves and deep threat rarity', () => {
             !TILE[cm[y]?.[x-1]]?.walk && !TILE[cm[y]?.[x+1]]?.walk
           check([-1,0,1].every(offset=>tight(p.x,p.y+offset)),
             'support and both neighbors belong to a tight north-south passage')
+          const entrance=floor.mineUpstairs,visited=new Set([keyXY(entrance.x,entrance.y)])
+          const queue=[entrance]
+          for(let i=0;i<queue.length;i++)for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+            const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
+            if(visited.has(k)||!TILE[cm[y]?.[x]]?.walk)continue
+            visited.add(k);queue.push({x,y})
+          }
+          check(visited.has(keyXY(p.x,p.y)),'mine support reachable without excavating pockets')
           check(!groundItems.some(g=>g.level===p.level&&g.x===p.x&&g.y===p.y),
             'supports avoid initial loot')
           check(!enemies.some(e=>e.alive&&e.level===p.level&&e.x===p.x&&e.y===p.y),
             'supports avoid initial creature positions')
+        }
+        for(let i=1;i<deepLevels.length;i++){
+          const floor=deepLevels[i]
+          if(!['dwarvenFort','dwarvenRuins','dwarvenMines'].includes(floor.kind))continue
+          const level=chainZForDepth(i+2),props=caveDecorations.filter(p=>p.level===level)
+          check(props.filter(p=>p.kind==='alcohol-barrel').length>=decorCfg.dwarfBarrelsPerFloor,
+            'each dwarven floor has at least two barrels')
+          check(props.filter(p=>p.kind==='dwarven-wall-relief').length>=decorCfg.dwarfReliefsPerFloor,
+            'each dwarven floor has at least two reliefs')
+          check(props.filter(p=>p.kind==='dwarven-wall-relief').every(p=>
+            floor.map[p.y][p.x]===(floor.kind==='dwarvenMines'?'cavewall':'dwarvenwall')),
+            'reliefs are on real walls')
         }
         check(dwarvenRuin && deepLevels[1],'fort still generated')
       })()`))

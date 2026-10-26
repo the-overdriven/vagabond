@@ -2070,5 +2070,21 @@
       "spiderCorrelation": 0.55,
       "wetMushroomCorrelation": 0.45
     }
+  },
+  "worldDecorations": {
+    "surfaceFissures": 4,
+    "minFissureSpacing": 12,
+    "uniqueVillageClearance": 40,
+    "surfaceSkeletons": 3,
+    "surfaceStones": 6,
+    "surfaceWoodTrash": 2,
+    "standingStones": 3,
+    "fallenBranches": 8,
+    "lakesidePlantsPerKind": 10,
+    "quarries": 2,
+    "dwarfBarrelsPerFloor": 2,
+    "dwarfReliefsPerFloor": 2,
+    "mineWallMushroomsPerFloor": 6,
+    "goblinoidCampDecorationChance": 0.60
   }
 }

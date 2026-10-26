@@ -5994,10 +5994,6 @@ more difficult:
         if (tryEnemySpell(e)) continue
         if (tryEnemyVanish(e)) continue
         if (tryEnemySummon(e)) continue
-        if (tryEnemyRush(e)) {
-          if (player.hp <= 0 || deathTransition) return
-          continue
-        }
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const loseInterestChance = speedChaseChance(playerSpeed - effectiveEnemySpeed)
@@ -6006,11 +6002,21 @@ more difficult:
           log(`The ${e.name} gives up the chase.`, 'info')
           continue
         }
-        if (e.aware && !e.alarmed && dist > ATTACK_RANGE && loseInterestChance > 0 && chance(loseInterestChance)) {
+        // Ordinary spotting sets Alarmed. Excluding that status made speed
+        // disengagement practically impossible for any active pursuer.
+        if (e.aware && dist > ATTACK_RANGE && loseInterestChance > 0 && chance(loseInterestChance)) {
+          if (enemyHasAbility(e,'collectiveMind') && collectiveMindAlertActive(e)) continue
           e.aware = false
-          log(justEvaded
+          e.alarmed = false
+          e.alarmedZ = null
+          e.alarmedLevelKind = null
+          if (enemyIsVisibleOnMainView(e)) log(justEvaded
             ? `The ${e.name} hesitates after its dodge, giving you a moment to act.`
             : `The ${e.name} loses interest in the chase.`, 'info')
+          continue
+        }
+        if (tryEnemyRush(e)) {
+          if (player.hp <= 0 || deathTransition) return
           continue
         }
         if (!e.aware) {
@@ -8788,7 +8794,7 @@ more difficult:
   let projectileAnims = []
   let playerProjectileDodges = []
   let enemyAttackVisualEnd = 0
-  const ENEMY_MELEE_ANIM_MS = 220
+  const ENEMY_MELEE_ANIM_MS = 132
   const ENEMY_ATTACK_GAP_MS = 35
   const PLAYER_DODGE_ANIM_MS = 180
   const PROJECTILE_DODGE_LEAD_MS = 140
@@ -9184,7 +9190,7 @@ more difficult:
       targetX: targetX,
       targetY: targetY,
       start: performance.now(),
-      duration: 220
+      duration: ENEMY_MELEE_ANIM_MS
     }
     render()
     return new Promise(resolve => {
@@ -9727,6 +9733,10 @@ more difficult:
     currentSurfaceTowerFov()
     const distantTowerRoof = towerShowsSummit()
     const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
+    const mountainSpringTiles = USE_TILE_IMAGES && currentZ===0 &&
+      resolveVisualImage(RENDER_STYLE.caveDecorations['mountain-water'])
+      ? new Set(caveDecorations.filter(prop=>prop.level===0&&prop.kind==='mountain-water')
+        .map(prop=>keyXY(prop.x,prop.y))) : null
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
     const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
@@ -9812,7 +9822,9 @@ more difficult:
         } else {
           const grassTreeVisual = tree ? towerGrassTreeVisual(mx, my) : null
           const foragedForestVisual = foraged ? {...coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53), baseTileKey: 'grass'} : null
-          const terrainImgVisual = foragedForestVisual || terrainVisual(tileKey, mx, my)
+          const terrainImgVisual = mountainSpringTiles?.has(keyXY(mx,my))
+            ? RENDER_STYLE.caveDecorations['mountain-water']
+            : foragedForestVisual || terrainVisual(tileKey, mx, my)
           const overlayVisual = grassTreeVisual
           const visual = overlayVisual || terrainImgVisual
           if (visual?.image || (Array.isArray(visual?.frames) && visual.frames.length)) {
@@ -9935,6 +9947,7 @@ more difficult:
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       const visual = RENDER_STYLE.caveDecorations[prop.kind]
       if (!visual) continue
+      if (visual.tileOnly && (!USE_TILE_IMAGES || prop.kind==='mountain-water')) continue
       let drawn
       if (prop.rotation) {
         ctx.save()
@@ -9943,7 +9956,7 @@ more difficult:
         drawn = drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, visual)
         ctx.restore()
       } else drawn = drawImageVisual(vx, vy, visual)
-      if (drawn) continue
+      if (drawn || visual.tileOnly) continue
       drawTile(vx, vy, visual.glyph, visual.color, tileBackground(prop.x, prop.y, map[prop.y][prop.x]))
     }
     // ground items
@@ -13742,6 +13755,7 @@ more difficult:
       populateTower()
       rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
+      spawnSurfaceFissures()
       player.x = spawnPoint.x
       player.y = spawnPoint.y
       // Decorations are hashed against final coordinates so regeneration is
@@ -13771,6 +13785,9 @@ more difficult:
       if (visual?.image) initialVisuals.push(visual.image)
     }
     for (const visual of Object.values(RENDER_STYLE?.enemies?.tiles || {})) {
+      if (visual?.image) initialVisuals.push(visual.image)
+    }
+    for (const visual of Object.values(RENDER_STYLE?.caveDecorations || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
     initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE)

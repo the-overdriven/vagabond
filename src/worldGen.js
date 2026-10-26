@@ -8014,15 +8014,209 @@ function spawnDeepCaveSpoor(){
   }
 }
 
+// The cosmetic pass uses coordinate hashes, not the combat/world RNG stream.
+// Sharing this hash also keeps surface fissures stable after world rotation.
+function worldDecorationRoll(x, y, level) {
+  let n = WORLD_SEED ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(level, 1274126177)
+  n = Math.imul(n ^ (n >>> 13), 1274126177)
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296
+}
+
+function spawnSurfaceFissures() {
+  const config = WORLD_GEN_CONFIG.worldDecorations
+  const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive), ...npcs]
+    .filter(e => (e.level ?? 0) === 0).map(e => keyXY(e.x, e.y)))
+  const clearOfLandmarks = (x, y) => {
+    if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < 16) return false
+    if (villageHuts.some(h => Math.max(Math.abs(h.x - x), Math.abs(h.y - y)) < 8)) return false
+    if (tower && x >= tower.x - 5 && x < tower.x + tower.size + 5 &&
+        y >= tower.y - 5 && y < tower.y + tower.size + 5) return false
+    return true
+  }
+  const candidates = []
+  for (let y = 5; y < MAP_H - 5; y++) for (let x = 5; x < MAP_W - 5; x++) {
+    if (!['grass','hill'].includes(surfaceMap[y][x]) || occupied.has(keyXY(x,y)) ||
+        grasslandTrees.has(keyXY(x,y)) || !clearOfLandmarks(x,y)) continue
+    // Avoid chokepoints, mountain passes, water shores and cave landings.
+    if (!DIRS8.every(([dx,dy]) => TILE[surfaceMap[y+dy]?.[x+dx]]?.walk)) continue
+    if (DIRS8.some(([dx,dy]) => ['caveentrance','river','frozenriver','water','dwarvengate'].includes(surfaceMap[y+dy]?.[x+dx]))) continue
+    candidates.push({x,y,score:worldDecorationRoll(x+173,y-293,47)})
+  }
+  candidates.sort((a,b) => a.score-b.score || a.y-b.y || a.x-b.x)
+  const selected = []
+  for (const site of candidates) {
+    if (selected.length >= config.surfaceFissures) break
+    if (selected.some(p => Math.max(Math.abs(site.x-p.x),Math.abs(site.y-p.y)) < config.minFissureSpacing)) continue
+    surfaceMap[site.y][site.x] = 'groundfissure'
+    selected.push(site)
+  }
+  if (selected.length < config.surfaceFissures)
+    throw new Error('No safe sites for the required surface fissures.')
+}
+
+// Keep natural and abandoned-world props on the existing saved decoration layer.
+// The only gameplay-changing feature is the separate groundfissure terrain.
+function spawnNaturalDecorations(roll) {
+  const cfg = WORLD_GEN_CONFIG.worldDecorations
+  const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive), ...npcs, ...caveSpoor]
+    .map(e => `${e.level ?? 0}:${keyXY(e.x,e.y)}`))
+  const used = new Set(caveDecorations.map(p => `${p.level}:${keyXY(p.x,p.y)}`))
+  const add = (level, kind, site, caveIndex = -1) => {
+    const id = `${level}:${keyXY(site.x,site.y)}`
+    if (used.has(id) || occupied.has(id)) return false
+    caveDecorations.push({x:site.x,y:site.y,kind,level,
+      levelKind:level===0?'surface':'chain',caveIndex})
+    used.add(id)
+    return true
+  }
+  const scatter = (level, kind, sites, count, salt, spacing = 0, caveIndex = -1) => {
+    const ranked = sites.map(({x,y}) => ({x,y,rank:roll(x+salt*37,y-salt*19,level+salt)}))
+      .sort((a,b) => a.rank-b.rank || a.y-b.y || a.x-b.x)
+    const chosen = []
+    for (const site of ranked) {
+      if (chosen.length >= count) break
+      if (chosen.some(p => Math.max(Math.abs(site.x-p.x),Math.abs(site.y-p.y)) < spacing)) continue
+      if (add(level,kind,site,caveIndex)) chosen.push(site)
+    }
+    return chosen.length
+  }
+  const nearby = (grid,x,y,types,radius=1) => {
+    for (let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++) {
+      if (!dx && !dy) continue
+      if (types.includes(grid[y+dy]?.[x+dx])) return true
+    }
+    return false
+  }
+  const clearOfHuts = (x,y,distance) => villageHuts.every(h =>
+    Math.max(Math.abs(x-h.x),Math.abs(y-h.y)) >= distance)
+  const surface = [], wet = []
+  for (let y=3;y<MAP_H-3;y++) for(let x=3;x<MAP_W-3;x++) {
+    const tile = surfaceMap[y][x],site={x,y}
+    if (['grass','hill','forest','taiga'].includes(tile) &&
+        !grasslandTrees.has(keyXY(x,y)) && clearOfHuts(x,y,5) &&
+        Math.max(Math.abs(x-spawnPoint.x),Math.abs(y-spawnPoint.y))>=7 &&
+        (!tower || x<tower.x-2 || x>tower.x+tower.size+1 ||
+          y<tower.y-2 || y>tower.y+tower.size+1)) surface.push(site)
+    if (tile==='water') wet.push(site)
+  }
+  const dry = surface.filter(p => ['grass','hill'].includes(surfaceMap[p.y][p.x]))
+  const nearForest = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['forest','taiga','ancientForest'],2))
+  const nearHills = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['hill'],2))
+  const nearMountains = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['mountain','snowmountain'],3))
+  const nearRiver = surface.filter(p=>nearby(surfaceMap,p.x,p.y,['water','river'],1))
+  scatter(0,'stone-skull-altar',nearHills.length?nearHills:dry,1,11)
+  const distantTrees = nearForest.filter(p=>clearOfHuts(p.x,p.y,cfg.uniqueVillageClearance))
+  const distantDry = dry.filter(p=>clearOfHuts(p.x,p.y,cfg.uniqueVillageClearance))
+  scatter(0,'tree-cage',distantTrees.length?distantTrees:distantDry,1,12)
+  scatter(0,'trash-wood',dry,cfg.surfaceWoodTrash,13,8)
+  scatter(0,'beast-skeleton-large',dry,1,14,8)
+  scatter(0,'beast-skeleton-small',dry,Math.max(0,cfg.surfaceSkeletons-1),15,8)
+  scatter(0,'stone-brown',dry,Math.ceil(cfg.surfaceStones/2),16,6)
+  scatter(0,'stone-grey',dry,Math.floor(cfg.surfaceStones/2),17,6)
+  for (const [i,kind] of ['standing-stone-blunt','standing-stone-leaning','standing-stone-split'].entries()) {
+    const standing=caveDecorations.filter(d=>d.level===0&&d.kind.startsWith('standing-stone-'))
+    const isolated=(nearHills.length?nearHills:dry).filter(p=>
+      standing.every(d=>Math.max(Math.abs(p.x-d.x),Math.abs(p.y-d.y))>=12))
+    scatter(0,kind,isolated,Math.ceil(cfg.standingStones/3),18+i,12)
+  }
+  scatter(0,'quarry-rocks',nearMountains.filter(p=>nearby(surfaceMap,p.x,p.y,['hill'],3)),cfg.quarries,22,10)
+  scatter(0,'fallen-branch-dry',nearForest,Math.floor(cfg.fallenBranches/2),23,5)
+  scatter(0,'fallen-branch-leafy',nearForest,Math.ceil(cfg.fallenBranches/2),24,5)
+  scatter(0,'plant-blue-flower',nearRiver,cfg.lakesidePlantsPerKind,25,5)
+  scatter(0,'plant-spiky',nearRiver,cfg.lakesidePlantsPerKind,26,5)
+
+  // Headwaters remain mountain terrain; the special sprite replaces only the
+  // visible mountain image at the source of a river.
+  const springs=[]
+  for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++) {
+    if (!['mountain','snowmountain'].includes(surfaceMap[y][x])) continue
+    if (!nearby(surfaceMap,x,y,['river','frozenriver'],1)) continue
+    if (!nearby(surfaceMap,x,y,['mountain','snowmountain'],1)) continue
+    springs.push({x,y})
+  }
+  scatter(0,'mountain-water',springs,Math.min(12,springs.length),27,3)
+
+  // Flood-fill water only; large oceans and river channels are not lily ponds.
+  const visited = new Set(), pondSites=[]
+  for (const start of wet) {
+    const first=keyXY(start.x,start.y)
+    if (visited.has(first)) continue
+    const component=[start];visited.add(first)
+    for(let i=0;i<component.length;i++) for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const x=component[i].x+dx,y=component[i].y+dy,k=keyXY(x,y)
+      if(surfaceMap[y]?.[x]!=='water'||visited.has(k))continue
+      visited.add(k);component.push({x,y})
+    }
+    if(component.length<3||component.length>110)continue
+    pondSites.push(...component.filter(p=>nearby(surfaceMap,p.x,p.y,['grass','forest','hill','sand'],2)))
+  }
+  scatter(0,'lily-pads',pondSites,Math.min(12,Math.ceil(pondSites.length/7)),28,2)
+  scatter(0,'lily-flowering',pondSites,Math.min(9,Math.ceil(pondSites.length/12)),29,2)
+
+  // Cave populations are fixed before this pass, so camp clues can reflect
+  // nearby goblinoids without influencing their placement or combat RNG.
+  for (const layer of [
+    {level:-1,descriptors:caves,maps:caveMaps,shared:undergroundMap},
+    {level:-2,descriptors:deepLevels[0]?.caves||[],maps:deepLevels[0]?.caveMaps||[],shared:deepLevels[0]?.map}
+  ]) {
+    if (!layer.shared) continue
+    for(let caveIndex=0;caveIndex<layer.maps.length;caveIndex++){
+      const desc=layer.descriptors[caveIndex],cm=layer.maps[caveIndex]
+      if(!desc||desc.crypt||!(desc.scenario||desc.populated))continue
+      const entrances=desc.entrances||[],sites=[]
+      for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++){
+        if(!['cavefloor','cavefloor2','cavefloorBrown'].includes(cm[y]?.[x]) ||
+           cm[y][x]!==layer.shared[y]?.[x] ||
+           entrances.some(e=>Math.max(Math.abs(e.x-x),Math.abs(e.y-y))<=3))continue
+        sites.push({x,y})
+      }
+      const salt=40+caveIndex*11+(-layer.level)*191
+      scatter(layer.level,'cave-remains',sites,1,salt,0,caveIndex)
+      scatter(layer.level,'debris-bones',sites,1,salt+1,0,caveIndex)
+      if(roll(caveIndex+111,layer.level-13,68)<0.65)
+        scatter(layer.level,'skull',sites,1,salt+2,0,caveIndex)
+      if(roll(caveIndex+223,layer.level-19,69)<0.45)
+        scatter(layer.level,'stone-grey',sites,1,salt+3,0,caveIndex)
+      if(roll(caveIndex+227,layer.level-29,70)<0.35)
+        scatter(layer.level,'beast-skeleton-small',sites,1,salt+4,0,caveIndex)
+      const goblins=enemies.filter(e=>e.alive&&e.level===layer.level&&e.caveIndex===caveIndex&&
+        ['Goblin','Skink','Kobold'].includes(e.baseName||e.name))
+      if(goblins.length>=2 && roll(caveIndex+23,layer.level+7,71)<cfg.goblinoidCampDecorationChance){
+        const nearCamp=sites.filter(p=>goblins.some(e=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y))<=5))
+        const names=['fishbone','debris-cloth','banana-peel','broken-sword','gnawed-bone']
+        const amount=1+Math.floor(roll(caveIndex+83,layer.level-7,72)*3)
+        for(let i=0;i<amount;i++){
+          const kind=names[Math.floor(roll(caveIndex*17+i*19,layer.level-5,73)*names.length)]
+          scatter(layer.level,kind,nearCamp,1,salt+10+i,0,caveIndex)
+        }
+      }
+    }
+  }
+
+  // Every dwarven floor, including the mines, has barrels and reliefs.
+  for(let i=1;i<deepLevels.length;i++){
+    const layer=deepLevels[i]
+    if(!['dwarvenFort','dwarvenRuins','dwarvenMines'].includes(layer?.kind))continue
+    const level=chainZForDepth(i+2),floor=layer.kind==='dwarvenMines'?'cavefloor2':'marble'
+    const wall=layer.kind==='dwarvenMines'?'cavewall':'dwarvenwall'
+    const floors=[],walls=[]
+    for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++){
+      if(layer.map[y][x]===floor) floors.push({x,y})
+      if(layer.map[y][x]===wall&&nearby(layer.map,x,y,[floor],1))walls.push({x,y})
+    }
+    const barrels=scatter(level,'alcohol-barrel',floors,cfg.dwarfBarrelsPerFloor,80+i*5,5)
+    const reliefs=scatter(level,'dwarven-wall-relief',walls,cfg.dwarfReliefsPerFloor,81+i*5,5)
+    if(barrels<cfg.dwarfBarrelsPerFloor||reliefs<cfg.dwarfReliefsPerFloor)
+      throw new Error(`Could not decorate dwarven floor ${level} with its required barrels and reliefs.`)
+    if(layer.kind==='dwarvenMines')
+      scatter(level,'wall-mushrooms',walls,cfg.mineWallMushroomsPerFloor,82+i*5,4)
+  }
+}
+
 function spawnCaveDecorations() {
   caveDecorations = []
   const cfg = WORLD_GEN_CONFIG.caveDecorations
-  // Coordinate hashing keeps purely decorative choices outside gameplay RNG.
-  const roll = (x, y, level) => {
-    let n = WORLD_SEED ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(level, 1274126177)
-    n = Math.imul(n ^ (n >>> 13), 1274126177)
-    return ((n ^ (n >>> 16)) >>> 0) / 4294967296
-  }
+  const roll = worldDecorationRoll
   const used = new Set()
   for (const layer of [
     {level: -1, descriptors: caves, maps: caveMaps, shared: undergroundMap},
@@ -8101,7 +8295,21 @@ function spawnCaveDecorations() {
   // world. The center and both neighboring cells must each be one tile wide.
   for (const {level: mine, z} of dungeonPackageLevels('dwarvenMines')) {
     const cm = mine.map
+    // A buried mineral pocket may contain a deceptively perfect straight
+    // corridor. Only support the network reachable from the mine entrance
+    // without excavating any intervening rock.
+    const upstairs = mine.mineUpstairs
+    const reachable = new Set(), queue = []
+    if (upstairs && TILE[cm[upstairs.y]?.[upstairs.x]]?.walk) {
+      reachable.add(keyXY(upstairs.x,upstairs.y));queue.push(upstairs)
+    }
+    for (let i=0;i<queue.length;i++)for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const x=queue[i].x+dx,y=queue[i].y+dy,key=keyXY(x,y)
+      if(reachable.has(key)||!TILE[cm[y]?.[x]]?.walk)continue
+      reachable.add(key);queue.push({x,y})
+    }
     const tight = (x, y) => cm[y]?.[x] === 'cavefloor2' &&
+      reachable.has(keyXY(x,y)) &&
       TILE[cm[y-1]?.[x]]?.walk === true && TILE[cm[y+1]?.[x]]?.walk === true &&
       !TILE[cm[y]?.[x-1]]?.walk && !TILE[cm[y]?.[x+1]]?.walk
     const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive)]
@@ -8132,4 +8340,5 @@ function spawnCaveDecorations() {
     }
   }
   spawnSurfaceSpiderWebs(roll)
+  spawnNaturalDecorations(roll)
 }

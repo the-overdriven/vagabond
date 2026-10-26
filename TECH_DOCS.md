@@ -717,6 +717,33 @@ Current terrain includes:
 - boulders
 - special landmarks
 
+The surface contains **four open fissures** on ordinary grass or hills, with
+at least twelve tiles between them. They are permanent, impassable terrain in
+both tile-image and ASCII modes (shown as `◉` in ASCII), but do not block
+vision or projectiles. They are placed on broadly connected terrain after
+world rotation, away from stair/entrance approaches, inhabited areas, water
+crossings and the Temple start. Their terrain IDs are saved in the world map,
+so loading or replaying cannot restore walkability accidentally.
+
+The following are tile-image-only, non-interactive surface scenery. Neither
+movement nor NPC/enemy pathfinding, combat, terrain bonuses, loot or ASCII
+presentation changes because of them:
+
+- Each world has one stone-skull altar near hills and one caged dead tree far
+  from the village (at least 40 tiles from every hut).
+- At least three beast skeletons, six loose stones and two piles of scrap wood
+  decorate the surface. Lone standing stones, fallen branches near woods and
+  quarry rocks along hill/mountain transitions provide larger landmarks.
+- Water lilies grow in small lakes; blue and spiky plants favor the boundary
+  between green land and open water. At river headwaters, the mountain-water
+  image takes the place of the ordinary mountain art, without altering the
+  impassable mountain terrain.
+
+Scenery is chosen after whole-world rotation by seeded coordinate hashes,
+avoids initial creatures and loose loot, and persists in the existing
+decoration layer. Each location holds at most one decoration; none appears on
+the ASCII or full-world minimap views.
+
 Grassland tree decoration:
 
 - Lone trees are placed visually on broad, grass-dominated areas during surface
@@ -1011,6 +1038,8 @@ traversable for that creature, or the nearest available tile if the immediate
 neighbors are occupied. The player retains the matching stair coordinate. Initial
 encounters remain at least three tiles from the stairs. No creatures, loot or
 door states reset when revisiting a floor.
+Downward tower stairs have their own `stairs-down.png` artwork in tile mode;
+the movement, ASCII glyphs and transitions remain the same.
 
 | Elevation | Number | Weighted encounter pool | Chest tier |
 |-----------|--------|-------------------------|------------|
@@ -1380,7 +1409,7 @@ clusters and accidental key piles without changing deliberate two-leaf gates.
 A matching key opens both leaves in **1 turn** and is consumed. Without the key,
 the first bump on a particular locked doorway identifies the lock without
 spending a turn. A subsequent bump attempts a breach with an equipped weapon,
-using the same **220 ms cosmetic attack lunge** as ordinary melee and crate
+using the same **132 ms cosmetic attack lunge** as ordinary melee and crate
 strikes. Inspection is remembered per physical lock (including double-door
 leaves), survives save/replay, and resets with a new character. Bare fists
 cannot attempt a breach and do not consume a turn. Each actual weapon attempt
@@ -2145,7 +2174,7 @@ their turn, regardless of the player's attack animation.
 A destroyed crate immediately becomes **walkable crate debris**
 (`dwarvencratepieces`) for game rules and save/replay. Broken boards, iron bands
 and any pre-rolled loot appear immediately, including during the player's
-**220 ms attack lunge**. Crates have no sinking, shrinking or fading death effect;
+**132 ms attack lunge**. Crates have no sinking, shrinking or fading death effect;
 monster death effects are unchanged. Debris remains
 over the marble floor; ASCII uses `;`. Debris does not block movement, sight,
 projectiles or auto-travel, cannot be smashed again, and remains beneath dropped
@@ -3004,8 +3033,26 @@ appears only in north–south, single-tile-wide corridors. The support tile and
 both immediate north/south neighbors must each have walkable exits **only north
 and south**; this requires at least five straight, tight passage tiles. Frames
 are spaced roughly eight eligible tiles apart and avoid initial creature, loot
-and exposed-crystal positions. They are visual only: the mine floor, movement,
+and exposed-crystal positions. They also require a dry walking route from that
+floor's entry staircase, without digging: sealed mineral pockets never receive
+supports, even if their hidden geometry contains a perfectly straight passage.
+They are visual only: the mine floor, movement,
 vision, mining and lighting rules remain unchanged.
+
+Additional cave decorations include beast remains, skulls, scattered bones,
+stones and other debris on the floors of ordinary caves, but not crypts or
+mausoleums. A cave with at least two Goblins, Skinks or Kobolds has an
+independent **60% chance** to receive one to three scraps of refuse close to
+those creatures (fishbones, torn cloth, banana peels, broken swords or gnawed
+bones). Such refuse is a clue, not proof of present monsters: it is generated
+once from their initial placement and does not move with them or disappear
+when they die.
+
+Every Dwarven Fort, Ruins and Mines floor receives at least **two alcohol
+barrels on open floor and two carved reliefs on the walls**. In the Mines,
+occasional wall mushrooms cling to exposed cave walls beside walkable passages.
+All of these new props are tile-image-only and do not change wall blocking,
+walking, visibility or loot. They are drawn below creatures and items.
 
 Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
@@ -3031,7 +3078,8 @@ Tracking clue.
 One position holds at most one decoration. The generated placement is saved
 and restored directly, survives normal deaths and reused-world characters, and
 is cleared and regenerated for a new world. Props draw below items and actors
-and respect underground visibility. Their ASCII glyphs are `%` (web), `^`
+and respect underground visibility. Only the older cave decorations have ASCII
+glyphs: `%` (web), `^`
 (stalagmites), `♣` (small mushrooms) and `Π` (mine supports).
 
 ## Guaranteed underground Vampire
@@ -4667,7 +4715,7 @@ or trigger Collective Mind. A monster trapped behind a sealed pocket wall may
 respond to the sound but cannot cross the wall. Noise-induced pursuit is visible
 when it actually enters view, without revealing offscreen listeners in the log.
 
-On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary or due to a large speed disadvantage. Losing range ends active pursuit; the existing Alarmed status expires independently under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
+On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary, but can be outpaced through the SPD disengagement rule below. Losing range ends active pursuit; the existing Alarmed status otherwise expires under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
 Movement occupancy is scoped to the currently active map (current z level), 
 including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
@@ -4786,9 +4834,14 @@ An already-aware **non-Alarmed** enemy standing on the outermost tile of its eff
 range has a 30% chance per turn to give up the chase. That outer ring is drawn
 with a more transparent red than the rest of the aggro overlay.
 
-**Non-Alarmed**, already-aware enemies can also lose interest in a chase
-when the player has higher effective SPD, provided they are **more than one tile
-away**. The chance is 5 percentage points per SPD advantage, capped at 50%.
+Already-aware enemies, **including those Alarmed by ordinary pursuit**, can
+lose interest in a chase when the player has higher effective SPD, provided
+they are **more than one tile away**. The chance is 5 percentage points per
+SPD advantage, capped at 50%. A successful roll ends that pursuit action and
+clears its ordinary awareness and Alarmed status; if the player stays nearby
+and visible, the creature may spot them again on a later turn. Permanent
+Collective Mind alerts are an exception: speed can delay their next chase step
+but cannot erase the shared alert.
 A successful dodge immediately before that roll changes only the log text,
 not the chance or normal turn behavior. Other losses of interest retain
 `The <enemy> loses interest in the chase.` The separate 30% outer-AGGRO
@@ -4814,9 +4867,11 @@ spell, haste, rush, or ranged attack roll. Adjacent enemies use their normal
 single melee action. The faster-pursuer log appears only while that monster
 is visible on the player's main screen; an unseen enemy still takes its earned
 extra action silently. For **losing interest**, the advantage runs in the
-opposite direction (player minus enemy), but Alarmed enemies and adjacent
-enemies cannot lose interest due to speed. Neither modifier consumes RNG when
-its chance is zero; the remaining eligible rolls use seeded RNG as usual.
+opposite direction (player minus enemy), but adjacent enemies cannot
+disengage due to speed. The roll occurs before rushes, leaps and extra pursuit
+movement but after spells and defensive responses. Neither
+modifier consumes RNG when its chance is zero; the remaining eligible rolls
+use seeded RNG as usual.
 
 Idle enemies can wander.
 
@@ -4974,7 +5029,9 @@ the shooter-specific fixed projectile ATK and doubled dodge chance documented in
 animation is presentation-only: dodge, critical/glancing, damage, HP and ammunition are
 resolved first from deterministic gameplay state, then the visual effect is queued. Monster
 melee lunges, arrows and magical projectiles (including Lich Death Bolt) play
-**in attack order**, without visual overlap between attacks. A dodged ranged
+**in attack order**, without visual overlap between attacks. Player and monster
+melee lunges last **132 ms** (40% faster than the former 220 ms); this is only
+presentation timing. A dodged ranged
 attack starts pushing the player's sprite backward shortly **before the
 projectile arrives**, then returns it to its
 unchanged tile. Movement and turn-taking input wait for the ordered attacks

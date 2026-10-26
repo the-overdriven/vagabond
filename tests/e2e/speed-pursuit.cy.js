@@ -96,7 +96,7 @@ describe('SPD-scaled pursuit and losing interest', () => {
     })()`)).should('equal',true)
   })
 
-  it('scales speed-based disengagement but never loses adjacent or Alarmed enemies', () => {
+  it('restores speed-based disengagement and the lost-interest message for Alarmed pursuers', () => {
     cy.window().then(win => win.eval(`(() => {
       const originalRng=rng,originalAttack=enemyAttackPlayer,originalLog=log
       let messages=[],attacks=0
@@ -116,10 +116,22 @@ describe('SPD-scaled pursuit and losing interest', () => {
         rng=()=>0
         enemyTurn()
         speedCheck(e.aware && attacks===1,'adjacent enemy cannot disengage due to SPD')
-        e=resetPursuitTest(15,5,2,true)
+        e=resetPursuitTest(15,5,2,true);messages=[]
         rng=()=>0
         enemyTurn()
-        speedCheck(e.aware && e.x===61,'Alarmed enemy ignores speed-based disengagement')
+        speedCheck(!e.aware && !e.alarmed && e.x===62,
+          'outpaced Alarmed enemy gives up an active chase without moving')
+        speedCheck(messages.some(m=>m.includes('loses interest in the chase')),
+          'ordinary visible Alarmed pursuers regain the lost-interest message')
+        e=resetPursuitTest(15,5,2,true)
+        rng=()=>0.51
+        enemyTurn()
+        speedCheck(e.aware && e.x===61,'failed speed hesitation lets Alarmed enemy advance')
+        e=resetPursuitTest(52,6,2,true)
+        rng=()=>0.49
+        enemyTurn()
+        speedCheck(!e.aware && !e.alarmed && e.x===62,
+          'even an alerted monster can be escaped at high player SPD')
         e=resetPursuitTest(15,5,2,false);e.justEvaded=true;messages=[]
         rng=()=>0.49
         enemyTurn()
@@ -156,6 +168,12 @@ describe('SPD-scaled pursuit and losing interest', () => {
         const expected=run()
         loadGameFromObject(saved,{isReplayInit:true})
         speedCheck(run()===expected,'same enemy turn, position, awareness and RNG after restoration')
+        resetPursuitTest(15,5,2,true)
+        rngState=975318642
+        const disengageSave=JSON.parse(JSON.stringify(buildSaveObject()))
+        const disengageResult=run()
+        loadGameFromObject(disengageSave,{isReplayInit:true})
+        speedCheck(run()===disengageResult,'SPD disengagement and alarm clearing replay deterministically')
       } finally {tryEnemyHaste=originalHaste;enemyAttackPlayer=originalAttack}
       return true
     })()`)).should('equal',true)
