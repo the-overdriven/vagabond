@@ -46,15 +46,19 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
   it('draws species sprites in tile mode and preserves glyph fallbacks in ASCII', () => {
     cy.window().then(win => win.eval(`(() => {
       const visuals=Object.entries(RENDER_STYLE.enemies.tiles);
-      invisibilityAssert(visuals.length===29,'all supplied monster sprites are mapped');
+      invisibilityAssert(visuals.length===68,'all supplied monster sprites are mapped');
       invisibilityAssert(visuals.every(([name,visual]) =>
         ENEMY_TEMPLATE_BY_NAME[name] && preloadedImages.has(visual.image)),
         'mapped monster sprites are preloaded before play');
+      invisibilityAssert(['Lich','Gargoyle','Naledi','Ogre','Xibal','Yeti'].every(name =>
+        visuals.some(([mapped])=>mapped===name)),
+        'new surface, tower and mine sprites are mapped');
       invisibilityAssert(!visuals.some(([,visual])=>visual.image.includes('dont-use')),
         'rejected orc reference is excluded');
 
       const goblin=spawnStealth('Goblin',41,40);
       goblin.prefix='Champion';goblin.name='Champion Goblin';
+      const lich=spawnStealth('Lich',43,40);
       const skerva=spawnStealth('Skerva',42,40);
       const oldMode=USE_TILE_IMAGES, oldDraw=ctx.drawImage, oldText=ctx.fillText;
       const calls=[];
@@ -72,6 +76,12 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
         const ascii=capture(goblin,false);
         invisibilityAssert(!ascii.includes('image') && ascii.includes('g'),
           'ASCII mode keeps the lowercase tier-two glyph');
+        const lichSprite=capture(lich,true);
+        invisibilityAssert(lichSprite.includes('image'),
+          'newly supplied species uses its tile sprite');
+        const lichAscii=capture(lich,false);
+        invisibilityAssert(!lichAscii.includes('image'),
+          'newly supplied species still uses a glyph in ASCII');
         const fallback=capture(skerva,true);
         invisibilityAssert(!fallback.includes('image') && fallback.includes('S'),
           'species without a supplied image retain their glyph in tile mode');

@@ -21,6 +21,18 @@ describe('Desktop overlay layout', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
   })
 
+  it('starts two desktop zoom steps closer and preserves zoom controls', () => {
+    cy.window().then(win => {
+      expect(win.eval('INITIAL_TILE_PX')).to.equal(48)
+      expect(win.eval('requestedTilePx')).to.equal(48)
+      expect(win.eval('TILE_PX')).to.equal(48)
+      win.eval('changeTileSize(-1)')
+      expect(win.eval('requestedTilePx')).to.equal(44)
+      win.eval('changeTileSize(1)')
+      expect(win.eval('requestedTilePx')).to.equal(48)
+    })
+  })
+
   it('keeps the desktop panels compact and preserves full-map zoom and pan while changing floors', () => {
     cy.window().then(win => {
       const side = win.document.getElementById('sidePanel').getBoundingClientRect()
@@ -386,6 +398,9 @@ describe('Desktop overlay layout', () => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: true}))
     cy.reload()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.window().then(win => {
+      expect(win.eval('INITIAL_TILE_PX'), 'mobile startup zoom stays unchanged').to.equal(56)
+    })
     cy.get('#raceOverlay').should('have.class', 'show')
     cy.get('#hud .stat:not(.stat-actions)').should($stats => {
       for (const stat of $stats) expect(getComputedStyle(stat).display).to.equal('none')

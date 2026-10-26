@@ -3578,8 +3578,8 @@ does not silently grant a ranged attack.
 
 In tile-image mode, monsters with supplied artwork use transparent PNG sprites
 from `img/enemies-tiles/`. `content/rendering.json` maps each species name to
-its image and display scale under `enemies.tiles`. All **29 currently mapped
-species** use scale 1 (one map tile); the remaining species retain their
+its image and display scale under `enemies.tiles`. Mapped species use scale 1
+(one map tile); the remaining species retain their
 existing glyphs until artwork is available. Enemy prefixes and other display
 names reuse the base species image. An absent or failed image falls back to the
 same tier-colored glyph used by ASCII mode. The wide Giant Spider image is
@@ -8177,8 +8177,8 @@ Current desktop controls include:
 | Mouse wheel over game canvas | Increase / decrease game tile size           |
 | G | Toggle god mode on or off                                       |
 
-Tile size starts at **40** canvas pixels on desktop and **56** on
-coarse-pointer mobile devices (four additional zoom steps). It changes in
+Tile size starts at **48** canvas pixels on desktop and **56** on
+coarse-pointer mobile devices (two additional zoom steps). It changes in
 four-pixel steps from 20 to 96. Wide layouts whose primary pointer is not
 coarse use the desktop overlay layout; this includes keyboard/headless contexts
 that report no primary pointer, while coarse-pointer/touch layouts remain on the
