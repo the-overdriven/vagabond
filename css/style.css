@@ -1310,6 +1310,12 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 /* ============================== RACE SELECTION ============================== */
+/* Hide the placeholder character's stats before Begin, without moving HUD
+   buttons or changing the layout when character creation closes. */
+body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
+  visibility: hidden;
+}
+
 #raceOverlay {
   background: rgba(5, 4, 3, 0.92);
   z-index: 40;

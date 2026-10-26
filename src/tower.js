@@ -5,6 +5,7 @@
 let tower = null
 let towerLevels = []
 const TOWER_SIZE = 11
+const TOWER_MIN_VILLAGE_GAP = 50
 
 // Surface perspective is derived from player position; it is never saved or
 // rolled with the world RNG. Six tiles away shows the darkened summit; closer
@@ -18,11 +19,13 @@ function towerInterior(x, y) {
   return !!tower && x > tower.x && x < tower.x + TOWER_SIZE - 1 &&
     y > tower.y && y < tower.y + TOWER_SIZE - 1
 }
-function towerDistance(x = player.x, y = player.y) {
-  if (!tower) return Infinity
-  const dx = Math.max(tower.x - x, 0, x - (tower.x + TOWER_SIZE - 1))
-  const dy = Math.max(tower.y - y, 0, y - (tower.y + TOWER_SIZE - 1))
+function towerFootprintDistance(x, y, left, top) {
+  const dx = Math.max(left - x, 0, x - (left + TOWER_SIZE - 1))
+  const dy = Math.max(top - y, 0, y - (top + TOWER_SIZE - 1))
   return Math.max(dx, dy)
+}
+function towerDistance(x = player.x, y = player.y) {
+  return tower ? towerFootprintDistance(x, y, tower.x, tower.y) : Infinity
 }
 function towerShowsSummit() {
   return currentZ === 0 && towerDistance() > TOWER_NEAR_DISTANCE
@@ -62,6 +65,7 @@ function generateTower() {
   // routes around the tower instead of sealing a narrow overworld passage.
   for (let y = 2; y < MAP_H-TOWER_SIZE-2; y++) for (let x = 2; x < MAP_W-TOWER_SIZE-2; x++) {
     if (Math.max(Math.abs(x+5-spawnPoint.x),Math.abs(y+5-spawnPoint.y)) < 18) continue
+    if (villageHuts.some(hut => towerFootprintDistance(hut.x, hut.y, x, y) < TOWER_MIN_VILLAGE_GAP)) continue
     let valid = true
     for (let dy = -1; dy <= TOWER_SIZE && valid; dy++) for (let dx = -1; dx <= TOWER_SIZE; dx++) {
       if (!natural.has(map[y+dy][x+dx]) || protectedCells.has(keyXY(x+dx,y+dy))) {valid=false;break}
@@ -293,9 +297,9 @@ function drawTowerSurfaceMonsters(now) {
     const vx = Math.round((x - camX) * TILE_PX)
     const vy = Math.round((y - camY) * TILE_PX)
     if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-    // Use the same glyph and palette as on the surface. No Alarmed marks,
-    // awareness rectangles, health bars, prefix glows or targeting overlays.
-    drawCreature(vx, vy, enemyGlyph(e), enemyColor(e))
+    // Use ordinary species artwork in tile mode and its glyph in ASCII.
+    // Do not expose upstairs combat indicators or targeting overlays.
+    drawEnemyVisual(vx, vy, e)
   }
 }
 

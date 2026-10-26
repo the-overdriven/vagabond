@@ -97,6 +97,12 @@ describe('Desktop overlay layout', () => {
 
   it('keeps race selection above gameplay panels and usable below wide or wrapped HUDs', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
+    cy.get('#hud .stat:not(.stat-actions)').should($stats => {
+      for (const stat of $stats) expect(getComputedStyle(stat).visibility).to.equal('hidden')
+    })
+    cy.get('#hud .stat-actions').should($actions => {
+      expect(getComputedStyle($actions[0]).visibility).to.equal('visible')
+    })
 
     cy.get('#hud').should($hud => {
       expectHudSingleRow($hud[0])
@@ -364,6 +370,11 @@ describe('Desktop overlay layout', () => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: true}))
     cy.reload()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.get('#raceOverlay').should('have.class', 'show')
+    cy.get('#hud .stat:not(.stat-actions)').should($stats => {
+      for (const stat of $stats) expect(getComputedStyle(stat).visibility).to.equal('hidden')
+    })
+    cy.get('#hud .stat-actions').should('have.css', 'visibility', 'visible')
     cy.get('#logpanel').should($log => {
       const style = $log[0].ownerDocument.defaultView.getComputedStyle($log[0])
       expect(style.position).not.to.equal('fixed')

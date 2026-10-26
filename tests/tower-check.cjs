@@ -26,13 +26,14 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
    const ambush=towerSurfaceMonsterVisible(e);e.wallAmbushHidden=false;
    currentZ=0;const sameFloor=towerSurfaceMonsterVisible(e);currentZ=1;
    return !unknown&&!ambush&&!sameFloor})()`),true)
- // Render uses the actual creature glyph, but not the interactive enemy list.
+ // Background monsters share the normal creature visual path, never the
+ // interactive enemy/overlay pass.
  context.surfaceCreatureDraws=[]
- run(`(()=>{const original=drawCreature;drawCreature=(...args)=>surfaceCreatureDraws.push(args);
-   try{drawTowerSurfaceMonsters(0)}finally{drawCreature=original}})()`)
+ run(`(()=>{const original=drawEnemyVisual;drawEnemyVisual=(...args)=>surfaceCreatureDraws.push(args);
+   try{drawTowerSurfaceMonsters(0)}finally{drawEnemyVisual=original}})()`)
  assert.equal(context.surfaceCreatureDraws.length>0,true)
  assert.equal(run(`(()=>{const e=enemies.find(e=>e.id===${JSON.stringify(ambientSetup.id)});
-   return surfaceCreatureDraws.some(d=>d[2]===enemyGlyph(e)&&d[3]===enemyColor(e))})()`),true)
+   return surfaceCreatureDraws.some(d=>d[2]===e)})()`),true)
  // A single overlay covers both terrain and silhouettes at +1 to +3, never
  // the summit or playable tower interior, in either tile/ASCII presentation.
  for (const z of [1,2,3,4]) {
@@ -119,6 +120,8 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits(${JSON.stringify(traits)}.map(name=>WORLD_TRAITS.find(t=>t.name===name)),'XS');player.inventory=[];player.curseDebuffs=[];player.poisonTurns=0;player.berryRegenTurns=0;enemies=[];groundItems=[];occupied=new Set()`)
   await run('generateNewWorld()')
   assert.equal(run('towerLevels.length'),4)
+  assert.equal(run('Math.min(...villageHuts.map(h=>towerDistance(h.x,h.y)))>=TOWER_MIN_VILLAGE_GAP'),true,
+    'every village hut is at least 50 tiles from the full tower footprint')
   assert.equal(run(`(()=>{const p=towerPoint(5,0);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')
   assert.equal(run(`(()=>{const p=towerPoint(3,0);return towerLevels[0].map[p.y][p.x]})()`),'towerwindow')
   assert.equal(run(`(()=>{const p=towerPoint(5,7);return towerLevels[0].map[p.y][p.x]})()`),'dwarvenwall')

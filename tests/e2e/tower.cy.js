@@ -21,7 +21,10 @@ describe('Guaranteed elevated tower',()=>{
         currentZ=0;map=surfaceMap
         rotateGeneratedWorld(1)
         const p=towerPoint(5,10)
-        return tower.rotation===1 && tower.entrance.x===p.x && tower.entrance.y===p.y &&
+        return TOWER_MIN_VILLAGE_GAP===50 &&
+          towerFootprintDistance(tower.x-50,tower.y,tower.x,tower.y)===50 &&
+          towerFootprintDistance(tower.x-49,tower.y,tower.x,tower.y)===49 &&
+          tower.rotation===1 && tower.entrance.x===p.x && tower.entrance.y===p.y &&
           Array.from({length:5},(_,z)=>{
             const board=z===0?surfaceMap:towerLevels[z-1].map
             return [z<4?towerStair(z,true):null,z>0?towerStair(z,false):null]
@@ -79,6 +82,9 @@ describe('Guaranteed elevated tower',()=>{
         }).every(Boolean)`)).to.equal(true)
         expect(win.eval("towerLevels[3].map[tower.y][tower.x]")).to.equal('marble')
         expect(win.eval("towerLevels[3].map[tower.y+10][tower.x+10]")).to.equal('marble')
+        expect(win.eval(`(()=>{const p=towerPoint(3,0);
+          return terrainVisual('towerwindow',p.x,p.y)?.quarterTurns === undefined
+        })()`)).to.equal(true)
         for(const tiles of [true,false]) {
           win.eval(`USE_TILE_IMAGES=${tiles};renderScene(performance.now())`)
           expect(win.eval('tileInspectInfo(tower.x-1,tower.y)')).to.equal(null)
@@ -88,6 +94,11 @@ describe('Guaranteed elevated tower',()=>{
             e.x=tower.x-2;e.y=tower.y+4;e.invisibleUntilTurn=0;
             e.wallAmbushHidden=false;e.pendingAbility=null;discovered[e.y][e.x]=true;
             return towerSurfaceMonsterVisible(e)&&!onCurrentLevel(e)&&tileInspectInfo(e.x,e.y)===null
+          })()`)).to.equal(true)
+          expect(win.eval(`(()=>{const original=drawEnemyVisual,draws=[];
+            drawEnemyVisual=(x,y,e)=>draws.push(e);
+            try{drawTowerSurfaceMonsters(performance.now());return draws.length>0}
+            finally{drawEnemyVisual=original}
           })()`)).to.equal(true)
           expect(win.eval(`(()=>{const original=ctx.fillRect,rects=[];
             ctx.fillRect=(...args)=>{if(ctx.fillStyle==='rgba(0, 0, 0, 0.5)')rects.push(args)};

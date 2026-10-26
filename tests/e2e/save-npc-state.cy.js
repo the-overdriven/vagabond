@@ -92,4 +92,40 @@ describe('Exact current-save state restoration', () => {
         'surface excavation colors remain correct after save/replay initialization')
     })()`))
   })
+
+  it('keeps the Drunk out of mined forest and grassland-tree tiles', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      currentZ=0;map=surfaceMap
+      const drunk=npcs.find(n=>n.name==='Drunk')
+      check(!!drunk,'Drunk exists in the saved village')
+      enemies=[];npcs=[drunk];occupied=new Set()
+      player.x=44;player.y=40
+      drunk.x=40;drunk.y=40;drunk.homeX=40;drunk.homeY=40
+      drunk.static=false;drunk.free=true;drunk.talkFreezeTurns=0
+      occupied.add(keyXY(40,40))
+      for(let y=39;y<=41;y++)for(let x=39;x<=41;x++){
+        map[y][x]='forest';grasslandTrees.delete(keyXY(x,y))
+      }
+      map[40][40]='grass'
+      const target=keyXY(41,40)
+      map[40][41]='boulder';tileUnderlays[target]='forest'
+      player.inventory.push(createItem('pickaxe'))
+      player.miningTutorialSeen=true;player.miningArmedTarget=null
+      Mining.strike(41,40);Mining.strike(41,40)
+      check(map[40][41]==='forest','mining restores the real forest tile')
+      const oldChance=chance
+      try {
+        chance=()=>true
+        npcTurn()
+        check(drunk.x===40&&drunk.y===40,'Drunk will not enter mined forest')
+        map[40][41]='grass';grasslandTrees.add(target)
+        npcTurn()
+        check(drunk.x===40&&drunk.y===40,'Drunk avoids a tree standing on grass')
+        grasslandTrees.delete(target)
+        npcTurn()
+        check(drunk.x===41&&drunk.y===40,'ordinary grass remains a valid NPC step')
+      } finally {chance=oldChance}
+    })()`))
+  })
 })

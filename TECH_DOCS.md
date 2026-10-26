@@ -90,6 +90,9 @@ and duplicate Begin clicks cannot start a second world.
 XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
+While race selection is open, the HUD hides the not-yet-created player's
+stats but keeps the normal Save/Load and other HUD buttons accessible. Race
+cards still explain each race's gameplay bonuses.
 On desktop, the selection overlay displays one of four terrain-only captures
 from Vagabond's surface generator and original tile renderer, with a continuous
 CSS drift. They are captured offline without the player, monsters, dropped items
@@ -953,11 +956,14 @@ five playable levels: the ground floor (`z:0`) and four upper floors (`z:+1`
 through `z:+4`). The tower is placed on a Temple-reachable patch of dry natural
 terrain, away from the starting sanctuary. Its footprint and surrounding
 walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
+The closest distance from any village hut to the tower's outer footprint is
+**at least 50 tiles** by Chebyshev distance, measured after the tower's full
+11×11 footprint is accounted for. This rule applies equally on small worlds.
 The ring preserves routes around the structure. Generation must reject a world
 rather than silently omit its tower when no valid site exists.
 
-The ground entrance artwork retains its upright orientation regardless of
-world rotation, although the entrance position and the tower layout still
+The ground entrance and window artwork retain their upright orientation
+regardless of world rotation, although their positions and the tower layout still
 rotate as a unit. The ground entrance is an ordinary unlocked door, like the two internal doors
 on each of the first four floors. Each of these **nine doors** independently
 starts **open with 10% probability** (otherwise closed). Initial states are
@@ -3474,6 +3480,9 @@ do not have this limit.
 - Vulture
 - Witherpod
 - Giant Toad
+
+Giant Toad uses rarity weight **0.15** in its eligible riverside and forest
+encounters. Its Jump and nearby-water spawning requirement are unchanged.
 
 ### Tier 2
 
@@ -6691,8 +6700,10 @@ than using straight-line distance. NPC path distance also treats forest and
 river/water tiles as unavailable, matching their wandering restrictions. The
 Drunk keeps the wider random Temple-area placement. Village NPCs and the
 Fisherman Hermit never spawn on grassland-tree tiles; neighboring tree artwork
-does not exclude other tiles. NPC wandering never enters
-forest, river, or water tiles.
+does not exclude other tiles. NPC wandering never enters forest, river, or
+water tiles, or grass tiles with grassland-tree artwork. The restriction also
+applies when a mined surface boulder reveals one of these tiles. An NPC with no
+eligible adjacent terrain waits rather than walking into the forest.
 
 NPC tile artwork is configured by exact NPC name in
 `content/rendering.json` under `npc.characters`, with `image` and `scale`
@@ -7935,7 +7946,8 @@ The surface outside the tower
 keeps its existing visibility rules. Outside their footprint, previously discovered surface
 terrain is drawn without per-tile color filters to avoid slow redraws. Unexplored surroundings stay
 hidden. The backdrop also shows living surface monsters roaming on previously explored
-outside tiles. They use their ordinary species glyph and color but cannot see,
+outside tiles. They use species sprites in tile mode when available and the
+original tier-colored glyphs in ASCII mode or when art is missing. They cannot see,
 track or attack the upstairs player; neither their Alarmed state nor their
 aggro range, status marks or inspection details are exposed. Nearby surface
 monsters receive passive, deterministic wandering opportunities on player
