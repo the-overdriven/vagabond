@@ -52,6 +52,40 @@ describe('Gear balance, racial growth, death shields and sanctuary', () => {
       }}finally{showLevelUpPopup=originalPopup}
     })()`))
   })
+  it('shows nominal and combat GRACE, with equipment penalties applied only once', () => {
+    cy.window().then(win=>win.eval(`(() => {
+      player.race='elf';player.lvl=8
+      const weapon={kind:'weapon',name:'Resilient Scimitar',base:'Scimitar',grace:4,atk:6,mod:'hp',modAmt:5}
+      player.equip={weapon,shield:{kind:'shield',base:'Kite Shield'},
+        armor:{kind:'armor',base:'Hauberk',gracePenalty:1}}
+      const skeleton=makeBalanceEnemy('Skeleton')
+      check(enemyGrace(skeleton)===3&&combatDelay(null,false,skeleton)===2,'unarmed skeleton timing')
+      check(playerGrace()===5&&playerGraceDisplay()==='5 (3.9)','nominal and combat GRACE are both visible')
+      check(Math.abs(playerCombatGrace(weapon)-3.88235294117647)<.000001,'armor and shield cost one GRACE each')
+      check(Math.abs(combatDelay(weapon,true)-6/playerCombatGrace(weapon))<.000001,'display uses combat timing value')
+      check(combatDelay(weapon,true)<combatDelay(null,false,skeleton),'elf scimitar faster than unarmed skeleton')
+      check(!canGetExtraWeaponAttack(null,weapon,false,true,skeleton,null),'skeleton cannot get extra timing strike')
+      const fullPenaltyGrace=playerCombatGrace(weapon)
+      player.equip.armor=null
+      check(Math.abs(playerCombatGrace(weapon)-fullPenaltyGrace-1)<.000001,'removing armor restores exactly one GRACE')
+      player.equip.shield=null
+      check(playerGrace()===7&&playerGraceDisplay()==='7 (5.9)','unencumbered timing is reflected in display')
+      check(Math.abs(combatDelay(weapon,true)-1.02)<.000001,'unencumbered weapon affinity keeps previous timing')
+      player.equip.weapon={kind:'weapon',name:'Slow club',base:'Club',grace:1,atk:3}
+      check(combatDelay(player.equip.weapon,true)>5.9,'elf bonus barely accelerates slow weapons')
+      check(playerGraceDisplay()==='4 (1.0)','weak weapon affinity is clear in display')
+      player.equip.weapon=weapon
+      player.equip.shield={kind:'shield',base:'Kite Shield'}
+      player.equip.armor={kind:'armor',base:'Hauberk',gracePenalty:1}
+      player.berserkTurns=5
+      check(Math.abs(playerCombatGrace(weapon)-1.88235294117647)<.000001,'berserk penalty subtracts after affinity')
+      player.berserkTurns=0
+      renderInventory()
+      const graceRow=[...document.querySelectorAll('#statGrid .row')].find(row=>row.textContent.includes('🤺 Grace'))
+      check(graceRow?.textContent.includes('5 (3.9)')&&graceRow.title.includes('effective combat GRACE'),
+        'character panel shows and explains both GRACE values')
+    })()`))
+  })
   it('survives one lethal hit, persists the spent shield and dies on the next strike', () => {
     cy.window().then(win=>win.eval(`(async () => {
       const e=makeBalanceEnemy('Gargoyle');player.baseAtk=10000;player.baseSpd=100

@@ -5242,22 +5242,29 @@ level GRACE = floor(level / 5)
 player bonus GRACE = racial GRACE + level GRACE
 gear GRACE penalty = 1 for a non-Buckler shield + armor.gracePenalty (if any)
 temporary GRACE penalty = 3 while Stone Skin + 2 while Berserk
-effective player weapon GRACE = max(1, weapon GRACE - gear GRACE penalty - temporary GRACE penalty)
-base player delay = 6 / effective player weapon GRACE
-weapon affinity = min(1, effective player weapon GRACE / 5)²
-GRACE reduction = player bonus GRACE × 0.25 × weapon affinity
-player delay = max(0.25, base delay - GRACE reduction)
+weapon affinity = min(1, weapon GRACE / 5)²
+unencumbered delay = max(0.25, 6 / weapon GRACE - player bonus GRACE × 0.25 × weapon affinity)
+unencumbered combat GRACE = 6 / unencumbered delay
+effective combat GRACE = max(1, unencumbered combat GRACE - gear GRACE penalty - temporary GRACE penalty)
+player delay = 6 / effective combat GRACE
 ```
 
 This makes both racial and level GRACE provide almost no benefit with slow
 weapons and progressively more benefit with graceful weapons. A GRACE 5 or
-higher weapon receives the full reduction. The player's displayed GRACE is
-weapon GRACE + racial GRACE + level GRACE - gear GRACE penalty - temporary
-GRACE penalty, with a minimum
-of 0. Combat timing separately floors effective weapon GRACE at 1, so heavy
-gear cannot disable the enemy's extra-attack checks by reducing the player's
-displayed GRACE to zero. Bucklers and armors without `gracePenalty` leave GRACE
-unchanged. Humanoid enemies with a non-Buckler shield or selected armor also
+higher weapon receives the full reduction. Affinity uses inherent weapon GRACE;
+armor, shields and statuses reduce the resulting combat GRACE **once**, without
+also weakening weapon affinity. The character sheet shows **nominal GRACE
+(effective combat GRACE)**, with the second number rounded to one decimal place.
+Nominal GRACE is weapon GRACE + racial GRACE + level GRACE minus penalties,
+floored at 0; effective combat GRACE is the value used for attack timing and
+extra-attack checks. A level-8 Elf wielding a GRACE-4 Scimitar with −2 total
+gear penalties shows **5 (3.9)** and has delay about **1.55**, versus an unarmed
+Skeleton's GRACE 3 and delay 2. The unarmed player displays nominal GRACE with
+`(—)` because no weapon timing check applies.
+
+Combat timing floors effective GRACE at 1, so heavy gear does not disable an
+armed player's extra-attack checks. Bucklers and armors without `gracePenalty`
+leave GRACE unchanged. Humanoid enemies with a non-Buckler shield or selected armor also
 lose 1 from natural GRACE in combat timing (floored at 1); enemy weapons still
 override natural GRACE and have no gear penalty because an enemy carries one
 equipment item.

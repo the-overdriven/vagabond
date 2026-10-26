@@ -2691,10 +2691,24 @@ more difficult:
       (permanent ? 0 : potionGracePenalty() + (player.gazeTurns > 0 ? 3 : 0))
   }
 
+  function playerCombatGrace(weapon, permanent = false) {
+    if (!isWeaponItem(weapon)) return null
+    const weaponValue = Math.max(1, weaponGrace(weapon))
+    // Preserve the stronger racial/level affinity for naturally graceful
+    // weapons. Penalties then reduce the resulting combat GRACE exactly once.
+    const affinity = Math.min(1, weaponValue / 5) ** 2
+    const unencumberedDelay = Math.max(0.25, 6 / weaponValue - playerGraceBonus() * 0.25 * affinity)
+    return Math.max(1, 6 / unencumberedDelay - playerGracePenalty(permanent))
+  }
+
   function playerGrace(permanent = false) {
-    const weapon = player.equip.weapon
-    const grace = weaponGrace(weapon) + playerGraceBonus() - playerGracePenalty(permanent)
+    const grace = weaponGrace(player.equip.weapon) + playerGraceBonus() - playerGracePenalty(permanent)
     return Math.max(0, grace)
+  }
+
+  function playerGraceDisplay(permanent = false) {
+    const combatGrace = playerCombatGrace(player.equip.weapon, permanent)
+    return `${playerGrace(permanent)} (${combatGrace === null ? '—' : combatGrace.toFixed(1)})`
   }
 
   // Highscores uses the ordinary stat formulas without transient conditions.
@@ -4047,23 +4061,14 @@ more difficult:
   function combatDelay(weapon, isPlayer = false, enemy = null) {
     // Players must wield a weapon to take part in GRACE checks. Monsters use
     // their natural GRACE while unarmed; an equipped weapon overrides it.
-    let grace
-    if (isWeaponItem(weapon)) {
-      grace = isPlayer ? weaponGrace(weapon) : enemyWeaponGrace(enemy, weapon)
-      if (isPlayer) grace = Math.max(1, grace - playerGracePenalty())
-    } else if (!isPlayer) {
-      grace = enemyGrace(enemy)
+    if (isPlayer) {
+      const grace = playerCombatGrace(weapon)
+      return grace === null ? null : 6 / grace
     }
+    let grace = isWeaponItem(weapon) ? enemyWeaponGrace(enemy, weapon) : enemyGrace(enemy)
     if (!Number.isFinite(grace) || grace <= 0) return null
-    if (!isPlayer) grace = Math.max(1, grace - gearGracePenalty(enemy?.equipment))
-    const baseDelay = 6 / grace
-    if (!isPlayer) return baseDelay
-    // Player GRACE bonuses (race + one point every five levels) act as weapon
-    // affinity, not a flat addition. Slow weapons use almost none of the bonus,
-    // while GRACE 5+ weapons receive the full reduction.
-    const weaponAffinity = Math.min(1, grace / 5) ** 2
-    const graceReduction = playerGraceBonus() * 0.25 * weaponAffinity
-    return Math.max(0.25, baseDelay - graceReduction)
+    grace = Math.max(1, grace - gearGracePenalty(enemy?.equipment))
+    return 6 / grace
   }
 
   function canGetExtraWeaponAttack(attackerWeapon, defenderWeapon, attackerIsPlayer = false, defenderIsPlayer = false, attackerEnemy = null, defenderEnemy = null) {
@@ -11854,7 +11859,7 @@ more difficult:
       // ['🎚️ Level', player.lvl],
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
-      ['🤺 Grace', playerGrace()],
+      ['🤺 Grace', playerGraceDisplay()],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
       ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
       ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
@@ -11879,6 +11884,7 @@ more difficult:
     for (const [k, v] of rows) {
       const d = document.createElement('div')
       d.className = k === '🏆 Strongest slain enemy' ? 'row achievement-row' : 'row'
+      if (k === '🤺 Grace') d.title = 'Nominal GRACE (effective combat GRACE used for attack timing)'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k

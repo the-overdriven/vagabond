@@ -138,6 +138,8 @@ describe('Gear bases on procedural artifacts', () => {
       equipItem(player.inventory.indexOf(weapon))
       check(player.equip.weapon===weapon && player.equip.shield===null,'two-handed weapon removes shield')
       check(playerGrace(true)===Math.max(0,weapon.grace+playerGraceBonus()-1),'artifact weapon uses GRACE')
+      check(Math.abs(combatDelay(weapon,true)-6/playerCombatGrace(weapon))<1e-9,
+        'artifact weapon uses effective combat GRACE')
       check(itemStatLine(armor).includes('GRACE -1'),'armor penalty in UI')
     })()`))
   })
