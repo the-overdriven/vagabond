@@ -1101,7 +1101,11 @@ body.hint-collapsed #hint .panel-toggle {
   padding-inline: 5px;
   margin-right: 6px;
   flex-shrink: 0;
-  order: -1;
+  order: 1;
+}
+
+#invList .invitem button:not(.inventory-drop-btn) {
+  order: 2;
 }
 
 .tier1 {

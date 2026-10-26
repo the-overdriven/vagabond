@@ -173,8 +173,11 @@ describe('Gear bases on procedural artifacts', () => {
     cy.get('#invList .invitem').should($row=>{
       const drop=$row[0].querySelector('.inventory-drop-btn')
       const name=$row[0].querySelector('.nm')
-      expect(drop.getBoundingClientRect().right, 'Drop is leftmost for unidentified gear')
-        .to.be.at.most(name.getBoundingClientRect().left)
+      expect(name.getBoundingClientRect().right, 'Drop follows the item name')
+        .to.be.at.most(drop.getBoundingClientRect().left)
+      const identify=$row[0].querySelector('button:not(.inventory-drop-btn)')
+      expect(drop.getBoundingClientRect().right, 'Drop is the leftmost action')
+        .to.be.at.most(identify.getBoundingClientRect().left)
     })
     cy.contains('#invList button','Equip').should('be.visible').click()
     cy.get('#slotWeapon').should('contain.text','Unidentified Dagger').and('contain.text','???')

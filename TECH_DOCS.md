@@ -1005,8 +1005,10 @@ stair has a clear 3×3 patch of ordinary floor (all eight adjacent tiles are
 walkable marble), and initial defenders and loot spawn at least three tiles
 away from either landing. Inspecting stairs uses the existing transition
 action and does not advance a combat turn. Ascending announces that the player
-climbs; descending announces that the player descends. An
-occupied destination blocks travel rather than relocating creatures. Initial
+climbs; descending announces that the player descends. An occupied stair
+landing does not block travel: its occupant is moved to a free adjacent tile
+traversable for that creature, or the nearest available tile if the immediate
+neighbors are occupied. The player retains the matching stair coordinate. Initial
 encounters remain at least three tiles from the stairs. No creatures, loot or
 door states reset when revisiting a floor.
 
@@ -3588,7 +3590,9 @@ to images during play. The existing P toggle displays **letter glyphs for every
 monster in ASCII mode**. Portraits in inspection and the Bestiary stay separate.
 Movement, water clipping, flying draw order, invisibility, awareness/enrage
 outlines, warning/status marks, and prefixed-enemy terrain tint apply equally
-to monster sprites. Graphics have no effect on enemy identity, mechanics,
+to monster sprites. In tile mode, a subtle, semi-transparent **one-tile circular
+backing** beneath each visible enemy improves contrast without obscuring
+its sprite or changing ASCII. Graphics have no effect on enemy identity, mechanics,
 randomness, saves, or replay.
 
 ---
@@ -4852,6 +4856,14 @@ normal, cave, special, and ambush spawn paths inherit the species' current
 `wander` / `homeRadius` values unless that individual spawn explicitly overrides
 them.
 
+Idle monsters on a level **one elevation above or below** the player's level
+also wander when within the ordinary **20-tile horizontal/vertical activation
+radius**. They use their own floor's terrain, occupancy, abilities and home
+leashes, but cannot acquire, pursue or attack the player across floors.
+Wandering outcomes use seeded gameplay RNG and persist through normal enemy
+positions; the surface creatures already simulated beneath the tower are not
+given a duplicate wandering opportunity.
+
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy hit by an invisible player reacts once instead of wandering on that turn
 (section 47). A missed attack causes no reaction, and the enemy can
@@ -4963,7 +4975,8 @@ animation is presentation-only: dodge, critical/glancing, damage, HP and ammunit
 resolved first from deterministic gameplay state, then the visual effect is queued. Monster
 melee lunges, arrows and magical projectiles (including Lich Death Bolt) play
 **in attack order**, without visual overlap between attacks. A dodged ranged
-attack briefly pushes the player's sprite backward before it returns to its
+attack starts pushing the player's sprite backward shortly **before the
+projectile arrives**, then returns it to its
 unchanged tile. Movement and turn-taking input wait for the ordered attacks
 and dodge recoil to finish; visual delays never affect RNG, combat, replay or
 saved positions. The clear-shot check still uses the deterministic tile trace,
@@ -5419,8 +5432,8 @@ and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
 sidebars are open. This applies even when the browser reports no pointer. 
 Inventory actions remain reachable without horizontal scrolling. 
-Drop buttons are placed to the left of item names and icons, including the
-separate drop action for portable crystals.
+Drop is the **leftmost action button**, placed just after the item name and
+icon and before all other actions. Portable crystals use the same ordering.
 On touch screens, the trade panel fills the available height: both stock
 columns have independently scrolling lists rather than the 280px desktop cap,
 and the Close control remains visible above the bottom message log.

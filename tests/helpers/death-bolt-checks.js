@@ -58,8 +58,9 @@ function deathBoltRulesCheck() {
       orderedShot.start >= secondMelee.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS,
       'Death Bolt starts after the second monster lunge finishes')
     check(playerProjectileDodges.length === 1 &&
-      Math.abs(playerProjectileDodges[0].start - (orderedShot.start + orderedShot.duration)) < 5,
-      'dodged Death Bolt queues a recoil on impact, not at cast time')
+      playerProjectileDodges[0].start < orderedShot.start + orderedShot.duration &&
+      playerProjectileDodges[0].start > orderedShot.start + orderedShot.duration - PLAYER_DODGE_ANIM_MS,
+      'dodged Death Bolt begins recoiling just before projectile impact')
     check(player.x === combatX && player.y === combatY && turnCount === combatTurn,
       'projectile dodge never moves the player or advances a turn')
     check(enemyAttackPresentationPending(), 'input stays locked through Death Bolt and recoil')

@@ -210,14 +210,50 @@ function travelTowerStairs() {
   const destination=currentZ+(tile==='towerstairsup'?1:-1)
   if(destination<0||destination>towerLevels.length)return false
   const terrain=destination===0?surfaceMap:towerLevels[destination-1].map
-  // Matching stairs share coordinates. A monster occupying the landing blocks
-  // travel; do not teleport either actor or silently reset the encounter.
-  if(enemies.some(e=>e.alive&&(e.level??0)===destination&&e.x===player.x&&e.y===player.y)) {
-    log('The stair landing is occupied. You cannot pass.','info');return true
+  // The player always retains the matching stair coordinate. Shift a creature
+  // off the destination landing, preferring its free adjacent traversable tiles.
+  const occupant=enemies.find(e=>e.alive&&(e.level??0)===destination&&
+    (!e.levelKind||e.levelKind===(destination===0?'surface':'tower'))&&
+    e.x===player.x&&e.y===player.y) ||
+    (destination===0?npcs.find(n=>n.x===player.x&&n.y===player.y):null)
+  if(occupant) {
+    const from={x:player.x,y:player.y}
+    const otherActors=new Set([
+      ...enemies.filter(e=>e!==occupant&&e.alive&&(e.level??0)===destination&&
+        (!e.levelKind||e.levelKind===(destination===0?'surface':'tower'))).map(e=>keyXY(e.x,e.y)),
+      ...(destination===0?npcs.filter(n=>n!==occupant).map(n=>keyXY(n.x,n.y)):[])
+    ])
+    const isNpc=npcs.includes(occupant)
+    const canEnter=(x,y)=>{
+      const tile=terrain[y]?.[x]
+      if(!tile||tile==='towervoid'||(destination===0&&grasslandTrees.has(keyXY(x,y))))return false
+      if(isNpc)return TILE[tile]?.walk===true&& !['forest','river','water'].includes(tile)
+      if(enemyHasAbility(occupant,'ethereal'))return true
+      if(TILE[tile]?.walk)return true
+      return tile==='water'&&(enemyHasAbility(occupant,'swim')||enemyHasAbility(occupant,'fly')) ||
+        tile==='boulder'&&enemyHasAbility(occupant,'fly')
+    }
+    const queue=[from],seen=new Set([keyXY(from.x,from.y)])
+    let free=null
+    for(let head=0;head<queue.length&&!free;head++) {
+      const p=queue[head]
+      for(const [dx,dy] of DIRS8) {
+        const x=p.x+dx,y=p.y+dy,key=keyXY(x,y)
+        if(seen.has(key)||!canEnter(x,y))continue
+        seen.add(key)
+        if(!otherActors.has(key)&&!(x===from.x&&y===from.y)) {free={x,y};break}
+        queue.push({x,y})
+      }
+    }
+    if(!free)return true // Fully packed floor: never overlap creatures.
+    occupant.x=free.x;occupant.y=free.y
+    if(isNpc) {occupant.animFromX=from.x;occupant.animFromY=from.y;occupant.animStart=performance.now()}
+    else beginEnemyMoveAnim(occupant,from.x,from.y)
   }
   currentZ=destination;currentCave=-1;map=terrain
   undergroundDiscovered=destination===0?undergroundDiscoveredL1:towerLevels[destination-1].discovered
   resetSwimming();clearAutoPath();pendingMove=null;hoveredEnemy=null;stopCameraAnimation()
+  rebuildActiveLevelOccupancy()
   invalidateUndergroundFov();minimapDirty=true
   log(destination ? `${tile==='towerstairsup' ? 'You climb' : 'You descend'} to tower floor +${destination}.` : 'You descend to the tower entrance.','info')
   render();updateHud();return true

@@ -4454,9 +4454,12 @@ more difficult:
     const animationDelay = spellAttack ? shot.animationMs : RANGED_CONFIG.projectileAnimationMs
 
     if (chance(rangedDodgeChance(e))) {
-      const presentation = queueEnemyAttackPresentation(animationDelay + PLAYER_DODGE_ANIM_MS)
+      // Recoil must lead the impact: beginning it after the shot arrived reads
+      // as knockback from a hit rather than an intentional dodge.
+      const dodgeLead = Math.min(PROJECTILE_DODGE_LEAD_MS, animationDelay * 0.45)
+      const presentation = queueEnemyAttackPresentation(animationDelay + PLAYER_DODGE_ANIM_MS - dodgeLead)
       spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
-      spawnPlayerProjectileDodge(e, presentation.start + animationDelay)
+      spawnPlayerProjectileDodge(e, presentation.start + animationDelay - dodgeLead)
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, presentation.delay + animationDelay)
       log(`You dodge the ${possessive}.`, 'good')
       return false
@@ -5574,6 +5577,59 @@ more difficult:
     return true
   }
 
+  // Idle creatures on the levels immediately above and below can move while
+  // close in x/y, even though they cannot sense or fight the player there.
+  // Work directly against the target floor's terrain and occupants: changing
+  // currentZ/map here would incorrectly activate cross-floor traps or AI.
+  function wanderAdjacentLevelEnemies() {
+    const adjacent=new Set([currentZ-1,currentZ+1])
+    for(const e of enemies) {
+      const z=e.level??0
+      if(!e.alive||!adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
+          e.wallAmbushHidden||enemyWanderMode(e)===false||
+          Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))>ENEMY_WANDER_ACTIVE_RADIUS) continue
+      // The existing tower backdrop already advances surface creatures from
+      // upper floors. Never give them two wandering chances in one turn.
+      if(z===0&&currentZ>0) continue
+      const kind=e.levelKind||(z===0?'surface':z>0?'tower':'chain')
+      const terrain=kind==='crypt2'?cryptLevel2?.map:z===0?surfaceMap:
+        z>0?towerLevels[z-1]?.map:depthUndergroundMap(chainDepthForZ(z))
+      if(!terrain||!chance(ENEMY_WANDER_CHANCE))continue
+      const mode=enemyWanderMode(e)
+      const leashed=(mode==='homeReanchored'||mode==='homeReturn')&&ENEMY_WANDER_LEASH
+      if(leashed&&(e.homeX===undefined||e.homeY===undefined)) {e.homeX=e.x;e.homeY=e.y}
+      const radius=enemyHomeRadius(e)
+      const oldHomeDistance=Math.max(Math.abs(e.x-(e.homeX??e.x)),Math.abs(e.y-(e.homeY??e.y)))
+      const returning=mode==='homeReturn'&&leashed&&oldHomeDistance>radius
+      if(mode==='homeReanchored'&&leashed&&oldHomeDistance>radius) {e.homeX=e.x;e.homeY=e.y}
+      const blocked=new Set(enemies.filter(other=>other!==e&&other.alive&&(other.level??0)===z&&
+        (other.levelKind||(z===0?'surface':z>0?'tower':'chain'))===kind)
+        .map(other=>keyXY(other.x,other.y)))
+      if(z===0)for(const npc of npcs)blocked.add(keyXY(npc.x,npc.y))
+      const traversable=(x,y)=>{
+        const tile=terrain[y]?.[x]
+        if(!tile||tile==='towervoid'||(z===0&&grasslandTrees.has(keyXY(x,y)))||
+          (z===0&&tower&&towerContains(x,y)))return false
+        if(enemyHasAbility(e,'ethereal'))return true
+        if(TILE[tile]?.walk)return true
+        return tile==='water'&&(enemyHasAbility(e,'swim')||enemyHasAbility(e,'fly'))||
+          tile==='boulder'&&enemyHasAbility(e,'fly')
+      }
+      const steps=[]
+      for(const [dx,dy] of DIRS8) {
+        const x=e.x+dx,y=e.y+dy
+        if(blocked.has(keyXY(x,y))||!traversable(x,y)||
+            (leashed&&!returning&&Math.max(Math.abs(x-e.homeX),Math.abs(y-e.homeY))>radius)||
+            (returning&&Math.max(Math.abs(x-e.homeX),Math.abs(y-e.homeY))>=oldHomeDistance))continue
+        steps.push({x,y})
+      }
+      if(!steps.length)continue
+      const fromX=e.x,fromY=e.y,next=steps[randInt(0,steps.length-1)]
+      e.x=next.x;e.y=next.y
+      beginEnemyMoveAnim(e,fromX,fromY)
+    }
+  }
+
   function sanctuaryDistance(x, y) {
     return Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y))
   }
@@ -5798,6 +5854,7 @@ more difficult:
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
     wanderSurfaceBelowTower()
+    wanderAdjacentLevelEnemies()
     const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
@@ -8734,6 +8791,7 @@ more difficult:
   const ENEMY_MELEE_ANIM_MS = 220
   const ENEMY_ATTACK_GAP_MS = 35
   const PLAYER_DODGE_ANIM_MS = 180
+  const PROJECTILE_DODGE_LEAD_MS = 140
   const FX_ANIM_MS = 420
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
@@ -10077,6 +10135,17 @@ more difficult:
     for (const {e} of visibleEnemies) if (!enemyInvisibleActive(e)) drawEnemyPrefixArea(
       Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
       e.x, e.y, e.prefix, undergroundVisible)
+    // A restrained, one-tile round backing separates small monster sprites
+    // from busy scenery. ASCII stays fully unchanged.
+    if (USE_TILE_IMAGES) for (const {e, vx, vy} of visibleEnemies) {
+      if (enemyInvisibleActive(e)) continue
+      ctx.save()
+      ctx.fillStyle = 'rgba(240, 243, 246, 0.17)'
+      ctx.beginPath()
+      ctx.arc(vx + TILE_PX / 2, vy + TILE_PX / 2, TILE_PX * 0.48, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
     const drawVisibleEnemy = ({e, vx, vy}) => {
       // no tile background is painted, so a sliding enemy doesn't drag a solid
       // tile-coloured block across the terrain it is walking over. Flying enemies

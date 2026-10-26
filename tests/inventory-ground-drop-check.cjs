@@ -25,6 +25,7 @@ const env = {
   currentLevelKind:()=>null,
   onCurrentLevel:g=>g.level === 0,
   canUseItemsWhileSwimming:()=>true,
+  enemyAttackPresentationPending:()=>false,
   Mining:{isMineralKind:()=>false},
   cemeteryTombstones:{},keyXY:(x,y)=>`${x},${y}`,
   recordReplayAction:a=>actions.push({...a}),

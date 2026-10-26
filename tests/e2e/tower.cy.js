@@ -91,6 +91,15 @@ describe('Guaranteed elevated tower',()=>{
         })()`)).to.equal(true)
         for(const tiles of [true,false]) {
           win.eval(`USE_TILE_IMAGES=${tiles};renderScene(performance.now())`)
+          const roundBackings=win.eval(`(()=>{
+            const original=ctx.fill;let drawn=0
+            ctx.fill=function(...args){
+              if(ctx.fillStyle==='rgba(240, 243, 246, 0.17)')drawn++
+              return original.apply(this,args)
+            }
+            try{renderScene(performance.now());return drawn}finally{ctx.fill=original}
+          })()`)
+          expect(roundBackings>0,'monster backing appears only in tile mode').to.equal(tiles)
           expect(win.eval('tileInspectInfo(tower.x-1,tower.y)')).to.equal(null)
           expect(win.eval("currentMapViewKey() === 'tower:4'")).to.equal(true)
           expect(win.eval('canvas.width > 0 && canvas.height > 0')).to.equal(true)
