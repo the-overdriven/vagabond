@@ -1088,6 +1088,8 @@ function loadGameFromObject(data, opts = {}) {
 
   stopCameraAnimation()
   stopAttackAnimation()
+  clearEnemyAnims()
+  projectileAnims = []
   stopDeathTransition()
   snapCameraToPlayer()
   reconcileSwimming()

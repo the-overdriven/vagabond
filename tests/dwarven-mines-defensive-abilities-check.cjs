@@ -10,7 +10,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
   context.fixture.version=run('SAVE_VERSION')
   run(`loadGameFromObject(fixture,{isReplayInit:true});
     turnCount=40;enemies=[];logHistory=[];log=s=>logHistory.push(s);
-    spawnDamageNumber=()=>{};beginEnemyAttackAnim=()=>{};replayAnimationsDisabled=true;
+    spawnDamageNumber=()=>{};beginEnemyAttackAnim=()=>({delay:0});replayAnimationsDisabled=true;
     player.godMode=true;player.invisibleTurns=0;player.godInvisible=false;
     player.x=40;player.y=40;enemyIsVisibleOnMainView=()=>true;
     enemyInsideSanctuary=()=>false;playerInsideSanctuary=()=>false;

@@ -2,8 +2,9 @@
 function setupEnemySpellArena() {
   replayRecording=false;replayPlaying=false;replayData=null;activeReplay=null
   replaySimulationMode=false;replayAnimationsDisabled=true
+  clearEnemyAnims()
   currentZ=0;currentCave=-1;map=surfaceMap;spawnPoint={x:5,y:5}
-  enemies=[];npcs=[];occupied=new Set();groundItems=[];damageAnims=[]
+  enemies=[];npcs=[];occupied=new Set();groundItems=[];damageAnims=[];projectileAnims=[]
   turnCount=0;consecutiveWaitTurns=0;deathTransition=null;pendingMove=null
   raceOpen=false;mapOpen=false;invOpen=false;tradeOpen=false;cameraAnimating=false;attackAnim=null
   player.x=40;player.y=40;player.maxHp=1000;player.hp=1000;player.lvl=1;player.race='human'

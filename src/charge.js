@@ -81,38 +81,29 @@ function tryEnemyRush(e) {
     // Presentation follows each crossed tile, but the whole charge (including
     // its hit and knockback) is resolved immediately for saves and replay.
     beginEnemyChargeAnim(e, fromX, fromY, line)
-    const firstDamage = damageAnims.length
     enemyAttackPlayer(e, true, 1, {atkMultiplier: 1 + 0.25 * (line.distance - 1), line})
-    if (e.chargeAnim) {
-      const impactAt = e.chargeAnim.start + e.chargeAnim.duration
-      if (e.attackStart !== undefined) e.attackStart = impactAt
-      for (const effect of damageAnims.slice(firstDamage))
-        effect.delay += Math.max(0, impactAt - effect.start)
-    }
+    // The rush reserves its own visual slot. The queued melee lunge and
+    // damage popup already follow it; adding a second delay would desync them.
   } else {
     const flavorId=ENEMY_TEMPLATE_BY_NAME[e.baseName || e.name]?.pullFlavor || 'web'
     const flavor=PULL_CONFIG.flavors?.[flavorId] || PULL_CONFIG.flavors?.web || {}
     log((flavor.message || '<enemy> drags you closer!').replace(/<enemy>/g, e.name), 'bad')
     const throwMs=flavor.projectile ? SPIDER_WEB_THROW_MS : 0, pullMs=SPIDER_WEB_PULL_MS
     const animated = !replayAnimationsDisabled && !replaySimulationMode
+    const presentation = animated ? queueEnemyAttackPresentation(throwMs + pullMs) : {delay:0}
     const from = {x:player.x, y:player.y}
     if (animated) {
       if(flavor.projectile) {
-        spawnProjectileAnim([{x:e.x,y:e.y}, from], flavor.projectile, throwMs)
-        spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs)
+        spawnProjectileAnim([{x:e.x,y:e.y}, from], flavor.projectile, throwMs, presentation.delay)
+        spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs + presentation.delay)
       }
     }
     forcePlayerPosition(e.x + line.sx, e.y + line.sy,
-      animated ? {kind:'pull', delay:throwMs, duration:pullMs} : undefined)
-    if (player.hp > 0 && !deathTransition && flavor.overlay === 'web') markSpiderWeb(e, animated)
-    const firstDamage = damageAnims.length
+      animated ? {kind:'pull', delay:throwMs + presentation.delay, duration:pullMs} : undefined)
+    if (player.hp > 0 && !deathTransition && flavor.overlay === 'web') markSpiderWeb(e, animated, presentation.delay)
     if (player.hp > 0 && !deathTransition) {
       enemyAttackPlayer(e, true)
-      // Only presentation waits for the thrown web and drag; rules have resolved.
-      if (animated) {
-        if (e.attackStart !== undefined) e.attackStart += throwMs + pullMs
-        for (const effect of damageAnims.slice(firstDamage)) effect.delay += throwMs + pullMs
-      }
+      // The melee lunge is already sequenced after the web's flight and drag.
     }
   }
   return true

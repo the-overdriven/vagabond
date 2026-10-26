@@ -10,7 +10,9 @@ describe('Duiwel Rupture presentation',()=>{
           const check=(ok,msg)=>{if(!ok)throw Error(msg)}
           const gameCanvas=document.getElementById('game')
           const originalVisible=enemyIsVisibleOnMainView
+          const savedEnemies=enemies
           try {
+            enemies=[]
             enemyIsVisibleOnMainView=()=>false
             replayAnimationsDisabled=false;replaySimulationMode=false
             player.x=40;player.y=40
@@ -60,7 +62,35 @@ describe('Duiwel Rupture presentation',()=>{
                 'Rupture resolves using the stronger effective attack immediately')
               check(player.hp===hp,'the intercepted damage roll does not change HP')
             } finally {damageRoll=originalRoll}
+            // Escaping the marks protects only the player: other grounded
+            // creatures standing there still suffer environmental damage.
+            const lootBefore=lootFromEnemy
+            try {
+              const spawn=(name,x,y,abilities)=>{
+                const t=ENEMY_TEMPLATE_BY_NAME[name]
+                return addEnemy({...t,baseName:t.name,abilities,x,y,level:currentZ,
+                  levelKind:currentLevelKind(),hp:t.hp,maxHp:t.hp,alive:true,
+                  homeX:x,homeY:y,homeTileType:'grass',equipment:null})
+              }
+              const caster=spawn('Duiwel',42,40,ENEMY_TEMPLATE_BY_NAME.Duiwel.abilities)
+              const grounded=spawn('Giant Rat',39,40,[])
+              const flying=spawn('Giant Bat',40,39,['fly'])
+              const ethereal=spawn('Ghost',41,40,['ethereal'])
+              const creatureHp=[caster.hp,flying.hp,ethereal.hp]
+              const credit=[player.kills,player.totalXpEarned]
+              let loot=0
+              lootFromEnemy=()=>loot++
+              damageRoll=()=>10000
+              player.x=35;player.y=35
+              resolveEnemyRupture(caster,{tiles:[{x:39,y:40},{x:40,y:39},{x:41,y:40},{x:42,y:40}]})
+              check(!grounded.alive && loot===1,'grounded monster dies and drops ordinary loot')
+              check(caster.hp===creatureHp[0] && flying.hp===creatureHp[1] &&
+                ethereal.hp===creatureHp[2],'caster, flying and ethereal monsters resist rupture')
+              check(player.kills===credit[0] && player.totalXpEarned===credit[1],
+                'rupture grants no player kills or XP')
+            } finally {lootFromEnemy=lootBefore;damageRoll=originalRoll}
           } finally {
+            enemies=savedEnemies
             enemyIsVisibleOnMainView=originalVisible
             replayAnimationsDisabled=false
             gameCanvas.ruptureShakeAnimation?.cancel()

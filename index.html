@@ -1200,6 +1200,7 @@ more difficult:
   }
 
   function inspect() {
+    if (enemyAttackPresentationPending()) return
     recordReplayAction({type: 'inspect'})
     if (!enterCave()) describeSurroundings()
   }
@@ -1744,7 +1745,7 @@ more difficult:
 
   function tryCloseDungeonDoorAt(x, y) {
     if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return false
-    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending())) return false
+    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) return false
     const closingGate = map[y]?.[x] === 'dwarvengateopen'
     if (!closeDungeonDoorAt(x, y)) return false
     clearAutoPath()
@@ -4333,12 +4334,12 @@ more difficult:
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
       ? e.equipment : null
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
-    beginEnemyAttackAnim(e)
+    const attackPresentation = beginEnemyAttackAnim(e)
     exposeEnemyAfterMelee(e)
     if (chance(options?.fixedHitChance != null ? 1 - options.fixedHitChance
       : charge ? missChance(enemySpd(e), playerSpd()) / 2
       : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
-      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss)
+      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, attackPresentation.delay + 100)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
       return false
     }
@@ -4351,8 +4352,8 @@ more difficult:
     if (glancing) dmg = Math.floor(dmg / 3)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
-    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical)
-    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, critical ? 120 : 0)
+    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, attackPresentation.delay + 100)
+    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, attackPresentation.delay + 100 + (critical ? 120 : 0))
     if (glancing) {
       if (enemyWeapon) {
         if (dmg === 0) {
@@ -4453,8 +4454,10 @@ more difficult:
     const animationDelay = spellAttack ? shot.animationMs : RANGED_CONFIG.projectileAnimationMs
 
     if (chance(rangedDodgeChance(e))) {
-      spawnProjectileAnim(projectilePath, projectile, animationDelay)
-      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, animationDelay)
+      const presentation = queueEnemyAttackPresentation(animationDelay + PLAYER_DODGE_ANIM_MS)
+      spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
+      spawnPlayerProjectileDodge(e, presentation.start + animationDelay)
+      spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, presentation.delay + animationDelay)
       log(`You dodge the ${possessive}.`, 'good')
       return false
     }
@@ -4469,9 +4472,10 @@ more difficult:
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
 
-    spawnProjectileAnim(projectilePath, projectile, animationDelay)
-    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, animationDelay)
-    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, animationDelay + (critical ? 120 : 0))
+    const presentation = queueEnemyAttackPresentation(animationDelay)
+    spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
+    if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, presentation.delay + animationDelay)
+    spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, presentation.delay + animationDelay + (critical ? 120 : 0))
     if (glancing) {
       if (dmg === 0) log(`The ${possessive} glances off your ${armor.name}!`, 'bad')
       else log(`The ${possessive} glances off your ${armor.name} and deals only ${dmg} damage.`, 'bad')
@@ -6482,6 +6486,7 @@ more difficult:
   }
 
   function tryDig(options = {}) {
+    if (enemyAttackPresentationPending()) return
     const tile = map[player.y]?.[player.x]
     if (tile !== 'sand') {
       log('You can only dig in sand.', 'info')
@@ -6642,6 +6647,7 @@ more difficult:
   }
 
   function lootSkeletonOrForage() {
+    if (enemyAttackPresentationPending()) return
     const tomb = cemeteryTombstones[keyXY(player.x, player.y)]
     const crystal = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && Mining.isMineralKind(g.kind))
     const dropped = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y &&
@@ -7186,7 +7192,7 @@ more difficult:
 
   async function tryMove(dx, dy) {
     if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
-    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending())) {
+    if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
       pendingMove = {dx: dx, dy: dy}
       return
     }
@@ -7546,7 +7552,7 @@ more difficult:
 
   async function skipTurn() {
     if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
-    if (cameraAnimating || attackAnim || chargeAnimationPending()) return
+    if (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
     const replayScope = recordReplayAction({type: 'skipTurn'})
     try {
     const frenzy = tryBerserkFrenzy()
@@ -8723,6 +8729,11 @@ more difficult:
   let soundAnims = []
   let damageAnims = []
   let projectileAnims = []
+  let playerProjectileDodges = []
+  let enemyAttackVisualEnd = 0
+  const ENEMY_MELEE_ANIM_MS = 220
+  const ENEMY_ATTACK_GAP_MS = 35
+  const PLAYER_DODGE_ANIM_MS = 180
   const FX_ANIM_MS = 420
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
@@ -8827,12 +8838,12 @@ more difficult:
     runAnimationLoop()
   }
 
-  function spawnProjectileAnim(path, projectile, duration = RANGED_CONFIG.projectileAnimationMs) {
+  function spawnProjectileAnim(path, projectile, duration = RANGED_CONFIG.projectileAnimationMs, delay = 0) {
     if (replayAnimationsDisabled || replaySimulationMode || !Array.isArray(path) || path.length < 2) return
     projectileAnims.push({
       path: path.map(point => ({x: point.x, y: point.y})),
       projectile,
-      start: performance.now(),
+      start: performance.now() + delay,
       duration
     })
     runAnimationLoop()
@@ -8906,10 +8917,12 @@ more difficult:
     e.animStart = undefined // The ordinary one-step slide would cross the whole route.
     if (replayAnimationsDisabled || replaySimulationMode || !e.alive) return
     const steps = line.distance - 1
+    const duration = steps * CHARGE_STEP_MS
+    const presentation = queueEnemyAttackPresentation(duration)
     e.chargeAnim = {
       fromX, fromY, sx: line.sx, sy: line.sy, steps,
       targetX: player.x, targetY: player.y,
-      start: performance.now(), duration: steps * CHARGE_STEP_MS
+      start: presentation.start, duration
     }
     runAnimationLoop()
   }
@@ -8928,19 +8941,49 @@ more difficult:
       enemies.some(e => e.alive && e.chargeAnim && onCurrentLevel(e))
   }
 
-  function beginEnemyAttackAnim(e) {
-    if (replayAnimationsDisabled) {
-      e.attackStart = undefined
-      return
-    }
-    e.attackStart = performance.now()
+  // All rolls and deaths resolve during enemyTurn(). Only their presentation is
+  // scheduled here; a delayed frame must never advance combat or consume RNG.
+  function queueEnemyAttackPresentation(duration) {
+    if (replayAnimationsDisabled || replaySimulationMode) return {start: 0, delay: 0}
+    const now = performance.now()
+    const start = Math.max(now, enemyAttackVisualEnd)
+    enemyAttackVisualEnd = start + duration + ENEMY_ATTACK_GAP_MS
+    runAnimationLoop()
+    return {start, delay: start - now}
+  }
+
+  function enemyAttackPresentationPending() {
+    return !replayAnimationsDisabled && !replaySimulationMode && performance.now() < enemyAttackVisualEnd
+  }
+
+  function spawnPlayerProjectileDodge(shooter, start) {
+    if (replayAnimationsDisabled || replaySimulationMode) return
+    const dx = player.x - shooter.x, dy = player.y - shooter.y
+    const length = Math.hypot(dx, dy) || 1
+    playerProjectileDodges.push({start, duration: PLAYER_DODGE_ANIM_MS,
+      dx: dx / length, dy: dy / length})
     runAnimationLoop()
   }
 
+  function beginEnemyAttackAnim(e) {
+    if (replayAnimationsDisabled || replaySimulationMode) {
+      e.attackStart = undefined
+      return {start: 0, delay: 0}
+    }
+    const presentation = queueEnemyAttackPresentation(ENEMY_MELEE_ANIM_MS)
+    // Preserve both visual strikes when the same creature earns an extra hit.
+    if (!e.attackVisualQueue) e.attackVisualQueue = []
+    e.attackVisualQueue.push(presentation.start)
+    return presentation
+  }
+
   function clearEnemyAnims() {
+    enemyAttackVisualEnd = 0
+    playerProjectileDodges = []
     for (const e of enemies) {
       e.animStart = undefined
       e.attackStart = undefined
+      e.attackVisualQueue = undefined
       e.chargeAnim = undefined
     }
     for (const n of npcs) n.animStart = undefined
@@ -8952,16 +8995,17 @@ more difficult:
       if (!e.alive) {
         e.animStart = undefined
         e.attackStart = undefined
+        e.attackVisualQueue = undefined
         e.chargeAnim = undefined
         continue
       }
-      if (e.animStart !== undefined || e.attackStart !== undefined || e.chargeAnim) return true
+      if (e.animStart !== undefined || e.attackStart !== undefined || e.attackVisualQueue?.length || e.chargeAnim) return true
     }
     return false
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
+    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -8972,20 +9016,20 @@ more difficult:
     if (animLoopFrame !== null) return
     const step = (now) => {
       render(now)
-      if (cameraAnimating && !moveAnim && !chargeAnimationPending()) {
+      if (cameraAnimating && !moveAnim && !chargeAnimationPending() && !enemyAttackPresentationPending()) {
         // Keep the input lock through a charge following the player's own step.
         // Only presentation waits; the monster's turn was resolved immediately.
         if (pendingMoveTask === null) pendingMoveTask = setTimeout(() => {
           pendingMoveTask = null
-          if (!cameraAnimating || moveAnim || chargeAnimationPending()) return
+          if (!cameraAnimating || moveAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
           cameraAnimating = false
           flushPendingMove()
         }, 0)
-      } else if (!cameraAnimating && !attackAnim && !chargeAnimationPending() &&
+      } else if (!cameraAnimating && !attackAnim && !chargeAnimationPending() && !enemyAttackPresentationPending() &&
           (pendingMove || (autoPath && autoPath.length))) {
         if (pendingMoveTask === null) pendingMoveTask = setTimeout(() => {
           pendingMoveTask = null
-          if (!cameraAnimating && !attackAnim && !chargeAnimationPending()) flushPendingMove()
+          if (!cameraAnimating && !attackAnim && !chargeAnimationPending() && !enemyAttackPresentationPending()) flushPendingMove()
         }, 0)
       }
       if (animationsPending()) {
@@ -10011,12 +10055,16 @@ more difficult:
           ey = e.animFromY + (e.y - e.animFromY) * p
         }
       }
-      if (e.attackStart !== undefined && !charging) {
-        const t = Math.max(0, Math.min(1, (now - e.attackStart) / 220))
-        const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35
-        ex = e.x + ((charge?.targetX ?? player.x) - e.x) * lunge
-        ey = e.y + ((charge?.targetY ?? player.y) - e.y) * lunge
-        if (t >= 1) e.attackStart = undefined
+      if (e.attackVisualQueue?.length && !charging) {
+        while (e.attackVisualQueue.length && now >= e.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS)
+          e.attackVisualQueue.shift()
+        const start = e.attackVisualQueue[0]
+        if (start !== undefined && now >= start) {
+          const t = Math.max(0, Math.min(1, (now - start) / ENEMY_MELEE_ANIM_MS))
+          const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35
+          ex = e.x + ((charge?.targetX ?? player.x) - e.x) * lunge
+          ey = e.y + ((charge?.targetY ?? player.y) - e.y) * lunge
+        }
       }
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
       if (haste && !hastening) e.hasteAnim = undefined
@@ -10213,9 +10261,8 @@ more difficult:
         projectileAnims.splice(i, 1)
         continue
       }
-      // A projectile can be queued after the current rAF frame timestamp was
-      // captured. Clamp that pre-start frame to zero progress; otherwise the
-      // computed segment becomes -1 and the presentation layer can crash.
+      // Queued projectiles remain invisible until their individual turn.
+      if (now < anim.start) continue
       const t = Math.max(0, Math.min(1, (now - anim.start) / anim.duration))
       if (t >= 1) {
         projectileAnims.splice(i, 1)
@@ -10266,6 +10313,18 @@ more difficult:
         const lunge = t < 0.5 ? (t / 0.5) * 0.5 : (1 - ((t - 0.5) / 0.5)) * 0.5
         px = attackAnim.fromX + (attackAnim.targetX - attackAnim.fromX) * lunge
         py = attackAnim.fromY + (attackAnim.targetY - attackAnim.fromY) * lunge
+      }
+      for (let i = playerProjectileDodges.length - 1; i >= 0; i--) {
+        const dodge = playerProjectileDodges[i]
+        if (now >= dodge.start + dodge.duration) {
+          playerProjectileDodges.splice(i, 1)
+          continue
+        }
+        if (now < dodge.start) continue
+        const t = (now - dodge.start) / dodge.duration
+        const recoil = Math.sin(Math.PI * t) * 0.32
+        px += dodge.dx * recoil
+        py += dodge.dy * recoil
       }
       const vx = Math.round((px - camX) * TILE_PX), vy = Math.round((py - camY) * TILE_PX)
       const faded = playerIsInvisible()
@@ -10845,7 +10904,7 @@ more difficult:
   }, {passive: false})
 
   function handleCanvasTap(clientX, clientY) {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim || replayPlaying) return
+    if (mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -10898,7 +10957,7 @@ more difficult:
   }
 
   canvas.addEventListener('click', (ev) => {
-    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim && !replayPlaying) {
+    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -13215,11 +13274,13 @@ more difficult:
     }
     if (k === ' ' || k === 'Spacebar') {
       ev.preventDefault()
+      if (enemyAttackPresentationPending()) return
       inspect()
       return
     }
     if (k === 'f' || k === 'F') {
       ev.preventDefault()
+      if (enemyAttackPresentationPending()) return
       lootSkeletonOrForage()
       return
     }

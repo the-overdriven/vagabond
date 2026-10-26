@@ -3622,8 +3622,14 @@ off every marked tile prevents the hit. A player is never deliberately left
 without an initially unoccupied one-step escape, although other hazards,
 rooting or moving actors can subsequently block it. A caught player takes an
 ordinary damage roll with **375% of the monster's effective ATK** against the
-player's DEF, without a separate miss/critical/glancing roll. Eruption gives
-the visible game canvas a pronounced **650 ms** visual shake whether it hits or misses; the animation
+player's DEF, without a separate miss/critical/glancing roll. It applies
+the same damage roll against the DEF of **every other grounded, non-ethereal
+monster on a marked tile**, even if the player escaped. The erupting Duiwel is
+immune to its own rupture, as are flying and ethereal creatures. Monsters killed
+by rupture drop normal loot, but grant no player XP, kill count or quest credit.
+Monster damage and deaths resolve deterministically with the eruption, not its
+shake animation. Eruption gives the visible game canvas a pronounced **650 ms**
+visual shake whether it hits or misses; the animation
 does not affect turns, damage or replay outcomes. Resolution consumes the
 monster's action and starts **five complete subsequent active-floor turns**
 of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
@@ -4954,8 +4960,14 @@ Monster ranged attacks reuse the same mitigation, glancing and critical systems,
 the shooter-specific fixed projectile ATK and doubled dodge chance documented in
 §20. They do not run melee GRACE timing or melee lunge/contact behavior. Projectile
 animation is presentation-only: dodge, critical/glancing, damage, HP and ammunition are
-resolved first from deterministic gameplay state, then the visual effect is queued. The
-clear-shot check still uses the deterministic tile trace, but the queued projectile is drawn
+resolved first from deterministic gameplay state, then the visual effect is queued. Monster
+melee lunges, arrows and magical projectiles (including Lich Death Bolt) play
+**in attack order**, without visual overlap between attacks. A dodged ranged
+attack briefly pushes the player's sprite backward before it returns to its
+unchanged tile. Movement and turn-taking input wait for the ordered attacks
+and dodge recoil to finish; visual delays never affect RNG, combat, replay or
+saved positions. The clear-shot check still uses the deterministic tile trace,
+but the queued projectile is drawn
 along the direct straight line from shooter center to target center rather than visibly
 stepping through each traced grid cell. Visual frame timing is clamped to the projectile
 effect lifetime, so a late-queued effect cannot interrupt input or combat resolution. The

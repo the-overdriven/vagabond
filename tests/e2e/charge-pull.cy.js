@@ -161,7 +161,7 @@ describe('Charge and Pull terrain rules', () => {
             if(direction==='diagonal')
               rushCheck(close(at(85).y,38) && close(at(205).y,39),
                 'diagonal charge passes through both tile steps')
-            rushCheck(minotaur.attackStart===impact,'melee lunge starts after arrival')
+            rushCheck(minotaur.attackVisualQueue?.[0]>=impact,'melee lunge starts after arrival')
             rushCheck(moveAnim?.kind==='charge-knockback' && moveAnim.start>=impact-2,
               'camera and player wait at the hit tile until impact')
             rushCheck(damageAnims.some(d=>typeof d.amount==='number' && d.start+d.delay>=impact-2),

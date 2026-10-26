@@ -11,7 +11,7 @@ const plain=value=>JSON.parse(JSON.stringify(value))
   context.fixture.version=run('SAVE_VERSION')
   run(`loadGameFromObject(fixture,{isReplayInit:true});
     turnCount=40;enemies=[];log=()=>{};replayAnimationsDisabled=true;
-    spawnDamageNumber=()=>{};beginEnemyAttackAnim=()=>{};
+    spawnDamageNumber=()=>{};beginEnemyAttackAnim=()=>({delay:0});
     player.godMode=false;player.invisibleTurns=0;player.godInvisible=false;
     player.hp=1000;player.x=40;player.y=40;
     enemyInsideSanctuary=()=>false;playerInsideSanctuary=()=>false;
@@ -63,6 +63,40 @@ const plain=value=>JSON.parse(JSON.stringify(value))
   run('damageRoll=()=>17;chance=()=>true;enemyTurn()')
   assert.equal(run('player.hp'),983,'one hit with no additional evasion roll or double damage')
   assert.equal(run('enemyAbilityCooldown(duiwel,"rupture")'),5)
+
+  // Only this Rupture harms other monsters. Ground targets take independent
+  // DEF rolls even when the player escaped; airborne/ethereal targets and the
+  // caster are immune. Environmental deaths still use ordinary loot handling.
+  run(`player.x=35;player.y=35;
+    makeRuptureTarget=(name,abilities,x,y)=>{
+      const t=ENEMY_TEMPLATE_BY_NAME[name];
+      return addEnemy({...t,baseName:t.name,abilities,x,y,level:0,levelKind:null,
+        hp:t.hp,maxHp:t.hp,homeX:x,homeY:y,homeTileType:'grass',
+        alive:true,sleeping:false,equipment:null,aware:true});
+    };
+    ruptureGround=makeRuptureTarget('Giant Rat',[],39,40);
+    ruptureFlying=makeRuptureTarget('Giant Bat',['fly'],40,39);
+    ruptureEthereal=makeRuptureTarget('Ghost',['ethereal'],41,40);
+    ruptureOther=makeRuptureTarget('Goblin',[],39,41);
+    ruptureLootCalls=[];lootFromEnemy=target=>ruptureLootCalls.push(target.id);
+    ruptureDamageRolls=[];damageRoll=(attack,defense)=>{
+      ruptureDamageRolls.push({attack,defense});return 10000
+    };
+    ruptureKillsBefore=player.kills;
+    ruptureXpBefore=player.totalXpEarned;
+    ruptureDuiwelHp=duiwel.hp;
+    ruptureFlyHp=ruptureFlying.hp;
+    ruptureEtherealHp=ruptureEthereal.hp;
+    resolveEnemyRupture(duiwel,{tiles:[{x:39,y:40},{x:40,y:39},{x:41,y:40},{x:39,y:41},{x:42,y:40}]});`)
+  assert.equal(run('ruptureGround.alive'),false,'grounded Rat dies to Duiwel Rupture')
+  assert.equal(run('ruptureOther.alive'),false,'all marked grounded monsters are independently hit')
+  assert.equal(run('ruptureFlying.hp'),run('ruptureFlyHp'),'flying monsters are immune')
+  assert.equal(run('ruptureEthereal.hp'),run('ruptureEtherealHp'),'ethereal monsters are immune')
+  assert.equal(run('duiwel.hp'),run('ruptureDuiwelHp'),'caster is immune to its own eruption')
+  assert.equal(run('player.kills'),run('ruptureKillsBefore'),'eruption gives no player kill credit')
+  assert.equal(run('player.totalXpEarned'),run('ruptureXpBefore'),'eruption gives no XP')
+  assert.equal(run('ruptureLootCalls.length'),2,'environmental kills still invoke normal loot')
+  assert.equal(run('ruptureDamageRolls.length'),2,'only eligible targets consume damage rolls')
 
   // Countdown freezes off-floor and survives replay snapshots exactly.
   run('duiwel.abilityCooldowns.rupture=3;duiwel.abilityCooldownStartedTurn= {rupture:turnCount-1}')

@@ -5,6 +5,8 @@ function deepSwimmingWater(x, y) {
 }
 
 function canUseItemsWhileSwimming() {
+  // The same input gate covers item actions during ordered monster attacks.
+  if (enemyAttackPresentationPending()) return false
   if (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) return true
   log('You cannot use items while swimming.', 'info')
   return false

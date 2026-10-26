@@ -36,6 +36,37 @@ function deathBoltRulesCheck() {
     check(damageAnims.some(a => typeof a.amount === 'number' && a.delay === 650), 'impact number waits for skull visually')
     const one = player.hp
     check(tryEnemySpell(bolt2) && player.hp < one, 'Death Bolt never runs out of ammo')
+    check(projectileAnims[1].start >= projectileAnims[0].start + 650,
+      'consecutive Death Bolts are presented after one another, never together')
+
+    // Two creature lunges must finish before the dodged skull flies. The
+    // visual dodge shifts the sprite only; neither position nor turns change.
+    setupEnemySpellArena()
+    const firstMelee = makeSpellTestEnemy('Giant Rat', [], 39, 39)
+    const secondMelee = makeSpellTestEnemy('Goblin', [], 40, 39)
+    const orderedBolt = makeSpellTestEnemy('Skeleton', ['deathBolt'], 38, 40)
+    replayAnimationsDisabled = false
+    chance = () => true // melee misses; spell succeeds and its projectile is dodged
+    check(!enemyAttackPlayer(firstMelee) && !enemyAttackPlayer(secondMelee), 'two normal melee attacks resolve')
+    check(firstMelee.attackVisualQueue.length === 1 && secondMelee.attackVisualQueue.length === 1 &&
+      secondMelee.attackVisualQueue[0] >= firstMelee.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS,
+      'melee attack animations have separate ordered start times')
+    const combatX = player.x, combatY = player.y, combatTurn = turnCount
+    check(tryEnemySpell(orderedBolt), 'Death Bolt casts after the melee strikes')
+    const orderedShot = projectileAnims[0]
+    check(orderedShot.projectile === 'deathBolt' &&
+      orderedShot.start >= secondMelee.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS,
+      'Death Bolt starts after the second monster lunge finishes')
+    check(playerProjectileDodges.length === 1 &&
+      Math.abs(playerProjectileDodges[0].start - (orderedShot.start + orderedShot.duration)) < 5,
+      'dodged Death Bolt queues a recoil on impact, not at cast time')
+    check(player.x === combatX && player.y === combatY && turnCount === combatTurn,
+      'projectile dodge never moves the player or advances a turn')
+    check(enemyAttackPresentationPending(), 'input stays locked through Death Bolt and recoil')
+    skipTurn()
+    check(turnCount === combatTurn, 'waiting cannot skip the queued visuals')
+    tryMove(1, 0)
+    check(pendingMove?.dx === 1 && player.x === combatX, 'movement input buffers until the attack queue finishes')
 
     setupEnemySpellArena()
     const dodgeCaster = makeSpellTestEnemy('Skeleton', ['deathBolt'])

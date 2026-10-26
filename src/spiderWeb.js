@@ -13,9 +13,9 @@ function clearSpiderWeb() {
   spiderWebOverlayStart = 0
 }
 
-function markSpiderWeb(e, animated) {
+function markSpiderWeb(e, animated, delay = 0) {
   player.spiderWebSourceId = e.id
-  spiderWebOverlayStart = animated ? performance.now() + SPIDER_WEB_THROW_MS : 0
+  spiderWebOverlayStart = animated ? performance.now() + delay + SPIDER_WEB_THROW_MS : 0
 }
 
 function spiderWebSource() {

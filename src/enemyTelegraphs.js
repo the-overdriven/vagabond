@@ -387,6 +387,23 @@ function resolveEnemyRupture(e, pending) {
   const cfg=enemyTelegraphConfig('rupture')
   if (!cfg) return false
   shakeRuptureScreen()
+  // Rupture is environmental damage from this Duiwel, not a player attack.
+  // Snapshot the targets because killing one removes it from the enemies array.
+  const marked=new Set(pending.tiles.map(tile=>keyXY(tile.x,tile.y)))
+  for (const target of enemies.slice()) {
+    if (target===e || !target.alive || !onCurrentLevel(target) ||
+        enemyHasAbility(target,'fly') || enemyHasAbility(target,'ethereal') ||
+        !marked.has(keyXY(target.x,target.y))) continue
+    const damage=damageRoll(enemyAtk(e)*cfg.damageMultiplier,enemyDef(target))
+    target.hp-=damage
+    spawnDamageNumber(target.x,target.y,damage,RENDER_STYLE.damage.enemyHit)
+    absorbEnemyFatalHit(target)
+    triggerEnemyShellRetreat(target)
+    if (target.hp<=0) {
+      if (enemyIsVisibleOnMainView(target)) log(`The ${target.name} is killed by the eruption.`, 'info')
+      killEnemy(target,false,'rupture')
+    }
+  }
   const struck=pending.tiles.some(tile=>tile.x===player.x && tile.y===player.y)
   if (!struck) {
     if (enemyIsVisibleOnMainView(e))log(cfg.missMessage.replace(/<enemy>/g,e.name),'good')
