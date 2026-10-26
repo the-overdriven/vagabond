@@ -212,7 +212,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261026-race-hud-compact">
+  <link rel="stylesheet" href="css/style.css?v=20261026-inventory-drop-left">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -2246,6 +2246,18 @@ more difficult:
     return it.identified ? it.name : ('Unidentified ' + it.noun)
   }
 
+  // Effect tier is unknown until identification, even when an artifact has
+  // already been equipped or appears in a merchant, loot log or inventory.
+  function visibleItemTier(item) {
+    return item && (item.kind !== 'artifact' || item.identified) && Number.isFinite(item.tier)
+      ? item.tier : null
+  }
+
+  function visibleItemTierTag(item) {
+    const tier = visibleItemTier(item)
+    return tier === null ? '' : ` [T${tier}]`
+  }
+
   function identifyArtifact(idx) {
     const it = player.inventory[idx]
     if (!it || it.kind !== 'artifact' || it.identified) return
@@ -3819,7 +3831,7 @@ more difficult:
   function itemLogHighlight(item, displayName) {
     if (!item) return []
     const text = displayName || (item.kind === 'artifact' ? artifactDisplayName(item) : item.name)
-    return text ? [{text, tier:Number.isFinite(item.tier) ? item.tier : null}] : []
+    return text ? [{text, tier:visibleItemTier(item)}] : []
   }
 
   function equipmentLog(msg, items, cls = 'good') {
@@ -3829,7 +3841,7 @@ more difficult:
       const index = msg.indexOf(text, cursor)
       if (index < 0) return []
       cursor = index + text.length
-      return [{text, index, tier: item.tier}]
+      return [{text, index, tier: visibleItemTier(item)}]
     })
     return log(msg, cls, highlights)
   }
@@ -6213,6 +6225,8 @@ more difficult:
       btn.textContent = action.activeLabel && player.equip[item.kind] ? action.activeLabel : action.label
       if (action.title) btn.title = action.title
       btn.onclick = () => ITEM_ACTION_HANDLERS[action.handler](idx)
+      if (action.handler === 'dropCrystal' || action.handler === 'dropItem')
+        btn.classList.add('inventory-drop-btn')
       row.appendChild(btn)
     }
   }
@@ -8614,7 +8628,7 @@ more difficult:
   function treeCanopyVisualAt(mx, my) {
     if (currentZ !== 0 || !map?.[my]?.[mx]) return null
     const tileKey = map[my][mx]
-    if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree, mx, my, 41)
+    if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return towerGrassTreeVisual(mx, my)
     if (tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53)
     if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my)
     return null
@@ -9686,14 +9700,15 @@ more difficult:
         const tree = currentZ === 0 && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
         const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
-        const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tree ? RENDER_STYLE.specialTiles.grassTree.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
+        const treeStyle = tree ? towerGrassTreeStyle(mx, my) : null
+        const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (treeStyle ? treeStyle.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
         const bg = tileBackground(mx, my, tileKey)
         if (!USE_TILE_IMAGES) {
           // ASCII mode must bypass all image-layer/base-compositing logic.
           // Preserve the original glyph + background renderer exactly.
-          drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
+          drawTile(px, py, treeStyle ? treeStyle.glyph : glyph, color, bg)
         } else {
-          const grassTreeVisual = tree ? coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree, mx, my, 41) : null
+          const grassTreeVisual = tree ? towerGrassTreeVisual(mx, my) : null
           const foragedForestVisual = foraged ? {...coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53), baseTileKey: 'grass'} : null
           const terrainImgVisual = foragedForestVisual || terrainVisual(tileKey, mx, my)
           const overlayVisual = grassTreeVisual
@@ -9729,7 +9744,7 @@ more difficult:
             }
             if (!drew) drawTile(px, py, glyph, color, bg)
           } else {
-            drawTile(px, py, tree ? RENDER_STYLE.specialTiles.grassTree.glyph : glyph, color, bg)
+            drawTile(px, py, treeStyle ? treeStyle.glyph : glyph, color, bg)
           }
           if (tileKey === 'sand' && dugSandTiles.has(keyXY(mx, my))) {
             // Keep the original sand/grass connector and the entire outer edge
@@ -11576,7 +11591,8 @@ more difficult:
   }
 
   function setSlotLabel(element, item, fallback = '-') {
-    element.className = 'val' + (item && item.tier ? ' ' + tierColorClass(item.tier) : '')
+    const tier = visibleItemTier(item)
+    element.className = 'val' + (tier !== null ? ' ' + tierColorClass(tier) : '')
     element.textContent = item ? slotLabel(item) : fallback
   }
 
@@ -11756,7 +11772,8 @@ more difficult:
         (kind === 'shield' && best.shield.has(idx)) ||
         (kind === 'armor' && best.armor.has(idx))
       if (isBest) row.classList.add('best-slot')
-      const cls = it.tier ? tierColorClass(it.tier) : ''
+      const tier = visibleItemTier(it)
+      const cls = tier !== null ? tierColorClass(tier) : ''
       const line = itemStatLine(it)
       const iconSvg = itemIconHTML(it)
       if (iconSvg) {
@@ -11770,7 +11787,7 @@ more difficult:
       const stackable = isStackableKind(it.kind)
       const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
       const prefix = isBest ? '✅ ' : ''
-      nm.textContent = prefix + artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + (it.tier !== undefined ? ' [T' + it.tier + ']' : '')
+      nm.textContent = prefix + artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
       if (TACTICAL_CONSUMABLE_KINDS.includes(it.kind)) nm.title = itemDefinition(it.kind).description
       row.appendChild(nm)
       if (it.kind === 'artifact') {
@@ -11986,7 +12003,8 @@ more difficult:
       merchantStock.filter(it => it.count !== 0).forEach((it) => {
         const row = document.createElement('div')
         row.className = 'invitem'
-        const cls = it.tier ? tierColorClass(it.tier) : ''
+        const tier = visibleItemTier(it)
+        const cls = tier !== null ? tierColorClass(tier) : ''
         const stackable = isStackableKind(it.kind)
         const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
         const line = itemStatLine(it)
@@ -11999,7 +12017,7 @@ more difficult:
         }
         const nm = document.createElement('span')
         nm.className = 'nm ' + cls
-        nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + (it.tier !== undefined ? ' [T' + it.tier + ']' : '')
+        nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
         row.appendChild(nm)
         const btn = document.createElement('button')
         const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
@@ -12028,7 +12046,8 @@ more difficult:
     sellable.forEach(({it, idx}) => {
       const row = document.createElement('div')
       row.className = 'invitem'
-      const cls = it.tier ? tierColorClass(it.tier) : ''
+      const tier = visibleItemTier(it)
+      const cls = tier !== null ? tierColorClass(tier) : ''
       const stackable = isStackableKind(it.kind)
       const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
       const line = itemStatLine(it)
@@ -12041,7 +12060,7 @@ more difficult:
       }
       const nm = document.createElement('span')
       nm.className = 'nm ' + cls
-      nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + (it.tier !== undefined ? ' [T' + it.tier + ']' : '')
+      nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
       row.appendChild(nm)
       const btn = document.createElement('button')
       btn.textContent = 'Sell for ' + itemSellValue(it) + 'g'

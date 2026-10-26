@@ -98,9 +98,10 @@ describe('Mine-only encounters and darkness', () => {
         mineralLighting.tileCenterOpacity<=0.12 && mineralLighting.tileMidOpacity<=0.04 &&
         mineralLighting.tileBloomOpacity<=0.08,
         'mineral light favors clear terrain over a strong colored overlay')
-      check(mineralLighting.surfaceExit.tileCenterOpacity>mineralLighting.tileCenterOpacity*3 &&
-        mineralLighting.surfaceExit.tileBloomOpacity>mineralLighting.tileBloomOpacity,
-        'natural cave daylight retains its stronger light while crystals stay restrained')
+      check(mineralLighting.surfaceExit.radius===1 &&
+        mineralLighting.surfaceExit.tileCenterOpacity>mineralLighting.tileCenterOpacity &&
+        mineralLighting.surfaceExit.tileBloomOpacity<=mineralLighting.tileBloomOpacity,
+        'cave daylight is confined to the exit and its immediate neighbor')
       const originalExcavations=first.level.mineExcavations
       const lightMap=Array.from({length:25},()=>Array(25).fill('cavefloor2'))
       first.level.mineExcavations=[{x:12,y:10,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]

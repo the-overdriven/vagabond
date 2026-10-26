@@ -1099,6 +1099,9 @@ body.hint-collapsed #hint .panel-toggle {
 
 .invitem .inventory-drop-btn {
   padding-inline: 5px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  order: -1;
 }
 
 .tier1 {

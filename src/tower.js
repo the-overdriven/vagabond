@@ -56,6 +56,50 @@ function towerStair(z, up) {
   return towerPoint(2 + (tower.cornerCut || 0), north ? 2 : tower.size - 3)
 }
 
+function towerDeadTreeAt(x, y) {
+  const distance = towerDistance(x, y)
+  return distance >= 2 && distance <= 4 && grasslandTrees.has(keyXY(x, y)) &&
+    surfaceMap[y]?.[x] === 'grass'
+}
+
+function towerGrassTreeStyle(x, y) {
+  const style = RENDER_STYLE.specialTiles.grassTree
+  return towerDeadTreeAt(x, y)
+    ? {...style, glyph:'♠', color:'#827365', variants:style.variants.slice(-3)}
+    : style
+}
+
+function towerGrassTreeVisual(x, y) {
+  return coordinateVisualVariant(towerGrassTreeStyle(x, y), x, y, 41)
+}
+
+function plantTowerDeadTrees(protectedCells) {
+  // Reuse the normal blocking grassland-tree state. No new saved registry or
+  // rendering-time randomness is needed; the tower determines the dead variant.
+  const spots=[]
+  for(let y=tower.y-4;y<tower.y+tower.size+4;y++) for(let x=tower.x-4;x<tower.x+tower.size+4;x++) {
+    if(x<1||y<1||x>=MAP_W-1||y>=MAP_H-1)continue
+    const distance=towerDistance(x,y),key=keyXY(x,y),tile=surfaceMap[y][x]
+    if(distance<2||distance>4||protectedCells.has(key)||!['grass','forest'].includes(tile))continue
+    if(tile==='grass') {
+      let walkable=0
+      for(const [dx,dy] of DIRS8) if(TILE[surfaceMap[y+dy]?.[x+dx]]?.walk)walkable++
+      if(walkable<5)continue // Never plant across a narrow overworld route.
+    }
+    spots.push({x,y,tile,score:Math.imul(x+17,73856093)^Math.imul(y+29,19349663)})
+  }
+  spots.sort((a,b)=>(a.tile==='forest'?0:1)-(b.tile==='forest'?0:1) ||
+    a.score-b.score || a.y-b.y || a.x-b.x)
+  const planted=[]
+  for(const p of spots) {
+    if(planted.length===3)break
+    if(planted.some(q=>Math.max(Math.abs(p.x-q.x),Math.abs(p.y-q.y))<3))continue
+    if(p.tile==='forest')surfaceMap[p.y][p.x]='grass'
+    grasslandTrees.add(keyXY(p.x,p.y))
+    planted.push(p)
+  }
+}
+
 function generateTower() {
   tower = null
   towerLevels = []
@@ -117,6 +161,7 @@ function generateTower() {
       towerLevels.push({map:terrain,discovered:Array.from({length:MAP_H},()=>Array(MAP_W).fill(false))})
     } else terrain[tower.entrance.y][tower.entrance.x]=randomDoor()
   }
+  plantTowerDeadTrees(protectedCells)
   // All cells in the clear perimeter were walkable before stamping. A ring
   // gives every old ingress an egress, preserving exterior connectivity.
   map=surfaceMap
@@ -222,13 +267,13 @@ function drawTowerBackground(x,y) {
     if(visual?.image)drawImageVisual(px,py,visual)
     if(tile==='grass'&&grasslandTrees.has(k)) {
       // Surface trees use seven deterministic image variants, scaling/mirroring.
-      const tree=coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree,x,y,41)
+      const tree=towerGrassTreeVisual(x,y)
       drawImageVisual(px,py,tree)
     }
   } else {
     const tree=tile==='grass'&&grasslandTrees.has(keyXY(x,y))
-    drawTile(px,py,tree?RENDER_STYLE.specialTiles.grassTree.glyph:t.ch,
-      tree?RENDER_STYLE.specialTiles.grassTree.color:t.color,t.bg)
+    const style=tree?towerGrassTreeStyle(x,y):null
+    drawTile(px,py,style?style.glyph:t.ch,style?style.color:t.color,t.bg)
   }
 }
 

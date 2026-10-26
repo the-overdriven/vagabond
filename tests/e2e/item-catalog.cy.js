@@ -174,6 +174,12 @@ describe('Non-gear item catalog', () => {
       cy.get('#invList .invitem').contains('Potato').parent().find('button').should('have.text', 'Drop')
       cy.get('#invList .invitem').contains('Scroll of Identification').parent().find('button').should('have.text', 'Drop')
       cy.get('#invList .invitem').contains('Amber').parent().find('button').should('have.text', 'Drop')
+      cy.get('#invList .invitem').contains('Amber').parent().should($row => {
+        const drop=$row[0].querySelector('.inventory-drop-btn')
+        const name=$row[0].querySelector('.nm')
+        expect(drop.getBoundingClientRect().right, 'Drop stays left of item icon and name')
+          .to.be.at.most(name.getBoundingClientRect().left)
+      })
       cy.get('#invList .invitem').contains('Shovel').parent().contains('button', 'Dig').should('exist')
       cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').should('exist')
       cy.get('#invList .invitem').contains('Wheelbarrow').parent().contains('button', 'Drop').should('not.exist')

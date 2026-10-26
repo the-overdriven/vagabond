@@ -72,6 +72,13 @@ test('generated artifacts inherit the stats of every available gear base', async
 test('non-gear artifacts keep The, equipment artifacts do not', async () => {
   await ready()
   const amulet = artifact('Amulet', 3)
+  assert.equal(run(`visibleItemTier(${JSON.stringify(amulet)})`),null,
+    'unidentified artifacts cannot leak their tier through display colors')
+  assert.equal(run(`visibleItemTierTag(${JSON.stringify(amulet)})`),'',
+    'unidentified artifacts cannot leak a [T3] inventory label')
+  amulet.identified = true
+  assert.equal(run(`visibleItemTier(${JSON.stringify(amulet)})`),3,
+    'identification reveals the tier again')
   const hauberk = artifact('Hauberk', 3)
   assert.match(amulet.name, /^The Amulet of /)
   assert.doesNotMatch(hauberk.name, /^The\s/)

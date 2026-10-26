@@ -784,9 +784,10 @@ and background.
 The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
 gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the
 generic ascent tile inside caves and retains its cave-floor background.
-Ordinary z:-1 cave exits admit steady, warm surface light over roughly three
-tiles. It uses the same smooth, wall-aware illumination as crystals, brightens
-the exit and nearby terrain in tile and ASCII modes, and can reveal lit tiles
+Ordinary z:-1 cave exits admit a restrained patch of steady, warm surface light
+limited to the exit and its immediately adjacent tile (one-tile radius).
+It uses the same smooth, wall-aware illumination as crystals, brightens
+the exit and the floor directly in front in tile and ASCII modes, and can reveal lit tiles
 within the player's line of sight. Opaque rock blocks the glow. Exit locations
 are already part of the cave map, so the effect adds no saved state or RNG.
 The surface Fort gate, its underground exit and the Dwarven Ruins up/down
@@ -965,6 +966,10 @@ away, exposing the original terrain below, with masonry at the new diagonal
 edges and inner corners. This rule applies equally on small worlds.
 The ring preserves routes around the structure. Generation must reject a world
 rather than silently omit its tower when no valid site exists.
+Several withered grassland trees grow near the tower's outer walls, beyond the
+clear walking ring. Existing dead-tree artwork is selected deterministically
+from the tower's position, while the trees use ordinary grassland-tree collision
+and save/replay rules. Their placement does not block the immediate perimeter.
 
 The ground entrance and window artwork retain their upright orientation
 regardless of world rotation, although their positions and the tower layout still
@@ -5402,6 +5407,8 @@ and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
 sidebars are open. This applies even when the browser reports no pointer. 
 Inventory actions remain reachable without horizontal scrolling. 
+Drop buttons are placed to the left of item names and icons, including the
+separate drop action for portable crystals.
 On touch screens, the trade panel fills the available height: both stock
 columns have independently scrolling lists rather than the 280px desktop cap,
 and the Close control remains visible above the bottom message log.
@@ -5895,7 +5902,10 @@ Unidentified <noun>
 
 Their real stats/details remain hidden, unless identified.
 This includes curse details and dwarven-owner names, even when the artifact
-is currently equipped.
+is currently equipped. The artifact's effect tier is also concealed: no tier
+number or tier-based text color appears in inventory, equipment, merchant lists
+or item logs until the artifact is identified. Identified artifacts display
+their ordinary tier and color.
 
 ---
 

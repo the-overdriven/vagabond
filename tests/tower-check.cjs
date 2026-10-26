@@ -125,6 +125,12 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert.equal(run('tower.size'),10,'new towers use a 10x10 bounding footprint')
   assert.equal(run('tower.cornerCut'),1,'all four outer corners are chamfered')
   assert.equal(run(`(()=>{
+    const trees=[...grasslandTrees].map(key=>key.split(',').map(Number))
+      .filter(([x,y])=>towerDeadTreeAt(x,y))
+    return trees.length>=2 && trees.every(([x,y])=>towerDistance(x,y)>=2 &&
+      towerGrassTreeVisual(x,y).image.includes('grassland-tree-dead-'))
+  })()`),true,'the tower has at least two dead trees beyond its unobstructed perimeter')
+  assert.equal(run(`(()=>{
     for(const [dx,dy] of [[0,0],[9,0],[0,9],[9,9]]){
       const p=towerPoint(dx,dy)
       if(towerContains(p.x,p.y)||!TILE[surfaceMap[p.y]?.[p.x]]?.walk) return false

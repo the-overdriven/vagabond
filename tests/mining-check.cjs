@@ -313,14 +313,14 @@ const plain = value => JSON.parse(JSON.stringify(value))
       currentZ=-2
       const deeper=Mining.lightSources().some(source=>source.kind==='surfaceExit')
       return {sources:sources.length,info,normal:normal.has('12,10'),exit:lit.has('12,10'),
-        nearby:lit.has('14,10'),outside:lit.has('16,10'),blocked:blocked.has('12,10'),deeper}
+        nearby:lit.has('13,10'),outside:lit.has('14,10'),blocked:blocked.has('12,10'),deeper}
     } finally {
       currentZ=previous.z;map=previous.map;caves=previous.caves
       player.x=previous.x;player.y=previous.y
     }
   })()`))
   assert.equal(daylight.sources,1,'a repeated entrance descriptor emits only one light source')
-  assert.deepEqual(daylight.info,{radius:3,opacity:0.8,color:'#ffe1a3',pulse:false},
+  assert.deepEqual(daylight.info,{radius:1,opacity:0.55,color:'#ffe1a3',pulse:false},
     'surface daylight is steady and configured independently of crystals')
   assert.equal(daylight.normal,false)
   assert.equal(daylight.exit,true,'daylight reveals a cave exit outside normal sight')

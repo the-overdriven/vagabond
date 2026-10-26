@@ -106,15 +106,15 @@ env.Mining.lightSources=()=>[{...exposedSource,kind:'dropped'}]
 run('drawCrystalGlow(0,new Set('+JSON.stringify([...crystalVisible])+'),0,0,21,13)')
 assert.equal(glowPixel(10.5,5.5)[3],0,
   'portable crystals likewise keep the overlaid light off their sprite')
-// Ordinary z:-1 daylight stays stronger, and crystal cutouts continue to work
+// Ordinary z:-1 daylight stays visible but close to its exit; crystal cutouts work
 // at a portrait tile viewport without affecting the tile-based ASCII path.
 env.currentZ=-1
 env.Mining.activeLevel=()=>null
 env.Mining.lightSources=()=>[{...source,kind:'surfaceExit',color:'#ffe1a3'}]
 ctx.clearRect(0,0,canvas.width,canvas.height)
 run('drawCrystalGlow(0,new Set('+JSON.stringify([...crystalVisible])+'),0,0,21,13)')
-assert(ctx.getImageData(10.5*TILE_PX,5.5*TILE_PX,1,1).data[3]>70,
-  'cave-exit sunlight keeps its original stronger halo')
+assert(ctx.getImageData(10.5*TILE_PX,5.5*TILE_PX,1,1).data[3]>30,
+  'cave-exit sunlight retains a subdued halo at its source')
 env.Mining.activeLevel=()=>({})
 env.currentZ=-9
 env.Mining.lightSources=()=>[source]
