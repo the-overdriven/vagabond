@@ -2694,21 +2694,15 @@ more difficult:
   function playerCombatGrace(weapon, permanent = false) {
     if (!isWeaponItem(weapon)) return null
     const weaponValue = Math.max(1, weaponGrace(weapon))
-    // Preserve the stronger racial/level affinity for naturally graceful
-    // weapons. Penalties then reduce the resulting combat GRACE exactly once.
+    // Racial and level bonuses contribute more to inherently graceful weapons.
+    // Gear and status penalties subtract once from the final combat GRACE.
     const affinity = Math.min(1, weaponValue / 5) ** 2
-    const unencumberedDelay = Math.max(0.25, 6 / weaponValue - playerGraceBonus() * 0.25 * affinity)
-    return Math.max(1, 6 / unencumberedDelay - playerGracePenalty(permanent))
+    return Math.max(1, weaponValue + playerGraceBonus() * affinity - playerGracePenalty(permanent))
   }
 
   function playerGrace(permanent = false) {
     const grace = weaponGrace(player.equip.weapon) + playerGraceBonus() - playerGracePenalty(permanent)
     return Math.max(0, grace)
-  }
-
-  function playerGraceDisplay(permanent = false) {
-    const combatGrace = playerCombatGrace(player.equip.weapon, permanent)
-    return `${playerGrace(permanent)} (${combatGrace === null ? '—' : combatGrace.toFixed(1)})`
   }
 
   // Highscores uses the ordinary stat formulas without transient conditions.
@@ -11800,6 +11794,10 @@ more difficult:
   function renderInventory() {
     consolidateConsumableStacks()
     const race = raceDef()
+    const equippedWeaponGrace = isWeaponItem(player.equip.weapon) ? Math.max(1, weaponGrace(player.equip.weapon)) : null
+    const weaponAffinity = equippedWeaponGrace === null ? 0 : Math.min(1, equippedWeaponGrace / 5) ** 2
+    const equippedCombatGrace = playerCombatGrace(player.equip.weapon)
+    const gracePenalty = playerGracePenalty()
     const charTitle = document.getElementById('charTitle')
     if (charTitle) charTitle.textContent = `${player.name} the ${race.name}`
     const equipment = player?.equip ?? {}
@@ -11859,7 +11857,11 @@ more difficult:
       // ['🎚️ Level', player.lvl],
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
-      ['🤺 Grace', playerGraceDisplay()],
+      ['🤺 Character GRACE', '+' + playerGraceBonus()],
+      ['⚔️ Weapon GRACE', equippedWeaponGrace === null ? '—' : equippedWeaponGrace],
+      ['🌀 Applied GRACE', equippedWeaponGrace === null ? '—' : '+' + (playerGraceBonus() * weaponAffinity).toFixed(1)],
+      ['⛓️ GRACE penalties', gracePenalty ? '−' + gracePenalty : '0'],
+      ['✨ Effective GRACE', equippedCombatGrace === null ? '—' : equippedCombatGrace.toFixed(1)],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
       ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
       ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
@@ -11884,7 +11886,9 @@ more difficult:
     for (const [k, v] of rows) {
       const d = document.createElement('div')
       d.className = k === '🏆 Strongest slain enemy' ? 'row achievement-row' : 'row'
-      if (k === '🤺 Grace') d.title = 'Nominal GRACE (effective combat GRACE used for attack timing)'
+      if (k === '🤺 Character GRACE') d.title = 'Racial GRACE plus one for every five levels'
+      if (k === '🌀 Applied GRACE') d.title = `Character GRACE × ${Math.round(weaponAffinity * 100)}% weapon affinity`
+      if (k === '✨ Effective GRACE') d.title = 'Attack delay = 6 / effective GRACE; higher means faster'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k

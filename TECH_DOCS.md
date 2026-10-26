@@ -5243,24 +5243,26 @@ player bonus GRACE = racial GRACE + level GRACE
 gear GRACE penalty = 1 for a non-Buckler shield + armor.gracePenalty (if any)
 temporary GRACE penalty = 3 while Stone Skin + 2 while Berserk
 weapon affinity = min(1, weapon GRACE / 5)²
-unencumbered delay = max(0.25, 6 / weapon GRACE - player bonus GRACE × 0.25 × weapon affinity)
-unencumbered combat GRACE = 6 / unencumbered delay
-effective combat GRACE = max(1, unencumbered combat GRACE - gear GRACE penalty - temporary GRACE penalty)
+effective combat GRACE = max(1, weapon GRACE + player bonus GRACE × weapon affinity - gear GRACE penalty - temporary GRACE penalty)
 player delay = 6 / effective combat GRACE
 ```
 
-This makes both racial and level GRACE provide almost no benefit with slow
-weapons and progressively more benefit with graceful weapons. A GRACE 5 or
-higher weapon receives the full reduction. Affinity uses inherent weapon GRACE;
-armor, shields and statuses reduce the resulting combat GRACE **once**, without
-also weakening weapon affinity. The character sheet shows **nominal GRACE
-(effective combat GRACE)**, with the second number rounded to one decimal place.
-Nominal GRACE is weapon GRACE + racial GRACE + level GRACE minus penalties,
-floored at 0; effective combat GRACE is the value used for attack timing and
-extra-attack checks. A level-8 Elf wielding a GRACE-4 Scimitar with −2 total
-gear penalties shows **5 (3.9)** and has delay about **1.55**, versus an unarmed
-Skeleton's GRACE 3 and delay 2. The unarmed player displays nominal GRACE with
-`(—)` because no weapon timing check applies.
+This makes racial and level GRACE provide a small relative speed benefit with
+slow weapons and progressively greater benefits with graceful weapons. A
+GRACE-5 or faster weapon receives the entire character bonus. Affinity uses
+the weapon's inherent GRACE; armor, shields and statuses subtract **once**
+from effective combat GRACE rather than also weakening affinity.
+
+The character sheet shows **character GRACE** (racial + level bonus),
+**weapon GRACE**, the **applied GRACE bonus** (character bonus multiplied by
+weapon affinity), total **GRACE penalties**, and **effective GRACE** (rounded
+to one decimal). Effective GRACE is the only player value used to calculate
+attack delay and extra-attack checks. Without a weapon, effective GRACE is
+shown as `—` and player GRACE cannot trigger extra attacks. A level-8 Elf
+has +3 character GRACE: with a GRACE-4 Scimitar, 64% affinity applies +1.9
+bonus GRACE. With −2 gear penalties, effective GRACE is
+`4 + 3 × 0.64 − 2 = 3.92` (displayed **3.9**) and delay is
+about **1.53**, versus an unarmed Skeleton's GRACE 3 and delay 2.
 
 Combat timing floors effective GRACE at 1, so heavy gear does not disable an
 armed player's extra-attack checks. Bucklers and armors without `gracePenalty`
@@ -5269,15 +5271,15 @@ lose 1 from natural GRACE in combat timing (floored at 1); enemy weapons still
 override natural GRACE and have no gear penalty because an enemy carries one
 equipment item.
 
-For an Elf with **+2 racial GRACE**:
+For an Elf with **+2 racial GRACE**, no level GRACE and no penalties:
 
-| Weapon GRACE | Normal delay | Elf delay | Delay reduction |
-|---:|---:|---:|---:|
-| 1 | 6.00 | 5.98 | 0.02 |
-| 2 | 3.00 | 2.92 | 0.08 |
-| 3 | 2.00 | 1.82 | 0.18 |
-| 4 | 1.50 | 1.18 | 0.32 |
-| 5 | 1.20 | 0.70 | 0.50 |
+| Weapon GRACE | Normal delay | Elf effective GRACE | Elf delay | Attack-rate increase |
+|---:|---:|---:|---:|---:|
+| 1 | 6.00 | 1.08 | 5.56 | 8% |
+| 2 | 3.00 | 2.32 | 2.59 | 16% |
+| 3 | 2.00 | 3.72 | 1.61 | 24% |
+| 4 | 1.50 | 5.28 | 1.14 | 32% |
+| 5 | 1.20 | 7.00 | 0.86 | 40% |
 
 The player must wield a weapon to take part in a grace check. Every enemy has natural GRACE and can take part while unarmed; if the enemy wields a weapon, the weapon's GRACE overrides its natural GRACE.
 
@@ -6629,7 +6631,7 @@ stat excluding both combat potions. The stat used for scaling is floored at zero
 gear, racial bonuses, terrain and other existing modifiers still apply. A repeated
 dose replaces the sampled bonus and refreshes duration without stacking or feeding
 its own bonus back into the formula. Both potion types may coexist. GRACE penalties
-stack with gear penalties in displayed GRACE and effective weapon combat timing;
+stack with gear penalties in the character sheet's penalty total and combat timing;
 the existing minimum effective weapon GRACE of 1 still applies, so slow weapons
 pay less of a timing cost. Expiry or actual death removes the modifiers. Highscores
 uses permanent stats, excluding both potions and their GRACE penalties.
