@@ -2,7 +2,8 @@ const cdp = (command, params) =>
   Cypress.automation('remote:debugger:protocol', {command, params})
 
 function expectHudSingleRow(hud) {
-  const centers = [...hud.querySelectorAll(':scope > .stat')].map(el => {
+  const centers = [...hud.querySelectorAll(':scope > .stat')].filter(el =>
+    el.ownerDocument.defaultView.getComputedStyle(el).display !== 'none').map(el => {
     const rect = el.getBoundingClientRect()
     return (rect.top + rect.bottom) / 2
   })
@@ -98,7 +99,7 @@ describe('Desktop overlay layout', () => {
   it('keeps race selection above gameplay panels and usable below wide or wrapped HUDs', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
     cy.get('#hud .stat:not(.stat-actions)').should($stats => {
-      for (const stat of $stats) expect(getComputedStyle(stat).visibility).to.equal('hidden')
+      for (const stat of $stats) expect(getComputedStyle(stat).display).to.equal('none')
     })
     cy.get('#hud .stat-actions').should($actions => {
       expect(getComputedStyle($actions[0]).visibility).to.equal('visible')
@@ -106,7 +107,17 @@ describe('Desktop overlay layout', () => {
 
     cy.get('#hud').should($hud => {
       expectHudSingleRow($hud[0])
+      const rect = $hud[0].getBoundingClientRect()
+      expect(rect.width, 'race-selection HUD fits its buttons').to.be.lessThan(460)
+      expect(rect.right, 'compact HUD sits at the right edge').to.be.closeTo(1440 - 16, 1)
     })
+
+    // The compact treatment belongs only to race selection. Once that
+    // overlay closes, the full centered in-game HUD must come back.
+    cy.get('#raceOverlay').invoke('removeClass', 'show')
+    cy.get('#hud .stat:not(.stat-actions)').first().should('be.visible')
+    cy.get('#raceOverlay').invoke('addClass', 'show')
+    cy.get('#hud .stat:not(.stat-actions)').first().should('have.css', 'display', 'none')
 
     cy.window().then(win => {
       const race = win.document.getElementById('raceOverlay')
@@ -184,11 +195,16 @@ describe('Desktop overlay layout', () => {
       expectHudSingleRow(hud)
     })
 
-    // Even if CSS is deliberately forced to wrap the HUD, presentation-only
-    // HUD height changes must not resize the map camera underneath it.
+    // Race selection has only one visible HUD stat (the action group), so
+    // explicitly wrap its buttons in a narrow HUD to exercise the layout.
+    // Presentation-only HUD height changes must not resize the map camera.
     cy.get('#hud').then($hud => {
-      $hud[0].style.width = '360px'
+      $hud[0].style.width = '160px'
       $hud[0].style.flexWrap = 'wrap'
+      const actions = $hud[0].querySelector('.stat-actions')
+      actions.style.flexWrap = 'wrap'
+      actions.style.minWidth = '0'
+      actions.style.maxWidth = '100%'
     })
     cy.get('#hud').should($hud => {
       expect($hud[0].getBoundingClientRect().height).to.be.greaterThan(initialHudHeight)
@@ -372,7 +388,7 @@ describe('Desktop overlay layout', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('have.class', 'show')
     cy.get('#hud .stat:not(.stat-actions)').should($stats => {
-      for (const stat of $stats) expect(getComputedStyle(stat).visibility).to.equal('hidden')
+      for (const stat of $stats) expect(getComputedStyle(stat).display).to.equal('none')
     })
     cy.get('#hud .stat-actions').should('have.css', 'visibility', 'visible')
     cy.get('#logpanel').should($log => {

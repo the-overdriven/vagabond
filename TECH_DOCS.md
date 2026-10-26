@@ -91,8 +91,10 @@ XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
 The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
 Loading a save bypasses character creation.
 While race selection is open, the HUD hides the not-yet-created player's
-stats but keeps the normal Save/Load and other HUD buttons accessible. Race
-cards still explain each race's gameplay bonuses.
+stats entirely, without reserving their space. On desktop the remaining
+Save/Load and other HUD actions occupy a compact bar at the upper right;
+on touch layouts they keep the normal tap-sized header. The full centered
+HUD returns during play. Race cards still explain each race's gameplay bonuses.
 On desktop, the selection overlay displays one of four terrain-only captures
 from Vagabond's surface generator and original tile renderer, with a continuous
 CSS drift. They are captured offline without the player, monsters, dropped items

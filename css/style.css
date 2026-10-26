@@ -1310,10 +1310,23 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 /* ============================== RACE SELECTION ============================== */
-/* Hide the placeholder character's stats before Begin, without moving HUD
-   buttons or changing the layout when character creation closes. */
+/* The selection screen has no active character, so don't reserve space for
+   placeholder stats. Keep all HUD actions available. */
 body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
-  visibility: hidden;
+  display: none;
+}
+
+/* On desktop, the action-only bar is a compact group at the upper right.
+   In-game the ordinary centered full-stat HUD remains unchanged. */
+@media (min-width: 721px) and (pointer: fine),
+       (min-width: 721px) and (pointer: none) {
+  body:has(#raceOverlay.show) #hud {
+    left: auto;
+    right: 16px;
+    transform: none;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
 }
 
 #raceOverlay {
