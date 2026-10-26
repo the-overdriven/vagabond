@@ -6412,7 +6412,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         dungeonRoomId: roomId,
         dungeonVaultId: vaultId
       }
-      if (role === 'backline') {
+      if (role === 'backline' || role === 'galleryBackline') {
         const ability = shooterAbility(tmpl)
         if (ability) {
           enemy.shooterAbility = ability
@@ -6422,6 +6422,9 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         enemy.shooterAbility = null
         enemy.shotsRemaining = 0
       }
+      // Gallery guards use ordinary humanoid equipment/HP scaling before
+      // their existing dungeon-depth prefix roll, just like roaming enemies.
+      if (role === 'galleryBackline') prepareEnemyEquipment(enemy)
       if (prefix) {
         enemy.prefix = prefix
         enemy.prefixBase = prefixBaseStats(enemy)
@@ -6454,7 +6457,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         const tmpl = pool.find(t => Math.max(1,t.tier) <= threatBudget-spent)
         if (!tmpl || level.map[spot.y]?.[spot.x] !== 'marble' || usedPositions.has(keyXY(spot.x,spot.y)))
           {room.galleryPopulationFailed = true;break}
-        const enemy = spawnTemplate(tmpl,claimSpot(spot),null,'backline',null,room.id,null)
+        const enemy = spawnTemplate(tmpl,claimSpot(spot),null,'galleryBackline',null,room.id,null)
         if (!enemy || !enemyIsShooter(enemy)) {room.galleryPopulationFailed = true;break}
         enemy.dungeonRole = `gallery${side}`
         spent += Math.max(1,tmpl.tier)

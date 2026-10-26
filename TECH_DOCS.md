@@ -1852,6 +1852,11 @@ one per side. Shooters are distributed along the length, have real ammunition,
 use existing LOS and ranged-combat AI through the bars, and count fully
 against the normal floor encounter budget before roaming enemies. This is
 an intentionally dangerous optional branch, not a progression requirement.
+Gallery shooters receive ordinary humanoid equipment/HP scaling and the same
+depth-based prefix chances as other Ruins encounters. Their gear and prefixes
+affect normal monster stats, defenses, melee behavior and loot, but cannot raise
+the fixed ATK of arrows or stones. This makes some guards harder to eliminate
+without multiplying the gallery's fixed ranged damage.
 Each gallery also has two independent **20%** optional rolls. One places a
 Giant Spider in the unobstructed central aisle, never inside a barred shooter
 cell. The other places one additional chest on a free, trap-safe aisle tile;
@@ -4500,6 +4505,15 @@ a glancing hit may remain at 0. Critical and glancing outcomes are mutually excl
 Shooter prefixes still modify their normal stats and melee behavior, but do not change
 the fixed projectile ATK. While ammunition remains, desktop/mobile inspection appends
 a red bow marker (`🏹`) to the existing species name; the marker disappears at zero shots.
+
+Multiple ordinary shooters attacking during one enemy turn present their
+projectiles as a simultaneous volley. Melee strikes and spells interrupt a volley
+and keep their ordinary presentation order. All ranged hits, dodges, ammunition,
+fatal outcomes, logging and RNG still resolve sequentially and deterministically
+before animation; a lethal shot prevents later attackers from acting. A shared
+volley of dodged shots uses one visible recoil rather than stacking displacements.
+The projectile-dodge recoil lasts **108 ms**, beginning at most **84 ms** before
+impact, without changing the probability of a dodge.
 
 ## Deadly
 

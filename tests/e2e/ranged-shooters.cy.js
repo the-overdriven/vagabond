@@ -222,6 +222,45 @@ describe('Ranged shooter monster variants', () => {
     })()`)).should('equal', true)
   })
 
+  it('presents shooters together without stacking dodges or changing deterministic combat', () => {
+    cy.window().then(win => win.eval(`(() => {
+      resetRangedArena()
+      const a=makeShooter('Skeleton',3,{id:'volley-a'})
+      const b=makeShooter('Skeleton',-3,{id:'volley-b'})
+      const oldChance=chance
+      try {
+        replayAnimationsDisabled=false;replaySimulationMode=false
+        clearEnemyAnims();projectileAnims=[];damageAnims=[]
+        chance=()=>false
+        const hpBefore=player.hp,ammoA=a.shotsRemaining,ammoB=b.shotsRemaining
+        enemyRangedAttackPlayer(a,projectilePathBetween(a.x,a.y,player.x,player.y))
+        enemyRangedAttackPlayer(b,projectilePathBetween(b.x,b.y,player.x,player.y))
+        rangedAssert(projectileAnims.length===2&&Math.abs(projectileAnims[0].start-projectileAnims[1].start)<17,
+          'both projectiles share one volley start')
+        rangedAssert(player.hp<hpBefore&&a.shotsRemaining===ammoA-1&&b.shotsRemaining===ammoB-1,
+          'each simultaneous shot still resolves its own damage and ammo')
+        const spellPresentation=queueEnemyAttackPresentation(200)
+        const afterSpell=queueEnemyAttackPresentation(200,true)
+        rangedAssert(afterSpell.start>=spellPresentation.start+200+ENEMY_ATTACK_GAP_MS,
+          'spells interrupt the volley before later shooters')
+        clearEnemyAnims();projectileAnims=[];damageAnims=[]
+        chance=()=>true
+        const dodgedHp=player.hp
+        enemyRangedAttackPlayer(a,projectilePathBetween(a.x,a.y,player.x,player.y))
+        enemyRangedAttackPlayer(b,projectilePathBetween(b.x,b.y,player.x,player.y))
+        rangedAssert(player.hp===dodgedHp&&playerProjectileDodges.length===1,
+          'simultaneous dodges share one visible recoil without changing misses')
+        rangedAssert(PLAYER_DODGE_ANIM_MS===108&&PROJECTILE_DODGE_LEAD_MS===84&&
+          playerProjectileDodges[0].duration===108,'dodge recoil and anticipation are 40% quicker')
+        const start=projectileAnims[0].start
+        turnCount++
+        const nextTurn=queueEnemyAttackPresentation(RANGED_CONFIG.projectileAnimationMs,true)
+        rangedAssert(nextTurn.start>=start+RANGED_CONFIG.projectileAnimationMs,
+          'a new enemy turn cannot reuse the preceding volley start')
+      } finally {chance=oldChance;replayAnimationsDisabled=true;clearEnemyAnims()}
+    })()`))
+  })
+
   it('keeps shooter behavior inside normal AI priorities and uses current effective AGGRO', () => {
     cy.window().then(win => win.eval(`(() => {
       const original=rng

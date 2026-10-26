@@ -6,7 +6,7 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
     cy.get('#loadingOverlay').should('not.be.visible')
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, reason) => { if (!ok) throw new Error(reason) }
-      let seen = 0
+      let seen = 0, geared = 0, prefixed = 0
       for (const seed of [610061, 610063, 554433]) {
         replayRecording = false
         replayPlaying = false
@@ -42,6 +42,11 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
               'one real shooter per six bay cells on both sides')
             check(monsters.every(e => enemyIsShooter(e) && e.shotsRemaining > 0),
               'all gallery shooters can attack with ammunition')
+            geared += monsters.filter(e => e.equipment).length
+            prefixed += monsters.filter(e => e.prefix).length
+            check(monsters.every(e => e.humanoid && Number.isFinite(e.gearScale) &&
+              (!e.equipment || e.equipment.kind === 'weapon' || e.equipment.kind === 'armor' || e.equipment.kind === 'shield')),
+              'gallery guards use ordinary humanoid equipment rules')
             check(gallery.shooterSpots.flat().every(p => gallery.fireTargets.some(t =>
               dungeonClearProjectileLine(level.map,p,t))), 'clear lanes through bars')
             const reward = groundItems.filter(g => g.level === z && g.galleryReward && g.dungeonRoomId === room.id)
@@ -59,7 +64,8 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
         const before = JSON.stringify(dungeonPackageLevels('dwarvenRuins').map(({level,z}) => ({
           z, rooms:level.rooms.filter(r=>r.gallery).map(r=>r.gallery),
           shooters:enemies.filter(e=>e.alive&&e.level===z&&['gallery0','gallery1'].includes(e.dungeonRole))
-            .map(e=>({id:e.id,role:e.dungeonRole,shots:e.shotsRemaining,x:e.x,y:e.y})),
+            .map(e=>({id:e.id,role:e.dungeonRole,shots:e.shotsRemaining,x:e.x,y:e.y,
+              equipment:e.equipment,prefix:e.prefix,hp:e.hp,maxHp:e.maxHp,gearScale:e.gearScale})),
           rewards:groundItems.filter(g=>g.level===z&&g.galleryReward)
         })))
         const rngBefore = rngState
@@ -67,7 +73,8 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
         const after = JSON.stringify(dungeonPackageLevels('dwarvenRuins').map(({level,z}) => ({
           z, rooms:level.rooms.filter(r=>r.gallery).map(r=>r.gallery),
           shooters:enemies.filter(e=>e.alive&&e.level===z&&['gallery0','gallery1'].includes(e.dungeonRole))
-            .map(e=>({id:e.id,role:e.dungeonRole,shots:e.shotsRemaining,x:e.x,y:e.y})),
+            .map(e=>({id:e.id,role:e.dungeonRole,shots:e.shotsRemaining,x:e.x,y:e.y,
+              equipment:e.equipment,prefix:e.prefix,hp:e.hp,maxHp:e.maxHp,gearScale:e.gearScale})),
           rewards:groundItems.filter(g=>g.level===z&&g.galleryReward)
         })))
         check(before === after && rngState === rngBefore, 'save/restore preserves gallery without reroll')
@@ -75,6 +82,7 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
         check(validateDwarvenRuinsStratum().ok, 'rotation preserves gallery geometry and reachability')
       }
       check(seen >= 3, 'fixed seeds exercised multiple galleries')
+      check(geared>0&&prefixed>0,'fixed seeds include equipped and prefixed gallery guards')
     })()`))
   })
 })

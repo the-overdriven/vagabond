@@ -4456,7 +4456,7 @@ more difficult:
       // Recoil must lead the impact: beginning it after the shot arrived reads
       // as knockback from a hit rather than an intentional dodge.
       const dodgeLead = Math.min(PROJECTILE_DODGE_LEAD_MS, animationDelay * 0.45)
-      const presentation = queueEnemyAttackPresentation(animationDelay + PLAYER_DODGE_ANIM_MS - dodgeLead)
+      const presentation = queueEnemyAttackPresentation(animationDelay + PLAYER_DODGE_ANIM_MS - dodgeLead, !spellAttack)
       spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
       spawnPlayerProjectileDodge(e, presentation.start + animationDelay - dodgeLead)
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, presentation.delay + animationDelay)
@@ -4474,7 +4474,7 @@ more difficult:
     else dmg = Math.max(1, dmg)
     player.hp -= dmg
 
-    const presentation = queueEnemyAttackPresentation(animationDelay)
+    const presentation = queueEnemyAttackPresentation(animationDelay, !spellAttack)
     spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, presentation.delay + animationDelay)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, presentation.delay + animationDelay + (critical ? 120 : 0))
@@ -8793,10 +8793,12 @@ more difficult:
   let projectileAnims = []
   let playerProjectileDodges = []
   let enemyAttackVisualEnd = 0
+  let shooterVolleyTurn = -1
+  let shooterVolleyStart = 0
   const ENEMY_MELEE_ANIM_MS = 132
   const ENEMY_ATTACK_GAP_MS = 35
-  const PLAYER_DODGE_ANIM_MS = 180
-  const PROJECTILE_DODGE_LEAD_MS = 140
+  const PLAYER_DODGE_ANIM_MS = 108
+  const PROJECTILE_DODGE_LEAD_MS = 84
   const FX_ANIM_MS = 420
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 650
@@ -9006,11 +9008,18 @@ more difficult:
 
   // All rolls and deaths resolve during enemyTurn(). Only their presentation is
   // scheduled here; a delayed frame must never advance combat or consume RNG.
-  function queueEnemyAttackPresentation(duration) {
+  function queueEnemyAttackPresentation(duration, shooterVolley = false) {
     if (replayAnimationsDisabled || replaySimulationMode) return {start: 0, delay: 0}
     const now = performance.now()
-    const start = Math.max(now, enemyAttackVisualEnd)
-    enemyAttackVisualEnd = start + duration + ENEMY_ATTACK_GAP_MS
+    // A group of ordinary shooters in one enemy turn shares a flight window.
+    // Melee and spells interrupt the volley so presentation remains ordered.
+    const start = shooterVolley && shooterVolleyTurn === turnCount
+      ? shooterVolleyStart : Math.max(now, enemyAttackVisualEnd)
+    if (shooterVolley) {
+      shooterVolleyTurn = turnCount
+      shooterVolleyStart = start
+    } else shooterVolleyTurn = -1
+    enemyAttackVisualEnd = Math.max(enemyAttackVisualEnd, start + duration + ENEMY_ATTACK_GAP_MS)
     runAnimationLoop()
     return {start, delay: start - now}
   }
@@ -9021,6 +9030,9 @@ more difficult:
 
   function spawnPlayerProjectileDodge(shooter, start) {
     if (replayAnimationsDisabled || replaySimulationMode) return
+    // Multiple dodged arrows from the same volley should not add their recoil
+    // and visually fling the player several tiles away.
+    if (playerProjectileDodges.some(dodge => Math.abs(dodge.start - start) < 1)) return
     const dx = player.x - shooter.x, dy = player.y - shooter.y
     const length = Math.hypot(dx, dy) || 1
     playerProjectileDodges.push({start, duration: PLAYER_DODGE_ANIM_MS,
@@ -9042,6 +9054,7 @@ more difficult:
 
   function clearEnemyAnims() {
     enemyAttackVisualEnd = 0
+    shooterVolleyTurn = -1
     playerProjectileDodges = []
     for (const e of enemies) {
       e.animStart = undefined
