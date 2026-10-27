@@ -3630,14 +3630,12 @@ does not silently grant a ranged attack.
 
 ### Monster tile artwork
 
-In tile-image mode, monsters with supplied artwork use transparent PNG sprites
+In tile-image mode, all 94 monster templates have transparent PNG sprites
 from `img/enemies-tiles/`. `content/rendering.json` maps each species name to
-its image and display scale under `enemies.tiles`. Mapped species use scale 1
-(one map tile); the remaining species retain their
-existing glyphs until artwork is available. Enemy prefixes and other display
-names reuse the base species image. An absent or failed image falls back to the
-same tier-colored glyph used by ASCII mode. The wide Giant Spider image is
-scaled to fit without distortion.
+its image and display scale under `enemies.tiles`. Sprites use scale 1 (one map
+tile); enemy prefixes and other display names reuse the base species image.
+An absent or failed image falls back to the same tier-colored glyph used by
+ASCII mode. The wide Giant Spider image is scaled to fit without distortion.
 
 Monster sprites load before character selection to avoid switching from letters
 to images during play. The existing P toggle displays **letter glyphs for every

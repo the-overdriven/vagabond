@@ -46,11 +46,14 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
   it('draws species sprites in tile mode and preserves glyph fallbacks in ASCII', () => {
     cy.window().then(win => win.eval(`(() => {
       const visuals=Object.entries(RENDER_STYLE.enemies.tiles);
-      invisibilityAssert(visuals.length===68,'all supplied monster sprites are mapped');
+      invisibilityAssert(visuals.length===94,'all monster sprites are mapped');
+      invisibilityAssert(ENEMY_TEMPLATES.every(enemy=>RENDER_STYLE.enemies.tiles[enemy.name]),
+        'every monster species has tile artwork');
       invisibilityAssert(visuals.every(([name,visual]) =>
         ENEMY_TEMPLATE_BY_NAME[name] && preloadedImages.has(visual.image)),
         'mapped monster sprites are preloaded before play');
-      invisibilityAssert(['Lich','Gargoyle','Naledi','Ogre','Xibal','Yeti'].every(name =>
+      invisibilityAssert(['Lich','Gargoyle','Naledi','Ogre','Xibal','Yeti','Amplyg','Alacran',
+        'Serpent Queen','Gorgon','Cave Troll','Wyrdhag','NHALUUN'].every(name =>
         visuals.some(([mapped])=>mapped===name)),
         'new surface, tower and mine sprites are mapped');
       invisibilityAssert(!visuals.some(([,visual])=>visual.image.includes('dont-use')),
@@ -82,9 +85,19 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
         const lichAscii=capture(lich,false);
         invisibilityAssert(!lichAscii.includes('image'),
           'newly supplied species still uses a glyph in ASCII');
-        const fallback=capture(skerva,true);
-        invisibilityAssert(!fallback.includes('image') && fallback.includes('S'),
-          'species without a supplied image retain their glyph in tile mode');
+        const skervaSprite=capture(skerva,true);
+        invisibilityAssert(skervaSprite.includes('image'),
+          'previously unmapped species now uses its tile sprite');
+        const skervaImagePath=RENDER_STYLE.enemies.tiles.Skerva.image;
+        const skervaImage=preloadedImages.get(skervaImagePath);
+        try {
+          preloadedImages.delete(skervaImagePath);
+          const fallback=capture(skerva,true);
+          invisibilityAssert(!fallback.includes('image') && fallback.includes('S'),
+            'missing sprite falls back to the monster glyph');
+        } finally {
+          preloadedImages.set(skervaImagePath,skervaImage);
+        }
       } finally {
         ctx.drawImage=oldDraw;ctx.fillText=oldText;USE_TILE_IMAGES=oldMode;
       }
