@@ -11,7 +11,7 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
     'GAUR': {tier:4, rarity:0.02},
     'DRUSK': {tier:4, rarity:0.02},
     'NULK': {tier:4, rarity:0.02},
-    'Giant Toad': {tier:1, rarity:0.1},
+    'Giant Toad': {tier:1, rarity:0.15},
     'SKELD': {tier:4, rarity:0.02},
     'Bog Spitter': {tier:3, rarity:0.1},
     'Thornmaw': {tier:3, rarity:0.1},

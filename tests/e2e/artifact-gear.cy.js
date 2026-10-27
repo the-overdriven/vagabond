@@ -182,8 +182,8 @@ describe('Gear bases on procedural artifacts', () => {
         .to.be.at.most(identify.getBoundingClientRect().left)
     })
     cy.contains('#invList button','Equip').should('be.visible').click()
-    cy.get('#slotWeapon').should('contain.text','Unidentified Dagger').and('contain.text','???')
-    cy.get('#slotWeapon').should('not.contain.text','Hidden Dwarf').and('not.contain.text','ATK +5')
+    cy.get('#slotWeapon .val').should('contain.text','Unidentified Dagger').and('contain.text','???')
+    cy.get('#slotWeapon .val').should('not.contain.text','Hidden Dwarf').and('not.contain.text','ATK +5')
       .and('not.have.class','tier3')
     cy.window().then(win=>win.eval(`(() => {
       if(player.equip.weapon?.identified!==false || player.equip.weapon?.bonuses?.atk!==5)
@@ -194,6 +194,6 @@ describe('Gear bases on procedural artifacts', () => {
         throw Error('unidentified equipped gear must survive save/replay restoration')
     })()`))
     cy.window().then(win=>win.eval('player.equip.weapon.identified=true;renderInventory()'))
-    cy.get('#slotWeapon').should('have.class','tier3')
+    cy.get('#slotWeapon .val').should('have.class','tier3')
   })
 })

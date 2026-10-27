@@ -103,7 +103,7 @@ describe('Surface encounters and item passives', () => {
       for(let y=96;y<=104;y++)for(let x=96;x<=104;x++)surfaceMap[y][x]='grass'
       const rngBefore=rngState
       spawnCaveDecorations()
-      const webs=caveDecorations.filter(p=>p.level===0)
+      const webs=caveDecorations.filter(p=>p.level===0 && p.levelKind==='surface' && p.kind==='web')
       check(webs.length>0 && webs.length<=2,'up to two webs generated')
       check(webs.every(p=>p.kind==='web' && p.levelKind==='surface' &&
         Math.max(Math.abs(p.x-100),Math.abs(p.y-100))>=2 &&

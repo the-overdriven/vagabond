@@ -8294,6 +8294,8 @@ baseline scaling and 7–50-column bounds, while the existing vertical drag stil
 controls visible rows. Pointer hit testing uses the canvas's actual
 displayed-to-buffer ratio. Zoom is presentation-only: it does not change world
 coordinates, gameplay RNG, save data, or the separate world-map zoom.
+Narrow fine-pointer windows scale their canvas to the stage width too, preventing
+horizontal cropping without switching to touch controls.
 Both panels remember their expanded/collapsed preferences in browser-local
 storage across page loads and character playthroughs, independently of the
 game save and replay. If storage is unavailable, both default to expanded.

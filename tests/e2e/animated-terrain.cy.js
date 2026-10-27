@@ -60,7 +60,7 @@ describe('Animated terrain rendering', () => {
             .filter(visual => visual.frames?.length)
             .every(visual => visual.frames.every(path => {
               const image = preloadedImages.get(path)
-              const key = TILE_PX + '|' + (visual.scale ?? 1) + '|' + (visual.filter || '')
+              const key = TILE_PX + '|' + (visual.scale ?? 1) + '|' + (visual.filter || '') + '|false'
               return !!image && scaledVisualCache.get(image)?.has(key)
             }))
         }

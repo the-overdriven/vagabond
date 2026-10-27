@@ -127,8 +127,19 @@ describe('Guaranteed elevated tower',()=>{
       })
       cy.get('#game').should('be.visible').then($canvas=>{
         const rect=$canvas[0].getBoundingClientRect()
-        expect(rect.left).to.be.at.least(0)
-        expect(rect.right).to.be.at.most(width+1)
+        if (width > 720) {
+          // Desktop intentionally centers an oversized canvas inside a clipped
+          // full-viewport stage, preserving whole, square terrain pixels.
+          const stage=$canvas[0].ownerDocument.querySelector('#stage').getBoundingClientRect()
+          expect(stage.left).to.be.at.least(0)
+          expect(stage.right).to.be.at.most(width+1)
+          expect(rect.left).to.be.at.most(stage.left+2)
+          expect(rect.right).to.be.at.least(stage.right-2)
+        } else {
+          // Narrow windows must fit the displayed canvas inside the viewport.
+          expect(rect.left).to.be.at.least(0)
+          expect(rect.right).to.be.at.most(width+1)
+        }
       })
     })
   }

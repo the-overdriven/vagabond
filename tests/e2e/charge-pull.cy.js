@@ -243,7 +243,7 @@ describe('Charge and Pull terrain rules', () => {
           'melee feedback follows the completed drag')
 
         // Ordinary walking without a Pull must retain its usual short pan.
-        stopCameraAnimation(); enemies=[]; occupied.clear(); projectileAnims=[]
+        stopCameraAnimation(); clearEnemyAnims(); enemies=[]; occupied.clear(); projectileAnims=[]
         player.x=40; player.y=41
         await tryMove(0,-1)
         rushCheck(moveAnim?.kind==='normal' && moveAnim.duration===MOVE_ANIM_MS,

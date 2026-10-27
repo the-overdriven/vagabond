@@ -1615,6 +1615,12 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
 
 /* Narrow windows need usable dialogs regardless of the browser pointer mode. */
 @media (max-width: 720px) {
+  /* Fit the canvas in narrow mouse/keyboard windows as well as on touch. */
+  #stage > canvas#game {
+    width: 100%;
+    height: auto;
+  }
+
   #hud .stat-actions {
     flex-wrap: wrap;
     justify-content: center;
