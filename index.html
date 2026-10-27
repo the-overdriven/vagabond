@@ -11518,6 +11518,33 @@ more difficult:
     ctx.restore()
   }
 
+  // Shortcut positions already live in the saved dungeon registry. Mark only
+  // discovered platforms on their own floors, never intermediate mine shafts.
+  function drawDungeonShortcutMarkers(ctx, scale, ox, oy, zoom, viewKey, seen) {
+    const marker = RENDER_STYLE.minimap.dungeonShortcut
+    const radius = Math.max(2.75, scale * 0.8) * zoom
+    ctx.save()
+    ctx.fillStyle = marker.color
+    ctx.strokeStyle = marker.outline
+    ctx.lineWidth = Math.max(1, zoom)
+    for (const shortcut of [dwarvenRuinsLiftShortcut(), dwarvenMinesCageShortcut()]) {
+      if (!shortcut) continue
+      for (const endpoint of [shortcut.upper, shortcut.lower]) {
+        if (!endpoint || viewKey !== `chain:${chainDepthForZ(endpoint.z)}` ||
+            !seen?.[endpoint.y]?.[endpoint.x]) continue
+        const x = (endpoint.x - ox + 0.5) * scale * zoom
+        const y = (endpoint.y - oy + 0.5) * scale * zoom
+        if (x + radius < 0 || y + radius < 0 ||
+            x - radius >= ctx.canvas.width || y - radius >= ctx.canvas.height) continue
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+      }
+    }
+    ctx.restore()
+  }
+
   function renderMinimapCanvas(ctx, scale, originX, originY, showMapPlayer) {
     ensureMiniBases()
     const w = ctx.canvas.width, h = ctx.canvas.height
@@ -11564,6 +11591,7 @@ more difficult:
         ctx.textBaseline = 'middle'
         ctx.fillText(RENDER_STYLE.minimap.temple.glyph, tx, ty)
       }
+      drawDungeonShortcutMarkers(ctx, scale, ox, oy, zoom, view.key, view.seen)
       drawDeathRemainsMarkers(ctx, scale, ox, oy, zoom, view.key)
       if (!onPlayerLevel) return
       const px = (player.x - ox) * scale * zoom + scale * zoom / 2
@@ -11603,6 +11631,8 @@ more difficult:
       ctx.fillStyle = RENDER_STYLE.minimap.spawnPoint
       ctx.fillRect((spawnPoint.x - ox) * scale - 1, (spawnPoint.y - oy) * scale - 1, dot, dot)
     }
+    drawDungeonShortcutMarkers(ctx, scale, ox, oy, 1, currentMapViewKey(),
+      currentZ === 0 ? discovered : undergroundDiscovered)
     drawDeathRemainsMarkers(ctx, scale, ox, oy, 1, currentMapViewKey())
     ctx.fillStyle = map[player.y] && CAVE_TRANSITION_TILES.has(map[player.y][player.x]) ? RENDER_STYLE.minimap.playerOnTransition : RENDER_STYLE.minimap.sidePlayer
     ctx.fillRect((player.x - ox) * scale - 1, (player.y - oy) * scale - 1, dot, dot)

@@ -383,6 +383,10 @@
     "sidePlayer": "#ffffff",
     "playerOutline": "#000",
     "spawnPoint": "#ffe08a",
+    "dungeonShortcut": {
+      "color": "#5df579",
+      "outline": "#102818"
+    },
     "playerRemains": {
       "glyph": "💀",
       "alpha": 0.55

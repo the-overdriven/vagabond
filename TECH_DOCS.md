@@ -3053,9 +3053,10 @@ bones). Such refuse is a clue, not proof of present monsters: it is generated
 once from their initial placement and does not move with them or disappear
 when they die.
 
-Every Dwarven Fort, Ruins and Mines floor receives at least **two alcohol
-barrels on open floor and two carved reliefs on the walls**. In the Mines,
-occasional wall mushrooms cling to exposed cave walls beside walkable passages.
+Every Dwarven Fort and Ruins floor receives at least **two alcohol barrels on
+open floor and two carved reliefs on the walls**. Abandoned Mines have neither
+barrels nor dwarven wall reliefs; their decorations are instead wooden passage
+supports and occasional wall mushrooms on cave walls beside walkable passages.
 All of these new props are tile-image-only and do not change wall blocking,
 walking, visibility or loot. They are drawn below creatures and items.
 
@@ -8157,6 +8158,12 @@ stay unchanged, allowing direct comparison of the same location across floors.
 An unexplored area on the selected floor remains fogged even if the same
 coordinates were explored on another floor. Only explicit zoom/pan controls
 change the shared map viewport while browsing.
+Discovered Dwarven Ruins lift platforms and Dwarven Mines haulage-cage endpoints
+have small bright-green, dark-outlined dots on both the nearby minimap and the
+full map (including previously explored floors). The dots identify shortcuts
+whether locked or unlocked, but never reveal an undiscovered location. The
+intermediate mine rope shaft receives no dot. Markers derive from saved shortcut
+endpoints and discovery grids, without additional game state or replay RNG.
 On the surface, a discovered sand tile that has been dug shows its darker
 excavated appearance on both minimaps and the full map, matching the main
 canvas. This uses the already persisted `dugSandTiles` state; digging updates

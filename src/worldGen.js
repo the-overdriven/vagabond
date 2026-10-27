@@ -8196,7 +8196,8 @@ function spawnNaturalDecorations(roll) {
     }
   }
 
-  // Every dwarven floor, including the mines, has barrels and reliefs.
+  // The inhabited fort and ruins keep dwarven furnishings; abandoned mines
+  // retain only natural wall mushrooms from this decoration pass.
   for(let i=1;i<deepLevels.length;i++){
     const layer=deepLevels[i]
     if(!['dwarvenFort','dwarvenRuins','dwarvenMines'].includes(layer?.kind))continue
@@ -8207,12 +8208,14 @@ function spawnNaturalDecorations(roll) {
       if(layer.map[y][x]===floor) floors.push({x,y})
       if(layer.map[y][x]===wall&&nearby(layer.map,x,y,[floor],1))walls.push({x,y})
     }
+    if(layer.kind==='dwarvenMines') {
+      scatter(level,'wall-mushrooms',walls,cfg.mineWallMushroomsPerFloor,82+i*5,4)
+      continue
+    }
     const barrels=scatter(level,'alcohol-barrel',floors,cfg.dwarfBarrelsPerFloor,80+i*5,5)
     const reliefs=scatter(level,'dwarven-wall-relief',walls,cfg.dwarfReliefsPerFloor,81+i*5,5)
     if(barrels<cfg.dwarfBarrelsPerFloor||reliefs<cfg.dwarfReliefsPerFloor)
       throw new Error(`Could not decorate dwarven floor ${level} with its required barrels and reliefs.`)
-    if(layer.kind==='dwarvenMines')
-      scatter(level,'wall-mushrooms',walls,cfg.mineWallMushroomsPerFloor,82+i*5,4)
   }
 }
 

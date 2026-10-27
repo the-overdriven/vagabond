@@ -95,6 +95,70 @@ describe('Dwarven Ruins shortcut lift', () => {
       inspect()
       check(currentZ === lift.lower.z && player.x === lift.lower.x && player.y === lift.lower.y,
         'upper lift returns to exact deeper endpoint')
+
+      // The two shortcut systems use the same map presentation, including
+      // historical full-map previews and the nearby side minimap.
+      const green = RENDER_STYLE.minimap.dungeonShortcut.color
+      const captureDots = (ctx, paint) => {
+        const dots = []
+        const oldArc = ctx.arc, oldFill = ctx.fill
+        let lastArc = null
+        ctx.arc = function(x, y, radius, ...rest) {
+          lastArc = {x, y, radius}
+          return oldArc.call(this, x, y, radius, ...rest)
+        }
+        ctx.fill = function(...args) {
+          if (this.fillStyle === green && lastArc) dots.push(lastArc)
+          return oldFill.apply(this, args)
+        }
+        try { paint() } finally { ctx.arc = oldArc; ctx.fill = oldFill }
+        return dots
+      }
+      const checkShortcutDot = (endpoint, label) => {
+        const depth = chainDepthForZ(endpoint.z)
+        const level = deepLevels[depth-2]
+        const seen = level.discovered
+        // Keep the historical floor browseable even with the shortcut fogged.
+        seen[endpoint.y][endpoint.x-1] = true
+        seen[endpoint.y][endpoint.x] = true
+        currentZ = 0; currentCave = -1; map = surfaceMap
+        mapViewKey = 'chain:' + depth
+        mapPanX = endpoint.x; mapPanY = endpoint.y
+        const worldDots = captureDots(mctx, () => renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true))
+        check(worldDots.length === 1 && worldDots[0].radius >= 2.75,
+          label + ' shows a visible green dot on a browsed full-map floor')
+
+        currentZ = endpoint.z; currentCave = -1; map = level.map
+        undergroundDiscovered = seen
+        player.x = endpoint.x; player.y = endpoint.y
+        const origin = sideMiniOrigin()
+        const sideDots = captureDots(sideCtx,
+          () => renderMinimapCanvas(sideCtx, SIDE_SCALE, origin.x, origin.y, false))
+        check(sideDots.length === 1 && sideDots[0].radius >= 3,
+          label + ' shows a visible green dot on the side minimap')
+
+        seen[endpoint.y][endpoint.x] = false
+        check(captureDots(sideCtx,
+          () => renderMinimapCanvas(sideCtx, SIDE_SCALE, origin.x, origin.y, false)).length === 0,
+          label + ' is hidden from the side minimap before discovery')
+        check(captureDots(mctx,
+          () => renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)).length === 0,
+          label + ' is hidden on historical full-map floors before discovery')
+        seen[endpoint.y][endpoint.x] = true
+      }
+      checkShortcutDot(lift.upper, 'Ruins upper lift')
+      checkShortcutDot(lift.lower, 'Ruins lower lift')
+      const cage = dwarvenMinesCageShortcut()
+      check(!!cage, 'Mines cage metadata exists alongside the Ruins lift')
+      checkShortcutDot(cage.upper, 'Mines upper haulage cage')
+      checkShortcutDot(cage.lower, 'Mines lower haulage cage')
+      const shaftDepth = chainDepthForZ(cage.upper.z) + 1
+      const shaftSeen = depthUndergroundDiscovered(shaftDepth)
+      shaftSeen[cage.upper.y][cage.upper.x] = true
+      mapViewKey = 'chain:' + shaftDepth
+      check(captureDots(mctx,
+        () => renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)).length === 0,
+        'intermediate rope shaft is not marked as a usable cage')
     })()`))
   })
 

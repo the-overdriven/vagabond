@@ -163,12 +163,19 @@ describe('Decorative caves and deep threat rarity', () => {
           const floor=deepLevels[i]
           if(!['dwarvenFort','dwarvenRuins','dwarvenMines'].includes(floor.kind))continue
           const level=chainZForDepth(i+2),props=caveDecorations.filter(p=>p.level===level)
+          if(floor.kind==='dwarvenMines') {
+            check(!props.some(p=>p.kind==='alcohol-barrel'||p.kind==='dwarven-wall-relief'),
+              'abandoned mine floors contain neither barrels nor carved dwarven reliefs')
+            check(props.some(p=>p.kind==='wall-mushrooms'),
+              'mines retain natural wall mushrooms')
+            continue
+          }
           check(props.filter(p=>p.kind==='alcohol-barrel').length>=decorCfg.dwarfBarrelsPerFloor,
-            'each dwarven floor has at least two barrels')
+            'fort and ruins floors have at least two barrels')
           check(props.filter(p=>p.kind==='dwarven-wall-relief').length>=decorCfg.dwarfReliefsPerFloor,
-            'each dwarven floor has at least two reliefs')
+            'fort and ruins floors have at least two reliefs')
           check(props.filter(p=>p.kind==='dwarven-wall-relief').every(p=>
-            floor.map[p.y][p.x]===(floor.kind==='dwarvenMines'?'cavewall':'dwarvenwall')),
+            floor.map[p.y][p.x]==='dwarvenwall'),
             'reliefs are on real walls')
         }
         check(dwarvenRuin && deepLevels[1],'fort still generated')
