@@ -710,6 +710,7 @@ body.hint-collapsed #hint .panel-toggle {
 @media (max-width: 720px), (pointer: coarse) {
   /* Keep the conversation above the fixed mobile message log (z-index: 110).
      The HUD (z-index: 130) stays accessible above the backdrop. */
+  body.npc-dialogue-open #stage { z-index: 119; }
   #npcOverlay { position: fixed; inset: var(--mobile-hud-height, 56px) 0 0; z-index: 120; align-items: flex-end; background: rgba(5, 4, 3, 0.76); }
   #npcOverlay .panelbox { width: 100%; max-width: 100%; max-height: min(82dvh, calc(100dvh - var(--mobile-hud-height, 56px))); box-sizing: border-box; margin: 0; border-radius: 10px 10px 0 0; padding: 20px 18px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border-color: #755137; }
   #npcOverlay .npc-dialogue-header { gap: 14px; margin-bottom: 20px; }

@@ -55,6 +55,8 @@ describe('Gear bases on procedural artifacts', () => {
         if(slot==='weapon'){
           check(item.atk===base.atk && item.grace===base.grace,'weapon stats '+base.name)
           check(item.twoHanded===base.twoHanded,'weapon handedness '+base.name)
+          if(base.rangedAtk)check(item.rangedAtk===base.rangedAtk && item.rangedRange===base.rangedRange,
+            'ranged artifact stats '+base.name)
         } else check(item.def===base.def,'defense '+base.name)
         if(slot==='armor')check(item.speedPenalty===(base.speedPenalty||0) &&
           (item.gracePenalty||0)===(base.gracePenalty||0),'armor penalties '+base.name)

@@ -87,10 +87,12 @@ describe('Desktop combat enemy tooltip', () => {
         const rect=canvas.getBoundingClientRect()
         const clientX=rect.left+(distant.x-camX+0.5)*TILE_PX*rect.width/canvas.width
         const clientY=rect.top+(distant.y-camY+0.5)*TILE_PX*rect.height/canvas.height
-        lastMousePx=(b.x-camX+0.5)*TILE_PX
-        lastMousePy=(b.y-camY+0.5)*TILE_PX
-        updateTooltip()
-        check(canvas.style.cursor.includes('red-sword.svg'),'adjacent monster uses sword cursor')
+        const adjacentX=rect.left+(b.x-camX+0.5)*TILE_PX*rect.width/canvas.width
+        const adjacentY=rect.top+(b.y-camY+0.5)*TILE_PX*rect.height/canvas.height
+        canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:adjacentX,clientY:adjacentY}))
+        check(canvas.style.cursor.includes('red-sword.svg'),
+          'adjacent monster uses sword cursor (hovered='+hoveredEnemy?.name+', tile='+
+          [Math.floor(camX+lastMousePx/TILE_PX),Math.floor(camY+lastMousePy/TILE_PX)]+')')
         canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX,clientY}))
         check(canvas.style.cursor.includes('red-sword.svg'),'distant monster also uses sword cursor')
         check(hoveredAutoPath?.at(-1)?.x===distant.x && hoveredAutoPath.at(-1).y===distant.y,

@@ -31,24 +31,24 @@ function artifact(base, tier) {
   })()`))
 }
 
-test('artifact noun catalog uses all eligible non-ranged gear bases', async () => {
+test('artifact noun catalog uses every gear base, including Short Bow', async () => {
   await ready()
-  const gear = Object.values(catalogs).flat().filter(base => !base.rangedAtk)
+  const gear = Object.values(catalogs).flat()
   for (const base of gear) {
     assert.ok(!nouns.includes(base.name), `gear noun duplicated: ${base.name}`)
-    const possible = run(`([...ARTIFACT_NOUNS, ...[...WEAPONS,...SHIELDS,...ARMORS].filter(i=>!i.rangedAtk&&i.tier<=${base.tier}).map(i=>i.name)]).includes(${JSON.stringify(base.name)})`)
+    const possible = run(`([...ARTIFACT_NOUNS, ...[...WEAPONS,...SHIELDS,...ARMORS].filter(i=>i.tier<=${base.tier}).map(i=>i.name)]).includes(${JSON.stringify(base.name)})`)
     assert.ok(possible, `${base.name} must automatically be eligible at its tier`)
   }
   assert.ok(!run('ARTIFACT_NOUNS.includes("Brigandine")'))
-  assert.ok(!run('[...ARTIFACT_NOUNS, ...WEAPONS.filter(i=>!i.rangedAtk).map(i=>i.name)].includes("Short Bow")'),
-    'Short Bow must not enter ordinary artifact generation')
+  assert.ok(run('[...ARTIFACT_NOUNS, ...WEAPONS.map(i=>i.name)].includes("Short Bow")'),
+    'Short Bow is an eligible artifact weapon base')
   assert.notEqual(artifact('Titan Warpick', 3).base, 'Titan Warpick', 'tier-3 artifact must not pick a tier-5 base')
 })
 
 test('generated artifacts inherit the stats of every available gear base', async () => {
   await ready()
   for (const [slot, gear] of Object.entries(catalogs)) {
-    for (const base of gear.filter(base => !base.rangedAtk)) {
+    for (const base of gear) {
       const item = artifact(base.name, Math.max(3, base.tier))
       assert.equal(item.kind, 'artifact')
       assert.equal(item.noun, base.name)
@@ -62,12 +62,50 @@ test('generated artifacts inherit the stats of every available gear base', async
         assert.equal(item.atk, base.atk)
         assert.equal(item.grace, base.grace)
         assert.equal(item.twoHanded, base.twoHanded)
+        if (base.rangedAtk) {
+          assert.equal(item.rangedAtk, base.rangedAtk, `${base.name} keeps ranged ATK`)
+          assert.equal(item.rangedRange, base.rangedRange, `${base.name} keeps ranged range`)
+        }
       } else assert.equal(item.def, base.def)
       if (slot === 'armor') {
         assert.equal(item.speedPenalty, base.speedPenalty || 0)
         assert.equal(item.gracePenalty || 0, base.gracePenalty || 0)
       }
     }
+  }
+})
+
+test('artifact Short Bow fires at fixed bow damage and consumes ammunition', async () => {
+  await ready()
+  const bow = artifact('Short Bow', 3)
+  assert.equal(bow.kind, 'artifact')
+  assert.equal(bow.artifactSlot, 'weapon')
+  assert.equal(bow.rangedAtk, 5)
+  assert.equal(bow.rangedRange, 6)
+  run(`(() => {
+    window.artBowOriginal={chance,damageRoll,enemyTurn,npcTurn,log}
+    replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+    enemies=[];npcs=[];groundItems=[];occupied=new Set()
+    player.x=40;player.y=40;player.godMode=false;player.invisibleTurns=0
+    player.equip={weapon:${JSON.stringify(bow)},armor:null,shield:null}
+    player.inventory=[createItem('arrows',{count:2})]
+    for(let y=37;y<=43;y++)for(let x=37;x<=47;x++){
+      map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+    }
+    const t=ENEMY_TEMPLATE_BY_NAME.Goblin
+    window.artBowTarget=addEnemy({...t,id:'artifact-bow-target',name:'Goblin',baseName:'Goblin',
+      x:44,y:40,level:0,alive:true,hp:100,maxHp:100,
+      equipment:null,shooterAbility:null,shotsRemaining:0})
+    occupied.add(keyXY(44,40))
+    chance=()=>false;damageRoll=atk=>atk;enemyTurn=()=>{};npcTurn=()=>{};log=()=>{}
+  })()`)
+  try {
+    assert.equal(run('equippedShortBow()?.kind'),'artifact')
+    assert.equal(run('shootEnemy(artBowTarget)'),true)
+    assert.equal(run('artBowTarget.hp'),95,'artifact bonuses do not increase fixed projectile damage')
+    assert.equal(run('player.inventory.find(i=>i.kind==="arrows")?.count'),1)
+  } finally {
+    run('chance=artBowOriginal.chance;damageRoll=artBowOriginal.damageRoll;enemyTurn=artBowOriginal.enemyTurn;npcTurn=artBowOriginal.npcTurn;log=artBowOriginal.log')
   }
 })
 

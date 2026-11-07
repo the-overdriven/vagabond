@@ -212,7 +212,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261107-mobile-npc-dialogue">
+  <link rel="stylesheet" href="css/style.css?v=20261107-mobile-npc-layer">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -2201,7 +2201,7 @@ more difficult:
       : pick(normalEffects.length ? normalEffects : pool)
     // A low-tier artifact must not roll the statistics of a higher-tier
     // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
-    const eligibleGearNames = [...WEAPONS.filter(w => !w.rangedAtk), ...SHIELDS, ...ARMORS]
+    const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
       .filter(base => base.tier <= effect.tier).map(base => base.name)
     const noun = pick([...ARTIFACT_NOUNS, ...eligibleGearNames])
     const gear = artifactGearBase(noun)
@@ -2253,7 +2253,8 @@ more difficult:
       ...(gear ? {
         base: gear.base.name,
         ...(slot === 'weapon' ? {
-          atk: gear.base.atk, grace: gear.base.grace, twoHanded: !!gear.base.twoHanded
+          atk: gear.base.atk, grace: gear.base.grace, twoHanded: !!gear.base.twoHanded,
+          ...(gear.base.rangedAtk ? {rangedAtk: gear.base.rangedAtk, rangedRange: gear.base.rangedRange} : {})
         } : {def: gear.base.def}),
         ...(slot === 'armor' ? {
           speedPenalty: gear.base.speedPenalty || 0,
@@ -13417,6 +13418,7 @@ more difficult:
     const overlayOpen = invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
+    document.body.classList.toggle('npc-dialogue-open', npcMenuOpen)
     requestAnimationFrame(updateMobileSafeAreas)
   }
 

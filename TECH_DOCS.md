@@ -5690,10 +5690,15 @@ bonuses do not increase the bow's fixed projectile damage. Enemy turns, XP,
 quests, and stealth reactions resolve with ordinary combat rules; projectile
 flight is visual-only and cannot affect the deterministic result.
 
-Short Bows come from the Merchant or arrow-shooting monsters (§54, §20), never
-the ordinary weapon/artifact generation pool. They are normal inventory gear
-with no new persistent state; arrow stacks, equipped bows, and monster
-ammunition use existing save fields. Replays record shots by enemy ID and tile;
+Ordinary Short Bows come from the Merchant or arrow-shooting monsters (§54, §20),
+not the ordinary random weapon pool. **Short Bow artifacts** can be generated
+from the normal artifact pool, inheriting the bow's 1 melee ATK, two-handed
+restriction, **5 ranged ATK**, and **6-tile range**. Enchantments and curses
+behave as on other equipped artifacts, but neither melee ATK bonuses nor
+artifact enchantments raise the fixed projectile damage. Unidentified bow
+artifacts retain their hidden names while equipped and firing. Like ordinary
+bows, they use the existing equipment, ammunition, and save rules. Replays
+record shots by enemy ID and tile;
 failed attempts do not mutate gameplay. Valid shots may also provoke one
 response step beyond a monster's normal AGGRO;
 the rules are in Enemy AI (§22). The bow's hover cursor uses the same glowing

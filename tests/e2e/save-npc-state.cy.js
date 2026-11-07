@@ -83,8 +83,17 @@ describe('Exact current-save state restoration', () => {
         const overlay=document.getElementById('npcOverlay')
         const panel=document.getElementById('npcPanel')
         const logPanel=document.getElementById('logpanel')
-        check(Number(getComputedStyle(overlay).zIndex)>Number(getComputedStyle(logPanel).zIndex),
-          'mobile conversation sits above the fixed message log')
+        const stage=document.getElementById('stage')
+        const stageZ=parseInt(getComputedStyle(stage).zIndex,10)||0
+        const logZ=parseInt(getComputedStyle(logPanel).zIndex,10)||0
+        check(document.body.classList.contains('npc-dialogue-open') && stageZ>logZ,
+          'mobile stage rises above the message log during conversation')
+        const sheet=panel.getBoundingClientRect(),logRect=logPanel.getBoundingClientRect()
+        const left=Math.max(sheet.left,logRect.left),right=Math.min(sheet.right,logRect.right)
+        const top=Math.max(sheet.top,logRect.top),bottom=Math.min(sheet.bottom,logRect.bottom)
+        check(right>left && bottom>top &&
+          overlay.contains(document.elementFromPoint((left+right)/2,(top+bottom)/2)),
+          'mobile conversation actually covers the message log where they overlap')
         check(parseFloat(getComputedStyle(document.getElementById('npcSpeech')).fontSize)>=15,
           'mobile spoken dialogue has legible text')
         selectNpcMenuOption('gossip')
