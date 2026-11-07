@@ -35,6 +35,8 @@ describe('Desktop combat enemy tooltip', () => {
       player.equip={weapon:null,armor:null,shield:null}
       snapCameraToPlayer();lastMousePx=null;lastMousePy=null;hoveredEnemy=null
       tooltip.style.display='none';hideDesktopCombatTooltip()
+      check(Math.round(parseFloat(getComputedStyle(document.getElementById('logpanel')).height))===220,
+        'desktop message log defaults to 220px height')
       document.body.classList.remove('hint-collapsed')
       check(desktopUsesHoverTooltips(),'desktop must use fine-pointer tooltip behavior')
 
@@ -85,9 +87,18 @@ describe('Desktop combat enemy tooltip', () => {
         const rect=canvas.getBoundingClientRect()
         const clientX=rect.left+(distant.x-camX+0.5)*TILE_PX*rect.width/canvas.width
         const clientY=rect.top+(distant.y-camY+0.5)*TILE_PX*rect.height/canvas.height
+        lastMousePx=(b.x-camX+0.5)*TILE_PX
+        lastMousePy=(b.y-camY+0.5)*TILE_PX
+        updateTooltip()
+        check(canvas.style.cursor.includes('red-sword.svg'),'adjacent monster uses sword cursor')
         canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX,clientY}))
+        check(canvas.style.cursor.includes('red-sword.svg'),'distant monster also uses sword cursor')
         check(hoveredAutoPath?.at(-1)?.x===distant.x && hoveredAutoPath.at(-1).y===distant.y,
           'hover shows a route to the occupied enemy tile')
+        const clearY=rect.top+(42-camY+0.5)*TILE_PX*rect.height/canvas.height
+        canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:rect.left+(40-camX+0.5)*TILE_PX*rect.width/canvas.width,clientY:clearY}))
+        check(canvas.style.cursor==='', 'empty tile restores normal cursor')
+        canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX,clientY}))
         canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX,clientY,button:0}))
         check(autoPath?.at(-1)?.x===distant.x && autoPath.at(-1).y===distant.y,
           'clicking a distant enemy starts a route to it')

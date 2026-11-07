@@ -51,6 +51,31 @@ describe('Dwarven Ruins rendering paths', () => {
         USE_TILE_IMAGES = false
         render()
         check(document.getElementById('game').width > 0 && document.getElementById('game').height > 0, 'ASCII canvas renders')
+        // A known route can extend past current sight. Its markers must stay
+        // above underground darkness without uncovering unknown terrain.
+        const distantX = player.x + 10 < MAP_W ? player.x + 10 : player.x - 10
+        check(!undergroundTileVisible(distantX, player.y), 'route test tile is outside underground FOV')
+        const oldFootstep = drawPathFootstepMarker, oldDarkness = drawMineSightDarkness
+        const oldAutoPath = autoPath, oldHoverPath = hoveredAutoPath
+        const drawOrder = []
+        try {
+          autoPath = null
+          hoveredAutoPath = [{x:distantX,y:player.y}]
+          drawPathFootstepMarker = (...args) => {drawOrder.push('footstep');return oldFootstep(...args)}
+          drawMineSightDarkness = (...args) => {drawOrder.push('darkness');return oldDarkness(...args)}
+          for (const tileMode of [true,false]) {
+            USE_TILE_IMAGES = tileMode
+            drawOrder.length = 0
+            render()
+            check(drawOrder.includes('darkness') && drawOrder.indexOf('footstep') > drawOrder.indexOf('darkness'),
+              'known underground route draws on top of darkness in mode '+tileMode)
+          }
+        } finally {
+          drawPathFootstepMarker = oldFootstep
+          drawMineSightDarkness = oldDarkness
+          autoPath = oldAutoPath
+          hoveredAutoPath = oldHoverPath
+        }
         USE_TILE_IMAGES = true
         render()
       })()`))

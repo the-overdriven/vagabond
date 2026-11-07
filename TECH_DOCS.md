@@ -450,9 +450,9 @@ Walking into an adjacent enemy attacks instead of entering its tile.
 On desktop/fine-pointer devices, clicking an adjacent living enemy (including a
 diagonal neighbor) invokes the same `tryMove(dx, dy)` combat path as keyboard
 movement, so turn consumption, replay recording, combat rules, and animations
-remain shared rather than duplicated. Hovering such an attackable enemy changes
-the canvas cursor to a red diagonal sword whose hotspot is the sword tip. Outside
-an attackable enemy, the inline cursor override is cleared so the canvas keeps its
+remain shared rather than duplicated. Hovering any visible living enemy, whether
+adjacent or distant, changes the canvas cursor to a red diagonal sword whose
+hotspot is the sword tip. Outside an enemy, the inline cursor override is cleared so the canvas keeps its
 existing stylesheet/default cursor. Clicking a visible, non-adjacent enemy
 uses normal auto-pathing toward its clicked tile, including the path preview on
 hover. If the enemy remains there, the final step attacks through the ordinary
@@ -461,6 +461,10 @@ clicked tile rather than automatically pursuing the enemy. Unreachable targets
 do not start a route. Coarse-pointer/mobile input does not use this cursor or
 desktop monster-click behavior. The sword SVG is decoded with the essential startup
 images, before character selection opens, and the cursor uses that preloaded URL.
+Auto-path footsteps and the remaining-step counter render above underground
+fog/darkness, remaining legible on already-discovered tiles beyond current sight.
+Pathfinding still refuses unknown underground tiles, so this does not expose
+unexplored terrain.
 
 On fine-pointer desktop layouts, attacking an enemy also keeps a temporary combat
 inspection target. While the keyboard-hint panel is collapsed, if that enemy is not
@@ -8366,16 +8370,17 @@ before each tile-size step. Desktop inspection tooltips remain overlays above
 the canvas and side panels; near the right or top edge they flip/clamp back into
 the visible canvas instead of being clipped by the browser edge.
 
-On desktop the message log floats as a narrow, taller panel along the lower-left
+On desktop the message log floats as a narrow panel along the lower-left
 side of the canvas rather than consuming camera height. It keeps its original
 40 px bottom inset relative to the stage instead of shifting in response to
 active-status badges. Very tall status strips may therefore overlap the log.
-Its panel background is semi-transparent so terrain remains perceptible beneath
-it, while the log itself remains scrollable and continues to intercept
+Its panel background is lightly transparent so terrain remains perceptible beneath
+it, with brighter informational text and gentler fading of older messages.
+The log remains scrollable and continues to intercept
 pointer/wheel input normally. A top-right resize grip lets the player change both
 width and height without resizing the game camera; the grip is inset from the
 native vertical scrollbar so the scrollbar cannot cover its visible or clickable
-area. The default is 420×260 px; resizing is bounded to at least 300×120 px when
+area. The default is 420×220 px; resizing is bounded to at least 300×120 px when
 space permits, at most 80% of the stage width and 60% of its height, and always
 kept inside the stage. The bottom anchor is preserved while resizing, so the
 panel grows upward/rightward without moving its resting position. The resize is

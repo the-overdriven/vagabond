@@ -7347,6 +7347,41 @@ more difficult:
     ctx.restore()
   }
 
+  function drawPlannedPathOverlay() {
+    const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
+    if (!previewPath?.length) return
+    let prevStep = {x: player.x, y: player.y}
+    for (let i = 0; i < previewPath.length; i++) {
+      const step = previewPath[i]
+      if (currentZ < 0 && !undergroundDiscovered?.[step.y]?.[step.x]) {
+        prevStep = step
+        continue
+      }
+      const pvx = Math.round((step.x - camX) * TILE_PX)
+      const pvy = Math.round((step.y - camY) * TILE_PX)
+      const nextStep = previewPath[i + 1] || null
+      const dirX = nextStep ? nextStep.x - step.x : step.x - prevStep.x
+      const dirY = nextStep ? nextStep.y - step.y : step.y - prevStep.y
+      drawPathFootstepMarker(pvx + TILE_PX * 0.5, pvy + TILE_PX * 0.5, TILE_PX, dirX, dirY)
+      prevStep = step
+    }
+    const last = previewPath[previewPath.length - 1]
+    if (currentZ < 0 && !undergroundDiscovered?.[last.y]?.[last.x]) return
+    const lx = Math.round((last.x - camX) * TILE_PX)
+    const ly = Math.round((last.y - camY) * TILE_PX)
+    ctx.save()
+    ctx.fillStyle = RENDER_STYLE.overlays.pathCounterBackground
+    ctx.beginPath()
+    ctx.arc(lx + TILE_PX * 0.78, ly + TILE_PX * 0.22, TILE_PX * 0.18, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = RENDER_STYLE.overlays.pathCounterText
+    ctx.font = 'bold 10px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(previewPath.length), lx + TILE_PX * 0.78, ly + TILE_PX * 0.22)
+    ctx.restore()
+  }
+
   function flushPendingMove() {
     if (onlineRecordsBlockActions()) return
     if (autoPath && autoPath.length) {
@@ -10541,42 +10576,8 @@ more difficult:
         ctx.restore()
       }
     }
-    // planned movement path, or the route a desktop click would use
-    const previewPath = autoPath && autoPath.length ? autoPath : hoveredAutoPath
-    if (previewPath && previewPath.length) {
-      let prevStep = {x: player.x, y: player.y}
-      for (let i = 0; i < previewPath.length; i++) {
-        const step = previewPath[i]
-        if (!undergroundTileVisible(step.x, step.y) ||
-            (undergroundVisible && !undergroundDiscovered?.[step.y]?.[step.x])) {
-          prevStep = step
-          continue
-        }
-        const pvx = Math.round((step.x - camX) * TILE_PX)
-        const pvy = Math.round((step.y - camY) * TILE_PX)
-        const nextStep = previewPath[i + 1] || null
-        const dirX = nextStep ? nextStep.x - step.x : step.x - prevStep.x
-        const dirY = nextStep ? nextStep.y - step.y : step.y - prevStep.y
-        drawPathFootstepMarker(pvx + TILE_PX * 0.5, pvy + TILE_PX * 0.5, TILE_PX, dirX, dirY)
-        prevStep = step
-      }
-      const last = previewPath[previewPath.length - 1]
-      if (undergroundTileVisible(last.x, last.y)) {
-      const lx = Math.round((last.x - camX) * TILE_PX)
-      const ly = Math.round((last.y - camY) * TILE_PX)
-      ctx.save()
-      ctx.fillStyle = RENDER_STYLE.overlays.pathCounterBackground
-      ctx.beginPath()
-      ctx.arc(lx + TILE_PX * 0.78, ly + TILE_PX * 0.22, TILE_PX * 0.18, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = RENDER_STYLE.overlays.pathCounterText
-      ctx.font = 'bold 10px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(String(previewPath.length), lx + TILE_PX * 0.78, ly + TILE_PX * 0.22)
-      ctx.restore()
-      }
-    }
+    // Surface and upper-level paths retain their original position beneath actors.
+    if (currentZ >= 0) drawPlannedPathOverlay()
     // Ranged projectiles are presentation-only. Gameplay, RNG, damage and
     // ammunition are already resolved before an entry is added here.
     for (let i = projectileAnims.length - 1; i >= 0; i--) {
@@ -10717,6 +10718,8 @@ more difficult:
     // to remove the darkness smoothly wherever their light actually reaches.
     drawMineSightDarkness(undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
     drawCrystalGlow(now, undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
+    // Underground path markers stay legible above the darkness overlay.
+    if (currentZ < 0) drawPlannedPathOverlay()
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     drawEnemyTelegraphWarnings(undergroundVisible,true)
@@ -11121,8 +11124,11 @@ more difficult:
   }
 
   function setDesktopCanvasCursor(e) {
-    if (window.matchMedia('(pointer: coarse)').matches) return
-    canvas.style.cursor = enemyIsDesktopClickAttackable(e)
+    if (window.matchMedia('(pointer: coarse)').matches) {
+      canvas.style.cursor = ''
+      return
+    }
+    canvas.style.cursor = e
       ? `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair` : ''
   }
 

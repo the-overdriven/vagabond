@@ -359,7 +359,7 @@ canvas {
     width: min(420px, calc(var(--game-width, 840px) - 24px));
     min-width: min(300px, calc(var(--game-width, 840px) - 24px));
     max-width: min(80vw, calc(var(--game-width, 840px) - 24px));
-    height: 260px;
+    height: 220px;
     min-height: 120px;
     max-height: min(60vh, calc(var(--game-height, 600px) - 84px));
     margin: 0;
@@ -369,10 +369,15 @@ canvas {
     background:
       linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) right 16px top 6px / 16px 2px no-repeat,
       linear-gradient(rgba(232, 162, 79, 0.72), rgba(232, 162, 79, 0.72)) right 16px top 6px / 2px 16px no-repeat,
-      linear-gradient(180deg, rgba(35, 26, 18, 0.78), rgba(26, 19, 14, 0.78));
+      linear-gradient(180deg, rgba(35, 26, 18, 0.93), rgba(26, 19, 14, 0.93));
     border-color: rgba(74, 51, 32, 0.88);
     box-shadow: 0 0 16px rgba(0, 0, 0, 0.38);
   }
+
+  #logpanel div.info { color: #cbb995; }
+  #logpanel > div { opacity: 0.88; filter: saturate(0.9); }
+  #logpanel > div:nth-last-child(3) { opacity: 0.94; filter: none; }
+  #logpanel > div:nth-last-child(2) { opacity: 0.97; filter: none; }
 
   /* The desktop log grows rightward and upward from its bottom-left anchor.
      The painted top-right corner stays visible even while log history scrolls. */
