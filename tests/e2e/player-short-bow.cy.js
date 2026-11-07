@@ -7,7 +7,7 @@ function beginNewGame(name) {
 }
 
 describe('Player Short Bow', () => {
-  it('sells bow and separate ten-arrow bundles; auto-recovers shooter arrows and rare bow drops', () => {
+  it('sells bow and separate ten-arrow bundles; distant shooter loot remains recoverable on the ground', () => {
     cy.viewport(1440, 900)
     beginNewGame('Bow Merchant Tester')
     cy.window().then(win => win.eval(`(() => {
@@ -27,7 +27,7 @@ describe('Player Short Bow', () => {
         'one bundle adds exactly ten arrows for 20 gold')
       check(merchantStock.includes(arrows),'arrows remain available for later purchases')
 
-      currentZ=0;map=surfaceMap;enemies=[];npcs=[];occupied=new Set()
+      currentZ=0;map=surfaceMap;enemies=[];npcs=[];groundItems=[];occupied=new Set()
       const template=ENEMY_TEMPLATE_BY_NAME.Kobold
       const shooter=addEnemy({...template,id:'bow-loot-shooter',baseName:'Kobold',name:'Kobold',
         x:player.x+2,y:player.y,level:0,alive:true,hp:1,maxHp:1,
@@ -36,12 +36,18 @@ describe('Player Short Bow', () => {
       const oldChance=chance
       try {
         chance=p=>p===RANGED_CONFIG.shortBowDropChance
-        killEnemy(shooter)
+        killEnemy(shooter,true,'arrow')
       } finally {chance=oldChance}
-      check(player.inventory.find(i=>i.kind==='arrows')?.count===14,
-        'all four remaining enemy arrows arrive directly in the inventory')
-      check(player.inventory.filter(i=>i.base==='Short Bow').length===2,
-        'seeded bow drop enters inventory without auto-equipping')
+      check(player.inventory.find(i=>i.kind==='arrows')?.count===10,
+        'distant enemy arrows do not teleport into the inventory')
+      const drops=groundItems.filter(g=>g.x===shooter.x&&g.y===shooter.y&&g.kind==='droppeditem')
+      check(drops.some(g=>g.item.kind==='arrows'&&g.item.count===4) &&
+        drops.some(g=>g.item.base==='Short Bow'),'both bow and arrows stack on one corpse tile')
+      player.x=shooter.x;player.y=shooter.y
+      lootSkeletonOrForage();lootSkeletonOrForage()
+      check(player.inventory.find(i=>i.kind==='arrows')?.count===14 &&
+        player.inventory.filter(i=>i.base==='Short Bow').length===2,
+        'foraging twice recovers both loot entries')
       check([...document.querySelectorAll('#logpanel')].some(el=>el.textContent.includes('4 arrows')),
         'the recovered ammunition appears in the message log')
     })()`))
@@ -150,6 +156,14 @@ describe('Player Short Bow', () => {
         check(!enemyOutmatchesPlayer(rat)&&shootEnemy(rat),'weak distant Rat can be shot at')
         check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
           'a miss still prompts one-tile retreat')
+        enemies=[];occupied=new Set()
+        const blockedRat=spawn('Giant Rat','response-blocked-rat')
+        for(let y=39;y<=41;y++)map[y][47]='mountain'
+        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===39,
+          'blocked retreat takes a legal sideways step toward farther ground')
+        check(shootEnemy(blockedRat)&&blockedRat.x===47&&blockedRat.y===38,
+          'another shot sends the monster around the obstacle')
+        for(let y=39;y<=41;y++)map[y][47]='grass'
         setDesktopCanvasCursor(rat)
         check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
           'equipped bow uses the refreshed glowing arrow cursor')
@@ -175,6 +189,38 @@ describe('Player Short Bow', () => {
       } finally {
         chance=oldChance;damageRoll=oldDamage;replayPlaying=false;replaySimulationMode=false
         replayRecording=false;activeReplay=null
+      }
+    })()`))
+  })
+
+  it('clears the mobile inspection target immediately after a fatal ranged hit', () => {
+    cy.viewport(390, 844)
+    beginNewGame('Mobile Bow Tester')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const oldChance=chance,oldDamage=damageRoll,oldEnemyTurn=enemyTurn,oldNpcTurn=npcTurn
+      try {
+        replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+        enemies=[];npcs=[];groundItems=[];occupied=new Set();deathTransition=null
+        player.x=40;player.y=40;player.godMode=false;player.invisibleTurns=0
+        player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
+        player.inventory=[createItem('arrows',{count:3})]
+        for(let y=37;y<=44;y++)for(let x=37;x<=46;x++){
+          map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        }
+        const t=ENEMY_TEMPLATE_BY_NAME.GiantRat || ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+        const enemy=addEnemy({...t,id:'mobile-bow-target',name:'Giant Rat',baseName:'Giant Rat',
+          x:43,y:40,level:0,alive:true,hp:1,maxHp:1,homeX:43,homeY:40,
+          equipment:null,shooterAbility:null,shotsRemaining:0})
+        occupied.add(keyXY(43,40))
+        updateMobileInfoPanel(43,40)
+        check(mobileInfoPanel._inspectedEnemy===enemy,'mobile info panel inspects living target')
+        chance=()=>false;damageRoll=()=>5;enemyTurn=()=>{turnCount++};npcTurn=()=>{}
+        check(shootEnemy(enemy)&&!enemy.alive,'bow kills inspected monster')
+        check(mobileInfoPanel._inspectedEnemy===null,
+          'fatal ranged hit clears the stale mobile monster inspection')
+      } finally {
+        chance=oldChance;damageRoll=oldDamage;enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn
       }
     })()`))
   })

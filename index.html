@@ -3979,19 +3979,36 @@ more difficult:
     tombstoneOrder = order
   }
 
-  function maybeDropTombstone(e) {
+  function maybeDropTombstone(e, onGround = false) {
     if (tombstonesRemaining <= 0) return false
     if (e.baseName !== 'Lich') return false
     if (!chance(0.8)) return false
     const slot = TOMBSTONE_INSCRIPTIONS.length - tombstonesRemaining
     const inscription = TOMBSTONE_INSCRIPTIONS[tombstoneOrder[slot]]
     tombstonesRemaining--
-    addInventoryItem('tombstone', {inscription})
-    log(`The ${e.name} dropped a Mysterious Tombstone.`, 'loot')
+    if (onGround) placeEnemyLootOnGround(e, createItem('tombstone', {inscription}))
+    else addInventoryItem('tombstone', {inscription})
+    log(`The ${e.name} dropped a Mysterious Tombstone${onGround ? ' on the ground' : ''}.`, 'loot')
     return true
   }
 
-  function lootFromEnemy(e) {
+  // Several distinct drops may occupy a corpse tile. Foraging picks up one
+  // entry at a time; matching stackables merge so arrow piles stay manageable.
+  function placeEnemyLootOnGround(e, item) {
+    const existing = isStackableKind(item.kind) && groundItems.find(g =>
+      g.kind === 'droppeditem' && g.x === e.x && g.y === e.y &&
+      g.level === (e.level ?? currentZ) && g.levelKind === (e.levelKind || currentLevelKind()) &&
+      g.caveIndex === (e.caveIndex ?? currentCave) && g.item?.kind === item.kind)
+    if (existing) {
+      existing.item.count = (existing.item.count || 1) + (item.count || 1)
+      return
+    }
+    groundItems.push({x:e.x, y:e.y, level:e.level ?? currentZ,
+      levelKind:e.levelKind || currentLevelKind(), caveIndex:e.caveIndex ?? currentCave,
+      kind:'droppeditem', item})
+  }
+
+  function lootFromEnemy(e, onGround = false) {
     const mf = playerMf()
 
     // Remaining ammunition is recovered automatically; bow drops are rarer.
@@ -3999,12 +4016,16 @@ more difficult:
     if (e.shooterAbility === 'shooterArrows') {
       const remaining = Math.max(0, e.shotsRemaining | 0)
       if (remaining) {
-        addInventoryItem('arrows', {count:remaining})
-        log(`You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
+        if (onGround) placeEnemyLootOnGround(e, createItem('arrows', {count:remaining}))
+        else addInventoryItem('arrows', {count:remaining})
+        log(onGround
+          ? `The ${e.name} drops ${remaining} arrow${remaining === 1 ? '' : 's'} on the ground.`
+          : `You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
       }
       if (chance(RANGED_CONFIG.shortBowDropChance)) {
         const bow = makeShortBowItem()
-        player.inventory.push(bow)
+        if (onGround) placeEnemyLootOnGround(e, bow)
+        else player.inventory.push(bow)
         lootLog(`The ${e.name} dropped a Short Bow.`, bow, bow.name)
       }
     }
@@ -4016,7 +4037,8 @@ more difficult:
       const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
       if (choices.length) {
         const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
-        addInventoryItem(entry.kind)
+        if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind))
+        else addInventoryItem(entry.kind)
         log(`The ${e.name} dropped a ${itemDefinition(entry.kind).name}.`,'loot')
       }
     }
@@ -4026,14 +4048,17 @@ more difficult:
     // cannot be skipped by later return paths.
     if ((e.baseName || e.name) === 'Fungus') {
       const mushroomCount = randInt(1, 3)
-      for (let i = 0; i < mushroomCount; i++) addMushroom()
+      for (let i = 0; i < mushroomCount; i++) {
+        if (onGround) placeEnemyLootOnGround(e, createItem('mushroom'))
+        else addMushroom()
+      }
       log(`The ${e.name} dropped ${mushroomCount} mushroom${mushroomCount === 1 ? '' : 's'}.`, 'loot')
     }
 
     // Gold drops from enemies have been disabled (per design decision) -
     // code kept/commented for easy reinstatement rather than deleted.
     // player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
-    maybeDropTombstone(e)
+    maybeDropTombstone(e, onGround)
     // Artifact drops are reduced to 40% of their former chance (60% rarer).
     // Guaranteed artifact chests are intentionally unaffected.
     const artifactDropRate = WORLD_GEN_CONFIG.lootRules.enemyArtifactDropRateMultiplier
@@ -4044,12 +4069,17 @@ more difficult:
       const art = makeArtifactItem(e.tier, mf)
       if (art) {
         lootLog(`The ${e.name} dropped ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
-        player.inventory.push(art)
+        if (onGround) placeEnemyLootOnGround(e, art)
+        else player.inventory.push(art)
       }
     }
     if (e.humanoid && e.equipment) {
       const item = e.equipment
       lootLog(`The ${e.name} dropped a ${item.name}.`, item)
+      if (onGround) {
+        placeEnemyLootOnGround(e, item)
+        return
+      }
       if (item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return
       player.inventory.push(item)
       return
@@ -4191,7 +4221,7 @@ more difficult:
 
   function tryEnemyTheft(e) {
     if (enemyInsideSanctuary(e) || !enemyHasAbility(e, 'thief') || e.theftUsed || !e.alive || e.hp <= 0 ||
-        playerHiddenFromEnemy(e) || enemyIsPassive(e) ||
+        playerHiddenFromEnemy(e) || enemyIsPassive(e) || enemyIsFleeing(e) ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) !== ATTACK_RANGE ||
         !enemyHasSight(e) || !enemyEscapeDestination(e)) return false
     const equipped = new Set(Object.values(player.equip).filter(Boolean))
@@ -4287,7 +4317,7 @@ more difficult:
 
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
-    const weaponName = player.equip.weapon ? (player.equip.weapon.kind === 'artifact' ? player.equip.weapon.name.replace(/^The\s+/i, '') : player.equip.weapon.name) : 'bare fists'
+    const weaponName = player.equip.weapon ? artifactDisplayName(player.equip.weapon).replace(/^The\s+/i, '') : 'bare fists'
     // The player can swing at the last known tile of an invisible enemy.
     // A miss does not expose it; a successful hit breaks its invisibility.
     const targetWasInvisible = enemyInvisibleActive(e)
@@ -4305,7 +4335,7 @@ more difficult:
     }
     // Ethereal immunity resolves before combat rolls.
     // Evasion requires seeing the attacker, including through true sight.
-    if (enemyHasAbility(e, 'ethereal') && !player.equip.weapon?.mod) {
+    if (enemyHasAbility(e, 'ethereal') && !player.equip.weapon?.mod && player.equip.weapon?.kind !== 'artifact') {
       log(`Your attack passes harmlessly through the ${e.name}. Only a magical weapon can harm it.`, 'info')
       spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
       return false
@@ -4368,7 +4398,7 @@ more difficult:
         ? e.equipment : null
       if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
         const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` :  e.name
-        log(`Your ${player.equip.weapon.name} outpaces ${enemyTimingText}, striking again!`, 'good')
+        log(`Your ${weaponName} outpaces ${enemyTimingText}, striking again!`, 'good')
         await playerAttackEnemy(e, true)
       }
     }
@@ -4444,7 +4474,7 @@ more difficult:
     if (!isExtraAttack && Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y)) <= ATTACK_RANGE &&
         canGetExtraWeaponAttack(enemyWeapon, player.equip.weapon, false, true, e, null)) {
       const enemyTimingText = enemyWeapon ? `${e.name}'s ${enemyWeapon.base}` : e.name
-      log(`${enemyTimingText} outpaces your ${player.equip.weapon.name}, striking again!`, 'bad')
+      log(`${enemyTimingText} outpaces your ${artifactDisplayName(player.equip.weapon)}, striking again!`, 'bad')
       return enemyAttackPlayer(e, true)
     }
     return false
@@ -4545,7 +4575,7 @@ more difficult:
       let hit = false
       if (rareBlocked) {
         log(`Your arrow cannot catch the fleeing ${e.name}.`, 'info')
-      } else if (enemyImmunityActive(e) || (enemyHasAbility(e, 'ethereal') && !bow.mod)) {
+      } else if (enemyImmunityActive(e) || (enemyHasAbility(e, 'ethereal') && !bow.mod && bow.kind !== 'artifact')) {
         log(`Your arrow passes harmlessly through the ${e.name}!`, 'bad')
         spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
       } else if (tryEvadePlayerAttack(e)) {
@@ -4573,7 +4603,7 @@ more difficult:
           `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
         logEnemyEnrageTransition(e, wasEnraged)
         if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
-        if (e.hp <= 0) killEnemy(e)
+        if (e.hp <= 0) killEnemy(e, true, 'arrow')
       }
       if (e.alive) {
         showDesktopCombatTooltip(e)
@@ -4731,7 +4761,11 @@ more difficult:
       e.stolenItemEquipped = false
       e.stolenItem = null
     }
-    if (cause !== 'sacrifice') lootFromEnemy(e)
+    if (cause !== 'sacrifice') {
+      const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+      lootFromEnemy(e, playerCredit && cause === 'arrow' && distance > ATTACK_RANGE)
+    }
+    if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
     updateHud()
   }
 
@@ -5395,11 +5429,38 @@ more difficult:
     return enemyStrength >= playerStrength
   }
 
+  // Bow targets may need to move sideways around a wall before they can gain
+  // distance. Keep the search local and deterministic, and never move closer
+  // to the shooter just to find an escape (which could cause backtracking).
+  function rangedRetreatDestination(e) {
+    const direct = enemyEscapeDestination(e)
+    if (direct) return direct
+    const startDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    const visited = new Set([keyXY(e.x, e.y)])
+    const queue = [{x:e.x, y:e.y, first:null, steps:0}]
+    for (let i = 0; i < queue.length; i++) {
+      const node = queue[i]
+      if (node.steps >= 12) continue
+      for (const [dx, dy] of DIRS8) {
+        const x = node.x + dx, y = node.y + dy, key = keyXY(x, y)
+        if (visited.has(key) || !enemyTileOpen(e, x, y) ||
+            (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+        const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+        if (distance < startDistance) continue
+        const first = node.first || {x, y}
+        if (distance > startDistance) return first
+        visited.add(key)
+        queue.push({x, y, first, steps:node.steps + 1})
+      }
+    }
+    return null
+  }
+
   function reactToDistantBowShot(e) {
     // A wounded fleeing creature stays defensive even if its base combat
     // stats still exceed the player's.
     if (!enemyIsFleeing(e) && enemyOutmatchesPlayer(e)) return enemyStepTowardPlayer(e)
-    const destination = enemyEscapeDestination(e)
+    const destination = rangedRetreatDestination(e)
     if (!destination) return false
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     const fromX = e.x, fromY = e.y
@@ -7012,7 +7073,7 @@ more difficult:
     }
     if (playerRemains) {
       if (playerRemains.item) player.inventory.push(playerRemains.item)
-      if (playerRemains.item) lootLog(`You recover ${playerRemains.item.name} from your remains.`, playerRemains.item)
+      if (playerRemains.item) lootLog(`You recover ${artifactDisplayName(playerRemains.item)} from your remains.`, playerRemains.item)
       else log('Nothing remains to recover.', 'loot')
       spawnPickupAnim(playerRemains)
       groundItems.splice(groundItems.indexOf(playerRemains), 1)
@@ -11265,7 +11326,10 @@ more difficult:
       return {mini: true, enemy: null,
         html: `<div class="nm">${name}</div><div>${note}</div>`}
     }
-    const g = groundItems.find(gi => onCurrentLevel(gi) && gi.kind !== 'gear' && gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' && gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
+    const groundHere = groundItems.filter(gi => onCurrentLevel(gi) && gi.kind !== 'gear' &&
+      gi.kind !== 'buriedgear' && gi.kind !== 'buriedartifact' &&
+      gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
+    const g = groundHere.find(gi => gi.kind === 'droppeditem') || groundHere[0]
     if (g) {
       if (g.kind === 'chest' && g.gasChamberId) return {
         mini: true, enemy: null,
@@ -11292,7 +11356,7 @@ more difficult:
       }
       if (g.kind === 'droppeditem') return {
         mini: true, enemy: null,
-        html: `<div class="nm">${groundItemLabel(g)}</div><div>Press F to pick up.</div>`
+        html: `<div class="nm">${groundItemLabel(g)}</div><div>${groundHere.filter(gi => gi.kind === 'droppeditem').length > 1 ? 'More items are piled here. ' : ''}Press F to pick up.</div>`
       }
       if (g.kind === 'skeleton') return {
         mini: true,

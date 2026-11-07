@@ -182,3 +182,50 @@ test('unidentified artifact gear can be equipped without exposing its secret ide
   assert.equal(run('player.equip.weapon.identified'),false,'save/replay initialization keeps identity hidden')
   assert.equal(run('player.equip.weapon.name'),'Dagger of Durvak','true name remains stored but hidden')
 })
+
+test('unidentified equipment never leaks its true name in combat logs; artifact weapons hit ghosts', async () => {
+  await ready()
+  run(`(() => {
+    replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+    enemies=[];npcs=[];occupied=new Set();player.x=40;player.y=40;player.hp=1000
+    map[40][40]='grass';map[40][41]='grass';player.godMode=false
+    player.equip={weapon:null,armor:null,shield:null};player.inventory=[]
+    window.testCombatMessages=[];log=msg=>window.testCombatMessages.push(msg)
+    chance=()=>false;damageRoll=()=>7;consumeItemTurn=()=>{}
+    const ghostTemplate=ENEMY_TEMPLATE_BY_NAME.Ghost
+    window.testGhost=addEnemy({...ghostTemplate,id:'unknown-gear-ghost',baseName:'Ghost',name:'Ghost',
+      x:41,y:40,level:0,alive:true,hp:100,maxHp:100,equipment:null})
+    occupied.add(keyXY(41,40))
+    window.testUnknownWeapon={kind:'artifact',artifactSlot:'weapon',name:'Dagger of Secret Flames',
+      noun:'Dagger',base:'Dagger',identified:false,atk:8,grace:3,twoHanded:false}
+    window.testUnknownArmor={kind:'artifact',artifactSlot:'armor',name:'Mail of Secret Flames',
+      noun:'Mail',base:'Mail',identified:false,def:8,speedPenalty:0}
+    window.testUnknownShield={kind:'artifact',artifactSlot:'shield',name:'Buckler of Secret Flames',
+      noun:'Buckler',base:'Buckler',identified:false,def:4}
+    player.inventory.push(testUnknownWeapon,testUnknownArmor,testUnknownShield)
+    equipItem(0);equipItem(0);equipItem(0)
+  })()`)
+  assert.equal(run('player.equip.weapon?.kind'),'artifact')
+  assert.equal(run('player.equip.armor?.kind'),'artifact')
+  assert.equal(run('player.equip.shield?.kind'),'artifact')
+  await run('playerAttackEnemy(testGhost)')
+  assert.equal(run('testGhost.hp'),93,'an unprefixed artifact weapon damages an ethereal Ghost')
+  const messages = run('window.testCombatMessages.join(" | ")')
+  assert.match(messages,/Unidentified Dagger/)
+  assert.match(messages,/Unidentified Mail/)
+  assert.match(messages,/Unidentified Buckler/)
+  assert.doesNotMatch(messages,/Secret Flames|of Secret/i,'actual equipment names stay secret')
+  run(`player.equip.weapon={kind:'weapon',name:'Dagger',base:'Dagger',atk:4,grace:3}`)
+  await run('playerAttackEnemy(testGhost)')
+  assert.equal(run('testGhost.hp'),93,'a mundane unmodified weapon cannot harm the Ghost')
+  run(`(() => {
+    player.equip.weapon=testUnknownWeapon;player.equip.shield=null;player.equip.armor=null
+    testGhost.abilities=['disarm'];testGhost.sleeping=false
+    testGhost.aware=true;testGhost.summonedTurn=-1
+    chance=()=>true;testCombatMessages.length=0
+  })()`)
+  assert.equal(run('tryEnemySpell(testGhost)'),true,'caster disarms an unknown artifact weapon')
+  const disarmLog=run('window.testCombatMessages.join(" | ")')
+  assert.match(disarmLog,/Unidentified Dagger/)
+  assert.doesNotMatch(disarmLog,/Secret Flames/,'disarming also preserves hidden equipment names')
+})

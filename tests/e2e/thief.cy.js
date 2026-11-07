@@ -173,6 +173,13 @@ describe('One-time monster theft', () => {
         for(const [dx,dy] of DIRS8) if(Math.max(Math.abs(e.x+dx-player.x),Math.abs(e.y+dy-player.y))>1) map[e.y+dy][e.x+dx]='mountain'
         theftCheck(!tryEnemyTheft(e) && calls===0,'cornered no roll')
         for(const [dx,dy] of DIRS8) map[e.y+dy][e.x+dx]='grass'
+        const monkey=makeThief('Monkey',{hp:9,maxHp:100})
+        occupied.delete(keyXY(e.x,e.y));enemies=enemies.filter(other=>other!==e)
+        calls=0
+        theftCheck(enemyIsFleeing(monkey)&&!tryEnemyTheft(monkey)&&calls===0 && !monkey.theftUsed,
+          'wounded retreating Monkey never attempts theft, even while adjacent')
+        enemies=enemies.filter(other=>other!==monkey);occupied.delete(keyXY(monkey.x,monkey.y))
+        occupied.add(keyXY(e.x,e.y))
         npcs=[{x:42,y:39},{x:42,y:40},{x:42,y:41}]
         theftCheck(!tryEnemyTheft(e) && calls===0,'NPCs close escape tiles');npcs=[]
         map[player.y][player.x]='temple';spawnPoint={x:player.x,y:player.y};rng=()=>0;enemyTurn()

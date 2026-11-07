@@ -148,7 +148,7 @@ function tryEnemySpell(e) {
     player.inventory.push(item)
     // Removing HP gear affects subsequent monsters now, even in headless replay.
     player.hp = Math.min(player.hp, playerMaxHp())
-    equipmentLog(`The ${e.name} casts a disarming spell! Your ${item.name} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
+    equipmentLog(`The ${e.name} casts a disarming spell! Your ${artifactDisplayName(item)} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
     spawnDamageNumber(player.x, player.y, 'Disarmed!', '#c7a5f6')
   } else if (spell === 'immunity') {
     e.immunityUsed = true

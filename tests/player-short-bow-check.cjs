@@ -87,16 +87,72 @@ async function main() {
     occupied.add(keyXY(shooter.x,shooter.y))
     const oldChance=chance
     chance=p=>p===RANGED_CONFIG.shortBowDropChance
-    killEnemy(shooter)
+    const arrowsBefore=player.inventory.find(i=>i.kind==='arrows')?.count
+    killEnemy(shooter,true,'arrow')
     chance=oldChance
-    check(player.inventory.find(i=>i.kind==='arrows')?.count===6,
-      'player auto-collects all four arrows remaining in shooter')
-    check(player.inventory.some(i=>i.base==='Short Bow'), 'shooter drops bow on seeded roll')
+    check(player.inventory.find(i=>i.kind==='arrows')?.count===arrowsBefore,
+      'distant kills do not teleport ammunition into inventory')
+    const drops=groundItems.filter(g=>g.x===46&&g.y===40&&g.kind==='droppeditem')
+    check(drops.some(g=>g.item.kind==='arrows'&&g.item.count===4),
+      'all four remaining shooter arrows land on the corpse tile')
+    check(drops.some(g=>g.item.base==='Short Bow'),
+      'seeded distant bow drop lands on the same tile as ammunition')
+    const extra=createItem('arrows',{count:3})
+    placeEnemyLootOnGround(shooter,extra)
+    check(groundItems.filter(g=>g.x===46&&g.y===40&&g.item?.kind==='arrows').length===1&&
+      drops.find(g=>g.item.kind==='arrows').item.count===7,
+      'matching ground arrow stacks merge instead of obscuring one another')
   })()`)
   console.log('PASS shooter ammunition recovery and bow drop')
 
   run(`(() => {
+    replayAnimationsDisabled=true
+    currentZ=0;currentCave=-1;map=surfaceMap;enemies=[];npcs=[];groundItems=[];occupied=new Set()
+    player.x=40;player.y=40;player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
+    player.inventory=[createItem('arrows',{count:3})]
+    for(let y=38;y<=43;y++)for(let x=38;x<=47;x++){
+      map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+    }
+    const t=ENEMY_TEMPLATE_BY_NAME.Kobold
+    const shield={kind:'shield',name:'Round Shield',base:'Round Shield',def:2}
+    const e=addEnemy({...t,id:'bow-fatal-loot',name:'Kobold',baseName:'Kobold',
+      x:44,y:40,level:0,alive:true,hp:1,maxHp:1,homeX:44,homeY:40,
+      equipment:shield,shooterAbility:'shooterArrows',shotsRemaining:2})
+    occupied.add(keyXY(44,40))
+    const oldEnemyTurn=enemyTurn,oldNpcTurn=npcTurn,oldChance=chance,oldDamage=damageRoll
+    try {
+      enemyTurn=()=>{turnCount++};npcTurn=()=>{};chance=()=>false;damageRoll=()=>5
+      if(!shootEnemy(e)||e.alive)throw Error('fatal ranged shot must kill target')
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      check(player.inventory.find(i=>i.kind==='arrows')?.count===2,
+        'a ranged kill cannot auto-collect the victim ammunition')
+      const loot=groundItems.filter(g=>g.kind==='droppeditem'&&g.x===44&&g.y===40)
+      check(loot.some(g=>g.item.kind==='arrows'&&g.item.count===2)&&
+        loot.some(g=>g.item.kind==='shield'),'multiple distinct drops share one corpse tile')
+      const saved=buildSaveObject()
+      loadGameFromObject(saved,{isReplayInit:true})
+      check(groundItems.filter(g=>g.kind==='droppeditem'&&g.x===44&&g.y===40).length===2,
+        'corpse item pile survives save and restore')
+      player.x=44;player.y=40
+      lootSkeletonOrForage();lootSkeletonOrForage()
+      check(player.inventory.find(i=>i.kind==='arrows')?.count===4&&
+        player.inventory.some(i=>i.kind==='shield')&&
+        !groundItems.some(g=>g.kind==='droppeditem'&&g.x===44&&g.y===40),
+        'two forage actions recover both drops without losing stack counts')
+      const next=addEnemy({...t,id:'bow-adjacent-loot',name:'Kobold',baseName:'Kobold',
+        x:45,y:40,level:0,alive:true,hp:1,maxHp:1,homeX:45,homeY:40,
+        equipment:null,shooterAbility:'shooterArrows',shotsRemaining:2})
+      occupied.add(keyXY(45,40))
+      killEnemy(next)
+      check(player.inventory.find(i=>i.kind==='arrows')?.count===6,
+        'adjacent kills still auto-collect remaining ammunition')
+    } finally {enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn;chance=oldChance;damageRoll=oldDamage}
+  })()`)
+  console.log('PASS ranged loot piles, pickup, save/restore and adjacent auto-loot')
+
+  run(`(() => {
     const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    replayAnimationsDisabled=true
     enemyTurn=realEnemyTurn;chance=()=>false;damageRoll=()=>1
     currentZ=0;map=surfaceMap;enemies=[];npcs=[];occupied=new Set()
     player.x=40;player.y=40;player.hp=1000;player.maxHp=1000
@@ -132,8 +188,10 @@ async function main() {
     reset();chance=()=>false
     const cornered=spawn('Giant Rat','bow-cornered')
     for(let y=39;y<=41;y++)map[y][47]='mountain'
-    check(shootEnemy(cornered)&&cornered.x===46&&cornered.y===40,
-      'a cornered weaker monster cannot retreat through terrain')
+    check(shootEnemy(cornered)&&cornered.x===46&&cornered.y===39,
+      'a blocked weaker monster first moves sideways along a legal escape route')
+    check(shootEnemy(cornered)&&cornered.x===47&&cornered.y===38,
+      'a second shot drives the monster farther around the obstacle')
     for(let y=39;y<=41;y++)map[y][47]='grass'
     reset()
     const near=spawn('Giant Rat','bow-near',44)

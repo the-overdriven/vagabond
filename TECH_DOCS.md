@@ -3973,9 +3973,9 @@ player continues phasing toward their last known direction while within aggro
 range even if a wall or bookshelf interrupts sight; ghosts do not acquire
 unseen targets through solid walls.
 
-Only an equipped weapon with a modifier prefix (`weapon.mod`) can damage an
-ethereal creature. Any weapon modifier qualifies, including non-damage modifiers;
-weapon tier, name, and unprefixed ATK alone do not. Unarmed and mundane attacks
+An equipped artifact weapon or a weapon with a modifier prefix (`weapon.mod`)
+can damage an ethereal creature. Any weapon modifier qualifies, including
+non-damage modifiers; ordinary weapon tier, name, and unprefixed ATK alone do not. Unarmed and mundane attacks
 consume their normal player action but deal no damage, use no combat RNG, and
 show an immunity marker with an explanatory message. They do not trigger an
 extra strike or an invisible-attack reaction. Magical attacks use normal combat
@@ -4190,7 +4190,7 @@ items are excluded; quest items are eligible. A selected stack loses exactly
 one unit. Entries have equal selection probability, regardless of stack size.
 A monster with no legal neighboring step that increases its Chebyshev distance
 from the player is cornered and cannot attempt theft. Empty packs, invisibility,
-and corners consume no theft roll. Failed rolls permit normal combat and can
+corners, and an already retreating monster consume no theft roll. Failed rolls permit normal combat and can
 retry next eligible turn; each monster can succeed only once.
 
 Success replaces the attack, logs “<name> has snatched <item> from you and runs
@@ -4507,10 +4507,11 @@ with **10 shots**. Shooter role and exact remaining ammunition persist with the
 enemy. A fired projectile always consumes one shot, including dodges and glancing
 hits. A blocked line consumes no ammunition. At zero shots the bow indicator
 disappears and the enemy immediately uses its ordinary species AI on later turns.
-On death, an enemy assigned `shooterArrows` transfers exactly its remaining
-arrows directly to the player's inventory, logging the amount when positive.
-It also has a **25%** seeded chance to drop a Short Bow into
-inventory; stone throwers cannot drop bows or arrows through this rule.
+On death, an enemy assigned `shooterArrows` drops exactly its remaining
+arrows, logging the amount when positive. It also has a **25%** seeded chance
+to drop a Short Bow; stone throwers cannot drop bows or arrows through this
+rule. Adjacent kills grant this loot directly, while distant kills leave it on
+the enemy's tile for collection (see §43).
 
 Ranged attacks ignore the monster's ordinary/equipment/prefix-modified ATK and use
 only projectile ATK. GRACE does not participate. DEF mitigation, monster critical
@@ -4760,8 +4761,11 @@ the Bestiary: **ATK + DEF + SPD + GRACE**, with current equipment, terrain and
 status effects. A target at least as strong as the player attempts **one tile
 toward the player**; a weaker target attempts **one tile farther away**. This
 gives strong low-AGGRO enemies a chance to close the gap, while weaker targets
-may retreat beyond the bow's six-tile reach. A blocked route costs the response
-without moving; neither reaction teleports or crosses forbidden terrain.
+may retreat beyond the bow's six-tile reach. When a weaker monster has no
+immediately farther open tile, it searches up to 12 steps around nearby obstacles
+and can take a sideways step along a route to a farther tile. It does not step
+closer to the player to escape; a genuinely blocked route costs the response
+without moving. Neither reaction teleports or crosses forbidden terrain.
 
 Inside effective AGGRO, normal combat and pursuit still apply. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
@@ -5515,7 +5519,8 @@ Physical artifact weapons, shields and armor can be equipped while
 **unidentified**. Their actual base stats, magic bonuses, penalties and curses
 apply immediately, but the equipped slot, inspection text and equipment logs
 continue to show `Unidentified <noun>` and `???` instead of revealing the
-hidden enchantments, curse or dwarven owner. Equipping and unequipping costs
+hidden enchantments, curse or dwarven owner. Combat messages also use the
+unidentified name until identification. Equipping and unequipping costs
 the usual item-action turn and **does not identify** the artifact. Players may
 infer some properties from combat or character stats; explicit identification
 remains necessary to reveal the item's true description. The identification
@@ -6208,7 +6213,7 @@ was removed.
 
 Monster templates may define an independent `lootTable` containing a total
 drop probability and a weighted list of ordinary item kinds. A successful
-roll awards **one** item directly to the inventory, in addition to any
+roll awards **one** item, in addition to any
 normal artifact or equipment drops. The weights choose which item drops;
 they do not multiply the total drop probability. **Nymph** has a **20%**
 chance to drop one Healing Herb, independently of its healing magic or
@@ -6217,6 +6222,15 @@ total chance to drop a Life Potion, Healing Herb or Mushroom, each with equal
 conditional probability (about **6⅔%** of kills per item). This loot chance
 does not increase with Magic Find. Using its own healing item in combat does
 not alter the separate death-drop roll.
+
+When the player kills a monster from more than one Chebyshev tile away, its
+ordinary loot (including remaining arrows, artifacts and carried equipment)
+stays at the death tile instead of being awarded directly to the backpack.
+Adjacent kills retain normal auto-looting and automatic weapon equipment.
+Multiple drops can occupy the same tile; matching stackable items combine,
+and **F** picks up one ground entry per action until the pile is cleared.
+These drops use the existing persistent ground-item system and do not change
+drop chances, quest credit or combat timing.
 
 Each generated Dwarven Fort/Ruins floor from **z:-3 through the deepest Ruins
 floor** contains **1–2 loose Life Potions**, selected from reachable, safe,
