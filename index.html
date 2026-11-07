@@ -7325,6 +7325,7 @@ more difficult:
   // reads as stuttering.
   let pendingMove = null
   let autoPath = null
+  let autoPathTargetEnemy = null
   let hoveredAutoPath = null
 
   function drawPathFootstepMarker(cx, cy, tilePx, dx = 0, dy = 1) {
@@ -7384,6 +7385,7 @@ more difficult:
 
   function flushPendingMove() {
     if (onlineRecordsBlockActions()) return
+    if (autoPathTargetEnemy) refreshAutoChasePath()
     if (autoPath && autoPath.length) {
       const next = autoPath.shift()
       if (!next || Math.abs(next.x - player.x) > 1 || Math.abs(next.y - player.y) > 1 || (next.x === player.x && next.y === player.y)) {
@@ -7401,6 +7403,7 @@ more difficult:
 
   function clearAutoPath() {
     autoPath = null
+    autoPathTargetEnemy = null
   }
 
   function clearHoveredAutoPath() {
@@ -7465,11 +7468,36 @@ more difficult:
     return steps
   }
 
-  function startAutoPath(targetX, targetY) {
+  function refreshAutoChasePath() {
+    const target = autoPathTargetEnemy
+    if (!target) return
+    // Do not follow a creature through darkness, offscreen, or to another level.
+    if (!enemies.includes(target) || !onCurrentLevel(target) || !enemyIsVisibleOnMainView(target)) {
+      clearAutoPath()
+      return
+    }
+    const destination = autoPath?.at(-1)
+    const next = autoPath?.[0]
+    const nextBlocked = next && (next.x !== target.x || next.y !== target.y) &&
+      (!playerPathCanTraverse(next.x, next.y) || occupied.has(keyXY(next.x, next.y)) ||
+        npcs.some(n => n.x === next.x && n.y === next.y))
+    if (!destination || destination.x !== target.x || destination.y !== target.y || nextBlocked) {
+      const updated = findPlayerPath(target.x, target.y)
+      if (!updated?.length) {
+        clearAutoPath()
+        return
+      }
+      autoPath = updated
+    }
+  }
+
+  function startAutoPath(targetX, targetY, targetEnemy = null) {
     const path = findPlayerPath(targetX, targetY)
     if (!path || !path.length) return false
     clearAutoPath()
     autoPath = path
+    autoPathTargetEnemy = targetEnemy
+    if (targetEnemy) hoveredAutoPath = null
     flushPendingMove()
     return true
   }
@@ -11195,7 +11223,8 @@ more difficult:
     if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
-      const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my && undergroundTileVisible(mx, my))
+      const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
+        undergroundTileVisible(mx, my) && enemyCanBeSeen(e))
       const npcAtTile = currentZ === 0 && npcs.some(n => n.x === mx && n.y === my)
       const nextPath = npcAtTile || enemyIsDesktopClickAttackable(enemy) ? null : findPlayerPath(mx, my)
       const oldEnd = hoveredAutoPath?.at(-1), newEnd = nextPath?.at(-1)
@@ -11287,11 +11316,12 @@ more difficult:
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
-      const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
+      const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my &&
+        undergroundTileVisible(mx, my) && enemyCanBeSeen(en))
       if (e) {
         clearAutoPath()
         if (enemyIsDesktopClickAttackable(e)) tryMove(e.x - player.x, e.y - player.y)
-        else startAutoPath(e.x, e.y)
+        else startAutoPath(e.x, e.y, e)
         return
       }
     }

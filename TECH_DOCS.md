@@ -455,12 +455,18 @@ adjacent or distant, changes the canvas cursor to a red diagonal sword whose
 hotspot is the sword tip. Outside an enemy, the inline cursor override is cleared so the canvas keeps its
 existing stylesheet/default cursor. Clicking a visible, non-adjacent enemy
 uses normal auto-pathing toward its clicked tile, including the path preview on
-hover. If the enemy remains there, the final step attacks through the ordinary
-movement/combat rules; if it moves, the route still targets the originally
-clicked tile rather than automatically pursuing the enemy. Unreachable targets
-do not start a route. Coarse-pointer/mobile input does not use this cursor or
+hover. Once clicked, auto-travel follows that particular creature: before each
+next step it refreshes the route when the target changes position or the way
+ahead becomes blocked. Reaching melee range attacks through the ordinary
+movement/combat rules. The pursuit ends if the creature dies, becomes unseen,
+leaves the visible screen or level, or cannot be reached using known terrain.
+Clicking empty ground still targets a fixed tile. Unreachable targets do not
+start a route. Coarse-pointer/mobile input does not use this cursor or
 desktop monster-click behavior. The sword SVG is decoded with the essential startup
 images, before character selection opens, and the cursor uses that preloaded URL.
+The chase target and planned route are transient UI state, cleared by loading a
+save or replay; the executed movement and combat actions remain individually
+recorded for deterministic playback.
 Auto-path footsteps and the remaining-step counter render above underground
 fog/darkness, remaining legible on already-discovered tiles beyond current sight.
 Pathfinding still refuses unknown underground tiles, so this does not expose

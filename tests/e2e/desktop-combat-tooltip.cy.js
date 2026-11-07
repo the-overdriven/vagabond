@@ -118,6 +118,47 @@ describe('Desktop combat enemy tooltip', () => {
     })()`))
   })
 
+  it('chases a moving monster by identity and stops when the target is lost', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Moving Quarry Tester')
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
+      currentZ=0;map=surfaceMap;enemies=[];npcs=[];groundItems=[];occupied=new Set()
+      player.x=40;player.y=40;player.rootTurns=0;player.confusionTurns=0;player.berserkTurns=0
+      for(let y=37;y<=46;y++)for(let x=37;x<=48;x++){
+        map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+      }
+      snapCameraToPlayer()
+      const template=ENEMY_TEMPLATE_BY_NAME.Goblin
+      const quarry=addEnemy({...template,id:'moving-quarry',name:'Goblin',baseName:'Goblin',
+        x:45,y:40,homeX:45,homeY:40,homeTileType:'grass',level:0,
+        alive:true,hp:40,maxHp:40,prefix:null,equipment:null,abilities:[]})
+      occupied.add(keyXY(quarry.x,quarry.y))
+      const oldEnemyTurn=enemyTurn,oldNpcTurn=npcTurn
+      try {
+        enemyTurn=()=>{};npcTurn=()=>{}
+        check(startAutoPath(quarry.x,quarry.y,quarry),'click creates a chase route')
+        check(autoPathTargetEnemy===quarry,'route tracks the actual monster')
+        const startRng=rngState
+        occupied.delete(keyXY(quarry.x,quarry.y));quarry.x=45;quarry.y=42
+        occupied.add(keyXY(quarry.x,quarry.y));flushPendingMove()
+        check(autoPath?.at(-1)?.x===45&&autoPath.at(-1).y===42,
+          'next movement automatically reroutes when monster wanders')
+        check(rngState===startRng,'replanning has no RNG cost')
+        occupied.delete(keyXY(quarry.x,quarry.y));quarry.x=46;quarry.y=42
+        occupied.add(keyXY(quarry.x,quarry.y));flushPendingMove()
+        check(autoPath?.at(-1)?.x===46&&autoPath.at(-1).y===42,
+          'further movement keeps following the same monster')
+        quarry.wallAmbushHidden=true;flushPendingMove()
+        check(autoPath===null&&autoPathTargetEnemy===null,'unseen target cancels pursuit')
+        quarry.wallAmbushHidden=false
+        check(startAutoPath(46,44),'ground auto-path still works')
+        check(autoPathTargetEnemy===null,'clicking ground never starts creature tracking')
+      } finally {enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn;clearAutoPath()}
+    })()`))
+  })
+
   it('keeps the normal hover tooltip when the attacked monster is already under the mouse and clears on death', () => {
     cy.viewport(1440, 900)
     beginNewGame('Hover Combat Tooltip Tester')
