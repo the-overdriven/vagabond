@@ -46,7 +46,7 @@
       "fortHint": {
         "chance": 0.5,
         "radius": 2,
-        "line": "They say the old dwarven fort still holds a fortune. I've sold supplies to plenty who went looking. Few came back."
+        "line": "They say the old dwarven fort still holds a fortune. I've sold supplies to plenty who went looking. Few came back. Let me mark the fort on your map."
       }
     },
     {
@@ -56,7 +56,11 @@
       ],
       "free": false,
       "portrait": "herbalist",
-      "services": true
+      "services": true,
+      "fishermanGossip": {
+        "chance": 0.1,
+        "line": "We're a tight-knit community, though my brother prefers his nets to our company. He lives far from the village to the {direction}. If you find him, give him my regards."
+      }
     }
   ],
   "ancientBellLich": {

@@ -31,6 +31,81 @@ describe('Exact current-save state restoration', () => {
     })()`))
   })
 
+  it('keeps the Herbalist gift greeting visible and rolls rare brother gossip only when requested', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const herbalist=npcs.find(n=>n.name==='Herbalist')
+      const fisherman=npcs.find(n=>n.name===FISHERMAN_NAME)
+      check(!!herbalist&&!!fisherman,'both NPCs are in the saved world')
+      raceOpen=false;currentZ=0;map=surfaceMap;replayRecording=false;replayPlaying=false;replaySimulationMode=false
+      herbalistGiftGiven=false;player.x=herbalist.x+1;player.y=herbalist.y
+      const count=()=>player.inventory.filter(i=>i.kind==='herb').reduce((n,i)=>n+(i.count||1),0)
+      const before=count(),oldRng=rng
+      try {
+        rng=()=>{throw Error('first Talk used RNG')}
+        check(openNpcMenu(herbalist),'herbalist menu opens')
+        check(npcMenuOptions(herbalist).some(o=>o.id==='gossip'&&o.label==='Gossip'),'generic gossip label')
+        selectNpcMenuOption('talk')
+        check(count()===before+1&&herbalistGiftGiven,'first Talk gives exactly one herb')
+        check(document.getElementById('npcSpeech').textContent.includes('Take this healing herb'),
+          'gift line stays visible instead of being replaced by generic Talk')
+        const turns=turnCount
+        rng=()=>.099999
+        selectNpcMenuOption('gossip')
+        const direction=TRACK_DIRECTIONS[trackDirection(fisherman.x-herbalist.x,fisherman.y-herbalist.y)]
+        check(document.getElementById('npcSpeech').textContent.includes('my brother') &&
+          document.getElementById('npcSpeech').textContent.includes('to the '+direction),
+          '10% gossip gives a family relation and a world-relative direction')
+        rng=()=>.1
+        selectNpcMenuOption('gossip')
+        check(!document.getElementById('npcSpeech').textContent.includes('my brother'),
+          '10% boundary does not reveal brother gossip')
+        check(count()===before+1&&turnCount===turns,'gossip does not grant more herbs or cost a turn')
+        closeNpcMenu()
+        const saved=structuredClone(buildSaveObject())
+        loadGameFromObject(saved,{isReplayInit:true})
+        check(herbalistGiftGiven&&count()===before+1,'gift flag and inventory survive save/load')
+      } finally {rng=oldRng;closeNpcMenu()}
+    })()`))
+  })
+
+  it('shows both the first Herbalist gift and gossip in the conversation panel', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const herbalist=npcs.find(n=>n.name==='Herbalist')
+      raceOpen=false;currentZ=0;map=surfaceMap;replayRecording=false;replayPlaying=false
+      herbalistGiftGiven=false;player.x=herbalist.x+1;player.y=herbalist.y
+      const oldRng=rng
+      try {
+        rng=()=>0
+        check(openNpcMenu(herbalist),'first gossip menu opens')
+        selectNpcMenuOption('gossip')
+        const speech=document.getElementById('npcSpeech').textContent
+        check(speech.includes('Take this healing herb')&&speech.includes('my brother'),
+          'first gift and gossip both appear in the dialogue panel')
+      } finally {rng=oldRng;closeNpcMenu()}
+    })()`))
+  })
+
+  it('shows the first Herbalist gift above her services and hides it on later visits', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const herbalist=npcs.find(n=>n.name==='Herbalist')
+      raceOpen=false;currentZ=0;map=surfaceMap;replayRecording=false;replayPlaying=false
+      herbalistGiftGiven=false;player.x=herbalist.x+1;player.y=herbalist.y
+      check(openNpcMenu(herbalist),'herbalist menu opens for services')
+      selectNpcMenuOption('trade')
+      const greeting=document.getElementById('tradeNpcSpeech')
+      check(tradeOpen&&!npcMenuOpen&&!greeting.hidden&&greeting.textContent.includes('Take this healing herb'),
+        'first gift speech remains visible above services')
+      toggleTrade(false)
+      check(openNpcMenu(herbalist),'herbalist menu reopens')
+      selectNpcMenuOption('trade')
+      check(tradeOpen&&greeting.hidden,'second services visit does not repeat the gift')
+      toggleTrade(false)
+    })()`))
+  })
+
   it('restores dug sand coloring on both cached maps and keeps digging state in replay', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

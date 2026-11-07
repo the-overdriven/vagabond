@@ -453,9 +453,13 @@ movement, so turn consumption, replay recording, combat rules, and animations
 remain shared rather than duplicated. Hovering such an attackable enemy changes
 the canvas cursor to a red diagonal sword whose hotspot is the sword tip. Outside
 an attackable enemy, the inline cursor override is cleared so the canvas keeps its
-existing stylesheet/default cursor. Non-adjacent clicks retain the normal click-to-move
-behavior, and coarse-pointer/mobile input does not use this cursor or desktop
-click-attack shortcut. The sword SVG is decoded with the essential startup
+existing stylesheet/default cursor. Clicking a visible, non-adjacent enemy
+uses normal auto-pathing toward its clicked tile, including the path preview on
+hover. If the enemy remains there, the final step attacks through the ordinary
+movement/combat rules; if it moves, the route still targets the originally
+clicked tile rather than automatically pursuing the enemy. Unreachable targets
+do not start a route. Coarse-pointer/mobile input does not use this cursor or
+desktop monster-click behavior. The sword SVG is decoded with the essential startup
 images, before character selection opens, and the cursor uses that preloaded URL.
 
 On fine-pointer desktop layouts, attacking an enemy also keeps a temporary combat
@@ -473,7 +477,10 @@ panels use a tighter upper-right stack so their collapse controls stay clear of 
 combat tooltip. This desktop-only presentation state is not saved or replayed;
 coarse-pointer/mobile inspection and layout remain unchanged.
 
-Walking into an NPC triggers interaction instead of entering its tile.
+Walking into an adjacent NPC opens the same conversation menu as clicking that
+NPC. Opening or dismissing the menu consumes no turn, generates no dialogue RNG,
+and does not commit to a quest or service. Selecting an option resolves the
+corresponding interaction; mobile uses the same choices in a compact panel.
 
 ## Swimming
 
@@ -6810,8 +6817,40 @@ Current named NPCs:
 - Merchant
 - Herbalist
 - Fisherman Hermit
+- Ancient Lich
 
 NPCs generally provide dialogue/exploration interactions.
+
+Clicking/tapping an adjacent NPC or attempting to move into their tile opens a
+shared compact conversation menu with their portrait, spoken line, and relevant
+choices. Opening and dismissing it are presentation-only: no turns, RNG rolls,
+NPC freezing, or rewards. Selecting an action invokes the existing deterministic
+gameplay handler and records its replay action. Dialogue is shown in the menu
+and the log. The menu is not saved or replayed; no NPC can wander while it is
+open because turns do not advance. Goodbye, Escape, and clicking outside close
+it. Desktop and mobile use the same actions, with a bottom panel on small or
+touch-primary screens.
+
+The Merchant offers Talk, Rumors and Trade; the Herbalist offers Talk,
+Gossip and Services; the Drunk offers Talk and Gossip. The Old Hunter
+offers Talk, ancient-forest lore and a separate hunt action. The Fisherman
+Hermit offers Talk, the Empty Nets quest, a swimming-lesson reminder while
+training is pending, and fish purchases after turn-in. The Gravedigger offers
+Talk and a separate tombstone return when the item is held; the Ancient Lich
+offers an additional Black Key topic when equipped. Quest labels reflect
+whether work can be taken, reviewed or turned in; a ready reward gets a visible
+`!` in the menu. Accepting work or claiming rewards requires selecting the
+quest choice, not merely speaking to that NPC. There is no free preview-and-
+reroll of a procedurally generated hunt before acceptance.
+
+Informational topics remain zero-turn interactions. Topics that use world
+state, such as the Herbalist's rare clue toward the Fisherman, compute from the
+current generated locations. Topics are recorded as `npcTopic` replay actions;
+their selected RNG and any first-gift effects are replayed without menu timing.
+The existing quest generation, rewards, shop inventories, prices, and service
+interfaces are unchanged. Movement and other gameplay controls remain blocked
+while the conversation is open, and loading a game, replay startup, or starting
+a new character closes it.
 
 At new-world generation, every named village NPC except the Drunk spawns within
 **5 NPC-walkable steps of the Temple**. Distance is measured with an 8-direction
@@ -6841,7 +6880,14 @@ remain in the existing NPC draw pass. NPC dialogue portraits are separate
 and unchanged. These visuals consume no RNG and change no NPC behavior,
 quest state, balance, save format or replay state.
 
-The Merchant additionally supports trading. Trading is possible by clicking on the Merchant, while standing next to him. The Herbalist also opens a services screen when clicked while adjacent. On the first interaction with the Herbalist, she gives exactly one **Healing Herb**; the one-time gift flag is saved, restored, and replayed so repeated conversations never duplicate it.
+The Merchant's Trade choice opens his trading interface; the Herbalist's
+Services choice opens hers. On the first *selected* interaction with the
+Herbalist (Talk or Services), she gives exactly one **Healing Herb**; merely
+viewing her menu does not grant it. The one-time gift flag is saved, restored,
+and replayed so repeated conversations never duplicate it. On first Talk, the
+gift dialogue is the spoken response; if Gossip is selected first, the gift
+and gossip responses both appear in the conversation panel. If Services is
+selected first, the gift speech appears above the service list.
 
 The Ancient Lich addresses the player by their selected race in its dialogue. This is flavor only and does not branch quests or rewards.
 
@@ -6868,15 +6914,16 @@ world-generation or dialogue decision depends on animation or unseeded randomnes
 
 `fishermanQuest` is an extensible `{type, state, targetId, ...}` record. The current
 `fish_predator` variant is **Empty Nets**. No predator exists before the first
-conversation. Activation chooses a free, foot-reachable land bank at least 25
+quest choice. Ordinary Talk does not activate Empty Nets. Activation chooses a free, foot-reachable land bank at least 25
 tiles away, preferring the same connected water region. The generated village
 center used by the target exclusion rule is persisted exactly in saves/replay
 snapshots so restoring the same action cannot change the legal target set. Activation
 then creates one non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
 Only that stored enemy ID's death, through the shared kill hook, makes the
 quest ready. The `!` is shown before activation, when ready, and on completed
-quests with an unclaimed reward and no pending lesson. Bumping or adjacent clicking gives short, gruff,
-one-way dialogue, with no player choices.
+quests with an unclaimed reward and no pending lesson. The quest menu option
+accepts the job, reviews progress or turns it in, while Talk only supplies
+short, gruff dialogue without advancing quest state.
 
 Turn-in completes the quest but only offers non-Merlings a persistent pending
 lesson (`player.fishermanLessonPending`). The reward is claimed and Swimming 5
@@ -6891,8 +6938,8 @@ swimmer dialogue and 100 XP, without numeric Swimming or practice. State changes
 before granting the reward prevent repeated rewards/restarts. After completion,
 the Hermit gives exactly one Fresh Fish per character at first turn-in, including
 Merlings. The persisted `fishermanFishGiftGiven` flag is not cleared by debug
-lesson resets, only by creating a new character. Subsequent interactions open
-the shared services interface, including while the lesson is pending, with only
+lesson resets, only by creating a new character. The Buy fish conversation option
+opens the shared services interface, including while the lesson is pending, with only
 **Buy fish (5g)**. Purchases stack fish and record a `fisherman` / `buyFish` replay
 action. The Hermit retains normal one-tile home-radius wandering.
 His discovered hut (not his current position) is a deep-blue (`#003366`) square
@@ -6915,7 +6962,11 @@ He warns the player about entering the Ancient Forest in a particular direction 
 
 ## Procedurally generated quests
 
-The Old Hunter can generate a new quest when the player interacts with him and has no active quest. Quest objectives are selected from the current world state rather than from a fixed quest list.
+The Old Hunter can generate a new quest when the player selects **Take a hunt**
+(or **Take a rare hunt** after learning Tracking). Ordinary Talk and his
+ancient-forest lore topic do not accept a quest. The menu changes to discuss an
+active hunt or claim its reward, without altering the existing quest logic.
+Quest objectives are selected from the current world state rather than from a fixed quest list.
 
 There is a 30% chance to receive an investigation quest when a cave entrance exists. It targets the cave entrance closest to the village (squared map distance; map scan order breaks ties). The target is stored by its map coordinates and landmark type, so the quest points to an actual location rather than an arbitrary wilderness tile.
 
@@ -7279,8 +7330,8 @@ The Merchant:
 
 ## One-time Dwarven Fort hint
 
-While the surface fort entrance is undiscovered, each eligible Merchant bump
-conversation or adjacent shop opening has a **50%** chance to add this line:
+While the surface fort entrance is undiscovered, each eligible Merchant
+**Rumors** choice has a **50%** chance to add this line:
 
 > They say the old dwarven fort still holds a fortune. I've sold supplies to
 > plenty who went looking. Few came back.
@@ -7293,16 +7344,20 @@ nearby terrain on the map, not the underground fort or a route across the world.
 A separate log confirms that the Merchant marked the ruins on the map.
 
 The world-level `merchantFortHintGiven` flag becomes true on success, suppressing
-all further hint dialogue and hint RNG rolls. Already-discovered entrances,
-missing entrances, other NPCs and off-surface interactions do not roll. Adjacent
-shop openings retain their existing zero-turn cost, so reopening permits free
-retries before success. Bump conversations retain their normal turn behavior.
+further hint RNG rolls and map reveals, but **not** the rumor itself: selecting
+Rumors again repeats the same line. The same rumor can be told if the entrance
+was discovered independently, without rolling or revealing it again.
+Already-discovered entrances, missing entrances, other NPCs and off-surface
+interactions do not roll.
+Ordinary Talk and Trade do not roll for the hint. Rumors remains a zero-turn
+choice and can be retried after a failed roll; limiting repeated requests
+would require a separate balance rule. Opening the menu alone never rolls.
 
 The flag starts false for each genuinely new world and remains unchanged through
 normal death and new characters reusing a permadeath world. Current saves store
 it beside Merchant stock; restoration and replay starting snapshots preserve it.
-Replay shop-opening actions mirror the hint roll and discovery even when the
-trade overlay is suppressed. Bump interactions replay through ordinary movement.
+Replay `npcTopic` Rumors actions mirror the hint roll and discovery even when
+the visual menu is suppressed. Merely opening the menu is not a replay action.
 Chance, reveal radius and the hint line are configured on the Merchant template
 in `content/npcs.json` under `fortHint`.
 
@@ -7460,10 +7515,14 @@ The Herbalist opens services while adjacent:
   (with the life-potion tile as an image fallback). Other service icons retain
   their current presentation.
 
-The Herbalist's other purpose is to hint that forests can be foraged for
-remedies, while also warning that forests are dangerous (because forest tiles
-can trigger an ambush). Forest ambush candidate selection excludes enemy
-templates with `aggro: 0`; passive creatures do not initiate ambushes.
+The Herbalist also hints that forests can be foraged for remedies while
+warning about forest ambushes. Her **Gossip** topic has a **10%** chance to
+mention her brother, the Fisherman Hermit, and the actual eight-way direction
+from her position to his. Otherwise she shares her ordinary forest advice.
+The clue does not mark his location on the map or start his quest. Gossip
+consumes no turn, but makes one deterministic RNG roll when the Hermit exists.
+Forest ambush candidate selection excludes enemy templates with `aggro: 0`;
+passive creatures do not initiate ambushes.
 Each step onto a forest or ancient-forest tile rolls the base
 `surfaceEnemies.forestAmbushChance` of **4%**. A spawn still requires an open
 adjacent tile of the same forest type and an eligible enemy template; the roll

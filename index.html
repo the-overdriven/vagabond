@@ -487,9 +487,24 @@ more difficult:
         <div class="closehint"><button class="slbtn" id="btnBestiaryCloseBottom" type="button">Close</button></div>
       </div>
     </div>
+    <div class="overlay" id="npcOverlay" role="dialog" aria-modal="true" aria-labelledby="npcName">
+      <div class="panelbox" id="npcPanel">
+        <button class="slbtn overlay-close" id="btnNpcClose" type="button" aria-label="Close conversation">✕</button>
+        <div class="npc-dialogue-header">
+          <img id="npcPortrait" alt="" hidden>
+          <div class="npc-dialogue-intro">
+            <h2 id="npcName"></h2>
+            <p id="npcSpeech" aria-live="polite">What would you like to discuss?</p>
+          </div>
+        </div>
+        <div id="npcChoices" class="npc-dialogue-choices" role="group" aria-label="Conversation options"></div>
+        <button class="slbtn npc-goodbye" id="btnNpcGoodbye" type="button">Goodbye</button>
+      </div>
+    </div>
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
         <h2 id="tradeTitle">Trade with the Merchant</h2>
+        <p id="tradeNpcSpeech" class="trade-npc-speech" hidden></p>
         <div class="trade-cols">
           <div class="trade-col">
             <b class="section-title">FOR SALE</b>
@@ -3533,8 +3548,8 @@ more difficult:
     return oldHunterQuest.state === 'completed' && player.trackingLearned && oldHunterQuest.type !== 'rare_hunt'
   }
 
-  function interactOldHunter() {
-    recordReplayAction({type:'talk', npc:'Old Hunter'})
+  function interactOldHunter(record = true) {
+    if (record) recordReplayAction({type:'talk', npc:'Old Hunter'})
     freezeNpcFromWandering(npcs.find(n => n.name === 'Old Hunter'))
     const deliveryQuest = oldHunterQuest
     const deliveryActive = deliveryQuest && ['active', 'ready'].includes(deliveryQuest.state) && ['recover_item', 'deliver_item'].includes(deliveryQuest.type)
@@ -3805,6 +3820,9 @@ more difficult:
   }
 
   function log(msg, cls, highlights = []) {
+    if (npcMenuOpen && npcMenuNpc && msg.startsWith(`${npcMenuNpc.name} says: `)) {
+      document.getElementById('npcSpeech').textContent = msg.slice(npcMenuNpc.name.length + 7)
+    }
     const statChanges = [...msg.matchAll(/[+-]\d+(?:% XP BONUS| (?:ATK|DEF|SPD|GRACE|MF|HP))/g)]
       .map(match => ({text: match[0], statDelta: Number.parseInt(match[0], 10)}))
     highlights = [...highlights, ...statChanges]
@@ -4671,6 +4689,7 @@ more difficult:
 
   function resetForNewCharacter() {
     clearLevelUpPopup()
+    closeNpcMenu()
     cancelAllPreparedEnemyAbilities()
     inspectedDungeonLocks = new Set()
     // A permadeath always starts the next character back on the surface at
@@ -6349,11 +6368,13 @@ more difficult:
     return true
   }
 
+  const HERBALIST_GIFT_LINE = 'Take this healing herb. The wilds are less forgiving than they look.'
+
   function grantHerbalistFirstGift(npc) {
     if (!npc || npc.name !== 'Herbalist' || herbalistGiftGiven) return false
     herbalistGiftGiven = true
     addHerb()
-    log('Herbalist says: Take this healing herb. The wilds are less forgiving than they look.', 'good')
+    log(`Herbalist says: ${HERBALIST_GIFT_LINE}`, 'good')
     return true
   }
 
@@ -7056,9 +7077,232 @@ more difficult:
 
   /* ============================== MOVEMENT ============================== */
   let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false
+  let npcMenuOpen = false, npcMenuNpc = null
   let raceOpen = true // block play input from startup through character creation
   let worldGenerating = false
   let reusingWorldAfterPermadeath = false
+
+  function npcMenuOptions(npc) {
+    if (npc.name === 'Old Hunter') {
+      const options = [{id:'talk',label:'Talk'},{id:'gossip',label:'Ask about the ancient forest'}]
+      const ready = hunterQuestReadyToTurnIn(oldHunterQuest)
+      if (ready) options.push({id:'quest',label:'Claim hunting reward',ready:true})
+      else if (!oldHunterQuest) options.push({id:'quest',label:'Take a hunt'})
+      else if (oldHunterQuest.state === 'active' || oldHunterQuest.state === 'ready')
+        options.push({id:'quest',label:'Discuss current hunt'})
+      else if (oldHunterQuest.state === 'completed' && player.trackingLearned && oldHunterQuest.type !== 'rare_hunt')
+        options.push({id:'quest',label:'Take a rare hunt'})
+      return options
+    }
+    if (npc.name === FISHERMAN_NAME) {
+      const options = [{id:'talk',label:'Talk'}]
+      if (!fishermanQuest) options.push({id:'quest',label:'Help with the empty nets'})
+      else if ((fishermanQuest.state === 'ready' || fishermanQuest.state === 'completed') &&
+               !player.fishermanRewardClaimed && !player.fishermanLessonPending)
+        options.push({id:'quest',label:'Report the predator slain',ready:true})
+      else if (fishermanQuest.state === 'active') options.push({id:'quest',label:'Ask about the predator'})
+      if (player.fishermanLessonPending) options.push({id:'lesson',label:'Ask about the swimming lesson'})
+      if (fishermanQuest?.state === 'completed' &&
+          (player.fishermanRewardClaimed || player.fishermanLessonPending))
+        options.push({id:'fish',label:'Buy fish (5g)'})
+      return options
+    }
+    if (npc.name === 'Gravedigger') return [
+      {id:'talk',label:'Talk'},
+      ...(player.inventory.some(item => item.kind === 'oddTombstone')
+        ? [{id:'return',label:'Return the strange tombstone',ready:true}] : [])]
+    if (npc.name === 'Drunk') return [{id:'talk',label:'Talk'},{id:'gossip',label:'Hear gossip'}]
+    if (npc.name === 'Merchant') return [{id:'talk',label:'Talk'},{id:'rumors',label:'Ask for rumors'},{id:'trade',label:'Trade'}]
+    if (npc.name === 'Herbalist') return [{id:'talk',label:'Talk'},{id:'gossip',label:'Gossip'},{id:'trade',label:'Services'}]
+    if (npc.name === 'Ancient Lich' && player.equip.blackkey)
+      return [{id:'talk',label:'Talk'},{id:'key',label:'Ask about the Black Key'}]
+    return [{id:'talk',label:'Talk'}]
+  }
+
+  function closeNpcMenu() {
+    if (!npcMenuOpen) return
+    npcMenuOpen = false
+    npcMenuNpc = null
+    document.getElementById('npcOverlay').classList.remove('show')
+    updateTouchControlsVisibility()
+  }
+
+  function renderNpcMenu() {
+    if (!npcMenuOpen || !npcMenuNpc) return
+    const npc = npcMenuNpc
+    document.getElementById('npcName').textContent = npc.name
+    const portrait = document.getElementById('npcPortrait')
+    portrait.hidden = true
+    if (npc.portrait) {
+      portrait.src = imageSrc(`img/npc/${npc.portrait}.jpg`)
+      if (portrait.complete && portrait.naturalWidth) portrait.hidden = false
+    }
+    const list = document.getElementById('npcChoices')
+    list.replaceChildren()
+    for (const option of npcMenuOptions(npc)) {
+      const button = document.createElement('button')
+      button.className = 'npc-dialogue-choice' + (option.ready ? ' quest-ready' : '')
+      button.type = 'button'
+      button.textContent = option.label + (option.ready ? ' !' : '')
+      button.dataset.action = option.id
+      button.addEventListener('click', () => selectNpcMenuOption(option.id))
+      list.appendChild(button)
+    }
+  }
+
+  function positionNpcMenu() {
+    if (!npcMenuOpen || !npcMenuNpc) return
+    const panel = document.getElementById('npcPanel')
+    if (window.matchMedia('(pointer: coarse), (max-width: 720px)').matches) {
+      panel.style.position = ''
+      panel.style.left = ''
+      panel.style.top = ''
+      return
+    }
+    const stage = document.getElementById('stage')
+    const stageRect = stage.getBoundingClientRect()
+    const canvasRect = canvas.getBoundingClientRect()
+    const x = canvasRect.left - stageRect.left +
+      (npcMenuNpc.x - camX + 0.5) * TILE_PX * canvasRect.width / canvas.width
+    const y = canvasRect.top - stageRect.top +
+      (npcMenuNpc.y - camY + 0.5) * TILE_PX * canvasRect.height / canvas.height
+    const wantedX = x + TILE_PX + panel.offsetWidth > stage.clientWidth
+      ? x - panel.offsetWidth - TILE_PX : x + TILE_PX
+    panel.style.position = 'absolute'
+    panel.style.left = `${Math.max(8, Math.min(wantedX, stage.clientWidth - panel.offsetWidth - 8))}px`
+    panel.style.top = `${Math.max(8, Math.min(y - panel.offsetHeight / 3, stage.clientHeight - panel.offsetHeight - 8))}px`
+  }
+
+  function openNpcMenu(npc) {
+    if (!npc || currentZ !== 0 || raceOpen || replayPlaying || replaySimulationMode ||
+        Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y)) > 1) return false
+    clearAutoPath()
+    pendingMove = null
+    npcMenuNpc = npc
+    npcMenuOpen = true
+    document.getElementById('npcSpeech').textContent = 'What would you like to discuss?'
+    renderNpcMenu()
+    document.getElementById('npcOverlay').classList.add('show')
+    positionNpcMenu()
+    document.querySelector('#npcChoices button')?.focus()
+    updateTouchControlsVisibility()
+    return true
+  }
+
+  function interactOrdinaryNpc(npc, record = true, topic = 'talk') {
+    if (!npc || currentZ !== 0) return false
+    if (record) recordReplayAction({type:'talk',npc:npc.name})
+    freezeNpcFromWandering(npc)
+    grantHerbalistFirstGift(npc)
+    if (npc.name === 'Gravedigger' && topic === 'return' && player.inventory.some(item => item.kind === 'oddTombstone')) {
+      const odd = player.inventory.find(item => item.kind === 'oddTombstone')
+      player.inventory.splice(player.inventory.indexOf(odd), 1)
+      addInventoryItem('shovel')
+      if (gravediggerGraveKey) cemeteryTombstones[gravediggerGraveKey] = {
+        name: odd.tombName, birth: odd.tombBirth, death: odd.tombDeath,
+        odd: false, inscription: odd.inscription
+      }
+      log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info')
+    } else if (npc.name === 'Ancient Lich' && topic === 'key' && player.equip.blackkey) {
+      log(`Ancient Lich says: ${raceDef().name}... A key such as this is not meant for pockets. It must be close to the heart. No, I don't want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.`, 'info')
+    } else {
+      const drunkGravediggerLine = 'Gravedigger? What gravedigger? I don\'t remember us having one.'
+      const dialogue = npc.name === 'Drunk' && topic !== 'gossip'
+        ? NPC_TEMPLATES.find(template => template.name === 'Drunk').lines[0]
+        : npc.name === 'Drunk' && bellRung && treasureMapUnearthed && chance(0.5)
+          ? drunkGravediggerLine : pick(npc.lines)
+      log(`${npc.name} says: ${npc.name === 'Ancient Lich' ? `${raceDef().name}... ${dialogue}` : dialogue}`, 'info')
+    }
+    updateHud()
+    render()
+    return true
+  }
+
+  function interactNpcTopic(npc, topic, record = true) {
+    if (!npc || currentZ !== 0 || !npcs.includes(npc) ||
+        Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y)) > 1 ||
+        !npcMenuOptions(npc).some(option => option.id === topic)) return false
+    if (record) recordReplayAction({type:'npcTopic',npc:npc.name,topic})
+    freezeNpcFromWandering(npc)
+    const gifted = grantHerbalistFirstGift(npc)
+    if (npc.name === 'Merchant' && topic === 'rumors') {
+      const alreadyKnown = merchantFortHintGiven || !!(dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x])
+      if (alreadyKnown) {
+        const hint = NPC_TEMPLATES.find(template => template.name === 'Merchant').fortHint
+        log(`Merchant says: ${hint.line}`, 'info')
+      } else if (!tryMerchantFortHint(npc)) {
+        log('Merchant says: Travelers bring more than goods. Tales of lost treasures, forgotten places, and fortunes waiting to be found. Most are lies, of course. But not all of them.', 'info')
+      }
+    } else if (npc.name === 'Herbalist' && topic === 'talk' && gifted) {
+      // The first gift is her greeting; a second line would immediately hide it in the panel.
+    } else if (npc.name === 'Herbalist' && topic === 'gossip') {
+      const hermit = npcs.find(other => other.name === FISHERMAN_NAME)
+      const bearing = hermit && trackDirection(hermit.x - npc.x, hermit.y - npc.y)
+      const rumor = NPC_TEMPLATES.find(template => template.name === 'Herbalist').fishermanGossip
+      log(`Herbalist says: ${hermit && bearing !== null && chance(rumor.chance)
+        ? rumor.line.replace('{direction}', TRACK_DIRECTIONS[bearing])
+        : npc.lines?.[0] || 'The forest offers many remedies to those who know where to look.'}`, 'info')
+    } else if (npc.name === 'Old Hunter' && topic === 'gossip') {
+      log(`Old Hunter says: ${npc.lines?.[0] || 'The ancient forest is no place for careless travelers.'}`, 'info')
+    } else if (npc.name === 'Old Hunter' && topic === 'talk') {
+      log('Old Hunter says: The country changes while folk sleep. Watch the tracks, not just the road.', 'info')
+    } else if (npc.name === FISHERMAN_NAME && topic === 'lesson') {
+      log('Fisherman Hermit says: Start on a solid bank close to me, then step into the deep water. I will watch your footing.', 'info')
+    } else if (npc.name === FISHERMAN_NAME && topic === 'talk') {
+      log(fishermanQuest?.state === 'completed'
+        ? 'Fisherman Hermit says: The nets are filling again. The water is finally quiet.'
+        : 'Fisherman Hermit says: The nets have been coming up empty. Something greedy is troubling the water.', 'info')
+    } else interactOrdinaryNpc(npc, false, topic)
+    if (gifted && topic !== 'talk' && npcMenuOpen && npcMenuNpc === npc) {
+      const speech = document.getElementById('npcSpeech')
+      speech.textContent = `${HERBALIST_GIFT_LINE}\n\n${speech.textContent}`
+    }
+    updateHud()
+    render()
+    return true
+  }
+
+  function selectNpcMenuOption(action) {
+    const npc = npcMenuNpc
+    if (!npc || !npcMenuOpen || !npcs.includes(npc) ||
+        Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y)) > 1) {
+      closeNpcMenu()
+      return
+    }
+    if (action === 'trade') {
+      closeNpcMenu()
+      tryOpenTrade(npc)
+      return
+    }
+    if (action === 'fish' && npc.name === FISHERMAN_NAME) {
+      closeNpcMenu()
+      interactFisherman()
+      return
+    }
+    if (action === 'quest' && npc.name === 'Old Hunter') interactOldHunter()
+    else if (action === 'quest' && npc.name === FISHERMAN_NAME) interactFisherman()
+    else if (npcMenuOptions(npc).some(option => option.id === action)) interactNpcTopic(npc, action)
+    else return
+    renderNpcMenu()
+    positionNpcMenu()
+    document.querySelector('#npcChoices button')?.focus()
+  }
+
+  document.getElementById('btnNpcClose').addEventListener('click', closeNpcMenu)
+  document.getElementById('btnNpcGoodbye').addEventListener('click', closeNpcMenu)
+  document.getElementById('npcOverlay').addEventListener('click', event => {
+    if (event.target.id === 'npcOverlay') closeNpcMenu()
+  })
+  document.getElementById('npcPortrait').addEventListener('error', event => {
+    event.currentTarget.hidden = true
+  })
+  document.getElementById('npcPortrait').addEventListener('load', event => {
+    event.currentTarget.hidden = false
+    if (npcMenuOpen) positionNpcMenu()
+  })
+  window.addEventListener('resize', () => {
+    if (npcMenuOpen) positionNpcMenu()
+  })
   function setLoading(message) {
     const overlay = document.getElementById('loadingOverlay')
     overlay.hidden = !message
@@ -7253,10 +7497,17 @@ more difficult:
   }
 
   async function tryMove(dx, dy) {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
+    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
       pendingMove = {dx: dx, dy: dy}
       return
+    }
+    // Bumping an NPC opens the same zero-turn menu as clicking. While confused,
+    // rooted or in an active frenzy, retain the ordinary movement/status rules.
+    if (!replayPlaying && !replaySimulationMode && !player.confusionTurns && !player.rootTurns &&
+        !(player.berserkTurns > 0 && frenzyTargets().length > 0)) {
+      const adjacentNpc = currentZ === 0 && npcs.find(n => n.x === player.x + dx && n.y === player.y + dy)
+      if (adjacentNpc && openNpcMenu(adjacentNpc)) return
     }
     const replayScope = recordReplayAction({type: 'move', dx: dx, dy: dy})
     try {
@@ -7318,32 +7569,12 @@ more difficult:
     if (npcTarget) {
       clearAutoPath()
       consecutiveWaitTurns = 0
-      freezeNpcFromWandering(npcTarget)
-      grantHerbalistFirstGift(npcTarget)
       if (npcTarget.name === FISHERMAN_NAME) {
         interactFisherman(false)
-      } else if (npcTarget.name === 'Gravedigger' && player.inventory.some(i => i.kind === 'oddTombstone')) {
-        const odd = player.inventory.find(i => i.kind === 'oddTombstone')
-        player.inventory.splice(player.inventory.indexOf(odd), 1)
-        addInventoryItem('shovel')
-        if (gravediggerGraveKey) cemeteryTombstones[gravediggerGraveKey] = {
-          name: odd.tombName,
-          birth: odd.tombBirth,
-          death: odd.tombDeath,
-          odd: false,
-          inscription: odd.inscription
-        }
-        log(`Gravedigger says: ${odd?.tombName || 'That'}? That's not my name. Yet, his expression changes. Where did you find it? Give it to me. Here, take the shovel, I don't need it anymore.`, 'info')
-      } else if (npcTarget.name === 'Ancient Lich' && player.equip.blackkey)
-        log(`Ancient Lich says: ${raceDef().name}... A key such as this is not meant for pockets. It must be close to the heart. No, I don't want it back. Although you seem lost, like a child, it has already chosen you as its bearer. Perhaps, if you return to where everything began and look beneath the thatches, the things you have seen will begin to make sense.`, 'info')
-      else {
-        const drunkGravediggerLine = 'Gravedigger? What gravedigger? I don\'t remember us having one.'
-        const dialogue = npcTarget.name === 'Drunk' && bellRung && treasureMapUnearthed && chance(0.5)
-          ? drunkGravediggerLine
-          : pick(npcTarget.lines)
-        log(`${npcTarget.name} says: ${npcTarget.name === 'Ancient Lich' ? `${raceDef().name}... ${dialogue}` : dialogue}`, 'info')
-      }
-      tryMerchantFortHint(npcTarget)
+      } else if (npcTarget.name === 'Old Hunter') interactOldHunter(false)
+      else interactOrdinaryNpc(npcTarget, false,
+        npcTarget.name === 'Gravedigger' && player.inventory.some(item => item.kind === 'oddTombstone')
+          ? 'return' : npcTarget.name === 'Ancient Lich' && player.equip.blackkey ? 'key' : 'talk')
       enemyTurn()
       npcTurn()
       render()
@@ -7613,7 +7844,7 @@ more difficult:
   }
 
   async function skipTurn() {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
+    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
     const replayScope = recordReplayAction({type: 'skipTurn'})
     try {
@@ -10806,7 +11037,7 @@ more difficult:
       <img src="${imageSrc(`img/npc/${n.portrait}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm">${n.name}</div>
-      ${n.name === 'Old Hunter' || n.name === FISHERMAN_NAME ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to talk</div>' : n.trades ? '<div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to trade</div>' : ''}
+      <div style="color:var(--parchment-dim);font-size:calc(10px * var(--ui-font-scale));">Click to interact</div>
       </div>`
       }
     }
@@ -10958,9 +11189,9 @@ more difficult:
     if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
-      const blocked = enemies.some(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my && undergroundTileVisible(mx, my)) ||
-        (currentZ === 0 && npcs.some(n => n.x === mx && n.y === my))
-      const nextPath = blocked ? null : findPlayerPath(mx, my)
+      const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my && undergroundTileVisible(mx, my))
+      const npcAtTile = currentZ === 0 && npcs.some(n => n.x === mx && n.y === my)
+      const nextPath = npcAtTile || enemyIsDesktopClickAttackable(enemy) ? null : findPlayerPath(mx, my)
       const oldEnd = hoveredAutoPath?.at(-1), newEnd = nextPath?.at(-1)
       if (!oldEnd || !newEnd || oldEnd.x !== newEnd.x || oldEnd.y !== newEnd.y || hoveredAutoPath.length !== nextPath.length) {
         hoveredAutoPath = nextPath?.length ? nextPath : null
@@ -10998,7 +11229,7 @@ more difficult:
   }, {passive: false})
 
   function handleCanvasTap(clientX, clientY) {
-    if (mapOpen || invOpen || tradeOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
+    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -11020,12 +11251,7 @@ more difficult:
     const n = currentZ === 0 && npcs.find(np => np.x === mx && np.y === my)
     if (n) {
       clearAutoPath()
-      if (n.name === FISHERMAN_NAME) {
-        interactFisherman()
-      } else if (n.name === 'Old Hunter') {
-        const adjacent = Math.max(Math.abs(n.x - player.x), Math.abs(n.y - player.y)) <= 1
-        if (adjacent) interactOldHunter()
-      } else tryOpenTrade(n)
+      openNpcMenu(n)
       return
     }
     const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
@@ -11051,14 +11277,15 @@ more difficult:
   }
 
   canvas.addEventListener('click', (ev) => {
-    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
+    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
       const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
-      if (enemyIsDesktopClickAttackable(e)) {
+      if (e) {
         clearAutoPath()
-        tryMove(e.x - player.x, e.y - player.y)
+        if (enemyIsDesktopClickAttackable(e)) tryMove(e.x - player.x, e.y - player.y)
+        else startAutoPath(e.x, e.y)
         return
       }
     }
@@ -12328,7 +12555,12 @@ more difficult:
   }
 
   function toggleTrade(force) {
-    tradeOpen = (force !== undefined) ? force : !tradeOpen
+    const next = (force !== undefined) ? force : !tradeOpen
+    if (next) {
+      closeNpcMenu()
+      document.getElementById('tradeNpcSpeech').hidden = true
+    }
+    tradeOpen = next
     document.getElementById('tradeOverlay').classList.toggle('show', tradeOpen)
     if (tradeOpen) renderTrade()
     updateTouchControlsVisibility()
@@ -12343,11 +12575,15 @@ more difficult:
     // Record that interaction or replay will let a non-static Herbalist wander,
     // consuming RNG values that the live run never consumed.
     recordReplayAction({type:'openTrade', npc:npc.name})
-    grantHerbalistFirstGift(npc)
+    const gifted = grantHerbalistFirstGift(npc)
     freezeNpcFromWandering(npc)
     serviceNpc = npc
-    tryMerchantFortHint(npc)
     toggleTrade(true)
+    if (gifted) {
+      const speech = document.getElementById('tradeNpcSpeech')
+      speech.textContent = `Herbalist says: ${HERBALIST_GIFT_LINE}`
+      speech.hidden = false
+    }
   }
 
   function purifyMushrooms() {
@@ -12881,7 +13117,7 @@ more difficult:
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = invOpen || mapOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
+    const overlayOpen = invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
     requestAnimationFrame(updateMobileSafeAreas)
@@ -13053,6 +13289,7 @@ more difficult:
     isReplayPlaybackActive: onlineReplayPlaybackActive,
     onVisibilityChange: () => {
       if (Graveyard.isOpen()) {
+        closeNpcMenu()
         Highscores.close(false)
         pendingMove = null
         clearAutoPath()
@@ -13064,6 +13301,7 @@ more difficult:
     isReplayPlaybackActive: onlineReplayPlaybackActive,
     onVisibilityChange: () => {
       if (Highscores.isOpen()) {
+        closeNpcMenu()
         Graveyard.close()
         if (!onlineReplayPlaybackActive()) {
           pendingMove = null
@@ -13076,6 +13314,7 @@ more difficult:
 
   function toggleInv(force) {
     const next = (force !== undefined) ? force : !invOpen
+    if (next) closeNpcMenu()
     if (next && mapOpen) toggleMap(false)
     if (next && bestiaryOpen) toggleBestiary(false)
     if (!next) document.getElementById('invOverlay').classList.remove('character-sheet')
@@ -13087,6 +13326,7 @@ more difficult:
 
   function toggleMap(force) {
     const next = (force !== undefined) ? force : !mapOpen
+    if (next) closeNpcMenu()
     if (next && invOpen) toggleInv(false)
     if (next && bestiaryOpen) toggleBestiary(false)
     mapOpen = next
@@ -13213,6 +13453,7 @@ more difficult:
 
   function toggleBestiary(force) {
     const next = force !== undefined ? force : !bestiaryOpen
+    if (next) closeNpcMenu()
     if (next && invOpen) toggleInv(false)
     if (next && mapOpen) toggleMap(false)
     if (next && tradeOpen) toggleTrade(false)
@@ -13338,6 +13579,16 @@ more difficult:
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
     const k = ev.key
+    if (npcMenuOpen) {
+      if (k === 'Escape') { ev.preventDefault(); closeNpcMenu() }
+      else if (k === 'Tab') {
+        ev.preventDefault()
+        const controls = [...document.querySelectorAll('#npcOverlay button')]
+        const index = controls.indexOf(document.activeElement)
+        controls[(index + (ev.shiftKey ? controls.length - 1 : 1)) % controls.length]?.focus()
+      }
+      return
+    }
     if (k === 'Control') {
       rangesHeld = true
       refreshRangeVisibility()

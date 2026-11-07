@@ -78,6 +78,29 @@ describe('Desktop combat enemy tooltip', () => {
         check(player.x===40 && player.y===41,'movement succeeds')
         check(desktopCombatTooltipEnemy===null,'movement clears pinned target')
         check(tooltip.dataset.autoCombat!=='true' && tooltip.style.display==='none','movement hides pinned tooltip')
+
+        // A distant enemy now uses the existing auto-path, while its final
+        // occupied tile still resolves through ordinary melee/replay logic.
+        const distant=makeEnemy('Goblin',43,41)
+        const rect=canvas.getBoundingClientRect()
+        const clientX=rect.left+(distant.x-camX+0.5)*TILE_PX*rect.width/canvas.width
+        const clientY=rect.top+(distant.y-camY+0.5)*TILE_PX*rect.height/canvas.height
+        canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX,clientY}))
+        check(hoveredAutoPath?.at(-1)?.x===distant.x && hoveredAutoPath.at(-1).y===distant.y,
+          'hover shows a route to the occupied enemy tile')
+        canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX,clientY,button:0}))
+        check(autoPath?.at(-1)?.x===distant.x && autoPath.at(-1).y===distant.y,
+          'clicking a distant enemy starts a route to it')
+        await new Promise((resolve,reject)=>{
+          const deadline=Date.now()+5000
+          const wait=()=>{
+            if(distant.hp<100) resolve()
+            else if(Date.now()>deadline) reject(new Error('auto-path did not reach and attack the distant enemy'))
+            else setTimeout(wait,20)
+          }
+          wait()
+        })
+        check(autoPath===null,'attacking the target ends the route')
       } finally {
         chance=oldChance;damageRoll=oldDamage;enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn
       }

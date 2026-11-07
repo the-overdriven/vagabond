@@ -350,7 +350,18 @@ async function runReplayAction(action) {
     case 'talk':
       if (action.npc === 'Old Hunter') interactOldHunter()
       else if (action.npc === FISHERMAN_NAME) interactFisherman()
+      else {
+        const npc = npcs.find(n => n.name === action.npc)
+        if (!npc || !interactOrdinaryNpc(npc))
+          return replayDesync(`Replay desynchronized: could not talk to ${action.npc || 'NPC'}.`)
+      }
       break
+    case 'npcTopic': {
+      const npc = npcs.find(n => n.name === action.npc)
+      if (!npc || !interactNpcTopic(npc, action.topic))
+        return replayDesync(`Replay desynchronized: invalid ${action.topic || 'topic'} conversation with ${action.npc || 'NPC'}.`)
+      break
+    }
     case 'openTrade': {
       const npc = npcs.find(n => n.name === action.npc)
       if (!npc) return replayDesync(`Replay desynchronized: could not find service NPC ${action.npc || ''}.`)
@@ -360,7 +371,6 @@ async function runReplayAction(action) {
       grantHerbalistFirstGift(npc)
       freezeNpcFromWandering(npc)
       serviceNpc = npc
-      tryMerchantFortHint(npc)
       break
     }
     case 'buy': {
@@ -667,6 +677,7 @@ async function playNextReplayAction() {
 }
 
 function startReplayPlayback() {
+  closeNpcMenu()
   replayActionDiagnostics = []
   replayCurrentActionIndex = null
   if (!replayData || !replayData.actions || !replayData.actions.length) return

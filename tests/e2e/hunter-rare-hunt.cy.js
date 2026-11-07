@@ -75,6 +75,9 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         const hunter = npcs.find(n => n.name === 'Old Hunter')
         player.trackingLearned = true
         oldHunterQuest = {id:'hunter_40', type:'investigate_area', state:'completed'}
+        if (!npcMenuOptions(hunter).some(option => option.id==='quest' && option.label==='Take a rare hunt') ||
+            !npcMenuOptions(hunter).some(option => option.id==='gossip'))
+          throw Error('hunter conversation does not separate forest gossip and rare hunt')
         oldHunterQuestSerial = 40
         const markerBefore = oldHunterHasNewDialogue()
         // Capture valid sites before the quest adds its quarry to the occupied tiles.
@@ -103,6 +106,8 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
         target.hp = 1
         killEnemy(target)
         const readyAfterTarget = oldHunterQuest.state
+        if (!npcMenuOptions(hunter).some(option => option.id==='quest' && option.ready))
+          throw Error('hunter reward option is not highlighted when quest is ready')
         const markerReady = oldHunterHasNewDialogue()
         const beforeReward = player.totalXpEarned
         const expectedReward = Math.round(400 * xpMultiplier())

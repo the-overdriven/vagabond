@@ -13,7 +13,13 @@ describe('Fisherman and swimming', () => {
       const results = await win.eval(`(async () => {
         const n=npcs.find(n=>n.name===FISHERMAN_NAME)
         player.x=n.x+1;player.y=n.y;player.race='human';player.gold=10
-        player.inventory=[];fishermanQuest={state:'ready'}
+        player.inventory=[];fishermanQuest=null
+        if (!openNpcMenu(n) || !npcMenuOptions(n).some(option=>option.id==='quest'))
+          throw Error('fisherman quest option missing')
+        document.querySelector('#npcChoices [data-action="talk"]').click()
+        if (fishermanQuest!==null) throw Error('ordinary talk incorrectly started Empty Nets')
+        closeNpcMenu()
+        fishermanQuest={state:'ready'}
         interactFisherman()
         const count=()=>player.inventory.filter(i=>i.kind==='fish').reduce((s,i)=>s+i.count,0)
         const first=count()===1 && player.fishermanFishGiftGiven && player.fishermanLessonPending

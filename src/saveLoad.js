@@ -353,6 +353,7 @@ function saveGame() {
 
 function loadGameFromObject(data, opts = {}) {
   clearLevelUpPopup()
+  closeNpcMenu()
   const isReplayInit = !!opts.isReplayInit
   if (!data || typeof data !== 'object' || (!Array.isArray(data.map) && typeof data.map !== 'string')) {
     throw new Error('That does not look like a Vagabond save file.')

@@ -70,15 +70,31 @@ describe('One-time Merchant Dwarven Fort hint', () => {
     })()`))
   })
 
-  it('preserves the ordinary bump dialogue and succeeds only once across save/load', () => {
+  it('keeps ordinary talk separate from the fort rumor across save/load', () => {
     cy.window().then(win => win.eval(`(async () => {
       const oldRng=rng,oldLog=log,messages=[]
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
       try {
-        rng=()=>.1;log=message=>messages.push(message)
+        rng=()=>{throw Error('opening the conversation rolled RNG')};log=message=>{messages.push(message);oldLog(message)}
         await tryMove(1,0)
+        hintCheck(npcMenuOpen && document.getElementById('npcOverlay').classList.contains('show'),'bump opens menu')
+        hintCheck(!messages.length && !merchantFortHintGiven,'opening menu makes no gameplay changes')
+        hintCheck(document.querySelector('#npcChoices [data-action="trade"]'),'merchant has a trade choice')
+        rng=()=>.1
+        document.querySelector('#npcChoices [data-action="talk"]').click()
         hintCheck(messages.includes('Merchant says: '+npcs[0].lines[0]),'ordinary dialogue retained')
+        hintCheck(!merchantFortHintGiven,'ordinary talk does not roll the fort rumor')
+        document.querySelector('#npcChoices [data-action="rumors"]').click()
         hintCheck(messages.filter(text=>text.includes('They say the old dwarven fort')).length===1,'hint appended once')
+        hintCheck(document.getElementById('npcSpeech').textContent.includes('They say the old dwarven fort'),
+          'spoken rumor appears in the conversation panel')
+        rng=()=>{throw Error('repeating a known rumor consumed RNG')}
+        document.querySelector('#npcChoices [data-action="rumors"]').click()
+        hintCheck(messages.filter(text=>text.includes('They say the old dwarven fort')).length===2,
+          'repeat rumors uses the original line even after the map reveal')
+        hintCheck(document.getElementById('npcSpeech').textContent===NPC_TEMPLATES.find(n=>n.name==='Merchant').fortHint.line,
+          'repeat rumor remains visible in the conversation panel')
+        closeNpcMenu()
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         hintCheck(saved.merchantFortHintGiven===true,'flag serialized')
         log=oldLog;rng=oldRng
@@ -90,12 +106,21 @@ describe('One-time Merchant Dwarven Fort hint', () => {
     })()`))
   })
 
-  it('records and replays shop reveals with identical discovery and RNG consumption', () => {
+  it('records and replays rumor reveals with identical discovery and RNG consumption', () => {
     cy.window().then(win => win.eval(`(async () => {
       rngState=12345;startReplayRecording()
       const turn=turnCount
-      for(let attempt=0;attempt<20 && !merchantFortHintGiven;attempt++)tryOpenTrade(npcs[0])
-      hintCheck(merchantFortHintGiven && turnCount===turn,'free shop interaction reveals fort')
+      hintCheck(openNpcMenu(npcs[0]),'adjacent click can open the dialogue menu')
+      document.querySelector('#npcChoices [data-action="trade"]').click()
+      hintCheck(tradeOpen && !npcMenuOpen,'trade choice opens the existing shop')
+      hintCheck(!merchantFortHintGiven,'trading alone does not reveal the fort')
+      toggleTrade(false)
+      for(let attempt=0;attempt<20 && !merchantFortHintGiven;attempt++){
+        hintCheck(openNpcMenu(npcs[0]),'rumor menu opens')
+        document.querySelector('#npcChoices [data-action="rumors"]').click()
+        closeNpcMenu()
+      }
+      hintCheck(merchantFortHintGiven && turnCount===turn,'rumor reveals fort without advancing a turn')
       const recorded=JSON.parse(JSON.stringify(replayData)),expected=JSON.stringify(discovered)
       // Match startReplayPlayback: dismiss the live shop before restoring playback.
       toggleTrade(false)
