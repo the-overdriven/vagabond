@@ -70,6 +70,7 @@ describe('Exact current-save state restoration', () => {
   })
 
   it('shows both the first Herbalist gift and gossip in the conversation panel', () => {
+    cy.viewport(390, 740)
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const herbalist=npcs.find(n=>n.name==='Herbalist')
@@ -79,12 +80,26 @@ describe('Exact current-save state restoration', () => {
       try {
         rng=()=>0
         check(openNpcMenu(herbalist),'first gossip menu opens')
+        const overlay=document.getElementById('npcOverlay')
+        const panel=document.getElementById('npcPanel')
+        const logPanel=document.getElementById('logpanel')
+        check(Number(getComputedStyle(overlay).zIndex)>Number(getComputedStyle(logPanel).zIndex),
+          'mobile conversation sits above the fixed message log')
+        check(parseFloat(getComputedStyle(document.getElementById('npcSpeech')).fontSize)>=15,
+          'mobile spoken dialogue has legible text')
         selectNpcMenuOption('gossip')
         const speech=document.getElementById('npcSpeech').textContent
         check(speech.includes('Take this healing herb')&&speech.includes('my brother'),
           'first gift and gossip both appear in the dialogue panel')
+        document.getElementById('npcSpeech').textContent='Long conversation. '.repeat(80)
+        check(panel.scrollHeight>panel.clientHeight,'long mobile dialogue scrolls inside its sheet')
+        panel.scrollTop=panel.scrollHeight
+        const goodbye=document.getElementById('btnNpcGoodbye').getBoundingClientRect()
+        check(goodbye.bottom<=innerHeight+2&&goodbye.top>=0,
+          'goodbye stays reachable after scrolling past a long conversation')
       } finally {rng=oldRng;closeNpcMenu()}
     })()`))
+    cy.viewport(1280, 800)
   })
 
   it('shows the first Herbalist gift above her services and hides it on later visits', () => {

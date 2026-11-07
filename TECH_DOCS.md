@@ -6874,8 +6874,11 @@ NPC freezing, or rewards. Selecting an action invokes the existing deterministic
 gameplay handler and records its replay action. Dialogue is shown in the menu
 and the log. The menu is not saved or replayed; no NPC can wander while it is
 open because turns do not advance. Goodbye, Escape, and clicking outside close
-it. Desktop and mobile use the same actions, with a bottom panel on small or
-touch-primary screens.
+it. Desktop and mobile use the same actions. On small or touch-primary screens,
+the conversation appears as a high-contrast, scrollable bottom sheet above the
+message log, below the HUD. Spoken dialogue and choices use larger, brighter
+text and touch-sized buttons; longer conversations remain scrollable rather
+than being covered by the log.
 
 The Merchant offers Talk, Rumors and Trade; the Herbalist offers Talk,
 Gossip and Services; the Drunk offers Talk and Gossip. The Old Hunter

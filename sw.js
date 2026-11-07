@@ -62,7 +62,7 @@ const PRECACHE_URLS = [
   './src/graveyard.js',
   './src/highscores.js',
   './src/consumables.js',
-  './css/style.css?v=20261008-2',
+  './css/style.css?v=20261107-mobile-npc-dialogue',
   './content/starting_weapons.json',
   './content/gear_weapons.json',
   './content/gear_shields.json',

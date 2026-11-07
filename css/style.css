@@ -708,9 +708,18 @@ body.hint-collapsed #hint .panel-toggle {
 .trade-npc-speech { color: var(--parchment-dim); font-size: calc(12px * var(--ui-font-scale)); line-height: 1.5; margin: 0 0 14px; }
 
 @media (max-width: 720px), (pointer: coarse) {
-  #npcOverlay { position: fixed; inset: var(--mobile-hud-height, 56px) 0 0; z-index: 101; align-items: flex-end; }
-  #npcOverlay .panelbox { width: 100%; max-width: 100%; max-height: 75%; box-sizing: border-box; margin: 0; border-radius: 8px 8px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
-  .npc-dialogue-choice { min-height: 44px; }
+  /* Keep the conversation above the fixed mobile message log (z-index: 110).
+     The HUD (z-index: 130) stays accessible above the backdrop. */
+  #npcOverlay { position: fixed; inset: var(--mobile-hud-height, 56px) 0 0; z-index: 120; align-items: flex-end; background: rgba(5, 4, 3, 0.76); }
+  #npcOverlay .panelbox { width: 100%; max-width: 100%; max-height: min(82dvh, calc(100dvh - var(--mobile-hud-height, 56px))); box-sizing: border-box; margin: 0; border-radius: 10px 10px 0 0; padding: 20px 18px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border-color: #755137; }
+  #npcOverlay .npc-dialogue-header { gap: 14px; margin-bottom: 20px; }
+  #npcOverlay #npcPortrait { width: 72px; height: 84px; }
+  #npcOverlay .npc-dialogue-intro h2 { font-size: 22px; line-height: 1.2; }
+  #npcOverlay #npcSpeech { color: #e5d5bb; font-size: 15px; line-height: 1.55; }
+  #npcOverlay .npc-dialogue-choices { gap: 10px; }
+  #npcOverlay .npc-dialogue-choice { min-height: 48px; padding: 12px 14px; color: #f1b76c; font-size: 15px; line-height: 1.4; border-color: #705039; }
+  #npcOverlay .npc-goodbye { min-height: 44px; font-size: 15px; }
+  #npcOverlay .overlay-close { width: 36px; height: 36px; }
 }
 
 .panelbox {
