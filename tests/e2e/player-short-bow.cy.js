@@ -109,4 +109,73 @@ describe('Player Short Bow', () => {
       }
     })()`))
   })
+
+  it('makes distant bow targets advance or retreat on their normal turn, including replay', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Bow Reaction Tester')
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const oldChance=chance,oldDamage=damageRoll
+      try {
+        replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true
+        currentZ=0;map=surfaceMap;deathTransition=null
+        enemies=[];npcs=[];groundItems=[];occupied=new Set()
+        player.x=40;player.y=40;player.hp=1000;player.maxHp=1000
+        player.baseAtk=2;player.baseDef=2;player.baseSpd=5;player.lvl=1
+        player.race='human';player.godMode=false;player.invisibleTurns=0
+        player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
+        player.inventory=[createItem('arrows',{count:10})]
+        for(let y=35;y<=50;y++)for(let x=35;x<=51;x++){
+          map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        }
+        snapCameraToPlayer()
+        const spawn=(name,id,x=46)=>{
+          const template=ENEMY_TEMPLATE_BY_NAME[name]
+          const e=addEnemy({...template,id,name,baseName:name,x,y:40,level:0,
+            alive:true,hp:template.hp,maxHp:template.hp,homeX:x,homeY:40,
+            homeTileType:'grass',shooterAbility:null,shotsRemaining:0,
+            equipment:null,prefix:null,sleeping:false})
+          occupied.add(keyXY(e.x,e.y))
+          return e
+        }
+        chance=()=>false;damageRoll=()=>1
+        const ogre=spawn('Ogre','response-ogre')
+        const turn=turnCount
+        check(enemyOutmatchesPlayer(ogre)&&shootEnemy(ogre),'strong distant Ogre can be shot')
+        check(ogre.x===45&&ogre.y===40&&turnCount===turn+1,
+          'Ogre advances exactly once without an extra enemy action')
+        enemies=[];occupied=new Set()
+        const rat=spawn('Giant Rat','response-rat')
+        chance=()=>true
+        check(!enemyOutmatchesPlayer(rat)&&shootEnemy(rat),'weak distant Rat can be shot at')
+        check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
+          'a miss still prompts one-tile retreat')
+        setDesktopCanvasCursor(rat)
+        check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
+          'equipped bow uses the refreshed glowing arrow cursor')
+
+        chance=oldChance;damageRoll=oldDamage
+        enemies=[];occupied=new Set()
+        const replayOgre=spawn('Ogre','response-replay-ogre')
+        rngState=918273;startReplayRecording()
+        check(shootEnemy(replayOgre),'recorded bow shot resolves')
+        const recorded=structuredClone(replayData)
+        const expected={x:replayOgre.x,y:replayOgre.y,hp:replayOgre.hp,
+          turn:turnCount,arrows:player.inventory.find(i=>i.kind==='arrows')?.count}
+        replayRecording=false
+        loadGameFromObject(recorded.initialState,{isReplayInit:true})
+        replayPlaying=true;replaySimulationMode=true;replayAnimationsDisabled=true
+        activeReplay=recorded;replayRngIndex=0
+        await runReplayAction(recorded.actions[0])
+        const restored=enemies.find(e=>e.id==='response-replay-ogre')
+        check(restored.x===expected.x&&restored.y===expected.y&&restored.hp===expected.hp&&
+          turnCount===expected.turn&&player.inventory.find(i=>i.kind==='arrows')?.count===expected.arrows,
+          'replay restores the same distant response and ammunition')
+        check(replayRngIndex===recorded.rng.length,'replay uses identical RNG outcomes')
+      } finally {
+        chance=oldChance;damageRoll=oldDamage;replayPlaying=false;replaySimulationMode=false
+        replayRecording=false;activeReplay=null
+      }
+    })()`))
+  })
 })

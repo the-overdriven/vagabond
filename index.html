@@ -4580,7 +4580,9 @@ more difficult:
         updateMobileInfoPanel(e.x, e.y)
       }
       if (wasHidden && e.alive && hit) reactToInvisibleAttack(e, Math.max(0, hpBefore - e.hp))
-      enemyTurn(wasHidden && hit ? e : null)
+      // A visible bow shot gets one normal enemy-turn reaction even outside
+      // detection range. Invisible attacks keep their separate surprise rules.
+      enemyTurn(wasHidden && hit ? e : null, null, !wasHidden && !rareBlocked ? e : null)
       npcTurn()
       updateHud()
       render()
@@ -5381,6 +5383,34 @@ more difficult:
     return true
   }
 
+  // Only used for the targeted response to a distant player bow shot. Compare
+  // the same four combat stats used for Bestiary strength, with current gear,
+  // terrain and status effects. Ties close in rather than allowing free shots.
+  function enemyOutmatchesPlayer(e) {
+    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
+    const naturalGrace = weapon ? enemyWeaponGrace(e, weapon) : enemyGrace(e)
+    const enemyStrength = monsterStrength({atk: enemyAtk(e), def: enemyDef(e), spd: enemySpd(e),
+      grace: Math.max(0, (naturalGrace || 0) - gearGracePenalty(e.equipment))})
+    const playerStrength = monsterStrength({atk: playerAtk(), def: playerDef(), spd: playerSpd(), grace: playerGrace()})
+    return enemyStrength >= playerStrength
+  }
+
+  function reactToDistantBowShot(e) {
+    // A wounded fleeing creature stays defensive even if its base combat
+    // stats still exceed the player's.
+    if (!enemyIsFleeing(e) && enemyOutmatchesPlayer(e)) return enemyStepTowardPlayer(e)
+    const destination = enemyEscapeDestination(e)
+    if (!destination) return false
+    if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
+    const fromX = e.x, fromY = e.y
+    occupied.delete(keyXY(fromX, fromY))
+    e.x = destination.x; e.y = destination.y
+    occupied.add(keyXY(e.x, e.y))
+    e.farPath = null
+    finishEnemyMove(e, fromX, fromY)
+    return true
+  }
+
 
   // How many of the player's turns an NPC stands still after being talked
   // to, so a conversation doesn't get cut short by them wandering off mid-chat.
@@ -5969,14 +5999,14 @@ more difficult:
     return Math.min(0.50, Math.max(0, speedAdvantage) * 0.05)
   }
 
-  function enemyTurn(reactedEnemy = null, playerMovement = null) {
+  function enemyTurn(reactedEnemy = null, playerMovement = null, bowShotTarget = null) {
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
     DungeonHazards.onPlayerTurnConsumed(turnCount)
     if (player.hp <= 0 || deathTransition) return
     try {
-      return resolveEnemyTurn(reactedEnemy, playerMovement)
+      return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget)
     } finally {
       // Fear stays active through its last action and damage can cancel it
       // immediately, including when a trap hits a monster later in turn order.
@@ -5986,7 +6016,7 @@ more difficult:
     }
   }
 
-  function resolveEnemyTurn(reactedEnemy, playerMovement) {
+  function resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget = null) {
     ageBeastTracks()
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
@@ -6109,6 +6139,13 @@ more difficult:
           !forestConcealsPlayer(e, dist) && tryEnemyGazeOrWail(e)) {
         if (!e.aware) { e.aware = true; alarmEnemy(e); logEnemySpotting(e) }
         tryTriggerCollectiveMind(e)
+        continue
+      }
+      // A low-AGGRO monster can otherwise ignore repeated six-tile bow shots.
+      // Spend its ordinary action reacting, never grant a bonus move. Evasion,
+      // rare flight, fear, sanctuary and invisible attacks already took priority.
+      if (e === bowShotTarget && dist > aggroRange) {
+        if (!justEvaded) reactToDistantBowShot(e)
         continue
       }
       if (!playerHasForestCover() ||
@@ -11288,7 +11325,7 @@ more difficult:
   }
 
   const DESKTOP_ENEMY_CURSOR_IMAGE = 'img/cursors/red-sword.svg'
-  const DESKTOP_BOW_CURSOR_IMAGE = 'img/cursors/red-arrow.svg'
+  const DESKTOP_BOW_CURSOR_IMAGE = 'img/cursors/red-arrow.svg?v=20261107-slim-nock'
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1

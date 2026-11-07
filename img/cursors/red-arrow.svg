@@ -1,7 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <g stroke="#2c0708" stroke-width="2" stroke-linejoin="round" stroke-linecap="square">
-    <path d="M3 3L18 18" fill="none" stroke="#e64b4b" stroke-width="4"/>
-    <path d="M18 9V18H9" fill="none" stroke="#e64b4b" stroke-width="4"/>
-    <path d="M18 18L28 28M16 23L23 16" fill="none" stroke="#e64b4b" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <defs>
+    <filter id="arrowGlowSoft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+    <filter id="arrowGlowTight" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1"/>
+    </filter>
+    <path id="arrowOutline" d="M16 1L9 11L14 9V26L13 25V28L15 29V31H16V29H17V31H18V29L19 28V25L18 26V9L23 11Z"/>
+  </defs>
+  <g transform="rotate(-45 16 16)">
+    <!-- Match the red sword's pink halo, dark outline and pixel highlights. -->
+    <use href="#arrowOutline" fill="#ff2a6d" opacity="0.5" filter="url(#arrowGlowSoft)"/>
+    <use href="#arrowOutline" fill="#ff7aa8" opacity="0.7" filter="url(#arrowGlowTight)"/>
+    <use href="#arrowOutline" fill="#16040a" opacity="0.75" transform="translate(1 1)"/>
+    <use href="#arrowOutline" fill="#30070f"/>
+    <!-- Triangular head with a bright edge. -->
+    <path d="M16 3L11 10L15 8H17L21 10Z" fill="#bd1936"/>
+    <path d="M16 3L12 9L15 7Z" fill="#ff7a94"/>
+    <path d="M16 4V9H17V7Z" fill="#ffb0bc"/>
+    <!-- Long narrow shaft. -->
+    <path d="M15 9H17V28H15Z" fill="#8c0f23"/>
+    <path d="M15 10H16V28H15Z" fill="#ff7a94"/>
+    <path d="M17 10H18V27H17Z" fill="#cf2942"/>
+    <!-- Two short feathers and a one-pixel nock, not a bulky second head. -->
+    <path d="M13 25L15 26V28L13 27Z" fill="#8c0f23"/>
+    <path d="M13 25L15 26V27L14 26Z" fill="#ff7a94"/>
+    <path d="M19 25L17 26V28L19 27Z" fill="#8c0f23"/>
+    <path d="M19 25L17 26V27L18 26Z" fill="#cf2942"/>
+    <path d="M15 29H16V31H15Z M17 29H18V31H17Z" fill="#d93a55"/>
   </g>
 </svg>

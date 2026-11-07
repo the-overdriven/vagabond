@@ -6,6 +6,9 @@ async function main() {
   await run('loadContent()')
   context.fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'saves/Tester_start.json'), 'utf8'))
   run('loadGameFromObject(fixture,{isReplayInit:true});log=()=>{};ensureMerchantStock()')
+  context.realEnemyTurn = run('enemyTurn')
+  context.realChance = run('chance')
+  context.realDamageRoll = run('damageRoll')
 
   run(`(() => {
     const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -91,6 +94,94 @@ async function main() {
     check(player.inventory.some(i=>i.base==='Short Bow'), 'shooter drops bow on seeded roll')
   })()`)
   console.log('PASS shooter ammunition recovery and bow drop')
+
+  run(`(() => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    enemyTurn=realEnemyTurn;chance=()=>false;damageRoll=()=>1
+    currentZ=0;map=surfaceMap;enemies=[];npcs=[];occupied=new Set()
+    player.x=40;player.y=40;player.hp=1000;player.maxHp=1000
+    player.baseAtk=2;player.baseDef=2;player.baseSpd=5;player.lvl=1
+    player.godMode=false;player.invisibleTurns=0;player.race='human'
+    player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
+    player.inventory=[createItem('arrows',{count:12})]
+    for(let y=35;y<=50;y++)for(let x=35;x<=51;x++){
+      map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+    }
+    const spawn=(name,id,x=46)=>{
+      const t=ENEMY_TEMPLATE_BY_NAME[name]
+      const e=addEnemy({...t,id,baseName:name,x,y:40,level:0,alive:true,
+        hp:t.hp,maxHp:t.hp,homeX:x,homeY:40,homeTileType:'grass',
+        equipment:null,shooterAbility:null,shotsRemaining:0,sleeping:false})
+      occupied.add(keyXY(e.x,e.y))
+      return e
+    }
+    const reset=()=>{enemies=[];occupied=new Set()}
+    const strong=spawn('Ogre','bow-strong')
+    check(enemyOutmatchesPlayer(strong),'Ogre has higher combat strength')
+    const playerHp=player.hp,turnBefore=turnCount
+    check(shootEnemy(strong),'shoots Ogre from outside AGGRO')
+    check(strong.x===45&&strong.y===40&&player.hp===playerHp&&turnCount===turnBefore+1,
+      'stronger monster advances exactly one tile as its normal action')
+    reset()
+    const weak=spawn('Giant Rat','bow-weak')
+    check(!enemyOutmatchesPlayer(weak),'Giant Rat has lower combat strength')
+    chance=()=>true
+    check(shootEnemy(weak),'shoots at Giant Rat')
+    check(weak.hp===weak.maxHp&&weak.x===47&&weak.y===40,
+      'even a missed arrow drives a weaker monster one tile away')
+    reset();chance=()=>false
+    const cornered=spawn('Giant Rat','bow-cornered')
+    for(let y=39;y<=41;y++)map[y][47]='mountain'
+    check(shootEnemy(cornered)&&cornered.x===46&&cornered.y===40,
+      'a cornered weaker monster cannot retreat through terrain')
+    for(let y=39;y<=41;y++)map[y][47]='grass'
+    reset()
+    const near=spawn('Giant Rat','bow-near',44)
+    check(shootEnemy(near)&&near.x===43&&near.y===40,
+      'inside effective AGGRO the ordinary chase still takes priority')
+    reset()
+    const wounded=spawn('Goblin','bow-wounded')
+    wounded.maxHp=100;wounded.hp=9
+    check(enemyOutmatchesPlayer(wounded)&&enemyIsFleeing(wounded),'wounded Goblin still outmatches player')
+    check(shootEnemy(wounded)&&wounded.x===47&&wounded.y===40,
+      'wounded flight takes priority over the stronger-monster advance')
+    reset()
+    const passive=spawn('Fungus','bow-passive')
+    check(shootEnemy(passive)&&passive.x===46&&passive.y===40,
+      'passive creatures do not react')
+    chance=realChance;damageRoll=realDamageRoll
+  })()`)
+  console.log('PASS distant bow shot response, miss, terrain, AGGRO and passive priority')
+
+  run(`(() => {
+    enemies=[];occupied=new Set();player.inventory=[createItem('arrows',{count:3})]
+    const t=ENEMY_TEMPLATE_BY_NAME.Ogre
+    const e=addEnemy({...t,id:'bow-replay-reactor',baseName:'Ogre',x:46,y:40,
+      level:0,alive:true,hp:t.hp,maxHp:t.hp,homeX:46,homeY:40,
+      homeTileType:'grass',equipment:null,shooterAbility:null,shotsRemaining:0,sleeping:false})
+    occupied.add(keyXY(e.x,e.y))
+    rngState=918273;startReplayRecording()
+    if(!shootEnemy(e))throw Error('recorded bow shot must be valid')
+    window.__bowReactionRecord=structuredClone(replayData)
+    window.__bowReactionExpected={x:e.x,y:e.y,hp:e.hp,turn:turnCount,
+      arrows:player.inventory.find(item=>item.kind==='arrows')?.count}
+    replayRecording=false
+  })()`)
+  await run(`(async () => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    const record=window.__bowReactionRecord,expected=window.__bowReactionExpected
+    loadGameFromObject(record.initialState,{isReplayInit:true})
+    replayPlaying=true;replaySimulationMode=true;replayAnimationsDisabled=true
+    activeReplay=record;replayRngIndex=0
+    const e=enemies.find(other=>other.id==='bow-replay-reactor')
+    await runReplayAction(record.actions[0])
+    check(e.x===expected.x&&e.y===expected.y&&e.hp===expected.hp&&
+      turnCount===expected.turn&&player.inventory.find(item=>item.kind==='arrows')?.count===expected.arrows,
+      'replay reproduces the exact one-step bow reaction')
+    check(replayRngIndex===record.rng.length,'replay consumes the same seeded RNG trace')
+    replayPlaying=false;replaySimulationMode=false;activeReplay=null
+  })()`)
+  console.log('PASS deterministic distant bow reaction replay')
 }
 
 main().catch(error => {console.error(error.stack);process.exitCode = 1})

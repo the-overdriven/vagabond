@@ -4751,6 +4751,26 @@ when it actually enters view, without revealing offscreen listeners in the log.
 
 On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary, but can be outpaced through the SPD disengagement rule below. Losing range ends active pursuit; the existing Alarmed status otherwise expires under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
+### Reactions to distant player bow shots
+
+An enemy targeted by a valid Short Bow shot reacts on that enemy's **ordinary
+turn**, even if the arrow misses, when the player is **outside its current
+effective AGGRO range**. Relative combat strength uses the same four stats as
+the Bestiary: **ATK + DEF + SPD + GRACE**, with current equipment, terrain and
+status effects. A target at least as strong as the player attempts **one tile
+toward the player**; a weaker target attempts **one tile farther away**. This
+gives strong low-AGGRO enemies a chance to close the gap, while weaker targets
+may retreat beyond the bow's six-tile reach. A blocked route costs the response
+without moving; neither reaction teleports or crosses forbidden terrain.
+
+Inside effective AGGRO, normal combat and pursuit still apply. Passive
+creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
+wounded fleeing and invisibility retain their own rules; an evasive dodge does
+not grant a second reaction step. A distant-shot reaction replaces that enemy's
+usual action rather than adding a free move, does not extend its AGGRO, and
+does not establish a persistent chase outside it. Only the shot target reacts
+this way, without additional RNG or save state; the same steps occur in replay.
+
 Movement occupancy is scoped to the currently active map (current z level), 
 including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
 blocking each other's paths; same-floor creatures still block movement. 
@@ -5669,7 +5689,10 @@ Short Bows come from the Merchant or arrow-shooting monsters (§54, §20), never
 the ordinary weapon/artifact generation pool. They are normal inventory gear
 with no new persistent state; arrow stacks, equipped bows, and monster
 ammunition use existing save fields. Replays record shots by enemy ID and tile;
-failed attempts do not mutate gameplay.
+failed attempts do not mutate gameplay. Valid shots may also provoke one
+response step beyond a monster's normal AGGRO;
+the rules are in Enemy AI (§22). The bow's hover cursor uses the same glowing
+red pixel-art style as the melee sword cursor.
 
 Prolonged Hammer has a Lucerne-style silhouette: a thin long handle, compact
 pronged hammer face, small rear peen and a long spike above the head.
