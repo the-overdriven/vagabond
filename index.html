@@ -597,6 +597,7 @@ more difficult:
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
+    <kbd>R</kbd> aim bow (<kbd>ENTER</kbd> shoot) &nbsp;<br>
     <kbd>T</kbd> wait / skip turn &nbsp;<br>
     <kbd>P</kbd> toggle tiles / ASCII &nbsp;<br>
     <kbd>+</kbd><kbd>−</kbd> tile size &nbsp;<br>
@@ -2037,7 +2038,8 @@ more difficult:
   }
 
   function makeWeaponItem(tier, mf = 0, sourceTier = 0) {
-    const base = pickEquipmentBase(WEAPONS, tier, sourceTier)
+    // Short Bows enter play only through the Merchant and arrow-shooting enemies.
+    const base = pickEquipmentBase(WEAPONS.filter(w => !w.rangedAtk), tier, sourceTier)
     const item = {
       kind: 'weapon',
       base: base.name,
@@ -2049,6 +2051,19 @@ more difficult:
       name: base.name
     }
     return rollModifier(base.name, item, mf, sourceTier)
+  }
+
+  function makeShortBowItem() {
+    const base = WEAPONS.find(w => w.name === 'Short Bow')
+    if (!base) throw new Error('Missing Short Bow in gear_weapons.json')
+    return {kind:'weapon', base:base.name, name:base.name, atk:base.atk,
+      grace:base.grace, tier:base.tier, baseValue:base.baseValue,
+      sellValue:base.sellValue, twoHanded:true,
+      rangedAtk:base.rangedAtk, rangedRange:base.rangedRange}
+  }
+
+  function equippedShortBow() {
+    return player.equip?.weapon?.base === 'Short Bow' ? player.equip.weapon : null
   }
 
   function makeShieldItem(tier, mf = 0, sourceTier = 0) {
@@ -2186,7 +2201,7 @@ more difficult:
       : pick(normalEffects.length ? normalEffects : pool)
     // A low-tier artifact must not roll the statistics of a higher-tier
     // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
-    const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
+    const eligibleGearNames = [...WEAPONS.filter(w => !w.rangedAtk), ...SHIELDS, ...ARMORS]
       .filter(base => base.tier <= effect.tier).map(base => base.name)
     const noun = pick([...ARTIFACT_NOUNS, ...eligibleGearNames])
     const gear = artifactGearBase(noun)
@@ -2502,6 +2517,7 @@ more difficult:
       return parts.join(', ')
     }
     if (it.atk) parts.push('ATK ' + it.atk + (it.mod === 'atk' ? ('+' + it.modAmt) : ''))
+    if (it.rangedAtk) parts.push('RANGED ATK ' + it.rangedAtk + ', RANGE ' + it.rangedRange)
     if (it.def) parts.push('DEF ' + it.def + (it.mod === 'def' ? ('+' + it.modAmt) : ''))
     if (it.kind === 'weapon' && (it.grace !== undefined || it.spd !== undefined)) {
       const baseGrace = it.grace !== undefined ? it.grace : 6 - it.spd
@@ -3978,6 +3994,21 @@ more difficult:
   function lootFromEnemy(e) {
     const mf = playerMf()
 
+    // Remaining ammunition is recovered automatically; bow drops are rarer.
+    // Use the assigned shooter role, even if its last arrow was already fired.
+    if (e.shooterAbility === 'shooterArrows') {
+      const remaining = Math.max(0, e.shotsRemaining | 0)
+      if (remaining) {
+        addInventoryItem('arrows', {count:remaining})
+        log(`You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
+      }
+      if (chance(RANGED_CONFIG.shortBowDropChance)) {
+        const bow = makeShortBowItem()
+        player.inventory.push(bow)
+        lootLog(`The ${e.name} dropped a Short Bow.`, bow, bow.name)
+      }
+    }
+
     // Optional per-species drops are independent of artifact/equipment loot.
     // Their total chance is rolled once, then a weighted item is selected.
     const drop = enemyTemplateForSavedEnemy(e)?.lootTable
@@ -4229,6 +4260,31 @@ more difficult:
       !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : 0)
   }
 
+  function tryEvadePlayerAttack(e) {
+    if (!enemyHasAbility(e, 'evades') || playerHiddenFromEnemy(e) || !chance(0.30)) return false
+    const fromX = e.x, fromY = e.y
+    const options = []
+    for (const [dx, dy] of DIRS8) {
+      const nx = e.x + dx, ny = e.y + dy
+      if (!enemyCanTraverse(e, nx, ny) || enemySanctuaryTileForbidden(e, nx, ny) ||
+          (nx === player.x && ny === player.y)) continue
+      if (occupied.has(keyXY(nx, ny)) || npcs.some(n => n.x === nx && n.y === ny)) continue
+      options.push({x:nx, y:ny})
+    }
+    if (!options.length) return false
+    const destination = pick(options)
+    occupied.delete(keyXY(e.x, e.y))
+    e.x = destination.x; e.y = destination.y
+    occupied.add(keyXY(e.x, e.y))
+    finishEnemyMove(e, fromX, fromY)
+    e.justEvaded = true
+    spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
+    log(`The ${e.name} evades your attack.`, 'bad')
+    updateMobileInfoPanel(e.x, e.y)
+    showDesktopCombatTooltip(e)
+    return true
+  }
+
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
     const weaponName = player.equip.weapon ? (player.equip.weapon.kind === 'artifact' ? player.equip.weapon.name.replace(/^The\s+/i, '') : player.equip.weapon.name) : 'bare fists'
@@ -4254,31 +4310,7 @@ more difficult:
       spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
       return false
     }
-    if (enemyHasAbility(e, 'evades') && !playerHiddenFromEnemy(e) && chance(0.30)) {
-      const fromX = e.x, fromY = e.y
-      const options = []
-      for (const [dx, dy] of DIRS8) {
-        const nx = e.x + dx, ny = e.y + dy
-        if (!enemyCanTraverse(e, nx, ny) || enemySanctuaryTileForbidden(e, nx, ny) ||
-            (nx === player.x && ny === player.y)) continue
-        if (occupied.has(keyXY(nx, ny)) || npcs.some(n => n.x === nx && n.y === ny)) continue
-        options.push({x: nx, y: ny})
-      }
-      if (options.length) {
-        const destination = pick(options)
-        occupied.delete(keyXY(e.x, e.y))
-        e.x = destination.x
-        e.y = destination.y
-        occupied.add(keyXY(e.x, e.y))
-        finishEnemyMove(e, fromX, fromY)
-        e.justEvaded = true // consumed by this enemy's immediate response
-        spawnDamageNumber(fromX, fromY, 'Miss!', RENDER_STYLE.damage.miss)
-        log(`The ${e.name} evades your attack.`, 'bad')
-        updateMobileInfoPanel(e.x, e.y)
-        showDesktopCombatTooltip(e)
-        return false
-      }
-    }
+    if (tryEvadePlayerAttack(e)) return false
     if (chance(targetWasInvisible
       ? Math.max(MONSTER_INVISIBILITY_MISS_CHANCE, missChance(playerSpd(), enemySpd(e)))
       : missChance(playerSpd(), enemySpd(e)))) {
@@ -4446,6 +4478,116 @@ more difficult:
       if (projectileTerrainBlocks(e, x, y) || projectileCreatureBlocks(e, x, y)) return null
     }
     return path
+  }
+
+  function playerBowShotPath(e) {
+    const bow = equippedShortBow()
+    if (!bow || !e?.alive || !onCurrentLevel(e) || !undergroundTileVisible(e.x, e.y) || !enemyCanBeSeen(e)) return null
+    if (Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > bow.rangedRange) return null
+    const origin = {x:player.x, y:player.y}
+    if (!UndergroundFov.canSee(map, origin.x, origin.y, e.x, e.y)) return null
+    const path = projectilePathBetween(origin.x, origin.y, e.x, e.y)
+    for (let i = 1; i < path.length - 1; i++) {
+      const {x, y} = path[i]
+      if (projectileTerrainBlocks(origin, x, y) || projectileCreatureBlocks(origin, x, y)) return null
+    }
+    return path
+  }
+
+  // Player shots resolve synchronously; their arrow flight is presentation only.
+  // A shoot action is recorded by enemy identity so replay never re-targets a
+  // creature that happens to move into the original coordinate.
+  function shootEnemy(e) {
+    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() ||
+        deathTransition || (!replayAnimationsDisabled && (cameraAnimating || attackAnim || enemyAttackPresentationPending()))) return false
+    const bow = equippedShortBow()
+    if (!bow || !e?.alive || !onCurrentLevel(e)) return false
+    if (playerInsideSanctuary()) {
+      log('You cannot shoot from sacred ground. Step beyond its protection.', 'info')
+      return false
+    }
+    if (!canUseItemsWhileSwimming()) return false
+    const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    if (distance > bow.rangedRange) { log('Target out of bow range.', 'info'); return false }
+    const path = playerBowShotPath(e)
+    if (!path) { log('Your arrow has no clear shot.', 'info'); return false }
+    const arrowStack = player.inventory.find(item => item.kind === 'arrows' && item.count > 0)
+    if (!arrowStack) { log('You have no arrows.', 'info'); return false }
+
+    const replayScope = recordReplayAction({type:'shoot', targetId:e.id, x:e.x, y:e.y})
+    try {
+      clearAutoPath()
+      consecutiveWaitTurns = 0
+      if (--arrowStack.count <= 0) player.inventory.splice(player.inventory.indexOf(arrowStack), 1)
+      const wasHidden = playerHiddenFromEnemy(e)
+      const hpBefore = e.hp
+      const targetWasInvisible = enemyInvisibleActive(e)
+      const wasEnraged = enemyIsEnraged(e)
+      const wasFleeing = enemyIsFleeing(e)
+      const shotCriticalChance = playerCriticalHitChance(e)
+      // Preserve rare creatures' two-sighting escape rules. Ordinary targets
+      // become alerted on being shot at, even when the arrow misses.
+      // A six-tile bow shot must not bypass the five-tile first-sighting gate.
+      if (rareFleeEligible(e) && distance > RARE_FLEE.sightRange)
+        rareStartFlee(e, RARE_FLEE.sightRange, true)
+      const rareBlocked = rareFleeBlocksAttack(e)
+      if (!rareBlocked) {
+        e.aware = true
+        e.forestConcealX = null; e.forestConcealY = null
+        alarmEnemy(e)
+      }
+      showDesktopCombatTooltip(e)
+      updateMobileInfoPanel(e.x, e.y)
+      if (!replayAnimationsDisabled && !replaySimulationMode) {
+        const presentation = queueEnemyAttackPresentation(RANGED_CONFIG.projectileAnimationMs)
+        spawnProjectileAnim(path, 'arrow', RANGED_CONFIG.projectileAnimationMs, presentation.delay)
+      }
+      let hit = false
+      if (rareBlocked) {
+        log(`Your arrow cannot catch the fleeing ${e.name}.`, 'info')
+      } else if (enemyImmunityActive(e) || (enemyHasAbility(e, 'ethereal') && !bow.mod)) {
+        log(`Your arrow passes harmlessly through the ${e.name}!`, 'bad')
+        spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
+      } else if (tryEvadePlayerAttack(e)) {
+        log(`Your arrow misses the dodging ${e.name}.`, 'info')
+      } else if (chance(Math.min(1, missChance(playerSpd(), enemySpd(e)) * RANGED_CONFIG.dodgeMultiplier))) {
+        log(`You shoot at the ${e.name} but miss.`, 'info')
+        spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
+      } else {
+        hit = true
+        const armor = equippedArmor(e.equipment)
+        const glancing = !!armor && chance(missChance(playerSpd(), enemySpd(e)))
+        let dmg = damageRoll(bow.rangedAtk, enemyDef(e))
+        const critical = !glancing && chance(shotCriticalChance)
+        if (critical) dmg = Math.round(dmg * 2)
+        if (glancing) dmg = Math.floor(dmg / 3)
+        e.hp -= dmg
+        if (targetWasInvisible) revealEnemyInvisibility(e)
+        if (dmg > 0) breakEnemyFear(e)
+        absorbEnemyFatalHit(e)
+        triggerEnemyShellRetreat(e)
+        alarmEnemiesNearHit(e)
+        if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
+        spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
+        log(glancing ? `Your arrow glances off the ${e.name}'s ${armor.base}, dealing ${dmg} damage.` :
+          `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
+        logEnemyEnrageTransition(e, wasEnraged)
+        if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
+        if (e.hp <= 0) killEnemy(e)
+      }
+      if (e.alive) {
+        showDesktopCombatTooltip(e)
+        updateMobileInfoPanel(e.x, e.y)
+      }
+      if (wasHidden && e.alive && hit) reactToInvisibleAttack(e, Math.max(0, hpBefore - e.hp))
+      enemyTurn(wasHidden && hit ? e : null)
+      npcTurn()
+      updateHud()
+      render()
+      runAnimationLoop()
+      updateTooltip()
+      return true
+    } finally { finishRecordedReplayAction(replayScope) }
   }
 
   function shooterCanSeePlayer(e) {
@@ -6980,7 +7122,7 @@ more difficult:
           let item
           if (isArtifact) item = makeArtifactItem(chestTier, mf)
           else {
-            const eligible = [...WEAPONS, ...SHIELDS, ...ARMORS].filter(base =>
+            const eligible = [...WEAPONS.filter(w => !w.rangedAtk), ...SHIELDS, ...ARMORS].filter(base =>
               base.tier >= royalCfg.gearMinTier && base.tier <= chestTier)
             const base = pick(eligible)
             if (WEAPONS.includes(base)) item = {kind:'weapon',base:base.name,name:base.name,
@@ -11146,6 +11288,7 @@ more difficult:
   }
 
   const DESKTOP_ENEMY_CURSOR_IMAGE = 'img/cursors/red-sword.svg'
+  const DESKTOP_BOW_CURSOR_IMAGE = 'img/cursors/red-arrow.svg'
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1
@@ -11157,7 +11300,7 @@ more difficult:
       return
     }
     canvas.style.cursor = e
-      ? `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair` : ''
+      ? `url("${imageSrc(equippedShortBow() ? DESKTOP_BOW_CURSOR_IMAGE : DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair` : ''
   }
 
   function updateTooltip() {
@@ -11226,7 +11369,7 @@ more difficult:
       const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
         undergroundTileVisible(mx, my) && enemyCanBeSeen(e))
       const npcAtTile = currentZ === 0 && npcs.some(n => n.x === mx && n.y === my)
-      const nextPath = npcAtTile || enemyIsDesktopClickAttackable(enemy) ? null : findPlayerPath(mx, my)
+      const nextPath = npcAtTile || (enemy && equippedShortBow()) || enemyIsDesktopClickAttackable(enemy) ? null : findPlayerPath(mx, my)
       const oldEnd = hoveredAutoPath?.at(-1), newEnd = nextPath?.at(-1)
       if (!oldEnd || !newEnd || oldEnd.x !== newEnd.x || oldEnd.y !== newEnd.y || hoveredAutoPath.length !== nextPath.length) {
         hoveredAutoPath = nextPath?.length ? nextPath : null
@@ -11292,6 +11435,7 @@ more difficult:
     const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my && undergroundTileVisible(mx, my))
     if (e) {
       clearAutoPath()
+      if (equippedShortBow()) shootEnemy(e)
       return
     }
     if (Math.max(Math.abs(mx - player.x), Math.abs(my - player.y)) === 1 &&
@@ -11320,7 +11464,8 @@ more difficult:
         undergroundTileVisible(mx, my) && enemyCanBeSeen(en))
       if (e) {
         clearAutoPath()
-        if (enemyIsDesktopClickAttackable(e)) tryMove(e.x - player.x, e.y - player.y)
+        if (equippedShortBow()) shootEnemy(e)
+        else if (enemyIsDesktopClickAttackable(e)) tryMove(e.x - player.x, e.y - player.y)
         else startAutoPath(e.x, e.y, e)
         return
       }
@@ -12338,6 +12483,8 @@ more difficult:
           tier: base.tier,
           baseValue: base.baseValue,
           twoHanded: !!base.twoHanded,
+          ...(base.rangedAtk ? {rangedAtk:base.rangedAtk, rangedRange:base.rangedRange,
+            sellValue:base.sellValue} : {}),
           name: base.name,
           merchantPrice: fixedItem.merchantPrice
         }
@@ -12388,6 +12535,11 @@ more difficult:
         count: invisibilityCfg.count, merchantPrice: invisibilityCfg.merchantPrice
       }))
     }
+    const arrowCfg = MERCHANT_STOCK_CONFIG.arrows
+    if (arrowCfg && !merchantStock.some(it => it.kind === arrowCfg.kind && it.bundleSize)) {
+      merchantStock.push(createItem(arrowCfg.kind, {count:1, bundleSize:arrowCfg.bundleSize,
+        merchantPrice:arrowCfg.bundlePrice, unlimitedStock:!!arrowCfg.unlimitedStock}))
+    }
   }
 
   // Gear/artifact tier pricing stays in loot_tables.json; other values live in items.json.
@@ -12395,6 +12547,7 @@ more difficult:
     if (it.startingWeapon) return 2
     const definition = itemDefinition(it.kind)
     if (definition) return definition.sellValue
+    if (Number.isFinite(it.sellValue)) return it.sellValue
     if (it.tier) {
       let v = SELL_VALUE_BY_TIER[it.tier] || 0
       if (it.mod) v += (it.modAmt || 1) * 5
@@ -12463,7 +12616,7 @@ more difficult:
         const tier = visibleItemTier(it)
         const cls = tier !== null ? tierColorClass(tier) : ''
         const stackable = isStackableKind(it.kind)
-        const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
+        const countTag = it.bundleSize ? ` (bundle of ${it.bundleSize})` : stackable && it.count > 1 ? ' x' + it.count : ''
         const line = itemStatLine(it)
         const iconSvg = itemIconHTML(it)
         if (iconSvg) {
@@ -12538,12 +12691,11 @@ more difficult:
     const stackable = isStackableKind(it.kind)
     if (stackable) {
       consolidateConsumableStacks()
-      const existing = player.inventory.find(i => i.kind === it.kind)
-      if (existing) existing.count = (existing.count ?? 1) + 1
-      else player.inventory.push({...it, count: 1})
-      it.count = (it.count || 1) - 1
+      const quantity = Math.max(1, it.bundleSize || 1)
+      addInventoryItem(it.kind, {count:quantity})
+      if (!it.unlimitedStock) it.count = (it.count || 1) - 1
       // Keep depleted finite scroll entries so save restoration cannot refill them.
-      if (it.count <= 0 && ![MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind,
+      if (!it.unlimitedStock && it.count <= 0 && ![MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind,
         MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.kind].includes(it.kind)) {
         const idx = merchantStock.indexOf(it)
         if (idx >= 0) merchantStock.splice(idx, 1)
@@ -12558,7 +12710,8 @@ more difficult:
     }
     player.gold -= value
     recordReplayAction({type:'buy', replayId, fallbackIndex: merchantStock.findIndex(stock => stock?.replayId === replayId), kind:it.kind, name:it.name})
-    log(`You buy the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
+    log(it.bundleSize ? `You buy ${it.bundleSize} arrows for ${value} gold.` :
+      `You buy the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
     updateHud()
     renderTrade()
     renderInventory()
@@ -12575,7 +12728,8 @@ more difficult:
     if (stackable) {
       it.count = (it.count || 1) - 1
       const existing = merchantStock.find(s => s.kind === it.kind && s.name === it.name)
-      if (existing) existing.count = (existing.count ?? 1) + 1
+      if (existing?.unlimitedStock) { /* infinite bundles are already stocked */ }
+      else if (existing) existing.count = (existing.count ?? 1) + 1
       else merchantStock.push({kind: it.kind, name: it.name, count: 1})
       if (it.count <= 0) player.inventory.splice(idx, 1)
     } else {
@@ -12734,6 +12888,9 @@ more difficult:
       equipmentLog(`${equipLead} the ${artifactDisplayName(it)}.${statDeltaText(before)}`, [old, it])
     }
     consumeItemTurn()
+    bowAimTarget = null
+    clearHoveredAutoPath()
+    updateTooltip()
   }
 
   function unequipItem(slot) {
@@ -12747,6 +12904,9 @@ more difficult:
     player.inventory.push(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     consumeItemTurn()
+    bowAimTarget = null
+    clearHoveredAutoPath()
+    updateTooltip()
   }
 
   // Inventory actions are player actions: they advance the world once even
@@ -13602,6 +13762,13 @@ more difficult:
     return true
   }
 
+  let bowAimTarget = null
+  function bowTargetsInRange() {
+    return enemies.filter(e => e.alive && onCurrentLevel(e) && playerBowShotPath(e))
+      .sort((a, b) => Math.max(Math.abs(a.x-player.x),Math.abs(a.y-player.y)) -
+        Math.max(Math.abs(b.x-player.x),Math.abs(b.y-player.y)) || String(a.id).localeCompare(String(b.id)))
+  }
+
   window.addEventListener('keydown', (ev) => {
     if (Highscores.isOpen()) {
       Highscores.handleKeydown(ev)
@@ -13633,6 +13800,16 @@ more difficult:
     if (k === 'CapsLock') {
       rangesLocked = !rangesLocked
       refreshRangeVisibility()
+      return
+    }
+
+    if (bowAimTarget && (k === 'Escape' || k === 'Enter')) {
+      ev.preventDefault()
+      const target = bowAimTarget
+      bowAimTarget = null
+      hoveredEnemy = null
+      if (k === 'Enter') shootEnemy(target)
+      render()
       return
     }
 
@@ -13683,6 +13860,18 @@ more difficult:
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()) return
+    if (k === 'r' || k === 'R') {
+      ev.preventDefault()
+      if (!equippedShortBow()) { log('Equip a bow to aim.', 'info'); return }
+      const targets = bowTargetsInRange()
+      if (!targets.length) { log('No clear bow targets within range.', 'info'); return }
+      const nextIndex = bowAimTarget ? (targets.indexOf(bowAimTarget) + 1) % targets.length : 0
+      bowAimTarget = targets[nextIndex]
+      hoveredEnemy = bowAimTarget
+      log(`Aiming at ${bowAimTarget.name}. Enter to shoot, R to change target, Escape to cancel.`, 'info')
+      render()
+      return
+    }
     if (player.godMode && (k === 'PageUp' || k === 'PageDown')) {
       ev.preventDefault()
       if (!ev.repeat) useGodModeTravel(k === 'PageDown' ? -1 : 1)
@@ -13720,6 +13909,7 @@ more difficult:
     const key = k.length === 1 ? k.toLowerCase() : k
     if (moves[key]) {
       ev.preventDefault()
+      bowAimTarget = null
       clearAutoPath()
       tryMove(moves[key][0], moves[key][1])
     }

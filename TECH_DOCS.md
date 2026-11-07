@@ -4507,6 +4507,10 @@ with **10 shots**. Shooter role and exact remaining ammunition persist with the
 enemy. A fired projectile always consumes one shot, including dodges and glancing
 hits. A blocked line consumes no ammunition. At zero shots the bow indicator
 disappears and the enemy immediately uses its ordinary species AI on later turns.
+On death, an enemy assigned `shooterArrows` transfers exactly its remaining
+arrows directly to the player's inventory, logging the amount when positive.
+It also has a **25%** seeded chance to drop a Short Bow into
+inventory; stone throwers cannot drop bows or arrows through this rule.
 
 Ranged attacks ignore the monster's ordinary/equipment/prefix-modified ATK and use
 only projectile ATK. GRACE does not participate. DEF mitigation, monster critical
@@ -5539,7 +5543,7 @@ Touch devices retain the existing full-screen layout for the other dialogs.
 
 ## Non-gear item catalog
 
-`content/items.json` defines all 22 non-gear inventory kinds. Weapons, shields,
+`content/items.json` defines all 23 non-gear inventory kinds. Weapons, shields,
 armor, and procedural artifacts retain their existing configuration systems.
 The dictionary keys are the canonical `kind` identifiers used by inventory,
 merchant references, saves, and replay actions. Descriptive loot-outcome names
@@ -5609,6 +5613,7 @@ Current base weapons include:
 | Dagger | 1 | 2 | 5 | No |
 | Short Sword | 1 | 3 | 4 | No |
 | Club | 1 | 3 | 2 | No |
+| Short Bow | 1 | 1 (melee) | 1 | Yes |
 | Rapier | 2 | 4 | 5 | No |
 | Staff | 2 | 6 | 2 | Yes |
 | Long Sword | 2 | 6 | 4 | No |
@@ -5634,6 +5639,37 @@ Current base weapons include:
 | Kanabo Club | 5 | 15 | 1 | Yes |
 | Crescent Blades | 5 | 13 | 5 | Yes |
 | Titan Warpick | 5 | 18 | 1 | Yes |
+
+### Short Bow and player ranged attacks
+
+The Short Bow is a two-handed weapon with **1 melee ATK**, **5 fixed ranged ATK**,
+and a maximum firing range of **6 Chebyshev tiles**. Equipping, swapping, or
+unequipping follows ordinary one-turn equipment rules; equipping removes a
+shield. Bumping a neighboring monster remains an ordinary, weak melee attack.
+Clicking/tapping a visible enemy with the bow equipped fires an arrow instead
+of auto-pathing toward the monster. Keyboard players can press **R** to aim at
+visible targets (repeated R cycles), **Enter** to fire, or **Escape** to cancel.
+Mouse hover changes from the red sword to a red arrow while the bow is equipped.
+
+Each valid shot consumes **one arrow and one turn**, including misses, and
+alerts its target even if it misses. Arrows stack as ordinary inventory items;
+without ammunition, firing is refused with a message and costs no turn.
+Shots require visible targets and the same deterministic FOV and unobstructed
+projectile path as monster arrows: walls, trees, solid structures, ground
+monsters and NPCs block intervening shots. Out-of-range or blocked attempts
+consume neither arrows nor turns. Shooting cannot bypass Temple sanctuary,
+enemy immunity, or rare-monster flight protection. Ranged attacks use double
+the normal SPD-based miss chance, ordinary critical and armor-glancing rules,
+but no melee GRACE timing or extra attacks. Base melee ATK and equipment ATK
+bonuses do not increase the bow's fixed projectile damage. Enemy turns, XP,
+quests, and stealth reactions resolve with ordinary combat rules; projectile
+flight is visual-only and cannot affect the deterministic result.
+
+Short Bows come from the Merchant or arrow-shooting monsters (§54, §20), never
+the ordinary weapon/artifact generation pool. They are normal inventory gear
+with no new persistent state; arrow stacks, equipped bows, and monster
+ammunition use existing save fields. Replays record shots by enemy ID and tile;
+failed attempts do not mutate gameplay.
 
 Prolonged Hammer has a Lucerne-style silhouette: a thin long handle, compact
 pronged hammer face, small rear peen and a long spike above the head.
@@ -7390,6 +7426,11 @@ stacks already present in older saves, keeping their total count.
 
 The game's base **sell value** is calculated by `itemSellValue()`.
 
+The Merchant also stocks a Short Bow for **300g** and unlimited separate
+bundles of **10 arrows for 20g**. Bows resell for **30g**, arrows for **1g**
+each. Purchasing a bow includes no free arrows; normal buy/sell and save/replay
+rules apply to both items.
+
 ### Tiered items
 
 If an item has a `tier`, its base sell value comes from:
@@ -9136,6 +9177,8 @@ not raw keyboard events. Current action types are:
 
 - `move` - one requested grid movement, including movement into an enemy (attack),
   an NPC (interaction), or an otherwise non-walkable destination;
+- `shoot` - a successful Short Bow firing action, recorded against one enemy ID
+  and its tile at the time of firing;
 - `inspect` - inspect / surroundings action;
 - `forage` - normal forage/search/loot action;
 - `dig` - shovel digging, including the sand+shovel `F` shortcut;

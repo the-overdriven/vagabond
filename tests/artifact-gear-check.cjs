@@ -31,22 +31,24 @@ function artifact(base, tier) {
   })()`))
 }
 
-test('artifact noun catalog deduplicates gear and automatically uses all eligible bases', async () => {
+test('artifact noun catalog uses all eligible non-ranged gear bases', async () => {
   await ready()
-  const gear = Object.values(catalogs).flat()
+  const gear = Object.values(catalogs).flat().filter(base => !base.rangedAtk)
   for (const base of gear) {
     assert.ok(!nouns.includes(base.name), `gear noun duplicated: ${base.name}`)
-    const possible = run(`([...ARTIFACT_NOUNS, ...[...WEAPONS,...SHIELDS,...ARMORS].filter(i=>i.tier<=${base.tier}).map(i=>i.name)]).includes(${JSON.stringify(base.name)})`)
+    const possible = run(`([...ARTIFACT_NOUNS, ...[...WEAPONS,...SHIELDS,...ARMORS].filter(i=>!i.rangedAtk&&i.tier<=${base.tier}).map(i=>i.name)]).includes(${JSON.stringify(base.name)})`)
     assert.ok(possible, `${base.name} must automatically be eligible at its tier`)
   }
   assert.ok(!run('ARTIFACT_NOUNS.includes("Brigandine")'))
+  assert.ok(!run('[...ARTIFACT_NOUNS, ...WEAPONS.filter(i=>!i.rangedAtk).map(i=>i.name)].includes("Short Bow")'),
+    'Short Bow must not enter ordinary artifact generation')
   assert.notEqual(artifact('Titan Warpick', 3).base, 'Titan Warpick', 'tier-3 artifact must not pick a tier-5 base')
 })
 
 test('generated artifacts inherit the stats of every available gear base', async () => {
   await ready()
   for (const [slot, gear] of Object.entries(catalogs)) {
-    for (const base of gear) {
+    for (const base of gear.filter(base => !base.rangedAtk)) {
       const item = artifact(base.name, Math.max(3, base.tier))
       assert.equal(item.kind, 'artifact')
       assert.equal(item.noun, base.name)

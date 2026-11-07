@@ -1,4 +1,13 @@
 {
+  "arrows": {
+    "name": "Arrows",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 1,
+    "actions": [],
+    "description": "Ammunition for a Short Bow. Each shot consumes one arrow.",
+    "baseValue": 2
+  },
   "potion": {
     "name": "Life Potion",
     "category": "supplies",

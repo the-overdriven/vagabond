@@ -191,6 +191,7 @@
   "ranged": {
     "shooterChance": 0.5,
     "startingShots": 10,
+    "shortBowDropChance": 0.25,
     "dodgeMultiplier": 2,
     "projectileAnimationMs": 220,
     "abilities": {

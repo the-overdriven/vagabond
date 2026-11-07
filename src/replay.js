@@ -332,6 +332,12 @@ async function runReplayAction(action) {
     case 'move':
       await tryMove(action.dx, action.dy)
       break
+    case 'shoot': {
+      const target = enemies.find(e => e.alive && onCurrentLevel(e) && e.id === action.targetId)
+      if (!target || target.x !== action.x || target.y !== action.y || !shootEnemy(target))
+        return replayDesync(`Replay desynchronized: invalid bow shot at ${action.x},${action.y}.`)
+      break
+    }
     case 'closeDoor':
       // Playback invokes the same turn resolver as clicks/taps. The recorded
       // coordinate is absolute so failed/unexpected transitions are detected.
