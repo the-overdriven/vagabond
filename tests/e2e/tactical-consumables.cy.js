@@ -79,7 +79,11 @@ describe('Tactical consumables', () => {
         win.eval('beginFireballTargeting(0);setFireballTarget(47,40)')
       })
       cy.get('#fireballCast').should('be.disabled')
-      cy.window().then(win => win.eval('setFireballTarget(44,40);if(fireballBlastTiles(44,40).length!==21)throw Error("centered 21-tile blast")'))
+      cy.window().then(win => win.eval(`
+        setFireballTarget(44,40);
+        if(fireballBlastTiles(44,40).length!==21)throw Error('centered 21-tile blast');
+        if(fireballVisualTiles(44,40).length!==49)throw Error('unclipped 7x7 flame presentation');
+      `))
       if (touch) cy.get('#fireballCast').should('be.enabled').click()
       else cy.window().then(win => {
         const point=win.eval(`(() => {

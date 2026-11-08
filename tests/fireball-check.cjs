@@ -14,11 +14,16 @@ const {run,context} = require('./helpers/node-game-runtime.cjs')
  id,baseName:'Goblin',name:'Goblin',x,y,level:0,alive:true,hp,maxHp:hp,equipment:null,shooterAbility:null,shotsRemaining:0});`)
  assert.equal(run('fireballBlastTiles(44,40).length'),21)
  assert(run('!fireballBlastTiles(44,40).some(p=>p.x===42&&p.y===38)'))
+ assert.equal(run('fireballVisualTiles(44,40).length'),49,'unobstructed flame sprites have a 7×7 drawing mask')
+ assert(run('fireballVisualTiles(44,40).some(p=>p.x===42&&p.y===38)'),
+   'visual flames may curl across damage-excluded corners without widening damage')
  assert(run('validFireballTarget(46,40)&&!validFireballTarget(47,40)'))
  run(`map[40][42]='mountain'`)
  assert(!run('validFireballTarget(44,40)'))
  run(`map[40][42]='grass';map[40][45]='dwarvenwall'`)
  assert(!run('fireballBlastTiles(44,40).some(p=>p.x===46&&p.y===40)'))
+ assert(!run('fireballVisualTiles(44,40).some(p=>p.x===45&&p.y===40||p.x===46&&p.y===40)'),
+   'the enlarged visual mask does not draw on or through walls')
  run(`map[40][45]='grass';map[41][44]='dwarvenwall';map[40][45]='dwarvenwall'`)
  assert(!run('fireballClearLine(44,40,45,41)'),'sealed diagonal blocks fire')
  run(`map[41][44]='grass';map[40][45]='grass';addInventoryItem('scrollOfFireball',{count:3});

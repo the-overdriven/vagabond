@@ -43,6 +43,16 @@ function fireballBlastTiles(x, y) {
   return tiles
 }
 
+// The flame sprites extend beyond the damage ring. Give them room to curl
+// naturally while still masking opaque terrain and blocked sight lines.
+function fireballVisualTiles(x, y) {
+  const tiles = []
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    if (fireballClearLine(x, y, x + dx, y + dy)) tiles.push({x:x + dx, y:y + dy})
+  }
+  return tiles
+}
+
 function fireballControls() {
   let bar = document.getElementById('fireballControls')
   if (bar) return bar
@@ -125,6 +135,7 @@ async function castFireball(idx, x, y) {
     if (!replayAnimationsDisabled && !replaySimulationMode) {
       const presentation = queueEnemyAttackPresentation(FIREBALL_FLIGHT_MS + FIREBALL_BURST_MS)
       fireballAnims.push({fromX:player.x, fromY:player.y, x, y, tiles,
+        visualTiles:fireballVisualTiles(x, y),
         start:presentation.start, mapKey:currentMapViewKey()})
       impactDelay = presentation.delay + FIREBALL_FLIGHT_MS
     }
@@ -217,9 +228,10 @@ function fireballGlow(x,y,radius,alpha) {
 function drawFireballBurst(a, age) {
   const t=Math.min(1,age/FIREBALL_BURST_MS)
   const cx=(a.x-camX+0.5)*TILE_PX,cy=(a.y-camY+0.5)*TILE_PX
-  // Clip to the exact legal blast, including wall shadows and visibility.
+  // Damage remains strictly inside a.tiles; visual flames may curl past it.
+  // Only opaque barriers and unexplored sight lines trim the presentation.
   ctx.save();ctx.beginPath()
-  for (const p of a.tiles) if (undergroundTileVisible(p.x,p.y))
+  for (const p of a.visualTiles) if (undergroundTileVisible(p.x,p.y))
     ctx.rect((p.x-camX)*TILE_PX,(p.y-camY)*TILE_PX,TILE_PX,TILE_PX)
   ctx.clip()
   const expansion=Math.min(1,t/0.65)

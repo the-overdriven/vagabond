@@ -7028,8 +7028,11 @@ then surviving monsters take their normal turn. All damage rolls are captured
 before effects and kill rewards; self-inflicted lethal damage cannot be undone
 by leveling up from a simultaneous kill. A fiery projectile travels for 280 ms,
 then a 780 ms effect flashes at the center and expands into a turbulent, hollow
-ring of fire with fading embers. The effect is clipped to affected visible cells;
-it never paints fire through walls or onto excluded corners. Damage/death
+ring of fire with fading embers. Flame tongues can extend slightly beyond the
+exact damage footprint on open ground, so the circular ring is not visibly
+cut off at tile boundaries. The visual effect still stops at opaque terrain,
+blocked rays and unseen cells; the target preview marks the actual affected
+tiles, including its excluded corners. Damage/death
 visuals wait for impact and input remains blocked through presentation. Animation
 frames never consume gameplay RNG or resolve damage. Replay records the scroll's
 identity and target coordinates, reusing the same action and seeded damage rolls.
