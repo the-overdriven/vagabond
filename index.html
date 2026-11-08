@@ -4046,9 +4046,12 @@ more difficult:
       const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
       if (choices.length) {
         const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
-        if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind))
-        else addInventoryItem(entry.kind)
-        log(`The ${e.name} dropped a ${itemDefinition(entry.kind).name}.`,'loot')
+        const count = entry.count ?? 1
+        if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid monster loot count: ' + entry.kind)
+        if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind, {count}))
+        else addInventoryItem(entry.kind, {count})
+        const name = itemDefinition(entry.kind).name
+        log(`The ${e.name} dropped ${count === 1 ? 'a ' + name : count + ' × ' + name}.`, 'loot')
       }
     }
 
@@ -6448,7 +6451,8 @@ more difficult:
           !Number.isFinite(item.sellValue) || item.sellValue < 0 ||
           !Number.isFinite(item.baseValue) || item.baseValue < 0 || !Array.isArray(item.actions))
         throw new Error('Invalid item definition: ' + kind)
-      if (item.icon !== undefined && (typeof item.icon !== 'string' || !/^img\/(?:icons|tiles)\/[A-Za-z0-9 _-]+\.(?:svg|png)$/.test(item.icon)))
+      if (item.icon !== undefined && item.icon !== null &&
+          (typeof item.icon !== 'string' || !/^img\/(?:icons|tiles)\/[A-Za-z0-9 _-]+\.(?:svg|png)$/.test(item.icon)))
         throw new Error('Invalid item icon: ' + kind)
       if (item.droppable !== undefined && typeof item.droppable !== 'boolean')
         throw new Error('Invalid droppable flag: ' + kind)
@@ -6556,7 +6560,7 @@ more difficult:
   }
 
   function itemIconPath(kind) {
-    return itemDefinition(kind)?.icon || 'img/icons/' + kind + '.svg'
+    return itemDefinition(kind)?.icon === null ? null : (itemDefinition(kind)?.icon || 'img/icons/' + kind + '.svg')
   }
 
   function itemEffectPower(kind, amount) {
@@ -6683,7 +6687,7 @@ more difficult:
   }
 
   function itemIconKinds() {
-    return ['weapon', 'armor', 'shield', 'artifact', ...Object.keys(ITEM_DEFINITIONS)]
+    return ['weapon', 'armor', 'shield', 'artifact', ...Object.keys(ITEM_DEFINITIONS).filter(kind => ITEM_DEFINITIONS[kind].icon !== null)]
   }
 
   function itemIconFallback(img, specificPath, fallbackPath) {
@@ -7020,7 +7024,7 @@ more difficult:
         else player.inventory.push(item)
       } else player.inventory.push(item)
       groundItems.splice(groundItems.indexOf(dropped), 1)
-      log(`You pick up ${artifactDisplayName(item)}.`, 'loot')
+      log(`You pick up ${item.count > 1 ? item.count + ' × ' : ''}${artifactDisplayName(item)}.`, 'loot')
       spawnPickupAnim(dropped)
       consumeItemTurn()
       return

@@ -128,6 +128,16 @@
     },
     "baseValue": 0
   },
+  "meat": {
+    "name": "Cut of Meat",
+    "category": "supplies",
+    "stackable": true,
+    "icon": null,
+    "sellValue": 2,
+    "actions": [],
+    "description": "Raw meat taken from a slain beast. It can be traded, but cannot yet be eaten.",
+    "baseValue": 4
+  },
   "potato": {
     "name": "Potato",
     "category": "supplies",

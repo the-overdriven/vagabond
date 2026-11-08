@@ -6261,15 +6261,33 @@ was removed.
 
 Monster templates may define an independent `lootTable` containing a total
 drop probability and a weighted list of ordinary item kinds. A successful
-roll awards **one** item, in addition to any
-normal artifact or equipment drops. The weights choose which item drops;
-they do not multiply the total drop probability. **Nymph** has a **20%**
+roll chooses **one item kind** and awards its configured fixed `count`
+(default **1**) as a stack, in addition to normal artifact and equipment
+drops. The weights choose which kind drops; they do not affect quantity or
+multiply the total drop probability. All units of a stack use one drop roll.
+**Nymph** has a **20%**
 chance to drop one Healing Herb, independently of its healing magic or
 ordinary humanoid gear. **Wyrdhag** has a **20%**
 total chance to drop a Life Potion, Healing Herb or Mushroom, each with equal
 conditional probability (about **6⅔%** of kills per item). This loot chance
 does not increase with Magic Find. Using its own healing item in combat does
 not alter the separate death-drop roll.
+
+The following **32 non-humanoid species** always drop raw meat on death
+(except deaths that suppress ordinary loot), with fixed quantities:
+
+| Meat per kill | Species |
+| --- | --- |
+| **1** | Giant Rat, Giant Bat, Wolf, Jackal, Hyena, Vulture, Giant Toad, Murkspawn, Chupacabra, Harpy, Bog Spitter, Thornmaw, Glaber, Tmusapod, Adelocosa, Barolg, Alacran, Amplyg, Spineback, Marsutal, Trogloraptor, Sifulian, Akravis |
+| **2** | Boar, Hogwyrm, Giant Crab, Serpent, Lion, White Tiger, Manticore |
+| **3** | Owlbear, Wyvern |
+
+All other species, including unlisted non-humanoids, have **no meat drop**.
+Meat is a stackable supply worth **2 gold per cut** when sold. It cannot
+currently be eaten or cooked. Its icon is intentionally unset until artwork
+is supplied; it is represented by the standard supplies glyph in ASCII mode.
+The quantities, chance and chosen species are configured in
+`content/enemy_templates.json`; meat's item data is in `content/items.json`.
 
 When the player kills a monster from more than one Chebyshev tile away, its
 ordinary loot (including remaining arrows, artifacts and carried equipment)
@@ -8709,7 +8727,7 @@ Ideas not implemented as general systems or named locations include:
 
 ### Survival
 
-- meat
+- eating or cooking meat (raw meat drops are available; see section 43)
 - cold protection
 - a general hunger/thirst system
 - a general rest/sleep system

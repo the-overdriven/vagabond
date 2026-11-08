@@ -82,5 +82,43 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   })()`)))
   assert.deepEqual(pickup,{kinds:['homecomingscroll','idscroll'],remaining:0,
     spentTurn:0,spentRng:false},'scrolls on surface ice can be collected without extra turns or RNG')
-  console.log('PASS nymph herb loot and diversified surface scroll composition')
+  const meatDrops = {
+  'Giant Rat':1,'Giant Bat':1,Boar:2,Wolf:1,Hogwyrm:2,Jackal:1,Hyena:1,Vulture:1,'Giant Toad':1,
+  'Giant Crab':2,Murkspawn:1,Owlbear:3,Serpent:2,Lion:2,Chupacabra:1,Harpy:1,'White Tiger':2,
+  'Bog Spitter':1,Thornmaw:1,Glaber:1,Tmusapod:1,Adelocosa:1,Barolg:1,Alacran:1,Amplyg:1,
+  Wyvern:3,Manticore:2,Spineback:1,Marsutal:1,Trogloraptor:1,Sifulian:1,Akravis:1
+}
+  const templates=JSON.parse(JSON.stringify(run('ENEMY_TEMPLATES')))
+  assert.equal(Object.keys(meatDrops).length,32)
+  assert.equal(run('itemDefinition("meat").stackable'),true)
+  assert.equal(run('itemDefinition("meat").sellValue'),2)
+  assert.equal(run('itemDefinition("meat").icon'),null)
+  assert.equal(run('itemIconHTML({kind:"meat"})'),'')
+  for(const t of templates) {
+    if (t.name in meatDrops) {
+      assert.equal(t.humanoid,false,`${t.name} is not humanoid`)
+      assert.deepEqual(t.lootTable,{chance:1,items:[{kind:'meat',weight:1,count:meatDrops[t.name]}]},
+        `${t.name} has its exact guaranteed drop`)
+      run(`player.inventory=[];chance=p=>p===1;lootFromEnemy({name:${JSON.stringify(t.name)},baseName:${JSON.stringify(t.name)},tier:${t.tier},humanoid:false})`)
+      assert.equal(run('player.inventory.find(it=>it.kind==="meat")?.count'),meatDrops[t.name],
+        `${t.name} gives exactly the configured quantity`)
+    } else if (!t.humanoid) {
+      assert.equal(t.lootTable?.items?.some(item=>item.kind==='meat')||false,false,
+        `${t.name} must not drop meat`)
+    }
+  }
+  run(`player.inventory=[];groundItems=[];chance=p=>p===1;
+    lootFromEnemy({name:'Wyvern',baseName:'Wyvern',tier:4,humanoid:false,
+      x:player.x,y:player.y,level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave},true)`)
+  assert.equal(run('groundItems.filter(g=>g.item?.kind==="meat").length'),1,
+    'the ground receives one stack rather than multiple entries')
+  assert.equal(run('groundItems.find(g=>g.item?.kind==="meat")?.item.count'),3)
+  run('const meatSave = buildSaveObject();loadGameFromObject(meatSave,{isReplayInit:true})')
+  assert.equal(run('groundItems.find(g=>g.item?.kind==="meat")?.item.count'),3,
+    'meat stack survives a save and load')
+  run('lootSkeletonOrForage()')
+  assert.equal(run('player.inventory.find(it=>it.kind==="meat")?.count'),3,
+    'foraging picks up all three cuts in one action')
+  assert.equal(run('groundItems.some(g=>g.item?.kind==="meat")'),false)
+  console.log('PASS nymph/herb loot, meat drop stacks, and surface scroll composition')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})
