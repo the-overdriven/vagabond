@@ -25,7 +25,7 @@ function trackDirection(dx, dy) {
   return (Math.round(Math.atan2(dx, -dy) / (Math.PI / 4)) + 8) % 8
 }
 
-function leaveBeastTrack(enemy, fromX, fromY) {
+function leaveBeastTrack(enemy, fromX, fromY, elapsedTurns = 0) {
   if (currentZ !== 0 || enemyWanderMode(enemy) !== 'far' || enemyHasAbility(enemy, 'fly') || enemy.humanoid) return
   if (Math.max(Math.abs(enemy.x - fromX), Math.abs(enemy.y - fromY)) !== 1) return
   // Water washes tracks away; frozen rivers keep their normal evidence.
@@ -34,9 +34,14 @@ function leaveBeastTrack(enemy, fromX, fromY) {
       !enemyCanTraverse(enemy, enemy.farTargetX, enemy.farTargetY)) return
   const direction = trackDirection(enemy.farTargetX - fromX, enemy.farTargetY - fromY)
   if (direction === null || rng() >= TRACK_CONFIG.chance) return
+  const key = keyXY(fromX, fromY)
+  if (elapsedTurns >= TRACK_CONFIG.lifetimeTurns) {
+    beastTracks.delete(key)
+    return
+  }
   // Use the vacated square, so the arrival step also has a nonzero bearing.
-  beastTracks.set(keyXY(fromX, fromY), {
-    x: fromX, y: fromY, direction, species: trackSpecies(enemy), age: 0
+  beastTracks.set(key, {
+    x: fromX, y: fromY, direction, species: trackSpecies(enemy), age: elapsedTurns
   })
 }
 

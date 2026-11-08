@@ -1647,6 +1647,7 @@ more difficult:
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
+        if (updateSurfaceAbsence(departureZ)) render()
       }
     }
   }
@@ -4827,6 +4828,7 @@ more difficult:
   }
 
   function returnPlayerToTemple() {
+    const departureZ = currentZ
     resetSwimming()
     cancelAllPreparedEnemyAbilities()
     const wasDead = player.hp <= 0
@@ -4837,6 +4839,7 @@ more difficult:
     rebuildActiveLevelOccupancy()
     player.x = spawnPoint.x
     player.y = spawnPoint.y
+    updateSurfaceAbsence(departureZ)
     clearSpiderWeb()
     if (wasDead) {
       player.hp = playerMaxHp()
@@ -4909,6 +4912,7 @@ more difficult:
   }
 
   function resetForNewCharacter() {
+    const departureZ = currentZ
     clearLevelUpPopup()
     closeNpcMenu()
     cancelAllPreparedEnemyAbilities()
@@ -4976,6 +4980,7 @@ more difficult:
       inventory: [],
       permadeath: false
     })
+    updateSurfaceAbsence(departureZ)
     selectedRaceId = DEFAULT_RACE
   }
 
@@ -5619,6 +5624,23 @@ more difficult:
   }
 
   let enemyFarBuffers = null
+  let surfaceFarCatchupTerrain = null
+
+  function prepareSurfaceFarCatchupTerrain() {
+    // Surface terrain stays fixed during catch-up. Cache its passability once
+    // per movement ability, while checking live occupancy and Temple avoidance
+    // on each step. Humanoids retain door-opening checks through the normal path.
+    const total = MAP_W * MAP_H
+    const ground = new Uint8Array(total), swimmer = new Uint8Array(total), flyer = new Uint8Array(total)
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+      const i = y * MAP_W + x, tile = surfaceMap[y]?.[x]
+      const walk = !!TILE[tile]?.walk
+      ground[i] = walk ? 1 : 0
+      swimmer[i] = walk || tile === 'water' ? 1 : 0
+      flyer[i] = walk || tile === 'water' || tile === 'boulder' ? 1 : 0
+    }
+    return {ground, swimmer, flyer}
+  }
 
   // These scratch buffers never survive a synchronous search/target selection.
   // Rebuild occupancy each time: earlier enemies in this turn may have moved.
@@ -5645,8 +5667,16 @@ more difficult:
 
   function enemyFarCanTraverse(e, x, y, search) {
     const i = y * MAP_W + x
-    if (!search.traversable[i])
-      search.traversable[i] = !DungeonHazards.isCrusherTrigger(x, y) && enemyCanPathThrough(e, x, y) ? 1 : 2
+    if (!search.traversable[i]) {
+      if (surfaceFarCatchupTerrain && !e.humanoid) {
+        const terrain = enemyHasAbility(e, 'fly') ? surfaceFarCatchupTerrain.flyer :
+          enemyHasAbility(e, 'swim') ? surfaceFarCatchupTerrain.swimmer : surfaceFarCatchupTerrain.ground
+        search.traversable[i] =
+          (enemyHasAbility(e, 'ethereal') || terrain[i]) && !enemySanctuaryTileForbidden(e, x, y) ? 1 : 2
+      } else {
+        search.traversable[i] = !DungeonHazards.isCrusherTrigger(x, y) && enemyCanPathThrough(e, x, y) ? 1 : 2
+      }
+    }
     return search.traversable[i] === 1
   }
 
@@ -5729,7 +5759,7 @@ more difficult:
     return false
   }
 
-  function enemyFarWander(e) {
+  function enemyFarWander(e, trackAge = 0) {
     const avoidingVillage = enemyFarVillageDistance(e.x, e.y) <= ENEMY_FAR_VILLAGE_AVOID_RADIUS
     if (avoidingVillage && !enemyFarTargetEscapesVillage(e)) {
       e.farTargetX = null
@@ -5762,7 +5792,7 @@ more difficult:
       const join = e.farPath?.findIndex(step =>
         Math.max(Math.abs(step.x - e.x), Math.abs(step.y - e.y)) === 1) ?? -1
       e.farPath = join >= 0 ? e.farPath.slice(join) : null
-      leaveBeastTrack(e, fromX, fromY)
+      leaveBeastTrack(e, fromX, fromY, trackAge)
       finishEnemyMove(e, fromX, fromY)
       return true
     }
@@ -5805,9 +5835,50 @@ more difficult:
     e.y = step.y
     e.farPath.shift()
     occupied.add(keyXY(e.x, e.y))
-    leaveBeastTrack(e, fromX, fromY)
+    leaveBeastTrack(e, fromX, fromY, trackAge)
     finishEnemyMove(e, fromX, fromY)
     return true
+  }
+
+  function simulateSurfaceFarWandering(elapsedTurns) {
+    if (currentZ !== 0 || map !== surfaceMap || elapsedTurns <= 0) return
+    // Resolve the same seeded far-wander decision for each missed surface
+    // turn, in turn order. Only these travelers are paused off-floor; other
+    // monsters retain their existing nearby off-floor wandering behavior.
+    const travelers = enemies.filter(e => e.alive && (e.level ?? 0) === 0 &&
+      (!e.levelKind || e.levelKind === 'surface') && enemyWanderMode(e) === 'far')
+    if (!travelers.length) return
+    surfaceFarCatchupTerrain = prepareSurfaceFarCatchupTerrain()
+    try {
+      for (let remaining = elapsedTurns - 1; remaining >= 0; remaining--) {
+        for (const e of travelers) {
+          if (!e.alive || e.sleeping || e.wallAmbushHidden || e.pendingAbility) continue
+          enemyFarWander(e, remaining)
+        }
+      }
+    } finally {
+      surfaceFarCatchupTerrain = null
+    }
+    // The simulated steps happened in the past, not during this render.
+    for (const e of travelers) {
+      e.animStart = undefined
+      e.animFromX = undefined
+      e.animFromY = undefined
+    }
+  }
+
+  function updateSurfaceAbsence(previousZ) {
+    if (previousZ === 0 && currentZ !== 0) {
+      surfaceDepartureTurn = turnCount
+      return false
+    }
+    if (previousZ !== 0 && currentZ === 0) {
+      const elapsed = Math.max(0, turnCount - (surfaceDepartureTurn ?? turnCount))
+      surfaceDepartureTurn = null
+      simulateSurfaceFarWandering(elapsed)
+      return elapsed > 0
+    }
+    return false
   }
 
   function enemyWander(e) {
@@ -5888,6 +5959,7 @@ more difficult:
       const z=e.level??0
       if(!e.alive||!adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
           e.wallAmbushHidden||enemyWanderMode(e)===false||
+          (z===0&&enemyWanderMode(e)==='far')||
           Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))>ENEMY_WANDER_ACTIVE_RADIUS) continue
       // The existing tower backdrop already advances surface creatures from
       // upper floors. Never give them two wandering chances in one turn.
@@ -6003,6 +6075,8 @@ more difficult:
   }
 
   let turnCount = 0
+  // The surface's far travelers advance once for each turn spent away.
+  let surfaceDepartureTurn = null
   let consecutiveWaitTurns = 0
   const MAX_CONSECUTIVE_WAIT_TURNS = 10
   function applyEnemyLifesteal(enemy, effectiveDamage) {
@@ -8348,10 +8422,13 @@ more difficult:
         return
       }
       if (cryptCaveIndex >= 0) {
+        const departureZ = currentZ
         currentCave = cryptCaveIndex
         currentZ = -1
         map = undergroundMap
         undergroundDiscovered = undergroundDiscoveredL1
+        rebuildActiveLevelOccupancy()
+        updateSurfaceAbsence(departureZ)
         log('You descend into the crypt.', 'info')
         resetSwimming()
         stopCameraAnimation()
@@ -8376,7 +8453,11 @@ more difficult:
       return
     }
     if (map[player.y]?.[player.x] === 'mausoleumtrapdoor') {
-      enterMausoleum()
+      const departureZ = currentZ
+      if (enterMausoleum() && currentZ !== departureZ) {
+        rebuildActiveLevelOccupancy()
+        updateSurfaceAbsence(departureZ)
+      }
       return
     }
     if (currentZ === -1 && map[player.y]?.[player.x] === 'sarcophagus') {
@@ -13972,6 +14053,7 @@ more difficult:
     }
     if (!nextMap || !nextMap[player.y]?.[player.x]) return false
     recordReplayAction({type: 'godTravel', direction})
+    const departureZ = currentZ
     currentZ = destination
     currentCave = -1
     map = nextMap
@@ -13986,6 +14068,7 @@ more difficult:
     minimapDirty = true
     cancelPreparedEnemyAbilitiesOutsideFloor()
     rebuildActiveLevelOccupancy()
+    updateSurfaceAbsence(departureZ)
     render()
     updateHud()
     updateTooltip()

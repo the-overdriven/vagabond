@@ -5049,6 +5049,19 @@ Wandering outcomes use seeded gameplay RNG and persist through normal enemy
 positions; the surface creatures already simulated beneath the tower are not
 given a duplicate wandering opportunity.
 
+Surface monsters with `"far"` wandering remain active while the player explores
+underground or the tower. The game saves the global turn count on leaving the
+surface and, on returning, advances those travelers through **every elapsed
+gameplay turn** using their normal **40% stay / 20% random step / 40% destination
+step** decisions, terrain and occupancy restrictions, and seeded RNG. Their
+positions and routes therefore continue to change even during long expeditions;
+they do not also receive ordinary nearby off-floor wandering turns. Tracks
+left on the surface during catch-up already have the appropriate elapsed age,
+and expired tracks are discarded. Other monsters retain their existing limited
+adjacent-level behavior; the catch-up does not simulate their combat or aggro.
+The departure turn is saved and restored so saving inside a dungeon and
+returning later has the same deterministic result.
+
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy hit by an invisible player reacts once instead of wandering on that turn
 (section 47). A missed attack causes no reaction, and the enemy can

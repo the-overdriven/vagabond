@@ -156,7 +156,7 @@ function buildSaveObject() {
     worldEdgesReached: Object.assign({}, worldEdgesReached),
     oldHunterQuest: oldHunterQuest,
     oldHunterQuestSerial,
-    turnCount, consecutiveWaitTurns,
+    turnCount, surfaceDepartureTurn, consecutiveWaitTurns,
     beastTracks: [...beastTracks.values()].map(track => ({...track})),
     caveSpoor: caveSpoor.map(track=>({...track})),
     fishermanQuest,
@@ -713,6 +713,7 @@ function loadGameFromObject(data, opts = {}) {
   beastTracks = new Map(data.beastTracks.map(track => [keyXY(track.x, track.y), {...track}]))
   caveSpoor = data.caveSpoor.map(track=>({...track}))
   turnCount = data.turnCount
+  surfaceDepartureTurn = data.surfaceDepartureTurn
   consecutiveWaitTurns = data.consecutiveWaitTurns
   oldHunterQuestSerial = data.oldHunterQuestSerial
   oldHunterQuest = data.oldHunterQuest || null

@@ -315,10 +315,10 @@ function drawTowerBackground(x,y) {
 
 
 // The surface remains a separate world while the player is upstairs. Nearby
-// outside creatures get ordinary passive wandering opportunities on gameplay
-// turns, without spotting the player, crossing a tower wall or activating AI.
-// No additional counters or saved state are required: positions use existing
-// enemy serialization and choices use the replay-recorded game RNG.
+// Nearby outside creatures, other than far travelers, get ordinary passive
+// wandering opportunities without spotting the player or crossing tower walls.
+// Far travelers instead catch up using elapsed turns when the player returns
+// to the surface, so they never receive duplicate movement chances here.
 function wanderSurfaceBelowTower() {
   if (currentZ <= 0 || !tower) return
   const blocked = new Set(npcs.map(n => keyXY(n.x, n.y)))
@@ -326,7 +326,7 @@ function wanderSurfaceBelowTower() {
   for (const e of enemies) {
     if (!e.alive || (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
         towerContains(e.x, e.y) || e.aware || e.sleeping || e.wallAmbushHidden ||
-        e.pendingAbility || enemyWanderMode(e) === false ||
+        e.pendingAbility || enemyWanderMode(e) === false || enemyWanderMode(e) === 'far' ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ENEMY_WANDER_ACTIVE_RADIUS) continue
     if (!chance(ENEMY_WANDER_CHANCE)) continue
     const mode = enemyWanderMode(e)

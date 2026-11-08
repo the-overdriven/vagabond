@@ -64,6 +64,56 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('catches up far surface travelers for every missed turn, with correctly aged tracks', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const originalRng = rng
+      try {
+        const traveler = trackEnemy({farTargetX:43,farTargetY:40,
+          farPath:[{x:41,y:40},{x:42,y:40},{x:43,y:40}]})
+        const other = trackEnemy({id:'ordinary',wander:'roam',x:50,y:50})
+        enemies = [traveler,other]; rebuildActiveLevelOccupancy()
+        let rolls = 0
+        rng = () => (++rolls % 2 ? .9 : 0)
+        currentZ = -1; map = undergroundMap
+        updateSurfaceAbsence(0)
+        trackAssert(surfaceDepartureTurn === 17, 'surface departure turn recorded')
+        trackAssert(buildSaveObject().surfaceDepartureTurn === 17, 'departure included in saves')
+        wanderAdjacentLevelEnemies()
+        trackAssert(rolls === 0 && traveler.x === 40, 'no duplicate nearby off-floor wandering')
+        turnCount = 20
+        currentZ = 0; map = surfaceMap; rebuildActiveLevelOccupancy()
+        trackAssert(updateSurfaceAbsence(-1), 'return catches up missed turns')
+        trackAssert(traveler.x === 43 && traveler.y === 40, 'three far-wander moves')
+        trackAssert(other.x === 50 && other.y === 50, 'ordinary wanderer not caught up')
+        trackAssert(rolls === 6, 'one movement roll and one track roll each turn')
+        for (const [x,age] of [[40,2],[41,1],[42,0]]) {
+          trackAssert(beastTrackAt(x,40)?.age === age, 'track age '+age)
+        }
+        trackAssert(surfaceDepartureTurn === null && !traveler.animStart, 'catch-up settled')
+        trackAssert(!updateSurfaceAbsence(-1) && rolls === 6 && traveler.x === 43,
+          'return catch-up cannot repeat')
+      } finally { rng = originalRng }
+    })()`))
+  })
+
+  it('records a real cave departure and restores it after loading underground', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const entrance = caves.flatMap(c => c.entrances).find(p =>
+        surfaceMap[p.y]?.[p.x] === 'caveentrance' && undergroundMap[p.y]?.[p.x] === 'caveentrance')
+      trackAssert(!!entrance, 'walkable cave entrance exists')
+      player.x = entrance.x; player.y = entrance.y; turnCount = 40
+      trackAssert(enterCave() && currentZ === -1 && surfaceDepartureTurn === 40,
+        'entering the cave records the surface turn')
+      const saved = JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(saved)
+      trackAssert(currentZ === -1 && surfaceDepartureTurn === 40,
+        'loading underground retains the original departure')
+      turnCount = 45
+      trackAssert(enterCave() && currentZ === 0 && surfaceDepartureTurn === null,
+        'return catches up and clears departure exactly once')
+    })()`))
+  })
+
   it('excludes other wander modes, humanoids, flyers, invalid targets and non-steps', () => {
     cy.window().then(win => win.eval(`(() => {
       const original = rng; let calls = 0
