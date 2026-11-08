@@ -3717,6 +3717,14 @@ more difficult:
     if (replayPlaying) {
       replayNpcDiagnostics = npcDiag
     }
+    // Village NPCs exist only on the surface. Underground/tower terrain must
+    // never decide their movement: the same coordinates may be cave floor
+    // below a forest tile, bypassing their surface-terrain restrictions.
+    if (currentZ !== 0) {
+      // Conversation freezes measure elapsed gameplay turns, even off-floor.
+      for (const n of npcs) if (!n.static && n.talkFreezeTurns > 0) n.talkFreezeTurns--
+      return
+    }
     for (let npcIndex = 0; npcIndex < npcs.length; npcIndex++) {
       const n = npcs[npcIndex]
       const before = replayPlaying ? replayRngIndex : null

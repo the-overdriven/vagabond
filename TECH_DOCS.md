@@ -5079,7 +5079,8 @@ Default home radius: 1 tile (overridable per enemy/template with `homeRadius`)
 Active range for home/roam: 20 tiles from the player (Chebyshev distance)
 ```
 
-NPC wandering is unchanged and continues to use the existing global settings.
+NPC wandering uses the existing global settings, but runs only while the
+player is on the surface.
 
 `"homeReanchored"`, `"homeReturn"`, and `"roam"` wandering are limited to enemies/NPCs within the active
 range of the player, not to what the camera viewport happens to be showing.
@@ -7111,6 +7112,10 @@ does not exclude other tiles. NPC wandering never enters forest, river, or
 water tiles, or grass tiles with grassland-tree artwork. The restriction also
 applies when a mined surface boulder reveals one of these tiles. An NPC with no
 eligible adjacent terrain waits rather than walking into the forest.
+Village NPCs wander only while the player is on the surface: turns spent in
+caves, mines, ruins, or the tower neither advance their wandering nor consume
+NPC movement RNG. This also ensures underground floor tiles cannot be mistaken
+for valid surface terrain when deciding an NPC's next step.
 
 NPC tile artwork is configured by exact NPC name in
 `content/rendering.json` under `npc.characters`, with `image` and `scale`

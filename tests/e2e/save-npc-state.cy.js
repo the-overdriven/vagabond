@@ -227,4 +227,42 @@ describe('Exact current-save state restoration', () => {
       } finally {chance=oldChance}
     })()`))
   })
+
+  it('does not move surface NPCs using underground or tower terrain', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const drunk=npcs.find(n=>n.name==='Drunk')
+      check(!!drunk,'Drunk exists')
+      const oldChance=chance
+      try {
+        enemies=[];npcs=[drunk];occupied=new Set([keyXY(40,40)])
+        player.x=44;player.y=40
+        drunk.x=40;drunk.y=40;drunk.homeX=40;drunk.homeY=40
+        drunk.static=false;drunk.free=true;drunk.talkFreezeTurns=2
+        for(let y=39;y<=41;y++)for(let x=39;x<=41;x++) {
+          surfaceMap[y][x]='forest'
+          undergroundMap[y][x]='cavefloor2'
+        }
+        surfaceMap[40][40]='grass'
+        currentZ=-1;map=undergroundMap
+        const beforeRng=rngState
+        chance=()=>{throw Error('underground NPC consumed a wander roll')}
+        npcTurn()
+        check(drunk.x===40&&drunk.y===40&&drunk.talkFreezeTurns===1,
+          'underground turns do not move NPCs but still age conversation freezes')
+        check(rngState===beforeRng,'underground NPC wandering uses no RNG')
+        currentZ=1;map=towerLevels[0].map
+        npcTurn()
+        check(drunk.x===40&&drunk.y===40&&drunk.talkFreezeTurns===0,
+          'tower turns cannot move village NPCs, but freezes expire')
+        currentZ=0;map=surfaceMap;drunk.talkFreezeTurns=0
+        chance=()=>true
+        npcTurn()
+        check(drunk.x===40&&drunk.y===40,'returning to surface still rejects forest')
+        surfaceMap[40][41]='grass'
+        npcTurn()
+        check(drunk.x===41&&drunk.y===40,'surface NPC wandering still works')
+      } finally {chance=oldChance}
+    })()`))
+  })
 })
