@@ -58,7 +58,7 @@ function rareStartFlee(e, dist, attacked = false) {
     e.farPath = null
   }
   log(e.rareSightings === 1
-    ? `Something huge breaks cover - a ${e.name}! It senses you, and is gone.`
+    ? `Something huge breaks cover - ${e.name}! It senses you, and is gone.`
     : `The ${e.name} again. It hesitates a moment too long, then bolts.`, 'good')
   return true
 }

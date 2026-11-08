@@ -96,6 +96,30 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('uses deterministic shortest routes around obstacles during surface catch-up', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const traveler=trackEnemy({x:40,y:45,farTargetX:52,farTargetY:45})
+      enemies=[traveler];occupied=new Set([keyXY(traveler.x,traveler.y)])
+      for(let y=40;y<=50;y++)surfaceMap[y][46]='mountain'
+      const rngBefore=rngState
+      const ordinary=enemyBuildFarPath(traveler,52,45)
+      const beforeCache=surfaceFarCatchupTerrain
+      let fast
+      try {
+        surfaceFarCatchupTerrain=prepareSurfaceFarCatchupTerrain()
+        fast=enemyBuildFarPath(traveler,52,45)
+      } finally { surfaceFarCatchupTerrain=beforeCache }
+      trackAssert(ordinary?.length>0&&fast?.length===ordinary.length,
+        'catch-up path remains shortest despite detouring around a wall')
+      trackAssert(fast.every((step,i)=>{
+        const last=i?fast[i-1]:traveler
+        return Math.max(Math.abs(step.x-last.x),Math.abs(step.y-last.y))===1 &&
+          surfaceMap[step.y][step.x]!=='mountain'
+      }), 'every catch-up path step remains adjacent and walkable')
+      trackAssert(rngState===rngBefore,'fast pathfinding consumes no RNG')
+    })()`))
+  })
+
   it('records a real cave departure and restores it after loading underground', () => {
     cy.window().then(win => win.eval(`(() => {
       const entrance = caves.flatMap(c => c.entrances).find(p =>

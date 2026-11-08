@@ -3009,6 +3009,9 @@ context without generating fresh loot. Chests that have been opened stay
 absent, and remaining chests never overlap the sarcophagus. Restoring a
 current-format save created before the orientation field was recorded uses its
 remaining marked chests and explored mausoleum tiles to reconstruct the layout.
+Returning through the mausoleum staircase places the player back inside the
+marked hut and immediately restores the surface view and side map, including
+the correct camera position, before any subsequent movement.
 
 The mausoleum has a separate defensive validation after the random z:-1 caves
 have been merged. Its 9x9 template is anchored on the mausoleum hut, with the
@@ -5099,6 +5102,12 @@ After an unreachable candidate exhausts the search, the same predecessor tree
 answers the remaining unoccupied candidates. Candidate sampling, RNG consumption,
 eight-direction visitation order and shortest-path tie breaks remain unchanged;
 scratch data is never saved.
+When catching up surface travelers after an absence, destination steps use a
+deterministic, goal-directed shortest-path search to avoid repeated full-world
+scans. It applies the same terrain, occupancy, player-tile and village-avoidance
+rules, though equally short paths can differ from ordinary live wandering.
+This shortcut consumes no additional RNG and does not change the 40/20/40
+movement probabilities.
 
 The fixed 20-tile radius replaced the old "is this enemy on screen" check,
 which depended on the live canvas viewport (window size, sidebar

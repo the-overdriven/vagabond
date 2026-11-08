@@ -1495,9 +1495,13 @@ more difficult:
     if (currentZ === -1 && map[player.y]?.[player.x] === 'mausoleumstairsup') {
       map = surfaceMap
       currentZ = 0
+      currentCave = -1
       player.x = hut?.x ?? player.x
       player.y = hut?.y ?? player.y
       resetSwimming()
+      stopCameraAnimation()
+      snapCameraToPlayer()
+      minimapDirty = true
       log('You climb back into the hut. The trapdoor closes behind you.', 'info')
       render()
       updateHud()
@@ -5688,7 +5692,95 @@ more difficult:
     return search.traversable[i] === 1
   }
 
+  let surfaceFarAStarBuffers = null
+  function enemyBuildFarCatchupPath(e, targetX, targetY, avoidVillage, search) {
+    // A goal-directed shortest-path search keeps long absences practical.
+    // Its tie breaks are stable; no animation frames, time or random rolls
+    // influence the selected path.
+    if (search.exhausted) return null
+    const total = MAP_W * MAP_H
+    if (!surfaceFarAStarBuffers || surfaceFarAStarBuffers.cost.length !== total) {
+      surfaceFarAStarBuffers = {cost: new Int32Array(total), closed: new Uint8Array(total)}
+    }
+    const {cost, closed} = surfaceFarAStarBuffers
+    cost.fill(0x3fffffff)
+    closed.fill(0)
+    const start = e.y * MAP_W + e.x, target = targetY * MAP_W + targetX
+    const heuristic = (x, y) => Math.max(Math.abs(targetX - x), Math.abs(targetY - y))
+    const heap = []
+    let sequence = 0
+    const before = (a, b) => a.f < b.f ||
+      (a.f === b.f && (a.h < b.h || (a.h === b.h && a.order < b.order)))
+    const push = entry => {
+      let i = heap.length
+      heap.push(entry)
+      while (i > 0) {
+        const parent = (i - 1) >> 1
+        if (!before(entry, heap[parent])) break
+        heap[i] = heap[parent]
+        i = parent
+      }
+      heap[i] = entry
+    }
+    const pop = () => {
+      const result = heap[0], tail = heap.pop()
+      if (heap.length) {
+        let i = 0
+        while (i * 2 + 1 < heap.length) {
+          let child = i * 2 + 1
+          if (child + 1 < heap.length && before(heap[child + 1], heap[child])) child++
+          if (!before(heap[child], tail)) break
+          heap[i] = heap[child]
+          i = child
+        }
+        heap[i] = tail
+      }
+      return result
+    }
+    cost[start] = 0
+    search.prev[start] = start
+    const initialH = heuristic(e.x, e.y)
+    push({id:start, f:initialH, h:initialH, order:sequence++})
+    while (heap.length) {
+      const {id} = pop()
+      if (closed[id]) continue
+      if (id === target) {
+        const path = []
+        for (let step = target; step !== start; step = search.prev[step])
+          path.push({x: step % MAP_W, y: Math.floor(step / MAP_W)})
+        path.reverse()
+        return path
+      }
+      closed[id] = 1
+      const x = id % MAP_W, y = Math.floor(id / MAP_W)
+      for (const [dx, dy] of DIRS8) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
+        const next = ny * MAP_W + nx
+        if (closed[next] || !enemyFarCanTraverse(e, nx, ny, search) ||
+            (next !== target && search.blocked[next]) ||
+            (nx === player.x && ny === player.y)) continue
+        if (avoidVillage) {
+          const fromVillage = enemyFarVillageDistance(x, y)
+          const toVillage = enemyFarVillageDistance(nx, ny)
+          if (toVillage <= ENEMY_FAR_VILLAGE_AVOID_RADIUS &&
+              (fromVillage > ENEMY_FAR_VILLAGE_AVOID_RADIUS || toVillage < fromVillage)) continue
+        }
+        const nextCost = cost[id] + 1
+        if (nextCost >= cost[next]) continue
+        cost[next] = nextCost
+        search.prev[next] = id
+        const h = heuristic(nx, ny)
+        push({id:next, f:nextCost+h, h, order:sequence++})
+      }
+    }
+    search.exhausted = true
+    return null
+  }
+
   function enemyBuildFarPath(e, targetX, targetY, avoidVillage = false, search = enemyFarSearch()) {
+    if (surfaceFarCatchupTerrain)
+      return enemyBuildFarCatchupPath(e, targetX, targetY, avoidVillage, search)
     const start = e.y * MAP_W + e.x
     const target = targetY * MAP_W + targetX
     const {prev, queue, blocked} = search

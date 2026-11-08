@@ -83,4 +83,28 @@ describe('Mausoleum layout and chest restoration', () => {
       check(mausoleumQuarterTurns===expected,'orientation survives without chests')
     })()`))
   })
+
+  it('refreshes the surface side map immediately on returning through the hut trapdoor', () => {
+    cy.viewport(1440, 900)
+    cy.window().then(win => win.document.body.classList.remove('side-collapsed'))
+    cy.get('#sideMinimap').should('be.visible')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const hut=villageHuts.find(h=>h.mausoleum)
+      const stairs=mausoleumOffset(4,7)
+      const x=hut.x+stairs.x,y=hut.y+stairs.y
+      check(undergroundMap[y][x]==='mausoleumstairsup','return stairs exist')
+      currentZ=-1;map=undergroundMap;currentCave=-1
+      undergroundDiscovered=undergroundDiscoveredL1
+      player.x=x;player.y=y
+      surfaceDepartureTurn=turnCount
+      minimapDirty=true;render()
+      check(miniBaseLevel===-1&&miniBaseMap===undergroundMap,'side map shows mausoleum before ascent')
+      check(enterCave()&&currentZ===0,'trapdoor returns to the surface')
+      check(miniBaseLevel===0&&miniBaseMap===surfaceMap&&miniBaseSeen===discovered,
+        'side-map terrain cache refreshes before the next movement')
+      check(miniPlayerX===player.x&&miniPlayerY===player.y,'side-map position refreshed')
+      check(!cameraAnimating,'old underground camera movement is stopped')
+    })()`))
+  })
 })
