@@ -1984,6 +1984,7 @@ more difficult:
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
 <script src="src/rareFlee.js"></script>
+<script src="src/combatSkills.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -2621,6 +2622,7 @@ more difficult:
     swimming: 0,
     mining: 0, miningXpUnits: 0, minedSurfaceStones: 0, miningArmedTarget: null,
     miningTutorialSeen: false,
+    combatSkills: freshCombatSkills(), combatSkillXp: freshCombatSkills(),
     fishermanRewardClaimed: false,
     fishermanLessonPending: false,
     fishermanFishGiftGiven: false,
@@ -3094,6 +3096,7 @@ more difficult:
     enemy.gearBonuses = enemy.gearBonuses || null
     enemy.meleeHitXpGranted = Number.isInteger(enemy.meleeHitXpGranted)
       ? Math.max(0, enemy.meleeHitXpGranted) : 0
+    enemy.combatSkillXp = enemy.combatSkillXp ? {...enemy.combatSkillXp} : null
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.immunityUsed = enemy.immunityUsed === true
     enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
@@ -4394,9 +4397,9 @@ more difficult:
       return false
     }
     if (tryEvadePlayerAttack(e)) return false
+    const trainedMiss = Math.max(0, missChance(playerSpd(), enemySpd(e)) - oneHandedMissReduction())
     if (chance(targetWasInvisible
-      ? Math.max(MONSTER_INVISIBILITY_MISS_CHANCE, missChance(playerSpd(), enemySpd(e)))
-      : missChance(playerSpd(), enemySpd(e)))) {
+      ? Math.max(MONSTER_INVISIBILITY_MISS_CHANCE, trainedMiss) : trainedMiss)) {
       spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
@@ -4405,7 +4408,7 @@ more difficult:
     }
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
-    let dmg = damageRoll(playerAtk(), enemyDef(e))
+    let dmg = damageRoll(playerAtk(), twoHandedDefence(enemyDef(e)))
     const criticalRoll = chance(playerCriticalHitChance(e))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
@@ -4414,6 +4417,8 @@ more difficult:
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
     awardMeleeHitXp(e, dmg)
+    const trainedMeleeSkill = meleeCombatSkill(player.equip.weapon)
+    if (trainedMeleeSkill) trainCombatSkill(trainedMeleeSkill, e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
     if (dmg > 0) breakEnemyFear(e)
     absorbEnemyFatalHit(e)
@@ -4478,16 +4483,22 @@ more difficult:
     }
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
+    const shieldBlockChance = !glancing && shieldingBlockChance()
+    const blocked = shieldBlockChance > 0 && chance(shieldBlockChance)
     let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef())
     const criticalRoll = chance(enemyCriticalHitChance(e))
-    const critical = !glancing && criticalRoll
+    const critical = !glancing && !blocked && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
-    if (glancing) dmg = Math.floor(dmg / 3)
+    if (glancing || blocked) dmg = Math.floor(dmg / 3)
+    if (player.equip.shield) trainCombatSkill('shielding', e)
     const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
     player.hp -= dmg
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, attackPresentation.delay + 100)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, attackPresentation.delay + 100 + (critical ? 120 : 0))
-    if (glancing) {
+    if (blocked) {
+      spawnDamageNumber(player.x, player.y, 'Block!', '#8dc4e8', attackPresentation.delay + 100)
+      log(`You block the ${e.name}'s attack with your ${artifactDisplayName(player.equip.shield)}! ${dmg} damage gets through.`, 'good')
+    } else if (glancing) {
       if (enemyWeapon) {
         if (dmg === 0) {
           log(`The ${e.name}'s ${enemyWeapon.base} glances off your ${armor.name}!`, 'bad')
@@ -4636,7 +4647,7 @@ more difficult:
         spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
       } else if (tryEvadePlayerAttack(e)) {
         log(`Your arrow misses the dodging ${e.name}.`, 'info')
-      } else if (chance(Math.min(1, missChance(playerSpd(), enemySpd(e)) * RANGED_CONFIG.dodgeMultiplier))) {
+      } else if (chance(marksmanshipMissChance(missChance(playerSpd(), enemySpd(e))))) {
         log(`You shoot at the ${e.name} but miss.`, 'info')
         spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       } else {
@@ -4648,6 +4659,7 @@ more difficult:
         if (critical) dmg = Math.round(dmg * 2)
         if (glancing) dmg = Math.floor(dmg / 3)
         e.hp -= dmg
+        trainCombatSkill('marksmanship', e, dmg)
         if (targetWasInvisible) revealEnemyInvisibility(e)
         if (dmg > 0) breakEnemyFear(e)
         absorbEnemyFatalHit(e)
@@ -4979,6 +4991,7 @@ more difficult:
       swimming: 0,
       mining: 0, miningXpUnits: 0, minedSurfaceStones: 0, miningArmedTarget: null,
       miningTutorialSeen: false,
+      combatSkills: freshCombatSkills(), combatSkillXp: freshCombatSkills(),
       fishermanRewardClaimed: false,
       fishermanLessonPending: false,
       fishermanFishGiftGiven: false,
@@ -12812,6 +12825,10 @@ more difficult:
       ['✨ Effective GRACE', equippedCombatGrace === null ? '—' : equippedCombatGrace.toFixed(1)],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
       ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
+      ['⚔️ One-Handed', combatSkillLabel('oneHanded')],
+      ['🪓 Two-Handed', combatSkillLabel('twoHanded')],
+      ['🛡️ Shielding', combatSkillLabel('shielding')],
+      ['🏹 Marksmanship', combatSkillLabel('marksmanship')],
       ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
       ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],

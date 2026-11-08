@@ -450,6 +450,45 @@ Human currently has a permanent +20% XP multiplier.
 Actual progression depends on encounter frequency, enemy composition, prefixes,
 exploration, and XP multipliers.
 
+## Combat proficiency
+
+Four independent **0–100 use-based skills** develop through combat:
+**One-Handed**, **Two-Handed**, **Shielding**, and **Marksmanship**. There is no
+individual weapon familiarity or skill tree. One-Handed includes one-handed
+melee weapons; Two-Handed includes two-handed melee weapons. Bows train only
+Marksmanship, even though they occupy both hands; unarmed attacks train neither
+melee category. Training never raises character XP or level, and weapon swaps
+never remove proficiency.
+
+| Skill at 100 | Gameplay benefit |
+| --- | --- |
+| One-Handed | −5 percentage points of melee miss chance |
+| Two-Handed | Ignore 25% of effective enemy DEF in melee |
+| Shielding | 20% chance to block a landed melee attack, reducing damage to one-third and preventing critical damage |
+| Marksmanship | Reduce the Short Bow's ranged miss multiplier from 2× to 1.5× |
+
+Effects scale linearly with proficiency. Shield blocks require an equipped
+shield and do not occur after armor already produces a glancing hit. Shield
+SPD and GRACE penalties are unchanged; passive shield DEF still applies.
+Successful blocks have a visible **Block!** cue and an explanatory message.
+
+Each damaging melee or bow hit trains its respective skill. A landed melee
+attack trains Shielding when the player carries a shield. Misses, immune
+targets and zero-damage offensive hits give no skill XP. Each monster has a
+persistent **2–6 XP budget per skill** of
+`clamp(ceil(monster kill XP / 25), 2, 6)`. Eligible actions give 1 skill XP,
+or 2 against enemies at least two tiers above the minimum relevant tier.
+The minimum eligible monster tier is
+`clamp(floor(player level / 5), 1, 5)`; weaker opponents and God Mode award no
+combat skill XP. Budgets persist across saves and replay to prevent indefinite
+training against regenerating or intentionally prolonged opponents.
+
+For skill value `s`, the next point costs `3 × (1 + floor(s / 25))` skill XP,
+for cumulative requirements **75 / 225 / 450 / 750** at levels
+**25 / 50 / 75 / 100**. The character sheet shows all four skills and their
+progress. Reaching level 1 or a multiple of 25 is announced in the log;
+training and blocking resolve deterministically, independently of animations.
+
 ---
 
 # 6. Movement
@@ -5223,6 +5262,11 @@ Therefore:
 - faster attacker → lower miss chance
 - slower attacker → higher miss chance
 
+Player One-Handed proficiency subtracts up to **5 percentage points** from
+melee miss chance when a one-handed weapon is equipped. It does not bypass
+the minimum miss chance against invisible enemies. Marksmanship separately
+reduces the bow's doubled ranged miss multiplier (see §5 and §33).
+
 ---
 
 # 26. Damage
@@ -5261,6 +5305,10 @@ upperSpread = max(2, mitigatedAtk × 0.20)
 variance = triangular(-lowerSpread, peak = 0, +upperSpread)
 finalDamage = max(1, round(mitigatedAtk + variance))
 ```
+
+The player's Two-Handed proficiency reduces enemy effective DEF by up to
+**25%** before this melee mitigation calculation. Bow shots and bare fists
+do not gain the benefit.
 
 The continuous triangular distribution peaks at zero adjustment: outcomes near
 mitigated ATK are more likely than extremes. Every damage roll consumes exactly
@@ -5790,7 +5838,9 @@ monsters and NPCs block intervening shots. Out-of-range or blocked attempts
 consume neither arrows nor turns. Shooting cannot bypass Temple sanctuary,
 enemy immunity, or rare-monster flight protection. Ranged attacks use double
 the normal SPD-based miss chance, ordinary critical and armor-glancing rules,
-but no melee GRACE timing or extra attacks. Base melee ATK and equipment ATK
+reduced linearly to **1.5×** by maximum Marksmanship proficiency. Successful
+damaging bow hits train Marksmanship but not Two-Handed. Shots have no melee
+GRACE timing or extra attacks. Base melee ATK and equipment ATK
 bonuses do not increase the bow's fixed projectile damage. Enemy turns, XP,
 quests, and stealth reactions resolve with ordinary combat rules; projectile
 flight is visual-only and cannot affect the deterministic result. A lethal
@@ -5875,6 +5925,13 @@ Inventory and trade item stat lines omit built-in shield and armor GRACE
 penalties to keep gear rows compact. The shield penalty still stacks with an armor GRACE
 penalty and reduces the player's extra-attack timing through effective weapon
 GRACE; it does not change the shield's DEF or SPD penalty.
+
+Shielding proficiency can convert an otherwise landed, non-glancing **melee**
+hit into a shield block, with a chance rising from 0% to 20%. It reduces the
+damage to one-third and suppresses critical damage, without eliminating any
+equipment penalty or replacing the shield's passive DEF. Projectiles and
+spells cannot trigger this special block. Landed melee attacks train Shielding
+when a shield is equipped, subject to the per-enemy budget in §5.
 
 ---
 
@@ -8081,7 +8138,7 @@ restoration does not generate or repopulate the tower.
 Current save version (defined in `src/version.js`):
 
 ```text
-115
+122
 ```
 
 The game release version changes for each deployment. The save format changes
@@ -8832,7 +8889,8 @@ Do not infer a general system from a specific implemented mechanic:
 - general crafting (the Herbalist brews potions; there is no general crafting system)
 - unrestricted tunneling (Mining excavates only generated weak mine walls,
   mineral deposits and overworld boulders; ordinary cave and Fort walls remain solid)
-- skill tree (Tracking and Swimming are learned individually; there is no tree)
+- skill tree (combat and Mining proficiency improve through use; Tracking and
+  Swimming are learned individually, with no tree)
 - generic cross-NPC quest framework (the Old Hunter and Fisherman Hermit have NPC-specific quests)
 - generic wound system (wounded enemies can flee, but there are no persistent wounds)
 - bleeding

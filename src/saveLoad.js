@@ -204,6 +204,8 @@ function buildSaveObject() {
       minedSurfaceStones: player.minedSurfaceStones,
       miningArmedTarget: player.miningArmedTarget,
       miningTutorialSeen: player.miningTutorialSeen,
+      combatSkills: {...player.combatSkills},
+      combatSkillXp: {...player.combatSkillXp},
       fishermanRewardClaimed: !!player.fishermanRewardClaimed,
       fishermanLessonPending: !!player.fishermanLessonPending,
       fishermanFishGiftGiven: !!player.fishermanFishGiftGiven,
@@ -228,6 +230,7 @@ function buildSaveObject() {
       hp: e.hp,
       maxHp: e.maxHp,
       meleeHitXpGranted: e.meleeHitXpGranted,
+      combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0,
       atk: e.atk,
       def: e.def,
@@ -774,6 +777,8 @@ function loadGameFromObject(data, opts = {}) {
   player.minedSurfaceStones = data.player.minedSurfaceStones
   player.miningArmedTarget = data.player.miningArmedTarget
   player.miningTutorialSeen = data.player.miningTutorialSeen
+  player.combatSkills = {...data.player.combatSkills}
+  player.combatSkillXp = {...data.player.combatSkillXp}
   player.killsBySpecies = {...data.player.killsBySpecies}
   player.strongestEnemyKilled = data.player.strongestEnemyKilled ? structuredClone(data.player.strongestEnemyKilled) : null
   player.swimming = data.player.swimming || 0
@@ -899,6 +904,7 @@ function loadGameFromObject(data, opts = {}) {
       name: e.name, baseName: e.baseName, tier: e.tier, level, levelKind, caveIndex: e.caveIndex,
       hp: e.hp, maxHp: e.maxHp,
       meleeHitXpGranted: Number.isInteger(e.meleeHitXpGranted) ? Math.max(0, e.meleeHitXpGranted) : 0,
+      combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
       abilities: [...e.abilities],
