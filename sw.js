@@ -70,6 +70,7 @@ const PRECACHE_URLS = [
   './content/item_modifiers.json',
   './content/enemy_templates.json',
   './content/enemy_config.json',
+  './content/monster_xp_weights.json',
   './content/enemy_default_biomes.json',
   './content/enemy_prefixes.json',
   './content/world_generation.json',

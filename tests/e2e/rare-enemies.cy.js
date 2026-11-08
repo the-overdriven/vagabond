@@ -52,6 +52,22 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
     })
   })
 
+  it('defines a deterministic XP bonus for every monster ability', () => {
+    cy.request('/content/enemy_templates.json').then(({body:templates}) => {
+      cy.request('/content/monster_xp_weights.json').then(({body:weights}) => {
+        const abilities = new Set(templates.flatMap(t => t.abilities || []))
+        for (const ability of abilities) {
+          expect(weights.abilityBonuses, `XP weight for ${ability}`).to.have.property(ability)
+          expect(weights.abilityBonuses[ability], `${ability} XP`).to.be.at.least(0)
+        }
+        expect(weights.statWeights.atk).to.be.greaterThan(weights.statWeights.spd)
+        expect(weights.statWeights.def).to.be.greaterThan(weights.statWeights.grace)
+        expect(weights.abilityBonuses.shooterArrows).to.be.lessThan(weights.abilityBonuses.rupture)
+        expect(weights.abilityBonuses.shooterStones).to.be.lessThan(weights.abilityBonuses.deathBolt)
+      })
+    })
+  })
+
   it('spawns ultra-rare species at most once across surface and underground for the DRUSK regression seed', () => {
     cy.visit('/')
     cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')

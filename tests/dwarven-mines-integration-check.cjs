@@ -51,6 +51,22 @@ const copy=value=>JSON.parse(JSON.stringify(value))
       x:42,y:40,homeX:42,homeY:40,homeTileType:'grass',
       hp:t.hp,maxHp:t.hp,alive:true,prefix:null,equipment:null})`)
   const reward=run('xpForEnemy(target)')
+  const xpConfig=copy(run('MONSTER_XP_WEIGHTS'))
+  assert(xpConfig.statWeights.atk>xpConfig.statWeights.spd)
+  assert(xpConfig.statWeights.def>xpConfig.statWeights.grace)
+  const baseline=run('xpForEnemy({...target,abilities:[],prefix:null,tier:1})')
+  assert.equal(run('xpForEnemy({...target,abilities:[],prefix:null,tier:5})'),baseline,
+    'tier does not change monster kill XP')
+  assert.equal(run('xpForEnemy({...target,abilities:["shooterArrows"],prefix:null})')-baseline,
+    xpConfig.abilityBonuses.shooterArrows,'ranged ability adds its flat XP even when unused')
+  assert.equal(run('xpForEnemy({...target,abilities:["shooterArrows","shooterArrows"],prefix:null})'),
+    baseline+xpConfig.abilityBonuses.shooterArrows,'duplicate abilities do not double count')
+  assert.equal(run('xpForEnemy({...target,abilities:["rupture"],prefix:null})')-baseline,
+    xpConfig.abilityBonuses.rupture,'dangerous abilities use the configured XP bonus')
+  const prefixedSameStats=run('xpForEnemy({...target,prefix:"Champion"})')
+  assert.equal(prefixedSameStats,reward,'prefix label alone does not multiply XP')
+  const improvedAtk=run('xpForEnemy({...target,atk:target.atk+6})')
+  assert(improvedAtk>reward,'permanent ATK increases raise XP without a prefix multiplier')
   const expectedReward=run('Math.round(xpForEnemy(target)*xpMultiplier())')
   const prevXp=run('player.totalXpEarned')
   assert(reward>0)

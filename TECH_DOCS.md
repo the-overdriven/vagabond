@@ -405,6 +405,31 @@ Racial scaling is `3 + floor(level / 5)` in the race's specialty stat. It stacks
 with ordinary level gains. Death can create XP debt but does not lower level,
 so it does not remove racial milestones. New characters restart at +3.
 
+Monster kill XP uses permanent combat stats and an additive bonus for each distinct
+monster ability, configured in `content/monster_xp_weights.json`. Monster tiers do
+**not** affect the reward:
+
+`stat XP = (max HP + 2 × ATK + 2 × DEF + 0.5 × SPD + 0.5 × GRACE) / 3`
+
+`kill XP = max(1, round(10 + stat XP + sum(ability XP bonuses)))`
+
+The flat 10 XP baseline keeps early kills worthwhile after removing tier XP.
+ATK and DEF each contribute four times as much as SPD or GRACE per point.
+Each ability in the monster's ability list contributes its configured flat
+bonus exactly once, even when the monster cannot use it during that fight.
+Ranged attacks have a small bonus (+3 XP); more dangerous abilities, such as
+rupture (+25) and death bolt (+30), give substantially more. A passive
+limitation such as blindness may have a zero bonus. The full ability table and
+stat coefficients live in the JSON, and missing ability weights are rejected
+rather than silently ignored.
+
+Use the monster's maximum HP and persistent stats, including generated stat
+variance, prefixes and equipment, but not temporary combat effects such as
+Enrage, Charge, or Gang Power. GRACE falls back to the species template when
+an enemy instance does not store it. Round the combined stat-and-ability
+reward once, then multiply by 1.5 and round again for prefixed enemies.
+Player XP multipliers (including Human +20%) apply when XP is awarded.
+
 XP is affected by the player's XP multiplier.
 
 Human currently has a permanent +20% XP multiplier.
@@ -4700,20 +4725,25 @@ rounded differences of at least one stat point (positive or negative).
 
 ## Enemy XP
 
-XP awarded for killing an enemy is calculated from its final spawned stats:
+Killing an enemy grants XP based on its **final permanent combat stats** and
+its inherent abilities. Monster tiers do not contribute to XP.
 
 ```text
-base XP = tier x 10 + floor((max HP + ATK x 2 + DEF x 2) / 3)
+stat XP = (max HP + 2 × ATK + 2 × DEF + 0.5 × SPD + 0.5 × GRACE) / 3
+enemy XP = max(1, round(10 + stat XP + sum of distinct ability bonuses))
 ```
 
-If the enemy has a prefix, the result is multiplied by 1.5 and rounded:
+The coefficients, base reward, and flat bonuses for each monster ability are
+configured in `content/monster_xp_weights.json`. ATK and DEF each have four
+times the per-point XP weight of SPD or GRACE. Abilities count even when the
+enemy never uses them; repeated copies of the same ability count once. Ranged
+attacks have a deliberately small bonus.
 
-```text
-prefixed enemy XP = round(base XP x 1.5)
-```
-
-Therefore, prefixed enemies yield 50% more XP than an otherwise identical
-enemy. The player's race and equipment XP bonuses are applied afterward.
+Permanent spawn variation, prefixes, and equipment affect XP through the
+resulting final stats; there is **no additional prefix multiplier**. Temporary
+combat effects (such as Enrage, Charge, or Gang Power), current HP, and nearby
+allies do not change the reward. The player's race and equipment XP bonuses
+are applied afterward.
 
 ---
 

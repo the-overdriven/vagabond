@@ -707,6 +707,7 @@ more difficult:
   let ARMORS = []
   let MODIFIERS = []
   let ENEMY_TEMPLATES = []
+  let MONSTER_XP_WEIGHTS = null
   let ENEMY_DEFAULT_BIOMES = []
   let ENEMY_PREFIXES = {}
   let ARTIFACT_NOUNS = []
@@ -903,6 +904,7 @@ more difficult:
       enemyDefaultBiomes: 'enemy_default_biomes.json',
       enemyPrefixes: 'enemy_prefixes.json',
       enemyConfig: 'enemy_config.json',
+      monsterXpWeights: 'monster_xp_weights.json',
       artifactNouns: 'artifact_nouns.json',
       artifactPrefixes: 'artifact_prefixes.json',
       artifactEpithets: 'artifact_epithets.json',
@@ -941,6 +943,10 @@ more difficult:
     SHIELDS = content.shields
     ARMORS = content.armors
     MODIFIERS = content.modifiers
+    MONSTER_XP_WEIGHTS = content.monsterXpWeights
+    const abilityWeights = MONSTER_XP_WEIGHTS.abilityBonuses
+    const missingXpWeights = [...new Set(content.enemyTemplates.flatMap(t => t.abilities || []))].filter(a => !Object.hasOwn(abilityWeights, a))
+    if (missingXpWeights.length) throw new Error('Missing monster XP weights: ' + missingXpWeights.join(', '))
     ENEMY_TEMPLATES = content.enemyTemplates
     ENEMY_TEMPLATE_BY_NAME = Object.fromEntries(ENEMY_TEMPLATES.map(t => [t.name, t]))
     ENEMY_DEFAULT_BIOMES = content.enemyDefaultBiomes
@@ -4091,9 +4097,20 @@ more difficult:
   }
 
   function xpForEnemy(e) {
-    let base = e.tier * 10 + Math.floor((e.maxHp + e.atk * 2 + e.def * 2) / 3)
-    if (e.prefix) base = Math.round(base * 1.5)
-    return base
+    const cfg = MONSTER_XP_WEIGHTS
+    const stats = cfg.statWeights
+    // Use permanent combat stats, not transient ability effects or current HP.
+    const statXp = (e.maxHp * stats.hp + e.atk * stats.atk +
+      e.def * stats.def + e.spd * stats.spd +
+      (e.grace ?? enemyTemplateForSavedEnemy(e)?.grace ?? 0) * stats.grace) / cfg.statDivisor
+    const abilities = new Set(e.abilities || [])
+    let abilityXp = 0
+    for (const ability of abilities) {
+      if (!Object.hasOwn(cfg.abilityBonuses, ability)) throw new Error('Missing monster XP weight: ' + ability)
+      abilityXp += cfg.abilityBonuses[ability]
+    }
+    let reward = Math.max(1, Math.round(cfg.baseXp + statXp + abilityXp))
+    return reward
   }
 
   function damageRoll(atk, def) {
