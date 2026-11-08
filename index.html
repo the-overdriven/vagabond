@@ -9042,7 +9042,8 @@ more difficult:
 
   function terrainVisual(tileKey, x, y) {
     if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
-        tileKey === 'dwarvendoorclosed') return {image:'img/tiles/tower-entrance.png',baseTileKey:'marble',scale:1}
+        ['dwarvendoorclosed','dwarvendooropen'].includes(tileKey)) return (
+      RENDER_STYLE.terrainTiles[tileKey === 'dwarvendooropen' ? 'towerentranceopen' : 'towerentrance'])
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
       ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
       : RENDER_STYLE.specialTiles?.coffin
@@ -12581,6 +12582,13 @@ more difficult:
         btn.title = 'Drop one item on the current tile'
         btn.onclick = () => ITEM_ACTION_HANDLERS.dropItem(idx)
         row.appendChild(btn)
+      }
+      const buttons = [...row.querySelectorAll('button')]
+      if (buttons.length) {
+        const actions = document.createElement('span')
+        actions.className = 'inventory-actions'
+        buttons.forEach(button => actions.appendChild(button))
+        row.appendChild(actions)
       }
       list.appendChild(row)
     })

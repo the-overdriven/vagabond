@@ -180,6 +180,25 @@ describe('Non-gear item catalog', () => {
         expect(name.getBoundingClientRect().right, 'Drop stays after the item name')
           .to.be.at.most(drop.getBoundingClientRect().left)
       })
+      cy.get('#invList').should($list => {
+        const rows = [...$list[0].querySelectorAll('.invitem')]
+        for (const row of rows) {
+          const buttons = [...row.querySelectorAll('.inventory-actions button')]
+          if (!buttons.length) continue
+          const right = Math.max(...buttons.map(button => button.getBoundingClientRect().right))
+          const style = getComputedStyle(row)
+          const expected = row.getBoundingClientRect().right - parseFloat(style.paddingRight)
+          expect(Math.abs(right - expected), 'action group reaches the right edge').to.be.lessThan(1)
+        }
+        for (const row of rows) {
+          const buttons = [...row.querySelectorAll('.inventory-actions button')]
+            .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+          for (let i = 1; i < buttons.length; i++) {
+            expect(buttons[i].getBoundingClientRect().left - buttons[i - 1].getBoundingClientRect().right,
+              'adjacent inventory actions have a gap').to.be.at.least(5)
+          }
+        }
+      })
       cy.get('#invList .invitem').contains('Shovel').parent().contains('button', 'Dig').should('exist')
       cy.get('#invList .invitem').contains('Old Rotten Casket').parent().contains('button', 'Open').should('exist')
       cy.get('#invList .invitem').contains('Wheelbarrow').parent().contains('button', 'Drop').should('not.exist')

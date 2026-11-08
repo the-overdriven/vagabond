@@ -1053,6 +1053,9 @@ clear walking ring. Existing dead-tree artwork is selected deterministically
 from the tower's position, while the trees use ordinary grassland-tree collision
 and save/replay rules. Their placement does not block the immediate perimeter.
 
+The ground entrance uses matching closed and open sprites; the open doorway
+has transparency over the underlying floor. Both states are registered in the terrain
+image catalog so startup loads them into the renderer, and cached for offline use.
 The ground entrance and window artwork retain their upright orientation
 regardless of world rotation, although their positions and the tower layout still
 rotate as a unit. The ground entrance is an ordinary unlocked door, like the two internal doors
@@ -5600,8 +5603,9 @@ and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
 sidebars are open. This applies even when the browser reports no pointer. 
 Inventory actions remain reachable without horizontal scrolling. 
-Drop is the **leftmost action button**, placed just after the item name and
-icon and before all other actions. Portable crystals use the same ordering.
+Each row’s action group is **aligned to the right edge** of the inventory.
+Drop is the **leftmost action button** within that group. Buttons have even
+spacing; portable crystals use the same ordering.
 On touch screens, the trade panel fills the available height: both stock
 columns have independently scrolling lists rather than the 280px desktop cap,
 and the Close control remains visible above the bottom message log.

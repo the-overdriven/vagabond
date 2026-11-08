@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
   './src/worldGen.js',
   './src/tower.js',
   './img/tiles/tower-entrance.png',
+  './img/tiles/tower-entrance-open.png',
   './img/tiles/tower-window.png',
   './img/tiles/tower-battlement.png',
   './img/tiles/tower-battlement-corner.png',
@@ -200,12 +201,9 @@ self.addEventListener('fetch', (event) => {
   // which is why updated images never showed up.
   event.respondWith(
     caches.open(RUNTIME).then(async (cache) => {
-      const raceBackdrop = /\/img\/ui\/race-landscape-[1-4]\.webp$/.test(url.pathname);
-      // Precached landscape files live in PRECACHE, not RUNTIME. Consult both
-      // so character creation can use them instantly on subsequent launches.
-      const cached = await cache.match(req) || (raceBackdrop
-        ? await caches.open(PRECACHE).then((precache) => precache.match(req))
-        : null);
+      // All precached assets must be available before their first runtime use.
+      const cached = await cache.match(req) ||
+        await caches.open(PRECACHE).then((precache) => precache.match(req));
 
       const refresh = fresh(req).then((res) => {
         if (res && res.ok) cache.put(req, res.clone());

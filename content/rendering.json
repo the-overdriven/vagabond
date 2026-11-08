@@ -428,6 +428,7 @@
   },
   "terrainTiles": {
     "towerentrance": {"image":"img/tiles/tower-entrance.png","baseTileKey":"marble","scale":1},
+    "towerentranceopen": {"image":"img/tiles/tower-entrance-open.png","baseTileKey":"marble","scale":1},
     "towerstairsup": {"image": "img/tiles/dwarven-stairs-up.png", "baseTileKey": "marble", "scale": 1},
     "towerstairsdown": {"image": "img/tiles/stairs-down.png", "baseTileKey": "marble", "scale": 1},
     "groundfissure": {"image": "img/tiles/ground-fissure.png", "baseTileKey": "grass", "scale": 1},

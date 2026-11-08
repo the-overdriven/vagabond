@@ -92,8 +92,8 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert.equal(Object.keys(meatDrops).length,32)
   assert.equal(run('itemDefinition("meat").stackable'),true)
   assert.equal(run('itemDefinition("meat").sellValue'),2)
-  assert.equal(run('itemDefinition("meat").icon'),null)
-  assert.equal(run('itemIconHTML({kind:"meat"})'),'')
+  assert.equal(run('itemDefinition("meat").icon'),'img/icons/meat.svg')
+  assert.ok(run('itemIconHTML({kind:"meat"})').includes('img/icons/meat.svg'))
   for(const t of templates) {
     if (t.name in meatDrops) {
       assert.equal(t.humanoid,false,`${t.name} is not humanoid`)
@@ -136,8 +136,8 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.sellValue`),value,`${kind} trade value`)
     assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.stackable`),true,`${kind} is stackable`)
     if (kind!=='amethyst') {
-      assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.icon`),null,`${kind} has no artwork`)
-      assert.equal(run(`itemIconHTML({kind:${JSON.stringify(kind)}})`),'',`${kind} never loads a missing icon`)
+      assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.icon`),`img/icons/${kind}.svg`,`${kind} artwork`)
+      assert.ok(run(`itemIconHTML({kind:${JSON.stringify(kind)}})`).includes(`img/icons/${kind}.svg`),`${kind} uses its artwork`)
     }
   }
   for (const [species,[kind,probability,count]] of Object.entries(materialDrops)) {

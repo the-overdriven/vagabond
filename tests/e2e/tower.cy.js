@@ -15,6 +15,16 @@ describe('Guaranteed elevated tower',()=>{
     loadTower()
     cy.window().then(async win=>{
       await win.eval(`(${checkTowerReplayAndIsolation.toString()})()`)
+      win.eval('currentZ=0;map=surfaceMap')
+      await win.eval('preloadImages()')
+      for (const state of ['dwarvendoorclosed','dwarvendooropen']) {
+        expect(win.eval(`resolveVisualImage(terrainVisual('${state}',tower.entrance.x,tower.entrance.y))?.naturalWidth > 0`),
+          state + ' image is loaded and drawable').to.equal(true)
+      }
+      expect(win.eval(`terrainVisual('dwarvendooropen',tower.entrance.x,tower.entrance.y).image`))
+        .to.equal('img/tiles/tower-entrance-open.png')
+      expect(win.eval(`terrainVisual('dwarvendoorclosed',tower.entrance.x,tower.entrance.y).image`))
+        .to.equal('img/tiles/tower-entrance.png')
       // Rotate the loaded fixture rather than adding another expensive world
       // generation case. Its doors, four maps, and matched landings must turn.
       expect(win.eval(`(()=>{
