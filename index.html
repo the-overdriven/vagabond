@@ -7940,9 +7940,11 @@ more difficult:
       if (openDungeonDoorAt(nx, ny)) {
         consecutiveWaitTurns = 0
         log(openingGate ? 'You open the dwarven gate.' : 'You open the dwarven door.', 'info')
-        // Auto-travel already shifted this step before tryMove(). Reinsert the
-        // now-open doorway so the next action actually moves through it.
-        if (autoPath) autoPath.unshift({x: nx, y: ny})
+        // Auto-travel already shifted this step before tryMove(). Only walk
+        // through the newly opened doorway if the destination is beyond it.
+        // Clicking the door itself must stop here, without entering its tile.
+        if (autoPath?.length) autoPath.unshift({x: nx, y: ny})
+        else if (autoPath) clearAutoPath()
         enemyTurn()
         npcTurn()
         updateHud()
@@ -7974,7 +7976,10 @@ more difficult:
           log(lockInfo.kind === 'gate'
             ? 'The Dwarven Key turns in the old lock. You unlock and open the gate.'
             : 'The Dwarven Key turns in the old lock. You unlock and open the door.', 'info')
-          if (autoPath) autoPath.unshift({x: nx, y: ny})
+          // A clicked locked door is also an interaction destination; do not
+          // step into it after unlocking unless the route continues beyond.
+          if (autoPath?.length) autoPath.unshift({x: nx, y: ny})
+          else if (autoPath) clearAutoPath()
           enemyTurn()
           npcTurn()
           updateHud()

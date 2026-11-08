@@ -63,4 +63,65 @@ describe('Dwarven door closing by mouse and touch', () => {
       expect(win.eval('turnCount')).to.equal(before.turnCount+1)
     })
   })
+
+  for (const [device,width,height] of [['desktop',1280,800],['mobile',390,844]]) {
+    it(`opens every closed door family without entering on ${device}`, () => {
+      cy.viewport(width,height)
+      cy.window().then(async win => {
+        const types = [
+          ['dwarvendoorclosed','dwarvendooropen'],
+          ['dwarvenprisondoorclosed','dwarvenprisondooropen'],
+          ['dwarvengateclosed','dwarvengateopen'],
+          ['dwarvendoorlocked','dwarvendooropen'],
+          ['dwarvenprisondoorlocked','dwarvenprisondooropen'],
+          ['dwarvengatelocked','dwarvengateopen']
+        ]
+        for (const [closed,opened] of types) {
+          const before=win.eval(`(()=>{
+            const floor=deepLevels[2]
+            currentZ=chainZForDepth(4);currentCave=-1;map=floor.map
+            undergroundDiscovered=floor.discovered
+            for(let y=38;y<=44;y++)for(let x=38;x<=44;x++){
+              map[y][x]='marble';undergroundDiscovered[y][x]=true
+            }
+            Object.assign(player,{x:40,y:41,hp:playerMaxHp()})
+            enemies=[];occupied=new Set();groundItems=[]
+            map[41][41]='${closed}'
+            if('${closed}'.startsWith('dwarvengate'))map[42][41]='${closed}'
+            player.inventory=player.inventory.filter(item=>item.kind!=='dwarvenkey')
+            if(isLockedDungeonDoorTile(map[41][41]))
+              addInventoryItem('dwarvenkey',{keyId:dungeonLockIdAt(41,41)})
+            replayAnimationsDisabled=true;replayRecording=false
+            clearAutoPath();pendingMove=null
+            stopCameraAnimation();snapCameraToPlayer();invalidateUndergroundFov();render()
+            return {turnCount,x:player.x,y:player.y}
+          })()`)
+          const pos=clientPosition(win)
+          if(device==='desktop') {
+            win.eval(`canvas.dispatchEvent(new MouseEvent('click',{
+              bubbles:true,clientX:${pos.x},clientY:${pos.y}
+            }))`)
+          } else {
+            win.eval(`(()=>{
+              const p={clientX:${pos.x},clientY:${pos.y}}
+              const start=new Event('touchstart',{bubbles:true,cancelable:true})
+              Object.defineProperty(start,'touches',{value:[p]})
+              canvas.dispatchEvent(start)
+              const end=new Event('touchend',{bubbles:true,cancelable:true})
+              Object.defineProperty(end,'touches',{value:[]})
+              Object.defineProperty(end,'changedTouches',{value:[p]})
+              canvas.dispatchEvent(end)
+            })()`)
+          }
+          expect(win.eval('map[41][41]'),closed).to.equal(opened)
+          expect(win.eval('player.x'),closed).to.equal(before.x)
+          expect(win.eval('player.y'),closed).to.equal(before.y)
+          expect(win.eval('turnCount'),closed).to.equal(before.turnCount+1)
+          expect(win.eval('autoPath'),closed).to.equal(null)
+          await win.eval('tryMove(1,0)')
+          expect(win.eval('player.x'),`${closed} opens before moving`).to.equal(41)
+        }
+      })
+    })
+  }
 })

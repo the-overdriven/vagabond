@@ -11,6 +11,53 @@ function loadTower() {
 }
 
 describe('Guaranteed elevated tower',()=>{
+  for (const [device,width,height] of [['desktop',1280,800],['mobile',390,844]]) {
+    it(`opens the clicked entrance without entering its tile on ${device}`,()=>{
+      cy.viewport(width,height);loadTower()
+      cy.window().then(async win=>{
+        const before=win.eval(`(()=>{
+          currentZ=0;map=surfaceMap;replayAnimationsDisabled=true;
+          const outside=towerPoint(5,tower.size)
+          Object.assign(player,outside)
+          map[tower.entrance.y][tower.entrance.x]='dwarvendoorclosed'
+          enemies=[];occupied=new Set();clearAutoPath();pendingMove=null
+          stopCameraAnimation();snapCameraToPlayer();invalidateUndergroundFov();render()
+          return {x:player.x,y:player.y,turnCount}
+        })()`)
+        const pos=win.eval(`(()=>{
+          const rect=canvas.getBoundingClientRect()
+          return {
+            x:rect.left+(tower.entrance.x-camX+.5)*TILE_PX*rect.width/canvas.width,
+            y:rect.top+(tower.entrance.y-camY+.5)*TILE_PX*rect.height/canvas.height
+          }
+        })()`)
+        if(device==='desktop') {
+          win.eval(`canvas.dispatchEvent(new MouseEvent('click',{
+            bubbles:true,clientX:${pos.x},clientY:${pos.y}
+          }))`)
+        } else {
+          win.eval(`(()=>{
+            const p={clientX:${pos.x},clientY:${pos.y}}
+            const start=new Event('touchstart',{bubbles:true,cancelable:true})
+            Object.defineProperty(start,'touches',{value:[p]})
+            canvas.dispatchEvent(start)
+            const end=new Event('touchend',{bubbles:true,cancelable:true})
+            Object.defineProperty(end,'touches',{value:[]})
+            Object.defineProperty(end,'changedTouches',{value:[p]})
+            canvas.dispatchEvent(end)
+          })()`)
+        }
+        expect(win.eval('map[tower.entrance.y][tower.entrance.x]')).to.equal('dwarvendooropen')
+        expect(win.eval('player.x')).to.equal(before.x)
+        expect(win.eval('player.y')).to.equal(before.y)
+        expect(win.eval('autoPath')).to.equal(null)
+        expect(win.eval('turnCount')).to.equal(before.turnCount+1)
+        await win.eval('tryMove(tower.entrance.x-player.x,tower.entrance.y-player.y)')
+        expect(win.eval('player.x')).to.equal(win.eval('tower.entrance.x'))
+        expect(win.eval('player.y')).to.equal(win.eval('tower.entrance.y'))
+      })
+    })
+  }
   it('keeps floors, background boundaries and save/replay state isolated',()=>{
     loadTower()
     cy.window().then(async win=>{

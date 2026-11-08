@@ -1375,13 +1375,16 @@ leaf while standing on it or while a monster occupies it. Invalid attempts
 cost no turn. Closing changes the tile back to its ordinary **unlocked** closed
 state; it never restores a spent lock/key, repairs a breached leaf, or closes
 an open progression gate. Closed doors again use their existing collision,
-sight and projectile rules; FOV refreshes immediately. Door interactions stop
-auto-travel and replay as distinct deterministic actions.
+sight and projectile rules; FOV refreshes immediately. Closing a door stops
+auto-travel. Opening and closing replay as distinct deterministic actions.
 Humanoid enemies treat unlocked closed doors as traversable routes but spend an
 action opening the encountered leaf before moving through it. Non-humanoids do
 not open them, while ethereal traversal retains its existing ability to pass
 through otherwise blocked terrain. Auto-travel may route through a known closed
-door and accounts for the extra opening action. Door state lives directly in the
+door and accounts for the extra opening action. Clicking or tapping a closed door
+as the destination opens it but stops before entering its tile, even when the
+player approaches from farther away. A route to a destination beyond the door
+continues through the doorway after the opening turn. Door state lives directly in the
 Ruins terrain map, so save/load and replay restore the exact open/closed state.
 
 Every Ruins floor now also contains one **two-leaf mandatory progression gate**
