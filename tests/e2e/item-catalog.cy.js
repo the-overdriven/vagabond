@@ -124,7 +124,8 @@ describe('Non-gear item catalog', () => {
       expect(result.chestScale).to.equal(100)
       expect(result.forageScale).to.equal(100)
       expect(result.scrollResult).to.equal('scrollOfInvisibility')
-      expect(result.chest, 'configured chest boundaries').to.have.length(25)
+      // Arrows are supplies and add one more set of three boundary cases.
+      expect(result.chest, 'configured chest boundaries').to.have.length(28)
       for (const {roll, expected, actual} of result.chest) {
         expect(actual, 'chest roll ' + roll).to.equal(expected)
       }

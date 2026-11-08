@@ -16,7 +16,8 @@ describe('Temple sanctuary boundary, immunity and pursuit', () => {
           for(let y=42;y<68;y++)for(let x=42;x<75;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
           enemies=[{id:'holy-test',name:'Goblin',baseName:'Goblin',tier:1,level:0,
             x:61,y:50,homeX:61,homeY:50,alive:true,hp:100,maxHp:100,atk:5,def:0,spd:2,
-            aggro:8,abilities:[],humanoid:false,aware:true,alarmed:false,sleeping:false,wander:false}];
+            aggro:8,abilities:[],humanoid:false,aware:true,alarmed:false,sleeping:false,wander:false,
+            meleeHitXpGranted:0}];
           occupied=new Set(['61,50']);`)
       })
     })

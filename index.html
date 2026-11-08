@@ -12257,12 +12257,19 @@ more difficult:
     const c = base.ctx
     c.clearRect(x * s, y * s, s, s)
     const terrainMap = view ? view.terrain : currentZ === 0 ? (surfaceMap || map) : map
-    const tileKey = terrainMap[y][x]
+    // Small synthetic maps used by visibility checks may be smaller than the
+    // current world dimensions. Their unmapped cells stay unexplored fog.
+    const tileKey = terrainMap[y]?.[x]
+    if (tileKey === undefined) {
+      c.fillStyle = RENDER_STYLE.minimap.fog
+      c.fillRect(x * s, y * s, s, s)
+      return
+    }
     const t = TILE[tileKey] || TILE.cavewall || TILE.grass
     const underKey = tileUnderlays[keyXY(x, y)] || tileKey
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
-    const visible = view ? view.seen[y]?.[x] : currentZ !== 0 ? undergroundDiscovered[y][x] : discovered[y][x]
+    const visible = view ? view.seen[y]?.[x] : currentZ !== 0 ? undergroundDiscovered[y]?.[x] : discovered[y]?.[x]
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
     const brownCave = tileKey === 'cavefloor2' && (view

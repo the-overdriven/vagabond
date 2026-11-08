@@ -235,7 +235,9 @@ describe('Rare monster sightings and flight', () => {
       const save=JSON.parse(JSON.stringify(buildSaveObject())), id=e.id
       fleeAssert(save.version===self.VAGABOND_SAVE_VERSION, 'current save version')
       const saved=save.enemies.find(v=>v.id===id)
-      fleeAssert(saved.rareSightings===1 && saved.rareFleeTurns===7 && saved.rareFleeAcc===0.5 && saved.rareArmed===false, 'exact mid-flight fields')
+      // First sightings take exactly one step per turn; no fractional pace is
+      // accumulated, so the default rareFleeAcc field stays omitted.
+      fleeAssert(saved.rareSightings===1 && saved.rareFleeTurns===7 && saved.rareFleeAcc===undefined && saved.rareArmed===false, 'exact mid-flight fields')
       loadGameFromObject(save,{isReplayInit:true}); replayAnimationsDisabled=true
       e=enemies.find(v=>v.id===id)
       fleeAssert(JSON.stringify(rareFleeSaveState(e))===JSON.stringify(rareFleeSaveState(saved)), 'mid-flight round trip')
