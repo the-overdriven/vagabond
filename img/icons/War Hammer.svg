@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g transform="rotate(35 12 12)"><path d="M11.2 7h1.6v15h-1.6z" fill="#82552e" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M11.4 8v13" fill="none" stroke="#bb8750" stroke-width="0.5" stroke-linejoin="round"/><path d="M11 16h2v5h-2z" fill="#4a3027" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M11 17l2 .7m-2 .8 2 .7m-2 .8 2 .7" fill="none" stroke="#a17c54" stroke-width="0.6" stroke-linejoin="round"/><path d="M5 4 7 2h12v6l-2 2H5z" fill="#56616a" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M5 4h12v6H5z" fill="#929fa7" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M5 4 7 2h12l-2 2z" fill="#d9e1dd" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M17 4 19 2v6l-2 2z" fill="#43515c" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M10 4h3v6h-3z" fill="#5c6972" stroke="#27262a" stroke-width="0.65" stroke-linejoin="round"/><path d="M6 5v3M14 5h2" fill="none" stroke="#d9e1dd" stroke-width="0.8" stroke-linejoin="round"/><circle cx="11.5" cy="6.8" r="0.7" fill="#b99652" stroke="#27262a" stroke-width="0.45"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g stroke="#27262a" stroke-width=".65" stroke-linejoin="round" stroke-linecap="round"><g transform="rotate(40 12 12)">
+<path d="M11.2 6h1.6v16h-1.6Z" fill="#795637"/><path d="M11.3 11h1.4v9h-1.4Z" fill="#45343a"/>
+<path d="m11.4 12 1.2.6m-1.2 1.5 1.2.6m-1.2 1.5 1.2.6m-1.2 1.5 1.2.6" stroke="#a58a66"/>
+<path d="m11 21 1-1 1 1v1l-1 1-1-1Z" fill="#b49861"/>
+<path d="m4 3 3-1 2 2h5l2-2 4 4-4 3-2-2H9l-2 3-3-1Z" fill="#65737c"/>
+<path d="M4 3h3v7L4 9Z" fill="#c2cccd"/><path d="m7 2 2 2h5l2-2-1 3H8Z" fill="#d2d7cf"/>
+<path d="m16 2 4 4-4 3 1-3Z" fill="#a7b5b9"/>
+<path d="M10 3h3v6h-3Z" fill="#aa8c54"/><path d="m11.5 4-1 1.5 1 1.5 1-1.5Z" fill="#514450"/>
+<path d="m4.7 4.5 1.4-.4m-.7 1v3" fill="none" stroke="#eef0dc"/>
+</g></g></svg>
