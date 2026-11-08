@@ -7965,7 +7965,7 @@ function spawnDeepCaveSpoor(){
   const directions=[[0,-1],[1,0],[0,1],[-1,0]]
   for(const complex of layer.complexes){
     const living=enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain'&&
-      complex.members.includes(e.caveIndex)&&e.baseName!=='Fungus')
+      complex.members.includes(e.caveIndex)&&caveSpoorEligibleSpecies(e.baseName||e.name))
     if(!living.length)continue
     const entrances=complex.members.flatMap(i=>layer.caves[i]?.entrances||[])
     const samples=[]

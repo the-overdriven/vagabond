@@ -3341,7 +3341,12 @@ are distributed across exploration space. Existing saves keep their already
 placed loot; generation does not rearrange it on entry or loading.
 
 Each connected deep complex may also contain **static old tracks** placed
-after actual inhabitants (including the guaranteed Vampire) are generated.
+after its inhabitants are generated. Only **non-humanoid beasts without the
+`fly` ability** can leave these clues; stationary Fungus is also excluded.
+Humanoids (including undead such as Mummies) and flying beasts never leave
+old cave tracks, regardless of temporary movement or sleep status. A complex
+with no eligible inhabitants has no old tracks.
+
 Each stair has a **20–35% seeded chance** to receive **1–4** clues on suitable
 floor tiles **3–16 cardinal walking steps** away. Territories have an
 independent **18%** chance for an additional clue; no complex exceeds **12**.
@@ -3353,8 +3358,10 @@ do **not** cause underground `far` wandering or participate in the surface
 track-aging system. They never reveal the existence of a Champion or exact
 coordinates. Untrained characters cannot interpret them; trained Tracking
 reveals direction and reveals species only after at least one normal kill of
-that species. They render as small, permanent paw/arrow marks in discovered,
-currently visible generic z:-2 cave terrain, and are inspectable without
+that species. Previously saved clues from ineligible species are ignored when
+viewed or inspected, without changing stored saves. Valid clues render as small,
+permanent paw/arrow marks in discovered, currently visible generic z:-2 cave
+terrain, and are inspectable without
 consuming a turn. The old tracks are persisted as `caveSpoor`, rotated with
 the world (including their eight-direction bearing), restored on save/replay,
 and retained when a new character reuses the same world.

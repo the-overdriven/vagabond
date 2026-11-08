@@ -2,6 +2,18 @@ const assert=require('node:assert/strict')
 const {run}=require('./helpers/node-game-runtime.cjs')
 ;(async()=>{
   await run('loadContent()')
+  const eligible=run(`({
+    mummy:caveSpoorEligibleSpecies('Mummy'),
+    vampire:caveSpoorEligibleSpecies('Vampire'),
+    bat:caveSpoorEligibleSpecies('Giant Bat'),
+    wyvern:caveSpoorEligibleSpecies('Wyvern'),
+    fungus:caveSpoorEligibleSpecies('Fungus'),
+    spider:caveSpoorEligibleSpecies('Giant Spider'),
+    snake:caveSpoorEligibleSpecies('Snake')
+  })`)
+  assert.deepEqual(JSON.parse(JSON.stringify(eligible)),{
+    mummy:false,vampire:false,bat:false,wyvern:false,fungus:false,spider:true,snake:true
+  },'only grounded non-humanoid beasts qualify for old cave tracks')
   run(`CaveSilhouettes.prepare = async seed => {
     CAVE_SILHOUETTES=[{id:CaveSilhouettes.idForSeed(seed),sourceIds:['mock-a','mock-b'],
       rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>(x-15)**2+(y-15)**2<212?'1':'0').join(''))}]
@@ -28,7 +40,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       const unique=componentStats.reduce((a,c)=>a+c.chests+c.provisions,0)
       const hints=caveSpoor.map(s=>({...s}))
       const badSpoor=hints.filter(s=>s.level!==-2||s.levelKind!=='chain'||
-        level.map[s.y]?.[s.x]!=='cavefloor2'||
+        level.map[s.y]?.[s.x]!=='cavefloor2'||!caveSpoorEligibleSpecies(s.species)||
         !enemies.some(e=>e.alive&&e.level===-2&&e.levelKind==='chain'&&
           indices.get(e.caveIndex)===s.complexId&&e.baseName===s.species))
       const corpseClue=hints[0] ? inspectCaveSpoor(hints[0]) : null
@@ -61,6 +73,16 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     assert.equal(run('JSON.stringify(caveDecorations)'),decorations,'decoration placement remains deterministic')
     if(summary.spoors.length){
       const hint=summary.spoors[0]
+      const hiddenOldClue=run(`(()=>{
+        const clue=caveSpoor[0],species=clue.species
+        currentZ=-2;map=deepLevels[0].map
+        clue.species='Mummy'
+        const hidden=caveSpoorAt(clue.x,clue.y)===null
+        clue.species=species
+        currentZ=0;map=surfaceMap
+        return hidden
+      })()`)
+      assert(hiddenOldClue,'ineligible spoor in a saved world cannot be inspected')
       const beforeRotation=run('({width:MAP_W,height:MAP_H,clue:{...caveSpoor[0]},rng:rngState})')
       run('rotateGeneratedWorld(1)')
       const rotated=run('({...caveSpoor[0]})')

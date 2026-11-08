@@ -11,6 +11,14 @@ function trackSpecies(enemy) {
   return enemyTemplateForSavedEnemy(enemy)?.name || enemy.baseName || enemy.name
 }
 
+// Old deep-cave spoor comes only from grounded beasts. Use the template's
+// inherent abilities, not a temporary state such as a flying beast sleeping.
+function caveSpoorEligibleSpecies(species) {
+  const template = ENEMY_TEMPLATE_BY_NAME[species]
+  return !!template && template.humanoid === false && template.name !== 'Fungus' &&
+    !template.abilities?.includes('fly')
+}
+
 function trackDirection(dx, dy) {
   if (!dx && !dy) return null
   // Canvas Y grows downward: north=0, east=2, south=4, west=6.
@@ -84,7 +92,7 @@ function drawBeastTracks() {
 // connected complex. They do not track moving monsters or reveal their position.
 function caveSpoorAt(x,y) {
   if(currentZ!==-2 || currentLevelKind()!=='chain')return null
-  return caveSpoor.find(p=>p.x===x&&p.y===y) || null
+  return caveSpoor.find(p=>p.x===x&&p.y===y&&caveSpoorEligibleSpecies(p.species)) || null
 }
 function inspectCaveSpoor(spoor) {
   if(!player.trackingLearned)return 'You find old tracks in the stone dust, but cannot make sense of them.'
@@ -95,6 +103,7 @@ function inspectCaveSpoor(spoor) {
 function drawCaveSpoor(visible) {
   if(currentZ!==-2||currentLevelKind()!=='chain')return
   for(const track of caveSpoor) {
+    if(!caveSpoorEligibleSpecies(track.species))continue
     if(!discovered[track.y]?.[track.x] || (visible&&!visible.has(keyXY(track.x,track.y))))continue
     const px=Math.round((track.x-camX)*TILE_PX),py=Math.round((track.y-camY)*TILE_PX)
     if(px< -TILE_PX||py< -TILE_PX||px>=canvas.width||py>=canvas.height)continue

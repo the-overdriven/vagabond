@@ -31,6 +31,8 @@ describe('Deep Caves 2.0 — rewards and permanent clues', () => {
       assert(drops.every(g=>level.caveMaps[g.caveIndex][g.y]?.[g.x]==='cavefloor2'),
         'rewards belong to an actual source floor')
       for(const clue of caveSpoor){
+        assert(caveSpoorEligibleSpecies(clue.species),
+          'old cave spoor belongs only to grounded non-humanoid beasts')
         assert(level.map[clue.y]?.[clue.x]==='cavefloor2','permanent spoor is on ordinary deep cave floor')
         assert(level.complexes.some(c=>c.id===clue.complexId&&c.members.some(ci=>
           enemies.some(e=>e.alive&&e.level===-2&&e.levelKind==='chain'&&
