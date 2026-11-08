@@ -1294,7 +1294,7 @@
         "loot": [
           {
             "kind": null,
-            "weight": 84
+            "weight": 83.1
           },
           {
             "kind": "potion",
@@ -1319,6 +1319,10 @@
           {
             "kind": "scrollOfChaos",
             "weight": 0.9
+          },
+          {
+            "kind":"scrollOfFireball",
+            "weight":0.9
           },
           {
             "kind": "scrollOfDeathShield",
@@ -1445,7 +1449,7 @@
         "lifePotionsPerFortFloor": [1, 2],
         "libraryScrolls": {
           "chance": 0.3,
-          "kinds": ["scrollOfFear", "scrollOfChaos", "scrollOfDeathShield"]
+          "kinds": ["scrollOfFear", "scrollOfChaos", "scrollOfDeathShield", "scrollOfFireball"]
         },
         "growthPerFloor": 0.1,
         "tierBiasGrowth": 0.12,

@@ -30,13 +30,13 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     const previousRng=rng,previousChance=chance
     try {
       chance=p=>p===0.75
-      return [0,0.51,0.9].map(value=>{
+      return [0,0.51,0.75,0.9].map(value=>{
         rng=()=>value
         return rollLooseSupplyKind('scrollOfInvisibility')
       }).concat([rollLooseSupplyKind('speedpotion')])
     } finally {rng=previousRng;chance=previousChance}
   })()`)))
-  assert.deepEqual(rolls,['idscroll','scrollOfFear','scrollOfChaos','speedpotion'],
+  assert.deepEqual(rolls,['idscroll','scrollOfFear','scrollOfChaos','scrollOfFireball','speedpotion'],
     'the diversified scroll pool does not alter speed-potion conversions')
   assert.equal(run('rollLooseSupplyKind(\'herb\')'),'herb')
   const generated=JSON.parse(JSON.stringify(run(`(()=>{
@@ -55,7 +55,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     assert.equal(result.first.length,9,'world retains its original loose scroll budget')
     assert.deepEqual(result.first,result.second,'fixed seed reproduces the same supply table')
     assert(result.first.every(kind=>
-      ['scrollOfInvisibility','idscroll','scrollOfFear','scrollOfChaos'].includes(kind)),
+      ['scrollOfInvisibility','idscroll','scrollOfFear','scrollOfChaos','scrollOfFireball'].includes(kind)),
       'only approved scroll kinds appear in the converted slots')
   }
   const pickup=JSON.parse(JSON.stringify(run(`(()=>{

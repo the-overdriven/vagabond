@@ -192,6 +192,12 @@
       "image": "img/tiles/scroll-of-chaos.png",
       "scale": 0.9
     },
+    "scrollOfFireball": {
+      "glyph": "?",
+      "color": "#ff8833",
+      "image": "img/icons/scroll-of-fireball.svg",
+      "scale": 0.9
+    },
     "stoneSkinPotion": {
       "glyph": "!",
       "color": "#b7b9ab",

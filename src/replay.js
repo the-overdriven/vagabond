@@ -208,7 +208,7 @@ function recordReplayAction(action) {
   replayData.actions.push(entry)
   recordingAction = entry
   const serial = ++recordingActionSerial
-  if (action.type !== 'move' && action.type !== 'skipTurn') {
+  if (action.type !== 'move' && action.type !== 'skipTurn' && action.type !== 'castFireball') {
     // Synchronous event handlers have completed when this callback runs.
     Promise.resolve().then(() => {
       if (recordingAction === entry && recordingActionSerial === serial)
@@ -332,6 +332,12 @@ async function runReplayAction(action) {
     case 'move':
       await tryMove(action.dx, action.dy)
       break
+    case 'castFireball': {
+      const idx = player.inventory.findIndex(item => item.replayId === action.replayId && item.kind === 'scrollOfFireball')
+      if (idx < 0 || !await castFireball(idx, action.x, action.y))
+        return replayDesync('Replay desynchronized: invalid fireball cast.')
+      break
+    }
     case 'shoot': {
       const target = enemies.find(e => e.alive && onCurrentLevel(e) && e.id === action.targetId)
       if (!target || target.x !== action.x || target.y !== action.y || !shootEnemy(target))

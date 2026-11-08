@@ -55,6 +55,49 @@ describe('Tactical consumables', () => {
     })
   }
 
+  for (const [width, touch] of [[1440,false],[390,true]]) {
+    it(`previews and cancels fireball, then casts once at ${width}px`, () => {
+      loadConsumableWorld(width,touch)
+      cy.window().then(win => win.eval(`
+        toggleInv(false);USE_TILE_IMAGES=${!touch};currentZ=0;map=surfaceMap;player.x=40;player.y=40;
+        player.hp=500;player.berserkTurns=0;player.inventory=[createItem('scrollOfFireball',{count:2})];
+        for(let y=30;y<52;y++)for(let x=30;x<52;x++){
+          map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        }
+        snapCameraToPlayer();window.fireballTurn=turnCount;toggleInv(true);renderInventory();
+      `))
+      cy.get('#invList .invitem').filter(':contains("Scroll of Fireball")').contains('button','Read').click()
+      if (touch) {
+        cy.get('#fireballControls').should('be.visible').and('contain','You are in the blast')
+        cy.get('#fireballCancel').click()
+      } else {
+        cy.get('#fireballControls').should('not.be.visible')
+        cy.get('body').trigger('keydown',{key:'Escape'})
+      }
+      cy.window().then(win => {
+        expect(win.eval('turnCount===window.fireballTurn && player.inventory[0].count===2')).to.equal(true)
+        win.eval('beginFireballTargeting(0);setFireballTarget(47,40)')
+      })
+      cy.get('#fireballCast').should('be.disabled')
+      cy.window().then(win => win.eval('setFireballTarget(44,40);if(fireballBlastTiles(44,40).length!==21)throw Error("centered 21-tile blast")'))
+      if (touch) cy.get('#fireballCast').should('be.enabled').click()
+      else cy.window().then(win => {
+        const point=win.eval(`(() => {
+          const r=canvas.getBoundingClientRect();
+          return {x:r.left+(44-camX+0.5)*TILE_PX*r.width/canvas.width,
+            y:r.top+(40-camY+0.5)*TILE_PX*r.height/canvas.height}
+        })()`);
+        win.eval('canvas').dispatchEvent(new win.MouseEvent('click',
+          {clientX:point.x,clientY:point.y,bubbles:true}))
+      })
+      cy.get('#fireballControls').should('not.be.visible')
+      cy.window().then(win => {
+        expect(win.eval('player.inventory[0].count')).to.equal(1)
+        expect(win.eval('turnCount')).to.equal(win.fireballTurn+1)
+      })
+    })
+  }
+
   it('boosts Wyrdling combat-potion strength once, keeps penalties, and restores sampled values', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => win.eval(`(() => {
@@ -78,7 +121,7 @@ describe('Tactical consumables', () => {
     cy.get('[data-status="berserk"]').should('have.attr','data-detail').and('contain','+9 ATK')
   })
 
-  it('keeps all five catalog icons, ground visuals, ASCII glyphs and pickup identities distinct', () => {
+  it('keeps all six catalog icons, ground visuals, ASCII glyphs and pickup identities distinct', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => {
       const result = win.eval(`(() => {
@@ -93,9 +136,9 @@ describe('Tactical consumables', () => {
         }
         return {paths,names,kinds:player.inventory.map(i=>i.kind),remaining:groundItems.length}
       })()`)
-      expect(new Set(result.paths).size).to.equal(5)
-      expect(new Set(result.names).size).to.equal(5)
-      expect(result.kinds).to.have.length(5)
+      expect(new Set(result.paths).size).to.equal(6)
+      expect(new Set(result.names).size).to.equal(6)
+      expect(result.kinds).to.have.length(6)
       expect(result.remaining).to.equal(0)
     })
   })

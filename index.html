@@ -1981,6 +1981,7 @@ more difficult:
 <script src="src/graveyard.js"></script>
 <script src="src/highscores.js"></script>
 <script src="src/consumables.js"></script>
+<script src="src/fireball.js"></script>
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
 <script src="src/rareFlee.js"></script>
@@ -4831,7 +4832,7 @@ more difficult:
     }
     if (cause !== 'sacrifice') {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      lootFromEnemy(e, playerCredit && cause === 'arrow' && distance > ATTACK_RANGE)
+      lootFromEnemy(e, playerCredit && ['arrow', 'fireball'].includes(cause) && distance > ATTACK_RANGE)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
     updateHud()
@@ -6594,6 +6595,7 @@ more difficult:
     scrollOfFear: idx => useTacticalConsumable(idx, 'scrollOfFear'),
     scrollOfDeathShield: idx => useTacticalConsumable(idx, 'scrollOfDeathShield'),
     scrollOfChaos: idx => useTacticalConsumable(idx, 'scrollOfChaos'),
+    scrollOfFireball: idx => beginFireballTargeting(idx),
     stoneSkinPotion: idx => useTacticalConsumable(idx, 'stoneSkinPotion'),
     berserkPotion: idx => useTacticalConsumable(idx, 'berserkPotion'),
     herb: idx => useHerb(idx),
@@ -8067,6 +8069,7 @@ more difficult:
   }
 
   async function tryMove(dx, dy) {
+    if (fireballAim) return false
     if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
       pendingMove = {dx: dx, dy: dy}
@@ -8419,6 +8422,7 @@ more difficult:
   }
 
   async function skipTurn() {
+    if (fireballAim) return
     if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
     const replayScope = recordReplayAction({type: 'skipTurn'})
@@ -9807,7 +9811,7 @@ more difficult:
   function beginEnemyMoveAnim(e, fromX, fromY) {
     e.animFromX = fromX
     e.animFromY = fromY
-    e.animStart = performance.now()
+    e.animStart = Math.max(performance.now(), fireballPresentationEnd())
   }
 
   function beginEnemyChargeAnim(e, fromX, fromY, line) {
@@ -9937,7 +9941,7 @@ more difficult:
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
+    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0 || fireballAnims.length > 0
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -10996,7 +11000,7 @@ more difficult:
         ex = pos.x
         ey = pos.y
       } else if (e.animStart !== undefined) {
-        const t = Math.min(1, (now - e.animStart) / MOVE_ANIM_MS)
+        const t = Math.max(0, Math.min(1, (now - e.animStart) / MOVE_ANIM_MS))
         if (t >= 1) {
           e.animStart = undefined
         } else {
@@ -11372,6 +11376,7 @@ more difficult:
     } else if (hoveredEnemy && hoveredEnemy.alive && undergroundTileVisible(hoveredEnemy.x, hoveredEnemy.y)) {
       drawEnemyRangeOverlay(hoveredEnemy)
     }
+    drawFireballPresentation(now)
     if (deathTransition && (deathTransition.phase === 'out' || deathTransition.phase === 'in')) {
       const elapsed = now - deathTransition.start
       let alpha = 0
@@ -11859,6 +11864,11 @@ more difficult:
   }
 
   canvas.addEventListener('mousemove', (ev) => {
+    if (fireballAim) {
+      const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
+      setFireballTarget(Math.floor(camX + Math.floor(p.px / TILE_PX)), Math.floor(camY + Math.floor(p.py / TILE_PX)))
+      return
+    }
     const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
     lastMousePx = p.px
     lastMousePy = p.py
@@ -11912,6 +11922,16 @@ more difficult:
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    if (fireballAim) {
+      if (!window.matchMedia('(pointer: coarse)').matches) {
+        setFireballTarget(mx, my)
+        void castAimedFireball()
+        return
+      }
+      if (fireballAim.x === mx && fireballAim.y === my && fireballAim.confirmed) void castAimedFireball()
+      else { setFireballTarget(mx, my); fireballAim.confirmed = true }
+      return
+    }
     updateMobileInfoPanel(mx, my)
     // Valve use is the same replayable movement interaction on desktop/mobile.
     if (map[my]?.[mx] === 'dwarvengasvalve' &&
@@ -11957,6 +11977,7 @@ more difficult:
   }
 
   canvas.addEventListener('click', (ev) => {
+    if (fireballAim) { handleCanvasTap(ev.clientX, ev.clientY); return }
     if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
@@ -13056,6 +13077,10 @@ more difficult:
         count: invisibilityCfg.count, merchantPrice: invisibilityCfg.merchantPrice
       }))
     }
+    const fireballCfg = MERCHANT_STOCK_CONFIG.scrolls.fireballScroll
+    if (!merchantStock.some(it => it.kind === fireballCfg.kind)) {
+      merchantStock.push(createItem(fireballCfg.kind, {count: fireballCfg.count, merchantPrice: fireballCfg.merchantPrice}))
+    }
     const arrowCfg = MERCHANT_STOCK_CONFIG.arrows
     if (arrowCfg && !merchantStock.some(it => it.kind === arrowCfg.kind && it.bundleSize)) {
       merchantStock.push(createItem(arrowCfg.kind, {count:1, bundleSize:arrowCfg.bundleSize,
@@ -13217,7 +13242,7 @@ more difficult:
       if (!it.unlimitedStock) it.count = (it.count || 1) - 1
       // Keep depleted finite scroll entries so save restoration cannot refill them.
       if (!it.unlimitedStock && it.count <= 0 && ![MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind,
-        MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.kind].includes(it.kind)) {
+        MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.kind, MERCHANT_STOCK_CONFIG.scrolls.fireballScroll.kind].includes(it.kind)) {
         const idx = merchantStock.indexOf(it)
         if (idx >= 0) merchantStock.splice(idx, 1)
       }
@@ -14035,7 +14060,7 @@ more difficult:
 
   function toggleInv(force) {
     const next = (force !== undefined) ? force : !invOpen
-    if (next) closeNpcMenu()
+    if (next) { closeNpcMenu(); cancelFireballTargeting() }
     if (next && mapOpen) toggleMap(false)
     if (next && bestiaryOpen) toggleBestiary(false)
     if (!next) document.getElementById('invOverlay').classList.remove('character-sheet')
@@ -14047,6 +14072,7 @@ more difficult:
 
   function toggleMap(force) {
     const next = (force !== undefined) ? force : !mapOpen
+    if (next) cancelFireballTargeting()
     if (next) closeNpcMenu()
     if (next && invOpen) toggleInv(false)
     if (next && bestiaryOpen) toggleBestiary(false)
@@ -14309,6 +14335,17 @@ more difficult:
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
     const k = ev.key
+    if (fireballAim) {
+      ev.preventDefault()
+      if (k === 'Escape') cancelFireballTargeting()
+      else if (k === 'Enter') void castAimedFireball()
+      else {
+        const step = {ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],
+          a:[-1,0],d:[1,0],w:[0,-1],s:[0,1]}[k]
+        if (step) setFireballTarget(fireballAim.x + step[0], fireballAim.y + step[1])
+      }
+      return
+    }
     if (npcMenuOpen) {
       if (k === 'Escape') { ev.preventDefault(); closeNpcMenu() }
       else if (k === 'Tab') {

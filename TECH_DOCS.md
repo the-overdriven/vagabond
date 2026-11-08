@@ -2294,22 +2294,22 @@ rolls its contents **once during accepted world generation** and persists its
 remaining HP and pre-rolled contents per dungeon floor. Empty crates yield
 nothing. The small crate loot table is editable in
 `content/world_generation.json` → `dungeons.dwarvenRuins.crates`: the defaults
-provide a **16% total drop chance** (previously 10%), with one result per crate:
+provide a **16.9% total drop chance**, with one result per crate:
 
 | Result | Chance per crate |
 |---|---:|
-| Nothing | 84% |
+| Nothing | 83.1% |
 | Life Potion | 6% |
 | Scroll of Invisibility | 4% |
 | Potion of Stone Skin | 1.8% |
 | Potion of Berserk | 1.8% |
 | Scroll of Fear | 1.2% |
 | Scroll of Chaos | 0.9% |
+| Scroll of Fireball | 0.9% |
 | Scroll of Death Shield | 0.3% |
 
-The five tactical consumables together account for 6% of crates. The original
-Life Potion (6%) and Invisibility (4%) chances are retained; the empty share
-falls from 90% to 84%. Death Shield remains the rarest. Drops appear on the broken crate tile, are picked up
+The six tactical consumables together account for 6.9% of crates.
+Life Potion and Invisibility account for 6% and 4%; the empty share is 83.1%. Death Shield remains the rarest. Drops appear on the broken crate tile, are picked up
 normally, and cannot be rerolled through save/load or replay. The JSON loot
 entries use **relative weights**: `P(result) = weight / sum(all weights)`. Supported
 kinds are `null` (nothing), `potion`, `speedpotion`, `scrollOfInvisibility`, and all
@@ -6464,7 +6464,7 @@ included. These supplies are ordinary ground items, not refillable containers.
 
 Each ordinary **Library** room in the Ruins has a **30%** chance to contain
 one loose rare scroll on its floor, chosen with equal weight from Fear, Chaos,
-and Death Shield. Rooms get independent rolls; a successful room receives at
+Fireball and Death Shield. Rooms get independent rolls; a successful room receives at
 most one additional scroll on an accessible unoccupied floor tile. Both chance
 and item kinds are configurable in `dwarvenRuins.loot.libraryScrolls`.
 
@@ -6646,7 +6646,7 @@ and scrolls cannot occupy the same tile on the same level/map. Surface loose
 supplies sample legal, unoccupied ground-item positions without replacement,
 preserving configured counts while enough valid positions exist. Cave loot
 already reserves each selected position. Runtime drops are unaffected.
-Loose scrolls of Identification, Invisibility, Fear, Chaos and Homecoming are
+Loose scrolls of Identification, Invisibility, Fear, Chaos, Fireball and Homecoming are
 collected when the player steps onto them, just like other loose consumables;
 their inventory stacks and save/replay behavior follow the ordinary item rules.
 The surface starts with up to four remote tier-3 chests guarded by tier-3+
@@ -6730,7 +6730,8 @@ the last threshold. The table uses the configured percentages directly.
 
 | Result | Cumulative upper threshold (rounded) | Chance (rounded) |
 |---|---:|---:|
-| Gold | 32 | 32% |
+| Gold | 30.5 | 30.5% |
+| Scroll of Fireball | 32 | 1.5% |
 | Arrows (10–50) | 40 | 8% |
 | Short Bow | 40.5 | 0.5% |
 | Chitin (1–5) | 41 | 0.5% |
@@ -6746,7 +6747,7 @@ the last threshold. The table uses the configured percentages directly.
 | Scroll of Identification (`elseResult`) | 100 | 5% |
 
 For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin,
-and 96 reaches the Identification-scroll fallback. All new supplies use their
+31 gives Fireball, and 96 reaches the Identification-scroll fallback. All new supplies use their
 catalog item IDs in chest outcomes, ground pickups, inventory actions and replay.
 
 The **100-point roll chooses the result category**. If the result is gear, a
@@ -6880,7 +6881,7 @@ after the 25% bonus is rounded, for 19 turns.
 
 ## Tactical consumables
 
-All five items are stackable Supplies in `content/items.json`. Reading or drinking
+All six items are stackable Supplies in `content/items.json`. Reading or drinking
 uses one ordinary turn, with the same swimming restrictions as existing supplies.
 Each has a unique transparent image shared between inventory and ground rendering,
 a colored ASCII glyph (`?` for scrolls, `!` for potions), and an inspection action
@@ -6891,6 +6892,7 @@ that describes its rules without consuming it.
 | Scroll of Fear | Tier 1–3 monsters within 5 tiles flee | 10 turns | 80g / 40g |
 | Scroll of Death Shield | One fatal damage event leaves the player at 1 HP | Until spent | 200g / 100g |
 | Scroll of Chaos | Relocates the player and monsters within 8 tiles | Immediate | 120g / 60g |
+| Scroll of Fireball | 21-tile, wall-clipped blast; 10–50 damage per creature, including the player | Immediate | 250g / 125g |
 | Potion of Stone Skin | `+6 + floor(DEF / 6)` DEF; −3 GRACE | 15 turns | 60g / 30g |
 | Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
 
@@ -6979,19 +6981,70 @@ uses permanent stats, excluding both potions and their GRACE penalties.
 
 Ordinary chests use the percentages above; guaranteed-artifact chests keep their
 artifact rule. On the surface, **75%** of the nine loose Invisibility-scroll
-slots instead become Identification, Fear or Chaos scrolls with respective
-relative weights **3:2:1**; 25% remain Invisibility. Expected Invisibility
+slots instead become Identification, Fear, Chaos or Fireball scrolls with respective
+relative weights **3:2:1:1**; 25% remain Invisibility. Expected Invisibility
 scrolls from these slots fall from **5.4 to 2.25 per world**. The separate
 loose Speed-Potion slots keep their **40%** chance to become a tactical
-consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5).
-Total loose-item counts, Life Potions, chest/crate loot and merchant stock are
-unchanged. Both replacement tables are editable in `content/loot_tables.json`.
+consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5, Fireball 1.5).
+Total loose-item counts and Life Potions are unchanged. Both replacement tables are editable in `content/loot_tables.json`.
 
 Player potion timers, exact sampled bonuses and ready shield charge, plus each
 monster's remaining fear timer, initialize on new actors, persist in current saves
 and replay snapshots, and restore without rerolling effects. Save version 55 rejects
 older saves/replays; no conversion is provided. All item RNG and state changes run
 synchronously before animations.
+
+## Scroll of Fireball
+
+Reading opens targeting without consuming a scroll, turn, or RNG. Choose a visible,
+unobstructed tile within **6 tiles Chebyshev distance**. On desktop, hover to
+preview and click once to cast; Escape cancels. No Cast/Cancel panel is shown.
+Arrow keys/WASD move the aim and Enter casts. On touch devices, tap to preview,
+then press Cast or tap the same tile again. Cancel/Escape costs nothing. The amber range overlay and stronger
+blast overlay work in tile and ASCII modes; the player's tile turns red when
+inside the blast. Targeting closes on save restoration and is never persisted.
+
+The footprint is **5×5 with the four corners removed (21 tiles before clipping)**.
+Relative offsets run from −2 to +2 on each axis, centered on the selected tile.
+The projectile lands at that exact center.
+Walls, opaque terrain and shut opaque doors block both the shot and straight
+blast rays; two touching opaque corners also block diagonal fire. Bars pass fire.
+The blast does not bend around walls. Other creatures do not intercept the shot.
+Only visible cells are previewed; creatures in unseen blast cells still take damage.
+
+Each living monster in the footprint and the player independently roll an integer
+from **10 through 50**, uniformly (mean **30**), without armor/DEF reduction,
+shield blocks, accuracy checks, critical hits, or weapon-skill training. Magical
+immunity and one-use Death Shields retain their effects; ethereal bodies are not
+immune to magical fire. Positive damage wakes and alerts monsters, breaks fear,
+and reveals invisible victims. Ordinary kill XP, quest credit and loot apply;
+distant drops stay at the victim's tile. Noncombat NPCs and terrain are unaffected.
+Casting from Temple sanctuary is prohibited, as with bow attacks. Swimming
+restrictions and Berserk's 25% adjacent-enemy interruption apply at commitment;
+an interrupted cast attacks instead without spending the scroll.
+
+One scroll is consumed on a valid cast. Damage resolves in the casting turn,
+then surviving monsters take their normal turn. All damage rolls are captured
+before effects and kill rewards; self-inflicted lethal damage cannot be undone
+by leveling up from a simultaneous kill. A fiery projectile travels for 280 ms,
+then a 780 ms effect flashes at the center and expands into a turbulent, hollow
+ring of fire with fading embers. The effect is clipped to affected visible cells;
+it never paints fire through walls or onto excluded corners. Damage/death
+visuals wait for impact and input remains blocked through presentation. Animation
+frames never consume gameplay RNG or resolve damage. Replay records the scroll's
+identity and target coordinates, reusing the same action and seeded damage rolls.
+Changing the blast footprint changes replay outcomes; saves and replay initial
+states require the current save schema. No older-save conversion is provided.
+No new persistent combat status is introduced; inventory, ground drops and stock
+use ordinary item save/replay serialization.
+
+The merchant stocks **three at 250g each**, selling value **125g**. Empty stock
+persists through save/load; selling back replenishes it normally. Fireball matches
+Chaos's loot frequency: **1.5% per ordinary chest**, **0.9% per dwarven crate**,
+and equal relative weights in surface supply variants and Ruins Library rooms.
+The chest probability comes from gold (30.5%), keeping Identification at 5%; crate
+probability comes from empty crates (83.1%). Adding it to weighted surface pools
+shares those existing supply slots rather than increasing their count.
 
 ## Scroll of Identification
 

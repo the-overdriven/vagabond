@@ -1104,6 +1104,8 @@ function loadGameFromObject(data, opts = {}) {
   stopAttackAnimation()
   clearEnemyAnims()
   projectileAnims = []
+  cancelFireballTargeting()
+  fireballAnims = []
   stopDeathTransition()
   snapCameraToPlayer()
   reconcileSwimming()

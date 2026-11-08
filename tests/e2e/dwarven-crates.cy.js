@@ -143,7 +143,7 @@ describe('Dwarven crate destruction, loot and persistence', () => {
   it('uses the configured chances for empty crates and every consumable, with one generation roll per crate', () => {
     cy.window().then(win => win.eval('(' + crateLootDistributionChecks.toString() + ')()'))
   })
-  it('preserves all five new crate drops through intact/drop saves, pickup and deterministic replay', () => {
+  it('preserves all six tactical crate drops through intact/drop saves, pickup and deterministic replay', () => {
     cy.window().then(win => win.eval('(' + crateConsumablesPersistenceChecks.toString() + ')()'))
   })
   for (const tileGraphics of [true, false]) {

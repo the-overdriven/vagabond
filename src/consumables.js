@@ -1,7 +1,7 @@
 'use strict'
 
 const TACTICAL_CONSUMABLE_KINDS = Object.freeze([
-  'scrollOfFear', 'scrollOfDeathShield', 'scrollOfChaos', 'stoneSkinPotion', 'berserkPotion'
+  'scrollOfFear', 'scrollOfDeathShield', 'scrollOfChaos', 'scrollOfFireball', 'stoneSkinPotion', 'berserkPotion'
 ])
 
 function potionGracePenalty() {

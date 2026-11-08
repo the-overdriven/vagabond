@@ -52,6 +52,11 @@
       "count": 9,
       "merchantPrice": 70
     },
+    "fireballScroll": {
+      "kind": "scrollOfFireball",
+      "count": 3,
+      "merchantPrice": 250
+    },
     "invisibilityScroll": {
       "kind": "scrollOfInvisibility",
       "count": 3,

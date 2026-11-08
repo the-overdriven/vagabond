@@ -35,12 +35,16 @@
     "scale": 100,
     "table": [
       {
-        "upTo": 32,
+        "upTo": 30.5,
         "result": "gold",
         "goldMin": 5,
         "goldMax": 15,
         "goldPerTier": true,
         "mfGoldMultiplier": 2
+      },
+      {
+        "upTo": 32,
+        "result": "scrollOfFireball"
       },
       {
         "upTo": 40,
@@ -127,18 +131,23 @@
         "weight": 1.5
       },
       {
+        "kind":"scrollOfFireball",
+        "weight":1.5
+      },
+      {
         "kind": "scrollOfDeathShield",
         "weight": 0.5
       }
     ]
   },
   "looseScrollVariants": {
-    "_note": "Each loose surface Invisibility scroll slot becomes an Identification, Fear, or Chaos scroll with this chance. Total scroll count is unchanged.",
+    "_note": "Each loose surface Invisibility scroll slot becomes an Identification, Fear, Chaos, or Fireball scroll with this chance. Total scroll count is unchanged.",
     "chance": 0.75,
     "table": [
       {"kind":"idscroll","weight":3},
       {"kind":"scrollOfFear","weight":2},
-      {"kind":"scrollOfChaos","weight":1}
+      {"kind":"scrollOfChaos","weight":1},
+      {"kind":"scrollOfFireball","weight":1}
     ]
   }
 }

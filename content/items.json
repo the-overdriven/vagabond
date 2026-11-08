@@ -445,6 +445,31 @@
     },
     "description": "Teleports you and monsters within 8 tiles to distinct safe, reachable tiles within 8 tiles of each starting position. Stays on this level."
   },
+  "scrollOfFireball": {
+    "name": "Scroll of Fireball",
+    "icon": "img/icons/scroll-of-fireball.svg",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 125,
+    "baseValue": 250,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "scrollOfFireball"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect effect"
+      }
+    ],
+    "effect": {
+      "range": 6,
+      "minDamage": 10,
+      "maxDamage": 50
+    },
+    "description": "Aim within 6 visible tiles. A 5×5 blast without corners deals 10–50 damage per creature, including you, ignoring armor. Walls block fire. Preview then Cast; Cancel costs nothing."
+  },
   "stoneSkinPotion": {
     "name": "Potion of Stone Skin",
     "icon": "img/tiles/potion-of-stone-skin.png",
