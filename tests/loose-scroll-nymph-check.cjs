@@ -120,5 +120,88 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert.equal(run('player.inventory.find(it=>it.kind==="meat")?.count'),3,
     'foraging picks up all three cuts in one action')
   assert.equal(run('groundItems.some(g=>g.item?.kind==="meat")'),false)
-  console.log('PASS nymph/herb loot, meat drop stacks, and surface scroll composition')
+  const materialDrops = {
+  Snake:['shedSkin',0.50,1],Scarab:['chitin',0.40,1],'Giant Bug':['chitin',0.50,1],
+  Witherpod:['blightedRoot',0.50,1],Cobra:['venomGland',0.55,1],
+  Scorpion:['venomGland',0.60,1],Dreadling:['blightedRoot',0.45,1],
+  'Giant Spider':['spiderSilk',0.70,1],NULK:['rareTrophy',1,1],
+  SKELD:['rareTrophy',1,1],DRUSK:['rareTrophy',1,1],GAUR:['rareTrophy',1,1],
+  ASHFANG:['rareTrophy',1,1],MIREHOWL:['rareTrophy',1,1],NHALUUN:['rareTrophy',1,1],
+  Vrakeber:['amethyst',0.40,1],Bellroach:['chitin',0.65,1],
+  Tholosum:['chitin',0.75,2],Xibal:['venomGland',0.60,1]
+}
+  assert.equal(Object.keys(materialDrops).length,19,'exactly nineteen selected non-meat species')
+  const sellValues={shedSkin:4,chitin:5,blightedRoot:6,venomGland:10,spiderSilk:12,rareTrophy:60,amethyst:16}
+  for (const [kind,value] of Object.entries(sellValues)) {
+    assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.sellValue`),value,`${kind} trade value`)
+    assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.stackable`),true,`${kind} is stackable`)
+    if (kind!=='amethyst') {
+      assert.equal(run(`itemDefinition(${JSON.stringify(kind)})?.icon`),null,`${kind} has no artwork`)
+      assert.equal(run(`itemIconHTML({kind:${JSON.stringify(kind)}})`),'',`${kind} never loads a missing icon`)
+    }
+  }
+  for (const [species,[kind,probability,count]] of Object.entries(materialDrops)) {
+    const template=templates.find(t=>t.name===species)
+    assert(template && !template.humanoid,`${species} is non-humanoid`)
+    assert.deepEqual(template.lootTable,{chance:probability,items:[{kind,weight:1,count}]},
+      `${species} has the exact independent material drop chance and quantity`)
+    run(`player.inventory=[];chance=p=>p===${probability};lootFromEnemy({name:${JSON.stringify(species)},
+      baseName:${JSON.stringify(species)},tier:${template.tier},equipment:null,humanoid:false})`)
+    assert.deepEqual(JSON.parse(JSON.stringify(run('player.inventory.map(i=>({kind:i.kind,count:i.count}))'))),
+      [{kind,count}],`${species} awards the whole material stack`)
+    run(`player.inventory=[];chance=()=>false;lootFromEnemy({name:${JSON.stringify(species)},
+      baseName:${JSON.stringify(species)},tier:${template.tier},equipment:null,humanoid:false})`)
+    assert.equal(run('player.inventory.length'),0,`${species} does not drop when the roll fails`)
+    if (probability<1) {
+      // Use the actual chance() and controlled RNG values at the precise boundary.
+      run(`player.inventory=[];chance=p=>rng()<p;rng=()=>${probability-0.000001};
+        lootFromEnemy({name:${JSON.stringify(species)},baseName:${JSON.stringify(species)},
+          tier:${template.tier},equipment:null,humanoid:false})`)
+      assert.equal(run(`player.inventory.some(i=>i.kind===${JSON.stringify(kind)})`),true,
+        `${species} succeeds just below its chance threshold`)
+      run(`player.inventory=[];rng=()=>${probability};
+        lootFromEnemy({name:${JSON.stringify(species)},baseName:${JSON.stringify(species)},
+          tier:${template.tier},equipment:null,humanoid:false})`)
+      assert.equal(run(`player.inventory.some(i=>i.kind===${JSON.stringify(kind)})`),false,
+        `${species} fails at its exact chance threshold`)
+    }
+  }
+  // Successful rolls follow game RNG, including after save/load, without new state.
+  const repeat=()=>JSON.parse(JSON.stringify(run(`(()=>{
+    chance=p=>rng()<p;let results=[];rngState=859413
+    for (const name of ['Snake','Scarab','Giant Spider','Tholosum','NULK','Vrakeber']) {
+      player.inventory=[]
+      const t=ENEMY_TEMPLATE_BY_NAME[name]
+      lootFromEnemy({...t,baseName:name,equipment:null})
+      results.push({name,inventory:player.inventory.map(i=>[i.kind,i.count])})
+    }
+    return {results,rngState}
+  })()`)))
+  assert.deepEqual(repeat(),repeat(),'identical seeds reproduce identical material drops')
+  run(`player.inventory=[];groundItems=[];chance=p=>p===0.75;
+    const t=ENEMY_TEMPLATE_BY_NAME.Tholosum
+    const e={...t,baseName:'Tholosum',x:player.x,y:player.y,
+      level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave,equipment:null}
+    lootFromEnemy(e,true);lootFromEnemy(e,true)`)
+  assert.equal(run('groundItems.filter(g=>g.item?.kind==="chitin").length'),1,
+    'multiple two-chitin drops combine into one ground stack')
+  assert.equal(run('groundItems[0].item.count'),4,'two Tholosums yield four chitin')
+  run('const materialSave=buildSaveObject();loadGameFromObject(materialSave,{isReplayInit:true})')
+  assert.equal(run('groundItems.find(g=>g.item?.kind==="chitin")?.item.count'),4,
+    'material stack survives save/load and replay initialization')
+  run('lootSkeletonOrForage()')
+  assert.equal(run('player.inventory.find(i=>i.kind==="chitin")?.count'),4,
+    'ground material is recovered as one inventory stack')
+  assert.equal(run('groundItems.some(g=>g.item?.kind==="chitin")'),false)
+  assert.equal(templates.find(t=>t.name==='Fungus').lootTable,undefined,
+    'Fungus retains its dedicated mushroom drop with no alternate loot table')
+  run(`player.inventory=[];chance=()=>false;rng=()=>0;
+    lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME.Fungus,baseName:'Fungus',equipment:null})`)
+  assert.equal(run('player.inventory.find(i=>i.kind==="mushroom")?.count'),1,
+    'Fungus still guarantees mushrooms even with every loot-table chance failing')
+  assert.deepEqual(templates.find(t=>t.name==='Nymph').lootTable,
+    {chance:0.2,items:[{kind:'herb',weight:1}]},'existing Nymph loot stays unchanged')
+  assert.equal(templates.find(t=>t.name==='Wyrdhag').lootTable.chance,0.2,
+    'existing Wyrdhag loot chance stays unchanged')
+  console.log('PASS nymph, Fungus, meat, alternative materials, seeded loot, stacking, save/replay, and scroll composition')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" role="img" aria-labelledby="title">
+<title id="title">Spider Silk</title>
+<defs>
+<g id="web" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 1.5 11.5 12 12 22.5M2 7l9.5 5L22 17M3 19l8.5-7L21 4M3.5 3.5l8 8.5L19 22M1 13l10.5-1L23 10"/>
+<path d="M12 3Q14.5 6.5 19.5 5.3Q18 8.5 21 10.2Q17.5 12 20 16Q16.5 16 17.8 20.3Q14 18 12 21Q10 17.5 5 17.4Q7 14 2.5 12.8Q7 11.5 3.5 7.8Q7.5 9 5 5Q9 7 12 3Z"/>
+<path d="M11.8 6.3Q14 9 17 7.2Q15.5 10 17.8 10.5Q15 12 16.9 14.6Q14 14.4 15.5 17Q13 15.5 11.9 17.8Q10 15 7.2 15.5Q8.5 13 6 12.5Q9 11 6.9 9.3Q9.5 10 8 8.3Q10.5 9 11.8 6.3Z"/>
+<path d="M11.7 9Q12.5 10.7 14.2 9.7Q13.5 11 14.8 11.5Q13 12.2 14 13.2Q12.5 13 13 14.1Q12 13.5 11.7 14.6Q10.5 13 9.5 13.6Q10 12.5 8.8 12.3Q10.5 11.7 9.3 10.8Q11 11 11.7 9Z"/>
+<path d="M3 19q-1 1-1 2M19.5 5.3q2-1 2-3M17.8 20.3l.2 2"/>
+</g>
+</defs>
+<use href="#web" stroke="#302e30" stroke-width="1.25"/>
+<use href="#web" stroke="#b9b2a0" stroke-width=".62"/>
+<path d="M12 3Q14.5 6.5 19.5 5.3M11.8 6.3Q14 9 17 7.2M5 17.4Q7 14 2.5 12.8M11.7 9l-.2 3" fill="none" stroke="#e1d8c3" stroke-width=".65" stroke-linecap="round"/>
+</svg>

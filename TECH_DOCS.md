@@ -5623,7 +5623,7 @@ Each definition contains a default `name`, inventory `category` (`supplies` or
 text, behavior parameters, carrying modifiers, and an inventory-icon override.
 The optional `droppable` flag defaults to true. The Brass Bell and Wheelbarrow
 set it to false; the same restriction can be applied to an individual item.
-Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon overrides may use either `.svg` or `.png` and may point to local `img/icons/` or `img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile (`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay consistent.
+An explicit `icon: null` suppresses the item image. Beast materials and meat use matching SVG files in `img/icons/` (for example, `shedSkin.svg` and `meat.svg`). Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon overrides may use either `.svg` or `.png` and may point to local `img/icons/` or `img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile (`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay consistent.
 
 Actions name approved JavaScript handlers; JSON contains no executable rules.
 Inventory buttons and replay item-use actions share that handler registry.
@@ -6282,10 +6282,34 @@ The following **32 non-humanoid species** always drop raw meat on death
 | **2** | Boar, Hogwyrm, Giant Crab, Serpent, Lion, White Tiger, Manticore |
 | **3** | Owlbear, Wyvern |
 
+Other non-humanoid species provide **one tradeable material per successful
+roll**, except Tholosum, which drops a
+stack of **two Chitin**. Each chance is independent of other loot and Magic
+Find; a failed roll provides no material. These are alternative drops, not
+extra meat:
+
+| Material | Species and drop chance | Sell value per item |
+| --- | --- | ---: |
+| Shed Skin | Snake **50%** | 4g |
+| Chitin | Scarab **40%**, Giant Bug **50%**, Bellroach **65%** (×1); Tholosum **75%** (×2) | 5g |
+| Blighted Root | Witherpod **50%**, Dreadling **45%** | 6g |
+| Venom Gland | Cobra **55%**, Scorpion **60%**, Xibal **60%** | 10g |
+| Spider Silk | Giant Spider **70%** | 12g |
+| Amethyst | Vrakeber **40%** | 16g |
+| Rare Trophy | NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN **100%** each | 60g |
+
+Materials are stackable and may be sold or dropped, but have no crafting or
+consumption effects. The six new materials have no dedicated artwork; the
+existing Amethyst item retains its current mineral appearance and interactions.
+Fungus continues to drop **1–3 Mushrooms** with certainty through its separate
+mushroom rule. Material drop configuration lives in
+`content/enemy_templates.json`, while item properties live in
+`content/items.json`.
+
 All other species, including unlisted non-humanoids, have **no meat drop**.
 Meat is a stackable supply worth **2 gold per cut** when sold. It cannot
-currently be eaten or cooked. Its icon is intentionally unset until artwork
-is supplied; it is represented by the standard supplies glyph in ASCII mode.
+currently be eaten or cooked. Its inventory icon is `img/icons/meat.svg`;
+it is represented by the standard supplies glyph in ASCII mode.
 The quantities, chance and chosen species are configured in
 `content/enemy_templates.json`; meat's item data is in `content/items.json`.
 

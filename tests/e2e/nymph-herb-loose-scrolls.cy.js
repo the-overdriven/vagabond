@@ -28,10 +28,10 @@ describe('Nymph herbs and surface scroll variety',()=>{
   Wyvern:3,Manticore:2,Spineback:1,Marsutal:1,Trogloraptor:1,Sifulian:1,Akravis:1
 }
             check(itemDefinition('meat')?.stackable===true &&
-              itemDefinition('meat').icon===null && !itemDefinition('meat').actions.length,
-              'meat exists as a stackable supply without an icon or food effect')
-            check(!itemIconKinds().includes('meat') && itemIconHTML({kind:'meat'})==='',
-              'missing meat artwork does not request a broken icon')
+              itemDefinition('meat').icon==='img/icons/meat.svg' && !itemDefinition('meat').actions.length,
+              'meat exists as a stackable supply with its icon and no food effect')
+            check(itemIconKinds().includes('meat') && itemIconHTML({kind:'meat'}).includes('img/icons/meat.svg'),
+              'meat resolves its supplied SVG icon')
             check(Object.keys(meatDrops).length===32,'all selected species are covered')
             chance=p=>p===1
             for(const [species,count] of Object.entries(meatDrops)) {
@@ -72,6 +72,70 @@ describe('Nymph herbs and surface scroll variety',()=>{
             lootFromEnemy({name:'Scarab',baseName:'Scarab',tier:1,humanoid:false})
             check(!player.inventory.some(it=>it.kind==='meat'),
               'unselected non-humanoids do not drop meat')
+            const materialDrops = {
+  Snake:['shedSkin',0.50,1],Scarab:['chitin',0.40,1],'Giant Bug':['chitin',0.50,1],
+  Witherpod:['blightedRoot',0.50,1],Cobra:['venomGland',0.55,1],
+  Scorpion:['venomGland',0.60,1],Dreadling:['blightedRoot',0.45,1],
+  'Giant Spider':['spiderSilk',0.70,1],NULK:['rareTrophy',1,1],
+  SKELD:['rareTrophy',1,1],DRUSK:['rareTrophy',1,1],GAUR:['rareTrophy',1,1],
+  ASHFANG:['rareTrophy',1,1],MIREHOWL:['rareTrophy',1,1],NHALUUN:['rareTrophy',1,1],
+  Vrakeber:['amethyst',0.40,1],Bellroach:['chitin',0.65,1],
+  Tholosum:['chitin',0.75,2],Xibal:['venomGland',0.60,1]
+}
+            check(Object.keys(materialDrops).length===19,'nineteen alternative-loot beasts are configured')
+            const values={shedSkin:4,chitin:5,blightedRoot:6,venomGland:10,
+              spiderSilk:12,rareTrophy:60,amethyst:16}
+            for(const [kind,value] of Object.entries(values)) {
+              const def=itemDefinition(kind)
+              check(def?.stackable===true && def.sellValue===value,
+                kind+' exists as a stackable tradeable item')
+              if(kind!=='amethyst')
+                check(def.icon==='img/icons/'+kind+'.svg' &&
+                  itemIconHTML({kind}).includes('img/icons/'+kind+'.svg'),
+                  kind+' resolves its supplied SVG icon')
+            }
+            for(const [species,[kind,probability,count]] of Object.entries(materialDrops)) {
+              const t=ENEMY_TEMPLATE_BY_NAME[species]
+              check(t && !t.humanoid && t.lootTable?.chance===probability &&
+                t.lootTable.items.length===1 && t.lootTable.items[0].kind===kind &&
+                t.lootTable.items[0].weight===1 && t.lootTable.items[0].count===count,
+                species+' has the exact material probability and quantity')
+              player.inventory=[];chance=p=>p===probability
+              lootFromEnemy({...t,baseName:species,equipment:null})
+              check(player.inventory.length===1 && player.inventory[0].kind===kind &&
+                player.inventory[0].count===count,species+' drops a complete material stack')
+              player.inventory=[];chance=()=>false
+              lootFromEnemy({...t,baseName:species,equipment:null})
+              check(player.inventory.length===0,species+' has no guaranteed drop if its roll fails')
+              if(probability<1) {
+                chance=p=>rng()<p;rng=()=>probability-0.000001
+                player.inventory=[];lootFromEnemy({...t,baseName:species,equipment:null})
+                check(player.inventory.some(i=>i.kind===kind),species+' succeeds below chance boundary')
+                rng=()=>probability
+                player.inventory=[];lootFromEnemy({...t,baseName:species,equipment:null})
+                check(!player.inventory.some(i=>i.kind===kind),species+' fails at chance boundary')
+              }
+            }
+            check(!ENEMY_TEMPLATE_BY_NAME.Fungus.lootTable,
+              'Fungus still uses guaranteed mushroom drops only')
+            chance=()=>false;rng=()=>0;player.inventory=[]
+            lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME.Fungus,baseName:'Fungus',equipment:null})
+            check(player.inventory.find(i=>i.kind==='mushroom')?.count===1,
+              'Fungus still guarantees mushrooms regardless of material loot rolls')
+            const tholosum=ENEMY_TEMPLATE_BY_NAME.Tholosum
+            chance=p=>p===0.75;player.inventory=[];groundItems=[]
+            const corpse={...tholosum,baseName:'Tholosum',x:player.x,y:player.y,
+              level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave,equipment:null}
+            lootFromEnemy(corpse,true);lootFromEnemy(corpse,true)
+            check(groundItems.filter(g=>g.item?.kind==='chitin').length===1 &&
+              groundItems[0].item.count===4,'two Tholosums yield one stack of four chitin')
+            const materialSave=buildSaveObject()
+            loadGameFromObject(materialSave,{isReplayInit:true})
+            check(groundItems.find(g=>g.item?.kind==='chitin')?.item.count===4,
+              'chitin ground stack survives save and replay initialization')
+            lootSkeletonOrForage()
+            check(player.inventory.some(i=>i.kind==='chitin' && i.count===4),
+              'the saved chitin stack can be collected in one action')
             check(LOOSE_SCROLL_VARIANTS.chance===0.75 &&
               LOOSE_CONSUMABLE_VARIANTS.chance===0.4,
               'surface scroll redistribution leaves speed-potion tuning unchanged')

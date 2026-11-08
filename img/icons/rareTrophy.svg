@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" role="img" aria-labelledby="title"><title id="title">Rare Trophy</title><g stroke="#241f23" stroke-width=".8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M6 3c2 6 2 11 0 18 8-2 15-9 14-18l-6 2Z" fill="#c1b18c"/>
+<path d="M20 3c1 9-6 16-14 18 6-5 10-10 9-16Z" fill="#83745e" stroke="none"/>
+<path d="M9 8q2 5-1 10" fill="none" stroke="#e4d6b4" stroke-width="1.1"/>
+<path d="m5 2 5 1 5 1 6-2-1 6-5 2-8-3Z" fill="#746044"/>
+<path d="m7 3 1 3 7 2 4-2 1-3" fill="none" stroke="#b49a63" stroke-width="1"/>
+<path d="m13 4 3 1-1 3-3-1Z" fill="#632d39"/>
+<path d="m16 12-3 1 1 2" fill="none" stroke="#514638" stroke-width=".8"/>
+</g></svg>
