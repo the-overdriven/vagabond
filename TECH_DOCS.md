@@ -427,8 +427,21 @@ Use the monster's maximum HP and persistent stats, including generated stat
 variance, prefixes and equipment, but not temporary combat effects such as
 Enrage, Charge, or Gang Power. GRACE falls back to the species template when
 an enemy instance does not store it. Round the combined stat-and-ability
-reward once, then multiply by 1.5 and round again for prefixed enemies.
-Player XP multipliers (including Human +20%) apply when XP is awarded.
+reward once. Prefixes have no extra XP multiplier beyond their effect on
+permanent stats and abilities. Player XP multipliers (including Human +20%)
+apply when XP is awarded.
+
+Each damaging player melee hit awards **3 additional XP** before player XP
+multipliers. This applies to ordinary and extra weapon strikes, including
+killing blows, but not misses, zero-damage strikes, or ranged attacks.
+To prevent repeated low-damage attacks or enemy regeneration from generating
+unlimited XP, each monster grants at most **floor(25% of its kill XP)** in
+melee-hit bonuses across the entire fight. The remaining allowance carries
+across saves and replay. Partial final awards respect the cap; the bonus does
+not reduce the monster's regular kill XP. Configuration lives alongside the
+monster XP weights in `content/monster_xp_weights.json`. Melee-heavy characters
+can thus reach level milestones sooner, but characters at the same level still
+have identical base max HP progression regardless of fighting style.
 
 XP is affected by the player's XP multiplier.
 

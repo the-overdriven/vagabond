@@ -2866,11 +2866,11 @@ more difficult:
     levelUpPopupTimer = setTimeout(clearLevelUpPopup, 2800)
   }
 
-  function gainXp(amount) {
+  function gainXp(amount, showLog = true) {
     amount = Math.round(amount * xpMultiplier())
     player.xp += amount
     player.totalXpEarned += Math.max(0, amount)
-    log(`You gain ${amount} XP.`, 'good')
+    if (showLog) log(`You gain ${amount} XP.`, 'good')
     const gains = {hp: 0, atk: 0, def: 0, spd: 0, grace: 0}
     let leveled = false
     while (player.xp >= xpToNext(player.lvl)) {
@@ -3085,6 +3085,8 @@ more difficult:
     initializeEnemySleep(enemy)
     initializeEnemyGearScale(enemy)
     enemy.gearBonuses = enemy.gearBonuses || null
+    enemy.meleeHitXpGranted = Number.isInteger(enemy.meleeHitXpGranted)
+      ? Math.max(0, enemy.meleeHitXpGranted) : 0
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.immunityUsed = enemy.immunityUsed === true
     enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
@@ -4113,6 +4115,20 @@ more difficult:
     return reward
   }
 
+  function awardMeleeHitXp(e, damage) {
+    if (damage <= 0) return
+    const cfg = MONSTER_XP_WEIGHTS.meleeHitBonus
+    // A capped per-enemy budget rewards close combat without allowing XP to
+    // be farmed indefinitely from regeneration or intentionally weak strikes.
+    const maxBonus = Math.floor(xpForEnemy(e) * cfg.maxEnemyRewardFraction)
+    const granted = e.meleeHitXpGranted
+    const award = Math.min(cfg.xpPerDamagingHit, Math.max(0, maxBonus - granted))
+    if (award <= 0) return
+    e.meleeHitXpGranted += award
+    // Melee hits can happen repeatedly in one fight: avoid one XP log per hit.
+    gainXp(award, false)
+  }
+
   function damageRoll(atk, def) {
     const mitigatedAtk = atk * 10 / (10 + Math.max(0, def))
     const lowerSpread = Math.max(1, mitigatedAtk * 0.30)
@@ -4378,6 +4394,7 @@ more difficult:
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
+    awardMeleeHitXp(e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
     if (dmg > 0) breakEnemyFear(e)
     absorbEnemyFatalHit(e)
