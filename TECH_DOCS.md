@@ -2921,8 +2921,10 @@ illuminate unobstructed tiles and creatures
 beyond the normal mine sight radius, regardless of how far the formation is
 from the player, provided each lit tile is in the player's line of sight and
 the light reaches it from its source. The formation itself need not be visible
-to illuminate a tile around a corner. Lit terrain is visible and explorable
-even outside ordinary FOV; solid walls and obstructed wall corners block the
+to illuminate a tile around a corner. Crystal-lit terrain can be visible outside
+ordinary FOV, but does not become explored until it enters the player's normal
+sight range. Neither minimap may reveal distant mineral locations. Solid walls
+and obstructed wall corners block the
 light. An opaque wall only receives crystal light when the visible wall face
 and the light source are on the same side, preventing colored light from
 showing through the opposite face. Diagonal light can pass an open corner
@@ -2943,8 +2945,9 @@ Within the normal **five-tile** mine sight circle, tiles three, four and five
 steps away receive **25%, 50% and 75%** darkness, respectively; the two nearest
 steps remain clear. The shading covers creatures as well as terrain but does
 not reduce visibility or monster targeting. Previously explored mine tiles
-outside current sight are **85%** dark, and crystals can illuminate and reveal
-tiles independently of the player's sight radius. These visual levels are
+outside current sight are **85%** dark, and crystals can illuminate
+tiles independently of the player's sight radius without marking them explored.
+These visual levels are
 configurable and do not affect turn resolution or replay. Crystal illumination
 **overrides the distance-based darkness** wherever it reaches: the crystal tile
 is fully relieved of the overlay, and the surrounding darkness returns smoothly
@@ -3124,6 +3127,8 @@ Every Dwarven Fort and Ruins floor receives at least **two alcohol barrels on
 open floor and two carved reliefs on the walls**. Abandoned Mines have neither
 barrels nor dwarven wall reliefs; their decorations are instead wooden passage
 supports and occasional wall mushrooms on cave walls beside walkable passages.
+Mushrooms do not appear on mineral-bearing walls, leaving embedded crystals and
+mining clues unobscured.
 All of these new props are tile-image-only and do not change wall blocking,
 walking, visibility or loot. They are drawn below creatures and items.
 
@@ -5644,7 +5649,7 @@ insertion. The listed base gear icons are preloaded for offline use. This change
 only presentation, not gear stats or loot odds.
 
 Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
-Supplies lists consumable food, herbs, mushrooms, potions, and scrolls,
+Supplies lists consumable food, herbs, mushrooms, potions, scrolls, and arrows,
 including potatoes. Other excludes equipment and supplies; All keeps its
 existing consumables-first ordering. Tabs only filter displayed inventory.
 In windows at most 720px wide, inventory, map, treasure map, trade,
@@ -5771,6 +5776,10 @@ Clicking/tapping a visible enemy with the bow equipped fires an arrow instead
 of auto-pathing toward the monster. Keyboard players can press **R** to aim at
 visible targets (repeated R cycles), **Enter** to fire, or **Escape** to cancel.
 Mouse hover changes from the red sword to a red arrow while the bow is equipped.
+The arrow fades to gray when the shot would be refused (such as no arrows,
+insufficient range, blocked line of fire, a concealed target, or a forbidden
+shooting state). The cursor reflects the same validity checks as firing and
+does not spend a turn or reveal hidden enemies.
 
 Each valid shot consumes **one arrow and one turn**, including misses, and
 alerts its target even if it misses. Arrows stack as ordinary inventory items;
@@ -7365,7 +7374,6 @@ Configuration in `content/enemy_config.json`:
   "sightRange": 5,
   "rearmDistance": 14,
   "fleeTurns": [8, 10],
-  "paceFloorFirst": 1.5,
   "paceMin": 0.35,
   "paceMax": 1.5,
   "slipMinDistance": 12,
@@ -7373,9 +7381,11 @@ Configuration in `content/enemy_config.json`:
 }
 ```
 
-Each turn adds `clamp(enemySpd / playerSpd, paceMin, paceMax)` to a fractional
-accumulator and takes its whole-number steps. Sighting one has a minimum pace of
-1.5 regardless of player speed. **Startled** temporarily raises effective enemy
+During the protected first sighting, the beast takes one outward step per turn;
+the final escape remains guaranteed even if the player corners it. During the
+second, catchable sighting, each turn adds
+`clamp(enemySpd / playerSpd, paceMin, paceMax)` to a fractional accumulator and
+takes its whole-number steps. **Startled** temporarily raises effective enemy
 SPD to at least 5 during either flight, including terrain modifiers; base template
 stats are unchanged. The bonus ends immediately on catch or escape and is shown
 with `Fleeing` and the Startled SPD bonus in the enemy tooltip. The internal
@@ -7398,8 +7408,12 @@ are cleared so the beast never slides across the map.
 
 If an enclosed component offers no valid tile, selection falls back to valid tiles
 outside that component. A boxed escape logs: "The enclosed <name> stampedes through
-you! You dodge aside, but it escapes!" It causes no damage, moves no player, and
-changes no terrain. If the entire map has no valid destination, the protected
+you! You dodge aside, but it escapes!" Every rare beast uses the same short,
+charge-paced animation across the player's tile, with a visible sideways dodge
+and a fade beyond the player in both ASCII and tile mode. The destination is
+resolved immediately, independent of animation timing; it causes no damage,
+changes no actual player position, and changes no terrain. If the entire map
+has no valid destination, the protected
 flight remains active and retries next turn. Relocation establishes the 14-tile
 separation and re-arms the next sighting immediately; simply lingering nearby never
 burns the next sighting.
@@ -7754,7 +7768,9 @@ buy price = explicit merchantPrice
             itemBaseValue(item)
 ```
 
-Selling a stackable item sells one unit at its per-item sell value.
+Selling a stackable item normally sells one unit at its per-item sell value.
+Holding Ctrl while clicking Sell sells the entire selected stack at the same
+per-unit price, in one transaction. This also works with Command on macOS.
 
 ---
 
@@ -8487,10 +8503,10 @@ An unexplored area on the selected floor remains fogged even if the same
 coordinates were explored on another floor. Only explicit zoom/pan controls
 change the shared map viewport while browsing.
 Discovered Dwarven Ruins lift platforms and Dwarven Mines haulage-cage endpoints
-have small bright-green, dark-outlined dots on both the nearby minimap and the
-full map (including previously explored floors). The dots identify shortcuts
+have small bright-green, dark-outlined squares on both the nearby minimap and the
+full map (including previously explored floors). The squares identify shortcuts
 whether locked or unlocked, but never reveal an undiscovered location. The
-intermediate mine rope shaft receives no dot. Markers derive from saved shortcut
+intermediate mine rope shaft receives no marker. Markers derive from saved shortcut
 endpoints and discovery grids, without additional game state or replay RNG.
 On the surface, a discovered sand tile that has been dug shows its darker
 excavated appearance on both minimaps and the full map, matching the main

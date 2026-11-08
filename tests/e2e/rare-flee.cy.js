@@ -83,12 +83,32 @@ describe('Rare monster sightings and flight', () => {
       map[e.y][e.x]='forest'
       for(const [dx,dy] of DIRS8) map[e.y+dy][e.x+dx]='wall'
       map[50][60]='forest'
+      replayAnimationsDisabled=false
       rareStartFlee(e,1,true); rareFlee(e,1)
       fleeAssert(!e.rareFleeTurns && fleeGap(e)>=RARE_FLEE.rearmDistance, 'boxed first sighting relocates')
       fleeAssert(!occupied.has(old) && occupied.has(keyXY(e.x,e.y)), 'occupancy follows slip')
       fleeAssert(e.homeX===e.x && e.homeY===e.y && enemyBiomes(ENEMY_TEMPLATE_BY_NAME.Vampire).includes(e.homeTileType), 'home reanchored in native biome')
       fleeAssert(e.animStart===undefined && e.hp===200 && player.hp===hp && !e.aware && !e.alarmed, 'no slide or combat')
       fleeAssert(document.getElementById('logpanel').textContent.includes('stampedes through you'), 'stampede message')
+      const stampede=rareStampedeAnims[0]
+      fleeAssert(stampede?.enemy===e && stampede.path.some(p=>p.x===player.x&&p.y===player.y) &&
+        stampede.path.at(-1).x===player.x-1,
+        'all rare beasts can charge through the player before fading out')
+      const oldVisual=drawEnemyVisual,oldTiles=USE_TILE_IMAGES
+      const modes=[]
+      try {
+        drawEnemyVisual=function(vx,vy,beast,...rest){
+          if(beast===e)modes.push(USE_TILE_IMAGES?'tiles':'ascii')
+          return oldVisual.call(this,vx,vy,beast,...rest)
+        }
+        USE_TILE_IMAGES=false;render(stampede.start+CHARGE_STEP_MS-10)
+        USE_TILE_IMAGES=true;render(stampede.start+CHARGE_STEP_MS+10)
+        fleeAssert(modes.includes('ascii')&&modes.includes('tiles'),
+          'the departing creature animates its glyph or tile according to mode')
+      } finally {
+        drawEnemyVisual=oldVisual;USE_TILE_IMAGES=oldTiles
+        clearEnemyAnims();replayAnimationsDisabled=true
+      }
       const home={x:e.homeX,y:e.homeY}; e.x++; map[e.y][e.x]='grass'
       occupied=new Set([keyXY(e.x,e.y)])
       player.x=20; player.y=20
@@ -125,6 +145,15 @@ describe('Rare monster sightings and flight', () => {
       rareStartFlee(e,5,true)
       rareFlee(e,5)
       fleeAssert(e.x===diagonal.x+1 && e.y===diagonal.y-1, 'diagonal approach produces the opposite diagonal bolt')
+
+      resetFleeArena()
+      e=makeFleeEnemy('ASHFANG',5)
+      const firstX=e.x
+      rareStartFlee(e,5,true)
+      rareFlee(e,5)
+      rareFlee(e,fleeGap(e))
+      fleeAssert(e.x===firstX+2 && e.rareSightings===1,
+        'protected first sighting takes one visible step per turn')
     })()`))
   })
 

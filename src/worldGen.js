@@ -8204,9 +8204,13 @@ function spawnNaturalDecorations(roll) {
     const level=chainZForDepth(i+2),floor=layer.kind==='dwarvenMines'?'cavefloor2':'marble'
     const wall=layer.kind==='dwarvenMines'?'cavewall':'dwarvenwall'
     const floors=[],walls=[]
+    const mineralWalls = layer.kind === 'dwarvenMines'
+      ? new Set((layer.mineExcavations || []).filter(t => t.mineral && !t.removed)
+        .map(t => keyXY(t.x, t.y))) : null
     for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++){
       if(layer.map[y][x]===floor) floors.push({x,y})
-      if(layer.map[y][x]===wall&&nearby(layer.map,x,y,[floor],1))walls.push({x,y})
+      if(layer.map[y][x]===wall&&nearby(layer.map,x,y,[floor],1)&&
+         !mineralWalls?.has(keyXY(x,y)))walls.push({x,y})
     }
     if(layer.kind==='dwarvenMines') {
       scatter(level,'wall-mushrooms',walls,cfg.mineWallMushroomsPerFloor,82+i*5,4)

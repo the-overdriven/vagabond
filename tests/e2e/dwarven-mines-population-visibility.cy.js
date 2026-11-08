@@ -110,6 +110,21 @@ describe('Mine-only encounters and darkness', () => {
         const distant=Mining.lightVisible(lightMap,2,10,normal)
         check(!normal.has('12,10')&&distant.has('12,10')&&distant.has('15,10'),
           'a distant crystal lights unobstructed terrain beyond normal sight radius')
+        const saved={map,seen:undergroundDiscovered,x:player.x,y:player.y}
+        try {
+          map=lightMap
+          player.x=2;player.y=10
+          undergroundDiscovered=Array.from({length:25},()=>Array(25).fill(false))
+          invalidateUndergroundFov()
+          const extended=currentUndergroundFov()
+          check(extended.has('12,10')&&!undergroundDiscovered[10][12] &&
+            undergroundDiscovered[10][7],
+            'crystal light stays visible without revealing distant map tiles')
+        } finally {
+          map=saved.map;undergroundDiscovered=saved.seen
+          player.x=saved.x;player.y=saved.y
+          invalidateUndergroundFov();rebuildMinimapBases()
+        }
         lightMap[10][8]='cavewall'
         const blocked=Mining.lightVisible(lightMap,2,10,normal)
         check(!blocked.has('12,10')&&blocked.has('12,8'),

@@ -176,7 +176,6 @@
     "sightRange": 5,
     "rearmDistance": 14,
     "fleeTurns": [8, 10],
-    "paceFloorFirst": 1.5,
     "paceMin": 0.35,
     "paceMax": 1.5,
     "slipMinDistance": 12,

@@ -168,6 +168,11 @@ describe('Decorative caves and deep threat rarity', () => {
               'abandoned mine floors contain neither barrels nor carved dwarven reliefs')
             check(props.some(p=>p.kind==='wall-mushrooms'),
               'mines retain natural wall mushrooms')
+            const mineralWalls=new Set((floor.mineExcavations||[]).filter(t=>t.mineral&&!t.removed)
+              .map(t=>keyXY(t.x,t.y)))
+            check(props.filter(p=>p.kind==='wall-mushrooms').every(p=>
+              !mineralWalls.has(keyXY(p.x,p.y))),
+              'wall mushrooms never overlap mineral-bearing mine walls')
             continue
           }
           check(props.filter(p=>p.kind==='alcohol-barrel').length>=decorCfg.dwarfBarrelsPerFloor,

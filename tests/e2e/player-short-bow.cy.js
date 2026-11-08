@@ -186,9 +186,23 @@ describe('Player Short Bow', () => {
           'just-shot target cannot lose interest even against much faster player')
         player.baseSpd=5;chance=()=>true
         for(let y=39;y<=41;y++)map[y][47]='grass'
-        setDesktopCanvasCursor(rat)
+        setDesktopCanvasCursor(pursuer)
         check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
-          'equipped bow uses the refreshed glowing arrow cursor')
+          'equipped bow uses the red arrow cursor for a legal shot')
+        setDesktopCanvasCursor(rat)
+        check(canvas.style.cursor.includes('not-allowed'),
+          'out-of-range targets show the disabled bow cursor')
+        const heldArrows=player.inventory
+        player.inventory=[]
+        setDesktopCanvasCursor(pursuer)
+        check(canvas.style.cursor.includes('not-allowed'),
+          'no ammunition disables the bow cursor')
+        player.inventory=heldArrows
+        map[40][41]='mountain'
+        setDesktopCanvasCursor(pursuer)
+        check(canvas.style.cursor.includes('not-allowed'),
+          'blocked projectile path disables the bow cursor')
+        map[40][41]='grass'
 
         chance=oldChance;damageRoll=oldDamage
         enemies=[];occupied=new Set()

@@ -392,7 +392,7 @@ async function runReplayAction(action) {
       if (Number.isInteger(action.fallbackIndex) && player.inventory[action.fallbackIndex]) idx = action.fallbackIndex
       if (idx < 0) idx = findReplayItemIndex(player.inventory, action.replayId, -1)
       if (idx < 0 || !player.inventory[idx]) return replayDesync(`Replay desynchronized: could not find sold item ${action.replayId || action.name || ''}.`)
-      sellItem(idx)
+      sellItem(idx, !!action.all)
       break
     }
     case 'fisherman':

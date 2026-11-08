@@ -190,6 +190,47 @@ describe('Non-gear item catalog', () => {
       expect(result).to.deep.equal({herbs: 2, fishName: 'Fresh Fish', inscriptions: ['First', 'Second'],
         homePrice: 70, homeSell: 50, gold: 30, homeCount: 8, potatoValue: 0, amberValue: 20, shellValue: 10})
     })
+    cy.window().then(win => win.eval(`(async () => {
+      const check = (ok, msg) => { if (!ok) throw Error(msg) }
+      const oldRecord = recordReplayAction
+      const oldInventory = player.inventory, oldGold = player.gold
+      const savedStock = merchantStock.map(it => ({...it}))
+      const recorded = []
+      try {
+        recordReplayAction = action => recorded.push(action)
+        player.inventory = []
+        addInventoryItem('arrows', {count:26})
+        check(itemDefinition('arrows').category === 'supplies' && isConsumableKind('arrows'),
+          'arrows appear in Supplies rather than Other')
+        player.gold = 0
+        toggleTrade(true)
+        const button = [...document.querySelectorAll('#tradeSellList .invitem')]
+          .find(row => row.querySelector('.nm')?.textContent.includes('Arrows'))?.querySelector('button')
+        check(!!button, 'arrows sell button is available')
+        button.dispatchEvent(new MouseEvent('click', {bubbles:true, ctrlKey:true}))
+        check(!player.inventory.some(it => it.kind === 'arrows') && player.gold === 26,
+          'Ctrl+Sell sells the full arrow stack for the per-unit value')
+        const action = recorded.at(-1)
+        check(action.type === 'sell' && action.all === true,
+          'bulk sale is identified in the replay action')
+        player.inventory = [createItem('arrows', {count:26})]
+        player.gold = 0
+        await runReplayAction(action)
+        check(!player.inventory.length && player.gold === 26,
+          'replaying Ctrl+Sell sells the same quantity')
+        player.inventory = [createItem('arrows', {count:3})]
+        player.gold = 0
+        sellItem(0)
+        check(player.inventory[0]?.count === 2 && player.gold === 1,
+          'ordinary Sell continues to sell one unit')
+      } finally {
+        recordReplayAction = oldRecord
+        player.inventory = oldInventory
+        player.gold = oldGold
+        merchantStock = savedStock
+        toggleTrade(false)
+      }
+    })()`))
   })
 
   for (const width of [1440, 390]) {

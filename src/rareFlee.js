@@ -38,7 +38,9 @@ function rareStartledBonus(e, ordinarySpeed = Math.max(1, e.spd + enemyTileEffec
 
 function rareFleePace(e) {
   const pace = Math.max(RARE_FLEE.paceMin, Math.min(RARE_FLEE.paceMax, enemySpd(e) / playerSpd()))
-  return e.rareSightings === 1 ? Math.max(pace, RARE_FLEE.paceFloorFirst) : pace
+  // The first escape is already protected: one visible step per turn is
+  // enough. Reserve fractional/speed-based bursts for the catchable chase.
+  return e.rareSightings === 1 ? 1 : pace
 }
 
 function rareStartFlee(e, dist, attacked = false) {
@@ -58,7 +60,7 @@ function rareStartFlee(e, dist, attacked = false) {
     e.farPath = null
   }
   log(e.rareSightings === 1
-    ? `Something huge breaks cover - ${e.name}! It senses you, and is gone.`
+    ? `Something huge breaks cover - ${/^[aeiou]/i.test(e.name) ? 'an' : 'a'} ${e.name}! It senses you, and is gone.`
     : `The ${e.name} again. It hesitates a moment too long, then bolts.`, 'good')
   return true
 }
@@ -133,7 +135,10 @@ function rareSlipAway(e, minDistance, stampede = false) {
     candidates = candidates.filter(p => distance(p) === nearest)
   }
   const spot = pick(candidates)
-  if (stampede || !reachable.length) log(`The enclosed ${e.name} stampedes through you! You dodge aside, but it escapes!`, 'good')
+  if (stampede || !reachable.length) {
+    log(`The enclosed ${e.name} stampedes through you! You dodge aside, but it escapes!`, 'good')
+    beginRareStampedeAnim(e, e.x, e.y)
+  }
   else log(`The ${e.name} slips away beyond your reach.`, 'good')
   occupied.delete(keyXY(e.x, e.y))
   e.x = spot.x

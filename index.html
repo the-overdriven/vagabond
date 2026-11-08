@@ -9607,6 +9607,7 @@ more difficult:
   let damageAnims = []
   let projectileAnims = []
   let playerProjectileDodges = []
+  let rareStampedeAnims = []
   let enemyAttackVisualEnd = 0
   let shooterVolleyTurn = -1
   let shooterVolleyStart = 0
@@ -9810,6 +9811,29 @@ more difficult:
     runAnimationLoop()
   }
 
+  // The rare beast's relocation is resolved immediately by rareSlipAway.
+  // The departing creature is drawn as a separate cosmetic charge so its
+  // new off-screen position never interpolates across the whole world.
+  function beginRareStampedeAnim(e, fromX, fromY) {
+    if (replayAnimationsDisabled || replaySimulationMode || currentZ !== 0) return
+    const path = projectilePathBetween(fromX, fromY, player.x, player.y)
+    if (path.length < 2) return
+    path.push({x:player.x + Math.sign(player.x - fromX),
+      y:player.y + Math.sign(player.y - fromY)})
+    // Keep even an unusually distant fallback escape under a second.
+    const stepMs = Math.min(CHARGE_STEP_MS, 700 / (path.length - 1))
+    const duration = (path.length - 1) * stepMs
+    const presentation = queueEnemyAttackPresentation(duration)
+    rareStampedeAnims.push({enemy:e, path, start:presentation.start, duration, stepMs})
+    // The player visibly sidesteps just before the beast crosses their tile.
+    // No gameplay displacement or damage is applied.
+    const dx = player.x - fromX, dy = player.y - fromY
+    const distance = Math.hypot(dx, dy) || 1
+    playerProjectileDodges.push({start:presentation.start + (path.length - 2) * stepMs - 60,
+      duration:PLAYER_DODGE_ANIM_MS, dx:-dy / distance, dy:dx / distance})
+    runAnimationLoop()
+  }
+
   function chargeVisualPosition(anim, now) {
     const elapsed = Math.max(0, now - anim.start)
     const step = Math.min(anim.steps - 1, Math.floor(elapsed / CHARGE_STEP_MS))
@@ -9874,6 +9898,7 @@ more difficult:
     enemyAttackVisualEnd = 0
     shooterVolleyTurn = -1
     playerProjectileDodges = []
+    rareStampedeAnims = []
     for (const e of enemies) {
       e.animStart = undefined
       e.attackStart = undefined
@@ -9899,7 +9924,7 @@ more difficult:
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
+    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -11280,6 +11305,31 @@ more difficult:
     for (const visibleEnemy of visibleEnemies) {
       if (enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
     }
+    // A cornered rare beast charges through the player's tile, then fades
+    // beyond it. Draw on top of the player and tree canopy in both modes.
+    for (let i = rareStampedeAnims.length - 1; i >= 0; i--) {
+      const anim = rareStampedeAnims[i]
+      if (now >= anim.start + anim.duration) {
+        rareStampedeAnims.splice(i, 1)
+        continue
+      }
+      if (now < anim.start || currentZ !== 0) continue
+      const elapsed = now - anim.start
+      const step = Math.min(anim.path.length - 2, Math.floor(elapsed / anim.stepMs))
+      const from = anim.path[step], to = anim.path[step + 1]
+      const t = Math.min(1, (elapsed - step * anim.stepMs) /
+        (anim.stepMs * CHARGE_STEP_MOVE_MS / CHARGE_STEP_MS))
+      const progress = 1 - Math.pow(1 - Math.max(0, t), 3)
+      const x = from.x + (to.x - from.x) * progress
+      const y = from.y + (to.y - from.y) * progress
+      const vx = Math.round((x - camX) * TILE_PX)
+      const vy = Math.round((y - camY) * TILE_PX)
+      if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
+      ctx.save()
+      ctx.globalAlpha = Math.min(1, (anim.start + anim.duration - now) / anim.stepMs)
+      drawEnemyVisual(vx, vy, anim.enemy, false)
+      ctx.restore()
+    }
     // Shade distant actors along with terrain, while allowing crystal halos
     // to remove the darkness smoothly wherever their light actually reaches.
     drawMineSightDarkness(undergroundVisible, baseMapX, baseMapY, renderCols, renderRows)
@@ -11689,6 +11739,27 @@ more difficult:
 
   const DESKTOP_ENEMY_CURSOR_IMAGE = 'img/cursors/red-sword.svg'
   const DESKTOP_BOW_CURSOR_IMAGE = 'img/cursors/red-arrow.svg?v=20261107-slim-nock'
+  let desktopDisabledBowCursor = null
+  const desktopBowCursorSource = new Image()
+  desktopBowCursorSource.onload = () => {
+    try {
+      const sprite = document.createElement('canvas')
+      sprite.width = desktopBowCursorSource.naturalWidth
+      sprite.height = desktopBowCursorSource.naturalHeight
+      const ctx = sprite.getContext('2d')
+      ctx.drawImage(desktopBowCursorSource, 0, 0)
+      const image = ctx.getImageData(0, 0, sprite.width, sprite.height)
+      for (let i = 0; i < image.data.length; i += 4) {
+        const grey = Math.round(0.299 * image.data[i] + 0.587 * image.data[i + 1] + 0.114 * image.data[i + 2])
+        image.data[i] = image.data[i + 1] = image.data[i + 2] = Math.min(215, 75 + Math.round(grey * 0.7))
+        image.data[i + 3] = Math.round(image.data[i + 3] * 0.75)
+      }
+      ctx.putImageData(image, 0, 0)
+      desktopDisabledBowCursor = sprite.toDataURL('image/png')
+    } catch (_) { desktopDisabledBowCursor = null }
+    if (hoveredEnemy) setDesktopCanvasCursor(hoveredEnemy)
+  }
+  desktopBowCursorSource.src = imageSrc(DESKTOP_BOW_CURSOR_IMAGE)
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1
@@ -11699,8 +11770,22 @@ more difficult:
       canvas.style.cursor = ''
       return
     }
-    canvas.style.cursor = e
-      ? `url("${imageSrc(equippedShortBow() ? DESKTOP_BOW_CURSOR_IMAGE : DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair` : ''
+    if (!e) { canvas.style.cursor = ''; return }
+    if (!equippedShortBow()) {
+      canvas.style.cursor = `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair`
+      return
+    }
+    const canShoot = !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen &&
+      !onlineRecordsBlockActions() && !deathTransition && !cameraAnimating && !attackAnim &&
+      !enemyAttackPresentationPending() && !playerInsideSanctuary() &&
+      (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) &&
+      player.inventory.some(item => item.kind === 'arrows' && item.count > 0) &&
+      !!playerBowShotPath(e)
+    canvas.style.cursor = canShoot
+      ? `url("${imageSrc(DESKTOP_BOW_CURSOR_IMAGE)}") 5 4, crosshair`
+      : desktopDisabledBowCursor
+        ? `url("${desktopDisabledBowCursor}") 5 4, not-allowed`
+        : 'not-allowed'
   }
 
   function updateTooltip() {
@@ -12254,22 +12339,25 @@ more difficult:
       // The exposed summit has no roof or enclosing rooms: all battlements,
       // defenders and treasure are visible, even beyond dungeon sight radius.
       // Outside scenery still uses the surface's already-explored state.
-      let visible
+      let ordinaryVisible
       if (currentZ === 4 && tower) {
-        visible = new Set()
+        ordinaryVisible = new Set()
         for (let dy = 0; dy < tower.size; dy++) {
           for (let dx = 0; dx < tower.size; dx++) {
             const x = tower.x + dx, y = tower.y + dy
-            if (map[y]?.[x] && map[y][x] !== 'towervoid') visible.add(keyXY(x, y))
+            if (map[y]?.[x] && map[y][x] !== 'towervoid') ordinaryVisible.add(keyXY(x, y))
           }
         }
       } else {
-        visible = Mining.lightVisible(map, player.x, player.y,
-          UndergroundFov.compute(map, player.x, player.y, radius))
+        ordinaryVisible = UndergroundFov.compute(map, player.x, player.y, radius)
       }
+      // Distant crystal light may be visible down an open corridor, but it
+      // must not reveal unseen deposit locations on the map.
+      const visible = currentZ === 4 && tower ? ordinaryVisible :
+        Mining.lightVisible(map, player.x, player.y, ordinaryVisible)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
-      for (const pos of visible) {
+      for (const pos of ordinaryVisible) {
         const [x, y] = pos.split(',').map(Number)
         if (map[y]?.[x] !== 'towervoid') markDiscovered(x, y)
       }
@@ -12333,7 +12421,7 @@ more difficult:
   // discovered platforms on their own floors, never intermediate mine shafts.
   function drawDungeonShortcutMarkers(ctx, scale, ox, oy, zoom, viewKey, seen) {
     const marker = RENDER_STYLE.minimap.dungeonShortcut
-    const radius = Math.max(2.75, scale * 0.8) * zoom
+    const size = Math.max(6, Math.round(Math.max(2.75, scale * 0.8) * zoom * 2))
     ctx.save()
     ctx.fillStyle = marker.color
     ctx.strokeStyle = marker.outline
@@ -12345,12 +12433,11 @@ more difficult:
             !seen?.[endpoint.y]?.[endpoint.x]) continue
         const x = (endpoint.x - ox + 0.5) * scale * zoom
         const y = (endpoint.y - oy + 0.5) * scale * zoom
-        if (x + radius < 0 || y + radius < 0 ||
-            x - radius >= ctx.canvas.width || y - radius >= ctx.canvas.height) continue
-        ctx.beginPath()
-        ctx.arc(x, y, radius, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.stroke()
+        const left = Math.round(x - size / 2), top = Math.round(y - size / 2)
+        if (left + size < 0 || top + size < 0 ||
+            left >= ctx.canvas.width || top >= ctx.canvas.height) continue
+        ctx.fillRect(left, top, size, size)
+        ctx.strokeRect(left, top, size, size)
       }
     }
     ctx.restore()
@@ -13084,8 +13171,8 @@ more difficult:
       row.appendChild(nm)
       const btn = document.createElement('button')
       btn.textContent = 'Sell for ' + itemSellValue(it) + 'g'
-      btn.onclick = () => {
-        sellItem(idx)
+      btn.onclick = (event) => {
+        sellItem(idx, event.ctrlKey || event.metaKey)
       }
       row.appendChild(btn)
       list.appendChild(row)
@@ -13127,28 +13214,31 @@ more difficult:
     renderInventory()
   }
 
-  function sellItem(idx) {
+  function sellItem(idx, all = false) {
     ensureReplayItemIds()
     const it = player.inventory[idx]
     if (!it) return
     const replayId = it.replayId
-    const value = itemSellValue(it)
-    if (value <= 0) return
+    const unitValue = itemSellValue(it)
+    if (unitValue <= 0) return
     const stackable = isStackableKind(it.kind)
+    const quantity = stackable && all ? Math.max(1, it.count || 1) : 1
+    const value = unitValue * quantity
     if (stackable) {
-      it.count = (it.count || 1) - 1
+      it.count = (it.count || 1) - quantity
       const existing = merchantStock.find(s => s.kind === it.kind && s.name === it.name)
       if (existing?.unlimitedStock) { /* infinite bundles are already stocked */ }
-      else if (existing) existing.count = (existing.count ?? 1) + 1
-      else merchantStock.push({kind: it.kind, name: it.name, count: 1})
+      else if (existing) existing.count = (existing.count ?? 1) + quantity
+      else merchantStock.push({kind: it.kind, name: it.name, count: quantity})
       if (it.count <= 0) player.inventory.splice(idx, 1)
     } else {
       player.inventory.splice(idx, 1)
       merchantStock.push(it)
     }
     player.gold += value
-    recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name})
-    log(`You sell the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
+    recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name, all:!!all})
+    log(quantity > 1 ? `You sell ${quantity} ${artifactDisplayName(it)} for ${value} gold.` :
+      `You sell the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
     updateHud()
     renderTrade()
     renderInventory()
