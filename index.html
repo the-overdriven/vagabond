@@ -2002,10 +2002,12 @@ more difficult:
     return randInt(6, 10)
   }
 
-  function rollModifierAmount(stat, mf = 0, sourceTier = 0) {
+  function rollModifierAmount(stat, mf = 0, sourceTier = 0, baseTier = 0) {
     const cfg = WORLD_GEN_CONFIG.lootRules
-    const exceptionalChance = cfg.exceptionalModifierChanceBase +
-      Math.max(0, sourceTier - 1) * cfg.exceptionalModifierChancePerMonsterTier
+    const exceptionalChance = (cfg.exceptionalModifierChanceBase +
+      Math.max(0, sourceTier - 1) * cfg.exceptionalModifierChancePerMonsterTier) *
+      (sourceTier >= 4 && baseTier >= 1 && baseTier <= 2
+        ? cfg.exceptionalLowTierHighMonsterMultiplier : 1)
     // MF never raises this exceptional gate. Larger values have smaller weights.
     if (chance(exceptionalChance)) {
       const [min, max] = stat === 'hp' ? [60, 100] : stat === 'xp' ? [16, 30] : [11, 20]
@@ -2018,7 +2020,7 @@ more difficult:
   function applyGearModifier(baseName, item, mod, mf = 0, sourceTier = 0) {
     item.mod = mod.stat
     item.name = mod.name + ' ' + baseName
-    const amount = rollModifierAmount(mod.stat, mf, sourceTier)
+    const amount = rollModifierAmount(mod.stat, mf, sourceTier, item.tier)
     if (mod.stat === 'xp') {
       item.xpBonus = amount
       // Preserve the existing independent pricing amount for XP equipment.
@@ -7193,6 +7195,27 @@ more difficult:
       lastLootHighlights = []
       if (!suppressLootLog) log(`You open a chest and find ${gold} gold!`, 'loot')
     },
+    arrows: (chestTier, mf, entry) => {
+      const count = randInt(entry.countMin, entry.countMax)
+      addInventoryItem('arrows', {count})
+      lastLootResult = `${count} arrows.`
+      lastLootHighlights = []
+      if (!suppressLootLog) log(`You open a chest and find ${count} arrows!`, 'loot')
+    },
+    shortBow: () => {
+      const item = makeShortBowItem()
+      lastLootResult = `${item.name}.`
+      lastLootHighlights = itemLogHighlight(item)
+      if (!suppressLootLog) lootLog(`You open a chest and find a ${item.name}.`, item)
+      if (!maybeAutoEquipWeapon(item, true)) player.inventory.push(item)
+    },
+    chitin: (chestTier, mf, entry) => {
+      const count = randInt(entry.countMin, entry.countMax)
+      addInventoryItem('chitin', {count})
+      lastLootResult = `${count} Chitin.`
+      lastLootHighlights = []
+      if (!suppressLootLog) log(`You open a chest and find ${count} Chitin!`, 'loot')
+    },
     gear: (chestTier, mf, entry) => {
       const itemTier = Math.min(chestTier, entry.gearMaxTier || chestTier)
       const pickRoll = rng()
@@ -9282,12 +9305,26 @@ more difficult:
   }
 
   function drawTreeCanopyOverlayAt(mx, my, alpha = 1) {
+    if (!USE_TILE_IMAGES) return false
     const visual = treeCanopyVisualAt(mx, my)
     if (!visual) return false
     const px = Math.round((mx - camX) * TILE_PX)
     const py = Math.round((my - camY) * TILE_PX)
     if (px < -TILE_PX || py < -TILE_PX || px > canvas.width || py > canvas.height) return false
     return drawImageVisual(px, py, visual, alpha)
+  }
+
+  // Pure presentation state: hovering a visible ground actor lets the cursor
+  // see through the canopy on that one tile, without revealing hidden foes.
+  function hoveredTreeEntityTileKey() {
+    if (!USE_TILE_IMAGES || currentZ !== 0 || lastMousePx === null || lastMousePy === null ||
+        window.matchMedia('(pointer: coarse)').matches) return null
+    const mx = Math.floor(camX + Math.floor(lastMousePx / TILE_PX))
+    const my = Math.floor(camY + Math.floor(lastMousePy / TILE_PX))
+    if (!treeCanopyVisualAt(mx, my) || !undergroundTileVisible(mx, my)) return null
+    if (player.x === mx && player.y === my) return keyXY(mx, my)
+    return enemies.some(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
+      enemyCanBeSeen(e) && !enemyHasAbility(e, 'fly')) ? keyXY(mx, my) : null
   }
 
   function drawNpcVisual(px, py, npc) {
@@ -10400,6 +10437,7 @@ more difficult:
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
+        const hasBeastTrack = currentZ === 0 && beastTracks.has(keyXY(mx, my))
         const tree = currentZ === 0 && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
         const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
@@ -10429,17 +10467,19 @@ more difficult:
                 ctx.fillRect(px, py, TILE_PX, TILE_PX)
                 drew = true
               }
-              drawImageVisual(px, py, overlayVisual)
+              if (!hasBeastTrack) drawImageVisual(px, py, overlayVisual)
             } else {
               const playerBehindAncientTree = tileKey === 'ancientForest' &&
                 Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
-              if (playerBehindAncientTree && resolveVisualImage(visual)) {
-                // Draw the tree only once, at half opacity in the canopy pass.
-                // Draw the same grass ground as on unoccupied forest tiles;
-                // using the ancient tile's dark fallback would leave a square.
-                const groundVisual = terrainVisual('grass', mx, my)
-                if (!groundVisual || !drawTerrainVisualStack(px, py, 'grass', mx, my, groundVisual, TILE.grass.bg)) {
-                  ctx.fillStyle = TILE.grass.bg
+              const trackBeneathTree = hasBeastTrack &&
+                ['forest', 'ancientForest', 'taiga'].includes(tileKey)
+              if ((playerBehindAncientTree || trackBeneathTree) && resolveVisualImage(visual)) {
+                // Paint the ground first; the tree returns in the foreground
+                // canopy pass above tracks and actors. Taiga uses snowy ground.
+                const groundKey = tileKey === 'taiga' ? 'snow' : 'grass'
+                const groundVisual = terrainVisual(groundKey, mx, my)
+                if (!groundVisual || !drawTerrainVisualStack(px, py, groundKey, mx, my, groundVisual, TILE[groundKey].bg)) {
+                  ctx.fillStyle = TILE[groundKey].bg
                   ctx.fillRect(px, py, TILE_PX, TILE_PX)
                 }
                 drew = true
@@ -10996,6 +11036,7 @@ more difficult:
     // afterward so the trees cannot cover them.
     {
       const canopyTiles = new Set()
+      const hoveredCanopyKey = hoveredTreeEntityTileKey()
       if (currentZ === 0) {
         // Only nearby occupied trees can overlap the viewport. Culling before
         // building keys avoids processing every world entity on each walking frame.
@@ -11016,12 +11057,14 @@ more difficult:
           if (g.kind === 'chest' && g.opened) continue
           canopyTiles.add(keyXY(g.x, g.y))
         }
+        for (const track of beastTracks.values()) if (inCanopyView(track.x, track.y))
+          canopyTiles.add(keyXY(track.x, track.y))
       }
       for (const key of canopyTiles) {
         const [mx, my] = key.split(',').map(Number)
         const playerBehindAncientTree = map[my]?.[mx] === 'ancientForest' &&
           Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
-        drawTreeCanopyOverlayAt(mx, my, playerBehindAncientTree ? 0.7 : 1)
+        drawTreeCanopyOverlayAt(mx, my, key === hoveredCanopyKey ? 0.32 : playerBehindAncientTree ? 0.7 : 1)
       }
     }
     for (const visibleEnemy of visibleEnemies) {
@@ -11254,6 +11297,7 @@ more difficult:
   }
 
   let lastMousePx = null, lastMousePy = null
+  let lastHoveredCanopyKey = null
   // Shared by both the desktop floating tooltip (mousemove) and the mobile
   // tap-to-inspect panel (touchstart) - builds the same info for whatever
   // occupies tile (mx,my), so both surfaces stay in sync automatically.
@@ -11459,8 +11503,10 @@ more difficult:
     const info = tileInspectInfo(mx, my)
     const e = info ? info.enemy : null
     setDesktopCanvasCursor(e)
-    if (e !== hoveredEnemy) {
+    const canopyKey = hoveredTreeEntityTileKey()
+    if (e !== hoveredEnemy || canopyKey !== lastHoveredCanopyKey) {
       hoveredEnemy = e
+      lastHoveredCanopyKey = canopyKey
       render() // redraw so the range overlay appears/updates/clears immediately
     }
     if (!info) {
@@ -11528,8 +11574,9 @@ more difficult:
     lastMousePy = null
     if (!desktopCombatTooltipEnemy || !renderDesktopCombatTooltip()) tooltip.style.display = 'none'
     if (!window.matchMedia('(pointer: coarse)').matches) canvas.style.cursor = ''
-    if (hoveredEnemy) {
+    if (hoveredEnemy || lastHoveredCanopyKey) {
       hoveredEnemy = null
+      lastHoveredCanopyKey = null
       render()
     }
     clearHoveredAutoPath()

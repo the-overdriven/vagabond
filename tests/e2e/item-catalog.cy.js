@@ -25,6 +25,41 @@ function beginNewGame(name = 'E2E Tester') {
 }
 
 describe('Non-gear item catalog', () => {
+  it('rolls arrows, rare bows and chitin in normal chests without altering other reward odds', () => {
+    beginNewGame('Chest Finds Tester')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const previous={rng,inventory:player.inventory,groundItems,autoEquip:maybeAutoEquipWeapon}
+      const rates={},table=CHEST_LOOT_TABLE.table
+      let lower=0
+      for(const entry of table){rates[entry.result]=entry.upTo-lower;lower=entry.upTo}
+      try {
+        check(rates.gold===32&&rates.arrows===8&&rates.shortBow===.5&&rates.chitin===.5,
+          'the new chest odds come only from gold')
+        check(rates.gear===22.6&&rates.potion>13.69&&rates.potion<13.71,
+          'existing gear and healing chances are unchanged')
+        maybeAutoEquipWeapon=()=>false
+        player.inventory=[]
+        for(const [roll,kind] of [[32,'arrows'],[40,'shortBow'],[40.5,'chitin']]){
+          rng=()=>roll/100
+          groundItems=[{kind:'chest',x:player.x,y:player.y,level:currentZ,tier:1}]
+          checkGroundAt(player.x,player.y)
+          check(player.inventory.some(item=>item.kind=== (kind==='shortBow'?'weapon':kind)),
+            'chest produces '+kind)
+          check(!groundItems.length,'chest consumed exactly once')
+        }
+        const arrows=player.inventory.find(item=>item.kind==='arrows')
+        const chitin=player.inventory.find(item=>item.kind==='chitin')
+        const bow=player.inventory.find(item=>item.base==='Short Bow')
+        check(arrows.count>=10&&arrows.count<=50,'arrow roll stays inside 10-50')
+        check(chitin.count>=1&&chitin.count<=5,'chitin roll stays inside 1-5')
+        check(bow?.tier===1&&bow?.rangedAtk===5,'normal chest bow is not an artifact')
+      } finally {
+        rng=previous.rng;player.inventory=previous.inventory;groundItems=previous.groundItems
+        maybeAutoEquipWeapon=previous.autoEquip
+      }
+    })()`))
+  })
   it('respects configured chest boundaries and forage chances on percentage scales', () => {
     beginNewGame('Percentage Loot Tester')
     cy.window().then(win => {

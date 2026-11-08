@@ -2019,6 +2019,7 @@
     "modifierChanceCap": 0.9,
     "exceptionalModifierChanceBase": 0.001,
     "exceptionalModifierChancePerMonsterTier": 0.0002,
+    "exceptionalLowTierHighMonsterMultiplier": 3,
     "modifierRollBonusPerMonsterTier": 1,
     "equipmentSameTierWeight": 2,
     "equipmentPreviousTierWeight": 1.5,

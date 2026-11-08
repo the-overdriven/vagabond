@@ -239,4 +239,55 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('layers forest tracks below trees and fades canopies only over hovered visible ground actors', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const original = {camX,camY,USE_TILE_IMAGES,lastMousePx,lastMousePy,
+        drawBeastTracks,drawTreeCanopyOverlayAt,rng}
+      const key = keyXY(40,40), events = []
+      try {
+        rng=()=>{throw new Error('hover or render consumed RNG')}
+        USE_TILE_IMAGES=true
+        map[40][40]='forest'; discovered[40][40]=true
+        beastTracks.set(key,{x:40,y:40,direction:0,species:'Wolf',age:0})
+        player.x=40;player.y=40
+        camX=targetCamX(player.x);camY=targetCamY(player.y)
+        lastMousePx=(40-camX+.5)*TILE_PX
+        lastMousePy=(40-camY+.5)*TILE_PX
+        trackAssert(hoveredTreeEntityTileKey()===key,'hovered player behind tree')
+        drawBeastTracks=()=>{events.push(['tracks']);original.drawBeastTracks()}
+        drawTreeCanopyOverlayAt=(x,y,alpha)=>{
+          if(x===40&&y===40)events.push(['canopy',alpha])
+          return true
+        }
+        renderScene(performance.now())
+        const tracksAt=events.findIndex(e=>e[0]==='tracks')
+        const canopyAt=events.findIndex(e=>e[0]==='canopy')
+        trackAssert(tracksAt>=0&&canopyAt>tracksAt,'forest canopy renders after tracks')
+        trackAssert(events[canopyAt][1]===.32,'hovered player canopy fades')
+        player.x=35;player.y=35
+        camX=targetCamX(player.x);camY=targetCamY(player.y)
+        lastMousePx=(40-camX+.5)*TILE_PX
+        lastMousePy=(40-camY+.5)*TILE_PX
+        const wolf=trackEnemy();enemies=[wolf]
+        trackAssert(hoveredTreeEntityTileKey()===key,'visible ground enemy behind tree')
+        wolf.wallAmbushHidden=true
+        trackAssert(hoveredTreeEntityTileKey()===null,'hidden enemy remains hidden')
+        wolf.wallAmbushHidden=false;wolf.abilities=['fly']
+        trackAssert(hoveredTreeEntityTileKey()===null,'flying enemy does not fade tree')
+        enemies=[]
+        events.length=0;lastMousePx=null;lastMousePy=null
+        renderScene(performance.now())
+        const normalCanopy=events.find(e=>e[0]==='canopy')
+        trackAssert(normalCanopy?.[1]===1,'tracked empty tree canopy stays opaque')
+        USE_TILE_IMAGES=false
+        trackAssert(hoveredTreeEntityTileKey()===null,'ASCII mode has no tree hover effect')
+      } finally {
+        camX=original.camX;camY=original.camY;USE_TILE_IMAGES=original.USE_TILE_IMAGES
+        lastMousePx=original.lastMousePx;lastMousePy=original.lastMousePy
+        drawBeastTracks=original.drawBeastTracks
+        drawTreeCanopyOverlayAt=original.drawTreeCanopyOverlayAt;rng=original.rng
+      }
+    })()`))
+  })
+
 })

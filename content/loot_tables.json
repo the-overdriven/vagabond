@@ -35,12 +35,28 @@
     "scale": 100,
     "table": [
       {
-        "upTo": 41,
+        "upTo": 32,
         "result": "gold",
         "goldMin": 5,
         "goldMax": 15,
         "goldPerTier": true,
         "mfGoldMultiplier": 2
+      },
+      {
+        "upTo": 40,
+        "result": "arrows",
+        "countMin": 10,
+        "countMax": 50
+      },
+      {
+        "upTo": 40.5,
+        "result": "shortBow"
+      },
+      {
+        "upTo": 41,
+        "result": "chitin",
+        "countMin": 1,
+        "countMax": 5
       },
       {
         "upTo": 63.6,

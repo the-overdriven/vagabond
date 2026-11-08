@@ -1273,7 +1273,10 @@ without a separate dark-ground image or the tile's dark fallback color. When
 the player is behind an Ancient Forest tree, its opaque terrain draw is skipped.
 The character is drawn at its normal opacity, then the foreground tree is drawn
 once at 70% opacity, letting the character show through it. Other trees retain
-their normal opacity.
+their normal opacity. Hovering the visible player or a grounded enemy beneath
+a forest, taiga or Ancient Forest tree temporarily reduces that canopy to
+**32% opacity**. The full canopy returns when the pointer leaves; hidden
+enemies stay hidden. Touch and ASCII modes do not have hover transparency.
 
 </details>
 
@@ -5926,6 +5929,13 @@ or for a tier-1 monster, this is **0.10%**. Each additional monster tier adds
 **0.02 percentage points**, reaching **0.18%** at tier 5. MF never increases this
 gate; it can still increase the chance to receive a prefix at all.
 
+A tier-1 or tier-2 base item from a tier-4 or tier-5 monster instead has a
+**triple exceptional gate**: **0.48%** for tier 4 or **0.54%** for tier 5.
+The modifier-availability roll (40% at MF 0), weighted base selection and
+exceptional value distribution remain unchanged. Tier-3–5 base items and
+lower-tier enemies keep their original gates. Only the resulting bonus—not
+the base item stats—can promote the item to tier 5.
+
 Exceptional values are picked with decreasing weights:
 
 ```text
@@ -5961,8 +5971,8 @@ of player MF. It also sets the exceptional chance:
 | 1 | +0 | 0.10% |
 | 2 | +1 | 0.12% |
 | 3 | +2 | 0.14% |
-| 4 | +3 | 0.16% |
-| 5 | +4 | 0.18% |
+| 4 | +3 | 0.16%, or 0.48% on tier-1/2 base gear |
+| 5 | +4 | 0.18%, or 0.54% on tier-1/2 base gear |
 
 For flat stats, boost is added to the 1–100 roll; HP and XP use its normalized
 value before their amount formulas. Worn humanoid equipment is rolled once
@@ -6007,12 +6017,12 @@ but require the exceptional branch (+11–20 flat stats, +60–100 HP, or +16–
 | 1 | 72.96% | 0.10% | 0.029184% | 3,427 |
 | 2 | 75.99% | 0.12% | 0.036475% | 2,742 |
 | 3 | 78.84% | 0.14% | 0.044150% | 2,265 |
-| 4 | 81.51% | 0.16% | 0.052166% | 1,917 |
-| 5 | 84.00% | 0.18% | 0.060480% | 1,653 |
+| 4 | 81.51% | 0.16% / 0.48% for tier-1/2 bases | 0.093502% | 1,069 |
+| 5 | 84.00% | 0.18% / 0.54% for tier-1/2 bases | 0.102191% | 979 |
 
 For a tier-5 humanoid at MF 0, a **Mighty +20 on any base item** has probability
-`84% × 40% × (1/6) × 0.18% × (1/55)`, or approximately **0.00018327%**:
-**one in 545,635 kills**. Requiring a specific base weapon reduces that chance
+approximately **0.0003097%**, or **one in 322,924 kills**, including the extra
+exceptional opportunities on low-tier bases. Requiring a specific base weapon reduces that chance
 further according to the weapon-type and weighted base-item selection rules.
 
 These are generation probabilities, not a reroll on death. An enemy's equipment
@@ -6571,6 +6581,9 @@ surface loot and special dungeon package chests are unaffected.
 Chest loot can include:
 
 - gold
+- Arrows (10–50)
+- Short Bow (rare)
+- Chitin (1–5, rare)
 - weapons
 - armor
 - shields
@@ -6604,7 +6617,10 @@ the last threshold. The table uses the configured percentages directly.
 
 | Result | Cumulative upper threshold (rounded) | Chance (rounded) |
 |---|---:|---:|
-| Gold | 41 | 41% |
+| Gold | 32 | 32% |
+| Arrows (10–50) | 40 | 8% |
+| Short Bow | 40.5 | 0.5% |
+| Chitin (1–5) | 41 | 0.5% |
 | Gear | 63.6 | 22.6% |
 | Life Potion | 77.3 | 13.7% |
 | Scroll of Invisibility | 80.5 | 3.2% |
@@ -6623,6 +6639,11 @@ catalog item IDs in chest outcomes, ground pickups, inventory actions and replay
 The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
 configured chances.
+Arrows and Chitin use seeded uniform stack counts and merge with existing
+inventory stacks. Short Bows are ordinary unenchanted weapons and use the normal
+auto-equip rule. The nine percentage points assigned to these three outcomes
+come entirely from gold; every other ordinary chest outcome retains its chance.
+Guaranteed artifact and royal treasury chests retain their separate rewards.
 
 Gear generated from a chest uses the chest tier (capped by the entry's
 `gearMaxTier`) and passes the player's Magic Find into the item generator.
@@ -7361,8 +7382,12 @@ follow the latest step, even on an obstacle detour, and does not change if the
 beast later retargets or dies. North points up; northeast rotates 45° clockwise;
 south rotates 180°. The approved transparent paw SVG and its PNG export live in
 `img/overlays/`. Tile mode rotates the PNG; ASCII mode uses a directional arrow.
-Tracks appear above terrain, below ground objects and actors, only on discovered
-surface tiles in the viewport. Tracks do not affect movement, collision or loot.
+Tracks appear above ground textures but **beneath forest, taiga and Ancient
+Forest tree canopies** in tile mode, as well as beneath ground objects and
+actors. The foreground canopy is drawn over tracked tiles even when nobody
+stands there. ASCII keeps its directional arrows visible. Only discovered
+surface tiles in the viewport show tracks. Tracks do not affect movement,
+collision or loot.
 
 Hover shows only `foot tracks?`, regardless of knowledge. Existing actor, NPC and
 ground-object tooltips take priority. Inspecting the tile uses the usual inspect

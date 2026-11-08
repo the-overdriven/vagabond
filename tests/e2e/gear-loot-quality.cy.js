@@ -58,6 +58,14 @@ describe('Exceptional prefixes and monster loot quality', () => {
           const gates=[];chance=p=>{gates.push(p);return false};rng=()=>0
           rollModifierAmount('atk',100,tier)
           check(Math.abs(gates[0]-(.001+(tier-1)*.0002))<1e-12,'rare gate tier '+tier)
+          gates.length=0
+          applyGearModifier('Dagger',{kind:'weapon',tier:1},{name:'Mighty',stat:'atk'},0,tier)
+          check(Math.abs(gates[0]-(.001+(tier-1)*.0002)*(tier>=4?3:1))<1e-12,
+            'tier 1-2 base exceptional boost on high-tier monsters '+tier)
+          gates.length=0
+          applyGearModifier('Sabre',{kind:'weapon',tier:3},{name:'Mighty',stat:'atk'},0,tier)
+          check(Math.abs(gates[0]-(.001+(tier-1)*.0002))<1e-12,
+            'tier 3+ base items retain their exceptional gate '+tier)
           check(rollOrdinaryModifierAmount('atk',0,tier)===1,'small quality boost preserves low rolls')
         }
       } finally {rng=oldRng;chance=oldChance;makeWeaponItem=oldMaker}
