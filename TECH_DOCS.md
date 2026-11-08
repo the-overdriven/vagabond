@@ -4826,13 +4826,21 @@ and can take a sideways step along a route to a farther tile. It does not step
 closer to the player to escape; a genuinely blocked route costs the response
 without moving. Neither reaction teleports or crosses forbidden terrain.
 
+Once a weaker bow target has actually retreated, it holds position behind
+terrain that blocks the player's shot while the Short Bow remains equipped,
+instead of wandering out from cover. Switching weapons ends the standoff,
+including for monsters on inactive floors. Reaching melee range or restoring a
+clear shot returns the target to ordinary combat behavior. Monsters not
+provoked into ranged retreat do not hold cover merely because a wall intervenes.
+This cover state is deterministic and saved/replayed with the enemy.
+
 Inside effective AGGRO, normal combat and pursuit still apply. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
 wounded fleeing and invisibility retain their own rules; an evasive dodge does
 not grant a second reaction step. A distant-shot reaction replaces that enemy's
 usual action rather than adding a free move, does not extend its AGGRO, and
 does not establish a persistent chase outside it. Only the shot target reacts
-this way, without additional RNG or save state; the same steps occur in replay.
+this way, without additional RNG; the same steps occur in replay.
 
 Movement occupancy is scoped to the currently active map (current z level), 
 including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
@@ -4963,6 +4971,11 @@ A successful dodge immediately before that roll changes only the log text,
 not the chance or normal turn behavior. Other losses of interest retain
 `The <enemy> loses interest in the chase.` The separate 30% outer-AGGRO
 check above remains unchanged and is evaluated first.
+
+The target of a valid player bow shot cannot lose interest through either
+disengagement roll on that shot's response turn, including when the arrow
+misses. Other enemies and subsequent non-shooting turns retain normal chase
+rules. This uses the existing recorded shot target and consumes no extra RNG.
 
 Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
 
@@ -5748,9 +5761,15 @@ the normal SPD-based miss chance, ordinary critical and armor-glancing rules,
 but no melee GRACE timing or extra attacks. Base melee ATK and equipment ATK
 bonuses do not increase the bow's fixed projectile damage. Enemy turns, XP,
 quests, and stealth reactions resolve with ordinary combat rules; projectile
-flight is visual-only and cannot affect the deterministic result.
+flight is visual-only and cannot affect the deterministic result. A lethal
+arrow starts the monster's falling-and-fading death effect at visual impact,
+after the projectile completes its flight. Tile mode animates the dying
+monster's pixel-art sprite; ASCII mode animates its glyph. The enemy is
+removed, XP awarded, and loot resolved on the shot's actual game turn;
+only the effect is delayed, and replay timing cannot change combat outcomes.
 
-Ordinary Short Bows come from the Merchant or arrow-shooting monsters (§54, §20),
+Ordinary Short Bows come from the Merchant, arrow-shooting monsters, or rare
+ordinary chests (§54, §20, §45),
 not the ordinary random weapon pool. **Short Bow artifacts** can be generated
 from the normal artifact pool, inheriting the bow's 1 melee ATK, two-handed
 restriction, **5 ranged ATK**, and **6-tile range**. Enchantments and curses
@@ -6487,7 +6506,12 @@ that is an intentional tier-5 quality classification, not a new base item.
 The worn item is already stored on the enemy as `e.equipment`.
 Combat glancing-hit messages and enemy tooltips show only the equipment's base
 name, so they do not reveal a modifier prefix before the item drops. The drop
-message and recovered item retain the full prefixed name.
+message and recovered item retain the full prefixed name. Every enemy item-drop
+message omits the indefinite article before the item name (for example,
+"The Skeleton dropped Mighty Crescent Blades" or "The Kobold dropped Short
+Bow"). Stackable rewards still display quantities when appropriate. This
+wording applies to regular gear, ammunition, special enemy drops, and
+biological materials without changing reward probabilities or inventory items.
 
 The item type is selected independently:
 

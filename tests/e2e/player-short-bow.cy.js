@@ -50,6 +50,10 @@ describe('Player Short Bow', () => {
         'foraging twice recovers both loot entries')
       check([...document.querySelectorAll('#logpanel')].some(el=>el.textContent.includes('4 arrows')),
         'the recovered ammunition appears in the message log')
+      const lootText=document.querySelector('#logpanel')?.textContent || ''
+      check(lootText.includes('The Kobold dropped Short Bow.') &&
+        !lootText.includes('The Kobold dropped a Short Bow.'),
+        'ordinary shooter drops use the same article-free item wording')
     })()`))
   })
 
@@ -156,6 +160,17 @@ describe('Player Short Bow', () => {
         check(!enemyOutmatchesPlayer(rat)&&shootEnemy(rat),'weak distant Rat can be shot at')
         check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
           'a miss still prompts one-tile retreat')
+        map[40][45]='mountain'
+        const ratX=rat.x,ratY=rat.y
+        check(rat.bowRetreatHold&&bowCoverBlocksPlayerShot(rat),
+          'ranged retreat remembers the weak target and cover blocks line of fire')
+        enemyTurn(null,null,null)
+        check(rat.x===ratX&&rat.y===ratY&&rat.bowRetreatHold,
+          'weak target stays behind cover while bow is equipped')
+        player.equip.weapon=null
+        enemyTurn(null,null,null)
+        check(!rat.bowRetreatHold,'unequipping bow ends the cover standoff')
+        player.equip.weapon=makeShortBowItem();map[40][45]='grass'
         enemies=[];occupied=new Set()
         const blockedRat=spawn('Giant Rat','response-blocked-rat')
         for(let y=39;y<=41;y++)map[y][47]='mountain'
@@ -163,6 +178,13 @@ describe('Player Short Bow', () => {
           'blocked retreat takes a legal sideways step toward farther ground')
         check(shootEnemy(blockedRat)&&blockedRat.x===47&&blockedRat.y===38,
           'another shot sends the monster around the obstacle')
+        enemies=[];occupied=new Set()
+        player.baseSpd=30;chance=()=>true
+        const pursuer=spawn('Giant Rat','response-shot-pursuer',43)
+        pursuer.aware=true;pursuer.alarmed=true
+        check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===42,
+          'just-shot target cannot lose interest even against much faster player')
+        player.baseSpd=5;chance=()=>true
         for(let y=39;y<=41;y++)map[y][47]='grass'
         setDesktopCanvasCursor(rat)
         check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
@@ -221,6 +243,46 @@ describe('Player Short Bow', () => {
           'fatal ranged hit clears the stale mobile monster inspection')
       } finally {
         chance=oldChance;damageRoll=oldDamage;enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn
+      }
+    })()`))
+  })
+
+  it('renders a falling enemy tile after arrow impact and its glyph in ASCII mode', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Death Animation Tester')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const original={drawImageVisual,fillText:ctx.fillText,USE_TILE_IMAGES,replayAnimationsDisabled}
+      try {
+        currentZ=0;map=surfaceMap;player.x=40;player.y=40
+        for(let y=37;y<=45;y++)for(let x=37;x<=47;x++){
+          map[y][x]='grass';discovered[y][x]=true;grasslandTrees.delete(keyXY(x,y))
+        }
+        enemies=[];npcs=[];groundItems=[];occupied=new Set();fxAnims=[];projectileAnims=[]
+        replayAnimationsDisabled=true;USE_TILE_IMAGES=true
+        const victim={name:'Giant Rat',baseName:'Giant Rat',tier:1,x:43,y:40}
+        spawnDeathAnim(victim,350)
+        const effect=fxAnims[0];check(!!effect.visual,'death stores a tile visual')
+        let spriteDraws=0,glyphDraws=0
+        drawImageVisual=(x,y,visual,alpha)=>{
+          if(visual===effect.visual){spriteDraws++;return true}
+          return original.drawImageVisual(x,y,visual,alpha)
+        }
+        ctx.fillText=(value,...args)=>{
+          if(value===effect.ch)glyphDraws++
+          return original.fillText.call(ctx,value,...args)
+        }
+        renderScene(effect.start-1)
+        check(spriteDraws===0,'future death effect does not draw before impact')
+        renderScene(effect.start+80)
+        check(spriteDraws>0&&glyphDraws===0,'tile effect uses sprite only')
+        const beforeAscii=spriteDraws
+        USE_TILE_IMAGES=false;renderScene(effect.start+150)
+        check(spriteDraws===beforeAscii&&glyphDraws>0,'ASCII mode uses falling glyph only')
+      } finally {
+        drawImageVisual=original.drawImageVisual;ctx.fillText=original.fillText
+        USE_TILE_IMAGES=original.USE_TILE_IMAGES
+        replayAnimationsDisabled=original.replayAnimationsDisabled
       }
     })()`))
   })

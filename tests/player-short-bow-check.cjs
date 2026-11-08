@@ -212,6 +212,150 @@ async function main() {
   console.log('PASS distant bow shot response, miss, terrain, AGGRO and passive priority')
 
   run(`(() => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    replayAnimationsDisabled=true;replaySimulationMode=false
+    enemies=[];occupied=new Set();npcs=[];currentZ=0;map=surfaceMap
+    player.x=40;player.y=40;player.baseSpd=30;player.hp=1000
+    player.equip.weapon=makeShortBowItem()
+    const t=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+    const rat=addEnemy({...t,id:'shot-disengage',baseName:'Giant Rat',name:'Giant Rat',
+      x:43,y:40,level:0,alive:true,hp:60,maxHp:60,aggro:4,
+      equipment:null,shooterAbility:null,shotsRemaining:0,
+      aware:true,alarmed:true,alarmedZ:0,alarmedLevelKind:currentLevelKind(),wander:false})
+    occupied.add(keyXY(rat.x,rat.y))
+    const oldChance=chance
+    try {
+      chance=()=>true
+      enemyTurn(null,null,rat)
+      check(rat.aware && rat.x===42,'recently shot target never disengages on response turn')
+      rat.x=43;rat.aware=true;rat.alarmed=true;occupied=new Set([keyXY(43,40)])
+      enemyTurn(null,null,null)
+      check(!rat.aware&&!rat.alarmed,'ordinary turn still allows SPD disengagement')
+    } finally {chance=oldChance}
+    enemies=[];occupied=new Set()
+    const covered=addEnemy({...t,id:'shot-covered',baseName:'Giant Rat',name:'Giant Rat',
+      x:46,y:40,level:0,alive:true,hp:60,maxHp:60,aggro:2,
+      equipment:null,shooterAbility:null,shotsRemaining:0,aware:true,wander:false})
+    occupied.add(keyXY(46,40))
+    for(let x=40;x<=48;x++)map[40][x]='grass'
+    check(reactToDistantBowShot(covered)&&covered.bowRetreatHold,
+      'weaker target enters bow-retreat state only after moving')
+    map[40][45]='mountain'
+    check(bowCoverBlocksPlayerShot(covered),'terrain blocks line of fire from cover')
+    const holdX=covered.x,holdY=covered.y
+    enemyTurn(null,null,null)
+    check(covered.x===holdX&&covered.y===holdY&&covered.bowRetreatHold,
+      'monster holds the cover position while bow is equipped')
+    const saved=buildSaveObject()
+    check(saved.enemies.find(e=>e.id==='shot-covered').bowRetreatHold,
+      'save records the cover state')
+    loadGameFromObject(saved,{isReplayInit:true})
+    const restored=enemies.find(e=>e.id==='shot-covered')
+    check(restored.bowRetreatHold,'save restoration preserves cover')
+    player.equip.weapon=null
+    enemyTurn(null,null,null)
+    check(!restored.bowRetreatHold,'switching weapons releases cover hold')
+    map[40][45]='grass'
+    player.equip.weapon=makeShortBowItem();player.baseSpd=5
+  })()`)
+  console.log('PASS shot-target pursuit and deterministic cover hold with save/restore')
+
+  run(`(() => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    currentZ=0;map=surfaceMap;enemies=[];occupied=new Set();npcs=[]
+    player.x=40;player.y=40;player.hp=1000;player.equip.weapon=makeShortBowItem()
+    player.inventory=[createItem('arrows',{count:4})]
+    for(let x=40;x<=45;x++)map[40][x]='grass'
+    const t=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+    const e=addEnemy({...t,id:'animated-bow-victim',baseName:'Giant Rat',name:'Giant Rat',
+      x:43,y:40,level:0,alive:true,hp:1,maxHp:1,
+      equipment:null,shooterAbility:null,shotsRemaining:0})
+    occupied.add(keyXY(e.x,e.y))
+    const old={enemyTurn,npcTurn,chance,damageRoll,lootLog}
+    try {
+      replayAnimationsDisabled=false;replaySimulationMode=false
+      fxAnims=[];projectileAnims=[];enemyAttackVisualEnd=0
+      enemyTurn=()=>{turnCount++};npcTurn=()=>{};chance=()=>false;damageRoll=()=>5
+      check(shootEnemy(e)&&!e.alive,'fatal animated shot')
+      const arrow=projectileAnims.find(p=>p.projectile==='arrow')
+      const death=fxAnims.find(p=>p.dir===1)
+      check(arrow&&death&&Math.abs(death.start-(arrow.start+arrow.duration))<2,
+        'falling animation starts when projectile reaches target')
+      check(death.visual===RENDER_STYLE.enemies.tiles['Giant Rat'],
+        'tile death effect stores creature sprite instead of only glyph')
+      const oldVisualDraw=drawImageVisual,oldGlyphDraw=ctx.fillText,oldTileMode=USE_TILE_IMAGES
+      const oldStatuses=updatePlayerStatuses,oldMinimap=renderMinimap
+      let tileDeathDraws=0,asciiDeathDraws=0
+      try {
+        drawImageVisual=(x,y,visual,alpha)=>{
+          if(visual===death.visual){tileDeathDraws++;return true}
+          return oldVisualDraw(x,y,visual,alpha)
+        }
+        ctx.fillText=(glyph,...args)=>{
+          if(glyph===death.ch)asciiDeathDraws++
+          return oldGlyphDraw(glyph,...args)
+        }
+        updatePlayerStatuses=()=>{};renderMinimap=()=>{}
+        USE_TILE_IMAGES=true;renderScene(death.start-1)
+        check(!tileDeathDraws,'death tile waits until impact')
+        renderScene(death.start+80)
+        check(tileDeathDraws>0&&!asciiDeathDraws,'tile death falls as its sprite')
+        USE_TILE_IMAGES=false;renderScene(death.start+150)
+        check(asciiDeathDraws>0,'ASCII death still falls as a glyph')
+      } finally {
+        drawImageVisual=oldVisualDraw;ctx.fillText=oldGlyphDraw;USE_TILE_IMAGES=oldTileMode
+        updatePlayerStatuses=oldStatuses;renderMinimap=oldMinimap
+      }
+      const messages=[];lootLog=(message)=>messages.push(message)
+      const lootTarget={name:'Skeleton',baseName:'Skeleton',tier:1,humanoid:true,
+        equipment:{kind:'weapon',base:'Crescent Blades',name:'Mighty Crescent Blades'}}
+      lootFromEnemy(lootTarget)
+      check(messages.some(m=>m.includes('dropped Mighty Crescent Blades.'))&&
+        !messages.some(m=>m.includes('dropped a Mighty Crescent Blades.')),
+        'prefixed equipment names omit the article')
+    } finally {
+      enemyTurn=old.enemyTurn;npcTurn=old.npcTurn;chance=old.chance
+      damageRoll=old.damageRoll;lootLog=old.lootLog;replayAnimationsDisabled=true
+    }
+  })()`)
+  console.log('PASS delayed ranged death sprite and equipment drop grammar')
+
+  run(`(() => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    const old={log,lootLog,chance,template:enemyTemplateForSavedEnemy,
+      makeArtifactItem,tombstonesRemaining,tombstoneOrder,inventory:player.inventory}
+    const messages=[]
+    try {
+      log=message=>messages.push(message);lootLog=message=>messages.push(message)
+      chance=()=>true;makeArtifactItem=()=>null
+      enemyTemplateForSavedEnemy=()=>({lootTable:{chance:1,items:[{kind:'chitin',count:1}]}})
+      player.inventory=[]
+      lootFromEnemy({name:'Kobold',baseName:'Kobold',tier:2,humanoid:true,
+        shooterAbility:'shooterArrows',shotsRemaining:0,
+        equipment:{kind:'weapon',base:'Mace',name:'Mace'}})
+      check(messages.includes('The Kobold dropped Short Bow.'),'short bow drops without article')
+      check(messages.includes('The Kobold dropped Chitin.'),'single biological loot without article')
+      check(messages.includes('The Kobold dropped Mace.'),'ordinary gear without article')
+      check(messages.every(m=>!m.includes('dropped a ')&&!m.includes('dropped an ')),
+        'no dropped-item message has indefinite article')
+      tombstonesRemaining=1;tombstoneOrder=[0]
+      maybeDropTombstone({name:'Lich',baseName:'Lich',tier:5})
+      check(messages.includes('The Lich dropped Mysterious Tombstone.'),
+        'special tombstone drops without article')
+      enemyTemplateForSavedEnemy=()=>({lootTable:{chance:1,items:[{kind:'chitin',count:3}]}})
+      lootFromEnemy({name:'Scarab',baseName:'Scarab',tier:1,humanoid:false})
+      check(messages.includes('The Scarab dropped 3 × Chitin.'),
+        'multiple biological drops retain quantity')
+    } finally {
+      log=old.log;lootLog=old.lootLog;chance=old.chance
+      enemyTemplateForSavedEnemy=old.template;makeArtifactItem=old.makeArtifactItem
+      tombstonesRemaining=old.tombstonesRemaining;tombstoneOrder=old.tombstoneOrder
+      player.inventory=old.inventory
+    }
+  })()`)
+  console.log('PASS all enemy drop wording and stacked quantities')
+
+  run(`(() => {
     enemies=[];occupied=new Set();player.inventory=[createItem('arrows',{count:3})]
     const t=ENEMY_TEMPLATE_BY_NAME.Ogre
     const e=addEnemy({...t,id:'bow-replay-reactor',baseName:'Ogre',x:46,y:40,

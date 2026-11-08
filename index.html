@@ -3098,6 +3098,7 @@ more difficult:
     enemy.stolenItem = enemy.stolenItem || null
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
+    enemy.bowRetreatHold = enemy.bowRetreatHold === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
     enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
@@ -3999,7 +4000,7 @@ more difficult:
     tombstonesRemaining--
     if (onGround) placeEnemyLootOnGround(e, createItem('tombstone', {inscription}))
     else addInventoryItem('tombstone', {inscription})
-    log(`The ${e.name} dropped a Mysterious Tombstone${onGround ? ' on the ground' : ''}.`, 'loot')
+    log(`The ${e.name} dropped Mysterious Tombstone${onGround ? ' on the ground' : ''}.`, 'loot')
     return true
   }
 
@@ -4037,7 +4038,7 @@ more difficult:
         const bow = makeShortBowItem()
         if (onGround) placeEnemyLootOnGround(e, bow)
         else player.inventory.push(bow)
-        lootLog(`The ${e.name} dropped a Short Bow.`, bow, bow.name)
+        lootLog(`The ${e.name} dropped Short Bow.`, bow, bow.name)
       }
     }
 
@@ -4053,7 +4054,7 @@ more difficult:
         if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind, {count}))
         else addInventoryItem(entry.kind, {count})
         const name = itemDefinition(entry.kind).name
-        log(`The ${e.name} dropped ${count === 1 ? 'a ' + name : count + ' × ' + name}.`, 'loot')
+        log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
       }
     }
 
@@ -4089,7 +4090,7 @@ more difficult:
     }
     if (e.humanoid && e.equipment) {
       const item = e.equipment
-      lootLog(`The ${e.name} dropped a ${item.name}.`, item)
+      lootLog(`The ${e.name} dropped ${item.name}.`, item)
       if (onGround) {
         placeEnemyLootOnGround(e, item)
         return
@@ -4608,9 +4609,11 @@ more difficult:
       }
       showDesktopCombatTooltip(e)
       updateMobileInfoPanel(e.x, e.y)
+      let deathFxDelay = 0
       if (!replayAnimationsDisabled && !replaySimulationMode) {
         const presentation = queueEnemyAttackPresentation(RANGED_CONFIG.projectileAnimationMs)
         spawnProjectileAnim(path, 'arrow', RANGED_CONFIG.projectileAnimationMs, presentation.delay)
+        deathFxDelay = presentation.delay + RANGED_CONFIG.projectileAnimationMs
       }
       let hit = false
       if (rareBlocked) {
@@ -4643,7 +4646,7 @@ more difficult:
           `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
         logEnemyEnrageTransition(e, wasEnraged)
         if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
-        if (e.hp <= 0) killEnemy(e, true, 'arrow')
+        if (e.hp <= 0) killEnemy(e, true, 'arrow', deathFxDelay)
       }
       if (e.alive) {
         showDesktopCombatTooltip(e)
@@ -4754,7 +4757,7 @@ more difficult:
     return true
   }
 
-  function killEnemy(e, playerCredit = true, cause = 'trap') {
+  function killEnemy(e, playerCredit = true, cause = 'trap', deathFxDelay = 0) {
     const visibleAtDeath = enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
@@ -4783,7 +4786,7 @@ more difficult:
       spawnDamageNumber(player.x, player.y, 'Freed!', '#9fe3bf')
     }
     if (playerCredit) player.kills++
-    spawnDeathAnim(e)
+    spawnDeathAnim(e, deathFxDelay)
     occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
     if (playerCredit) gainXp(xpForEnemy(e))
@@ -5496,6 +5499,12 @@ more difficult:
     return null
   }
 
+  function bowCoverBlocksPlayerShot(e) {
+    if (!UndergroundFov.canSee(map, player.x, player.y, e.x, e.y)) return true
+    const path = projectilePathBetween(player.x, player.y, e.x, e.y)
+    return path.slice(1, -1).some(tile => projectileTerrainBlocks(player, tile.x, tile.y))
+  }
+
   function reactToDistantBowShot(e) {
     // A wounded fleeing creature stays defensive even if its base combat
     // stats still exceed the player's.
@@ -5508,6 +5517,7 @@ more difficult:
     e.x = destination.x; e.y = destination.y
     occupied.add(keyXY(e.x, e.y))
     e.farPath = null
+    e.bowRetreatHold = true
     finishEnemyMove(e, fromX, fromY)
     return true
   }
@@ -6142,6 +6152,9 @@ more difficult:
     // Occupancy is derived from living actors. Repair ghost blockers before
     // pursuit when a death, burrow or forced move left a stale occupied tile.
     rebuildActiveLevelOccupancy()
+    // Changing away from the bow ends every ranged-cover standoff, including
+    // monsters on nearby but currently inactive floors.
+    if (!equippedShortBow()) for (const e of enemies) e.bowRetreatHold = false
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
     wanderSurfaceBelowTower()
@@ -6232,6 +6245,11 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      // A weaker bow target keeps the cover it reached instead of wandering
+      // back into the same shot. Reaching melee range or opening a new line
+      // of fire ends the standstill and restores ordinary combat behavior.
+      if (e.bowRetreatHold && equippedShortBow() && dist > ATTACK_RANGE &&
+          bowCoverBlocksPlayerShot(e)) continue
       if (enemyHasAbility(e,'rupture') && !forestConcealsPlayer(e,dist) && tryPrepareEnemyRupture(e)) continue
       let aggroRange = effectiveAggroRange(e)
       // Wail reaches four tiles even when the Banshee's normal chase radius
@@ -6295,14 +6313,14 @@ more difficult:
         const playerSpeed = playerSpd()
         const effectiveEnemySpeed = enemySpd(e)
         const loseInterestChance = speedChaseChance(playerSpeed - effectiveEnemySpeed)
-        if (e.aware && !e.alarmed && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
+        if (e !== bowShotTarget && e.aware && !e.alarmed && dist === aggroRange && chance(OUTER_AGGRO_GIVE_UP_CHANCE)) {
           e.aware = false
           log(`The ${e.name} gives up the chase.`, 'info')
           continue
         }
         // Ordinary spotting sets Alarmed. Excluding that status made speed
         // disengagement practically impossible for any active pursuer.
-        if (e.aware && dist > ATTACK_RANGE && loseInterestChance > 0 && chance(loseInterestChance)) {
+        if (e !== bowShotTarget && e.aware && dist > ATTACK_RANGE && loseInterestChance > 0 && chance(loseInterestChance)) {
           if (enemyHasAbility(e,'collectiveMind') && collectiveMindAlertActive(e)) continue
           e.aware = false
           e.alarmed = false
@@ -9504,8 +9522,11 @@ more difficult:
     spawnFxAnim(g.x, g.y, glyph.ch, glyph.color, -1)
   }
 
-  function spawnDeathAnim(e) {
-    spawnFxAnim(e.x, e.y, enemyGlyph(e), enemyColor(e), 1)
+  function spawnDeathAnim(e, delay = 0) {
+    fxAnims.push({x:e.x, y:e.y, ch:enemyGlyph(e), color:enemyColor(e), dir:1,
+      visual:RENDER_STYLE.enemies.tiles?.[e.baseName || e.name] || null,
+      start:performance.now() + delay, duration:FX_ANIM_MS})
+    runAnimationLoop()
   }
 
   function spawnHornSoundAnim() {
@@ -10654,6 +10675,7 @@ more difficult:
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
         const p = fxAnims[i]
+        if (now < p.start) continue
         const t = Math.max(0, Math.min(1, (now - p.start) / p.duration))
         if (t >= 1) {
           fxAnims.splice(i, 1)
@@ -10668,15 +10690,22 @@ more difficult:
         ctx.globalAlpha = 1 - t
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2 + bump)
         ctx.scale(scale, scale)
-        ctx.fillStyle = p.color
-        const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
-        if (p.label) {
-          ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
-          ctx.lineWidth = 3
-          ctx.strokeStyle = '#0b0906'
-          ctx.strokeText(p.ch, 0, textY)
+        const drewDeathTile = USE_TILE_IMAGES && p.visual &&
+          drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, p.visual)
+        if (!drewDeathTile) {
+          ctx.fillStyle = p.color
+          const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.font = `bold ${Math.round(TILE_PX * 0.78)}px Consolas, 'Courier New', monospace`
+          if (p.label) {
+            ctx.font = `bold ${Math.round(TILE_PX * 0.5)}px Consolas, 'Courier New', monospace`
+            ctx.lineWidth = 3
+            ctx.strokeStyle = '#0b0906'
+            ctx.strokeText(p.ch, 0, textY)
+          }
+          ctx.fillText(p.ch, 0, textY)
         }
-        ctx.fillText(p.ch, 0, textY)
         ctx.restore()
       }
     }
