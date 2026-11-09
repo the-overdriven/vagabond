@@ -2695,9 +2695,10 @@ more difficult:
   function playerTerrainEffects() {
     const tile = map[player.y]?.[player.x]
     const coldRiver = tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
+    const riverOrWater = tile === 'river' || tile === 'water'
     return {
       tile,
-      speed: (TERRAIN_SPEED[tile] || 0) - (coldRiver ? 1 : 0),
+      speed: (riverOrWater && raceHas('swims') ? 0 : (TERRAIN_SPEED[tile] || 0)) - (coldRiver ? 1 : 0),
       defense: TERRAIN_DEFENSE[tile] || 0,
     }
   }

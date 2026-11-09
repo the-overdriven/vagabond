@@ -163,7 +163,8 @@ Consumables are **25% more effective**.
 
 **Unlimited swimming.**
 
-Open water is therefore walkable for the player.
+Open water is therefore walkable for the player. Merlings also ignore the
+ordinary river/water SPD penalties, but not cold-river slowdown (§11).
 
 ## Troll
 
@@ -974,6 +975,11 @@ Current terrain speed effects:
 | Taiga | -1 |
 | River | -2 |
 | Water | -2 |
+
+Merlings ignore the normal **−2 SPD** in river and water. A river with a snow
+underlay still applies its separate **−1 SPD** cold penalty, and frozen river
+tiles retain their **−1 SPD** penalty. Other races and monsters keep their
+existing terrain modifiers and movement rules.
 
 Hill trades movement speed for defense:
 

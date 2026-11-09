@@ -105,6 +105,28 @@ describe('Active player statuses', () => {
     cy.get('[data-status="forest-cover"]').should('contain.text', 'Forest Cover')
     cy.get('#hSpd').should('have.class', 'terrain-stat-down')
     cy.get('#hDef').should('not.have.class', 'terrain-stat-up')
+
+    cy.window().then(win => win.eval(`
+      player.race = 'merling'
+      map[player.y][player.x] = 'river'
+      delete tileUnderlays[keyXY(player.x, player.y)]
+      updateHud()
+    `))
+    cy.get('[data-status="terrain"]').should('not.exist')
+    cy.get('#hSpd').should('not.have.class', 'terrain-stat-down')
+    cy.window().then(win => win.eval(`map[player.y][player.x] = 'water'; updateHud()`))
+    cy.get('[data-status="terrain"]').should('not.exist')
+    cy.window().then(win => win.eval(`map[player.y][player.x] = 'frozenriver'; updateHud()`))
+    cy.get('[data-status="terrain"]').should('contain.text', 'Frozen River · SPD −1')
+    cy.get('#hSpd').should('have.class', 'terrain-stat-down')
+    cy.window().then(win => win.eval(`
+      map[player.y][player.x] = 'river'
+      tileUnderlays[keyXY(player.x, player.y)] = 'snow'
+      updateHud()
+    `))
+    cy.get('[data-status="terrain"]').should('contain.text', 'River · SPD −1')
+    cy.window().then(win => win.eval(`player.race = 'human'; updateHud()`))
+    cy.get('[data-status="terrain"]').should('contain.text', 'River · SPD −3')
   })
 
   it('fits desktop and narrow canvases in tile and ASCII modes and keeps inspection turn-free', () => {

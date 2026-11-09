@@ -32,7 +32,7 @@ function statsFixture() {
     keyXY:(x,y)=>`${x},${y}`, itemDefinition:kind=>({carryStats:kind==='bigbell'?{spd:-2}:{}}),
     rng:()=>{throw new Error('ranking must not consume RNG')},
     Math:Object.assign(Object.create(Math), {random:()=>{throw new Error('no random ranking')}})})
-  const functions = ['raceDef','raceBonus','raceGrace','isWeaponItem','weaponGrace','armorGracePenalty',
+  const functions = ['raceDef','raceBonus','raceHas','raceGrace','isWeaponItem','weaponGrace','armorGracePenalty',
     'gearGracePenalty','playerGracePenalty','levelGrace','playerGraceBonus','playerGrace',
     'forEachActiveArtifact','artifactBonusSum','curseDebuffSum','carriedItemStat',
     'playerTerrainEffects','playerAtk','playerDef','playerSpdRaw','playerSpd',
@@ -93,6 +93,24 @@ test('terrain highlighting reads effective changes, including cold river penalti
   ctx.map[0][0] = 'snow'
   assert.equal(ctx.playerSpd(), 1)
   assert.equal(ctx.playerEffectiveTerrainStatChanges().speed, 0, 'clamped speed is not falsely marked as reduced')
+
+  ctx.TERRAIN_SPEED.river = -2; ctx.TERRAIN_SPEED.water = -2
+  ctx.player.baseSpd = 5
+  const terrainSpeedFor = (race, tile, snowy = false) => {
+    ctx.player.race = race
+    ctx.map[0][0] = tile
+    if (snowy) ctx.tileUnderlays['0,0'] = 'snow'
+    else delete ctx.tileUnderlays['0,0']
+    return ctx.playerTerrainEffects().speed
+  }
+  assert.equal(terrainSpeedFor('human', 'river'), -2)
+  assert.equal(terrainSpeedFor('human', 'water'), -2)
+  assert.equal(terrainSpeedFor('human', 'river', true), -3)
+  assert.equal(terrainSpeedFor('merling', 'river'), 0)
+  assert.equal(terrainSpeedFor('merling', 'water'), 0)
+  assert.equal(terrainSpeedFor('merling', 'river', true), -1)
+  assert.equal(terrainSpeedFor('merling', 'frozenriver'), -1)
+  assert.equal(ctx.playerEffectiveTerrainStatChanges().speed, -1, 'cold-river penalty remains visible to Merlings')
 })
 
 test('only active artifact bonuses used by combat contribute, without mutation', () => {
