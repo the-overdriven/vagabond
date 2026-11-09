@@ -4645,12 +4645,12 @@ more difficult:
         log(`Your arrow cannot catch the fleeing ${e.name}.`, 'info')
       } else if (enemyImmunityActive(e) || (enemyHasAbility(e, 'ethereal') && !bow.mod && bow.kind !== 'artifact')) {
         log(`Your arrow passes harmlessly through the ${e.name}!`, 'bad')
-        spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
+        spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss, deathFxDelay)
       } else if (tryEvadePlayerAttack(e)) {
         log(`Your arrow misses the dodging ${e.name}.`, 'info')
       } else if (chance(marksmanshipMissChance(missChance(playerSpd(), enemySpd(e))))) {
         log(`You shoot at the ${e.name} but miss.`, 'info')
-        spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
+        spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss, deathFxDelay)
       } else {
         hit = true
         const armor = equippedArmor(e.equipment)
@@ -4666,8 +4666,8 @@ more difficult:
         absorbEnemyFatalHit(e)
         triggerEnemyShellRetreat(e)
         alarmEnemiesNearHit(e)
-        if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
-        spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
+        if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical, deathFxDelay)
+        spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, deathFxDelay + (critical ? 120 : 0))
         log(glancing ? `Your arrow glances off the ${e.name}'s ${armor.base}, dealing ${dmg} damage.` :
           `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
         logEnemyEnrageTransition(e, wasEnraged)
@@ -9724,6 +9724,7 @@ more difficult:
   function spawnDeathAnim(e, delay = 0) {
     fxAnims.push({x:e.x, y:e.y, ch:enemyGlyph(e), color:enemyColor(e), dir:1,
       visual:RENDER_STYLE.enemies.tiles?.[e.baseName || e.name] || null,
+      holdUntilImpact:delay > 0,
       start:performance.now() + delay, duration:FX_ANIM_MS})
     runAnimationLoop()
   }
@@ -10898,7 +10899,9 @@ more difficult:
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
         const p = fxAnims[i]
-        if (now < p.start) continue
+        // A ranged kill resolves immediately, but its victim must remain
+        // visible, motionless, until the projectile actually reaches it.
+        if (now < p.start && !p.holdUntilImpact) continue
         const t = Math.max(0, Math.min(1, (now - p.start) / p.duration))
         if (t >= 1) {
           fxAnims.splice(i, 1)

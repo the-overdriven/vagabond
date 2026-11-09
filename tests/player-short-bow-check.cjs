@@ -274,13 +274,16 @@ async function main() {
     const old={enemyTurn,npcTurn,chance,damageRoll,lootLog}
     try {
       replayAnimationsDisabled=false;replaySimulationMode=false
-      fxAnims=[];projectileAnims=[];enemyAttackVisualEnd=0
+      fxAnims=[];projectileAnims=[];damageAnims=[];enemyAttackVisualEnd=0
       enemyTurn=()=>{turnCount++};npcTurn=()=>{};chance=()=>false;damageRoll=()=>5
       check(shootEnemy(e)&&!e.alive,'fatal animated shot')
       const arrow=projectileAnims.find(p=>p.projectile==='arrow')
       const death=fxAnims.find(p=>p.dir===1)
       check(arrow&&death&&Math.abs(death.start-(arrow.start+arrow.duration))<2,
         'falling animation starts when projectile reaches target')
+      check(death.holdUntilImpact,'killed monster remains visible until arrow impact')
+      check(damageAnims.some(p=>p.amount===5 && Math.abs(p.delay-(death.start-p.start))<2),
+        'damage number appears at arrow impact rather than at release')
       check(death.visual===RENDER_STYLE.enemies.tiles['Giant Rat'],
         'tile death effect stores creature sprite instead of only glyph')
       const oldVisualDraw=drawImageVisual,oldGlyphDraw=ctx.fillText,oldTileMode=USE_TILE_IMAGES
@@ -297,11 +300,20 @@ async function main() {
         }
         updatePlayerStatuses=()=>{};renderMinimap=()=>{}
         USE_TILE_IMAGES=true;renderScene(death.start-1)
-        check(!tileDeathDraws,'death tile waits until impact')
+        check(tileDeathDraws>0&&!asciiDeathDraws,
+          'death tile holds visibly in place while the arrow is in flight')
+        const heldDraws=tileDeathDraws
         renderScene(death.start+80)
-        check(tileDeathDraws>0&&!asciiDeathDraws,'tile death falls as its sprite')
-        USE_TILE_IMAGES=false;renderScene(death.start+150)
-        check(asciiDeathDraws>0,'ASCII death still falls as a glyph')
+        check(tileDeathDraws>heldDraws&&!asciiDeathDraws,'tile death falls as its sprite')
+        USE_TILE_IMAGES=false;renderScene(death.start-1)
+        check(asciiDeathDraws>0,'ASCII victim remains visible before arrow impact')
+        const heldGlyphs=asciiDeathDraws
+        renderScene(death.start+150)
+        check(asciiDeathDraws>heldGlyphs,'ASCII death still falls as a glyph')
+        spawnDeathAnim({name:'Giant Rat',baseName:'Giant Rat',x:44,y:40})
+        check(!fxAnims.at(-1).holdUntilImpact,
+          'ordinary melee deaths are still animated immediately without a hold')
+        fxAnims.pop()
       } finally {
         drawImageVisual=oldVisualDraw;ctx.fillText=oldGlyphDraw;USE_TILE_IMAGES=oldTileMode
         updatePlayerStatuses=oldStatuses;renderMinimap=oldMinimap

@@ -277,9 +277,9 @@ describe('Player Short Bow', () => {
         const victim={name:'Giant Rat',baseName:'Giant Rat',tier:1,x:43,y:40}
         spawnDeathAnim(victim,350)
         const effect=fxAnims[0];check(!!effect.visual,'death stores a tile visual')
-        let spriteDraws=0,glyphDraws=0
+        let spriteDraws=0,glyphDraws=0,visibleAlpha=[]
         drawImageVisual=(x,y,visual,alpha)=>{
-          if(visual===effect.visual){spriteDraws++;return true}
+          if(visual===effect.visual){spriteDraws++;visibleAlpha.push(ctx.globalAlpha);return true}
           return original.drawImageVisual(x,y,visual,alpha)
         }
         ctx.fillText=(value,...args)=>{
@@ -287,9 +287,12 @@ describe('Player Short Bow', () => {
           return original.fillText.call(ctx,value,...args)
         }
         renderScene(effect.start-1)
-        check(spriteDraws===0,'future death effect does not draw before impact')
+        check(spriteDraws>0&&visibleAlpha.at(-1)===1,
+          'lethal ranged target remains full-size and visible during arrow flight')
+        const heldSpriteDraws=spriteDraws
         renderScene(effect.start+80)
-        check(spriteDraws>0&&glyphDraws===0,'tile effect uses sprite only')
+        check(spriteDraws>heldSpriteDraws&&visibleAlpha.at(-1)<1&&glyphDraws===0,
+          'tile sprite falls and fades only after impact')
         const beforeAscii=spriteDraws
         USE_TILE_IMAGES=false;renderScene(effect.start+150)
         check(spriteDraws===beforeAscii&&glyphDraws>0,'ASCII mode uses falling glyph only')

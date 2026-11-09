@@ -5847,8 +5847,9 @@ flight is visual-only and cannot affect the deterministic result. A lethal
 arrow starts the monster's falling-and-fading death effect at visual impact,
 after the projectile completes its flight. Tile mode animates the dying
 monster's pixel-art sprite; ASCII mode animates its glyph. The enemy is
-removed, XP awarded, and loot resolved on the shot's actual game turn;
-only the effect is delayed, and replay timing cannot change combat outcomes.
+held visually in place until impact, even though the actual combat turn has
+already removed it, awarded XP, and resolved loot. The falling effect and
+damage/miss cues appear at impact; replay timing cannot change combat outcomes.
 
 Ordinary Short Bows come from the Merchant, arrow-shooting monsters, or rare
 ordinary chests (§54, §20, §45),
@@ -7032,7 +7033,8 @@ ring of fire with fading embers. Flame tongues can extend slightly beyond the
 exact damage footprint on open ground, so the circular ring is not visibly
 cut off at tile boundaries. The visual effect still stops at opaque terrain,
 blocked rays and unseen cells; the target preview marks the actual affected
-tiles, including its excluded corners. Damage/death
+tiles, including its excluded corners. Victims remain visible until impact,
+then play their falling death effects. Damage/death
 visuals wait for impact and input remains blocked through presentation. Animation
 frames never consume gameplay RNG or resolve damage. Replay records the scroll's
 identity and target coordinates, reusing the same action and seeded damage rolls.
