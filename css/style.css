@@ -2409,3 +2409,9 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
   #invOverlay.character-sheet #btnCharacterBack { display: inline-block; }
 }
 
+
+/* Contextual camping controls share one compact, scrollable layout on touch and desktop. */
+#campOverlay { position: fixed; inset: 0; z-index: 20000; background: #0009; display: flex; align-items: center; justify-content: center; }
+#campOverlay .panelbox { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; padding: 18px; background: #252018; color: var(--parchment); border: 1px solid #a88b56; }
+#campOverlay button { display: block; width: 100%; min-height: 42px; margin-top: 8px; white-space: normal; }
+#campOverlay p { line-height: 1.4; }

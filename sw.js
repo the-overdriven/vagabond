@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-fireball-ring-desktop';
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-campfire-cooking';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -64,6 +64,9 @@ const PRECACHE_URLS = [
   './src/graveyard.js',
   './src/highscores.js',
   './src/consumables.js',
+  './src/camping.js',
+  './img/icons/flint.svg',
+  './img/icons/brushwood.svg',
   './src/fireball.js',
   './img/icons/scroll-of-fireball.svg',
   './css/style.css?v=20261107-mobile-npc-dialogue',

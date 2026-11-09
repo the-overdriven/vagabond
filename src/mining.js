@@ -581,6 +581,7 @@ const Mining = (() => {
           minimapDirty = true
           grantXp(0, true)
           log('You clear the boulder, opening a new route.', 'good')
+          Campfires.findFlint(0.05)
         } else {
           target.removed = true
           if (target.kind !== 'exposed') map[y][x] = 'cavefloor2'
@@ -660,7 +661,7 @@ const Mining = (() => {
     finishEnemyMove(e, fromX, fromY)
     job.steps--
     if (!job.announced && enemyIsVisibleOnMainView(e)) {
-      log(`The ${e.name} approaches, drawn by your mining!`, 'bad')
+      log(`The ${e.name} approaches, drawn by ${job.source === 'fire' ? 'your fire' : 'your mining'}!`, 'bad')
       job.announced = true
     }
     if (!job.steps) e.miningInvestigation = null
@@ -668,6 +669,7 @@ const Mining = (() => {
   }
 
   function lightInfo(deposit) {
+    if (deposit.kind === 'campfire' && Campfires.burning(deposit)) return {radius:3,opacity:1,color:'#ffae55',pulse:false}
     if (deposit.kind === 'surfaceExit') {
       const daylight = config().lighting.surfaceExit
       return {radius: daylight.radius, opacity: daylight.opacity,
@@ -704,7 +706,8 @@ const Mining = (() => {
       seen.add(position)
       exits.push({x: entrance.x, y: entrance.y, kind: 'surfaceExit'})
     }
-    return [...natural, ...carriedOntoFloor, ...exits]
+    return [...natural, ...carriedOntoFloor, ...exits, ...groundItems.filter(f =>
+      f.kind === 'campfire' && onCurrentLevel(f) && Campfires.burning(f))]
   }
 
   function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {

@@ -196,6 +196,7 @@ function buildSaveObject() {
       weakenTurns: player.weakenTurns, slowTurns: player.slowTurns,
       deathShieldReady: player.deathShieldReady,
       berryRegenTurns: player.berryRegenTurns,
+      campRestProgress: player.campRestProgress,
       poisonTurns: player.poisonTurns,
       lowHpWarningActive: player.lowHpWarningActive,
       swimming: player.swimming,
@@ -362,6 +363,7 @@ function saveGame() {
 function loadGameFromObject(data, opts = {}) {
   clearLevelUpPopup()
   closeNpcMenu()
+  Campfires.close()
   clearAutoPath()
   const isReplayInit = !!opts.isReplayInit
   if (!data || typeof data !== 'object' || (!Array.isArray(data.map) && typeof data.map !== 'string')) {
@@ -859,6 +861,7 @@ function loadGameFromObject(data, opts = {}) {
   player.deathShieldReady = data.player.deathShieldReady
   player.speedPotionBonus = data.player.speedPotionBonus
   player.poisonTurns = Math.max(0, Math.floor(player.poisonTurns))
+  player.campRestProgress = data.player.campRestProgress
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
   player.weakenTurns = data.player.weakenTurns

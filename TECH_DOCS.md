@@ -171,7 +171,8 @@ ordinary river/water SPD penalties, but not cold-river slowdown (§11).
 Regenerates:
 
 **1 HP every 5 turns at levels 1–4, every 4 turns at levels 5–9, and every
-3 turns from level 10 onward.** The rate stays at 3 turns at higher levels.
+3 turns from level 10 onward.** The rate stays at 3 turns at higher levels. Cooked-food regeneration and campfire
+resting also benefit Trolls, alongside this natural regeneration.
 The interval uses the global turn count, and regeneration stops at full HP.
 The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 `regenMinEvery: 3` in `content/races.json`.
@@ -644,7 +645,9 @@ Most mine walls are unbreakable. Each generated weak seam or mineral deposit is
 finite and keeps its identity even while concealed from an inexperienced miner.
 Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
-its original brown floor. Overworld boulders can be cleared to open shortcuts;
+its original brown floor. Completing an overworld boulder has a **5%** chance
+to yield one reusable Flint Stone; individual strikes and underground deposits
+do not roll for flint. Overworld boulders can be cleared to open shortcuts;
 the cleared tile restores its underlying surface terrain (grass, forest, hill
 or sand), even after world rotation or save/load. Both minimaps immediately
 reflect the cleared tile, as does the full-world map when opened.
@@ -4895,6 +4898,15 @@ The default aggro range is:
 4
 ```
 
+**Campfire ignition noise.** Lighting a fire can be heard by non-passive monsters
+within **8 Euclidean tiles** on the same floor. Hearing chance is
+`min(0.95, max(0.10, 0.95 × (1 − distance/8)²) × blind multiplier)`, with a
+1.5 multiplier for Blind monsters and 1 otherwise. Listeners become Alarmed
+and investigate the fireplace for 2–6 ordinary movement turns using the same
+pathfinding as mining investigation. Walls do not attenuate sound but still
+block movement. It creates no enemies and reveals no hidden listeners.
+Refueling, cooking and resting do not repeat the ignition noise.
+
 **Mining noise.** Each confirmed Pickaxe strike can be heard by non-passive
 monsters within **25 Euclidean tiles** on the same floor. Walls do not attenuate
 the sound. For distance `d`, base hearing chance is
@@ -5758,7 +5770,7 @@ only presentation, not gear stats or loot odds.
 
 Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
 Supplies lists consumable food, herbs, mushrooms, potions, scrolls, and arrows,
-including potatoes. Other excludes equipment and supplies; All keeps its
+including raw and cooked potatoes. Flint and brushwood appear in Other. Other excludes equipment and supplies; All keeps its
 existing consumables-first ordering. Tabs only filter displayed inventory.
 In windows at most 720px wide, inventory, map, treasure map, trade,
 and character-creation dialogs are positioned against the browser viewport.
@@ -5795,7 +5807,7 @@ Actions name approved JavaScript handlers; JSON contains no executable rules.
 Inventory buttons and replay item-use actions share that handler registry.
 Handlers retain turn costs, swimming restrictions, quest consequences, and
 replay recording. An empty actions list means no special inventory action beyond
-Drop: potatoes are inert Supplies, valuables are Other, and Identification
+Drop: raw potatoes are cooking ingredients in Supplies, valuables are Other, and Identification
 scrolls are used through an artifact's identification button. The Black Key remains in inventory
 when equipped and uses its special Equip/Unequip action.
 
@@ -6705,7 +6717,10 @@ Non-humanoid enemies do not wear or drop normal weapons, armor, or shields.
 # 45. Chests
 
 The surface and underground areas contain chests. Generated chests, potions
-and scrolls cannot occupy the same tile on the same level/map. Surface loose
+and scrolls cannot occupy the same tile on the same level/map. Every newly
+opened chest also has an independent **0.5%** chance to contain a Flint Stone,
+including guaranteed equipment/artifact chests. This extra roll leaves the
+ordinary chest reward probabilities unchanged. Surface loose
 supplies sample legal, unoccupied ground-item positions without replacement,
 preserving configured counts while enough valid positions exist. Cave loot
 already reserves each selected position. Runtime drops are unaffected.
@@ -7136,11 +7151,84 @@ normally or 63 HP as a Wyrdling. Actual recovery is still capped by missing HP.
 Foraged item. Shares its regeneration effect with Fresh Fish: each serving adds
 100 turns, or 125 for a Wyrdling, to the existing regeneration duration.
 Eating spends one turn, leaving 99 or 124 turns after the first serving.
-Trolls consume either food without gaining additional regeneration.
+Trolls consume berries and fresh fish without gaining additional regeneration.
+Cooked food, including Cooked Fish, does benefit Trolls.
 
 Wyrdling increases each serving's duration by 25% before it is added to the
 existing counter. Both foods use the same five-turn regeneration tick.
 Effect durations are configured per item in `content/items.json`.
+Resting beside a lit abandoned campfire accelerates this same food effect
+without creating a second healing stream; see Cooking and campfire resting.
+
+## Cooking and campfire resting
+
+Abandoned campfires are reusable cooking and resting locations. Stand on the
+fireplace or an adjacent tile and press **F** (the forage/search control on
+touch), or inspect the fireplace while standing on it. Walls and sealed diagonal
+corners prevent using a fire through them. Searching ashes retains its single
+30% Potato roll, independently of lighting, refueling, cooking and resting.
+Portable fire placement and dwarven stoves are not available.
+
+Lighting requires a reusable **Flint Stone** and consumes **one Brushwood** and
+one world turn. The fire then supports **12 subsequent turns**. Refueling a
+burning fire consumes another bundle and one turn, restoring 12 subsequent turns;
+it cannot bank fuel above that duration. Expiration follows global game turns,
+including time spent on another floor. The cold fireplace remains reusable.
+Fireplaces never block movement or deal contact damage.
+
+Each portion takes one real turn and transforms one ingredient:
+
+| Ingredient | Result | Total recovery before race bonus |
+| --- | --- | --- |
+| Meat | Roasted Meat | `8 + floor(0.04 × max HP)` |
+| Potato | Baked Potato | `12 + floor(0.04 × max HP)` |
+| Fresh Fish | Cooked Fish | `24 + floor(0.04 × max HP)` |
+
+Total recovery is calculated **when eaten**, using current effective maximum HP.
+Wyrdlings receive `round(total × 1.25)` recovery; that bonus applies once.
+At 50 maximum HP the three foods provide 10, 14 and 26 HP; at 200 maximum HP
+these become 16, 20 and 32 HP. Eating takes one turn and adds five regeneration
+turns per HP to the existing shared food effect. Ordinary recovery remains
+**1 HP per five global turns**. Multiple foods extend the effect rather than
+stacking its rate. The timer continues at full HP, and ordinary ticks at full
+HP are lost. Cooked-food recovery works for Trolls; their natural regeneration
+remains independent. Roasted Meat sells for the same 2g as raw Meat; baked
+potatoes and cooked fish cannot be sold. Cooking grants no XP or proficiency.
+
+**Rest** queues up to eight real turns. While food recovery remains, each rest
+turn restores up to `max(2, ceil(0.03 × max HP))` HP, bounded by missing HP and
+remaining food recovery. This consumes the corresponding food benefit, including
+partial progress toward its next ordinary tick, rather than multiplying the
+food's total healing. At 50/100/150/200/300 maximum HP the rate is 2/3/5/6/9 HP
+per turn. Without food, four consecutive rest turns restore **1 HP**. Non-rest
+actions or danger reset that weak-rest progress; closing the panel alone does
+not grant or erase progress. Rest ends at full HP or when its active food
+recovery runs out; another rest can use weak food-free recovery. There is no
+recovery cooldown or once-per-floor limit: food, fuel, accessible fireplaces and safety limit use.
+
+Cooking can queue up to three portions. Cooking/rest queues stop when a
+detectable hostile within eight tiles has clear sight to the player, damage
+occurs, poison/drowning or an active chamber hazard makes camping unsafe, the player is displaced, the fire expires,
+or the player cancels. Hidden enemies do not veto starting a camp action.
+Perception uses world geometry, independent of camera animation, zoom and
+viewport size.
+Every executed action runs ordinary enemies, NPCs, statuses and environmental
+rules. A portion cooked during the last burning turn completes; an unstarted
+portion never spends ingredients. No queue automatically eats or refuels.
+Normal swimming item restrictions apply.
+
+Firelight reaches three tiles using the existing wall-aware cave illumination
+rules. Adjacent warmth suppresses environmental freezing. A lit area removes
+forest concealment, and ignition can lure nearby monsters (see Monster AI).
+Lit/cold graphics, fuel duration, recipe recovery, available supplies, current
+HP and food recovery are shown in the contextual panel. The existing status
+interface displays warmth and the food effect.
+
+Fire expiry and searched state persist on the existing ground object. The
+shared food timer and partial food-free rest progress persist on the player.
+Each completed cooking/rest/lighting/refueling action is recorded separately;
+UI queues and animation delays are not gameplay state. Loading cancels the UI
+queue, restores its completed effects, and never silently resumes automation.
 
 ## Mushroom
 
@@ -7167,9 +7255,12 @@ a shovel.
 
 Ordinary forest tiles can be foraged.
 
-Each forest tile can only be foraged once. Finding berries, a herb, or a
+Each forest tile can only be foraged once. Every eligible forest search also
+grants **one Brushwood**, up to five carried, without another RNG roll or
+changing the food probabilities. Merchant fuel remains available in sparse
+forests and cold worlds. Finding brushwood, berries, a herb, or a
 mushroom displays a short rising, fading **found!** label above the searched
-tile in both tile and ASCII modes. Empty searches and repeat searches show no
+tile in both tile and ASCII modes. Searches finding neither food nor brushwood, and repeat searches, show no
 label. This feedback is cosmetic: the item and turn resolve immediately,
 without animation timing or extra RNG; simulation-only replay skips the effect.
 
@@ -7179,7 +7270,7 @@ Results:
 9% → Handful of Berries
 8% → Healing Herb
 8% → Mushroom
-75% → Nothing
+75% → No food
 ```
 
 Taiga and Ancient Forest cannot be foraged. Cursed world traits can change
@@ -7225,8 +7316,7 @@ An abandoned campfire can be searched once by inspecting it or pressing F
 while standing on it. A seeded 30% roll grants one Potato; a failed search
 finds nothing. The `searched` flag is stored on its ground object and saved,
 preventing repeated rolls. Potatoes stack in the inventory and use
-`img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be
-used, equipped, or sold.
+`img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be eaten raw, equipped, or sold; a lit fire can bake them.
 Searched campfires have a gray ASCII glyph and a slightly dimmed, desaturated
 tile image.
 
@@ -7818,6 +7908,12 @@ the visual menu is suppressed. Merely opening the menu is not a replay action.
 Chance, reveal radius and the hint line are configured on the Merchant template
 in `content/npcs.json` under `fortHint`.
 
+The Merchant always offers reusable **Flint Stone for 100g** and **Brushwood
+for 10g per bundle**. Both have unlimited merchant stock and cannot be sold
+back. Brushwood purchases and ordinary pickup cannot exceed five carried;
+excess dropped bundles stay on the ground. Flint can also be found while
+completing boulders (5%), ordinary sand digging (1%) and opening chests (0.5%).
+
 Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
 world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
 Homecoming scrolls are finite: an exhausted stack remains in saved stock with
@@ -8258,7 +8354,7 @@ restoration does not generate or repopulate the tower.
 Current save version (defined in `src/version.js`):
 
 ```text
-122
+125
 ```
 
 The game release version changes for each deployment. The save format changes
@@ -9390,15 +9486,17 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 | 14 | Find a broken shovel handle |
 | 15–16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
 | 17 | Find a silver spoon; flavor message only |
-| 18–100 | Find nothing |
+| 18 | Find one Flint Stone |
+| 19–100 | Find nothing |
 
 </details>
 
 Amber (worth 20g) and Seashell (worth 10g) are stackable inventory items.
 The silver spoon has a **1%** chance on an ordinary dig and logs “You dig up a
 silver spoon. Someone threw away a good spoon.” It is never an inventory item.
-This replaces one empty outcome (nothing: **84% → 83%**) without changing other
-loot chances, guaranteed buried finds, turn costs or the number of RNG rolls.
+Flint occupies another single outcome; ordinary empty digs have an 82% chance.
+Neither result changes guaranteed buried finds, turn costs or the number of
+RNG rolls.
 
 ## Scarab spawning
 

@@ -141,9 +141,14 @@
     "icon": "img/icons/meat.svg",
     "sellValue": 2,
     "actions": [],
-    "description": "Raw meat taken from a slain beast. It can be traded, but cannot yet be eaten.",
+    "description": "Raw meat taken from a slain beast. Cook it at a lit abandoned campfire before eating.",
     "baseValue": 4
   },
+  "roastedMeat": {"name": "Roasted Meat", "category": "supplies", "stackable": true, "icon": "img/icons/meat.svg", "sellValue": 2, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 8}, "baseValue": 4},
+  "bakedPotato": {"name": "Baked Potato", "category": "supplies", "stackable": true, "icon": "img/icons/potato.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 12}, "baseValue": 0},
+  "cookedFish": {"name": "Cooked Fish", "category": "supplies", "stackable": true, "icon": "img/icons/fish.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 24}, "baseValue": 0},
+  "flint": {"name": "Flint Stone", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Reusable fire-lighting tool. Use an abandoned campfire to light it with brushwood.", "baseValue": 100},
+  "brushwood": {"name": "Brushwood", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Dry fuel for an abandoned campfire. One bundle burns for 12 turns. Carry up to five.", "baseValue": 10},
   "potato": {
     "name": "Potato",
     "category": "supplies",

@@ -1,4 +1,5 @@
 {
+  "camping": [{"kind":"flint","price":100},{"kind":"brushwood","price":10}],
   "fixedItems": [
     {
       "kind": "weapon",

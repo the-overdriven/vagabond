@@ -1989,6 +1989,7 @@ more difficult:
 <script src="src/graveyard.js"></script>
 <script src="src/highscores.js"></script>
 <script src="src/consumables.js"></script>
+<script src="src/camping.js"></script>
 <script src="src/fireball.js"></script>
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
@@ -2511,6 +2512,7 @@ more difficult:
   }
 
   function itemStatLine(it) {
+    if (itemDefinition(it.kind)?.effect?.cookedRecovery !== undefined) return `${Campfires.foodRecovery(it.kind)} HP over time; faster while resting`
     const parts = []
 
     if (it.kind === 'artifact') {
@@ -2626,6 +2628,7 @@ more difficult:
     weakenTurns: 0, slowTurns: 0,
     deathShieldReady: false,
     berryRegenTurns: 0,
+    campRestProgress: 0,
     poisonTurns: 0,
     lowHpWarningActive: false,
     swimming: 0,
@@ -4644,7 +4647,7 @@ more difficult:
   // A shoot action is recorded by enemy identity so replay never re-targets a
   // creature that happens to move into the original coordinate.
   function shootEnemy(e) {
-    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() ||
+    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() ||
         deathTransition || (!replayAnimationsDisabled && (cameraAnimating || attackAnim || enemyAttackPresentationPending()))) return false
     const bow = equippedShortBow()
     if (!bow || !e?.alive || !onCurrentLevel(e)) return false
@@ -5041,6 +5044,7 @@ more difficult:
     weakenTurns: 0, slowTurns: 0,
       deathShieldReady: false,
       berryRegenTurns: 0,
+      campRestProgress: 0,
       poisonTurns: 0,
       lowHpWarningActive: false,
       swimming: 0,
@@ -5163,6 +5167,8 @@ more difficult:
     player.deathShieldReady = false
     player.poisonTurns = 0
     player.berryRegenTurns = 0
+    player.campRestProgress = 0
+    Campfires.close()
     player.freezing = {active: false, turns: 0}
     player.curseDebuffs = []
     pendingMove = null
@@ -5326,7 +5332,7 @@ more difficult:
   // reaching the adjacent tile. The saved coordinates preserve this across loads.
   function playerHasForestCover() {
     return currentZ === 0 && (map[player.y]?.[player.x] === 'forest' || map[player.y]?.[player.x] === 'ancientForest') &&
-      !foragedTiles.has(keyXY(player.x, player.y))
+      !Campfires.litAt(player.x, player.y) && !foragedTiles.has(keyXY(player.x, player.y))
   }
 
   function forestHideChance(e, dist) {
@@ -6355,10 +6361,7 @@ more difficult:
   }
 
   function tickBerryRegen() {
-    if (player.berryRegenTurns > 0) {
-      player.berryRegenTurns--
-      if (turnCount % 5 === 0) healPlayer(consumablePower(1))
-    }
+    Campfires.tickFood()
   }
 
   function tickFreezing() {
@@ -6368,7 +6371,7 @@ more difficult:
     const cold = tile === 'snow' || tile === 'taiga' || isLakeIce(tile) || tile === 'frozenriver' ||
       ((tile === 'river' || tile === 'water') && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
     if (!player.freezing) player.freezing = {active: false, turns: 0}
-    if (!cold) {
+    if (!cold || Campfires.warm()) {
       if (player.freezing.active) {
         player.freezing.active = false
         player.freezing.turns = 0
@@ -6406,6 +6409,7 @@ more difficult:
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    Campfires.beginTurn()
     DungeonHazards.onPlayerTurnConsumed(turnCount)
     if (player.hp <= 0 || deathTransition) return
     try {
@@ -6708,6 +6712,7 @@ more difficult:
     ediblemushroom: idx => useEdibleMushroom(idx),
     berries: idx => useBerries(idx),
     fish: idx => useFish(idx),
+    cookedFood: idx => Campfires.eat(idx),
     scrollOfInvisibility: idx => useInvisibilityScroll(idx),
     homecomingscroll: idx => useHomecomingScroll(idx),
     tombstone: idx => readTombstone(idx),
@@ -6735,7 +6740,7 @@ more difficult:
 
   const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','scrollOfFear','scrollOfDeathShield',
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
-    'berries','fish','scrollOfInvisibility','homecomingscroll','echoBlightHorn','venomGland'])
+    'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
     async idx => {
       const item = player.inventory[idx]
@@ -7102,7 +7107,7 @@ more difficult:
       log('You search through the undergrowth and find a Mushroom.', 'loot')
     },
     nothing: () => {
-      log('You search through the undergrowth but find nothing of use.', 'info')
+      log('You search through the undergrowth but find no food.', 'info')
     },
   }
 
@@ -7156,7 +7161,8 @@ more difficult:
       }
     }
     (FORAGE_RESULT_HANDLERS[result] || FORAGE_RESULT_HANDLERS.nothing)()
-    if (['berries', 'herb', 'mushroom'].includes(result)) spawnForageFoundAnim()
+    const gatheredWood = Campfires.gather()
+    if (gatheredWood || ['berries', 'herb', 'mushroom'].includes(result)) spawnForageFoundAnim()
     enemyTurn()
     npcTurn()
     updateHud()
@@ -7279,6 +7285,7 @@ more difficult:
         log('Something bursts from the sand beside you - a scarab!', 'bad')
       } else log('You hear something moving beneath the sand, but nothing emerges.', 'info')
     } else if (roll === 17) log('You dig up a silver spoon. Someone threw away a good spoon.', 'loot')
+    else if (roll === 18) { addInventoryItem('flint'); log('You dig up a Flint Stone.', 'loot') }
     else log('You dig carefully, but find nothing.', 'info')
     render()
     updateHud()
@@ -7331,10 +7338,20 @@ more difficult:
     const crystal = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && Mining.isMineralKind(g.kind))
     const dropped = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y &&
       g.kind === 'droppeditem')
-    const sandWithShovel = !crystal && !dropped && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
+    const sandWithShovel = !Campfires.nearby() && !crystal && !dropped && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
     if (!sandWithShovel) recordReplayAction({type: 'forage'})
     if (dropped) {
       const item = dropped.item
+      if (item.kind === 'brushwood') {
+        const take = Math.min(item.count || 1, Campfires.FUEL_LIMIT-Campfires.count('brushwood'))
+        if (take <= 0) { log('You can carry at most five bundles of brushwood.', 'info'); return }
+        addInventoryItem('brushwood',{count:take})
+        item.count = (item.count || 1)-take
+        if (item.count <= 0) groundItems.splice(groundItems.indexOf(dropped),1)
+        log(`You pick up ${take} bundle(s) of brushwood.`, 'loot')
+        consumeItemTurn()
+        return
+      }
       if (isStackableKind(item.kind)) {
         const existing = player.inventory.find(it => it.kind === item.kind)
         if (existing) existing.count = (existing.count || 1) + (item.count || 1)
@@ -7414,7 +7431,7 @@ more difficult:
       return
     }
     const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
-    const campfire = groundItems.find(g => onCurrentLevel(g) && g.kind === 'campfire' && g.x === player.x && g.y === player.y)
+    const campfire = Campfires.nearby()
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
     const stolenLoot = groundItems.find(g => onCurrentLevel(g) && g.kind === 'stolenloot' && g.x === player.x && g.y === player.y)
@@ -7453,8 +7470,9 @@ more difficult:
       updateHud()
       return
     }
-    if (campfire) {
-      if (!searchAbandonedCampfire(campfire)) log('You have already searched these ashes.', 'info')
+    if (campfire && !skeleton) {
+      searchAbandonedCampfire(campfire)
+      Campfires.open(campfire)
       return
     }
     if (skeleton) {
@@ -7617,6 +7635,7 @@ more difficult:
           lastLootHighlights = itemLogHighlight(item,name)
           if (!suppressLootLog) lootLog(`You open the royal treasury chest and find ${name} and ${gold} gold!`,item,name)
           if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item,true))) player.inventory.push(item)
+          Campfires.findFlint(0.005)
           spawnPickupAnim(g)
           groundItems.splice(i,1)
           continue
@@ -7627,6 +7646,7 @@ more difficult:
           lastLootResult = `${artifactDisplayName(art)}.`
           lastLootHighlights = itemLogHighlight(art, artifactDisplayName(art))
           if (!suppressLootLog) lootLog(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
+          Campfires.findFlint(0.005)
           spawnPickupAnim(g)
           groundItems.splice(i, 1)
           continue
@@ -7642,6 +7662,7 @@ more difficult:
         const chestResult = chestEntry ? chestEntry.result : (CHEST_LOOT_TABLE.elseResult || 'idscroll');
         (CHEST_LOOT_HANDLERS[chestResult] || CHEST_LOOT_HANDLERS.idscroll)(chestTier, mf, chestEntry || {})
 
+        Campfires.findFlint(0.005)
         spawnPickupAnim(g)
         groundItems.splice(i, 1)
       } else if (g.kind === 'deadbody' || g.kind === 'playerremains' || g.kind === 'stolenloot') {
@@ -8178,7 +8199,7 @@ more difficult:
 
   async function tryMove(dx, dy) {
     if (fireballAim) return false
-    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
+    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
       pendingMove = {dx: dx, dy: dy}
       return
@@ -8531,7 +8552,7 @@ more difficult:
 
   async function skipTurn() {
     if (fireballAim) return
-    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
+    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
     const replayScope = recordReplayAction({type: 'skipTurn'})
     try {
@@ -8757,6 +8778,7 @@ more difficult:
     } else if (currentGround && currentGround.kind === 'campfire') {
       log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info')
       searchAbandonedCampfire(currentGround)
+      Campfires.open(currentGround)
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'ruinprop') {
       log(`Abandoned dwarven remains. ${currentGround.description}`, 'info')
@@ -9877,6 +9899,7 @@ more difficult:
     player.hp = Math.min(playerMaxHp(), player.hp + Math.max(0, amount))
     checkPlayerHealthWarning()
     const restored = Math.max(0, Math.round(player.hp - before))
+    Campfires.noteHealing(restored)
     if (restored > 0) spawnDamageNumber(player.x, player.y, `+${restored}`, '#8ee58e')
     return restored
   }
@@ -10954,6 +10977,7 @@ more difficult:
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
+        if (g.kind === 'campfire' && Campfires.draw(g,vx,vy)) return
         if (g.kind === 'droppeditem' && drawImageVisualWithShadow(vx,vy,
           droppedInventoryVisual(g.item))) return
         if (g.kind === 'stolenloot') {
@@ -11826,7 +11850,7 @@ more difficult:
       if (g.kind === 'campfire') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">An abandoned campfire${g.searched ? ' (searched)' : ''}.</div>`
+        html: `<div class="nm">Abandoned campfire · ${Campfires.burning(g) ? `${Campfires.remaining(g)} turns of fire` : 'cold'}${g.searched ? ' (searched)' : ''}</div><div>Stand beside it and press F to cook or rest.</div>`
       }
       if (g.kind === 'deadbody') return {
         mini: true,
@@ -11914,7 +11938,7 @@ more difficult:
       canvas.style.cursor = `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair`
       return
     }
-    const canShoot = !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen &&
+    const canShoot = !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen &&
       !onlineRecordsBlockActions() && !deathTransition && !cameraAnimating && !attackAnim &&
       !enemyAttackPresentationPending() && !playerInsideSanctuary() &&
       (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) &&
@@ -12039,7 +12063,7 @@ more difficult:
   }, {passive: false})
 
   function handleCanvasTap(clientX, clientY) {
-    if (mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
+    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -12099,7 +12123,7 @@ more difficult:
 
   canvas.addEventListener('click', (ev) => {
     if (fireballAim) { handleCanvasTap(ev.clientX, ev.clientY); return }
-    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
+    if (!window.matchMedia('(pointer: coarse)').matches && !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -13284,6 +13308,10 @@ more difficult:
     if (!merchantStock.some(it => it.kind === fireballCfg.kind)) {
       merchantStock.push(createItem(fireballCfg.kind, {count: fireballCfg.count, merchantPrice: fireballCfg.merchantPrice}))
     }
+    for (const supply of MERCHANT_STOCK_CONFIG.camping) {
+      if (!merchantStock.some(it => it.kind === supply.kind))
+        merchantStock.push(createItem(supply.kind, {count:1, merchantPrice:supply.price, unlimitedStock:true}))
+    }
     const arrowCfg = MERCHANT_STOCK_CONFIG.arrows
     if (arrowCfg && !merchantStock.some(it => it.kind === arrowCfg.kind && it.bundleSize)) {
       merchantStock.push(createItem(arrowCfg.kind, {count:1, bundleSize:arrowCfg.bundleSize,
@@ -13433,6 +13461,9 @@ more difficult:
 
   function buyItem(it) {
     if (!it || it.count === 0) return
+    if (it.kind === 'brushwood' && Campfires.count('brushwood') >= Campfires.FUEL_LIMIT) {
+      log('You can carry at most five bundles of brushwood.', 'info'); return
+    }
     ensureReplayItemIds()
     const replayId = it.replayId
     const value = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
@@ -14091,7 +14122,7 @@ more difficult:
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
+    const overlayOpen = campOpen || invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
     document.body.classList.toggle('npc-dialogue-open', npcMenuOpen)
@@ -14564,6 +14595,7 @@ more difficult:
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
     const k = ev.key
+    if (campOpen) { Campfires.keydown(ev); return }
     if (fireballAim) {
       ev.preventDefault()
       if (k === 'Escape') cancelFireballTargeting()

@@ -113,8 +113,9 @@ describe('Non-gear item catalog', () => {
               let draws = 0
               rng = () => {draws++;return oldRoll}
               tryForage()
-              forage.push((player.inventory[0]?.kind || 'nothing') === expected && draws === 1 &&
-                fxAnims.filter(effect => effect.ch === 'found!').length === (expected === 'nothing' ? 0 : 1))
+              forage.push((player.inventory.find(it=>it.kind!=='brushwood')?.kind || 'nothing') === expected && draws === 1 &&
+                player.inventory.find(it=>it.kind==='brushwood')?.count === 1 &&
+                fxAnims.filter(effect => effect.ch === 'found!').length === 1)
             }
           }
           return {chest,forage,chestScale:CHEST_LOOT_TABLE.scale,forageScale:FORAGE_TABLE.scale,
@@ -166,7 +167,7 @@ describe('Non-gear item catalog', () => {
           player.inventory = previous.inventory; groundItems = previous.groundItems; rng = previous.rng
         }
       })()`)
-      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 4,
+      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 8,
         groundKinds: ['homecomingscroll', 'idscroll', 'potion', 'scrollOfInvisibility', 'speedpotion'],
         names: ['Life Potion', 'Potion of Speed', 'Scroll of Homecoming',
           'Scroll of Identification', 'Scroll of Invisibility'], remainingGround: 0})

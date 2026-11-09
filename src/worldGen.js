@@ -6074,7 +6074,7 @@ function spawnCaveScenarios() {
     }
     if (rules.camp) {
       const spot = takeSpot('far')
-      if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'campfire',
+      if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'campfire', burnUntil: 0,
         description: pick(CAMPFIRE_INSPECTIONS), level, levelKind: 'chain', caveIndex})
     }
     // Existing skeleton search creates a z:-1 chest, so place remains only there.

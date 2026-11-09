@@ -1,0 +1,112 @@
+const assert = require('node:assert/strict')
+const fs = require('fs')
+const {run,context} = require('./helpers/node-game-runtime.cjs')
+context.fixture = JSON.parse(fs.readFileSync('tests/saves/Tester_start.json','utf8'))
+const check = (expression,message) => assert(run(expression),message)
+async function main() {
+  await run('loadContent()')
+  run(`loadGameFromObject(structuredClone(fixture),{isReplayInit:true});
+    log=()=>{};replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true;
+    replaySimulationMode=false;raceOpen=false;mapOpen=false;invOpen=false;tradeOpen=false;
+    deathTransition=null;cameraAnimating=false;attackAnim=null;
+    currentZ=0;map=surfaceMap;player.x=60;player.y=50;spawnPoint={x:20,y:20};
+    for(let y=40;y<=60;y++)for(let x=50;x<=70;x++)map[y][x]='grass';
+    player.race='human';player.maxHp=200;player.hp=20;player.equip={};player.curseDebuffs=[];
+    player.berryRegenTurns=0;player.poisonTurns=0;player.godMode=false;player.campRestProgress=0;
+    player.inventory=[];enemies=[];npcs=[];groundItems=[];occupied=new Set();turnCount=0;
+    groundItems.push({kind:'campfire',x:61,y:50,level:0,burnUntil:0,searched:false});
+    addInventoryItem('flint');addInventoryItem('brushwood',{count:5});
+    addInventoryItem('meat',{count:3});addInventoryItem('potato');addInventoryItem('fish');
+    window.fire=groundItems[0];`)
+  check('Campfires.foodRecovery("roastedMeat")===16 && Campfires.foodRecovery("bakedPotato")===20 && Campfires.foodRecovery("cookedFish")===32 && Campfires.rate()===6','food and rest scale with max HP')
+  check('!Campfires.perform(fire,"cook","meat") && Campfires.count("meat")===3 && turnCount===0','cold cooking spends nothing')
+  check('Campfires.perform(fire,"light") && Campfires.remaining(fire)===12 && Campfires.count("brushwood")===4 && Campfires.count("flint")===1','ignition costs one turn and fuel, never flint')
+  for (const kind of ['meat','potato','fish']) check(`Campfires.perform(fire,'cook','${kind}')`,'cook '+kind)
+  run(`Campfires.eat(player.inventory.findIndex(it=>it.kind==='roastedMeat'));window.hpBefore=player.hp;window.foodBefore=Campfires.foodRemaining();`)
+  check('Campfires.perform(fire,"rest") && player.hp-hpBefore===6 && foodBefore-Campfires.foodRemaining()===6','rest accelerates but does not multiply recovery')
+  run('player.berryRegenTurns=0;player.campRestProgress=0;window.hpBefore=player.hp')
+  for(let i=0;i<4;i++) check('Campfires.perform(fire,"rest")','weak rest tick')
+  check('player.hp-hpBefore===1','food-free recovery is one HP per four consecutive rest turns')
+  run('fire.burnUntil=turnCount+1;window.raw=Campfires.count("meat")')
+  check('Campfires.perform(fire,"cook","meat") && Campfires.count("meat")===raw-1 && !Campfires.burning(fire)','last burning turn completes cooking')
+  check('!Campfires.perform(fire,"cook","meat") && Campfires.count("meat")===raw-1','expired fire preserves remaining food')
+  run('Campfires.perform(fire,"light");player.poisonTurns=2;window.before=turnCount')
+  check('!Campfires.perform(fire,"rest") && turnCount===before','poison blocks resting without revealing hidden enemies')
+  run('player.poisonTurns=0;map[50][60]="snow";tickFreezing()')
+  check('!player.freezing.active','adjacent fire prevents environmental freezing')
+  run('map[50][60]="forest";foragedTiles=new Set()')
+  check('!playerHasForestCover()','firelight removes concealment')
+  run('map[50][60]="grass";player.race="troll";player.berryRegenTurns=0;player.hp=20;turnCount=20;fire.burnUntil=100;Campfires.eat(player.inventory.findIndex(it=>it.kind==="bakedPotato"))')
+  check('Campfires.foodRemaining()>0','Troll cooked-food recovery is active')
+  run('window.hpBefore=player.hp;Campfires.perform(fire,"rest")')
+  check('player.hp-hpBefore>=6','Troll gets food-assisted rest in addition to racial regen')
+  // Exact accounting at every global tick phase, with early cancellation and continuation.
+  for(let phase=0;phase<5;phase++) {
+    run(`player.race='human';player.hp=1;player.maxHp=200;player.berryRegenTurns=0;turnCount=${phase};fire.burnUntil=200;
+      addInventoryItem('roastedMeat');Campfires.eat(player.inventory.findIndex(it=>it.kind==='roastedMeat'));
+      for(let i=0;i<3;i++)Campfires.perform(fire,'rest');`)
+    check('player.hp===17 && Campfires.foodRemaining()===0','exact 16 HP total at phase '+phase)
+  }
+  run(`player.hp=20;player.berryRegenTurns=0;player.campRestProgress=0;
+    Campfires.perform(fire,'rest');Campfires.perform(fire,'rest');
+    window.saved=JSON.parse(JSON.stringify(buildSaveObject()));
+    loadGameFromObject(saved,{isReplayInit:true});window.fire=groundItems.find(f=>f.kind==='campfire');`)
+  check('player.campRestProgress===2 && fire.burnUntil===200','current save restores partial rest and fire expiry')
+  run('Campfires.perform(fire,"rest");Campfires.perform(fire,"rest")')
+  check('player.hp===21','partial rest survives reload without losing or duplicating recovery')
+  // Snapshot and replay a complete camp with real world turns.
+  run(`player.inventory=[];addInventoryItem('flint');addInventoryItem('brushwood',{count:2});addInventoryItem('fish');
+    player.hp=20;player.berryRegenTurns=0;player.campRestProgress=0;fire.burnUntil=0;fire.searched=false;
+    startReplayRecording();Campfires.perform(fire,'search');Campfires.perform(fire,'light');
+    Campfires.perform(fire,'cook','fish');Campfires.eat(player.inventory.findIndex(it=>it.kind==='cookedFish'));
+    Campfires.perform(fire,'rest');Campfires.perform(fire,'rest');
+    window.record=structuredClone(replayData);
+    window.state=()=>JSON.stringify({hp:player.hp,food:player.berryRegenTurns,progress:player.campRestProgress,
+      turn:turnCount,inventory:player.inventory.map(i=>[i.kind,i.count]),fire:groundItems.find(g=>g.kind==='campfire')});
+    window.expected=state();replayRecording=false;
+    loadGameFromObject(structuredClone(record.initialState),{isReplayInit:true});activeReplay=record;
+    replayPlaying=true;replaySimulationMode=true;replayRngIndex=0;`)
+  for(const action of context.record.actions){context.action=action;await run('runReplayAction(action)')}
+  check('state()===expected && replayRngIndex===record.rng.length','replay matches food, HP, resources, fire, search, turns and RNG')
+  run(`replayPlaying=false;replaySimulationMode=false;activeReplay=null;replayRecording=false;
+    player.inventory=[];player.hp=30;player.berryRegenTurns=0;player.campRestProgress=0;
+    window.fire=groundItems.find(f=>f.kind==='campfire');fire.burnUntil=turnCount+100;
+    addInventoryItem('brushwood',{count:4});window.oldRng=rng;rng=()=>0.999;
+    foragedTiles=new Set();map[player.y][player.x]='forest';tryForage();window.firstTurn=turnCount;tryForage();`)
+  check('Campfires.count("brushwood")===5 && turnCount===firstTurn','one forage per tile, guaranteed wood without duplicate gathering')
+  run(`player.gold=1000;ensureMerchantStock();window.goldBefore=player.gold;buyItem(merchantStock.find(i=>i.kind==='brushwood'))`)
+  check('player.gold===goldBefore && Campfires.count("brushwood")===5','full fuel capacity does not charge gold')
+  run(`groundItems.push({kind:'droppeditem',x:player.x,y:player.y,level:0,item:createItem('brushwood',{count:3})});
+    player.inventory.find(i=>i.kind==='brushwood').count=4;lootSkeletonOrForage();`)
+  check('Campfires.count("brushwood")===5 && groundItems.find(g=>g.kind==="droppeditem").item.count===2','partial fuel pickup leaves excess on the ground')
+  run(`groundItems=groundItems.filter(g=>g.kind!=='droppeditem');map[player.y][player.x]='sand';
+    addInventoryItem('shovel');dugSandTiles=new Set();rng=()=>0.175;tryDig();window.digTurn=turnCount;tryDig();`)
+  check('Campfires.count("flint")===1 && turnCount===digTurn','flint sand find can be claimed only once')
+  run(`rng=()=>0;map[player.y][player.x]='grass';addInventoryItem('pickaxe');player.miningTutorialSeen=true;
+    map[50][62]='boulder';for(let n=0;n<10&&map[50][62]==='boulder';n++)Mining.strike(62,50);`)
+  check('Campfires.count("flint")===2 && !Mining.strike(62,50)','completed boulder grants one flint roll, never repeat strikes')
+  run(`groundItems.push({kind:'chest',x:60,y:50,level:0,tier:1});checkGroundAt(60,50);checkGroundAt(60,50)`)
+  check('Campfires.count("flint")===3','chest bonus flint is not duplicated by repeat pickup')
+  run(`rng=oldRng;player.hp=30;player.berryRegenTurns=0;fire.burnUntil=turnCount+100;
+    enemies=[{id:'camp-threat',name:'Goblin',baseName:'Goblin',alive:true,hp:30,level:0,x:63,y:50,abilities:[]}];
+    camX=0;camY=0;window.cameraA=Campfires.perform(fire,'rest');camX=500;camY=500;window.cameraB=Campfires.perform(fire,'rest');`)
+  check('!cameraA && !cameraB','visible threat blocks rest independently of camera and animation')
+  run(`enemies=[];window.oldEnemyTurn=enemyTurn;enemyTurn=function(){const result=oldEnemyTurn();player.hp-=1;return result};
+    Campfires.perform(fire,'rest');enemyTurn=oldEnemyTurn;`)
+  check('player.campRestProgress===0','damage resets weak-rest progress')
+  run(`window.fire=groundItems.find(f=>f.kind==='campfire');fire.burnUntil=turnCount+20;
+    map[50][61]='grass';map[50][60]='grass';map[51][60]='cavewall';map[50][61]='cavewall';
+    window.diagonal=Mining.lightCanReach(map,60,50,61,51,61,51);
+    map[51][60]='grass';map[50][61]='grass';
+    currentZ=-1;fire.level=-1;invalidateUndergroundFov();`)
+  check('!diagonal && Mining.lightSources().includes(fire) && Mining.lightInfo(fire).radius===3','campfire illumination uses wall-aware light sources without sealed diagonal leaks')
+  run(`currentZ=0;fire.level=0;window.expiry=fire.burnUntil;currentZ=-1;turnCount=expiry;
+    currentZ=0;invalidateUndergroundFov()`)
+  check('!Campfires.burning(fire)','fire expires across time spent on another floor')
+  run(`rng=()=>0;player.hp=100;player.godMode=true;player.godInvisible=true;fire.burnUntil=0;
+    addInventoryItem('brushwood');addEnemy({...ENEMY_TEMPLATES.find(e=>e.name==='Giant Rat'),id:'fire-listener',x:65,y:50,homeX:65,homeY:50,homeTileType:'grass',level:0,alive:true,hp:30,maxHp:30,aware:false,wander:false});
+    Campfires.perform(fire,'light');rng=oldRng;`)
+  check('enemies.some(e=>e.miningInvestigation?.source==="fire")','ignition gives hearing monsters a finite fireplace investigation')
+  console.log('PASS camping recipes, scaling, resource accounting, final fire turn, Trolls, warmth, concealment, save and replay')
+}
+main().catch(error=>{console.error(error);process.exitCode=1})

@@ -13,6 +13,9 @@ function activePlayerStatuses() {
         terrainChanges.speed > 0 || terrainChanges.defense > 0 ? 'up' : 'down',
       detail:`${terrainDisplayName(terrain.tile)} changes your effective ${terrainBonus.replace(', ', ' and ')}. Leaving this terrain removes the modifier.`})
   }
+  if (['forest','ancientForest'].includes(terrain.tile) && Campfires.litAt(player.x,player.y))
+    statuses.push({id:'firelight',icon:'♨',label:'Exposed by firelight',counter:'',tone:'down',
+      detail:'The nearby fire lights this ground and prevents forest concealment.'})
   if (playerHasForestCover()) {
     const concealedFrom = playerConcealedFromVisibleEnemies()
     const hidden = concealedFrom.length > 0
@@ -62,9 +65,11 @@ function activePlayerStatuses() {
     statuses.push({id: 'poison', icon: '☠', label: 'Poisoned', counter: `${player.poisonTurns}t`,
       detail: `Poison: ${turns(player.poisonTurns)} remaining. Lose 1 HP each turn. A Healing Herb or Life Potion cures it.`})
   }
+  if (Campfires.warm()) statuses.push({id:'warmth',icon:'♨',label:'Warm',counter:'',tone:'up',
+    detail:'The nearby campfire protects against environmental freezing.'})
   if (player.berryRegenTurns > 0) {
     statuses.push({id: 'regen', icon: '✚', label: 'Regen', counter: `${player.berryRegenTurns}t`,
-      detail: `Regeneration: ${turns(player.berryRegenTurns)} remaining. Berries restore ${consumablePower(1)} HP every 5 turns; eating more extends the duration.`})
+      detail: `Food recovery: ${Campfires.foodRemaining()} HP remaining; 1 HP every 5 turns, or up to ${Campfires.rate()} HP per turn while resting at a fire. Eating more extends the effect.`})
   }
   if (playerIsInvisible()) {
     statuses.push({id: 'invisible', icon: '◇', label: 'Invisible', counter: player.godMode ? '∞' : `${player.invisibleTurns}t`,
