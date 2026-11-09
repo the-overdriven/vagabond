@@ -3648,6 +3648,7 @@ Aggro
 Biomes
 Evade capability
 Humanoid status
+Family (`living`, `undead`), independent of humanoid status
 Flying status
 Wander mode (`"homeReanchored"`, `"homeReturn"`, `"roam"`, `"far"`, or `false`) and optional `homeRadius`
 ```
@@ -3661,6 +3662,9 @@ so it remains both harmless and stationary.
 Passive AGGRO 0 enemies cannot become Alarmed.
 
 Spawned enemies receive approximately 95%–105% random variance from template stats.
+Every enemy template declares a family. Undead (including vampires, ghouls,
+ghosts, banshees and gravehounds) and constructs (gargoyles) cannot be
+poisoned; susceptibility checks use family rather than individual species.
 
 ---
 
@@ -4574,7 +4578,29 @@ HP and abilities serialization preserve it without an additional status.
 
 ## Poison
 
-Scorpion, Manticore, and Wyvern have the `poison` ability. Each melee hit
+**Player-applied venom:** A Venom Gland can be used from the inventory to
+coat the currently equipped melee weapon or prepare one arrow when a Short Bow
+is equipped. Soaking costs one turn and consumes one gland. It is refused
+without an equipped weapon, if the weapon is already coated, or if a bow has
+no arrows; refused uses cost no turn or gland. A green droplet beside the
+weapon name shows the prepared charge, which stays with that weapon through
+unequipping and reequipping. A non-glancing melee hit spends the coating and
+poisons a living target; misses and glancing blows preserve it. A valid bow
+shot spends the prepared arrow and coating even if it misses, glances, or
+strikes an immune target. Hitting in melee with a bow never spends the arrow.
+Venom does not stack on one weapon, and attacks on poison-immune families
+consume the coating without applying a status.
+
+Poisoned enemies use the same duration formula and 1 HP damage per turn as
+the player below. An application refreshes rather than stacks; poison ignores
+DEF, is displayed on the enemy's inspection panel, and shows green damage
+feedback. The first tick occurs on the *following* consumed player action,
+not the application action. Ticks happen on the active floor, even while the
+enemy is out of sight; inactive floors do not advance monster effects. Poison
+can kill monsters, awarding normal XP, kill credit and loot. The duration is
+set when poison is applied, independently of subsequent maximum-HP changes.
+
+Scorpion, Manticore, Wyvern, Alacran and Xibal have the `poison` ability. Each melee hit
 dealing positive damage has a 30% seeded chance to poison a surviving player,
 including damaging glancing hits and extra attacks. Misses, zero-damage hits,
 and ranged attacks do not apply poison. No poison RNG is used for other enemies.
@@ -4603,9 +4629,10 @@ Enemies may poison the player again during that turn's response. Application,
 refresh, damage, cure, and natural expiry have message logs. The active-status
 strip shows Poisoned with turns remaining and explains its cure.
 
-Remaining turns initialize to zero, persist in format 25 saves and replay initial
-states, restore exactly, and reset for death and new characters. All rolls and
-ticks resolve in game rules, independently of animation timing.
+The player's remaining poison turns and each monster's poison timer and
+application turn persist in current saves and replay initial states. Coated
+weapons persist as equipment state. All rolls and ticks resolve in game rules,
+independently of animation timing.
 
 ## Humanoid
 
@@ -6464,8 +6491,10 @@ extra meat:
 | Amethyst | Vrakeber **40%** | 16g |
 | Rare Trophy | NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN **100%** each | 60g |
 
-Materials are stackable and may be sold or dropped, but have no crafting or
-consumption effects. The six new materials have no dedicated artwork; the
+Materials are stackable and may be sold or dropped. Venom Glands can also
+be consumed to prepare a poisoned weapon or arrow (see the Poison rules in
+§20); the other materials have no crafting or consumption effects. The
+six materials have dedicated inventory artwork; the
 existing Amethyst item retains its current mineral appearance and interactions.
 Fungus continues to drop **1–3 Mushrooms** with certainty through its separate
 mushroom rule. Material drop configuration lives in

@@ -249,6 +249,14 @@ more difficult:
       display: block;
     }
 
+    .venom-marker {
+      color: #52d778;
+      margin-left: 3px;
+      font-family: 'Segoe UI Symbol', sans-serif;
+      font-variant-emoji: text;
+      white-space: nowrap;
+    }
+
     .paperdoll .slot .item-icon {
       width: 20px;
       height: 20px;
@@ -3125,6 +3133,7 @@ more difficult:
       if (m) nextEnemyId = Math.max(nextEnemyId, Number(m[1]) + 1)
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    enemy.family = tmpl?.family
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
     initializeEnemySleep(enemy)
     initializeEnemyGearScale(enemy)
@@ -3137,6 +3146,8 @@ more difficult:
     enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
     enemy.immunityUntilTurn = Number.isInteger(enemy.immunityUntilTurn) ? Math.max(0, enemy.immunityUntilTurn) : 0
     enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
+    enemy.poisonTurns = Math.max(0, Math.floor(enemy.poisonTurns || 0))
+    enemy.poisonAppliedTurn = Number.isInteger(enemy.poisonAppliedTurn) ? enemy.poisonAppliedTurn : -1
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
@@ -4479,6 +4490,11 @@ more difficult:
     } else {
       log(`${critical ? 'Critical hit! ' : ''}You strike the ${e.name} with your ${weaponName} for ${dmg}.`, 'good')
     }
+    // The bow holds a prepared arrow, never venom on its melee striking surface.
+    if (!glancing && player.equip.weapon?.venomCoated && !equippedShortBow()) {
+      player.equip.weapon.venomCoated = false
+      applyPlayerVenomToEnemy(e)
+    }
     logEnemyEnrageTransition(e, wasEnraged)
     if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
     if (e.hp <= 0) {
@@ -4649,6 +4665,9 @@ more difficult:
       clearAutoPath()
       consecutiveWaitTurns = 0
       if (--arrowStack.count <= 0) player.inventory.splice(player.inventory.indexOf(arrowStack), 1)
+      // A prepared arrow is spent as soon as it is fired, even on a miss.
+      const venomArrow = bow.venomCoated === true
+      if (venomArrow) bow.venomCoated = false
       const wasHidden = playerHiddenFromEnemy(e)
       const hpBefore = e.hp
       const targetWasInvisible = enemyInvisibleActive(e)
@@ -4704,6 +4723,7 @@ more difficult:
         spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, deathFxDelay + (critical ? 120 : 0))
         log(glancing ? `Your arrow glances off the ${e.name}'s ${armor.base}, dealing ${dmg} damage.` :
           `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
+        if (venomArrow && !glancing) applyPlayerVenomToEnemy(e)
         logEnemyEnrageTransition(e, wasEnraged)
         if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
         if (e.hp <= 0) killEnemy(e, true, 'arrow', deathFxDelay)
@@ -4866,7 +4886,7 @@ more difficult:
     }
     if (cause !== 'sacrifice') {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      lootFromEnemy(e, playerCredit && ['arrow', 'fireball'].includes(cause) && distance > ATTACK_RANGE)
+      lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
     updateHud()
@@ -6249,12 +6269,52 @@ more difficult:
     updateMobileInfoPanel(enemy.x, enemy.y)
   }
 
+  function rollPoisonDuration(maxHp) {
+    const baseTurns = Math.min(40, Math.floor(maxHp * 0.20))
+    return Math.max(1, Math.round(baseTurns * (0.90 + rng() * 0.20)))
+  }
+
+  function applyPlayerVenomToEnemy(enemy) {
+    if (enemy.hp <= 0 || !enemy.alive) return
+    if (enemy.family === 'undead' || enemy.family === 'construct') {
+      log(`The ${enemy.name} is immune to venom.`, 'info')
+      if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, 'Immune!', '#87c69a')
+      return
+    }
+    const refreshed = enemy.poisonTurns > 0
+    enemy.poisonTurns = rollPoisonDuration(enemy.maxHp)
+    enemy.poisonAppliedTurn = turnCount
+    log(refreshed ? `Your venom renews the poison on the ${enemy.name}.` : `Your venom poisons the ${enemy.name}!`, 'good')
+    if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, 'Poisoned!', '#52d778')
+    updateMobileInfoPanel(enemy.x, enemy.y)
+    showDesktopCombatTooltip(enemy)
+  }
+
+  function tickEnemyPoison() {
+    for (const enemy of enemies.slice()) {
+      if (!enemy.alive || !onCurrentLevel(enemy) || enemy.poisonTurns <= 0 ||
+          turnCount <= enemy.poisonAppliedTurn + 1) continue
+      enemy.poisonTurns--
+      enemy.hp = Math.max(0, enemy.hp - 1)
+      absorbEnemyFatalHit(enemy)
+      if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, '-1', '#52d778')
+      if (enemy.hp <= 0) {
+        log(`The ${enemy.name} dies from poison.`, 'good')
+        killEnemy(enemy, true, 'poison')
+      } else {
+        if (enemy.poisonTurns === 0 && enemyIsVisibleOnMainView(enemy)) log(`The ${enemy.name}'s poison wears off.`, 'info')
+        if (enemyIsVisibleOnMainView(enemy)) {
+          updateMobileInfoPanel(enemy.x, enemy.y)
+          showDesktopCombatTooltip(enemy)
+        }
+      }
+    }
+  }
+
   function applyEnemyPoison(enemy) {
     if (!enemyHasAbility(enemy, 'poison') || !chance(0.30)) return
-    const baseTurns = Math.min(40, Math.floor(playerMaxHp() * 0.20))
-    const duration = Math.max(1, Math.round(baseTurns * (0.90 + rng() * 0.20)))
     const refreshed = player.poisonTurns > 0
-    player.poisonTurns = duration
+    player.poisonTurns = rollPoisonDuration(playerMaxHp())
     log(refreshed ? `The ${enemy.name}'s venom renews your poison.`
       : `The ${enemy.name} poisons you!`, 'bad')
   }
@@ -6371,6 +6431,7 @@ more difficult:
     tickBerryRegen()
     tickArtifactCurses()
     tickMonsterStatuses()
+    tickEnemyPoison()
     tickEnemyRegeneration()
     expireEnemyImmunities()
     if (player.speedPotionTurns > 0) {
@@ -6651,6 +6712,7 @@ more difficult:
     homecomingscroll: idx => useHomecomingScroll(idx),
     tombstone: idx => readTombstone(idx),
     echoBlightHorn: idx => useEchoBlightHorn(idx),
+    venomGland: idx => useVenomGland(idx),
     blackKey: () => toggleBlackKey(),
     openCasket: () => openTreasureCasket(),
     treasuremap: () => inspectTreasureMap(),
@@ -6673,13 +6735,15 @@ more difficult:
 
   const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','scrollOfFear','scrollOfDeathShield',
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
-    'berries','fish','scrollOfInvisibility','homecomingscroll','echoBlightHorn'])
+    'berries','fish','scrollOfInvisibility','homecomingscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
     async idx => {
       const item = player.inventory[idx]
       const frenzyEligible = FRENZY_ITEM_ACTIONS.has(action) && item &&
         canUseItemsWhileSwimming() && player.berserkTurns > 0 && frenzyTargets().length > 0 &&
-        !(action === 'scrollOfDeathShield' && player.deathShieldReady)
+        !(action === 'scrollOfDeathShield' && player.deathShieldReady) &&
+        (action !== 'venomGland' || (player.equip.weapon && !player.equip.weapon.venomCoated &&
+          (!equippedShortBow() || player.inventory.some(entry => entry.kind === 'arrows' && entry.count > 0))))
       if (frenzyEligible) {
         // Must record the attempted item action before the RNG roll. The
         // ordinary handler would otherwise record after the frenzy check.
@@ -11684,6 +11748,7 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−1 HP/turn)</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
@@ -12770,16 +12835,25 @@ more difficult:
     if (invOpen) renderInventory()
   }
 
-  function slotLabel(it) {
-    if (!it) return '-'
-    const line = itemStatLine(it)
-    return artifactDisplayName(it) + (line ? ' \u2022 ' + line : '')
+  function venomMarker() {
+    const marker = document.createElement('span')
+    marker.className = 'venom-marker'
+    marker.textContent = ' 💧︎'
+    marker.title = 'Venom prepared for one non-glancing hit (one shot for bows)'
+    return marker
   }
 
   function setSlotLabel(element, item, fallback = '-') {
     const tier = visibleItemTier(item)
     element.className = 'val' + (tier !== null ? ' ' + tierColorClass(tier) : '')
-    element.textContent = item ? slotLabel(item) : fallback
+    element.textContent = item ? artifactDisplayName(item) : fallback
+    if (item?.venomCoated) element.appendChild(venomMarker())
+    const line = item && itemStatLine(item)
+    if (line) {
+      const details = document.createElement('span')
+      details.textContent = ' \u2022 ' + line
+      element.appendChild(details)
+    }
   }
 
   function bestSlotIndexes(kind) {
@@ -13049,7 +13123,11 @@ more difficult:
       const stackable = isStackableKind(it.kind)
       const countTag = stackable && it.count > 1 ? ' x' + it.count : ''
       const prefix = isBest ? '✅ ' : ''
-      nm.textContent = prefix + artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
+      nm.textContent = prefix + artifactDisplayName(it)
+      if (it.venomCoated) nm.appendChild(venomMarker())
+      const suffix = document.createElement('span')
+      suffix.textContent = countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
+      nm.appendChild(suffix)
       if (TACTICAL_CONSUMABLE_KINDS.includes(it.kind)) nm.title = itemDefinition(it.kind).description
       row.appendChild(nm)
       if (it.kind === 'artifact') {
@@ -13593,6 +13671,32 @@ more difficult:
     runAnimationLoop()
     renderInventory()
     updateTooltip()
+  }
+
+  function useVenomGland(idx) {
+    const gland = player.inventory[idx]
+    if (!gland || gland.kind !== 'venomGland' || !canUseItemsWhileSwimming()) return
+    const weapon = player.equip.weapon
+    if (!weapon) {
+      log('You need to equip a weapon you want to soak in the venom', 'info')
+      return
+    }
+    if (weapon.venomCoated) {
+      log('Your equipped weapon already has venom prepared.', 'info')
+      return
+    }
+    if (equippedShortBow() && !player.inventory.some(item => item.kind === 'arrows' && item.count > 0)) {
+      log('You need an arrow to soak in the venom.', 'info')
+      return
+    }
+    ensureReplayItemIds()
+    recordReplayAction({type:'useItem', action:'venomGland', idx, replayId:gland.replayId})
+    gland.count = (gland.count || 1) - 1
+    if (gland.count <= 0) player.inventory.splice(idx, 1)
+    weapon.venomCoated = true
+    log(equippedShortBow() ? 'You soak an arrow in venom and ready it for your bow.' :
+      `You soak your ${artifactDisplayName(weapon)} in venom.`, 'good')
+    consumeItemTurn()
   }
 
   function usePotion(idx) {
