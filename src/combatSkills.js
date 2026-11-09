@@ -24,9 +24,31 @@ function combatSkillCost(key) {
 }
 
 function combatSkillLabel(key) {
-  const value = combatSkillValue(key)
-  return value >= COMBAT_SKILL_MAX ? '100 / 100 · Master' :
-    `${value} / 100 · ${player.combatSkillXp[key]}/${combatSkillCost(key)} XP`
+  return `${combatSkillValue(key)} / ${COMBAT_SKILL_MAX}`
+}
+
+function combatSkillDescription(key) {
+  const skill = combatSkillValue(key)
+  const percent = amount => Number(amount.toFixed(2))
+  const details = {
+    oneHanded: [
+      `Your one-handed melee attacks have ${percent(skill * 0.05)} fewer percentage points of miss chance (up to 5).`,
+      'Train by damaging enemies with one-handed melee weapons. Unarmed attacks and bows do not count.'
+    ],
+    twoHanded: [
+      `Your two-handed melee attacks ignore ${percent(skill * 0.25)}% of enemy DEF (up to 25%).`,
+      'Train by damaging enemies with two-handed melee weapons. Bows do not count.'
+    ],
+    shielding: [
+      `With a shield equipped, you have a ${percent(skill * 0.2)}% chance to block a landed melee hit (up to 20%). Blocks cut damage to one-third and prevent critical damage.`,
+      'Train by receiving melee hits while carrying a shield. Misses, arrows and spells do not count.'
+    ],
+    marksmanship: [
+      `Your Short Bow has ${percent(skill * 0.25)}% fewer misses compared with an untrained bow (up to 25%).`,
+      'Train by damaging enemies with arrows from a Short Bow.'
+    ]
+  }
+  return [...details[key]].join('\n')
 }
 
 // Bows are two-handed items but have their own ranged proficiency. A bow

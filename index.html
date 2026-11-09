@@ -12776,6 +12776,31 @@ more difficult:
     return visible
   }
 
+  function positionCombatSkillTooltip(row, tooltip) {
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+    const margin = 12
+    const gap = 8
+    const rect = row.getBoundingClientRect()
+    const width = Math.max(1, Math.min(320, window.innerWidth - 2 * margin))
+    tooltip.style.width = `${width}px`
+    tooltip.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin))}px`
+    const hidden = !tooltip.getClientRects().length
+    if (hidden) {
+      tooltip.style.display = 'block'
+      tooltip.style.visibility = 'hidden'
+    }
+    const height = tooltip.getBoundingClientRect().height
+    if (hidden) {
+      tooltip.style.removeProperty('display')
+      tooltip.style.removeProperty('visibility')
+    }
+    const below = rect.bottom + gap
+    const above = rect.top - height - gap
+    const top = below + height <= window.innerHeight - margin || above < margin
+      ? Math.min(below, window.innerHeight - height - margin) : above
+    tooltip.style.top = `${Math.max(margin, top)}px`
+  }
+
   function renderInventory() {
     consolidateConsumableStacks()
     const race = raceDef()
@@ -12843,16 +12868,16 @@ more difficult:
       ['✨ XP to Next Level', player.xp + ' / ' + xpToNext(player.lvl)],
       ['📈 XP Bonus', Math.round((xpMultiplier() - 1) * 100) + '%'],
       ['🤺 Character GRACE', '+' + playerGraceBonus()],
-      ['⚔️ Weapon GRACE', equippedWeaponGrace === null ? '—' : equippedWeaponGrace],
-      ['🌀 Applied GRACE', equippedWeaponGrace === null ? '—' : '+' + (playerGraceBonus() * weaponAffinity).toFixed(1)],
-      ['⛓️ GRACE penalties', gracePenalty ? '−' + gracePenalty : '0'],
-      ['✨ Effective GRACE', equippedCombatGrace === null ? '—' : equippedCombatGrace.toFixed(1)],
+      ['🤺 Weapon GRACE', equippedWeaponGrace === null ? '—' : equippedWeaponGrace],
+      ['🤺 Applied GRACE', equippedWeaponGrace === null ? '—' : '+' + (playerGraceBonus() * weaponAffinity).toFixed(1)],
+      ['🤺 GRACE penalties', gracePenalty ? '−' + gracePenalty : '0'],
+      ['🤺 Effective GRACE', equippedCombatGrace === null ? '—' : equippedCombatGrace.toFixed(1)],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
       ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
-      ['⚔️ One-Handed', combatSkillLabel('oneHanded')],
-      ['🪓 Two-Handed', combatSkillLabel('twoHanded')],
-      ['🛡️ Shielding', combatSkillLabel('shielding')],
-      ['🏹 Marksmanship', combatSkillLabel('marksmanship')],
+      ['⚔️ One-Handed', combatSkillLabel('oneHanded'), 'oneHanded'],
+      ['🪓 Two-Handed', combatSkillLabel('twoHanded'), 'twoHanded'],
+      ['🛡️ Shielding', combatSkillLabel('shielding'), 'shielding'],
+      ['🏹 Marksmanship', combatSkillLabel('marksmanship'), 'marksmanship'],
       ...(player.trackingLearned ? [['Tracking:', 'Learned']] : []),
       ['💥 Crit Chance', Math.round(BASE_CRIT_CHANCE * 100) + '%'],
       // ['⚔️ Attack', playerAtk()],
@@ -12872,12 +12897,12 @@ more difficult:
         ? `${player.strongestEnemyKilled.name} (strength ${Math.round(player.strongestEnemyKilled.strength)})` : 'None'],
       ['📍 Position', player.x + ', ' + player.y],
     ]
-    for (const [k, v] of rows) {
+    for (const [k, v, skillKey] of rows) {
       const d = document.createElement('div')
       d.className = k === '🏆 Strongest slain enemy' ? 'row achievement-row' : 'row'
       if (k === '🤺 Character GRACE') d.title = 'Racial GRACE plus one for every five levels'
-      if (k === '🌀 Applied GRACE') d.title = `Character GRACE × ${Math.round(weaponAffinity * 100)}% weapon affinity`
-      if (k === '✨ Effective GRACE') d.title = 'Attack delay = 6 / effective GRACE; higher means faster'
+      if (k === '🤺 Applied GRACE') d.title = `Character GRACE × ${Math.round(weaponAffinity * 100)}% weapon affinity`
+      if (k === '🤺 Effective GRACE') d.title = 'Attack delay = 6 / effective GRACE; higher means faster'
       const lbl = document.createElement('span')
       lbl.className = 'lbl'
       lbl.textContent = k
@@ -12885,6 +12910,32 @@ more difficult:
       val.textContent = v
       d.appendChild(lbl)
       d.appendChild(val)
+      if (skillKey) {
+        d.classList.add('combat-skill-row')
+        d.dataset.skill = skillKey
+        d.tabIndex = 0
+        d.setAttribute('role', 'button')
+        d.setAttribute('aria-expanded', 'false')
+        const description = document.createElement('span')
+        description.className = 'combat-skill-detail'
+        description.id = `combat-skill-${skillKey}-detail`
+        description.textContent = combatSkillDescription(skillKey)
+        d.setAttribute('aria-describedby', description.id)
+        d.appendChild(description)
+        const placeTooltip = () => positionCombatSkillTooltip(d, description)
+        d.addEventListener('mouseenter', placeTooltip)
+        d.addEventListener('focus', placeTooltip)
+        d.addEventListener('click', () => {
+          const expanded = d.classList.toggle('expanded')
+          d.setAttribute('aria-expanded', String(expanded))
+          if (expanded) placeTooltip()
+        })
+        d.addEventListener('keydown', event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          d.click()
+        })
+      }
       sg.appendChild(d)
     }
 

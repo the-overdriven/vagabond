@@ -67,5 +67,41 @@ describe('Use-based combat proficiency', () => {
         enemyTurn=original.enemyTurn;npcTurn=original.npcTurn
       }
     })()`))
+    cy.window().then(win => win.eval('toggleInv(true)'))
+    cy.get('.stats-details').invoke('prop', 'open', true)
+    cy.get('#statGrid .lbl').filter((_, label) => label.textContent.includes('GRACE'))
+      .should('have.length', 5).each($label => {
+        expect($label.text()).to.match(/^🤺/)
+      })
+    cy.get('#statGrid').then($grid => {
+      const strongest = $grid[0].querySelector('.achievement-row')
+      expect(strongest.getBoundingClientRect().width).to.be.lessThan(
+        $grid[0].getBoundingClientRect().width * 0.6)
+    })
+    cy.get('.combat-skill-row').should('have.length', 4)
+    let rowHeight
+    cy.get('.combat-skill-row[data-skill="oneHanded"]').then($row => {
+      rowHeight = $row[0].getBoundingClientRect().height
+    })
+    cy.get('.combat-skill-row[data-skill="oneHanded"]')
+      .find('b').invoke('text').should('match', /^\d+ \/ 100$/)
+    cy.get('.combat-skill-row[data-skill="oneHanded"]')
+      .find('.combat-skill-detail').should('not.be.visible')
+    cy.get('.combat-skill-row[data-skill="oneHanded"]')
+      .click().should('have.attr', 'aria-expanded', 'true')
+      .find('.combat-skill-detail').should('contain', 'Train by damaging enemies with one-handed melee weapons')
+    cy.get('.combat-skill-row[data-skill="oneHanded"]').then($row => {
+      if (!$row[0].ownerDocument.defaultView.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+      const tooltip = $row[0].querySelector('.combat-skill-detail')
+      expect($row[0].ownerDocument.defaultView.getComputedStyle(tooltip).position).to.equal('fixed')
+      expect($row[0].getBoundingClientRect().height).to.equal(rowHeight)
+      expect(tooltip.getBoundingClientRect().top).to.be.at.least(0)
+    })
+    cy.get('.combat-skill-row[data-skill="shielding"]')
+      .click().find('.combat-skill-detail').should('contain', 'Misses, arrows and spells do not count')
+    cy.viewport(390, 844)
+    cy.get('#invOverlay').invoke('addClass', 'character-sheet')
+    cy.get('.combat-skill-row[data-skill="marksmanship"]')
+      .click().find('.combat-skill-detail').should('be.visible')
   })
 })

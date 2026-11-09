@@ -1043,8 +1043,48 @@ body.hint-collapsed #hint .panel-toggle {
   font-weight: 700;
 }
 
-.statgrid .achievement-row {
+.statgrid .combat-skill-row { cursor: help; }
+.statgrid .combat-skill-row .lbl { text-decoration: underline dotted; text-underline-offset: 3px; }
+.statgrid .combat-skill-row:focus-visible { outline: 1px solid var(--ember-bright); outline-offset: 2px; }
+.statgrid .combat-skill-detail {
+  display: none;
   grid-column: 1 / -1;
+  padding: 7px 9px;
+  background: rgba(28, 19, 12, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--parchment);
+  font: calc(12px * var(--ui-font-scale))/1.5 monospace;
+  text-align: left;
+  white-space: pre-line;
+}
+@media (hover: hover) and (pointer: fine) {
+  .statgrid .combat-skill-detail {
+    position: fixed;
+    box-sizing: border-box;
+    width: min(320px, calc(100vw - 24px));
+    max-height: min(320px, 50vh);
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+  }
+  .statgrid .combat-skill-row:hover .combat-skill-detail { display: block; }
+}
+.statgrid .combat-skill-row.expanded .combat-skill-detail,
+.statgrid .combat-skill-row:focus-visible .combat-skill-detail { display: block; }
+
+.statgrid .achievement-row {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.statgrid .achievement-row .lbl,
+.statgrid .achievement-row b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.statgrid .achievement-row b {
+  text-align: right;
 }
 
 .stats-details {
