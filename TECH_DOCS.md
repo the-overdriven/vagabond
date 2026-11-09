@@ -486,8 +486,10 @@ training against regenerating or intentionally prolonged opponents.
 For skill value `s`, the next point costs `3 × (1 + floor(s / 25))` skill XP,
 for cumulative requirements **75 / 225 / 450 / 750** at levels
 **25 / 50 / 75 / 100**. The character sheet shows each skill simply as a
-**0–100 rating**; a floating desktop tooltip or expandable touch row explains
-training, the current effect and the maximum benefit. Intermediate XP stays internal.
+**0–100 rating**; a desktop tooltip appears during hover or keyboard focus,
+while touch layouts let players expand one skill description at a time.
+Descriptions explain training, the current effect and the maximum benefit;
+intermediate XP stays internal.
 Reaching level 1 or a multiple of 25 is announced in the log;
 training and blocking resolve deterministically, independently of animations.
 

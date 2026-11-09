@@ -12926,9 +12926,15 @@ more difficult:
         d.addEventListener('mouseenter', placeTooltip)
         d.addEventListener('focus', placeTooltip)
         d.addEventListener('click', () => {
-          const expanded = d.classList.toggle('expanded')
+          // Desktop tips follow hover/focus; only touch layouts pin a detail.
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+          const expanded = !d.classList.contains('expanded')
+          sg.querySelectorAll('.combat-skill-row.expanded').forEach(openRow => {
+            openRow.classList.remove('expanded')
+            openRow.setAttribute('aria-expanded', 'false')
+          })
+          d.classList.toggle('expanded', expanded)
           d.setAttribute('aria-expanded', String(expanded))
-          if (expanded) placeTooltip()
         })
         d.addEventListener('keydown', event => {
           if (event.key !== 'Enter' && event.key !== ' ') return

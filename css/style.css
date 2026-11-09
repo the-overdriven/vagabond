@@ -1050,7 +1050,7 @@ body.hint-collapsed #hint .panel-toggle {
   display: none;
   grid-column: 1 / -1;
   padding: 7px 9px;
-  background: rgba(28, 19, 12, 0.85);
+  background: #1c130c;
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--parchment);

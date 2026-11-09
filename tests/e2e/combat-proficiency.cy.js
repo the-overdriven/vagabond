@@ -93,7 +93,12 @@ describe('Use-based combat proficiency', () => {
     cy.get('.combat-skill-row[data-skill="oneHanded"]')
       .find('.combat-skill-detail').should('not.be.visible')
     cy.get('.combat-skill-row[data-skill="oneHanded"]')
-      .click().should('have.attr', 'aria-expanded', 'true')
+      .click().then($row => {
+        if ($row[0].ownerDocument.defaultView.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+          expect($row).to.have.attr('aria-expanded', 'false')
+          expect($row).not.to.have.class('expanded')
+        }
+      })
       .find('.combat-skill-detail').should('contain', 'Train by damaging enemies with one-handed melee weapons')
     cy.get('.combat-skill-row[data-skill="oneHanded"]').then($row => {
       if (!$row[0].ownerDocument.defaultView.matchMedia('(hover: hover) and (pointer: fine)').matches) return
@@ -103,10 +108,24 @@ describe('Use-based combat proficiency', () => {
       expect(tooltip.getBoundingClientRect().top).to.be.at.least(0)
     })
     cy.get('.combat-skill-row[data-skill="shielding"]')
-      .click().find('.combat-skill-detail').should('contain', 'Misses, arrows and spells do not count')
+      .click().then($row => {
+        if ($row[0].ownerDocument.defaultView.matchMedia('(hover: hover) and (pointer: fine)').matches)
+          expect($row).not.to.have.class('expanded')
+      })
+      .find('.combat-skill-detail').should('contain', 'Misses, arrows and spells do not count')
     cy.viewport(390, 844)
     cy.get('#invOverlay').invoke('addClass', 'character-sheet')
+    cy.window().then(win => {
+      const original = win.matchMedia.bind(win)
+      cy.stub(win, 'matchMedia').callsFake(query =>
+        query === '(hover: hover) and (pointer: fine)' ? {matches:false} : original(query))
+    })
     cy.get('.combat-skill-row[data-skill="marksmanship"]')
-      .click().find('.combat-skill-detail').should('be.visible')
+      .click().should('have.attr', 'aria-expanded', 'true')
+      .find('.combat-skill-detail').should('be.visible')
+    cy.get('.combat-skill-row[data-skill="shielding"]')
+      .click().should('have.class', 'expanded')
+    cy.get('.combat-skill-row[data-skill="marksmanship"]')
+      .should('not.have.class', 'expanded').should('have.attr', 'aria-expanded', 'false')
   })
 })
