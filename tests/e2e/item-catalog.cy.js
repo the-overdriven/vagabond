@@ -66,6 +66,7 @@ describe('Non-gear item catalog', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
         const previous = {inventory: player.inventory, groundItems, rng, enemyTurn, npcTurn,
+          autoEquip: maybeAutoEquipWeapon,
           tile: map[player.y][player.x], foragedTiles,
           multipliers: WORLD_GEN_CONFIG.environment.forageResultMultipliers, fxAnims, replayAnimationsDisabled}
         const chest = []
@@ -80,12 +81,16 @@ describe('Non-gear item catalog', () => {
         }
         cases.push([100 - 1e-7, CHEST_LOOT_TABLE.elseResult])
         try {
+          // The boundary test inspects chest rewards in the inventory. A Short Bow
+          // otherwise auto-equips, leaving that inventory slot empty.
+          maybeAutoEquipWeapon = () => false
           for (const [roll, expected] of cases) {
             player.inventory = []
             rng = () => roll / CHEST_LOOT_TABLE.scale
             groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
             checkGroundAt(player.x, player.y)
-            chest.push({roll, expected, actual:player.inventory[0]?.kind})
+            const item = player.inventory[0]
+            chest.push({roll, expected, actual:item?.base === 'Short Bow' ? 'shortBow' : item?.kind})
           }
           enemyTurn = () => {}; npcTurn = () => {}
           map[player.y][player.x] = 'forest'
@@ -116,6 +121,7 @@ describe('Non-gear item catalog', () => {
             scrollResult:CHEST_LOOT_TABLE.table.find(e=>e.result==='scrollOfInvisibility')?.result}
         } finally {
           player.inventory=previous.inventory;groundItems=previous.groundItems;rng=previous.rng
+          maybeAutoEquipWeapon=previous.autoEquip
           enemyTurn=previous.enemyTurn;npcTurn=previous.npcTurn
           map[player.y][player.x]=previous.tile;foragedTiles=previous.foragedTiles
           WORLD_GEN_CONFIG.environment.forageResultMultipliers=previous.multipliers
