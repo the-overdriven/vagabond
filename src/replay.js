@@ -357,7 +357,7 @@ async function runReplayAction(action) {
       lootSkeletonOrForage()
       break
     case 'camp': {
-      const fire = groundItems.find(g => g.kind === 'campfire' && onCurrentLevel(g) && g.x === action.x && g.y === action.y)
+      const fire = groundItems.find(g => Campfires.isFire(g) && onCurrentLevel(g) && g.x === action.x && g.y === action.y)
       if (!Campfires.perform(fire,action.action,action.ingredient)) return replayDesync('Replay desynchronized: invalid camp action.')
       break
     }

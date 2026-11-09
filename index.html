@@ -7471,7 +7471,7 @@ more difficult:
       return
     }
     if (campfire && !skeleton) {
-      searchAbandonedCampfire(campfire)
+      if (campfire.kind === 'campfire') searchAbandonedCampfire(campfire)
       Campfires.open(campfire)
       return
     }
@@ -7667,7 +7667,7 @@ more difficult:
         groundItems.splice(i, 1)
       } else if (g.kind === 'deadbody' || g.kind === 'playerremains' || g.kind === 'stolenloot') {
         continue
-      } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || g.kind === 'campfire' || g.kind === 'explorerremains') {
+      } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || Campfires.isFire(g) || g.kind === 'explorerremains') {
         continue
       } else if (TACTICAL_CONSUMABLE_KINDS.includes(g.kind)) {
         addInventoryItem(g.kind)
@@ -8775,9 +8775,9 @@ more difficult:
     if (currentGround && currentGround.kind === 'skeleton') {
       log(`Skeletal Remains${currentGround.looted ? ' (searched)' : ''}. ${currentGround.description || pick(SKELETON_INSPECTIONS)}`, 'info')
       inspectedGround = true
-    } else if (currentGround && currentGround.kind === 'campfire') {
-      log(`An abandoned campfire. ${currentGround.description || pick(CAMPFIRE_INSPECTIONS)}`, 'info')
-      searchAbandonedCampfire(currentGround)
+    } else if (Campfires.isFire(currentGround)) {
+      log(`${currentGround.kind === 'dwarvenstove' ? 'A dwarven stove' : 'An abandoned campfire'}. ${currentGround.description || (currentGround.kind === 'campfire' ? pick(CAMPFIRE_INSPECTIONS) : 'The stone hearth is cold.')}`, 'info')
+      if (currentGround.kind === 'campfire') searchAbandonedCampfire(currentGround)
       Campfires.open(currentGround)
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'ruinprop') {
@@ -10977,7 +10977,7 @@ more difficult:
       if (g.kind === 'chest' && g.opened) continue
       const visual = RENDER_STYLE.groundItems[g.kind]
       const drawGroundItem = () => {
-        if (g.kind === 'campfire' && Campfires.draw(g,vx,vy)) return
+        if (Campfires.isFire(g) && Campfires.draw(g,vx,vy)) return
         if (g.kind === 'droppeditem' && drawImageVisualWithShadow(vx,vy,
           droppedInventoryVisual(g.item))) return
         if (g.kind === 'stolenloot') {
@@ -11706,7 +11706,7 @@ more difficult:
 
   function groundItemLabel(g) {
     if (g.kind === 'droppeditem') return g.item ? artifactDisplayName(g.item) : 'Dropped Item'
-    return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
+    return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'dwarvenstove' ? 'Dwarven Stove' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
   }
 
   let lastMousePx = null, lastMousePy = null
@@ -11847,10 +11847,10 @@ more difficult:
         mini: true, enemy: null,
         html: '<div class="nm">Dwarven Chest</div><div>Strange pipes lead toward this chest. An emergency valve stands nearby.</div>'
       }
-      if (g.kind === 'campfire') return {
+      if (Campfires.isFire(g)) return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">Abandoned campfire · ${Campfires.burning(g) ? `${Campfires.remaining(g)} turns of fire` : 'cold'}${g.searched ? ' (searched)' : ''}</div><div>Stand beside it and press F to cook or rest.</div>`
+        html: `<div class="nm">${groundItemLabel(g)} · ${Campfires.burning(g) ? `${Campfires.remaining(g)} turns of fire` : 'cold'}${g.kind === 'campfire' && g.searched ? ' (searched)' : ''}</div><div>Stand beside it and press F to cook or rest.</div>`
       }
       if (g.kind === 'deadbody') return {
         mini: true,

@@ -11,11 +11,11 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
   it('builds themed rooms, randomized vaults, tactical shooters, final defenses, and depth loot', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, msg) => { if (!ok) throw new Error(msg) }
-      const expectedRooms = new Set(['Barracks','Armory','Dining Hall','Library','Forge','Workshop','Dormitory','Burial Chamber','Temple','Prison','Storage'])
+      const expectedRooms = new Set(['Barracks','Armory','Dining Hall','Kitchen','Library','Forge','Workshop','Dormitory','Burial Chamber','Temple','Prison','Storage'])
       const expectedVaults = new Set(['fortifiedBarracks','trappedArmory','treasury','libraryArchive','prisonBlock','floodedCistern','collapsedHall','sealedTomb','forgeKillzone','barricadedDormitory'])
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
-      check(Object.keys(cfg.rooms.archetypes).length === 11 && Object.keys(cfg.rooms.archetypes).every(name => expectedRooms.has(name)),
-        'all eleven regular room archetypes are configured')
+      check(Object.keys(cfg.rooms.archetypes).length === 12 && Object.keys(cfg.rooms.archetypes).every(name => expectedRooms.has(name)),
+        'all regular room archetypes and the guaranteed Kitchen are configured')
       const normalVaultDefs = Object.entries(cfg.vaults.definitions).filter(([,def]) => !def.fallbackOnly)
       check(normalVaultDefs.length === 10 && normalVaultDefs.every(([name]) => expectedVaults.has(name)),
         'all ten planned reusable vault concepts are configured')

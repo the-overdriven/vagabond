@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" shape-rendering="crispEdges">
+  <!-- Transparent, slightly elevated top-down view of a dwarven stone cooker. -->
+  <path d="M12 28h8V16h60v12h8v50h-8v8H20v-8h-8Z" fill="#272727"/>
+  <path d="M16 26h8V18h52v8h8v48h-8v8H24v-8h-8Z" fill="#55514d"/>
+  <path d="M24 14h52v8H24ZM16 26h8v48h-8Zm60 0h8v48h-8Z" fill="#827972"/>
+  <path d="M28 22h44v8H28ZM24 34h52v20H24Z" fill="#393936"/>
+  <path d="M30 34h40v18H30Z" fill="#1c201f"/>
+  <path d="M34 38h32v10H34Z" fill="#555e59"/>
+  <path d="M38 40h24v6H38Z" fill="#232727"/>
+  <path d="M24 58h52v18H24Z" fill="#302d2b"/>
+  <path d="M28 60h44v14H28Z" fill="#171816"/>
+  <path d="M32 64h36v6H32Z" fill="#4d3124"/>
+  <path d="M36 66h28v4H36Z" fill="#934a24"/>
+  <path d="M24 76h52v6H24Z" fill="#7a7066"/>
+  <path d="M30 80h8v6h-8Zm32 0h8v6h-8Z" fill="#494643"/>
+  <path d="M10 32h6v38h-6Zm74 0h6v38h-6Z" fill="#514e4b"/>
+  <path d="M22 26h6v6h-6Zm50 0h6v6h-6ZM22 72h6v6h-6Zm50 0h6v6h-6Z" fill="#9a8e7d"/>
+  <path d="M32 34h4v4h-4Zm32 0h4v4h-4Z" fill="#d0b88a"/>
+</svg>

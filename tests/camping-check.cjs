@@ -107,6 +107,35 @@ async function main() {
     addInventoryItem('brushwood');addEnemy({...ENEMY_TEMPLATES.find(e=>e.name==='Giant Rat'),id:'fire-listener',x:65,y:50,homeX:65,homeY:50,homeTileType:'grass',level:0,alive:true,hp:30,maxHp:30,aware:false,wander:false});
     Campfires.perform(fire,'light');rng=oldRng;`)
   check('enemies.some(e=>e.miningInvestigation?.source==="fire")','ignition gives hearing monsters a finite fireplace investigation')
-  console.log('PASS camping recipes, scaling, resource accounting, final fire turn, Trolls, warmth, concealment, save and replay')
+  // The Fort/Kitchen stove uses the same action and replay pipeline, but
+  // burns longer and cannot be searched for campfire potato loot.
+  run(`enemies=[];groundItems=[{kind:'dwarvenstove',x:61,y:50,level:0,burnUntil:0}];
+    window.stove=groundItems[0];player.godMode=false;player.godInvisible=false;
+    player.hp=20;player.maxHp=200;player.berryRegenTurns=0;player.campRestProgress=0;
+    player.inventory=[];addInventoryItem('flint');addInventoryItem('brushwood',{count:2});
+    addInventoryItem('fish');startReplayRecording();`)
+  check('Campfires.nearby()===stove && !Campfires.perform(stove,"search")','stoves are usable fireplaces with no ash-search loot')
+  check('Campfires.perform(stove,"light") && Campfires.remaining(stove)===18','stoves burn for eighteen turns per bundle')
+  check('Campfires.perform(stove,"cook","fish") && Campfires.count("cookedFish")===1','stoves cook existing recipes')
+  run(`Campfires.eat(player.inventory.findIndex(it=>it.kind==='cookedFish'));
+    Campfires.perform(stove,'rest');window.stoveRecord=structuredClone(replayData);
+    window.stoveState=()=>JSON.stringify({hp:player.hp,regen:player.berryRegenTurns,
+      turn:turnCount,inventory:player.inventory.map(i=>[i.kind,i.count]),stove:groundItems[0]});
+    window.stoveExpected=stoveState();replayRecording=false;
+    loadGameFromObject(structuredClone(stoveRecord.initialState),{isReplayInit:true});
+    activeReplay=stoveRecord;replayPlaying=true;replaySimulationMode=true;replayRngIndex=0;`)
+  for(const action of context.stoveRecord.actions){context.action=action;await run('runReplayAction(action)')}
+  check('stoveState()===stoveExpected && replayRngIndex===stoveRecord.rng.length','stove cooking and rest replay exactly')
+  run(`replayPlaying=false;replaySimulationMode=false;activeReplay=null;
+    stove=groundItems[0];stove.burnUntil=0;player.godMode=true;player.godInvisible=true;
+    addInventoryItem('brushwood');window.stoveOldRng=rng;rng=()=>0;
+    enemies=[{id:'near',name:'Giant Rat',baseName:'Giant Rat',alive:true,level:0,
+      x:64,y:50,hp:20,maxHp:20,abilities:[],wander:false},
+      {id:'far',name:'Giant Rat',baseName:'Giant Rat',alive:true,level:0,
+      x:66,y:50,hp:20,maxHp:20,abilities:[],wander:false}];
+    Campfires.perform(stove,'light');rng=stoveOldRng;`)
+  check('enemies.find(e=>e.id==="near").miningInvestigation?.source==="fire" && !enemies.find(e=>e.id==="far").miningInvestigation',
+    'stove ignition lures monsters within four tiles but not farther ones')
+  console.log('PASS campfires and stoves: recipes, scaling, fuel, quieter ignition, Trolls, warmth, concealment, save and replay')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

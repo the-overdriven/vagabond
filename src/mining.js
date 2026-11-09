@@ -669,7 +669,7 @@ const Mining = (() => {
   }
 
   function lightInfo(deposit) {
-    if (deposit.kind === 'campfire' && Campfires.burning(deposit)) return {radius:3,opacity:1,color:'#ffae55',pulse:false}
+    if (Campfires.isFire(deposit) && Campfires.burning(deposit)) return {radius:3,opacity:1,color:'#ffae55',pulse:false}
     if (deposit.kind === 'surfaceExit') {
       const daylight = config().lighting.surfaceExit
       return {radius: daylight.radius, opacity: daylight.opacity,
@@ -707,7 +707,7 @@ const Mining = (() => {
       exits.push({x: entrance.x, y: entrance.y, kind: 'surfaceExit'})
     }
     return [...natural, ...carriedOntoFloor, ...exits, ...groundItems.filter(f =>
-      f.kind === 'campfire' && onCurrentLevel(f) && Campfires.burning(f))]
+      Campfires.isFire(f) && onCurrentLevel(f) && Campfires.burning(f))]
   }
 
   function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {

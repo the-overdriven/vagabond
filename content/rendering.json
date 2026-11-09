@@ -86,6 +86,12 @@
       "image": "img/tiles/cold-campfire.png",
       "scale": 1
     },
+    "dwarvenstove": {
+      "glyph": "♨",
+      "color": "#c9a17e",
+      "image": "img/tiles/dwarven-stove.svg",
+      "scale": 1
+    },
     "skeleton": {
       "glyph": "╶☠╴",
       "color": "#d0d0c0",

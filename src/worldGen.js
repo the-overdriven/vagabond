@@ -1122,7 +1122,7 @@ function generateCaves() {
     caves: [],
     discovered: Array.from({length: MAP_H}, () => new Array(MAP_W).fill(false))
   })
-  buildDwarvenRuin(deepLevels[1])
+  if (!buildDwarvenRuin(deepLevels[1])) return false
   // The surface Fort gate must belong to the Temple's walkable component.
   // Candidate selection already enforces this, and this check remains as a
   // defensive invariant against future terrain/gate-placement changes.
@@ -1731,6 +1731,45 @@ function buildDwarvenRuin(targetLevel) {
     })
   }
 
+  // The entrance Fort predates the themed Ruins room generator. Furnish one
+  // enclosed, reachable room as a kitchen instead of scattering a loose stove.
+  const fortReach = reachableFromGate()
+  const freeKitchenTile = p => cm[p.y]?.[p.x] === 'marble' &&
+    fortReach.has(keyXY(p.x,p.y)) &&
+    !groundItems.some(g => g.level === ruinLevel && g.x === p.x && g.y === p.y) &&
+    !enemies.some(e => e.alive && e.level === ruinLevel && e.x === p.x && e.y === p.y)
+  const kitchenOptions = []
+  for (const room of rooms.slice(1)) {
+    const edge = dwarvenRoomInterior(room).filter(p => freeKitchenTile(p) &&
+      (p.x === room.x+1 || p.x === room.x+room.w-2 ||
+        p.y === room.y+1 || p.y === room.y+room.h-2))
+    const pairs = []
+    for (const stove of edge) {
+      if (![[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy]) => freeKitchenTile({x:stove.x+dx,y:stove.y+dy}))) continue
+      for (const table of edge) {
+        if (Math.max(Math.abs(stove.x-table.x),Math.abs(stove.y-table.y)) < 3) continue
+        cm[table.y][table.x] = 'dwarventable'
+        const accessible = reachableFromGate().has(keyXY(stove.x,stove.y))
+        cm[table.y][table.x] = 'marble'
+        if (accessible) { pairs.push({stove,table}); break }
+      }
+      if (pairs.length) break
+    }
+    if (pairs.length) kitchenOptions.push({room,pairs})
+  }
+  if (!kitchenOptions.length) return false
+  const chosenKitchen = pick(kitchenOptions)
+  const kitchenPair = pick(chosenKitchen.pairs)
+  const table = kitchenPair.table, stove = kitchenPair.stove
+  cm[table.y][table.x] = 'dwarventable'
+  ruinMap[table.y][table.x] = 'dwarventable'
+  ruinCave.kitchenRoom = {x:chosenKitchen.room.x,y:chosenKitchen.room.y,
+    w:chosenKitchen.room.w,h:chosenKitchen.room.h,archetype:'Kitchen'}
+  groundItems.push({x:stove.x,y:stove.y,kind:'dwarvenstove',burnUntil:0,
+    level:ruinLevel,levelKind:'chain',caveIndex:dwarvenRuin.caveIndex,
+    description:'A stone-and-iron cooking stove in an old dwarven kitchen.'})
+  return true
+
 }
 
 function dungeonWalkDistances(cm, start, blocked = null) {
@@ -1857,7 +1896,8 @@ function buildDwarvenCrossfireGallery(cm, room) {
 function dwarvenRoomArchetypeForProgress(progress, finalFloor = false) {
   const roomCfg = WORLD_GEN_CONFIG.dungeons?.dwarvenRuins?.rooms || {}
   const defs = roomCfg.archetypes || {}
-  const names = Object.keys(defs)
+  // A single guaranteed Kitchen is assigned after the Prison quota is met.
+  const names = Object.keys(defs).filter(name => name !== 'Kitchen')
   if (!names.length) return 'Storage'
   const defensive = new Set(['Barracks', 'Armory', 'Dormitory', 'Prison'])
   return pickWeighted(names, name => {
@@ -1925,7 +1965,8 @@ function dwarvenRoomEntryPoint(cm, room) {
 function deriveDwarvenTacticalSlots(cm, room, roleCounts = null) {
   const requested = roleCounts || {backline: 1, frontline: 2, group: 2, champion: 1, any: 2}
   const entry = dwarvenRoomEntryPoint(cm, room)
-  const interior = dwarvenRoomInterior(room).filter(p => cm[p.y]?.[p.x] === 'marble')
+  const interior = dwarvenRoomInterior(room).filter(p => cm[p.y]?.[p.x] === 'marble' &&
+    !(room.stoveSpot && room.stoveSpot.x === p.x && room.stoveSpot.y === p.y))
   const used = new Set()
   const take = (pool, count) => {
     const result = []
@@ -2101,6 +2142,9 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
   if (room.archetype === 'Barracks') place('dwarvenbed', Math.min(5, 2 + span), zonePool(['backline','sleeping'], edge))
   else if (room.archetype === 'Armory') place('dwarvencrate', Math.min(5, 2 + span), zonePool(['stores','treasure'], edge))
   else if (room.archetype === 'Dining Hall') place('dwarventable', Math.min(4, 1 + span), center)
+  else if (room.archetype === 'Kitchen') {
+    if (!place('dwarventable', Math.min(3, 1 + span), edge)) room.kitchenFurnishingFailed = true
+  }
   else if (room.archetype === 'Library') place('dwarvenshelf', Math.min(6, 2 + span), zonePool(['archive','aisles'], edge))
   else if (room.archetype === 'Forge') place('dwarvencrate', Math.min(3, 1 + span), zonePool(['backline'], edge))
   else if (room.archetype === 'Workshop') place('dwarvencrate', Math.min(4, 1 + span), zonePool(['stores'], edge))
@@ -3209,6 +3253,14 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
     validPrisons++
   }
   if (validPrisons < requiredPrisons) return null
+  // Exactly one ordinary room is a kitchen. Prefer an existing Dining Hall,
+  // but never displace the guaranteed Prison quota, vaults or special chambers.
+  const kitchenCandidates = ordinarySlots.filter(room => room.archetype !== 'Prison' &&
+    !room.vaultType && !room.galleryReserved && !room.crusherReserved && !room.landmark)
+  if (!kitchenCandidates.length) return null
+  const diningKitchens = kitchenCandidates.filter(room => room.archetype === 'Dining Hall')
+  const kitchen = pick(diningKitchens.length ? diningKitchens : kitchenCandidates)
+  kitchen.archetype = 'Kitchen'
   const roomCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.rooms?.archetypes || {}
   const vaultCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.vaults?.definitions || {}
   const keyCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.progressionKeys || {}
@@ -3396,10 +3448,23 @@ function createDwarvenRuinsFloor(entry, floorIndex, floorCount) {
   ])
   if (galleryRoom?.gallery) for (const p of [galleryRoom.gallery.chest,
     ...galleryRoom.gallery.aisle,...galleryRoom.gallery.bays.flat()]) reserved.add(keyXY(p.x,p.y))
+  // Preserve a stone hearth and working space before furniture, tactical
+  // positions, keys and rewards are finalized.
+  const stoveCandidates = dwarvenRoomInterior(kitchen).filter(p => cm[p.y]?.[p.x] === 'marble' &&
+    !reserved.has(keyXY(p.x,p.y)) &&
+    (p.x === kitchen.x+1 || p.x === kitchen.x+kitchen.w-2 ||
+      p.y === kitchen.y+1 || p.y === kitchen.y+kitchen.h-2) &&
+    (kitchen.doorways || []).flat().every(door => Math.max(Math.abs(p.x-door.x),Math.abs(p.y-door.y)) > 2) &&
+    [[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy]) => cm[p.y+dy]?.[p.x+dx] === 'marble'))
+  if (!stoveCandidates.length) return null
+  kitchen.stoveSpot = pick(stoveCandidates)
+  for (const [dx,dy] of [[0,0],[0,1],[0,-1],[1,0],[-1,0]])
+    reserved.add(keyXY(kitchen.stoveSpot.x+dx,kitchen.stoveSpot.y+dy))
   for (const room of roomMetas) {
     if (room.gallery) {buildDwarvenCrossfireGallery(cm, room); continue}
     decorateDwarvenRoomTerrain(cm, room, progress, finalFloor, reserved, overlayUnderlays)
     if (room.archetype === 'Prison' && (room.prisonCellGenerationFailed || !room.prisonCellDoorCandidate)) return null
+    if (room.kitchenFurnishingFailed) return null
   }
   if (hall) {
     // Three paired supports preserve the central aisle and usable side routes.
@@ -3711,6 +3776,11 @@ function buildDwarvenRuinsStratum() {
     }
     if (!level) return false
     const z = chainZForDepth(floorIndex + 4)
+    const kitchen = level.rooms?.find(room => room.archetype === 'Kitchen')
+    if (!kitchen?.stoveSpot || level.rooms.filter(room => room.archetype === 'Kitchen').length !== 1) return false
+    groundItems.push({x:kitchen.stoveSpot.x,y:kitchen.stoveSpot.y,kind:'dwarvenstove',
+      level:z,levelKind:'chain',caveIndex:-1,burnUntil:0,dungeonRoomId:kitchen.id,
+      description:'An old dwarven kitchen stove stands beside the preparation tables.'})
     for (const [xy, floor] of Object.entries(level._overlayUnderlays || {})) {
       const [x, y] = xy.split(',').map(Number)
       if (['dwarvenrubble', 'dwarvenstatue', 'dwarventhrone'].includes(level.map[y]?.[x]))
@@ -7170,6 +7240,14 @@ function validateDwarvenRuinsStratum() {
   const cfg = dungeonPackageConfig('dwarvenRuins') || {}
   const base = validateDungeonStratumBasics('dwarvenRuins')
   const issues = base.issues.slice()
+  const fortKitchen = deepLevels[1]?.caves?.find(c => c.kitchenRoom)?.kitchenRoom
+  const fortStoves = groundItems.filter(g => g.kind === 'dwarvenstove' && g.level === -3)
+  if (!fortKitchen || fortStoves.length !== 1 ||
+      !fortStoves.every(g => g.x > fortKitchen.x && g.x < fortKitchen.x+fortKitchen.w-1 &&
+        g.y > fortKitchen.y && g.y < fortKitchen.y+fortKitchen.h-1 &&
+        deepLevels[1]?.map[g.y]?.[g.x] === 'marble' &&
+        dungeonWalkDistances(deepLevels[1].map,dwarvenRuin).has(keyXY(g.x,g.y))))
+    issues.push('Dwarven Fort: expected exactly one reachable stove inside its kitchen')
   let artifactCount = 0
   const eligible = base.contexts.filter(({z}) => z <= (cfg.timedHazards?.minimumZ ?? -5))
   const gasCount = eligible.reduce((total,{level}) => total +
@@ -7184,6 +7262,15 @@ function validateDwarvenRuinsStratum() {
   for (const context of base.contexts) {
     const {level,z,entry,exit,tag,floorIndex,trapSafe,floorGround} = context
     if (!entry || !exit) continue
+    const kitchens = (level.rooms || []).filter(room => room.archetype === 'Kitchen')
+    const stoves = floorGround.filter(item => item.kind === 'dwarvenstove')
+    if (kitchens.length !== 1 || stoves.length !== 1 || !stoves.every(stove => {
+      const room = kitchens[0]
+      return room && stove.dungeonRoomId === room.id && room.stoveSpot?.x === stove.x &&
+        room.stoveSpot?.y === stove.y && level.map[stove.y]?.[stove.x] === 'marble' &&
+        dungeonWalkDistancesWithDoorTraversal(level.map,entry).has(keyXY(stove.x,stove.y)) &&
+        !groundItems.some(other => other !== stove && other.level === z && other.x === stove.x && other.y === stove.y)
+    })) issues.push(`${tag}: expected exactly one accessible stove in a Kitchen, with no prop overlap`)
     for (const crusher of (level.hazards || []).filter(h=>h.type==='crusher')) {
       const reward=crusher.geometry.rewardChest
       const chests=floorGround.filter(g=>g.kind==='chest' && g.crusherReward===crusher.id)

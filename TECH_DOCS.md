@@ -171,7 +171,7 @@ ordinary river/water SPD penalties, but not cold-river slowdown (§11).
 Regenerates:
 
 **1 HP every 5 turns at levels 1–4, every 4 turns at levels 5–9, and every
-3 turns from level 10 onward.** The rate stays at 3 turns at higher levels. Cooked-food regeneration and campfire
+3 turns from level 10 onward.** The rate stays at 3 turns at higher levels. Cooked-food regeneration and fireplace
 resting also benefit Trolls, alongside this natural regeneration.
 The interval uses the global turn count, and regeneration stops at full HP.
 The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
@@ -1873,6 +1873,16 @@ habitation toward military/industrial rooms. On the final floor, Barracks,
 Armory, Dormitory and Prison weights receive an additional **1.45x defensive
 multiplier**. Archetypes change encounter budget/roles, lock likelihood, loot
 placement/quality and physical furniture rather than being cosmetic labels.
+
+Each floor also contains **exactly one Kitchen**, converted from an ordinary
+non-Prison, non-vault room after the mandatory Prison quota is secured; an
+available Dining Hall is preferred. It has preparation tables and one usable
+Dwarven Stove, with a free approach from the room interior. Neither stair halls
+nor special chambers are converted. The entrance Fort on z:-3 has the same
+one-kitchen/one-stove guarantee within its own enclosed-room layout. There are
+no stoves in the Dwarven Mines. Kitchen furnishings and stove placement cannot
+replace stairs, progression keys, required rewards, trap mechanisms or tactical
+enemy positions. See Cooking and fireplace resting for stove rules.
 
 Each floor then selects **1–2 major vaults** from ten procedural concepts:
 fortified barracks, trapped armory, treasury, library archive, prison block,
@@ -4898,9 +4908,10 @@ The default aggro range is:
 4
 ```
 
-**Campfire ignition noise.** Lighting a fire can be heard by non-passive monsters
-within **8 Euclidean tiles** on the same floor. Hearing chance is
-`min(0.95, max(0.10, 0.95 × (1 − distance/8)²) × blind multiplier)`, with a
+**Fire ignition noise.** Lighting an abandoned campfire can be heard by
+non-passive monsters within **8 Euclidean tiles** on the same floor, while a
+more enclosed Dwarven Stove reaches only **4 tiles**. Hearing chance is
+`min(0.95, max(0.10, 0.95 × (1 − distance/radius)²) × blind multiplier)`, with a
 1.5 multiplier for Blind monsters and 1 otherwise. Listeners become Alarmed
 and investigate the fireplace for 2–6 ordinary movement turns using the same
 pathfinding as mining investigation. Walls do not attenuate sound but still
@@ -5834,7 +5845,7 @@ Drop locations and probabilities stay in `loot_tables.json` and world-generation
 configuration. Merchant quantities and purchase prices stay in
 `merchant_stock.json`, which references item kinds without duplicating names.
 World-dependent mushroom poison chance stays in world-generation configuration.
-Chests, corpses, campfires, and other environmental objects are outside this
+Chests, corpses, campfires, stoves, and other environmental objects are outside this
 inventory catalog.
 
 
@@ -7157,22 +7168,23 @@ Cooked food, including Cooked Fish, does benefit Trolls.
 Wyrdling increases each serving's duration by 25% before it is added to the
 existing counter. Both foods use the same five-turn regeneration tick.
 Effect durations are configured per item in `content/items.json`.
-Resting beside a lit abandoned campfire accelerates this same food effect
-without creating a second healing stream; see Cooking and campfire resting.
+Resting beside a lit fireplace accelerates this same food effect
+without creating a second healing stream; see Cooking and fireplace resting.
 
-## Cooking and campfire resting
+## Cooking and fireplace resting
 
-Abandoned campfires are reusable cooking and resting locations. Stand on the
-fireplace or an adjacent tile and press **F** (the forage/search control on
-touch), or inspect the fireplace while standing on it. Walls and sealed diagonal
-corners prevent using a fire through them. Searching ashes retains its single
-30% Potato roll, independently of lighting, refueling, cooking and resting.
-Portable fire placement and dwarven stoves are not available.
+Abandoned campfires and permanent **Dwarven Stoves** are reusable cooking and
+resting locations. Stand on the fireplace or an adjacent tile and press **F**
+(the forage/search control on touch), or inspect it while standing on it.
+Walls and sealed diagonal corners prevent interaction through them. Abandoned
+campfires retain their single 30% Potato search; stoves have no ash-search loot.
+Portable fire placement is not available.
 
 Lighting requires a reusable **Flint Stone** and consumes **one Brushwood** and
-one world turn. The fire then supports **12 subsequent turns**. Refueling a
-burning fire consumes another bundle and one turn, restoring 12 subsequent turns;
-it cannot bank fuel above that duration. Expiration follows global game turns,
+one world turn. Campfires then support **12 subsequent turns**; Dwarven Stoves
+support **18 subsequent turns**. Refueling consumes another bundle and one turn,
+restoring the corresponding full duration without banking additional fuel.
+Stoves have a quieter ignition sound (see Monster AI). Expiration follows global game turns,
 including time spent on another floor. The cold fireplace remains reusable.
 Fireplaces never block movement or deal contact damage.
 
@@ -7224,7 +7236,7 @@ Lit/cold graphics, fuel duration, recipe recovery, available supplies, current
 HP and food recovery are shown in the contextual panel. The existing status
 interface displays warmth and the food effect.
 
-Fire expiry and searched state persist on the existing ground object. The
+Fire expiry and campfire searched state persist on the existing ground object. The
 shared food timer and partial food-free rest progress persist on the player.
 Each completed cooking/rest/lighting/refueling action is recorded separately;
 UI queues and animation delays are not gameplay state. Loading cancels the UI

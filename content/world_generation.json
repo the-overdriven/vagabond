@@ -717,6 +717,11 @@
             "lootMultiplier": 0.8,
             "tierBiasBonus": 0
           },
+          "Kitchen": {
+            "encounterMultiplier": 0.8,
+            "lootMultiplier": 0.8,
+            "tierBiasBonus": 0
+          },
           "Library": {
             "weightEarly": 1.15,
             "weightLate": 0.65,

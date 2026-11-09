@@ -29,7 +29,7 @@ const DungeonHazards = (() => {
     const occupied = new Set(groundItems.filter(g => g.level === z).map(encode))
     for (const e of enemies) if (e.alive && e.level === z) occupied.add(encode(e))
     const rooms = (level.rooms || []).filter(r => !r.stairRoom && r.optional && !r.onMainRoute && !r.gallery &&
-      !r.landmark && !r.vaultType && r.archetype !== 'Prison' && !r.prisonCell &&
+      !r.landmark && !r.vaultType && !['Prison','Kitchen'].includes(r.archetype) && !r.prisonCell &&
       r.w >= 8 && r.h >= 8 && r.doorways?.length === 1 && r.doorways[0].length === 2 &&
       !(level.vaults || []).some(v => v.roomId === r.id))
       .sort((a,b) => hash(z,0x5fac33a1,a.cx,a.cy) - hash(z,0x5fac33a1,b.cx,b.cy))
@@ -134,7 +134,7 @@ const DungeonHazards = (() => {
     for (const trap of level.traps || []) banned.add(encode(trap.trigger))
     for (const p of groundItems) if (p.level === z) banned.add(encode(p))
     const rooms = (level.rooms || []).filter(r => !r.stairRoom && r.optional && !r.onMainRoute && !r.gallery &&
-      !r.landmark && r.archetype !== 'Prison' && !r.prisonCell &&
+      !r.landmark && !['Prison','Kitchen'].includes(r.archetype) && !r.prisonCell &&
       !(level.vaults || []).some(v => v.roomId === r.id) &&
       // Between two opposing original room walls, never a tiny isolated tile.
       ((r.w>=7 && r.w<=10 && r.h>=9) || (r.h>=7 && r.h<=10 && r.w>=9)))

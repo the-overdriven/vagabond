@@ -18,6 +18,31 @@ function campFixture() {
 }
 
 describe('Abandoned campfire cooking and recovery', () => {
+  it('uses a dwarven kitchen stove for longer cooking and persists the fire', () => {
+    cy.viewport(1366,900)
+    campFixture()
+    cy.window().then(win => win.eval(`Campfires.close();groundItems=[{
+      kind:'dwarvenstove',x:61,y:50,level:0,burnUntil:0,
+      description:'An old dwarven kitchen stove.'}];lootSkeletonOrForage();`))
+    cy.contains('#campOverlay h2','Dwarven stove').should('be.visible')
+    cy.contains('#campOverlay button','Search ashes').should('not.exist')
+    cy.contains('#campOverlay button','Light fire').click()
+    cy.contains('#campOverlay','Burning · 18 turns left').should('be.visible')
+    cy.contains('#campOverlay button','Cook Fresh Fish (1)').click()
+    cy.contains('#campOverlay button','Eat Cooked Fish').click()
+    cy.window().then(win => {
+      const snapshot=win.eval(`(() => {
+        const save=buildSaveObject();
+        return {fire:save.groundItems.find(g=>g.kind==='dwarvenstove'),
+          fish:player.inventory.some(i=>i.kind==='cookedFish'),
+          food:Campfires.foodRemaining()}
+      })()`)
+      expect(snapshot.fire.burnUntil).to.be.greaterThan(0)
+      expect(snapshot.fish).to.equal(false)
+      expect(snapshot.food).to.be.greaterThan(0)
+    })
+  })
+
   for (const [name,width,height] of [['desktop',1366,900],['mobile',390,844]]) {
     it(`cooks, eats and rests through the ${name} controls`, () => {
       cy.viewport(width,height)

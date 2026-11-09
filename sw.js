@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-campfire-cooking';
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-dwarven-stoves';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -65,6 +65,7 @@ const PRECACHE_URLS = [
   './src/highscores.js',
   './src/consumables.js',
   './src/camping.js',
+  './img/tiles/dwarven-stove.svg',
   './img/icons/flint.svg',
   './img/icons/brushwood.svg',
   './src/fireball.js',
