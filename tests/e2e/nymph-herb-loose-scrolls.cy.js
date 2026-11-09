@@ -140,10 +140,10 @@ describe('Nymph herbs and surface scroll variety',()=>{
               LOOSE_CONSUMABLE_VARIANTS.chance===0.4,
               'surface scroll redistribution leaves speed-potion tuning unchanged')
             chance=p=>p===0.75
-            check([0,0.51,0.9].map(v=>{
+            check([0,0.51,0.75,0.9].map(v=>{
               rng=()=>v;return rollLooseSupplyKind('scrollOfInvisibility')
-            }).join(',')==='idscroll,scrollOfFear,scrollOfChaos',
-              'all three approved scroll alternatives can spawn')
+            }).join(',')==='idscroll,scrollOfFear,scrollOfChaos,scrollOfFireball',
+              'all four approved scroll alternatives can spawn')
             check(rollLooseSupplyKind('speedpotion')==='speedpotion',
               'original tactical speed-potion conversion remains independent')
           } finally {chance=oldChance;rng=oldRng;log=oldLog}

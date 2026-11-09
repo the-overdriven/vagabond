@@ -34,8 +34,9 @@ describe('Non-gear item catalog', () => {
       let lower=0
       for(const entry of table){rates[entry.result]=entry.upTo-lower;lower=entry.upTo}
       try {
-        check(rates.gold===32&&rates.arrows===8&&rates.shortBow===.5&&rates.chitin===.5,
-          'the new chest odds come only from gold')
+        check(rates.gold===30.5&&rates.scrollOfFireball===1.5&&
+          rates.arrows===8&&rates.shortBow===.5&&rates.chitin===.5,
+          'Fireball takes 1.5 percentage points from chest gold only')
         check(rates.gear===22.6&&rates.potion>13.69&&rates.potion<13.71,
           'existing gear and healing chances are unchanged')
         maybeAutoEquipWeapon=()=>false
@@ -124,8 +125,8 @@ describe('Non-gear item catalog', () => {
       expect(result.chestScale).to.equal(100)
       expect(result.forageScale).to.equal(100)
       expect(result.scrollResult).to.equal('scrollOfInvisibility')
-      // Arrows are supplies and add one more set of three boundary cases.
-      expect(result.chest, 'configured chest boundaries').to.have.length(28)
+      // Arrows and Fireball each add their own three boundary cases.
+      expect(result.chest, 'configured chest boundaries').to.have.length(31)
       for (const {roll, expected, actual} of result.chest) {
         expect(actual, 'chest roll ' + roll).to.equal(expected)
       }
