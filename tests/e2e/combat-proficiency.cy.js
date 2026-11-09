@@ -77,6 +77,11 @@ describe('Use-based combat proficiency', () => {
       const strongest = $grid[0].querySelector('.achievement-row')
       expect(strongest.getBoundingClientRect().width).to.be.lessThan(
         $grid[0].getBoundingClientRect().width * 0.6)
+      const value = strongest.querySelector('b')
+      if (value.textContent === 'None') {
+        expect(value.getBoundingClientRect().width).to.be.lessThan(
+          strongest.getBoundingClientRect().width / 3)
+      }
     })
     cy.get('.combat-skill-row').should('have.length', 4)
     let rowHeight

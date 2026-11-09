@@ -1076,7 +1076,7 @@ body.hint-collapsed #hint .panel-toggle {
 
 .statgrid .achievement-row {
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) fit-content(55%);
 }
 .statgrid .achievement-row .lbl,
 .statgrid .achievement-row b {
