@@ -40,16 +40,42 @@ describe('Monster poison', () => {
         chance=()=>false
         await playerAttackEnemy(goblin)
         check(!club.venomCoated && goblin.poisonTurns>0,'non-glancing hit poisons and spends coating')
+        check(goblin.poisonDamageRemaining===20 && goblin.poisonDamagePerTurn===2 && goblin.poisonTurns===10,
+          '100 HP target gets 20 damage budget over ten 2-damage ticks')
         const duration=goblin.poisonTurns,hp=goblin.hp
         turnCount=goblin.poisonAppliedTurn+1;tickEnemyPoison()
         check(goblin.hp===hp && goblin.poisonTurns===duration,'no immediate poison tick')
         turnCount++;tickEnemyPoison()
-        check(goblin.hp===hp-1 && goblin.poisonTurns===duration-1,'next turn loses one HP ignoring DEF')
+        check(goblin.hp===hp-2 && goblin.poisonTurns===duration-1 && goblin.poisonDamageRemaining===18,
+          'next turn loses two HP ignoring DEF and spends exactly two damage budget')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved)
         replayAnimationsDisabled=true
-        check(enemies.find(e=>e.id==='venom-goblin').poisonTurns===duration-1,
-          'enemy poison persists through save and load')
+        const restored=enemies.find(e=>e.id==='venom-goblin')
+        check(restored.poisonTurns===duration-1 && restored.poisonDamageRemaining===18 &&
+          restored.poisonDamagePerTurn===2,'enemy poison budget and tick damage persist through save and load')
+        const oneOff=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'venom-budget-target',
+          x:43,y:40,hp:125,maxHp:125,level:0,alive:true,equipment:null})
+        applyPlayerVenomToEnemy(oneOff)
+        check(oneOff.poisonDamageRemaining===25 && oneOff.poisonDamagePerTurn===2 && oneOff.poisonTurns===13,
+          '125 HP target gets exact 25 damage over 13 ticks')
+        turnCount=oneOff.poisonAppliedTurn+2
+        for(let i=0;i<12;i++){tickEnemyPoison();turnCount++}
+        check(oneOff.hp===101 && oneOff.poisonDamageRemaining===1 && oneOff.poisonTurns===1,
+          'the first twelve poison ticks consume 24 of 25 budget')
+        tickEnemyPoison()
+        check(oneOff.hp===100 && oneOff.poisonDamageRemaining===0 && oneOff.poisonTurns===0,
+          'last tick deals only the one remaining HP')
+        applyPlayerVenomToEnemy(oneOff)
+        check(oneOff.poisonDamageRemaining===25 && oneOff.poisonTurns===13,
+          'a new coating refreshes the budget instead of stacking')
+        for(const [maxHp,budget,damage] of [[14,20,2],[43,20,2],[108,21,2],[132,26,2],[200,40,3],[300,60,4]]) {
+          const target=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'venom-scale-'+maxHp,
+            x:45,y:40,hp:maxHp,maxHp,level:0,alive:true,equipment:null})
+          applyPlayerVenomToEnemy(target)
+          check(target.poisonDamageRemaining===budget && target.poisonDamagePerTurn===damage &&
+            target.poisonTurns===Math.ceil(budget/damage),'monster poison scales for '+maxHp+' HP')
+        }
         player.equip.weapon.venomCoated=true
         const skeleton=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Skeleton,id:'venom-skeleton',
           x:41,y:40,hp:50,maxHp:50,level:0,alive:true,equipment:null})
@@ -119,9 +145,12 @@ describe('Monster poison', () => {
         check(shootEnemy(enemy) && enemy.poisonTurns>0 && !player.equip.weapon.venomCoated,
           'successful shot poisons and spends arrow coating')
         const expectedTurns=enemy.poisonTurns
+        const expectedDamage=enemy.poisonDamageRemaining
+        const expectedRate=enemy.poisonDamagePerTurn
         const poisoned=JSON.parse(JSON.stringify(buildSaveObject()))
-        check(poisoned.enemies.find(e=>e.id==='venom-archery-target').poisonTurns>0,
-          'poisoned target is serialized')
+        const savedTarget=poisoned.enemies.find(e=>e.id==='venom-archery-target')
+        check(savedTarget.poisonTurns>0 && savedTarget.poisonDamageRemaining===expectedDamage &&
+          savedTarget.poisonDamagePerTurn===expectedRate,'poisoned target budget is serialized')
         const recording=structuredClone(replayData)
         check(recording.actions.length===2 && recording.actions[0].action==='venomGland' &&
           recording.actions[1].type==='shoot','venom and shot recorded as ordered actions')
@@ -131,7 +160,8 @@ describe('Monster poison', () => {
         activeReplay=recording;replayRngIndex=0
         for(const action of recording.actions) await runReplayAction(action)
         const replayTarget=enemies.find(e=>e.id==='venom-archery-target')
-        check(replayTarget.poisonTurns===expectedTurns && !player.equip.weapon.venomCoated &&
+        check(replayTarget.poisonTurns===expectedTurns && replayTarget.poisonDamageRemaining===expectedDamage &&
+          replayTarget.poisonDamagePerTurn===expectedRate && !player.equip.weapon.venomCoated &&
           replayRngIndex===recording.rng.length,'replay reproduces poison duration and charge use')
       } finally {
         enemyTurn=oldEnemyTurn;npcTurn=oldNpcTurn;chance=oldChance;damageRoll=oldDamage

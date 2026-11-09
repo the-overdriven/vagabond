@@ -3150,6 +3150,8 @@ more difficult:
     enemy.immunityUntilTurn = Number.isInteger(enemy.immunityUntilTurn) ? Math.max(0, enemy.immunityUntilTurn) : 0
     enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
     enemy.poisonTurns = Math.max(0, Math.floor(enemy.poisonTurns || 0))
+    enemy.poisonDamageRemaining = Math.max(0, Math.floor(enemy.poisonDamageRemaining || 0))
+    enemy.poisonDamagePerTurn = Math.max(0, Math.floor(enemy.poisonDamagePerTurn || 0))
     enemy.poisonAppliedTurn = Number.isInteger(enemy.poisonAppliedTurn) ? enemy.poisonAppliedTurn : -1
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
@@ -6280,6 +6282,14 @@ more difficult:
     return Math.max(1, Math.round(baseTurns * (0.90 + rng() * 0.20)))
   }
 
+  function monsterPoisonBudget(maxHp) {
+    return Math.max(20, Math.floor(maxHp * 0.20))
+  }
+
+  function monsterPoisonDamagePerTurn(maxHp) {
+    return Math.min(4, Math.max(2, Math.ceil(maxHp * 0.015)))
+  }
+
   function applyPlayerVenomToEnemy(enemy) {
     if (enemy.hp <= 0 || !enemy.alive) return
     if (enemy.family === 'undead' || enemy.family === 'construct') {
@@ -6288,7 +6298,9 @@ more difficult:
       return
     }
     const refreshed = enemy.poisonTurns > 0
-    enemy.poisonTurns = rollPoisonDuration(enemy.maxHp)
+    enemy.poisonDamageRemaining = monsterPoisonBudget(enemy.maxHp)
+    enemy.poisonDamagePerTurn = monsterPoisonDamagePerTurn(enemy.maxHp)
+    enemy.poisonTurns = Math.ceil(enemy.poisonDamageRemaining / enemy.poisonDamagePerTurn)
     enemy.poisonAppliedTurn = turnCount
     log(refreshed ? `Your venom renews the poison on the ${enemy.name}.` : `Your venom poisons the ${enemy.name}!`, 'good')
     if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, 'Poisoned!', '#52d778')
@@ -6300,10 +6312,12 @@ more difficult:
     for (const enemy of enemies.slice()) {
       if (!enemy.alive || !onCurrentLevel(enemy) || enemy.poisonTurns <= 0 ||
           turnCount <= enemy.poisonAppliedTurn + 1) continue
-      enemy.poisonTurns--
-      enemy.hp = Math.max(0, enemy.hp - 1)
+      const damage = Math.min(enemy.poisonDamagePerTurn, enemy.poisonDamageRemaining)
+      enemy.poisonDamageRemaining -= damage
+      enemy.poisonTurns = Math.ceil(enemy.poisonDamageRemaining / enemy.poisonDamagePerTurn)
+      enemy.hp = Math.max(0, enemy.hp - damage)
       absorbEnemyFatalHit(enemy)
-      if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, '-1', '#52d778')
+      if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, `-${damage}`, '#52d778')
       if (enemy.hp <= 0) {
         log(`The ${enemy.name} dies from poison.`, 'good')
         killEnemy(enemy, true, 'poison')
@@ -11772,7 +11786,7 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
-      ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−1 HP/turn)</div>` : ''}
+      ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${e.poisonDamagePerTurn} HP/turn, ${e.poisonDamageRemaining} HP remaining)</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}

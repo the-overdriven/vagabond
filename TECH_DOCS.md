@@ -4604,21 +4604,33 @@ strikes an immune target. Hitting in melee with a bow never spends the arrow.
 Venom does not stack on one weapon, and attacks on poison-immune families
 consume the coating without applying a status.
 
-Poisoned enemies use the same duration formula and 1 HP damage per turn as
-the player below. An application refreshes rather than stacks; poison ignores
-DEF, is displayed on the enemy's inspection panel, and shows green damage
-feedback. The first tick occurs on the *following* consumed player action,
-not the application action. Ticks happen on the active floor, even while the
-enemy is out of sight; inactive floors do not advance monster effects. Poison
-can kill monsters, awarding normal XP, kill credit and loot. The duration is
-set when poison is applied, independently of subsequent maximum-HP changes.
+Poisoned enemies have a fixed damage budget based on their effective maximum
+HP at application:
+
+`total damage = max(20, floor(maxHP × 0.20))`
+
+`damage per turn = min(4, max(2, ceil(maxHP × 0.015)))`
+
+The last tick deals only the remaining budget. For example, a 43-HP Orc
+takes up to 20 poison damage over 10 turns (2 per turn); a 125-HP enemy
+takes 25 damage over 13 turns (twelve ticks of 2, then 1). This is **potential**
+damage: a monster that dies sooner takes fewer poison ticks. An application
+replaces the remaining budget and duration rather than stacking; poison ignores
+DEF, is displayed on the enemy's inspection panel with its rate and remaining
+budget, and shows green damage feedback. The first tick occurs on the
+*following* consumed player action, not the application action. Ticks happen
+on the active floor, even while the enemy is out of sight; inactive floors do
+not advance monster effects. Poison can kill monsters, awarding normal XP,
+kill credit and loot. The budget and tick damage are fixed at application,
+independently of subsequent maximum-HP changes.
 
 Scorpion, Manticore, Wyvern, Alacran and Xibal have the `poison` ability. Each melee hit
 dealing positive damage has a 30% seeded chance to poison a surviving player,
 including damaging glancing hits and extra attacks. Misses, zero-damage hits,
 and ranged attacks do not apply poison. No poison RNG is used for other enemies.
 
-Duration is calculated at application from current effective maximum HP:
+**Poison on the player** retains its separate duration formula, calculated
+at application from current effective maximum HP:
 
 `max(1, round(min(40, floor(maxHP × 0.20)) × (0.90 + RNG × 0.20)))`
 
@@ -4642,10 +4654,11 @@ Enemies may poison the player again during that turn's response. Application,
 refresh, damage, cure, and natural expiry have message logs. The active-status
 strip shows Poisoned with turns remaining and explains its cure.
 
-The player's remaining poison turns and each monster's poison timer and
-application turn persist in current saves and replay initial states. Coated
-weapons persist as equipment state. All rolls and ticks resolve in game rules,
-independently of animation timing.
+The player's remaining poison turns and each monster's remaining damage
+budget, per-turn damage, derived turn counter and application turn persist in
+current saves and replay initial states. Coated weapons persist as equipment
+state. All rolls and ticks resolve in game rules, independently of animation
+timing.
 
 ## Humanoid
 
