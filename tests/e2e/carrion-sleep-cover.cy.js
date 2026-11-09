@@ -72,12 +72,31 @@ describe('Carrion instinct, sleeping Wyverns and forest cover', () => {
       map[player.y][player.x]='forest';foragedTiles.delete(keyXY(player.x,player.y))
       const e=makeEnemy('Hyena');const before=rngState
       let html=playerConcealmentInfo();check(html.includes('Hide chance vs Hyena:')&&!html.includes('Concealed from'),'chance is not claimed concealment')
+      updateHud();check(document.querySelector('[data-status="forest-cover"]')?.textContent.includes('Forest Cover'),'forest shows potential cover without claiming concealment')
       e.forestConcealX=player.x;e.forestConcealY=player.y
       html=playerConcealmentInfo();check(html.includes('Concealed from Hyena')&&html.includes('%'),'actual concealment and chance shown')
+      updateHud();check(document.querySelector('[data-status="forest-cover"]')?.textContent.includes('Concealed'),'successful cover changes the visible badge')
       check(rngState===before,'tooltip consumes no RNG')
       foragedTiles.add(keyXY(player.x,player.y))
       check(!playerHasForestCover()&&forestHideChance(e,4)===0&&!forestConcealsPlayer(e,4),'foraged forest blocks cached concealment')
       check(playerConcealmentInfo()==='','foraged tooltip has no cover')
+      updateHud();check(!document.querySelector('[data-status="forest-cover"]'),'foraging removes forest cover status')
+
+      e.homeTileType='grass'
+      map[e.y][e.x]='hill'
+      html=tileInspectInfo(e.x,e.y).html
+      check(html.includes('Terrain: Hill · SPD −1, DEF +1')&&html.includes('terrain-stat-up')&&html.includes('terrain-stat-down'),'monster hill tradeoff is shown')
+      map[e.y][e.x]='forest'
+      html=tileInspectInfo(e.x,e.y).html
+      check(html.includes('Terrain: Forest · SPD −1')&&html.includes('terrain-stat-down'),'monster SPD loss is shown')
+      e.homeTileType='forest'
+      html=tileInspectInfo(e.x,e.y).html
+      check(!html.includes('Terrain: Forest · SPD −1'),'native terrain does not claim a suppressed speed penalty')
+      e.homeTileType='grass'
+      map[e.y][e.x]='grass'
+      html=tileInspectInfo(e.x,e.y).html
+      check(!html.includes('Terrain: Grass'),'grass no longer grants monster speed')
+      check(rngState===before,'terrain inspection consumes no RNG')
     })()`))
   })
   it('excludes unopened and unnamed loot from Hunter delivery candidates', () => {

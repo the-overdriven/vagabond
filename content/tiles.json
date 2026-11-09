@@ -849,7 +849,7 @@
     "dwarvengasvent": "a dwarven vent with green residue around its grate; something dangerous may be piped into the room"
   },
   "terrainSpeed": {
-    "grass": 1,
+    "hill": -1,
     "forest": -1,
     "ancientForest": -1,
     "sand": -1,

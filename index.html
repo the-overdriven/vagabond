@@ -212,7 +212,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261107-mobile-npc-layer">
+  <link rel="stylesheet" href="css/style.css?v=20261109-hill-terrain-status">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -2683,7 +2683,7 @@ more difficult:
       if (it.def) d += it.def
       if (it.mod === 'def') d += it.modAmt
     }
-    if (!permanent) d += TERRAIN_DEFENSE[map[player.y] && map[player.y][player.x]] || 0
+    if (!permanent) d += playerTerrainEffects().defense
     d += artifactBonusSum('def') + (permanent ? 0 : curseDebuffSum('def'))
     if (!permanent && !excludePotions) {
       if (player.stoneSkinTurns > 0) d += player.stoneSkinBonus
@@ -2692,15 +2692,40 @@ more difficult:
     return d
   }
 
-  function playerSpdRaw(permanent = false) {
+  function playerTerrainEffects() {
+    const tile = map[player.y]?.[player.x]
+    const coldRiver = tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
+    return {
+      tile,
+      speed: (TERRAIN_SPEED[tile] || 0) - (coldRiver ? 1 : 0),
+      defense: TERRAIN_DEFENSE[tile] || 0,
+    }
+  }
+
+  function terrainDisplayName(tile) {
+    return ({ancientForest: 'Ancient Forest', frozenriver: 'Frozen River'})[tile] ||
+      (tile ? tile.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase()) : 'Unknown terrain')
+  }
+
+  function terrainModifierText(changes) {
+    return [['SPD', changes.speed], ['DEF', changes.defense]]
+      .filter(([, delta]) => delta !== 0)
+      .map(([stat, delta]) => `${stat} ${delta > 0 ? '+' : '−'}${Math.abs(delta)}`)
+      .join(', ')
+  }
+
+  function terrainStatClass(delta) {
+    return delta > 0 ? 'terrain-stat-up' : delta < 0 ? 'terrain-stat-down' : ''
+  }
+
+  function playerSpdRaw(permanent = false, ignoreTerrain = false) {
     let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2) + artifactBonusSum('spd')
     if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
     if (player.equip.armor) s -= (player.equip.armor.speedPenalty || 0)
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
     if (!permanent) {
       if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
-      s += TERRAIN_SPEED[map[player.y] && map[player.y][player.x]] || 0
-      if (map[player.y]?.[player.x] === 'frozenriver' || (map[player.y]?.[player.x] === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')) s -= 1
+      if (!ignoreTerrain) s += playerTerrainEffects().speed
       s -= player.gazeTurns > 0 ? 3 : 0
       s += curseDebuffSum('spd')
       s += carriedItemStat('spd')
@@ -2711,6 +2736,14 @@ more difficult:
 
   function playerSpd(permanent = false) {
     return Math.max(1, playerSpdRaw(permanent))
+  }
+
+  function playerEffectiveTerrainStatChanges() {
+    const terrain = playerTerrainEffects()
+    return {
+      defense: terrain.defense,
+      speed: playerSpd() - Math.max(1, playerSpdRaw(false, true)),
+    }
   }
 
   function levelGrace() {
@@ -5281,19 +5314,29 @@ more difficult:
     return Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.20 : 0))
   }
 
-  function playerConcealmentInfo() {
-    if (!playerHasForestCover()) return ''
+  function visibleForestConcealmentEnemies() {
+    if (!playerHasForestCover()) return []
     const visible = enemies.filter(e => e.alive && onCurrentLevel(e) && !enemyIsPassive(e) && enemyIsVisibleOnMainView(e))
     visible.sort((a,b) => Math.max(Math.abs(a.x-player.x),Math.abs(a.y-player.y)) -
       Math.max(Math.abs(b.x-player.x),Math.abs(b.y-player.y)))
+    return visible
+  }
+
+  function playerConcealedFromVisibleEnemies(visible = visibleForestConcealmentEnemies()) {
+    return visible.filter(other => {
+      const dist = Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y))
+      return forestHideChance(other,dist)>0 && other.forestConcealX===player.x && other.forestConcealY===player.y
+    })
+  }
+
+  function playerConcealmentInfo() {
+    if (!playerHasForestCover()) return ''
+    const visible = visibleForestConcealmentEnemies()
     const e = visible[0]
     if (!e) return '<div class="pfx">Forest cover · no visible monster nearby</div>'
     const dist = Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
     const hidden = forestHideChance(e, dist) > 0 && e.forestConcealX === player.x && e.forestConcealY === player.y
-    const concealed = visible.filter(other => {
-      const d = Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y))
-      return forestHideChance(other,d)>0 && other.forestConcealX===player.x && other.forestConcealY===player.y
-    })
+    const concealed = playerConcealedFromVisibleEnemies(visible)
     const statuses = concealed.map(other => `<div class="pfx">Concealed from ${other.name}</div>`).join('')
     const odds = Math.round(100 * forestHideChance(e,dist))
     return statuses + `<div class="pfx">Hide chance vs ${e.name}: ${odds}%${hidden ? ' (new check; current cover holds)' : dist > effectiveAggroRange(e) ? ' (if it checks from this distance)' : ''}</div>`
@@ -11613,6 +11656,14 @@ more difficult:
       const atkColor = effectiveEnemyAtk < playerAtk() ? 'var(--parchment-dim)' : 'white'
       const effectiveEnemyDef = enemyDef(e)
       const effectiveEnemySpeed = enemySpd(e)
+      const ordinarySpeedWithoutTerrain = Math.max(1, e.spd)
+      const terrainStatChanges = {
+        defense: effectiveEnemyDef - Math.max(0, enemyDefensiveBase(e) + (inspiringChampionFor(e) ? INSPIRED_DEF : 0)),
+        speed: effectiveEnemySpeed - (ordinarySpeedWithoutTerrain + rareStartledBonus(e, ordinarySpeedWithoutTerrain)),
+      }
+      const terrainInfo = terrainModifierText(terrainStatChanges)
+      const terrainName = terrainDisplayName(map[e.y]?.[e.x])
+      const terrainHtml = terrainInfo ? `<div class="pfx terrain-effect">Terrain: ${terrainName} · ${terrainInfo}</div>` : ''
       const defColor = effectiveEnemyDef < playerDef() ? 'var(--parchment-dim)' : 'white'
       const playerSpeed = playerSpd()
       const spdColor = effectiveEnemySpeed > playerSpeed ? '#e0473f' : playerSpeed >= effectiveEnemySpeed * 2 ? 'var(--parchment-dim)' : 'white'
@@ -11657,6 +11708,7 @@ more difficult:
       ${enemyHasAbility(e, 'regen') ? `<div class="pfx" style="color:#82e49b">Regen · +${ENEMY_DEFENSE_CONFIG.regen.healAmount} HP every ${ENEMY_DEFENSE_CONFIG.regen.intervalTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
       ${e.prefix !== 'Champion' && inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
+      ${terrainHtml}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
       ${enemyCarrionInstinctActive(e) ? '<div class="crit">Carrion Instinct · active (+1 AGGRO, +25% ATK)</div>' : ''}
       ${boostHtml}${critHtml}${gangPower > 0 ? `<div class="crit" style="color:#d9b879">gang power (+${gangPower} ATK)</div>` : ''}${enemyIsFleeing(e) ? '<div class="crit" style="color:#d9b879">Fleeing</div>' : ''}${enemyIsEnraged(e) ? '<div class="crit" style="color:#e0473f">Enraged (ATK +25%)</div>' : ''}${e.alarmed ? '<div class="crit" style="color:#e0473f">Alarmed (AGGRO +2)</div>' : ''}${equipmentHtml}
@@ -11665,7 +11717,7 @@ more difficult:
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
       </div>
       <div class="statrow">
-      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
+      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span class="${terrainStatClass(terrainStatChanges.defense)}" ${terrainStatChanges.defense ? '' : `style="color:${defColor}"`}>DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span class="${terrainStatClass(terrainStatChanges.speed)}" ${terrainStatChanges.speed ? '' : `style="color:${spdColor}"`}>SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
       <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>`
@@ -12702,6 +12754,14 @@ more difficult:
     document.getElementById('hAtk').textContent = playerAtk()
     document.getElementById('hDef').textContent = playerDef()
     document.getElementById('hSpd').textContent = playerSpd()
+    const terrainChanges = playerEffectiveTerrainStatChanges()
+    const terrainName = terrainDisplayName(playerTerrainEffects().tile)
+    for (const [id, change] of [['hDef', terrainChanges.defense], ['hSpd', terrainChanges.speed]]) {
+      const stat = document.getElementById(id)
+      stat.classList.toggle('terrain-stat-up', change > 0)
+      stat.classList.toggle('terrain-stat-down', change < 0)
+      stat.title = change ? `${terrainName}: ${id === 'hDef' ? 'DEF' : 'SPD'} ${change > 0 ? '+' : '−'}${Math.abs(change)}` : ''
+    }
     document.getElementById('hMf').textContent = playerMf()
     document.getElementById('hGold').textContent = player.gold
     document.getElementById('hDeaths').textContent = player.deaths
@@ -12908,6 +12968,10 @@ more difficult:
       lbl.textContent = k
       const val = document.createElement('b')
       val.textContent = v
+      if (k === 'DEF' || k === 'SPD') {
+        const changes = playerEffectiveTerrainStatChanges()
+        val.className = terrainStatClass(k === 'DEF' ? changes.defense : changes.speed)
+      }
       d.appendChild(lbl)
       d.appendChild(val)
       if (skillKey) {

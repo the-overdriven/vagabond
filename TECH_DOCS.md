@@ -965,7 +965,8 @@ Current terrain speed effects:
 
 | Terrain | SPD |
 |---|---:|
-| Grass | +1 |
+| Grass | 0 |
+| Hill | -1 |
 | Forest | -1 |
 | Ancient Forest | -1 |
 | Sand | -1 |
@@ -974,13 +975,28 @@ Current terrain speed effects:
 | River | -2 |
 | Water | -2 |
 
-Hill:
+Hill trades movement speed for defense:
 
 ```text
-+1 DEF
++1 DEF, -1 SPD
 ```
 
 There is currently no general terrain-based ATK or vision system.
+
+Terrain modifiers apply to both players and enemies through their existing
+effective-stat calculations. A monster does not take a negative SPD modifier
+on its native terrain; normal minimum-stat limits still apply. Cold river
+terrain may apply an additional SPD penalty (see Snow / Cold).
+
+The HUD highlights effective player DEF/SPD in green with an upward arrow for
+terrain gains and red with a downward arrow for terrain losses. The status strip
+identifies the terrain and the effective changes while the modifier is active.
+Enemy inspection tooltips show the same directional stat highlights and a
+terrain summary, including on mobile. The character sheet reflects these
+changes on its mobile stat rows. Colors and arrows describe actual effective
+changes after stat limits, not hypothetical raw bonuses. Terrain modifiers are
+derived from the current tile, not separate timed statuses; inspecting them
+never changes combat calculations, RNG, or replay state.
 
 ---
 
@@ -4971,6 +4987,13 @@ loading does not reroll a stationary player's cover. The character tooltip repor
 per-enemy successful concealment and the hide probability against the nearest visible
 hostile monster. Probability is for a new check, not a reroll of cached cover.
 Tooltip rendering never consumes RNG.
+An active **Forest Cover** badge appears in the status strip while standing
+on unforaged forest. The same badge reads **Concealed** when at least one
+visible hostile enemy currently has a successful concealment check against
+the player, with details identifying those enemies. Standing in forest alone
+does not imply successful concealment; when no visible hostile remains
+concealed, the badge returns to **Forest Cover**. Neither display triggers a
+new spotting roll.
 
 ### Alarmed
 

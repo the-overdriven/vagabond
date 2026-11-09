@@ -4,6 +4,23 @@
 function activePlayerStatuses() {
   if (player.hp <= 0) return []
   const statuses = []
+  const terrain = playerTerrainEffects()
+  const terrainChanges = playerEffectiveTerrainStatChanges()
+  const terrainBonus = terrainModifierText(terrainChanges)
+  if (terrainBonus) {
+    statuses.push({id:'terrain', icon:'⌁', label:`${terrainDisplayName(terrain.tile)} · ${terrainBonus}`,
+      counter:'', tone: terrainChanges.speed * terrainChanges.defense < 0 ? 'mixed' :
+        terrainChanges.speed > 0 || terrainChanges.defense > 0 ? 'up' : 'down',
+      detail:`${terrainDisplayName(terrain.tile)} changes your effective ${terrainBonus.replace(', ', ' and ')}. Leaving this terrain removes the modifier.`})
+  }
+  if (playerHasForestCover()) {
+    const concealedFrom = playerConcealedFromVisibleEnemies()
+    const hidden = concealedFrom.length > 0
+    statuses.push({id:'forest-cover', icon:'♣', label: hidden ? 'Concealed' : 'Forest Cover', counter:'', tone:'up',
+      detail: hidden
+        ? `Forest cover conceals you from ${concealedFrom.map(e => e.name).join(', ')}. It lasts at this position until the enemy can detect you; moving allows a new hide check.`
+        : 'Unforaged forest cover offers a chance to hide from unaware enemies at least two tiles away. It does not guarantee concealment against enemies that already noticed you or are adjacent.'})
+  }
   const gas = DungeonHazards.activeGasStatus()
   if (gas) statuses.push({id:'gas',icon:'☠',label:'Poison gas',counter:`${gas.remainingTurns}t`,
     detail:`The chamber vents in ${gas.remainingTurns} turns. The emergency valve takes two turns; alternatively breach the exit with a weapon.`})
@@ -146,6 +163,7 @@ function updatePlayerStatuses() {
       button.append(icon, label)
     }
     button.children[0].textContent = status.icon
+    button.dataset.tone = status.tone || ''
     const text = status.counter ? `${status.label} · ${status.counter}` : status.label
     if (button.children[1].textContent !== text) button.children[1].textContent = text
     button.dataset.detail = status.detail

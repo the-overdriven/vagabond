@@ -28,14 +28,15 @@ function statsFixture() {
   const ctx = vm.createContext({player,
     DEFAULT_RACE:'human', RACES:JSON.parse(fs.readFileSync(path.join(root, 'content/races.json'))),
     ARMORS:JSON.parse(fs.readFileSync(path.join(root, 'content/gear_armors.json'))),
-    map:[['grass']], TERRAIN_DEFENSE:{hill:1}, TERRAIN_SPEED:{snow:-1}, tileUnderlays:{},
+    map:[['grass']], TERRAIN_DEFENSE:{hill:1}, TERRAIN_SPEED:{snow:-1,hill:-1}, tileUnderlays:{},
     keyXY:(x,y)=>`${x},${y}`, itemDefinition:kind=>({carryStats:kind==='bigbell'?{spd:-2}:{}}),
     rng:()=>{throw new Error('ranking must not consume RNG')},
     Math:Object.assign(Object.create(Math), {random:()=>{throw new Error('no random ranking')}})})
   const functions = ['raceDef','raceBonus','raceGrace','isWeaponItem','weaponGrace','armorGracePenalty',
     'gearGracePenalty','playerGracePenalty','levelGrace','playerGraceBonus','playerGrace',
     'forEachActiveArtifact','artifactBonusSum','curseDebuffSum','carriedItemStat',
-    'playerAtk','playerDef','playerSpdRaw','playerSpd','playerPermanentStats']
+    'playerTerrainEffects','playerAtk','playerDef','playerSpdRaw','playerSpd',
+    'playerEffectiveTerrainStatChanges','playerPermanentStats']
   vm.runInContext(functions.map(gameFunction).join('\n'), ctx)
   return ctx
 }
@@ -69,8 +70,29 @@ test('transient terrain, curses, potion and bell affect live stats but not ranki
     assert.deepEqual(plain(ctx.playerPermanentStats()), expected)
     assert.equal(ctx.playerAtk(), 4.25)
     assert.equal(ctx.playerDef(), tile === 'hill' ? 9.5 : 8.5)
-    assert.equal(ctx.playerSpd(), ['snow','frozenriver','river'].includes(tile) ? 3.5 : 4.5)
+    assert.equal(ctx.playerSpd(), ['hill','snow','frozenriver','river'].includes(tile) ? 3.5 : 4.5)
   }
+})
+
+test('terrain highlighting reads effective changes, including cold river penalties', () => {
+  const tileRules = JSON.parse(fs.readFileSync(path.join(root, 'content/tiles.json')))
+  assert.equal(tileRules.terrainSpeed.grass ?? 0, 0, 'grass has no speed bonus')
+  assert.equal(tileRules.terrainSpeed.hill, -1, 'hills reduce speed by one')
+  assert.equal(tileRules.terrainDefense.hill, 1, 'hills still add one defense')
+  const ctx = statsFixture()
+  ctx.map[0][0] = 'hill'
+  assert.deepEqual(plain(ctx.playerEffectiveTerrainStatChanges()), {defense:1,speed:-1})
+  ctx.map[0][0] = 'snow'
+  assert.deepEqual(plain(ctx.playerEffectiveTerrainStatChanges()), {defense:0,speed:-1})
+  ctx.map[0][0] = 'river'; ctx.tileUnderlays['0,0'] = 'snow'
+  assert.deepEqual(plain(ctx.playerEffectiveTerrainStatChanges()), {defense:0,speed:-1})
+  ctx.map[0][0] = 'grass'
+  assert.deepEqual(plain(ctx.playerEffectiveTerrainStatChanges()), {defense:0,speed:0})
+  ctx.player.lvl = 1; ctx.player.race = 'human'; ctx.player.baseSpd = 0
+  ctx.player.equip.shield = null; ctx.player.equip.armor = null
+  ctx.map[0][0] = 'snow'
+  assert.equal(ctx.playerSpd(), 1)
+  assert.equal(ctx.playerEffectiveTerrainStatChanges().speed, 0, 'clamped speed is not falsely marked as reduced')
 })
 
 test('only active artifact bonuses used by combat contribute, without mutation', () => {

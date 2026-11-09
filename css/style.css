@@ -141,6 +141,28 @@ h1 {
   color: var(--ember-bright);
 }
 
+/* Terrain modifies the effective value, not the underlying stat. Keep the
+   direction legible without relying on color alone in HUD and inspection UI. */
+#hud .stat b.terrain-stat-up,
+:is(#statGrid, #tooltip, #mobileInfoPanel) .terrain-stat-up {
+  color: #7ddc7d;
+}
+
+#hud .stat b.terrain-stat-down,
+:is(#statGrid, #tooltip, #mobileInfoPanel) .terrain-stat-down {
+  color: #e0655a;
+}
+
+:is(#hud, #statGrid, #tooltip, #mobileInfoPanel) .terrain-stat-up::after {
+  content: ' ↑';
+  font-size: 0.85em;
+}
+
+:is(#hud, #statGrid, #tooltip, #mobileInfoPanel) .terrain-stat-down::after {
+  content: ' ↓';
+  font-size: 0.85em;
+}
+
 #hpbarwrap {
   width: 160px;
   height: 14px;
@@ -2290,6 +2312,12 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
 .player-status[data-status="regen"] .player-status-icon { color: #98ba78; }
 .player-status[data-status="invisible"] .player-status-icon { color: #b1a5d8; }
 .player-status[data-status="speed"] .player-status-icon { color: var(--ember-bright); }
+.player-status[data-tone="up"] .player-status-icon { color: #7ddc7d; }
+.player-status[data-tone="down"] .player-status-icon { color: #e0655a; }
+.player-status[data-tone="mixed"] .player-status-icon { color: #d9b879; }
+
+#tooltip .terrain-effect,
+#mobileInfoPanel .terrain-effect { color: var(--parchment); }
 
 #playerStatusDetail {
   position: absolute;

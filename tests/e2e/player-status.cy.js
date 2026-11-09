@@ -86,10 +86,25 @@ describe('Active player statuses', () => {
       updateHud()
     `))
     cy.get('#playerStatuses').should('not.be.visible')
+    cy.get('#hSpd').should('not.have.class', 'terrain-stat-up')
     cy.window().then(win => win.eval('player.godMode = true; player.godInvisible = true; updateHud()'))
     cy.get('[data-status="invisible"]').should('contain.text', '∞')
     cy.window().then(win => win.eval('player.godInvisible = false; updateHud()'))
     cy.get('#playerStatuses').should('not.be.visible')
+    cy.window().then(win => win.eval(`
+      map[player.y][player.x] = 'hill'; updateHud()
+    `))
+    cy.get('[data-status="terrain"]').should('contain.text', 'Hill · SPD −1, DEF +1')
+    cy.get('[data-status="terrain"]').should('have.attr', 'data-tone', 'mixed')
+    cy.get('#hDef').should('have.class', 'terrain-stat-up')
+    cy.get('#hSpd').should('have.class', 'terrain-stat-down')
+    cy.window().then(win => win.eval(`
+      map[player.y][player.x] = 'forest'; updateHud()
+    `))
+    cy.get('[data-status="terrain"]').should('contain.text', 'Forest · SPD −1')
+    cy.get('[data-status="forest-cover"]').should('contain.text', 'Forest Cover')
+    cy.get('#hSpd').should('have.class', 'terrain-stat-down')
+    cy.get('#hDef').should('not.have.class', 'terrain-stat-up')
   })
 
   it('fits desktop and narrow canvases in tile and ASCII modes and keeps inspection turn-free', () => {
