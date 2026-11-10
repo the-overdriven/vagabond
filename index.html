@@ -1687,18 +1687,29 @@ more difficult:
     }
   }
 
+  // Synchronous path searches cannot mutate props. Index their blockers once;
+  // discard the snapshot afterwards so loads, floors and prop edits stay live.
+  let pathingStoveTiles = null
+  function withPathingStoves(action) {
+    if (pathingStoveTiles) return action()
+    pathingStoveTiles = new Set(groundItems.filter(g =>
+      g.kind === 'dwarvenstove' && onCurrentLevel(g)).map(g => keyXY(g.x, g.y)))
+    try { return action() } finally { pathingStoveTiles = null }
+  }
+
   function isWalkable(x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     const row = map[y]
     if (!row) return false // world not generated yet
-    if (groundItems.some(g => g.kind === 'dwarvenstove' && g.x === x && g.y === y && onCurrentLevel(g))) return false
     const key = row[x]
     const tile = TILE[key]
     if (!tile) {
       console.warn('Unknown tile at', x, y, '-> value was:', key)
       return false
     }
-    return tile.walk
+    if (!tile.walk) return tile.walk
+    return !(pathingStoveTiles ? pathingStoveTiles.has(keyXY(x, y)) :
+      groundItems.some(g => g.kind === 'dwarvenstove' && g.x === x && g.y === y && onCurrentLevel(g)))
   }
 
   const DUNGEON_DOOR_OPEN_STATE = Object.freeze({
@@ -5524,6 +5535,10 @@ more difficult:
   // blocked - so two monsters queuing up behind each other, or one standing behind a
   // boulder, could never walk around the obstruction.
   function enemyFindStep(e, requireRoute = false) {
+    return withPathingStoves(() => enemyFindStepWithStoves(e, requireRoute))
+  }
+
+  function enemyFindStepWithStoves(e, requireRoute = false) {
     const minX = Math.max(0, Math.min(e.x, player.x) - CHASE_DETOUR)
     const maxX = Math.min(MAP_W - 1, Math.max(e.x, player.x) + CHASE_DETOUR)
     const minY = Math.max(0, Math.min(e.y, player.y) - CHASE_DETOUR)
@@ -5902,6 +5917,10 @@ more difficult:
   }
 
   function enemyBuildFarPath(e, targetX, targetY, avoidVillage = false, search = enemyFarSearch()) {
+    return withPathingStoves(() => enemyBuildFarPathWithStoves(e, targetX, targetY, avoidVillage, search))
+  }
+
+  function enemyBuildFarPathWithStoves(e, targetX, targetY, avoidVillage = false, search = enemyFarSearch()) {
     if (surfaceFarCatchupTerrain)
       return enemyBuildFarCatchupPath(e, targetX, targetY, avoidVillage, search)
     const start = e.y * MAP_W + e.x
@@ -5951,6 +5970,10 @@ more difficult:
   }
 
   function enemyChooseFarTarget(e, avoidVillage = false) {
+    return withPathingStoves(() => enemyChooseFarTargetWithStoves(e, avoidVillage))
+  }
+
+  function enemyChooseFarTargetWithStoves(e, avoidVillage = false) {
     const search = enemyFarSearch()
     let candidateSides
     if (avoidVillage) {
@@ -10001,24 +10024,39 @@ more difficult:
     runAnimationLoop()
   }
 
+  const DAMAGE_LINE_PX = 24
   function spawnDamageNumber(x, y, amount, color, delay, duration = DAMAGE_ANIM_MS) {
-    const start = performance.now(), showAt = start + (delay || 0)
-    const labelWidth = value => Math.max(18, String(value).length * 11)
-    const labelY = (popup, when) => popup.y - (popup.stack || 0) * 0.95 -
-      0.85 * Math.max(0, Math.min(1, (when - popup.start - popup.delay) / popup.duration))
-    let stack = 0
-    // Pick a free *screen-space* lane, not just an unused stack number.
-    // Stacking a popup one tile below another by one tile made their labels
-    // land on top of each other even though their stack numbers differed.
-    while (damageAnims.some(p => {
-      const first = Math.max(showAt, p.start + p.delay)
-      if (first >= Math.min(showAt + duration, p.start + p.delay + p.duration)) return false
-      if (Math.abs(p.x - x) * TILE_PX >= (labelWidth(p.amount) + labelWidth(amount)) / 2 + 4) return false
-      const proposed = {x, y, start, delay: delay || 0, duration, stack}
-      return Math.abs(labelY(p, first) - labelY(proposed, first)) * TILE_PX < 24
-    })) stack++
-    damageAnims.push({x, y, amount, color, start, delay: delay || 0, duration, stack})
+    damageAnims.push({x, y, amount, color, start: performance.now(), delay: delay || 0, duration})
     runAnimationLoop()
+  }
+
+  // Lay out only labels whose impact has arrived. Newest stays at its anchor;
+  // older overlapping labels move up one text line, independent of tile zoom.
+  function layoutDamageNumbers(now) {
+    const active = damageAnims.filter(p => now >= p.start + p.delay &&
+      now < p.start + p.delay + p.duration)
+    active.sort((a, b) => (b.start + b.delay) - (a.start + a.delay) ||
+      damageAnims.indexOf(b) - damageAnims.indexOf(a))
+    const placed = []
+    for (const p of active) {
+      const t = (now - p.start - p.delay) / p.duration
+      const baseY = p.y * TILE_PX - 16 * t
+      let y = baseY - (p.liftPx || 0)
+      const width = Math.max(18, String(p.amount).length * 11)
+      const overlapping = placed.filter(q => Math.abs(q.x - p.x) * TILE_PX < (q.width + width) / 2 + 4)
+      // A push can meet another label above it, so repeat until all lanes clear.
+      let pushed
+      do {
+        pushed = false
+        for (const q of overlapping) if (Math.abs(y - q.y) < DAMAGE_LINE_PX) {
+          y = q.y - DAMAGE_LINE_PX
+          pushed = true
+        }
+      } while (pushed)
+      p.liftPx = baseY - y
+      p.displayY = y
+      placed.push({x:p.x, y, width})
+    }
   }
 
   function spawnProjectileAnim(path, projectile, duration = RANGED_CONFIG.projectileAnimationMs, delay = 0) {
@@ -11244,6 +11282,7 @@ more difficult:
         ctx.restore()
       }
     }
+    layoutDamageNumbers(now)
     for (let i = damageAnims.length - 1; i >= 0; i--) {
       const p = damageAnims[i]
       const elapsed = now - p.start
@@ -11255,7 +11294,7 @@ more difficult:
       }
       if (!undergroundTileVisible(p.x, p.y)) continue
       const vx = Math.round((p.x - camX) * TILE_PX)
-      const vy = Math.round((p.y - camY) * TILE_PX - TILE_PX * (0.85 * t + (p.stack || 0) * 0.95))
+      const vy = Math.round(p.displayY - camY * TILE_PX)
       ctx.save()
       ctx.globalAlpha = 1 - t
       ctx.font = 'bold 18px Consolas, \'Courier New\', monospace'

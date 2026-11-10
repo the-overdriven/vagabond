@@ -497,12 +497,26 @@ async function main() {
     const before=rngState
     spawnDamageNumber(40,40,'Enraged!','#fff')
     spawnDamageNumber(40,41,'Hit!','#fff')
+    layoutDamageNumbers(performance.now())
     const [upper,lower]=damageAnims
-    const upperY=upper.y-(upper.stack||0)*0.95
-    const lowerY=lower.y-(lower.stack||0)*0.95
-    if(Math.abs(upperY-lowerY)*TILE_PX<24)throw Error('adjacent combat labels visually overlap')
-    spawnDamageNumber(40,40,'Miss!','#fff')
-    if(damageAnims[2].stack===upper.stack)throw Error('same-tile combat labels share a lane')
+    if(Math.abs(upper.displayY-lower.displayY)<24)throw Error('adjacent combat labels visually overlap')
+    damageAnims=[]
+    for(const zoom of [16,32,64]) {
+      const originalSize=TILE_PX
+      TILE_PX=zoom
+      damageAnims=[]
+      spawnDamageNumber(40,40,'Old','#fff')
+      spawnDamageNumber(40,40,'New','#fff')
+      layoutDamageNumbers(performance.now())
+      if(damageAnims[1].displayY-damageAnims[0].displayY!==24)throw Error('newest must be one line below')
+      spawnDamageNumber(40,40,'Delayed','#fff',300)
+      layoutDamageNumbers(performance.now())
+      if(damageAnims[2].displayY!==undefined)throw Error('pending impact entered layout')
+      layoutDamageNumbers(damageAnims[2].start+300)
+      if(damageAnims[2].displayY-damageAnims[1].displayY!==24 ||
+         damageAnims[1].displayY-damageAnims[0].displayY!==24)throw Error('delayed impact order')
+      TILE_PX=originalSize
+    }
     if(rngState!==before)throw Error('combat label layout consumed gameplay RNG')
   })()`)
   console.log('PASS staggered combat popups avoid adjacent-tile overlap without RNG')

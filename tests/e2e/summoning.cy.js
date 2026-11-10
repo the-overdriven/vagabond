@@ -75,11 +75,23 @@ describe('Once-only monster summoning', () => {
           damageAnims=[]
           spawnDamageNumber(40,40,'Enraged!','#ffffff')
           spawnDamageNumber(40,41,'Hit!','#ffffff')
+          layoutDamageNumbers(performance.now())
           const [upper,lower]=damageAnims
-          summonCheck(Math.abs((upper.y-upper.stack*0.95)-(lower.y-lower.stack*0.95))*TILE_PX>=24,
+          summonCheck(Math.abs(upper.displayY-lower.displayY)>=DAMAGE_LINE_PX,
             'adjacent enemy popups have separate screen-space positions')
-          spawnDamageNumber(40,40,'Miss!','#ffffff')
-          summonCheck(damageAnims[2].stack!==upper.stack,'same-tile popups avoid stacking in one lane')
+          damageAnims=[]
+          spawnDamageNumber(40,40,'Old','#ffffff')
+          spawnDamageNumber(40,40,'New','#ffffff')
+          layoutDamageNumbers(performance.now())
+          summonCheck(Math.abs(damageAnims[1].displayY-damageAnims[0].displayY-DAMAGE_LINE_PX)<0.01,
+            'new popup sits one text line below the old popup')
+          const before=damageAnims[0].displayY
+          spawnDamageNumber(40,40,'Delayed','#ffffff',300)
+          layoutDamageNumbers(performance.now())
+          summonCheck(damageAnims[0].displayY>=before-1,'pending hits do not push visible text')
+          layoutDamageNumbers(damageAnims[2].start+300)
+          summonCheck(damageAnims[2].displayY>damageAnims[1].displayY &&
+            damageAnims[1].displayY>damageAnims[0].displayY,'impact order pushes older labels upward')
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
             summonCheck(e.atk===Math.max(1,Math.round(t.atk*strength)) && e.def===Math.max(0,Math.round(t.def*strength)),'template ATK/DEF')

@@ -724,6 +724,12 @@ Animation never controls rules or RNG: actor destinations are resolved first, an
 animation loop only presents those already-determined start/end positions and guarantees
 a final repaint.
 
+Combat and healing popups place the newest visible message at the bottom.
+Older overlapping messages move upward by one 24-pixel text line, independent
+of map zoom; labels from adjacent tiles also avoid overlap. Delayed projectile
+feedback joins the stack only when its impact is displayed. Popups never delay
+input or affect combat resolution, saves, or replay RNG.
+
 ---
 
 # 8. Auto-Pathing
@@ -5180,7 +5186,11 @@ disengagement roll on that shot's response turn, including when the arrow
 misses. Other enemies and subsequent non-shooting turns retain normal chase
 rules. This uses the existing recorded shot target and consumes no extra RNG.
 
-Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit.
+Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit. Synchronous searches index
+stove blockers once rather than rescanning every ground item for every tile.
+The index is discarded after the search; terrain, doors and actor occupancy
+remain live. This preserves route tie-breaking, monster counts, turn order and
+seeded RNG, and adds no saved state.
 
 Both chase modifiers use effective SPD (including terrain, equipment, potions,
 status effects and monster speed bonuses) and the same formula:

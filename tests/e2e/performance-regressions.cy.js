@@ -12,7 +12,7 @@ function referencePath(e, targetX, targetY, avoidVillage = false) {
     for (const [dx, dy] of DIRS8) {
       const nx = cx + dx, ny = cy + dy, ni = ny * MAP_W + nx
       if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H || prev[ni] !== -1) continue
-      if (!enemyCanTraverse(e, nx, ny)) continue
+      if (DungeonHazards.isCrusherTrigger(nx, ny) || !enemyCanPathThrough(e, nx, ny)) continue
       if (avoidVillage) {
         const a = enemyFarVillageDistance(cx, cy), b = enemyFarVillageDistance(nx, ny)
         if (b <= ENEMY_FAR_VILLAGE_AVOID_RADIUS && (a > ENEMY_FAR_VILLAGE_AVOID_RADIUS || b < a)) continue
@@ -74,6 +74,36 @@ describe('Turn and idle rendering performance regressions', () => {
         } finally { ({map, occupied, spawnPoint} = saved); render() }
       })()`)
       expect(result.every(Boolean)).to.equal(true)
+    })
+  })
+
+  it('indexes stove blockers per search without retaining stale props or consuming RNG', () => {
+    cy.window().then(win => {
+      win.eval(`window.referencePath = ${referencePath.toString()}`)
+      const result = win.eval(`(() => {
+        const saved = {map, groundItems, occupied, spawnPoint, currentZ}
+        try {
+          currentZ=0
+          map=Array.from({length:MAP_H},()=>Array(MAP_W).fill('grass'))
+          occupied=new Set();spawnPoint={x:1,y:1}
+          groundItems=Array.from({length:500},(_,i)=>({kind:'skeleton',x:i%MAP_W,y:5,level:0}))
+          const stove={kind:'dwarvenstove',x:31,y:30,level:0}
+          groundItems.push(stove)
+          const e={x:30,y:30}, before=rngState
+          const results=[]
+          for(const move of [false,true]) {
+            if(move)stove.x=32
+            results.push(JSON.stringify(enemyBuildFarPath(e,34,30))===JSON.stringify(referencePath(e,34,30)))
+            results.push(!isWalkable(stove.x,stove.y) && pathingStoveTiles===null)
+          }
+          groundItems.pop()
+          results.push(enemyBuildFarPath(e,34,30).length===4 && isWalkable(32,30))
+          try {withPathingStoves(()=>{throw Error('test')})} catch {}
+          results.push(pathingStoveTiles===null && rngState===before)
+          return results.every(Boolean)
+        } finally {({map,groundItems,occupied,spawnPoint,currentZ}=saved)}
+      })()`)
+      expect(result).to.equal(true)
     })
   })
 
