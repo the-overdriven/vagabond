@@ -5773,6 +5773,7 @@ more difficult:
       .map(choice => choice.side)
   }
 
+  let turnSurfaceTraversal = null
   let enemyFarBuffers = null
   let surfaceFarCatchupTerrain = null
 
@@ -5818,7 +5819,30 @@ more difficult:
   function enemyFarCanTraverse(e, x, y, search) {
     const i = y * MAP_W + x
     if (!search.traversable[i]) {
-      if (surfaceFarCatchupTerrain && !e.humanoid) {
+      if (currentZ === 0 && pathingStoveTiles && !surfaceFarCatchupTerrain) {
+        // Surface geology has no mine deposits or crusher plates. Reuse the
+        // existing movement rules per terrain/ability combination; sanctuary
+        // and live stove positions remain coordinate-specific.
+        if (!search.surfaceRules) {
+          const profile = [!!e.humanoid, enemyHasAbility(e,'ethereal'),
+            enemyHasAbility(e,'swim'), enemyHasAbility(e,'fly')].join('|')
+          const profiles = turnSurfaceTraversal || new Map()
+          if (!profiles.has(profile)) profiles.set(profile, new Map())
+          search.surfaceRules = {terrain:profiles.get(profile),
+            outside:(e.level ?? 0) === 0 && sanctuaryDistance(e.x,e.y) > FLEE_DISTANCE,
+            protectedPlayer:playerInsideSanctuary()}
+        }
+        const rules = search.surfaceRules
+        const forbidden = rules.outside && (sanctuaryDistance(x,y) <= FLEE_DISTANCE ||
+          (rules.protectedPlayer && Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) <= ATTACK_RANGE))
+        if (forbidden) search.traversable[i] = 2
+        else {
+          const key = map[y]?.[x] + '|' + pathingStoveTiles.has(keyXY(x,y))
+          if (!rules.terrain.has(key)) rules.terrain.set(key,
+            enemyCanTraverse(e,x,y) || enemyCanOpenDungeonDoor(e,x,y))
+          search.traversable[i] = rules.terrain.get(key) ? 1 : 2
+        }
+      } else if (surfaceFarCatchupTerrain && !e.humanoid) {
         const terrain = enemyHasAbility(e, 'fly') ? surfaceFarCatchupTerrain.flyer :
           enemyHasAbility(e, 'swim') ? surfaceFarCatchupTerrain.swimmer : surfaceFarCatchupTerrain.ground
         search.traversable[i] =
@@ -6486,9 +6510,12 @@ more difficult:
     Campfires.beginTurn()
     DungeonHazards.onPlayerTurnConsumed(turnCount)
     if (player.hp <= 0 || deathTransition) return
+    const previousTraversal = turnSurfaceTraversal
+    turnSurfaceTraversal = new Map()
     try {
       return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget)
     } finally {
+      turnSurfaceTraversal = previousTraversal
       // Fear stays active through its last action and damage can cancel it
       // immediately, including when a trap hits a monster later in turn order.
       for (const e of enemies) if (e.fearTurns > 0) e.fearTurns--
@@ -10293,6 +10320,7 @@ more difficult:
         animLoopFrame = requestAnimationFrame(step)
       } else {
         animLoopFrame = null
+        updatePlayerStatuses()
         if (lastMousePx !== null) updateTooltip()
       }
     }
@@ -10489,13 +10517,25 @@ more difficult:
     }, AMBIENT_TILE_ANIM_MS)
   }
 
+  let frameMiningLightSources = null
+  function renderLightSources() {
+    if (frameMiningLightSources) return frameMiningLightSources
+    const sources = Mining.lightSources()
+    if (visualFrameTime !== null) frameMiningLightSources = sources
+    return sources
+  }
+
   function render(now, terrainCells = null) {
+    if (now === undefined) updatePlayerStatuses()
+    const previousLights = frameMiningLightSources
+    frameMiningLightSources = null
     const previousFrameTime = visualFrameTime
     visualFrameTime = now ?? performance.now()
     try {
       renderScene(visualFrameTime, terrainCells)
     } finally {
       visualFrameTime = previousFrameTime
+      frameMiningLightSources = previousLights
     }
   }
 
@@ -10752,7 +10792,7 @@ more difficult:
         if (!visible.has(keyXY(mx, my))) continue
         let darkness = mineSightDarknessAt(mx, my)
         if (!darkness) continue
-        for (const source of Mining.lightSources()) {
+        for (const source of renderLightSources()) {
           const light = Mining.lightInfo(source)
           if (!light) continue
           const dist = Math.hypot(mx - source.x, my - source.y)
@@ -10797,7 +10837,7 @@ more difficult:
     darknessGradient.addColorStop(1, `rgba(0, 0, 0, ${lighting.exploredDarkness})`)
     shadeCtx.fillStyle = darknessGradient
     shadeCtx.fillRect(0, 0, canvas.width, canvas.height)
-    for (const source of Mining.lightSources()) {
+    for (const source of renderLightSources()) {
       const light = Mining.lightInfo(source)
       if (!light) continue
       const mask = mineCrystalMask(source, light.radius, visible, baseX, baseY, columns, rows)
@@ -10828,7 +10868,7 @@ more difficult:
     const lighting = MINING_CONFIG.lighting
     const pulse = lighting.pulseOpacity * Math.sin(now / lighting.pulsePeriodMs)
     const inMines = !!Mining.activeLevel()
-    const sources = Mining.lightSources()
+    const sources = renderLightSources()
     const crystalLayer = mineLightingCanvas('crystalGlow')
     const crystalCtx = crystalLayer.getContext('2d')
     crystalCtx.clearRect(0, 0, crystalLayer.width, crystalLayer.height)
@@ -10919,7 +10959,6 @@ more difficult:
 
   function renderScene(now, terrainCells = null) {
     if (!map.length || worldGenerating) return
-    updatePlayerStatuses()
     updateAlarmedEnemies()
     const undergroundVisible = currentUndergroundFov()
     // Keep the ordinary surface discovery rules outside the tower. Only the
@@ -10934,7 +10973,7 @@ more difficult:
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
     const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
-      ? Mining.lightSources().map(source => {
+      ? renderLightSources().map(source => {
         const light = Mining.lightInfo(source)
         const hex = light?.color || MINING_CONFIG.minerals[source.mineral]?.glow
         return {source, light, color: hex

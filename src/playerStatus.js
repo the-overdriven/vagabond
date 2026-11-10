@@ -132,6 +132,12 @@ function schedulePlayerStatusLayout() {
 }
 
 window.addEventListener('resize', schedulePlayerStatusLayout)
+if (typeof ResizeObserver !== 'undefined') {
+  const statusLayoutObserver = new ResizeObserver(schedulePlayerStatusLayout)
+  statusLayoutObserver.observe(playerStatusRoot.parentElement)
+  const statusCanvas = document.getElementById('game')
+  if (statusCanvas) statusLayoutObserver.observe(statusCanvas)
+}
 
 function inspectPlayerStatus(id) {
   inspectedPlayerStatus = id
@@ -144,7 +150,7 @@ function inspectPlayerStatus(id) {
 }
 
 function updatePlayerStatuses() {
-  positionPlayerStatusesOverCanvas()
+  schedulePlayerStatusLayout()
   const statuses = activePlayerStatuses()
   const signature = JSON.stringify(statuses)
   if (signature === playerStatusSignature) return

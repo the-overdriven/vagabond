@@ -107,6 +107,51 @@ describe('Turn and idle rendering performance regressions', () => {
     })
   })
 
+  it('shares surface terrain checks across movement profiles without changing paths', () => {
+    cy.window().then(win => {
+      win.eval(`window.referencePath = ${referencePath.toString()}`)
+      expect(win.eval(`(() => {
+        const saved={map,groundItems,occupied,spawnPoint,currentZ,turnSurfaceTraversal}
+        try {
+          currentZ=0;spawnPoint={x:1,y:1};occupied=new Set()
+          map=Array.from({length:MAP_H},()=>Array(MAP_W).fill('mountain'))
+          for(let y=25;y<38;y++)for(let x=25;x<38;x++)map[y][x]='grass'
+          map[30][31]='water';map[31][31]='boulder';map[29][31]='dwarvendoorclosed'
+          groundItems=[{kind:'dwarvenstove',x:32,y:30,level:0}]
+          turnSurfaceTraversal=new Map()
+          const before=rngState
+          for(const abilities of [[],['swim'],['fly'],['ethereal']])
+            for(const humanoid of [false,true])for(const sleeping of [false,true]) {
+              const e={x:30,y:30,abilities,humanoid,sleeping}
+              const fast=enemyBuildFarPath(e,35,30)
+              if(JSON.stringify(fast)!==JSON.stringify(referencePath(e,35,30)))return false
+            }
+          map[30][31]='grass';groundItems[0].x=33
+          const e={x:30,y:30,abilities:[]}
+          return JSON.stringify(enemyBuildFarPath(e,35,30))===JSON.stringify(referencePath(e,35,30)) && rngState===before
+        } finally {({map,groundItems,occupied,spawnPoint,currentZ,turnSurfaceTraversal}=saved)}
+      })()`)).to.equal(true)
+    })
+  })
+
+  it('reuses light lists only inside a frame and skips status rebuilds on animation frames', () => {
+    cy.window().then(win => {
+      expect(win.eval(`(() => {
+        const saved={renderScene,updatePlayerStatuses,lightSources:Mining.lightSources}
+        let lists=0,statuses=0
+        try {
+          updatePlayerStatuses=()=>statuses++
+          Mining.lightSources=()=>{lists++;return []}
+          renderScene=()=>{renderLightSources();renderLightSources();renderLightSources()}
+          render(100);render(120)
+          if(lists!==2 || statuses!==0)return false
+          render()
+          return lists===3 && statuses===1 && frameMiningLightSources===null
+        } finally {renderScene=saved.renderScene;updatePlayerStatuses=saved.updatePlayerStatuses;Mining.lightSources=saved.lightSources}
+      })()`)).to.equal(true)
+    })
+  })
+
   it('retains candidate/RNG order while reusing exhausted searches', () => {
     cy.window().then(win => {
       win.eval(`window.referencePath = ${referencePath.toString()}`)

@@ -730,6 +730,13 @@ of map zoom; labels from adjacent tiles also avoid overlap. Delayed projectile
 feedback joins the stack only when its impact is displayed. Popups never delay
 input or affect combat resolution, saves, or replay RNG.
 
+Animation-only frames reuse the current status display. Actions and HUD changes
+refresh it, and the animation loop refreshes it again on completion so visible
+concealment information follows the settled camera. Status placement follows
+canvas/stage resizing. Lighting passes share one source list within each render;
+the next frame rebuilds it, preserving immediate pickup, fire and floor changes.
+
+
 ---
 
 # 8. Auto-Pathing
@@ -5190,7 +5197,11 @@ Enemy pathfinding uses breadth-first search and can route around obstacles and o
 stove blockers once rather than rescanning every ground item for every tile.
 The index is discarded after the search; terrain, doors and actor occupancy
 remain live. This preserves route tie-breaking, monster counts, turn order and
-seeded RNG, and adds no saved state.
+seeded RNG, and adds no saved state. During a surface turn, equivalent movement
+profiles share terrain passability results. Flying, swimming, ethereal movement,
+sleeping and door-opening capabilities remain distinct; sanctuary restrictions,
+stove positions and actor occupancy are still checked for the current search.
+These derived results are discarded after the turn, including interrupted turns.
 
 Both chase modifiers use effective SPD (including terrain, equipment, potions,
 status effects and monster speed bonuses) and the same formula:
