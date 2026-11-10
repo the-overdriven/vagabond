@@ -845,6 +845,7 @@ function generateMap() {
   // Validate mandatory walking routes while lakes are still impassable.
   // Fragile ice must never be required to reach a landmark or entrance.
   freezeSurfaceLakes()
+  meltSurroundedLakeIce()
 }
 
 // Picks the sand tile the treasure map's X marks. Chosen once per world so
@@ -1133,9 +1134,50 @@ function generateCaves() {
   if (fortTooClose) return false
   if (!buildDwarvenRuinsStratum()) return false
   if (!buildDwarvenMinesStratum()) return false
+  placeDwarvenFortHole()
   initializeMausoleum()
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
+}
+
+// A rare, one-way hole connects an accessible z:-2 grotto to the outer fort.
+// The fort exit remains the only return route; no passage is carved in z:-3.
+function placeDwarvenFortHole() {
+  const deep = deepLevels[0]
+  const cfg = WORLD_GEN_CONFIG.caves.deep
+  if (!deep?.map || !dwarvenRuin || !chance(cfg.fortHoleChance)) return
+  const queue = [], distances = new Map()
+  for (const cave of deep.caves || []) for (const p of cave.entrances || []) {
+    if (deep.map[p.y]?.[p.x] !== 'caveup') continue
+    const key = keyXY(p.x, p.y)
+    if (distances.has(key)) continue
+    queue.push({x:p.x, y:p.y})
+    distances.set(key, 0)
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const p = queue[i], distance = distances.get(keyXY(p.x, p.y))
+    for (const [dx, dy] of DIRS8) {
+      const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
+      if (distances.has(key) || !TILE[deep.map[y]?.[x]]?.walk) continue
+      distances.set(key, distance + 1)
+      queue.push({x, y})
+    }
+  }
+  const spots = []
+  for (const [key, distance] of distances) {
+    if (distance < cfg.fortHoleMinStairDistance) continue
+    const [x, y] = key.split(',').map(Number)
+    if (deep.map[y][x] !== 'cavefloor2') continue
+    if (groundItems.some(g => g.level === -2 && g.x === x && g.y === y) ||
+        enemies.some(e => e.alive && e.level === -2 && e.x === x && e.y === y)) continue
+    if (!deep.caveMaps.some(cm => cm[y]?.[x] === 'cavefloor2')) continue
+    spots.push({x, y})
+  }
+  if (!spots.length) return
+  const site = pick(spots)
+  deep.map[site.y][site.x] = 'dwarvenhole'
+  for (const cm of deep.caveMaps) if (cm[site.y]?.[site.x] === 'cavefloor2')
+    cm[site.y][site.x] = 'dwarvenhole'
 }
 
 // The crypt must remain a separate z:-1 region. Check the actual merged
@@ -5229,12 +5271,12 @@ function spawnEnemies() {
     return pool
   }
 
-  function spawnOneFromTemplate(tmpl, preferredPool = null) {
+  function spawnOneFromTemplate(tmpl, preferredPool = null, forcedSpot = null) {
     if (!surfaceSpawnEligible(tmpl) || !naturalSpawnEligible(tmpl)) return false
     const pool = preferredPool || poolFor(tmpl)
     if (!pool.length) return false
-    let x = 0, y = 0, tries = 0, placed = false
-    while (tries < cfg.placementTries) {
+    let x = forcedSpot?.x ?? 0, y = forcedSpot?.y ?? 0, tries = 0, placed = !!forcedSpot
+    while (!forcedSpot && tries < cfg.placementTries) {
       tries++
       const p = randInt(0, (pool.length >> 1) - 1) * 2
       x = pool[p]
@@ -5243,7 +5285,7 @@ function spawnEnemies() {
       placed = true
       break
     }
-    if (!placed) return false
+    if (!placed || occupied.has(keyXY(x, y))) return null
     const variance = cfg.statVarianceMin + rng() * cfg.statVarianceSpan
     const e = {
       name: tmpl.name, tier: tmpl.tier, level: 0, ordinarySurface: true,
@@ -5275,9 +5317,29 @@ function spawnEnemies() {
       else if ((e.wander === 'home' || e.wander === 'homeReanchored') && cfg.roamPromotionChance > 0 && chance(cfg.roamPromotionChance)) e.wander = 'roam'
     }
     occupied.add(keyXY(x, y))
-    return true
+    return e
   }
 
+  const groupPools = new Map()
+  function nearbyGroupSpots(tmpl, anchor) {
+    let allowed = groupPools.get(tmpl.name)
+    if (!allowed) {
+      const pool = poolFor(tmpl)
+      allowed = new Set()
+      for (let i = 0; i < pool.length; i += 2) allowed.add(keyXY(pool[i], pool[i + 1]))
+      groupPools.set(tmpl.name, allowed)
+    }
+    const spots = []
+    for (let dy = -cfg.groupRadius; dy <= cfg.groupRadius; dy++)
+      for (let dx = -cfg.groupRadius; dx <= cfg.groupRadius; dx++) {
+        if (!dx && !dy) continue
+        const x = anchor.x + dx, y = anchor.y + dy, key = keyXY(x, y)
+        if (allowed.has(key) && !occupied.has(key)) spots.push({x, y})
+      }
+    return spots
+  }
+
+  // Packs are additional monsters: never reduce the usual world population.
   for (let i = 0; i < total; i++) {
     let r = rng(), tier = 1, acc = 0
     for (let t = 0; t < weights.length; t++) {
@@ -5290,7 +5352,17 @@ function spawnEnemies() {
     const templates = ENEMY_TEMPLATES.filter(e => e.tier === tier && surfaceSpawnEligible(e) && naturalSpawnEligible(e))
     if (!templates.length) continue
     const tmpl = pickWeighted(templates, t => (t.rarity ?? 1) * (t.humanoid ? 1 : cfg.nonHumanoidRarityMultiplier))
-    spawnOneFromTemplate(tmpl)
+    const first = spawnOneFromTemplate(tmpl)
+    if (!first) continue
+    const packChance = cfg.groupChanceByTier[String(tier)] || 0
+    if (!packChance || !chance(packChance)) continue
+    const packSize = randInt(...cfg.groupSizeRange)
+    for (let member = 1; member < packSize; member++) {
+      const available = nearbyGroupSpots(tmpl, first)
+      if (!available.length) break
+      const spot = pick(available)
+      if (!spawnOneFromTemplate(tmpl, null, spot)) break
+    }
   }
 
   // Migrant groups start on a world edge. Their far pathfinding targets the
@@ -6949,9 +7021,8 @@ function spawnDwarvenRuinsRoomProps(level, z) {
     else if (room.archetype === 'Burial Chamber' || room.archetype === 'Temple')
       addProp(room, 'dwarvenremains', 'Old dwarven remains lie where this chamber was overrun.')
   }
-  // Decorative dwarven remains and searchable skeletal remains are separate
-  // populations. The former preserve the ruined-fort dressing; the latter are
-  // interactive corpses using the normal one-time search/loot rules.
+  // Ambient dwarven remains and skeletal remains are separate populations.
+  // Both are searchable, with their own independent loot tables and placement.
   const remainsRange = story.remainsPerFloorRange || [2, 4]
   const remainsBase = randInt(remainsRange[0], remainsRange[1])
   const remainsProgress = dungeonProgressMultiplier(story.remainsProgressMultiplierRange, level.progress, 1)

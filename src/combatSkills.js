@@ -44,8 +44,8 @@ function combatSkillDescription(key) {
       'Train by receiving melee hits while carrying a shield. Misses, arrows and spells do not count.'
     ],
     marksmanship: [
-      `Your Short Bow has ${percent(skill * 0.25)}% fewer misses compared with an untrained bow (up to 25%).`,
-      'Train by damaging enemies with arrows from a Short Bow.'
+      `Your bows have ${percent(skill * 0.25)}% fewer misses compared with an untrained archer (up to 25%).`,
+      'Train by damaging enemies with arrows from any bow.'
     ]
   }
   return [...details[key]].join('\n')

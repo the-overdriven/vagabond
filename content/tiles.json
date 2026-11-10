@@ -154,6 +154,7 @@
       "mini": "#ff6b2e",
       "walk": true
     },
+    "dwarvenhole": {"ch":"◉", "color":"#a68d72", "bg":"#0a0b0d", "mini":"#da6d3d", "walk":true},
     "dwarvenfortexit": {
       "ch": "^",
       "color": "#e8b85b",
@@ -686,6 +687,7 @@
     "cavefloor2": "2",
     "cavedown": "d",
     "caveup": "u",
+    "dwarvenhole": "?",
     "dwarvenfortexit": "U",
     "dwarvenstairsdown": "A",
     "dwarvenstairsup": "B",
@@ -775,6 +777,7 @@
     "cavefloor2": "the cold stone floor of a deeper cave",
     "cavedown": "a narrow crack descending further into the dark",
     "caveup": "a rough passage leading back up",
+    "dwarvenhole": "a deep, rough-edged hole dropping into the ruined Dwarven Fort; there is no way to climb back",
     "dwarvenfortexit": "the Dwarven Fort exit, a stairway rising through the ruined gates",
     "dwarvenstairsdown": "a broad dwarven staircase descending deeper into the ruined settlement",
     "dwarvenstairsup": "a broad dwarven staircase leading back toward the upper ruins",

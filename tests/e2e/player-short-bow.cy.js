@@ -7,6 +7,24 @@ function beginNewGame(name) {
 }
 
 describe('Player Short Bow', () => {
+  it('loads both bows from the ranged catalog and gives the tier-three Hunting Bow seven ranged ATK', () => {
+    beginNewGame('Hunting Bow Tester')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const short=WEAPONS.find(w=>w.name==='Short Bow')
+      const hunting=WEAPONS.find(w=>w.name==='Hunting Bow')
+      check(short?.tier===1&&short.rangedAtk===5&&short.rangedRange===6,'short bow is unchanged')
+      check(hunting?.tier===3&&hunting.rangedAtk===7&&hunting.rangedRange===6,'Hunting Bow stats')
+      const bow=makeBowItem('Hunting Bow')
+      check(bow.twoHanded&&bow.rangedAtk===7&&bow.atk===2&&bow.baseValue===600,'Hunting Bow item')
+      player.equip={weapon:bow,armor:null,shield:null}
+      check(equippedShortBow()===bow,'all ranged bows activate shooting')
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(saved,{isReplayInit:true})
+      check(player.equip.weapon.base==='Hunting Bow'&&equippedShortBow()?.rangedAtk===7,
+        'Hunting Bow survives save and replay restoration')
+    })()`))
+  })
   it('sells bow and separate ten-arrow bundles; distant shooter loot remains recoverable on the ground', () => {
     cy.viewport(1440, 900)
     beginNewGame('Bow Merchant Tester')

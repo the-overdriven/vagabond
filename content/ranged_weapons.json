@@ -1,0 +1,4 @@
+[
+  {"name": "Short Bow",   "atk":1, "grace":1, "twoHanded":true, "tier":1, "baseValue":300, "sellValue":30, "rangedAtk":5, "rangedRange":6},
+  {"name": "Hunting Bow", "atk":2, "grace":1, "twoHanded":true, "tier":3, "baseValue":600, "sellValue":60, "rangedAtk":7, "rangedRange":6}
+]

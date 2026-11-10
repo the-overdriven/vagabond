@@ -419,4 +419,91 @@ describe('Persistent Dwarven Ruins stratum', () => {
     })()`))
   })
 
+  it('creates a reachable one-way grotto hole with a cancellable warning and a safe fort-gate landing', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const cfg=WORLD_GEN_CONFIG.caves.deep,originalChance=cfg.fortHoleChance
+      const originalConfirm=window.confirm
+      try {
+        cfg.fortHoleChance=1
+        for (const seed of [17632,42618]) {
+          replayPlaying=false;replayRecording=false
+          currentZ=0;currentCave=-1;map=surfaceMap
+          applyWorldTraits([]);WORLD_SEED=seed;rngState=seed
+          await generateNewWorld()
+          const caveMap=deepLevels[0].map
+          const holes=[]
+          for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
+            if(caveMap[y][x]==='dwarvenhole')holes.push({x,y})
+          check(holes.length===1,'forced chance produces one grotto hole for seed '+seed)
+          const hole=holes[0],queue=[],seen=new Set()
+          for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)if(caveMap[y][x]==='caveup'){
+            queue.push({x,y});seen.add(keyXY(x,y))
+          }
+          for(let i=0;i<queue.length;i++)for(const [dx,dy] of DIRS8){
+            const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
+            if(seen.has(k)||!TILE[caveMap[y]?.[x]]?.walk)continue
+            seen.add(k);queue.push({x,y})
+          }
+          check(seen.has(keyXY(hole.x,hole.y)),'hole reachable from normal cave ascent')
+          check(deepLevels[0].caveMaps.some(cm=>cm[hole.y]?.[hole.x]==='dwarvenhole'),
+            'hole is stamped into the cave map used for rendering')
+          currentZ=-2;currentCave=-1;map=caveMap
+          undergroundDiscovered=depthUndergroundDiscovered(2)
+          player.x=hole.x;player.y=hole.y
+          const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+          loadGameFromObject(saved,{isReplayInit:true})
+          check(map[player.y][player.x]==='dwarvenhole','save restores hole and player position')
+          let prompts=0
+          window.confirm=message=>{prompts++;check(message.includes('ONE-WAY'),'jump warning is explicit');return false}
+          inspect()
+          check(prompts===1&&currentZ===-2,'cancel leaves player in cave')
+          window.confirm=()=>true
+          inspect()
+          check(currentZ===-3&&player.x===dwarvenRuin.x&&player.y===dwarvenRuin.y,
+            'confirmed jump lands on original fort gate, without skipping locked rooms')
+          check(map[player.y][player.x]==='dwarvenfortexit','fort gate remains usable')
+          inspect()
+          check(currentZ===0&&player.x===dwarvenRuin.x&&player.y===dwarvenRuin.y,
+            'player returns to surface via main fort gate')
+        }
+      } finally {cfg.fortHoleChance=originalChance;window.confirm=originalConfirm}
+    })()`))
+  })
+
+  it('searches dwarven remains once for gold, arrows, crystals, or ordinary gear, never a pickaxe', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      currentZ=-3;currentCave=-1;map=depthUndergroundMap(3)
+      player.x=dwarvenRuin.x;player.y=dwarvenRuin.y;player.inventory=[]
+      enemies=[];npcs=[];occupied=new Set();Campfires.close()
+      const originalRng=rng
+      try {
+        for(const [roll,expected] of [[.05,'gold'],[.18,'arrows'],[.24,'crystal'],[.29,'gear'],[.95,'empty']]) {
+          groundItems=[{kind:'dwarvenremains',level:-3,levelKind:'chain',x:player.x,y:player.y,
+            description:'Old dwarf bones.'}]
+          player.inventory=[];player.gold=0;rng=()=>roll
+          lootSkeletonOrForage()
+          const remains=groundItems[0]
+          check(remains.looted,'dwarven remains are marked searched')
+          const gear=player.inventory.filter(i=>['weapon','armor','shield'].includes(i.kind))
+          check(expected!=='gold'||player.gold>=5,'gold reward')
+          check(expected!=='arrows'||player.inventory.some(i=>i.kind==='arrows'),'arrow reward')
+          check(expected!=='crystal'||player.inventory.some(i=>['quartz','amethyst','topaz'].includes(i.kind)),
+            'crystal reward')
+          check(expected!=='gear'||gear.length===1,'one ordinary gear reward')
+          check(expected!=='empty'||(!player.inventory.length&&player.gold===0),'empty result')
+          check(!player.inventory.some(i=>i.base==='Pickaxe'||i.kind==='pickaxe'),'never drops pickaxe')
+          const invCount=player.inventory.length,gold=player.gold
+          lootSkeletonOrForage()
+          check(player.inventory.length===invCount&&player.gold===gold,'cannot loot remains twice')
+        }
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        check(groundItems.some(g=>g.kind==='dwarvenremains'&&g.looted),
+          'searched status survives save and replay restoration')
+      } finally {rng=originalRng}
+    })()`))
+  })
+
 })

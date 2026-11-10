@@ -6,7 +6,7 @@ let campOpen = false
 const Campfires = (() => {
   const FUEL_LIMIT = 5
   const fireRules = {
-    campfire: {name:'Abandoned campfire',burnTurns:12,noiseRadius:8},
+    campfire: {name:'Abandoned campfire',burnTurns:12,noiseRadius:16},
     dwarvenstove: {name:'Dwarven stove',burnTurns:18,noiseRadius:4}
   }
   const isFire = fire => !!fireRules[fire?.kind]

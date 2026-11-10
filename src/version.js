@@ -2,5 +2,5 @@
 // Bump the save version for incompatible save data or replay action/turn-rule changes.
 // Generation-only changes keep the save version: saves and replay initial states
 // restore complete generated worlds instead of rerunning world generation.
-self.VAGABOND_GAME_VERSION = 'v209'
-self.VAGABOND_SAVE_VERSION = 128
+self.VAGABOND_GAME_VERSION = 'v210'
+self.VAGABOND_SAVE_VERSION = 129

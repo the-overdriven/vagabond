@@ -907,6 +907,7 @@ more difficult:
   async function loadContent() {
     const files = {
       weapons: 'gear_weapons.json',
+      rangedWeapons: 'ranged_weapons.json',
       shields: 'gear_shields.json',
       armors: 'gear_armors.json',
       modifiers: 'item_modifiers.json',
@@ -948,8 +949,8 @@ more difficult:
       if (!response.ok) throw new Error('Failed to load content/' + file + ' (' + response.status + ')')
       content[key] = await response.json()
     }
-    WEAPONS = content.weapons
-    BASE_WEAPONS = content.weapons
+    WEAPONS = [...content.weapons, ...content.rangedWeapons]
+    BASE_WEAPONS = WEAPONS
     SHIELDS = content.shields
     ARMORS = content.armors
     MODIFIERS = content.modifiers
@@ -1233,6 +1234,8 @@ more difficult:
 
   function inspect() {
     if (enemyAttackPresentationPending()) return
+    if (currentZ === -2 && currentLevelKind() === 'chain' && map[player.y]?.[player.x] === 'dwarvenhole' &&
+        !replayPlaying && !window.confirm('Jump into the hole?\n\nIt drops into the ruined Dwarven Fort. This is ONE-WAY: you cannot climb back up. You must find your way out through the fort\'s main gates.')) return
     recordReplayAction({type: 'inspect'})
     if (!enterCave()) describeSurroundings()
   }
@@ -1294,7 +1297,7 @@ more difficult:
   // connect the fort and persistent Dwarven Ruins floors.
   const CAVE_TRANSITION_TILES = new Set([
     'towerstairsup', 'towerstairsdown',
-    'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup',
+    'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup', 'dwarvenhole',
     'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenminesopen',
     'minestairsup', 'minestairsdown', 'minecageupperoff', 'minecageloweroff',
     'minecageupperon', 'minecageloweron', 'dwarvenliftoff', 'dwarvenlifton',
@@ -1563,6 +1566,24 @@ more difficult:
       if (tile === 'dwarvengate') log('You climb back through the open gates into the mountain air. The silence of the dead settlement fades behind you.', 'info')
       else if (returnCave?.crypt) log('You climb out of the crypt and back into the ruined chapel.', 'info')
       else log('You climb back out into the mountain air.', 'info')
+    } else if (tile === 'dwarvenhole') {
+      if (currentZ !== -2 || currentLevelKind() !== 'chain' || !dwarvenRuin) return false
+      const fortMap = depthUndergroundMap(3)
+      if (!fortMap) return false
+      // Land only on the existing fort gate, never across a locked door.
+      const landing = {x:dwarvenRuin.x, y:dwarvenRuin.y}
+      if (fortMap[landing.y]?.[landing.x] !== 'dwarvenfortexit' ||
+          enemies.some(e => e.alive && e.level === -3 && e.x === landing.x && e.y === landing.y)) {
+        log('The fall is obstructed below. You step away from the hole.', 'info')
+        return true
+      }
+      currentCave = -1
+      currentZ = -3
+      map = fortMap
+      undergroundDiscovered = depthUndergroundDiscovered(3)
+      player.x = landing.x
+      player.y = landing.y
+      log('You jump into the hole and land amid the ruins of the Dwarven Fort. There is no way back up.', 'bad')
     } else if (tile === 'cavedown') {
       const depth = chainDepthForZ(currentZ), nextDepth = depth + 1
       const nextMap = depthUndergroundMap(nextDepth)
@@ -2066,8 +2087,9 @@ more difficult:
   }
 
   function makeWeaponItem(tier, mf = 0, sourceTier = 0) {
-    // Short Bows enter play only through the Merchant and arrow-shooting enemies.
-    const base = pickEquipmentBase(WEAPONS.filter(w => !w.rangedAtk), tier, sourceTier)
+    // Short Bows retain their special sources. Tier-3 Hunting Bows can appear
+    // alongside ordinary tier-3+ weapon drops, chests, and artifacts.
+    const base = pickEquipmentBase(WEAPONS.filter(w => !w.rangedAtk || w.name === 'Hunting Bow'), tier, sourceTier)
     const item = {
       kind: 'weapon',
       base: base.name,
@@ -2076,14 +2098,15 @@ more difficult:
       tier: base.tier,
       baseValue: base.baseValue,
       twoHanded: !!base.twoHanded,
+      ...(base.rangedAtk ? {rangedAtk:base.rangedAtk, rangedRange:base.rangedRange, sellValue:base.sellValue} : {}),
       name: base.name
     }
     return rollModifier(base.name, item, mf, sourceTier)
   }
 
-  function makeShortBowItem(mf = 0, sourceTier = 0, enchanted = false) {
-    const base = WEAPONS.find(w => w.name === 'Short Bow')
-    if (!base) throw new Error('Missing Short Bow in gear_weapons.json')
+  function makeBowItem(baseName, mf = 0, sourceTier = 0, enchanted = false) {
+    const base = WEAPONS.find(w => w.name === baseName && w.rangedAtk)
+    if (!base) throw new Error('Missing ranged weapon in ranged_weapons.json: ' + baseName)
     const item = {kind:'weapon', base:base.name, name:base.name, atk:base.atk,
       grace:base.grace, tier:base.tier, baseValue:base.baseValue,
       sellValue:base.sellValue, twoHanded:true,
@@ -2091,8 +2114,12 @@ more difficult:
     return enchanted ? rollModifier(base.name, item, mf, sourceTier) : item
   }
 
+  function makeShortBowItem(mf = 0, sourceTier = 0, enchanted = false) {
+    return makeBowItem('Short Bow', mf, sourceTier, enchanted)
+  }
+
   function equippedShortBow() {
-    return player.equip?.weapon?.base === 'Short Bow' ? player.equip.weapon : null
+    return player.equip?.weapon?.rangedAtk ? player.equip.weapon : null
   }
 
   function makeShieldItem(tier, mf = 0, sourceTier = 0) {
@@ -4107,7 +4134,7 @@ more difficult:
           : `You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
       }
       if (chance(RANGED_CONFIG.shortBowDropChance)) {
-        const bow = makeShortBowItem(mf, e.tier || 0, true)
+        const bow = makeBowItem(e.tier >= 3 && chance(0.25) ? 'Hunting Bow' : 'Short Bow', mf, e.tier || 0, true)
         if (onGround) placeEnemyLootOnGround(e, bow)
         else player.inventory.push(bow)
         lootLog(`The ${e.name} dropped ${bow.name}.`, bow, bow.name)
@@ -7472,6 +7499,7 @@ more difficult:
       return
     }
     const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
+    const dwarvenRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'dwarvenremains' && g.x === player.x && g.y === player.y)
     const campfire = Campfires.nearby()
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
@@ -7513,6 +7541,35 @@ more difficult:
     }
     if (campfire && !skeleton) {
       Campfires.open(campfire)
+      return
+    }
+    if (dwarvenRemains) {
+      if (dwarvenRemains.looted) {
+        log('These dwarven remains have already been searched.', 'info')
+        return
+      }
+      dwarvenRemains.looted = true
+      const roll = rng()
+      if (roll < 0.14) {
+        const gold = randInt(5, 25)
+        player.gold += gold
+        log(`You search the dwarven remains and find ${gold} gold.`, 'loot')
+      } else if (roll < 0.22) {
+        const arrows = randInt(4, 12)
+        addInventoryItem('arrows', {count: arrows})
+        log(`You search the dwarven remains and find ${arrows} arrows.`, 'loot')
+      } else if (roll < 0.27) {
+        const mineral = pick(['quartz', 'quartz', 'amethyst', 'topaz'])
+        addInventoryItem(mineral)
+        log(`You find ${itemDefinition(mineral).name} among the dwarven remains.`, 'loot')
+      } else if (roll < 0.31) {
+        const kind = pick(['weapon', 'armor', 'shield'])
+        const equipment = kind === 'weapon' ? makeWeaponItem(2) :
+          kind === 'armor' ? makeArmorItem(2) : makeShieldItem(2)
+        player.inventory.push(equipment)
+        lootLog(`You search the dwarven remains and recover ${equipment.name}.`, equipment)
+      } else log('You search the dwarven remains, but find nothing.', 'info')
+      consumeItemTurn()
       return
     }
     if (skeleton) {
@@ -8522,6 +8579,8 @@ more difficult:
             : cryptExit
               ? 'You\'re standing beneath the ruined chapel. Press "inspect" to climb back into it.'
               : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
+        } else if (onto === 'dwarvenhole') {
+          log('A deep hole opens in the cave floor. It leads into the ruined Dwarven Fort. Press "inspect" to consider a one-way jump.', 'bad')
         } else if (onto === 'cavedown') {
           log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
         } else if (onto === 'dwarvenfortexit') {
@@ -8824,7 +8883,7 @@ more difficult:
       log(`Abandoned dwarven remains. ${currentGround.description}`, 'info')
       inspectedGround = true
     } else if (currentGround && (currentGround.kind === 'dwarvenremains' || currentGround.kind === 'anvil')) {
-      log(`${currentGround.kind === 'anvil' ? 'An abandoned dwarven anvil' : 'dwarven remains'}. ${currentGround.description}`, 'info')
+      log(`${currentGround.kind === 'anvil' ? 'An abandoned dwarven anvil' : 'Dwarven remains'}. ${currentGround.description || ''}${currentGround.kind === 'dwarvenremains' ? (currentGround.looted ? ' (searched)' : ' Press F to search them.') : ''}`, 'info')
       inspectedGround = true
     } else if (currentGround && (currentGround.kind === 'wheelbarrow' || currentGround.kind === 'goldcoin')) {
       log(currentGround.description, 'info')
@@ -11077,7 +11136,7 @@ more difficult:
           drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65, true)
           return
         }
-        if ((g.kind === 'skeleton' && g.looted) || (g.kind === 'campfire' && g.searched)) {
+        if (((g.kind === 'skeleton' || g.kind === 'dwarvenremains') && g.looted) || (g.kind === 'campfire' && g.searched)) {
           ctx.save()
           ctx.filter = 'grayscale(0.7) brightness(0.8)'
           const drawn = drawImageVisualWithShadow(vx, vy, visual)
@@ -11963,10 +12022,10 @@ more difficult:
         mini: true, enemy: null,
         html: `<div class="nm">${groundItemLabel(g)}</div><div>${groundHere.filter(gi => gi.kind === 'droppeditem').length > 1 ? 'More items are piled here. ' : ''}Press F to pick up.</div>`
       }
-      if (g.kind === 'skeleton') return {
+      if (g.kind === 'skeleton' || g.kind === 'dwarvenremains') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">Skeletal Remains${g.looted ? ' (searched)' : ''}</div>`
+        html: `<div class="nm">${g.kind === 'skeleton' ? 'Skeletal Remains' : 'Dwarven Remains'}${g.looted ? ' (searched)' : ''}</div>${g.looted ? '' : '<div>Press F to search</div>'}`
       }
       return {mini: true, enemy: null, html: `<div class="nm">${groundItemLabel(g)}</div>`}
     }

@@ -14,6 +14,22 @@ function freezeSurfaceLakes() {
   }
 }
 
+// Remove isolated frozen pixels only when all eight original neighbors are
+// water. Evaluate from a snapshot so one conversion cannot melt another tile.
+function meltSurroundedLakeIce() {
+  const surrounded = []
+  for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+    if (!isLakeIce(map[y][x])) continue
+    if (DIRS8.every(([dx, dy]) => map[y + dy][x + dx] === 'water'))
+      surrounded.push({x, y})
+  }
+  for (const {x, y} of surrounded) {
+    map[y][x] = 'water'
+    surfaceMap[y][x] = 'water'
+  }
+  return surrounded
+}
+
 // Rule checks run once per elapsed player turn, before freezing and enemies.
 // Animation clocks, rendering and monsters never advance lake ice.
 function tickLakeIce(playerMovement = null) {
@@ -58,6 +74,13 @@ function tickLakeIce(playerMovement = null) {
     const key = keyXY(change.x, change.y)
     tileUnderlays[key] = 'snow'
     if (change.next === 'water') beastTracks.delete(key)
+  }
+  // Breaking ice can leave isolated intact or cracked tiles surrounded by
+  // water. The same eight-neighbor rule also applies during play.
+  const isolated = meltSurroundedLakeIce()
+  for (const {x: ix, y: iy} of isolated) {
+    changes.push({x:ix, y:iy, next:'water'})
+    beastTracks.delete(keyXY(ix, iy))
   }
   clearAutoPath()
   ensureMiniBases()

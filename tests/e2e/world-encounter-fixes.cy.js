@@ -7,6 +7,57 @@ describe('Surface encounters and item passives', () => {
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })
 
+  it('uses the lowered Wyvern defense, flat Blind XP, and eight-neighbor lake ice rule', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      check(ENEMY_TEMPLATE_BY_NAME.Wyvern.def===2,'Wyvern defense is two')
+      check(MONSTER_XP_WEIGHTS.abilityBonuses.blind===15,'Blind adds fifteen XP')
+      const ordinary={maxHp:30,atk:7,def:3,spd:4,grace:0,abilities:[]}
+      const blind={...ordinary,abilities:['blind']}
+      check(xpForEnemy(blind)-xpForEnemy(ordinary)===15,'Blind increases the actual award by fifteen')
+      map=surfaceMap;currentZ=0
+      const x=28,y=28
+      for(let yy=y-1;yy<=y+1;yy++)for(let xx=x-1;xx<=x+1;xx++)map[yy][xx]='water'
+      map[y][x]='ice';map[y-1][x-1]='grass'
+      meltSurroundedLakeIce()
+      check(map[y][x]==='ice','seven water neighbors do not melt ice')
+      map[y-1][x-1]='water';meltSurroundedLakeIce()
+      check(map[y][x]==='water','eight water neighbors melt ice')
+      map[y][x]='crackingice';map[y-1][x-1]='ice';meltSurroundedLakeIce()
+      check(map[y][x]==='crackingice','cracked ice also requires eight water neighbors')
+      map[y-1][x-1]='water';meltSurroundedLakeIce()
+      check(map[y][x]==='water','isolated cracked ice melts')
+    })()`))
+  })
+
+  it('adds low-tier surface packs on top of the normal spawn population', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const cfg=WORLD_GEN_CONFIG.surfaceEnemies
+      const oldWeights=cfg.tierWeights,oldChance=cfg.groupChanceByTier,oldSize=cfg.groupSizeRange
+      const oldEnemies=enemies,oldOccupied=occupied,oldRng=rngState
+      try {
+        currentZ=0;map=surfaceMap
+        cfg.tierWeights=[1,0,0,0,0];cfg.groupSizeRange=[3,3]
+        cfg.groupChanceByTier={'1':0,'2':0}
+        enemies=[];occupied=new Set();rngState=62123
+        spawnEnemies()
+        const normal=enemies.filter(e=>e.ordinarySurface).length
+        cfg.groupChanceByTier={'1':1,'2':0}
+        enemies=[];occupied=new Set();rngState=62123
+        spawnEnemies()
+        const packed=enemies.filter(e=>e.ordinarySurface)
+        check(normal>0&&packed.length>normal*1.5,
+          'groups are extra monsters, not replacements for the normal budget')
+        check(new Set(packed.map(e=>keyXY(e.x,e.y))).size===packed.length,
+          'every extra group member occupies its own tile')
+      } finally {
+        cfg.tierWeights=oldWeights;cfg.groupChanceByTier=oldChance;cfg.groupSizeRange=oldSize
+        enemies=oldEnemies;occupied=oldOccupied;rngState=oldRng
+      }
+    })()`))
+  })
+
   it('initializes Lich tombstone inscriptions and never repeats one per world', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,message)=>{if(!ok)throw new Error(message)}

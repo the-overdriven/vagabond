@@ -575,6 +575,7 @@
       "image": "img/tiles/cave-up.png",
       "scale": 1
     },
+    "dwarvenhole": {"image":"img/tiles/dwarven-hole.svg", "baseTileKey":"cavefloor2", "scale":1},
     "dwarvenfortexit": {
       "image": "img/tiles/dwarven-stairs-up.png",
       "baseTileKey": "marble",

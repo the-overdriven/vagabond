@@ -18,6 +18,31 @@ function campFixture() {
 }
 
 describe('Abandoned campfire cooking and recovery', () => {
+  it('attracts monsters up to sixteen tiles away, while stoves keep a four-tile radius', () => {
+    campFixture()
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      Campfires.close()
+      const fire=groundItems.find(g=>g.kind==='campfire')
+      const t=ENEMY_TEMPLATE_BY_NAME.Goblin
+      const makeEnemy=(id,x)=>addEnemy({...t,id,name:'Goblin',baseName:'Goblin',
+        x,y:fire.y,level:0,alive:true,hp:20,maxHp:20,equipment:null})
+      const near=makeEnemy('fire-15',fire.x+15), far=makeEnemy('fire-17',fire.x+17)
+      const originalChance=chance,originalEnemyTurn=enemyTurn,originalNpcTurn=npcTurn
+      try {
+        chance=()=>true;enemyTurn=()=>{};npcTurn=()=>{}
+        check(Campfires.perform(fire,'light'),'campfire lights')
+        check(near.miningInvestigation?.source==='fire','enemy at distance 15 hears campfire')
+        check(!far.miningInvestigation,'enemy at distance 17 does not hear campfire')
+        const stove={kind:'dwarvenstove',x:fire.x,y:fire.y,level:0,burnUntil:0}
+        groundItems=[stove]
+        near.miningInvestigation=null;far.miningInvestigation=null
+        player.inventory.push(createItem('brushwood'))
+        check(Campfires.perform(stove,'light'),'stove lights')
+        check(!near.miningInvestigation,'stove does not attract a monster fifteen tiles away')
+      } finally {chance=originalChance;enemyTurn=originalEnemyTurn;npcTurn=originalNpcTurn}
+    })()`))
+  })
   it('inspects overlapping ground objects and interactive terrain without skipping either', () => {
     campFixture()
     cy.window().then(win => win.eval(`(() => {

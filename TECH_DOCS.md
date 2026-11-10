@@ -1027,6 +1027,11 @@ rotation. Ice is applied after landmark/cave validation, so required walking
 routes are checked with lakes still impassable. Fisherman access likewise
 excludes fragile lake ice.
 
+Ice or cracking ice surrounded by **water on all eight neighbouring tiles**,
+including diagonals, becomes water. This cleanup runs after world generation
+and after dynamic ice breaks. Neighbours are evaluated together before any
+isolated tiles melt, so results do not depend on traversal order.
+
 | Tile under the player | Checks per elapsed turn | Result |
 | --- | --- | --- |
 | Intact ice | First: 1% instant break | Deep freezing water, skipping the cracking stage |
@@ -2388,9 +2393,9 @@ validation.
 Environmental damage now rises continuously with normalized floor progress: rubble
 pressure scales **0.9x → 1.3x**, decorative-remains pressure **0.8x → 1.5x**, breached-door pressure
 **0.75x → 2.0x**, dormitory barricade chance **5% → 22%**, and optional defensive
-debris **3% → 16%** before the final-floor override. **Decorative `dwarvenremains` and
-searchable skeletal remains are separate populations and must not be conflated.** Each
-Ruins floor keeps the original seeded **2–4 decorative `dwarvenremains`** roll, scaled
+debris **3% → 16%** before the final-floor override. **Ambient `dwarvenremains` and
+searchable skeletal remains are separate populations and have different loot tables.** Each
+Ruins floor keeps the original seeded **2–4 ambient `dwarvenremains`** roll, scaled
 by depth. In addition, it rolls **3–5 searchable skeletal remains** as real `skeleton`
 ground objects using the normal one-time search rules and an independent **10% loot
 chance**. The two populations use separate placement rolls and cannot occupy the same
@@ -2399,7 +2404,7 @@ cell-specific skeletons are generated independently so the scattered remains
 population is not reduced by adding prison occupants.
 
 On the final floor, both populations become denser to sell the failed-last-stand
-scene. Decorative remains use at least a **2.5x** multiplier, yielding **5–10** ambient
+scene. Ambient remains use at least a **2.5x** multiplier, yielding **5–10**
 `dwarvenremains` before room-specific decorations; searchable skeletons independently
 use at least a **2.5x** multiplier, yielding **8–13** ambient searchable corpses before
 any progression-key corpse. The final floor also raises rubble to at least **1.65x**,
@@ -2849,13 +2854,22 @@ uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
 part of the generic chain, while Crypt Level 2 entities are marked as `crypt2`,
 so enemies and items cannot appear or act on the wrong z:-2 map.
 
+Generic z:-2 caves have a **40% chance per world** of containing one reachable
+hole at least eight walking tiles from their ascent. Inspecting the hole asks
+for confirmation before a **one-way jump** to the original z:-3 Dwarven Fort
+entrance. The player cannot climb back up the hole and must exit through the
+fort gates. The drop never skips locked rooms or leads into the crypt, and is
+refused if the fort entrance is occupied. Both gameplay and replay use the
+saved deep-cave terrain and the usual fort gate coordinates.
+
 ## z:-3: Dwarven Fort
 
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave. It is also D0, the entrance
 complex for the Dwarven Ruins.
 Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
-same coordinates. No fort-related transitions are stamped on z:-1 or z:-2.
+same coordinates. A one-way hole from a generic z:-2 cave can optionally lead
+to that fort entrance without creating a return passage or unlocking doors.
 A generated `dwarvenstairsdown` elsewhere on reachable fort marble begins the
 Ruins chain at z:-4. Generic `caveup` tiles still ascend to the preceding cave
 depth, including any encountered elsewhere on z:-3.
@@ -3618,6 +3632,13 @@ This preserves roughly the former density of:
 The target scales with actual eligible land on each generated world, not just
 its dimensions. Guaranteed Liches and other special spawns are additional.
 
+Ordinary tier-1 surface spawns have a **10%** chance to form a group of two
+or three of the same species; tier-2 spawns have a **7%** chance. Companions
+spawn within two tiles on individually eligible unoccupied terrain, **in
+addition to** the normal surface population budget. Grouping increases the
+number of low-tier encounters without changing individual AI, XP, loot, or
+spawn-safety rules.
+
 Tier distribution:
 
 | Tier | Weight |
@@ -3710,6 +3731,10 @@ poisoned; susceptibility checks use family rather than individual species.
 ---
 
 # 19. Enemy Roster
+
+The tier-4 Wyvern has base **132 HP, 18 ATK, 2 DEF and 7 SPD**. Its flying,
+poison and carrion-related behavior remains unchanged; its lower armor makes
+direct damage a more practical counter to its speed and high health.
 
 Current templates contain **75 enemies**. The seven all-uppercase species
 NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN use `rarity: 0.02`
@@ -4920,7 +4945,8 @@ The coefficients, base reward, and flat bonuses for each monster ability are
 configured in `content/monster_xp_weights.json`. ATK and DEF each have four
 times the per-point XP weight of SPD or GRACE. Abilities count even when the
 enemy never uses them; repeated copies of the same ability count once. Ranged
-attacks have a deliberately small bonus.
+attacks have a deliberately small bonus. Blind contributes **15 flat XP** as
+its own ability weight; trueSight retains its separate bonus when present.
 
 Permanent spawn variation, prefixes, and equipment affect XP through the
 resulting final stats; there is **no additional prefix multiplier**. Temporary
@@ -4950,7 +4976,7 @@ The default aggro range is:
 ```
 
 **Fire ignition noise.** Lighting an abandoned campfire can be heard by
-non-passive monsters within **8 Euclidean tiles** on the same floor, while a
+non-passive monsters within **16 Euclidean tiles** on the same floor, while a
 more enclosed Dwarven Stove reaches only **4 tiles**. Hearing chance is
 `min(0.95, max(0.10, 0.95 × (1 − distance/radius)²) × blind multiplier)`, with a
 1.5 multiplier for Blind monsters and 1 otherwise. Listeners become Alarmed
@@ -5940,6 +5966,7 @@ Current base weapons include:
 | Short Sword | 1 | 3 | 4 | No |
 | Club | 1 | 3 | 2 | No |
 | Short Bow | 1 | 1 (melee) | 1 | Yes |
+| Hunting Bow | 3 | 2 (melee) | 1 | Yes |
 | Rapier | 2 | 4 | 5 | No |
 | Staff | 2 | 6 | 2 | Yes |
 | Long Sword | 2 | 6 | 4 | No |
@@ -5966,10 +5993,15 @@ Current base weapons include:
 | Crescent Blades | 5 | 13 | 5 | Yes |
 | Titan Warpick | 5 | 18 | 1 | Yes |
 
-### Short Bow and player ranged attacks
+### Bows and player ranged attacks
 
-The Short Bow is a two-handed weapon with **1 melee ATK**, **5 fixed ranged ATK**,
-and a maximum firing range of **6 Chebyshev tiles**. Equipping, swapping, or
+The Short Bow is a tier-1 two-handed weapon with **1 melee ATK** and **5 fixed
+ranged ATK**. The tier-3 Hunting Bow has **2 melee ATK** and **7 fixed ranged
+ATK**. Both have a maximum range of **6 Chebyshev tiles**, spend one action and
+one arrow per shot, and use the same Marksmanship, accuracy, poison, artifact,
+and projectile rules. Their melee GRACE of 1 does not change ranged shot timing.
+Bow templates are stored in `content/ranged_weapons.json`, separate from the
+ordinary melee weapon catalog. Equipping, swapping, or
 unequipping follows ordinary one-turn equipment rules; equipping removes a
 shield. Bumping a neighboring monster remains an ordinary, weak melee attack.
 Clicking/tapping a visible enemy with the bow equipped fires an arrow instead
@@ -6007,16 +6039,18 @@ damage/miss cues appear at impact; replay timing cannot change combat outcomes.
 
 Ordinary Short Bows come from the Merchant, arrow-shooting monsters, or rare
 ordinary chests (§54, §20, §45),
-not the ordinary random weapon pool. **Short Bow artifacts** can be generated
-from the normal artifact pool, inheriting the bow's 1 melee ATK, two-handed
-restriction, **5 ranged ATK**, and **6-tile range**. Enchantments and curses
+not the ordinary random weapon pool. Hunting Bows can appear in tier-3+
+ordinary weapon rewards and in **25% of successful bow drops** from tier-3+
+arrow-shooting monsters. Their base value is 600g, versus 300g for Short Bows.
+**Bow artifacts** can be generated from the normal artifact pool, inheriting
+each bow's fixed ranged power, two-handed restriction, and six-tile range. Enchantments and curses
 behave as on other equipped artifacts, but neither melee ATK bonuses nor
 artifact enchantments raise the fixed projectile damage. Unidentified bow
 artifacts retain their hidden names while equipped and firing. Like ordinary
 bows, they use the existing equipment, ammunition, and save rules. Replays
 record shots by enemy ID and tile. Monster-dropped and chest Short Bows can
 roll normal weapon prefixes, while the Merchant's basic bow is unmodified.
-Prefixes change melee properties, not the fixed 5 ranged ATK; the aiming cursor
+Prefixes change melee properties, not fixed ranged ATK; the aiming cursor
 refreshes immediately after an attack;
 failed attempts do not mutate gameplay. Valid shots may also provoke one
 response step beyond a monster's normal AGGRO;
@@ -8384,6 +8418,12 @@ The dwarven ruin contains environmental story objects such as:
 
 Some are currently lore/inspection objects.
 
+Dwarven remains on fort and ruins floors can be searched once with the forage
+action, consuming one turn. Each search yields 5–25 gold (14%), 4–12 arrows
+(8%), one low-tier crystal (5%), ordinary weapon/armor/shield equipment (4%),
+or nothing (69%). Searches visibly dull the remains and persist in saved
+worlds and replays. Dwarven remains never contain a pickaxe or quest key.
+
 The wheelbarrow is mechanically significant because it enables moving the Big Bell.
 Picking it up removes the ground object and refreshes the canvas and HUD
 immediately, without waiting for another movement or animation frame.
@@ -8484,7 +8524,7 @@ restoration does not generate or repopulate the tower.
 Current save version (defined in `src/version.js`):
 
 ```text
-128
+129
 ```
 
 The game release version changes for each deployment. The save format changes

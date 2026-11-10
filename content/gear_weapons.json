@@ -2,7 +2,6 @@
   {"name": "Dagger",           "atk":2,  "grace":5, "twoHanded": false, "tier": 1, "baseValue": 30},
   {"name": "Short Sword",      "atk":3,  "grace":4, "twoHanded": false, "tier": 1, "baseValue": 30},
   {"name": "Club",             "atk":3,  "grace":2, "twoHanded": false, "tier": 1, "baseValue": 30},
-  {"name": "Short Bow",        "atk":1,  "grace":1, "twoHanded": true,  "tier": 1, "baseValue": 300, "sellValue": 30, "rangedAtk": 5, "rangedRange": 6},
   {"name": "Rapier",           "atk":4,  "grace":5, "twoHanded": false, "tier": 2, "baseValue": 60},
   {"name": "Staff",            "atk":6,  "grace":2, "twoHanded": true,  "tier": 2, "baseValue": 60},
   {"name": "Long Sword",       "atk":6,  "grace":4, "twoHanded": false, "tier": 2, "baseValue": 60},

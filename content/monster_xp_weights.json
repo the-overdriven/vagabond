@@ -9,7 +9,7 @@
   },
   "statDivisor": 3,
   "abilityBonuses": {
-    "blind": 0,
+    "blind": 15,
     "burrow": 15,
     "carrionInstinct": 3,
     "charge": 10,
