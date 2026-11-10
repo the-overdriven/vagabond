@@ -5766,6 +5766,25 @@ Shield
 Armor
 ```
 
+During normal gameplay, **1** selects the strongest available melee weapon and,
+if it is one-handed, the strongest available shield. **2** selects the strongest
+ranged weapon. Both shortcuts consider backpack gear and what is already
+equipped; they leave a matching or equally strong equipped item alone. Melee
+selection uses the inventory's existing equipment score (primary combat stat,
+GRACE and secondary bonuses). Ranged selection prioritizes ranged ATK, then
+range, then that equipment score. Inventory items with unidentified artifact
+properties are not auto-selected; an already-equipped unidentified artifact is
+left in place when it belongs to the requested weapon category. The shield is
+automatically put away when a two-handed weapon is selected.
+
+These are convenience shortcuts, **not free combat swaps**: equipping a weapon
+costs one ordinary turn, and equipping or upgrading its shield costs another.
+No action or turn is spent when the requested loadout already matches. Each
+equipment change uses the normal logged, saved and replayed equip action, so
+monsters continue acting between successive changes. The shortcuts are disabled
+while other gameplay overlays are open, during replay, and when item use is
+restricted.
+
 Physical artifact weapons, shields and armor can be equipped while
 **unidentified**. Their actual base stats, magic bonuses, penalties and curses
 apply immediately, but the equipped slot, inspection text and equipment logs
@@ -8912,6 +8931,8 @@ Current desktop controls include:
 | F | Forage / search / special pickup / dig (in sand with a shovel) |
 | T | Wait                                                           |
 | Tab | Inventory                                                      |
+| 1 | Equip best melee weapon and best shield if one-handed |
+| 2 | Equip best ranged weapon |
 | M | Map                                                            |
 | K | Save                                                           |
 | L | Load                                                           |

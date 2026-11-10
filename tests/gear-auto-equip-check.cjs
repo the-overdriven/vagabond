@@ -8,5 +8,23 @@ async function main(){
   run(fs.readFileSync(path.join(__dirname,'helpers/gear-auto-equip-checks.js'),'utf8'))
   run('gearAutoEquipShieldConflictCheck()')
   console.log('PASS gear auto-equip conflict, save/load, and one-handed/two-handed cases')
+  run('quickEquipBestLoadoutChecks()')
+  await run(`(async () => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    const record=window.__quickEquipReplay,expected=window.__quickEquipExpected
+    loadGameFromObject(record.initialState,{isReplayInit:true})
+    replayPlaying=true;replaySimulationMode=true;replayAnimationsDisabled=true
+    activeReplay=record;replayRngIndex=0
+    try {
+      for(const action of record.actions)await runReplayAction(action)
+      check(player.equip.weapon?.base===expected.weapon&&
+        player.equip.shield?.base===expected.shield&&turnCount===expected.turn,
+        'replay reconstructs the full melee and shield loadout')
+      check(replayRngIndex===record.rng.length,'quick loadout replays the same RNG stream')
+    } finally {
+      replayPlaying=false;replaySimulationMode=false;activeReplay=null
+    }
+  })()`)
+  console.log('PASS best melee/ranged loadout shortcuts, turn cost, and deterministic replay')
 }
 main().catch(err=>{console.error(err.stack);process.exitCode=1})

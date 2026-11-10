@@ -212,7 +212,7 @@ test('unidentified artifact gear can be equipped without exposing its secret ide
   run('equipItem(0)')
   assert.equal(run('player.equip.weapon.identified'),false,'equipping does not identify')
   assert.equal(run('playerAtk()-' + before),12,'hidden base ATK and bonus both apply')
-  assert.equal(run('slotLabel(player.equip.weapon)'),'Unidentified Dagger • ???')
+  assert.equal(run('artifactDisplayName(player.equip.weapon)'),'Unidentified Dagger')
   assert.equal(run('itemStatLine(player.equip.weapon)'),'???')
   assert.equal(run('player.equip.weapon.curse.everyTurns'),8,'curse remains active and unidentified')
   const snapshot=clone(run('buildSaveObject()'))

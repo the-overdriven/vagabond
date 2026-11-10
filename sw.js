@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-camp-right-dock-cornered-bow';
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-camp-right-dock-cornered-bow-quick-gear';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 

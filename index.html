@@ -606,6 +606,8 @@ more difficult:
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
     <kbd>R</kbd> aim bow (<kbd>ENTER</kbd> shoot) &nbsp;<br>
+    <kbd>1</kbd> best melee (+shield) &nbsp;<br>
+    <kbd>2</kbd> best ranged weapon &nbsp;<br>
     <kbd>T</kbd> wait / skip turn &nbsp;<br>
     <kbd>P</kbd> toggle tiles / ASCII &nbsp;<br>
     <kbd>+</kbd><kbd>−</kbd> tile size &nbsp;<br>
@@ -13709,6 +13711,56 @@ more difficult:
     updateTooltip()
   }
 
+  // Match the inventory's gear ranking, but compare melee and ranged weapons
+  // separately. Never silently identify or select an unknown artifact.
+  function bestLoadoutItem(slot, accepts, ranged = false) {
+    const current = player.equip?.[slot]
+    if (current && accepts(current) && current.kind === 'artifact' && !current.identified)
+      return current
+    let best = current && accepts(current) ? current : null
+    const rank = item => ranged
+      ? [item.rangedAtk || 0, item.rangedRange || 0, equipmentSortValues(item).sum]
+      : [equipmentSortValues(item).sum]
+    const better = (candidate, equipped) => {
+      const a = rank(candidate), b = rank(equipped)
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return a[i] > b[i]
+      }
+      return false // Ties keep the equipped item or first inventory candidate.
+    }
+    for (const item of player.inventory) {
+      if (!accepts(item) || (item.kind === 'artifact' && !item.identified)) continue
+      if (!best || better(item, best)) best = item
+    }
+    return best
+  }
+
+  function equipBestLoadout(mode) {
+    if (!['melee', 'ranged'].includes(mode) || player.hp <= 0 || deathTransition ||
+        !canUseItemsWhileSwimming() || onlineRecordsBlockActions() ||
+        (!replayAnimationsDisabled && (cameraAnimating || attackAnim || enemyAttackPresentationPending()))) return false
+    const ranged = mode === 'ranged'
+    const weapon = bestLoadoutItem('weapon', item => isWeaponItem(item) &&
+      (!!item.rangedAtk === ranged), ranged)
+    if (!weapon) {
+      log(ranged ? 'You have no ranged weapon.' : 'You have no melee weapon.', 'info')
+      return false
+    }
+    const shield = !ranged && !weapon.twoHanded
+      ? bestLoadoutItem('shield', item => item.kind === 'shield' ||
+          (item.kind === 'artifact' && item.artifactSlot === 'shield')) : null
+    const changeWeapon = player.equip.weapon !== weapon
+    const changeShield = !!shield && player.equip.shield !== shield
+    if (!changeWeapon && !changeShield) return false
+    clearAutoPath()
+    if (changeWeapon) equipItem(player.inventory.indexOf(weapon))
+    // Each actual equipment change costs its ordinary turn. An enemy can
+    // interrupt this two-part switch, so never equip the shield after death.
+    if (changeShield && player.hp > 0 && !deathTransition && canUseItemsWhileSwimming())
+      equipItem(player.inventory.indexOf(shield))
+    return true
+  }
+
   function unequipItem(slot) {
     if (!['weapon', 'shield', 'armor'].includes(slot)) return
     const item = player.equip[slot]
@@ -14718,6 +14770,11 @@ more difficult:
       return
     }
     if (mapOpen || invOpen || tradeOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen()) return
+    if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && (k === '1' || k === '2')) {
+      ev.preventDefault()
+      if (!ev.repeat) equipBestLoadout(k === '1' ? 'melee' : 'ranged')
+      return
+    }
     if (k === 'r' || k === 'R') {
       ev.preventDefault()
       if (!equippedShortBow()) { log('Equip a bow to aim.', 'info'); return }
