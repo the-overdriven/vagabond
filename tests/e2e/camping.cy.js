@@ -18,6 +18,27 @@ function campFixture() {
 }
 
 describe('Abandoned campfire cooking and recovery', () => {
+  it('inspects overlapping ground objects and interactive terrain without skipping either', () => {
+    campFixture()
+    cy.window().then(win => win.eval(`(() => {
+      Campfires.close()
+      groundItems=[{kind:'chest',x:60,y:50,level:0,opened:false},
+        {kind:'potion',x:62,y:50,level:0},
+        {kind:'droppeditem',x:62,y:50,level:0,item:createItem('potato')}]
+      map[50][62]='dwarvenlever';map[51][62]='dwarvenpressureplate'
+      enemies=[{name:'Goblin',baseName:'Goblin',x:62,y:51,level:0,alive:true},
+        {name:'Hidden Goblin',baseName:'Goblin',x:63,y:51,level:0,alive:true,wallAmbushHidden:true}]
+      const lines=[],oldLog=log
+      try {log=message=>lines.push(message);describeSurroundings()}
+      finally {log=oldLog}
+      const text=lines.join(' ')
+      if(!text.includes('a chest here')||!text.includes('a potion')||
+        !text.includes('Potato')||!text.includes('control lever')||
+        !text.includes('pressure plate')||!text.includes('Goblin')||text.includes('Hidden Goblin'))
+        throw Error('Inspect omitted a nearby object, occupied trap, or item underfoot: '+text)
+    })()`))
+  })
+
   it('searches nearby campfire ashes with Inspect only once while F opens cooking', () => {
     campFixture()
     cy.window().then(win => win.eval(`(() => {

@@ -8861,6 +8861,46 @@ more difficult:
     const notes = {}
     let pillarDirection = null
     let bellDirection = null
+    const groundLabels = {
+      chest: item => item.opened ? 'an opened chest' : 'a chest',
+      potion: 'a potion',
+      speedpotion: 'a speed potion',
+      scrollOfInvisibility: 'a scroll',
+      idscroll: 'a scroll',
+      homecomingscroll: 'a scroll',
+      treasurecasket: 'an old casket',
+      skeleton: 'skeletal remains',
+      stolenloot: "a thief's bag",
+      playerremains: 'your remains',
+      campfire: 'a campfire',
+      dwarvenstove: 'a dwarven stove',
+      anvil: 'an anvil',
+      wheelbarrow: 'a wheelbarrow',
+      goldcoin: 'a giant gold coin',
+      dwarvenremains: 'dwarven remains',
+      ruinprop: 'dwarven remains',
+      explorerremains: "a long-dead explorer's remains",
+      oddTombstone: 'a tombstone',
+      shovel: 'a shovel'
+    }
+    const groundLabel = item => {
+      if (item.kind === 'deadbody')
+        return `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
+      const label = groundLabels[item.kind]
+      return typeof label === 'function' ? label(item) : label ||
+        (itemDefinition(item.kind)?.name ? `a ${itemDefinition(item.kind).name}` :
+          groundGlyph(item) ? `a ${groundItemLabel(item)}` : 'something')
+    }
+    const groundByCell = new Map()
+    for (const g of groundItems) {
+      if (!onCurrentLevel(g) || g.kind === 'gear' || g.kind === 'buriedgear' ||
+          g.kind === 'buriedartifact') continue
+      const cell = keyXY(g.x, g.y)
+      if (!groundByCell.has(cell)) groundByCell.set(cell, [])
+      groundByCell.get(cell).push(g)
+    }
+    const standingLabels = (groundByCell.get(keyXY(player.x, player.y)) || []).map(groundLabel)
+    for (const label of new Set(standingLabels)) log(`You notice ${label} here.`, 'info')
     // Report interactive terrain and furniture, not purely cosmetic props.
     const inspectableTerrain = new Set([
       'towerstairsup','towerstairsdown','dwarvenfortexit','dwarvenstairsup','dwarvenstairsdown',
@@ -8902,50 +8942,16 @@ more difficult:
                         'southeast'
 
         const enemy = enemies.find(
-          en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny
+          en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny &&
+            undergroundTileVisible(nx, ny) && enemyCanBeSeen(en)
         )
 
         if (enemy) addNote(`a ${enemy.name}`, direction)
 
-        const item = groundItems.find(
-          g => onCurrentLevel(g) && g.x === nx && g.y === ny &&
-            g.kind !== 'gear' && g.kind !== 'buriedgear' && g.kind !== 'buriedartifact'
-        )
-
-        if (item) {
-          const itemLabels = {
-            chest: item.opened ? 'an opened chest' : 'a chest',
-            potion: 'a potion',
-            speedpotion: 'a speed potion',
-            scrollOfInvisibility: 'a scroll',
-            idscroll: 'a scroll',
-            homecomingscroll: 'a scroll',
-            treasurecasket: 'an old casket',
-            skeleton: 'skeletal remains',
-            stolenloot: 'a thief\'s bag',
-            playerremains: 'your remains',
-            campfire: 'a campfire',
-            dwarvenstove: 'a dwarven stove',
-            anvil: 'an anvil',
-            wheelbarrow: 'a wheelbarrow',
-            goldcoin: 'a giant gold coin',
-            dwarvenremains: 'dwarven remains',
-            ruinprop: 'dwarven remains',
-            explorerremains: "a long-dead explorer's remains",
-            oddTombstone: 'a tombstone',
-            shovel: 'a shovel'
-          }
-
-          const label = item.kind === 'deadbody'
-            ? `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
-            : itemLabels[item.kind] || (itemDefinition(item.kind)?.name
-              ? `a ${itemDefinition(item.kind).name}` : groundGlyph(item) ? `a ${groundItemLabel(item)}` : 'something')
-
-          addNote(label, direction)
-          continue
-        }
-
-        if (enemy) continue
+        // A tile can hold an item, monster, and interactive terrain at once.
+        // Inspect each layer independently so a dropped item never hides a
+        // lever, pressure plate, doorway, or other point of interest.
+        for (const item of groundByCell.get(keyXY(nx, ny)) || []) addNote(groundLabel(item), direction)
         const t = map[ny][nx]
 
         if (t === 'blackpillar') {
@@ -9009,7 +9015,7 @@ more difficult:
 
     if (summary.length) {
       log(`You notice ${summary.join(', ')}.`, 'info')
-    } else if (!pillarDirection && !bellDirection) {
+    } else if (!pillarDirection && !bellDirection && !standingLabels.length) {
       log('Nothing of note nearby.', 'info')
     }
 

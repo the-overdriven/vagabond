@@ -164,6 +164,22 @@ async function main() {
     log=message=>inspectionLogs.push(message);describeSurroundings();`)
   check('inspectionLogs.some(s=>s.toLowerCase().includes("dwarven stove"))',
     'Inspect reports an adjacent stove rather than only the surrounding floor')
+  run(`inspectionLogs=[];groundItems=[
+      {kind:'chest',x:60,y:50,level:0,opened:false},
+      {kind:'potion',x:62,y:50,level:0},
+      {kind:'droppeditem',x:62,y:50,level:0,item:createItem('potato')}];
+    map[50][62]='dwarvenlever';map[51][62]='dwarvenpressureplate';
+    enemies=[{name:'Goblin',baseName:'Goblin',x:62,y:51,level:0,alive:true},
+      {name:'Hidden Goblin',baseName:'Goblin',x:63,y:51,level:0,alive:true,wallAmbushHidden:true}];
+    describeSurroundings();`)
+  check('inspectionLogs.some(s=>s.includes("a chest here"))',
+    'Inspect mentions ordinary objects underneath the player')
+  check('inspectionLogs.some(s=>s.includes("a potion") && s.includes("Potato"))',
+    'Inspect reports every pickable object sharing a nearby tile')
+  check('inspectionLogs.some(s=>s.includes("control lever") && s.includes("pressure plate") && s.includes("Goblin"))',
+    'Inspect reports terrain even under items and enemies')
+  check('!inspectionLogs.some(s=>s.includes("Hidden Goblin"))',
+    'Inspect does not reveal concealed creatures')
   run(`groundItems=[{kind:'campfire',x:61,y:50,level:0,burnUntil:0,searched:false}];
     window.potatoesBefore=Campfires.count('potato');window.inspectionChance=chance;
     chance=()=>true;describeSurroundings();describeSurroundings();

@@ -7431,7 +7431,10 @@ Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object. It reports nearby nondecorative
 ground objects (including campfires and stoves), visible enemies, items,
 doors, furniture, traps and other interactive terrain without suppressing an
-object simply because an enemy occupies the same location.
+object simply because an enemy or item occupies the same location. Multiple
+items on one tile are all reported, including ordinary loot beneath the player;
+buried objects remain hidden until found through digging.
+Invisible or concealed creatures are not revealed by inspecting their tile.
 The nearby-village intuition checks the surface position **only while the
 player is on z:0**; underground inspections never claim to sense a surface
 village merely because the two positions share map coordinates.
