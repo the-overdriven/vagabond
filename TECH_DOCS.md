@@ -6555,7 +6555,7 @@ extra meat:
 | Amethyst | Vrakeber **40%** | 16g |
 | Rare Trophy | NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN **100%** each | 60g |
 
-Wyvern and Alacran additionally have an independent **55%** chance to drop
+Wyvern, Manticore and Alacran additionally have an independent **55%** chance to drop
 one Venom Gland alongside their guaranteed meat. Either drop can be collected
 separately when the creature is killed from a distance.
 

@@ -47,7 +47,7 @@ describe('Nymph herbs and surface scroll variety',()=>{
                 species+' grants the entire meat stack in one loot roll')
             }
             // Poisonous meat sources also provide a separate, optional gland.
-            for (const [species,meatCount] of [['Wyvern',3],['Alacran',1]]) {
+            for (const [species,meatCount] of [['Wyvern',3],['Manticore',2],['Alacran',1]]) {
               const t=ENEMY_TEMPLATE_BY_NAME[species]
               const extra=t.additionalLootTables
               check(extra?.length===1 && extra[0].chance===0.55 &&
@@ -79,7 +79,7 @@ describe('Nymph herbs and surface scroll variety',()=>{
                 check(!t.lootTable?.items?.some(item=>item.kind==='meat'),
                   t.name+' must not drop meat')
             }
-            player.inventory=[];groundItems=[]
+            chance=p=>p===1;player.inventory=[];groundItems=[]
             const wyvern=ENEMY_TEMPLATE_BY_NAME.Wyvern
             const deathTile={...wyvern,baseName:'Wyvern',x:player.x,y:player.y,
               level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave,equipment:null}
