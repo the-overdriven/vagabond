@@ -332,8 +332,8 @@ describe('Mine-only encounters and darkness', () => {
 
       let wideCorridorCrystals=0
       for(const [i,{level,z}] of mine.entries()) {
-        check(level.minePockets.length>=3 && level.minePockets.length<=10,
-          'floor '+(i+1)+' has three to ten sealed mining pockets')
+        check(level.minePockets.length>=3 && level.minePockets.length<=12,
+          'floor '+(i+1)+' has up to twelve mining chambers, some already open')
         check(level.minePockets.every(p=>{
           const xs=p.cells.map(c=>c.x),ys=p.cells.map(c=>c.y)
           return Math.max(...xs)-Math.min(...xs)<8 && Math.max(...ys)-Math.min(...ys)<8

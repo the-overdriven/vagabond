@@ -59,6 +59,12 @@ async function main() {
       for(let i=0;i<3;i++)Campfires.perform(fire,'rest');`)
     check('player.hp===17 && Campfires.foodRemaining()===0','exact 16 HP total at phase '+phase)
   }
+  run(`player.berryRegenTurns=290;addInventoryItem('roastedMeat',{count:2});
+    window.firstMeal=Campfires.eat(player.inventory.findIndex(it=>it.kind==='roastedMeat'));
+    window.countAfterMeal=Campfires.count('roastedMeat');window.turnsAfterMeal=player.berryRegenTurns;
+    window.secondMeal=Campfires.eat(player.inventory.findIndex(it=>it.kind==='roastedMeat'));`)
+  check('firstMeal && turnsAfterMeal>300 && !secondMeal && player.berryRegenTurns===turnsAfterMeal && Campfires.count("roastedMeat")===countAfterMeal',
+    'a meal may cross 300 regeneration turns once but cannot consume another serving above the cap')
   run(`player.hp=20;player.berryRegenTurns=0;player.campRestProgress=0;
     Campfires.perform(fire,'rest');Campfires.perform(fire,'rest');
     window.saved=JSON.parse(JSON.stringify(buildSaveObject()));
@@ -83,9 +89,14 @@ async function main() {
   run(`replayPlaying=false;replaySimulationMode=false;activeReplay=null;replayRecording=false;
     player.inventory=[];player.hp=30;player.berryRegenTurns=0;player.campRestProgress=0;
     window.fire=groundItems.find(f=>f.kind==='campfire');fire.burnUntil=turnCount+100;
-    addInventoryItem('brushwood',{count:4});window.oldRng=rng;rng=()=>0.999;
+    addInventoryItem('brushwood',{count:4});window.oldRng=rng;rng=()=>0.74;
     foragedTiles=new Set();map[player.y][player.x]='forest';tryForage();window.firstTurn=turnCount;tryForage();`)
-  check('Campfires.count("brushwood")===5 && turnCount===firstTurn','one forage per tile, guaranteed wood without duplicate gathering')
+  check('Campfires.count("brushwood")===5 && turnCount===firstTurn','one forage per tile and 75% brushwood success without repeat gathering')
+  run(`player.inventory.find(it=>it.kind==='brushwood').count=4;
+    player.x++;map[player.y][player.x]='forest';rng=()=>0.90;tryForage();window.emptyWoodTurn=turnCount;tryForage();`)
+  check('Campfires.count("brushwood")===4 && turnCount===emptyWoodTurn',
+    'failed brushwood roll does not replenish fuel and cannot be farmed by revisiting')
+  run(`player.inventory.find(it=>it.kind==='brushwood').count=5`)
   run(`player.gold=1000;ensureMerchantStock();window.goldBefore=player.gold;buyItem(merchantStock.find(i=>i.kind==='brushwood'))`)
   check('player.gold===goldBefore && Campfires.count("brushwood")===5','full fuel capacity does not charge gold')
   run(`groundItems.push({kind:'droppeditem',x:player.x,y:player.y,level:0,item:createItem('brushwood',{count:3})});

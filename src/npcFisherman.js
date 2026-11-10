@@ -209,8 +209,12 @@ function completeFishermanLesson(from) {
 function activateFishermanQuest(npc) {
   const water = fishermanWaterRegions()
   const banks = fishermanBanks(fishermanFootReachable(), water)
-  const p = fishermanBestTarget(npc,
-    fishermanEligibleTargets(banks, fishermanBlockedTiles()), water)
+  const eligible = fishermanEligibleTargets(banks, fishermanBlockedTiles())
+  // Reuse the pre-quest feeding-ground clues: the Fat Slurper actually appears
+  // in the fishbone-strewn shore area that players could notice beforehand.
+  const clues = caveDecorations.filter(d => d.level === 0 && d.kind === 'fishbone')
+  const marked = eligible.filter(p => clues.some(d => bankDistance(p,d) <= 3))
+  const p = fishermanBestTarget(npc, marked.length ? marked : eligible, water)
   if (!p) return false
   const t = ENEMY_TEMPLATE_BY_NAME.Slurper
   const target = addEnemy({...t, name: 'Fat Slurper', baseName: 'Slurper', prefix: 'fat',

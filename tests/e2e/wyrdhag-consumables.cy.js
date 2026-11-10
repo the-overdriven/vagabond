@@ -52,8 +52,8 @@ describe('Wyrdhag consumable healing and individual monster loot', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,why)=>{if(!ok)throw Error(why)}
       const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,origChance=chance
-      const items=t.lootTable.items
-      check(t.lootTable.chance===0.2 && items.length===3 &&
+      const items=t.lootTable[0].items
+      check(t.lootTable[0].chance===0.2 && items.length===3 &&
         items.every(it=>it.weight===1) &&
         ['potion','herb','mushroom'].every(k=>items.some(it=>it.kind===k)),
         '20% total chance is split equally')

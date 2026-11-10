@@ -22,7 +22,9 @@
     "blindProbeConfirm": true
   },
   "generation": {
-    "pocketsPerFloor": [3, 10],
+    "pocketsPerFloor": [5, 12],
+    "openPocketsPerFloor": [1, 2],
+    "looseCracksPerFloor": [18, 35],
     "pocketRetries": 350,
     "pocketRadiusX": [1, 4],
     "pocketRadiusY": [1, 4],

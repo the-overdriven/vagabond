@@ -12,7 +12,7 @@ describe('Nymph herbs and surface scroll variety',()=>{
           try {
             log=()=>{};player.inventory=[]
             const n=ENEMY_TEMPLATE_BY_NAME.Nymph
-            check(n.lootTable?.chance===0.2 && n.lootTable.items[0].kind==='herb',
+            check(n.lootTable?.[0]?.chance===0.2 && n.lootTable[0].items[0].kind==='herb',
               'nymph has a 20% independent herb drop chance')
             chance=p=>p===0.2
             lootFromEnemy({...n,baseName:'Nymph',equipment:null})
@@ -36,9 +36,9 @@ describe('Nymph herbs and surface scroll variety',()=>{
             chance=p=>p===1
             for(const [species,count] of Object.entries(meatDrops)) {
               const t=ENEMY_TEMPLATE_BY_NAME[species]
-              check(t && !t.humanoid && t.lootTable?.chance===1 &&
-                t.lootTable.items.length===1 && t.lootTable.items[0].kind==='meat' &&
-                t.lootTable.items[0].weight===1 && t.lootTable.items[0].count===count,
+              check(t && !t.humanoid && t.lootTable?.[0]?.chance===1 &&
+                t.lootTable[0].items.length===1 && t.lootTable[0].items[0].kind==='meat' &&
+                t.lootTable[0].items[0].weight===1 && t.lootTable[0].items[0].count===count,
                 species+' has the requested guaranteed meat count')
               player.inventory=[]
               lootFromEnemy({...t,baseName:species,equipment:null})
@@ -49,8 +49,8 @@ describe('Nymph herbs and surface scroll variety',()=>{
             // Poisonous meat sources also provide a separate, optional gland.
             for (const [species,meatCount] of [['Wyvern',3],['Manticore',2],['Alacran',1]]) {
               const t=ENEMY_TEMPLATE_BY_NAME[species]
-              const extra=t.additionalLootTables
-              check(extra?.length===1 && extra[0].chance===0.55 &&
+              const extra=t.lootTable.slice(1)
+              check(extra.length===1 && extra[0].chance===0.55 &&
                 extra[0].items.length===1 && extra[0].items[0].kind==='venomGland' &&
                 extra[0].items[0].count===1,
                 species+' has an independent 55% venom gland drop')
@@ -76,7 +76,7 @@ describe('Nymph herbs and surface scroll variety',()=>{
             }
             for(const t of ENEMY_TEMPLATES) {
               if (!t.humanoid && !(t.name in meatDrops))
-                check(!t.lootTable?.items?.some(item=>item.kind==='meat'),
+                check(!t.lootTable?.some(drop=>drop.items?.some(item=>item.kind==='meat')),
                   t.name+' must not drop meat')
             }
             chance=p=>p===1;player.inventory=[];groundItems=[]
@@ -124,9 +124,9 @@ describe('Nymph herbs and surface scroll variety',()=>{
             }
             for(const [species,[kind,probability,count]] of Object.entries(materialDrops)) {
               const t=ENEMY_TEMPLATE_BY_NAME[species]
-              check(t && !t.humanoid && t.lootTable?.chance===probability &&
-                t.lootTable.items.length===1 && t.lootTable.items[0].kind===kind &&
-                t.lootTable.items[0].weight===1 && t.lootTable.items[0].count===count,
+              check(t && !t.humanoid && t.lootTable?.[0]?.chance===probability &&
+                t.lootTable[0].items.length===1 && t.lootTable[0].items[0].kind===kind &&
+                t.lootTable[0].items[0].weight===1 && t.lootTable[0].items[0].count===count,
                 species+' has the exact material probability and quantity')
               player.inventory=[];chance=p=>p===probability
               lootFromEnemy({...t,baseName:species,equipment:null})
@@ -146,6 +146,9 @@ describe('Nymph herbs and surface scroll variety',()=>{
             }
             check(!ENEMY_TEMPLATE_BY_NAME.Fungus.lootTable,
               'Fungus still uses guaranteed mushroom drops only')
+            check(ENEMY_TEMPLATE_BY_NAME['Giant Spider'].lootTable[1].chance===0.55 &&
+              ENEMY_TEMPLATE_BY_NAME['Giant Spider'].lootTable[1].items[0].kind==='venomGland',
+              'Giant Spider rolls venom independently from silk')
             chance=()=>false;rng=()=>0;player.inventory=[]
             lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME.Fungus,baseName:'Fungus',equipment:null})
             check(player.inventory.find(i=>i.kind==='mushroom')?.count===1,

@@ -28,7 +28,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
     if(!testSeam)throw Error('missing safe obvious seam');
     player.x=testApproach.x;player.y=testApproach.y;player.hp=playerMaxHp();
     invalidateUndergroundFov()`)
-  assert.equal(run('miningTrial.minePockets.length>=3&&miningTrial.minePockets.length<=10'), true)
+  assert.equal(run('miningTrial.minePockets.length>=3&&miningTrial.minePockets.length<=12'), true)
   assert.equal(run('miningTrial.minePockets.every(p=>p.cells.length>0&&p.entrances.length>0)'), true)
   const pocketDepths = plain(run('miningTrial.minePockets.map(p=>p.approachDepth)'))
   assert(pocketDepths.every(d => Number.isInteger(d) && d >= 1 && d <= 20),
@@ -38,12 +38,14 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(run(`miningTrial.minePockets.every(p=>{
     const entrance=p.entrances[0]
     return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>
-      miningTrial.mineExcavations.filter(t=>t.kind==='wall'&&t.pocketId===p.id)
-        .every(t=>t.removed===false) &&
       Array.from({length:p.approachDepth},(_,n)=>({x:entrance.x+dx*n,y:entrance.y+dy*n}))
-        .every(t=>miningTrial.mineExcavations.some(s=>s.kind==='wall'&&s.pocketId===p.id&&s.x===t.x&&s.y===t.y)) &&
+        .every(t=>miningTrial.map[t.y][t.x]==='cavefloor2' ||
+          miningTrial.mineExcavations.some(s=>s.kind==='wall'&&s.pocketId===p.id&&s.x===t.x&&s.y===t.y)) &&
       p.cells.some(c=>c.x===entrance.x+dx*p.approachDepth&&c.y===entrance.y+dy*p.approachDepth))
-  })`), true, 'every pocket approach remains a continuous mineable route')
+  })`), true, 'each pocket has a continuous open or mineable route')
+  assert.equal(run(`(()=>{const reached=mineFloorWalkable(miningTrial.map,miningTrial.mineUpstairs)
+    return miningTrial.minePockets.slice(1).filter(p=>p.cells.some(c=>reached.has(keyXY(c.x,c.y)))).length})()`), 1,
+    'the fixed seed starts with one freely accessible non-training chamber')
   assert.equal(run('miningTrial.mineMineralValue>=50&&miningTrial.mineMineralValue<=150'), true)
   const initialCrystal = plain(run('miningTrial.mineExcavations.find(t=>t.kind===\'exposed\')'))
   assert(initialCrystal,'the test mine includes an exposed crystal')
@@ -425,7 +427,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
     console.log(`seed ${seed}: ${count} floors, ${survey.reduce((n,f)=>n+f.availableXp,0)} available mining XP`)
     for (let i = 0; i < survey.length; i++) {
       const floor=survey[i], limits=[[50,150],[250,450],[350,650],[500,900],[700,1000]][i]
-      assert(floor.pockets.length>=3&&floor.pockets.length<=10,`${seed}: pocket count on floor ${i+1}`)
+      assert(floor.pockets.length>=3&&floor.pockets.length<=12,`${seed}: pocket count on floor ${i+1}`)
       assert(floor.mineralValue>=limits[0]&&floor.mineralValue<=limits[1],
         `${seed}: floor ${i+1} generated mineral value remains in budget`)
       const queue=[floor.up], visited=new Set([`${floor.up.x},${floor.up.y}`])
@@ -435,19 +437,22 @@ const plain = value => JSON.parse(JSON.stringify(value))
         if(!['cavefloor2','minestairsup','minestairsdown','minecageupperoff','minecageloweroff'].includes(floor.tiles[y]?.[x])||visited.has(`${x},${y}`))continue
         visited.add(`${x},${y}`);queue.push({x,y})
       }
+      let accessibleChambers=0
       for(const p of floor.pockets){
         const xs=p.cells.map(c=>c.x),ys=p.cells.map(c=>c.y)
         assert(Math.max(...xs)-Math.min(...xs)<8&&Math.max(...ys)-Math.min(...ys)<8,
           `${seed}: pocket bounding box`)
         assert(p.entrances.length>=1,`${seed}: pocket has a mineable approach`)
-        assert(p.cells.every(c=>!visited.has(`${c.x},${c.y}`)),
-          `${seed}: floor ${i+1} pocket ${p.id} must remain sealed until mining opens its wall`)
+        if (p.cells.some(c=>visited.has(`${c.x},${c.y}`))) accessibleChambers++
+        else assert(p.entrances.length>=1,`${seed}: sealed pocket has a mining approach`)
         if(p.type==='geode'){
           const within=floor.minerals.filter(m=>p.cells.some(c=>c.x===m.x&&c.y===m.y))
           assert(new Set(within.map(m=>m.mineral)).size<=1,
             `${seed}: geode pocket contains only one mineral type`)
         }
       }
+      assert(accessibleChambers>=1&&accessibleChambers<=2,
+        `${seed}: floor ${i+1} opens one or two chambers without mining`)
       const separation=run('MINING_CONFIG.generation.differentMineralSeparation')
       for(let a=0;a<floor.minerals.length;a++)for(let b=a+1;b<floor.minerals.length;b++){
         const one=floor.minerals[a],two=floor.minerals[b]

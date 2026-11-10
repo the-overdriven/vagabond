@@ -55,6 +55,8 @@ const Mining = (() => {
       cfg.lighting.tileUnknownFogFadeTiles <= 0 || cfg.lighting.tileUnknownFogFadeTiles > 3 ||
       !Number.isFinite(cfg.lighting.pulsePeriodMs) || cfg.lighting.pulsePeriodMs <= 0 ||
       !bounds(cfg.generation.pocketsPerFloor, 1, 30) ||
+      !bounds(cfg.generation.openPocketsPerFloor, 1, 3) ||
+      !bounds(cfg.generation.looseCracksPerFloor, 0, 100) ||
       !bounds(cfg.generation.waterReleaseTiles, 0, 10) ||
       cfg.skill.max !== 100 || cfg.skill.strikeMilestones?.length !== 5 ||
       cfg.skill.awarenessThresholds?.length !== 4 ||
@@ -255,6 +257,70 @@ const Mining = (() => {
     }
   }
 
+  function openExistingPockets(level, isRespite) {
+    const candidates = []
+    const exposed = new Set(level.mineExcavations.filter(t => t.kind === 'exposed')
+      .map(t => key(t.x, t.y)))
+    for (const pocket of level.minePockets.slice(isRespite ? 1 : 0)) {
+      if (pocket.type === 'water') continue
+      const entrance = pocket.entrances[0]
+      for (const [dx, dy] of dirs4) {
+        const route = Array.from({length: pocket.approachDepth}, (_, i) =>
+          ({x:entrance.x+dx*i, y:entrance.y+dy*i}))
+        if (level.map[entrance.y-dy]?.[entrance.x-dx] !== 'cavefloor2' ||
+            !pocket.cells.some(p => p.x === entrance.x+dx*pocket.approachDepth &&
+              p.y === entrance.y+dy*pocket.approachDepth)) continue
+        if (!route.every(p => level.mineExcavations.some(t => t.x === p.x && t.y === p.y &&
+            t.kind === 'wall' && t.pocketId === pocket.id))) continue
+        // An exposed crystal can completely plug the pocket's throat. Only
+        // pre-open chambers whose unoccupied floor can be reached from the
+        // breached entrance; other chambers remain discoverable by mining.
+        const pocketFloor = new Set(pocket.cells.filter(p => !exposed.has(key(p.x,p.y)))
+          .map(p => key(p.x,p.y)))
+        const inside = {x:entrance.x+dx*pocket.approachDepth,
+          y:entrance.y+dy*pocket.approachDepth}
+        const start = key(inside.x,inside.y)
+        if (!pocketFloor.has(start)) continue
+        const visited = new Set([start]), queue = [inside]
+        for (let i = 0; i < queue.length; i++) for (const [xx,yy] of DIRS8) {
+          const next = {x:queue[i].x+xx,y:queue[i].y+yy}
+          const k = key(next.x,next.y)
+          if (!pocketFloor.has(k) || visited.has(k)) continue
+          visited.add(k)
+          queue.push(next)
+        }
+        if (visited.size !== pocketFloor.size) continue
+        candidates.push(route)
+        break
+      }
+    }
+    const count = Math.min(candidates.length, randInt(...config().generation.openPocketsPerFloor))
+    for (let n = 0; n < count; n++) {
+      const route = candidates.splice(randInt(0, candidates.length - 1), 1)[0]
+      const opened = new Set(route.map(p => key(p.x, p.y)))
+      for (const p of route) level.map[p.y][p.x] = 'cavefloor2'
+      level.mineFloorTiles += route.length
+      level.mineExcavations = level.mineExcavations.filter(t => !opened.has(key(t.x, t.y)))
+    }
+  }
+
+  function addLooseCracks(level) {
+    const pocketCells = new Set(level.minePockets.flatMap(p => p.cells.map(c => key(c.x,c.y))))
+    const candidates = []
+    for (let y = 5; y < MAP_H - 5; y++) for (let x = 5; x < MAP_W - 5; x++) {
+      if (level.map[y][x] !== 'cavewall' || find(level,x,y) || !doorFree(level,x,y,4)) continue
+      if (!dirs4.some(([dx,dy]) => level.map[y+dy]?.[x+dx] === 'cavefloor2' &&
+        !pocketCells.has(key(x+dx,y+dy)))) continue
+      if (DIRS8.some(([dx,dy]) => pocketCells.has(key(x+dx,y+dy)))) continue
+      candidates.push({x,y})
+    }
+    const count = Math.min(candidates.length,randInt(...config().generation.looseCracksPerFloor))
+    for (let n = 0; n < count; n++) {
+      const p = candidates.splice(randInt(0,candidates.length-1),1)[0]
+      mark(level,p.x,p.y,'wall',{hardness:chance(0.8)?'weak':'hard'})
+    }
+  }
+
   function generateMinerals(level, floor) {
     const cfg = config().generation, cm = level.map
     const [minimum, maximum] = cfg.budgets[Math.min(floor - 1, cfg.budgets.length - 1)]
@@ -433,6 +499,8 @@ const Mining = (() => {
         generatePocket(level, i + 1, originalFloor, originalDistance)
       connectOccasionalPockets(level)
       generateMinerals(level, i + 1)
+      openExistingPockets(level, i === 0)
+      addLooseCracks(level)
     }
   }
 

@@ -122,6 +122,11 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits(${JSON.stringify(traits)}.map(name=>WORLD_TRAITS.find(t=>t.name===name)),'XS');player.inventory=[];player.curseDebuffs=[];player.poisonTurns=0;player.berryRegenTurns=0;enemies=[];groundItems=[];occupied=new Set()`)
   await run('generateNewWorld()')
   assert.equal(run('towerLevels.length'),4)
+  assert.equal(run(`(()=>{
+    const stoves=groundItems.filter(g=>g.kind==='dwarvenstove'&&g.levelKind==='tower')
+    return stoves.length<=1 && stoves.every(g=>g.level>=1&&g.level<=3&&
+      towerLevels[g.level-1].map[g.y]?.[g.x]==='marble')
+  })()`),true,'at most one tower stove, only on intermediate floors')
   assert.equal(run('tower.size'),10,'new towers use a 10x10 bounding footprint')
   assert.equal(run('tower.cornerCut'),1,'all four outer corners are chamfered')
   assert.equal(run(`(()=>{

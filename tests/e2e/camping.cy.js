@@ -18,6 +18,22 @@ function campFixture() {
 }
 
 describe('Abandoned campfire cooking and recovery', () => {
+  it('searches nearby campfire ashes with Inspect only once while F opens cooking', () => {
+    campFixture()
+    cy.window().then(win => win.eval(`(() => {
+      Campfires.close()
+      const fire=groundItems.find(g=>g.kind==='campfire')
+      fire.searched=false
+      const before=Campfires.count('potato'),oldChance=chance
+      try {chance=()=>true;describeSurroundings();describeSurroundings()}
+      finally {chance=oldChance}
+      if(!fire.searched||Campfires.count('potato')!==before+1)
+        throw Error('Inspect must search ashes once from an adjacent tile')
+      lootSkeletonOrForage()
+    })()`))
+    cy.contains('#campOverlay h2','Abandoned campfire').should('be.visible')
+  })
+
   it('uses a dwarven kitchen stove for longer cooking and persists the fire', () => {
     cy.viewport(1366,900)
     campFixture()
@@ -26,6 +42,7 @@ describe('Abandoned campfire cooking and recovery', () => {
       description:'An old dwarven kitchen stove.'}];lootSkeletonOrForage();`))
     cy.contains('#campOverlay h2','Dwarven stove').should('be.visible')
     cy.contains('#campOverlay button','Search ashes').should('not.exist')
+    cy.window().then(win => expect(win.eval('isWalkableForPlayer(61,50)')).to.equal(false))
     cy.contains('#campOverlay button','Light fire').click()
     cy.contains('#campOverlay','Burning · 18 turns left').should('be.visible')
     cy.contains('#campOverlay button','Cook Fresh Fish (1)').click()
@@ -135,5 +152,26 @@ describe('Abandoned campfire cooking and recovery', () => {
       win.eval('enemyTurn=campEnemyTurn')
     })
     cy.contains('#campOverlay','It is unsafe to camp here.').should('be.visible')
+    cy.contains('#campOverlay','Cooking and resting are unavailable until it is safe again.').should('be.visible')
+  })
+
+  it('prevents further food stacking after a serving crosses 300 turns', () => {
+    campFixture()
+    cy.window().then(win => win.eval(`(() => {
+      Campfires.close()
+      player.berryRegenTurns=290
+      const before=Campfires.count('meat')
+      player.inventory.push(createItem('roastedMeat',{count:2}))
+      const idx=player.inventory.findIndex(i=>i.kind==='roastedMeat')
+      if(!Campfires.eat(idx))throw Error('first meal should be allowed below 300')
+      if(player.berryRegenTurns<=300)throw Error('first meal should cross the soft cap')
+      const remaining=Campfires.count('roastedMeat'),turns=player.berryRegenTurns
+      if(Campfires.eat(player.inventory.findIndex(i=>i.kind==='roastedMeat')))
+        throw Error('second meal must be blocked above 300')
+      if(Campfires.count('roastedMeat')!==remaining||player.berryRegenTurns!==turns)
+        throw Error('blocked meal consumed food or changed duration')
+      if(Campfires.count('meat')!==before)throw Error('raw ingredients changed unexpectedly')
+    })()`))
+    cy.get('#logpanel').should('contain','You are full.')
   })
 })

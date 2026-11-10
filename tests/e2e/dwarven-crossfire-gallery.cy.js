@@ -42,6 +42,12 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
               'one real shooter per six bay cells on both sides')
             check(monsters.every(e => enemyIsShooter(e) && e.shotsRemaining > 0),
               'all gallery shooters can attack with ammunition')
+            check(new Set(monsters.map(e=>e.baseName)).size===1 &&
+              monsters.every(e=>['Goblin','Kobold'].includes(e.baseName)),
+              'both barred gallery bays belong to the same species')
+            check(caveDecorations.some(d=>d.level===z&&d.kind==='fishbone'&&
+              gallery.bays.flat().some(p=>d.x===p.x&&d.y===p.y)),
+              'fish remains appear behind gallery bars')
             geared += monsters.filter(e => e.equipment).length
             prefixed += monsters.filter(e => e.prefix).length
             check(monsters.every(e => e.humanoid && Number.isFinite(e.gearScale) &&

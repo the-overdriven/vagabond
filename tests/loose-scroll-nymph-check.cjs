@@ -11,9 +11,9 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     currentZ=0;map=surfaceMap;replayRecording=false;`)
 
   const nymph=run('ENEMY_TEMPLATE_BY_NAME.Nymph')
-  assert.equal(nymph.lootTable?.chance,0.2)
-  assert.equal(nymph.lootTable.items.length,1)
-  assert.equal(nymph.lootTable.items[0].kind,'herb')
+  assert.equal(nymph.lootTable?.[0]?.chance,0.2)
+  assert.equal(nymph.lootTable[0].items.length,1)
+  assert.equal(nymph.lootTable[0].items[0].kind,'herb')
 
   run(`chance=p=>p===0.2;
     lootFromEnemy({name:'Nymph',baseName:'Nymph',tier:2,equipment:null,humanoid:true});`)
@@ -97,13 +97,13 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   for(const t of templates) {
     if (t.name in meatDrops) {
       assert.equal(t.humanoid,false,`${t.name} is not humanoid`)
-      assert.deepEqual(t.lootTable,{chance:1,items:[{kind:'meat',weight:1,count:meatDrops[t.name]}]},
+      assert.deepEqual(t.lootTable[0],{chance:1,items:[{kind:'meat',weight:1,count:meatDrops[t.name]}]},
         `${t.name} has its exact guaranteed drop`)
       run(`player.inventory=[];chance=p=>p===1;lootFromEnemy({name:${JSON.stringify(t.name)},baseName:${JSON.stringify(t.name)},tier:${t.tier},humanoid:false})`)
       assert.equal(run('player.inventory.find(it=>it.kind==="meat")?.count'),meatDrops[t.name],
         `${t.name} gives exactly the configured quantity`)
     } else if (!t.humanoid) {
-      assert.equal(t.lootTable?.items?.some(item=>item.kind==='meat')||false,false,
+      assert.equal(t.lootTable?.some(drop=>drop.items?.some(item=>item.kind==='meat'))||false,false,
         `${t.name} must not drop meat`)
     }
   }
@@ -143,7 +143,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   for (const [species,[kind,probability,count]] of Object.entries(materialDrops)) {
     const template=templates.find(t=>t.name===species)
     assert(template && !template.humanoid,`${species} is non-humanoid`)
-    assert.deepEqual(template.lootTable,{chance:probability,items:[{kind,weight:1,count}]},
+    assert.deepEqual(template.lootTable[0],{chance:probability,items:[{kind,weight:1,count}]},
       `${species} has the exact independent material drop chance and quantity`)
     run(`player.inventory=[];chance=p=>p===${probability};lootFromEnemy({name:${JSON.stringify(species)},
       baseName:${JSON.stringify(species)},tier:${template.tier},equipment:null,humanoid:false})`)
@@ -199,9 +199,12 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME.Fungus,baseName:'Fungus',equipment:null})`)
   assert.equal(run('player.inventory.find(i=>i.kind==="mushroom")?.count'),1,
     'Fungus still guarantees mushrooms even with every loot-table chance failing')
-  assert.deepEqual(templates.find(t=>t.name==='Nymph').lootTable,
+  assert.deepEqual(templates.find(t=>t.name==='Nymph').lootTable[0],
     {chance:0.2,items:[{kind:'herb',weight:1}]},'existing Nymph loot stays unchanged')
-  assert.equal(templates.find(t=>t.name==='Wyrdhag').lootTable.chance,0.2,
+  assert.equal(templates.find(t=>t.name==='Wyrdhag').lootTable[0].chance,0.2,
     'existing Wyrdhag loot chance stays unchanged')
+  assert.deepEqual(templates.find(t=>t.name==='Giant Spider').lootTable[1],
+    {chance:0.55,items:[{kind:'venomGland',weight:1,count:1}]},
+    'Giant Spider can drop venom independently of its silk')
   console.log('PASS nymph, Fungus, meat, alternative materials, seeded loot, stacking, save/replay, and scroll composition')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

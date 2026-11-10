@@ -29,6 +29,15 @@ describe('Dwarven prison shooter density', () => {
                 : e.dungeonRole === 'prisonShooter'))
             check(shooters.length === expected, 'seed ' + seed + ', z ' + z + ', room ' + room.id +
               ': expected ' + expected + ' shooters but found ' + shooters.length)
+            check(new Set(shooters.map(e => e.baseName)).size===1 &&
+              shooters.every(e=>['Goblin','Kobold'].includes(e.baseName)),
+              'each barred room contains one unmixed goblin or kobold guard group')
+            if(!room.gallery) {
+              const cell=room.prisonCellRegion
+              check(enemies.filter(e=>e.alive&&e.level===z&&e.x>=cell.x1&&e.x<=cell.x2&&
+                e.y>=cell.y1&&e.y<=cell.y2).every(e=>shooters.includes(e)),
+                'other creatures, including Giant Spiders, stay outside the bars')
+            }
             check(shooters.every(e => level.caves[0].entrances.every(stair =>
               Math.max(Math.abs(e.x-stair.x),Math.abs(e.y-stair.y)) > 1)),
               'stair 3x3 landing is clear of prison shooters')

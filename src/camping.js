@@ -12,6 +12,8 @@ const Campfires = (() => {
   const isFire = fire => !!fireRules[fire?.kind]
   const rule = fire => fireRules[fire?.kind]
   const recipes = {meat:'roastedMeat', potato:'bakedPotato', fish:'cookedFish'}
+  const recipeIcons = {meat:'🥩', potato:'🥔', fish:'🐟'}
+  const FOOD_REGEN_SOFT_CAP = 300
   let selected = null, queued = false, queueToken = 0, turnContext = null
   const count = kind => player.inventory.filter(it => it.kind === kind)
     .reduce((sum, it) => sum + (it.count || 1), 0)
@@ -48,6 +50,7 @@ const Campfires = (() => {
   }
   function gather() {
     if (count('brushwood') >= FUEL_LIMIT) return false
+    if (!chance(0.75)) return false
     addInventoryItem('brushwood')
     log('You gather a bundle of dry brushwood.', 'loot')
     return true
@@ -112,12 +115,14 @@ const Campfires = (() => {
   function eat(index) {
     const item = player.inventory[index]
     if (!foodRecovery(item?.kind) || !canUseItemsWhileSwimming() || enemyAttackPresentationPending()) return false
+    if (player.berryRegenTurns >= FOOD_REGEN_SOFT_CAP) { log('You are full.', 'info'); return false }
     ensureReplayItemIds()
     recordReplayAction({type:'useItem',action:'cookedFood',idx:index,replayId:item.replayId})
     const amount = foodRecovery(item.kind), name = item.name
     consume(item.kind)
     player.berryRegenTurns += amount*5
     log(`You eat ${name}. Food will restore up to ${amount} HP.`, 'good')
+    if (player.berryRegenTurns > FOOD_REGEN_SOFT_CAP) log('You are full.', 'info')
     consumeItemTurn()
     return true
   }
@@ -230,7 +235,10 @@ const Campfires = (() => {
     info.className = 'camp-info'
     info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/4 turns without${player.campRestProgress ? ` (${player.campRestProgress}/4 progress)` : ''}.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
     box.appendChild(info)
-    const warning = unsafe() || (!count('flint') && !burning(selected) ? 'A Flint Stone is required to light this fire.' : '')
+    const danger = unsafe()
+    const warning = danger
+      ? `${danger} Cooking and resting are unavailable until it is safe again. You can still eat or add fuel.`
+      : (!count('flint') && !burning(selected) ? 'A Flint Stone is required to light this fire.' : '')
     if (warning) { const text = document.createElement('p'); text.className = 'camp-notice'; text.textContent = warning; box.appendChild(text) }
     if (burning(selected) && !foodRemaining() && remaining(selected) < 4-player.campRestProgress) {
       const notice = document.createElement('p')
@@ -251,29 +259,29 @@ const Campfires = (() => {
       b.onclick = callback; parent.appendChild(b)
     }
     const hearth = section('Hearth', 'hearth')
-    if (selected.kind === 'campfire' && !selected.searched)
-      button(hearth,'Search ashes',queued,()=>{ perform(selected,'search');renderPanel() })
     button(hearth,burning(selected) ? `Add brushwood · restore ${rule(selected).burnTurns} turns` : 'Light fire · 1 brushwood',
       queued || !count('brushwood') || (!burning(selected) && !count('flint')) || remaining(selected)>=rule(selected).burnTurns,
       ()=>queue(burning(selected)?'refuel':'light',null,1))
     const cooking = section('Cook', 'cook')
     for (const [ingredient,kind] of Object.entries(recipes)) {
       const amount = count(ingredient)
-      button(cooking,`Cook ${itemDefinition(ingredient).name} (${amount}) → ${foodRecovery(kind)} HP`,
-        queued || !burning(selected) || !amount || !!unsafe(),()=>queue('cook',ingredient,1))
-      if (amount > 1) button(cooking,`Cook up to 3 ${itemDefinition(ingredient).name}`,
-        queued || !burning(selected) || !!unsafe(),()=>queue('cook',ingredient,Math.min(3,amount)),'secondary')
+      button(cooking,`${recipeIcons[ingredient]} Cook ${itemDefinition(ingredient).name} (${amount}) → ${foodRecovery(kind)} HP`,
+        queued || !burning(selected) || !amount || !!danger,()=>queue('cook',ingredient,1))
+      if (amount > 1) button(cooking,`${recipeIcons[ingredient]} Cook up to 3 ${itemDefinition(ingredient).name}`,
+        queued || !burning(selected) || !!danger,()=>queue('cook',ingredient,Math.min(3,amount)),'secondary')
     }
     const availableMeals = Object.values(recipes).filter(kind => count(kind))
     if (availableMeals.length) {
       const eating = section('Eat', 'eat')
       for (const kind of availableMeals)
-        button(eating,`Eat ${itemDefinition(kind).name} · ${foodRecovery(kind)} HP`,queued,()=>{
-          void ITEM_ACTION_HANDLERS.cookedFood(player.inventory.findIndex(it=>it.kind===kind)).then(renderPanel)
+        button(eating,`${recipeIcons[Object.keys(recipes).find(ingredient=>recipes[ingredient]===kind)]} Eat ${itemDefinition(kind).name} · ${foodRecovery(kind)} HP`,
+          queued || player.berryRegenTurns >= FOOD_REGEN_SOFT_CAP,()=>{
+          ITEM_ACTION_HANDLERS.cookedFood(player.inventory.findIndex(it=>it.kind===kind))
+          renderPanel()
         })
     }
     const resting = section('Rest', 'rest')
-    button(resting,'Rest · up to 8 turns',queued || !burning(selected) || !!unsafe() || player.hp>=playerMaxHp(),()=>queue('rest',null,8),'primary')
+    button(resting,'Rest · up to 8 turns',queued || !burning(selected) || !!danger || player.hp>=playerMaxHp(),()=>queue('rest',null,8),'primary')
     button(resting,queued ? 'Stop' : 'Close',false,()=>{ if(queued){queued=false;queueToken++;renderPanel()}else close() },'quiet')
     overlay.appendChild(box)
   }

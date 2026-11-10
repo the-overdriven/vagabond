@@ -178,6 +178,7 @@ function populateTower() {
     {min:3,max:5,roster:['Skeleton','Skeleton','Orc','Orc','Goblin','Ogre']},
     {min:3,max:6,roster:['Orc','Orc','Ogre','Ogre','Skeleton','Gargoyle']}
   ]
+  const stoveFloor = chance(0.25) ? randInt(1, 3) : -1
   for(let z=0;z<=4;z++) {
     const terrain=z===0?surfaceMap:towerLevels[z-1].map
     const spots=[]
@@ -201,6 +202,20 @@ function populateTower() {
     }
     if(z>0) groundItems.push({...take(),level:z,levelKind:'tower',caveIndex:-1,
       kind:'chest',tier:z===4?5:Math.min(3,z+1),opened:false})
+    if (z === stoveFloor) {
+      // Use spare floor space away from stairs, doors and already populated
+      // squares. A wall-adjacent position keeps the narrow passage open.
+      const candidates = spots.filter(p => [[0,-1],[0,1],[-1,0],[1,0]].some(([dx,dy]) =>
+        terrain[p.y+dy]?.[p.x+dx] === 'dwarvenwall') &&
+        [[0,-1],[0,1],[-1,0],[1,0]].filter(([dx,dy]) =>
+          terrain[p.y+dy]?.[p.x+dx] === 'marble').length >= 2)
+      if (candidates.length) {
+        const p = pick(candidates)
+        groundItems.push({...p,level:z,levelKind:'tower',caveIndex:-1,
+          kind:'dwarvenstove',burnUntil:0,
+          description:'An old iron stove stands against the tower wall.'})
+      }
+    }
   }
 }
 

@@ -1184,6 +1184,10 @@ new abilities. The summit always keeps its Lich with two Gargoyles. Each upper
 floor has one ordinary, persistent chest. The summit is an optional high-risk
 encounter, not a safe early-game loot route. Retreat is allowed, but collected
 treasure and damage persist.
+There is also a **25% chance of one Dwarven Stove per tower**, appearing on
+one of the intermediate floors (+1 to +3), never the entrance or roof. It
+blocks movement, is kept clear of stair landings, and uses normal cooking and
+resting rules.
 
 
 ## Temple
@@ -1883,6 +1887,9 @@ free approach from the room interior. Neither stair halls nor special chambers
 are converted. There are **no stoves in the Dwarven Mines**. Kitchen furnishings and stove placement cannot
 replace stairs, progression keys, required rewards, trap mechanisms or tactical
 enemy positions. See Cooking and fireplace resting for stove rules.
+Stoves block ordinary player and monster movement (ethereal traversal retains
+its existing exception) and are operated from an adjacent
+accessible tile rather than by standing on them.
 
 Each floor then selects **1–2 major vaults** from ten procedural concepts:
 fortified barracks, trapped armory, treasury, library archive, prison block,
@@ -1933,6 +1940,9 @@ walkable cell-floor tiles**, rounded up per cell. These are armed, ammunition-
 limited monsters that shoot through bars, not decorative prisoners or a 65%
 chance of one guard. The same staffing ratio applies to ordinary prison cells
 and gallery bays; galleries round their two sides independently. Guards are
+either **all Goblins (75%) or all Kobolds (25%) in a given barred room**,
+never mixed. Other enemies cannot spawn inside these cells. Gallery Giant
+Spiders appear in the unbarred central aisle only. Guards are
 placed before ambient encounters and use a special placement exception for
 enclosed cells: they may be closer to stairs than roaming monsters, but cannot
 occupy the protected 3×3 landing. Spike/arrow trap placement avoids occupying
@@ -1999,6 +2009,8 @@ depth-based prefix chances as other Ruins encounters. Their gear and prefixes
 affect normal monster stats, defenses, melee behavior and loot, but cannot raise
 the fixed ATK of arrows or stones. This makes some guards harder to eliminate
 without multiplying the gallery's fixed ranged damage.
+Gallery cells also contain visible scraps of fish, food and other refuse;
+this dressing does not obstruct movement, sight or projectiles.
 Each gallery also has two independent **20%** optional rolls. One places a
 Giant Spider in the unobstructed central aisle, never inside a barred shooter
 cell. The other places one additional chest on a free, trap-safe aisle tile;
@@ -2301,8 +2313,10 @@ crates, and prisons use bars. Beds (including bed barricades) and all other room
 forbidden **anywhere inside a Ruins stair room**. The additional mechanically
 clear 3×3 stair landing rule remains unchanged. Other rooms may contain their
 normal furniture, even when they happen to be close to a staircase. Dwarven crates remain solid to movement and
-projectiles until destroyed by equipped-weapon strikes. Every crate has **8 HP**
+projectiles until destroyed by equipped-weapon strikes. Intact crates have **8 HP**
 and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
+**10% of placed crates start as broken, walkable debris**, without an intact
+container to smash or loot.
 Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
 player's cosmetic melee lunge. Every successful weapon strike against a crate,
 including the final blow, immediately Alarms all eligible nonpassive monsters
@@ -2963,21 +2977,26 @@ The mine-specific monster abilities use the generic handlers documented in
 **Enemy Special Properties**. Mine terrain and stair geometry constrain their
 legal moves and target tiles.
 
-**Mining pockets and minerals.** Each mine floor contains **3–10** generated,
+**Mining pockets and minerals.** Each mine floor targets **5–12** generated,
 irregular hidden cavities, never larger than an 8×8 bounding box. Their contents
 are drawn from empty hollows, minerals, limited water, nonhumanoid nests, caches
 and rare glowing geodes. A monster nest contains 1–3 members of **one**
-nonhumanoid species, selected for that floor. Pockets are enclosed until mineable weak seams are
-opened. Their primary approaches are fully mineable routes through otherwise
+nonhumanoid species, selected for that floor. **One or two non-water chambers
+per floor start with their passage already open**; the other pockets remain
+sealed until their mineable seams are broken. The first floor's nearby one-wall
+training seam stays closed so the player can learn to mine. Primary approaches
+are generated as fully mineable routes through otherwise
 solid rock: **15%** shallow (1–3 walls), **25%** medium (4–9), and **60%** deep
 (10–20). Each chamber's distance is also checked against the original corridor
 network, so a long route does not lead to a chamber already beside another
 tunnel. Failed long placements can fall back to shorter ones rather than
-breaking floor generation. The respite floor retains an obvious, inexpensive
-one-wall training opportunity. The routes mostly contain weak stone, with a
+breaking floor generation. The routes mostly contain weak stone, with a
 **15%** chance of a hard wall at each step after the first. Larger pockets can
 have multiple marked approaches; nearby pockets may rarely connect through
-another mineable seam. Most ordinary mine walls remain solid. Mineral
+another mineable seam. Each floor also exposes **18–35 additional mineable cracked walls** adjacent
+to its accessible tunnels. These are mostly weak stone, may lead nowhere,
+and give the pickaxe more exploratory uses without adding gem value.
+Most remaining ordinary mine walls stay solid. Mineral
 deposits may be embedded in walls or exposed in corridor alcoves, widened
 corridor floors and pockets; veins contain 1–4 connected deposits of a single
 mineral. Different mineral types are separated by at least **10 tiles of
@@ -3195,9 +3214,9 @@ vision, mining and lighting rules remain unchanged.
 Additional cave decorations include beast remains, skulls, scattered bones,
 stones and other debris on the floors of ordinary caves, but not crypts or
 mausoleums. A cave with at least two Goblins, Skinks or Kobolds has an
-independent **60% chance** to receive one to three scraps of refuse close to
+independent **90% chance** to receive two to five scraps of refuse close to
 those creatures (fishbones, torn cloth, banana peels, broken swords or gnawed
-bones). Such refuse is a clue, not proof of present monsters: it is generated
+bones), including at least one fishbone. Such refuse is a clue, not proof of present monsters: it is generated
 once from their initial placement and does not move with them or disappear
 when they die.
 
@@ -5981,7 +6000,10 @@ behave as on other equipped artifacts, but neither melee ATK bonuses nor
 artifact enchantments raise the fixed projectile damage. Unidentified bow
 artifacts retain their hidden names while equipped and firing. Like ordinary
 bows, they use the existing equipment, ammunition, and save rules. Replays
-record shots by enemy ID and tile;
+record shots by enemy ID and tile. Monster-dropped and chest Short Bows can
+roll normal weapon prefixes, while the Merchant's basic bow is unmodified.
+Prefixes change melee properties, not the fixed 5 ranged ATK; the aiming cursor
+refreshes immediately after an attack;
 failed attempts do not mutate gameplay. Valid shots may also provoke one
 response step beyond a monster's normal AGGRO;
 the rules are in Enemy AI (§22). The bow's hover cursor uses the same glowing
@@ -6513,14 +6535,14 @@ random(1–5) × enemy tier, modified by Magic Find
 Chests and Magic Find still grant gold normally; only the per-kill enemy gold
 was removed.
 
-Monster templates may define an independent `lootTable` containing a total
-drop probability and a weighted list of ordinary item kinds. A successful
+Monster templates may define a single `lootTable` array containing independent
+drop rolls, each with a total probability and weighted item kinds. A successful
 roll chooses **one item kind** and awards its configured fixed `count`
 (default **1**) as a stack, in addition to normal artifact and equipment
 drops. The weights choose which kind drops; they do not affect quantity or
 multiply the total drop probability. All units of a stack use one drop roll.
-An optional `additionalLootTables` list supplies separate independent rolls,
-allowing a species to yield both its guaranteed meat and a rarer material.
+Several entries let a species yield both guaranteed meat and a rarer material.
+Giant Spiders independently roll for Spider Silk (70%) and a Venom Gland (55%).
 
 **Nymph** has a **20%**
 chance to drop one Healing Herb, independently of its healing magic or
@@ -6830,6 +6852,7 @@ Chest loot can include:
 - gold
 - Arrows (10–50)
 - Short Bow (rare)
+- Potato (independent 0.5% chance per ordinary chest)
 - Chitin (1–5, rare)
 - weapons
 - armor
@@ -6888,7 +6911,7 @@ The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
 configured chances.
 Arrows and Chitin use seeded uniform stack counts and merge with existing
-inventory stacks. Short Bows are ordinary unenchanted weapons and use the normal
+inventory stacks. Short Bows may have ordinary weapon prefixes and use the normal
 auto-equip rule. The nine percentage points assigned to these three outcomes
 come entirely from gold; every other ordinary chest outcome retains its chance.
 Guaranteed artifact and royal treasury chests retain their separate rewards.
@@ -7219,11 +7242,14 @@ without creating a second healing stream; see Cooking and fireplace resting.
 ## Cooking and fireplace resting
 
 Abandoned campfires and permanent **Dwarven Stoves** are reusable cooking and
-resting locations. Stand on the fireplace or an adjacent tile and press **F**
-(the forage/search control on touch), or inspect it while standing on it.
+resting locations. Stand on or beside a campfire, or adjacent to a stove, and
+press **F** (the hand/forage control on touch) to open the cooking/rest panel.
+Use **Inspect** to search campfire ashes, including from an adjacent tile.
 Walls and sealed diagonal corners prevent interaction through them. Abandoned
 campfires retain their single 30% Potato search; stoves have no ash-search loot.
 Portable fire placement is not available.
+Outside scripted cave camps, ordinary shallow caves have a 25% campfire chance
+and ordinary z:-2 grotto caves have a 20% chance, subject to valid placement.
 
 Lighting requires a reusable **Flint Stone** and consumes **one Brushwood** and
 one world turn. Campfires then support **12 subsequent turns**; Dwarven Stoves
@@ -7231,7 +7257,8 @@ support **18 subsequent turns**. Refueling consumes another bundle and one turn,
 restoring the corresponding full duration without banking additional fuel.
 Stoves have a quieter ignition sound (see Monster AI). Expiration follows global game turns,
 including time spent on another floor. The cold fireplace remains reusable.
-Fireplaces never block movement or deal contact damage.
+Campfires do not block movement or deal contact damage. Stoves block movement;
+the player cooks from an adjacent accessible tile.
 
 Each portion takes one real turn and transforms one ingredient:
 
@@ -7247,7 +7274,11 @@ At 50 maximum HP the three foods provide 10, 14 and 26 HP; at 200 maximum HP
 these become 16, 20 and 32 HP. Eating takes one turn and adds five regeneration
 turns per HP to the existing shared food effect. Ordinary recovery remains
 **1 HP per five global turns**. Multiple foods extend the effect rather than
-stacking its rate. The timer continues at full HP, and ordinary ticks at full
+stacking its rate. Eating is blocked once **300 or more food-regeneration turns**
+remain; the player sees “You are full.” One serving started below the cap can
+cross it, but no further servings can stack until the counter drops below 300.
+This also limits berries and Fresh Fish (subject to their existing Troll
+regeneration exemption). The timer continues at full HP, and ordinary ticks at full
 HP are lost. Cooked-food recovery works for Trolls; their natural regeneration
 remains independent. Roasted Meat sells for the same 2g as raw Meat; baked
 potatoes and cooked fish cannot be sold. Cooking grants no XP or proficiency.
@@ -7277,13 +7308,19 @@ Every executed action runs ordinary enemies, NPCs, statuses and environmental
 rules. A portion cooked during the last burning turn completes; an unstarted
 portion never spends ingredients. No queue automatically eats or refuels.
 Normal swimming item restrictions apply.
+An approaching detectable threat disables cooking and resting in the panel;
+an explicit notice explains that those options are unavailable until the danger
+passes. Eating prepared food and adding fuel remain available.
 
 Firelight reaches three tiles using the existing wall-aware cave illumination
 rules. Adjacent warmth suppresses environmental freezing. A lit area removes
 forest concealment, and ignition can lure nearby monsters (see Monster AI).
 Lit/cold graphics, fuel duration, recipe recovery, available supplies, current
 HP and food recovery are shown in the contextual panel. The existing status
-interface displays warmth and the food effect. Fine-pointer desktop panels
+interface displays warmth and the food effect. Recipes and meals use food-specific
+meat, potato and fish symbols; cooked-food inventory names
+show the name and stack count, with recovery details behind the `?` control.
+Fine-pointer desktop panels
 group Hearth, Cook, Eat and Rest controls in compact two-column rows with
 warm brown/copper actions, dock at the right edge, and leave the game view
 undimmed and unblurred. Narrow and touch layouts retain centered, full-width,
@@ -7321,9 +7358,11 @@ a shovel.
 
 Ordinary forest tiles can be foraged.
 
-Each forest tile can only be foraged once. Every eligible forest search also
-grants **one Brushwood**, up to five carried, without another RNG roll or
-changing the food probabilities. Merchant fuel remains available in sparse
+Each forest tile can only be foraged once. Each eligible search has an
+independent **75% chance to grant one Brushwood**, up to five carried. The
+ordinary herb, mushroom and berry roll still occurs even when the brushwood
+roll fails or succeeds; brushwood does not replace a foraging reward.
+Repeated searches never generate new brushwood. Merchant fuel remains available in sparse
 forests and cold worlds. Finding brushwood, berries, a herb, or a
 mushroom displays a short rising, fading **found!** label above the searched
 tile in both tile and ASCII modes. Searches finding neither food nor brushwood, and repeat searches, show no
@@ -7378,8 +7417,8 @@ include crypt coffins/sarcophagi, tombstones, special graves, village/landmark
 tiles, dwarven columns (`dwarvenstatue`), and special ground objects such as skeletons,
 campfires, dwarven props, explorer remains, and dead bodies.
 
-An abandoned campfire can be searched once by inspecting it or pressing F
-while standing on it. A seeded 30% roll grants one Potato; a failed search
+An abandoned campfire can be searched once using Inspect while on or beside
+the fire; F/hand opens cooking instead. A seeded 30% roll grants one Potato; a failed search
 finds nothing. The `searched` flag is stored on its ground object and saved,
 preventing repeated rolls. Potatoes stack in the inventory and use
 `img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be eaten raw, equipped, or sold; a lit fire can bake them.
@@ -7387,7 +7426,10 @@ Searched campfires have a gray ASCII glyph and a slightly dimmed, desaturated
 tile image.
 
 Ordinary surroundings inspection only runs when no higher-priority special
-inspection has handled the current tile/object.
+inspection has handled the current tile/object. It reports nearby nondecorative
+ground objects (including campfires and stoves), visible enemies, items,
+doors, furniture, traps and other interactive terrain without suppressing an
+object simply because an enemy occupies the same location.
 The nearby-village intuition checks the surface position **only while the
 player is on z:0**; underground inspections never claim to sense a surface
 village merely because the two positions share map coordinates.
@@ -7523,7 +7565,10 @@ tiles away, preferring the same connected water region. The generated village
 center used by the target exclusion rule is persisted exactly in saves/replay
 snapshots so restoring the same action cannot change the legal target set. Activation
 then creates one non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
-Only that stored enemy ID's death, through the shared kill hook, makes the
+Fishbone clues appear near a suitable water-bank target before the quest is
+accepted; activation favors those prepared banks when valid, allowing the
+player to recognize the Slurper's feeding ground ahead of time. Only that
+stored enemy ID's death, through the shared kill hook, makes the
 quest ready. The `!` is shown before activation, when ready, and on completed
 quests with an unclaimed reward and no pending lesson. The quest menu option
 accepts the job, reviews progress or turns it in, while Talk only supplies
@@ -8420,11 +8465,13 @@ restoration does not generate or repopulate the tower.
 Current save version (defined in `src/version.js`):
 
 ```text
-125
+128
 ```
 
 The game release version changes for each deployment. The save format changes
 only when stored data or replay action/turn rules become incompatible.
+The Save Game button stays hidden until a character begins or a saved game
+is loaded.
 Generation-only changes keep the format: saves store the complete generated
 world and current RNG state, and replays load their complete initial snapshot
 rather than rerunning generation. Optional cave metadata stored in existing
@@ -8833,8 +8880,10 @@ level label and up/down controls on the right.
 Generic z:-2 caves and the separate Crypt Level 2 have distinct entries,
 despite sharing a depth. Historical views paint only their saved discovered
 tiles; undiscovered terrain stays fogged. The full-map player marker pulses
-only on the currently occupied map. Browsing does not change the active game
-map, field of view, side minimap, save state, or replay RNG. Reopening the map
+only on the currently occupied map. The full-map canvas maintains its intrinsic
+aspect ratio even when viewport height constrains the overlay, so the marker
+stays round. Browsing does not change the active game map, field of view, side
+minimap, save state, or replay RNG. Reopening the map
 starts on the current level at the character's position. While switching
 between explored levels in the open map, the zoom and map-center coordinates
 stay unchanged, allowing direct comparison of the same location across floors.
@@ -9516,6 +9565,9 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
 - A world-generated `buriedgear` or `buriedartifact` object takes priority over
   the normal digging loot table but not over the treasure-map location. It
   remains completely hidden until that sand tile is dug.
+- Ordinary digging also has an independent **0.5% chance** to reveal a Potato
+  before the normal 1–100 loot roll, without changing treasure or buried-gear
+  priority.
 
 ## Treasure-map reward
 

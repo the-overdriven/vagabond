@@ -2133,7 +2133,9 @@ function decorateDwarvenRoomTerrain(cm, room, progress = 0, finalFloor = false, 
       if (cm[p.y]?.[p.x] !== 'marble' || protectedTile(p)) continue
       if (tile === 'dwarvenrubble' || tile === 'dwarvenstatue')
         overlayUnderlays[keyXY(p.x, p.y)] = cm[p.y][p.x]
-      cm[p.y][p.x] = tile
+      // Roughly one in ten crates were destroyed long before the player
+      // arrived. Their fragments use the existing walkable debris tile.
+      cm[p.y][p.x] = tile === 'dwarvencrate' && chance(0.10) ? 'dwarvencratepieces' : tile
       if (++placed >= count) break
     }
     return placed
@@ -6153,7 +6155,9 @@ function spawnCaveScenarios() {
         makeEnemy(tmpl, spot, prefix)
       }
     }
-    if (rules.camp) {
+    // Camps also occur outside authored camp scenarios, including the
+    // deeper grottoes, without changing the fixed scenario encounter roster.
+    if (rules.camp || chance(level === -2 ? 0.20 : 0.25)) {
       const spot = takeSpot('far')
       if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'campfire', burnUntil: 0,
         description: pick(CAMPFIRE_INSPECTIONS), level, levelKind: 'chain', caveIndex})
@@ -6395,7 +6399,8 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const ordinaryPrisonRooms = rooms.filter(r => r.archetype === 'Prison' && !r.gallery && r.prisonCellRegion)
     const prisonShootersRequired = new Map(ordinaryPrisonRooms.map(room => [room.id,
       Math.ceil(dwarvenPrisonCellPoints(room).filter(p => level.map[p.y]?.[p.x] === 'marble').length / shooterTilesPerEnemy)]))
-    const shooterTemplates = eligible.filter(t => isShooterTemplate(t) && naturalSpawnEligible(t))
+    const shooterTemplates = ['Goblin','Kobold'].map(name => ENEMY_TEMPLATE_BY_NAME[name])
+      .filter(t => isShooterTemplate(t) && naturalSpawnEligible(t))
       .sort((a,b) => Math.max(1,a.tier)-Math.max(1,b.tier) || a.name.localeCompare(b.name))
     const cheapestShooter = shooterTemplates.length ? Math.max(1,shooterTemplates[0].tier) : Infinity
     const galleryShooterCount = rooms.filter(r => r.gallery).reduce((sum,r)=>sum+r.gallery.shooterSpots.flat().length,0)
@@ -6419,8 +6424,16 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     const usedPositions = new Set()
     const safeSet = new Set(safeTiles.map(p => keyXY(p.x, p.y)))
     const galleryRooms = rooms.filter(room => !!room.gallery)
+    // A barred room is a gang territory: all its guards are Goblins or all
+    // Kobolds. Choose the species once per room, before staffing both bays.
+    const guardSpecies = new Map([...galleryRooms,...ordinaryPrisonRooms].map(room =>
+      [room.id, chance(0.25) ? 'Kobold' : 'Goblin']))
     const inGallery = p => galleryRooms.some(room => p.x > room.x && p.x < room.x+room.w-1 &&
       p.y > room.y && p.y < room.y+room.h-1)
+    const inOrdinaryCell = p => ordinaryPrisonRooms.some(room => {
+      const c = room.prisonCellRegion
+      return p.x >= c.x1 && p.x <= c.x2 && p.y >= c.y1 && p.y <= c.y2
+    })
     // Other encounters never occupy the gallery aisle or shooter cells;
     // guaranteed shooters are positioned explicitly before ambient population.
     for (const p of safeTiles) if (inGallery(p)) safeSet.delete(keyXY(p.x,p.y))
@@ -6438,7 +6451,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
       if (required) {
         for (const p of room?.tacticalSlots?.[role] || [])
           if (safeSet.has(keyXY(p.x, p.y)) && !usedPositions.has(keyXY(p.x, p.y))) return claimSpot(p)
-        const fallback = safeTiles.find(p => !usedPositions.has(keyXY(p.x, p.y)) &&
+        const fallback = safeTiles.find(p => !usedPositions.has(keyXY(p.x, p.y)) && !inOrdinaryCell(p) &&
           p.x > room.x && p.x < room.x + room.w - 1 && p.y > room.y && p.y < room.y + room.h - 1)
         if (fallback) return claimSpot(fallback)
       }
@@ -6530,9 +6543,7 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
     // One real shooter for each six usable bay tiles. They are funded FIRST,
     // before the ordinary floor population; never place decorative stand-ins.
     for (const room of galleryRooms) {
-      const pool = eligible.filter(t => isShooterTemplate(t) && naturalSpawnEligible(t) &&
-        (t.rarity ?? 1) > (cfg.dominantRarityCutoff ?? 0.1))
-        .sort((a,b)=>a.tier-b.tier || a.name.localeCompare(b.name))
+      const pool = shooterTemplates.filter(t => t.name === guardSpecies.get(room.id))
       if (!pool.length) {room.galleryPopulationFailed = true;continue}
       for (let side=0;side<2;side++) for (const spot of room.gallery.shooterSpots[side]) {
         const tmpl = pool.find(t => Math.max(1,t.tier) <= threatBudget-spent)
@@ -6588,7 +6599,8 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
             (Math.abs(a.x-door.x)+Math.abs(a.y-door.y))-(Math.abs(b.x-door.x)+Math.abs(b.y-door.y)) ||
             a.y-b.y || a.x-b.x
         })
-        const tmpl = shooterTemplates.find(t => Math.max(1,t.tier) <= threatBudget-spent)
+        const tmpl = shooterTemplates.find(t => t.name === guardSpecies.get(room.id) &&
+          Math.max(1,t.tier) <= threatBudget-spent)
         if (!tmpl) { room.prisonPopulationFailed = true; break }
         const spot = claimSpot(available[0])
         const enemy = spawnTemplate(tmpl,spot,null,'backline',null,room.id,null)
@@ -6598,6 +6610,9 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         placed++
       }
     }
+    // The only inhabitants of cells are their designated same-species guards.
+    // Other encounters, including Giant Spiders, belong outside the bars.
+    for (const p of safeTiles) if (inOrdinaryCell(p)) safeSet.delete(keyXY(p.x,p.y))
     const organizedBudget = Math.max(spent + throneReserveCost,
       Math.max(1, Math.floor(threatBudget * Math.min(1, Math.max(0, cfg.dominantFamilyShare ?? 0.82)))))
     const nonEntranceRooms = rooms.filter(room => !room.stairRoom)
@@ -8205,6 +8220,24 @@ function spawnNaturalDecorations(roll) {
   const nearHills = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['hill'],2))
   const nearMountains = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['mountain','snowmountain'],3))
   const nearRiver = surface.filter(p=>nearby(surfaceMap,p.x,p.y,['water','river'],1))
+  const hermit = npcs.find(n => n.name === FISHERMAN_NAME)
+  if (hermit) {
+    const water = fishermanWaterRegions()
+    const target = fishermanBestTarget(hermit,
+      fishermanEligibleTargets(fishermanBanks(fishermanFootReachable(),water),fishermanBlockedTiles()),water)
+    if (target) {
+      // The target bank is often sand, which the generic surface-decoration
+      // candidate list excludes. Keep fish remains close to that shoreline.
+      const clues = []
+      for (let dy=-3;dy<=3;dy++) for (let dx=-3;dx<=3;dx++) {
+        const x=target.x+dx,y=target.y+dy
+        if (['grass','sand','hill'].includes(surfaceMap[y]?.[x]) &&
+            !grasslandTrees.has(keyXY(x,y)) &&
+            nearby(surfaceMap,x,y,['water','river'],2)) clues.push({x,y})
+      }
+      scatter(0,'fishbone',clues,4,109,1)
+    }
+  }
   scatter(0,'stone-skull-altar',nearHills.length?nearHills:dry,1,11)
   const distantTrees = nearForest.filter(p=>clearOfHuts(p.x,p.y,cfg.uniqueVillageClearance))
   const distantDry = dry.filter(p=>clearOfHuts(p.x,p.y,cfg.uniqueVillageClearance))
@@ -8285,9 +8318,9 @@ function spawnNaturalDecorations(roll) {
       if(goblins.length>=2 && roll(caveIndex+23,layer.level+7,71)<cfg.goblinoidCampDecorationChance){
         const nearCamp=sites.filter(p=>goblins.some(e=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y))<=5))
         const names=['fishbone','debris-cloth','banana-peel','broken-sword','gnawed-bone']
-        const amount=1+Math.floor(roll(caveIndex+83,layer.level-7,72)*3)
+        const amount=2+Math.floor(roll(caveIndex+83,layer.level-7,72)*4)
         for(let i=0;i<amount;i++){
-          const kind=names[Math.floor(roll(caveIndex*17+i*19,layer.level-5,73)*names.length)]
+          const kind=i===0?'fishbone':names[Math.floor(roll(caveIndex*17+i*19,layer.level-5,73)*names.length)]
           scatter(layer.level,kind,nearCamp,1,salt+10+i,0,caveIndex)
         }
       }
@@ -8318,6 +8351,16 @@ function spawnNaturalDecorations(roll) {
     const reliefs=scatter(level,'dwarven-wall-relief',walls,cfg.dwarfReliefsPerFloor,81+i*5,5)
     if(barrels<cfg.dwarfBarrelsPerFloor||reliefs<cfg.dwarfReliefsPerFloor)
       throw new Error(`Could not decorate dwarven floor ${level} with its required barrels and reliefs.`)
+  }
+  // The debris behind gallery bars tells a story without giving extra loot
+  // or consuming a combat turn. It never obscures the guards' own squares.
+  for (const {level:layer,z} of dungeonPackageLevels('dwarvenRuins')) {
+    for (const room of layer.rooms || []) {
+      if (!room.gallery) continue
+      const sites = room.gallery.bays.flat().filter(p => layer.map[p.y]?.[p.x] === 'marble')
+      for (const [i,kind] of ['fishbone','fishbone','gnawed-bone','banana-peel','debris-cloth'].entries())
+        scatter(z,kind,sites,1,101+(room.cx+room.cy)*11+i,0,-1)
+    }
   }
 }
 

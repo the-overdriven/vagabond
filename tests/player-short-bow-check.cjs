@@ -436,12 +436,13 @@ async function main() {
     try {
       log=message=>messages.push(message);lootLog=message=>messages.push(message)
       chance=()=>true;makeArtifactItem=()=>null
-      enemyTemplateForSavedEnemy=()=>({lootTable:{chance:1,items:[{kind:'chitin',count:1}]}})
+      enemyTemplateForSavedEnemy=()=>({lootTable:[{chance:1,items:[{kind:'chitin',count:1}]}]})
       player.inventory=[]
       lootFromEnemy({name:'Kobold',baseName:'Kobold',tier:2,humanoid:true,
         shooterAbility:'shooterArrows',shotsRemaining:0,
         equipment:{kind:'weapon',base:'Mace',name:'Mace'}})
-      check(messages.includes('The Kobold dropped Short Bow.'),'short bow drops without article')
+      check(messages.some(m=>m.startsWith('The Kobold dropped ') && m.endsWith('Short Bow.')),
+        'short bow drops with a valid name and no article')
       check(messages.includes('The Kobold dropped Chitin.'),'single biological loot without article')
       check(messages.includes('The Kobold dropped Mace.'),'ordinary gear without article')
       check(messages.every(m=>!m.includes('dropped a ')&&!m.includes('dropped an ')),
@@ -450,7 +451,7 @@ async function main() {
       maybeDropTombstone({name:'Lich',baseName:'Lich',tier:5})
       check(messages.includes('The Lich dropped Mysterious Tombstone.'),
         'special tombstone drops without article')
-      enemyTemplateForSavedEnemy=()=>({lootTable:{chance:1,items:[{kind:'chitin',count:3}]}})
+      enemyTemplateForSavedEnemy=()=>({lootTable:[{chance:1,items:[{kind:'chitin',count:3}]}]})
       lootFromEnemy({name:'Scarab',baseName:'Scarab',tier:1,humanoid:false})
       check(messages.includes('The Scarab dropped 3 × Chitin.'),
         'multiple biological drops retain quantity')

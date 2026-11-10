@@ -953,6 +953,16 @@ body.hint-collapsed #hint .panel-toggle {
   border-radius: 4px;
 }
 
+/* Preserve the intrinsic canvas proportions when viewport height caps the map.
+   Independent width/height limits otherwise stretch the player dot into an oval. */
+#minimap {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
+  margin-inline: auto;
+}
+
 .paperdoll {
   display: flex;
   gap: 10px;
@@ -1177,6 +1187,13 @@ body.hint-collapsed #hint .panel-toggle {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.invitem .inventory-food-detail:not([hidden]) {
+  display: block;
+  margin-top: 3px;
+  color: var(--parchment-dim);
+  font-size: calc(11px * var(--ui-font-scale));
 }
 
 .invitem button {

@@ -2096,6 +2096,6 @@
     "dwarfBarrelsPerFloor": 2,
     "dwarfReliefsPerFloor": 2,
     "mineWallMushroomsPerFloor": 6,
-    "goblinoidCampDecorationChance": 0.60
+    "goblinoidCampDecorationChance": 0.90
   }
 }
