@@ -3158,6 +3158,7 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.bowRetreatHold = enemy.bowRetreatHold === true
+    enemy.bowCorneredPursuit = enemy.bowCorneredPursuit === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
     enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
@@ -5608,12 +5609,24 @@ more difficult:
     return path.slice(1, -1).some(tile => projectileTerrainBlocks(player, tile.x, tile.y))
   }
 
+  function corneredBowTargetClosesIn(e) {
+    e.bowRetreatHold = false
+    const advanced = enemyStepTowardPlayer(e)
+    // Stay committed long enough to enter normal AGGRO. Otherwise a monster
+    // would step out of its corner, find its old tile open, and flee back into it.
+    e.bowCorneredPursuit = advanced &&
+      Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > effectiveAggroRange(e)
+    return advanced
+  }
+
   function reactToDistantBowShot(e) {
+    if (e.bowCorneredPursuit) return corneredBowTargetClosesIn(e)
     // A wounded fleeing creature stays defensive even if its base combat
     // stats still exceed the player's.
     if (!enemyIsFleeing(e) && enemyOutmatchesPlayer(e)) return enemyStepTowardPlayer(e)
     const destination = rangedRetreatDestination(e)
-    if (!destination) return false
+    // A cornered target has nothing to gain by standing still under fire.
+    if (!destination) return corneredBowTargetClosesIn(e)
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     const fromX = e.x, fromY = e.y
     occupied.delete(keyXY(fromX, fromY))
@@ -6465,7 +6478,10 @@ more difficult:
     rebuildActiveLevelOccupancy()
     // Changing away from the bow ends every ranged-cover standoff, including
     // monsters on nearby but currently inactive floors.
-    if (!equippedShortBow()) for (const e of enemies) e.bowRetreatHold = false
+    if (!equippedShortBow()) for (const e of enemies) {
+      e.bowRetreatHold = false
+      e.bowCorneredPursuit = false
+    }
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
     wanderSurfaceBelowTower()
@@ -6556,6 +6572,9 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      if (e.bowCorneredPursuit &&
+          (dist <= effectiveAggroRange(e) || dist > equippedShortBow()?.rangedRange))
+        e.bowCorneredPursuit = false
       // A weaker bow target keeps the cover it reached instead of wandering
       // back into the same shot. Reaching melee range or opening a new line
       // of fire ends the standstill and restores ordinary combat behavior.

@@ -194,6 +194,39 @@ async function main() {
       'a second shot drives the monster farther around the obstacle')
     for(let y=39;y<=41;y++)map[y][47]='grass'
     reset()
+    const trapped=spawn('Ghoul','bow-trapped-ghoul')
+    player.baseAtk=70
+    trapped.bowRetreatHold=true
+    for(let y=39;y<=41;y++){
+      map[y][46]=y===40?'grass':'mountain'
+      map[y][47]='mountain'
+    }
+    check(!enemyOutmatchesPlayer(trapped)&&!rangedRetreatDestination(trapped),
+      'weaker Ghoul has a path to the player but no legal retreat')
+    check(shootEnemy(trapped)&&trapped.x===45&&trapped.y===40&&
+      trapped.bowCorneredPursuit&&!trapped.bowRetreatHold,
+      'cornered Ghoul abandons cover hold and approaches on the shot turn')
+    const corneredSave=buildSaveObject()
+    check(corneredSave.enemies.find(e=>e.id===trapped.id).bowCorneredPursuit,
+      'save preserves the cornered Ghoul commitment')
+    loadGameFromObject(corneredSave,{isReplayInit:true})
+    replayAnimationsDisabled=true
+    const restoredGhoul=enemies.find(e=>e.id==='bow-trapped-ghoul')
+    check(restoredGhoul.bowCorneredPursuit,'load restores cornered pursuit')
+    chance=realChance;damageRoll=realDamageRoll
+    rngState=617293;startReplayRecording()
+    check(shootEnemy(restoredGhoul)&&restoredGhoul.x===44&&
+      !restoredGhoul.bowCorneredPursuit,
+      'a second shot does not send the Ghoul back to its corner')
+    window.__corneredBowRecord=structuredClone(replayData)
+    window.__corneredBowExpected={x:restoredGhoul.x,y:restoredGhoul.y,
+      hp:restoredGhoul.hp,turn:turnCount}
+    replayRecording=false;chance=()=>false;damageRoll=()=>1
+    for(let y=39;y<=41;y++){
+      map[y][46]='grass';map[y][47]='grass'
+    }
+    player.baseAtk=2
+    reset()
     const near=spawn('Giant Rat','bow-near',44)
     check(shootEnemy(near)&&near.x===43&&near.y===40,
       'inside effective AGGRO the ordinary chase still takes priority')
@@ -210,6 +243,26 @@ async function main() {
     chance=realChance;damageRoll=realDamageRoll
   })()`)
   console.log('PASS distant bow shot response, miss, terrain, AGGRO and passive priority')
+
+  await run(`(async () => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    const record=window.__corneredBowRecord, expected=window.__corneredBowExpected
+    loadGameFromObject(record.initialState,{isReplayInit:true})
+    replayPlaying=true;replaySimulationMode=true;replayAnimationsDisabled=true
+    activeReplay=record;replayRngIndex=0
+    try {
+      const ghoul=enemies.find(e=>e.id==='bow-trapped-ghoul')
+      check(ghoul?.bowCorneredPursuit,'replay starts with the saved cornered pursuit')
+      await runReplayAction(record.actions[0])
+      check(ghoul.x===expected.x&&ghoul.y===expected.y&&ghoul.hp===expected.hp&&
+        turnCount===expected.turn&&!ghoul.bowCorneredPursuit,
+        'replay preserves the cornered Ghoul response')
+      check(replayRngIndex===record.rng.length,'cornered response replays all RNG outcomes')
+    } finally {
+      replayPlaying=false;replaySimulationMode=false;activeReplay=null
+    }
+  })()`)
+  console.log('PASS cornered bow pursuit save, load and replay')
 
   run(`(() => {
     const check=(ok,msg)=>{if(!ok)throw Error(msg)}

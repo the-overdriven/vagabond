@@ -47,7 +47,28 @@ describe('Abandoned campfire cooking and recovery', () => {
     it(`cooks, eats and rests through the ${name} controls`, () => {
       cy.viewport(width,height)
       campFixture()
+      cy.get('#campOverlay .camp-section-cook .camp-section-actions').then($actions => {
+        const win=$actions[0].ownerDocument.defaultView
+        const desktop=win.matchMedia('(min-width: 721px) and (any-pointer: fine)').matches
+        const style=win.getComputedStyle($actions[0])
+        const firstButton=$actions[0].querySelector('button')
+        expect($actions[0].querySelectorAll('button').length).to.equal(4)
+        if (desktop) {
+          expect(style.display).to.equal('grid')
+          expect(style.gridTemplateColumns.trim().split(/\s+/).length).to.equal(2)
+          expect(win.getComputedStyle(firstButton).backgroundColor).to.equal('rgb(51, 39, 30)')
+          expect(firstButton.getBoundingClientRect().height).to.be.lessThan(42)
+        } else {
+          expect(style.display).not.to.equal('grid')
+          expect(firstButton.getBoundingClientRect().height).to.be.at.least(42)
+        }
+      })
       cy.contains('#campOverlay button','Light fire').click()
+      cy.get('#campOverlay .camp-section-cook button:not(:disabled)').first().then($button => {
+        const win=$button[0].ownerDocument.defaultView
+        if (win.matchMedia('(min-width: 721px) and (any-pointer: fine)').matches)
+          expect(win.getComputedStyle($button[0]).backgroundImage).to.include('linear-gradient')
+      })
       cy.contains('#campOverlay','Burning · 12 turns left').should('be.visible')
       cy.contains('#campOverlay button','Cook Fresh Fish (1)').click()
       cy.contains('#campOverlay button','Eat Cooked Fish').click()
@@ -61,10 +82,32 @@ describe('Abandoned campfire cooking and recovery', () => {
       })
       cy.get('#campOverlay .panelbox').then($box => {
         const bounds=$box[0].getBoundingClientRect()
+        const win=$box[0].ownerDocument.defaultView
+        const backdrop=win.getComputedStyle(win.document.getElementById('campOverlay'))
+        const desktop=win.matchMedia('(min-width: 721px) and (any-pointer: fine)').matches
         expect(bounds.left).to.be.at.least(0)
         expect(bounds.right).to.be.at.most(width)
         expect(bounds.bottom).to.be.at.most(height)
+        if (desktop) {
+          expect(backdrop.justifyContent).to.equal('flex-end')
+          expect(backdrop.backgroundColor).to.equal('rgba(0, 0, 0, 0)')
+          expect(backdrop.backdropFilter).to.equal('none')
+          expect(bounds.right).to.be.closeTo(width-16,2)
+        } else {
+          expect(backdrop.justifyContent).to.equal('center')
+          expect(backdrop.backgroundColor).not.to.equal('rgba(0, 0, 0, 0)')
+        }
       })
+      if (name === 'desktop') {
+        cy.viewport(1024,600)
+        cy.get('#campOverlay .panelbox').then($box => {
+          const bounds=$box[0].getBoundingClientRect()
+          expect(bounds.left).to.be.at.least(0)
+          expect(bounds.right).to.be.at.most(1024)
+          expect(bounds.bottom).to.be.at.most(600)
+        })
+        cy.viewport(width,height)
+      }
       cy.window().then(win => win.eval(`(() => {
         const fire=groundItems.find(g=>g.kind==='campfire')
         player.berryRegenTurns=0;player.campRestProgress=0

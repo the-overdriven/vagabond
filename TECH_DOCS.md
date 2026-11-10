@@ -4959,8 +4959,14 @@ gives strong low-AGGRO enemies a chance to close the gap, while weaker targets
 may retreat beyond the bow's six-tile reach. When a weaker monster has no
 immediately farther open tile, it searches up to 12 steps around nearby obstacles
 and can take a sideways step along a route to a farther tile. It does not step
-closer to the player to escape; a genuinely blocked route costs the response
-without moving. Neither reaction teleports or crosses forbidden terrain.
+closer to the player merely to escape. If no retreat route exists within that
+search, the cornered target abandons its retreat and advances toward the player
+along its ordinary pursuit path, fighting back when it reaches melee range. It
+commits to closing the distance rather than bouncing back into the corner on
+the next shot; ordinary pursuit takes over within AGGRO range. Switching away
+from the bow or escaping its range ends this cornered pursuit.
+If neither path exists, it cannot move or attack across walls. Neither reaction
+teleports or crosses forbidden terrain.
 
 Once a weaker bow target has actually retreated, it holds position behind
 terrain that blocks the player's shot while the Short Bow remains equipped,
@@ -4968,7 +4974,8 @@ instead of wandering out from cover. Switching weapons ends the standoff,
 including for monsters on inactive floors. Reaching melee range or restoring a
 clear shot returns the target to ordinary combat behavior. Monsters not
 provoked into ranged retreat do not hold cover merely because a wall intervenes.
-This cover state is deterministic and saved/replayed with the enemy.
+The cover and cornered-pursuit states are deterministic and saved/replayed with
+the enemy.
 
 Inside effective AGGRO, normal combat and pursuit still apply. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
@@ -7251,7 +7258,12 @@ rules. Adjacent warmth suppresses environmental freezing. A lit area removes
 forest concealment, and ignition can lure nearby monsters (see Monster AI).
 Lit/cold graphics, fuel duration, recipe recovery, available supplies, current
 HP and food recovery are shown in the contextual panel. The existing status
-interface displays warmth and the food effect.
+interface displays warmth and the food effect. Fine-pointer desktop panels
+group Hearth, Cook, Eat and Rest controls in compact two-column rows with
+warm brown/copper actions, dock at the right edge, and leave the game view
+undimmed and unblurred. Narrow and touch layouts retain centered, full-width,
+touch-sized actions with the modal backdrop. Appearance does not affect
+gameplay or replay.
 
 Fire expiry and campfire searched state persist on the existing ground object. The
 shared food timer and partial food-free rest progress persist on the player.

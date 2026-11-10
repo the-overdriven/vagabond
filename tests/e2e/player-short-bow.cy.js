@@ -179,6 +179,26 @@ describe('Player Short Bow', () => {
         check(shootEnemy(blockedRat)&&blockedRat.x===47&&blockedRat.y===38,
           'another shot sends the monster around the obstacle')
         enemies=[];occupied=new Set()
+        const trappedGhoul=spawn('Ghoul','response-trapped-ghoul')
+        player.baseAtk=70;chance=()=>false
+        trappedGhoul.bowRetreatHold=true
+        for(let y=39;y<=41;y++){
+          map[y][46]=y===40?'grass':'mountain'
+          map[y][47]='mountain'
+        }
+        check(!enemyOutmatchesPlayer(trappedGhoul)&&!rangedRetreatDestination(trappedGhoul),
+          'Ghoul is too weak to stand its ground but cannot escape its corner')
+        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===45&&trappedGhoul.y===40&&
+          trappedGhoul.bowCorneredPursuit&&!trappedGhoul.bowRetreatHold,
+          'trapped Ghoul turns toward the player on the first shot')
+        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===44&&
+          !trappedGhoul.bowCorneredPursuit,
+          'trapped Ghoul continues advancing instead of oscillating in the corner')
+        for(let y=39;y<=41;y++){
+          map[y][46]='grass';map[y][47]='grass'
+        }
+        player.baseAtk=2
+        enemies=[];occupied=new Set()
         player.baseSpd=30;chance=()=>true
         const pursuer=spawn('Giant Rat','response-shot-pursuer',43)
         pursuer.aware=true;pursuer.alarmed=true

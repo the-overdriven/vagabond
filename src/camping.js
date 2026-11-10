@@ -223,40 +223,58 @@ const Campfires = (() => {
     const box = document.createElement('div'); box.className = 'panelbox'
     const heading = document.createElement('h2'); heading.textContent = rule(selected).name; box.appendChild(heading)
     const status = document.createElement('p')
+    status.className = 'camp-status'
     status.textContent = `${burning(selected) ? `Burning · ${remaining(selected)} turns left` : 'Cold'} · Brushwood ${count('brushwood')}/${FUEL_LIMIT}`
     box.appendChild(status)
     const info = document.createElement('p')
+    info.className = 'camp-info'
     info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/4 turns without${player.campRestProgress ? ` (${player.campRestProgress}/4 progress)` : ''}.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
     box.appendChild(info)
     const warning = unsafe() || (!count('flint') && !burning(selected) ? 'A Flint Stone is required to light this fire.' : '')
-    if (warning) { const text = document.createElement('p'); text.textContent = warning; box.appendChild(text) }
+    if (warning) { const text = document.createElement('p'); text.className = 'camp-notice'; text.textContent = warning; box.appendChild(text) }
     if (burning(selected) && !foodRemaining() && remaining(selected) < 4-player.campRestProgress) {
       const notice = document.createElement('p')
+      notice.className = 'camp-notice'
       notice.textContent = `Only ${remaining(selected)} turn${remaining(selected)===1?'':'s'} of fire remain. Without food, you need ${4-player.campRestProgress} consecutive rest turns to heal 1 HP. Add Brushwood or eat cooked food first.`
       box.appendChild(notice)
     }
-    const button = (label, disabled, callback) => {
-      const b = document.createElement('button'); b.textContent = label; b.disabled = disabled
-      b.onclick = callback; box.appendChild(b)
+    const section = (title, kind) => {
+      const wrap = document.createElement('section'); wrap.className = `camp-section camp-section-${kind}`
+      const caption = document.createElement('h3'); caption.textContent = title; wrap.appendChild(caption)
+      const actions = document.createElement('div'); actions.className = 'camp-section-actions'; wrap.appendChild(actions)
+      box.appendChild(wrap)
+      return actions
     }
+    const button = (parent, label, disabled, callback, variant = '') => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.disabled = disabled
+      b.className = `camp-button${variant ? ` camp-button-${variant}` : ''}`
+      b.onclick = callback; parent.appendChild(b)
+    }
+    const hearth = section('Hearth', 'hearth')
     if (selected.kind === 'campfire' && !selected.searched)
-      button('Search ashes',queued,()=>{ perform(selected,'search');renderPanel() })
-    button(burning(selected) ? `Add brushwood · restore ${rule(selected).burnTurns} turns` : 'Light fire · 1 brushwood',
+      button(hearth,'Search ashes',queued,()=>{ perform(selected,'search');renderPanel() })
+    button(hearth,burning(selected) ? `Add brushwood · restore ${rule(selected).burnTurns} turns` : 'Light fire · 1 brushwood',
       queued || !count('brushwood') || (!burning(selected) && !count('flint')) || remaining(selected)>=rule(selected).burnTurns,
       ()=>queue(burning(selected)?'refuel':'light',null,1))
+    const cooking = section('Cook', 'cook')
     for (const [ingredient,kind] of Object.entries(recipes)) {
       const amount = count(ingredient)
-      button(`Cook ${itemDefinition(ingredient).name} (${amount}) → ${foodRecovery(kind)} HP`,
+      button(cooking,`Cook ${itemDefinition(ingredient).name} (${amount}) → ${foodRecovery(kind)} HP`,
         queued || !burning(selected) || !amount || !!unsafe(),()=>queue('cook',ingredient,1))
-      if (amount > 1) button(`Cook up to 3 ${itemDefinition(ingredient).name}`,
-        queued || !burning(selected) || !!unsafe(),()=>queue('cook',ingredient,Math.min(3,amount)))
+      if (amount > 1) button(cooking,`Cook up to 3 ${itemDefinition(ingredient).name}`,
+        queued || !burning(selected) || !!unsafe(),()=>queue('cook',ingredient,Math.min(3,amount)),'secondary')
     }
-    for (const kind of Object.values(recipes)) if (count(kind))
-      button(`Eat ${itemDefinition(kind).name} · ${foodRecovery(kind)} HP`,queued,()=>{
-        void ITEM_ACTION_HANDLERS.cookedFood(player.inventory.findIndex(it=>it.kind===kind)).then(renderPanel)
-      })
-    button('Rest · up to 8 turns',queued || !burning(selected) || !!unsafe() || player.hp>=playerMaxHp(),()=>queue('rest',null,8))
-    button(queued ? 'Stop' : 'Close',false,()=>{ if(queued){queued=false;queueToken++;renderPanel()}else close() })
+    const availableMeals = Object.values(recipes).filter(kind => count(kind))
+    if (availableMeals.length) {
+      const eating = section('Eat', 'eat')
+      for (const kind of availableMeals)
+        button(eating,`Eat ${itemDefinition(kind).name} · ${foodRecovery(kind)} HP`,queued,()=>{
+          void ITEM_ACTION_HANDLERS.cookedFood(player.inventory.findIndex(it=>it.kind===kind)).then(renderPanel)
+        })
+    }
+    const resting = section('Rest', 'rest')
+    button(resting,'Rest · up to 8 turns',queued || !burning(selected) || !!unsafe() || player.hp>=playerMaxHp(),()=>queue('rest',null,8),'primary')
+    button(resting,queued ? 'Stop' : 'Close',false,()=>{ if(queued){queued=false;queueToken++;renderPanel()}else close() },'quiet')
     overlay.appendChild(box)
   }
   function keydown(event) {
