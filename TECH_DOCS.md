@@ -7227,7 +7227,11 @@ partial progress toward its next ordinary tick, rather than multiplying the
 food's total healing. At 50/100/150/200/300 maximum HP the rate is 2/3/5/6/9 HP
 per turn. Without food, four consecutive rest turns restore **1 HP**. Non-rest
 actions or danger reset that weak-rest progress; closing the panel alone does
-not grant or erase progress. Rest ends at full HP or when its active food
+not grant or erase progress. The panel shows progress toward the next weak-rest
+HP and warns when the remaining fire duration is too short to complete it;
+partial rest gives no HP and is lost if the fire dies before the fourth turn.
+Progress messages never describe an unhealed rest turn as recovered HP.
+Rest ends at full HP or when its active food
 recovery runs out; another rest can use weak food-free recovery. There is no
 recovery cooldown or once-per-floor limit: food, fuel, accessible fireplaces and safety limit use.
 

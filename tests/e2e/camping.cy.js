@@ -65,6 +65,13 @@ describe('Abandoned campfire cooking and recovery', () => {
         expect(bounds.right).to.be.at.most(width)
         expect(bounds.bottom).to.be.at.most(height)
       })
+      cy.window().then(win => win.eval(`(() => {
+        const fire=groundItems.find(g=>g.kind==='campfire')
+        player.berryRegenTurns=0;player.campRestProgress=0
+        fire.burnUntil=turnCount+3;Campfires.open(fire)
+      })()`))
+      cy.contains('#campOverlay','Only 3 turns of fire remain').should('be.visible')
+      cy.contains('#campOverlay','you need 4 consecutive rest turns to heal 1 HP').should('be.visible')
       cy.contains('#campOverlay button',/^Close$/).click()
       cy.get('#campOverlay').should('not.exist')
     })

@@ -159,7 +159,9 @@ const Campfires = (() => {
       const interrupted = damaged || player.x !== x || player.y !== y || !reachable(fire) ||
         !burning(fire) || !!unsafe()
       if (isRest) {
-        log(`You rest and recover ${turnContext.healed} HP.`, 'info')
+        if (turnContext.healed > 0) log(`You rest and recover ${turnContext.healed} HP.`, 'info')
+        else if (!interrupted && !hadFood && player.campRestProgress > 0)
+          log(`You rest (${player.campRestProgress}/4 turns toward 1 HP without food).`, 'info')
         if (hadFood && foodRemaining() === 0) {
           queued = false
           log('Your food recovery is complete.', 'info')
@@ -168,7 +170,10 @@ const Campfires = (() => {
       if (interrupted) {
         queued = false
         player.campRestProgress = 0
-        log(damaged ? 'Damage interrupts your camping.' : 'Camping stops: the fire, position, or surroundings changed.', 'info')
+        log(damaged ? 'Damage interrupts your camping.' :
+          isRest && !burning(fire) && !hadFood && turnContext.healed === 0
+            ? 'The fire goes out before you recover. Without food, you need four consecutive rest turns for 1 HP.'
+            : 'Camping stops: the fire, position, or surroundings changed.', 'info')
       }
       updateHud(); render(); runAnimationLoop()
       return true
@@ -221,10 +226,15 @@ const Campfires = (() => {
     status.textContent = `${burning(selected) ? `Burning · ${remaining(selected)} turns left` : 'Cold'} · Brushwood ${count('brushwood')}/${FUEL_LIMIT}`
     box.appendChild(status)
     const info = document.createElement('p')
-    info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/4 turns without.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
+    info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/4 turns without${player.campRestProgress ? ` (${player.campRestProgress}/4 progress)` : ''}.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
     box.appendChild(info)
     const warning = unsafe() || (!count('flint') && !burning(selected) ? 'A Flint Stone is required to light this fire.' : '')
     if (warning) { const text = document.createElement('p'); text.textContent = warning; box.appendChild(text) }
+    if (burning(selected) && !foodRemaining() && remaining(selected) < 4-player.campRestProgress) {
+      const notice = document.createElement('p')
+      notice.textContent = `Only ${remaining(selected)} turn${remaining(selected)===1?'':'s'} of fire remain. Without food, you need ${4-player.campRestProgress} consecutive rest turns to heal 1 HP. Add Brushwood or eat cooked food first.`
+      box.appendChild(notice)
+    }
     const button = (label, disabled, callback) => {
       const b = document.createElement('button'); b.textContent = label; b.disabled = disabled
       b.onclick = callback; box.appendChild(b)

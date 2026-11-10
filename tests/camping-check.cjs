@@ -27,6 +27,18 @@ async function main() {
   run('player.berryRegenTurns=0;player.campRestProgress=0;window.hpBefore=player.hp')
   for(let i=0;i<4;i++) check('Campfires.perform(fire,"rest")','weak rest tick')
   check('player.hp-hpBefore===1','food-free recovery is one HP per four consecutive rest turns')
+  run(`player.hp=20;player.berryRegenTurns=0;player.campRestProgress=0;
+    fire.burnUntil=turnCount+3;window.shortRestLog=[];window.oldCampLog=log;
+    log=message=>shortRestLog.push(message);`)
+  for(let i=0;i<3;i++) check('Campfires.perform(fire,"rest")','short fire weak rest turn')
+  check('player.hp===20 && !Campfires.burning(fire) && player.campRestProgress===0',
+    'three fire turns are insufficient for food-free recovery and partial progress expires')
+  check('shortRestLog.some(m=>m.includes("fire goes out before you recover")) && !shortRestLog.some(m=>m.includes("recover 0 HP"))',
+    'short-fire rest explains why no HP recovered without claiming zero healing')
+  run('log=oldCampLog')
+  run('player.campRestProgress=1;fire.burnUntil=turnCount+3;window.hpBefore=player.hp')
+  for(let i=0;i<3;i++) check('Campfires.perform(fire,"rest")','partial-progress short fire rest')
+  check('player.hp===hpBefore+1','three fire turns do heal when one earlier rest turn already counted')
   run('fire.burnUntil=turnCount+1;window.raw=Campfires.count("meat")')
   check('Campfires.perform(fire,"cook","meat") && Campfires.count("meat")===raw-1 && !Campfires.burning(fire)','last burning turn completes cooking')
   check('!Campfires.perform(fire,"cook","meat") && Campfires.count("meat")===raw-1','expired fire preserves remaining food')
