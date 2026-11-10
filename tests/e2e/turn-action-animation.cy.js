@@ -21,7 +21,7 @@ describe('Stationary turn animation handoff', () => {
           runAnimationLoop, rng, randInt, foragedTiles, dugSandTiles, groundItems,
           treasureMapSpot, tile: map[player.y][player.x]
         }
-        let loops = 0
+        let loops = 0, loopStarted = false
         try {
           enemyTurn = () => {}
           npcTurn = () => {}
@@ -29,19 +29,20 @@ describe('Stationary turn animation handoff', () => {
           render = () => {}
           renderInventory = () => {}
           updateTooltip = () => {}
-          runAnimationLoop = () => { loops++ }
+          // The real scheduler coalesces repeated requests into a single rAF.
+          runAnimationLoop = () => { if (!loopStarted) { loops++; loopStarted = true } }
 
           consumeItemTurn()
           const itemLoops = loops
 
-          loops = 0
+          loops = 0; loopStarted = false
           map[player.y][player.x] = 'forest'
           foragedTiles = new Set()
           rng = () => 0.99
           tryForage()
           const forageLoops = loops
 
-          loops = 0
+          loops = 0; loopStarted = false
           map[player.y][player.x] = 'sand'
           dugSandTiles = new Set()
           groundItems = []

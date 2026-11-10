@@ -3661,7 +3661,7 @@ Aggro
 Biomes
 Evade capability
 Humanoid status
-Family (`living`, `undead`), independent of humanoid status
+Family (`living`, `undead`, `construct`), independent of humanoid status
 Flying status
 Wander mode (`"homeReanchored"`, `"homeReturn"`, `"roam"`, `"far"`, or `false`) and optional `homeRadius`
 ```
@@ -6519,6 +6519,9 @@ roll chooses **one item kind** and awards its configured fixed `count`
 (default **1**) as a stack, in addition to normal artifact and equipment
 drops. The weights choose which kind drops; they do not affect quantity or
 multiply the total drop probability. All units of a stack use one drop roll.
+An optional `additionalLootTables` list supplies separate independent rolls,
+allowing a species to yield both its guaranteed meat and a rarer material.
+
 **Nymph** has a **20%**
 chance to drop one Healing Herb, independently of its healing magic or
 ordinary humanoid gear. **Wyrdhag** has a **20%**
@@ -6552,6 +6555,10 @@ extra meat:
 | Amethyst | Vrakeber **40%** | 16g |
 | Rare Trophy | NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN **100%** each | 60g |
 
+Wyvern and Alacran additionally have an independent **55%** chance to drop
+one Venom Gland alongside their guaranteed meat. Either drop can be collected
+separately when the creature is killed from a distance.
+
 Materials are stackable and may be sold or dropped. Venom Glands can also
 be consumed to prepare a poisoned weapon or arrow (see the Poison rules in
 §20); the other materials have no crafting or consumption effects. The
@@ -6564,7 +6571,7 @@ mushroom rule. Material drop configuration lives in
 
 All other species, including unlisted non-humanoids, have **no meat drop**.
 Meat is a stackable supply worth **2 gold per cut** when sold. It cannot
-currently be eaten or cooked. Its inventory icon is `img/icons/meat.svg`;
+be eaten raw, but can be roasted at a lit fireplace. Its inventory icon is `img/icons/meat.svg`;
 it is represented by the standard supplies glyph in ASCII mode.
 The quantities, chance and chosen species are configured in
 `content/enemy_templates.json`; meat's item data is in `content/items.json`.

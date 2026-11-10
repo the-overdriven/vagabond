@@ -79,12 +79,13 @@ describe('Scroll of Invisibility', () => {
     beginGame()
     cy.window().then(win => win.eval(`(async () => {
       replayAnimationsDisabled = true
-      const e = {
-        name: 'Goblin', baseName: 'Goblin', tier: 2, aggro: 3, hp: 100, maxHp: 100,
+      const e = addEnemy({
+        ...ENEMY_TEMPLATE_BY_NAME.Goblin, name: 'Goblin', baseName: 'Goblin',
+        tier: 2, aggro: 3, hp: 100, maxHp: 100,
         atk: 1, def: 0, spd: 2, x: player.x + 1, y: player.y,
-        level: currentZ, alive: true, }
+        level: currentZ, alive: true, abilities: [], equipment: null
+      })
       map[e.y][e.x] = 'grass'
-      enemies.push(e)
       occupied.add(keyXY(e.x, e.y))
       player.invisibleTurns = 20
       const originalRng = rng

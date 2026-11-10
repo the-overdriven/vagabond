@@ -196,7 +196,7 @@ describe('Tracking and beast evidence', () => {
         }
         trackAssert(tileInspectInfo(40,40).html.includes('foot tracks?'), 'trained hover still generic')
         groundItems.push({kind:'campfire',x:40,y:40,level:0})
-        trackAssert(tileInspectInfo(40,40).html.includes('campfire'), 'ground object priority')
+        trackAssert(tileInspectInfo(40,40).html.includes('Abandoned Campfire'), 'ground object priority')
         groundItems = []; discovered[40][40] = false
         trackAssert(tileInspectInfo(40,40) === null, 'undiscovered track hidden')
       } finally { rng = original }

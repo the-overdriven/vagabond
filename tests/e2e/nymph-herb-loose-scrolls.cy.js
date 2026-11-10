@@ -46,6 +46,34 @@ describe('Nymph herbs and surface scroll variety',()=>{
                 player.inventory[0].count===count,
                 species+' grants the entire meat stack in one loot roll')
             }
+            // Poisonous meat sources also provide a separate, optional gland.
+            for (const [species,meatCount] of [['Wyvern',3],['Alacran',1]]) {
+              const t=ENEMY_TEMPLATE_BY_NAME[species]
+              const extra=t.additionalLootTables
+              check(extra?.length===1 && extra[0].chance===0.55 &&
+                extra[0].items.length===1 && extra[0].items[0].kind==='venomGland' &&
+                extra[0].items[0].count===1,
+                species+' has an independent 55% venom gland drop')
+              chance=p=>p===1 || p===0.55
+              player.inventory=[]
+              lootFromEnemy({...t,baseName:species,equipment:null})
+              check(player.inventory.some(i=>i.kind==='meat' && i.count===meatCount) &&
+                player.inventory.some(i=>i.kind==='venomGland' && i.count===1),
+                species+' can drop guaranteed meat and a venom gland together')
+              chance=p=>p===1
+              player.inventory=[]
+              lootFromEnemy({...t,baseName:species,equipment:null})
+              check(player.inventory.length===1 && player.inventory[0].kind==='meat' &&
+                player.inventory[0].count===meatCount,
+                species+' retains meat when the gland roll fails')
+              chance=p=>p===1 || p===0.55
+              groundItems=[]
+              lootFromEnemy({...t,baseName:species,equipment:null,x:player.x,y:player.y,
+                level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave},true)
+              check(groundItems.some(g=>g.item?.kind==='meat' && g.item.count===meatCount) &&
+                groundItems.some(g=>g.item?.kind==='venomGland' && g.item.count===1),
+                species+' leaves both kinds of loot at the death tile')
+            }
             for(const t of ENEMY_TEMPLATES) {
               if (!t.humanoid && !(t.name in meatDrops))
                 check(!t.lootTable?.items?.some(item=>item.kind==='meat'),

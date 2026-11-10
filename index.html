@@ -4113,17 +4113,20 @@ more difficult:
 
     // Optional per-species drops are independent of artifact/equipment loot.
     // Their total chance is rolled once, then a weighted item is selected.
-    const drop = enemyTemplateForSavedEnemy(e)?.lootTable
-    if (drop?.items?.length && chance(drop.chance ?? 0)) {
-      const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
-      if (choices.length) {
-        const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
-        const count = entry.count ?? 1
-        if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid monster loot count: ' + entry.kind)
-        if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind, {count}))
-        else addInventoryItem(entry.kind, {count})
-        const name = itemDefinition(entry.kind).name
-        log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
+    const template = enemyTemplateForSavedEnemy(e)
+    // Secondary tables (e.g. venom glands alongside meat) roll independently.
+    for (const drop of [template?.lootTable, ...(template?.additionalLootTables || [])]) {
+      if (drop?.items?.length && chance(drop.chance ?? 0)) {
+        const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
+        if (choices.length) {
+          const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
+          const count = entry.count ?? 1
+          if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid monster loot count: ' + entry.kind)
+          if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind, {count}))
+          else addInventoryItem(entry.kind, {count})
+          const name = itemDefinition(entry.kind).name
+          log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
+        }
       }
     }
 
