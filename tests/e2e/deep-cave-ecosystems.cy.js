@@ -28,14 +28,22 @@ describe('Deep Caves 2.0 parametric ecosystem', () => {
         'each connected complex gets a seeded shared budget')
       check(level.caves.every(c=>c.entrances.every(e=>!caveScenarioClue(-2,e.x,e.y) &&
         !caveScenarioIntro(-2,e.x,e.y))), 'population hidden on cave entry')
+      const campfires=groundItems.filter(g=>g.kind==='campfire'&&g.level===-2&&g.levelKind==='chain')
+      check(campfires.every(g=>level.map[g.y]?.[g.x]==='cavefloor2' &&
+        level.caveMaps[g.caveIndex]?.[g.y]?.[g.x]==='cavefloor2' &&
+        level.caves.every(c=>c.entrances.every(p=>Math.max(Math.abs(p.x-g.x),Math.abs(p.y-g.y))>=4)) &&
+        !mobs.some(m=>m.x===g.x&&m.y===g.y)), 'abandoned deep fires avoid entrances and occupied cells')
       const before=JSON.stringify({caves:level.caves,territories:level.territories,
-        complexes:level.complexes,spawns:mobs.map(e=>[e.id,e.baseName,e.prefix,e.x,e.y,e.caveIndex]),rng:rngState})
+        complexes:level.complexes,spawns:mobs.map(e=>[e.id,e.baseName,e.prefix,e.x,e.y,e.caveIndex]),
+        campfires:campfires.map(g=>[g.x,g.y,g.caveIndex,g.burnUntil]),rng:rngState})
       const save=structuredClone(buildSaveObject())
       loadGameFromObject(save,{isReplayInit:true})
       const restored=deepLevels[0]
       const after=JSON.stringify({caves:restored.caves,territories:restored.territories,
         complexes:restored.complexes,spawns:enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')
-          .map(e=>[e.id,e.baseName,e.prefix,e.x,e.y,e.caveIndex]),rng:rngState})
+          .map(e=>[e.id,e.baseName,e.prefix,e.x,e.y,e.caveIndex]),
+        campfires:groundItems.filter(g=>g.kind==='campfire'&&g.level===-2&&g.levelKind==='chain')
+          .map(g=>[g.x,g.y,g.caveIndex,g.burnUntil]),rng:rngState})
       check(before===after,'deep ecosystem restores without rerolling or replay RNG desync')
     })()`))
   })

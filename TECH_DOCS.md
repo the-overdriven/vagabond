@@ -7250,6 +7250,8 @@ campfires retain their single 30% Potato search; stoves have no ash-search loot.
 Portable fire placement is not available.
 Outside scripted cave camps, ordinary shallow caves have a 25% campfire chance
 and ordinary z:-2 grotto caves have a 20% chance, subject to valid placement.
+Deep-cave campfires are independent of monster and treasure budgets and are
+placed on reachable dry cave floors, at least four tiles from every cave entrance.
 
 Lighting requires a reusable **Flint Stone** and consumes **one Brushwood** and
 one world turn. Campfires then support **12 subsequent turns**; Dwarven Stoves

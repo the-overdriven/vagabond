@@ -6155,9 +6155,9 @@ function spawnCaveScenarios() {
         makeEnemy(tmpl, spot, prefix)
       }
     }
-    // Camps also occur outside authored camp scenarios, including the
-    // deeper grottoes, without changing the fixed scenario encounter roster.
-    if (rules.camp || chance(level === -2 ? 0.20 : 0.25)) {
+    // Shallow caves retain authored camp scenes and their independent
+    // chance of an abandoned fire. Deep caves use their own ecosystem pass.
+    if (rules.camp || chance(0.25)) {
       const spot = takeSpot('far')
       if (spot) groundItems.push({x: spot.x, y: spot.y, kind: 'campfire', burnUntil: 0,
         description: pick(CAMPFIRE_INSPECTIONS), level, levelKind: 'chain', caveIndex})
@@ -6190,6 +6190,34 @@ function spawnCaveScenarios() {
     })
   }
 
+  // The ordinary scenario deck deliberately skips z:-2, whose inhabitants
+  // and rewards belong to connected ecosystems. Give those caves their own
+  // modest campfire roll without duplicating scenario monsters or treasure.
+  function populateDeepCampfires(deep) {
+    if (!deep) return
+    const allEntrances = deep.caves.flatMap(c => c.entrances || [])
+    const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive)]
+      .filter(e => e.level === -2 && e.levelKind === 'chain')
+      .map(e => keyXY(e.x,e.y)))
+    for (let i = 0; i < deep.caves.length; i++) {
+      const cave = deep.caves[i], cm = deep.caveMaps[i]
+      if (cave.crypt || !cm || !cave.entrances?.length || !chance(0.20)) continue
+      const reachable = dungeonWalkDistances(deep.map, cave.entrances[0])
+      const sites = []
+      for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+        if (cm[y][x] !== 'cavefloor2' || deep.map[y]?.[x] !== 'cavefloor2' ||
+            !reachable.has(keyXY(x,y)) || occupied.has(keyXY(x,y)) ||
+            allEntrances.some(p => Math.max(Math.abs(p.x-x),Math.abs(p.y-y)) < 4)) continue
+        sites.push({x,y})
+      }
+      if (!sites.length) continue
+      const spot = pick(sites)
+      groundItems.push({...spot,kind:'campfire',burnUntil:0,
+        description:pick(CAMPFIRE_INSPECTIONS),level:-2,levelKind:'chain',caveIndex:i})
+      occupied.add(keyXY(spot.x,spot.y))
+    }
+  }
+
   for (let i = 0; i < caveMaps.length; i++)
     populate(caves[i], caveMaps[i], i, -1, 'cavefloor')
   // z:-2 has ordinary caves; z:-3 is the purpose-built Dwarven Fort.
@@ -6197,6 +6225,7 @@ function spawnCaveScenarios() {
   if (deep) {
     populateDeepCaveEcosystems(deep, fungusTopUpSites)
     populateDeepCaveRewards(deep)
+    populateDeepCampfires(deep)
   }
 
   // Guarantee at least three Fungus across the whole ordinary underground
