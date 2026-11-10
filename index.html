@@ -3160,7 +3160,6 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.bowRetreatHold = enemy.bowRetreatHold === true
-    enemy.bowCorneredPursuit = enemy.bowCorneredPursuit === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
     enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
@@ -5490,7 +5489,7 @@ more difficult:
   // straight" approach used before would simply give up whenever the direct line was
   // blocked - so two monsters queuing up behind each other, or one standing behind a
   // boulder, could never walk around the obstruction.
-  function enemyFindStep(e) {
+  function enemyFindStep(e, requireRoute = false) {
     const minX = Math.max(0, Math.min(e.x, player.x) - CHASE_DETOUR)
     const maxX = Math.min(MAP_W - 1, Math.max(e.x, player.x) + CHASE_DETOUR)
     const minY = Math.max(0, Math.min(e.y, player.y) - CHASE_DETOUR)
@@ -5543,6 +5542,9 @@ more difficult:
         queue.push(nx, ny)
       }
     }
+    // A bow target only fights back when a complete approach route exists.
+    // Ordinary pursuit may still edge closer without one, as before.
+    if (requireRoute) return null
     // No route at all - edge toward the player if any neighbour at least helps.
     let best = null
     const current = Math.max(Math.abs(player.x - e.x), Math.abs(player.y - e.y))
@@ -5552,8 +5554,7 @@ more difficult:
     return best ? {x: best.x, y: best.y} : null
   }
 
-  function enemyStepTowardPlayer(e) {
-    const step = enemyFindStep(e)
+  function enemyStepTowardPlayer(e, step = enemyFindStep(e)) {
     if (!step) return false // genuinely boxed in
     if (enemyWanderMode(e) === 'far') e.farPath = null
     if (enemyOpenDoorInsteadOfMove(e, step.x, step.y)) return true
@@ -5564,18 +5565,6 @@ more difficult:
     occupied.add(keyXY(e.x, e.y))
     finishEnemyMove(e, fromX, fromY)
     return true
-  }
-
-  // Only used for the targeted response to a distant player bow shot. Compare
-  // the same four combat stats used for Bestiary strength, with current gear,
-  // terrain and status effects. Ties close in rather than allowing free shots.
-  function enemyOutmatchesPlayer(e) {
-    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
-    const naturalGrace = weapon ? enemyWeaponGrace(e, weapon) : enemyGrace(e)
-    const enemyStrength = monsterStrength({atk: enemyAtk(e), def: enemyDef(e), spd: enemySpd(e),
-      grace: Math.max(0, (naturalGrace || 0) - gearGracePenalty(e.equipment))})
-    const playerStrength = monsterStrength({atk: playerAtk(), def: playerDef(), spd: playerSpd(), grace: playerGrace()})
-    return enemyStrength >= playerStrength
   }
 
   // Bow targets may need to move sideways around a wall before they can gain
@@ -5611,24 +5600,9 @@ more difficult:
     return path.slice(1, -1).some(tile => projectileTerrainBlocks(player, tile.x, tile.y))
   }
 
-  function corneredBowTargetClosesIn(e) {
-    e.bowRetreatHold = false
-    const advanced = enemyStepTowardPlayer(e)
-    // Stay committed long enough to enter normal AGGRO. Otherwise a monster
-    // would step out of its corner, find its old tile open, and flee back into it.
-    e.bowCorneredPursuit = advanced &&
-      Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > effectiveAggroRange(e)
-    return advanced
-  }
-
-  function reactToDistantBowShot(e) {
-    if (e.bowCorneredPursuit) return corneredBowTargetClosesIn(e)
-    // A wounded fleeing creature stays defensive even if its base combat
-    // stats still exceed the player's.
-    if (!enemyIsFleeing(e) && enemyOutmatchesPlayer(e)) return enemyStepTowardPlayer(e)
+  function retreatFromBowShot(e) {
     const destination = rangedRetreatDestination(e)
-    // A cornered target has nothing to gain by standing still under fire.
-    if (!destination) return corneredBowTargetClosesIn(e)
+    if (!destination) return false
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     const fromX = e.x, fromY = e.y
     occupied.delete(keyXY(fromX, fromY))
@@ -6480,10 +6454,7 @@ more difficult:
     rebuildActiveLevelOccupancy()
     // Changing away from the bow ends every ranged-cover standoff, including
     // monsters on nearby but currently inactive floors.
-    if (!equippedShortBow()) for (const e of enemies) {
-      e.bowRetreatHold = false
-      e.bowCorneredPursuit = false
-    }
+    if (!equippedShortBow()) for (const e of enemies) e.bowRetreatHold = false
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
     wanderSurfaceBelowTower()
@@ -6574,10 +6545,7 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
-      if (e.bowCorneredPursuit &&
-          (dist <= effectiveAggroRange(e) || dist > equippedShortBow()?.rangedRange))
-        e.bowCorneredPursuit = false
-      // A weaker bow target keeps the cover it reached instead of wandering
+      // A bow target blocked from pursuing keeps the cover it reached instead of wandering
       // back into the same shot. Reaching melee range or opening a new line
       // of fire ends the standstill and restores ordinary combat behavior.
       if (e.bowRetreatHold && equippedShortBow() && dist > ATTACK_RANGE &&
@@ -6592,12 +6560,22 @@ more difficult:
         tryTriggerCollectiveMind(e)
         continue
       }
-      // A low-AGGRO monster can otherwise ignore repeated six-tile bow shots.
-      // Spend its ordinary action reacting, never grant a bonus move. Evasion,
-      // rare flight, fear, sanctuary and invisible attacks already took priority.
-      if (e === bowShotTarget && dist > aggroRange) {
-        if (!justEvaded) reactToDistantBowShot(e)
-        continue
+      // A shot target with a complete route can fight back regardless of its
+      // strength. Otherwise it tries to retreat, even behind projectile-open
+      // prison bars and even when the player is within its AGGRO distance.
+      if (e === bowShotTarget && dist > ATTACK_RANGE) {
+        if (justEvaded) continue
+        if (enemyIsFleeing(e) && tryWoundedEnemyFlee(e)) continue
+        const pursuitStep = enemyFindStep(e, true)
+        if (!pursuitStep) {
+          retreatFromBowShot(e)
+          continue
+        }
+        e.bowRetreatHold = false
+        if (dist > aggroRange) {
+          enemyStepTowardPlayer(e, pursuitStep)
+          continue
+        }
       }
       if (!playerHasForestCover() ||
           (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {

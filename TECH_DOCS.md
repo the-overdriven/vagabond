@@ -4947,37 +4947,35 @@ when it actually enters view, without revealing offscreen listeners in the log.
 
 On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary, but can be outpaced through the SPD disengagement rule below. Losing range ends active pursuit; the existing Alarmed status otherwise expires under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
 
-### Reactions to distant player bow shots
+### Reactions to player bow shots
 
 An enemy targeted by a valid Short Bow shot reacts on that enemy's **ordinary
-turn**, even if the arrow misses, when the player is **outside its current
-effective AGGRO range**. Relative combat strength uses the same four stats as
-the Bestiary: **ATK + DEF + SPD + GRACE**, with current equipment, terrain and
-status effects. A target at least as strong as the player attempts **one tile
-toward the player**; a weaker target attempts **one tile farther away**. This
-gives strong low-AGGRO enemies a chance to close the gap, while weaker targets
-may retreat beyond the bow's six-tile reach. When a weaker monster has no
-immediately farther open tile, it searches up to 12 steps around nearby obstacles
-and can take a sideways step along a route to a farther tile. It does not step
-closer to the player merely to escape. If no retreat route exists within that
-search, the cornered target abandons its retreat and advances toward the player
-along its ordinary pursuit path, fighting back when it reaches melee range. It
-commits to closing the distance rather than bouncing back into the corner on
-the next shot; ordinary pursuit takes over within AGGRO range. Switching away
-from the bow or escaping its range ends this cornered pursuit.
-If neither path exists, it cannot move or attack across walls. Neither reaction
-teleports or crosses forbidden terrain.
+turn**, even if the arrow misses. Its response depends on **reachability**, not
+relative combat strength. If it has a traversable pursuit route to a tile
+adjacent to the player, it fights back: within AGGRO it takes its normal combat
+turn (including spells and ranged attacks), and beyond AGGRO it advances one
+tile without gaining a persistent chase. This means a cornered Ghoul still
+approaches even when the tile behind it becomes free on the following turn.
 
-Once a weaker bow target has actually retreated, it holds position behind
+If no pursuit route exists within ordinary chase pathfinding, the target tries
+to withdraw **one tile farther away**, regardless of its ATK or DEF. This
+includes enemies separated from the player by prison bars, which stop movement
+but allow arrows through. If no immediately farther tile is open, it searches
+up to 12 steps around obstacles and may first step sideways without moving
+closer to the player. If it has neither a pursuit route nor a retreat route,
+it remains blocked; it cannot attack through an impassable partition. Adjacent
+enemies retain their normal melee response. No response teleports or bypasses
+terrain or creature occupancy.
+
+Once a bow target has actually retreated, it holds position behind
 terrain that blocks the player's shot while the Short Bow remains equipped,
 instead of wandering out from cover. Switching weapons ends the standoff,
 including for monsters on inactive floors. Reaching melee range or restoring a
 clear shot returns the target to ordinary combat behavior. Monsters not
 provoked into ranged retreat do not hold cover merely because a wall intervenes.
-The cover and cornered-pursuit states are deterministic and saved/replayed with
-the enemy.
+The cover state is deterministic and saved/replayed with the enemy.
 
-Inside effective AGGRO, normal combat and pursuit still apply. Passive
+Other turns inside effective AGGRO retain normal combat and pursuit. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
 wounded fleeing and invisibility retain their own rules; an evasive dodge does
 not grant a second reaction step. A distant-shot reaction replaces that enemy's
