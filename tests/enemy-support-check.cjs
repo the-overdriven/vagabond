@@ -79,7 +79,8 @@ async function main() {
   reset();run('hasted=addSupportEnemy("Gravehound",37,40);chance=()=>true;turnCount=1')
   assert(!run('tryEnemyHaste(hasted,3)') || run('hasted.x===39'),'burst cannot strike adjacent player')
   reset();run('hasted=addSupportEnemy("Gravehound",37,40);player.invisibleTurns=3;chance=()=>true;enemyTurn()')
-  assert(run('hasted.x') <= 37,'invisible player is not chased (idle wandering is permitted)')
+  assert(run('!hasted.aware && Math.max(Math.abs(hasted.x-37),Math.abs(hasted.y-40))<=1'),
+    'invisible player is not acquired or chased; one ordinary wander step is permitted')
   reset();run('hasted=addSupportEnemy("Gravehound",37,40);spawnPoint={x:40,y:40};chance=()=>true;enemyTurn()')
   assert(run('hasted.x') < 37,'monster retreats rather than pursuing a protected player')
   reset();run('hasted=addSupportEnemy("Gravehound",37,40);chance=p=>p===0.20;enemyTurn()')

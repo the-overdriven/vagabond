@@ -159,6 +159,17 @@ async function main() {
     Campfires.perform(stove,'light');rng=stoveOldRng;`)
   check('enemies.find(e=>e.id==="near").miningInvestigation?.source==="fire" && !enemies.find(e=>e.id==="far").miningInvestigation',
     'stove ignition lures monsters within four tiles but not farther ones')
+  check('!isWalkableForPlayer(stove.x,stove.y)','even god mode cannot stand on a stove')
+  run(`player.x=60;player.y=50;window.inspectionLogs=[];window.oldInspectionLog=log;
+    log=message=>inspectionLogs.push(message);describeSurroundings();`)
+  check('inspectionLogs.some(s=>s.toLowerCase().includes("dwarven stove"))',
+    'Inspect reports an adjacent stove rather than only the surrounding floor')
+  run(`groundItems=[{kind:'campfire',x:61,y:50,level:0,burnUntil:0,searched:false}];
+    window.potatoesBefore=Campfires.count('potato');window.inspectionChance=chance;
+    chance=()=>true;describeSurroundings();describeSurroundings();
+    chance=inspectionChance;log=oldInspectionLog;`)
+  check('groundItems[0].searched && Campfires.count("potato")===potatoesBefore+1',
+    'Inspect searches nearby ashes exactly once and cannot farm potatoes')
   console.log('PASS campfires and stoves: recipes, scaling, fuel, quieter ignition, Trolls, warmth, concealment, save and replay')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})
