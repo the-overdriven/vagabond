@@ -97,9 +97,16 @@ describe('Player Short Bow', () => {
 
         startReplayRecording()
         const beforeHp=enemy.hp
+        lastMousePx=(enemy.x-camX+0.5)*TILE_PX
+        lastMousePy=(enemy.y-camY+0.5)*TILE_PX
+        updateTooltip()
+        check(canvas.style.cursor.includes('red-arrow.svg'),
+          'cursor is enabled before a valid shot')
         check(shootEnemy(enemy),'legal shot succeeds')
         const afterHp=enemy.hp
         check(afterHp===beforeHp-5,'ranged damage uses fixed five ATK')
+        check(canvas.style.cursor.includes('red-arrow.svg'),
+          'cursor refreshes immediately after a shot if ammunition and line of fire remain')
         check(enemy.alarmed,'shot immediately alarms its target')
         check(turnCount===1 && player.inventory[0].count===2,'valid shot costs one turn and one arrow')
         const recorded=structuredClone(replayData)

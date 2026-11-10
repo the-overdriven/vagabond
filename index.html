@@ -9935,12 +9935,20 @@ more difficult:
 
   function spawnDamageNumber(x, y, amount, color, delay, duration = DAMAGE_ANIM_MS) {
     const start = performance.now(), showAt = start + (delay || 0)
-    const occupied = new Set(damageAnims.filter(p =>
-      Math.abs(p.x-x) <= 1 && Math.abs(p.y-y) <= 1 &&
-      showAt < p.start + p.delay + p.duration && showAt + duration > p.start + p.delay)
-      .map(p => p.stack || 0))
+    const labelWidth = value => Math.max(18, String(value).length * 11)
+    const labelY = (popup, when) => popup.y - (popup.stack || 0) * 0.95 -
+      0.85 * Math.max(0, Math.min(1, (when - popup.start - popup.delay) / popup.duration))
     let stack = 0
-    while (occupied.has(stack)) stack++
+    // Pick a free *screen-space* lane, not just an unused stack number.
+    // Stacking a popup one tile below another by one tile made their labels
+    // land on top of each other even though their stack numbers differed.
+    while (damageAnims.some(p => {
+      const first = Math.max(showAt, p.start + p.delay)
+      if (first >= Math.min(showAt + duration, p.start + p.delay + p.duration)) return false
+      if (Math.abs(p.x - x) * TILE_PX >= (labelWidth(p.amount) + labelWidth(amount)) / 2 + 4) return false
+      const proposed = {x, y, start, delay: delay || 0, duration, stack}
+      return Math.abs(labelY(p, first) - labelY(proposed, first)) * TILE_PX < 24
+    })) stack++
     damageAnims.push({x, y, amount, color, start, delay: delay || 0, duration, stack})
     runAnimationLoop()
   }

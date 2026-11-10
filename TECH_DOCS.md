@@ -5360,6 +5360,9 @@ along the direct straight line from shooter center to target center rather than 
 stepping through each traced grid cell. Visual frame timing is clamped to the projectile
 effect lifetime, so a late-queued effect cannot interrupt input or combat resolution. The
 projectile uses a readable glyph in both tile-image and ASCII rendering modes.
+Floating combat labels remain visible for **850 ms** and are separated by their
+actual screen positions, including when two nearby monsters stand on different rows.
+Their visual placement consumes no gameplay RNG and does not delay combat resolution.
 
 ---
 
@@ -5967,7 +5970,9 @@ Mouse hover changes from the red sword to a red arrow while the bow is equipped.
 The arrow fades to gray when the shot would be refused (such as no arrows,
 insufficient range, blocked line of fire, a concealed target, or a forbidden
 shooting state). The cursor reflects the same validity checks as firing and
-does not spend a turn or reveal hidden enemies.
+does not spend a turn or reveal hidden enemies. It refreshes after each shot
+and again when the attack presentation finishes, without requiring another
+mouse movement; a still-valid target with ammunition restores the red arrow.
 
 Each valid shot consumes **one arrow and one turn**, including misses, and
 alerts its target even if it misses. Arrows stack as ordinary inventory items;

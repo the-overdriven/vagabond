@@ -492,6 +492,20 @@ async function main() {
     check(replayRngIndex===record.rng.length,'replay consumes the same seeded RNG trace')
     replayPlaying=false;replaySimulationMode=false;activeReplay=null
   })()`)
+  run(`(() => {
+    damageAnims=[]
+    const before=rngState
+    spawnDamageNumber(40,40,'Enraged!','#fff')
+    spawnDamageNumber(40,41,'Hit!','#fff')
+    const [upper,lower]=damageAnims
+    const upperY=upper.y-(upper.stack||0)*0.95
+    const lowerY=lower.y-(lower.stack||0)*0.95
+    if(Math.abs(upperY-lowerY)*TILE_PX<24)throw Error('adjacent combat labels visually overlap')
+    spawnDamageNumber(40,40,'Miss!','#fff')
+    if(damageAnims[2].stack===upper.stack)throw Error('same-tile combat labels share a lane')
+    if(rngState!==before)throw Error('combat label layout consumed gameplay RNG')
+  })()`)
+  console.log('PASS staggered combat popups avoid adjacent-tile overlap without RNG')
   console.log('PASS deterministic distant bow reaction replay')
 }
 

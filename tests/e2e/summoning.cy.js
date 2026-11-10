@@ -72,6 +72,14 @@ describe('Once-only monster summoning', () => {
           summonCheck(summonFx.slice(-children.length).every(anim=>anim.duration===SUMMON_ANIM_MS),'each summoned creature gets the slower label duration')
           spawnDamageNumber(player.x, player.y, 'Hit!', '#ffffff')
           summonCheck(damageAnims[damageAnims.length-1].duration===DAMAGE_ANIM_MS,'ordinary damage labels keep their original duration')
+          damageAnims=[]
+          spawnDamageNumber(40,40,'Enraged!','#ffffff')
+          spawnDamageNumber(40,41,'Hit!','#ffffff')
+          const [upper,lower]=damageAnims
+          summonCheck(Math.abs((upper.y-upper.stack*0.95)-(lower.y-lower.stack*0.95))*TILE_PX>=24,
+            'adjacent enemy popups have separate screen-space positions')
+          spawnDamageNumber(40,40,'Miss!','#ffffff')
+          summonCheck(damageAnims[2].stack!==upper.stack,'same-tile popups avoid stacking in one lane')
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
             summonCheck(e.atk===Math.max(1,Math.round(t.atk*strength)) && e.def===Math.max(0,Math.round(t.def*strength)),'template ATK/DEF')
