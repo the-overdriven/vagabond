@@ -118,11 +118,12 @@ describe('Dwarven Ruins reusable traps', () => {
       trapFixture()
       const x = 12, y = 12
       map[y][x] = 'dwarvenpressureplate'
-      const marble = RENDER_STYLE.terrainTiles.marble.image
-      const hidden = RENDER_STYLE.terrainTiles.dwarvenpressureplate.image
+      const marble = terrainVisual('marble', x, y).image
+      const hidden = terrainVisual('dwarvenpressureplate', x, y).image
       const check = (condition, label) => { if (!condition) throw Error(label) }
-      check(hidden === marble, 'image mode uses exactly the marble art')
-      check(terrainVisual('dwarvenpressureplate', x, y).image === marble, 'runtime tile has no visible plate')
+      check(hidden === marble, 'hidden plate matches the current marble variant')
+      check(['img/tiles/marble-floor.png','img/tiles/marble-floor-cracked.png'].includes(hidden),
+        'runtime tile has only ordinary floor art')
       check(TILE.dwarvenpressureplate.ch === TILE.marble.ch, 'base ASCII glyph matches marble')
       check(TILE_CODE.dwarvenpressureplate !== TILE_CODE.marble && CODE_TILE[TILE_CODE.dwarvenpressureplate] === 'dwarvenpressureplate', 'unique save/replay terrain code retained')
       check(map[y][x] === 'dwarvenpressureplate', 'gameplay terrain still identifies the trigger')

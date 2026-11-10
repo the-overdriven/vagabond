@@ -46,9 +46,9 @@ describe('Mine-only encounters and darkness', () => {
       check(RENDER_STYLE.terrainTiles.minestairsup.image==='img/tiles/shoddy-mine-stairs-up.png' &&
         RENDER_STYLE.terrainTiles.minestairsdown.image==='img/tiles/shoddy-mine-stairs-down.png',
         'the mine stairs have dedicated brownish artwork')
-      check(RENDER_STYLE.terrainTiles.dwarvenminesopen.image==='img/tiles/shoddy-mine-stairs-down.png' &&
+      check(RENDER_STYLE.terrainTiles.dwarvenminesopen.image==='img/tiles/dwarven-mineshaft-cleaned.png' &&
         RENDER_STYLE.terrainTiles.dwarvenminesopen.baseTileKey==='marble',
-        'the cleared entrance shows shoddy stairs while retaining the Ruins floor')
+        'the cleared entrance has distinct dwarven mineshaft art over the Ruins floor')
       check(RENDER_STYLE.terrainTiles.minestairsup.baseTileKey==='cavefloorBrown' &&
         RENDER_STYLE.terrainTiles.minestairsdown.baseTileKey==='cavefloorBrown',
         'stair sprites sit on the same brown cave floor as the mine')

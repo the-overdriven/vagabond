@@ -38,6 +38,41 @@ describe('Dwarven Ruins rendering paths', () => {
         check(RENDER_STYLE.terrainTiles.dwarvenlever.baseTileKey === 'marble' &&
           RENDER_STYLE.terrainTiles.dwarvenleverpulled.baseTileKey === 'marble',
           'both lever states render over marble while blocking terrain is unchanged')
+        check(RENDER_STYLE.terrainTiles.dwarvenprisondoorbreached.image ===
+          'img/tiles/dwarven-prison-door-locked-breached.png',
+          'a breached prison door keeps its distinct barred-door art')
+        check(RENDER_STYLE.terrainTiles.dwarvenminesopen.image ===
+          'img/tiles/dwarven-mineshaft-cleaned.png',
+          'the opened mine entrance uses the cleared mineshaft art')
+        const marble = RENDER_STYLE.terrainTiles.marble
+        check(marble.variants.length === 4 &&
+          marble.variants.filter(path => path === 'img/tiles/marble-floor-cracked.png').length === 1 &&
+          marble.variants.filter(path => path === marble.image).length === 3,
+          'Ruins marble has a 25% cracked visual variant')
+        const marbleSamples = []
+        for (let y=0;y<20;y++) for (let x=0;x<20;x++) {
+          const chosen = terrainVisual('marble', x, y).image
+          check(chosen === terrainVisual('marble', x, y).image, 'marble visuals are stable')
+          check(chosen === terrainVisual('dwarvenpressureplate', x, y).image,
+            'pressure plates match their floor pattern at every coordinate')
+          marbleSamples.push(chosen)
+        }
+        const crackCount = marbleSamples.filter(path => path === 'img/tiles/marble-floor-cracked.png').length
+        check(crackCount > 60 && crackCount < 140, 'roughly one quarter of Ruins tiles are cracked')
+        currentZ = 1
+        check(terrainVisual('marble', 0, 0).image === marble.image &&
+          terrainVisual('marble', 3, 4).image === marble.image,
+          'tower marble stays intact')
+        currentZ = -4
+        for (const path of [
+          'img/tiles/dwarven-prison-door-locked-breached.png',
+          'img/tiles/dwarven-mineshaft-cleaned.png',
+          'img/tiles/marble-floor-cracked.png'
+        ]) {
+          const art = preloadedImages.get(path)
+          check(art?.naturalWidth > 0 && art?.naturalHeight > 0,
+            'new dwarven art preloads successfully: ' + path)
+        }
         for (const image of ['img/tiles/dwarven-column-indoor.png', 'img/tiles/dwarven-rubble.png', 'img/tiles/dwarven-stone-wall.png', 'img/tiles/dwarven-stone-wall-cracked.png', 'img/tiles/dwarven-stone-wall-moss.png', 'img/tiles/dwarven-stone-wall-ivy.png'])
           check(preloadedImages.has(image), 'Dwarven visual was preloaded: ' + image)
         for (const path of new Set(RENDER_STYLE.terrainTiles.dwarvenwall.variants)) {

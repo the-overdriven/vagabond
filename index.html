@@ -9491,6 +9491,15 @@ more difficult:
       : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
+    // Marble wear is a Ruins-only visual variation; the tower keeps clean
+    // marble. Concealed pressure plates must match the same tile coordinates
+    // so a different floor pattern cannot reveal them before inspection.
+    if (tileKey === 'marble' || tileKey === 'dwarvenpressureplate') {
+      const marble = RENDER_STYLE.terrainTiles.marble
+      const image = currentZ <= -3 && marble.variants?.length
+        ? tileVariantImage(marble.variants, x, y) : visual.image
+      return {...visual, image}
+    }
     if (tower && tileKey === 'towerbattlement') return {...visual,
       quarterTurns: y === tower.y ? 0 : x === tower.x+tower.size-1 ? 1 : y === tower.y+tower.size-1 ? 2 : 3}
     if (tower && tileKey === 'towerbattlementcorner') return {...visual,

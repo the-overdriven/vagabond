@@ -1380,6 +1380,12 @@ A large underground dwarven settlement/ruin containing:
 - a guaranteed artifact chest
 - a direct surface gate
 
+Marble floor tiles in the Fort and deeper Ruins use a stable, coordinate-based
+**25% cracked / 75% intact** artwork mix. This is cosmetic: cracks do not
+change movement, combat, vision or loot. The Tower retains intact marble,
+and concealed pressure plates use the same pattern as normal floor at their
+coordinates so their artwork cannot betray a trap.
+
 The fort is the dedicated generic-chain level at **z:-3** and now serves as
 the entrance complex (**D0**) for the deeper Dwarven Ruins. Fort enemies and
 ground objects use `level: -3`, `levelKind: 'chain'`, and the fort's
@@ -2453,7 +2459,9 @@ gates, while reusing the normal solid dwarven door sprites for room entrances
 and progression gates. The bars beside a prison cell use
 `dwarven-prison-bars.png`; closed and locked cell leaves use
 `dwarven-prison-door-locked.png`, with `dwarven-gate-open.png` reserved for their
-open state. The pulled lever has dedicated `dwarven-lever-pulled.png` art.
+open state. Breached prison doors have their own broken barred-door artwork,
+distinct from breached solid gates. The pulled lever has dedicated
+`dwarven-lever-pulled.png` art.
 Room furniture/barricades are mechanical terrain with dedicated ASCII glyphs,
 colors, inspect strings, and tile art displayed at 40×40 for beds, dragged-bed barricades,
 bookshelves, tables, crates, and prison bars. The bed barricade and smashed-crate
@@ -2895,7 +2903,8 @@ The first floor offers a comparatively quiet respite after the Dwarven Fort;
 the second is a deliberate difficulty spike. Mine floors use **brown cave-floor
 tiles**, with dedicated brownish **Shoddy Mine Stairs** art for stair travel.
 After a pickaxe clears the collapsed mine entrance in the Ruins, the revealed
-downward staircase uses the same shoddy artwork, against the Ruins' stone floor.
+entrance uses a cleared dwarven mineshaft image, distinct from the shoddy
+staircases within the Mines.
 The collapsed entrance is highlighted **red** on the maps like other exits.
 
 The initial mine layout uses a narrow winding excavated spine, side branches,

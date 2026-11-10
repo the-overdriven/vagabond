@@ -524,6 +524,12 @@
     },
     "marble": {
       "image": "img/tiles/marble-floor.png",
+      "variants": [
+        "img/tiles/marble-floor.png",
+        "img/tiles/marble-floor.png",
+        "img/tiles/marble-floor.png",
+        "img/tiles/marble-floor-cracked.png"
+      ],
       "scale": 1
     },
     "cryptstairsdown": {
@@ -590,7 +596,7 @@
       "scale": 1
     },
     "dwarvenminesopen": {
-      "image": "img/tiles/shoddy-mine-stairs-down.png", "baseTileKey": "marble", "scale": 1
+      "image": "img/tiles/dwarven-mineshaft-cleaned.png", "baseTileKey": "marble", "scale": 1
     },
     "minestairsup": {
       "image": "img/tiles/shoddy-mine-stairs-up.png", "baseTileKey": "cavefloorBrown", "scale": 1
@@ -878,7 +884,7 @@
       "scale": 1
     },
     "dwarvenprisondoorbreached": {
-      "image": "img/tiles/dwarven-gate-breached.png",
+      "image": "img/tiles/dwarven-prison-door-locked-breached.png",
       "baseTileKey": "marble",
       "scale": 1
     },
