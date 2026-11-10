@@ -1874,13 +1874,13 @@ Armory, Dormitory and Prison weights receive an additional **1.45x defensive
 multiplier**. Archetypes change encounter budget/roles, lock likelihood, loot
 placement/quality and physical furniture rather than being cosmetic labels.
 
-Each floor also contains **exactly one Kitchen**, converted from an ordinary
-non-Prison, non-vault room after the mandatory Prison quota is secured; an
-available Dining Hall is preferred. It has preparation tables and one usable
-Dwarven Stove, with a free approach from the room interior. Neither stair halls
-nor special chambers are converted. The entrance Fort on z:-3 has the same
-one-kitchen/one-stove guarantee within its own enclosed-room layout. There are
-no stoves in the Dwarven Mines. Kitchen furnishings and stove placement cannot
+The entrance Fort on z:-3 guarantees **one Kitchen with one Dwarven Stove**.
+Every deeper Dwarven Ruins floor independently has a **35% chance** to contain
+one Kitchen and stove, but never more than one per floor. Kitchens convert an
+ordinary non-Prison, non-vault room after the mandatory Prison quota is secured;
+an available Dining Hall is preferred. Each stove has preparation tables and a
+free approach from the room interior. Neither stair halls nor special chambers
+are converted. There are **no stoves in the Dwarven Mines**. Kitchen furnishings and stove placement cannot
 replace stairs, progression keys, required rewards, trap mechanisms or tactical
 enemy positions. See Cooking and fireplace resting for stove rules.
 
@@ -4949,23 +4949,24 @@ On the surface, standing in an enemy's aggro range triggers pursuit. Underground
 
 ### Reactions to player bow shots
 
-An enemy targeted by a valid Short Bow shot reacts on that enemy's **ordinary
-turn**, even if the arrow misses. Its response depends on **reachability**, not
-relative combat strength. If it has a traversable pursuit route to a tile
-adjacent to the player, it fights back: within AGGRO it takes its normal combat
-turn (including spells and ranged attacks), and beyond AGGRO it advances one
-tile without gaining a persistent chase. This means a cornered Ghoul still
-approaches even when the tile behind it becomes free on the following turn.
+An enemy targeted by a valid Short Bow shot reacts on its **ordinary turn**,
+even if the arrow misses. It compares its current combat strength with the
+player's (ATK, DEF, SPD, GRACE, including equipment and modifiers). A **weaker**
+monster tries to flee if it has a meaningful escape route, even if it could
+reach the player. A **stronger or equally strong** monster fights if it has a
+traversable pursuit route to a tile adjacent to the player. If it cannot reach
+the player, even a stronger monster tries to escape instead; prison bars can
+block approach while still allowing the player's arrows through.
 
-If no pursuit route exists within ordinary chase pathfinding, the target tries
-to withdraw **one tile farther away**, regardless of its ATK or DEF. This
-includes enemies separated from the player by prison bars, which stop movement
-but allow arrows through. If no immediately farther tile is open, it searches
-up to 12 steps around obstacles and may first step sideways without moving
-closer to the player. If it has neither a pursuit route nor a retreat route,
-it remains blocked; it cannot attack through an impassable partition. Adjacent
-enemies retain their normal melee response. No response teleports or bypasses
-terrain or creature occupancy.
+An escape must reach cover, outside bow range, or at least two tiles farther
+away. Retreat searches up to 12 steps and may begin with a sideways step, but
+never moves closer. A one-tile dead-end is not an escape: a weak, cornered Ghoul
+with an approach route fights back rather than oscillating into its dead end.
+When fighting from beyond AGGRO, the target advances only one tile without
+starting a persistent chase; within AGGRO it takes its normal combat turn,
+including ranged attacks and spells. If it has neither an approach route nor
+an escape route, it stays blocked. Adjacent enemies retain normal melee rules.
+No response teleports or bypasses terrain or creature occupancy.
 
 Once a bow target has actually retreated, it holds position behind
 terrain that blocks the player's shot while the Short Bow remains equipped,

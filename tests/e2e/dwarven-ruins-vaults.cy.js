@@ -15,7 +15,8 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
       const expectedVaults = new Set(['fortifiedBarracks','trappedArmory','treasury','libraryArchive','prisonBlock','floodedCistern','collapsedHall','sealedTomb','forgeKillzone','barricadedDormitory'])
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
       check(Object.keys(cfg.rooms.archetypes).length === 12 && Object.keys(cfg.rooms.archetypes).every(name => expectedRooms.has(name)),
-        'all regular room archetypes and the guaranteed Kitchen are configured')
+        'all regular room archetypes and optional Kitchen are configured')
+      check(cfg.kitchenChance === 0.35,'each deeper Ruins floor has a 35% kitchen chance')
       const normalVaultDefs = Object.entries(cfg.vaults.definitions).filter(([,def]) => !def.fallbackOnly)
       check(normalVaultDefs.length === 10 && normalVaultDefs.every(([name]) => expectedVaults.has(name)),
         'all ten planned reusable vault concepts are configured')
@@ -51,10 +52,20 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
 
         const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(ruins.length === fixture.count, 'forced fixture floor count generated')
+        const ruinsZs = new Set(ruins.map((_, i) => chainZForDepth(i + 4)))
+        check(groundItems.filter(g => g.kind === 'dwarvenstove').every(g => g.level === -3 || ruinsZs.has(g.level)),
+          'Dwarven Mines never contain kitchen stoves')
+        check(groundItems.filter(g => g.kind === 'dwarvenstove' && g.level === -3).length === 1,
+          'entrance Fort guarantees exactly one kitchen stove')
         for (let i = 0; i < ruins.length; i++) {
           const level = ruins[i]
           const z = chainZForDepth(i + 4)
           const rooms = level.rooms || []
+          const kitchens = rooms.filter(room => room.archetype === 'Kitchen')
+          const stoves = groundItems.filter(g => g.kind === 'dwarvenstove' && g.level === z)
+          check(kitchens.length <= 1 && kitchens.length === stoves.length &&
+            stoves.every(stove => kitchens[0]?.id === stove.dungeonRoomId),
+            'Ruins floors have zero or one kitchen with exactly one corresponding stove')
           const vaults = level.vaults || []
           const mobs = enemies.filter(e => e.alive && (e.level ?? 0) === z)
           const decorativeRemains = groundItems.filter(g => g.level === z && g.kind === 'dwarvenremains')

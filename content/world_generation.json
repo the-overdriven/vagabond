@@ -610,6 +610,7 @@
   "dungeons": {
     "dwarvenRuins": {
       "lockNamespace": "dwarven",
+      "kitchenChance": 0.35,
       "levelCountRange": [
         3,
         5

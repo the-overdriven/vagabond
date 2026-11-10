@@ -5567,13 +5567,23 @@ more difficult:
     return true
   }
 
-  // Bow targets may need to move sideways around a wall before they can gain
-  // distance. Keep the search local and deterministic, and never move closer
-  // to the shooter just to find an escape (which could cause backtracking).
+  // Compare current combat strength, including equipment and terrain, for
+  // the targeted bow reaction. A weaker enemy retreats if escape is possible.
+  function enemyOutmatchesPlayer(e) {
+    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
+    const naturalGrace = weapon ? enemyWeaponGrace(e, weapon) : enemyGrace(e)
+    const enemyStrength = monsterStrength({atk: enemyAtk(e), def: enemyDef(e), spd: enemySpd(e),
+      grace: Math.max(0, (naturalGrace || 0) - gearGracePenalty(e.equipment))})
+    const playerStrength = monsterStrength({atk: playerAtk(), def: playerDef(), spd: playerSpd(), grace: playerGrace()})
+    return enemyStrength >= playerStrength
+  }
+
+  // Seek an actual escape, not a one-tile dead end that makes weak enemies
+  // oscillate under repeated shots. Cover or an escape at least two tiles
+  // farther away (or beyond bow range) qualifies. Never move closer to flee.
   function rangedRetreatDestination(e) {
-    const direct = enemyEscapeDestination(e)
-    if (direct) return direct
     const startDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
+    const minEscapeDistance = Math.min((equippedShortBow()?.rangedRange ?? 6) + 1, startDistance + 2)
     const visited = new Set([keyXY(e.x, e.y)])
     const queue = [{x:e.x, y:e.y, first:null, steps:0}]
     for (let i = 0; i < queue.length; i++) {
@@ -5586,7 +5596,7 @@ more difficult:
         const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
         if (distance < startDistance) continue
         const first = node.first || {x, y}
-        if (distance > startDistance) return first
+        if (distance >= minEscapeDistance || bowCoverBlocksPlayerShotAt(x, y)) return first
         visited.add(key)
         queue.push({x, y, first, steps:node.steps + 1})
       }
@@ -5594,10 +5604,14 @@ more difficult:
     return null
   }
 
-  function bowCoverBlocksPlayerShot(e) {
-    if (!UndergroundFov.canSee(map, player.x, player.y, e.x, e.y)) return true
-    const path = projectilePathBetween(player.x, player.y, e.x, e.y)
+  function bowCoverBlocksPlayerShotAt(x, y) {
+    if (!UndergroundFov.canSee(map, player.x, player.y, x, y)) return true
+    const path = projectilePathBetween(player.x, player.y, x, y)
     return path.slice(1, -1).some(tile => projectileTerrainBlocks(player, tile.x, tile.y))
+  }
+
+  function bowCoverBlocksPlayerShot(e) {
+    return bowCoverBlocksPlayerShotAt(e.x, e.y)
   }
 
   function retreatFromBowShot(e) {
@@ -6560,16 +6574,17 @@ more difficult:
         tryTriggerCollectiveMind(e)
         continue
       }
-      // A shot target with a complete route can fight back regardless of its
-      // strength. Otherwise it tries to retreat, even behind projectile-open
-      // prison bars and even when the player is within its AGGRO distance.
+      // A weaker shot target retreats when it can; a stronger one fights if
+      // it can reach the player. An unreachable target also tries to retreat
+      // regardless of strength (e.g. a Gargoyle behind prison bars). Only a
+      // cornered target with a complete approach route stands and fights.
       if (e === bowShotTarget && dist > ATTACK_RANGE) {
         if (justEvaded) continue
         if (enemyIsFleeing(e) && tryWoundedEnemyFlee(e)) continue
         const pursuitStep = enemyFindStep(e, true)
-        if (!pursuitStep) {
-          retreatFromBowShot(e)
-          continue
+        if (!pursuitStep || !enemyOutmatchesPlayer(e)) {
+          if (retreatFromBowShot(e)) continue
+          if (!pursuitStep) continue
         }
         e.bowRetreatHold = false
         if (dist > aggroRange) {

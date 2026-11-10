@@ -157,9 +157,10 @@ describe('Player Short Bow', () => {
         enemies=[];occupied=new Set()
         const rat=spawn('Giant Rat','response-rat')
         chance=()=>true
+        check(!enemyOutmatchesPlayer(rat),'Rat is weaker than the player')
         check(shootEnemy(rat),'distant Rat can be shot at')
-        check(rat.hp===rat.maxHp&&rat.x===45&&rat.y===40,
-          'a miss still prompts one-tile approach when the Rat can reach the player')
+        check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
+          'a miss still prompts a weak Rat to retreat even with a path to the player')
         enemies=[];occupied=new Set()
         const covered=spawn('Giant Rat','response-covered-rat')
         for(let y=30;y<=50;y++)map[y][45]='dwarvenprisonbars'
@@ -211,8 +212,8 @@ describe('Player Short Bow', () => {
         check(shootEnemy(trappedGhoul)&&trappedGhoul.x===45&&trappedGhoul.y===40&&
           !trappedGhoul.bowRetreatHold,
           'trapped Ghoul turns toward the player on the first shot')
-        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===44,
-          'trapped Ghoul continues advancing instead of oscillating in the corner')
+        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===45&&trappedGhoul.y===39,
+          'once a side escape opens, weak Ghoul flees instead of returning to its dead end')
         for(let y=39;y<=41;y++){
           map[y][46]='grass';map[y][47]='grass'
         }
@@ -239,8 +240,8 @@ describe('Player Short Bow', () => {
         player.baseSpd=30;chance=()=>true
         const pursuer=spawn('Giant Rat','response-shot-pursuer',43)
         pursuer.aware=true;pursuer.alarmed=true
-        check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===42,
-          'just-shot reachable target advances without losing awareness')
+        check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===44,
+          'just-shot weaker target retreats without losing awareness')
         player.baseSpd=5;chance=()=>true
         for(let y=39;y<=41;y++)map[y][47]='grass'
         setDesktopCanvasCursor(pursuer)

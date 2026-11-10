@@ -179,10 +179,11 @@ async function main() {
       'stronger monster advances exactly one tile as its normal action')
     reset()
     const weak=spawn('Giant Rat','bow-weak')
+    check(!enemyOutmatchesPlayer(weak),'Rat is weaker than the player')
     chance=()=>true
     check(shootEnemy(weak),'shoots at Giant Rat')
-    check(weak.hp===weak.maxHp&&weak.x===45&&weak.y===40,
-      'even a missed arrow drives a reachable target toward the player')
+    check(weak.hp===weak.maxHp&&weak.x===47&&weak.y===40,
+      'even a missed arrow drives a weaker target away despite a path to the player')
     reset();chance=()=>false
     const cornered=spawn('Giant Rat','bow-cornered')
     for(let y=30;y<=50;y++)map[y][45]='dwarvenprisonbars'
@@ -231,8 +232,8 @@ async function main() {
       'load restores a Ghoul that can still approach')
     chance=realChance;damageRoll=realDamageRoll
     rngState=617293;startReplayRecording()
-    check(shootEnemy(restoredGhoul)&&restoredGhoul.x===44,
-      'a second shot does not send the Ghoul back to its corner')
+    check(shootEnemy(restoredGhoul)&&restoredGhoul.x===45&&restoredGhoul.y===39,
+      'a second shot sends the now-escapable weak Ghoul sideways, not back into its dead end')
     window.__corneredBowRecord=structuredClone(replayData)
     window.__corneredBowExpected={x:restoredGhoul.x,y:restoredGhoul.y,
       hp:restoredGhoul.hp,turn:turnCount}
@@ -243,8 +244,8 @@ async function main() {
     player.baseAtk=2
     reset()
     const near=spawn('Giant Rat','bow-near',44)
-    check(shootEnemy(near)&&near.x===43&&near.y===40,
-      'reachable targets close in even inside effective AGGRO')
+    check(shootEnemy(near)&&near.x===45&&near.y===40,
+      'weak target flees even inside effective AGGRO when escape is possible')
     reset()
     player.baseAtk=70
     const gargoyle=spawn('Gargoyle','bow-gargoyle',44)
@@ -267,8 +268,8 @@ async function main() {
     player.baseAtk=70
     const shooter=spawn('Kobold','bow-armed-shooter',43)
     shooter.shooterAbility='shooterArrows';shooter.shotsRemaining=2
-    check(shootEnemy(shooter)&&shooter.x===43&&shooter.shotsRemaining===1,
-      'active ranged shooters retaliate instead of retreating under bow pressure')
+    check(!enemyOutmatchesPlayer(shooter)&&shootEnemy(shooter)&&shooter.x===44&&shooter.shotsRemaining===2,
+      'weaker ranged shooters also withdraw when an escape exists')
     player.baseAtk=2
     reset()
     const wounded=spawn('Goblin','bow-wounded')
@@ -320,7 +321,7 @@ async function main() {
     try {
       chance=()=>true
       enemyTurn(null,null,rat)
-      check(rat.aware && rat.x===42,'recently shot reachable target closes in without disengaging')
+      check(rat.aware && rat.x===44,'recently shot weaker target flees without disengaging')
       rat.x=43;rat.aware=true;rat.alarmed=true;occupied=new Set([keyXY(43,40)])
       enemyTurn(null,null,null)
       check(!rat.aware&&!rat.alarmed,'ordinary turn still allows SPD disengagement')
