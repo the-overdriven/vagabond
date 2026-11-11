@@ -3235,6 +3235,13 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.bowRetreatHold = enemy.bowRetreatHold === true
+    enemy.bowEvasion = enemy.bowEvasion && ['trapped', 'thief'].includes(enemy.bowEvasion.kind) &&
+      Array.isArray(enemy.bowEvasion.path) ? {
+        kind: enemy.bowEvasion.kind,
+        path: enemy.bowEvasion.path.filter(p => Number.isInteger(p.x) && Number.isInteger(p.y))
+          .map(p => ({x:p.x,y:p.y})),
+      } : null
+    enemy.bowEvasionSpent = enemy.bowEvasionSpent === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
     enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
@@ -4404,9 +4411,11 @@ more difficult:
 
   function tryWoundedEnemyFlee(e, immediate = false) {
     if (!enemyIsFleeing(e)) return false
+    if (e.bowEvasion?.kind === 'thief' && equippedShortBow()) return advanceBowEvasion(e)
     const destination = enemyEscapeDestination(e)
-    // No escape tile: let normal combat handle a cornered monster.
-    if (!destination) return false
+    // A thief boxed against a wall may flank via a short, committed side
+    // route. Without that route, the monster fights instead of pacing back.
+    if (!destination) return enemyHasAbility(e,'thief') && beginBowEvasion(e,'thief')
     e.aware = !playerHiddenFromEnemy(e)
     if (!immediate && chance(0.10)) return true // Hesitation consumes the whole action.
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
@@ -5652,8 +5661,8 @@ more difficult:
         queue.push(nx, ny)
       }
     }
-    // A bow target only fights back when a complete approach route exists.
-    // Ordinary pursuit may still edge closer without one, as before.
+    // Melee pursuit can require a complete route. Shooters may still return
+    // fire through barriers without having a traversable melee approach.
     if (requireRoute) return null
     // No route at all - edge toward the player if any neighbour at least helps.
     let best = null
@@ -5677,10 +5686,10 @@ more difficult:
     return true
   }
 
-  // Undead do not assess danger from player arrows: they keep fighting or
-  // pursuing regardless of their relative strength or lack of an approach route.
+  // Undead, constructs and non-humanoid creatures ignore the bow-strength
+  // comparison. Other Fear, rare flight and wounded-flee abilities are separate.
   function enemyFearlessOfBow(e) {
-    return e.family === 'undead'
+    return e.family === 'undead' || e.family === 'construct' || !e.humanoid
   }
 
   // Compare current combat strength, including equipment and terrain, for
@@ -5718,6 +5727,106 @@ more difficult:
       if (distance > range && !rangeEscape) rangeEscape = {x, y}
     }
     return allowRangeEscape ? rangeEscape : null
+  }
+
+  // A trapped humanoid without a working ranged attack cannot close through
+  // prison bars. Find a reachable tile farther from the bow, preferring to
+  // leave its range or break the shot. Thieves may take a short lateral route
+  // around a corner rather than oscillating between two tiles. Both plans
+  // consume ordinary movement turns, never animation time or additional RNG.
+  function bowEvasionPath(e, kind) {
+    const distance = (x, y) => Math.max(Math.abs(x-player.x), Math.abs(y-player.y))
+    const startDist = distance(e.x,e.y)
+    const bowRange = equippedShortBow()?.rangedRange ?? 6
+    const limit = kind === 'thief' ? 4 : 9
+    const queue = [{x:e.x,y:e.y,path:[]}]
+    const visited = new Set([keyXY(e.x,e.y)])
+    let best = null, bestScore = -Infinity
+    for (let i=0; i<queue.length; i++) {
+      const node=queue[i]
+      if (node.path.length) {
+        const d=distance(node.x,node.y)
+        if (d>startDist) {
+          const shelter = bowCoverBlocksPlayerShotAt(node.x,node.y)
+          const outOfRange = d>bowRange
+          // Reaching safety is best; otherwise make real distance progress.
+          // Penalize meandering so the route doesn't cross the whole room.
+          const score=outOfRange ? 1000-node.path.length*15 :
+            shelter ? 750-node.path.length*15 : d*10-node.path.length*3
+          if (score>bestScore) {best={path:node.path};bestScore=score}
+        }
+      }
+      if (node.path.length>=limit) continue
+      for (const [dx,dy] of DIRS8) {
+        const x=node.x+dx,y=node.y+dy,k=keyXY(x,y)
+        if (visited.has(k) || !enemyTileOpen(e,x,y) || !enemyCanTraverse(e,x,y) ||
+            (currentZ===0 && npcs.some(n=>n.x===x&&n.y===y)) ||
+            distance(x,y)<startDist-1) continue
+        visited.add(k)
+        queue.push({x,y,path:[...node.path,{x,y}]})
+      }
+    }
+    return best?.path ?? null
+  }
+
+  function advanceBowEvasion(e) {
+    if (!e.bowEvasion?.path.length) return false
+    const step=e.bowEvasion.path[0]
+    if (!enemyTileOpen(e,step.x,step.y) || !enemyCanTraverse(e,step.x,step.y) ||
+        (currentZ===0 && npcs.some(n=>n.x===step.x&&n.y===step.y))) {
+      e.bowEvasion=null
+      e.bowEvasionSpent=true
+      return false
+    }
+    e.bowEvasion.path.shift()
+    const fromX=e.x,fromY=e.y
+    occupied.delete(keyXY(fromX,fromY))
+    e.x=step.x;e.y=step.y
+    occupied.add(keyXY(e.x,e.y))
+    e.farPath=null
+    if (e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
+      e.theftEscapeSteps++
+      if (e.theftEscapeSteps === THIEF_CONFIG.maxEscapeSteps) {
+        e.homeX=e.x;e.homeY=e.y
+      }
+    }
+    leaveBeastTrack(e,fromX,fromY)
+    finishEnemyMove(e,fromX,fromY)
+    if (e.alive && (e.stolenItem || enemyIsFleeing(e))) alertDwarvenRuinsEnemiesFromFlee(e)
+    if (e.bowEvasion?.path.length===0) {
+      e.bowEvasion=null
+      e.bowEvasionSpent=true
+    }
+    return true
+  }
+
+  function beginBowEvasion(e, kind) {
+    if (e.bowEvasionSpent || !equippedShortBow() || enemyFearlessOfBow(e)) return false
+    const path=bowEvasionPath(e,kind)
+    if (!path) return false
+    e.bowEvasion={kind,path}
+    return advanceBowEvasion(e)
+  }
+
+  // Shooters can change firing lanes when another creature or a terrain edge
+  // blocks their return shot. Check both sight and projectile obstruction at
+  // each legal adjacent tile; do not expose gear prefixes in these decisions.
+  function shooterSideStepForClearShot(e) {
+    const maxDist=Math.max(2,effectiveAggroRange(e),equippedShortBow()?.rangedRange ?? 6)
+    let best=null
+    for (const [dx,dy] of DIRS8) {
+      const x=e.x+dx,y=e.y+dy
+      const distance=Math.max(Math.abs(player.x-x),Math.abs(player.y-y))
+      if (distance<=ATTACK_RANGE || distance>maxDist || !enemyTileOpen(e,x,y) ||
+          !enemyCanTraverse(e,x,y) ||
+          (currentZ===0 && npcs.some(n=>n.x===x&&n.y===y)) ||
+          !UndergroundFov.canSee(map,x,y,player.x,player.y)) continue
+      const path=projectilePathBetween(x,y,player.x,player.y)
+      if (path.slice(1,-1).some(p=>projectileTerrainBlocks({x,y},p.x,p.y) ||
+          projectileCreatureBlocks(e,p.x,p.y))) continue
+      if (!best || distance<best.distance) best={x,y,distance}
+    }
+    return best ? {x:best.x,y:best.y} : null
   }
 
   function bowCoverBlocksPlayerShotAt(x, y) {
@@ -6698,7 +6807,11 @@ more difficult:
     rebuildActiveLevelOccupancy()
     // Changing away from the bow ends every ranged-cover standoff, including
     // monsters on nearby but currently inactive floors.
-    if (!equippedShortBow()) for (const e of enemies) e.bowRetreatHold = false
+    if (!equippedShortBow()) for (const e of enemies) {
+      e.bowRetreatHold = false
+      e.bowEvasion = null
+      e.bowEvasionSpent = false
+    }
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
     wanderSurfaceBelowTower()
@@ -6789,6 +6902,29 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      // Retaliation outranks fear and a blocked melee approach. The southern
+      // prison-gallery kobold can shoot through bars but cannot cross them.
+      // A mode switch consumes its whole turn, exactly like ordinary shooting.
+      if (e === bowShotTarget && !justEvaded && dist > ATTACK_RANGE &&
+          enemyIsShooter(e) && shooterCanSeePlayer(e)) {
+        const returnShot=clearProjectilePath(e)
+        if (returnShot) {
+          e.bowRetreatHold=false
+          e.bowEvasion=null
+          if (enemyRangedAttackPlayer(e,returnShot)) return
+          continue
+        }
+        const firingLane=shooterSideStepForClearShot(e)
+        if (firingLane) {
+          e.bowRetreatHold=false
+          e.bowEvasion=null
+          enemyStepTowardPlayer(e,firingLane)
+          continue
+        }
+      }
+      if (e.bowEvasion && equippedShortBow() && dist > ATTACK_RANGE) {
+        if (advanceBowEvasion(e)) continue
+      }
       // A shot target keeps seeking actual cover across ordinary turns, not
       // only immediately after another arrow. Once sheltered or beyond range,
       // it stays put until the player changes weapons, closes to melee, or
@@ -6816,16 +6952,22 @@ more difficult:
         tryTriggerCollectiveMind(e)
         continue
       }
-      // Undead never retreat from bow threat, even when hopelessly outmatched
-      // or trapped behind a barrier. Other monsters prefer cover when weaker
-      // or when no approach route exists, but still fight when cornered.
+      // Only ordinary humanoids assess bow strength. A shooter with a clear
+      // return shot has already fired above. A weaker thief that cannot find
+      // immediate cover makes a limited sideways breakout, not a one-step
+      // approach/retreat loop. A trapped unarmed humanoid moves away even
+      // when true safety is unreachable; it does not kite on open ground.
       if (e === bowShotTarget && dist > ATTACK_RANGE) {
         if (justEvaded) continue
         if (enemyIsFleeing(e) && tryWoundedEnemyFlee(e)) continue
         const pursuitStep = enemyFindStep(e, true)
         if (!enemyFearlessOfBow(e) && (!pursuitStep || !enemyOutmatchesPlayer(e))) {
           if (retreatFromBowShot(e)) continue
-          if (!pursuitStep) continue
+          if (enemyHasAbility(e,'thief') && beginBowEvasion(e,'thief')) continue
+          if (!pursuitStep) {
+            if (!enemyIsShooter(e) && beginBowEvasion(e,'trapped')) continue
+            continue
+          }
         }
         e.bowRetreatHold = false
         if (dist > aggroRange) {
@@ -6929,7 +7071,7 @@ more difficult:
             if (enemyAttackPlayer(e)) return
             break
           }
-          if (enemyIsShooter(e) && distNow < aggroRange && shooterCanSeePlayer(e)) {
+          if (enemyIsShooter(e) && distNow <= aggroRange && shooterCanSeePlayer(e)) {
             const projectilePath = clearProjectilePath(e)
             if (projectilePath) {
               if (enemyRangedAttackPlayer(e, projectilePath)) return

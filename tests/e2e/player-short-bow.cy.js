@@ -180,17 +180,18 @@ describe('Player Short Bow', () => {
         check(ogre.x===45&&ogre.y===40&&turnCount===turn+1,
           'Ogre advances exactly once without an extra enemy action')
         enemies=[];occupied=new Set()
-        const rat=spawn('Giant Rat','response-rat')
+        player.baseAtk=70
+        const rat=spawn('Goblin','response-rat')
         chance=()=>true
-        check(!enemyOutmatchesPlayer(rat),'Rat is weaker than the player')
-        check(shootEnemy(rat),'distant Rat can be shot at')
+        check(!enemyOutmatchesPlayer(rat),'Goblin is weaker than the player')
+        check(shootEnemy(rat),'distant Goblin can be shot at')
         check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
           'an immediate one-step escape beyond range is safe even on a miss')
         enemies=[];occupied=new Set()
-        const covered=spawn('Giant Rat','response-covered-rat')
+        const covered=spawn('Goblin','response-covered-rat')
         for(let y=30;y<=50;y++)map[y][45]='dwarvenprisonbars'
         check(!enemyFindStep(covered,true)&&shootEnemy(covered)&&covered.x===47,
-          'Rat behind bars retreats even without a strength disadvantage')
+          'Goblin behind bars retreats even without a strength disadvantage')
         map[40][45]='mountain'
         const ratX=covered.x,ratY=covered.y
         check(covered.bowRetreatHold&&bowCoverBlocksPlayerShot(covered),
@@ -204,28 +205,29 @@ describe('Player Short Bow', () => {
         player.equip.weapon=makeShortBowItem()
         for(let y=30;y<=50;y++)map[y][45]='grass'
         enemies=[];occupied=new Set()
-        const blockedRat=spawn('Giant Rat','response-blocked-rat')
+        const blockedRat=spawn('Goblin','response-blocked-rat')
         for(let y=30;y<=50;y++)map[y][45]='dwarvenprisonbars'
         for(let y=39;y<=41;y++)map[y][47]='mountain'
         check(playerBowShotPath(blockedRat)&&!enemyFindStep(blockedRat,true),
           'prison bars pass arrows but block a complete pursuit route')
-        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===40,
-          'blocked target refuses an exposed sideways escape route')
-        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===40,
-          'repeated bow shots do not trigger futile exposed retreat')
+        check(shootEnemy(blockedRat)&&blockedRat.bowEvasion?.kind==='trapped',
+          'unarmed shooter-less humanoid trapped behind bars finds a bounded escape')
+        const prevBlocked={x:blockedRat.x,y:blockedRat.y}
+        check(shootEnemy(blockedRat)&&(blockedRat.x!==prevBlocked.x||blockedRat.y!==prevBlocked.y),
+          'trapped humanoid continues its planned escape rather than pacing')
         enemies=[];occupied=new Set()
-        const isolated=spawn('Giant Rat','response-isolated-rat')
+        const isolated=spawn('Goblin','response-isolated-rat')
         for(let y=39;y<=41;y++)map[y][46]=y===40?'grass':'mountain'
         check(!enemyFindStep(isolated,true)&&!rangedRetreatDestination(isolated),
-          'Rat isolated behind bars has no approach or retreat path')
+          'Goblin isolated behind bars has no approach or retreat path')
         check(shootEnemy(isolated)&&isolated.x===46&&isolated.y===40,
-          'isolated Rat cannot walk through bars or solid walls')
+          'isolated Goblin cannot walk through bars or solid walls')
         for(let y=30;y<=50;y++)map[y][45]='grass'
         for(let y=39;y<=41;y++){
           map[y][46]='grass';map[y][47]='grass'
         }
         enemies=[];occupied=new Set()
-        const trappedRat=spawn('Giant Rat','response-trapped-rat')
+        const trappedRat=spawn('Goblin','response-trapped-rat')
         player.baseAtk=70;chance=()=>false
         trappedRat.bowRetreatHold=true
         for(let y=39;y<=41;y++){
@@ -233,18 +235,18 @@ describe('Player Short Bow', () => {
           map[y][47]='mountain'
         }
         check(enemyFindStep(trappedRat,true)&&!rangedRetreatDestination(trappedRat),
-          'cornered Rat has a route to the player but no way to escape')
+          'cornered Goblin has a route to the player but no way to escape')
         check(shootEnemy(trappedRat)&&trappedRat.x===45&&trappedRat.y===40&&
           !trappedRat.bowRetreatHold,
-          'trapped Rat turns toward the player on the first shot')
+          'trapped Goblin turns toward the player on the first shot')
         check(shootEnemy(trappedRat)&&trappedRat.x===44&&trappedRat.y===40,
-          'Rat continues advancing when the alternative requires an exposed first step')
+          'Goblin continues advancing when the alternative requires an exposed first step')
         for(let y=39;y<=41;y++){
           map[y][46]='grass';map[y][47]='grass'
         }
         // Undead ignore ranged threat strength even when hopelessly outmatched.
         player.baseAtk=70
-        for(const name of ['Skeleton','Ghoul','Ghost']){
+        for(const name of ['Skeleton','Ghoul','Ghost','Gargoyle','Giant Rat']){
           enemies=[];occupied=new Set()
           const undead=spawn(name,'fearless-'+name,44)
           undead.invisibleUntilTurn=0;undead.invisibilityReadyTurn=999999
@@ -267,13 +269,13 @@ describe('Player Short Bow', () => {
         for(let y=30;y<=50;y++)map[y][42]='dwarvenprisonbars'
         check(!enemyFindStep(gargoyle,true)&&playerBowShotPath(gargoyle),
           'the Gargoyle is behind bars, though arrows reach it')
-        check(shootEnemy(gargoyle)&&gargoyle.x===44,
-          'Gargoyle cannot retreat through exposed tiles behind bars')
+        check(shootEnemy(gargoyle)&&gargoyle.x<=44&&!gargoyle.bowRetreatHold,
+          'construct ignores strength comparison and refuses to flee')
         player.baseAtk=2
         enemies=[];occupied=new Set()
         const strongerBlocked=spawn('Gargoyle','response-strong-blocked-gargoyle',44)
-        check(!enemyFindStep(strongerBlocked,true)&&shootEnemy(strongerBlocked)&&strongerBlocked.x===44,
-          'even a stronger Gargoyle stays blocked without safe retreat')
+        check(!enemyFindStep(strongerBlocked,true)&&shootEnemy(strongerBlocked)&&strongerBlocked.x<=44&&!strongerBlocked.bowRetreatHold,
+          'construct never retreats from bow strength behind bars')
         for(let y=30;y<=50;y++)map[y][42]='grass'
         enemies=[];occupied=new Set()
         const strongNear=spawn('Gargoyle','response-strong-gargoyle',44)
@@ -281,7 +283,7 @@ describe('Player Short Bow', () => {
           'Gargoyle with a route pursues within AGGRO')
         enemies=[];occupied=new Set()
         player.baseSpd=30;chance=()=>true
-        const pursuer=spawn('Giant Rat','response-shot-pursuer',43)
+        const pursuer=spawn('Goblin','response-shot-pursuer',43)
         pursuer.aware=true;pursuer.alarmed=true
         check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===42,
           'just-shot weaker target approaches without an immediate safe escape')
@@ -290,7 +292,7 @@ describe('Player Short Bow', () => {
         setDesktopCanvasCursor(pursuer)
         check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
           'equipped bow uses the red arrow cursor for a legal shot')
-        const farAway=spawn('Giant Rat','response-far-rat',49)
+        const farAway=spawn('Goblin','response-far-rat',49)
         setDesktopCanvasCursor(farAway)
         check(canvas.style.cursor.includes('not-allowed'),
           'out-of-range targets show the disabled bow cursor')
@@ -312,7 +314,7 @@ describe('Player Short Bow', () => {
           map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
         }
         map[41][42]='mountain'
-        const shelterRat=spawn('Giant Rat','response-shelter-rat',44)
+        const shelterRat=spawn('Goblin','response-shelter-rat',44)
         chance=()=>true
         check(!!playerBowShotPath(shelterRat),'shot begins with clear line to rat')
         check(rangedRetreatDestination(shelterRat).x===44&&
@@ -332,7 +334,7 @@ describe('Player Short Bow', () => {
         // tile the player can still shoot. Fight instead of fleeing endlessly.
         enemies=[];occupied=new Set()
         map[42][43]='mountain'
-        const exposedRat=spawn('Giant Rat','response-distant-cover-rat',44)
+        const exposedRat=spawn('Goblin','response-distant-cover-rat',44)
         check(playerBowShotPath(exposedRat)&&bowCoverBlocksPlayerShotAt(44,43)&&
           !bowCoverBlocksPlayerShotAt(44,41),
           'a sheltered tile exists but the approach is in the bow firing lane')
@@ -343,7 +345,7 @@ describe('Player Short Bow', () => {
           'weaker monster closes to fight instead of giving free shots')
         map[42][43]='grass'
         enemies=[];occupied=new Set()
-        const edgeRat=spawn('Giant Rat','response-edge-rat',46)
+        const edgeRat=spawn('Goblin','response-edge-rat',46)
         check(shootEnemy(edgeRat)&&edgeRat.x===47&&edgeRat.bowRetreatHold,
           'first range escape takes exactly one safe step')
         player.x=41
@@ -351,6 +353,35 @@ describe('Player Short Bow', () => {
         check(edgeRat.x===46&&!edgeRat.bowRetreatHold,
           'moving after a range escape causes pursuit, not endless open-field flight')
         player.x=40
+
+        // A prisoner can shoot through bars despite having no melee approach.
+        // Depleted ammunition then starts a finite attempt to leave bow range.
+        enemies=[];occupied=new Set()
+        for(let y=30;y<=55;y++)map[y][38]='dwarvenprisonbars'
+        const cageKobold=spawn('Kobold','response-prison-kobold',37)
+        cageKobold.shooterAbility='shooterArrows';cageKobold.shotsRemaining=3
+        cageKobold.shooterMode='ranged'
+        check(!enemyFindStep(cageKobold,true)&&!!clearProjectilePath(cageKobold),
+          'prison shooter has a return shot, but no melee approach')
+        enemyTurn(null,null,cageKobold)
+        check(cageKobold.shotsRemaining===2&&cageKobold.x===37,
+          'shot target fires back from behind bars instead of stopping')
+        cageKobold.shotsRemaining=0
+        enemyTurn(null,null,cageKobold)
+        check(cageKobold.bowEvasion?.kind==='trapped'&&cageKobold.x<37,
+          'out-of-arrows prisoner tries to withdraw toward the back of its cell')
+        for(let y=30;y<=55;y++)map[y][38]='grass'
+        enemies=[];occupied=new Set()
+        for(const [x,y] of [[45,39],[45,40],[45,41]])map[y][x]='mountain'
+        player.baseAtk=70
+        const thief=spawn('Imp','response-cornered-thief',44)
+        check(!rangedRetreatDestination(thief),
+          'no safe first escape step for the cornered thief')
+        enemyTurn(null,null,thief)
+        check(thief.bowEvasion?.kind==='thief'&&thief.y!==40,
+          'cornered thief flanks sideways instead of bouncing toward the player')
+        for(const [x,y] of [[45,39],[45,40],[45,41]])map[y][x]='grass'
+        player.baseAtk=2
 
         chance=oldChance;damageRoll=oldDamage
         enemies=[];occupied=new Set()
@@ -392,8 +423,8 @@ describe('Player Short Bow', () => {
         for(let y=37;y<=44;y++)for(let x=37;x<=46;x++){
           map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
         }
-        const t=ENEMY_TEMPLATE_BY_NAME.GiantRat || ENEMY_TEMPLATE_BY_NAME['Giant Rat']
-        const enemy=addEnemy({...t,id:'mobile-bow-target',name:'Giant Rat',baseName:'Giant Rat',
+        const t=ENEMY_TEMPLATE_BY_NAME.GiantGoblin || ENEMY_TEMPLATE_BY_NAME['Goblin']
+        const enemy=addEnemy({...t,id:'mobile-bow-target',name:'Goblin',baseName:'Goblin',
           x:43,y:40,level:0,alive:true,hp:1,maxHp:1,homeX:43,homeY:40,
           equipment:null,shooterAbility:null,shotsRemaining:0})
         occupied.add(keyXY(43,40))
@@ -422,7 +453,7 @@ describe('Player Short Bow', () => {
         }
         enemies=[];npcs=[];groundItems=[];occupied=new Set();fxAnims=[];projectileAnims=[]
         replayAnimationsDisabled=true;USE_TILE_IMAGES=true
-        const victim={name:'Giant Rat',baseName:'Giant Rat',tier:1,x:43,y:40}
+        const victim={name:'Goblin',baseName:'Goblin',tier:1,x:43,y:40}
         spawnDeathAnim(victim,350)
         const effect=fxAnims[0];check(!!effect.visual,'death stores a tile visual')
         let spriteDraws=0,glyphDraws=0,visibleAlpha=[]

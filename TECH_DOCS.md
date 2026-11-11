@@ -4438,7 +4438,10 @@ to hesitate. The special loot escape lasts **40 successful movement steps in tot
 the player is visible. Hesitation, opened doors without movement, being cornered,
 invisibility, and off-level turns do not advance the counter. Losing sight of an
 invisible player suspends directed retreat without losing the loot or resetting
-the one-time theft. A cornered thief fights normally until it can escape again.
+the one-time theft. A cornered thief usually fights until it can escape again;
+under bow fire it can instead attempt a short, committed lateral detour around
+nearby obstacles. Actual movement on that detour counts toward the same
+40-step stolen-item escape budget; no extra free moves are granted.
 
 On the 40th escape step, the thief anchors its home at the stopping tile and
 resumes normal wandering, aggro, and combat behavior from the following turn.
@@ -5049,17 +5052,22 @@ On the surface, standing in an enemy's aggro range triggers pursuit. Underground
 ### Reactions to player bow shots
 
 An enemy targeted by a valid Short Bow shot reacts on its **ordinary turn**,
-even if the arrow misses. It compares its current combat strength with the
-player's (ATK, DEF, SPD, GRACE, including equipment and modifiers). A **weaker**
-monster tries to flee if it has a meaningful escape route, even if it could
-reach the player. A **stronger or equally strong** monster fights if it has a
-traversable pursuit route to a tile adjacent to the player. If it cannot reach
-the player, even a stronger monster tries to escape instead; prison bars can
-block approach while still allowing the player's arrows through. **Undead are
-fearless:** they never compare combat strength or flee from player bow shots,
-not even when trapped or clearly outmatched. They instead pursue or attack
-whenever able; an impassable route leaves them blocked, not retreating. Other
-flight, sanctuary and supernatural status rules are independent of this choice.
+even if the arrow misses. A shooter with ammunition and an unobstructed line
+of fire **shoots back first**, regardless of its strength or whether it can
+reach the player in melee. Prison bars stop melee approach but not arrows.
+Switching from melee to a ranged weapon still consumes a complete action
+before the next shot. If a creature blocks its projectile, an armed shooter
+may sidestep to an immediately reachable clear firing lane rather than freeze.
+Normal shooting also works at the enemy's effective aggro boundary.
+
+For bow threat, **undead, constructs and every non-humanoid are fearless**:
+they do not compare their strength against the player's or retreat simply
+because they are outmatched. An ordinary **humanoid** without a return shot
+compares ATK, DEF, SPD and GRACE, including equipment and modifiers. Weaker
+humanoids prefer retreat if safe escape exists. Stronger or equally strong
+humanoids pursue if they have a traversable approach route; one unable to
+reach the player also seeks escape. Fear spells, sanctuary, wounded flight,
+and rare-creature abilities retain their separate rules.
 
 Retreat is allowed only when the monster can reach safety **on its very next
 step**. The chosen adjacent tile must block the player's projectile line of
@@ -5070,8 +5078,22 @@ cover and out-of-range tiles **do not count** when reaching them would require
 even one exposed movement turn: the archer could keep firing while it fled.
 The monster prefers immediate terrain cover over stepping outside bow range.
 Prison bars never count as projectile cover. If no immediately safe retreat is
-available, it stops fleeing and fights or pursues when a route to the player
-exists; monsters with neither escape nor approach simply remain blocked.
+available, the humanoid normally fights or pursues when an approach route exists.
+Two bounded desperation behaviors are exceptions, **not safe escapes**:
+
+- A **non-shooter or out-of-ammunition humanoid trapped without a melee route**
+  can spend ordinary turns moving away, even if the intermediate squares are
+  exposed. It follows a short reachable path toward bow range's edge, stopping
+  at the farthest available position if its enclosure prevents full escape.
+  It does not pace back toward the player or flee indefinitely across open ground.
+- A **cornered thief** can risk a short sideways detour to get around a wall
+  or the archer. It commits to that route instead of alternating a forward and
+  backward step. If the detour fails or its limited moves are spent, it fights.
+  Stolen-item escape steps still count normally.
+
+Both detours require legal walkable tiles and are abandoned when blocked;
+they use no extra actions or unseeded decisions. If the creature has no firing
+lane, approach route or useful retreat, it remains trapped.
 
 A monster may use one immediate step beyond bow range to escape a shot, but cannot chain repeated
 out-of-range moves when the player follows: it then seeks actual terrain cover
@@ -5081,10 +5103,11 @@ This avoids unproductive open-field chases without a random fleeing timeout.
 A monster that reaches safety holds that position while the Short Bow stays
 equipped; moving the player to regain a shot makes it seek another immediately
 safe tile, or resume combat if none exists. Switching weapons or closing
-to melee allows normal combat and pursuit to resume. The retreat intent uses
-the existing saved enemy state and pathfinding recomputes each turn, so changing
-obstacles or enemy positions cannot leave a stale route. Enemies not provoked
-by player arrows do not seek bow cover on their own.
+to melee allows normal combat and pursuit to resume. The retreat hold and
+any short desperation route are saved and restored for deterministic replay.
+If a planned step becomes occupied or obstructed, the plan is discarded.
+The desperation limit is reset when the player switches away from the bow.
+Enemies not provoked by player arrows do not seek bow cover on their own.
 
 Other turns inside effective AGGRO retain normal combat and pursuit. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
