@@ -267,3 +267,18 @@ test('unidentified equipment never leaks its true name in combat logs; artifact 
   assert.match(disarmLog,/Unidentified Dagger/)
   assert.doesNotMatch(disarmLog,/Secret Flames/,'disarming also preserves hidden equipment names')
 })
+
+test('artifact stat summaries keep bonuses but omit equipment labels', async () => {
+  await ready()
+  for (const [slot, stat] of [['armor','DEF 4'],['weapon','ATK 7'],['shield','DEF 3']]) {
+    const item={kind:'artifact',artifactSlot:slot,noun:'Sample',name:'Sample of Shasar',
+      identified:true,def:slot==='weapon'?0:slot==='armor'?4:3,
+      atk:slot==='weapon'?7:0,grace:2,bonuses:{mf:2}}
+    const line=run(`itemStatLine(${JSON.stringify(item)})`)
+    assert.match(line,new RegExp(stat))
+    assert.match(line,/MF \+2/)
+    assert.doesNotMatch(line,/\b(WEAPON|ARMOR|SHIELD)\b/)
+    item.identified=false
+    assert.equal(run(`itemStatLine(${JSON.stringify(item)})`),'???')
+  }
+})

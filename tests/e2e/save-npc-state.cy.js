@@ -174,6 +174,18 @@ describe('Exact current-save state restoration', () => {
       player.mining=0
       player.miningArmedTarget=null
       player.inventory.push(createItem('pickaxe'))
+      // Water and shallow rivers give no stable stance for mining, even for
+      // natural swimmers; failed attempts must not mutate turn or RNG state.
+      const underPlayer=map[player.y][player.x]
+      for (const terrain of ['water','river']) {
+        map[player.y][player.x]=terrain
+        const turns=turnCount, rngBefore=rngState
+        check(Mining.strike(x,y)==='warn','mining refused from '+terrain)
+        check(turnCount===turns&&rngState===rngBefore,'blocked strike changes no turns or RNG')
+        check(map[y][x]==='boulder'&&!miningSurfaceProgress[key],
+          'blocked strike leaves surface boulder intact')
+      }
+      map[player.y][player.x]=underPlayer
       rebuildMinimapBases()
       const pixel=scale=>Array.from(miniBases[scale].ctx.getImageData(x*scale,y*scale,1,1).data)
       const before=MINI_SCALES.map(pixel)

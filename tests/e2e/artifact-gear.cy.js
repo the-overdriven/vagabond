@@ -50,6 +50,23 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('does not append redundant equipment categories to artifact stats', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      for (const [slot,noun,stat] of [['armor','Tunic','DEF 4'],['weapon','Spear','ATK 7'],['shield','Buckler','DEF 3']]) {
+        const item={kind:'artifact',artifactSlot:slot,noun,base:noun,
+          name:noun+' of Shasar',identified:true,def:slot==='weapon'?0:slot==='armor'?4:3,
+          atk:slot==='weapon'?7:0,grace:2,bonuses:{mf:2}}
+        const line=itemStatLine(item)
+        check(line.includes(stat)&&line.includes('MF +2'),'artifact stats still visible')
+        check(!['WEAPON','ARMOR','SHIELD'].some(label=>line.includes(label)),
+          'no redundant category for '+slot)
+        item.identified=false
+        check(itemStatLine(item)==='???','unidentified artifact stays secret')
+      }
+    })()`))
+  })
+
   it('discounts only artifact selling when unidentified or identified as cursed', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

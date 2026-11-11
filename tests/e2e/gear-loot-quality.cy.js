@@ -69,7 +69,7 @@ describe('Exceptional prefixes and monster loot quality', () => {
         const calls=[];makeWeaponItem=(...args)=>{calls.push(args);return {kind:'weapon'}}
         chance=()=>true;rng=()=>0;player.baseMf=50
         rollEnemyEquipment({tier:5,humanoid:true});rollEnemyDropEquipment({tier:5,humanoid:true})
-        check(JSON.stringify(calls)===JSON.stringify([[5,0,5],[4,0,5]]),'source tier survives fallback; player MF is not quality')
+        check(JSON.stringify(calls)===JSON.stringify([[5,0,5,false],[4,0,5,false]]),'source tier survives fallback; player MF is not quality')
         for(const tier of [1,2,3,4,5]) {
           const gates=[];chance=p=>{gates.push(p);return false};rng=()=>0
           rollModifierAmount('atk',100,tier)
@@ -85,6 +85,41 @@ describe('Exceptional prefixes and monster loot quality', () => {
           check(rollOrdinaryModifierAmount('atk',0,tier)===1,'small quality boost preserves low rolls')
         }
       } finally {rng=oldRng;chance=oldChance;makeWeaponItem=oldMaker}
+    })()`))
+  })
+
+  it('equips bows only on actual arrow shooters, including stolen and corpse weapons', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalChance=chance,originalRng=rng,originalPick=pickEquipmentBase
+      try {
+        chance=()=>true;rng=()=>0
+        // Force bow selection whenever the allowed weapon pool includes one.
+        pickEquipmentBase=(pool)=>pool.find(item=>item.name==='Hunting Bow')||pool[0]
+        const newMonster=name=>{
+          const tmpl=ENEMY_TEMPLATE_BY_NAME[name]
+          return {...tmpl,baseName:name,name,hp:tmpl.hp,maxHp:tmpl.hp,
+            abilities:[...tmpl.abilities],gearScale:1,equipment:null}
+        }
+        const gorgon=newMonster('Gorgon')
+        prepareEnemyEquipment(gorgon)
+        check(!gorgon.shooterAbility && !gorgon.equipment?.rangedAtk,'Gorgon does not wear a bow')
+        const kobold=newMonster('Kobold')
+        prepareEnemyEquipment(kobold)
+        check(kobold.shooterAbility==='shooterArrows' && kobold.equipment?.base==='Hunting Bow',
+          'actual archer is eligible for a bow')
+        const goblin=newMonster('Goblin')
+        prepareEnemyEquipment(goblin)
+        check(goblin.shooterAbility==='shooterStones'&&!goblin.equipment?.rangedAtk,
+          'stone thrower cannot wear a bow')
+        const bow={kind:'weapon',name:'Hunting Bow',base:'Hunting Bow',rangedAtk:7,atk:2,grace:1}
+        const before=gorgon.atk
+        check(applyEnemyEquipment(gorgon,bow)===false&&gorgon.atk===before,'forced bow equip rejected')
+        check(applyEnemyEquipment(kobold,bow)===true,'archer may equip bow')
+        const stripped={...gorgon,equipment:bow,gearBonuses:{atk:2,def:0,spd:0,hp:0,maxHp:0},atk:before+2}
+        check(removeInvalidEnemyBow(stripped)===true&&stripped.equipment===null&&stripped.atk===before,
+          'invalid saved bow is removed together with its bonuses')
+      } finally {chance=originalChance;rng=originalRng;pickEquipmentBase=originalPick}
     })()`))
   })
 

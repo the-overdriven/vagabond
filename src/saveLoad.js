@@ -994,6 +994,7 @@ function loadGameFromObject(data, opts = {}) {
       miningInvestigation: e.miningInvestigation ? structuredClone(e.miningInvestigation) : null,
     })
   })
+  for (const enemy of enemies) removeInvalidEnemyBow(enemy)
   occupied = new Set()
   nextEnemyId = 1
   hunterEnsureIds()

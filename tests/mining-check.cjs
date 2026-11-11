@@ -506,5 +506,104 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(nest.count,3,'a sufficiently large pocket can hold three nest monsters')
   assert.equal(nest.species.length,1,'all monsters in a pocket nest share one species')
   assert.equal(nest.nonhumanoid,true,'nest inhabitants remain nonhumanoid')
+  run(`(() => {
+    // Force the atmospheric message on an ordinary mine strike but not on a
+    // surface-boulder strike; the same sound mechanic still alerts listeners.
+    const oldChance=chance,oldLog=log,oldZ=currentZ,oldMap=map,
+      oldLast=miningLastEchoTurn,
+      oldAmbient=MINING_CONFIG.sound.ambientMessageChance,
+      oldPlayerX=player.x,oldPlayerY=player.y,oldTutorial=player.miningTutorialSeen
+    const messages=[]
+    try {
+      chance=()=>true;log=msg=>messages.push(msg)
+      MINING_CONFIG.sound.ambientMessageChance=1;miningLastEchoTurn=-100000
+      player.miningTutorialSeen=true;currentZ=0;map=surfaceMap
+      player.x=40;player.y=40;map[40][41]='boulder'
+      if(Mining.strike(41,40)!=='strike')throw Error('surface mining test did not strike')
+      if(messages.some(msg=>msg.includes('echo through the shafts')))
+        throw Error('surface boulder emitted underground echo message')
+      currentZ=-9;map=oldMap;player.x=oldPlayerX;player.y=oldPlayerY
+      miningLastEchoTurn=-100000
+      const mine=Mining.activeLevel()
+      const target=mine?.mineExcavations?.find(d=>!d.removed&&d.kind==='wall')
+      if(!target)throw Error('underground mining fixture has no unexcavated wall')
+      player.x=target.x-1;player.y=target.y
+      if(Mining.strike(target.x,target.y)!=='strike')throw Error('underground mining test did not strike')
+      if(!messages.some(msg=>msg.includes('echo through the shafts')))
+        throw Error('underground mining echo must remain available')
+    } finally {
+      chance=oldChance;log=oldLog;currentZ=oldZ;map=oldMap
+      player.x=oldPlayerX;player.y=oldPlayerY
+      player.miningTutorialSeen=oldTutorial
+      miningLastEchoTurn=oldLast
+      MINING_CONFIG.sound.ambientMessageChance=oldAmbient
+    }
+  })()`)
+  run(`(() => {
+    // Reject water mining before tutorial, progress, sound, XP or RNG effects.
+    const previous={z:currentZ,map,px:player.x,py:player.y,
+      tutorial:player.miningTutorialSeen,armed:player.miningArmedTarget,
+      enemies,miningSurfaceProgress}
+    try {
+      currentZ=0;map=surfaceMap;enemies=[]
+      player.x=65;player.y=65
+      const target={x:66,y:65}, originalTarget=map[target.y][target.x],
+        originalFooting=map[player.y][player.x]
+      map[target.y][target.x]='boulder'
+      player.miningTutorialSeen=false
+      player.miningArmedTarget='unchanged'
+      const start={turns:turnCount,rng:rngState,hp:player.hp,
+        skill:player.mining,xp:player.miningXpUnits,
+        progress:JSON.stringify(miningSurfaceProgress)}
+      try {
+        for(const terrain of ['water','river']){
+          map[player.y][player.x]=terrain
+          const result=Mining.strike(target.x,target.y)
+          if(result!=='warn'||turnCount!==start.turns||rngState!==start.rng||
+            player.hp!==start.hp||player.mining!==start.skill||
+            player.miningXpUnits!==start.xp||!player.miningArmedTarget||
+            player.miningTutorialSeen||JSON.stringify(miningSurfaceProgress)!==start.progress)
+            throw Error('mining from '+terrain+' should be free and have no effects')
+        }
+        // Frozen surfaces are solid footing and should still show the one-time tutorial.
+        map[player.y][player.x]='frozenriver'
+        if(Mining.strike(target.x,target.y)!=='warn'||!player.miningTutorialSeen)
+          throw Error('frozen water should allow normal mining tutorial')
+      } finally {
+        map[target.y][target.x]=originalTarget
+        map[player.y][player.x]=originalFooting
+      }
+    } finally {
+      currentZ=previous.z;map=previous.map;player.x=previous.px;player.y=previous.py
+      player.miningTutorialSeen=previous.tutorial;player.miningArmedTarget=previous.armed
+      enemies=previous.enemies;miningSurfaceProgress=previous.miningSurfaceProgress
+    }
+  })()`)
+  await run(`(async () => {
+    // Real movement/interaction path must not advance the world when mining
+    // would be attempted from water, not merely the lower-level strike call.
+    const previous={z:currentZ,map,x:player.x,y:player.y,
+      tutorial:player.miningTutorialSeen,enemyList:enemies}
+    const x=74,y=74
+    try {
+      currentZ=0;map=surfaceMap;enemies=[]
+      const footprint=map[y][x],rock=map[y][x+1]
+      try {
+        map[y][x+1]='boulder';player.x=x;player.y=y
+        player.miningTutorialSeen=true
+        for(const surface of ['water','river']) {
+          map[y][x]=surface
+          const turns=turnCount,rngBefore=rngState
+          await tryMove(1,0)
+          if(turnCount!==turns||rngState!==rngBefore||map[y][x+1]!=='boulder')
+            throw Error('water mining interaction consumed a turn or changed state')
+        }
+      } finally {map[y][x]=footprint;map[y][x+1]=rock}
+    } finally {
+      currentZ=previous.z;map=previous.map
+      player.x=previous.x;player.y=previous.y
+      player.miningTutorialSeen=previous.tutorial;enemies=previous.enemyList
+    }
+  })()`)
   console.log('PASS Mining generation, turn cost, persistence and skill progression')
 })().catch(err => { console.error(err.stack); process.exitCode = 1 })

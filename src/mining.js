@@ -603,6 +603,12 @@ const Mining = (() => {
 
   function strike(x, y) {
     if (!canTarget(x, y)) return false
+    // A swimmer cannot brace a pickaxe against rock. Rivers also have no
+    // solid footing; frozen water is terrain rather than open water.
+    if (['water', 'river'].includes(map[player.y]?.[player.x])) {
+      log('You cannot mine while standing in water.', 'info')
+      return 'warn'
+    }
     if (!player.inventory.some(i => i.kind === 'pickaxe')) {
       log('You need a Pickaxe to mine stone and crystals.', 'info')
       return 'warn'
@@ -691,7 +697,7 @@ const Mining = (() => {
           announced: false}
       }
     }
-    if (turnCount - miningLastEchoTurn >= cfg.ambientMessageCooldown && chance(cfg.ambientMessageChance)) {
+    if (currentZ < 0 && turnCount - miningLastEchoTurn >= cfg.ambientMessageCooldown && chance(cfg.ambientMessageChance)) {
       miningLastEchoTurn = turnCount
       log('Your blows echo through the shafts. Hopefully nothing heard.', 'info')
     }

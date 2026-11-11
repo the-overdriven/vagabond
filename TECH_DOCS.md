@@ -632,7 +632,11 @@ The character sheet displays Swimming as **Unknown**, its numeric value, or
 Mining is a **0–100** numerical skill that improves through extracting minerals
 and opening mineable stone. A carried Pickaxe is required, but does not need to be
 equipped. Attempting to move into an adjacent cracked wall, a crystal formation,
-or an overworld boulder initiates mining; all eight directions work. The first
+or an overworld boulder initiates mining; all eight directions work. Mining
+cannot be performed while standing in deep water or an unfrozen river, regardless
+of race or God Mode. A blocked attempt displays a message without consuming a
+turn, triggering noise, or changing skill or excavation progress; solid frozen
+water remains valid footing. The first
 mining attempt in a playthrough displays a one-time warning and costs no turn,
 even when the wall looks solid. Every subsequent attempt, including one aimed
 at a new target, immediately strikes once per turn. The tutorial state persists
@@ -4459,8 +4463,9 @@ The stolen item remains on the thief and the theft escape never restarts; ordina
 low-HP fleeing can still apply to monsters with `flee`. Sacred-ground protection
 still prevents new thefts.
 
-A thief with an empty equipment slot immediately equips stolen weapons, shields,
-or armor and logs "<name> has equipped <item>." Monsters have one equipment slot;
+A thief with an empty equipment slot immediately equips eligible stolen weapons,
+shields, or armor and logs "<name> has equipped <item>." Bows remain in the
+stolen loot bag unless the thief is an assigned arrow shooter. Monsters have one equipment slot;
 existing gear is never replaced by theft. Consumables and artifacts are carried
 without equipping. This uses the normal enemy equipment rules, including weapon
 ATK/GRACE, armor or shield DEF, and their usual speed penalty. Bonuses apply once,
@@ -5043,7 +5048,10 @@ pathfinding as mining investigation. Walls do not attenuate sound but still
 block movement. It creates no enemies and reveals no hidden listeners.
 Refueling, cooking and resting do not repeat the ignition noise.
 
-**Mining noise.** Each confirmed Pickaxe strike can be heard by non-passive
+**Mining noise.** The atmospheric message about blows echoing through the
+shafts is shown only underground, never when clearing surface boulders. The
+underlying sound, hearing and investigation mechanics still apply on the surface.
+Each confirmed Pickaxe strike can be heard by non-passive
 monsters within **25 Euclidean tiles** on the same floor. Walls do not attenuate
 the sound. For distance `d`, base hearing chance is
 `max(0.03, 0.90 × (1 − d / 25)²)` up to the 25-tile limit; Blind monsters
@@ -5826,7 +5834,7 @@ ground objects, so this state survives save/load.
 
 **Killer equipment selection and ties.** Monsters have one equipment slot,
 not separate weapon, shield, and armor slots. The killer considers only the
-dead player's equipped weapon: it does not compare matching armor slots or
+dead player's equipped weapon (bows require an assigned arrow-shooter role): it does not compare matching armor slots or
 randomly choose among the player's three equipment types. Corpse selection
 happens first. If the weapon was reserved for the corpse, the killer takes
 nothing; otherwise, the weapon is compared with whatever the killer currently
@@ -6932,6 +6940,15 @@ Monster tier additionally improves prefix strength and the exceptional gate as
 specified in section 36. Player MF still does not improve worn-item modifier
 quality. An exceptional roll may promote a weak base item above the source tier;
 that is an intentional tier-5 quality classification, not a new base item.
+
+Only enemies actually assigned the **arrow-shooter role** may wear a Hunting Bow. 
+Having a species capable of ranged attacks is insufficient: a non-shooting Kobold, 
+a stone thrower or a non-shooting humanoid uses the melee-only weapon pool. 
+The shooter role is decided before rolling equipment. Monsters that cannot 
+shoot arrows cannot equip bows stolen from the player or taken from a corpse. 
+If such gear is found equipped in a restored game, its combat bonuses are 
+removed with the invalid equipment. A bow-capable archer remains eligible 
+even after running out of ammunition.
 
 The worn item is already stored on the enemy as `e.equipment`.
 Combat glancing-hit messages and enemy tooltips show only the equipment's base

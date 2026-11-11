@@ -2106,10 +2106,10 @@ more difficult:
       base.tier === sourceTier - 1 ? cfg.equipmentPreviousTierWeight : 1)
   }
 
-  function makeWeaponItem(tier, mf = 0, sourceTier = 0) {
+  function makeWeaponItem(tier, mf = 0, sourceTier = 0, allowRanged = true) {
     // Short Bows retain their special sources. Tier-3 Hunting Bows can appear
     // alongside ordinary tier-3+ weapon drops, chests, and artifacts.
-    const base = pickEquipmentBase(WEAPONS.filter(w => !w.rangedAtk || w.name === 'Hunting Bow'), tier, sourceTier)
+    const base = pickEquipmentBase(WEAPONS.filter(w => !w.rangedAtk || (allowRanged && w.name === 'Hunting Bow')), tier, sourceTier)
     const item = {
       kind: 'weapon',
       base: base.name,
@@ -2508,7 +2508,7 @@ more difficult:
     const dropChance = cfg.enemyEquipmentChanceBase + e.tier * cfg.enemyEquipmentChancePerTier
     if (!chance(Math.min(cfg.enemyEquipmentChanceCap, dropChance))) return null
     const roll = rng()
-    if (roll < cfg.enemyEquipmentWeaponShare) return makeWeaponItem(e.tier, 0, e.tier)
+    if (roll < cfg.enemyEquipmentWeaponShare) return makeWeaponItem(e.tier, 0, e.tier, enemyCanEquipBow(e))
     if (roll < cfg.enemyEquipmentWeaponShare + cfg.enemyEquipmentArmorShare) return makeArmorItem(e.tier, 0, e.tier)
     return makeShieldItem(e.tier, 0, e.tier)
   }
@@ -2522,13 +2522,16 @@ more difficult:
     let tier = e.tier
     const lowerTierChance = Math.max(0.05, 0.35 - (tier - 1) * 0.05 - mf * 0.01)
     if (chance(lowerTierChance) && tier > 1) tier -= 1
-    if (roll < 0.5) return makeWeaponItem(tier, 0, e.tier)
+    if (roll < 0.5) return makeWeaponItem(tier, 0, e.tier, enemyCanEquipBow(e))
     if (roll < 0.75) return makeArmorItem(tier, 0, e.tier)
     return makeShieldItem(tier, 0, e.tier)
   }
 
   function prepareEnemyEquipment(e) {
     if (!e || !e.humanoid) return
+    // Choose the actual ranged role before rolling gear, not merely the
+    // species' potential shooter ability. Some Kobolds never become shooters.
+    initializeEnemyShooter(e)
     const hpMultiplier = WORLD_GEN_CONFIG.environment.humanoidHpMultiplier
     e.hp = Math.max(1, Math.round(e.hp * hpMultiplier))
     e.maxHp = e.hp
@@ -2550,8 +2553,28 @@ more difficult:
       (weapon.mod === 'grace' ? enemyGearStat(e, weapon.modAmt) : 0))
   }
 
+  function enemyCanEquipBow(e) {
+    // Stone throwers are not bow users; ammunition exhaustion does not
+    // retroactively revoke an assigned archer's bow proficiency.
+    return e?.shooterAbility === 'shooterArrows'
+  }
+
+  function removeInvalidEnemyBow(e) {
+    if (!e?.equipment?.rangedAtk || enemyCanEquipBow(e)) return false
+    // Restore the unmodified monster stats when a saved enemy carries a bow
+    // it cannot use. This also applies to current-version replay snapshots.
+    if (e.gearBonuses) for (const [stat, bonus] of Object.entries(e.gearBonuses)) {
+      if (['atk', 'def', 'spd', 'hp', 'maxHp'].includes(stat) && Number.isFinite(bonus)) e[stat] -= bonus
+    }
+    e.hp = Math.max(1, Math.min(e.hp, e.maxHp))
+    e.equipment = null
+    e.gearBonuses = null
+    e.stolenItemEquipped = false
+    return true
+  }
+
   function applyEnemyEquipment(e, item) {
-    if (!e || !item) return
+    if (!e || !item || (item.rangedAtk && !enemyCanEquipBow(e))) return false
     initializeEnemyGearScale(e)
     if (e.gearBonuses) for (const [stat, value] of Object.entries(e.gearBonuses)) e[stat] -= value
     const before = {atk:e.atk, def:e.def, spd:e.spd, hp:e.hp, maxHp:e.maxHp}
@@ -2569,6 +2592,7 @@ more difficult:
     if (item.kind !== 'weapon') e.spd = Math.max(1, e.spd - 1)
     e.gearBonuses = Object.fromEntries(Object.entries(before).map(([stat,value]) => [stat,e[stat]-value]))
     e.hp = Math.max(1, Math.min(e.hp,e.maxHp))
+    return true
   }
 
   function itemStatLine(it) {
@@ -2599,7 +2623,6 @@ more difficult:
       // CURSED is an instance property, not an artifact-effect property.
       // Only artifacts that actually rolled a curse should display it.
       if (it.curse !== null && it.curse !== undefined) parts.push('CURSED')
-      if (it.artifactSlot && it.artifactSlot !== 'trinket') parts.push(it.artifactSlot.toUpperCase())
       return parts.join(', ')
     }
     if (it.atk) parts.push('ATK ' + it.atk + (it.mod === 'atk' ? ('+' + it.modAmt) : ''))
@@ -3286,6 +3309,7 @@ more difficult:
     }
     Object.assign(enemy, rareFleeDefaults(enemy))
     initializeEnemyShooter(enemy, tmpl)
+    removeInvalidEnemyBow(enemy)
     enemies.push(enemy)
     return enemy
   }
@@ -4462,8 +4486,8 @@ more difficult:
     e.theftEscapeSteps = 0
     e.attackStart = undefined
     log(`${e.name} has snatched ${artifactDisplayName(e.stolenItem)} from you and runs away!`, 'bad')
-    if (!e.equipment && ['weapon', 'shield', 'armor'].includes(e.stolenItem.kind)) {
-      applyEnemyEquipment(e, e.stolenItem)
+    if (!e.equipment && ['weapon', 'shield', 'armor'].includes(e.stolenItem.kind) &&
+        applyEnemyEquipment(e, e.stolenItem)) {
       equipmentLog(`${e.name} has equipped ${artifactDisplayName(e.stolenItem)}.`, [e.stolenItem], 'bad')
     }
     tryWoundedEnemyFlee(e, true)
@@ -5066,8 +5090,8 @@ more difficult:
     const remainingWeapons = gear.filter(i => !bodyGear || i !== bodyGear).filter(i => i.kind === 'weapon')
     if (killer && killer.humanoid && remainingWeapons.length) {
       const candidate = pick(remainingWeapons)
-      if (!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) {
-        applyEnemyEquipment(killer, {...candidate})
+      if ((!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) &&
+          applyEnemyEquipment(killer, {...candidate})) {
         killer.stolenItemEquipped = false
         equipmentLog(`The ${killer.name} takes up ${killer.equipment.name}.`, [killer.equipment], 'bad')
       }
