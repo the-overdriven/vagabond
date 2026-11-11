@@ -6239,6 +6239,7 @@ more difficult:
   // Work directly against the target floor's terrain and occupants: changing
   // currentZ/map here would incorrectly activate cross-floor traps or AI.
   function wanderAdjacentLevelEnemies() {
+    const occupancyByFloor = new Map()
     const adjacent=new Set([currentZ-1,currentZ+1])
     for(const e of enemies) {
       const z=e.level??0
@@ -6260,10 +6261,19 @@ more difficult:
       const oldHomeDistance=Math.max(Math.abs(e.x-(e.homeX??e.x)),Math.abs(e.y-(e.homeY??e.y)))
       const returning=mode==='homeReturn'&&leashed&&oldHomeDistance>radius
       if(mode==='homeReanchored'&&leashed&&oldHomeDistance>radius) {e.homeX=e.x;e.homeY=e.y}
-      const blocked=new Set(enemies.filter(other=>other!==e&&other.alive&&(other.level??0)===z&&
-        (other.levelKind||(z===0?'surface':z>0?'tower':'chain'))===kind)
-        .map(other=>keyXY(other.x,other.y)))
-      if(z===0)for(const npc of npcs)blocked.add(keyXY(npc.x,npc.y))
+      const floorKey = z + '|' + kind
+      let blocked = occupancyByFloor.get(floorKey)
+      if (!blocked) {
+        blocked = new Map()
+        const add = actor => {
+          const key = keyXY(actor.x,actor.y)
+          blocked.set(key,(blocked.get(key)||0)+1)
+        }
+        for (const other of enemies) if (other.alive && (other.level??0)===z &&
+          (other.levelKind||(z===0?'surface':z>0?'tower':'chain'))===kind) add(other)
+        if (z===0) for (const npc of npcs) add(npc)
+        occupancyByFloor.set(floorKey,blocked)
+      }
       const traversable=(x,y)=>{
         const tile=terrain[y]?.[x]
         if(!tile||tile==='towervoid'||(z===0&&grasslandTrees.has(keyXY(x,y)))||
@@ -6284,6 +6294,11 @@ more difficult:
       if(!steps.length)continue
       const fromX=e.x,fromY=e.y,next=steps[randInt(0,steps.length-1)]
       e.x=next.x;e.y=next.y
+      const oldKey=keyXY(fromX,fromY),newKey=keyXY(e.x,e.y)
+      const remaining=blocked.get(oldKey)-1
+      if (remaining) blocked.set(oldKey,remaining)
+      else blocked.delete(oldKey)
+      blocked.set(newKey,(blocked.get(newKey)||0)+1)
       beginEnemyMoveAnim(e,fromX,fromY)
     }
   }
@@ -9666,7 +9681,7 @@ more difficult:
     }
     if (tileKey === 'dwarvenspikes') {
       const occupiedByPlayer = player.x === x && player.y === y
-      const occupiedByEnemy = enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y)
+      const occupiedByEnemy = renderEnemiesAt(x,y).some(e => e.alive)
       return occupiedByPlayer || occupiedByEnemy ? {...visual, image: visual.activeImage} : visual
     }
 
@@ -9869,7 +9884,7 @@ more difficult:
     const my = Math.floor(camY + Math.floor(lastMousePy / TILE_PX))
     if (!treeCanopyVisualAt(mx, my) || !undergroundTileVisible(mx, my)) return null
     if (player.x === mx && player.y === my) return keyXY(mx, my)
-    return enemies.some(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
+    return renderEnemiesAt(mx,my).some(e => e.alive &&
       enemyCanBeSeen(e) && !enemyHasAbility(e, 'fly')) ? keyXY(mx, my) : null
   }
 
@@ -10540,6 +10555,28 @@ more difficult:
     }, AMBIENT_TILE_ANIM_MS)
   }
 
+  // Derived render-only lists live for one synchronous frame. Rebuild after
+  // every action/frame, so direct array edits, loads and floor changes are live.
+  let frameObjects = null
+  function renderLevelObjects(kind) {
+    const source = kind === 'enemies' ? enemies : kind === 'ground' ? groundItems : caveDecorations
+    if (!frameObjects) return source.filter(onCurrentLevel)
+    if (!frameObjects[kind]) frameObjects[kind] = source.filter(onCurrentLevel)
+    return frameObjects[kind]
+  }
+  function renderEnemiesAt(x,y) {
+    if (!frameObjects) return enemies.filter(e => onCurrentLevel(e) && e.x===x && e.y===y)
+    if (!frameObjects.enemiesByCell) {
+      frameObjects.enemiesByCell = new Map()
+      for (const e of renderLevelObjects('enemies')) {
+        const key=keyXY(e.x,e.y)
+        if (!frameObjects.enemiesByCell.has(key)) frameObjects.enemiesByCell.set(key,[])
+        frameObjects.enemiesByCell.get(key).push(e)
+      }
+    }
+    return frameObjects.enemiesByCell.get(keyXY(x,y)) || []
+  }
+
   let frameMiningLightSources = null
   function renderLightSources() {
     if (frameMiningLightSources) return frameMiningLightSources
@@ -10550,6 +10587,8 @@ more difficult:
 
   function render(now, terrainCells = null) {
     if (now === undefined) updatePlayerStatuses()
+    const previousObjects = frameObjects
+    frameObjects = {}
     const previousLights = frameMiningLightSources
     frameMiningLightSources = null
     const previousFrameTime = visualFrameTime
@@ -10559,6 +10598,7 @@ more difficult:
     } finally {
       visualFrameTime = previousFrameTime
       frameMiningLightSources = previousLights
+      frameObjects = previousObjects
     }
   }
 
@@ -10991,7 +11031,7 @@ more difficult:
     const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
     const mountainSpringTiles = USE_TILE_IMAGES && currentZ===0 &&
       resolveVisualImage(RENDER_STYLE.caveDecorations['mountain-water'])
-      ? new Set(caveDecorations.filter(prop=>prop.level===0&&prop.kind==='mountain-water')
+      ? new Set(renderLevelObjects('decorations').filter(prop=>prop.level===0&&prop.kind==='mountain-water')
         .map(prop=>keyXY(prop.x,prop.y))) : null
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
@@ -11200,8 +11240,8 @@ more difficult:
     drawBeastTracks()
     drawCaveSpoor(undergroundVisible)
     // Decorative overlays never enter the loot, collision or inspection systems.
-    for (const prop of caveDecorations) {
-      if (!onCurrentLevel(prop) || (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y)))) continue
+    for (const prop of renderLevelObjects('decorations')) {
+      if (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y))) continue
       const vx = Math.round((prop.x - camX) * TILE_PX), vy = Math.round((prop.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       const visual = RENDER_STYLE.caveDecorations[prop.kind]
@@ -11219,8 +11259,7 @@ more difficult:
       drawTile(vx, vy, visual.glyph, visual.color, tileBackground(prop.x, prop.y, map[prop.y][prop.x]))
     }
     // ground items
-    for (const g of groundItems) {
-      if (!onCurrentLevel(g)) continue
+    for (const g of renderLevelObjects('ground')) {
       if (!undergroundTileVisible(g.x, g.y)) continue
       if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
       const vx = Math.round((g.x - camX) * TILE_PX)
@@ -11346,8 +11385,7 @@ more difficult:
     }
     // Gather animated enemy positions, then tint before drawing any glyphs.
     const visibleEnemies = []
-    for (const e of enemies) {
-      if (!onCurrentLevel(e)) continue
+    for (const e of renderLevelObjects('enemies')) {
       if (!e.alive) continue
       let ex = e.x, ey = e.y
       const charge = e.chargeAnim
@@ -11662,13 +11700,13 @@ more difficult:
         if (inCanopyView(player.x, player.y)) canopyTiles.add(keyXY(player.x, player.y))
         if (moveAnim && inCanopyView(moveAnim.fromX, moveAnim.fromY))
           canopyTiles.add(keyXY(moveAnim.fromX, moveAnim.fromY))
-        for (const e of enemies) {
-          if (!onCurrentLevel(e) || !e.alive || !inCanopyView(e.x, e.y)) continue
+        for (const e of renderLevelObjects('enemies')) {
+          if (!e.alive || !inCanopyView(e.x, e.y)) continue
           canopyTiles.add(keyXY(e.x, e.y))
         }
         for (const n of npcs) if (inCanopyView(n.x, n.y)) canopyTiles.add(keyXY(n.x, n.y))
-        for (const g of groundItems) {
-          if (!onCurrentLevel(g) || !inCanopyView(g.x, g.y)) continue
+        for (const g of renderLevelObjects('ground')) {
+          if (!inCanopyView(g.x, g.y)) continue
           if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
           if (g.kind === 'chest' && g.opened) continue
           canopyTiles.add(keyXY(g.x, g.y))
@@ -11733,8 +11771,7 @@ more difficult:
     // range overlays are drawn last so they tint everything underneath without
     // being erased by later tile/entity draws.
     if (showAllVisibleEnemyRanges) {
-      for (const e of enemies) {
-        if (!onCurrentLevel(e)) continue
+      for (const e of renderLevelObjects('enemies')) {
         if (enemyIsVisibleOnMainView(e)) drawEnemyRangeOverlay(e)
       }
     } else if (hoveredEnemy && hoveredEnemy.alive && undergroundTileVisible(hoveredEnemy.x, hoveredEnemy.y)) {

@@ -741,7 +741,9 @@ Animation-only frames reuse the current status display. Actions and HUD changes
 refresh it, and the animation loop refreshes it again on completion so visible
 concealment information follows the settled camera. Status placement follows
 canvas/stage resizing. Lighting passes share one source list within each render;
-the next frame rebuilds it, preserving immediate pickup, fire and floor changes.
+the next frame rebuilds it, preserving immediate pickup, fire and floor changes. Current-floor object lists and enemy-cell lookups are also
+shared only within one render. Each new frame reflects moves, deaths, pickups
+and level changes; tower views retain their separate surface-actor pass.
 
 
 ---
@@ -5287,7 +5289,10 @@ radius**. They use their own floor's terrain, occupancy, abilities and home
 leashes, but cannot acquire, pursue or attack the player across floors.
 Wandering outcomes use seeded gameplay RNG and persist through normal enemy
 positions; the surface creatures already simulated beneath the tower are not
-given a duplicate wandering opportunity.
+given a duplicate wandering opportunity. Occupancy is built once per
+visited floor during this pass and updated after each actor moves. Shared tiles
+retain their other occupants, and NPCs continue to block surface movement.
+These indexes are temporary and do not change trap avoidance, actor order or RNG.
 
 Surface monsters with `"far"` wandering remain active while the player explores
 underground or the tower. The game saves the global turn count on leaving the

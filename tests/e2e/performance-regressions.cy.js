@@ -152,6 +152,64 @@ describe('Turn and idle rendering performance regressions', () => {
     })
   })
 
+  it('refreshes render indexes after moves, deaths, pickups and floor changes', () => {
+    cy.window().then(win => {
+      expect(win.eval(`(() => {
+        const saved={renderScene,updatePlayerStatuses,enemies,groundItems,caveDecorations,currentZ}
+        try {
+          updatePlayerStatuses=()=>{}
+          currentZ=0
+          const e={x:30,y:30,level:0,alive:true}, g={x:30,y:30,level:0,kind:'goldcoin'}
+          enemies=[e,{x:30,y:30,level:-1,alive:true}];groundItems=[g];caveDecorations=[]
+          let ok=true,phase=0
+          renderScene=()=>{
+            const list=renderLevelObjects('enemies')
+            ok=ok && list===renderLevelObjects('enemies') && list.length===1
+            if(phase===0)ok=ok && renderEnemiesAt(30,30)[0]===e && renderLevelObjects('ground')[0]===g
+            if(phase===1)ok=ok && renderEnemiesAt(30,30).length===0 && renderEnemiesAt(31,30)[0]===e && !e.alive && renderLevelObjects('ground').length===0
+            if(phase===2)ok=ok && renderEnemiesAt(30,30)[0]===enemies[1]
+          }
+          render(100);e.x=31;e.alive=false;groundItems.splice(0,1);phase=1
+          render(120);currentZ=-1;phase=2;render(140)
+          return ok && frameObjects===null
+        } finally {({renderScene,updatePlayerStatuses,enemies,groundItems,caveDecorations,currentZ}=saved)}
+      })()`)).to.equal(true)
+    })
+  })
+
+  it('updates adjacent-floor blockers in actor order while preserving trap avoidance', () => {
+    cy.window().then(win => {
+      expect(win.eval(`(() => {
+        const saved={surfaceMap,enemies,npcs,currentZ,tower,grasslandTrees,chance,randInt,px:player.x,py:player.y}
+        try {
+          currentZ=-1;player.x=11;player.y=20;tower=null;grasslandTrees=new Set()
+          surfaceMap=Array.from({length:MAP_H},()=>Array(MAP_W).fill('mountain'))
+          for(let x=10;x<=12;x++)surfaceMap[20][x]='grass'
+          chance=()=>true;randInt=min=>min;npcs=[]
+          const actor=x=>({x,y:20,level:0,alive:true,wander:'roam',abilities:[]})
+          enemies=[actor(11),actor(10)]
+          wanderAdjacentLevelEnemies()
+          if(enemies[0].x!==12 || enemies[1].x!==11)return false
+          enemies=[actor(11),actor(10),actor(11)]
+          wanderAdjacentLevelEnemies()
+          if(enemies[0].x!==12 || enemies[1].x!==10 || enemies[2].x!==11)return false
+          enemies=[actor(11),actor(10)];npcs=[{x:12,y:20}]
+          wanderAdjacentLevelEnemies()
+          if(enemies[0].x!==11 || enemies[1].x!==10)return false
+          npcs=[];surfaceMap[20][12]='dwarvenspikes'
+          wanderAdjacentLevelEnemies()
+          if(enemies[0].x!==11 || enemies[1].x!==10)return false
+          enemies[0].abilities=['fly']
+          wanderAdjacentLevelEnemies()
+          return enemies[0].x===12 && enemies[1].x===11
+        } finally {
+          ({surfaceMap,enemies,npcs,currentZ,tower,grasslandTrees,chance,randInt}=saved)
+          player.x=saved.px;player.y=saved.py
+        }
+      })()`)).to.equal(true)
+    })
+  })
+
   it('retains candidate/RNG order while reusing exhausted searches', () => {
     cy.window().then(win => {
       win.eval(`window.referencePath = ${referencePath.toString()}`)
