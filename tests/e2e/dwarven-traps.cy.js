@@ -132,6 +132,63 @@ describe('Dwarven Ruins reusable traps', () => {
     })()`))
   })
 
+  it('keeps wandering monsters off trap triggers without preventing deliberate pursuit', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const oldChance=chance,oldRandInt=randInt
+      chance=()=>true;randInt=(a,b)=>b
+      const makeEnemy=(wander='roam',level=-4)=>({id:'wander-test',name:'Tough Grivel',
+        baseName:'Grivel',x:20,y:12,level,levelKind:'chain',alive:true,aware:false,
+        hp:100,maxHp:100,atk:4,def:2,spd:4,grace:2,tier:2,abilities:[],
+        wander,homeX:18,homeY:12,homeRadius:1})
+      try {
+        for(const tile of ['dwarvenspikes','dwarvenpressureplate']) {
+          const floor=trapFixture(),e=makeEnemy()
+          for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)
+            if(dx||dy)map[e.y+dy][e.x+dx]='dwarvenwall'
+          map[11][19]='marble';map[13][21]=tile
+          floor.traps=[{id:'wandering',type:tile==='dwarvenspikes'?'spikes':'projectile',
+            trigger:{x:21,y:13},emitter:{x:25,y:13},direction:{dx:-1,dy:0},range:12}]
+          enemies=[e]
+          check(enemyWander(e)&&e.x===19&&e.y===11&&e.hp===100,
+            'roaming Grivel avoids '+tile+' instead of entering the trap')
+          e.x=20;e.y=12;occupied.clear();occupied.add(keyXY(e.x,e.y))
+          map[11][19]='dwarvenwall'
+          check(!enemyWander(e)&&e.x===20&&e.y===12,
+            'monster waits when its only exit is a trap')
+          e.abilities=['fly']
+          check(enemyWander(e)&&e.x===21&&e.y===13&&e.hp===100,
+            'flying monsters may cross harmless floor triggers')
+          if(tile==='dwarvenspikes') {
+            e.abilities=[]
+            const hp=e.hp
+            DungeonTraps.onEntry(e,20,12)
+            check(e.hp<hp,'a grounded monster entering during pursuit still takes spike damage')
+          }
+        }
+
+        const floor=trapFixture(),returner=makeEnemy('homeReturn')
+        map[12][19]='dwarvenspikes'
+        floor.traps=[{id:'home-spike',type:'spikes',trigger:{x:19,y:12}}]
+        enemies=[returner]
+        check(enemyWander(returner) && !(returner.x===19&&returner.y===12) &&
+          Math.max(Math.abs(returner.x-18),Math.abs(returner.y-12))===1,
+          'homeReturn finds a safe detour around spikes')
+
+        trapFixture()
+        const adjacent=blankCaveMap(),offFloor=makeEnemy('roam',-5)
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)
+          adjacent[offFloor.y+dy][offFloor.x+dx]='dwarvenwall'
+        adjacent[11][19]='marble';adjacent[13][21]='dwarvenspikes'
+        deepLevels[3]={map:adjacent,kind:'dwarvenRuins',dungeonPackage:'dwarvenRuins',traps:[]}
+        enemies=[offFloor]
+        wanderAdjacentLevelEnemies()
+        check(offFloor.x===19&&offFloor.y===11,
+          'off-floor wandering reads its own terrain and avoids its own spike trap')
+      } finally {chance=oldChance;randInt=oldRandInt}
+    })()`))
+  })
+
   it('restores mechanisms and replays both trap types with the same RNG tape', () => {
     cy.window().then(win => win.eval(`(${trapPersistenceChecks.toString()})()`))
   })

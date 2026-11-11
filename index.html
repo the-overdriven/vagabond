@@ -5703,6 +5703,16 @@ more difficult:
     return defaultEnemyWanderMode()
   }
 
+  // Idle movement avoids active floor mechanisms. Flying and ethereal creatures
+  // can cross spike/arrow triggers harmlessly; all monsters avoid crusher plates.
+  // Use the supplied terrain for off-floor wandering, not the player's map.
+  function enemyWanderTrapBlocked(e, terrain, x, y) {
+    const tile = terrain[y]?.[x]
+    return (DungeonTraps.isTrigger(tile) && !enemyHasAbility(e, 'fly') &&
+      !enemyHasAbility(e, 'ethereal')) || tile === 'dwarvencrusherplate' ||
+      (terrain === map && DungeonHazards.isCrusherTrigger(x, y))
+  }
+
   function enemyIsPassive(e) {
     return enemyAggroRange(e) === 0
   }
@@ -5819,6 +5829,10 @@ more difficult:
   function enemyFarCanTraverse(e, x, y, search) {
     const i = y * MAP_W + x
     if (!search.traversable[i]) {
+      if (currentZ < 0 && enemyWanderTrapBlocked(e, map, x, y)) {
+        search.traversable[i] = 2
+        return false
+      }
       if (currentZ === 0 && pathingStoveTiles && !surfaceFarCatchupTerrain) {
         // Surface geology has no mine deposits or crusher plates. Reuse the
         // existing movement rules per terrain/ability combination; sanctuary
@@ -6181,7 +6195,8 @@ more difficult:
       Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > homeRadius) {
       const pathHome = enemyBuildFarPath(e, e.homeX, e.homeY)
       const stepHome = pathHome && pathHome[0]
-      if (stepHome && !DungeonHazards.isCrusherTrigger(stepHome.x, stepHome.y) && enemyTileOpen(e, stepHome.x, stepHome.y)) {
+      if (stepHome && !enemyWanderTrapBlocked(e, map, stepHome.x, stepHome.y) &&
+          enemyTileOpen(e, stepHome.x, stepHome.y)) {
         if (enemyOpenDoorInsteadOfMove(e, stepHome.x, stepHome.y)) return true
         occupied.delete(keyXY(e.x, e.y))
         const fromX = e.x, fromY = e.y
@@ -6202,7 +6217,7 @@ more difficult:
         if (leashed &&
           Math.max(Math.abs(nx - e.homeX), Math.abs(ny - e.homeY)) > homeRadius) continue
         if (nx === player.x && ny === player.y) continue
-        if (!enemyCanPathThrough(e, nx, ny) || DungeonHazards.isCrusherTrigger(nx, ny)) continue
+        if (!enemyCanPathThrough(e, nx, ny) || enemyWanderTrapBlocked(e, map, nx, ny)) continue
         if (occupied.has(keyXY(nx, ny))) continue
         options.push({x: nx, y: ny})
       }
@@ -6261,7 +6276,7 @@ more difficult:
       const steps=[]
       for(const [dx,dy] of DIRS8) {
         const x=e.x+dx,y=e.y+dy
-        if(blocked.has(keyXY(x,y))||!traversable(x,y)||
+        if(blocked.has(keyXY(x,y))||!traversable(x,y)||enemyWanderTrapBlocked(e,terrain,x,y)||
             (leashed&&!returning&&Math.max(Math.abs(x-e.homeX),Math.abs(y-e.homeY))>radius)||
             (returning&&Math.max(Math.abs(x-e.homeX),Math.abs(y-e.homeY))>=oldHomeDistance))continue
         steps.push({x,y})

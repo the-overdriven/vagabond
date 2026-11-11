@@ -5245,6 +5245,15 @@ Enemy templates may define `wander` individually:
 | `"far"` | On the surface, picks a reachable random walkable tile on the opposite side of the map. Each idle turn has a **40% chance to stay**, **20% chance to move one open tile in a random direction other than the previous tile**, and **40% chance to take one step along the path to its destination**. An obstructed chosen move may still leave it in place. It is not limited by the player's 20-tile wander activation radius. When it reaches the village Temple's **20-tile Chebyshev avoidance radius**, it drops any cross-village destination and retargets toward an edge on its current side of the Temple; while inside that radius, random steps and cached path steps may not move closer to the Temple, so `far` travelers turn away instead of crossing the village. The destination remains fixed after random detours and until reached or invalidated; a detour rejoins the cached path when possible or rebuilds it on the next destination step. Normal aggro, attacks, pursuit, Temple fleeing, and invisible-attack reactions still take priority over travel. |
 | `false` | Never performs idle wandering. |
 
+Idle wandering avoids dwarven spike and hidden arrow-pressure triggers for
+grounded, corporeal monsters; flying and ethereal creatures can cross those
+triggers without activating them. All creatures avoid crusher activation plates.
+This applies to random roaming, paths back home, and idle movement on adjacent
+levels using that level's terrain. If no safe idle step exists, the monster
+waits. **Active pursuit and forced movement can still carry creatures into
+traps**, allowing players to lure enemies into hazards. Avoidance is a pathing
+rule only; it does not affect trap damage or consume additional RNG.
+
 A template value overrides the old global setting. Enemies without an explicit
 `wander` property retain the old global behavior as a compatibility fallback:
 `wandering.enabled: false` means no wandering; otherwise `wandering.leash:
