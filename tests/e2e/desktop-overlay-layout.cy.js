@@ -108,6 +108,75 @@ describe('Desktop overlay layout', () => {
     })
   })
 
+  // Map click-to-travel is exercised here alongside the existing desktop
+  // overlay zoom/floor checks, rather than adding another smoke spec.
+  it('travels to discovered map tiles after zooming and panning, without mistaking drags or other floors for clicks', () => {
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mapTravelSave = save
+      win.eval(`
+        loadGameFromObject(window.__mapTravelSave,{isReplayInit:true})
+        currentZ=0;map=surfaceMap;enemies=[];npcs=[];occupied=new Set()
+        player.x=100;player.y=100;player.hp=playerMaxHp()
+        discovered.forEach(row=>row.fill(false))
+        for(let y=96;y<=104;y++)for(let x=96;x<=104;x++){
+          map[y][x]='grass';discovered[y][x]=true;grasslandTrees.delete(keyXY(x,y))
+        }
+        surfaceCatchupBusy=true // Keep the route queued so its target can be asserted.
+        toggleMap(true);mapZoomIndex=3;mapPanX=110;mapPanY=109;renderMinimap()
+      `)
+      delete win.__mapTravelSave
+    }))
+    const clickTile = (win, x, y) => {
+      const point = win.eval(`(() => {
+        const targetX=${x}, targetY=${y}
+        const rect=mini.getBoundingClientRect(), view=fullMapViewport()
+        const width=rect.width-2*mini.clientLeft,height=rect.height-2*mini.clientTop
+        return {clientX: rect.left+mini.clientLeft+(targetX-view.ox+.5)*view.tileSize/mini.width*width,
+          clientY: rect.top+mini.clientTop+(targetY-view.oy+.5)*view.tileSize/mini.height*height}
+      })()`)
+      const canvas = win.document.getElementById('minimap')
+      canvas.dispatchEvent(new win.MouseEvent('mousedown', {bubbles:true,button:0,...point}))
+      win.dispatchEvent(new win.MouseEvent('mouseup', {bubbles:true,button:0,...point}))
+      canvas.dispatchEvent(new win.MouseEvent('click', {bubbles:true,button:0,...point}))
+      return point
+    }
+    cy.window().then(win => {
+      // The map must not route through fog, even when the endpoint is known.
+      win.eval(`for(let y=96;y<=104;y++)discovered[y][101]=false`)
+      clickTile(win, 103, 100)
+      expect(win.eval('mapOpen')).to.equal(true)
+      expect(win.eval('autoPath')).to.equal(null)
+      // Test hidden destination separately.
+      clickTile(win, 112, 100)
+      expect(win.eval('mapOpen')).to.equal(true)
+      expect(win.eval('autoPath')).to.equal(null)
+      // A click on a previously explored floor must never move the player.
+      win.eval(`mapViewKey='chain:1';renderMinimap()`)
+      clickTile(win, 100, 100)
+      expect(win.eval('mapOpen')).to.equal(true)
+      expect(win.eval('autoPath')).to.equal(null)
+      win.eval(`mapViewKey='surface';renderMinimap()`)
+      // Distinguish drag-to-pan from clicking the release position.
+      const canvas = win.document.getElementById('minimap')
+      const start = clickTile(win, 100, 100) // Current tile: no movement.
+      canvas.dispatchEvent(new win.MouseEvent('mousedown', {bubbles:true,button:0,...start}))
+      win.dispatchEvent(new win.MouseEvent('mousemove', {bubbles:true,clientX:start.clientX+20,clientY:start.clientY+10}))
+      win.dispatchEvent(new win.MouseEvent('mouseup', {bubbles:true,button:0}))
+      canvas.dispatchEvent(new win.MouseEvent('click', {bubbles:true,button:0,clientX:start.clientX+20,clientY:start.clientY+10}))
+      expect(win.eval('mapOpen')).to.equal(true)
+      expect(win.eval('autoPath')).to.equal(null)
+      // Restore the known corridor and click through the CSS-scaled canvas.
+      win.eval(`for(let y=96;y<=104;y++)discovered[y][101]=true;renderMinimap()`)
+      const dest = clickTile(win, 103, 100)
+      expect(win.eval(`fullMapTileAt(${dest.clientX},${dest.clientY})`)).to.deep.equal({x:103,y:100})
+      expect(win.eval('mapOpen')).to.equal(false)
+      expect(win.eval('({x:autoPath.at(-1).x,y:autoPath.at(-1).y})')).to.deep.equal({x:103,y:100})
+      expect(win.eval('player.x')).to.equal(100)
+      expect(win.eval('player.y')).to.equal(100)
+      win.eval('clearAutoPath();surfaceCatchupBusy=false')
+    })
+  })
+
   it('keeps race selection above gameplay panels and usable below wide or wrapped HUDs', () => {
     cy.get('#raceOverlay').should('have.class', 'show')
     cy.get('#hud .stat:not(.stat-actions)').should($stats => {
@@ -413,5 +482,49 @@ describe('Desktop overlay layout', () => {
     })
     cy.get('#sidePanel').should('have.css', 'display', 'none')
     cy.get('#hint').should('have.css', 'display', 'none')
+
+    // On a CSS-scaled mobile map, a tap starts travel; a swipe does not.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mobileMapSave=save
+      win.eval(`
+        loadGameFromObject(window.__mobileMapSave,{isReplayInit:true})
+        currentZ=0;map=surfaceMap;enemies=[];npcs=[];occupied=new Set()
+        player.x=100;player.y=100;discovered.forEach(row=>row.fill(false))
+        for(let y=98;y<=102;y++)for(let x=98;x<=104;x++){
+          map[y][x]='grass';discovered[y][x]=true;grasslandTrees.delete(keyXY(x,y))
+        }
+        surfaceCatchupBusy=true;toggleMap(true)
+        mapZoomIndex=3;mapPanX=105;mapPanY=104;renderMinimap()
+      `)
+      delete win.__mobileMapSave
+    }))
+    cy.window().then(win => {
+      const mini=win.document.getElementById('minimap')
+      const coords=win.eval(`(() => {
+        const v=fullMapViewport(),rect=mini.getBoundingClientRect()
+        return {x:rect.left+mini.clientLeft+(102-v.ox+.5)*v.tileSize/mini.width*(rect.width-2*mini.clientLeft),
+          y:rect.top+mini.clientTop+(100-v.oy+.5)*v.tileSize/mini.height*(rect.height-2*mini.clientTop)}
+      })()`)
+      const touchAt=(x,y) => new win.Touch({identifier:1,target:mini,clientX:x,clientY:y})
+      const touchEvent=(type,touches,changed) => new win.TouchEvent(type,{
+        bubbles:true,cancelable:true,touches,targetTouches:touches,changedTouches:changed
+      })
+      const start=touchAt(coords.x,coords.y)
+      const end=touchAt(coords.x+25,coords.y+5)
+      mini.dispatchEvent(touchEvent('touchstart',[start],[start]))
+      mini.dispatchEvent(touchEvent('touchmove',[end],[end]))
+      mini.dispatchEvent(touchEvent('touchend',[],[end]))
+      mini.dispatchEvent(new win.MouseEvent('click',{bubbles:true,button:0,clientX:end.clientX,clientY:end.clientY}))
+      expect(win.eval('mapOpen'), 'mobile swipe pans instead of traveling').to.equal(true)
+      // A new touch resets drag suppression. It resolves the destination
+      // through the same zoom/pan transform as a desktop click.
+      win.eval('mapPanX=105;mapPanY=104;renderMinimap()')
+      mini.dispatchEvent(touchEvent('touchstart',[start],[start]))
+      mini.dispatchEvent(touchEvent('touchend',[],[start]))
+      mini.dispatchEvent(new win.MouseEvent('click',{bubbles:true,button:0,clientX:start.clientX,clientY:start.clientY}))
+      expect(win.eval('mapOpen'), 'tap closes the map').to.equal(false)
+      expect(win.eval('({x:autoPath.at(-1).x,y:autoPath.at(-1).y})')).to.deep.equal({x:102,y:100})
+      win.eval('clearAutoPath();surfaceCatchupBusy=false')
+    })
   })
 })

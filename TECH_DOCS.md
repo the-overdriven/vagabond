@@ -751,8 +751,17 @@ and level changes; tower views retain their separate surface-actor pass.
 # 8. Auto-Pathing
 
 The player can path toward a destination by tapping or clicking on a walkable target tile.
+On the full map, clicking or tapping a **discovered, reachable tile on the current
+floor** closes the overlay and begins the same turn-by-turn auto-travel. The
+selected destination and every tile on its route must be explored; a route
+cannot use hidden terrain as a shortcut. The player cannot issue travel orders
+while browsing a different floor. Fog, unreachable or impassable destinations,
+and the player's own tile are ignored without consuming a turn. Dragging pans
+the map, while pinching zooms; neither starts travel, even on mobile.
 
-Pathfinding uses breadth-first search over walkable tiles.
+Map travel follows the existing rules for hazards, enemies, interactions,
+manual movement, and interruptions. It uses deterministic breadth-first
+pathfinding and does not add saved or replay state.
 
 Auto-pathing can account for:
 

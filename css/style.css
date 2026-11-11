@@ -961,6 +961,14 @@ body.hint-collapsed #hint .panel-toggle {
   max-width: 100%;
   aspect-ratio: auto;
   margin-inline: auto;
+  cursor: pointer;
+}
+
+.map-travel-hint {
+  margin: 5px 0 0;
+  color: var(--parchment-dim);
+  font-size: calc(11px * var(--ui-font-scale));
+  text-align: center;
 }
 
 .paperdoll {

@@ -467,7 +467,8 @@ more difficult:
             <button class="slbtn" id="btnMapLevelDown" type="button" aria-label="View lower explored level">▼</button>
           </div>
         </div>
-        <canvas id="minimap"></canvas>
+        <canvas id="minimap" aria-label="Explored map: click or tap a destination to travel"></canvas>
+        <p class="map-travel-hint" id="mapTravelHint">Click or tap a discovered tile to travel. Drag to pan.</p>
         <div class="closehint">
           <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
           <button class="slbtn" id="btnMapCloseBottom" type="button">Close</button>
@@ -8366,17 +8367,29 @@ more difficult:
     return isLockedDungeonDoorTile(map[y]?.[x]) && !!matchingDungeonKeyAt(x, y)
   }
 
-  function findPlayerPath(targetX, targetY) {
+  function findPlayerPath(targetX, targetY, discoveredOnly = false) {
     if (targetX < 0 || targetY < 0 || targetX >= MAP_W || targetY >= MAP_H) return null
-    if (currentZ < 0 && !undergroundDiscovered?.[targetY]?.[targetX]) return null
-    if (!playerPathCanTraverse(targetX, targetY)) return null
+    const knownTiles = currentZ === 0 ? discovered : undergroundDiscovered
+    if ((discoveredOnly || currentZ < 0) && !knownTiles?.[targetY]?.[targetX]) return null
+    // The same tile is examined from up to eight neighbours. Memoize terrain
+    // checks within this synchronous search, never across game turns.
+    const traversableCache = new Map()
+    const canTraverse = (x, y) => {
+      const key = keyXY(x, y)
+      if (!traversableCache.has(key))
+        traversableCache.set(key, playerPathCanTraverse(x, y))
+      return traversableCache.get(key)
+    }
+    if (!canTraverse(targetX, targetY)) return null
     if (targetX === player.x && targetY === player.y) return []
     const queue = [{x: player.x, y: player.y}]
     const cameFrom = new Map()
     cameFrom.set(keyXY(player.x, player.y), null)
     let found = false
-    while (queue.length) {
-      const cur = queue.shift()
+    // Large-map destinations can be hundreds of tiles away: advance an index
+    // rather than repeatedly shifting the BFS queue (quadratic on long routes).
+    for (let head = 0; head < queue.length; head++) {
+      const cur = queue[head]
       if (cur.x === targetX && cur.y === targetY) {
         found = true
         break
@@ -8384,8 +8397,8 @@ more difficult:
       for (const [dx, dy] of DIRS8) {
         const nx = cur.x + dx, ny = cur.y + dy
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
-        if (currentZ < 0 && !undergroundDiscovered?.[ny]?.[nx]) continue
-        if (!playerPathCanTraverse(nx, ny)) continue
+        if ((discoveredOnly || currentZ < 0) && !knownTiles?.[ny]?.[nx]) continue
+        if (!canTraverse(nx, ny)) continue
         const nk = keyXY(nx, ny)
         if (cameFrom.has(nk)) continue
         if ((nx !== targetX || ny !== targetY) && occupied.has(nk)) continue
@@ -8435,9 +8448,8 @@ more difficult:
     }
   }
 
-  function startAutoPath(targetX, targetY, targetEnemy = null) {
-    const path = findPlayerPath(targetX, targetY)
-    if (!path || !path.length) return false
+  function startPlannedAutoPath(path, targetEnemy = null) {
+    if (!path?.length) return false
     clearAutoPath()
     autoPath = path
     autoPathTargetEnemy = targetEnemy
@@ -8445,6 +8457,10 @@ more difficult:
     if (targetEnemy) hoveredAutoPath = null
     if (!cameraAnimating) flushPendingMove()
     return true
+  }
+
+  function startAutoPath(targetX, targetY, targetEnemy = null) {
+    return startPlannedAutoPath(findPlayerPath(targetX, targetY), targetEnemy)
   }
 
   // Low-odds ambushes start ordinary forest creatures, or stronger creatures
@@ -12770,6 +12786,33 @@ more difficult:
   let mapViewKey = 'surface'
   let mapPreviewBase = null
 
+  // Share the exact zoom/pan transform between rendering and map-click targeting.
+  // Viewport units are canvas buffer pixels, not CSS pixels.
+  function fullMapViewport() {
+    const zoom = MAP_ZOOMS[mapZoomIndex]
+    const tileSize = MAP_SCALE * zoom
+    const viewW = mini.width / tileSize, viewH = mini.height / tileSize
+    const panX = mapPanX ?? player.x, panY = mapPanY ?? player.y
+    return {tileSize,
+      ox: Math.max(0, Math.min(MAP_W - viewW, panX - viewW / 2)),
+      oy: Math.max(0, Math.min(MAP_H - viewH, panY - viewH / 2)),
+      viewW, viewH}
+  }
+
+  function fullMapTileAt(clientX, clientY) {
+    const bounds = mini.getBoundingClientRect()
+    const width = bounds.width - mini.clientLeft * 2
+    const height = bounds.height - mini.clientTop * 2
+    const cx = clientX - bounds.left - mini.clientLeft
+    const cy = clientY - bounds.top - mini.clientTop
+    if (width <= 0 || height <= 0 || cx < 0 || cy < 0 || cx >= width || cy >= height) return null
+    const view = fullMapViewport()
+    const x = Math.floor(view.ox + (cx / width) * mini.width / view.tileSize)
+    const y = Math.floor(view.oy + (cy / height) * mini.height / view.tileSize)
+    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return null
+    return {x, y}
+  }
+
   function currentMapViewKey() {
     if (currentZ > 0) return `tower:${currentZ}`
     if (currentZ === 0) return 'surface'
@@ -12810,6 +12853,9 @@ more difficult:
     const levels = exploredMapLevels()
     const index = levels.findIndex(level => level.key === mapViewKey)
     document.getElementById('mapLevelLabel').textContent = levels[index]?.label || 'World Map'
+    document.getElementById('mapTravelHint').textContent = mapViewKey === currentMapViewKey()
+      ? 'Click or tap a discovered tile to travel. Drag to pan.'
+      : 'Return to your current floor to travel. Drag to pan.'
     document.getElementById('btnMapLevelUp').disabled = index <= 0
     document.getElementById('btnMapLevelDown').disabled = index < 0 || index >= levels.length - 1
   }
@@ -13086,14 +13132,7 @@ more difficult:
       if (!view) return
       const onPlayerLevel = view.key === currentMapViewKey()
       const zoom = MAP_ZOOMS[mapZoomIndex]
-      const viewW = w / (scale * zoom)
-      const viewH = h / (scale * zoom)
-      if (mapPanX === null || mapPanY === null) {
-        mapPanX = player.x
-        mapPanY = player.y
-      }
-      const ox = Math.max(0, Math.min(MAP_W - viewW, mapPanX - viewW / 2))
-      const oy = Math.max(0, Math.min(MAP_H - viewH, mapPanY - viewH / 2))
+      const {viewW, viewH, ox, oy} = fullMapViewport()
       ctx.drawImage(fullMapBase(view), ox * scale, oy * scale, viewW * scale, viewH * scale, 0, 0, w, h)
       if (view.z === 0) ctx.fillStyle = RENDER_STYLE.minimap.cave
       for (const cave of view.z === 0 ? caves : []) {
@@ -14546,6 +14585,19 @@ more difficult:
   })
 
   mini.style.touchAction = 'none'
+  mini.addEventListener('click', ev => {
+    if (!mapOpen || ev.button !== 0 || mapDragMoved || mapPinchStartDist !== null ||
+      mapViewKey !== currentMapViewKey() || replayPlaying || replaySimulationMode ||
+      deathTransition || onlineRecordsBlockActions()) return
+    const target = fullMapTileAt(ev.clientX, ev.clientY)
+    if (!target || !selectedMapLevel()?.seen?.[target.y]?.[target.x]) return
+    // World-map travel can use only known terrain. It must not calculate a
+    // shortcut through unrevealed squares using hidden map information.
+    const path = findPlayerPath(target.x, target.y, true)
+    if (!path?.length) return
+    toggleMap(false)
+    startPlannedAutoPath(path)
+  })
   mini.addEventListener('wheel', (ev) => {
     if (!mapOpen) return
     ev.preventDefault()
@@ -14569,8 +14621,9 @@ more difficult:
     const zoom = MAP_ZOOMS[mapZoomIndex], scale = MAP_SCALE
     const dx = ev.clientX - mapDragLastX, dy = ev.clientY - mapDragLastY
     if (Math.abs(dx) + Math.abs(dy) > 1) mapDragMoved = true
-    mapPanX -= dx / (scale * zoom)
-    mapPanY -= dy / (scale * zoom)
+    const bounds = mini.getBoundingClientRect()
+    mapPanX -= dx * mini.width / (bounds.width - 2 * mini.clientLeft) / (scale * zoom)
+    mapPanY -= dy * mini.height / (bounds.height - 2 * mini.clientTop) / (scale * zoom)
     mapDragLastX = ev.clientX
     mapDragLastY = ev.clientY
     renderMinimap()
@@ -14583,6 +14636,7 @@ more difficult:
   mini.addEventListener('touchstart', (ev) => {
     if (!mapOpen) return
     if (ev.touches.length === 2) {
+      mapDragMoved = true // Pinches must never be mistaken for travel taps.
       mapDragLastX = null
       mapDragLastY = null
       mapPinchStartDist = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY)
@@ -14609,8 +14663,9 @@ more difficult:
       const zoom = MAP_ZOOMS[mapZoomIndex], scale = MAP_SCALE
       const dx = ev.touches[0].clientX - mapDragLastX, dy = ev.touches[0].clientY - mapDragLastY
       if (Math.abs(dx) + Math.abs(dy) > 1) mapDragMoved = true
-      mapPanX -= dx / (scale * zoom)
-      mapPanY -= dy / (scale * zoom)
+      const bounds = mini.getBoundingClientRect()
+      mapPanX -= dx * mini.width / (bounds.width - 2 * mini.clientLeft) / (scale * zoom)
+      mapPanY -= dy * mini.height / (bounds.height - 2 * mini.clientTop) / (scale * zoom)
       mapDragLastX = ev.touches[0].clientX
       mapDragLastY = ev.touches[0].clientY
       renderMinimap()
