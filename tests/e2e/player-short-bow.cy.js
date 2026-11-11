@@ -159,7 +159,7 @@ describe('Player Short Bow', () => {
         player.baseAtk=2;player.baseDef=2;player.baseSpd=5;player.lvl=1
         player.race='human';player.godMode=false;player.invisibleTurns=0
         player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
-        player.inventory=[createItem('arrows',{count:15})]
+        player.inventory=[createItem('arrows',{count:30})]
         for(let y=35;y<=50;y++)for(let x=35;x<=51;x++){
           map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
         }
@@ -185,7 +185,7 @@ describe('Player Short Bow', () => {
         check(!enemyOutmatchesPlayer(rat),'Rat is weaker than the player')
         check(shootEnemy(rat),'distant Rat can be shot at')
         check(rat.hp===rat.maxHp&&rat.x===47&&rat.y===40,
-          'a miss still prompts a weak Rat to retreat even with a path to the player')
+          'an immediate one-step escape beyond range is safe even on a miss')
         enemies=[];occupied=new Set()
         const covered=spawn('Giant Rat','response-covered-rat')
         for(let y=30;y<=50;y++)map[y][45]='dwarvenprisonbars'
@@ -209,10 +209,10 @@ describe('Player Short Bow', () => {
         for(let y=39;y<=41;y++)map[y][47]='mountain'
         check(playerBowShotPath(blockedRat)&&!enemyFindStep(blockedRat,true),
           'prison bars pass arrows but block a complete pursuit route')
-        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===39,
-          'blocked retreat takes a legal sideways step toward farther ground')
-        check(shootEnemy(blockedRat)&&blockedRat.x===47&&blockedRat.y===38,
-          'another shot sends the monster around the obstacle')
+        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===40,
+          'blocked target refuses an exposed sideways escape route')
+        check(shootEnemy(blockedRat)&&blockedRat.x===46&&blockedRat.y===40,
+          'repeated bow shots do not trigger futile exposed retreat')
         enemies=[];occupied=new Set()
         const isolated=spawn('Giant Rat','response-isolated-rat')
         for(let y=39;y<=41;y++)map[y][46]=y===40?'grass':'mountain'
@@ -225,23 +225,41 @@ describe('Player Short Bow', () => {
           map[y][46]='grass';map[y][47]='grass'
         }
         enemies=[];occupied=new Set()
-        const trappedGhoul=spawn('Ghoul','response-trapped-ghoul')
+        const trappedRat=spawn('Giant Rat','response-trapped-rat')
         player.baseAtk=70;chance=()=>false
-        trappedGhoul.bowRetreatHold=true
+        trappedRat.bowRetreatHold=true
         for(let y=39;y<=41;y++){
           map[y][46]=y===40?'grass':'mountain'
           map[y][47]='mountain'
         }
-        check(enemyFindStep(trappedGhoul,true)&&!rangedRetreatDestination(trappedGhoul),
-          'cornered Ghoul has a route to the player but no way to escape')
-        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===45&&trappedGhoul.y===40&&
-          !trappedGhoul.bowRetreatHold,
-          'trapped Ghoul turns toward the player on the first shot')
-        check(shootEnemy(trappedGhoul)&&trappedGhoul.x===45&&trappedGhoul.y===39,
-          'once a side escape opens, weak Ghoul flees instead of returning to its dead end')
+        check(enemyFindStep(trappedRat,true)&&!rangedRetreatDestination(trappedRat),
+          'cornered Rat has a route to the player but no way to escape')
+        check(shootEnemy(trappedRat)&&trappedRat.x===45&&trappedRat.y===40&&
+          !trappedRat.bowRetreatHold,
+          'trapped Rat turns toward the player on the first shot')
+        check(shootEnemy(trappedRat)&&trappedRat.x===44&&trappedRat.y===40,
+          'Rat continues advancing when the alternative requires an exposed first step')
         for(let y=39;y<=41;y++){
           map[y][46]='grass';map[y][47]='grass'
         }
+        // Undead ignore ranged threat strength even when hopelessly outmatched.
+        player.baseAtk=70
+        for(const name of ['Skeleton','Ghoul','Ghost']){
+          enemies=[];occupied=new Set()
+          const undead=spawn(name,'fearless-'+name,44)
+          undead.invisibleUntilTurn=0;undead.invisibilityReadyTurn=999999
+          undead.bowRetreatHold=true
+          check(shootEnemy(undead)&&undead.x===43&&!undead.bowRetreatHold,
+            name+' advances instead of seeking cover from an overpowered archer')
+        }
+        enemies=[];occupied=new Set()
+        const blockedUndead=spawn('Ghoul','fearless-blocked',44)
+        for(let y=30;y<=55;y++)map[y][42]='dwarvenprisonbars'
+        check(!enemyFindStep(blockedUndead,true)&&playerBowShotPath(blockedUndead),
+          'undead cannot cross bars but can be targeted with arrows')
+        check(shootEnemy(blockedUndead)&&blockedUndead.x<=44&&!blockedUndead.bowRetreatHold,
+          'blocked undead stays fearless and does not retreat')
+        for(let y=30;y<=55;y++)map[y][42]='grass'
         player.baseAtk=2
         enemies=[];occupied=new Set()
         const gargoyle=spawn('Gargoyle','response-gargoyle',44)
@@ -249,13 +267,13 @@ describe('Player Short Bow', () => {
         for(let y=30;y<=50;y++)map[y][42]='dwarvenprisonbars'
         check(!enemyFindStep(gargoyle,true)&&playerBowShotPath(gargoyle),
           'the Gargoyle is behind bars, though arrows reach it')
-        check(shootEnemy(gargoyle)&&gargoyle.x===45&&gargoyle.y===40,
-          'Gargoyle withdraws behind bars inside AGGRO')
+        check(shootEnemy(gargoyle)&&gargoyle.x===44,
+          'Gargoyle cannot retreat through exposed tiles behind bars')
         player.baseAtk=2
         enemies=[];occupied=new Set()
         const strongerBlocked=spawn('Gargoyle','response-strong-blocked-gargoyle',44)
-        check(!enemyFindStep(strongerBlocked,true)&&shootEnemy(strongerBlocked)&&strongerBlocked.x===45,
-          'even a stronger Gargoyle withdraws when bars block pursuit')
+        check(!enemyFindStep(strongerBlocked,true)&&shootEnemy(strongerBlocked)&&strongerBlocked.x===44,
+          'even a stronger Gargoyle stays blocked without safe retreat')
         for(let y=30;y<=50;y++)map[y][42]='grass'
         enemies=[];occupied=new Set()
         const strongNear=spawn('Gargoyle','response-strong-gargoyle',44)
@@ -265,8 +283,8 @@ describe('Player Short Bow', () => {
         player.baseSpd=30;chance=()=>true
         const pursuer=spawn('Giant Rat','response-shot-pursuer',43)
         pursuer.aware=true;pursuer.alarmed=true
-        check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===44,
-          'just-shot weaker target retreats without losing awareness')
+        check(shootEnemy(pursuer)&&pursuer.aware&&pursuer.x===42,
+          'just-shot weaker target approaches without an immediate safe escape')
         player.baseSpd=5;chance=()=>true
         for(let y=39;y<=41;y++)map[y][47]='grass'
         setDesktopCanvasCursor(pursuer)
@@ -287,6 +305,52 @@ describe('Player Short Bow', () => {
         check(canvas.style.cursor.includes('not-allowed'),
           'blocked projectile path disables the bow cursor')
         map[40][41]='grass'
+
+        // Cover, not distance, is the preferred response to a player arrow.
+        enemies=[];occupied=new Set();player.baseAtk=70;player.baseSpd=5
+        for(let y=35;y<=50;y++)for(let x=35;x<=51;x++){
+          map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        }
+        map[41][42]='mountain'
+        const shelterRat=spawn('Giant Rat','response-shelter-rat',44)
+        chance=()=>true
+        check(!!playerBowShotPath(shelterRat),'shot begins with clear line to rat')
+        check(rangedRetreatDestination(shelterRat).x===44&&
+          rangedRetreatDestination(shelterRat).y===41,
+          'rat selects hiding behind mountain instead of fleeing east in full view')
+        check(shootEnemy(shelterRat)&&shelterRat.x===44&&shelterRat.y===41&&
+          !playerBowShotPath(shelterRat),'even a miss sends rat out of line of fire')
+        enemyTurn(null,null,null)
+        check(shelterRat.x===44&&shelterRat.y===41,'rat keeps its cover')
+        player.x=42;player.y=39
+        check(!!playerBowShotPath(shelterRat),'new shooting angle exposes the rat')
+        enemyTurn(null,null,null);enemyTurn(null,null,null)
+        check(!shelterRat.bowRetreatHold,
+          're-exposed rat gives up retreat when the path to cover is exposed')
+        player.x=40;player.y=40;map[41][42]='grass'
+        // Distant mountain shelter cannot justify a first step through a
+        // tile the player can still shoot. Fight instead of fleeing endlessly.
+        enemies=[];occupied=new Set()
+        map[42][43]='mountain'
+        const exposedRat=spawn('Giant Rat','response-distant-cover-rat',44)
+        check(playerBowShotPath(exposedRat)&&bowCoverBlocksPlayerShotAt(44,43)&&
+          !bowCoverBlocksPlayerShotAt(44,41),
+          'a sheltered tile exists but the approach is in the bow firing lane')
+        check(!rangedRetreatDestination(exposedRat),
+          'a retreat path crossing an exposed step is not considered safe')
+        check(shootEnemy(exposedRat)&&exposedRat.x===43&&exposedRat.y===40&&
+          !exposedRat.bowRetreatHold,
+          'weaker monster closes to fight instead of giving free shots')
+        map[42][43]='grass'
+        enemies=[];occupied=new Set()
+        const edgeRat=spawn('Giant Rat','response-edge-rat',46)
+        check(shootEnemy(edgeRat)&&edgeRat.x===47&&edgeRat.bowRetreatHold,
+          'first range escape takes exactly one safe step')
+        player.x=41
+        enemyTurn(null,null,null)
+        check(edgeRat.x===46&&!edgeRat.bowRetreatHold,
+          'moving after a range escape causes pursuit, not endless open-field flight')
+        player.x=40
 
         chance=oldChance;damageRoll=oldDamage
         enemies=[];occupied=new Set()

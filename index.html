@@ -5676,8 +5676,14 @@ more difficult:
     return true
   }
 
+  // Undead do not assess danger from player arrows: they keep fighting or
+  // pursuing regardless of their relative strength or lack of an approach route.
+  function enemyFearlessOfBow(e) {
+    return e.family === 'undead'
+  }
+
   // Compare current combat strength, including equipment and terrain, for
-  // the targeted bow reaction. A weaker enemy retreats if escape is possible.
+  // the targeted bow reaction. A weaker living enemy retreats if safe escape exists.
   function enemyOutmatchesPlayer(e) {
     const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
     const naturalGrace = weapon ? enemyWeaponGrace(e, weapon) : enemyGrace(e)
@@ -5687,30 +5693,30 @@ more difficult:
     return enemyStrength >= playerStrength
   }
 
-  // Seek an actual escape, not a one-tile dead end that makes weak enemies
-  // oscillate under repeated shots. Cover or an escape at least two tiles
-  // farther away (or beyond bow range) qualifies. Never move closer to flee.
-  function rangedRetreatDestination(e) {
+  // A retreat is only useful when its FIRST step is safe from the player's
+  // next arrow. Do not path through exposed squares to reach distant cover or
+  // beyond bow range: the player would get free shots along that route.
+  // Prefer immediately reachable terrain shelter to a one-step range escape.
+  // An already-retreating enemy cannot chain range escapes forever when chased.
+  // Sorting is fixed and uses no RNG, keeping replay deterministic.
+  function rangedRetreatDestination(e, allowRangeEscape = true) {
     const startDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-    const minEscapeDistance = Math.min((equippedShortBow()?.rangedRange ?? 6) + 1, startDistance + 2)
-    const visited = new Set([keyXY(e.x, e.y)])
-    const queue = [{x:e.x, y:e.y, first:null, steps:0}]
-    for (let i = 0; i < queue.length; i++) {
-      const node = queue[i]
-      if (node.steps >= 12) continue
-      for (const [dx, dy] of DIRS8) {
-        const x = node.x + dx, y = node.y + dy, key = keyXY(x, y)
-        if (visited.has(key) || !enemyTileOpen(e, x, y) ||
-            (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
-        const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
-        if (distance < startDistance) continue
-        const first = node.first || {x, y}
-        if (distance >= minEscapeDistance || bowCoverBlocksPlayerShotAt(x, y)) return first
-        visited.add(key)
-        queue.push({x, y, first, steps:node.steps + 1})
-      }
+    const range = equippedShortBow()?.rangedRange ?? 6
+    const awayX = e.x - player.x, awayY = e.y - player.y
+    const retreatDirs = DIRS8.slice().sort((a, b) =>
+      (b[0] * awayX + b[1] * awayY) - (a[0] * awayX + a[1] * awayY) ||
+      (Math.abs(a[0]) + Math.abs(a[1])) - (Math.abs(b[0]) + Math.abs(b[1])))
+    let rangeEscape = null
+    for (const [dx, dy] of retreatDirs) {
+      const x = e.x + dx, y = e.y + dy
+      if (!enemyTileOpen(e, x, y) || !enemyCanTraverse(e, x, y) ||
+          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
+      const distance = Math.max(Math.abs(x - player.x), Math.abs(y - player.y))
+      if (distance < startDistance) continue
+      if (distance <= range && bowCoverBlocksPlayerShotAt(x, y)) return {x, y}
+      if (distance > range && !rangeEscape) rangeEscape = {x, y}
     }
-    return null
+    return allowRangeEscape ? rangeEscape : null
   }
 
   function bowCoverBlocksPlayerShotAt(x, y) {
@@ -5723,8 +5729,8 @@ more difficult:
     return bowCoverBlocksPlayerShotAt(e.x, e.y)
   }
 
-  function retreatFromBowShot(e) {
-    const destination = rangedRetreatDestination(e)
+  function retreatFromBowShot(e, allowRangeEscape = true) {
+    const destination = rangedRetreatDestination(e, allowRangeEscape)
     if (!destination) return false
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
     const fromX = e.x, fromY = e.y
@@ -6782,11 +6788,23 @@ more difficult:
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
-      // A bow target blocked from pursuing keeps the cover it reached instead of wandering
-      // back into the same shot. Reaching melee range or opening a new line
-      // of fire ends the standstill and restores ordinary combat behavior.
-      if (e.bowRetreatHold && equippedShortBow() && dist > ATTACK_RANGE &&
-          bowCoverBlocksPlayerShot(e)) continue
+      // A shot target keeps seeking actual cover across ordinary turns, not
+      // only immediately after another arrow. Once sheltered or beyond range,
+      // it stays put until the player changes weapons, closes to melee, or
+      // repositions to regain a clear shot.
+      if (e.bowRetreatHold && (enemyFearlessOfBow(e) || dist <= ATTACK_RANGE)) e.bowRetreatHold = false
+      if (e.bowRetreatHold && equippedShortBow() && dist > ATTACK_RANGE) {
+        if (dist > equippedShortBow().rangedRange || bowCoverBlocksPlayerShot(e)) continue
+        // One step beyond range is an escape, not a permanent kiting loop.
+        // Once chased out of shelter, only immediate terrain cover warrants
+        // further retreat; otherwise turn and pursue, even outside AGGRO.
+        if (retreatFromBowShot(e, false)) continue
+        e.bowRetreatHold = false
+        if (dist > effectiveAggroRange(e)) {
+          const pursuitStep = enemyFindStep(e, true)
+          if (pursuitStep) { enemyStepTowardPlayer(e, pursuitStep); continue }
+        }
+      }
       if (enemyHasAbility(e,'rupture') && !forestConcealsPlayer(e,dist) && tryPrepareEnemyRupture(e)) continue
       let aggroRange = effectiveAggroRange(e)
       // Wail reaches four tiles even when the Banshee's normal chase radius
@@ -6797,21 +6815,20 @@ more difficult:
         tryTriggerCollectiveMind(e)
         continue
       }
-      // A weaker shot target retreats when it can; a stronger one fights if
-      // it can reach the player. An unreachable target also tries to retreat
-      // regardless of strength (e.g. a Gargoyle behind prison bars). Only a
-      // cornered target with a complete approach route stands and fights.
+      // Undead never retreat from bow threat, even when hopelessly outmatched
+      // or trapped behind a barrier. Other monsters prefer cover when weaker
+      // or when no approach route exists, but still fight when cornered.
       if (e === bowShotTarget && dist > ATTACK_RANGE) {
         if (justEvaded) continue
         if (enemyIsFleeing(e) && tryWoundedEnemyFlee(e)) continue
         const pursuitStep = enemyFindStep(e, true)
-        if (!pursuitStep || !enemyOutmatchesPlayer(e)) {
+        if (!enemyFearlessOfBow(e) && (!pursuitStep || !enemyOutmatchesPlayer(e))) {
           if (retreatFromBowShot(e)) continue
           if (!pursuitStep) continue
         }
         e.bowRetreatHold = false
         if (dist > aggroRange) {
-          enemyStepTowardPlayer(e, pursuitStep)
+          if (pursuitStep) enemyStepTowardPlayer(e, pursuitStep)
           continue
         }
       }

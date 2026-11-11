@@ -5046,25 +5046,36 @@ monster tries to flee if it has a meaningful escape route, even if it could
 reach the player. A **stronger or equally strong** monster fights if it has a
 traversable pursuit route to a tile adjacent to the player. If it cannot reach
 the player, even a stronger monster tries to escape instead; prison bars can
-block approach while still allowing the player's arrows through.
+block approach while still allowing the player's arrows through. **Undead are
+fearless:** they never compare combat strength or flee from player bow shots,
+not even when trapped or clearly outmatched. They instead pursue or attack
+whenever able; an impassable route leaves them blocked, not retreating. Other
+flight, sanctuary and supernatural status rules are independent of this choice.
 
-An escape must reach cover, outside bow range, or at least two tiles farther
-away. Retreat searches up to 12 steps and may begin with a sideways step, but
-never moves closer. A one-tile dead-end is not an escape: a weak, cornered Ghoul
-with an approach route fights back rather than oscillating into its dead end.
-When fighting from beyond AGGRO, the target advances only one tile without
-starting a persistent chase; within AGGRO it takes its normal combat turn,
-including ranged attacks and spells. If it has neither an approach route nor
-an escape route, it stays blocked. Adjacent enemies retain normal melee rules.
-No response teleports or bypasses terrain or creature occupancy.
+Retreat is allowed only when the monster can reach safety **on its very next
+step**. The chosen adjacent tile must block the player's projectile line of
+fire (for example, terrain behind a wall or tree) or be **outside the equipped
+bow's firing range**. It must be traversable immediately, without first opening
+a door, and the monster does not step closer to the player to escape. Distant
+cover and out-of-range tiles **do not count** when reaching them would require
+even one exposed movement turn: the archer could keep firing while it fled.
+The monster prefers immediate terrain cover over stepping outside bow range.
+Prison bars never count as projectile cover. If no immediately safe retreat is
+available, it stops fleeing and fights or pursues when a route to the player
+exists; monsters with neither escape nor approach simply remain blocked.
 
-Once a bow target has actually retreated, it holds position behind
-terrain that blocks the player's shot while the Short Bow remains equipped,
-instead of wandering out from cover. Switching weapons ends the standoff,
-including for monsters on inactive floors. Reaching melee range or restoring a
-clear shot returns the target to ordinary combat behavior. Monsters not
-provoked into ranged retreat do not hold cover merely because a wall intervenes.
-The cover state is deterministic and saved/replayed with the enemy.
+A monster may use one immediate step beyond bow range to escape a shot, but cannot chain repeated
+out-of-range moves when the player follows: it then seeks actual terrain cover
+or turns to pursue, including a pursuit step outside its ordinary AGGRO range.
+This avoids unproductive open-field chases without a random fleeing timeout.
+
+A monster that reaches safety holds that position while the Short Bow stays
+equipped; moving the player to regain a shot makes it seek another immediately
+safe tile, or resume combat if none exists. Switching weapons or closing
+to melee allows normal combat and pursuit to resume. The retreat intent uses
+the existing saved enemy state and pathfinding recomputes each turn, so changing
+obstacles or enemy positions cannot leave a stale route. Enemies not provoked
+by player arrows do not seek bow cover on their own.
 
 Other turns inside effective AGGRO retain normal combat and pursuit. Passive
 creatures do not react. Special priorities such as rare flight, Fear, sanctuary,
