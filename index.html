@@ -9952,6 +9952,7 @@ more difficult:
   const DAMAGE_ANIM_MS = 850
   const SUMMON_ANIM_MS = 1000
   const DAMAGE_POPUP_HOLD_MS = 280
+  const DAMAGE_POPUP_RAISE_PX = 8
   // The shaded asset is reserved for dropped floor bags; carrier markers stay flat.
   function drawThiefBag(x, y, size, dropped = false) {
     const image = dropped && USE_TILE_IMAGES && preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
@@ -10074,7 +10075,7 @@ more difficult:
       damageAnims.indexOf(b) - damageAnims.indexOf(a))
     const placed = []
     for (const p of active) {
-      const baseY = p.y * TILE_PX - 16 * damagePopupFadeProgress(p, now)
+      const baseY = p.y * TILE_PX - DAMAGE_POPUP_RAISE_PX - 16 * damagePopupFadeProgress(p, now)
       let y = baseY - (p.liftPx || 0)
       const width = Math.max(18, String(p.amount).length * 11)
       const overlapping = placed.filter(q => Math.abs(q.x - p.x) * TILE_PX < (q.width + width) / 2 + 4)
@@ -11328,30 +11329,6 @@ more difficult:
         ctx.restore()
       }
     }
-    layoutDamageNumbers(now)
-    for (let i = damageAnims.length - 1; i >= 0; i--) {
-      const p = damageAnims[i]
-      const elapsed = now - p.start
-      if (elapsed < p.delay) continue
-      const t = Math.min(1, (elapsed - p.delay) / (p.duration || DAMAGE_ANIM_MS))
-      if (t >= 1) {
-        damageAnims.splice(i, 1)
-        continue
-      }
-      if (!undergroundTileVisible(p.x, p.y)) continue
-      const vx = Math.round((p.x - camX) * TILE_PX)
-      const vy = Math.round(p.displayY - camY * TILE_PX)
-      ctx.save()
-      ctx.globalAlpha = 1 - damagePopupFadeProgress(p, now)
-      ctx.font = 'bold 18px Consolas, \'Courier New\', monospace'
-      ctx.textAlign = 'center'
-      ctx.fillStyle = p.color
-      ctx.strokeStyle = RENDER_STYLE.damage.outline
-      ctx.lineWidth = 3
-      ctx.strokeText(String(p.amount), vx + TILE_PX / 2, vy + 2)
-      ctx.fillText(String(p.amount), vx + TILE_PX / 2, vy + 2)
-      ctx.restore()
-    }
     // Gather animated enemy positions, then tint before drawing any glyphs.
     const visibleEnemies = []
     for (const e of enemies) {
@@ -11749,6 +11726,33 @@ more difficult:
       drawEnemyRangeOverlay(hoveredEnemy)
     }
     drawFireballPresentation(now)
+    // Damage and healing feedback is screen-facing: render it after sprites,
+    // telegraphs, darkness and rectangular range overlays, never underneath them.
+    layoutDamageNumbers(now)
+    for (let i = damageAnims.length - 1; i >= 0; i--) {
+      const p = damageAnims[i]
+      const elapsed = now - p.start
+      if (elapsed < p.delay) continue
+      const t = Math.min(1, (elapsed - p.delay) / (p.duration || DAMAGE_ANIM_MS))
+      if (t >= 1) {
+        damageAnims.splice(i, 1)
+        continue
+      }
+      if (!undergroundTileVisible(p.x, p.y)) continue
+      const vx = Math.round((p.x - camX) * TILE_PX)
+      const vy = Math.round(p.displayY - camY * TILE_PX)
+      ctx.save()
+      ctx.globalAlpha = 1 - damagePopupFadeProgress(p, now)
+      ctx.font = 'bold 18px Consolas, \'Courier New\', monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillStyle = p.color
+      ctx.strokeStyle = RENDER_STYLE.damage.outline
+      ctx.lineWidth = 3
+      ctx.strokeText(String(p.amount), vx + TILE_PX / 2, vy + 2)
+      ctx.fillText(String(p.amount), vx + TILE_PX / 2, vy + 2)
+      ctx.restore()
+    }
     if (deathTransition && (deathTransition.phase === 'out' || deathTransition.phase === 'in')) {
       const elapsed = now - deathTransition.start
       let alpha = 0

@@ -97,6 +97,8 @@ describe('Once-only monster summoning', () => {
           const popup=damageAnims[0],arrival=popup.start+popup.delay
           layoutDamageNumbers(arrival)
           const originalY=popup.displayY
+          summonCheck(DAMAGE_POPUP_RAISE_PX===8 && originalY===40*TILE_PX-8,
+            'popups appear eight screen pixels higher in both display modes')
           layoutDamageNumbers(arrival+DAMAGE_POPUP_HOLD_MS)
           summonCheck(DAMAGE_POPUP_HOLD_MS===280 && popup.displayY===originalY &&
             damagePopupFadeProgress(popup,arrival+DAMAGE_POPUP_HOLD_MS)===0,
@@ -106,6 +108,22 @@ describe('Once-only monster summoning', () => {
             'fade and upward drift begin together after the hold')
           summonCheck(damagePopupFadeProgress(popup,arrival+popup.duration)===1,
             'the hold does not extend popup lifetime')
+          const savedHovered=hoveredEnemy, oldRange=drawEnemyRangeOverlay, oldStroke=ctx.strokeText
+          const paintOrder=[]
+          try {
+            hoveredEnemy=children[0]
+            drawEnemyRangeOverlay=(...args)=>{paintOrder.push('range');return oldRange(...args)}
+            ctx.strokeText=function(...args){
+              if(args[0]==='Hold') paintOrder.push('popup')
+              return oldStroke.apply(this,args)
+            }
+            render()
+            summonCheck(paintOrder.includes('range')&&paintOrder.includes('popup')&&
+              paintOrder.lastIndexOf('range')<paintOrder.indexOf('popup'),
+              'popups are painted after enemy range rectangles')
+          } finally {
+            hoveredEnemy=savedHovered;drawEnemyRangeOverlay=oldRange;ctx.strokeText=oldStroke
+          }
           damageAnims=[]
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
