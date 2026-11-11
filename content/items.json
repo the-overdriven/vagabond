@@ -10,6 +10,7 @@
   },
   "potion": {
     "name": "Life Potion",
+    "description": "A crimson elixir that fully restores your health and cures poison.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 8,
@@ -26,6 +27,7 @@
   },
   "speedpotion": {
     "name": "Potion of Speed",
+    "description": "A fleeting burst of movement speed lasting 15 turns. A fresh dose refreshes the effect.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 12,
@@ -45,6 +47,7 @@
   },
   "herb": {
     "name": "Healing Herb",
+    "description": "A medicinal leaf that restores some health and cures poison when eaten.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 4,
@@ -62,6 +65,7 @@
   },
   "mushroom": {
     "name": "Mushroom",
+    "description": "An unidentified wild mushroom. It may restore health or turn out to be poisonous; the Herbalist can purify it.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 3,
@@ -79,6 +83,7 @@
   },
   "ediblemushroom": {
     "name": "Edible Mushroom",
+    "description": "A mushroom purified by the Herbalist. Safe to eat for a modest health recovery.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 5,
@@ -96,6 +101,7 @@
   },
   "berries": {
     "name": "Handful of Berries",
+    "description": "Fresh berries that slowly restore health over time.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 2,
@@ -113,6 +119,7 @@
   },
   "fish": {
     "name": "Fresh Fish",
+    "description": "A freshly caught fish. Eat it as provisions or cook it over a lit fire for better recovery.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 0,
@@ -144,13 +151,14 @@
     "description": "Raw meat taken from a slain beast. Cook it at a lit abandoned campfire before eating.",
     "baseValue": 4
   },
-  "roastedMeat": {"name": "Roasted Meat", "category": "supplies", "stackable": true, "icon": "img/icons/meat.svg", "sellValue": 2, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 8}, "baseValue": 4},
-  "bakedPotato": {"name": "Baked Potato", "category": "supplies", "stackable": true, "icon": "img/icons/potato.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 12}, "baseValue": 0},
-  "cookedFish": {"name": "Cooked Fish", "category": "supplies", "stackable": true, "icon": "img/icons/fish.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 24}, "baseValue": 0},
+  "roastedMeat": {"name": "Roasted Meat", "category": "supplies", "stackable": true, "icon": "img/icons/meat.svg", "sellValue": 2, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 8}, "description": "Tender roasted meat that provides gradual health recovery, faster when resting.", "baseValue": 4},
+  "bakedPotato": {"name": "Baked Potato", "category": "supplies", "stackable": true, "icon": "img/icons/potato.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 12}, "description": "A filling baked potato that restores health gradually, faster while resting.", "baseValue": 0},
+  "cookedFish": {"name": "Cooked Fish", "category": "supplies", "stackable": true, "icon": "img/icons/fish.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 24}, "description": "A nutritious cooked fish that restores health over time, faster during rest.", "baseValue": 0},
   "flint": {"name": "Flint Stone", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Reusable fire-lighting tool. Use an abandoned campfire to light it with brushwood.", "baseValue": 100},
   "brushwood": {"name": "Brushwood", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Dry fuel for an abandoned campfire. One bundle burns for 12 turns. Carry up to five.", "baseValue": 10},
   "potato": {
     "name": "Potato",
+    "description": "A raw potato found while foraging or searching. Bake it at a lit campfire or stove.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 0,
@@ -159,6 +167,7 @@
   },
   "scrollOfInvisibility": {
     "name": "Scroll of Invisibility",
+    "description": "A scroll that conceals you from ordinary sight for a limited time. True-sighted enemies may still detect you.",
     "icon": "img/icons/scroll.svg",
     "category": "supplies",
     "stackable": true,
@@ -177,6 +186,7 @@
   },
   "homecomingscroll": {
     "name": "Scroll of Homecoming",
+    "description": "A magical passage back to the Temple, far from the dangers of the wilderness.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 50,
@@ -190,6 +200,7 @@
   },
   "idscroll": {
     "name": "Scroll of Identification",
+    "description": "Reveals the true name, effects and possible curse of one unidentified artifact.",
     "category": "supplies",
     "stackable": true,
     "sellValue": 20,
@@ -198,6 +209,7 @@
   },
   "amber": {
     "name": "Amber",
+    "description": "A warm golden piece of fossil resin, prized by traders.",
     "category": "other",
     "stackable": true,
     "sellValue": 20,
@@ -206,6 +218,7 @@
   },
   "seashell": {
     "name": "Seashell",
+    "description": "A smooth, wave-worn seashell with little use beyond trade.",
     "category": "other",
     "stackable": true,
     "sellValue": 10,
@@ -214,6 +227,7 @@
   },
   "shovel": {
     "name": "Shovel",
+    "description": "A digging tool for searching sandy ground for buried treasures and surprises.",
     "category": "other",
     "stackable": false,
     "sellValue": 0,
@@ -295,6 +309,7 @@
   },
   "treasuremap": {
     "name": "Old Treasure Map",
+    "description": "A faded map marking the approximate location of something buried. Inspect it for clues.",
     "category": "other",
     "stackable": false,
     "sellValue": 0,
@@ -322,6 +337,7 @@
   },
   "tombstone": {
     "name": "Mysterious Tombstone",
+    "description": "An uncanny grave marker with an inscription that may reveal a forgotten history.",
     "category": "other",
     "stackable": false,
     "sellValue": 0,
@@ -335,6 +351,7 @@
   },
   "oddTombstone": {
     "name": "Odd Tombstone",
+    "description": "An unusual cemetery stone bearing a troubling inscription. The Gravedigger may want to see it.",
     "category": "other",
     "stackable": false,
     "sellValue": 0,
@@ -356,13 +373,13 @@
     "description": "A sturdy iron pickaxe. Strike fractured stone, boulders, and exposed crystals to mine them; subtle seams become easier to notice as Mining improves.",
     "actions": [{"label": "?", "handler": "inspect"}]
   },
-  "quartz": {"name":"Quartz","category":"other","stackable":true,"sellValue":8,"baseValue":8,"icon":"img/tiles/mineral-quartz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "amethyst": {"name":"Amethyst","category":"other","stackable":true,"sellValue":16,"baseValue":16,"icon":"img/tiles/mineral-amethyst-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "topaz": {"name":"Topaz","category":"other","stackable":true,"sellValue":28,"baseValue":28,"icon":"img/tiles/mineral-topaz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "aquamarine": {"name":"Aquamarine","category":"other","stackable":true,"sellValue":38,"baseValue":38,"icon":"img/tiles/mineral-aquamarine-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "emerald": {"name":"Emerald","category":"other","stackable":true,"sellValue":52,"baseValue":52,"icon":"img/tiles/mineral-emerald-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "sapphire": {"name":"Sapphire","category":"other","stackable":true,"sellValue":72,"baseValue":72,"icon":"img/tiles/mineral-sapphire-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
-  "ruby": {"name":"Ruby","category":"other","stackable":true,"sellValue":94,"baseValue":94,"icon":"img/tiles/mineral-ruby-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}]},
+  "quartz": {"name":"Quartz","category":"other","stackable":true,"sellValue":8,"baseValue":8,"icon":"img/tiles/mineral-quartz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A pale crystal mined from stone, suitable for trade."},
+  "amethyst": {"name":"Amethyst","category":"other","stackable":true,"sellValue":16,"baseValue":16,"icon":"img/tiles/mineral-amethyst-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A violet crystal pried from the rock, valued by collectors."},
+  "topaz": {"name":"Topaz","category":"other","stackable":true,"sellValue":28,"baseValue":28,"icon":"img/tiles/mineral-topaz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A golden mineral specimen that catches the light."},
+  "aquamarine": {"name":"Aquamarine","category":"other","stackable":true,"sellValue":38,"baseValue":38,"icon":"img/tiles/mineral-aquamarine-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A clear blue-green gemstone, precious in the markets above."},
+  "emerald": {"name":"Emerald","category":"other","stackable":true,"sellValue":52,"baseValue":52,"icon":"img/tiles/mineral-emerald-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A vivid green gemstone cut free of its dark host rock."},
+  "sapphire": {"name":"Sapphire","category":"other","stackable":true,"sellValue":72,"baseValue":72,"icon":"img/tiles/mineral-sapphire-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A deep blue gemstone of considerable value."},
+  "ruby": {"name":"Ruby","category":"other","stackable":true,"sellValue":94,"baseValue":94,"icon":"img/tiles/mineral-ruby-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A rare red gemstone that glows like an ember beneath the light."},
   "dwarvenkey": {
     "name": "Dwarven Key",
     "icon": "img/tiles/dwarven-key.png",

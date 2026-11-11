@@ -247,13 +247,28 @@ describe('Tracking and beast evidence', () => {
       trackAssert(tileInspectInfo(40,40).html.includes('foot tracks?'), 'generic hover')
       trackAssert(inspectBeastTrack(t) === 'You notice something that looks like foot tracks, but cannot make sense of them.', 'untrained')
       player.trackingLearned = true
+      trackAssert(TRACK_DIRECTIONS.join(',') === 'north,north-east,east,south-east,south,south-west,west,north-west',
+        'all eight displayed compass bearings')
+      trackAssert(LOOK_DIRS.filter(d => d.dx && d.dy).map(d => d.name).join(',') ===
+        'north-west,north-east,south-west,south-east', 'nearby inspection uses hyphenated diagonals')
+      // Treasure-map hints form diagonals independently of the compass lookup.
+      const originalVillage = villageCenter, originalSpot = treasureMapSpot
+      try {
+        villageCenter = {x: 50, y: 50}
+        for (const [dx,dy,bearing] of [[-30,-30,'north-west'],[30,-30,'north-east'],
+          [-30,30,'south-west'],[30,30,'south-east'],[0,-30,'north']]) {
+          treasureMapSpot = {x: 50 + dx, y: 50 + dy}
+          trackAssert(treasureMapClueText().includes('to the ' + bearing + ' of the village.'),
+            'treasure clue uses ' + bearing)
+        }
+      } finally { villageCenter = originalVillage; treasureMapSpot = originalSpot }
       const original = rng
       try {
         rng = () => { throw new Error('inspection consumed RNG') }
-        trackAssert(inspectBeastTrack(t) === "Fresh tracks lead northeast. You've never seen paw prints like these before.", 'unknown species')
+        trackAssert(inspectBeastTrack(t) === "Fresh tracks lead north-east. You've never seen paw prints like these before.", 'unknown species')
         player.killsBySpecies.Wolf = 1
         for (const [age,start] of [[0,'Fresh'],[59,'Fresh'],[60,'The'],[179,'The'],[180,'Fading'],[239,'Fading']]) {
-          t.age = age; trackAssert(inspectBeastTrack(t) === start+' wolf tracks lead northeast.', 'freshness '+age)
+          t.age = age; trackAssert(inspectBeastTrack(t) === start+' wolf tracks lead north-east.', 'freshness '+age)
         }
         trackAssert(tileInspectInfo(40,40).html.includes('foot tracks?'), 'trained hover still generic')
         groundItems.push({kind:'campfire',x:40,y:40,level:0})

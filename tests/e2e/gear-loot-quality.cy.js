@@ -16,6 +16,22 @@ function beginRareHuntGame(name = 'Rare Hunt Tester') {
 describe('Exceptional prefixes and monster loot quality', () => {
   beforeEach(() => beginRareHuntGame('Quality Tester'))
 
+  it('never gives non-humanoid monsters a procedural artifact drop', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const oldChance=chance,oldRng=rng,oldMakeArtifact=makeArtifactItem
+      try {
+        let artifactRolls=0
+        chance=()=>true;rng=()=>0
+        makeArtifactItem=()=>{artifactRolls++;return {kind:'artifact',name:'Forbidden Artifact',noun:'Club'}}
+        const snake={...ENEMY_TEMPLATE_BY_NAME.Snake,baseName:'Snake',
+          humanoid:false,x:player.x+4,y:player.y+4,level:0,alive:true}
+        lootFromEnemy(snake,true)
+        check(artifactRolls===0,'non-humanoid Snake cannot roll an artifact')
+      } finally {chance=oldChance;rng=oldRng;makeArtifactItem=oldMakeArtifact}
+    })()`))
+  })
+
   it('promotes all over-range bonuses and keeps old ceilings ordinary', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)},oldRng=rng
@@ -120,6 +136,15 @@ describe('Exceptional prefixes and monster loot quality', () => {
       player.inventory=[{kind:'weapon',name:'Mighty Dagger',base:'Dagger',atk:2,grace:5,tier:5,baseValue:30,mod:'atk',modAmt:20}]
       invTab='all';toggleInv(true)
     })()`))
+    if (width === 390) {
+      for (const category of ['weapon','shield','armor']) {
+        cy.get(`.inv-tab[data-tab="${category}"] img.inv-tab-mobile`).should('be.visible')
+      }
+      cy.get('.inv-tab[data-tab="supplies"] .inv-tab-apple').should('be.visible').and('contain.text','🍎')
+      cy.get('.inv-tab[data-tab="weapon"] .inv-tab-label').should('not.be.visible')
+    } else {
+      cy.get('.inv-tab[data-tab="weapon"] .inv-tab-label').should('be.visible')
+    }
     cy.get('#invList .nm.tier5').contains('Mighty Dagger').should('have.css','color','rgb(224, 71, 63)')
     cy.get('#invList .invitem').contains('Mighty Dagger').parent().should('contain.text','ATK 2+20')
   })

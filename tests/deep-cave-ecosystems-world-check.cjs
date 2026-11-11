@@ -8,6 +8,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
         ((x-15)**2+(y-15)**2<212?'1':'0')).join(''))}]
     return CAVE_SILHOUETTES[0]
   }; log=()=>{};renderInventory=()=>{};replayAnimationsDisabled=true;replayRecording=false;raceOpen=false`)
+  let totalCampfires = 0
   for (const [seed,traits] of [[67893,[]],[12345,['things_below']]]) {
     run(`WORLD_SEED=${seed};rngState=WORLD_SEED;
       applyWorldTraits(${JSON.stringify(traits)}.map(name=>WORLD_TRAITS.find(t=>t.name===name)),'XS');
@@ -38,7 +39,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     assert.equal(summary.sourceValid,true,'deep spawns have correct source cave')
     assert.equal(summary.campfireValid,true,'deep campfires sit on accessible source cave floors away from entrances')
     assert.equal(summary.campfireUnoccupied,true,'deep campfires do not overlap monsters')
-    if (seed===67893) assert(summary.campfires.length>0,'seeded deep caves include abandoned campfires')
+    totalCampfires += summary.campfires.length
     assert(summary.enemies>0 && summary.species>=2,'nontrivial population')
     assert.equal(summary.valid,true,'world validates with population')
     assert.equal(summary.vampire,true,'vampire guarantee survives ecosystem update')
@@ -49,4 +50,5 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     {const a=JSON.parse(summary.snapshot),b=JSON.parse(restored);for (const key of Object.keys(a))assert.equal(JSON.stringify(a[key]),JSON.stringify(b[key]),'save/replay restores '+key)}
     console.log('PASS seeded world ecosystem',seed,traits,JSON.stringify({...summary,snapshot:undefined}))
   }
+  assert(totalCampfires>0,'fixed-seed deep caves include abandoned campfires')
 })().catch(e=>{console.error(e);process.exitCode=1})

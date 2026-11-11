@@ -762,6 +762,10 @@ Auto-pathing can account for:
 Occupied enemy/NPC tiles are generally avoided except when they are the intended destination.
 
 Direct interaction cancels pathing.
+Keyboard movement also cancels both the active path and its preview; the
+desktop preview returns when the pointer enters a new destination tile.
+On touch screens, tapping another destination while a movement animation is
+finishing replaces the route.
 
 ---
 
@@ -1179,8 +1183,8 @@ while the other connects the eastern chamber to the southern hallway. The
 partition and southern chamber wall meet at a solid masonry corner, so neither
 a straight nor a diagonal path can bypass closed doors. The summit is an open
 battlement floor, with plain stone rather than raised corner battlements.
-In the tower's local layout, stair landings alternate between the southwest
-and northwest chambers, then rotate together with the rest of the world. Each
+In the tower's local layout, stair landings alternate between the south-west
+and north-west chambers, then rotate together with the rest of the world. Each
 stair has a clear 3×3 patch of ordinary floor (all eight adjacent tiles are
 walkable marble), and initial defenders and loot spawn at least three tiles
 away from either landing. Inspecting stairs uses the existing transition
@@ -1581,8 +1585,9 @@ spending a turn. A subsequent bump attempts a breach with an equipped weapon,
 using the same **132 ms cosmetic attack lunge** as ordinary melee and crate
 strikes. Inspection is remembered per physical lock (including double-door
 leaves), survives save/replay, and resets with a new character. Bare fists
-cannot attempt a breach and do not consume a turn. Each actual weapon attempt
-costs **1 turn**, does not consume or damage the weapon, and uses
+and ranged weapons cannot attempt a breach and do not consume a turn. Each
+actual melee-weapon attempt costs **1 turn**, does not consume or damage the
+weapon, and uses
 the player's **final ATK** (the same ATK shown in the HUD, including the equipped
 weapon and other current ATK bonuses/penalties):
 
@@ -3962,6 +3967,8 @@ jumper to an available landing tile without damage or same-turn melee. A
 blocked landing leaves it at the origin. Cooldown: **four complete active-floor
 turns**. Blind hesitation is checked before pursuit Jumps. Neither Jump nor
 Burrow can land on dungeon transitions, protecting staircase access.
+The warning announces that a leap is imminent but never names or highlights
+the target square.
 
 **Wall Ambush** is a generic one-time concealment rule, currently used by
 Trogloraptor. Concealed monsters spawn in ordinary legal spaces beside a solid
@@ -4182,9 +4189,11 @@ do not receive `evades`; their defense is ethereal immunity to mundane weapons.
 
 ## Ethereal
 
-Ghost has `ethereal` ability. All Ghost spawn
-paths, including scripted dwarven-ruin Ghosts, receive it. Ethereal creatures
-can traverse any in-bounds terrain, including walls, mountains, water, and lava.
+Ghost has `ethereal` ability. All Ghost spawn paths, including scripted
+dwarven-ruin Ghosts, receive it. Ghosts never enter surface wildlife or
+ancient-forest ambush pools; their underground spawns remain available.
+Ethereal creatures can traverse any in-bounds terrain, including walls,
+mountains, water, and lava.
 Actor collision and map boundaries still apply. Chasing, wandering, evasion,
 and invisible-attack retreat use the same terrain permission. Walls retain
 their normal sight-blocking behavior. A Ghost that has already detected the
@@ -4700,8 +4709,8 @@ kill credit and loot. The budget and tick damage are fixed at application,
 independently of subsequent maximum-HP changes.
 
 Scorpion, Manticore, Wyvern, Alacran and Xibal have the `poison` ability. Each melee hit
-dealing positive damage has a 30% seeded chance to poison a surviving player,
-including damaging glancing hits and extra attacks. Misses, zero-damage hits,
+dealing positive non-glancing damage has a 30% seeded chance to poison a surviving
+player, including extra attacks. Misses, glancing hits, zero-damage hits,
 and ranged attacks do not apply poison. No poison RNG is used for other enemies.
 
 **Poison on the player** retains its separate duration formula, calculated
@@ -4759,8 +4768,12 @@ live in `content/enemy_config.json`.
 
 Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and starts
 with **10 shots**. Shooter role and exact remaining ammunition persist with the
-enemy. A fired projectile always consumes one shot, including dodges and glancing
-hits. A blocked line consumes no ammunition. At zero shots the bow indicator
+enemy. A shooter must spend one enemy action switching between its projectile
+weapon and melee weapon, announcing the ordinary weapon type without revealing
+equipment modifiers. The current mode is saved and restored; merely switching
+does not spend ammunition or attack. A fired projectile always consumes one
+shot, including dodges and glancing hits. A blocked line consumes no
+ammunition. At zero shots the bow indicator
 disappears and the enemy immediately uses its ordinary species AI on later turns.
 On death, an enemy assigned `shooterArrows` drops exactly its remaining
 arrows, logging the amount when positive. It also has a **25%** seeded chance
@@ -4779,8 +4792,9 @@ min(100%, normal melee dodge chance × 2)
 A genuine non-glancing ranged hit deals at least 1 damage after ordinary mitigation;
 a glancing hit may remain at 0. Critical and glancing outcomes are mutually exclusive.
 Shooter prefixes still modify their normal stats and melee behavior, but do not change
-the fixed projectile ATK. While ammunition remains, desktop/mobile inspection appends
-a red bow marker (`🏹`) to the existing species name; the marker disappears at zero shots.
+the fixed projectile ATK. While ammunition remains, desktop/mobile inspection marks
+the equipped attack mode (`🏹` for ranged, `⚔` for melee); the marker disappears
+at zero shots.
 
 Multiple ordinary shooters attacking during one enemy turn present their
 projectiles as a simultaneous volley. Melee strikes and spells interrupt a volley
@@ -5929,6 +5943,8 @@ insertion. The listed base gear icons are preloaded for offline use. This change
 only presentation, not gear stats or loot odds.
 
 Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
+On mobile, category tabs use their corresponding equipment symbols and an
+apple for Supplies instead of text labels.
 Supplies lists consumable food, herbs, mushrooms, potions, scrolls, and arrows,
 including raw and cooked potatoes. Flint and brushwood appear in Other. Other excludes equipment and supplies; All keeps its
 existing consumables-first ordering. Tabs only filter displayed inventory.
@@ -5989,6 +6005,13 @@ the floor; the **forage key (F)** collects the dropped item or stack in one
 turn. It does not auto-pick up on movement. A dropped worn Black Key is
 automatically unequipped. Crystals retain their existing mineral floor art,
 light emission and collection rules.
+Ground-item labels and hover tooltips show an item's base type only, not its
+unidentified artifact status or generated modifier prefix. Ground tile icons
+and ASCII symbols likewise disguise artifacts as their ordinary equipment
+types, or as neutral objects for trinkets. Picking an item up
+reveals ordinary gear prefixes, while artifact identity follows the existing
+identification rules. Environmental ground objects are identified by their
+specific Inspect descriptions.
 
 Drop locations and probabilities stay in `loot_tables.json` and world-generation
 configuration. Merchant quantities and purchase prices stay in
@@ -6763,7 +6786,9 @@ Artifact chance and quality (effect tier, curse odds) scale with Magic Find
 # 44. Enemy Equipment Drops
 
 Humanoid enemies can carry equipment. The worn item affects the enemy's stats
-and is dropped as that same item when the humanoid dies.
+and is dropped as that same item when the humanoid dies. Only humanoids are
+eligible for the random artifact drop roll; biological monsters retain their
+ordinary material drops.
 
 ## Humanoid equipment effectiveness
 
@@ -6851,11 +6876,13 @@ that is an intentional tier-5 quality classification, not a new base item.
 
 The worn item is already stored on the enemy as `e.equipment`.
 Combat glancing-hit messages and enemy tooltips show only the equipment's base
-name, so they do not reveal a modifier prefix before the item drops. The drop
-message and recovered item retain the full prefixed name. Every enemy item-drop
-message omits the indefinite article before the item name (for example,
-"The Skeleton dropped Mighty Crescent Blades" or "The Kobold dropped Short
-Bow"). Stackable rewards still display quantities when appropriate. This
+name, so they do not reveal a modifier prefix before the item drops. Distant
+ground-drop messages likewise show only the base item name. A collected
+ordinary gear item reveals its full modifier prefix, while an unidentified
+artifact keeps its hidden identity. Every enemy item-drop message omits the
+indefinite article before the item name (for example, a nearby collected
+"Mighty Crescent Blades" or a distant "Short Bow"). Stackable rewards still
+display quantities when appropriate. This
 wording applies to regular gear, ammunition, special enemy drops, and
 biological materials without changing reward probabilities or inventory items.
 
@@ -7531,6 +7558,8 @@ preventing repeated rolls. Potatoes stack in the inventory and use
 Searched campfires have a gray ASCII glyph and a slightly dimmed, desaturated
 tile image.
 
+Player-facing compass descriptions use hyphens for all diagonal bearings (`north-east`, `north-west`, `south-east`, `south-west`) across inspection, tracking, NPC dialogue, creature calls and treasure-map clues. Cardinal directions are unchanged.
+
 Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object. It reports nearby nondecorative
 ground objects (including campfires and stoves), visible enemies, items,
@@ -7931,7 +7960,7 @@ vacated tile; a new impression replaces any existing track on that tile.
 The bearing is the nearest of eight compass directions from the track tile to the
 beast's stored **final destination**, captured when the track is made. It does not
 follow the latest step, even on an obstacle detour, and does not change if the
-beast later retargets or dies. North points up; northeast rotates 45° clockwise;
+beast later retargets or dies. North points up; north-east rotates 45° clockwise;
 south rotates 180°. The approved transparent paw SVG and its PNG export live in
 `img/overlays/`. Tile mode rotates the PNG; ASCII mode uses a directional arrow.
 Tracks appear above ground textures but **beneath forest, taiga and Ancient
@@ -7949,9 +7978,9 @@ cannot make sense of them.” With Tracking, it reports bearing and freshness:
 
 | Age in turns | Example for a recognized species |
 |---|---|
-| 0–59 | Fresh wolf tracks lead northeast. |
-| 60–179 | The wolf tracks lead northeast. |
-| 180–239 | Fading wolf tracks lead northeast. |
+| 0–59 | Fresh wolf tracks lead north-east. |
+| 60–179 | The wolf tracks lead north-east. |
+| 180–239 | Fading wolf tracks lead north-east. |
 | 240 | Track removed |
 
 Species recognition requires at least one player kill of that **base species**;
@@ -10147,8 +10176,10 @@ Replay playback neither reads nor updates this count. Death number is
 incremented before snapshot. Player stats, equipment and location are captured
 before XP/max-HP penalties, backpack drops, teleport, corpse transfer, or
 character reset. The `dropped_item` field is attached **after** the actual
-non-permadeath item-loss roll; it contains one lost item (with its identity,
-item details and stat line), or null when nothing was dropped or on permadeath.
+non-permadeath item-loss roll; it contains one lost item (with its publicly
+known identity, item details and stat line), or null when nothing was dropped
+or on permadeath. Unidentified artifacts are displayed and uploaded with a
+generic type and unknown stats, without their secret name or effects.
 This changes neither the loss probability nor gameplay RNG.
 The mode is read from `player.permadeath` directly; non-permadeath deaths each
 produce a separate event and the same character continues; a permadeath

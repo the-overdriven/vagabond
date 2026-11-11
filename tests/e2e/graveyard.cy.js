@@ -175,6 +175,46 @@ describe('Graveyard', () => {
     })
   })
 
+  it('never exposes the true name or bonuses of a dropped unidentified artifact', () => {
+    configureTestGraveyard()
+    beginNewGame('Hidden Artifact Tester')
+    const rows = []
+    cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__ = true
+      win.supabase = {createClient: () => ({from: () => ({
+        insert: record => { rows.push(record); return Promise.resolve({error:null}) },
+        select: () => ({
+          order() {return this}, limit() {return this},
+          then(resolve) {
+            resolve({data:rows.map(row=>({...row,
+              dropped_item:{kind:'artifact',name:'Scimitar of Thingar',noun:'Scimitar',
+                identified:false,stat_line:'ATK +99'}})) ,error:null})
+          }
+        })
+      })})}
+      win.eval(`(() => {
+        const lost={kind:'artifact',name:'Scimitar of Thingar',noun:'Scimitar',base:'Scimitar',
+          identified:false,artifactSlot:'weapon',atk:4,bonuses:{atk:99},effectId:'secret'}
+        const publicItem=Graveyard.snapshotItem(lost,itemStatLine)
+        if(JSON.stringify(publicItem).includes('Thingar') || JSON.stringify(publicItem).includes('99'))
+          throw Error('snapshot leaked unidentified artifact identity')
+        player.equip={weapon:null,shield:null,armor:null}
+        player.inventory=[lost]
+        die({name:'Scorpion',alive:false})
+      })()`)
+    })
+    cy.wrap(rows).should(records => {
+      expect(records).to.have.length(1)
+      expect(records[0].dropped_item).to.include({kind:'artifact',name:'Unidentified Scimitar',stat_line:'???'})
+      expect(JSON.stringify(records[0].dropped_item)).not.to.include('Thingar')
+      expect(JSON.stringify(records[0].dropped_item)).not.to.include('99')
+    })
+    cy.get('#btnGraveyard').click()
+    cy.get('#graveyardList .graveyard-record').first().click()
+    cy.get('#graveyardList').should('contain.text', 'Dropped item: Unidentified Scimitar (???)')
+    cy.get('#graveyardList').should('not.contain.text', 'Thingar')
+  })
+
   it('rounds every uploaded strongest-kill number while preserving exact gameplay ranking', () => {
     configureTestGraveyard()
     beginNewGame('Strength Tester')

@@ -44,6 +44,11 @@ const Graveyard = (() => {
 
   function snapshotItem(item, statLine) {
     if (!item) return null
+    // A public record must not expose an unidentified item's true name or
+    // modifiers, even in its JSON payload before the Graveyard renders it.
+    if (item.kind === 'artifact' && item.identified !== true)
+      return {kind: 'artifact', name: `Unidentified ${item.noun || item.base || 'Artifact'}`, noun: item.noun || item.base || 'Artifact',
+        identified: false, stat_line: '???'}
     const {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
       speedPenalty, xpBonus} = item
@@ -117,6 +122,9 @@ const Graveyard = (() => {
 
   function gearLabel(item, fallback) {
     if (!item) return fallback || '-'
+    // Also protect legacy public records that uploaded a hidden true name.
+    if (item.kind === 'artifact' && item.identified !== true)
+      return `Unidentified ${item.noun || 'Artifact'} (???)`
     const name = item.name || fallback || '-'
     return name + (typeof item.stat_line === 'string' && item.stat_line ? ` (${item.stat_line})` : '')
   }

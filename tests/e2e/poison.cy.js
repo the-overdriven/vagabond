@@ -1,4 +1,35 @@
 describe('Monster poison', () => {
+  it('does not poison on a damaging glancing melee hit', () => {
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Glancing Poison Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalChance=chance,originalDamage=damageRoll,originalPoison=applyEnemyPoison
+      try {
+        replayAnimationsDisabled=true;currentZ=0;map=surfaceMap
+        map[40][40]='grass';map[40][41]='grass';player.x=40;player.y=40
+        enemies=[];npcs=[];occupied=new Set();player.hp=1000;player.maxHp=1000
+        player.equip={weapon:null,shield:null,armor:{kind:'armor',name:'Robe',base:'Robe',def:1}}
+        player.poisonTurns=0;player.godMode=false
+        const e=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Scorpion,id:'glancing-scorpion',
+          x:41,y:40,homeX:41,homeY:40,level:0,hp:100,maxHp:100,alive:true})
+        let calls=0,poisonCalls=0
+        applyEnemyPoison=()=>{poisonCalls++}
+        damageRoll=()=>6
+        chance=()=>++calls===2
+        const before=player.hp
+        enemyAttackPlayer(e)
+        check(before-player.hp===2,'glancing hit still deals positive damage')
+        check(poisonCalls===0,'glancing hit cannot poison')
+        chance=()=>false
+        enemyAttackPlayer(e)
+        check(poisonCalls===1,'non-glancing hit can trigger poison handling')
+      } finally {chance=originalChance;damageRoll=originalDamage;applyEnemyPoison=originalPoison}
+    })()`))
+  })
+
   it('coats a melee weapon, preserves it on misses and glances, and poisons only living enemies', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Venom Melee Tester')

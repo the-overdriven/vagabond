@@ -11,6 +11,11 @@ describe('Dwarven Ruins ordinary doors', () => {
   it('generates paired doors and preserves open state through save/replay restoration', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, msg) => { if (!ok) throw new Error(msg) }
+      check(!isBreachWeapon(makeShortBowItem()), 'Short Bow cannot breach locked doors')
+      check(!isBreachWeapon({kind:'artifact',artifactSlot:'weapon',rangedAtk:5}),
+        'ranged artifacts cannot breach locked doors')
+      check(isBreachWeapon({kind:'weapon',base:'Club',atk:2}),
+        'melee weapons retain their door-breaching ability')
       replayRecording = false
       replayPlaying = false
       currentZ = 0

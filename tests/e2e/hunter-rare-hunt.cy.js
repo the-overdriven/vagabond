@@ -250,8 +250,8 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       expect(result.first.turn).to.equal(result.beforeTurn + 1)
       expect(result.first.soundQueued, 'horn creates immediate visual sound effect').to.equal(true)
       expect(result.first.log).to.include('You hear something answering from east.')
-      expect(result.first.log).to.include('You hear something answering from northwest.')
-      expect(result.first.log).to.include('You hear something answering from southwest.')
+      expect(result.first.log).to.include('You hear something answering from north-west.')
+      expect(result.first.log).to.include('You hear something answering from south-west.')
       expect(result.first.log).not.to.include('You hear something answering from south.')
       expect((result.first.log.match(/You hear something answering from east\./g) || []).length,
         'same direction is reported only once').to.equal(1)

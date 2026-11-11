@@ -4,7 +4,7 @@
 let beastTracks = new Map()
 let caveSpoor = [] // Permanent, static z:-2 evidence, not aged surface tracks.
 let TRACK_CONFIG
-const TRACK_DIRECTIONS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest']
+const TRACK_DIRECTIONS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
 const TRACK_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
 
 function trackSpecies(enemy) {

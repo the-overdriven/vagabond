@@ -15,6 +15,41 @@ function loadedGame() {
 describe('Gear bases on procedural artifacts', () => {
   beforeEach(loadedGame)
 
+  it('keeps ground item prefixes and artifact identities concealed until collection', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const club={kind:'weapon',base:'Club',name:'Profound Club',atk:2,mod:'mf',modAmt:3}
+      const artifact={kind:'artifact',name:'Scimitar of Thingar',noun:'Scimitar',
+        base:'Scimitar',identified:false,artifactSlot:'weapon',bonuses:{atk:12}}
+      check(groundItemLabel({kind:'droppeditem',item:club})==='Club',
+        'ordinary prefix is not visible before pickup')
+      check(groundItemLabel({kind:'droppeditem',item:artifact})==='Scimitar',
+        'artifact identity is not visible on ground')
+      check(groundGlyph({kind:'droppeditem',item:artifact}).ch ===
+        groundGlyph({kind:'droppeditem',item:club}).ch,
+        'ASCII floor symbol does not reveal an artifact weapon')
+      check(groundGlyph({kind:'droppeditem',item:{...artifact,artifactSlot:'trinket'}}).ch !== '♦',
+        'non-gear artifacts use a neutral floor symbol')
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;enemies=[];npcs=[]
+      const drop={kind:'droppeditem',item:club,x:41,y:40,level:0}
+      groundItems=[drop]
+      let tooltip=tileInspectInfo(drop.x,drop.y)?.html || ''
+      check(tooltip.includes('>Club<')&&!tooltip.includes('Profound'),
+        'ground hover only shows the base equipment name')
+      drop.item=artifact
+      tooltip=tileInspectInfo(drop.x,drop.y)?.html || ''
+      check(tooltip.includes('>Scimitar<')&&!tooltip.includes('Thingar'),
+        'ground hover never names an unidentified artifact')
+      groundItems=[{kind:'gear',x:41,y:40,level:0}]
+      check(!tileInspectInfo(41,40)?.html?.includes('Equipment'),
+        'buried gear remains hidden until it is dug up')
+      const catalog=Object.entries(ITEM_DEFINITIONS || {})
+      check(catalog.every(([kind,definition])=>typeof definition.description==='string' &&
+        definition.description.trim()),'every catalog item has a readable description')
+      check(!!TILE_DESC.mausoleumtrapdoor,'mausoleum trapdoor is inspectable')
+    })()`))
+  })
+
   it('discounts only artifact selling when unidentified or identified as cursed', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

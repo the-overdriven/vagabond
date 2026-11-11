@@ -1171,6 +1171,14 @@ body.hint-collapsed #hint .panel-toggle {
   border-color: var(--ember-bright);
 }
 
+.inv-tab-mobile { display: none; }
+@media (max-width: 720px), (pointer: coarse) {
+  .inv-tab:has(.inv-tab-mobile) { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; min-height: 32px; padding: 4px; }
+  .inv-tab-label { display: none; }
+  .inv-tab img.inv-tab-mobile { display: block; width: 22px; height: 22px; object-fit: contain; }
+  .inv-tab .inv-tab-apple { display: inline-block; font-size: 20px; line-height: 22px; }
+}
+
 .invitem {
   display: flex;
   justify-content: space-between;

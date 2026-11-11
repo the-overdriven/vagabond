@@ -1719,7 +1719,7 @@ function buildDwarvenRuin(targetLevel) {
       level: ruinLevel,
       levelKind: 'chain',
       caveIndex: dwarvenRuin.caveIndex,
-      description: 'You something resembling a wheelbarrow. This thing has not been used in years. The craftsmanship, however, is of the highest quality and unknown material. It appears to be surprisingly light - you can pick it up if you want to. Though you\'re not sure why you would need it.'
+      description: 'You find something resembling a wheelbarrow. It has not been used in years, yet its craftsmanship is exceptional and the material is unfamiliar. It looks surprisingly light - you could pick it up, though you are not sure why you would need it.'
     })
     const coinSpot = [[deepSpot.x - 1, deepSpot.y], [deepSpot.x + 1, deepSpot.y], [deepSpot.x, deepSpot.y - 1], [deepSpot.x, deepSpot.y + 1]]
       .map(([x, y]) => ({x, y})).find(p => cm[p.y]?.[p.x] === 'marble')
@@ -5221,7 +5221,8 @@ function naturalSpawnEligible(tmpl) {
 // Depth-only templates are not surface wanderers. In particular, the surface
 // biome fallback must never place a mine-exclusive species on grass or snow.
 function surfaceSpawnEligible(tmpl) {
-  return !!tmpl && enemyBiomes(tmpl).some(biome => !/^z-\d+$/.test(biome))
+  return !!tmpl && tmpl.name !== 'Ghost' &&
+    enemyBiomes(tmpl).some(biome => !/^z-\d+$/.test(biome))
 }
 
 function spawnEnemies() {

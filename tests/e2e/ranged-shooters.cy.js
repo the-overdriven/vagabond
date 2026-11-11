@@ -37,6 +37,7 @@ function beginShooterGame() {
         alarmed:!!extra.alarmed, alarmedZ:extra.alarmed ? 0 : null,
         alarmedLevelKind:extra.alarmed ? currentLevelKind() : null,
         shooterAbility:extra.shooterAbility ?? ability, shotsRemaining:extra.shotsRemaining ?? 10,
+        shooterMode:extra.shooterMode ?? 'ranged',
         equipment:extra.equipment ?? null, prefix:extra.prefix ?? null, crit:!!extra.crit,
         ...extra
       }
@@ -68,7 +69,8 @@ describe('Ranged shooter monster variants', () => {
         rng = () => { calls++; return 0.499999 }
         const e = {name:'Skeleton',baseName:'Skeleton'}
         initializeEnemyShooter(e, ENEMY_TEMPLATE_BY_NAME.Skeleton)
-        rangedAssert(e.shooterAbility === 'shooterArrows' && e.shotsRemaining === 10, 'eligible spawn becomes shooter')
+        rangedAssert(e.shooterAbility === 'shooterArrows' && e.shotsRemaining === 10 &&
+          e.shooterMode === 'ranged', 'eligible spawn begins with ranged weapon equipped')
         initializeEnemyShooter(e, ENEMY_TEMPLATE_BY_NAME.Skeleton)
         rangedAssert(calls === 1 && e.shotsRemaining === 10, 'shooter roll happens only once')
         const wolf = {name:'Wolf',baseName:'Wolf'}
@@ -84,17 +86,20 @@ describe('Ranged shooter monster variants', () => {
       } finally { rng = original }
 
       resetRangedArena()
-      const shooter = makeShooter('Skeleton', 3, {id:'persist-shooter',shotsRemaining:7})
+      const shooter = makeShooter('Skeleton', 3, {id:'persist-shooter',shotsRemaining:7,shooterMode:'melee'})
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
       rangedAssert(save.version === self.VAGABOND_SAVE_VERSION, 'save version')
       rangedAssert(save.enemies.find(e=>e.id==='persist-shooter').shotsRemaining === 7, 'save exact ammo')
-      shooter.shotsRemaining = 1
+      rangedAssert(save.enemies.find(e=>e.id==='persist-shooter').shooterMode === 'melee', 'save equipped attack mode')
+      shooter.shotsRemaining = 1; shooter.shooterMode = 'ranged'
       loadGameFromObject(save)
       const loaded = enemies.find(e=>e.id==='persist-shooter')
       rangedAssert(loaded.shooterAbility === 'shooterArrows' && loaded.shotsRemaining === 7, 'load exact ammo')
+      rangedAssert(loaded.shooterMode === 'melee', 'load equipped attack mode')
       startReplayRecording()
       const snap = replayData.initialState.enemies.find(e=>e.id==='persist-shooter')
       rangedAssert(snap.shooterAbility === 'shooterArrows' && snap.shotsRemaining === 7, 'replay starting state exact ammo')
+      rangedAssert(snap.shooterMode === 'melee', 'replay starting mode')
       replayRecording = false; replayData = null
       return true
     })()`)).should('equal', true)
@@ -269,8 +274,19 @@ describe('Ranged shooter monster variants', () => {
         resetRangedArena(); let e=makeShooter('Skeleton',3,{aggro:4,aware:true}); let x=e.x
         enemyTurn(); rangedAssert(e.shotsRemaining===9 && e.x===x, 'inside range shoots without moving/kiting')
 
-        resetRangedArena(); e=makeShooter('Skeleton',1,{aggro:4,aware:true}); enemyTurn()
-        rangedAssert(e.shotsRemaining===10, 'adjacent shooter melees without ammo use')
+        resetRangedArena(); e=makeShooter('Skeleton',1,{aggro:4,aware:true})
+        let beforeHp=player.hp; enemyTurn()
+        rangedAssert(e.shotsRemaining===10 && e.shooterMode==='melee' && player.hp===beforeHp,
+          'adjacent shooter spends first action readying melee weapon')
+        enemyTurn()
+        rangedAssert(player.hp<beforeHp && e.shotsRemaining===10, 'subsequent melee turn attacks without ammo use')
+
+        resetRangedArena(); e=makeShooter('Skeleton',3,{aggro:4,aware:true,shooterMode:'melee'})
+        x=e.x; beforeHp=player.hp; enemyTurn()
+        rangedAssert(e.shooterMode==='ranged' && e.shotsRemaining===10 &&
+          player.hp===beforeHp && e.x===x, 'switching back to bow costs an action without firing')
+        enemyTurn()
+        rangedAssert(e.shotsRemaining===9, 'following turn fires one arrow')
 
         resetRangedArena(); e=makeShooter('Skeleton',4,{aggro:4,aware:true}); x=e.x; enemyTurn()
         rangedAssert(e.shotsRemaining===10 && e.x!==x, 'exact outer AGGRO line chases')

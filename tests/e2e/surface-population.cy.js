@@ -65,6 +65,8 @@ describe('Surface monster population', () => {
       expect(result.afterTiles).to.be.lessThan(result.beforeTiles)
       expect(result.afterSpawns).to.equal(Math.round(result.afterTiles / result.tilesPerEnemy * result.density))
       expect(result.afterSpawns).to.be.lessThan(result.beforeSpawns)
+      expect(win.eval("surfaceSpawnEligible(ENEMY_TEMPLATE_BY_NAME.Ghost)"),
+        'Ghost is excluded from ordinary surface spawn, migration, and population pools').to.equal(false)
     })
   })
 })

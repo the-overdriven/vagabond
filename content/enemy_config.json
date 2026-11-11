@@ -70,7 +70,7 @@
       "cooldownTurns": 4,
       "minimumPursuitGain": 2,
       "crossableTiles": ["dwarvenbed","dwarventable","dwarvencrate"],
-      "warningMessage": "The <enemy> crouches to leap toward the marked ground!",
+      "warningMessage": "The <enemy> crouches, preparing to leap!",
       "landMessage": "The <enemy> lands after a long leap!",
       "failedMessage": "The <enemy> cannot land its leap!"
     },

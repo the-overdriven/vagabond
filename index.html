@@ -431,10 +431,10 @@ more difficult:
         </div>
         <div class="inv-tabs" id="invTabs">
           <button class="inv-tab active" data-tab="all" type="button">All</button>
-          <button class="inv-tab" data-tab="weapon" type="button">Weapons</button>
-          <button class="inv-tab" data-tab="shield" type="button">Shields</button>
-          <button class="inv-tab" data-tab="armor" type="button">Armors</button>
-          <button class="inv-tab" data-tab="supplies" type="button">Supplies</button>
+          <button class="inv-tab" data-tab="weapon" type="button" aria-label="Weapons"><span class="inv-tab-label">Weapons</span><img class="inv-tab-mobile" src="img/icons/weapon.svg" alt="" aria-hidden="true"></button>
+          <button class="inv-tab" data-tab="shield" type="button" aria-label="Shields"><span class="inv-tab-label">Shields</span><img class="inv-tab-mobile" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
+          <button class="inv-tab" data-tab="armor" type="button" aria-label="Armors"><span class="inv-tab-label">Armors</span><img class="inv-tab-mobile" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
+          <button class="inv-tab" data-tab="supplies" type="button" aria-label="Supplies"><span class="inv-tab-label">Supplies</span><span class="inv-tab-mobile inv-tab-apple" aria-hidden="true">🍎</span></button>
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
@@ -1974,7 +1974,7 @@ more difficult:
     const info = DUNGEON_LOCK_STATE[tileKey]
     const weapon = player.equip.weapon
     if (!info || !info.breachable) return {attempted: false, success: false, reason: 'unbreachable'}
-    if (!isWeaponItem(weapon)) return {attempted: false, success: false, reason: 'weapon'}
+    if (!isBreachWeapon(weapon)) return {attempted: false, success: false, reason: 'weapon'}
     const breachAtk = playerBreachAtk()
     const success = chance(Math.min(1, breachAtk / 100))
     if (success) {
@@ -2242,6 +2242,10 @@ more difficult:
 
   function isWeaponItem(item) {
     return !!item && (item.kind === 'weapon' || (item.kind === 'artifact' && item.artifactSlot === 'weapon'))
+  }
+
+  function isBreachWeapon(item) {
+    return isWeaponItem(item) && !item.rangedAtk
   }
 
 
@@ -3133,7 +3137,11 @@ more difficult:
   function initializeEnemyShooter(enemy, tmpl = null) {
     if (!enemy) return enemy
     if (Object.prototype.hasOwnProperty.call(enemy, 'shooterAbility') ||
-        Object.prototype.hasOwnProperty.call(enemy, 'shotsRemaining')) return enemy
+        Object.prototype.hasOwnProperty.call(enemy, 'shotsRemaining')) {
+      enemy.shooterMode = enemy.shooterAbility
+        ? (enemy.shooterMode === 'melee' ? 'melee' : 'ranged') : null
+      return enemy
+    }
     const ability = shooterAbilityForTemplate(tmpl || ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name])
     enemy.shooterAbility = null
     enemy.shotsRemaining = 0
@@ -3141,6 +3149,7 @@ more difficult:
       enemy.shooterAbility = ability
       enemy.shotsRemaining = RANGED_CONFIG.startingShots
     }
+    enemy.shooterMode = enemy.shooterAbility ? 'ranged' : null
     return enemy
   }
 
@@ -3151,6 +3160,20 @@ more difficult:
 
   function enemyIsShooter(e) {
     return !!shooterDefinition(e) && Number.isFinite(e.shotsRemaining) && e.shotsRemaining > 0
+  }
+
+  function switchEnemyShooterMode(e, mode) {
+    if (!e.shooterAbility || e.shooterMode === mode || (mode === 'ranged' && !enemyIsShooter(e))) return false
+    e.shooterMode = mode
+    if (enemyIsVisibleOnMainView(e)) {
+      const melee = e.equipment?.kind === 'weapon' ? e.equipment.base || 'weapon'
+        : e.humanoid ? 'bare hands' : 'claws'
+      const ranged = e.shooterAbility === 'shooterArrows' ? 'a bow and arrows' : 'stones'
+      log(mode === 'ranged'
+        ? `The ${e.name} readies ${ranged}.`
+        : `The ${e.name} puts away its ranged weapon and readies ${melee} for melee.`, 'info')
+    }
+    return true // Switching costs the entire enemy action; no attack this turn.
   }
 
   function initializeEnemySleep(e) {
@@ -4158,7 +4181,8 @@ more difficult:
         const bow = makeBowItem(e.tier >= 3 && chance(0.25) ? 'Hunting Bow' : 'Short Bow', mf, e.tier || 0, true)
         if (onGround) placeEnemyLootOnGround(e, bow)
         else player.inventory.push(bow)
-        lootLog(`The ${e.name} dropped ${bow.name}.`, bow, bow.name)
+        const bowLabel = onGround ? bow.base : bow.name
+        lootLog(`The ${e.name} dropped ${bowLabel}.`, bow, bowLabel)
       }
     }
 
@@ -4222,17 +4246,19 @@ more difficult:
     const artifactChance = artifactDropRate *
       (WORLD_GEN_CONFIG.lootRules.enemyArtifactBaseChance + (e.tier - 1) * WORLD_GEN_CONFIG.lootRules.enemyArtifactTierChanceStep) *
       (1 + mf * WORLD_GEN_CONFIG.lootRules.enemyArtifactMagicFindMultiplierPerPoint)
-    if (chance(Math.min(WORLD_GEN_CONFIG.lootRules.enemyArtifactChanceCapBeforeRate * artifactDropRate, artifactChance))) {
+    if (e.humanoid && chance(Math.min(WORLD_GEN_CONFIG.lootRules.enemyArtifactChanceCapBeforeRate * artifactDropRate, artifactChance))) {
       const art = makeArtifactItem(e.tier, mf)
       if (art) {
-        lootLog(`The ${e.name} dropped ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
+        const label = onGround ? art.noun : artifactDisplayName(art)
+        lootLog(`The ${e.name} dropped ${label}.`, art, label)
         if (onGround) placeEnemyLootOnGround(e, art)
         else player.inventory.push(art)
       }
     }
     if (e.humanoid && e.equipment) {
       const item = e.equipment
-      lootLog(`The ${e.name} dropped ${item.name}.`, item)
+      const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
+      lootLog(`The ${e.name} dropped ${label}.`, item, label)
       if (onGround) {
         placeEnemyLootOnGround(e, item)
         return
@@ -4598,6 +4624,7 @@ more difficult:
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null, options = null) {
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
+    if (!isExtraAttack && switchEnemyShooterMode(e, 'melee')) return false
     revealEnemyInvisibility(e)
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
@@ -4652,7 +4679,7 @@ more difficult:
     checkPlayerHealthWarning()
     applyEnemyLifesteal(e, effectiveDamage)
     if (dmg > 0 && player.hp > 0) {
-      applyEnemyPoison(e)
+      if (!glancing) applyEnemyPoison(e)
       applyEnemyContactStatuses(e)
     }
     if (player.hp > 0 && options?.onHit) options.onHit()
@@ -4841,6 +4868,7 @@ more difficult:
     // No ammunition is consumed for a spell; both types share all combat rolls.
     const projectilePath = spellAttack ? clearProjectilePath(e) : (path || projectilePathBetween(e.x, e.y, player.x, player.y))
     if (!projectilePath) return false
+    if (!spellAttack && switchEnemyShooterMode(e, 'ranged')) return false
     clearAutoPath()
     if (!spellAttack) e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
     const projectile = shot.projectile
@@ -5281,7 +5309,7 @@ more difficult:
     const deathLogId = log(
       player.permadeath
         ? `You have fallen... You made ${player.steps} steps and slew ${player.kills} creatures, but your journey ends here.`
-        : `You have fallen... and awaken at the Temple. You lose ${xpLoss} XP and ${maxHpLoss} max HP permanently.${droppedItem ? ` You dropped ${droppedItem.name} where you fell.` : ''}`,
+        : `You have fallen... and awaken at the Temple. You lose ${xpLoss} XP and ${maxHpLoss} max HP permanently.${droppedItem ? ` You dropped ${artifactDisplayName(droppedItem)} where you fell.` : ''}`,
       'bad'
     )
     stopCameraAnimation()
@@ -8396,8 +8424,9 @@ more difficult:
     clearAutoPath()
     autoPath = path
     autoPathTargetEnemy = targetEnemy
+    pendingMove = null
     if (targetEnemy) hoveredAutoPath = null
-    flushPendingMove()
+    if (!cameraAnimating) flushPendingMove()
     return true
   }
 
@@ -8424,7 +8453,7 @@ more difficult:
       candidates.push({x: nx, y: ny})
     }
     if (!candidates.length) return
-    const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest') && naturalSpawnEligible(t))
+    const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && t.name !== 'Ghost' && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest') && naturalSpawnEligible(t))
     if (!templates.length) return
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
     const spot = pick(candidates)
@@ -8578,7 +8607,7 @@ more difficult:
     }
     if (DungeonHazards.doorHazard(nx,ny)?.state === 'active' && map[ny]?.[nx] === 'dwarvendoorlocked') {
       clearAutoPath()
-      const armed = isWeaponItem(player.equip.weapon)
+      const armed = isBreachWeapon(player.equip.weapon)
       DungeonHazards.onDoorInteraction(nx,ny,armed)
       if (armed) {
         consecutiveWaitTurns = 0
@@ -8629,8 +8658,10 @@ more difficult:
         return
       }
       const weapon = player.equip.weapon
-      if (!isWeaponItem(weapon)) {
-        log('The locked dwarven door will not yield to bare fists. You need a weapon to breach it.', 'info')
+      if (!isBreachWeapon(weapon)) {
+        log(isWeaponItem(weapon)
+          ? 'A bow cannot breach a locked dwarven door. Equip a melee weapon.'
+          : 'The locked dwarven door will not yield to bare fists. You need a melee weapon to breach it.', 'info')
         render()
         updateTooltip()
         flushPendingMove()
@@ -8844,8 +8875,8 @@ more difficult:
   const LOOK_DIRS = [
     {dx: 0, dy: -1, name: 'north'}, {dx: 0, dy: 1, name: 'south'},
     {dx: -1, dy: 0, name: 'west'}, {dx: 1, dy: 0, name: 'east'},
-    {dx: -1, dy: -1, name: 'northwest'}, {dx: 1, dy: -1, name: 'northeast'},
-    {dx: -1, dy: 1, name: 'southwest'}, {dx: 1, dy: 1, name: 'southeast'},
+    {dx: -1, dy: -1, name: 'north-west'}, {dx: 1, dy: -1, name: 'north-east'},
+    {dx: -1, dy: 1, name: 'south-west'}, {dx: 1, dy: 1, name: 'south-east'},
   ]
 
   function spawnAncientBellLich() {
@@ -9107,9 +9138,14 @@ more difficult:
       if (item.kind === 'deadbody')
         return `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
       const label = groundLabels[item.kind]
-      return typeof label === 'function' ? label(item) : label ||
-        (itemDefinition(item.kind)?.name ? `a ${itemDefinition(item.kind).name}` :
-          groundGlyph(item) ? `a ${groundItemLabel(item)}` : 'something')
+      if (typeof label === 'function') return label(item)
+      if (label) return label
+      if (item.kind === 'droppeditem' && item.item) return `a ${groundItemLabel(item)}`
+      const name = itemDefinition(item.kind)?.name
+      if (name) return `a ${name}`
+      if (typeof item.description === 'string' && item.description.trim()) return item.description.trim()
+      console.warn('Inspect: unknown ground object kind', item.kind)
+      return null
     }
     const groundByCell = new Map()
     for (const g of groundItems) {
@@ -9120,7 +9156,7 @@ more difficult:
       groundByCell.get(cell).push(g)
     }
     const standingLabels = (groundByCell.get(keyXY(player.x, player.y)) || []).map(groundLabel)
-    for (const label of new Set(standingLabels)) log(`You notice ${label} here.`, 'info')
+    for (const label of new Set(standingLabels)) if (label) log(`You notice ${label} here.`, 'info')
     // Report interactive terrain and furniture, not purely cosmetic props.
     const inspectableTerrain = new Set([
       'towerstairsup','towerstairsdown','dwarvenfortexit','dwarvenstairsup','dwarvenstairsdown',
@@ -9156,10 +9192,10 @@ more difficult:
             dx === 0 && dy > 0 ? 'south' :
               dx < 0 && dy === 0 ? 'west' :
                 dx > 0 && dy === 0 ? 'east' :
-                  dx < 0 && dy < 0 ? 'northwest' :
-                    dx > 0 && dy < 0 ? 'northeast' :
-                      dx < 0 && dy > 0 ? 'southwest' :
-                        'southeast'
+                  dx < 0 && dy < 0 ? 'north-west' :
+                    dx > 0 && dy < 0 ? 'north-east' :
+                      dx < 0 && dy > 0 ? 'south-west' :
+                        'south-east'
 
         const enemy = enemies.find(
           en => onCurrentLevel(en) && en.alive && en.x === nx && en.y === ny &&
@@ -9171,7 +9207,10 @@ more difficult:
         // A tile can hold an item, monster, and interactive terrain at once.
         // Inspect each layer independently so a dropped item never hides a
         // lever, pressure plate, doorway, or other point of interest.
-        for (const item of groundByCell.get(keyXY(nx, ny)) || []) addNote(groundLabel(item), direction)
+        for (const item of groundByCell.get(keyXY(nx, ny)) || []) {
+          const label = groundLabel(item)
+          if (label) addNote(label, direction)
+        }
         const t = map[ny][nx]
 
         if (t === 'blackpillar') {
@@ -9196,7 +9235,7 @@ more difficult:
           t === 'village' ||
           inspectableTerrain.has(t)
         ) {
-          const label = TILE_DESC[t] || (t === 'mausoleumtrapdoor' ? 'a trapdoor into the mausoleum' : null)
+          const label = TILE_DESC[t]
           if (label) addNote(label, direction)
         }
       }
@@ -9205,22 +9244,22 @@ more difficult:
     const summary = Object.entries(notes).map(([label, directions]) => {
       const dirs = [...directions]
       // A cardinal direction subsumes its adjacent diagonal sectors. This
-      // avoids verbose output such as "north and northeast" for one object.
+      // avoids verbose output such as "north and north-east" for one object.
       if (dirs.includes('north')) {
-        directions.delete('northwest')
-        directions.delete('northeast')
+        directions.delete('north-west')
+        directions.delete('north-east')
       }
       if (dirs.includes('south')) {
-        directions.delete('southwest')
-        directions.delete('southeast')
+        directions.delete('south-west')
+        directions.delete('south-east')
       }
       if (dirs.includes('east')) {
-        directions.delete('northeast')
-        directions.delete('southeast')
+        directions.delete('north-east')
+        directions.delete('south-east')
       }
       if (dirs.includes('west')) {
-        directions.delete('northwest')
-        directions.delete('southwest')
+        directions.delete('north-west')
+        directions.delete('south-west')
       }
       const conflatedDirs = [...directions]
 
@@ -10105,7 +10144,9 @@ more difficult:
   // descriptors without changing gameplay/world-generation code.
   function groundGlyph(g) {
     if (g.kind === 'droppeditem') {
-      const kind = g.item?.kind
+      // Before collection, even the ASCII symbol must not disclose that an
+      // otherwise ordinary-looking weapon, shield or armor is an artifact.
+      const kind = g.item?.kind === 'artifact' ? g.item.artifactSlot : g.item?.kind
       const ch = kind === 'weapon' ? '⚔' : kind === 'shield' ? '◈' :
         kind === 'armor' ? '▣' : kind === 'artifact' ? '♦' :
           itemDefinition(kind)?.category === 'supplies' ? '!' : '¤'
@@ -10127,7 +10168,11 @@ more difficult:
       ? (item.base || (item.kind === 'artifact' ? item.noun : item.name)) : null
     const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
       ? 'img/icons/' + base + '.svg' : null
-    const fallback = itemIconPath(item.kind)
+    // The artifact-specific icon would reveal its identity before pickup.
+    // Use the mundane equipment fallback, or a neutral glyph for trinkets.
+    const fallback = item.kind === 'artifact'
+      ? (['weapon','shield','armor'].includes(gearKind) ? itemIconPath(gearKind) : null)
+      : itemIconPath(item.kind)
     const path = [specific, fallback].find(path => path && preloadedImages.has(path))
     return path ? {image:path, scale:0.72} : null
   }
@@ -12082,7 +12127,8 @@ more difficult:
   }
 
   function groundItemLabel(g) {
-    if (g.kind === 'droppeditem') return g.item ? artifactDisplayName(g.item) : 'Dropped Item'
+    if (g.kind === 'droppeditem') return g.item
+      ? (g.item.kind === 'artifact' ? g.item.noun || g.item.base || 'Artifact' : g.item.base || g.item.name || 'Item') : 'Dropped Item'
     return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'dwarvenstove' ? 'Dwarven Stove' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
   }
 
@@ -12147,7 +12193,7 @@ more difficult:
         mini: false, enemy: e, html: `
       <img src="${imageSrc(`img/enemies/${slug(e.baseName || e.name)}.jpg`)}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? ' <span class="shooter-marker">&#127993;&#xfe0e;</span>' : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
       ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${e.poisonDamagePerTurn} HP/turn, ${e.poisonDamageRemaining} HP remaining)</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
@@ -12440,10 +12486,17 @@ more difficult:
   }, {passive: false})
 
   function handleCanvasTap(clientX, clientY) {
-    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || cameraAnimating || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
+    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    // A new tap can redirect movement during the last step's camera pan.
+    // No gameplay step runs until that animation finishes.
+    if (cameraAnimating) {
+      if (window.matchMedia('(pointer: coarse)').matches && !fireballAim)
+        startAutoPath(mx, my)
+      return
+    }
     if (fireballAim) {
       if (!window.matchMedia('(pointer: coarse)').matches) {
         setFireballTarget(mx, my)
@@ -13107,7 +13160,7 @@ more difficult:
     const dx = treasureMapSpot.x - origin.x, dy = treasureMapSpot.y - origin.y
     const ns = Math.abs(dy) > Math.abs(dx) * 0.5 ? (dy < 0 ? 'north' : 'south') : ''
     const ew = Math.abs(dx) > Math.abs(dy) * 0.5 ? (dx < 0 ? 'west' : 'east') : ''
-    const dir = (ns + ew) || 'nearby'
+    const dir = (ns && ew ? `${ns}-${ew}` : ns || ew) || 'nearby'
     const dist = Math.round(Math.max(Math.abs(dx), Math.abs(dy)))
     const far = dist > 60 ? 'a great distance' : dist > 25 ? 'a fair distance' : 'not far'
     return `A shaky hand has marked a lone X beside a stretch of dunes, ${far} to the ${dir} of the village.`
@@ -15194,6 +15247,7 @@ more difficult:
       ev.preventDefault()
       bowAimTarget = null
       clearAutoPath()
+      hoveredAutoPath = null
       tryMove(moves[key][0], moves[key][1])
     }
   })
