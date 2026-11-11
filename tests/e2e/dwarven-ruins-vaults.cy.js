@@ -267,8 +267,8 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         [type,{weight:def.weight,progressRange:def.progressRange?.slice(),minSize:def.minSize?.slice(),
           requiredEntrances:def.requiredEntrances?.slice(),doorRequirement:def.doorRequirement}]))
       vaultCfg.countRange = [2,2]
-      // Force the optional *second* fitted vault to exercise this recipe, no
-      // longer rely on a compulsory final-floor defensive-vault selection.
+      // Bias ordinary fitted vaults toward this recipe. No particular floor
+      // guarantees it, because the available procedural rooms still matter.
       for (const [type,def] of Object.entries(defs)) {
         if (type !== 'barricadedDormitory' && !['treasury','sealedTomb','trappedArmory','guardedArtifactChamber'].includes(type))
           def.progressRange=[0,0]
@@ -292,13 +292,14 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         }
       }
 
-      const final = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins').at(-1)
-      const vault = (final.vaults || []).find(v => v.type === 'barricadedDormitory')
+      const dormitoryFloor = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
+        .find(level => (level.vaults || []).some(v => v.type === 'barricadedDormitory'))
+      const vault = dormitoryFloor?.vaults.find(v => v.type === 'barricadedDormitory')
       check(!!vault, 'optional fitted vault can still select barricaded dormitory')
-      const room = final.rooms.find(r => r.id === vault.roomId)
+      const room = dormitoryFloor.rooms.find(r => r.id === vault.roomId)
       let barricades = 0
       for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) {
-        if (final.map[y]?.[x] === 'dwarvenbedbarricade') barricades++
+        if (dormitoryFloor.map[y]?.[x] === 'dwarvenbedbarricade') barricades++
       }
       check(barricades >= 1, 'barricaded dormitory visibly contains dragged-bed cover')
       check(TILE.dwarvenbedbarricade.walk === false && TILE.dwarvenbedbarricade.projectileBlock === true,

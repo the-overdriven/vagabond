@@ -113,9 +113,10 @@ describe('Non-gear item catalog', () => {
               let draws = 0
               rng = () => {draws++;return oldRoll}
               tryForage()
-              forage.push((player.inventory.find(it=>it.kind!=='brushwood')?.kind || 'nothing') === expected && draws === 1 &&
-                player.inventory.find(it=>it.kind==='brushwood')?.count === 1 &&
-                fxAnims.filter(effect => effect.ch === 'found!').length === 1)
+              const brushwoodFound = oldRoll < 0.75
+              forage.push((player.inventory.find(it=>it.kind!=='brushwood')?.kind || 'nothing') === expected && draws === 2 &&
+                (player.inventory.find(it=>it.kind==='brushwood')?.count || 0) === Number(brushwoodFound) &&
+                fxAnims.filter(effect => effect.ch === 'found!').length === Number(brushwoodFound || expected !== 'nothing'))
             }
           }
           return {chest,forage,chestScale:CHEST_LOOT_TABLE.scale,forageScale:FORAGE_TABLE.scale,
@@ -167,7 +168,8 @@ describe('Non-gear item catalog', () => {
           player.inventory = previous.inventory; groundItems = previous.groundItems; rng = previous.rng
         }
       })()`)
-      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 8,
+      // Each chest also rolls separately for the rare Flint Stone and Potato.
+      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 12,
         groundKinds: ['homecomingscroll', 'idscroll', 'potion', 'scrollOfInvisibility', 'speedpotion'],
         names: ['Life Potion', 'Potion of Speed', 'Scroll of Homecoming',
           'Scroll of Identification', 'Scroll of Invisibility'], remainingGround: 0})

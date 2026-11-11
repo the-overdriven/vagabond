@@ -11,6 +11,9 @@ describe('Monster poison', () => {
         replayAnimationsDisabled=true;player.berserkTurns=0;player.godMode=false
         currentZ=0;map=surfaceMap;enemies=[];occupied=new Set();npcs=[]
         player.x=40;player.y=40;player.equip.weapon=null
+        // The seeded surface may put these coordinates in deep water, where
+        // using inventory items is correctly forbidden.
+        map[player.y][player.x]='grass'
         player.inventory=[createItem('venomGland',{count:3})];turnCount=0
         enemyTurn=()=>{turnCount++};npcTurn=()=>{};damageRoll=()=>2
         useVenomGland(0)

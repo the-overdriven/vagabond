@@ -731,10 +731,11 @@ feedback joins the stack only when its impact is displayed. Each label remains
 fully opaque and stationary for **280 ms** before drifting and fading over the
 rest of its existing lifetime (850 ms for ordinary combat text, 1,000 ms for
 summoning). New messages still push older ones up immediately. Popups never
-delay input or affect combat resolution, saves, or replay RNG. Labels sit 8
-screen pixels above their original anchor and are drawn over creatures,
-lighting, attack telegraphs, and rectangular range overlays in both tile and
-ASCII modes. Screen-fade transitions still cover the whole scene.
+delay input or affect combat resolution, saves, or replay RNG. Labels begin 5
+screen pixels above their tile anchor, stay there during the hold, and are
+drawn over creatures, lighting, attack telegraphs, and rectangular range
+overlays in both tile and ASCII modes. Screen-fade transitions still cover
+the whole scene.
 
 Animation-only frames reuse the current status display. Actions and HUD changes
 refresh it, and the animation loop refreshes it again on completion so visible

@@ -420,7 +420,10 @@ describe('Mine-only encounters and darkness', () => {
       player.godMode=false;player.x=solid.x;player.y=solid.y
       invalidateUndergroundFov()
 
-      const roster=monsters.map(e=>[e.id,e.baseName,e.level,e.x,e.y,e.prefix,e.prefixBase,e.equipment,e.gearScale,e.gearBonuses])
+      // The first-floor monsters were deliberately removed before the mining
+      // turn checks; persist only the representatives still in the world.
+      const roster=enemies.filter(e=>e.alive && names.includes(e.baseName) && e.levelKind==='chain')
+        .map(e=>[e.id,e.baseName,e.level,e.x,e.y,e.prefix,e.prefixBase,e.equipment,e.gearScale,e.gearBonuses])
       const saved=JSON.parse(JSON.stringify(buildSaveObject())),rng=rngState
       loadGameFromObject(saved,{isReplayInit:true})
       check(rngState===rng,'save restoration does not consume RNG')

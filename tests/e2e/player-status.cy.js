@@ -142,7 +142,9 @@ describe('Active player statuses', () => {
       cy.viewport(width, 900)
       for (const tiles of [true, false]) {
         cy.window().then(win => win.eval(`USE_TILE_IMAGES = ${tiles}; render()`))
-        cy.get('#playerStatusList').then(list => {
+        // Positioning runs in requestAnimationFrame after render/viewport
+        // changes. Retry until that frame has placed the badges over the map.
+        cy.get('#playerStatusList').should(list => {
           const canvas = list[0].ownerDocument.getElementById('game').getBoundingClientRect()
           for (const badge of list[0].children) {
             const rect = badge.getBoundingClientRect()

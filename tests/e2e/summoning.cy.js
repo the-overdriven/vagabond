@@ -97,8 +97,8 @@ describe('Once-only monster summoning', () => {
           const popup=damageAnims[0],arrival=popup.start+popup.delay
           layoutDamageNumbers(arrival)
           const originalY=popup.displayY
-          summonCheck(DAMAGE_POPUP_RAISE_PX===8 && originalY===40*TILE_PX-8,
-            'popups appear eight screen pixels higher in both display modes')
+          summonCheck(DAMAGE_POPUP_RAISE_PX===5 && originalY===40*TILE_PX-5,
+            'popups appear five screen pixels higher in both display modes')
           layoutDamageNumbers(arrival+DAMAGE_POPUP_HOLD_MS)
           summonCheck(DAMAGE_POPUP_HOLD_MS===280 && popup.displayY===originalY &&
             damagePopupFadeProgress(popup,arrival+DAMAGE_POPUP_HOLD_MS)===0,
