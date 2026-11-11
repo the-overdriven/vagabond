@@ -54,7 +54,6 @@ more difficult:
 !3 [mysteriando] ❓ the shoddy staircase in crypt should be unlocked by stepping on a pressure plate?
 !3 [npc] 🧙 herbalist has a small chance to reveal fisherman dialogue: We're a tight-knit community, though my brother prefers his nets to our company. Lives far from the village in <direction>. If you find him, give him my regards. (or cousin instead of brother), + !1 [npc] 🧙 witch is a crazy niece of hunter
 !3 [npc] 🧙 feat: new NPC: blacksmith to improve weapons, or witch to enchant them (for a fee), witch gives a reward choice, The witch has a crystal ball that can give the player cryptic clues about the location of a monster carrying good loot - specifically, hints about which direction to travel? witch can enchant items, but also remove curses and identify artifacts
-!3 [pathfinding] 🧭 fix: autopath should ignore swimming, unless already in water
 !3 [permadeath] ☠️ dying on permadeath should wait for player input before showing race selection for new char
 !3 [status effects] 🌀 Diseased: healing received −50% for 10 turns.
 !3 [survival] 🔥 feat: add limited ability to rest (may be interrupted), might require setting up camp. abandoned campfire could be reused
@@ -72,7 +71,6 @@ more difficult:
 
 !4 [enemy abilities] 👹 monster ability: cry for help (on low hp?)
 !3 [monsters] 👹 add deers. passive but run away
-!4 [pathfinding] 🧭 autopath should take your swimming skill into account
 !4 [permadeath] ☠️ starting a second game on permadeath world should respawn enemies underground?
 !4 [rendering] 🎨 - animation refresh rate on mobile is too slow. when walking I see fungus some item or unmoving creature glyph blinking
 !4 [simulation] 🌐 feat: the world should feel like it lives its own life, i.e. world changes, wandering monsters, fighting monsters, wandering NPC and monsters
@@ -8474,6 +8472,13 @@ more difficult:
     if (onlineRecordsBlockActions()) return
     if (autoPathTargetEnemy) refreshAutoChasePath()
     if (autoPath && autoPath.length) {
+      // Water endurance may have changed since the route was planned (for
+      // example by waiting in water or ice breaking). Never follow a stale,
+      // newly dangerous path automatically.
+      if (!autoPathHasSafeSwim(autoPath)) {
+        clearAutoPath()
+        return
+      }
       const next = autoPath.shift()
       if (!next || Math.abs(next.x - player.x) > 1 || Math.abs(next.y - player.y) > 1 || (next.x === player.x && next.y === player.y)) {
         clearAutoPath()
@@ -8509,6 +8514,20 @@ more difficult:
     return isLockedDungeonDoorTile(map[y]?.[x]) && !!matchingDungeonKeyAt(x, y)
   }
 
+  // Each step into deep water spends one Swimming turn. Dry tiles reset the
+  // budget; rivers and intact ice are not deep water. A swimmer already in
+  // water must use their remaining endurance rather than start a fresh count.
+  function autoPathHasSafeSwim(path) {
+    if (player.godMode || raceHas('swims')) return true
+    let waterRun = deepSwimmingWater(player.x, player.y) ? (player.swimTurns || 0) : 0
+    const limit = Math.max(0, player.swimming || 0)
+    for (const step of path) {
+      waterRun = deepSwimmingWater(step.x, step.y) ? waterRun + 1 : 0
+      if (waterRun > limit) return false
+    }
+    return true
+  }
+
   function findPlayerPath(targetX, targetY, discoveredOnly = false) {
     if (targetX < 0 || targetY < 0 || targetX >= MAP_W || targetY >= MAP_H) return null
     const knownTiles = currentZ === 0 ? discovered : undergroundDiscovered
@@ -8524,16 +8543,27 @@ more difficult:
     }
     if (!canTraverse(targetX, targetY)) return null
     if (targetX === player.x && targetY === player.y) return []
-    const queue = [{x: player.x, y: player.y}]
-    const cameFrom = new Map()
-    cameFrom.set(keyXY(player.x, player.y), null)
-    let found = false
+    const unlimitedSwim = player.godMode || raceHas('swims')
+    const swimLimit = Math.max(0, player.swimming || 0)
+    const startInWater = deepSwimmingWater(player.x, player.y)
+    const initialRun = !unlimitedSwim && startInWater ? (player.swimTurns || 0) : 0
+    // Breadth-first search still finds the shortest safe route. Water tiles
+    // remember the lowest consecutive swim count seen at an equal or shorter
+    // distance. A higher count cannot improve any continuation, so discard it
+    // without multiplying the queue by every possible Swimming skill level.
+    const dryVisited = new Set()
+    const bestWaterRun = new Map()
+    const startId = player.y * MAP_W + player.x
+    if (startInWater) bestWaterRun.set(startId, initialRun)
+    else dryVisited.add(startId)
+    const queue = [{x: player.x, y: player.y, waterRun: initialRun, parent: -1}]
+    let foundIndex = -1
     // Large-map destinations can be hundreds of tiles away: advance an index
-    // rather than repeatedly shifting the BFS queue (quadratic on long routes).
+    // rather than shifting the queue (quadratic on long routes).
     for (let head = 0; head < queue.length; head++) {
       const cur = queue[head]
       if (cur.x === targetX && cur.y === targetY) {
-        found = true
+        foundIndex = head
         break
       }
       for (const [dx, dy] of DIRS8) {
@@ -8542,20 +8572,26 @@ more difficult:
         if ((discoveredOnly || currentZ < 0) && !knownTiles?.[ny]?.[nx]) continue
         if (!canTraverse(nx, ny)) continue
         const nk = keyXY(nx, ny)
-        if (cameFrom.has(nk)) continue
         if ((nx !== targetX || ny !== targetY) && occupied.has(nk)) continue
         if ((nx !== targetX || ny !== targetY) && npcs.some(n => n.x === nx && n.y === ny)) continue
-        cameFrom.set(nk, cur)
-        queue.push({x: nx, y: ny})
+        const inWater = deepSwimmingWater(nx, ny)
+        const nextRun = inWater && !unlimitedSwim ? cur.waterRun + 1 : 0
+        if (inWater && !unlimitedSwim && nextRun > swimLimit) continue
+        const tileId = ny * MAP_W + nx
+        if (inWater) {
+          if (bestWaterRun.has(tileId) && bestWaterRun.get(tileId) <= nextRun) continue
+          bestWaterRun.set(tileId, nextRun)
+        } else {
+          if (dryVisited.has(tileId)) continue
+          dryVisited.add(tileId)
+        }
+        queue.push({x: nx, y: ny, waterRun: nextRun, parent: head})
       }
     }
-    if (!found) return null
+    if (foundIndex < 0) return null
     const tiles = []
-    let cur = {x: targetX, y: targetY}
-    while (cur.x !== player.x || cur.y !== player.y) {
-      tiles.push(cur)
-      cur = cameFrom.get(keyXY(cur.x, cur.y))
-    }
+    for (let i = foundIndex; queue[i].parent !== -1; i = queue[i].parent)
+      tiles.push({x: queue[i].x, y: queue[i].y})
     tiles.reverse()
     const steps = []
     let fromX = player.x, fromY = player.y

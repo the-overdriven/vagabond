@@ -14,6 +14,124 @@ function beginGame() {
   cy.get('#raceOverlay').should('not.have.class', 'show')
 }
 
+describe('Swimming-aware auto-pathing', () => {
+  it('limits consecutive water tiles, finds safe detours and respects remaining endurance', () => {
+    beginGame()
+    cy.window().then(win => win.eval(`(() => {
+      const check = (ok, message) => {if (!ok) throw Error(message)}
+      const previous = {map, discovered, currentZ, enemies, npcs, occupied,
+        x: player.x, y: player.y, race: player.race, swimming: player.swimming,
+        swimTurns: player.swimTurns, godMode: player.godMode, autoPath,
+        autoPathTargetEnemy, surfaceCatchupBusy}
+      const startingRng = rngState
+      const testMap = () => {
+        map = Array.from({length: MAP_H}, () => Array(MAP_W).fill('mountain'))
+        discovered = Array.from({length: MAP_H}, () => Array(MAP_W).fill(false))
+        currentZ = 0; enemies = []; npcs = []; occupied = new Set()
+        player.x = 50; player.y = 50; player.race = 'human'
+        player.swimming = 5; player.swimTurns = 0; player.godMode = false
+        autoPath = null; autoPathTargetEnemy = null; surfaceCatchupBusy = false
+      }
+      const put = (x, y, terrain) => {map[y][x] = terrain; discovered[y][x] = true}
+      const row = (end, waterX) => {
+        for (let x = 50; x <= end; x++) put(x, 50, waterX.includes(x) ? 'water' : 'grass')
+      }
+      const maxWetRun = path => {
+        let longest = 0, run = map[player.y][player.x] === 'water' ? player.swimTurns : 0
+        for (const step of path) {
+          run = map[step.y][step.x] === 'water' ? run + 1 : 0
+          longest = Math.max(longest, run)
+        }
+        return longest
+      }
+      try {
+        testMap()
+        row(56, [51, 52, 53, 54, 55])
+        let path = findPlayerPath(56, 50, true)
+        check(path?.length === 6 && maxWetRun(path) === 5 && autoPathHasSafeSwim(path),
+          'Swimming 5 permits exactly five consecutive deep-water steps')
+        put(56, 50, 'water'); put(57, 50, 'grass')
+        check(findPlayerPath(57, 50, true) === null,
+          'a sixth consecutive water tile is not a viable route')
+        player.swimming = 6
+        path = findPlayerPath(57, 50, true)
+        check(path?.length === 7 && maxWetRun(path) === 6,
+          'Swimming 6 permits a six-tile crossing')
+        player.race = 'merling'; player.swimming = 0
+        check(findPlayerPath(57, 50, true)?.length === 7,
+          'Merling can cross with no learned Swimming skill')
+        player.race = 'human'; player.godMode = true
+        check(findPlayerPath(57, 50, true)?.length === 7,
+          'God Mode ignores swimming endurance')
+        player.godMode = false
+        check(findPlayerPath(57, 50, true) === null,
+          'ordinary non-swimmer cannot automatically enter deep water')
+
+        testMap()
+        row(57, [51, 52, 53, 54, 55, 56])
+        for (let x = 50; x <= 57; x++) put(x, 49, 'grass')
+        path = findPlayerPath(57, 50, true)
+        check(path?.length > 0 && maxWetRun(path) <= 5,
+          'the pathfinder chooses a safe land detour when direct water is too long')
+        check(path.every(step => discovered[step.y][step.x]),
+          'the large map route stays on explored terrain')
+        player.swimming = 0
+        check(findPlayerPath(57, 50, true)?.every(step => map[step.y][step.x] !== 'water'),
+          'a non-swimmer takes the dry detour')
+
+        testMap()
+        player.swimming = 3
+        row(58, [51, 52, 53, 55, 56, 57])
+        path = findPlayerPath(58, 50, true)
+        check(path?.length === 8 && maxWetRun(path) === 3,
+          'land between separate three-tile crossings resets endurance')
+        player.swimming = 2
+        check(findPlayerPath(58, 50, true) === null,
+          'insufficient Swimming rejects both crossings')
+        testMap()
+        row(57, [])
+        for (let x = 51; x <= 56; x++) put(x, 50, 'river')
+        player.swimming = 0
+        check(findPlayerPath(57, 50, true)?.length === 7,
+          'ordinary rivers do not consume Swimming endurance')
+
+        testMap()
+        player.swimming = 5
+        put(50, 50, 'water'); put(51, 50, 'water')
+        put(52, 50, 'water'); put(53, 50, 'grass')
+        player.swimTurns = 4
+        check(findPlayerPath(53, 50, true) === null,
+          'starting in water with four spent turns leaves only one safe water step')
+        player.swimTurns = 3
+        path = findPlayerPath(53, 50, true)
+        check(path?.length === 3 && maxWetRun(path) === 5,
+          'a water start uses remaining endurance, allowing the exact limit')
+        player.swimTurns = 4
+        check(!autoPathHasSafeSwim(path), 'an outdated plan becomes unsafe after waiting in water')
+        const before = {x: player.x, y: player.y}
+        autoPath = path
+        flushPendingMove()
+        check(autoPath === null && player.x === before.x && player.y === before.y,
+          'auto movement cancels a stale unsafe water route before spending a turn')
+        player.swimming = 0; player.swimTurns = 5
+        put(51, 50, 'grass')
+        check(findPlayerPath(51, 50, true)?.length === 1,
+          'a drowning swimmer may always auto-path directly onto adjacent shore')
+        check(rngState === startingRng, 'planning routes consumes no gameplay RNG')
+      } finally {
+        ({map, discovered, currentZ, enemies, npcs, occupied,
+          surfaceCatchupBusy} = previous)
+        player.x = previous.x; player.y = previous.y; player.race = previous.race
+        player.swimming = previous.swimming; player.swimTurns = previous.swimTurns
+        player.godMode = previous.godMode
+        autoPath = previous.autoPath; autoPathTargetEnemy = previous.autoPathTargetEnemy
+        render()
+      }
+      return true
+    })()`)).should('equal', true)
+  })
+})
+
 describe('Swimming visuals', () => {
   it('masks the lower half of characters over liquid water, including mid-move', () => {
     beginGame()

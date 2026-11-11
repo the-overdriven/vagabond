@@ -763,10 +763,20 @@ Map travel follows the existing rules for hazards, enemies, interactions,
 manual movement, and interruptions. It uses deterministic breadth-first
 pathfinding and does not add saved or replay state.
 
-Auto-pathing can account for:
-
-- normal walkable terrain
-- water when playing Merling
+Auto-pathing accounts for normal walkable terrain and Swimming. For ordinary
+characters, a path can contain no more than the current Swimming skill's number
+of **consecutive deep-water tiles**. Each entry step counts; a dry tile resets
+the count, so separate short crossings are allowed. A character already in deep
+water uses the remaining allowance (`Swimming − swimTurns`), not a new full
+allowance. If the direct route is too long, the pathfinder searches for a safe
+land detour; if none exists, it refuses the route without spending a turn.
+A swimmer with no learned skill cannot automatically enter deep water. Merlings
+and God Mode ignore the limit. Rivers, frozen rivers, and intact ice do not
+consume Swimming endurance. This restriction applies to map clicks, on-screen
+movement, enemy chase routes, and previews alike; a route is also cancelled if
+changes to the water or current endurance make it unsafe before the next step.
+Manual swimming and unexpected ice collapse still follow the normal drowning
+rules (§6).
 
 Occupied enemy/NPC tiles are generally avoided except when they are the intended destination.
 
@@ -5081,7 +5091,7 @@ Prison bars never count as projectile cover. If no immediately safe retreat is
 available, the humanoid normally fights or pursues when an approach route exists.
 Two bounded desperation behaviors are exceptions, **not safe escapes**:
 
-- A **non-shooter or out-of-ammunition humanoid trapped without a melee route**
+- An **unarmed or out-of-ammunition humanoid trapped without a melee route**
   can spend ordinary turns moving away, even if the intermediate squares are
   exposed. It follows a short reachable path toward bow range's edge, stopping
   at the farthest available position if its enclosure prevents full escape.
