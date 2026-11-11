@@ -436,7 +436,7 @@ async function main() {
     try {
       log=message=>messages.push(message);lootLog=message=>messages.push(message)
       chance=()=>true;makeArtifactItem=()=>null
-      enemyTemplateForSavedEnemy=()=>({lootTable:[{chance:1,items:[{kind:'chitin',count:1}]}]})
+      enemyTemplateForSavedEnemy=()=>({lootTable:[{kind:'chitin',chance:1,count:1}]})
       player.inventory=[]
       lootFromEnemy({name:'Kobold',baseName:'Kobold',tier:2,humanoid:true,
         shooterAbility:'shooterArrows',shotsRemaining:0,
@@ -451,7 +451,7 @@ async function main() {
       maybeDropTombstone({name:'Lich',baseName:'Lich',tier:5})
       check(messages.includes('The Lich dropped Mysterious Tombstone.'),
         'special tombstone drops without article')
-      enemyTemplateForSavedEnemy=()=>({lootTable:[{chance:1,items:[{kind:'chitin',count:3}]}]})
+      enemyTemplateForSavedEnemy=()=>({lootTable:[{kind:'chitin',chance:1,count:3}]})
       lootFromEnemy({name:'Scarab',baseName:'Scarab',tier:1,humanoid:false})
       check(messages.includes('The Scarab dropped 3 × Chitin.'),
         'multiple biological drops retain quantity')

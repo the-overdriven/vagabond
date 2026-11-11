@@ -4152,24 +4152,42 @@ more difficult:
       }
     }
 
-    // Optional per-species drops are independent of artifact/equipment loot.
-    // Their total chance is rolled once, then a weighted item is selected.
+    // Per-species loot uses absolute probabilities. Ungrouped entries roll
+    // independently; entries sharing a group compete for one exclusive drop.
     const template = enemyTemplateForSavedEnemy(e)
-    // Each entry in the single table is an independent drop roll; meat and
-    // additional materials can therefore be earned from the same kill.
-    for (const drop of (template?.lootTable || [])) {
-      if (drop?.items?.length && chance(drop.chance ?? 0)) {
-        const choices = drop.items.filter(entry => (entry.weight ?? 1) > 0 && itemDefinition(entry.kind))
-        if (choices.length) {
-          const entry = pickWeighted(choices, item => Number(item.weight ?? 1))
-          const count = entry.count ?? 1
-          if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid monster loot count: ' + entry.kind)
-          if (onGround) placeEnemyLootOnGround(e, createItem(entry.kind, {count}))
-          else addInventoryItem(entry.kind, {count})
-          const name = itemDefinition(entry.kind).name
-          log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
+    const lootTable = template?.lootTable || []
+    const rolledGroups = new Set()
+    for (const drop of lootTable) {
+      if (!drop) continue
+      let selected = drop
+      if (drop.group) {
+        if (rolledGroups.has(drop.group)) continue
+        rolledGroups.add(drop.group)
+        const choices = lootTable.filter(entry => entry?.group === drop.group)
+        const totalChance = choices.reduce((sum, entry) => sum + entry.chance, 0)
+        if (!Number.isFinite(totalChance) || totalChance > 1 + 1e-12 ||
+            choices.some(entry => !Number.isFinite(entry.chance) || entry.chance < 0 || !itemDefinition(entry.kind)))
+          throw new Error('Invalid monster loot group: ' + drop.group)
+        if (!chance(totalChance)) continue
+        let roll = rng() * totalChance
+        selected = choices.findLast(entry => entry.chance > 0)
+        for (const entry of choices) {
+          if (entry.chance === 0) continue
+          roll -= entry.chance
+          if (roll <= 0) { selected = entry; break }
         }
+      } else {
+        if (!Number.isFinite(drop.chance) || drop.chance < 0 || drop.chance > 1 || !itemDefinition(drop.kind))
+          throw new Error('Invalid monster loot entry: ' + drop.kind)
+        if (!chance(drop.chance)) continue
+        rng() // Preserve the former single-item selection draw for saved replays.
       }
+      const count = selected.count ?? 1
+      if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid monster loot count: ' + selected.kind)
+      if (onGround) placeEnemyLootOnGround(e, createItem(selected.kind, {count}))
+      else addInventoryItem(selected.kind, {count})
+      const name = itemDefinition(selected.kind).name
+      log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
     }
 
     // Fungus always yields ordinary unidentified mushrooms. Keep this separate

@@ -12,8 +12,8 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
 
   const nymph=run('ENEMY_TEMPLATE_BY_NAME.Nymph')
   assert.equal(nymph.lootTable?.[0]?.chance,0.2)
-  assert.equal(nymph.lootTable[0].items.length,1)
-  assert.equal(nymph.lootTable[0].items[0].kind,'herb')
+  assert.equal(nymph.lootTable.length,1)
+  assert.equal(nymph.lootTable[0].kind,'herb')
 
   run(`chance=p=>p===0.2;
     lootFromEnemy({name:'Nymph',baseName:'Nymph',tier:2,equipment:null,humanoid:true});`)
@@ -97,13 +97,13 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   for(const t of templates) {
     if (t.name in meatDrops) {
       assert.equal(t.humanoid,false,`${t.name} is not humanoid`)
-      assert.deepEqual(t.lootTable[0],{chance:1,items:[{kind:'meat',weight:1,count:meatDrops[t.name]}]},
+      assert.deepEqual(t.lootTable[0],{kind:'meat',chance:1,count:meatDrops[t.name]},
         `${t.name} has its exact guaranteed drop`)
       run(`player.inventory=[];chance=p=>p===1;lootFromEnemy({name:${JSON.stringify(t.name)},baseName:${JSON.stringify(t.name)},tier:${t.tier},humanoid:false})`)
       assert.equal(run('player.inventory.find(it=>it.kind==="meat")?.count'),meatDrops[t.name],
         `${t.name} gives exactly the configured quantity`)
     } else if (!t.humanoid) {
-      assert.equal(t.lootTable?.some(drop=>drop.items?.some(item=>item.kind==='meat'))||false,false,
+      assert.equal(t.lootTable?.some(drop=>drop.kind==='meat')||false,false,
         `${t.name} must not drop meat`)
     }
   }
@@ -143,7 +143,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   for (const [species,[kind,probability,count]] of Object.entries(materialDrops)) {
     const template=templates.find(t=>t.name===species)
     assert(template && !template.humanoid,`${species} is non-humanoid`)
-    assert.deepEqual(template.lootTable[0],{chance:probability,items:[{kind,weight:1,count}]},
+    assert.deepEqual(template.lootTable[0],{kind,chance:probability,count},
       `${species} has the exact independent material drop chance and quantity`)
     run(`player.inventory=[];chance=p=>p===${probability};lootFromEnemy({name:${JSON.stringify(species)},
       baseName:${JSON.stringify(species)},tier:${template.tier},equipment:null,humanoid:false})`)
@@ -200,11 +200,41 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   assert.equal(run('player.inventory.find(i=>i.kind==="mushroom")?.count'),1,
     'Fungus still guarantees mushrooms even with every loot-table chance failing')
   assert.deepEqual(templates.find(t=>t.name==='Nymph').lootTable[0],
-    {chance:0.2,items:[{kind:'herb',weight:1}]},'existing Nymph loot stays unchanged')
-  assert.equal(templates.find(t=>t.name==='Wyrdhag').lootTable[0].chance,0.2,
-    'existing Wyrdhag loot chance stays unchanged')
+    {kind:'herb',chance:0.2},'Nymph retains her 20% herb drop')
+  const wyrdhagDrops=templates.find(t=>t.name==='Wyrdhag').lootTable
+  assert.deepEqual(wyrdhagDrops,['potion','herb','mushroom'].map(kind=>
+    ({kind,chance:0.066,group:'healing'})),
+    'Wyrdhag keeps three mutually exclusive 6.6% outcomes')
+  assert(Math.abs(wyrdhagDrops.reduce((sum,drop)=>sum+drop.chance,0)-0.198)<1e-12)
+  for(const [value,kind] of [[0.1,'potion'],[0.5,'herb'],[0.9,'mushroom']]) {
+    run(`player.inventory=[];chance=p=>Math.abs(p-0.198)<1e-12;rng=()=>${value};
+      lootFromEnemy({name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false})`)
+    assert.deepEqual(JSON.parse(JSON.stringify(run('player.inventory.map(i=>i.kind)'))),[kind],
+      `Wyrdhag chooses only ${kind} within its healing group`)
+  }
+  run(`player.inventory=[];chance=()=>false;
+    lootFromEnemy({name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false})`)
+  assert.equal(run('player.inventory.length'),0,'failed Wyrdhag group roll drops nothing')
+  const unequal=JSON.parse(JSON.stringify(run(`(()=>{
+    const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,original=t.lootTable
+    const oldChance=chance,oldRng=rng
+    try {
+      t.lootTable=[{kind:'potion',chance:0,group:'healing'},
+        {kind:'herb',chance:0.15,group:'healing'},
+        {kind:'mushroom',chance:0.05,group:'healing'},
+        {kind:'chitin',chance:1}]
+      chance=p=>p===0.2 || p===1
+      return [0,0.9].map(value=>{
+        rng=()=>value;player.inventory=[]
+        lootFromEnemy({name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false})
+        return player.inventory.map(i=>i.kind)
+      })
+    } finally {t.lootTable=original;chance=oldChance;rng=oldRng}
+  })()`)))
+  assert.deepEqual(unequal,[['herb','chitin'],['mushroom','chitin']],
+    'unequal group chances remain exclusive, and an independent item can also drop')
   assert.deepEqual(templates.find(t=>t.name==='Giant Spider').lootTable[1],
-    {chance:0.55,items:[{kind:'venomGland',weight:1,count:1}]},
+    {kind:'venomGland',chance:0.55,count:1},
     'Giant Spider can drop venom independently of its silk')
   console.log('PASS nymph, Fungus, meat, alternative materials, seeded loot, stacking, save/replay, and scroll composition')
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

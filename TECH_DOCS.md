@@ -6630,20 +6630,22 @@ random(1–5) × enemy tier, modified by Magic Find
 Chests and Magic Find still grant gold normally; only the per-kill enemy gold
 was removed.
 
-Monster templates may define a single `lootTable` array containing independent
-drop rolls, each with a total probability and weighted item kinds. A successful
-roll chooses **one item kind** and awards its configured fixed `count`
-(default **1**) as a stack, in addition to normal artifact and equipment
-drops. The weights choose which kind drops; they do not affect quantity or
-multiply the total drop probability. All units of a stack use one drop roll.
-Several entries let a species yield both guaranteed meat and a rarer material.
-Giant Spiders independently roll for Spider Silk (70%) and a Venom Gland (55%).
+Monster templates may define a flat `lootTable`. Each entry specifies an item
+`kind`, its **absolute drop chance** (0–1), and an optional fixed `count`
+(default **1**). Entries without `group` roll independently: a creature can
+drop guaranteed meat and an additional material, and Giant Spiders can drop
+both Spider Silk (70%) and a Venom Gland (55%). Entries sharing the same `group`
+are mutually exclusive: one group roll selects at most one item, with each
+entry's `chance` representing its **actual probability per kill**. Group
+probabilities must total at most 1; the remainder is the chance of no drop
+from that group. All units of a stack are awarded by one roll. These drops
+are separate from artifact and equipment rewards.
 
 **Nymph** has a **20%**
 chance to drop one Healing Herb, independently of its healing magic or
-ordinary humanoid gear. **Wyrdhag** has a **20%**
-total chance to drop a Life Potion, Healing Herb or Mushroom, each with equal
-conditional probability (about **6⅔%** of kills per item). This loot chance
+ordinary humanoid gear. **Wyrdhag** has a **19.8%**
+total chance to drop a Life Potion, Healing Herb or Mushroom, each with an
+absolute **6.6%** chance and the same exclusive `healing` group. This loot chance
 does not increase with Magic Find. Using its own healing item in combat does
 not alter the separate death-drop roll.
 

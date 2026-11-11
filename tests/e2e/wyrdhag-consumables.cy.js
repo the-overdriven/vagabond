@@ -44,31 +44,39 @@ describe('Wyrdhag consumable healing and individual monster loot', () => {
     })()`))
   })
 
-  it('has one independent 20% drop roll across equally weighted consumables', () => {
+  it('has one exclusive 19.8% drop group with equal absolute item chances', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Wyrdhag Loot Tester')
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,why)=>{if(!ok)throw Error(why)}
-      const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,origChance=chance
-      const items=t.lootTable[0].items
-      check(t.lootTable[0].chance===0.2 && items.length===3 &&
-        items.every(it=>it.weight===1) &&
-        ['potion','herb','mushroom'].every(k=>items.some(it=>it.kind===k)),
-        '20% total chance is split equally')
+      const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,origChance=chance,origRng=rng
+      const items=t.lootTable
+      check(items.length===3 && items.every(it=>it.group==='healing' &&
+        it.chance===0.066) &&
+        ['potion','herb','mushroom'].every(k=>items.some(it=>it.kind===k)) &&
+        Math.abs(items.reduce((sum,it)=>sum+it.chance,0)-0.198)<1e-12,
+        '19.8% total chance is split into exclusive 6.6% outcomes')
       const before=player.inventory.reduce((sum,it)=>sum+(['potion','herb','mushroom'].includes(it.kind)?(it.count||1):0),0)
       const enemy={name:'Wyrdhag',baseName:'Wyrdhag',humanoid:false,tier:4}
       try {
-        chance=p=>p===0.2
+        chance=p=>Math.abs(p-0.198)<1e-12;rng=()=>0.5
         lootFromEnemy(enemy)
         const after=player.inventory.reduce((sum,it)=>sum+(['potion','herb','mushroom'].includes(it.kind)?(it.count||1):0),0)
-        check(after===before+1,'successful monster table produces exactly one item')
+        check(after===before+1,'successful group roll produces exactly one item')
+        for (const [value,kind] of [[0.1,'potion'],[0.5,'herb'],[0.9,'mushroom']]) {
+          player.inventory=[];rng=()=>value
+          lootFromEnemy(enemy)
+          check(player.inventory.length===1 && player.inventory[0].kind===kind,
+            'exclusive group selects '+kind+' without any extra drops')
+        }
+        player.inventory=[]
         chance=()=>false
         lootFromEnemy(enemy)
         const final=player.inventory.reduce((sum,it)=>sum+(['potion','herb','mushroom'].includes(it.kind)?(it.count||1):0),0)
-        check(final===after,'failed roll produces no item')
-      } finally {chance=origChance}
+        check(final===0,'failed group roll produces no item')
+      } finally {chance=origChance;rng=origRng}
     })()`))
   })
 
