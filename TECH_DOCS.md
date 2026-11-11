@@ -727,8 +727,11 @@ a final repaint.
 Combat and healing popups place the newest visible message at the bottom.
 Older overlapping messages move upward by one 24-pixel text line, independent
 of map zoom; labels from adjacent tiles also avoid overlap. Delayed projectile
-feedback joins the stack only when its impact is displayed. Popups never delay
-input or affect combat resolution, saves, or replay RNG.
+feedback joins the stack only when its impact is displayed. Each label remains
+fully opaque and stationary for **280 ms** before drifting and fading over the
+rest of its existing lifetime (850 ms for ordinary combat text, 1,000 ms for
+summoning). New messages still push older ones up immediately. Popups never
+delay input or affect combat resolution, saves, or replay RNG.
 
 Animation-only frames reuse the current status display. Actions and HUD changes
 refresh it, and the animation loop refreshes it again on completion so visible
@@ -8443,7 +8446,12 @@ Dwarven remains on fort and ruins floors can be searched once with the forage
 action, consuming one turn. Each search yields 5–25 gold (14%), 4–12 arrows
 (8%), one low-tier crystal (5%), ordinary weapon/armor/shield equipment (4%),
 or nothing (69%). Searches visibly dull the remains and persist in saved
-worlds and replays. Dwarven remains never contain a pickaxe or quest key.
+worlds and replays. Fort `ruinprop` objects depicting remains share these rules
+and display the same search prompt, rather than appearing as unsearchable
+corpses. Descriptions of the surrounding broken tools and furniture remain
+purely atmospheric; they do not imply a guaranteed item. Dwarven remains never
+contain a pickaxe or quest key. Searching remains underfoot takes precedence
+over interacting with a nearby campfire.
 
 The wheelbarrow is mechanically significant because it enables moving the Big Bell.
 Picking it up removes the ground object and refreshes the canvas and HUD

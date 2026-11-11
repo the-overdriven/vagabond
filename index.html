@@ -7549,7 +7549,8 @@ more difficult:
       return
     }
     const skeleton = groundItems.find(g => onCurrentLevel(g) && g.kind === 'skeleton' && g.x === player.x && g.y === player.y)
-    const dwarvenRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'dwarvenremains' && g.x === player.x && g.y === player.y)
+    const dwarvenRemains = groundItems.find(g => onCurrentLevel(g) &&
+      (g.kind === 'dwarvenremains' || g.kind === 'ruinprop') && g.x === player.x && g.y === player.y)
     const campfire = Campfires.nearby()
     const deadBody = groundItems.find(g => onCurrentLevel(g) && g.kind === 'deadbody' && g.x === player.x && g.y === player.y)
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
@@ -7589,7 +7590,7 @@ more difficult:
       updateHud()
       return
     }
-    if (campfire && !skeleton) {
+    if (campfire && !skeleton && !dwarvenRemains) {
       Campfires.open(campfire)
       return
     }
@@ -7815,7 +7816,7 @@ more difficult:
         groundItems.splice(i, 1)
       } else if (g.kind === 'deadbody' || g.kind === 'playerremains' || g.kind === 'stolenloot') {
         continue
-      } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'anvil' || Campfires.isFire(g) || g.kind === 'explorerremains') {
+      } else if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'ruinprop' || g.kind === 'anvil' || Campfires.isFire(g) || g.kind === 'explorerremains') {
         continue
       } else if (TACTICAL_CONSUMABLE_KINDS.includes(g.kind)) {
         addInventoryItem(g.kind)
@@ -8929,11 +8930,9 @@ more difficult:
       log(`${currentGround.kind === 'dwarvenstove' ? 'A dwarven stove' : 'An abandoned campfire'}. ${currentGround.description || (currentGround.kind === 'campfire' ? pick(CAMPFIRE_INSPECTIONS) : 'The stone hearth is cold.')}`, 'info')
       if (currentGround.kind === 'campfire') searchAbandonedCampfire(currentGround)
       inspectedGround = true
-    } else if (currentGround && currentGround.kind === 'ruinprop') {
-      log(`Abandoned dwarven remains. ${currentGround.description}`, 'info')
-      inspectedGround = true
-    } else if (currentGround && (currentGround.kind === 'dwarvenremains' || currentGround.kind === 'anvil')) {
-      log(`${currentGround.kind === 'anvil' ? 'An abandoned dwarven anvil' : 'Dwarven remains'}. ${currentGround.description || ''}${currentGround.kind === 'dwarvenremains' ? (currentGround.looted ? ' (searched)' : ' Press F to search them.') : ''}`, 'info')
+    } else if (currentGround && (currentGround.kind === 'dwarvenremains' || currentGround.kind === 'ruinprop' || currentGround.kind === 'anvil')) {
+      const remains = currentGround.kind !== 'anvil'
+      log(`${remains ? 'Dwarven remains' : 'An abandoned dwarven anvil'}. ${currentGround.description || ''}${remains ? (currentGround.looted ? ' (searched)' : ' Press F to search them.') : ''}`, 'info')
       inspectedGround = true
     } else if (currentGround && (currentGround.kind === 'wheelbarrow' || currentGround.kind === 'goldcoin')) {
       log(currentGround.description, 'info')
@@ -9952,6 +9951,7 @@ more difficult:
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 850
   const SUMMON_ANIM_MS = 1000
+  const DAMAGE_POPUP_HOLD_MS = 280
   // The shaded asset is reserved for dropped floor bags; carrier markers stay flat.
   function drawThiefBag(x, y, size, dropped = false) {
     const image = dropped && USE_TILE_IMAGES && preloadedImages.get(RENDER_STYLE.overlays.thiefBagImage)
@@ -10057,6 +10057,14 @@ more difficult:
     runAnimationLoop()
   }
 
+  // Remain stationary and fully opaque briefly, then drift and fade together.
+  // Keep the existing total lifetime, so feedback never adds animation frames.
+  function damagePopupFadeProgress(p, now) {
+    const hold = Math.min(DAMAGE_POPUP_HOLD_MS, p.duration / 2)
+    return Math.max(0, Math.min(1, (now - p.start - p.delay - hold) /
+      Math.max(1, p.duration - hold)))
+  }
+
   // Lay out only labels whose impact has arrived. Newest stays at its anchor;
   // older overlapping labels move up one text line, independent of tile zoom.
   function layoutDamageNumbers(now) {
@@ -10066,8 +10074,7 @@ more difficult:
       damageAnims.indexOf(b) - damageAnims.indexOf(a))
     const placed = []
     for (const p of active) {
-      const t = (now - p.start - p.delay) / p.duration
-      const baseY = p.y * TILE_PX - 16 * t
+      const baseY = p.y * TILE_PX - 16 * damagePopupFadeProgress(p, now)
       let y = baseY - (p.liftPx || 0)
       const width = Math.max(18, String(p.amount).length * 11)
       const overlapping = placed.filter(q => Math.abs(q.x - p.x) * TILE_PX < (q.width + width) / 2 + 4)
@@ -11213,7 +11220,7 @@ more difficult:
           drawThiefBag(vx + TILE_PX * 0.5, vy + TILE_PX * 0.15, TILE_PX * 0.65, true)
           return
         }
-        if (((g.kind === 'skeleton' || g.kind === 'dwarvenremains') && g.looted) || (g.kind === 'campfire' && g.searched)) {
+        if (((g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'ruinprop') && g.looted) || (g.kind === 'campfire' && g.searched)) {
           ctx.save()
           ctx.filter = 'grayscale(0.7) brightness(0.8)'
           const drawn = drawImageVisualWithShadow(vx, vy, visual)
@@ -11335,7 +11342,7 @@ more difficult:
       const vx = Math.round((p.x - camX) * TILE_PX)
       const vy = Math.round(p.displayY - camY * TILE_PX)
       ctx.save()
-      ctx.globalAlpha = 1 - t
+      ctx.globalAlpha = 1 - damagePopupFadeProgress(p, now)
       ctx.font = 'bold 18px Consolas, \'Courier New\', monospace'
       ctx.textAlign = 'center'
       ctx.fillStyle = p.color
@@ -12100,7 +12107,7 @@ more difficult:
         mini: true, enemy: null,
         html: `<div class="nm">${groundItemLabel(g)}</div><div>${groundHere.filter(gi => gi.kind === 'droppeditem').length > 1 ? 'More items are piled here. ' : ''}Press F to pick up.</div>`
       }
-      if (g.kind === 'skeleton' || g.kind === 'dwarvenremains') return {
+      if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'ruinprop') return {
         mini: true,
         enemy: null,
         html: `<div class="nm">${g.kind === 'skeleton' ? 'Skeletal Remains' : 'Dwarven Remains'}${g.looted ? ' (searched)' : ''}</div>${g.looted ? '' : '<div>Press F to search</div>'}`

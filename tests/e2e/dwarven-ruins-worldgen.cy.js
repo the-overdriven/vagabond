@@ -479,11 +479,20 @@ describe('Persistent Dwarven Ruins stratum', () => {
       enemies=[];npcs=[];occupied=new Set();Campfires.close()
       const originalRng=rng
       try {
+        for(const remainsKind of ['dwarvenremains','ruinprop'])
         for(const [roll,expected] of [[.05,'gold'],[.18,'arrows'],[.24,'crystal'],[.29,'gear'],[.95,'empty']]) {
-          groundItems=[{kind:'dwarvenremains',level:-3,levelKind:'chain',x:player.x,y:player.y,
-            description:'Old dwarf bones.'}]
+          groundItems=[{kind:remainsKind,looted:false,level:-3,levelKind:'chain',x:player.x,y:player.y,
+            description:'A snapped pick lies beside a dead dwarven miner.'}]
           player.inventory=[];player.gold=0;rng=()=>roll
-          lootSkeletonOrForage()
+          const messages=[],oldLog=log
+          try {log=message=>messages.push(message);describeSurroundings()} finally {log=oldLog}
+          check(messages.some(message=>message.includes('Press F to search them.')),
+            'both dwarf-remains kinds advertise foraging')
+          const originalNearby=Campfires.nearby
+          try {
+            if(remainsKind==='ruinprop'&&expected==='gold') Campfires.nearby=()=>({kind:'campfire'})
+            lootSkeletonOrForage()
+          } finally {Campfires.nearby=originalNearby}
           const remains=groundItems[0]
           check(remains.looted,'dwarven remains are marked searched')
           const gear=player.inventory.filter(i=>['weapon','armor','shield'].includes(i.kind))
@@ -498,10 +507,12 @@ describe('Persistent Dwarven Ruins stratum', () => {
           lootSkeletonOrForage()
           check(player.inventory.length===invCount&&player.gold===gold,'cannot loot remains twice')
         }
+        groundItems.push({kind:'dwarvenremains',looted:true,level:-3,levelKind:'chain',
+          x:player.x+1,y:player.y,description:'Old dwarf bones.'})
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
-        check(groundItems.some(g=>g.kind==='dwarvenremains'&&g.looted),
-          'searched status survives save and replay restoration')
+        check(['ruinprop','dwarvenremains'].every(kind=>groundItems.some(g=>g.kind===kind&&g.looted)),
+          'both searchable remains kinds persist their searched status in saves and replays')
       } finally {rng=originalRng}
     })()`))
   })

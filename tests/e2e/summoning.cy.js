@@ -92,6 +92,21 @@ describe('Once-only monster summoning', () => {
           layoutDamageNumbers(damageAnims[2].start+300)
           summonCheck(damageAnims[2].displayY>damageAnims[1].displayY &&
             damageAnims[1].displayY>damageAnims[0].displayY,'impact order pushes older labels upward')
+          damageAnims=[]
+          spawnDamageNumber(40,40,'Hold','#ffffff')
+          const popup=damageAnims[0],arrival=popup.start+popup.delay
+          layoutDamageNumbers(arrival)
+          const originalY=popup.displayY
+          layoutDamageNumbers(arrival+DAMAGE_POPUP_HOLD_MS)
+          summonCheck(DAMAGE_POPUP_HOLD_MS===280 && popup.displayY===originalY &&
+            damagePopupFadeProgress(popup,arrival+DAMAGE_POPUP_HOLD_MS)===0,
+            'ordinary popups stay fully opaque and stationary for the first 280 ms')
+          layoutDamageNumbers(arrival+DAMAGE_POPUP_HOLD_MS+150)
+          summonCheck(popup.displayY<originalY && damagePopupFadeProgress(popup,arrival+DAMAGE_POPUP_HOLD_MS+150)>0,
+            'fade and upward drift begin together after the hold')
+          summonCheck(damagePopupFadeProgress(popup,arrival+popup.duration)===1,
+            'the hold does not extend popup lifetime')
+          damageAnims=[]
           for(const e of children) {
             summonCheck(e.hp===Math.max(1,Math.round(t.hp*strength)) && e.maxHp===e.hp,'template HP')
             summonCheck(e.atk===Math.max(1,Math.round(t.atk*strength)) && e.def===Math.max(0,Math.round(t.def*strength)),'template ATK/DEF')

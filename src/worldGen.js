@@ -1660,10 +1660,11 @@ function buildDwarvenRuin(targetLevel) {
       x,
       y,
       kind: 'ruinprop',
+      looted: false,
       level: ruinLevel,
       levelKind: 'chain',
       caveIndex: dwarvenRuin.caveIndex,
-      description: pick(['A snapped pick lies beneath the dust.', 'A cracked keg still smells faintly of ale.', 'A workbench collapsed under its own tools.', 'A dwarven lintel bears a name worn smooth by generations.'])
+      description: pick(['A snapped pick lies beside a dead dwarven miner.', 'A cracked keg lies beside the bones of its owner.', 'An old workbench collapsed over a dwarven worker.', 'A worn lintel pins the remains of a long-dead dwarf.'])
     })
   }
   // Place the anvil on a valid, reachable marble tile. The old fixed
