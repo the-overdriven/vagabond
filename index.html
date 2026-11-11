@@ -2142,6 +2142,10 @@ more difficult:
     return player.equip?.weapon?.rangedAtk ? player.equip.weapon : null
   }
 
+  function hasBowAmmunition() {
+    return player.inventory.some(item => item.kind === 'arrows' && item.count > 0)
+  }
+
   function makeShieldItem(tier, mf = 0, sourceTier = 0) {
     const base = pickEquipmentBase(SHIELDS, tier, sourceTier)
     const item = {kind: 'shield', base: base.name, def: base.def, tier: base.tier, baseValue: base.baseValue, name: base.name}
@@ -4114,7 +4118,8 @@ more difficult:
 
   function maybeAutoEquipWeapon(item, announce = true) {
     if (!item || item.kind !== 'weapon' || player.equip.weapon ||
-        (item.twoHanded && player.equip.shield)) return false
+        (item.twoHanded && player.equip.shield) ||
+        (item.rangedAtk && !hasBowAmmunition())) return false
     const before = statSnapshot()
     player.equip.weapon = item
     if (announce) {
@@ -14329,6 +14334,11 @@ more difficult:
       return
     }
 
+    if (slot === 'weapon' && it.rangedAtk && !hasBowAmmunition()) {
+      log('You cannot equip a bow without arrows.', 'info')
+      return
+    }
+
     if (slot === 'shield' && player.equip.weapon && player.equip.weapon.twoHanded) {
       log('You cannot equip a shield while wielding a two-handed weapon.', 'bad')
       return
@@ -14390,6 +14400,10 @@ more difficult:
       (!!item.rangedAtk === ranged), ranged)
     if (!weapon) {
       log(ranged ? 'You have no ranged weapon.' : 'You have no melee weapon.', 'info')
+      return false
+    }
+    if (ranged && !hasBowAmmunition()) {
+      log('You cannot equip a bow without arrows.', 'info')
       return false
     }
     const shield = !ranged && !weapon.twoHanded

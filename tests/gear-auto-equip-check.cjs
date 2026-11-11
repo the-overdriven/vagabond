@@ -7,7 +7,8 @@ async function main(){
   run(fs.readFileSync(path.join(__dirname,'helpers/enemy-spell-checks.js'),'utf8'))
   run(fs.readFileSync(path.join(__dirname,'helpers/gear-auto-equip-checks.js'),'utf8'))
   run('gearAutoEquipShieldConflictCheck()')
-  console.log('PASS gear auto-equip conflict, save/load, and one-handed/two-handed cases')
+  run('bowRequiresAmmunitionChecks()')
+  console.log('PASS gear auto-equip conflict, no-ammo bow equip, save/load and shield cases')
   run('quickEquipBestLoadoutChecks()')
   await run(`(async () => {
     const check=(ok,msg)=>{if(!ok)throw Error(msg)}

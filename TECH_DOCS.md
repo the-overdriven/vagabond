@@ -6131,9 +6131,15 @@ ATK**. Both have a maximum range of **6 Chebyshev tiles**, spend one action and
 one arrow per shot, and use the same Marksmanship, accuracy, poison, artifact,
 and projectile rules. Their melee GRACE of 1 does not change ranged shot timing.
 Bow templates are stored in `content/ranged_weapons.json`, separate from the
-ordinary melee weapon catalog. Equipping, swapping, or
-unequipping follows ordinary one-turn equipment rules; equipping removes a
-shield. Bumping a neighboring monster remains an ordinary, weak melee attack.
+ordinary melee weapon catalog. **A bow cannot be equipped without at least
+one arrow in inventory**, whether through the inventory, ranged-loadout hotkey
+(**2**), or automatic loot equipment. Refused attempts cost no turn, preserve
+the current weapon and shield, and do not record a replay action. A newly looted
+bow is carried instead of automatically equipped when arrows are absent.
+Running out of arrows after equipping does not automatically unequip the bow;
+firing still requires ammunition. Successful equipping, swapping, or unequipping
+follows ordinary one-turn equipment rules; equipping removes a shield. Bumping
+a neighboring monster remains an ordinary, weak melee attack.
 Clicking/tapping a visible enemy with the bow equipped fires an arrow instead
 of auto-pathing toward the monster. Keyboard players can press **R** to aim at
 visible targets (repeated R cycles), **Enter** to fire, or **Escape** to cancel.

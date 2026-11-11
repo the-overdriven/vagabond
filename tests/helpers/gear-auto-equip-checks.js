@@ -48,8 +48,61 @@ function setupQuickEquipKeyboardArena() {
   player.inventory=[
     {kind:'weapon',base:'Long Sword',name:'Long Sword',atk:6,grace:4,tier:2,twoHanded:false},
     {kind:'shield',base:'Buckler',name:'Buckler',def:2,tier:1},
-    {kind:'shield',base:'Tower Shield',name:'Tower Shield',def:5,tier:3}
+    {kind:'shield',base:'Tower Shield',name:'Tower Shield',def:5,tier:3},
+    {kind:'arrows',name:'Arrows',count:4}
   ]
+}
+
+// Also exercised from the existing keyboard equipment Cypress test.
+function bowRequiresAmmunitionChecks() {
+  const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+  setupEnemySpellArena()
+  const melee={kind:'weapon',base:'Mace',name:'Mace',atk:6,grace:2,tier:2}
+  const shield={kind:'shield',base:'Buckler',name:'Buckler',def:2,tier:1}
+  const bow=makeShortBowItem()
+  const artifact={...makeBowItem('Hunting Bow'),kind:'artifact',artifactSlot:'weapon',
+    identified:false,name:'Hunting Bow of Secrets'}
+  player.equip.weapon=melee
+  player.equip.shield=shield
+  player.inventory=[bow,artifact]
+  const oldLog=log
+  const messages=[]
+  try {
+    log=message=>messages.push(message)
+    startReplayRecording()
+    equipItem(0)
+    check(!equipBestLoadout('ranged'),'ranged hotkey refuses to equip bow without arrows')
+    equipItem(1)
+    check(player.equip.weapon===melee&&player.equip.shield===shield&&
+      player.inventory[0]===bow&&player.inventory[1]===artifact,
+      'normal and artifact bow equip are refused without altering weapon or shield')
+    check(turnCount===0&&replayData.actions.length===0,
+      'all no-ammo equips cost no turn and record no action')
+    check(messages.filter(message=>message==='You cannot equip a bow without arrows.').length===3,
+      'all three equip methods show the same useful message')
+    replayRecording=false
+    player.inventory.push({kind:'arrows',name:'Arrows',count:1})
+    equipItem(1)
+    check(player.equip.weapon===artifact&&player.equip.shield===null&&turnCount===1,
+      'an artifact bow can be equipped as soon as ammunition exists')
+    check(player.inventory.some(item=>item.kind==='arrows'&&item.count===1),
+      'equipping does not spend ammunition')
+    // Running out of arrows does not force the equipped bow out of the slot.
+    player.inventory=player.inventory.filter(item=>item.kind!=='arrows')
+    check(player.equip.weapon===artifact,'depleting ammunition does not unequip bow')
+  } finally {
+    log=oldLog
+    replayRecording=false
+  }
+
+  setupEnemySpellArena()
+  const dropped=makeShortBowItem()
+  check(!maybeAutoEquipWeapon(dropped,false)&&player.equip.weapon===null,
+    'looted bow stays in backpack when no arrows are carried')
+  player.inventory.push(dropped)
+  player.inventory.push({kind:'arrows',name:'Arrows',count:2})
+  check(maybeAutoEquipWeapon(dropped,false)&&player.equip.weapon===dropped,
+    'auto equipment is allowed when ammunition is available')
 }
 
 function quickEquipBestLoadoutChecks() {
@@ -92,7 +145,7 @@ function quickEquipBestLoadoutChecks() {
     atk:20,grace:1,rangedAtk:5,rangedRange:6,twoHanded:true}
   const strongerBow={kind:'weapon',name:'Long Range Bow',base:'Short Bow',
     atk:1,grace:1,rangedAtk:7,rangedRange:6,twoHanded:true}
-  player.inventory=[strongerBow]
+  player.inventory=[strongerBow,{kind:'arrows',name:'Arrows',count:2}]
   check(equipBestLoadout('ranged')&&player.equip.weapon===strongerBow,
     'ranged strength takes priority over a bow melee ATK modifier')
 
@@ -108,4 +161,4 @@ function quickEquipBestLoadoutChecks() {
   replayRecording=false
 }
 if(typeof module!=='undefined')module.exports={gearAutoEquipShieldConflictCheck,
-  setupQuickEquipKeyboardArena,quickEquipBestLoadoutChecks}
+  setupQuickEquipKeyboardArena,quickEquipBestLoadoutChecks,bowRequiresAmmunitionChecks}
