@@ -1,3 +1,31 @@
+  function referenceCatchupCandidates(e, side, search = enemyFarSearch()) {
+    const candidates = []
+    const addRegion = (fraction) => {
+      candidates.length = 0
+      const xCut = Math.max(1, Math.floor(MAP_W * fraction))
+      const yCut = Math.max(1, Math.floor(MAP_H * fraction))
+      const minX = side === 'east' ? MAP_W - xCut : 0
+      const maxX = side === 'west' ? xCut - 1 : MAP_W - 1
+      const minY = side === 'south' ? MAP_H - yCut : 0
+      const maxY = side === 'north' ? yCut - 1 : MAP_H - 1
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (side === 'east' && x < minX) continue
+          if (side === 'west' && x > maxX) continue
+          if (side === 'south' && y < minY) continue
+          if (side === 'north' && y > maxY) continue
+          if (x === e.x && y === e.y) continue
+          if (!enemyFarCanTraverse(e, x, y, search)) continue
+          if (search.blocked[y * MAP_W + x]) continue
+          candidates.push({x, y})
+        }
+      }
+    }
+    addRegion(0.25)
+    if (!candidates.length) addRegion(0.5)
+    return candidates
+  }
+
 // Reference implementation deliberately preserves the pre-optimization search.
 function referencePath(e, targetX, targetY, avoidVillage = false) {
   const start = e.y * MAP_W + e.x, target = targetY * MAP_W + targetX
@@ -206,6 +234,39 @@ describe('Turn and idle rendering performance regressions', () => {
           ({surfaceMap,enemies,npcs,currentZ,tower,grasslandTrees,chance,randInt}=saved)
           player.x=saved.px;player.y=saved.py
         }
+      })()`)).to.equal(true)
+    })
+  })
+
+  it('caches catch-up candidates without changing order, sanctuary rules or live occupancy', () => {
+    cy.window().then(win => {
+      win.eval(`window.referenceCatchupCandidates = ${referenceCatchupCandidates.toString()}`)
+      expect(win.eval(`(() => {
+        const saved={currentZ,map,surfaceFarCatchupTerrain,occupied,enemyFarCanTraverse}
+        try {
+          currentZ=0;map=surfaceMap;occupied=new Set()
+          surfaceFarCatchupTerrain=prepareSurfaceFarCatchupTerrain()
+          const before=rngState
+          for(const abilities of [[],['swim'],['fly'],['ethereal']])
+            for(const inside of [false,true])for(const side of ['west','east','north','south']) {
+              const e={x:inside?spawnPoint.x:0,y:inside?spawnPoint.y:0,level:0,abilities}
+              const actual=enemyFarTargetCandidates(e,side)
+              const expected=referenceCatchupCandidates(e,side)
+              if(JSON.stringify(actual)!==JSON.stringify(expected))return false
+              if(actual.length) {
+                const p=actual[0],key=keyXY(p.x,p.y)
+                occupied.add(key)
+                if(JSON.stringify(enemyFarTargetCandidates(e,side))!==JSON.stringify(referenceCatchupCandidates(e,side)))return false
+                occupied.delete(key)
+              }
+            }
+          const e={x:0,y:0,level:0,abilities:[]}
+          enemyFarTargetCandidates(e,'east')
+          let calls=0
+          enemyFarCanTraverse=(...args)=>{calls++;return saved.enemyFarCanTraverse(...args)}
+          enemyFarTargetCandidates(e,'east')
+          return calls===0 && rngState===before
+        } finally {({currentZ,map,surfaceFarCatchupTerrain,occupied,enemyFarCanTraverse}=saved)}
       })()`)).to.equal(true)
     })
   })

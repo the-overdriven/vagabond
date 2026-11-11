@@ -5732,31 +5732,35 @@ more difficult:
   }
 
   function enemyFarTargetCandidates(e, side, search = enemyFarSearch()) {
-    const candidates = []
-    const addRegion = (fraction) => {
-      candidates.length = 0
-      const xCut = Math.max(1, Math.floor(MAP_W * fraction))
-      const yCut = Math.max(1, Math.floor(MAP_H * fraction))
-      const minX = side === 'east' ? MAP_W - xCut : 0
-      const maxX = side === 'west' ? xCut - 1 : MAP_W - 1
-      const minY = side === 'south' ? MAP_H - yCut : 0
-      const maxY = side === 'north' ? yCut - 1 : MAP_H - 1
-      for (let y = minY; y <= maxY; y++) {
-        for (let x = minX; x <= maxX; x++) {
-          if (side === 'east' && x < minX) continue
-          if (side === 'west' && x > maxX) continue
-          if (side === 'south' && y < minY) continue
-          if (side === 'north' && y > maxY) continue
-          if (x === e.x && y === e.y) continue
-          if (!enemyFarCanTraverse(e, x, y, search)) continue
-          if (search.blocked[y * MAP_W + x]) continue
-          candidates.push({x, y})
+    const addRegion = fraction => {
+      // Catch-up terrain is fixed for beasts. Reuse row-major candidate order,
+      // but filter current occupancy and the actor's position on every request.
+      // Humanoids can open doors, so retain their live terrain scan.
+      const cache = surfaceFarCatchupTerrain && !e.humanoid
+        ? surfaceFarCatchupTerrain.candidates : null
+      const cacheKey = cache ? [side,fraction,enemyHasAbility(e,'fly'),
+        enemyHasAbility(e,'swim'),enemyHasAbility(e,'ethereal'),
+        (e.level??0)===0 && sanctuaryDistance(e.x,e.y)>FLEE_DISTANCE].join('|') : null
+      let region = cache?.get(cacheKey)
+      if (!region) {
+        region = []
+        const xCut = Math.max(1, Math.floor(MAP_W * fraction))
+        const yCut = Math.max(1, Math.floor(MAP_H * fraction))
+        const minX = side === 'east' ? MAP_W - xCut : 0
+        const maxX = side === 'west' ? xCut - 1 : MAP_W - 1
+        const minY = side === 'south' ? MAP_H - yCut : 0
+        const maxY = side === 'north' ? yCut - 1 : MAP_H - 1
+        for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+          if (!enemyFarCanTraverse(e,x,y,search)) continue
+          region.push({x,y})
         }
+        if (cache) cache.set(cacheKey,region)
       }
+      return region.filter(p => !(p.x===e.x && p.y===e.y) &&
+        !search.blocked[p.y*MAP_W+p.x])
     }
-    addRegion(0.25)
-    if (!candidates.length) addRegion(0.5)
-    return candidates
+    const candidates = addRegion(0.25)
+    return candidates.length ? candidates : addRegion(0.5)
   }
 
   function enemyFarVillageDistance(x, y) {
@@ -5800,7 +5804,7 @@ more difficult:
       swimmer[i] = walk || tile === 'water' ? 1 : 0
       flyer[i] = walk || tile === 'water' || tile === 'boulder' ? 1 : 0
     }
-    return {ground, swimmer, flyer}
+    return {ground, swimmer, flyer, candidates:new Map()}
   }
 
   // These scratch buffers never survive a synchronous search/target selection.
@@ -5857,10 +5861,17 @@ more difficult:
           search.traversable[i] = rules.terrain.get(key) ? 1 : 2
         }
       } else if (surfaceFarCatchupTerrain && !e.humanoid) {
-        const terrain = enemyHasAbility(e, 'fly') ? surfaceFarCatchupTerrain.flyer :
-          enemyHasAbility(e, 'swim') ? surfaceFarCatchupTerrain.swimmer : surfaceFarCatchupTerrain.ground
-        search.traversable[i] =
-          (enemyHasAbility(e, 'ethereal') || terrain[i]) && !enemySanctuaryTileForbidden(e, x, y) ? 1 : 2
+        if (!search.catchupRules) search.catchupRules = {
+          terrain:enemyHasAbility(e,'fly') ? surfaceFarCatchupTerrain.flyer :
+            enemyHasAbility(e,'swim') ? surfaceFarCatchupTerrain.swimmer : surfaceFarCatchupTerrain.ground,
+          ethereal:enemyHasAbility(e,'ethereal'),
+          outside:(e.level??0)===0 && sanctuaryDistance(e.x,e.y)>FLEE_DISTANCE,
+          protectedPlayer:playerInsideSanctuary()
+        }
+        const rules=search.catchupRules
+        const forbidden=rules.outside && (sanctuaryDistance(x,y)<=FLEE_DISTANCE ||
+          (rules.protectedPlayer && Math.max(Math.abs(x-player.x),Math.abs(y-player.y))<=ATTACK_RANGE))
+        search.traversable[i]=(rules.ethereal || rules.terrain[i]) && !forbidden ? 1 : 2
       } else {
         search.traversable[i] = !DungeonHazards.isCrusherTrigger(x, y) && enemyCanPathThrough(e, x, y) ? 1 : 2
       }

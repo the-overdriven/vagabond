@@ -5306,6 +5306,11 @@ and expired tracks are discarded. Other monsters retain their existing limited
 adjacent-level behavior; the catch-up does not simulate their combat or aggro.
 The departure turn is saved and restored so saving inside a dungeon and
 returning later has the same deterministic result.
+Catch-up reuses terrain-compatible destination lists for beasts with matching
+movement abilities and sanctuary restrictions. Each request filters current
+occupancy and the traveler's position while preserving candidate order and RNG.
+Humanoids retain live scans because they can open doors. These caches exist only
+for one catch-up operation; no elapsed turns are skipped or capped.
 
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy hit by an invisible player reacts once instead of wandering on that turn
