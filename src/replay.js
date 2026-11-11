@@ -211,7 +211,7 @@ function recordReplayAction(action) {
   if (action.type !== 'move' && action.type !== 'skipTurn' && action.type !== 'castFireball') {
     // Synchronous event handlers have completed when this callback runs.
     Promise.resolve().then(() => {
-      if (recordingAction === entry && recordingActionSerial === serial)
+      if (!surfaceCatchupBusy && recordingAction === entry && recordingActionSerial === serial)
         finishRecordedReplayAction()
     })
   }
@@ -351,7 +351,7 @@ async function runReplayAction(action) {
         return replayDesync(`Replay desynchronized: cannot close door at ${action.x},${action.y}.`)
       break
     case 'inspect':
-      inspect()
+      await inspect()
       break
     case 'forage':
       lootSkeletonOrForage()

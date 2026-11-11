@@ -1233,11 +1233,19 @@ more difficult:
   }
 
   function inspect() {
-    if (enemyAttackPresentationPending()) return
+    if (surfaceCatchupBusy || enemyAttackPresentationPending()) return
     if (currentZ === -2 && currentLevelKind() === 'chain' && map[player.y]?.[player.x] === 'dwarvenhole' &&
         !replayPlaying && !window.confirm('Jump into the hole?\n\nIt drops into the ruined Dwarven Fort. This is ONE-WAY: you cannot climb back up. You must find your way out through the fort\'s main gates.')) return
-    recordReplayAction({type: 'inspect'})
-    if (!enterCave()) describeSurroundings()
+    const scope = recordReplayAction({type: 'inspect'})
+    try {
+      const entered = enterCave(true)
+      if (entered?.then) return entered.finally(() => finishRecordedReplayAction(scope))
+      if (!entered) describeSurroundings()
+    } catch (error) {
+      finishRecordedReplayAction(scope)
+      throw error
+    }
+    finishRecordedReplayAction(scope)
   }
 
   function enemyBiomes(tmpl) {
@@ -1523,7 +1531,7 @@ more difficult:
     return false
   }
 
-  function enterCave() {
+  function enterCave(responsive = false) {
     const departureZ=currentZ,departureKind=currentLevelKind()
     try {
     if (travelTowerStairs()) return true
@@ -1682,7 +1690,9 @@ more difficult:
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
-        if (updateSurfaceAbsence(departureZ)) render()
+        const catchup = updateSurfaceAbsence(departureZ, responsive)
+        if (catchup?.then) return catchup.then(() => { render(); updateHud(); return true })
+        if (catchup) render()
       }
     }
   }
@@ -4976,7 +4986,7 @@ more difficult:
     log('The Temple restores your strength.', 'good')
   }
 
-  function returnPlayerToTemple() {
+  function returnPlayerToTemple(responsive = false) {
     const departureZ = currentZ
     resetSwimming()
     cancelAllPreparedEnemyAbilities()
@@ -4988,19 +4998,23 @@ more difficult:
     rebuildActiveLevelOccupancy()
     player.x = spawnPoint.x
     player.y = spawnPoint.y
-    updateSurfaceAbsence(departureZ)
-    clearSpiderWeb()
-    if (wasDead) {
-      player.hp = playerMaxHp()
-      checkPlayerHealthWarning()
-      player.lastTempleHealXp = player.totalXpEarned
-    } else tryTempleHeal()
-    pendingMove = null
-    clearAutoPath()
-    stopCameraAnimation()
-    clearEnemyAnims()
-    stopAttackAnimation()
-    snapCameraToPlayer()
+    const catchup = updateSurfaceAbsence(departureZ, responsive)
+    const finish = () => {
+      clearSpiderWeb()
+      if (wasDead) {
+        player.hp = playerMaxHp()
+        checkPlayerHealthWarning()
+        player.lastTempleHealXp = player.totalXpEarned
+      } else tryTempleHeal()
+      pendingMove = null
+      clearAutoPath()
+      stopCameraAnimation()
+      clearEnemyAnims()
+      stopAttackAnimation()
+      snapCameraToPlayer()
+    }
+    if (catchup?.then) return catchup.then(finish)
+    return finish()
   }
 
   function createPermadeathBody(killer, place = true) {
@@ -5144,14 +5158,14 @@ more difficult:
       deathStart: deathTransition.deathStart,
       permadeath: deathTransition.permadeath
     }
-    const step = (now) => {
+    const step = async (now) => {
       render(now)
       if (!deathTransition) return
       const elapsed = now - deathTransition.start
       if (deathTransition.phase === 'out' && elapsed >= deathTransition.duration) {
         // Death always returns the player to the Temple on the surface, even
         // if death occurred in a cave or deeper underground level.
-        if (!deathTransition.permadeath) returnPlayerToTemple()
+        if (!deathTransition.permadeath) await returnPlayerToTemple(true)
         else {
           stopDeathTransition()
           resetForNewCharacter()
@@ -5164,7 +5178,7 @@ more difficult:
         if (remains) groundItems.push(remains)
         minimapDirty = true
         updateHud()
-        deathTransition = {phase: 'in', start: now, duration: 900, rotation: 0}
+        deathTransition = {phase: 'in', start: performance.now(), duration: 900, rotation: 0}
         render(now)
         requestAnimationFrame(step)
         return
@@ -5836,7 +5850,7 @@ more difficult:
       }
     }
     const search = {...enemyFarBuffers, exhausted: false}
-    search.prev.fill(-1)
+    if (!surfaceFarCatchupTerrain) search.prev.fill(-1)
     search.traversable.fill(0)
     search.blocked.fill(0)
     for (const key of occupied) {
@@ -5905,18 +5919,23 @@ more difficult:
     if (search.exhausted) return null
     const total = MAP_W * MAP_H
     if (!surfaceFarAStarBuffers || surfaceFarAStarBuffers.cost.length !== total) {
-      surfaceFarAStarBuffers = {cost: new Int32Array(total), closed: new Uint8Array(total)}
+      surfaceFarAStarBuffers = {cost:new Int32Array(total), seen:new Uint32Array(total),
+        closed:new Uint32Array(total), epoch:0, heap:[], nodes:[]}
     }
-    const {cost, closed} = surfaceFarAStarBuffers
-    cost.fill(0x3fffffff)
-    closed.fill(0)
+    const {cost, seen, closed, heap, nodes} = surfaceFarAStarBuffers
+    const epoch = surfaceFarAStarBuffers.epoch = (surfaceFarAStarBuffers.epoch + 1) >>> 0 || 1
+    if (epoch === 1) { seen.fill(0); closed.fill(0) }
     const start = e.y * MAP_W + e.x, target = targetY * MAP_W + targetX
     const heuristic = (x, y) => Math.max(Math.abs(targetX - x), Math.abs(targetY - y))
-    const heap = []
+    heap.length = 0
+    let nodeCount = 0
     let sequence = 0
     const before = (a, b) => a.f < b.f ||
       (a.f === b.f && (a.h < b.h || (a.h === b.h && a.order < b.order)))
-    const push = entry => {
+    const push = (id,f,h) => {
+      const entry = nodes[nodeCount] || (nodes[nodeCount] = {id:0,f:0,h:0,order:0})
+      nodeCount++
+      entry.id=id; entry.f=f; entry.h=h; entry.order=sequence++
       let i = heap.length
       heap.push(entry)
       while (i > 0) {
@@ -5943,12 +5962,13 @@ more difficult:
       return result
     }
     cost[start] = 0
+    seen[start] = epoch
     search.prev[start] = start
     const initialH = heuristic(e.x, e.y)
-    push({id:start, f:initialH, h:initialH, order:sequence++})
+    push(start,initialH,initialH)
     while (heap.length) {
       const {id} = pop()
-      if (closed[id]) continue
+      if (closed[id] === epoch) continue
       if (id === target) {
         const path = []
         for (let step = target; step !== start; step = search.prev[step])
@@ -5956,13 +5976,13 @@ more difficult:
         path.reverse()
         return path
       }
-      closed[id] = 1
+      closed[id] = epoch
       const x = id % MAP_W, y = Math.floor(id / MAP_W)
       for (const [dx, dy] of DIRS8) {
         const nx = x + dx, ny = y + dy
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
         const next = ny * MAP_W + nx
-        if (closed[next] || !enemyFarCanTraverse(e, nx, ny, search) ||
+        if (closed[next] === epoch || !enemyFarCanTraverse(e, nx, ny, search) ||
             (next !== target && search.blocked[next]) ||
             (nx === player.x && ny === player.y)) continue
         if (avoidVillage) {
@@ -5972,11 +5992,12 @@ more difficult:
               (fromVillage > ENEMY_FAR_VILLAGE_AVOID_RADIUS || toVillage < fromVillage)) continue
         }
         const nextCost = cost[id] + 1
-        if (nextCost >= cost[next]) continue
+        if (seen[next] === epoch && nextCost >= cost[next]) continue
+        seen[next] = epoch
         cost[next] = nextCost
         search.prev[next] = id
         const h = heuristic(nx, ny)
-        push({id:next, f:nextCost+h, h, order:sequence++})
+        push(next,nextCost+h,h)
       }
     }
     search.exhausted = true
@@ -6153,7 +6174,35 @@ more difficult:
     return true
   }
 
+  let surfaceCatchupBusy = false
   function simulateSurfaceFarWandering(elapsedTurns) {
+    for (const progress of surfaceCatchupSteps(elapsedTurns)) { /* synchronous replay/test driver */ }
+  }
+
+  async function simulateSurfaceFarWanderingResponsive(elapsedTurns) {
+    surfaceCatchupBusy = true
+    clearAutoPath()
+    pendingMove = null
+    setLoading('Synchronizing surface wildlife…')
+    const steps = surfaceCatchupSteps(elapsedTurns)
+    try {
+      await paintLoading()
+      let started = performance.now()
+      for (const progress of steps) {
+        // Time only chooses when to paint. It never chooses a rule or skips a turn.
+        if (performance.now() - started < 8) continue
+        setLoading(`Synchronizing surface wildlife… ${progress}/${elapsedTurns}`)
+        await paintLoading()
+        started = performance.now()
+      }
+    } finally {
+      steps.return()
+      surfaceCatchupBusy = false
+      setLoading(null)
+    }
+  }
+
+  function* surfaceCatchupSteps(elapsedTurns) {
     if (currentZ !== 0 || map !== surfaceMap || elapsedTurns <= 0) return
     // Resolve the same seeded far-wander decision for each missed surface
     // turn, in turn order. Only these travelers are paused off-floor; other
@@ -6165,22 +6214,23 @@ more difficult:
     try {
       for (let remaining = elapsedTurns - 1; remaining >= 0; remaining--) {
         for (const e of travelers) {
-          if (!e.alive || e.sleeping || e.wallAmbushHidden || e.pendingAbility) continue
-          enemyFarWander(e, remaining)
+          if (e.alive && !e.sleeping && !e.wallAmbushHidden && !e.pendingAbility)
+            enemyFarWander(e, remaining)
+          yield elapsedTurns - remaining
         }
       }
     } finally {
       surfaceFarCatchupTerrain = null
-    }
-    // The simulated steps happened in the past, not during this render.
-    for (const e of travelers) {
-      e.animStart = undefined
-      e.animFromX = undefined
-      e.animFromY = undefined
+      // These steps happened in the past, not during this render.
+      for (const e of travelers) {
+        e.animStart = undefined
+        e.animFromX = undefined
+        e.animFromY = undefined
+      }
     }
   }
 
-  function updateSurfaceAbsence(previousZ) {
+  function updateSurfaceAbsence(previousZ, responsive = false) {
     if (previousZ === 0 && currentZ !== 0) {
       surfaceDepartureTurn = turnCount
       return false
@@ -6188,6 +6238,8 @@ more difficult:
     if (previousZ !== 0 && currentZ === 0) {
       const elapsed = Math.max(0, turnCount - (surfaceDepartureTurn ?? turnCount))
       surfaceDepartureTurn = null
+      if (responsive && elapsed >= 10 && !replayPlaying && !replayAnimationsDisabled && !replaySimulationMode)
+        return simulateSurfaceFarWanderingResponsive(elapsed).then(() => true)
       simulateSurfaceFarWandering(elapsed)
       return elapsed > 0
     }
@@ -6885,7 +6937,7 @@ more difficult:
     fish: idx => useFish(idx),
     cookedFood: idx => Campfires.eat(idx),
     scrollOfInvisibility: idx => useInvisibilityScroll(idx),
-    homecomingscroll: idx => useHomecomingScroll(idx),
+    homecomingscroll: idx => useHomecomingScroll(idx, true),
     tombstone: idx => readTombstone(idx),
     echoBlightHorn: idx => useEchoBlightHorn(idx),
     venomGland: idx => useVenomGland(idx),
@@ -8156,7 +8208,7 @@ more difficult:
     if (message) document.getElementById('loadingText').textContent = message
   }
   // Capture keyboard/touch input too, including shortcuts outside the canvas.
-  for (const type of ['click', 'keydown', 'pointerdown', 'touchstart', 'wheel']) {
+  for (const type of ['click', 'keydown', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'wheel', 'drop', 'dragover', 'change', 'submit']) {
     window.addEventListener(type, event => {
       if (document.getElementById('loadingOverlay').hidden) return
       event.preventDefault()
@@ -8230,6 +8282,7 @@ more difficult:
   }
 
   function flushPendingMove() {
+    if (surfaceCatchupBusy) return
     if (onlineRecordsBlockActions()) return
     if (autoPathTargetEnemy) refreshAutoChasePath()
     if (autoPath && autoPath.length) {
@@ -10366,6 +10419,7 @@ more difficult:
   function runAnimationLoop() {
     if (animLoopFrame !== null) return
     const step = (now) => {
+      if (surfaceCatchupBusy) { animLoopFrame = requestAnimationFrame(step); return }
       render(now)
       if (cameraAnimating && !moveAnim && !chargeAnimationPending() && !enemyAttackPresentationPending()) {
         // Keep the input lock through a charge following the player's own step.
@@ -10580,7 +10634,7 @@ more difficult:
     if (ambientTileAnimIntervalStarted) return
     ambientTileAnimIntervalStarted = true
     setInterval(() => {
-      renderAmbientTerrain()
+      if (!surfaceCatchupBusy) renderAmbientTerrain()
     }, AMBIENT_TILE_ANIM_MS)
   }
 
@@ -10615,6 +10669,7 @@ more difficult:
   }
 
   function render(now, terrainCells = null) {
+    if (surfaceCatchupBusy) return
     if (now === undefined) updatePlayerStatuses()
     const previousObjects = frameObjects
     frameObjects = {}
@@ -14144,17 +14199,19 @@ more difficult:
     consumeItemTurn()
   }
 
-  function useHomecomingScroll(idx) {
+  function useHomecomingScroll(idx, responsive = false) {
+    if (surfaceCatchupBusy) return
     const it = player.inventory[idx]
     if (!it || it.kind !== 'homecomingscroll') return
     if (!canUseItemsWhileSwimming()) return
-    ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
+    ensureReplayItemIds(); const scope = recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
-    returnPlayerToTemple()
-    toggleInv(false)
-    consumeItemTurn()
+    const finish = () => { toggleInv(false); consumeItemTurn() }
+    const catchup = returnPlayerToTemple(responsive)
+    if (catchup?.then) return catchup.then(finish).finally(() => finishRecordedReplayAction(scope))
+    finish()
   }
 
   function useSpeedPotion(idx) {
@@ -14944,7 +15001,7 @@ more difficult:
       destination += direction
     }
     if (!nextMap || !nextMap[player.y]?.[player.x]) return false
-    recordReplayAction({type: 'godTravel', direction})
+    const scope = recordReplayAction({type: 'godTravel', direction})
     const departureZ = currentZ
     currentZ = destination
     currentCave = -1
@@ -14960,11 +15017,15 @@ more difficult:
     minimapDirty = true
     cancelPreparedEnemyAbilitiesOutsideFloor()
     rebuildActiveLevelOccupancy()
-    updateSurfaceAbsence(departureZ)
-    render()
-    updateHud()
-    updateTooltip()
-    return true
+    const catchup = updateSurfaceAbsence(departureZ, true)
+    const finish = () => {
+      render()
+      updateHud()
+      updateTooltip()
+      return true
+    }
+    if (catchup?.then) return catchup.then(finish).finally(() => finishRecordedReplayAction(scope))
+    return finish()
   }
 
   let bowAimTarget = null

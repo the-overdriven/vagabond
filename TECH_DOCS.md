@@ -5311,6 +5311,13 @@ movement abilities and sanctuary restrictions. Each request filters current
 occupancy and the traveler's position while preserving candidate order and RNG.
 Humanoids retain live scans because they can open doors. These caches exist only
 for one catch-up operation; no elapsed turns are skipped or capped.
+Long returns to the surface display synchronization progress and let the browser
+paint between batches of travelers. Movement and other input remain blocked
+until all missed turns finish, including returns by Homecoming or resurrection.
+Batch timing only controls presentation: traveler order, RNG, tracks and final
+positions match uninterrupted simulation. Replay resolves the same work within
+the returning action. Pathfinding reuses temporary search storage without
+adding saved state.
 
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy hit by an invisible player reacts once instead of wandering on that turn

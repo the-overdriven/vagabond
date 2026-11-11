@@ -108,6 +108,10 @@ describe('Tracking and beast evidence', () => {
       try {
         surfaceFarCatchupTerrain=prepareSurfaceFarCatchupTerrain()
         fast=enemyBuildFarPath(traveler,52,45)
+        surfaceFarAStarBuffers.epoch = 0xffffffff
+        const afterWrap = enemyBuildFarPath(traveler,52,45)
+        trackAssert(JSON.stringify(afterWrap) === JSON.stringify(fast),
+          'reused search storage remains correct after stamp rollover')
       } finally { surfaceFarCatchupTerrain=beforeCache }
       trackAssert(ordinary?.length>0&&fast?.length===ordinary.length,
         'catch-up path remains shortest despite detouring around a wall')
@@ -120,8 +124,54 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('keeps batched catch-up deterministic and holds its replay scope across paints', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const originalPaint = paintLoading, originalNow = performance.now
+      const snapshot = () => JSON.stringify({enemies, tracks:[...beastTracks],
+        occupied:[...occupied], rngState})
+      const reset = seed => {
+        enemies = [trackEnemy(),trackEnemy({id:'second',x:50,y:50}),
+          trackEnemy({id:'sleeper',x:60,y:60,sleeping:true})]
+        beastTracks.clear(); rebuildActiveLevelOccupancy(); rngState = seed
+      }
+      let paints = 0, clock = 0
+      try {
+        performance.now = () => (clock += 10)
+        paintLoading = async () => {
+          paints++
+          await Promise.resolve()
+          trackAssert(surfaceCatchupBusy, 'simulation locked across paint')
+          trackAssert(!document.getElementById('loadingOverlay').hidden, 'progress visible')
+          trackAssert(recordingAction !== null, 'replay scope survives microtask')
+          const before = snapshot()
+          pendingMove = {dx:1,dy:0}; flushPendingMove(); pendingMove = null
+          inspect()
+          trackAssert(snapshot() === before, 'input cannot mutate partial simulation')
+        }
+        for (const seed of [12345,62123,992341]) {
+          replayRecording = false; reset(seed)
+          simulateSurfaceFarWandering(12)
+          const expected = snapshot()
+          reset(seed); startReplayRecording()
+          const scope = recordReplayAction({type:'inspect'})
+          await simulateSurfaceFarWanderingResponsive(12)
+          finishRecordedReplayAction(scope)
+          trackAssert(snapshot() === expected, 'identical batched state for seed '+seed)
+          trackAssert(scope._rngEnd === replayData.rng.length && scope._rngEnd > scope._rngStart,
+            'catch-up RNG belongs to returning action')
+          trackAssert(recordingAction === null && !surfaceCatchupBusy, 'scope and lock released')
+          trackAssert(document.getElementById('loadingOverlay').hidden, 'progress dismissed')
+        }
+        trackAssert(paints > 3, 'work actually yielded between travelers')
+      } finally {
+        paintLoading = originalPaint; performance.now = originalNow
+        replayRecording = false; recordingAction = null; pendingMove = null
+      }
+    })()`))
+  })
+
   it('records a real cave departure and restores it after loading underground', () => {
-    cy.window().then(win => win.eval(`(() => {
+    cy.window().then(win => win.eval(`(async () => {
       const entrance = caves.flatMap(c => c.entrances).find(p =>
         surfaceMap[p.y]?.[p.x] === 'caveentrance' && undergroundMap[p.y]?.[p.x] === 'caveentrance')
       trackAssert(!!entrance, 'walkable cave entrance exists')
@@ -135,6 +185,17 @@ describe('Tracking and beast evidence', () => {
       turnCount = 45
       trackAssert(enterCave() && currentZ === 0 && surfaceDepartureTurn === null,
         'return catches up and clears departure exactly once')
+      turnCount = 50; enterCave(); turnCount = 65
+      replayAnimationsDisabled = false; startReplayRecording()
+      const returning = inspect()
+      trackAssert(returning?.then && surfaceCatchupBusy, 'real return uses responsive catch-up')
+      await returning
+      const action = replayData.actions.at(-1)
+      trackAssert(currentZ === 0 && !surfaceCatchupBusy && recordingAction === null,
+        'real return finishes and releases input')
+      trackAssert(action.type === 'inspect' && action._rngEnd === replayData.rng.length,
+        'return action closes after catch-up')
+      replayRecording = false; replayAnimationsDisabled = true
     })()`))
   })
 
