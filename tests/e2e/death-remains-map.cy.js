@@ -117,7 +117,14 @@ describe('Normal-death remains map markers', () => {
   })
 
   it('replays the forage action without bringing back a recovered skull', () => {
-    beginNewGame()
+    // Replay logic is independent of world generation. Loading the fixed save
+    // avoids an unrelated, occasionally slow procedural-world initialization.
+    cy.visit('/')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__remainsReplaySave = save
+      win.eval('loadGameFromObject(window.__remainsReplaySave, {isReplayInit:true})')
+      delete win.__remainsReplaySave
+    }))
     cy.window().then(win => {
       win.eval(`
         replayAnimationsDisabled = true

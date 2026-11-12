@@ -167,8 +167,16 @@ describe('Desktop overlay layout', () => {
       expect(win.eval('autoPath')).to.equal(null)
       // Restore the known corridor and click through the CSS-scaled canvas.
       win.eval(`for(let y=96;y<=104;y++)discovered[y][101]=true;renderMinimap()`)
-      const dest = clickTile(win, 103, 100)
-      expect(win.eval(`fullMapTileAt(${dest.clientX},${dest.clientY})`)).to.deep.equal({x:103,y:100})
+      // Coordinate hit testing requires an open map; a successful travel click closes it.
+      const destPoint = win.eval(`(() => {
+        const targetX=103, targetY=100
+        const rect=mini.getBoundingClientRect(), view=fullMapViewport()
+        const width=rect.width-2*mini.clientLeft,height=rect.height-2*mini.clientTop
+        return {clientX: rect.left+mini.clientLeft+(targetX-view.ox+.5)*view.tileSize/mini.width*width,
+          clientY: rect.top+mini.clientTop+(targetY-view.oy+.5)*view.tileSize/mini.height*height}
+      })()`)
+      expect(win.eval(`fullMapTileAt(${destPoint.clientX},${destPoint.clientY})`)).to.deep.equal({x:103,y:100})
+      clickTile(win, 103, 100)
       expect(win.eval('mapOpen')).to.equal(false)
       expect(win.eval('({x:autoPath.at(-1).x,y:autoPath.at(-1).y})')).to.deep.equal({x:103,y:100})
       expect(win.eval('player.x')).to.equal(100)
@@ -255,7 +263,7 @@ describe('Desktop overlay layout', () => {
       expect(style.overflow).to.equal('hidden')
       expect(canvasRect.left).to.be.at.most(stageRect.left + 2)
       expect(canvasRect.right).to.be.at.least(stageRect.right - 2)
-      expect(canvasRect.top).to.be.at.most(stageRect.top + 2)
+      expect(canvasRect.top).to.be.at.most(stageRect.top - 2)
       expect(canvasRect.bottom).to.be.at.least(stageRect.bottom - 2)
       expect(Math.abs((stageRect.left - canvasRect.left) - (canvasRect.right - stageRect.right))).to.be.lessThan(2)
     })
