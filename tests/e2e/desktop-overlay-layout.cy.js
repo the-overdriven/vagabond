@@ -122,7 +122,7 @@ describe('Desktop overlay layout', () => {
           map[y][x]='grass';discovered[y][x]=true;grasslandTrees.delete(keyXY(x,y))
         }
         surfaceCatchupBusy=true // Keep the route queued so its target can be asserted.
-        toggleMap(true);mapZoomIndex=3;mapPanX=110;mapPanY=109;renderMinimap()
+        toggleMap(true);mapZoomIndex=3;mapPanX=102;mapPanY=100;renderMinimap()
       `)
       delete win.__mapTravelSave
     }))

@@ -11,7 +11,7 @@ describe('Damage, healing, and equipped Hunter quest messages', () => {
     cy.window().then(win=>win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw new Error(msg)}
       replayRecording=false;replayAnimationsDisabled=true;player.maxHp=100;player.equip={weapon:null,armor:null,shield:null}
-      player.godMode=false;player.invisibleTurns=0;currentZ=0;map=surfaceMap
+      player.godMode=false;player.invisibleTurns=0;currentZ=0;map=surfaceMap;spawnPoint={x:120,y:120}
       player.x=40;player.y=40;map[40][40]='grass';npcs=[];enemies=[];occupied.clear()
       const old={log,chance,damageRoll},messages=[]
       try {
@@ -21,7 +21,7 @@ describe('Damage, healing, and equipped Hunter quest messages', () => {
           level:0,alive:true,hp:100,maxHp:100,abilities:[],equipment:null,prefix:null,summonedTurn:null})
         reset();enemyAttackPlayer(e,true)
         check(messages[0].includes('hits you')&&messages[1]==="You're hurt badly.",'melee damage before warning')
-        e.shooterAbility=Object.keys(RANGED_CONFIG.abilities).find(k=>RANGED_CONFIG.abilities[k].projectile==='arrow');e.shotsRemaining=10
+        e.shooterAbility=Object.keys(RANGED_CONFIG.abilities).find(k=>RANGED_CONFIG.abilities[k].projectile==='arrow');e.shotsRemaining=10;e.shooterMode='ranged'
         reset();enemyRangedAttackPlayer(e,[{x:43,y:40},{x:40,y:40}])
         check(messages[0].includes('at you for 5 damage')&&messages[1]==="You're hurt badly.",'arrow damage before warning')
         reset();player.hp=20;player.poisonTurns=2;tickPlayerPoison()

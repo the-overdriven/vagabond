@@ -289,7 +289,7 @@ describe('Ranged shooter monster variants', () => {
         rangedAssert(e.shotsRemaining===9, 'following turn fires one arrow')
 
         resetRangedArena(); e=makeShooter('Skeleton',4,{aggro:4,aware:true}); x=e.x; enemyTurn()
-        rangedAssert(e.shotsRemaining===10 && e.x!==x, 'exact outer AGGRO line chases')
+        rangedAssert(e.shotsRemaining===10 && e.x!==x, 'exact outer AGGRO line chases even with clear aim')
 
         resetRangedArena(); e=makeShooter('Skeleton',3,{aggro:4,aware:true}); map[player.y][player.x+2]='forest'; x=e.x; enemyTurn()
         rangedAssert(e.shotsRemaining===10 && e.x!==x, 'blocked shot uses normal chase and spends no ammo')

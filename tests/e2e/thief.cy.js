@@ -211,6 +211,9 @@ describe('One-time monster theft', () => {
         occupied.clear();e.x=41;e.y=40;occupied.add(keyXY(e.x,e.y))
         for(const [dx,dy] of DIRS8) if(e.x+dx!==player.x || e.y+dy!==player.y) map[e.y+dy][e.x+dx]='mountain'
         const hp=player.hp;enemyTurn()
+        theftCheck(player.hp===hp && e.shooterMode==='melee' && e.shotsRemaining===10,
+          'cornered shooter spends a turn readying melee')
+        enemyTurn()
         theftCheck(player.hp===hp-5 && e.stolenItem && e.shotsRemaining===10,'cornered melee')
         map[40][42]='grass';enemyTurn();theftCheck(e.x===42,'retreat resumes')
         const stolen=JSON.stringify(e.stolenItem),id=e.id
