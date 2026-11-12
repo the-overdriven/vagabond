@@ -120,6 +120,12 @@ describe('Normal-death remains map markers', () => {
     // Replay logic is independent of world generation. Loading the fixed save
     // avoids an unrelated, occasionally slow procedural-world initialization.
     cy.visit('/')
+    // Startup fetches content JSON asynchronously. Loading a save before the
+    // configuration is ready crashes in applyWorldTraits(), before replay begins.
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.window().should(win => {
+      expect(win.eval('!!BASE_MAP_CONFIG.world?.defaultSize'), 'world configuration loaded').to.equal(true)
+    })
     cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
       win.__remainsReplaySave = save
       win.eval('loadGameFromObject(window.__remainsReplaySave, {isReplayInit:true})')
