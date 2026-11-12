@@ -7098,7 +7098,7 @@ more difficult:
             if (enemyAttackPlayer(e)) return
             break
           }
-          if (enemyIsShooter(e) && distNow <= aggroRange && shooterCanSeePlayer(e)) {
+          if (enemyIsShooter(e) && distNow < aggroRange && shooterCanSeePlayer(e)) {
             const projectilePath = clearProjectilePath(e)
             if (projectilePath) {
               if (enemyRangedAttackPlayer(e, projectilePath)) return

@@ -5162,13 +5162,15 @@ Alarmed and racial/world modifiers:
 
 ```text
 adjacent -> normal melee
-exactly on outermost AGGRO line -> normal chase
+exactly on outermost AGGRO line -> normal chase, even with a clear shot
 inside outer AGGRO line + shooter FOV + clear shot -> fire
 inside range but blocked/no shooter FOV -> normal chase
 zero ammunition -> completely normal monster behavior
 ```
 
-A shooter without `trueSight` never fires at an invisible player and never kites/backpedals. Existing
+A shooter without `trueSight` never fires at an invisible player and never kites/backpedals.
+The outer-boundary chase restriction applies to ordinary shooter turns; immediate
+return fire after a valid player bow shot remains a separate, higher-priority reaction. Existing
 extra pursuit behavior may still produce the same move-then-attack style sequence the
 normal AI already permits, but a ranged attack itself does not grant another action.
 

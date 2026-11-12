@@ -53,8 +53,13 @@ describe('Dwarven Ruins rooms, vaults, and tactical encounters', () => {
         const ruins = deepLevels.filter(level => level.dungeonPackage === 'dwarvenRuins')
         check(ruins.length === fixture.count, 'forced fixture floor count generated')
         const ruinsZs = new Set(ruins.map((_, i) => chainZForDepth(i + 4)))
-        check(groundItems.filter(g => g.kind === 'dwarvenstove').every(g => g.level === -3 || ruinsZs.has(g.level)),
-          'Dwarven Mines never contain kitchen stoves')
+        const towerStoves = groundItems.filter(g => g.kind === 'dwarvenstove' && g.levelKind === 'tower')
+        check(towerStoves.length <= 1 &&
+          towerStoves.every(g => g.level >= 1 && g.level < towerLevels.length),
+          'tower has at most one stove, away from the ground floor and roof')
+        check(groundItems.filter(g => g.kind === 'dwarvenstove').every(g =>
+          g.level === -3 || ruinsZs.has(g.level) || towerStoves.includes(g)),
+          'Dwarven Mines and other cave floors never contain kitchen stoves')
         check(groundItems.filter(g => g.kind === 'dwarvenstove' && g.level === -3).length === 1,
           'entrance Fort guarantees exactly one kitchen stove')
         for (let i = 0; i < ruins.length; i++) {

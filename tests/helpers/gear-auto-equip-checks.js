@@ -60,8 +60,8 @@ function bowRequiresAmmunitionChecks() {
   const melee={kind:'weapon',base:'Mace',name:'Mace',atk:6,grace:2,tier:2}
   const shield={kind:'shield',base:'Buckler',name:'Buckler',def:2,tier:1}
   const bow=makeShortBowItem()
-  const artifact={...makeBowItem('Hunting Bow'),kind:'artifact',artifactSlot:'weapon',
-    identified:false,name:'Hunting Bow of Secrets'}
+  const artifact=Object.assign({},makeBowItem('Hunting Bow'),{kind:'artifact',artifactSlot:'weapon',
+    identified:false,name:'Hunting Bow of Secrets'})
   player.equip.weapon=melee
   player.equip.shield=shield
   player.inventory=[bow,artifact]
