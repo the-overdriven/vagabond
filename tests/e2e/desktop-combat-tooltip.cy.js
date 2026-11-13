@@ -14,6 +14,32 @@ function beginNewGame(name) {
 }
 
 describe('Desktop combat enemy tooltip', () => {
+  it('hides equipped enemy gear prefixes without changing the actual item', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Hidden Enemy Gear Tester')
+
+    cy.window().then(win => {
+      const result = win.eval(`(() => {
+        currentZ=0;currentCave=-1;map=surfaceMap
+        enemies=[];occupied=new Set()
+        const x=player.x+1,y=player.y
+        map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        const t=ENEMY_TEMPLATE_BY_NAME.Goblin
+        const e=addEnemy({...t,baseName:'Goblin',name:'Goblin',x,y,level:0,
+          alive:true,hp:20,maxHp:20,homeX:x,homeY:y,homeTileType:'grass',
+          prefix:null,equipment:null,abilities:[]})
+        e.equipment={kind:'weapon',base:'Dagger',name:'Mighty Dagger',tier:2}
+        const tooltip=tileInspectInfo(x,y)?.html || ''
+        return {showsBase:tooltip.includes('Equipped:') && tooltip.includes('Dagger'),
+          hidesPrefix:!tooltip.includes('Mighty'),
+          preservesLootName:e.equipment.name==='Mighty Dagger'}
+      })()`)
+      expect(result.showsBase).to.equal(true)
+      expect(result.hidesPrefix).to.equal(true)
+      expect(result.preservesLootName).to.equal(true)
+    })
+  })
+
   afterEach(() => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: false}))
   })

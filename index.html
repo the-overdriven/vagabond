@@ -12697,7 +12697,7 @@ more difficult:
         ? `<div class="crit">${Math.round(critChance * 100)}% chance to crit</div>`
         : ''
       const equipmentHtml = e.equipment
-        ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.name || e.equipment.base}</span></div>`
+        ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
         : ''
       return {
         mini: false, enemy: e, html: `

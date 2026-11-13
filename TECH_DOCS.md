@@ -6957,8 +6957,9 @@ removed with the invalid equipment. A bow-capable archer remains eligible
 even after running out of ammunition.
 
 The worn item is already stored on the enemy as `e.equipment`.
-Combat glancing-hit messages and enemy tooltips show only the equipment's base
-name, so they do not reveal a modifier prefix before the item drops. Distant
+Combat glancing-hit messages and enemy tooltips (both hover inspection and
+pinned combat tooltips) show only the equipment's base name, so they do not
+reveal a modifier prefix before the item drops. Distant
 ground-drop messages likewise show only the base item name. A collected
 ordinary gear item reveals its full modifier prefix, while an unidentified
 artifact keeps its hidden identity. Every enemy item-drop message omits the
