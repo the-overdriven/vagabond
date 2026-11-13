@@ -7404,9 +7404,11 @@ exact damage footprint on open ground, so the circular ring is not visibly
 cut off at tile boundaries. The visual effect still stops at opaque terrain,
 blocked rays and unseen cells; the target preview marks the actual affected
 tiles, including its excluded corners. Victims remain visible until impact,
-then play their falling death effects. Damage/death
-visuals wait for impact and input remains blocked through presentation. Animation
-frames never consume gameplay RNG or resolve damage. Replay records the scroll's
+then play their falling death effects. A lethal self-hit starts the player's
+fall only at impact, and the death-screen fade waits until the fireball burst
+finishes. Damage and death still resolve in the casting turn; these delays are
+purely visual and input remains blocked through presentation. Animation frames
+never consume gameplay RNG or resolve damage. Replay records the scroll's
 identity and target coordinates, reusing the same action and seeded damage rolls.
 Changing the blast footprint changes replay outcomes; saves and replay initial
 states require the current save schema. No older-save conversion is provided.

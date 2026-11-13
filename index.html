@@ -5345,7 +5345,7 @@ more difficult:
     if (!deathTransition || deathTransition.phase !== 'pending') return
     deathTransition = {
       phase: 'out',
-      start: performance.now(),
+      start: Math.max(performance.now(), deathTransition.fadeNotBefore || 0),
       duration: 900,
       deathStart: deathTransition.deathStart,
       permadeath: deathTransition.permadeath
@@ -5500,11 +5500,16 @@ more difficult:
       }
       return
     }
+    // Fireball damage is resolved now for deterministic replay, but its lethal
+    // animation must not start before the projectile actually hits the player.
+    const fireballEnd = cause === 'fireball' ? fireballPresentationEnd() : 0
+    const deathNow = performance.now()
     deathTransition = {
       phase: 'pending',
-      start: performance.now(),
+      start: deathNow,
       duration: 900,
-      deathStart: performance.now(),
+      deathStart: fireballEnd ? Math.max(deathNow, fireballEnd - FIREBALL_BURST_MS) : deathNow,
+      fadeNotBefore: fireballEnd,
       rotation: 0,
       permadeath: player.permadeath
     }

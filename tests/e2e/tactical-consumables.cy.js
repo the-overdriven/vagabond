@@ -102,6 +102,46 @@ describe('Tactical consumables', () => {
     })
   }
 
+  it('plays a lethal self-fireball impact before the player falls and the death screen fades', () => {
+    loadConsumableWorld(1440)
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalRandInt=randInt
+      const originalDisabled=replayAnimationsDisabled,originalSimulation=replaySimulationMode
+      try {
+        toggleInv(false)
+        replayAnimationsDisabled=false;replaySimulationMode=false
+        currentZ=0;currentCave=-1;map=surfaceMap
+        player.x=40;player.y=40;player.hp=1;player.godMode=false
+        player.deathShieldReady=false;player.permadeath=false;player.berserkTurns=0
+        player.inventory=[createItem('scrollOfFireball',{count:1})]
+        enemies=[];occupied=new Set()
+        for(let y=35;y<46;y++)for(let x=35;x<46;x++)map[y][x]='grass'
+        snapCameraToPlayer()
+        randInt=(a,b)=>a===10&&b===50?49:originalRandInt(a,b)
+        check(await castFireball(0,player.x,player.y),'self-cast committed')
+        const spell=fireballAnims.at(-1)
+        check(!!spell && !!deathTransition,'spell and death presentation both scheduled')
+        check(player.hp===0,'damage resolves in the casting turn')
+        check(deathTransition.phase==='pending','death remains in presentation phase')
+        check(Math.abs(deathTransition.deathStart-(spell.start+FIREBALL_FLIGHT_MS))<5,
+          'fall starts exactly when the projectile impacts')
+        check(deathTransition.fadeNotBefore>=spell.start+FIREBALL_FLIGHT_MS+FIREBALL_BURST_MS,
+          'death fade must not obscure the fireball burst')
+        startDeathFade(null)
+        check(deathTransition.phase==='out' && deathTransition.start>=deathTransition.deathStart+FIREBALL_BURST_MS,
+          'fade is held until the blast is finished')
+        check(!player.permadeath && player.hp===0,'presentation does not alter gameplay outcome')
+      } finally {
+        randInt=originalRandInt
+        stopDeathTransition();fireballAnims=[];fxAnims=[];damageAnims=[]
+        replayAnimationsDisabled=originalDisabled;replaySimulationMode=originalSimulation
+        loadGameFromObject(before,{isReplayInit:true})
+      }
+    })()`))
+  })
+
   it('counts each self-damaging Fireball cast only once in Cursed World and saves the counter', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => win.eval(`(async () => {
