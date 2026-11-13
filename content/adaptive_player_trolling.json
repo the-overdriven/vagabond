@@ -242,6 +242,7 @@
       "goldMin": 5,
       "goldMax": 25,
       "scrollKind": "homecomingscroll",
+      "scrollChance": 0.3,
       "minPathSteps": 4,
       "maxPathSteps": 12,
       "minStairDistance": 2,

@@ -2127,6 +2127,14 @@ more difficult:
       base.tier === sourceTier - 1 ? cfg.equipmentPreviousTierWeight : 1)
   }
 
+  // Shared by the village starter hut and Early Descent remains. Names are
+  // sourced from starting_weapons.json; no magical modifier is rolled.
+  function makeImprovisedWeapon(name) {
+    return {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false,
+      startingWeapon: true, baseValue: ITEM_BASE_VALUES.startingWeapon,
+      ...(WORLD_GEN_CONFIG.lootRules.commonStartingWeapons ? {tier: 1} : {})}
+  }
+
   function makeWeaponItem(tier, mf = 0, sourceTier = 0, allowRanged = true) {
     // Short Bows retain their special sources. Tier-3 Hunting Bows can appear
     // alongside ordinary tier-3+ weapon drops, chests, and artifacts.
@@ -9469,8 +9477,7 @@ more difficult:
     if (map[player.y]?.[player.x] === 'village' || hut) {
       if (hut?.startingWeapon && !hut.startingWeaponTaken && !player.equip.weapon) {
         const name = hut.startingWeapon
-        const item = {kind: 'weapon', base: name, name, atk: 1, grace: 1, twoHanded: false, startingWeapon: true, baseValue: ITEM_BASE_VALUES.startingWeapon,
-          ...(WORLD_GEN_CONFIG.lootRules.commonStartingWeapons ? {tier: 1} : {})}
+        const item = makeImprovisedWeapon(name)
         hut.startingWeaponTaken = true
         lootLog(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, item, name)
         if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)

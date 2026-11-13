@@ -850,50 +850,91 @@ describe('Dwarven Ruins encounter progression', () => {
     })()`))
   })
 
-  it('places one early-descent corpse and a separate Homecoming scroll on a safe first descent', () => {
+  it('rolls exclusive Early Descent rewards: 30% ground scroll or 70% improvised corpse weapon', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
       const originalChance=chance
       try {
-        activeWorldTraits=[{name:'test curse',effects:[]}]
-        AdaptivePlayerTrolling.reset()
-        chance=()=>false // No optional ruin monsters or thief checks in this test.
-        currentZ=-2;currentCave=0
-        map=depthUndergroundMap(2);undergroundDiscovered=depthUndergroundDiscovered(2)
-        check(!!map && TILE.cavefloor.walk,'test has an ordinary, walkable depth-two cave')
-        for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='cavefloor'
-        player.x=39;player.y=39;player.lvl=3
-        enemies=[];groundItems=[];occupied=new Set()
-        rebuildActiveLevelOccupancy()
-        check(AdaptivePlayerTrolling.onFloorChanged(),'early arrival produces an encounter')
-        const bodies=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
-        const drops=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='droppeditem')
-        check(bodies.length===1 && drops.length===2,'one corpse and two independent ground drops')
-        const body=bodies[0],scroll=drops.find(g=>g.item.kind==='homecomingscroll')
-        const gear=drops.find(g=>['weapon','shield','armor'].includes(g.item.kind))
-        check(!!gear && gear.item.tier===1 && !gear.item.mod,
-          'worn adventurer gear has no magical bonus and belongs to the lowest tier')
-        check(body.gear===null && body.gold>=5 && body.gold<=25 && !body.looted,
-          'the searchable corpse holds only a small amount of gold')
-        check(!!scroll && scroll.kind==='droppeditem' &&
-          Math.abs(scroll.x-body.x)+Math.abs(scroll.y-body.y)===1 &&
-          Math.abs(gear.x-body.x)+Math.abs(gear.y-body.y)===1 &&
-          (gear.x!==scroll.x || gear.y!==scroll.y),
-          'two different tiles beside the corpse hold the scroll and gear for normal pickup')
-        check(AdaptivePlayerTrolling.completed('early_descent'), 'one lifetime reward is committed')
-        const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
-        loadGameFromObject(snapshot,{isReplayInit:true})
-        check(AdaptivePlayerTrolling.completed('early_descent') &&
-          groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===3,
-          'save and replay restoration keep the same two physical ground objects')
-        AdaptivePlayerTrolling.onFloorChanged()
-        check(groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===3,
-          'returning to the qualifying floor does not duplicate the cache')
-        // Reaching -2 too late never qualifies; entering the fort for the first
-        // time still has its own approved level-five threshold.
+        for (const scrollOutcome of [true,false]) {
+          loadGameFromObject(before,{isReplayInit:true})
+          activeWorldTraits=[{name:'test curse',effects:[]}]
+          AdaptivePlayerTrolling.reset()
+          // Force each branch independently; other optional event rolls stay off.
+          let outcomeRolls=0
+          chance=p=>{
+            if(p===0.3){outcomeRolls++;return scrollOutcome}
+            return false
+          }
+          currentZ=-2;currentCave=0
+          map=depthUndergroundMap(2);undergroundDiscovered=depthUndergroundDiscovered(2)
+          check(!!map && TILE.cavefloor.walk,'test has an ordinary, walkable depth-two cave')
+          for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='cavefloor'
+          player.x=39;player.y=39;player.lvl=3
+          enemies=[];groundItems=[];occupied=new Set()
+          rebuildActiveLevelOccupancy()
+          check(AdaptivePlayerTrolling.onFloorChanged(),'early arrival produces an encounter')
+          const bodies=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
+          const drops=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='droppeditem')
+          check(bodies.length===1 && drops.length===(scrollOutcome?2:1),
+            'one corpse and the expected number of independent ground drops')
+          const body=bodies[0],scroll=drops.find(g=>g.item.kind==='homecomingscroll')
+          const gear=drops.find(g=>['weapon','shield','armor'].includes(g.item.kind))
+          check(outcomeRolls===1,'the 30/70 reward is rolled exactly once when placed')
+          check(!!gear && gear.item.tier===1 && !gear.item.mod,
+            'ordinary adventurer gear remains unenchanted tier one in both outcomes')
+          check(body.gold>=5 && body.gold<=25 && !body.looted,
+            'the corpse is searchable and holds the configured gold range')
+          check(Math.abs(gear.x-body.x)+Math.abs(gear.y-body.y)===1,
+            'ordinary tier-one equipment remains on the tile next to the corpse')
+          if (scrollOutcome) {
+            check(body.gear===null && !!scroll &&
+              Math.abs(scroll.x-body.x)+Math.abs(scroll.y-body.y)===1 &&
+              (gear.x!==scroll.x || gear.y!==scroll.y),
+              '30% outcome gives a separate adjacent Homecoming scroll and no corpse weapon')
+          } else {
+            const weapon=body.gear
+            check(!scroll && !!weapon && weapon.kind==='weapon' &&
+              STARTING_WEAPONS.includes(weapon.name) && weapon.base===weapon.name &&
+              weapon.atk===1 && weapon.grace===1 && weapon.twoHanded===false &&
+              weapon.startingWeapon===true && weapon.baseValue===ITEM_BASE_VALUES.startingWeapon &&
+              !weapon.mod,
+              '70% outcome contains an ordinary randomly named improvised weapon inside the corpse')
+          }
+          check(AdaptivePlayerTrolling.completed('early_descent'),
+            'one lifetime reward is committed regardless of loot outcome')
+          const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+          loadGameFromObject(snapshot,{isReplayInit:true})
+          check(AdaptivePlayerTrolling.completed('early_descent') &&
+            groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===(scrollOutcome?3:2),
+            'save and replay restoration preserve the ground/corpse loot composition')
+          check(!AdaptivePlayerTrolling.onFloorChanged() &&
+            groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===(scrollOutcome?3:2),
+            're-entering the qualifying floor never duplicates loot or rerolls')
+          const remains=groundItems.find(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
+          const startingGold=player.gold,startingInventory=player.inventory.length
+          player.x=remains.x;player.y=remains.y
+          lootSkeletonOrForage()
+          check(remains.looted && player.gold===startingGold+remains.gold &&
+            player.inventory.length===startingInventory+(scrollOutcome?0:1),
+            'searching the corpse yields gold plus the improvised weapon only in its outcome')
+          if (!scrollOutcome) check(player.inventory.some(item=>item.name===remains.gear.name && item.startingWeapon),
+            'the improvised weapon is obtained by searching, not from a ground drop')
+          lootSkeletonOrForage()
+          check(player.gold===startingGold+remains.gold &&
+            player.inventory.length===startingInventory+(scrollOutcome?0:1),
+            'searching the corpse again cannot duplicate either reward')
+          const searched=JSON.parse(JSON.stringify(buildSaveObject()))
+          loadGameFromObject(searched,{isReplayInit:true})
+          check(groundItems.some(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody' && g.looted),
+            'searched corpse status persists through save/replay restoration')
+        }
+        // Level thresholds and Cursed World exclusion do not depend on loot outcome.
         AdaptivePlayerTrolling.reset();groundItems=[]
-        player.lvl=4
+        chance=()=>false
+        player.lvl=4;currentZ=-2;currentCave=0
+        map=depthUndergroundMap(2);undergroundDiscovered=depthUndergroundDiscovered(2)
+        player.x=39;player.y=39
         AdaptivePlayerTrolling.onFloorChanged()
         check(!AdaptivePlayerTrolling.serialize().events.early_descent &&
           !AdaptivePlayerTrolling.completed('early_descent'),
@@ -901,10 +942,10 @@ describe('Dwarven Ruins encounter progression', () => {
         player.lvl=5;currentZ=-3;currentCave=-1
         map=depthUndergroundMap(3);undergroundDiscovered=depthUndergroundDiscovered(3)
         for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='marble'
-        player.x=39;player.y=39
+        player.x=39;player.y=39;enemies=[];occupied=new Set()
+        rebuildActiveLevelOccupancy()
         check(AdaptivePlayerTrolling.onFloorChanged() && AdaptivePlayerTrolling.completed('early_descent'),
           'first entry to the fort at level five qualifies independently')
-        // Only Cursed World can create the remains, even when level is low.
         AdaptivePlayerTrolling.reset();groundItems=[]
         activeWorldTraits=[];player.lvl=1
         check(!AdaptivePlayerTrolling.onFloorChanged() &&

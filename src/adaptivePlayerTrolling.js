@@ -598,6 +598,7 @@ const AdaptivePlayerTrolling = (() => {
         descent.gearTier !== 1 ||
         JSON.stringify(descent.gearKinds) !== JSON.stringify(['weapon','armor','shield']) ||
         descent.scrollKind !== 'homecomingscroll' || !ITEM_DEFINITIONS[descent.scrollKind] ||
+        !Number.isFinite(descent.scrollChance) || descent.scrollChance < 0 || descent.scrollChance > 1 ||
         !Number.isInteger(descent.goldMin) || descent.goldMin < 0 ||
         !Number.isInteger(descent.goldMax) || descent.goldMax < descent.goldMin ||
         !Number.isInteger(descent.minPathSteps) || descent.minPathSteps < 2 ||
@@ -1891,9 +1892,10 @@ const AdaptivePlayerTrolling = (() => {
         visited.add(key);queue.push({x,y,steps:pos.steps+1})
       }
     }
-    // Both the old equipment and the rescue scroll are real ground pickups
-    // on distinct adjacent tiles. The corpse only holds gold, and remains
-    // visible rather than being hidden beneath a dropped-item icon.
+    // Ordinary tier-one gear always lies beside the corpse. The second reward
+    // is either a ground scroll or a weapon inside the searchable remains.
+    // Retain two safe adjacent sites for either outcome to avoid rerolling loot
+    // when a specific floor has insufficient placement space.
     const available=new Set(safe.map(p=>keyXY(p.x,p.y)))
     const candidates=safe.map(body=>({body,lootSites:dirs
       .map(([dx,dy])=>({x:body.x+dx,y:body.y+dy}))
@@ -1901,16 +1903,19 @@ const AdaptivePlayerTrolling = (() => {
       .filter(entry=>entry.lootSites.length>=2)
       .slice(0,cfg.maxCandidateSites)
     if (!candidates.length) return false
-    const selected=pick(candidates),scroll=pick(selected.lootSites)
-    const equipment=pick(selected.lootSites.filter(p=>p.x!==scroll.x || p.y!==scroll.y))
+    const selected=pick(candidates),equipment=pick(selected.lootSites)
+    const hasScroll=chance(cfg.scrollChance)
+    const scroll=hasScroll ? pick(selected.lootSites.filter(p=>
+      p.x!==equipment.x || p.y!==equipment.y)) : null
     const item=unenchantedDescentGear(),gold=randInt(cfg.goldMin,cfg.goldMax)
     const body={x:selected.body.x,y:selected.body.y,level:currentZ,
       levelKind:currentLevelKind(),caveIndex:currentCave,
       kind:'deadbody',name:'Hasty Explorer',race:'adventurer',killer:'the depths',
-      gear:null,gold,looted:false,adaptiveEventId:'early_descent'}
-    if (!dropRewardOnGround('early_descent',createItem(cfg.scrollKind),scroll.x,scroll.y)) return false
-    if (!dropRewardOnGround('early_descent',item,equipment.x,equipment.y)) {
-      groundItems.pop() // Roll back the preceding scroll (no intervening mutation).
+      gear:hasScroll ? null : makeImprovisedWeapon(pick(STARTING_WEAPONS)),
+      gold,looted:false,adaptiveEventId:'early_descent'}
+    if (!dropRewardOnGround('early_descent',item,equipment.x,equipment.y)) return false
+    if (scroll && !dropRewardOnGround('early_descent',createItem(cfg.scrollKind),scroll.x,scroll.y)) {
+      groundItems.pop() // Roll back the preceding equipment drop.
       return false
     }
     groundItems.push(body)

@@ -10703,7 +10703,7 @@ placement rules and seeded random draws.
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
 | 15 | **Gold Imp** (`gold_imp`) | Carry **2,000g or more**. | A Gold Imp tracks the player and may steal 10% of current gold (maximum 300g), recoverable on defeat. |
 | 16 | **Unread Scrolls** (`unread_scrolls`) | Never read a scroll and hold at least one continuously for **500 gameplay turns**. | A mocking note, “I wish I could read,” appears in Dwarven Ruins. |
-| 17 | **Early Descent** (`early_descent`) | First enter depth −2 by **level 3**, or enter the Dwarven Fort by **level 5**. | Nearby dead adventurer leaves tier-one equipment, gold and a Scroll of Homecoming. |
+| 17 | **Early Descent** (`early_descent`) | First enter depth −2 by **level 3**, or enter the Dwarven Fort by **level 5**. | Nearby remains hold 5–25g and either a Scroll of Homecoming (30%, beside the corpse) or a random improvised weapon (70%, inside it); one ordinary tier-one gear item lies beside the corpse. |
 | 18 | **Unused Healing** (`unused_healing`) | Die **twice**, each time still holding **at least 2 Life Potions**. | Searchable underground remains offer two Life Potions. |
 | 19 | **Humanoid Hunter** (`humanoid_hunter`) | Kill **30+ humanoids**, making up **at least 70%** of all credited kills. | Ordinary living beasts initiate combat only 75% as often while the condition holds. |
 | 20 | **Beast Hunter** (`beast_hunter`) | Kill **40+ beasts**, making up **at least 60%** of credited kills. | A marked native tier-four beast begins a persistent surface hunt. |
@@ -10891,18 +10891,27 @@ level (z:-2) at **character level 3 or below**, or the first entry into the
 Dwarven Fort (z:-3) at **character level 5 or below**, marks one premature
 expedition. A fallen adventurer's searchable remains appear on a connected,
 trap-safe tile **4–12 walking steps** from that floor's arrival.
-An unread **Scroll of Homecoming** and one ordinary, **unenchanted tier-one**
-weapon, armor or shield lie on two distinct adjacent ground tiles and must be
-picked up normally. Searching the corpse recovers **5–25 gold** using the
-existing corpse-looting interaction. There is no chest; the three objects
-are independently accessible. This one-time response does not consume a
-special-threat slot. If no clear set of three tiles exists, the response remains pending on the specific qualifying
-floor; it will not move to a different cave, crypt, or fort level. Re-entering
-that floor cannot create duplicate loot. Initial selection and placement,
-including the deferred floor identity, are deterministic and saved/replayed.
-The encounter is exclusive to Cursed World. This small rescue cache is
-intended to warn about the danger of descending too early; the free escape
-scroll is intentionally more useful than the worn equipment.
+One ordinary, **unenchanted tier-one** weapon, armor or shield always lies
+on an adjacent ground tile. A second, mutually exclusive reward is rolled
+when the remains can be placed:
+
+- **30%:** an unread **Scroll of Homecoming** lies on a different adjacent
+  ground tile; searching the corpse recovers **5–25 gold**.
+- **70%:** the corpse contains a randomly named **improvised weapon** drawn
+  from `content/starting_weapons.json`, with the same ATK 1, GRACE 1 and
+  one-handed rules as the village starter weapon. Searching the corpse recovers
+  both the weapon and **5–25 gold**; no Homecoming scroll is generated.
+
+The regular tier-one gear must still be picked up from the ground. The
+corpse uses ordinary search/loot behavior, and no chest is created. This
+one-time response does not consume a special-threat slot. Placement still
+requires the corpse and two clear adjacent tiles so neither reward outcome
+changes which floors can host the event. If the tiles cannot be placed,
+the response remains pending on the specific qualifying floor; it does not
+move to a different cave, crypt or fort level. Re-entering cannot create
+duplicate loot. Selection, placement and corpse contents use the seeded RNG
+and persist through saves and replay. The encounter is exclusive to Cursed
+World. The uncertain escape scroll makes descending early a meaningful risk.
 
 **Opposite Weapon and Neglected Shield:** These mutually exclusive, one-time
 Cursed World rewards encourage experimenting with combat options the character
