@@ -1,0 +1,599 @@
+{
+  "enabled": true,
+  "schema": 29,
+  "activationChecks": {
+    "stepsPerCheck": 500,
+    "earlyRuinsFloors": [
+      2,
+      3
+    ]
+  },
+  "defaults": {
+    "oncePerCharacter": true
+  },
+  "limits": {
+    "floorThreats": 2,
+    "nemesisBonusThreat": 1,
+    "minThreatSeparation": 6,
+    "surfaceRegionTargetTiles": 96,
+    "surfaceRegionThreats": 2
+  },
+  "events": {
+    "merchant_expansion": {
+      "type": "merchant_stock_expansion",
+      "minTradeGold": 1500,
+      "utilityPool": [
+        "scrollOfFear",
+        "scrollOfDeathShield",
+        "scrollOfChaos"
+      ],
+      "progression": {
+        "levelTierCaps": [
+          {
+            "maxLevel": 4,
+            "tier": 2
+          },
+          {
+            "maxLevel": 7,
+            "tier": 3
+          },
+          {
+            "maxLevel": 11,
+            "tier": 4
+          },
+          {
+            "minLevel": 12,
+            "tier": 5
+          }
+        ]
+      },
+      "minPurchasePriceByTier": {
+        "4": 500,
+        "5": 1000
+      },
+      "templeClearanceRadius": 100
+    },
+    "nemesis": {
+      "type": "champion_for_repeated_deaths",
+      "minDeathsBySpecies": 2,
+      "location": "last_dwarven_ruins_floor",
+      "prefix": "Champion",
+      "outsideFov": true
+    },
+    "fan_club": {
+      "type": "gear_prefix_fan_club",
+      "minMatchingEquippedItems": 3,
+      "members": [
+        "Kobold",
+        "Goblin",
+        "Skink"
+      ],
+      "equipmentKinds": [
+        "weapon",
+        "shield",
+        "armor"
+      ],
+      "minSpawnDistance": 10,
+      "maxMemberDistance": 2,
+      "maxCandidateSites": 48,
+      "minGearTier": 2,
+      "maxGearTier": 5,
+      "location": "dwarven_ruins"
+    },
+    "self_fireball": {
+      "type": "self_blast_corridor_scroll",
+      "minSelfHits": 2,
+      "itemKind": "scrollOfFireball",
+      "minPlayerDistance": 10,
+      "maxCandidateSites": 64,
+      "location": "underground"
+    },
+    "venom_eater": {
+      "type": "poison_absorbing_hunter",
+      "minDistinctPoisonedEnemies": 15,
+      "minUndeadPoisonAttempts": 5,
+      "location": "last_two_dwarven_ruins_floors",
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 128,
+      "venomHealMaxHpRatio": 0.2
+    },
+    "oculus": {
+      "type": "champion_invisibility_counter",
+      "minSeparateEngagements": 3,
+      "minAttackFreeTurns": 5,
+      "location": "last_two_dwarven_ruins_floors",
+      "prefix": "Champion",
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 128
+    },
+    "ancient_scarab": {
+      "type": "double_champion_scarab",
+      "location": "sand_dig_surface",
+      "minPreviousDigs": 35,
+      "combatMultiplier": 2,
+      "minSpawnDistance": 4,
+      "maxSpawnDistance": 8
+    },
+    "trogloraptor_ambush": {
+      "type": "mineral_deposit_wall_ambush",
+      "location": "dwarven_mines",
+      "monster": "Trogloraptor",
+      "minPreviousDeposits": 12,
+      "minSpawnSteps": 3,
+      "maxSpawnSteps": 10,
+      "maxDepositDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96
+    },
+    "mushroom_prophet": {
+      "type": "fungus_patch_prophecy",
+      "location": "natural_underground_fungi",
+      "minMushroomsCollected": 30,
+      "warningTurns": 1,
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxFungusDistance": 3,
+      "maxCandidateSites": 128,
+      "prophecy": "The harvest has a price. Flee now, or become part of the earth."
+    },
+    "previous_owner": {
+      "type": "cursed_artifact_former_owner",
+      "location": "last_two_dwarven_ruins_floors",
+      "minEquippedTurns": 300,
+      "recognitionDistance": 7,
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 96,
+      "baseSpecies": "Ghost"
+    },
+    "debt_collector": {
+      "type": "dwarven_remains_debt",
+      "location": "last_two_dwarven_ruins_floors",
+      "minRemainsSearched": 10,
+      "goldDemand": 100,
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 128
+    },
+    "uninvited_guest": {
+      "type": "campfire_visitor",
+      "location": "lit_abandoned_campfire",
+      "minPreviousLightings": 8,
+      "friendlyChance": 0.5,
+      "warningTurns": 1,
+      "minSpawnSteps": 2,
+      "maxSpawnSteps": 5,
+      "maxFireDistance": 4,
+      "maxCandidateSites": 48,
+      "mealPool": [
+        "roastedMeat",
+        "bakedPotato",
+        "cookedFish"
+      ]
+    },
+    "ignored_mushroom_cleaning": {
+      "type": "neglected_herbalist_purification",
+      "minIgnoredVisits": 3,
+      "location": "next_unvisited_cave_or_dwarven_ruins_floor",
+      "mushroomsTotal": 6,
+      "rawMushrooms": 5,
+      "clusterRadius": 3,
+      "minPlayerDistance": 10,
+      "maxCandidateSites": 96
+    },
+    "hungry_monster": {
+      "type": "meat_scent_hunter",
+      "location": "native_habitats",
+      "monsterPool": [
+        "Ogre",
+        "Cyclops",
+        "Cave Troll"
+      ],
+      "healthMultiplier": 0.8,
+      "defenseMultiplier": 0.8,
+      "attackMultiplier": 1.2,
+      "droppedMeatDetectionRange": 6,
+      "meatUnitsEaten": 1,
+      "minSpawnDistance": 10,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 80,
+      "eligibleMeatKinds": [
+        "meat",
+        "roastedMeat"
+      ],
+      "minCarriedMeat": 25
+    },
+    "gold_imp": {
+      "type": "gold_thief",
+      "location": "native_imp_habitats",
+      "minPlayerGold": 2000,
+      "stealRatio": 0.1,
+      "maxStolenGold": 300,
+      "minSpawnDistance": 10,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 80
+    },
+    "unread_scrolls": {
+      "type": "hoarded_scrolls_note",
+      "location": "dwarven_ruins",
+      "minUnusedScrollTurns": 500,
+      "noteItemKind": "tauntingNote",
+      "noteText": "I wish I could read.",
+      "minPlayerDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96
+    },
+    "early_descent": {
+      "type": "premature_descent_remains",
+      "location": "first_deep_cave_or_dwarven_fort_entry",
+      "maxLevelForDepthTwo": 3,
+      "maxLevelForFort": 5,
+      "gearTier": 1,
+      "gearKinds": [
+        "weapon",
+        "armor",
+        "shield"
+      ],
+      "goldMin": 5,
+      "goldMax": 25,
+      "scrollKind": "homecomingscroll",
+      "minPathSteps": 4,
+      "maxPathSteps": 12,
+      "minStairDistance": 2,
+      "maxCandidateSites": 96
+    },
+    "unused_healing": {
+      "type": "unused_potions_death_count",
+      "minDeaths": 2,
+      "minCarriedPotions": 2,
+      "itemKind": "potion",
+      "location": "underground",
+      "rewardItemKind": "potion",
+      "minPlayerDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96,
+      "rewardCount": 2
+    },
+    "humanoid_hunter": {
+      "type": "beast_initiation_moderation",
+      "minHumanoidKills": 30,
+      "minHumanoidKillShare": 0.7,
+      "initiateCombatChanceMultiplier": 0.75,
+      "family": "living",
+      "ordinaryOnly": true
+    },
+    "beast_hunter": {
+      "type": "beast_retaliation_pursuit",
+      "location": "surface",
+      "minBeastKills": 40,
+      "minBeastKillShare": 0.6,
+      "minTier": 4,
+      "minHp": 140,
+      "minAtk": 18,
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48,
+      "monsterPool": [
+        "Spineback",
+        "Manticore"
+      ],
+      "pursuit": {
+        "idleChance": 0.4,
+        "roamChance": 0.2
+      }
+    },
+    "strange_green_potion": {
+      "type": "unidentifiable_green_potion",
+      "minPotionsDrunk": 20,
+      "itemKind": "strangeGreenPotion",
+      "confusionChance": 0.5,
+      "confusionTurns": 5,
+      "minPlayerDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96
+    },
+    "trap_lure": {
+      "type": "trap_detour_ground_reward",
+      "location": "dwarven_ruins",
+      "minDistinctTraps": 5,
+      "rewardItemKind": "potion",
+      "maxSafeRoute": 38,
+      "minDetour": 3,
+      "maxDetour": 15,
+      "minPlayerDistance": 9,
+      "maxTrapDistance": 4,
+      "maxCandidateSites": 96
+    },
+    "drowning_lure": {
+      "type": "drowning_crossing_ground_reward",
+      "location": "shore_with_safe_detour",
+      "minCrossings": 2,
+      "minWaterSteps": 2,
+      "minShoreSeparation": 3,
+      "minWaterWidth": 2,
+      "maxWaterWidth": 9,
+      "maxNearShoreDistance": 4,
+      "maxSafeRoute": 50,
+      "minDetour": 4,
+      "rewardItemKind": "homecomingscroll",
+      "maxCandidateSites": 80
+    },
+    "low_hp_carrion": {
+      "type": "persistent_carrion_beast",
+      "location": "native_habitats",
+      "playerHpRatio": 0.25,
+      "minBelowHpTurns": 30,
+      "minTier": 4,
+      "minHp": 100,
+      "minAtk": 12,
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48
+    },
+    "reckless_fighter": {
+      "type": "graceful_duelist",
+      "location": "native_habitats",
+      "minFights": 5,
+      "quietTurns": 5,
+      "playerHpRatio": 0.1,
+      "minCarriedPotions": 1,
+      "minTier": 3,
+      "minHp": 60,
+      "minAtk": 10,
+      "hpMultiplier": 1.8,
+      "minPlayerHpMultiplier": 1.25,
+      "atkMultiplier": 1.15,
+      "defMultiplier": 1.3,
+      "graceLead": 2,
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48
+    },
+    "opposite_weapon": {
+      "type": "opposite_specialization_artifact",
+      "location": "last_two_dwarven_ruins_floors",
+      "exclusiveGroup": "neglected_combat_gear",
+      "minPlayerDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96,
+      "artifactEffectId": "blessed_relic",
+      "minPrimarySkill": 60,
+      "maxOppositeSkill": 10,
+      "weaponPools": {
+        "oneHanded": [
+          "Bone Cleaver"
+        ],
+        "twoHanded": [
+          "Giant Sword",
+          "Crescent Blades",
+          "Titan Warpick"
+        ]
+      }
+    },
+    "neglected_shield": {
+      "type": "neglected_shield_artifact",
+      "location": "last_two_dwarven_ruins_floors",
+      "exclusiveGroup": "neglected_combat_gear",
+      "minPlayerDistance": 10,
+      "minStairDistance": 3,
+      "maxCandidateSites": 96,
+      "artifactEffectId": "blessed_relic",
+      "maxShieldingSkill": 10,
+      "minShieldlessFights": 15,
+      "quietTurns": 5,
+      "shieldBase": "Royal Shield",
+      "variantBonuses": {
+        "atk": {
+          "atk": 2
+        },
+        "def": {
+          "def": 2
+        },
+        "spd": {
+          "spd": 2
+        },
+        "mf": {
+          "mf": 3
+        },
+        "grace": {
+          "grace": 2
+        }
+      },
+      "variantPriority": [
+        "atk",
+        "def",
+        "spd",
+        "mf",
+        "grace"
+      ]
+    },
+    "last_survivor": {
+      "type": "bestiary_species_retaliation",
+      "location": "native_habitats",
+      "minSpeciesKills": 20,
+      "minKillShare": 0.2,
+      "companions": 2,
+      "leaderPrefix": "Champion",
+      "leaderHpMultiplier": 1.5,
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "maxCompanionDistance": 2,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 64
+    },
+    "strong_enemy_hunter": {
+      "type": "opportunist_pack_retaliation",
+      "location": "native_habitats",
+      "minInitiatedFights": 5,
+      "minEnemyStrengthRatio": 1.25,
+      "maxPackStrengthRatio": 0.85,
+      "maxPackTier": 2,
+      "groupSize": 4,
+      "maxCompanionDistance": 2,
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48,
+      "monsterPool": [
+        "Goblin",
+        "Kobold",
+        "Skink",
+        "Ratling"
+      ]
+    },
+    "hidden_leader": {
+      "type": "guarded_champion_retaliation",
+      "location": "native_habitats",
+      "minLeaderFirstKills": 3,
+      "minLivingFollowers": 2,
+      "followers": 2,
+      "followersWithin": 2,
+      "leaderPrefix": "Champion",
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48,
+      "monsterPool": [
+        "Goblin",
+        "Kobold",
+        "Skink",
+        "Ratling"
+      ]
+    },
+    "unused_scroll_ambush": {
+      "type": "unused_scroll_cave_exit_ambush",
+      "location": "natural_cave_exit",
+      "minTurnsInCave": 100,
+      "minSameKindScrolls": 2,
+      "scrollKinds": [
+        "scrollOfInvisibility",
+        "homecomingscroll"
+      ],
+      "ambushSpecies": [
+        "Goblin",
+        "Kobold",
+        "Skink"
+      ],
+      "normalChance": 0.2,
+      "multiExitChance": 0.4,
+      "multiExitThreshold": 2,
+      "groupSize": 3,
+      "minSpawnDistance": 3,
+      "maxSpawnDistance": 9,
+      "maxCompanionDistance": 3,
+      "maxCandidateSites": 80
+    },
+    "undead_shield_hunter": {
+      "type": "anti_marksmanship_undead",
+      "location": "last_two_dwarven_ruins_floors",
+      "minMarksmanship": 30,
+      "baseSpecies": "Skeleton",
+      "name": "Undead Warden",
+      "hp": 84,
+      "atk": 13,
+      "def": 5,
+      "spd": 4,
+      "grace": 3,
+      "tier": 4,
+      "shieldHits": 3,
+      "shieldDamageMultiplier": 0.25,
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 96
+    },
+    "depth_guardian": {
+      "type": "mine_wall_guardian",
+      "location": "dwarven_mines",
+      "minWallsBroken": 30,
+      "warningTurns": 5,
+      "baseSpecies": "Guardian of the Deep",
+      "minSpawnDistance": 10,
+      "minEntranceDistance": 4,
+      "maxCandidateSites": 96,
+      "investigationSteps": 25
+    },
+    "unfinished_business": {
+      "type": "escaped_wounded_enemy_returns",
+      "location": "native_habitats",
+      "minEscapes": 3,
+      "hpThreshold": 0.25,
+      "quietTurns": 5,
+      "escapeDistance": 8,
+      "maxRememberedEscapes": 12,
+      "returnPrefix": "Champion",
+      "minSpawnDistance": 12,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 48
+    },
+    "forest_spirit": {
+      "type": "forest_overforaging_retribution",
+      "location": "surface",
+      "minDistinctForagedForestTiles": 70,
+      "returnSurfaceTurns": 100,
+      "returnRetryInterval": 10,
+      "minSpawnDistance": 10,
+      "maxSpawnDistance": 32,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 80,
+      "initialBiome": "forest",
+      "enemy": "Forest Spirit",
+      "pursuit": {
+        "idleChance": 0.4,
+        "roamChance": 0.2
+      }
+    },
+    "explorer_galleries": {
+      "type": "explorer_crossfire_reinforcement",
+      "location": "dwarven_ruins_galleries",
+      "minOppositeEdges": 2,
+      "minReachableExploredFraction": 0.5,
+      "reinforcementChance": 0.85,
+      "extraShooters": 2,
+      "leaderPrefix": "Champion",
+      "promoteExistingShooter": true,
+      "extraShootersPerBay": 1
+    },
+    "fort_quest": {
+      "type": "merchant_dwarven_recovery",
+      "minPlayerLevel": 10,
+      "itemKind": "dwarvenTradeLedger",
+      "location": "dwarven_ruins",
+      "minPathSteps": 8,
+      "maxPathSteps": 200,
+      "rewardGold": 350,
+      "mapRevealRadius": 2,
+      "targetZ": -5
+    },
+    "scroll_restock": {
+      "type": "merchant_scroll_resupply",
+      "minSuccessfulUses": 12
+    }
+  },
+  "fortEncounterChances": [
+    0.1,
+    0.2,
+    0.35,
+    0.6,
+    0.85
+  ],
+  "modifiers": {
+    "unsold_equipment": {
+      "type": "dynamic_ordinary_thief_encounters",
+      "minUnequippedGear": 15,
+      "normalChance": 0.1,
+      "hoardingChance": 0.3,
+      "minSpawnDistance": 10,
+      "maxSpawnDistance": 28,
+      "minEntranceDistance": 3,
+      "maxCandidateSites": 80
+    }
+  }
+}

@@ -508,6 +508,21 @@ more difficult:
         <button class="slbtn npc-goodbye" id="btnNpcGoodbye" type="button">Goodbye</button>
       </div>
     </div>
+    <div class="overlay" id="debtCollectorOverlay" role="dialog" aria-modal="true" aria-labelledby="debtCollectorTitle">
+      <div class="panelbox" id="debtCollectorPanel">
+        <div class="npc-dialogue-header">
+          <img src="img/enemies/debt_collector.jpg" alt="Dwarven ghost" class="debt-portrait">
+          <div class="npc-dialogue-intro">
+            <h2 id="debtCollectorTitle">Debt Collector</h2>
+            <p id="debtCollectorDemand" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="npc-dialogue-choices">
+          <button type="button" class="npc-dialogue-choice" id="btnDebtCollectorPay">Surrender the debt</button>
+          <button type="button" class="npc-dialogue-choice" id="btnDebtCollectorRefuse">Refuse — fight or flee</button>
+        </div>
+      </div>
+    </div>
     <div class="overlay" id="tradeOverlay">
       <div class="panelbox" id="tradePanel">
         <h2 id="tradeTitle">Trade with the Merchant</h2>
@@ -939,6 +954,8 @@ more difficult:
       caveSilhouettes: 'cave_silhouettes.json',
       worldTraits: 'world_traits.json',
       merchantStockConfig: 'merchant_stock.json',
+      adaptivePlayerTrolling: 'adaptive_player_trolling.json',
+      monsterNames: 'monster_names.json',
       rendering: 'rendering.json',
       playerVisuals: 'player_visuals.json'
     }
@@ -1058,6 +1075,7 @@ more difficult:
     WORLD_TRAITS = content.worldTraits.traits
     TRAITS_PER_WORLD = content.worldTraits.traits_per_world
     MERCHANT_STOCK_CONFIG = content.merchantStockConfig
+    AdaptivePlayerTrolling.configure(content.adaptivePlayerTrolling, content.monsterNames)
     RENDER_STYLE = content.rendering
     PLAYER_RACE_IMAGES = content.playerVisuals.playerRaceImages || {}
     RACE_SELECTION_IMAGES = content.playerVisuals.raceSelectionImages || {}
@@ -1143,7 +1161,7 @@ more difficult:
       paths = only
     } else {
       paths = []
-      for (const tmpl of ENEMY_TEMPLATES) paths.push('img/enemies/' + slug(tmpl.name) + '.jpg')
+      for (const tmpl of ENEMY_TEMPLATES) paths.push(enemyPortraitPath(tmpl.name))
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
       for (const kind of itemIconKinds()) paths.push(itemIconPath(kind))
       for (const gear of [...WEAPONS, ...SHIELDS, ...ARMORS])
@@ -1473,6 +1491,7 @@ more difficult:
   }
 
   function onCurrentLevel(entity) {
+    if (entity?.adaptiveEventId === 'forest_spirit' && entity.forestSpiritDormant && AdaptivePlayerTrolling.active()) return false
     if (entity?.levelKind && entity.levelKind !== currentLevelKind()) return false
     const level = entity.level || 0
     return level === 0 ? currentZ === 0 : currentZ === level
@@ -1531,7 +1550,7 @@ more difficult:
   }
 
   function enterCave(responsive = false) {
-    const departureZ=currentZ,departureKind=currentLevelKind()
+    const departureZ=currentZ,departureKind=currentLevelKind(),departureCave=currentCave
     try {
     if (travelTowerStairs()) return true
     if (enterMausoleum()) return true
@@ -1689,6 +1708,7 @@ more difficult:
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
+        if (AdaptivePlayerTrolling.onFloorChanged({fromZ:departureZ,fromKind:departureKind,fromCave:departureCave})) render()
         const catchup = updateSurfaceAbsence(departureZ, responsive)
         if (catchup?.then) return catchup.then(() => { render(); updateHud(); return true })
         if (catchup) render()
@@ -2035,6 +2055,7 @@ more difficult:
 <script src="src/highscores.js"></script>
 <script src="src/consumables.js"></script>
 <script src="src/camping.js"></script>
+<script src="src/adaptivePlayerTrolling.js"></script>
 <script src="src/fireball.js"></script>
 <script src="src/playerStatus.js"></script>
 <script src="src/tracking.js"></script>
@@ -2357,6 +2378,34 @@ more difficult:
     return item
   }
 
+  // Special adaptive loot uses the normal unidentified artifact structure,
+  // owner lore, identification, pricing and equipment slot rules. It is not
+  // rerolled until a desired base happens to appear in the random artifact pool.
+  function makeAdaptiveGearArtifact(baseName, effectId, extraBonuses = {}) {
+    const gear = artifactGearBase(baseName)
+    const effect = ARTIFACT_EFFECTS.find(fx => fx.id === effectId)
+    if (!gear || !['weapon', 'shield'].includes(gear.slot) || !effect ||
+        effect.tier < gear.base.tier || effect.maxHpPct < 0)
+      throw new Error('Invalid adaptive artifact reward: ' + baseName + ', ' + effectId)
+    const possessor = ARTIFACT_NAMES_DWARF.length ? pick(ARTIFACT_NAMES_DWARF) : null
+    const ownerLore = possessor ? makeDwarfOwnerLore(possessor) : null
+    const name = possessor ? `${baseName} of ${possessor}` : `${baseName} of the Forgotten`
+    const bonuses = rollArtifactBonuses(effect.bonuses)
+    for (const [stat, value] of Object.entries(extraBonuses))
+      bonuses[stat] = (bonuses[stat] || 0) + value
+    return {
+      kind: 'artifact', name, noun: baseName, tier: effect.tier,
+      effectId: effect.id, baseValue: effect.baseValue, artifactSlot: gear.slot,
+      base: baseName,
+      ...(gear.slot === 'weapon' ? {
+        atk: gear.base.atk, grace: gear.base.grace, twoHanded: !!gear.base.twoHanded
+      } : {def: gear.base.def}),
+      identified: false, bonuses, maxHpPct: effect.maxHpPct || 0,
+      curse: null, curseTimer: 0, possessor, ownerLore,
+      description: generateArtifactDescription(baseName, name, effect, null, possessor, ownerLore)
+    }
+  }
+
   function artifactDisplayName(it) {
     if (it.kind !== 'artifact') return it.name
     return it.identified ? it.name : ('Unidentified ' + it.noun)
@@ -2386,6 +2435,7 @@ more difficult:
     ensureReplayItemIds()
     recordReplayAction({type:'useItem', action:'identifyArtifact', idx, replayId:it.replayId})
     if (!player.godMode) {
+      AdaptivePlayerTrolling.onScrollUsed('idscroll')
       scroll.count = (scroll.count || 1) - 1
       if (scroll.count <= 0) {
         const scrollIdx = player.inventory.indexOf(scroll)
@@ -2618,6 +2668,7 @@ more difficult:
         if (it.bonuses.hp) parts.push('HP +' + it.bonuses.hp)
         if (it.bonuses.mf) parts.push('MF +' + it.bonuses.mf)
         if (it.bonuses.spd) parts.push('SPD +' + it.bonuses.spd)
+        if (it.bonuses.grace) parts.push('GRACE +' + it.bonuses.grace)
       }
       if (it.maxHpPct) parts.push('Max HP ' + it.maxHpPct + '%')
       // CURSED is an instance property, not an artifact-effect property.
@@ -2846,7 +2897,7 @@ more difficult:
   }
 
   function playerGraceBonus() {
-    return raceGrace() + levelGrace()
+    return raceGrace() + levelGrace() + artifactBonusSum('grace')
   }
 
   function armorGracePenalty(armor) {
@@ -3238,6 +3289,12 @@ more difficult:
       if (m) nextEnemyId = Math.max(nextEnemyId, Number(m[1]) + 1)
     }
     const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    enemy.adaptiveEventId = typeof enemy.adaptiveEventId === 'string' ? enemy.adaptiveEventId : null
+    enemy.forestSpiritDormant = enemy.adaptiveEventId === 'forest_spirit' && enemy.forestSpiritDormant === true
+    enemy.hiddenLeaderRole = enemy.adaptiveEventId === 'hidden_leader' &&
+      ['leader','guard'].includes(enemy.hiddenLeaderRole) ? enemy.hiddenLeaderRole : null
+    enemy.hiddenLeaderGroupId = enemy.adaptiveEventId === 'hidden_leader' &&
+      typeof enemy.hiddenLeaderGroupId === 'string' ? enemy.hiddenLeaderGroupId : null
     enemy.family = tmpl?.family
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
     initializeEnemySleep(enemy)
@@ -3246,6 +3303,8 @@ more difficult:
     enemy.meleeHitXpGranted = Number.isInteger(enemy.meleeHitXpGranted)
       ? Math.max(0, enemy.meleeHitXpGranted) : 0
     enemy.combatSkillXp = enemy.combatSkillXp ? {...enemy.combatSkillXp} : null
+    enemy.shieldGuardHits = Number.isInteger(enemy.shieldGuardHits) ? Math.max(0,enemy.shieldGuardHits) : 0
+    enemy.shieldGuardBroken = enemy.shieldGuardBroken === true
     enemy.deathShieldUsed = enemy.deathShieldUsed === true
     enemy.immunityUsed = enemy.immunityUsed === true
     enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
@@ -3257,6 +3316,7 @@ more difficult:
     enemy.poisonAppliedTurn = Number.isInteger(enemy.poisonAppliedTurn) ? enemy.poisonAppliedTurn : -1
     enemy.theftUsed = enemy.theftUsed === true
     enemy.stolenItem = enemy.stolenItem || null
+    enemy.stolenGold = Number.isInteger(enemy.stolenGold) ? Math.max(0,enemy.stolenGold) : 0
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.bowRetreatHold = enemy.bowRetreatHold === true
@@ -4294,7 +4354,9 @@ more difficult:
       const item = e.equipment
       const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
       lootLog(`The ${e.name} dropped ${label}.`, item, label)
-      if (onGround) {
+      // Adaptive enemies' enchanted gear is a visible ground pickup, not
+      // silently added to inventory or auto-equipped after a melee kill.
+      if (onGround || e.adaptiveEventId === 'fan_club' && AdaptivePlayerTrolling.active()) {
         placeEnemyLootOnGround(e, item)
         return
       }
@@ -4398,7 +4460,7 @@ more difficult:
 
   function enemyIsFleeing(e) {
     return e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) &&
-      ((!!e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) ||
+      (((!!e.stolenItem || e.stolenGold > 0) && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) ||
       (e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')))
   }
 
@@ -4451,7 +4513,7 @@ more difficult:
     e.x = destination.x; e.y = destination.y
     occupied.add(keyXY(e.x, e.y))
     e.farPath = null
-    if (e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
+    if ((e.stolenItem || e.stolenGold > 0) && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
       e.theftEscapeSteps++
       if (e.theftEscapeSteps === THIEF_CONFIG.maxEscapeSteps) {
         // The thief stops its special escape and settles at its new position.
@@ -4469,6 +4531,23 @@ more difficult:
         playerHiddenFromEnemy(e) || enemyIsPassive(e) || enemyIsFleeing(e) ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) !== ATTACK_RANGE ||
         !enemyHasSight(e) || !enemyEscapeDestination(e)) return false
+    // The Greedy Imp takes only coins, never a backpack item. Keep the normal
+    // thief's 10% adjacent-turn chance and escape requirement.
+    if (e.adaptiveEventId === 'gold_imp' && AdaptivePlayerTrolling.active()) {
+      const amount=AdaptivePlayerTrolling.goldImpStealAmount()
+      if (amount <= 0) return false
+      revealEnemyInvisibility(e)
+      if (!chance(THIEF_CONFIG.chance)) return false
+      player.gold -= amount
+      e.stolenGold = amount
+      e.theftUsed = true
+      e.theftEscapeSteps = 0
+      e.attackStart = undefined
+      log(`${e.name} steals ${amount} gold and runs away!`, 'bad')
+      tryWoundedEnemyFlee(e, true)
+      updateHud()
+      return true
+    }
     const equipped = new Set(Object.values(player.equip).filter(Boolean))
     const candidates = player.inventory.map((item, index) => ({item, index}))
       .filter(entry => !equipped.has(entry.item) && (entry.item.count ?? 1) > 0)
@@ -4562,6 +4641,10 @@ more difficult:
 
   async function playerAttackEnemy(e, isExtraAttack = false) {
     if (rareFleeBlocksAttack(e)) return false
+    AdaptivePlayerTrolling.onCombatAttack(turnCount)
+    if (!isExtraAttack) AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
+    AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
+    const scrollInvisibleAttack = !player.godMode && player.invisibleTurns > 0
     const weaponName = player.equip.weapon ? artifactDisplayName(player.equip.weapon).replace(/^The\s+/i, '') : 'bare fists'
     // The player can swing at the last known tile of an invisible enemy.
     // A miss does not expose it; a successful hit breaks its invisibility.
@@ -4610,6 +4693,7 @@ more difficult:
     if (trainedMeleeSkill) trainCombatSkill(trainedMeleeSkill, e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
     if (dmg > 0) breakEnemyFear(e)
+    if (scrollInvisibleAttack) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
     absorbEnemyFatalHit(e)
     triggerEnemyShellRetreat(e)
     alarmEnemy(e)
@@ -4662,6 +4746,7 @@ more difficult:
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
     if (!isExtraAttack && switchEnemyShooterMode(e, 'melee')) return false
+    AdaptivePlayerTrolling.onCombatAttack(turnCount)
     revealEnemyInvisibility(e)
     clearAutoPath()
     const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
@@ -4812,6 +4897,10 @@ more difficult:
       // A prepared arrow is spent as soon as it is fired, even on a miss.
       const venomArrow = bow.venomCoated === true
       if (venomArrow) bow.venomCoated = false
+      AdaptivePlayerTrolling.onCombatAttack(turnCount)
+      AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
+      AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
+      const scrollInvisibleShot = !player.godMode && player.invisibleTurns > 0
       const wasHidden = playerHiddenFromEnemy(e)
       const hpBefore = e.hp
       const targetWasInvisible = enemyInvisibleActive(e)
@@ -4856,17 +4945,23 @@ more difficult:
         const critical = !glancing && chance(shotCriticalChance)
         if (critical) dmg = Math.round(dmg * 2)
         if (glancing) dmg = Math.floor(dmg / 3)
+        const shield = AdaptivePlayerTrolling.shieldHunterArrowHit(e,dmg)
+        dmg = shield.damage
         e.hp -= dmg
         trainCombatSkill('marksmanship', e, dmg)
         if (targetWasInvisible) revealEnemyInvisibility(e)
         if (dmg > 0) breakEnemyFear(e)
+        if (scrollInvisibleShot) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
         absorbEnemyFatalHit(e)
         triggerEnemyShellRetreat(e)
         alarmEnemiesNearHit(e)
         if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical, deathFxDelay)
         spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, deathFxDelay + (critical ? 120 : 0))
-        log(glancing ? `Your arrow glances off the ${e.name}'s ${armor.base}, dealing ${dmg} damage.` :
-          `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
+        log(shield.absorbed
+          ? `The ${e.name}'s shield absorbs your arrow. ${dmg} damage gets through.${shield.broken ? ' Its shield SHATTERS!' : ''}`
+          : glancing ? `Your arrow glances off the ${e.name}'s ${armor.base}, dealing ${dmg} damage.`
+          : `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
+        if (shield.broken) spawnDamageNumber(e.x,e.y,'BREAK!', '#f2c17c', deathFxDelay)
         if (venomArrow && !glancing) applyPlayerVenomToEnemy(e)
         logEnemyEnrageTransition(e, wasEnraged)
         if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
@@ -4906,6 +5001,7 @@ more difficult:
     const projectilePath = spellAttack ? clearProjectilePath(e) : (path || projectilePathBetween(e.x, e.y, player.x, player.y))
     if (!projectilePath) return false
     if (!spellAttack && switchEnemyShooterMode(e, 'ranged')) return false
+    AdaptivePlayerTrolling.onCombatAttack(turnCount)
     clearAutoPath()
     if (!spellAttack) e.shotsRemaining = Math.max(0, e.shotsRemaining - 1)
     const projectile = shot.projectile
@@ -4992,12 +5088,18 @@ more difficult:
       recordStrongestEnemyKill(e)
       const species = trackSpecies(e)
       player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
+      AdaptivePlayerTrolling.onEnemyKilled(e)
       if (fishermanQuest?.state === 'active' && fishermanQuest.targetId === e.id) fishermanQuest.state = 'ready'
       log(`You have slain the ${e.name}!`, 'good')
       // Notify quest logic before removing the corpse. Recover-item quests
       // must inspect the weapon/equipment the monster was carrying.
       onOldHunterEnemyKilled(e)
-    } else if (cause === 'trap') log(`The ${e.name} is killed by a trap.`, 'info')
+    } else {
+      // A genuine non-player kill also removes a Temple-clearance target.
+      // Luring a living enemy away never does.
+      AdaptivePlayerTrolling.onTempleClearanceKill(e)
+      if (cause === 'trap') log(`The ${e.name} is killed by a trap.`, 'info')
+    }
     e.alive = false
     if (inspiredNearby && visibleAtDeath) {
       log(`The ${e.name} falls; its followers lose their inspiration!`, 'good')
@@ -5028,6 +5130,12 @@ more difficult:
       if (e.stolenItemEquipped) e.equipment = null
       e.stolenItemEquipped = false
       e.stolenItem = null
+    }
+    if (e.stolenGold > 0) {
+      groundItems.push({x:e.x,y:e.y,level:e.level ?? currentZ,
+        levelKind:e.levelKind || currentLevelKind(),caveIndex:e.caveIndex ?? currentCave,
+        kind:'stolenloot',gold:e.stolenGold})
+      e.stolenGold=0
     }
     if (cause !== 'sacrifice') {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
@@ -5140,6 +5248,7 @@ more difficult:
   }
 
   function resetForNewCharacter() {
+    AdaptivePlayerTrolling.reset()
     const departureZ = currentZ
     clearLevelUpPopup()
     closeNpcMenu()
@@ -5266,6 +5375,7 @@ more difficult:
     const shore = cause === 'drowning' ? drowningShore() : null
     resetSwimming()
     Graveyard.reconcileDeathCount(player, WORLD_SEED, true)
+    AdaptivePlayerTrolling.onPlayerDied(killer)
     const deathRecord = {
       character_id: player.characterId,
       character_name: player.name,
@@ -5700,6 +5810,36 @@ more difficult:
     return best ? {x: best.x, y: best.y} : null
   }
 
+  // An adaptive hungry monster may path to dropped meat instead of the player.
+  // Use the same legal monster steps/door handling as ordinary pursuit; do not
+  // mutate player coordinates or reuse a cached route to a different target.
+  function enemyFindStepToFood(e, targetX, targetY) {
+    return withPathingStoves(() => {
+      const detour=CHASE_DETOUR
+      const minX=Math.max(0,Math.min(e.x,targetX)-detour)
+      const maxX=Math.min(MAP_W-1,Math.max(e.x,targetX)+detour)
+      const minY=Math.max(0,Math.min(e.y,targetY)-detour)
+      const maxY=Math.min(MAP_H-1,Math.max(e.y,targetY)+detour)
+      const width=maxX-minX+1
+      const at=(x,y)=>(y-minY)*width+(x-minX)
+      const seen=new Uint8Array(width*(maxY-minY+1))
+      const queue=[{x:e.x,y:e.y,first:null}]
+      seen[at(e.x,e.y)]=1
+      for(let i=0;i<queue.length;i++) {
+        const current=queue[i]
+        for(const [dx,dy] of DIRS8) {
+          const x=current.x+dx,y=current.y+dy
+          if(x<minX||x>maxX||y<minY||y>maxY||seen[at(x,y)]||!enemyTileOpen(e,x,y))continue
+          seen[at(x,y)]=1
+          const first=current.first||{x,y}
+          if(x===targetX && y===targetY)return first
+          queue.push({x,y,first})
+        }
+      }
+      return null
+    })
+  }
+
   function enemyStepTowardPlayer(e, step = enemyFindStep(e)) {
     if (!step) return false // genuinely boxed in
     if (enemyWanderMode(e) === 'far') e.farPath = null
@@ -5811,7 +5951,7 @@ more difficult:
     e.x=step.x;e.y=step.y
     occupied.add(keyXY(e.x,e.y))
     e.farPath=null
-    if (e.stolenItem && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
+    if ((e.stolenItem || e.stolenGold > 0) && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) {
       e.theftEscapeSteps++
       if (e.theftEscapeSteps === THIEF_CONFIG.maxEscapeSteps) {
         e.homeX=e.x;e.homeY=e.y
@@ -5819,7 +5959,7 @@ more difficult:
     }
     leaveBeastTrack(e,fromX,fromY)
     finishEnemyMove(e,fromX,fromY)
-    if (e.alive && (e.stolenItem || enemyIsFleeing(e))) alertDwarvenRuinsEnemiesFromFlee(e)
+    if (e.alive && (e.stolenItem || e.stolenGold > 0 || enemyIsFleeing(e))) alertDwarvenRuinsEnemiesFromFlee(e)
     if (e.bowEvasion?.path.length===0) {
       e.bowEvasion=null
       e.bowEvasionSpent=true
@@ -6658,6 +6798,15 @@ more difficult:
 
   function applyPlayerVenomToEnemy(enemy) {
     if (enemy.hp <= 0 || !enemy.alive) return
+    const reaction = AdaptivePlayerTrolling.onVenomAttempt(enemy)
+    if (reaction?.immune) {
+      log(`The ${enemy.name} absorbs your venom${reaction.healed ? ` and recovers ${reaction.healed} HP` : ''}!`, 'bad')
+      if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y,
+        reaction.healed ? `+${reaction.healed}` : 'Immune!', '#87c69a')
+      updateMobileInfoPanel(enemy.x, enemy.y)
+      showDesktopCombatTooltip(enemy)
+      return
+    }
     if (enemy.family === 'undead' || enemy.family === 'construct') {
       log(`The ${enemy.name} is immune to venom.`, 'info')
       if (enemyIsVisibleOnMainView(enemy)) spawnDamageNumber(enemy.x, enemy.y, 'Immune!', '#87c69a')
@@ -6789,13 +6938,15 @@ more difficult:
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    const trollingActive = AdaptivePlayerTrolling.active()
+    if (trollingActive) AdaptivePlayerTrolling.onWorldTurn()
     Campfires.beginTurn()
     DungeonHazards.onPlayerTurnConsumed(turnCount)
     if (player.hp <= 0 || deathTransition) return
     const previousTraversal = turnSurfaceTraversal
     turnSurfaceTraversal = new Map()
     try {
-      return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget)
+      return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget, trollingActive)
     } finally {
       turnSurfaceTraversal = previousTraversal
       // Fear stays active through its last action and damage can cancel it
@@ -6806,7 +6957,7 @@ more difficult:
     }
   }
 
-  function resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget = null) {
+  function resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget = null, trollingActive = AdaptivePlayerTrolling.active()) {
     ageBeastTracks()
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
@@ -6852,6 +7003,8 @@ more difficult:
     for (const e of enemies.slice()) {
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      // Prophecies resolve as a game turn before any chase or attack AI.
+      if (trollingActive && e.adaptiveEventId && AdaptivePlayerTrolling.onEnemyTurn(e, turnCount)) continue
       expireEnemyInvisibility(e)
       if (e.wallAmbushNoActionTurn === turnCount) continue
       if (resolveEnemyTelegraphIfPending(e)) {
@@ -6905,7 +7058,7 @@ more difficult:
       } else if (!hiddenFromEnemy && rareStartFlee(e, rareDistance)) {
         if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
       }
-      if (e.stolenItem && tryWoundedEnemyFlee(e)) continue
+      if ((e.stolenItem || e.stolenGold > 0) && tryWoundedEnemyFlee(e)) continue
       const justEvaded = e.justEvaded === true
       e.justEvaded = false
       if (enemyIsPassive(e)) {
@@ -6926,9 +7079,22 @@ more difficult:
         if (e !== reactedEnemy && (enemyWanderMode(e) === 'far' || enemyIsOnScreen(e))) enemyWander(e)
         continue
       }
+      if (trollingActive && e.adaptiveEventId) {
+        if (AdaptivePlayerTrolling.takeHungryMonsterTurn(e)) continue
+        if (AdaptivePlayerTrolling.takeGoldImpTurn(e)) continue
+        if (AdaptivePlayerTrolling.takeAdaptiveHunterTurn(e)) continue
+        if (AdaptivePlayerTrolling.takeBeastHunterTurn(e)) continue
+        if (AdaptivePlayerTrolling.takeForestSpiritTurn(e)) continue
+        if (AdaptivePlayerTrolling.takeHiddenLeaderTurn(e)) continue
+      }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
       const dist = Math.max(Math.abs(dx), Math.abs(dy))
+      // Humanoid-heavy hunters are slightly less likely to provoke ordinary
+      // living beasts. This is a per-turn initiation roll; an attacked, aware
+      // or alarmed beast retains normal retaliation and pursuit behavior.
+      if (trollingActive && dist <= effectiveAggroRange(e) && enemyHasSight(e) &&
+          !AdaptivePlayerTrolling.beastMayInitiateCombat(e)) continue
       // Retaliation outranks fear and a blocked melee approach. The southern
       // prison-gallery kobold can shoot through bars but cannot cross them.
       // A mode switch consumes its whole turn, exactly like ordinary shooting.
@@ -7139,6 +7305,7 @@ more difficult:
   const ITEM_ACTION_HANDLERS_BASE = {
     potion: idx => usePotion(idx),
     speedpotion: idx => useSpeedPotion(idx),
+    strangeGreenPotion: idx => useStrangeGreenPotion(idx),
     scrollOfFear: idx => useTacticalConsumable(idx, 'scrollOfFear'),
     scrollOfDeathShield: idx => useTacticalConsumable(idx, 'scrollOfDeathShield'),
     scrollOfChaos: idx => useTacticalConsumable(idx, 'scrollOfChaos'),
@@ -7154,6 +7321,7 @@ more difficult:
     scrollOfInvisibility: idx => useInvisibilityScroll(idx),
     homecomingscroll: idx => useHomecomingScroll(idx, true),
     tombstone: idx => readTombstone(idx),
+    tauntingNote: idx => readTauntingNote(idx),
     echoBlightHorn: idx => useEchoBlightHorn(idx),
     venomGland: idx => useVenomGland(idx),
     blackKey: () => toggleBlackKey(),
@@ -7176,7 +7344,7 @@ more difficult:
     }
   }
 
-  const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','scrollOfFear','scrollOfDeathShield',
+  const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','strangeGreenPotion','scrollOfFear','scrollOfDeathShield',
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
     'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
@@ -7247,7 +7415,9 @@ more difficult:
 
   function addInventoryItem(kind, overrides = {}) {
     const item = createItem(kind, overrides)
-    const existing = isStackableKind(kind) && player.inventory.find(it => it.kind === kind)
+    if (kind === 'mushroom') AdaptivePlayerTrolling.onMushroomsCollected(item.count || 1)
+    const existing = isStackableKind(kind) && !item.dwarvenRemainsLootId &&
+      player.inventory.find(it => it.kind === kind && !it.dwarvenRemainsLootId)
     if (existing) {
       existing.count = (existing.count || 1) + item.count
       return existing
@@ -7270,7 +7440,8 @@ more difficult:
     }
     const existing = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y)
     const merges = existing?.kind === 'droppeditem' && isStackableKind(item.kind) &&
-      existing.item?.kind === item.kind
+      existing.item?.kind === item.kind && !existing.item?.dwarvenRemainsLootId &&
+      !item.dwarvenRemainsLootId
     if (existing && !merges) {
       log('The ground here is already occupied.', 'info')
       return
@@ -7280,17 +7451,22 @@ more difficult:
     const dropped = structuredClone(item)
     if (isStackableKind(item.kind)) {
       dropped.count = 1
-      if ((item.count || 1) > 1) delete dropped.replayId
+      if ((item.count || 1) > 1) {
+        delete dropped.replayId
+        AdaptivePlayerTrolling.splitDwarvenRemainsLoot(dropped)
+      }
     }
     if (merges) existing.item.count = (existing.item.count || 1) + 1
     else groundItems.push({x:player.x, y:player.y, level:currentZ,
-      levelKind:currentLevelKind(), caveIndex:currentCave, kind:'droppeditem', item:dropped})
+      levelKind:currentLevelKind(), caveIndex:currentCave, kind:'droppeditem', item:dropped,
+      playerDropped:true})
     if (isStackableKind(item.kind) && (item.count || 1) > 1) item.count--
     else {
       player.inventory.splice(idx, 1)
       if (item.kind === 'blackkey' && (player.equip.blackkey === item ||
         !player.inventory.some(other => other.kind === 'blackkey'))) player.equip.blackkey = null
     }
+    AdaptivePlayerTrolling.onScrollInventoryChanged()
     log(`You place ${artifactDisplayName(item)} on the ground.`, 'info')
     consumeItemTurn()
   }
@@ -7303,13 +7479,21 @@ more difficult:
       return
     }
     const existing = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y)
-    if (existing && existing.kind !== item.kind) {
+    if (existing && (item.dwarvenRemainsLootId || existing.kind !== item.kind)) {
       log('The ground here is already occupied.', 'info')
       return
     }
     ensureReplayItemIds()
     recordReplayAction({type: 'useItem', action: 'dropCrystal', idx, replayId: item.replayId})
-    if (existing) existing.count = (existing.count || 1) + 1
+    if (item.dwarvenRemainsLootId) {
+      const dropped = structuredClone(item)
+      dropped.count = 1
+      delete dropped.replayId
+      if ((item.count || 1) > 1) AdaptivePlayerTrolling.splitDwarvenRemainsLoot(dropped)
+      groundItems.push({x:player.x,y:player.y,level:currentZ,
+        levelKind:currentLevelKind(),caveIndex:currentCave,kind:'droppeditem',
+        item:dropped,playerDropped:true})
+    } else if (existing) existing.count = (existing.count || 1) + 1
     else groundItems.push({x: player.x, y: player.y, level: currentZ,
       levelKind: currentLevelKind(), caveIndex: currentCave, kind: item.kind, count: 1})
     item.count = (item.count || 1) - 1
@@ -7633,6 +7817,10 @@ more difficult:
     // what (if anything) it turns up, so the world gets a turn here.
     enemyTurn()
     npcTurn()
+    // Count only fresh dig actions (after the normal turn is resolved).
+    // Delaying the new monster until here gives the player their next turn
+    // to react instead of allowing an immediate free enemy attack.
+    AdaptivePlayerTrolling.onNewSandDig()
     updateHud()
     // Redraw immediately so the darker sand is visible, then keep repainting
     // any enemy/NPC movement until its already-resolved animation reaches the
@@ -7782,8 +7970,13 @@ more difficult:
     const crystal = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y && Mining.isMineralKind(g.kind))
     const dropped = groundItems.find(g => onCurrentLevel(g) && g.x === player.x && g.y === player.y &&
       g.kind === 'droppeditem')
-    const sandWithShovel = !Campfires.nearby() && !crystal && !dropped && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
+    const guestWithMeal = !dropped && AdaptivePlayerTrolling.friendlyUninvitedGuestNearby()
+    const sandWithShovel = !guestWithMeal && !Campfires.nearby() && !crystal && !dropped && map[player.y]?.[player.x] === 'sand' && player.inventory.some(i => i.kind === 'shovel')
     if (!sandWithShovel) recordReplayAction({type: 'forage'})
+    if (guestWithMeal && AdaptivePlayerTrolling.claimUninvitedGuestMeal()) {
+      consumeItemTurn()
+      return
+    }
     if (dropped) {
       const item = dropped.item
       if (item.kind === 'brushwood') {
@@ -7796,8 +7989,11 @@ more difficult:
         consumeItemTurn()
         return
       }
+      if (item.kind === 'mushroom' && !dropped.playerDropped)
+        AdaptivePlayerTrolling.onMushroomsCollected(item.count || 1)
       if (isStackableKind(item.kind)) {
-        const existing = player.inventory.find(it => it.kind === item.kind)
+        const existing = player.inventory.find(it => it.kind === item.kind &&
+          !it.dwarvenRemainsLootId && !item.dwarvenRemainsLootId)
         if (existing) existing.count = (existing.count || 1) + (item.count || 1)
         else player.inventory.push(item)
       } else player.inventory.push(item)
@@ -7882,8 +8078,13 @@ more difficult:
     const playerRemains = groundItems.find(g => onCurrentLevel(g) && g.kind === 'playerremains' && g.x === player.x && g.y === player.y)
     const stolenLoot = groundItems.find(g => onCurrentLevel(g) && g.kind === 'stolenloot' && g.x === player.x && g.y === player.y)
     if (stolenLoot) {
-      player.inventory.push(stolenLoot.item)
-      lootLog(`You recover ${artifactDisplayName(stolenLoot.item)} from the thief's bag.`, stolenLoot.item, artifactDisplayName(stolenLoot.item))
+      if (Number.isInteger(stolenLoot.gold) && stolenLoot.gold > 0) {
+        player.gold += stolenLoot.gold
+        log(`You recover ${stolenLoot.gold} stolen gold from the thief's bag.`, 'loot')
+      } else {
+        player.inventory.push(stolenLoot.item)
+        lootLog(`You recover ${artifactDisplayName(stolenLoot.item)} from the thief's bag.`, stolenLoot.item, artifactDisplayName(stolenLoot.item))
+      }
       spawnPickupAnim(stolenLoot)
       groundItems.splice(groundItems.indexOf(stolenLoot), 1)
       updateHud()
@@ -7926,23 +8127,34 @@ more difficult:
         return
       }
       dwarvenRemains.looted = true
+      AdaptivePlayerTrolling.onDwarvenRemainsSearched()
       const roll = rng()
       if (roll < 0.14) {
         const gold = randInt(5, 25)
         player.gold += gold
+        AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(gold)
         log(`You search the dwarven remains and find ${gold} gold.`, 'loot')
       } else if (roll < 0.22) {
         const arrows = randInt(4, 12)
-        addInventoryItem('arrows', {count: arrows})
+        if (AdaptivePlayerTrolling.active()) {
+          const foundArrows = createItem('arrows', {count: arrows})
+          AdaptivePlayerTrolling.tagDwarvenRemainsLoot(foundArrows)
+          player.inventory.push(foundArrows)
+        } else addInventoryItem('arrows', {count: arrows})
         log(`You search the dwarven remains and find ${arrows} arrows.`, 'loot')
       } else if (roll < 0.27) {
         const mineral = pick(['quartz', 'quartz', 'amethyst', 'topaz'])
-        addInventoryItem(mineral)
+        if (AdaptivePlayerTrolling.active()) {
+          const foundCrystal = createItem(mineral)
+          AdaptivePlayerTrolling.tagDwarvenRemainsLoot(foundCrystal)
+          player.inventory.push(foundCrystal)
+        } else addInventoryItem(mineral)
         log(`You find ${itemDefinition(mineral).name} among the dwarven remains.`, 'loot')
       } else if (roll < 0.31) {
         const kind = pick(['weapon', 'armor', 'shield'])
         const equipment = kind === 'weapon' ? makeWeaponItem(2) :
           kind === 'armor' ? makeArmorItem(2) : makeShieldItem(2)
+        AdaptivePlayerTrolling.tagDwarvenRemainsLoot(equipment)
         player.inventory.push(equipment)
         lootLog(`You search the dwarven remains and recover ${equipment.name}.`, equipment)
       } else log('You search the dwarven remains, but find nothing.', 'info')
@@ -8225,7 +8437,13 @@ more difficult:
       ...(player.inventory.some(item => item.kind === 'oddTombstone')
         ? [{id:'return',label:'Return the strange tombstone',ready:true}] : [])]
     if (npc.name === 'Drunk') return [{id:'talk',label:'Talk'},{id:'gossip',label:'Hear gossip'}]
-    if (npc.name === 'Merchant') return [{id:'talk',label:'Talk'},{id:'rumors',label:'Ask for rumors'},{id:'trade',label:'Trade'}]
+    if (npc.name === 'Merchant') {
+      const options=[{id:'talk',label:'Talk'},{id:'rumors',label:'Ask for rumors'},{id:'trade',label:'Trade'}]
+      const quest=AdaptivePlayerTrolling.fortQuestOption()
+      if (quest) options.push({id:'fortQuest',label:quest==='offer' ? 'A job in the dwarven fort' :
+        quest==='turnin' ? 'Return the Dwarven Trade Ledger' : 'Ask about the ledger',ready:quest==='turnin'})
+      return options
+    }
     if (npc.name === 'Herbalist') return [{id:'talk',label:'Talk'},{id:'gossip',label:'Gossip'},{id:'trade',label:'Services'}]
     if (npc.name === 'Ancient Lich' && player.equip.blackkey)
       return [{id:'talk',label:'Talk'},{id:'key',label:'Ask about the Black Key'}]
@@ -8338,7 +8556,9 @@ more difficult:
     if (record) recordReplayAction({type:'npcTopic',npc:npc.name,topic})
     freezeNpcFromWandering(npc)
     const gifted = grantHerbalistFirstGift(npc)
-    if (npc.name === 'Merchant' && topic === 'rumors') {
+    if (npc.name === 'Merchant' && topic === 'fortQuest') {
+      AdaptivePlayerTrolling.interactFortQuest()
+    } else if (npc.name === 'Merchant' && topic === 'rumors') {
       const alreadyKnown = merchantFortHintGiven || !!(dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x])
       if (alreadyKnown) {
         const hint = NPC_TEMPLATES.find(template => template.name === 'Merchant').fortHint
@@ -9049,6 +9269,7 @@ more difficult:
       if (currentZ === -2 && cryptLevel2 && map[ny][nx] === 'crypttrap') {
         log(CRYPT2_TRAP_DISCOVER, 'info')
       }
+      AdaptivePlayerTrolling.onPlayerMoved()
       maybeSpawnForestAmbush(nx, ny)
       moved = true
       consecutiveWaitTurns = 0
@@ -9328,7 +9549,7 @@ more difficult:
       log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'stolenloot') {
-      log('A thief\'s abandoned bag. Press the forage key to recover your stolen item.', 'info')
+      log(currentGround.gold > 0 ? 'A thief\'s bag of stolen gold. Press the forage key to recover the coins.' : 'A thief\'s abandoned bag. Press the forage key to recover your stolen item.', 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'playerremains') {
       log('These are the remains of your last defeat. Press the forage key to recover the item you dropped.', 'info')
@@ -9711,6 +9932,7 @@ more difficult:
   // monster without altering the letter, terrain, or fog of war.
   function drawEnemyPrefixArea(px, py, x, y, prefix, visibleTiles) {
     if (!prefix) return
+    const spirit = prefix === 'ForestSpirit'
     const champion = prefix === 'Champion'
     const style = champion ? RENDER_STYLE.enemies.prefixArea.champion : RENDER_STYLE.enemies.prefixArea.other
     const radius = champion ? 2 : 1
@@ -9720,7 +9942,8 @@ more difficult:
       if ((visibleTiles && !visibleTiles.has(keyXY(mx, my))) || !undergroundTileVisible(mx, my)) continue
       const vx = px + dx * TILE_PX, vy = py + dy * TILE_PX
       if (vx <= -TILE_PX || vy <= -TILE_PX || vx >= canvas.width || vy >= canvas.height) continue
-      ctx.fillStyle = champion && Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outer : style.inner
+      ctx.fillStyle = spirit ? 'rgba(75, 195, 119, 0.17)' :
+        champion && Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outer : style.inner
       ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
     }
   }
@@ -10371,11 +10594,12 @@ more difficult:
   }
 
   function enemyGlyph(e) {
-    const ch = (e.baseName || e.name).trim().split(/\s+/).pop()[0]
+    const ch = e.adaptiveEventId === 'forest_spirit' ? 'F' : (e.baseName || e.name).trim().split(/\s+/).pop()[0]
     return e.tier <= RENDER_STYLE.enemies.lowercaseThroughTier ? ch.toLowerCase() : ch
   }
 
   function enemyColor(e) {
+    if (e.adaptiveEventId === 'forest_spirit') return '#75d39a'
     return RENDER_STYLE.enemies.tierColors[String(e.tier)] || RENDER_STYLE.enemies.defaultColor
   }
 
@@ -10384,6 +10608,8 @@ more difficult:
   // descriptors without changing gameplay/world-generation code.
   function groundGlyph(g) {
     if (g.kind === 'droppeditem') {
+      if (g.item?.kind === 'strangeGreenPotion') return {ch:'!',color:'#61d478'}
+      if (g.item?.kind === 'dwarvenTradeLedger') return {ch:'✦',color:'#f0d78d'}
       // Before collection, even the ASCII symbol must not disclose that an
       // otherwise ordinary-looking weapon, shield or armor is an artifact.
       const kind = g.item?.kind === 'artifact' ? g.item.artifactSlot : g.item?.kind
@@ -10953,6 +11179,29 @@ more difficult:
     return sources
   }
 
+  function syncDebtCollectorOverlay() {
+    const overlay=document.getElementById('debtCollectorOverlay')
+    if (!overlay) return
+    const ghost=!replayPlaying && !replaySimulationMode && AdaptivePlayerTrolling.pendingDebtCollector()
+    const wasOpen=overlay.classList.contains('show')
+    overlay.classList.toggle('show',!!ghost)
+    if (ghost) {
+      const debt=AdaptivePlayerTrolling.debtCollectorDemand(ghost)
+      document.getElementById('debtCollectorDemand').textContent=debt.isGold
+        ? `You disturbed the dwarven dead. Repay them ${debt.gold} gold, or answer to me.`
+        : `You disturbed the dwarven dead. Return ${debt.count>1 ? debt.count+' × ' : ''}${debt.itemName}, or answer to me.`
+      const pay=document.getElementById('btnDebtCollectorPay')
+      pay.textContent=debt.isGold ? `Pay ${debt.gold} gold` : 'Surrender the item'
+      pay.disabled=!debt.canPay
+    }
+    if (wasOpen !== !!ghost) {
+      updateTouchControlsVisibility()
+      if (ghost) document.getElementById('btnDebtCollectorPay').disabled
+        ? document.getElementById('btnDebtCollectorRefuse').focus()
+        : document.getElementById('btnDebtCollectorPay').focus()
+    }
+  }
+
   function render(now, terrainCells = null) {
     if (surfaceCatchupBusy) return
     if (now === undefined) updatePlayerStatuses()
@@ -10964,6 +11213,7 @@ more difficult:
     visualFrameTime = now ?? performance.now()
     try {
       renderScene(visualFrameTime, terrainCells)
+      if (now === undefined) syncDebtCollectorOverlay()
     } finally {
       visualFrameTime = previousFrameTime
       frameMiningLightSources = previousLights
@@ -11801,7 +12051,7 @@ more difficult:
     }
     for (const {e} of visibleEnemies) if (!enemyInvisibleActive(e)) drawEnemyPrefixArea(
       Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
-      e.x, e.y, e.prefix, undergroundVisible)
+      e.x, e.y, e.adaptiveEventId === 'forest_spirit' ? 'ForestSpirit' : e.prefix, undergroundVisible)
     // A restrained, one-tile round backing separates small monster sprites
     // from busy scenery. ASCII stays fully unchanged.
     if (USE_TILE_IMAGES) for (const {e, vx, vy} of visibleEnemies) {
@@ -11841,6 +12091,15 @@ more difficult:
         }
         ctx.restore()
       }
+      if (e.adaptiveEventId === 'undead_shield_hunter' && !e.shieldGuardBroken) {
+        ctx.save()
+        ctx.font = `bold ${Math.max(12,Math.round(TILE_PX*0.45))}px serif`
+        ctx.textAlign = 'right';ctx.textBaseline = 'top'
+        ctx.lineWidth = 3;ctx.strokeStyle = '#171b20';ctx.fillStyle = '#d0dce3'
+        ctx.strokeText('🛡',vx+TILE_PX,vy+1)
+        ctx.fillText('🛡',vx+TILE_PX,vy+1)
+        ctx.restore()
+      }
       if (inspiringChampionFor(e)) {
         ctx.save()
         ctx.font = `bold ${Math.max(11,Math.round(TILE_PX*0.40))}px Consolas, monospace`
@@ -11850,7 +12109,7 @@ more difficult:
         ctx.fillText('✦',vx+1,vy+TILE_PX-1)
         ctx.restore()
       }
-      if (e.stolenItem) drawThiefBag(vx + TILE_PX * 0.78, vy + 1, TILE_PX * 0.42)
+      if (e.stolenItem || e.stolenGold > 0) drawThiefBag(vx + TILE_PX * 0.78, vy + 1, TILE_PX * 0.42)
       if (e.victoryLevel) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.42))}px serif`
@@ -11859,8 +12118,8 @@ more difficult:
         ctx.lineWidth = 2
         ctx.strokeStyle = '#180907'
         ctx.fillStyle = '#e0473f'
-        ctx.strokeText('☠︎', vx + TILE_PX * (e.stolenItem ? 0.43 : 0.78), vy + 1)
-        ctx.fillText('☠︎', vx + TILE_PX * (e.stolenItem ? 0.43 : 0.78), vy + 1)
+        ctx.strokeText('☠︎', vx + TILE_PX * ((e.stolenItem || e.stolenGold > 0) ? 0.43 : 0.78), vy + 1)
+        ctx.fillText('☠︎', vx + TILE_PX * ((e.stolenItem || e.stolenGold > 0) ? 0.43 : 0.78), vy + 1)
         ctx.restore()
       }
 
@@ -11899,8 +12158,8 @@ more difficult:
         ctx.lineWidth = 3
         ctx.strokeStyle = '#180907'
         ctx.fillStyle = '#ffffff'
-        ctx.strokeText('!', vx + TILE_PX * (e.stolenItem ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
-        ctx.fillText('!', vx + TILE_PX * (e.stolenItem ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
+        ctx.strokeText('!', vx + TILE_PX * ((e.stolenItem || e.stolenGold > 0) ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
+        ctx.fillText('!', vx + TILE_PX * ((e.stolenItem || e.stolenGold > 0) ? (e.victoryLevel ? 0.14 : 0.48) : (e.victoryLevel ? 0.60 : 0.78)), vy + 1)
         ctx.restore()
       }
 
@@ -12366,6 +12625,10 @@ more difficult:
     return name.toLowerCase().replace(/\s+/g, '_')
   }
 
+  function enemyPortraitPath(species) {
+    return `img/enemies/${slug(species === 'Forest Spirit' ? 'Ghost' : species)}.jpg`
+  }
+
   function groundItemLabel(g) {
     if (g.kind === 'droppeditem') return g.item
       ? (g.item.kind === 'artifact' ? g.item.noun || g.item.base || 'Artifact' : g.item.base || g.item.name || 'Item') : 'Dropped Item'
@@ -12427,14 +12690,19 @@ more difficult:
         ? `<div class="crit">${Math.round(critChance * 100)}% chance to crit</div>`
         : ''
       const equipmentHtml = e.equipment
-        ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.base}</span></div>`
+        ? `<div style="margin:3px 0 4px;color:var(--parchment-dim);">Equipped: <span class="tier${e.equipment.tier}">${e.equipment.name || e.equipment.base}</span></div>`
         : ''
       return {
         mini: false, enemy: e, html: `
-      <img src="${imageSrc(`img/enemies/${slug(e.baseName || e.name)}.jpg`)}" onerror="this.style.display='none'">
+      <img src="${imageSrc(enemyPortraitPath(e.adaptiveEventId === 'debt_collector' ? e.name : e.adaptiveEventId === 'forest_spirit' ? 'Forest Spirit' : e.baseName || e.name))}" onerror="this.style.display='none'">
       <div class="info-body">
-      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${e.stolenItem ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
+      <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${(e.stolenItem || e.stolenGold > 0) ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.adaptiveEventId === 'reckless_fighter' ? `<div class="pfx" style="color:#9cddd7">Graceful · GRACE ${Math.round(enemyGrace(e) || 0)} · precise strikes</div>` : ''}
+      ${e.adaptiveEventId === 'low_hp_carrion' ? '<div class="pfx">Carrion hunter · tracks wounded prey across long distances</div>' : ''}
+      ${e.adaptiveEventId === 'beast_hunter' ? '<div class="pfx">Beast Hunter · tracks you from afar, but can lose the trail</div>' : ''}
+      ${e.adaptiveEventId === 'undead_shield_hunter' ? `<div class="pfx" style="color:#c4d7e3">Shield guard · ${e.shieldGuardBroken ? 'broken, vulnerable to arrows' : `${AdaptivePlayerTrolling.shieldHunterRemaining(e)} arrow hits until broken; melee and spells bypass`}</div>` : ''}
+      ${e.adaptiveEventId === 'debt_collector' && e.debtDemandState !== 'hostile' ? '<div class="pfx">Demands stolen dwarven loot</div>' : ''}
       ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${e.poisonDamagePerTurn} HP/turn, ${e.poisonDamageRemaining} HP remaining)</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
@@ -12444,6 +12712,8 @@ more difficult:
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind</div>' : ''}
+      ${e.adaptiveEventId === 'uninvited_guest' ? `<div class="pfx" style="color:${e.guestDisposition === 'friendly' ? '#a5e0ac' : '#e88469'}">${e.guestDisposition === 'friendly' ? 'Offers a cooked meal · press F when adjacent' : e.guestDisposition === 'warning' ? 'Drawn blade · one turn to retreat' : 'Hostile traveler'}</div>` : ''}
+      ${e.adaptiveEventId === 'mushroom_prophet' ? `<div class="pfx" style="color:#c9bf83">Prophecy · ${Number.isInteger(e.prophetWarnedAtTurn) ? e.prophetWarnedAtTurn === turnCount ? 'one turn to retreat' : 'hostile' : 'waiting to speak'}</div>` : ''}
       ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
@@ -12522,7 +12792,7 @@ more difficult:
       }
       if (g.kind === 'stolenloot') return {
         mini: true, enemy: null,
-        html: '<div class="nm">Thief’s Bag</div><div>Forage to recover your stolen item</div>'
+        html: `<div class="nm">Thief’s Bag</div><div>Forage to recover your stolen ${g.gold > 0 ? g.gold + ' gold' : 'item'}</div>`
       }
       if (g.kind === 'playerremains') return {
         mini: true,
@@ -14114,7 +14384,8 @@ more difficult:
         }
         const nm = document.createElement('span')
         nm.className = 'nm ' + cls
-        nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
+        nm.textContent = (it.merchantNew ? 'NEW · ' : '') + artifactDisplayName(it) + countTag +
+          (line ? ' | ' + line : '') + visibleItemTierTag(it)
         row.appendChild(nm)
         const btn = document.createElement('button')
         const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
@@ -14196,10 +14467,12 @@ more difficult:
       merchantStock.splice(idx, 1)
       const bought = {...it}
       delete bought.merchantPrice
+      delete bought.merchantNew
       player.inventory.push(bought)
     }
     player.gold -= value
     recordReplayAction({type:'buy', replayId, fallbackIndex: merchantStock.findIndex(stock => stock?.replayId === replayId), kind:it.kind, name:it.name})
+    AdaptivePlayerTrolling.onMerchantTransaction('buy', value)
     log(it.bundleSize ? `You buy ${it.bundleSize} arrows for ${value} gold.` :
       `You buy the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
     updateHud()
@@ -14230,6 +14503,8 @@ more difficult:
     }
     player.gold += value
     recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name, all:!!all})
+    AdaptivePlayerTrolling.onMerchantTransaction('sell', value)
+    AdaptivePlayerTrolling.onScrollInventoryChanged()
     log(quantity > 1 ? `You sell ${quantity} ${artifactDisplayName(it)} for ${value} gold.` :
       `You sell the ${artifactDisplayName(it)} for ${value} gold.`, 'good')
     updateHud()
@@ -14261,6 +14536,7 @@ more difficult:
     const gifted = grantHerbalistFirstGift(npc)
     freezeNpcFromWandering(npc)
     serviceNpc = npc
+    AdaptivePlayerTrolling.onHerbalistServicesOpened(npc)
     toggleTrade(true)
     if (gifted) {
       const speech = document.getElementById('tradeNpcSpeech')
@@ -14278,6 +14554,7 @@ more difficult:
       return log('You need mushrooms and 2g per mushroom.', 'info')
 
     recordReplayAction({type:'herbalist', action:'purifyMushrooms'})
+    AdaptivePlayerTrolling.onHerbalistPurification()
     player.gold -= count * 2
 
     // Consume only the affordable portion, preserving the remaining stacks.
@@ -14506,6 +14783,7 @@ more difficult:
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'potion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    AdaptivePlayerTrolling.onPotionDrunk()
     if (itemDefinition(it.kind).effect.fullHeal) healPlayer(playerMaxHp() - player.hp)
     log('You drink a Life Potion and feel fully restored.', 'good')
     curePlayerPoison()
@@ -14519,6 +14797,7 @@ more difficult:
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'scrollOfInvisibility', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    AdaptivePlayerTrolling.onScrollUsed('scrollOfInvisibility')
     player.invisibleTurns = itemEffectPower('scrollOfInvisibility', itemDefinition('scrollOfInvisibility').effect.durationTurns)
     log('You read the Scroll of Invisibility. The shadows swallow you.', 'good')
     consumeItemTurn()
@@ -14532,11 +14811,34 @@ more difficult:
     ensureReplayItemIds(); const scope = recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    AdaptivePlayerTrolling.onScrollUsed('homecomingscroll')
     log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
     const finish = () => { toggleInv(false); consumeItemTurn() }
     const catchup = returnPlayerToTemple(responsive)
     if (catchup?.then) return catchup.then(finish).finally(() => finishRecordedReplayAction(scope))
     finish()
+  }
+
+  function useStrangeGreenPotion(idx) {
+    const item=player.inventory[idx]
+    if (!item || item.kind!=='strangeGreenPotion' || !canUseItemsWhileSwimming()) return
+    ensureReplayItemIds()
+    recordReplayAction({type:'useItem',action:'strangeGreenPotion',idx,replayId:item.replayId})
+    item.count=(item.count||1)-1
+    if(item.count<=0)player.inventory.splice(idx,1)
+    AdaptivePlayerTrolling.onPotionDrunk()
+    const effect=AdaptivePlayerTrolling.strangePotionEffect()
+    if(effect==='confusion') {
+      player.confusionTurns=AdaptivePlayerTrolling.strangePotionConfusionTurns()
+      player.confusionSourceId=null
+      log('The green potion clouds your thoughts. You are confused!', 'bad')
+      spawnDamageNumber(player.x,player.y,'Confused!','#dba3fa')
+    } else {
+      player.poisonTurns=rollPoisonDuration(playerMaxHp())
+      log('The green potion burns! You are poisoned!', 'bad')
+      spawnDamageNumber(player.x,player.y,'Poisoned!','#75c973')
+    }
+    consumeItemTurn()
   }
 
   function useSpeedPotion(idx) {
@@ -14546,6 +14848,7 @@ more difficult:
     ensureReplayItemIds(); recordReplayAction({type:'useItem', action:'speedpotion', idx, replayId:player.inventory[idx]?.replayId})
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    AdaptivePlayerTrolling.onPotionDrunk()
     const effect = itemDefinition('speedpotion').effect
     const baseBoost = effect.baseBonus + Math.round(playerSpd() / effect.speedDivisor)
     player.speedPotionBonus = itemEffectPower('speedpotion', baseBoost)
@@ -14673,6 +14976,15 @@ more difficult:
       log(`You hear something answering from ${TRACK_DIRECTIONS[answer.direction]}.`, 'info')
     }
     if (!answers.length) log('Nothing answers.', 'info')
+    consumeItemTurn()
+  }
+
+  function readTauntingNote(idx) {
+    const it=player.inventory[idx]
+    if (it?.kind !== 'tauntingNote' || !canUseItemsWhileSwimming()) return
+    ensureReplayItemIds()
+    recordReplayAction({type:'useItem',action:'tauntingNote',idx,replayId:it.replayId})
+    log(`You read the scrawled note: "${it.inscription || 'I wish I could read.'}"`, 'info')
     consumeItemTurn()
   }
 
@@ -14909,13 +15221,21 @@ more difficult:
   // flow below the log/info panel (not layered over the canvas), so it needs
   // its own visibility toggle whenever an overlay opens/closes - it's no
   // longer covered by those overlays automatically.
+  document.getElementById('btnDebtCollectorPay').addEventListener('click', () => {
+    AdaptivePlayerTrolling.resolveDebtCollector('pay')
+  })
+  document.getElementById('btnDebtCollectorRefuse').addEventListener('click', () => {
+    AdaptivePlayerTrolling.resolveDebtCollector('refuse')
+  })
+
   function updateTouchControlsVisibility() {
     const tc = document.getElementById('touchControls')
     if (!tc) return
-    const overlayOpen = campOpen || invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
+    const debtPending = !!AdaptivePlayerTrolling.pendingDebtCollector()
+    const overlayOpen = debtPending || campOpen || invOpen || mapOpen || tradeOpen || npcMenuOpen || treasureMapOpen || bestiaryOpen || Graveyard.isOpen() || Highscores.isOpen()
     tc.style.display = overlayOpen ? 'none' : ''
     document.body.classList.toggle('overlay-open', overlayOpen)
-    document.body.classList.toggle('npc-dialogue-open', npcMenuOpen)
+    document.body.classList.toggle('npc-dialogue-open', npcMenuOpen || debtPending)
     requestAnimationFrame(updateMobileSafeAreas)
   }
 
@@ -15179,7 +15499,7 @@ more difficult:
         if (!window.matchMedia('(pointer: coarse)').matches) return
         const expanded = row.classList.toggle('portrait-open')
         row.setAttribute('aria-expanded', String(expanded))
-        if (expanded && !portrait.src) portrait.src = imageSrc(`img/enemies/${slug(species)}.jpg`)
+        if (expanded && !portrait.src) portrait.src = imageSrc(enemyPortraitPath(species))
       })
       row.addEventListener('keydown', ev => {
         if (ev.key !== 'Enter' && ev.key !== ' ') return
@@ -15216,7 +15536,7 @@ more difficult:
     tooltip.style.zIndex = '30'
 
     const image = document.createElement('img')
-    image.src = imageSrc(`img/enemies/${slug(species)}.jpg`)
+    image.src = imageSrc(enemyPortraitPath(species))
     image.alt = species
     image.onerror = () => { image.style.display = 'none' }
 
@@ -15388,6 +15708,18 @@ more difficult:
     }
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
+    if (AdaptivePlayerTrolling.pendingDebtCollector()) {
+      // The ghost's ultimatum cannot be dismissed by moving or opening a menu.
+      // Both buttons are keyboard-focusable; Tab cycles within the dialogue.
+      if (ev.key === 'Tab') {
+        ev.preventDefault()
+        const buttons=[document.getElementById('btnDebtCollectorPay'),
+          document.getElementById('btnDebtCollectorRefuse')].filter(button=>!button.disabled)
+        const current=buttons.indexOf(document.activeElement)
+        buttons[(current+(ev.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus()
+      } else if (ev.key !== 'Enter' && ev.key !== ' ') ev.preventDefault()
+      return
+    }
     const k = ev.key
     if (campOpen) { Campfires.keydown(ev); return }
     if (fireballAim) {
@@ -15822,6 +16154,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    AdaptivePlayerTrolling.reset()
     // Test-only notification precedes all generation work, including failures.
     if (window.Cypress) window.dispatchEvent(new CustomEvent('vagabond:world-generation', {
       detail: {seed: WORLD_SEED, width: unrotatedWorldWidth, height: unrotatedWorldHeight,

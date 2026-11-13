@@ -286,7 +286,10 @@ const DungeonTraps = (() => {
     // Neither an incorporeal body nor a flying one depresses a floor trigger.
     if (actor !== player && (enemyHasAbility(actor, 'ethereal') || enemyHasAbility(actor, 'fly'))) return
     const trap = activeLevel()?.traps?.find(t => t.trigger.x === actor.x && t.trigger.y === actor.y)
-    if (trap) triggerTrap(trap, actor)
+    if (trap) {
+      if (actor === player) AdaptivePlayerTrolling.onPlayerTriggeredTrap(trap)
+      triggerTrap(trap, actor)
+    }
   }
 
   return {generate, onEntry, safeSpawn, isTrigger, safeReachable, usefulTriggerTile, usefulThroughRoute, usefulProjectileEmitterTile}

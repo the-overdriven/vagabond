@@ -102,6 +102,39 @@ describe('Tactical consumables', () => {
     })
   }
 
+  it('counts each self-damaging Fireball cast only once in Cursed World and saves the counter', () => {
+    loadConsumableWorld(1440)
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const animationsBefore=replayAnimationsDisabled
+      const simBefore=replaySimulationMode
+      try {
+        toggleInv(false)
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        replayAnimationsDisabled=true;replaySimulationMode=true
+        currentZ=0;currentCave=-1;map=surfaceMap;player.x=40;player.y=40
+        player.hp=500;player.berserkTurns=0;enemies=[];occupied=new Set()
+        for(let y=33;y<48;y++) for(let x=33;x<48;x++)map[y][x]='grass'
+        player.inventory=[createItem('scrollOfFireball',{count:3})]
+        check(validFireballTarget(player.x,player.y),'fireball can target own tile')
+        await castFireball(0,player.x,player.y)
+        check(AdaptivePlayerTrolling.serialize().selfFireballHits===1,'first self-hit counted once')
+        check(!AdaptivePlayerTrolling.completed('self_fireball'),'single cast is insufficient')
+        await castFireball(0,player.x,player.y)
+        check(AdaptivePlayerTrolling.serialize().selfFireballHits===2,'second distinct cast counted')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.serialize().selfFireballHits===2,'save/load preserves distinct casts')
+        check(!AdaptivePlayerTrolling.completed('self_fireball'),'reaction waits for new floor')
+      } finally {
+        replayAnimationsDisabled=animationsBefore;replaySimulationMode=simBefore
+        loadGameFromObject(before,{isReplayInit:true})
+      }
+    })()`))
+  })
+
   it('boosts Wyrdling combat-potion strength once, keeps penalties, and restores sampled values', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => win.eval(`(() => {

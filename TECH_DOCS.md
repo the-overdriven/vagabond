@@ -88,7 +88,8 @@ and duplicate Begin clicks cannot start a second world.
 
 **World size** is independently selectable at character creation (XS, S, M, L, XL,
 XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
-The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world).
+The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world),
+including its [Adaptive Player Trolling](#adaptive-player-trolling) reactions.
 Loading a save bypasses character creation.
 While race selection is open, the HUD hides the not-yet-created player's
 stats entirely, without reserving their space. On desktop the remaining
@@ -1682,9 +1683,9 @@ wall separating a corridor from walkable room flooring is never eligible:
 otherwise the `!` mechanism can appear to cap a pointless dead-end corridor
 while the hidden plate passes the separate route check. The check applies
 before the emitter replaces the wall and to every candidate direction; a
-rejected candidate consumes no placement slot. Triggers stay at least four Chebyshev tiles from entrances, 
-generated keys and lift platforms. 
-Every staircase, Dwarven key source (including key-bearing searchable remains) 
+rejected candidate consumes no placement slot. Triggers stay at least four Chebyshev tiles from entrances,
+generated keys and lift platforms.
+Every staircase, Dwarven key source (including key-bearing searchable remains)
 and lift endpoint retains a route avoiding all triggers; keys reachable
 before unlocking also retain their original accessibility. Optional loot and
 non-key searchable/decorative remains are not mandatory safe-route targets and may
@@ -3510,7 +3511,7 @@ Difficulty/reward correlation is sampled **65% neutral, 25% mildly positive,
 10% weakly negative**. The resulting distribution is deliberately uneven,
 but does not systematically penalize dangerous complexes with poor loot.
 
-The total world budget and tier chances stay unchanged. 
+The total world budget and tier chances stay unchanged.
 An unguarded candidate is rejected when **two other rewards are
 already within 7 Chebyshev tiles**; a candidate within **7 tiles of any enemy**
 allows at most **four rewards** in that radius, including the candidate.
@@ -3786,7 +3787,8 @@ The tier-4 Wyvern has base **132 HP, 18 ATK, 2 DEF and 7 SPD**. Its flying,
 poison and carrion-related behavior remains unchanged; its lower armor makes
 direct damage a more practical counter to its speed and high health.
 
-Current templates contain **75 enemies**. The seven all-uppercase species
+Current templates contain **96 enemies**, including the special 
+encounter-only Venom Eater and Mushroom Prophet. The seven all-uppercase species
 NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN use `rarity: 0.02`
 and `ultraRare: true`. They follow the normal tier, biome, distance, prefix,
 wandering and stat-variance rules, but each is limited to one spawned
@@ -3837,6 +3839,7 @@ encounters. Its Jump and nearby-water spawning requirement are unchanged.
 
 ### Tier 3
 
+- Mushroom Prophet (Cursed World encounter only)
 - Owlbear
 - Serpent
 - Lion
@@ -3877,6 +3880,7 @@ encounters. Its Jump and nearby-water spawning requirement are unchanged.
 - GAUR
 - ASHFANG
 - MIREHOWL
+- Venom Eater (Cursed World encounter only)
 - Spineback
 - NHALUUN
 
@@ -4311,7 +4315,7 @@ rounding and minimum-stat limits, not a percentage. Both appear in the status
 strip with remaining turns, do not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
 counters persist in saves and replay initial states.
 
-Disarm is announced as a **disarming spell**, not a physical disarm. 
+Disarm is announced as a **disarming spell**, not a physical disarm.
 It preserves the exact item's identity, modifiers, and identification state;
 it never drops or destroys it, and never touches the Black Key slot or passive
 backpack trinkets. HP changes caused by removing equipment resolve immediately,
@@ -4773,11 +4777,11 @@ timing.
 
 ## Humanoid
 
-Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death. 
-All enemies have natural GRACE and can take part in grace checks while unarmed; 
-an equipped enemy weapon overrides natural GRACE. A non-Buckler shield or an armor with `gracePenalty: 1` 
-lowers an equipped enemy's natural GRACE by 1 for combat timing (minimum 1). 
-This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice. 
+Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death.
+All enemies have natural GRACE and can take part in grace checks while unarmed;
+an equipped enemy weapon overrides natural GRACE. A non-Buckler shield or an armor with `gracePenalty: 1`
+lowers an equipped enemy's natural GRACE by 1 for combat timing (minimum 1).
+This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice.
 The player must still wield a weapon to take part in grace checks.
 
 ## Ranged shooter variants
@@ -5135,9 +5139,9 @@ usual action rather than adding a free move, does not extend its AGGRO, and
 does not establish a persistent chase outside it. Only the shot target reacts
 this way, without additional RNG; the same steps occur in replay.
 
-Movement occupancy is scoped to the currently active map (current z level), 
+Movement occupancy is scoped to the currently active map (current z level),
 including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
-blocking each other's paths; same-floor creatures still block movement. 
+blocking each other's paths; same-floor creatures still block movement.
 The active occupancy set is rebuilt after world generation, floor changes,
 save/replay restoration, and before each enemy response. This clears any stale
 blocked coordinates after deaths, burrows or forced movement, so an aware
@@ -5170,8 +5174,8 @@ zero ammunition -> completely normal monster behavior
 
 A shooter without `trueSight` never fires at an invisible player and never kites/backpedals.
 The outer-boundary chase restriction applies to ordinary shooter turns; immediate
-return fire after a valid player bow shot remains a separate, higher-priority reaction.
-Existing extra pursuit behavior may still produce the same move-then-attack style sequence the
+return fire after a valid player bow shot remains a separate, higher-priority reaction. Existing
+extra pursuit behavior may still produce the same move-then-attack style sequence the
 normal AI already permits, but a ranged attack itself does not grant another action.
 
 Shooter visibility uses the deterministic sight-line geometry in `src/fov.js`; normal
@@ -5195,8 +5199,8 @@ Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
 uses seeded game RNG. A successful check logs `The trees conceal you from the
 <enemy>.` only if that enemy is visible in the main view.
 
-Halflings gain another 20 percentage points (63% at distance 2; 73% at distance
-4) and may roll against Alarmed enemies
+Halflings gain another 20 percentage points (63% at distance 2; 73% 
+at distance 4) and may roll against Alarmed enemies
 that have not yet spotted them. For other races, becoming Alarmed cancels a
 successful concealment immediately. An enemy already aware of the player
 cannot be concealed from, even for a Halfling.
@@ -6014,8 +6018,8 @@ existing consumables-first ordering. Tabs only filter displayed inventory.
 In windows at most 720px wide, inventory, map, treasure map, trade,
 and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the
-sidebars are open. This applies even when the browser reports no pointer. 
-Inventory actions remain reachable without horizontal scrolling. 
+sidebars are open. This applies even when the browser reports no pointer.
+Inventory actions remain reachable without horizontal scrolling.
 Each row’s action group is **aligned to the right edge** of the inventory.
 Drop is the **leftmost action button** within that group. Buttons have even
 spacing; portable crystals use the same ordering.
@@ -6943,13 +6947,13 @@ specified in section 36. Player MF still does not improve worn-item modifier
 quality. An exceptional roll may promote a weak base item above the source tier;
 that is an intentional tier-5 quality classification, not a new base item.
 
-Only enemies actually assigned the **arrow-shooter role** may wear a Hunting Bow. 
-Having a species capable of ranged attacks is insufficient: a non-shooting Kobold, 
-a stone thrower or a non-shooting humanoid uses the melee-only weapon pool. 
-The shooter role is decided before rolling equipment. Monsters that cannot 
-shoot arrows cannot equip bows stolen from the player or taken from a corpse. 
-If such gear is found equipped in a restored game, its combat bonuses are 
-removed with the invalid equipment. A bow-capable archer remains eligible 
+Only enemies actually assigned the **arrow-shooter role** may wear a Hunting Bow.
+Having a species capable of ranged attacks is insufficient: a non-shooting Kobold,
+a stone thrower or a non-shooting humanoid uses the melee-only weapon pool.
+The shooter role is decided before rolling equipment. Monsters that cannot
+shoot arrows cannot equip bows stolen from the player or taken from a corpse.
+If such gear is found equipped in a restored game, its combat bonuses are
+removed with the invalid equipment. A bow-capable archer remains eligible
 even after running out of ammunition.
 
 The worn item is already stored on the enemy as `e.equipment`.
@@ -9847,6 +9851,9 @@ RNG rolls.
 
 ## Scarab spawning
 
+The ordinary Scarab result is part of the standard digging loot
+roll (**2% chance**) and uses the following normal spawning rules.
+
 On the Scarab result:
 
 - The game searches the eight adjacent tiles.
@@ -10353,8 +10360,8 @@ queued movement and hides touch controls; it consumes no turn or RNG and blocks
 live gameplay keys. Recorded replay actions continue normally if the dialog is
 opened during playback, but its unavailable state makes no online query.
 
-An unidentified artifact remains unidentified in public highscore snapshots. 
-The expanded equipment/artifact rows show only its generic `Unidentified <noun>` name and `???`, 
+An unidentified artifact remains unidentified in public highscore snapshots.
+The expanded equipment/artifact rows show only its generic `Unidentified <noun>` name and `???`,
 never the dwarven owner's name, hidden curse or item bonuses. Secret item fields are
 removed before submission; the ordinary character-level permanent stats and
 ranking remain visible and use the item's real equipped effects.
@@ -10655,6 +10662,1071 @@ Herbal Bloom, Blighted Harvest, Fungal Bloom, Flooded Depths,
 Beast Kingdom and Drowned Lands. Ordinary
 population is unchanged, so humanoids replace some beasts rather than making
 the world empty.
+
+## Adaptive Player Trolling
+
+Cursed World additionally enables adaptive responses to player behavior. The
+reaction system is inactive in ordinary worlds, uses gameplay-turn and action
+results rather than animation timing, and persists its counters and completed
+reactions through the standard save and replay snapshots. Without Cursed World,
+adaptive tracking, encounter creation, special AI, Venom Eater healing and
+Warden arrow protection are disabled. Disabling the system does not delete
+previously created enemies, items or their ordinary stats.
+
+Existing step, Bestiary, foraging, exploration and combat-skill statistics remain
+the source of truth. Derived Bestiary totals are refreshed after credited kills
+and rebuilt after loading or resetting a character; they are not extra saved
+counters. Spawn searches share temporary entrance and occupancy lookups within
+a checkpoint, while preserving candidate order, habitat-specific traversal,
+placement rules and seeded random draws.
+
+### All 38 triggers and reactions
+
+<details>
+<summary>!spoiler — show all 38 Adaptive Player Trolling triggers and reactions</summary>
+
+| # | Reaction | Player trigger | World response |
+|---:|---|---|---|
+| 1 | **Merchant Expansion** (`merchant_expansion`) | Sell goods for **1,500g** total, buy goods for **1,500g** total, **or** kill all required surface monsters within 100 tiles of the Temple (excluding `farWandering`). | Merchant adds one weapon, one armor/shield and one utility item. Permanent stock addition; another character can unlock another expansion after permadeath. |
+| 2 | **Nemesis** (`nemesis`) | Die to the **same enemy species twice**. | A Champion of that species is guaranteed on the last Dwarven Ruins floor. |
+| 3 | **Fan Club** (`fan_club`) | Equip prefixed weapon, shield and armor with the **same modifier**. | Three matching-prefixed Kobold, Goblin and Skink copy the style, use real enchanted equipment and can drop it. |
+| 4 | **Fireball Self-Harm** (`self_fireball`) | Damage yourself with **two separately cast Fireballs**. | A Scroll of Fireball appears in an accessible narrow underground corridor. |
+| 5 | **Venom Eater** (`venom_eater`) | Poison **15 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins; poisoned weapon hits heal it instead of poisoning. |
+| 6 | **Champion Oculus** (`oculus`) | Hit **3 distinct enemies** while invisible from a scroll, in **3 separate engagements**. | A True Sight Champion Oculus can hunt the invisible player in deep ruins. |
+| 7 | **Ancient Scarab** (`ancient_scarab`) | Dig **35 distinct sand tiles**, then dig another new sand tile. | A doubled-stat Champion Scarab emerges from sand. |
+| 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
+| 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
+| 10 | **The Previous Owner** (`previous_owner`) | Wear the **same cursed artifact for 300 gameplay turns**. | Its named former owner appears as a Ghost that recognizes the item and pursues while it is worn. |
+| 11 | **Debt Collector** (`debt_collector`) | Search **10 distinct dwarven remains**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
+| 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
+| 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
+| 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
+| 15 | **Gold Imp** (`gold_imp`) | Carry **2,000g or more**. | A Gold Imp tracks the player and may steal 10% of current gold (maximum 300g), recoverable on defeat. |
+| 16 | **Unread Scrolls** (`unread_scrolls`) | Never read a scroll and hold at least one continuously for **500 gameplay turns**. | A mocking note, “I wish I could read,” appears in Dwarven Ruins. |
+| 17 | **Early Descent** (`early_descent`) | First enter depth −2 by **level 3**, or enter the Dwarven Fort by **level 5**. | Nearby dead adventurer leaves tier-one equipment, gold and a Scroll of Homecoming. |
+| 18 | **Unused Healing** (`unused_healing`) | Die **twice**, each time still holding **at least 2 Life Potions**. | Searchable underground remains offer two Life Potions. |
+| 19 | **Humanoid Hunter** (`humanoid_hunter`) | Kill **30+ humanoids**, making up **at least 70%** of all credited kills. | Ordinary living beasts initiate combat only 75% as often while the condition holds. |
+| 20 | **Beast Hunter** (`beast_hunter`) | Kill **40+ beasts**, making up **at least 60%** of credited kills. | A marked native tier-four beast begins a persistent surface hunt. |
+| 21 | **Strange Green Potion** (`strange_green_potion`) | Drink **20 ordinary potions**. | An unidentified green potion appears; drinking causes Confusion or Poison at equal odds. |
+| 22 | **Trap Lure** (`trap_lure`) | Activate **5 distinct Dwarven Ruins traps**. | A Life Potion appears beyond a spike-trap shortcut that also has a safe detour. |
+| 23 | **Drowning Lure** (`drowning_lure`) | Finish **2 separate damaging deep-water crossings**. | A Scroll of Homecoming appears across water, also reachable via a longer dry route. |
+| 24 | **Low HP Carrion** (`low_hp_carrion`) | Remain below **25% HP for 30 turns** and stay wounded until a qualifying check. | A powerful Carrion beast gets long-range pursuit and bonus damage at very low HP. |
+| 25 | **Reckless Fighter** (`reckless_fighter`) | End **5 separate fights** below **10% HP**, with a Life Potion still carried. | A glowing **Graceful** monster arrives with superior GRACE and boosted HP/ATK/DEF. |
+| 26 | **Opposite Weapon** (`opposite_weapon`) | Reach **60** One-Handed or Two-Handed skill while the other remains **10 or lower**. | A tier-five artifact of the neglected weapon style appears in deep ruins. |
+| 27 | **Neglected Shield** (`neglected_shield`) | Finish **15 fights** without equipping an available shield; Shielding remains **10 or lower**. | An attribute-attuned tier-five Royal Shield artifact appears in deep ruins. |
+| 28 | **Last Survivor** (`last_survivor`) | Kill **20 enemies of one species**, representing **at least 20%** of all kills. | A named Champion survivor returns with two members of that species. |
+| 29 | **Strong Enemy Hunter** (`strong_enemy_hunter`) | Initiate attacks on **5 stronger unalarmed enemies** (each 25% above your combat strength). | Four individually weaker **Opportunist** humanoids form a gang and ambush you. |
+| 30 | **Hidden Leader** (`hidden_leader`) | Kill **3 genuine Champions** while each still has **2 living inspired followers**. | A Guarded Champion returns with two guards and a protective formation. |
+| 31 | **Unused Scroll Ambush** (`unused_scroll_ambush`) | In one ordinary cave visit, spend **100 turns**, kill a Goblin/Kobold/Skink, keep **2 same-kind escape/invisibility scrolls**, and **never read any scroll**. | On ascent, 20% (or 40% with extra entrances) chance of a three-enemy ambush. |
+| 32 | **Undead Warden** (`undead_shield_hunter`) | Reach **30 Marksmanship**. | An Undead Warden appears, blocking 75% of the first three landed arrow hits. |
+| 33 | **Depth Guardian** (`depth_guardian`) | Break **30 ordinary mineable walls** in the Dwarven Mines. | After a warning, a stone Guardian of the Deep appears on a connected passage. |
+| 34 | **Unfinished Business** (`unfinished_business`) | Wound **3 ordinary enemies below 25% HP** and leave them alive by disengaging. | One of the same survivors returns healed as a named Champion, retaining its enemy identity and gear. |
+| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface, retreats into dormancy and can return later. |
+| 36 | **Explorer Galleries** (`explorer_galleries`) | Explore **50% of reachable surface** and physically reach **both opposite world edges** on one axis. | On first visits to ruins galleries, 85% chance of a Champion shooter plus two extra archers. |
+| 37 | **Fort Quest** (`fort_quest`) | Reach **level 10** before ever visiting the Dwarven Fort; accept the Merchant’s commission. | Find the Dwarven Trade Ledger at **z:−5** and return it for **350g**. |
+| 38 | **Scroll Restock** (`scroll_restock`) | Successfully use **12 non-Identification scrolls** in one character’s life. | Merchant gains one extra copy of each scroll type used, including types not previously sold. |
+
+</details>
+
+The table covers the **38 active events** in `content/adaptive_player_trolling.json`.
+The independent **Unsold Equipment** thief-rate modifier is documented below,
+not counted as an event. **Relieved Thief** remains unimplemented and is not
+part of this table. Detailed qualification, placement, balance and counterplay
+rules follow beneath the spoiler.
+
+One-time reactions reset with the character, including when a new character starts on the same
+world following permadeath. The core bookkeeping reserves at most **two optional special threats per
+underground floor** for the entire character run, without recycling slots
+after enemies die. A multi-enemy ambush consumes one slot, not one per
+member. On the surface, two threats are allowed per map-size-scaled region.
+Nemesis is an independent guaranteed encounter that can appear **in
+addition to both slots** on the last ruin floor.
+
+**Scheduled encounter checks:** The first optional check happens on the
+**500th actual walking step** or upon first reaching **Dwarven Ruins floor 2**,
+whichever comes first. The second happens on the **1,000th step** or first
+reaching **ruin floor 3**, whichever comes first. Subsequent optional checks
+occur at **1,500, 2,000, 2,500... walking steps**. Reaching a later ruin floor
+can also satisfy an earlier outstanding ruin checkpoint; if multiple
+checkpoints become due in the same transition, they are recorded together
+but create **one** encounter-selection attempt, not several RNG rerolls.
+Steps are counted from character creation using the existing `player.steps`
+counter: unsuccessful movement, waiting, mining, animations and stairs do not
+add steps. Re-entering a floor does not add checks. A checkpoint is spent
+even when its location has no eligible monsters or no safe spawn site.
+
+Optional responses are drawn at the **current player location** (surface,
+caves, mines, or fort) and never teleported from another habitat. On a
+scheduled check in the Dwarven Ruins, placeable candidates compete with equal
+weights. The first encounter uses a **10%, 20%, 35%, 60%, 85%** chance on
+ruin floors 1–5; other ruin-floor counts interpolate that curve. If that
+encounter actually spawns, a **second independent chance at the same depth
+probability** is rolled for a different eligible reaction when a slot remains.
+Non-fort checks use their existing native-habitat eligibility, placement and
+local limits. Successful special encounters must be separated from existing
+adaptive enemies by at least six Chebyshev tiles and meet terrain and
+stair-safety rules. Failed/used check numbers and affected floor results are
+saved, so walking, loading and stair-hopping cannot duplicate a check.
+Action-specific events (mineral extraction, digging, campfires) and guaranteed
+or non-threat effects (Nemesis, merchant expansion, first-visit rewards,
+ordinary-thief region checks) still use their own triggers and are not delayed
+until one of these optional checks. This keeps the causal link between the
+player's action and the world response.
+
+### Merchant supply and commissions
+
+In a **Cursed World**, the Merchant expands normal stock with **one weapon,
+one shield or armor, and one utility item** when **any one** of three
+requirements is met:
+
+- Total sales revenue to the Merchant reaches **1,500g**;
+- Total purchases from the Merchant reach **1,500g**;
+- **Every eligible surface monster initially within a 100-tile Euclidean
+  radius** of the Temple is killed (excluding far-wandering monsters).
+
+The buy and sell totals accumulate separately throughout a character's life,
+including across saves/replays. They are not netted or added together: selling
+900g and buying 600g is not enough. Herbalist transactions do not count.
+For the Temple challenge, the eligible population is captured on the first
+surface turn; later monsters arriving inside the circle are included at the next
+enemy death. A tracked monster must actually die, even if it wanders or is
+lured outside the circle; traps and other genuine deaths count. Far-wandering surface enemies and
+all underground enemies are excluded. Merely having an empty radius without
+killing any eligible enemy cannot award stock.
+
+**Each character can earn this equipment expansion once**, regardless of how
+many qualifying conditions are satisfied. On permadeath the next character
+may earn another expansion in the same world, and previously supplied stock
+stays with the Merchant. The equipment's maximum generation tier depends on
+the player's level when the reward occurs: tiers 2/3/4/5 at levels 1–4,
+5–7, 8–11, and 12+, respectively. Actual tier-4 gear costs at least 500g,
+and actual tier-5 gear at least 1,000g; lower tiers keep normal prices.
+The extra utility item uses its normal price. These values and the utility
+pool are configured in `content/adaptive_player_trolling.json`.
+
+**Scroll resupply is separate** from equipment expansion. After **12
+successful non-Identification scroll uses** during one character's life,
+the Merchant receives **one additional copy of each scroll type used**,
+including kinds missing from his original assortment. Identification scrolls,
+failed actions, and canceled targeting do not advance the counter. Remaining
+stock gets one additional unit; missing kinds appear as purchasable entries at
+their normal base prices. The grant occurs once per character, survives
+saves/replays, and can occur again for another character after permadeath.
+Both equipment additions and newly supplied scrolls display a **NEW** marker
+in the trade window. Their stock remains finite; purchased copies are not
+restored just by reopening the shop or loading the game.
+
+**Fort Quest — Merchant's Dwarven Trade Ledger commission:**
+
+At **level 10 or higher**, a character who has **never entered the Dwarven Fort**
+can accept the Merchant's one-time **Fort Quest**. Entering the fort by its
+surface gate, a lower-cave hole, or another chain-level transition disqualifies
+an unaccepted quest for that character. Returning after reaching level 10 does
+not undo the disqualification; an already accepted commission survives entry,
+leaving, saving and replay. The Merchant has a dedicated quest dialogue choice
+alongside Talk, Rumors and Trade; talking about an active commission repeats the
+objective without resetting its state or re-rolling anything. The quest is
+available only with Adaptive Player Trolling in Cursed World.
+
+Accepting reveals the fort gate and the surrounding **radius-2 / 5×5** area on
+the overworld map, without revealing corridors or underground treasures. The
+objective is a **Dwarven Trade Ledger**, a unique physical quest item placed
+on **z:-5, the second Dwarven Ruins floor** (not in the z:-3 entrance fort or
+on the first ruins floor at z:-4). This depth exists in all 3–5-floor ruins.
+It is placed on an unoccupied, trap-safe tile reachable from the arrival tile
+by a walkable path of **8–200 cardinal steps**. Placement avoids blocked or
+locked paths, stair transitions and other ground objects. If no legal site is
+available at first arrival, later visits to z:-5 can retry. It does not consume
+an optional enemy-threat slot or an RNG roll. A placed ledger is never
+duplicated by floor revisits: it remains a normal, saved ground pickup, then
+a non-droppable, non-sellable inventory item after collection.
+
+With the ledger in inventory, the Merchant offers **Return the Dwarven Trade
+Ledger**, consuming exactly one ledger and paying **350 gold** once. Merely
+visiting the fort or speaking to the Merchant without the ledger never grants
+a reward. The quest's accepted/fort-visited flags and `completed` entry are
+saved in `adaptivePlayerTrolling`, restored by replay and reset per character.
+The gold payment and item removal happen in the same recorded NPC-topic action.
+
+### Monster encounters, environmental lures and rewards
+
+**Nemesis:** If at least two deaths
+were inflicted on the same monster species, a Champion of that species is
+guaranteed on entry to the final Dwarven Ruins floor (including a later return).
+If several species qualify, the most frequent killer wins; the latest death
+breaks ties. It spawns off-screen on connected, safe terrain and never
+reappears after the event has been committed. The Champion uses the ordinary
+Champion bonuses and normal monster combat rules. Merely inspecting the UI or
+re-entering a floor does not consume randomness.
+
+**Venom Eater:** Only in Cursed World, successfully poisoning **15 different
+monsters**, or spending **5 venom coatings attempting to poison undead**, makes
+one Venom Eater eligible in either of the last two Dwarven Ruins floors. A
+poison refresh against the same creature does not count as another unique
+monster. A missed attack or unused coating does not count, and attempting to
+poison a construct does not count toward the undead threshold. The encounter
+uses the same depth-weighted probability and equal-weight candidate selection
+as other optional ruins events. It spawns once, out of sight and on connected,
+trap-free terrain with stair clearance; unsuccessful placement leaves it
+eligible for a later transition. The Venom Eater is a **tier-4, 150 HP, 18
+ATK, 6 DEF, 5 SPD** monster (3 GRACE), using the Venom Absorption ability
+described in the monster properties section. Its walking tile is the Bog
+Spitter's, with its own Venom Eater portrait. The species is otherwise excluded from
+natural spawning. The player can respond with uncoated attacks, avoidance,
+or by avoiding venom: every qualifying venom hit can restore another 20% of its maximum HP.
+
+**Venom Absorption (Venom Eater)** is a special defensive response, distinct
+from the undead/construct family immunity rule. The creature is permanently
+immune to player-applied venom even though its family is `living`. **Every**
+qualifying attempt heals `min(missing HP, round(max HP × 0.20))`, or up to
+30 HP at its base 150 maximum HP. Each attempt must actually hit and consume
+a venom coating; misses and glances that preserve the coating do not trigger
+absorption. Further venom hits can heal it again, including after changing
+floors or restoring a save. At full HP the venom is still consumed but heals
+nothing. The effect resolves synchronously before combat animations and uses
+no additional RNG or persistent per-monster cooldown.
+
+**Early Descent:** The first arrival at a generic/crypt second underground
+level (z:-2) at **character level 3 or below**, or the first entry into the
+Dwarven Fort (z:-3) at **character level 5 or below**, marks one premature
+expedition. A fallen adventurer's searchable remains appear on a connected,
+trap-safe tile **4–12 walking steps** from that floor's arrival.
+An unread **Scroll of Homecoming** and one ordinary, **unenchanted tier-one**
+weapon, armor or shield lie on two distinct adjacent ground tiles and must be
+picked up normally. Searching the corpse recovers **5–25 gold** using the
+existing corpse-looting interaction. There is no chest; the three objects
+are independently accessible. This one-time response does not consume a
+special-threat slot. If no clear set of three tiles exists, the response remains pending on the specific qualifying
+floor; it will not move to a different cave, crypt, or fort level. Re-entering
+that floor cannot create duplicate loot. Initial selection and placement,
+including the deferred floor identity, are deterministic and saved/replayed.
+The encounter is exclusive to Cursed World. This small rescue cache is
+intended to warn about the danger of descending too early; the free escape
+scroll is intentionally more useful than the worn equipment.
+
+**Opposite Weapon and Neglected Shield:** These mutually exclusive, one-time
+Cursed World rewards encourage experimenting with combat options the character
+has ignored. They are independent of optional monster-threat limits and
+scheduled checks. Once their qualifying behavior has been observed, an
+unidentified tier-five artifact is placed on a reachable, trap-safe ground tile
+at least 10 Chebyshev tiles away and outside sight, at least three tiles from
+stairs, when the player enters either of the last two Dwarven Ruins floors.
+The player must pick up, identify and equip the item normally. If placement is
+impossible, no reward is consumed and another qualifying arrival can be tried.
+Neither event grants both rewards, even when both conditions qualify at once;
+if both are eligible, choose one with equal seeded probability. The other is
+then permanently unavailable for this character. No additional threat slot is
+consumed. The selected reward is saved and replayed like other ground items.
+
+- **Opposite Weapon** qualifies when either One-Handed or Two-Handed weapon
+  proficiency reaches **60/100** while the other stays at **10/100 or below**.
+  It grants a non-ranged tier-five artifact weapon of the *less-practiced* style:
+  Bone Cleaver for one-handed, or Giant Sword, Crescent Blades or Titan Warpick
+  for two-handed. This is not a forced equipment swap; using the unfamiliar
+  weapon is the player's choice.
+- **Neglected Shield** qualifies after **15 separate fights** conducted without
+  an equipped shield, despite carrying a usable shield and wielding no
+  two-handed weapon, with Shielding proficiency at **10/100 or below**. A fight
+  begins with either side's attack attempt and ends after **five complete
+  attack-free turns**; switching to an incompatible weapon, equipping a shield,
+  or losing access to the carried shield during a fight invalidates that fight.
+  Death also cancels an unfinished fight. The reward is a **Royal Shield**
+  (tier five, base **9 DEF**) with an artifact effect and an extra bonus based
+  on the character's strongest attribute investment beyond starting stats
+  plus racial adjustments. Level-gained SPD/GRACE, equipment and temporary
+  effects do not determine the variant. Equal investments break ties in the
+  order ATK, DEF, SPD, MF, GRACE:
+
+  | Focus | Additional Royal Shield bonus |
+  |---|---:|
+  | ATK | +2 ATK |
+  | DEF | +2 DEF |
+  | SPD | +2 SPD |
+  | MF | +3 MF |
+  | GRACE | +2 GRACE |
+
+Both rewards use the existing *Blessed Relic* tier-five artifact effect and
+normal procedural dwarf owner lore, preserving ordinary identification,
+artifact modifiers and item icon lookup. The Royal Shield's existing
+`img/icons/Royal Shield.svg` is reused; no special tile or portrait is
+required. Its GRACE bonus, if rolled, affects normal player combat-GRACE
+calculations only while equipped and displays on the item stat line.
+Shieldless-fight count, unfinished-fight information, qualification flags,
+reward completion and final placed loot are serialized and replay-safe.
+
+Adaptive Royal Shield artifacts can also carry **+2 GRACE** as a unique
+attribute attunement. As with other artifact statistics, the bonus applies
+only when the shield is equipped, stacks with existing level and race GRACE,
+and is subject to the normal shield GRACE penalty. It never changes the
+base weapon GRACE value or trains combat proficiency.
+
+**Unread Scrolls:** In Cursed World, a player who **has never read any
+scroll** must carry **at least one scroll of any type**, identified or not, for
+**at least 500 consecutive gameplay turns**. This is only a minimum holding
+period: nothing appears at the 500-turn mark. The player must still be carrying
+at least one scroll on arriving at an eligible Dwarven Ruins floor, whether
+the uninterrupted streak lasts 500, 1,000 or more turns. Switching between
+scrolls is allowed as long as at least one remains carried at all times.
+Dropping, selling, or otherwise losing the last scroll resets the possession
+streak. **Reading any scroll at any point permanently disqualifies the player
+from this reaction** (even if more scrolls are collected afterwards). A
+failed or cancelled spell targeting action does not count as reading. On a
+qualifying ruins floor, the note appears as a normal reachable, off-screen
+ground item, clear of stairs, with the inscription *“I wish I could read.”*
+The player must pick it up and choose Read to see the message. It is a one-time
+reaction and does not consume an optional monster-threat slot. The streak and
+completion are saved and replayed, with no RNG consumed during turn counting.
+
+**The Previous Owner — cursed artifact haunting:** In Cursed World, a
+*single equipped cursed artifact* (weapon, armor or shield) must be worn for
+**300 actual gameplay turns** before it can attract its former owner. Only
+turns spent equipped count, even across breaks or floor transitions; a cursed
+artifact merely carried in the backpack does not progress. The wear count
+stays on the item through inventory transfers, saving and replay. Once
+qualified, a Ghost with a seeded dwarf name can appear in either of the
+**last two Dwarven Ruins floors**, outside sight and at least 10 tiles away,
+subject to the normal scheduled encounter roll and threat limit. Each
+character receives only one such encounter. Original cursed artifacts keep
+their existing cursed-prefix names (they normally have no named owner); the
+haunting's identity is assigned only when the ghost is created.
+
+The ghost initially waits and does not attack. When the player approaches
+within **7 tiles**, with a clear sight line and without hiding from the
+Ghost, it recognizes the cursed artifact, displays a distinct gaze message
+and begins using its ordinary Ghost combat AI. **Unequipping the specific
+artifact stops its pursuit immediately**; equipping it again renews pursuit
+if the ghost has already recognized it. Wounding or poisoning the ghost
+provokes it permanently, so gear-swapping cannot safely cancel retaliation
+after hostility was initiated by the player. Removing the artifact does not
+erase the encounter, restore the threat slot, or spawn another owner. The
+same named Ghost and the linked artifact identity survive save and replay;
+no owner-copying, theft or give-back interaction is added. This encounter
+uses the existing Ghost sprite and ordinary combat stats.
+
+**Undead Warden — response to Marksmanship:** In Cursed World,
+reaching **30/100 Marksmanship** makes a single Undead Warden eligible
+at scheduled checks on one of the **last two Dwarven Ruins floors**. It
+competes in the ordinary depth-weighted special encounter lottery, requires a
+reachable, trap-safe location at least 10 tiles from the player and outside
+sight, and occupies one of the two usual optional threat slots. Failed
+placement leaves it eligible for another check, while a successful spawn
+finishes the reaction for this character. The creature is **tier 4, 84 HP,
+13 ATK, 5 DEF, 4 SPD, 3 GRACE**, undead and melee-only; its appearance uses
+the Skeleton species art with a distinct shield marker. It yields normal
+combat XP and uses ordinary enemy pursuits; its distinctive shield guard is
+described immediately below. The player may spend arrows to
+break the shield, fight in melee, cast a Fireball, or withdraw.
+
+**Undead Warden — shield guard:**
+
+**Undead Warden** is a special undead melee warrior whose shield counters
+bow-heavy play, without any facing or directional hit rules. Its guard absorbs
+**75% of the damage** from each of the first **three landed arrows** (a
+positive hit still deals at least one HP). The **third** landed arrow still
+receives the reduction but breaks the shield permanently, after which all
+arrows deal their ordinary damage. Misses and immunity checks do not wear it
+down. The guard does not prevent ordinary melee strikes, Fireball, or other
+sources of damage; those also do not use up the three-arrow durability.
+
+The enemy displays a shield symbol in both ASCII and tile modes while its
+shield is intact. Its inspection panel shows the number of landed arrows
+remaining until breakage, and the combat log and a **BREAK!** marker announce
+when it shatters. The rule resolves at the time the attack lands, independent
+of animations. Shield durability and the broken state persist through saves,
+replays and level transitions; there is no recovery or repair.
+
+**Depth Guardian — over-mining the Dwarven Mines:** In Cursed World,
+breaking **30 distinct ordinary mineable walls** (not surface boulders,
+mineral-bearing seams or strikes that leave a wall intact) awakens a warning
+on that mine floor. The first warning lasts **five completed gameplay turns**.
+If the player remains on the same floor, the **Guardian of the Deep** can
+appear on an existing, reachable corridor at least **10 tiles** away and
+outside the player's vision, clear of stairs, lifts, traps, items and other
+special threats. There is no tunneling or teleporting through solid rock.
+If there is no valid corridor or free threat slot, the creature waits rather
+than spawning in an inaccessible location. Leaving the floor before its
+arrival cancels that warning; mining another ordinary wall can provoke a new
+warning, but there is only **one successful Guardian encounter per character**.
+The Guardian is a slow **construct** with **120 HP, 16 ATK, 8 DEF, 2 SPD,
+1 GRACE** and tier 4, using the existing stone-golem artwork and an
+existing mining-noise investigation toward the player's last mining position
+for up to **25 movement attempts**. It then uses ordinary combat AI on contact. It is immune to poison through its construct family, but
+no artificial combat immunity is added. Its appearance occupies **one**
+local special-threat slot, grants normal monster XP and never consumes
+random numbers during warning turns. Total walls mined, current pending
+warning, the spawned enemy and one-time completion persist in saves/replays.
+
+**Unfinished Business — returning wounded survivor:** When the player
+personally wounds **three distinct ordinary, hostile enemies below 25% of
+maximum HP**, then escapes while each is still alive, one of those enemies may
+return on a later scheduled encounter check. Escaping requires moving at least
+**eight Chebyshev tiles** from the wounded enemy, leaving its floor, or
+ending combat after the five-turn quiet period with the required separation.
+A continuing fight credits at most one survivor. Event enemies, existing
+prefixed monsters, special quest targets, stolen-item carriers, guarded
+progression-key carriers and other reserved encounter roles do not qualify.
+Repeatedly attacking or fleeing the same enemy never credits it twice.
+
+The returning foe is **the original persistent monster**, not a clone: it
+keeps its ID, species, equipment and existing abilities, gains the ordinary
+**Champion** prefix and its bonuses, heals to its new maximum HP, and receives
+a random proper name (for example, *Grukhar, the Unfinished Goblin*).
+It reappears on a safe, connected, off-screen tile **12–28 path steps** away
+in a habitat appropriate to its species; it cannot attack on the appearance
+turn. If the original enemy has died or no legal destination/optional threat
+slot exists, placement waits without duplicating it. Only one successful
+return occurs per character. The credited enemy IDs, identity, upgraded
+stats, slot use and completion persist through saves and deterministic replay.
+
+**Hidden Leader — organized Champion escort:** In Cursed World, killing a
+real **Champion** while at least **two different living non-Champion followers**
+remain within its **Inspired radius (two tiles)** counts as taking down a
+group's leader before its protection. Three *distinct* qualifying groups
+activate the response; followers credited to one group cannot count again for
+another, and special adaptive Champions never qualify. The condition counts
+only player-credited kills, not traps or another monster's attacks.
+
+A scheduled special-threat check may then deploy **one Guarded Champion** with
+**two ordinary guards** of a single native gang-capable humanoid species
+(Goblin, Kobold, Skink or Ratling), in surface, cave or matching ruins habitat.
+The group occupies **one** persistent threat slot and spawns connected,
+off-screen, far from entrances and other special threats. A shortest route
+from the player defines its formation: one guard blocks the route directly
+in front of the Champion, and the other usually stands alongside it
+(or farther forward when terrain is narrow).
+The Champion applies its normal **Inspired (+2 ATK, +1 DEF)** aura to guards
+within two tiles. It holds its rear position while a guard survives, unless
+attacked or the player reaches melee; guards pursue with ordinary AI. Pulling
+guards away removes their aura bonus, and killing them frees the leader to
+advance. Ranged combat, alternate approaches and terrain can circumvent the
+formation: guards are **not** a magical projectile shield. Leader and guard
+identities, formation and state persist in saves/replays without added runtime
+randomness. The player recognizes the Champion by its name and existing aura.
+
+**Unused Scroll Ambush — cave-exit retaliation:** In Cursed World, spending
+**at least 100 actual gameplay turns during one continuous visit to an ordinary
+cave**, personally killing a **Goblin, Kobold or Skink during that visit**, and still
+carrying **at least two Scrolls of Invisibility or at least two Scrolls of
+Homecoming** when emerging to the surface can cause an ambush. One scroll of
+each type is insufficient; counts from separate stacks of the same kind add up.
+Reading **any** scroll during the character's life permanently disqualifies
+this encounter. Merely possessing or identifying scrolls does not count as
+reading them. The visited cave can span shallow and deeper floors, but moving
+between its stair levels neither resets nor duplicates the turn counter.
+Crypts, Dwarven Fort visits and stairs within underground levels do not trigger
+the cave-exit roll. The kill count and turns are for the *current cave visit*,
+not lifetime Bestiary totals; trap-only kills do not qualify.
+
+At the first qualifying ascent from the cave to the surface, the world makes
+**one 20% roll**, increased to **40% when that cave has more than two surface
+entrances**. The game chooses the Goblin, Kobold or Skink species the player killed
+more often during the visit (ties resolved alphabetically), but skips a species
+that cannot form a valid group on reachable terrain near that particular exit.
+If successful, **three ordinary, immediately alert enemies** of the selected
+species appear as a group, 3–9 cardinal path steps from the cave entrance and
+no farther than three tiles from their leader. They use their normal species
+abilities and existing sprites, without additional Champion strength or loot.
+All spawn sites must be safe, unoccupied, native for the species, away from
+sanctuary and transition tiles, and inside the exit's surface threat region.
+The entire ambush occupies **one persistent special-threat slot**. If no safe
+placement or slot is available, no roll is made; leaving the cave still ends
+this visit. A failed roll also ends the visit, so climbing back into the same
+cave does **not** permit another immediate attempt. The player must spend
+another 100 turns and kill another qualifying enemy on a new visit. Once it
+successfully spawns, the encounter cannot repeat during that character's life.
+Cave-visit identity, last counted turn, turn count and species kills persist in
+save/replay snapshots; the chance roll uses seeded gameplay RNG, independent of
+transition animation. All thresholds, odds and group dimensions are stored in
+`content/adaptive_player_trolling.json`.
+
+**Unused Healing:** In Cursed World, two character deaths while still
+carrying **at least two Life Potions each time** qualify a single reward.
+Using potions earlier in a fight does not disqualify the player, and both
+enemy and environmental deaths count. On the **next scheduled adaptive check
+that occurs underground** (caves, mines, crypt or fort), searchable remains
+containing **two Life Potions in one stack** can appear on safe, reachable ground at least
+10 tiles away, outside sight and at least three tiles from stairs. The player
+searches the remains normally to recover both potions; there is no chest.
+If no safe space exists, the reward waits for another underground check.
+The encounter uses no special-threat slot and never appears on the surface.
+Its qualification count, one-time completion and remains all persist in saves
+and replay. Permadeath runs cannot meet the two-death threshold for one
+character. Death-by-species tracking for Nemesis remains independent.
+
+**Strong Enemy Hunter — opportunist pack:** In Cursed World, deliberately
+starting combat against **five distinct, previously unalarmed enemies** whose
+combined current ATK, DEF, SPD and GRACE exceed the player's corresponding
+combat strength by **at least 25%** qualifies an opportunist retaliation.
+The comparison uses the same stat-sum strength metric as ranged enemy AI,
+including live equipment and terrain bonuses; enemy-initiated battles, repeated
+attacks on the same target, special-event enemies and attacks that do not start
+an encounter cannot advance it. A legal melee swing or fired arrow is enough;
+the player does not have to win. Progress is attached to persistent enemy IDs
+and saved in the adaptive state, including replay snapshots.
+
+At a subsequent **scheduled adaptive check**, **four individually weaker
+humanoids of one native species** can gather off-screen on connected, trap-free
+terrain. The possible species are Goblin, Kobold, Skink and Ratling; only species
+that belong to the current habitat and whose base combat strength is at most
+**85% of the player's current strength** are eligible. They keep their normal
+combat stats, possible ranged roles and **gangPower** ability, without extra
+equipment rolls or artificial damage buffs. The pack is identifiable by the
+*Opportunist* name prefix and consists of exactly four members within two
+tiles of their anchor. It appears 12–28 cardinal path steps away, well clear
+of entrances, sanctuary, active hazards and occupied tiles, and counts as
+**one** of the area's persistent special threats. If the habitat, threat
+budget or connected terrain cannot support the pack, the encounter is deferred
+without a random roll. Spawning uses only the seeded game RNG and can occur
+once per character. The player can separate the gang to suppress gangPower,
+use terrain to disrupt its shooters, fight or escape.
+
+**Last Survivor — Bestiary retaliation:** In Cursed World, killing at least
+**20 enemies of one base species** when that species represents **at least 20%
+of all player-credited kills** can qualify a once-per-character retaliation.
+The game reads the existing Bestiary `killsBySpecies` totals, including
+prefixed variants under their base species; trap-only deaths are excluded.
+Only ordinary hostile species with a native habitat at the current surface,
+cave or dungeon location can form a band. At a later **scheduled 500-step
+check**, a reachable group may gather off-screen: **one individually named Last Survivor**
+with Champion stats, Champion aura and **50% additional HP after ordinary
+modifiers**, accompanied by **two ordinary members of the same species**.
+The group appears 12–28 path steps from the player, outside the viewport or
+underground FOV, away from occupied tiles, traps and transitions, and within
+two tiles of one another. The most-killed currently placeable qualifying
+species is chosen, with alphabetical ties. A species that cannot form a legal
+band in its natural habitat waits for another check; no other species is
+manufactured to fill the gap. Once spawned, all three use ordinary monster
+combat and awareness rules: this is a gathered revenge band rather than
+telepathic tracking. The leader receives one randomly selected name from at least 50 unique entries
+in `content/monster_names.json` when the band actually spawns (for example,
+*Grukhar, Last Survivor*). The selected name is preserved with the enemy in
+save/replay, while its original Bestiary species remains available as
+`baseName` for sprites, kill statistics and abilities. Name selection uses the
+seeded gameplay RNG, not cosmetic randomness or per-frame drawing. The named
+leader is the final survivor of an earlier slaughtered band, *not* literally
+the last member of the species. The group
+counts as **one special threat** under the area's lifetime budget; its
+participants, Champion aura and completion survive normal save and replay
+without a second kill-history ledger. Its threshold, band size, strength and
+spawn distances are configured in `content/adaptive_player_trolling.json`.
+
+**Humanoid Hunter — hesitant beasts:** When at least **30** player-credited kills
+are humanoids and humanoids account for **70% or more** of all the player's
+kills, ordinary living, non-humanoid monsters have a **75% chance to start an
+otherwise valid fight** instead of the normal 100%. This check happens only
+when an unaware, unalarmed beast first has sight of the player inside its
+usual aggression range. A failed attempt costs the beast its action and shows
+a visible *Hesitates* cue if the monster is on screen; the next action may
+check again. Attacking the beast or alarming it through another mechanic
+restores normal retaliation and pursuit. Already-engaged enemies, nonliving
+creatures, special adaptive encounters, and ultra-rare creatures are excluded.
+The condition automatically stops applying if further kills reduce the
+humanoid proportion below 70%. The calculation uses the existing persistent
+`killsBySpecies` record and needs no additional kill counter.
+
+**Strange Green Potion:** Drinking at least **20 real potions** (Life, Speed,
+Stone Skin, or Berserk) qualifies a one-time unidentified green elixir. The
+next eligible scheduled adaptive check places the potion on reachable, empty
+ground at least ten tiles from the player, outside underground sight and
+away from stairs. It is not placed in a chest, consumes no monster-threat slot
+and does not spawn immediately on the twentieth drink. The player must pick
+it up manually. The potion has no identification action and its description
+does not reveal its effect. Drinking consumes one normal turn and rolls once:
+**50% chance for the existing five-turn Confused status, or 50% chance for the
+existing Poisoned status** using its ordinary HP-based duration. Existing
+status expiry, curing and save/replay rules apply. If placement is impossible,
+the event is postponed to a later scheduled check. The consumed-potion counter
+and completed reward are serialized with adaptive state; the final effect is
+resolved from seeded RNG when the potion is drunk, never during animation.
+
+**Trap Lure:** In Cursed World, stepping onto **five different real Dwarven
+Ruins trap triggers** (including dodged or harmless activations) qualifies a
+one-time ground reward. Repeatedly crossing the same mechanism does not increase
+the count. A subsequent **scheduled adaptive check in the Dwarven Ruins** can
+place **one Life Potion** beyond existing, visible spike traps. The shortest
+available route crosses a real spike trigger, but a fully passable, trap-free
+walking route must also exist, at most **38 steps** long and **3–15 steps**
+longer than the shortcut. The item is at least nine tiles from the player,
+outside underground visibility, away from traps, stairs, occupied terrain and
+wall-arrow firing lanes. No additional traps or doors are generated; if no
+qualifying bypass exists, placement waits for a later scheduled check. The
+potion is a normal persistent ground pickup and does not consume a
+special-threat slot.
+
+**Drowning Lure:** In Cursed World, **two separate completed crossings** through
+deep water that actually inflicted drowning damage qualify a one-time shore
+reward. Each crossing must move through at least **two deep-water tiles** and
+finish on land at least **three tiles** from its entry shore, with deep water
+between both shores; waiting in water,
+falling through ice alone, or returning immediately to the same shore does not
+count. During a later **scheduled adaptive check** while standing near a
+qualifying stretch of deep water, a **Scroll of Homecoming** may be placed on
+the far shore. The water separates the player from the item, but an existing
+**water-free walking route of at most 50 steps** must reach it, at least four
+steps longer than the direct water crossing. No swimming or drowning is
+required to retrieve the scroll: the player can take the detour, swim, or
+ignore it. If no valid shoreline and safe detour exist, the reward is deferred.
+Both the crossing-in-progress state and completed-crossing counter persist
+through saves and replays. Neither lure consumes a special-threat slot; both
+are disabled outside Cursed World. The item kind, thresholds and safe-route
+limits can be adjusted in `content/adaptive_player_trolling.json`.
+
+**Unsold Equipment — extra ordinary thieves:** In Cursed World, each newly
+visited eligible underground floor (including its cave identity) or surface
+region receives **one dynamic thief encounter check**. The normal chance is
+**10%**, increasing to **30%** while carrying at least **15 unequipped weapons or armor pieces** in the backpack. Equipped items do not count;
+stacked spare equipment is counted by quantity. The probability is chosen at
+the instant the area is first entered, not retroactively when the pack changes.
+Checks are persistent, including failed rolls and regions with no legal spawn,
+so returning to the same floor or stepping across a boundary cannot farm
+extra attempts. The modifier uses only ordinary thief-capable species eligible
+for the current habitat/depth and a player-connected location outside sight,
+at least **10 tiles away**, not on entrances, traps, items, NPCs, occupied
+terrain, or in the Temple sanctuary. A successful roll adds one ordinary
+monster that uses its native movement, gear, theft and escape rules and leaves
+normal loot on death. This is an **ordinary population addition** and neither
+consumes the two-special-threat budget nor completes a once-per-character
+special encounter. The monster and the checked-area ledger survive saves and
+replays. Ordinary worlds do not roll or record these checks.
+
+**Hungry Monster:** Carrying **at least 25 raw Meat or 25 Roasted Meat** qualifies one special
+Hungry Ogre or Hungry Cyclops on matching surface terrain, a Hungry Ogre on
+sufficiently deep dungeon floors (its normal z:-5 minimum), or a Hungry Cave
+Troll on eligible Dwarven Mines floors at its normal z:-12 minimum. The actual
+creature spawns on a **scheduled encounter check in a matching habitat**, not
+when meat is first picked up. Eligible enemies and positions
+are selected from the player's connected terrain, outside the current view,
+10–28 tiles away and clear of entrance approaches, traps, props and other
+special threats. If no suitable position exists, the event waits; it never
+forces a spawn into the player's path. In the Dwarven Ruins it participates
+in the ordinary depth-weighted event lottery. Elsewhere it uses the next eligible scheduled check, respecting the
+surface-region or underground-floor two-threat limit. It is one encounter per character, ignoring the ordinary
+monster population limit.
+
+The name uses **Hungry** without granting ordinary monster-prefix powers.
+Its starting HP and DEF are multiplied by **0.8**, and ATK by **1.2**,
+rounded to nearest integer with at least one point of change for positive
+stats. Other natural abilities and attack rules remain those of the species.
+After spawning it actively tracks the player and responds to dropped
+meat using the scent-driven pursuit rules below. It does not attack in the movement action that spawns it, and leaving
+the floor does not create another hunter. The player can fight, escape, hide or sacrifice meat.
+
+**Hungry Monster — scent-driven pursuit and meat distraction:**
+
+A one-time **Hungry** variant of Ogre, Cyclops or Cave Troll hunts its prey
+beyond its ordinary aggression radius. This is a property of the special
+encounter, not a new prefix available to ordinary monsters. It keeps the
+species' natural melee and ranged attacks; Fear, invisibility, sleep and the
+Temple's sanctuary retain their normal priority. The hungry creature can
+pathfind around walls and doors on its current floor, but does not teleport
+or follow the player between floors.
+
+The player may drop uncooked **Meat** from their inventory to divert it. A
+player-dropped pile within **six Chebyshev tiles** becomes the preferred goal
+if the creature can walk to it; already spawned meat, cooked meals and
+unreachable piles do not qualify. Reaching the pile uses ordinary movement.
+On its next action, the monster consumes **one** piece and spends that action
+eating, then resumes pursuing the player. It ignores the same pile thereafter
+so a large stack cannot pin it down indefinitely. An attempted melee, bow or
+Fireball attack interrupts the distraction, including a miss, and makes it
+ignore the targeted pile. A fresh pile elsewhere can distract it again.
+
+The currently targeted pile, consumed/ignored pile, and brief attack-driven
+interruption are stored on the actual monster; save/restore and replay keep
+its chosen goal and inventory changes deterministic. Animation timing does
+not affect movement or consumption.
+
+**Beast Hunter:** After the player has killed **at least 40 living,
+non-humanoid beasts**, making up **at least 60% of all credited kills**, one
+ordinary native surface beast becomes eligible for an announced retaliation
+hunt. It is selected from **Spineback or Manticore** (tier 4, natural rarity 0.1–0.3,
+never ultra-rare), only where that species can naturally spawn. All retain
+**normal HP, ATK, DEF, SPD and abilities**. A
+*Hunting [species]* name and the usual prefix glow identify the individual;
+no ordinary prefix stat bonus is applied. At the next scheduled check on the
+surface, the hunter appears off-screen on connected, trap-free ground
+**12–28 tiles away**, in the current surface region and away from protected
+entrances. It starts aware and tries to follow the player beyond its ordinary aggression
+range with the **far-wandering cadence**: on every distant hunting action
+40% idle, 20% attempted non-directed roaming, and 40% pursuit pathfinding.
+Only within ordinary aggro range does normal, faster combat AI take over. The player sees a **HUNTED!** cue at activation.
+It **can lose the trail**: out of ordinary aggression range, the standard
+speed-advantage disengagement roll applies (5 percentage points per SPD,
+maximum 50% each pursuing action); invisibility, forest concealment and
+sanctuary also stop its distant tracking through existing monster AI. Once
+unaware, it returns to normal wildlife behavior and can only reacquire the
+player under normal combat rules. The hunter is a genuine, persistent enemy;
+leaving the level doesn't create another. One per character, occupying one
+surface-region special-threat slot. Eligibility uses the player's existing
+saved `killsBySpecies` counter, so no separate persistent counter is needed.
+The selected enemy, its alert state and the completed encounter survive
+save/load and replay. Other beasts and non-Cursed-World runs are unchanged.
+
+**Forest Spirit — overforaging:** In Cursed World, searching **70 distinct
+forest tiles** (including searches that find nothing) makes the Forest Spirit
+eligible for one scheduled encounter on the surface. Previously searched tiles
+do not count again; eligibility uses the already-persisted surface `foragedTiles`
+set rather than a second activity counter. The first manifestation must occupy
+a **forest** tile, 10–32 walking steps from the player, beyond the current
+camera, on connected, safe terrain, clear of entrances and other special
+threats. No suitable forest site or free surface-region slot defers the event
+without consuming it. It takes **one surface-region threat slot** and never
+spawns a second spirit for the same character.
+
+The Forest Spirit is a **tier-four spectral undead** with **90 HP, 13 ATK,
+3 DEF, 5 SPD, 4 GRACE** and the existing **Ethereal** ability. It is not a
+natural spawn. Its green halo and distinct name identify it, including outside
+the forest. Until its dedicated artwork is supplied, the tile and portrait
+reuse the Ghost artwork; this does not change its species identity or Bestiary
+entry. At a distance it stalks with **40% idle, 20% roaming, 40% pathfinding**
+per action; ordinary combat AI applies within its aggression range. The
+standard speed-based loss-of-trail roll and existing concealment, invisibility
+and sanctuary rules still offer escapes.
+
+When the spirit loses the trail or the player descends underground, the **same
+living enemy** becomes dormant and disappears from active surface encounters.
+It cannot attack during this interval. After **100 gameplay turns actually
+spent on the surface**, it may reappear at an off-screen reachable location,
+including outside a forest. If no safe spot exists, it retries every 10
+additional surface turns. The spirit retains its remaining HP, unique enemy ID,
+abilities and status; no new threat slot or kill/drop opportunity is created.
+Another descent restarts the surface countdown. Killing it ends the hunt
+permanently. Dormancy, the surface-turn countdown and its last counted turn
+survive saves and deterministic replays; rendering or waiting in menus cannot
+advance the countdown.
+
+**Low HP Carrion:** Staying below **25% of maximum HP for 30 consecutive
+game turns** makes one special hunter eligible, provided the player is still
+wounded when the scheduled check occurs and combat has ended. Healing to
+25% or more resets the streak and prevents a pending spawn. The game selects
+a naturally occurring **living, non-humanoid tier-four beast** with at least
+100 HP and 12 ATK, excluding rupture attackers; the creature must be native
+to the current surface biome or underground depth and have a reachable,
+off-screen spawn point 12–28 tiles away. It receives `carrionInstinct` **only
+on that individual** (never on the species template), takes the name *Carrion
+[species]* and appears with an ordinary prefixed-monster halo. Its existing
+abilities, base combat stats and movement speed are otherwise retained.
+Once spawned it tracks the player even from beyond ordinary AGGRO through
+real passable paths, respecting invisibility, sanctuary and combat rules.
+The normal `carrionInstinct` +25% ATK applies only when the player is below
+20% HP. The monster is not teleported into combat and cannot attack during
+its summoning turn. The appearance uses a local special-threat slot and is
+once per character; an unsuitable habitat or unsafe location defers it.
+
+**Reckless Fighter:** Each time a fight ends with the player **strictly below
+10% maximum HP** while carrying at least one Life Potion, add one to the
+reckless-fight count. A fight consists of player or enemy combat attack
+attempts (melee, arrows or spells) and ends after **five full turns with no
+attacks from either side**. A prolonged fight, even with changing targets,
+counts only once; dying before the quiet period ends does not count. After
+**five such fights**, a scheduled encounter check can spawn a strong, native
+living beast on reachable off-screen terrain 12–28 tiles away. The beast is
+called *Graceful [species]* and uses the normal prefixed-monster glow, without
+receiving any ordinary random prefix effects. At spawning, its natural
+GRACE becomes at least **2 greater than the player's current GRACE**; it has
+**1.8× base HP** (at least **1.25× the player's maximum HP**), **1.15× ATK**
+and **1.3× DEF**, rounded to integers. SPD is unchanged. The boosted GRACE
+is fixed once spawned, even if the player later switches weapons. The enemy
+uses normal combat and paths toward the player from afar. This is a single
+special-threat encounter per character; it cannot spawn alongside a live
+Low HP Carrion pursuit on the same level. The hero can heal, fight, escape,
+use terrain and invisibility as usual; combat and qualification state is
+resolved in game turns, serialized and replayed independently of animation.
+
+**Gold Imp:** In Cursed World, carrying **at least 2,000 gold** makes a single
+Gold Imp encounter eligible at the next scheduled check in a
+suitable habitat. The Imp uses its normal living Imp stats, combat, terrain
+restrictions and thief ability, and appears out of sight on safely reachable
+ground **10–28 tiles away**, at least 3 tiles clear of entrances. On the
+surface it spawns only on natural hill or forest terrain in the player's
+current region; underground it respects the Imp's usual depth restriction.
+It begins an active pursuit even outside ordinary aggro range, but still
+respects invisibility, sanctuary, path blockers and normal defensive behavior.
+It occupies one optional lifetime threat slot; in the Dwarven Ruins it
+competes in the existing equal-weight, depth-weighted event lottery. The
+Gold Imp steals once using the normal adjacent thief opportunity: 10% per
+eligible adjacent turn, only if it has a legal escape step. Successful theft
+removes **10% of the player's current gold, capped at 300 gold**, with the
+amount rounded down and preserved on the enemy. The original amount is
+recoverable from a regular thief bag after it dies; the bag lies on the
+floor and requires a normal forage action. The one-time encounter, stolen
+coins and threat reservation survive saves and replay; ordinary Imp theft
+is unchanged. If no safe spawn site exists the event waits for another
+eligible scheduled check.
+
+**Ignored mushroom cleaning:** In Cursed World, three **separate visits to
+Herbalist Services** while carrying untreated Mushrooms, without purifying
+any during those visits, attract a fungal windfall. A visit counts only after
+the player leaves the Herbalist's interaction range (or changes levels);
+closing and reopening Services without leaving is still the same visit.
+Purifying at least one mushroom disqualifies that visit. On the next
+previously unvisited cave or Dwarven Ruins floor after the third ignored visit,
+a group of **six mushrooms (five ordinary, one edible)** appears on safe,
+reachable ground in one cluster, outside sight and at least ten tiles from
+the entry. The items are real ground pickups, not chest rewards; there is no
+monster-threat cost. If a suitable cluster cannot be placed, the event
+waits for a later unvisited eligible floor. Previous floor visits, completed
+visits and in-progress Herbalist interactions persist through saves and replay.
+
+**Mushroom Prophet:** In Cursed World, collecting **30 ordinary Mushrooms**
+from foraging, monster loot or ground pickups makes a unique Prophet eligible
+on a **later suitable underground floor**. Dropping and picking up the same
+mushrooms never advances the threshold again. The candidate floor must contain
+natural fungal growth (cave mushrooms, mine wall mushrooms, or an existing
+Fungus), and the Prophet appears on reachable, safe ground within **3 tiles**
+of the fungus, at least **10 tiles** from the player, outside sight and away
+from stairs. It uses the normal Fungus walking sprite, but has its own
+portrait and combat identity: **tier 3, 100 HP, 14 ATK, 4 DEF, 4 SPD**, with
+ordinary melee attacks. Once seen, it speaks a warning and gives the player
+one full action to escape before pursuing and attacking (described below).
+Its appearance consumes one of the two lifetime threat slots on that
+underground floor; no patch or free slot means defer rather than force a spawn.
+In the Dwarven Ruins it enters the same depth-weighted equal-candidate lottery;
+in other fungal caves and mines it activates on the next qualifying
+scheduled check.
+All collection counts and warning state are saved and replayed. Ordinary
+worlds never accumulate this progress.
+
+**Mushroom Prophet — warning action:**
+
+**Mushroom Prophet's warning** is an encounter-specific non-damaging
+first action, not an additional attack or a status affecting other monsters.
+When the player and Prophet first see one another (not while the player is
+invisible), it recites its prophecy and spends that enemy turn without moving
+or attacking. The player therefore has a complete next action to flee,
+attack first, or reposition; from the next enemy turn onward it follows normal
+melee pursuit and combat. The warning cannot repeat through retreat, changing
+floors, or reloading, and does not count as a damaging turn. Its turn marker
+is stored with the monster and restored with the ordinary enemy state.
+
+**Ancient Scarab:** In Cursed World, digging **35 different sand tiles**
+primes an encounter on the **next successful new sand dig** (the 36th). This
+is independent of the usual 2% ordinary Scarab dig result and does not replace
+normal buried loot. A single named **Champion Scarab** rises from reachable,
+unoccupied sand **4–8 path steps** from the player, outside the Temple
+sanctuary. The ordinary Champion modifier is applied first; **HP, ATK, DEF
+and SPD are then doubled**, while GRACE and the other base properties remain
+unchanged. With the base Scarab stats, the special opponent has **38 HP,
+8 ATK, 12 DEF, 12 SPD**, retains the Champion **Inspired** aura, and keeps
+the visible *Champion Scarab* name rather than a duplicate prefix. It is
+alerted immediately but does not take a free attack during the digging action
+that summons it. If no safe reachable sand exists within range, or the surface
+special-threat limit is full, the event is postponed to the next distinct dig.
+Repeated digging of an already disturbed tile never advances the count. The
+count, unique enemy identity, occupied surface threat slot and completion
+persist through saves/replays. Ordinary worlds are unaffected.
+
+**Surface threat regions:** The overworld is divided into a configurable
+number of approximately equal rectangular regions, with the region count
+increasing with world dimensions. At a target span of **96 tiles**, maps of
+size XS (184×184), L (260×260), and XXL (320×320) contain **2×2**, **3×3**,
+and **4×4** regions respectively. Each region may host at most **two adaptive
+special threats for the lifetime of the character**, while separate regions
+retain their own capacity. The qualifying player's action chooses the region;
+the nearby spawned threat must remain within it. A creature killed in that
+region does not free its reservation. Regions use the restored map dimensions
+and persistent event counts, so switching floors, revisiting, reloading or
+replaying never resets capacity. This changes no ordinary population limit,
+site generation, or non-Cursed behavior.
+
+**Trogloraptor mine ambush:** In Cursed World, fully extracting **12 different
+mineral deposits** primes a special Trogloraptor at the **13th extraction**.
+Striking a deposit without finishing it, cracking an ordinary mine wall, and
+repeatedly interacting with a removed vein never advance the counter. A
+single ordinary **Trogloraptor (108 HP, 20 ATK, 5 DEF, 7 SPD)** is added on
+player-connected dry mine floor beside an intact solid wall, **3–10 path
+steps** away and within **10 tiles of the extracted mineral**, clear of
+stairs, traps, items and existing special threats. Its ordinary **wallAmbush**
+concealment, anticipation warning, reveal timing and counterplay remain
+unchanged. The monster does not receive an attack during the extraction that
+creates it. On a mine floor above its normal minimum habitat (z:-10) or with
+no legal concealed position, the encounter waits until another distinct
+mineral extraction. It consumes one of the mine floor's two special-threat
+slots, ignores ordinary population limits, and is unique per character.
+Its progress, completed state, threat reservation and hidden monster state
+persist with saves and replay.
+
+**Uninvited Guest:** After the player **lights an abandoned campfire eight
+separate times** in Cursed World, the **next completed lighting** can attract
+a mysterious visitor. Relighting the same fire after it goes out counts as a
+new lighting; adding fuel, cooking, resting and using a dwarven stove do not.
+The visitor appears on safe, traversable, player-connected ground **2–5 path
+steps** away and no more than **4 tiles from the campfire**, within sight of
+the player; it must respect the same lifetime special-threat budget as its
+surface region or underground floor. If no safe spot remains, subsequent
+lighting actions retry without duplicating the encounter. The event rolls
+**50% friendly / 50% hostile**, once on successful placement, and stores the
+result in the monster state. Both versions use the **Uninvited Guest** 100×100
+walking tile and portrait. The melee profile is **tier 3, 80 HP, 14 ATK,
+4 DEF, 6 SPD** (2 GRACE) with no special combat ability.
+
+The friendly visitor displays a food offer rather than hostility and remains
+passive until approached. Pressing **F** beside the visitor leaves one random
+cooked meal (Roasted Meat, Baked Potato or Cooked Fish) on the ground at its
+feet and dismisses the visitor; the player must pick up the meal manually.
+Attacking the friendly traveler forfeits the meal and provokes normal melee
+retaliation. The hostile visitor arrives with a visibly drawn blade and a
+warning: **it cannot attack on the lighting action**, giving the player one
+complete action to retreat before the usual melee AI resumes. Both intentions
+are visible through tile feedback, message and enemy tooltip. Encounter
+eligibility, the selected outcome, timing, remaining guest and ground reward
+survive ordinary saves and replay. Ordinary worlds never track the trigger.
+
+**Debt Collector:** Searching **10 distinct dwarven remains** (including
+fort `ruinprop` remains) makes a unique dwarven Ghost eligible on either of
+the last two Dwarven Ruins floors. The encounter uses the same depth-weighted,
+equal-candidate lottery and occupies one of the two optional threat slots.
+It appears on reachable, trap-safe ground, at least 10 tiles away and outside
+sight. It reuses the Ghost walking sprite and combat profile (36 HP, 9 ATK,
+1 DEF, 5 SPD), with its own dwarven-ghost portrait and name. It waits until
+the player sees it before making a demand. The player may avoid it entirely,
+surrender the randomly selected eligible loot or gold, or refuse and fight/flee.
+
+The Ghost selects **one random recovered object** among currently carried
+remains items (including equipped gear, gems and ammunition stacks) **and
+affordable purses of gold recovered from those remains**. Each original find
+is one equally weighted candidate, regardless of arrow-stack size or coin
+quantity. The ghost does not target an ordinary item merely because its name
+matches: items carry an origin identifier, and recovered gold is recorded by
+its original find amount. When a purse is selected, the ghost demands exactly
+the amount found on those remains (5–25g), payable using any current gold;
+there is no artificial distinction between physical coins after pickup.
+An eligible item stack is surrendered in full. If no recovered items or
+affordable remains purses qualify, the demand is **100 gold** instead. The
+selection resolves once on discovery, never on UI refresh, and stays
+locked until the player responds. Paying removes
+the actual item or gold and peacefully dismisses the Ghost, without loot or
+XP. Refusal makes it hostile using normal Ghost combat. Attacking first also
+makes it hostile, without a payment demand. A single dialog choice is
+recorded for replay and consumes no extra turn; the next player action
+resumes ordinary monster turns. The pending demand, selected loot or gold-purse identity,
+loot provenance, recovered-gold records, searched-remains total and hostility
+state all survive save/restore and replay. When payment is unaffordable, refusal remains
+available; the dialog cannot be dismissed without choosing. Ordinary worlds
+have no such tracking or encounter.
+
+Each distinct successful search counts toward this encounter. Recovered gear,
+crystals and arrow stacks retain their dwarven-remains origin while carried,
+equipped or dropped, without mixing into ordinary stacks. Gold finds are
+recorded as separate purses of their original 5–25 gold amounts and can also
+be demanded by the Collector when the player holds enough money. Gold remains
+ordinary fungible currency, not a separate inventory item.
+
+**Champion Oculus:** In Cursed World, hitting **three different enemies**
+while under the effect of a Scroll of Invisibility, in **three separate
+engagements**, qualifies one Champion Oculus on either of the last two
+Dwarven Ruins floors. An engagement begins with an attack after at least five
+full gameplay turns without any player melee, bow or Fireball attack or a
+monster's direct melee, ranged or projectile attack. Misses and blocked
+attacks still interrupt the quiet period, but do not count as successful hits.
+Multiple hits within one engagement, including multiple targets, extra weapon
+attacks and Fireball area damage, count at most once. Reusing an already
+counted enemy in a later engagement does not advance the trigger. Invisible
+attacks resulting from God Mode do not count. Qualification and engagement
+timing persist across saving, replay and floor changes. The encounter shares
+the depth-weighted ruins roll, equal candidate weights and two-special-threat
+limit with other optional reactions. It appears on path-connected, trap-safe
+terrain outside sight, well clear of stairs; failed placements defer the
+encounter. The Oculus uses the existing **Champion** stat multipliers and
+retains its original **True Sight**, allowing it to see and fight the invisible
+player through normal visibility rules. It spawns once per character.
+
+**Fan Club:** Reaching a scheduled check on a Dwarven Ruins floor while wearing three ordinary
+randomly prefixed pieces of equipment (weapon, shield, and armor) with the
+**same modifier prefix** makes one Fan Club encounter eligible. Its members are
+always exactly one Kobold, one Goblin, and one Skink. Each has a real piece of
+randomly generated enchanted equipment with the copied modifier prefix:
+Kobold carries a weapon, Goblin a shield, and Skink wears armor. Base gear
+quality is bounded by the highest tier of the player's three qualifying items
+(minimum tier 2, maximum tier 5), with ordinary tier-selection and modifier
+rolls. Their displayed monster names echo that prefix (for example, *Mighty
+Kobold*), but **no monster-prefix effects are applied**. Their combat stats
+change only via the existing enemy equipment scaling and applicable item
+bonuses; effects such as MF or XP bonuses are not converted into artificial
+combat power. They keep their normal species abilities, including shooter
+roles. This is a one-time ambush per character, placed as a group outside the
+player's underground field of view, away from stairs and traps, on connected
+passable terrain. Its defeated members leave their enchanted gear as ground
+items to pick up manually instead of silently adding it to the inventory.
+Each participant's special-encounter identity persists through save and replay
+restoration, so special ground-loot behavior survives loading. The player can
+evade the encounter, engage, or exploit terrain and enemy AI.
+
+**Explorer Galleries — reinforced shooter galleries:** Exploring at least **50% of the
+reachable surface** and **actually reaching both the western and eastern
+edges, or both the northern and southern edges**, makes gallery
+reinforcements possible. Opposing sides use the game's existing persistent
+world-edge milestones and their normal boundary settings, so merely revealing
+a distant edge on the map does not count. The explored percentage uses the
+existing surface fog-of-war and terrain flood fill; God Mode reveals do not
+activate this condition. Adjacent edges reached at one corner do not qualify.
+On the **first entry to each Ruins floor after qualification**, each intact
+crossfire gallery independently has an **85% chance** to reinforce. The
+upgrade promotes **one existing ranged guard** to Champion and adds exactly
+**two real archers** (one in each barred bay), making a usual gallery of
+**10 guards become 12**, not 13. Champion bonuses and the *Inspired* aura
+use the ordinary prefix rules; the two extra archers keep normal ammunition,
+humanoid equipment and ranged AI. Their locations must have clear projectile
+lines into the aisle and cannot overlap terrain hazards, other units or items.
+Cleared galleries remain cleared. A gallery's outcome is persistent, never
+rerolled on a return visit, including failed 15% rolls. Temporarily blocked
+placement defers the roll. Reinforcement does **not** consume either of the
+floor's two optional special-threat slots, alter dungeon generation, or
+force the player through this optional branch. Combat alternatives remain
+fighting through bars, reaching the side cell, or ignoring the gallery.
+
+**Fireball self-harm lure:** In Cursed World, two separately cast Fireballs
+that actually damage the player qualify for a single Scroll of Fireball placed
+on a later qualifying underground floor. The scroll lies on a reachable,
+trap-free **one-tile-wide corridor** with opposite openings, at least ten
+Chebyshev tiles from the entrance position and outside the current underground
+field of view. An existing enemy, prop, item or stair cannot be displaced by
+it. If no legal passage exists, the reward waits for a later floor change.
+The player must approach and pick up the scroll manually. The two self-hits
+are counted only when a cast is committed and its damage is resolved; aiming,
+canceling, or the number of flame animation frames cannot increment the count.
+The reaction consumes no special-threat slot and can occur in an ordinary cave
+or dungeon rather than being restricted to the Dwarven Ruins. Its threshold,
+placement distance and item kind are kept in the adaptive JSON configuration.
+
+Special equipment rewards are created as ordinary `droppeditem` objects on
+reachable, unoccupied ground, rather than being hidden in chests. The player
+must pick them up through the ordinary ground-item interaction; items persist
+in `groundItems` until collected. When a valid location is unavailable, the
+reaction is postponed instead of placing an inaccessible item.
+
+Behavior-dependent reactions, their limits and chosen item or monster pools
+are configured in `content/adaptive_player_trolling.json`; the complete set
+of playable event IDs is listed once in the spoiler table above. New events
+must connect a measurable player behavior to the gameplay hook that resolves
+the world response before they enter an optional encounter pool.
+
+**Tester trigger diagnostics:** Saves and replay snapshots contain
+`adaptivePlayerTrolling.triggerFlags`, with one boolean for each of **39 tracked diagnostic IDs**: the active
+reactions plus an independent Unsold Equipment modifier and a reserved
+Relieved Thief placeholder. Scroll Restock uses its saved completion/counter
+state rather than its own diagnostic trigger flag. A `true` flag means the condition was **observed at
+least once** during this run (or its event has happened), not that it is
+*currently* eligible for an encounter: changing inventory, location, HP or
+equipment can temporarily invalidate eligibility. Future, unimplemented
+reactions remain `false`. Actual one-time consumption is still represented
+by `completed`, while counters, selected events and per-floor threat budgets
+remain in the same `adaptivePlayerTrolling` save object. Cursed World alone
+updates these diagnostic flags; they are historical observations, so an already
+true condition is not repeatedly evaluated. Explorer Galleries separately use
+the saved exploration milestone to retain qualification. Logging never consumes RNG.
+
+`adaptivePlayerTrolling.debugTrolling` is a persisted tester boolean, `true`
+by default for a new character and in the tester starting save. Existing
+saves and replay snapshots restore their explicit value. Disable it with
+`AdaptivePlayerTrolling.setDebugTrolling(false)` in the browser console. When
+active, the normal message log reports **the first time each trigger condition
+is observed**, scheduled checkpoint numbers, and successful special spawns
+with location/slot details. A new save or replay restores the same setting;
+tester messages use **bold white** text in the game log (including older
+entries, which do not fade); logging does not consume gameplay RNG or change
+movement, drops or encounter probabilities. It is disabled automatically in ordinary worlds because the
+adaptive system is inactive there.
 
 ## Persistence and balance
 

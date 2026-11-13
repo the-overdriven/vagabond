@@ -1,4 +1,51 @@
 describe('Monster poison', () => {
+  it('counts distinct venom targets or undead attempts only in cursed worlds', () => {
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Venom Eater Trigger Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        AdaptivePlayerTrolling.reset()
+        activeWorldTraits=[]
+        const target=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'adaptive-venom-0',
+          x:40,y:40,level:0,hp:100,maxHp:100,alive:true,equipment:null})
+        applyPlayerVenomToEnemy(target)
+        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===0,
+          'ordinary worlds never track venom for cursed reactions')
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        for(let i=0;i<15;i++) {
+          const e=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'adaptive-venom-'+i,
+            x:40,y:40,level:0,hp:100,maxHp:100,alive:true,equipment:null})
+          applyPlayerVenomToEnemy(e)
+          applyPlayerVenomToEnemy(e)
+          check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===i+1,
+            'poison refresh never counts a target twice')
+        }
+        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===15,
+          '15 distinct targets qualify')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        AdaptivePlayerTrolling.reset()
+        AdaptivePlayerTrolling.restore(saved.adaptivePlayerTrolling)
+        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===15,
+          'the unique target history survives restoration')
+        AdaptivePlayerTrolling.reset()
+        const skeleton=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Skeleton,id:'adaptive-undead',
+          x:41,y:40,level:0,hp:80,maxHp:80,alive:true,equipment:null})
+        for(let i=0;i<5;i++) applyPlayerVenomToEnemy(skeleton)
+        check(AdaptivePlayerTrolling.serialize().undeadVenomAttempts===5 &&
+          skeleton.poisonTurns===0, 'five poison attempts on undead count despite immunity')
+        const construct=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Gargoyle,id:'adaptive-construct',
+          x:42,y:40,level:0,hp:80,maxHp:80,alive:true,equipment:null})
+        applyPlayerVenomToEnemy(construct)
+        check(AdaptivePlayerTrolling.serialize().undeadVenomAttempts===5,
+          'construct immunity does not count as undead')
+      } finally {loadGameFromObject(before)}
+    })()`))
+  })
+
   it('does not poison on a damaging glancing melee hit', () => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Glancing Poison Tester')

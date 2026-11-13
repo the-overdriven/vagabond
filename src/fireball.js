@@ -124,6 +124,9 @@ async function castFireball(idx, x, y) {
     }
     item.count = (item.count || 1) - 1
     if (item.count <= 0) player.inventory.splice(idx, 1)
+    AdaptivePlayerTrolling.onScrollUsed('scrollOfFireball')
+    AdaptivePlayerTrolling.onCombatAttack(turnCount)
+    const scrollInvisibleCast = !player.godMode && player.invisibleTurns > 0
     const tiles = fireballBlastTiles(x, y), cells = new Set(tiles.map(p => keyXY(p.x, p.y)))
     const victims = enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) && cells.has(keyXY(e.x, e.y)))
     const selfHit = cells.has(keyXY(player.x, player.y))
@@ -141,6 +144,7 @@ async function castFireball(idx, x, y) {
     }
     log('You cast a fireball!', 'info')
     for (const {enemy:e, damage} of hits) {
+      AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
       // Spell immunity and one-use death protection still work; armor does not.
       if (enemyImmunityActive(e)) {
         spawnDamageNumber(e.x, e.y, 'Immune!', '#c7a5f6', impactDelay)
@@ -148,8 +152,9 @@ async function castFireball(idx, x, y) {
       }
       const wasEnraged = enemyIsEnraged(e)
       e.hp -= damage
+      if (scrollInvisibleCast) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
       revealEnemyInvisibility(e); breakEnemyFear(e); wakeSleepingEnemy(e)
-      absorbEnemyFatalHit(e); triggerEnemyShellRetreat(e)
+      absorbEnemyFatalHit(e); AdaptivePlayerTrolling.onPlayerWoundedEnemy(e,damage); triggerEnemyShellRetreat(e)
       alarmEnemy(e); alarmEnemiesNearHit(e)
       spawnDamageNumber(e.x, e.y, damage, RENDER_STYLE.damage.enemyHit, impactDelay)
       log(`Fireball burns the ${e.name} for ${damage} damage.`, 'good')
@@ -163,6 +168,8 @@ async function castFireball(idx, x, y) {
       log(`Your fireball burns you for ${selfDamage} damage!`, 'bad')
       absorbPlayerFatalDamage()
     }
+    // Count only a committed cast which actually damages its own caster.
+    if (selfHit && selfDamage > 0) AdaptivePlayerTrolling.onSelfFireballHit()
     const fatal = player.hp <= 0
     for (const {enemy} of hits) if (enemy.hp <= 0) killEnemy(enemy, true, 'fireball', impactDelay)
     if (fatal) { player.hp = 0; die(null, 'fireball') }

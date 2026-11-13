@@ -614,6 +614,8 @@ const Mining = (() => {
       return 'warn'
     }
     const level = activeLevel(), target = level ? find(level, x, y) : null
+    let extractedMineral = false
+    let brokenOrdinaryMineWall = false
     const keyTarget = `${currentZ}:${x},${y}`
     if (!player.miningTutorialSeen) {
       player.miningTutorialSeen = true
@@ -664,9 +666,11 @@ const Mining = (() => {
             const mineral = config().minerals[target.mineral]
             grantXp(config().skill.xp[mineral.tier])
             log(`You extract ${mineral.name}.`, 'loot')
+            extractedMineral = true
           } else {
             grantXp(config().skill.xp[hardness])
             log('The cracked wall gives way.', 'good')
+            brokenOrdinaryMineWall = target.kind === 'wall'
           }
           flood(level, target)
         }
@@ -676,6 +680,10 @@ const Mining = (() => {
     }
     // Rules resolve before enemy movement. Animations never change results.
     sound(x, y, target)
+    // The action has committed and nearby enemies have already heard it.
+    // New adaptive ambushers cannot act until the next player response.
+    if (extractedMineral) AdaptivePlayerTrolling.onMineMineralExtracted(x, y)
+    if (brokenOrdinaryMineWall) AdaptivePlayerTrolling.onMineWallBroken()
     return 'strike'
   }
 

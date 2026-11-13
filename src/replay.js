@@ -373,6 +373,11 @@ async function runReplayAction(action) {
           return replayDesync(`Replay desynchronized: could not talk to ${action.npc || 'NPC'}.`)
       }
       break
+    case 'debtCollector': {
+      if (!AdaptivePlayerTrolling.resolveDebtCollector(action.choice,action.enemyId,false))
+        return replayDesync('Replay desynchronized: invalid Debt Collector choice.')
+      break
+    }
     case 'npcTopic': {
       const npc = npcs.find(n => n.name === action.npc)
       if (!npc || !interactNpcTopic(npc, action.topic))
@@ -388,6 +393,7 @@ async function runReplayAction(action) {
       grantHerbalistFirstGift(npc)
       freezeNpcFromWandering(npc)
       serviceNpc = npc
+      AdaptivePlayerTrolling.onHerbalistServicesOpened(npc)
       break
     }
     case 'buy': {

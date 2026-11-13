@@ -38,16 +38,19 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
     ? prior.x !== from.x || prior.y !== from.y
     : prior.x !== here.x || prior.y !== here.y))) resetSwimming()
   if (!deepSwimmingWater(here.x, here.y)) {
+    if (from && deepSwimmingWater(from.x,from.y)) AdaptivePlayerTrolling.onWaterExited(here)
     if (player.swimPosition || player.swimTurns > 0) log('You reach the shore and catch your breath.', 'info')
     resetSwimming()
     return
   }
   if (from && !deepSwimmingWater(from.x, from.y)) {
+    AdaptivePlayerTrolling.onWaterEntered(from)
     resetSwimming()
     log(raceHas('swims') ? 'You slip into the water and swim with ease.'
       : 'You enter the deep water and begin swimming.', 'info')
   }
   player.swimPosition = here
+  if (moved) AdaptivePlayerTrolling.onWaterMoved()
   if (player.godMode || raceHas('swims')) {
     player.swimTurns = 0
     player.drowning = false
@@ -71,6 +74,7 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
   player.drowning = drowning
   const damage = Math.max(1, Math.round(playerMaxHp() * (fellThroughIce ? 0.08 : 0.05)))
   player.hp = Math.max(0, player.hp - damage)
+  if (damage > 0 && !fellThroughIce) AdaptivePlayerTrolling.onDrowningDamage()
   absorbPlayerFatalDamage()
   if (fellThroughIce) log(`The plunge into freezing water costs you ${damage} HP.`, 'bad')
   checkPlayerHealthWarning()

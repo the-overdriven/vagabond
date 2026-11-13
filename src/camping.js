@@ -143,6 +143,7 @@ const Campfires = (() => {
     const scope = recordReplayAction({type:'camp',action,ingredient,x:fire.x,y:fire.y})
     const initialHp = player.hp, deaths = player.deaths, x = player.x, y = player.y
     const hadFood = foodRemaining() > 0
+    let visitorArrived = false
     turnContext = {action,healed:0}
     try {
       clearAutoPath()
@@ -150,6 +151,7 @@ const Campfires = (() => {
         consume('brushwood')
         fire.burnUntil = turnCount+rule(fire).burnTurns+1
         if (action === 'light') igniteNoise(fire)
+        if (action === 'light') visitorArrived = AdaptivePlayerTrolling.onCampfireLit(fire)
         invalidateUndergroundFov()
         log(action === 'light' ? `You light the ${rule(fire).name.toLowerCase()}.` : 'You feed the fire with brushwood.', 'info')
       } else if (isCook) {
@@ -180,6 +182,7 @@ const Campfires = (() => {
             ? 'The fire goes out before you recover. Without food, you need four consecutive rest turns for 1 HP.'
             : 'Camping stops: the fire, position, or surroundings changed.', 'info')
       }
+      if (visitorArrived) close() // Reveal the visitor and return control before any further camping action.
       updateHud(); render(); runAnimationLoop()
       return true
     } finally { turnContext = null; finishRecordedReplayAction(scope) }

@@ -5212,7 +5212,7 @@ function keyXY(x, y) {
 // The saved enemy roster and world kill history enforce the limit, including
 // after the first individual dies or a new permadeath character begins.
 function naturalSpawnEligible(tmpl) {
-  if (!tmpl) return false
+  if (!tmpl || tmpl.adaptiveOnly === true) return false
   if (tmpl.ultraRare !== true) return true
   return !worldKilledSpecies.has(tmpl.name) &&
     !enemies.some(e => (e.baseName || e.name) === tmpl.name)
@@ -5221,7 +5221,7 @@ function naturalSpawnEligible(tmpl) {
 // Depth-only templates are not surface wanderers. In particular, the surface
 // biome fallback must never place a mine-exclusive species on grass or snow.
 function surfaceSpawnEligible(tmpl) {
-  return !!tmpl && tmpl.name !== 'Ghost' &&
+  return !!tmpl && tmpl.adaptiveOnly !== true && tmpl.name !== 'Ghost' &&
     enemyBiomes(tmpl).some(biome => !/^z-\d+$/.test(biome))
 }
 

@@ -45,6 +45,26 @@
     },
     "baseValue": 24
   },
+  "strangeGreenPotion": {
+    "name": "Strange Green Potion",
+    "description": "A cloudy green elixir of unknown origin. Its effects cannot be identified in advance.",
+    "category": "supplies",
+    "stackable": true,
+    "sellValue": 1,
+    "baseValue": 2,
+    "icon": "img/tiles/strange-green-potion.png",
+    "actions": [
+      {
+        "label": "Drink",
+        "handler": "strangeGreenPotion"
+      },
+      {
+        "label": "?",
+        "handler": "inspect",
+        "title": "Inspect potion"
+      }
+    ]
+  },
   "herb": {
     "name": "Healing Herb",
     "description": "A medicinal leaf that restores some health and cures poison when eaten.",
@@ -135,12 +155,71 @@
     },
     "baseValue": 0
   },
-  "shedSkin": {"name": "Shed Skin", "category": "other", "stackable": true, "icon": "img/icons/shedSkin.svg", "sellValue": 4, "actions": [], "description": "A preserved reptile skin, useful to traders and collectors.", "baseValue": 8},
-  "chitin": {"name": "Chitin", "category": "other", "stackable": true, "icon": "img/icons/chitin.svg", "sellValue": 5, "actions": [], "description": "A tough piece of a creature's outer shell.", "baseValue": 10},
-  "blightedRoot": {"name": "Blighted Root", "category": "other", "stackable": true, "icon": "img/icons/blightedRoot.svg", "sellValue": 6, "actions": [], "description": "An unsettling root from a corrupted creature.", "baseValue": 12},
-  "venomGland": {"name": "Venom Gland", "category": "other", "stackable": true, "icon": "img/icons/venomGland.svg", "sellValue": 10, "actions": [{"label":"Use","handler":"venomGland"}], "description": "Soaks your equipped weapon, or one arrow in a bow, with a single dose of venom.", "baseValue": 20},
-  "spiderSilk": {"name": "Spider Silk", "category": "other", "stackable": true, "icon": "img/icons/spiderSilk.svg", "sellValue": 12, "actions": [], "description": "Strong, fine strands collected from a giant spider.", "baseValue": 24},
-  "rareTrophy": {"name": "Rare Trophy", "category": "other", "stackable": true, "icon": "img/icons/rareTrophy.svg", "sellValue": 60, "actions": [], "description": "An exceptional trophy recovered from a legendary beast.", "baseValue": 120},
+  "shedSkin": {
+    "name": "Shed Skin",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/shedSkin.svg",
+    "sellValue": 4,
+    "actions": [],
+    "description": "A preserved reptile skin, useful to traders and collectors.",
+    "baseValue": 8
+  },
+  "chitin": {
+    "name": "Chitin",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/chitin.svg",
+    "sellValue": 5,
+    "actions": [],
+    "description": "A tough piece of a creature's outer shell.",
+    "baseValue": 10
+  },
+  "blightedRoot": {
+    "name": "Blighted Root",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/blightedRoot.svg",
+    "sellValue": 6,
+    "actions": [],
+    "description": "An unsettling root from a corrupted creature.",
+    "baseValue": 12
+  },
+  "venomGland": {
+    "name": "Venom Gland",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/venomGland.svg",
+    "sellValue": 10,
+    "actions": [
+      {
+        "label": "Use",
+        "handler": "venomGland"
+      }
+    ],
+    "description": "Soaks your equipped weapon, or one arrow in a bow, with a single dose of venom.",
+    "baseValue": 20
+  },
+  "spiderSilk": {
+    "name": "Spider Silk",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/spiderSilk.svg",
+    "sellValue": 12,
+    "actions": [],
+    "description": "Strong, fine strands collected from a giant spider.",
+    "baseValue": 24
+  },
+  "rareTrophy": {
+    "name": "Rare Trophy",
+    "category": "other",
+    "stackable": true,
+    "icon": "img/icons/rareTrophy.svg",
+    "sellValue": 60,
+    "actions": [],
+    "description": "An exceptional trophy recovered from a legendary beast.",
+    "baseValue": 120
+  },
   "meat": {
     "name": "Meat",
     "category": "supplies",
@@ -151,11 +230,78 @@
     "description": "Raw meat taken from a slain beast. Cook it at a lit abandoned campfire before eating.",
     "baseValue": 4
   },
-  "roastedMeat": {"name": "Roasted Meat", "category": "supplies", "stackable": true, "icon": "img/icons/meat.svg", "sellValue": 2, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 8}, "description": "Tender roasted meat that provides gradual health recovery, faster when resting.", "baseValue": 4},
-  "bakedPotato": {"name": "Baked Potato", "category": "supplies", "stackable": true, "icon": "img/icons/potato.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 12}, "description": "A filling baked potato that restores health gradually, faster while resting.", "baseValue": 0},
-  "cookedFish": {"name": "Cooked Fish", "category": "supplies", "stackable": true, "icon": "img/icons/fish.svg", "sellValue": 0, "actions": [{"label": "Eat", "handler": "cookedFood"}], "effect": {"cookedRecovery": 24}, "description": "A nutritious cooked fish that restores health over time, faster during rest.", "baseValue": 0},
-  "flint": {"name": "Flint Stone", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Reusable fire-lighting tool. Use an abandoned campfire to light it with brushwood.", "baseValue": 100},
-  "brushwood": {"name": "Brushwood", "category": "other", "stackable": true, "sellValue": 0, "actions": [], "description": "Dry fuel for an abandoned campfire. One bundle burns for 12 turns. Carry up to five.", "baseValue": 10},
+  "roastedMeat": {
+    "name": "Roasted Meat",
+    "category": "supplies",
+    "stackable": true,
+    "icon": "img/icons/meat.svg",
+    "sellValue": 2,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "cookedFood"
+      }
+    ],
+    "effect": {
+      "cookedRecovery": 8
+    },
+    "description": "Tender roasted meat that provides gradual health recovery, faster when resting.",
+    "baseValue": 4
+  },
+  "bakedPotato": {
+    "name": "Baked Potato",
+    "category": "supplies",
+    "stackable": true,
+    "icon": "img/icons/potato.svg",
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "cookedFood"
+      }
+    ],
+    "effect": {
+      "cookedRecovery": 12
+    },
+    "description": "A filling baked potato that restores health gradually, faster while resting.",
+    "baseValue": 0
+  },
+  "cookedFish": {
+    "name": "Cooked Fish",
+    "category": "supplies",
+    "stackable": true,
+    "icon": "img/icons/fish.svg",
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Eat",
+        "handler": "cookedFood"
+      }
+    ],
+    "effect": {
+      "cookedRecovery": 24
+    },
+    "description": "A nutritious cooked fish that restores health over time, faster during rest.",
+    "baseValue": 0
+  },
+  "flint": {
+    "name": "Flint Stone",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 0,
+    "actions": [],
+    "description": "Reusable fire-lighting tool. Use an abandoned campfire to light it with brushwood.",
+    "baseValue": 100
+  },
+  "brushwood": {
+    "name": "Brushwood",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 0,
+    "actions": [],
+    "description": "Dry fuel for an abandoned campfire. One bundle burns for 12 turns. Carry up to five.",
+    "baseValue": 10
+  },
   "potato": {
     "name": "Potato",
     "description": "A raw potato found while foraging or searching. Bake it at a lit campfire or stove.",
@@ -371,15 +517,118 @@
     "sellValue": 20,
     "baseValue": 40,
     "description": "A sturdy iron pickaxe. Strike fractured stone, boulders, and exposed crystals to mine them; subtle seams become easier to notice as Mining improves.",
-    "actions": [{"label": "?", "handler": "inspect"}]
+    "actions": [
+      {
+        "label": "?",
+        "handler": "inspect"
+      }
+    ]
   },
-  "quartz": {"name":"Quartz","category":"other","stackable":true,"sellValue":8,"baseValue":8,"icon":"img/tiles/mineral-quartz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A pale crystal mined from stone, suitable for trade."},
-  "amethyst": {"name":"Amethyst","category":"other","stackable":true,"sellValue":16,"baseValue":16,"icon":"img/tiles/mineral-amethyst-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A violet crystal pried from the rock, valued by collectors."},
-  "topaz": {"name":"Topaz","category":"other","stackable":true,"sellValue":28,"baseValue":28,"icon":"img/tiles/mineral-topaz-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A golden mineral specimen that catches the light."},
-  "aquamarine": {"name":"Aquamarine","category":"other","stackable":true,"sellValue":38,"baseValue":38,"icon":"img/tiles/mineral-aquamarine-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A clear blue-green gemstone, precious in the markets above."},
-  "emerald": {"name":"Emerald","category":"other","stackable":true,"sellValue":52,"baseValue":52,"icon":"img/tiles/mineral-emerald-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A vivid green gemstone cut free of its dark host rock."},
-  "sapphire": {"name":"Sapphire","category":"other","stackable":true,"sellValue":72,"baseValue":72,"icon":"img/tiles/mineral-sapphire-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A deep blue gemstone of considerable value."},
-  "ruby": {"name":"Ruby","category":"other","stackable":true,"sellValue":94,"baseValue":94,"icon":"img/tiles/mineral-ruby-exposed.png","actions":[{"label":"Drop","handler":"dropCrystal"}],"description":"A rare red gemstone that glows like an ember beneath the light."},
+  "quartz": {
+    "name": "Quartz",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 8,
+    "baseValue": 8,
+    "icon": "img/tiles/mineral-quartz-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A pale crystal mined from stone, suitable for trade."
+  },
+  "amethyst": {
+    "name": "Amethyst",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 16,
+    "baseValue": 16,
+    "icon": "img/tiles/mineral-amethyst-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A violet crystal pried from the rock, valued by collectors."
+  },
+  "topaz": {
+    "name": "Topaz",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 28,
+    "baseValue": 28,
+    "icon": "img/tiles/mineral-topaz-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A golden mineral specimen that catches the light."
+  },
+  "aquamarine": {
+    "name": "Aquamarine",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 38,
+    "baseValue": 38,
+    "icon": "img/tiles/mineral-aquamarine-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A clear blue-green gemstone, precious in the markets above."
+  },
+  "emerald": {
+    "name": "Emerald",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 52,
+    "baseValue": 52,
+    "icon": "img/tiles/mineral-emerald-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A vivid green gemstone cut free of its dark host rock."
+  },
+  "sapphire": {
+    "name": "Sapphire",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 72,
+    "baseValue": 72,
+    "icon": "img/tiles/mineral-sapphire-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A deep blue gemstone of considerable value."
+  },
+  "ruby": {
+    "name": "Ruby",
+    "category": "other",
+    "stackable": true,
+    "sellValue": 94,
+    "baseValue": 94,
+    "icon": "img/tiles/mineral-ruby-exposed.png",
+    "actions": [
+      {
+        "label": "Drop",
+        "handler": "dropCrystal"
+      }
+    ],
+    "description": "A rare red gemstone that glows like an ember beneath the light."
+  },
   "dwarvenkey": {
     "name": "Dwarven Key",
     "icon": "img/tiles/dwarven-key.png",
@@ -544,5 +793,37 @@
       "durationTurns": 15
     },
     "description": "For 15 turns: +4 ATK plus one sixth of ATK (rounded down), −2 GRACE, −3 DEF. With an adjacent enemy, each action has a 25% chance to become a random melee attack instead. Repeated doses refresh without stacking."
+  },
+  "tauntingNote": {
+    "name": "Scrawled Note",
+    "description": "A crumpled note with a short message in uneven handwriting.",
+    "icon": "img/icons/scroll.svg",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "baseValue": 0,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "tauntingNote"
+      }
+    ],
+    "droppable": true
+  },
+  "dwarvenTradeLedger": {
+    "name": "Dwarven Trade Ledger",
+    "description": "An old merchant ledger sealed with the mark of a dwarven trade guild. The Merchant promised a reward for its return.",
+    "icon": "img/icons/scroll.svg",
+    "category": "other",
+    "stackable": false,
+    "sellValue": 0,
+    "baseValue": 0,
+    "actions": [
+      {
+        "label": "Inspect",
+        "handler": "inspect"
+      }
+    ],
+    "droppable": false
   }
 }

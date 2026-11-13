@@ -1,4 +1,136 @@
 describe('Dwarven Ruins encounter progression', () => {
+  it('spawns one 150 HP Venom Eater on the last two ruin floors and absorbs venom repeatedly', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const ruins=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins')
+        check(ruins.length>=3,'ruins generated for trial')
+        for(let i=0;i<15;i++) AdaptivePlayerTrolling.onVenomAttempt({
+          id:'venom-prey-'+i,alive:true,hp:30,family:'living'})
+        const enter=(floor)=>{
+          currentZ=chainZForDepth(deepLevels.indexOf(floor)+2);currentCave=-1
+          map=floor.map;undergroundDiscovered=floor.discovered
+          const entrance=floor.caves[0].entrances[0]
+          player.x=entrance.x;player.y=entrance.y
+          rebuildActiveLevelOccupancy()
+        }
+        player.equip.weapon=null;player.equip.armor=null;player.equip.shield=null
+        enter(ruins[0])
+        chance=()=>true
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'the early ruins cannot spawn Venom Eater')
+        enter(ruins[ruins.length-2])
+        check(AdaptivePlayerTrolling.onFloorChanged(),'the penultimate ruin floor accepts Venom Eater')
+        let eater=enemies.find(e=>e.adaptiveEventId==='venom_eater')
+        check(!!eater && eater.baseName==='Venom Eater' && eater.maxHp===150 &&
+          eater.hp===150 && eater.atk===18 && eater.def===6 && eater.spd===5 &&
+          eater.tier===4, 'Venom Eater uses approved tier-4 stats')
+        check(!undergroundTileVisible(eater.x,eater.y) &&
+          !CAVE_TRANSITION_TILES.has(map[eater.y][eater.x]),
+          'spawn is unseen and does not occupy a stair')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1]===1,
+          'Venom Eater occupies one persistent special threat slot')
+        eater.hp=80
+        applyPlayerVenomToEnemy(eater)
+        check(eater.hp===110 && eater.poisonTurns===0,
+          'venom hit heals 20% maximum HP without poisoning')
+        eater.hp=90
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        eater=enemies.find(e=>e.adaptiveEventId==='venom_eater')
+        check(eater.hp===90, 'wounded state survives save restoration')
+        applyPlayerVenomToEnemy(eater)
+        check(eater.hp===120 && eater.poisonTurns===0,
+          'subsequent venom restores HP even after save and load')
+        applyPlayerVenomToEnemy(eater)
+        check(eater.hp===150 && eater.poisonTurns===0,
+          'every qualifying venom hit heals up to the maximum')
+        applyPlayerVenomToEnemy(eater)
+        check(eater.hp===150, 'venom cannot heal beyond maximum HP')
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          enemies.filter(e=>e.adaptiveEventId==='venom_eater').length===1,
+          'reentry never duplicates Venom Eater')
+        check(saved.adaptivePlayerTrolling.poisonedEnemyIds.length===15 &&
+          saved.adaptivePlayerTrolling.completed.includes('venom_eater'),
+          'trigger counters and completion are present in saves and replay snapshots')
+      } finally {chance=originalChance;loadGameFromObject(before)}
+    })()`))
+  })
+
+  it('counts three separated scroll-invisibility engagements and spawns one True Sight Champion Oculus', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const prey=id=>({id,alive:true,hp:50,family:'living'})
+        const a=prey('oculus-prey-a'),b=prey('oculus-prey-b'),c=prey('oculus-prey-c')
+        const tryHit=(target,turn,hidden=true)=>{
+          AdaptivePlayerTrolling.onCombatAttack(turn)
+          if(hidden) AdaptivePlayerTrolling.onPlayerInvisibleHit(target,turn)
+        }
+        tryHit(a,100)
+        tryHit(b,102) // Same battle, cannot count another target.
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===1,
+          'different targets within one engagement cannot count twice')
+        tryHit(b,106)
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===1,
+          'only four attack-free turns do not start a new fight')
+        tryHit(b,111)
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===2,
+          'five attack-free turns qualify a second engagement')
+        const mid=JSON.parse(JSON.stringify(buildSaveObject()))
+        AdaptivePlayerTrolling.reset()
+        AdaptivePlayerTrolling.restore(mid.adaptivePlayerTrolling)
+        tryHit(c,112,false) // Visible/god-mode hit does not qualify.
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===2,
+          'attacks without scroll invisibility never qualify')
+        tryHit(a,117)
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===2,
+          'previously counted enemy cannot qualify twice')
+        tryHit(c,122)
+        check(AdaptivePlayerTrolling.serialize().oculusTargetIds.length===3,
+          'third separate engagement with a new enemy qualifies')
+        const ruins=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins')
+        check(ruins.length>=2,'test world has late ruins floors')
+        const enter=(floor)=>{
+          currentZ=chainZForDepth(deepLevels.indexOf(floor)+2);currentCave=-1
+          map=floor.map;undergroundDiscovered=floor.discovered
+          const entrance=floor.caves[0].entrances[0]
+          player.x=entrance.x;player.y=entrance.y
+          rebuildActiveLevelOccupancy()
+        }
+        player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
+        chance=()=>true
+        enter(ruins[0]);check(!AdaptivePlayerTrolling.onFloorChanged(),
+          'early ruin floor does not spawn Oculus')
+        enter(ruins[ruins.length-2]);check(AdaptivePlayerTrolling.onFloorChanged(),
+          'Champion Oculus appears on qualifying late floor')
+        let eye=enemies.find(e=>e.adaptiveEventId==='oculus')
+        check(!!eye && eye.prefix==='Champion' && eye.baseName==='Oculus' &&
+          eye.maxHp===154 && eye.atk===23 && eye.def===6 && eye.spd===6 &&
+          eye.abilities.includes('trueSight'), 'Champion Oculus inherits Champion stats and true sight')
+        check(!undergroundTileVisible(eye.x,eye.y), 'Oculus spawns out of sight')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        eye=enemies.find(e=>e.adaptiveEventId==='oculus')
+        check(!!eye && eye.prefix==='Champion' && eye.abilities.includes('trueSight'),
+          'Champion Oculus survives save/load')
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          enemies.filter(e=>e.adaptiveEventId==='oculus').length===1,
+          'stair re-entry does not duplicate the encounter')
+        check(saved.adaptivePlayerTrolling.completed.includes('oculus') &&
+          saved.adaptivePlayerTrolling.oculusTargetIds.length===3,
+          'completion and distinct fight targets are serialized')
+      } finally {chance=originalChance;loadGameFromObject(before)}
+    })()`))
+  })
+
   beforeEach(() => {
     cy.visit('/')
     cy.get('#raceName').clear().type('Ruins Encounter Tester')
@@ -230,4 +362,700 @@ describe('Dwarven Ruins encounter progression', () => {
         'no alert roll occurs when no fleeing movement happened')
     })()`))
   })
+
+
+  it('spawns exactly one off-screen kobold, goblin and skink with real prefixed equipment, not monster prefix buffs', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const ruin=deepLevels.find(level=>level.dungeonPackage==='dwarvenRuins')
+        check(!!ruin,'ruin floor generated')
+        currentZ=chainZForDepth(deepLevels.indexOf(ruin)+2);currentCave=-1
+        map=ruin.map;undergroundDiscovered=ruin.discovered
+        const entrance=ruin.caves[0].entrances[0];player.x=entrance.x;player.y=entrance.y
+        rebuildActiveLevelOccupancy()
+        const mod=MODIFIERS.find(m=>m.name==='Mighty')
+        const gearFor=(kind)=>{
+          const item=kind==='weapon'?makeWeaponItem(2,0,2,false):
+            kind==='shield'?makeShieldItem(2,0,2):makeArmorItem(2,0,2)
+          delete item.mod;delete item.modAmt;delete item.xpBonus
+          return applyGearModifier(item.base,item,mod,0,2)
+        }
+        player.equip.weapon=gearFor('weapon');player.equip.shield=gearFor('shield')
+        player.equip.armor=gearFor('armor')
+        const count=enemies.length
+        player.steps=500 // first optional-event checkpoint, even on the first ruin floor
+        let encounterChecks=0
+        chance=prob=>{encounterChecks++;return true}
+        check(AdaptivePlayerTrolling.onFloorChanged(),'qualified trio enters an early ruin at a successful gate')
+        const fan=enemies.filter(e=>e.adaptiveEventId==='fan_club' && e.level===currentZ)
+        check(fan.length===3 && enemies.length===count+3,'exactly three added monsters')
+        check(JSON.stringify(fan.map(e=>e.baseName))===JSON.stringify(['Kobold','Goblin','Skink']),
+          'fan club consists of one member of each required species')
+        check(JSON.stringify(fan.map(e=>e.equipment.kind))===JSON.stringify(['weapon','shield','armor']),
+          'three different equipment categories assigned')
+        for (const e of fan) {
+          check(e.name==='Mighty '+e.baseName && e.prefix===null,'monster prefix only appears in display name')
+          check(e.equipment.name.startsWith('Mighty ') && e.equipment.mod==='atk','real prefixed item equipped')
+          check(e.gearBonuses.atk>0 && !e.prefixBase,'ATK came from gear, not enemy prefix')
+          check(!undergroundTileVisible(e.x,e.y),'every member starts outside field of view')
+          check(CAVE_TRANSITION_TILES.has(map[e.y][e.x])===false,'no member blocks a stair')
+        }
+        check(AdaptivePlayerTrolling.completed('fan_club'),'encounter committed once')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
+          'three members occupy only one floor-threat slot')
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'reentry cannot duplicate the club')
+        check(enemies.filter(e=>e.adaptiveEventId==='fan_club').length===3,'no extra members')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        check(AdaptivePlayerTrolling.completed('fan_club') &&
+          enemies.filter(e=>e.adaptiveEventId==='fan_club').length===3,
+          'save restores member identity and event completion')
+        const member=enemies.find(e=>e.adaptiveEventId==='fan_club')
+        const preInventory=player.inventory.length,preGround=groundItems.length
+        lootFromEnemy(member,false)
+        check(groundItems.length>preGround && player.inventory.length===preInventory &&
+          groundItems.some(g=>g.kind==='droppeditem' && g.item?.name===member.equipment.name),
+          'special enemy equipment is dropped on the ground, never added directly')
+      } finally {
+        chance=originalChance
+        loadGameFromObject(before)
+      }
+    })()`))
+  })
+
+  it('does not reroll unchanged failed Fan Club encounters by revisiting or changing prefix', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const oldChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const ruin=deepLevels.find(l=>l.dungeonPackage==='dwarvenRuins')
+        currentZ=chainZForDepth(deepLevels.indexOf(ruin)+2);currentCave=-1
+        map=ruin.map;undergroundDiscovered=ruin.discovered
+        const entrance=ruin.caves[0].entrances[0];player.x=entrance.x;player.y=entrance.y
+        rebuildActiveLevelOccupancy()
+        const withPrefix=name=>{
+          const mod=MODIFIERS.find(m=>m.name===name)
+          const items=[makeWeaponItem(2,0,2,false),makeShieldItem(2,0,2),makeArmorItem(2,0,2)]
+          for (const item of items) {delete item.mod;delete item.modAmt;delete item.xpBonus;applyGearModifier(item.base,item,mod)}
+          ;[player.equip.weapon,player.equip.shield,player.equip.armor]=items
+        }
+        withPrefix('Mighty')
+        player.steps=500 // an eligible check on an early ruin floor
+        let calls=0
+        chance=()=>{calls++;return false}
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'initial eligible attempt fails')
+        check(calls===1,'exactly one probability gate')
+        check(!AdaptivePlayerTrolling.onFloorChanged() && calls===1,'same floor cannot reroll')
+        // Returning with other equipment does not create a distinct event.
+        chance=oldChance;withPrefix('Swift');chance=()=>{calls++;return false}
+        check(!AdaptivePlayerTrolling.onFloorChanged() && calls===1,
+          'changing only prefix cannot farm another roll')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        check(!AdaptivePlayerTrolling.onFloorChanged() && calls===1,'save/load does not reroll')
+      } finally {chance=oldChance;loadGameFromObject(before)}
+    })()`))
+  })
+
+  it('deposits a one-time Fireball lure in a connected narrow passage, without consuming threat slots', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        currentZ=-4;currentCave=-1
+        player.x=2;player.y=20
+        player.equip={weapon:null,shield:null,armor:null,blackkey:null}
+        map=Array.from({length:35},()=>Array(35).fill('dwarvenwall'))
+        undergroundDiscovered=Array.from({length:35},()=>Array(35).fill(false))
+        groundItems=[];enemies=[];occupied=new Set()
+        // Two self-hits can qualify but nothing is placed on a floor without a passage.
+        check(!AdaptivePlayerTrolling.onSelfFireballHit(),'one cast does not qualify')
+        check(AdaptivePlayerTrolling.onSelfFireballHit(),'two casts qualify')
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'wall-only floor defers placement')
+        check(!AdaptivePlayerTrolling.completed('self_fireball'),'deferred event stays available')
+        for(let x=1;x<33;x++)map[20][x]='marble'
+        check(AdaptivePlayerTrolling.onFloorChanged(),'one-tile passage can receive the reward')
+        const drops=groundItems.filter(g=>g.adaptiveEventId==='self_fireball')
+        check(drops.length===1 && drops[0].kind==='droppeditem' &&
+          drops[0].item.kind==='scrollOfFireball','scroll is ordinary ground loot')
+        check(drops[0].y===20 && drops[0].x>=12,'off-screen and away from stairs')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:-4:-1']===undefined,
+          'loot does not occupy a threat slot')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        check(saved.adaptivePlayerTrolling.completed.includes('self_fireball') &&
+          saved.groundItems.some(g=>g.adaptiveEventId==='self_fireball'),
+          'save contains the completed reaction and its item')
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          groundItems.filter(g=>g.adaptiveEventId==='self_fireball').length===1,
+          're-entering cannot duplicate loot')
+      } finally {loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
+  it('places two independent optional ruins reactions and allows Nemesis as a third threat', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        for(let i=0;i<15;i++) AdaptivePlayerTrolling.onVenomAttempt({
+          id:'dual-event-prey-'+i,alive:true,hp:50,maxHp:50,family:'living'})
+        for(let i=0;i<3;i++) {
+          const turn=100+6*i
+          AdaptivePlayerTrolling.onCombatAttack(turn)
+          AdaptivePlayerTrolling.onPlayerInvisibleHit({id:'invisible-prey-'+i},turn)
+        }
+        player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
+        const last=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins').at(-1)
+        currentZ=chainZForDepth(deepLevels.indexOf(last)+2);currentCave=-1
+        map=last.map;undergroundDiscovered=last.discovered
+        const stair=last.caves[0].entrances[0]
+        player.x=stair.x;player.y=stair.y
+        rebuildActiveLevelOccupancy()
+        let gates=0
+        chance=()=>{gates++;return true}
+        check(AdaptivePlayerTrolling.onFloorChanged(),'two eligible optional reactions spawn')
+        const specials=enemies.filter(e=>e.level===currentZ &&
+          ['venom_eater','oculus'].includes(e.adaptiveEventId))
+        check(specials.length===2 && new Set(specials.map(e=>e.adaptiveEventId)).size===2,
+          'two distinct optional reactions share one entry')
+        check(gates===2,'each successful optional encounter has its own probability gate')
+        const separation=Math.max(Math.abs(specials[0].x-specials[1].x),
+          Math.abs(specials[0].y-specials[1].y))
+        check(separation>=6,'separate threat placement')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===2,
+          'two ordinary floor threats consume the complete optional budget')
+        check(!AdaptivePlayerTrolling.onFloorChanged() && gates===2,
+          'reentering with a full budget cannot reroll')
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
+        check(AdaptivePlayerTrolling.onFloorChanged(),'guaranteed Nemesis uses a bonus slot')
+        const all=enemies.filter(e=>e.level===currentZ && e.adaptiveEventId)
+        check(all.length===3 && all.some(e=>e.name==='Champion Giant Rat'),
+          'two optional reactions plus Nemesis remain on the floor')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===2,
+          'Nemesis never consumes an optional slot')
+        const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(snapshot)
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'save/load cannot duplicate committed reactions')
+        check(enemies.filter(e=>e.level===currentZ && e.adaptiveEventId).length===3,
+          'three special monsters survive save/load')
+      } finally {chance=originalChance;loadGameFromObject(before)}
+    })()`))
+  })
+
+  it('remembers a failed second ruins roll instead of rerolling on stair-hops', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        for(let i=0;i<15;i++)AdaptivePlayerTrolling.onVenomAttempt({
+          id:'single-event-prey-'+i,alive:true,hp:30,family:'living'})
+        for(let i=0;i<3;i++) {
+          const turn=100+6*i
+          AdaptivePlayerTrolling.onCombatAttack(turn)
+          AdaptivePlayerTrolling.onPlayerInvisibleHit({id:'other-prey-'+i},turn)
+        }
+        player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
+        const last=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins').at(-1)
+        currentZ=chainZForDepth(deepLevels.indexOf(last)+2);currentCave=-1
+        map=last.map;undergroundDiscovered=last.discovered
+        const stair=last.caves[0].entrances[0]
+        player.x=stair.x;player.y=stair.y
+        rebuildActiveLevelOccupancy()
+        let gates=0
+        chance=()=>++gates===1
+        check(AdaptivePlayerTrolling.onFloorChanged(),'first successful roll creates one encounter')
+        check(gates===2,'second eligible candidate receives one independent roll')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
+          'failed second roll does not consume a slot')
+        check(!AdaptivePlayerTrolling.onFloorChanged() && gates===2,
+          'reentry cannot reroll unchanged failed second candidate')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        check(!AdaptivePlayerTrolling.onFloorChanged() && gates===2,
+          'failed second roll remains blocked across save/load')
+      } finally {chance=originalChance;loadGameFromObject(before)}
+    })()`))
+  })
+
+  it('spawns one guaranteed cursed-world Nemesis on the final ruins floor and persists it', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const savedBefore=JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const last=deepLevels.filter(level=>level.dungeonPackage==='dwarvenRuins').at(-1)
+        check(last && last.dungeonFloor===last.floorCount,'last ruin floor exists')
+        const depth=deepLevels.indexOf(last)+2
+        currentZ=chainZForDepth(depth)
+        currentCave=-1
+        map=last.map
+        undergroundDiscovered=last.discovered
+        const stair=last.caves[0].entrances[0]
+        player.x=stair.x;player.y=stair.y
+        rebuildActiveLevelOccupancy()
+        const beforeCount=enemies.length
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'no event without qualifying deaths')
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'one death does not qualify')
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
+        AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
+        check(AdaptivePlayerTrolling.onFloorChanged(),'Nemesis is guaranteed when eligible')
+        check(enemies.length===beforeCount+1,'exactly one Nemesis spawned')
+        const nemesis=enemies.find(e=>e.name==='Champion Giant Rat' && e.level===currentZ)
+        check(nemesis?.prefix==='Champion' && nemesis.baseName==='Giant Rat','latest repeated death breaks equal-count tie')
+        check(!undergroundTileVisible(nemesis.x,nemesis.y),'Nemesis starts outside player FOV')
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'reentry never duplicates committed Nemesis')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        check(saved.adaptivePlayerTrolling.completed.includes('nemesis'),'Nemesis completion saved')
+        loadGameFromObject(saved)
+        check(enemies.some(e=>e.name==='Champion Giant Rat' && e.level===currentZ),'Nemesis restored with monster list')
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'restored event never respawns')
+      } finally {
+        loadGameFromObject(savedBefore)
+      }
+    })()`))
+  })
+
+
+
+  it('randomly demands recovered dwarven items or gold purses and remembers payment decisions', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const original=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      const originalVisible=undergroundTileVisible
+      const originalCanSee=enemyCanBeSeen
+      const originalHidden=playerHiddenFromEnemy
+      try {
+        activeWorldTraits=[{name:'test cursed world',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        player.inventory=[]
+        player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
+        player.gold=150
+        const held={kind:'weapon',name:'Dwarven Sword',base:'Sword',tier:2,atk:7}
+        const worn={kind:'shield',name:'Dwarven Buckler',base:'Buckler',tier:2,def:3}
+        const arrows=createItem('arrows',{count:8})
+        for(const item of [held,worn,arrows])AdaptivePlayerTrolling.tagDwarvenRemainsLoot(item)
+        player.inventory.push(held,arrows)
+        player.equip.shield=worn
+        check(new Set([held,worn,arrows].map(i=>i.dwarvenRemainsLootId)).size===3,
+          'all remains loot instances get distinct identifiers')
+        const ruins=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins')
+        const last=ruins.at(-1)
+        check(last && ruins.length>=2,'Dwarven Ruins have a final floor')
+        currentZ=chainZForDepth(deepLevels.indexOf(last)+2);currentCave=-1
+        map=last.map;undergroundDiscovered=last.discovered
+        const stair=last.caves[0].entrances[0]
+        player.x=stair.x;player.y=stair.y
+        rebuildActiveLevelOccupancy()
+        chance=()=>true
+        for(let i=0;i<9;i++)AdaptivePlayerTrolling.onDwarvenRemainsSearched()
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'nine searches cannot summon the collector')
+        AdaptivePlayerTrolling.onDwarvenRemainsSearched()
+        player.steps=1500 // next scheduled check after the initial late-floor visit
+        check(AdaptivePlayerTrolling.onFloorChanged(),'tenth search qualifies the collector')
+        let ghost=enemies.find(e=>e.adaptiveEventId==='debt_collector')
+        check(!!ghost && ghost.baseName==='Ghost' && ghost.name==='Debt Collector' &&
+          ghost.maxHp===36 && ghost.debtDemandState==='watching',
+          'a neutral dwarven ghost using Ghost stats spawns on the last ruin floor')
+        check(!originalVisible(ghost.x,ghost.y),'collector starts outside sight')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1]===1,
+          'collector occupies one optional threat slot')
+        undergroundTileVisible=()=>true
+        enemyCanBeSeen=()=>true
+        playerHiddenFromEnemy=()=>false
+        check(AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount),'collector cannot attack while making demand')
+        check(!!AdaptivePlayerTrolling.pendingDebtCollector(), 'demand becomes pending on discovery')
+        const demandedId=ghost.debtDemandLootId
+        check([held,worn,arrows].some(i=>i.dwarvenRemainsLootId===demandedId),
+          'demand draws only from provenance-marked held or equipped items')
+        const pendingSnapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        check(pendingSnapshot.adaptivePlayerTrolling.dwarvenRemainsSearched===10 &&
+          pendingSnapshot.adaptivePlayerTrolling.nextDwarvenLootId===4,
+          'loot counters and unique item identity save with the current schema')
+        loadGameFromObject(pendingSnapshot)
+        ghost=AdaptivePlayerTrolling.pendingDebtCollector()
+        check(!!ghost && ghost.debtDemandLootId===demandedId &&
+          AdaptivePlayerTrolling.debtCollectorDemand(ghost).canPay,
+          'saved pending demand retains the selected item without another RNG roll')
+        const hadIt=()=>[...player.inventory,...Object.values(player.equip)].some(it=>
+          it?.dwarvenRemainsLootId===demandedId)
+        check(hadIt(),'requested loot still belongs to the player')
+        check(AdaptivePlayerTrolling.resolveDebtCollector('pay',ghost.id,false),'player can surrender')
+        check(!hadIt() && !enemies.some(e=>e.adaptiveEventId==='debt_collector' && e.alive),
+          'surrender removes that exact item and peacefully dismisses the ghost')
+        check(AdaptivePlayerTrolling.completed('debt_collector'),'the collector cannot respawn')
+        loadGameFromObject(pendingSnapshot)
+        ghost=AdaptivePlayerTrolling.pendingDebtCollector()
+        check(AdaptivePlayerTrolling.resolveDebtCollector('refuse',ghost.id,false), 'player may refuse')
+        check(ghost.debtDemandState==='hostile' && ghost.aggro>0 &&
+          [held,worn,arrows].some(i=>[...player.inventory,...Object.values(player.equip)].some(j=>
+            j?.dwarvenRemainsLootId===i.dwarvenRemainsLootId)),
+          'refusal preserves gear and makes the ghost hostile')
+        const refusedSnapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(refusedSnapshot)
+        check(enemies.some(e=>e.adaptiveEventId==='debt_collector' &&
+          e.debtDemandState==='hostile' && e.aggro>0),'hostility survives save/replay restoration')
+        // Two separately found gold purses compete as individual loot
+        // candidates. Only the one affordable with current money qualifies.
+        ghost=enemies.find(e=>e.adaptiveEventId==='debt_collector')
+        player.inventory=player.inventory.filter(it=>!it.dwarvenRemainsLootId)
+        player.equip.shield=null
+        player.gold=13
+        AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(18)
+        AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(9)
+        const purses=AdaptivePlayerTrolling.serialize().dwarvenGoldLoot
+        check(purses.length===2 && purses[0].amount===18 && purses[1].amount===9 &&
+          new Set(purses.map(p=>p.id)).size===2,
+          'dwarven gold finds have distinct, persisted provenance identities')
+        ghost.debtDemandState='watching';ghost.debtDemandLootId=null
+        AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount)
+        check(ghost.debtDemandLootId===purses[1].id,
+          'unaffordable recovered gold is not an eligible choice')
+        let goldDemand=AdaptivePlayerTrolling.debtCollectorDemand(ghost)
+        check(goldDemand.isGold && goldDemand.recoveredGold &&
+          goldDemand.gold===9 && goldDemand.canPay,
+          'collector demands the exact amount recovered, not the 100g fallback')
+        const goldDemandSnapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(goldDemandSnapshot)
+        ghost=AdaptivePlayerTrolling.pendingDebtCollector()
+        check(ghost && ghost.debtDemandLootId===purses[1].id &&
+          AdaptivePlayerTrolling.debtCollectorDemand(ghost).gold===9,
+          'the gold-purse demand stays locked through save and restore')
+        check(AdaptivePlayerTrolling.resolveDebtCollector('pay',ghost.id,false) &&
+          player.gold===4 && AdaptivePlayerTrolling.serialize().dwarvenGoldLoot.length===1,
+          'payment consumes exactly the demanded recovered gold amount')
+        // Restore pre-negotiation state to check the original 100g fallback
+        // when no traceable recovered item or affordable purse is held.
+        loadGameFromObject(refusedSnapshot)
+        ghost=enemies.find(e=>e.adaptiveEventId==='debt_collector')
+        player.inventory=player.inventory.filter(it=>!it.dwarvenRemainsLootId)
+        player.equip.shield=null
+        ghost.debtDemandState='watching';ghost.debtDemandLootId=null
+        player.gold=99
+        AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount)
+        let demand=AdaptivePlayerTrolling.debtCollectorDemand(ghost)
+        check(demand.isGold && demand.gold===100 && !demand.canPay,
+          'lack of carried remains loot demands 100 gold and disables unaffordable payment')
+        check(!AdaptivePlayerTrolling.resolveDebtCollector('pay',ghost.id,false),
+          'cannot create gold by accepting an unaffordable demand')
+        player.gold=100
+        check(AdaptivePlayerTrolling.resolveDebtCollector('pay',ghost.id,false) && player.gold===0,
+          'exactly 100 gold is consumed when money replaces missing gear')
+      } finally {
+        chance=originalChance
+        undergroundTileVisible=originalVisible
+        enemyCanBeSeen=originalCanSee
+        playerHiddenFromEnemy=originalHidden
+        loadGameFromObject(original)
+      }
+    })()`))
+  })
+
+
+  it('only places the unread-scroll note after uninterrupted possession through ruins arrival', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const oldChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        currentZ=0;currentCave=-1;map=surfaceMap
+        player.inventory=[createItem('idscroll',{count:1,identified:false})]
+        player.equip={weapon:null,shield:null,armor:null,blackkey:null}
+        turnCount=2000
+        for(let n=0;n<499;n++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===499,'499 turns is too early')
+        turnCount++
+        AdaptivePlayerTrolling.onWorldTurn()
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===500 &&
+          !AdaptivePlayerTrolling.completed('unread_scrolls'),
+          '500 turns qualifies but never creates the note by itself')
+        player.inventory=[]
+        AdaptivePlayerTrolling.onScrollInventoryChanged()
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===0,
+          'losing the last scroll resets the streak immediately')
+        player.inventory=[createItem('homecomingscroll',{count:1})]
+        const ruins=deepLevels.find(level=>level.dungeonPackage==='dwarvenRuins')
+        check(!!ruins,'a generated dwarven ruins floor exists')
+        const depth=deepLevels.indexOf(ruins)+2
+        currentZ=chainZForDepth(depth);currentCave=-1
+        map=ruins.map;undergroundDiscovered=ruins.discovered
+        player.x=11;player.y=11
+        for(let y=8;y<48;y++)for(let x=8;x<48;x++)map[y][x]='marble'
+        enemies=[];groundItems=[];occupied=new Set()
+        rebuildActiveLevelOccupancy()
+        chance=()=>false // Ordinary thieves and optional monsters cannot obscure this test.
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!groundItems.some(g=>g.adaptiveEventId==='unread_scrolls'),
+          'having a scroll again on arrival is not sufficient after a broken streak')
+        // A later, uninterrupted 500+ turn holding period must still be valid.
+        AdaptivePlayerTrolling.reset()
+        turnCount=3000
+        for(let n=0;n<720;n++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===720,
+          'streak keeps counting beyond 500 until floor arrival')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===720,
+          'continuous holding period restored from save/replay')
+        check(AdaptivePlayerTrolling.onFloorChanged(),'qualifying ruins arrival creates the note')
+        const notes=groundItems.filter(g=>g.adaptiveEventId==='unread_scrolls')
+        check(notes.length===1 && notes[0].kind==='droppeditem' &&
+          notes[0].item.kind==='tauntingNote' && notes[0].item.inscription==='I wish I could read.',
+          'one readable taunting note lies on the ground, not in a chest')
+        check(AdaptivePlayerTrolling.completed('unread_scrolls') &&
+          !AdaptivePlayerTrolling.onFloorChanged(),
+          'event persists and cannot duplicate')
+        // Even a single scroll read in the run permanently disables the
+        // reaction. Holding another for 500+ turns never requalifies.
+        AdaptivePlayerTrolling.reset()
+        groundItems=[]
+        AdaptivePlayerTrolling.onScrollUsed()
+        check(AdaptivePlayerTrolling.serialize().scrollEverRead &&
+          AdaptivePlayerTrolling.serialize().unreadScrollTurns===0,
+          'reading any scroll records a permanent disqualification')
+        turnCount=4000
+        for(let n=0;n<800;n++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
+        check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===0,
+          'holding a later scroll for 800 turns is not enough after ever reading')
+        const disqualified=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(disqualified,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.serialize().scrollEverRead === true,
+          'permanent disqualification survives save/replay restore')
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          !groundItems.some(g=>g.adaptiveEventId==='unread_scrolls'),
+          'a later qualifying floor cannot override the disqualification')
+      } finally {chance=oldChance;loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
+  it('places one early-descent corpse and a separate Homecoming scroll on a safe first descent', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        chance=()=>false // No optional ruin monsters or thief checks in this test.
+        currentZ=-2;currentCave=0
+        map=depthUndergroundMap(2);undergroundDiscovered=depthUndergroundDiscovered(2)
+        check(!!map && TILE.cavefloor.walk,'test has an ordinary, walkable depth-two cave')
+        for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='cavefloor'
+        player.x=39;player.y=39;player.lvl=3
+        enemies=[];groundItems=[];occupied=new Set()
+        rebuildActiveLevelOccupancy()
+        check(AdaptivePlayerTrolling.onFloorChanged(),'early arrival produces an encounter')
+        const bodies=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
+        const drops=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='droppeditem')
+        check(bodies.length===1 && drops.length===2,'one corpse and two independent ground drops')
+        const body=bodies[0],scroll=drops.find(g=>g.item.kind==='homecomingscroll')
+        const gear=drops.find(g=>['weapon','shield','armor'].includes(g.item.kind))
+        check(!!gear && gear.item.tier===1 && !gear.item.mod,
+          'worn adventurer gear has no magical bonus and belongs to the lowest tier')
+        check(body.gear===null && body.gold>=5 && body.gold<=25 && !body.looted,
+          'the searchable corpse holds only a small amount of gold')
+        check(!!scroll && scroll.kind==='droppeditem' &&
+          Math.abs(scroll.x-body.x)+Math.abs(scroll.y-body.y)===1 &&
+          Math.abs(gear.x-body.x)+Math.abs(gear.y-body.y)===1 &&
+          (gear.x!==scroll.x || gear.y!==scroll.y),
+          'two different tiles beside the corpse hold the scroll and gear for normal pickup')
+        check(AdaptivePlayerTrolling.completed('early_descent'), 'one lifetime reward is committed')
+        const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(snapshot,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.completed('early_descent') &&
+          groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===3,
+          'save and replay restoration keep the same two physical ground objects')
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===3,
+          'returning to the qualifying floor does not duplicate the cache')
+        // Reaching -2 too late never qualifies; entering the fort for the first
+        // time still has its own approved level-five threshold.
+        AdaptivePlayerTrolling.reset();groundItems=[]
+        player.lvl=4
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.serialize().events.early_descent &&
+          !AdaptivePlayerTrolling.completed('early_descent'),
+          'level four is too late to trigger the second-depth warning')
+        player.lvl=5;currentZ=-3;currentCave=-1
+        map=depthUndergroundMap(3);undergroundDiscovered=depthUndergroundDiscovered(3)
+        for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='marble'
+        player.x=39;player.y=39
+        check(AdaptivePlayerTrolling.onFloorChanged() && AdaptivePlayerTrolling.completed('early_descent'),
+          'first entry to the fort at level five qualifies independently')
+        // Only Cursed World can create the remains, even when level is low.
+        AdaptivePlayerTrolling.reset();groundItems=[]
+        activeWorldTraits=[];player.lvl=1
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          !groundItems.some(g=>g.adaptiveEventId==='early_descent'),
+          'ordinary worlds never create adaptive remains')
+      } finally {chance=originalChance;loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
+  it('checks adaptive encounters at 500 or ruin floor 2, then 1000 or ruin floor 3, without stair or replay rerolls', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const originalChance=chance
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        chance=()=>false // no unrelated thief spawn or optional event RNG
+        AdaptivePlayerTrolling.reset()
+        player.steps=499;player.gold=0;player.inventory=[]
+        player.equip.weapon=null;player.equip.armor=null;player.equip.shield=null
+        currentZ=-1;currentCave=-1;map=undergroundMap
+        undergroundDiscovered=undergroundDiscoveredL1
+        AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===0,
+          '499 walking steps cannot trigger a check')
+        player.steps=500;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          '500th successful walking step claims the first check')
+        AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          'refresh or repeat call on same step cannot duplicate a check')
+        player.steps=999;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          '999 steps do not meet the next checkpoint')
+        const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(snapshot,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          'check progress survives save and replay init')
+        player.steps=1000;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===2,
+          '1000th step claims the second check')
+        player.steps=1500;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===3,
+          'later checks repeat every 500 actual steps')
+
+        // Restart only the adaptive registry; a new character begins at step 0.
+        AdaptivePlayerTrolling.reset();player.steps=60
+        const ruins=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins')
+        check(ruins.length>=3,'world has at least three Dwarven Ruins floors')
+        const enter=(ruin)=>{
+          currentZ=chainZForDepth(deepLevels.indexOf(ruin)+2);currentCave=-1
+          map=ruin.map;undergroundDiscovered=ruin.discovered
+          const stair=ruin.caves[0].entrances[0]
+          player.x=stair.x;player.y=stair.y
+          rebuildActiveLevelOccupancy()
+          AdaptivePlayerTrolling.onFloorChanged()
+        }
+        enter(ruins[0]);check(AdaptivePlayerTrolling.serialize().activationChecks===0,
+          'first ruin floor alone is not the early milestone')
+        enter(ruins[1]);check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          'ruin floor 2 triggers first check before step 500')
+        enter(ruins[1]);check(AdaptivePlayerTrolling.serialize().activationChecks===1,
+          'returning to the second floor does not retrigger')
+        enter(ruins[2]);check(AdaptivePlayerTrolling.serialize().activationChecks===2,
+          'ruin floor 3 triggers second check before step 1000')
+        player.steps=500;AdaptivePlayerTrolling.onPlayerMoved()
+        player.steps=1000;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===2,
+          'early ruin checks replace rather than stack with step 500 and 1000')
+        player.steps=1500;AdaptivePlayerTrolling.onPlayerMoved()
+        check(AdaptivePlayerTrolling.serialize().activationChecks===3,
+          'step 1500 still triggers next ordinary periodic check')
+      } finally {chance=originalChance;loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
+  it('counts deaths with at least two unused Life Potions regardless of recent potion usage or killer', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        player.inventory=[{kind:'potion',count:1}]
+        AdaptivePlayerTrolling.onPlayerDied(null)
+        check(AdaptivePlayerTrolling.serialize().unusedHealingDeaths===0,
+          'death with only one potion is not counted')
+        player.inventory=[{kind:'potion',count:2}]
+        AdaptivePlayerTrolling.onPlayerDied(null)
+        check(AdaptivePlayerTrolling.serialize().unusedHealingDeaths===1,
+          'environmental death with two potions counts')
+        AdaptivePlayerTrolling.onPlayerDied({baseName:'Giant Rat'})
+        check(AdaptivePlayerTrolling.serialize().unusedHealingDeaths===2 &&
+          AdaptivePlayerTrolling.serialize().deathsBySpecies['Giant Rat']===1,
+          'second death counts and preserves Nemesis killer bookkeeping')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.serialize().unusedHealingDeaths===2,
+          'two qualifying deaths survive save and replay restoration')
+        activeWorldTraits=[]
+        AdaptivePlayerTrolling.onPlayerDied(null)
+        check(AdaptivePlayerTrolling.serialize().unusedHealingDeaths===2,
+          'ordinary worlds never increase adaptive death counters')
+      } finally {loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
+  it('places trap bait only beyond visible spikes with an existing safe detour', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const ruins=deepLevels.find(f=>f.dungeonPackage==='dwarvenRuins')
+        check(!!ruins,'ruins exist')
+        currentZ=chainZForDepth(deepLevels.indexOf(ruins)+2);currentCave=-1;map=ruins.map
+        for(let y=46;y<=61;y++)for(let x=48;x<=72;x++)map[y][x]='dwarvenwall'
+        for(let x=50;x<=68;x++)map[52][x]='marble'
+        for(let x=52;x<=63;x++)map[54][x]='marble'
+        for(let y=52;y<=54;y++){map[y][52]='marble';map[y][63]='marble'}
+        map[52][59]='dwarvenspikes'
+        ruins.traps=[{id:'test-spike',type:'spikes',trigger:{x:59,y:52}}]
+        player.x=50;player.y=52;player.steps=0
+        enemies=enemies.filter(e=>e.level!==currentZ)
+        groundItems=groundItems.filter(g=>g.level!==currentZ)
+        occupied=new Set();rebuildActiveLevelOccupancy()
+        for(let i=0;i<4;i++)AdaptivePlayerTrolling.onPlayerTriggeredTrap({id:'test-'+i})
+        AdaptivePlayerTrolling.onPlayerTriggeredTrap({id:'test-1'})
+        check(AdaptivePlayerTrolling.serialize().triggeredTrapIds.length===4,
+          'repeated trap visits are not double-counted')
+        player.steps=500
+        AdaptivePlayerTrolling.onPlayerMoved()
+        check(!AdaptivePlayerTrolling.completed('trap_lure'),'four triggers are insufficient')
+        AdaptivePlayerTrolling.onPlayerTriggeredTrap({id:'test-4'})
+        player.steps=1000
+        AdaptivePlayerTrolling.onPlayerMoved()
+        const drops=groundItems.filter(g=>g.adaptiveEventId==='trap_lure')
+        check(drops.length===1 && drops[0].item?.kind==='potion' && drops[0].kind==='droppeditem',
+          'one Life Potion lies on ground, not in a chest')
+        check(drops[0].x>59 && drops[0].y===52 && map[drops[0].y][drops[0].x]!=='dwarvenspikes',
+          'bait is beyond the existing spike plate')
+        const save=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(save,{isReplayInit:true})
+        check(AdaptivePlayerTrolling.completed('trap_lure') &&
+          AdaptivePlayerTrolling.serialize().triggeredTrapIds.length===5,
+          'trap history and reward completion persist')
+        check(groundItems.filter(g=>g.adaptiveEventId==='trap_lure').length===1,
+          'reward persists without duplication')
+      } finally {loadGameFromObject(before,{isReplayInit:true})}
+    })()`))
+  })
+
 })

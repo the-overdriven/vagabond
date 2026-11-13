@@ -162,6 +162,8 @@ function useTacticalConsumable(idx, kind) {
   recordReplayAction({type: 'useItem', action: kind, idx, replayId: item.replayId})
   item.count = (item.count || 1) - 1
   if (item.count <= 0) player.inventory.splice(idx, 1)
+  if (kind.startsWith('scrollOf')) AdaptivePlayerTrolling.onScrollUsed(kind)
+  else AdaptivePlayerTrolling.onPotionDrunk()
   const effect = itemDefinition(kind).effect
   if (kind === 'scrollOfFear') applyFearScroll(effect)
   else if (kind === 'scrollOfDeathShield') {

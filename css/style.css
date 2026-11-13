@@ -308,6 +308,15 @@ canvas {
   color: white;
 }
 
+/* Tester-only adaptive diagnostics remain legible in a crowded log, even
+   after ordinary entries fade. Do not change standard info message styling. */
+#logpanel > div.trolling-debug {
+  color: #fff;
+  font-weight: 700;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
 /* Wide non-touch layouts use the desktop overlay treatment. Headless
    Chromium can report pointer:none, so include that desktop-like mode while
    keeping coarse-pointer/mobile layouts excluded. */
@@ -716,6 +725,12 @@ body.hint-collapsed #hint .panel-toggle {
 }
 
 #npcOverlay { z-index: 40; }
+#debtCollectorOverlay { z-index: 141; }
+#debtCollectorOverlay .panelbox { width: min(370px, calc(100% - 24px)); padding: 18px; }
+#debtCollectorOverlay .debt-portrait { width: 78px; height: 92px; flex: none; object-fit: cover; border: 1px solid var(--border); }
+#debtCollectorDemand { color: var(--parchment-dim); font-size: calc(12px * var(--ui-font-scale)); line-height: 1.5; margin: 0; }
+#btnDebtCollectorPay:disabled { opacity: .5; cursor: not-allowed; }
+
 #npcOverlay .panelbox { width: min(340px, calc(100% - 24px)); padding: 18px; }
 .npc-dialogue-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; padding-right: 16px; }
 #npcPortrait { width: 78px; height: 92px; object-fit: cover; border: 1px solid var(--border); flex: none; }
@@ -733,6 +748,11 @@ body.hint-collapsed #hint .panel-toggle {
   /* Keep the conversation above the fixed mobile message log (z-index: 110).
      The HUD (z-index: 130) stays accessible above the backdrop. */
   body.npc-dialogue-open #stage { z-index: 119; }
+  #debtCollectorOverlay { position: fixed; inset: var(--mobile-hud-height, 56px) 0 0; z-index: 141; align-items: flex-end; background: rgba(5, 4, 3, 0.76); }
+  #debtCollectorOverlay .panelbox { width: 100%; max-width: 100%; max-height: min(82dvh, calc(100dvh - var(--mobile-hud-height, 56px))); box-sizing: border-box; margin: 0; border-radius: 10px 10px 0 0; padding: 20px 18px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  #debtCollectorOverlay .debt-portrait { width: 72px; height: 84px; }
+  #debtCollectorOverlay #debtCollectorDemand { font-size: 15px; line-height: 1.55; }
+  #debtCollectorOverlay .npc-dialogue-choice { min-height: 48px; font-size: 15px; }
   #npcOverlay { position: fixed; inset: var(--mobile-hud-height, 56px) 0 0; z-index: 120; align-items: flex-end; background: rgba(5, 4, 3, 0.76); }
   #npcOverlay .panelbox { width: 100%; max-width: 100%; max-height: min(82dvh, calc(100dvh - var(--mobile-hud-height, 56px))); box-sizing: border-box; margin: 0; border-radius: 10px 10px 0 0; padding: 20px 18px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; border-color: #755137; }
   #npcOverlay .npc-dialogue-header { gap: 14px; margin-bottom: 20px; }

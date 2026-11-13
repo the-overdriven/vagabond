@@ -171,15 +171,53 @@
       "scale": 0.72
     },
     "pickaxe": {
-      "glyph": "⚒", "color": "#b3ad9f", "image": "img/tiles/pickaxe.png", "scale": 0.8
+      "glyph": "⚒",
+      "color": "#b3ad9f",
+      "image": "img/tiles/pickaxe.png",
+      "scale": 0.8
     },
-    "quartz": {"glyph": "♦", "color": "#e1e4ff", "image": "img/tiles/mineral-quartz-exposed.png", "scale": 0.8},
-    "amethyst": {"glyph": "♦", "color": "#ae70ef", "image": "img/tiles/mineral-amethyst-exposed.png", "scale": 0.8},
-    "topaz": {"glyph": "♦", "color": "#ffb52d", "image": "img/tiles/mineral-topaz-exposed.png", "scale": 0.8},
-    "aquamarine": {"glyph": "♦", "color": "#35d9df", "image": "img/tiles/mineral-aquamarine-exposed.png", "scale": 0.8},
-    "emerald": {"glyph": "♦", "color": "#34e389", "image": "img/tiles/mineral-emerald-exposed.png", "scale": 0.8},
-    "sapphire": {"glyph": "♦", "color": "#407bff", "image": "img/tiles/mineral-sapphire-exposed.png", "scale": 0.8},
-    "ruby": {"glyph": "♦", "color": "#f24b75", "image": "img/tiles/mineral-ruby-exposed.png", "scale": 0.8},
+    "quartz": {
+      "glyph": "♦",
+      "color": "#e1e4ff",
+      "image": "img/tiles/mineral-quartz-exposed.png",
+      "scale": 0.8
+    },
+    "amethyst": {
+      "glyph": "♦",
+      "color": "#ae70ef",
+      "image": "img/tiles/mineral-amethyst-exposed.png",
+      "scale": 0.8
+    },
+    "topaz": {
+      "glyph": "♦",
+      "color": "#ffb52d",
+      "image": "img/tiles/mineral-topaz-exposed.png",
+      "scale": 0.8
+    },
+    "aquamarine": {
+      "glyph": "♦",
+      "color": "#35d9df",
+      "image": "img/tiles/mineral-aquamarine-exposed.png",
+      "scale": 0.8
+    },
+    "emerald": {
+      "glyph": "♦",
+      "color": "#34e389",
+      "image": "img/tiles/mineral-emerald-exposed.png",
+      "scale": 0.8
+    },
+    "sapphire": {
+      "glyph": "♦",
+      "color": "#407bff",
+      "image": "img/tiles/mineral-sapphire-exposed.png",
+      "scale": 0.8
+    },
+    "ruby": {
+      "glyph": "♦",
+      "color": "#f24b75",
+      "image": "img/tiles/mineral-ruby-exposed.png",
+      "scale": 0.8
+    },
     "scrollOfFear": {
       "glyph": "?",
       "color": "#d99bff",
@@ -220,100 +258,403 @@
   "enemies": {
     "lowercaseThroughTier": 2,
     "tiles": {
-      "Adelocosa": {"image": "img/enemies-tiles/adelocosa.png", "scale": 1},
-      "Akravis": {"image": "img/enemies-tiles/akravis.png", "scale": 1},
-      "Alacran": {"image": "img/enemies-tiles/alacran.png", "scale": 1},
-      "Amplyg": {"image": "img/enemies-tiles/amplyg.png", "scale": 1},
-      "ASHFANG": {"image": "img/enemies-tiles/ashfang.png", "scale": 1},
-      "Banshee": {"image": "img/enemies-tiles/banshee.png", "scale": 1},
-      "Barolg": {"image": "img/enemies-tiles/barolg.png", "scale": 1},
-      "Bellroach": {"image": "img/enemies-tiles/bellroach.png", "scale": 1},
-      "Boar": {"image": "img/enemies-tiles/boar.png", "scale": 1},
-      "Bog Spitter": {"image": "img/enemies-tiles/bog_spitter.png", "scale": 1},
-      "Cave Troll": {"image": "img/enemies-tiles/cave_troll.png", "scale": 1},
-      "Centaur": {"image": "img/enemies-tiles/centaur.png", "scale": 1},
-      "Chupacabra": {"image": "img/enemies-tiles/chupacabra.png", "scale": 1},
-      "Cobra": {"image": "img/enemies-tiles/cobra.png", "scale": 1},
-      "Cyclops": {"image": "img/enemies-tiles/cyclops.png", "scale": 1},
-      "Dreadling": {"image": "img/enemies-tiles/dreadling.png", "scale": 1},
-      "DRUSK": {"image": "img/enemies-tiles/drusk.png", "scale": 1},
-      "Duiwel": {"image": "img/enemies-tiles/duiwel.png", "scale": 1},
-      "Fungus": {"image": "img/enemies-tiles/fungus.png", "scale": 1},
-      "Gargoyle": {"image": "img/enemies-tiles/gargoyle.png", "scale": 1},
-      "GAUR": {"image": "img/enemies-tiles/gaur.png", "scale": 1},
-      "Ghoul": {"image": "img/enemies-tiles/ghoul.png", "scale": 1},
-      "Ghost": {"image": "img/enemies-tiles/ghost.png", "scale": 1},
-      "Giant Spider": {"image": "img/enemies-tiles/giant-spider.png", "scale": 1, "fit": "contain"},
-      "Giant Bat": {"image": "img/enemies-tiles/giant_bat.png", "scale": 1},
-      "Giant Bug": {"image": "img/enemies-tiles/giant_bug.png", "scale": 1},
-      "Giant Crab": {"image": "img/enemies-tiles/giant_crab.png", "scale": 1},
-      "Giant Rat": {"image": "img/enemies-tiles/giant_rat.png", "scale": 1},
-      "Giant Toad": {"image": "img/enemies-tiles/giant_toad.png", "scale": 1},
-      "Glaber": {"image": "img/enemies-tiles/glaber.png", "scale": 1},
-      "Goblin": {"image": "img/enemies-tiles/goblin.png", "scale": 1},
-      "Gorgon": {"image": "img/enemies-tiles/gorgon.png", "scale": 1},
-      "Gravehound": {"image": "img/enemies-tiles/gravehound.png", "scale": 1},
-      "Grivel": {"image": "img/enemies-tiles/grivel.png", "scale": 1},
-      "Grivkin": {"image": "img/enemies-tiles/grivkin.png", "scale": 1},
-      "Harpy": {"image": "img/enemies-tiles/harpy.png", "scale": 1},
-      "Hogwyrm": {"image": "img/enemies-tiles/hogwyrm.png", "scale": 1},
-      "Hyena": {"image": "img/enemies-tiles/hyena.png", "scale": 1},
-      "Imp": {"image": "img/enemies-tiles/imp.png", "scale": 1},
-      "Jackal": {"image": "img/enemies-tiles/jackal.png", "scale": 1},
-      "Kobold": {"image": "img/enemies-tiles/kobold.png", "scale": 1},
-      "Kveld": {"image": "img/enemies-tiles/kveld.png", "scale": 1},
-      "Lich": {"image": "img/enemies-tiles/lich.png", "scale": 1},
-      "Lion": {"image": "img/enemies-tiles/lion.png", "scale": 1},
-      "Lizard Man": {"image": "img/enemies-tiles/lizard_man.png", "scale": 1},
-      "Manticore": {"image": "img/enemies-tiles/manticore.png", "scale": 1},
-      "Marsutal": {"image": "img/enemies-tiles/marsutal.png", "scale": 1},
-      "MIREHOWL": {"image": "img/enemies-tiles/mirehowl.png", "scale": 1},
-      "Minotaur": {"image": "img/enemies-tiles/minotaur.png", "scale": 1},
-      "Monkey": {"image": "img/enemies-tiles/monkey.png", "scale": 1},
-      "Mummy": {"image": "img/enemies-tiles/mummy.png", "scale": 1},
-      "Murkspawn": {"image": "img/enemies-tiles/murkspawn.png", "scale": 1},
-      "Myrka": {"image": "img/enemies-tiles/myrka.png", "scale": 1},
-      "Naledi": {"image": "img/enemies-tiles/naledi.png", "scale": 1},
-      "NHALUUN": {"image": "img/enemies-tiles/nhaluun.png", "scale": 1},
-      "NULK": {"image": "img/enemies-tiles/nulk.png", "scale": 1},
-      "Nymph": {"image": "img/enemies-tiles/nymph.png", "scale": 1},
-      "Oculus": {"image": "img/enemies-tiles/oculus.png", "scale": 1},
-      "Ogre": {"image": "img/enemies-tiles/ogre.png", "scale": 1},
-      "Orc": {"image": "img/enemies-tiles/orc.png", "scale": 1},
-      "Owlbear": {"image": "img/enemies-tiles/owlbear.png", "scale": 1},
-      "Ratling": {"image": "img/enemies-tiles/ratling.png", "scale": 1},
-      "Sasquatch": {"image": "img/enemies-tiles/sasquatch.png", "scale": 1},
-      "Scarab": {"image": "img/enemies-tiles/scarab.png", "scale": 1},
-      "Scorpion": {"image": "img/enemies-tiles/scorpion.png", "scale": 1},
-      "Serpent": {"image": "img/enemies-tiles/serpent.png", "scale": 1},
-      "Serpent Queen": {"image": "img/enemies-tiles/serpent_queen.png", "scale": 1},
-      "Sifulian": {"image": "img/enemies-tiles/sifulian.png", "scale": 1},
-      "SKELD": {"image": "img/enemies-tiles/skeld.png", "scale": 1},
-      "Skeleton": {"image": "img/enemies-tiles/skeleton.png", "scale": 1},
-      "Skink": {"image": "img/enemies-tiles/skink.png", "scale": 1},
-      "Skerva": {"image": "img/enemies-tiles/skerva.png", "scale": 1},
-      "Slurper": {"image": "img/enemies-tiles/slurper.png", "scale": 1},
-      "Snake": {"image": "img/enemies-tiles/snake.png", "scale": 1},
-      "Spineback": {"image": "img/enemies-tiles/spineback.png", "scale": 1},
-      "Tholosum": {"image": "img/enemies-tiles/tholosum.png", "scale": 1},
-      "Thornmaw": {"image": "img/enemies-tiles/thornmaw.png", "scale": 1},
-      "Tmusapod": {"image": "img/enemies-tiles/tmusapod.png", "scale": 1},
-      "Tokka": {"image": "img/enemies-tiles/tokka.png", "scale": 1},
-      "Troglodyte": {"image": "img/enemies-tiles/troglodyte.png", "scale": 1},
-      "Trogloraptor": {"image": "img/enemies-tiles/trogloraptor.png", "scale": 1},
-      "Tulla": {"image": "img/enemies-tiles/tulla.png", "scale": 1},
-      "Vampire": {"image": "img/enemies-tiles/vampire.png", "scale": 1},
-      "Vulture": {"image": "img/enemies-tiles/vulture.png", "scale": 1},
-      "Vrakeber": {"image": "img/enemies-tiles/vrakeber.png", "scale": 1},
-      "Wasp": {"image": "img/enemies-tiles/wasp.png", "scale": 1},
-      "White Tiger": {"image": "img/enemies-tiles/white-tiger.png", "scale": 1},
-      "Witherpod": {"image": "img/enemies-tiles/witherpod.png", "scale": 1},
-      "Wolf": {"image": "img/enemies-tiles/wolf.png", "scale": 1},
-      "Wretchling": {"image": "img/enemies-tiles/wretchling.png", "scale": 1},
-      "Wyrdhag": {"image": "img/enemies-tiles/wyrdhag.png", "scale": 1},
-      "Wyvern": {"image": "img/enemies-tiles/wyvern.png", "scale": 1},
-      "Xibal": {"image": "img/enemies-tiles/xibal.png", "scale": 1},
-      "Yeti": {"image": "img/enemies-tiles/yeti.png", "scale": 1}
+      "Adelocosa": {
+        "image": "img/enemies-tiles/adelocosa.png",
+        "scale": 1
+      },
+      "Akravis": {
+        "image": "img/enemies-tiles/akravis.png",
+        "scale": 1
+      },
+      "Alacran": {
+        "image": "img/enemies-tiles/alacran.png",
+        "scale": 1
+      },
+      "Amplyg": {
+        "image": "img/enemies-tiles/amplyg.png",
+        "scale": 1
+      },
+      "ASHFANG": {
+        "image": "img/enemies-tiles/ashfang.png",
+        "scale": 1
+      },
+      "Banshee": {
+        "image": "img/enemies-tiles/banshee.png",
+        "scale": 1
+      },
+      "Barolg": {
+        "image": "img/enemies-tiles/barolg.png",
+        "scale": 1
+      },
+      "Bellroach": {
+        "image": "img/enemies-tiles/bellroach.png",
+        "scale": 1
+      },
+      "Boar": {
+        "image": "img/enemies-tiles/boar.png",
+        "scale": 1
+      },
+      "Bog Spitter": {
+        "image": "img/enemies-tiles/bog_spitter.png",
+        "scale": 1
+      },
+      "Venom Eater": {
+        "image": "img/enemies-tiles/bog_spitter.png",
+        "scale": 1
+      },
+      "Cave Troll": {
+        "image": "img/enemies-tiles/cave_troll.png",
+        "scale": 1
+      },
+      "Guardian of the Deep": {
+        "image": "img/tiles/guardian-of-the-deep.png",
+        "scale": 1
+      },
+      "Centaur": {
+        "image": "img/enemies-tiles/centaur.png",
+        "scale": 1
+      },
+      "Chupacabra": {
+        "image": "img/enemies-tiles/chupacabra.png",
+        "scale": 1
+      },
+      "Cobra": {
+        "image": "img/enemies-tiles/cobra.png",
+        "scale": 1
+      },
+      "Cyclops": {
+        "image": "img/enemies-tiles/cyclops.png",
+        "scale": 1
+      },
+      "Dreadling": {
+        "image": "img/enemies-tiles/dreadling.png",
+        "scale": 1
+      },
+      "DRUSK": {
+        "image": "img/enemies-tiles/drusk.png",
+        "scale": 1
+      },
+      "Duiwel": {
+        "image": "img/enemies-tiles/duiwel.png",
+        "scale": 1
+      },
+      "Fungus": {
+        "image": "img/enemies-tiles/fungus.png",
+        "scale": 1
+      },
+      "Mushroom Prophet": {
+        "image": "img/enemies-tiles/fungus.png",
+        "scale": 1
+      },
+      "Uninvited Guest": {
+        "image": "img/tiles/npc-uninvited-guest.png",
+        "scale": 1
+      },
+      "Gargoyle": {
+        "image": "img/enemies-tiles/gargoyle.png",
+        "scale": 1
+      },
+      "GAUR": {
+        "image": "img/enemies-tiles/gaur.png",
+        "scale": 1
+      },
+      "Ghoul": {
+        "image": "img/enemies-tiles/ghoul.png",
+        "scale": 1
+      },
+      "Ghost": {
+        "image": "img/enemies-tiles/ghost.png",
+        "scale": 1
+      },
+      "Giant Spider": {
+        "image": "img/enemies-tiles/giant-spider.png",
+        "scale": 1,
+        "fit": "contain"
+      },
+      "Giant Bat": {
+        "image": "img/enemies-tiles/giant_bat.png",
+        "scale": 1
+      },
+      "Giant Bug": {
+        "image": "img/enemies-tiles/giant_bug.png",
+        "scale": 1
+      },
+      "Giant Crab": {
+        "image": "img/enemies-tiles/giant_crab.png",
+        "scale": 1
+      },
+      "Giant Rat": {
+        "image": "img/enemies-tiles/giant_rat.png",
+        "scale": 1
+      },
+      "Giant Toad": {
+        "image": "img/enemies-tiles/giant_toad.png",
+        "scale": 1
+      },
+      "Glaber": {
+        "image": "img/enemies-tiles/glaber.png",
+        "scale": 1
+      },
+      "Goblin": {
+        "image": "img/enemies-tiles/goblin.png",
+        "scale": 1
+      },
+      "Gorgon": {
+        "image": "img/enemies-tiles/gorgon.png",
+        "scale": 1
+      },
+      "Gravehound": {
+        "image": "img/enemies-tiles/gravehound.png",
+        "scale": 1
+      },
+      "Grivel": {
+        "image": "img/enemies-tiles/grivel.png",
+        "scale": 1
+      },
+      "Grivkin": {
+        "image": "img/enemies-tiles/grivkin.png",
+        "scale": 1
+      },
+      "Harpy": {
+        "image": "img/enemies-tiles/harpy.png",
+        "scale": 1
+      },
+      "Hogwyrm": {
+        "image": "img/enemies-tiles/hogwyrm.png",
+        "scale": 1
+      },
+      "Hyena": {
+        "image": "img/enemies-tiles/hyena.png",
+        "scale": 1
+      },
+      "Imp": {
+        "image": "img/enemies-tiles/imp.png",
+        "scale": 1
+      },
+      "Jackal": {
+        "image": "img/enemies-tiles/jackal.png",
+        "scale": 1
+      },
+      "Kobold": {
+        "image": "img/enemies-tiles/kobold.png",
+        "scale": 1
+      },
+      "Kveld": {
+        "image": "img/enemies-tiles/kveld.png",
+        "scale": 1
+      },
+      "Lich": {
+        "image": "img/enemies-tiles/lich.png",
+        "scale": 1
+      },
+      "Lion": {
+        "image": "img/enemies-tiles/lion.png",
+        "scale": 1
+      },
+      "Lizard Man": {
+        "image": "img/enemies-tiles/lizard_man.png",
+        "scale": 1
+      },
+      "Manticore": {
+        "image": "img/enemies-tiles/manticore.png",
+        "scale": 1
+      },
+      "Marsutal": {
+        "image": "img/enemies-tiles/marsutal.png",
+        "scale": 1
+      },
+      "MIREHOWL": {
+        "image": "img/enemies-tiles/mirehowl.png",
+        "scale": 1
+      },
+      "Minotaur": {
+        "image": "img/enemies-tiles/minotaur.png",
+        "scale": 1
+      },
+      "Monkey": {
+        "image": "img/enemies-tiles/monkey.png",
+        "scale": 1
+      },
+      "Mummy": {
+        "image": "img/enemies-tiles/mummy.png",
+        "scale": 1
+      },
+      "Murkspawn": {
+        "image": "img/enemies-tiles/murkspawn.png",
+        "scale": 1
+      },
+      "Myrka": {
+        "image": "img/enemies-tiles/myrka.png",
+        "scale": 1
+      },
+      "Naledi": {
+        "image": "img/enemies-tiles/naledi.png",
+        "scale": 1
+      },
+      "NHALUUN": {
+        "image": "img/enemies-tiles/nhaluun.png",
+        "scale": 1
+      },
+      "NULK": {
+        "image": "img/enemies-tiles/nulk.png",
+        "scale": 1
+      },
+      "Nymph": {
+        "image": "img/enemies-tiles/nymph.png",
+        "scale": 1
+      },
+      "Oculus": {
+        "image": "img/enemies-tiles/oculus.png",
+        "scale": 1
+      },
+      "Ogre": {
+        "image": "img/enemies-tiles/ogre.png",
+        "scale": 1
+      },
+      "Orc": {
+        "image": "img/enemies-tiles/orc.png",
+        "scale": 1
+      },
+      "Owlbear": {
+        "image": "img/enemies-tiles/owlbear.png",
+        "scale": 1
+      },
+      "Ratling": {
+        "image": "img/enemies-tiles/ratling.png",
+        "scale": 1
+      },
+      "Sasquatch": {
+        "image": "img/enemies-tiles/sasquatch.png",
+        "scale": 1
+      },
+      "Scarab": {
+        "image": "img/enemies-tiles/scarab.png",
+        "scale": 1
+      },
+      "Scorpion": {
+        "image": "img/enemies-tiles/scorpion.png",
+        "scale": 1
+      },
+      "Serpent": {
+        "image": "img/enemies-tiles/serpent.png",
+        "scale": 1
+      },
+      "Serpent Queen": {
+        "image": "img/enemies-tiles/serpent_queen.png",
+        "scale": 1
+      },
+      "Sifulian": {
+        "image": "img/enemies-tiles/sifulian.png",
+        "scale": 1
+      },
+      "SKELD": {
+        "image": "img/enemies-tiles/skeld.png",
+        "scale": 1
+      },
+      "Skeleton": {
+        "image": "img/enemies-tiles/skeleton.png",
+        "scale": 1
+      },
+      "Skink": {
+        "image": "img/enemies-tiles/skink.png",
+        "scale": 1
+      },
+      "Skerva": {
+        "image": "img/enemies-tiles/skerva.png",
+        "scale": 1
+      },
+      "Slurper": {
+        "image": "img/enemies-tiles/slurper.png",
+        "scale": 1
+      },
+      "Snake": {
+        "image": "img/enemies-tiles/snake.png",
+        "scale": 1
+      },
+      "Spineback": {
+        "image": "img/enemies-tiles/spineback.png",
+        "scale": 1
+      },
+      "Tholosum": {
+        "image": "img/enemies-tiles/tholosum.png",
+        "scale": 1
+      },
+      "Thornmaw": {
+        "image": "img/enemies-tiles/thornmaw.png",
+        "scale": 1
+      },
+      "Tmusapod": {
+        "image": "img/enemies-tiles/tmusapod.png",
+        "scale": 1
+      },
+      "Tokka": {
+        "image": "img/enemies-tiles/tokka.png",
+        "scale": 1
+      },
+      "Troglodyte": {
+        "image": "img/enemies-tiles/troglodyte.png",
+        "scale": 1
+      },
+      "Trogloraptor": {
+        "image": "img/enemies-tiles/trogloraptor.png",
+        "scale": 1
+      },
+      "Tulla": {
+        "image": "img/enemies-tiles/tulla.png",
+        "scale": 1
+      },
+      "Vampire": {
+        "image": "img/enemies-tiles/vampire.png",
+        "scale": 1
+      },
+      "Vulture": {
+        "image": "img/enemies-tiles/vulture.png",
+        "scale": 1
+      },
+      "Vrakeber": {
+        "image": "img/enemies-tiles/vrakeber.png",
+        "scale": 1
+      },
+      "Wasp": {
+        "image": "img/enemies-tiles/wasp.png",
+        "scale": 1
+      },
+      "White Tiger": {
+        "image": "img/enemies-tiles/white-tiger.png",
+        "scale": 1
+      },
+      "Witherpod": {
+        "image": "img/enemies-tiles/witherpod.png",
+        "scale": 1
+      },
+      "Wolf": {
+        "image": "img/enemies-tiles/wolf.png",
+        "scale": 1
+      },
+      "Wretchling": {
+        "image": "img/enemies-tiles/wretchling.png",
+        "scale": 1
+      },
+      "Wyrdhag": {
+        "image": "img/enemies-tiles/wyrdhag.png",
+        "scale": 1
+      },
+      "Wyvern": {
+        "image": "img/enemies-tiles/wyvern.png",
+        "scale": 1
+      },
+      "Xibal": {
+        "image": "img/enemies-tiles/xibal.png",
+        "scale": 1
+      },
+      "Yeti": {
+        "image": "img/enemies-tiles/yeti.png",
+        "scale": 1
+      },
+      "Forest Spirit": {
+        "image": "img/enemies-tiles/ghost.png",
+        "scale": 1
+      }
     },
     "prefixArea": {
       "other": {
@@ -439,14 +780,46 @@
     "mark": "#8a1c1c"
   },
   "terrainTiles": {
-    "towerentrance": {"image":"img/tiles/tower-entrance.png","baseTileKey":"marble","scale":1},
-    "towerentranceopen": {"image":"img/tiles/tower-entrance-open.png","baseTileKey":"marble","scale":1},
-    "towerstairsup": {"image": "img/tiles/dwarven-stairs-up.png", "baseTileKey": "marble", "scale": 1},
-    "towerstairsdown": {"image": "img/tiles/stairs-down.png", "baseTileKey": "marble", "scale": 1},
-    "groundfissure": {"image": "img/tiles/ground-fissure.png", "baseTileKey": "grass", "scale": 1},
-    "towerwindow": {"image": "img/tiles/tower-window.png", "baseTileKey": "dwarvenwall", "scale": 1},
-    "towerbattlement": {"image": "img/tiles/tower-battlement.png", "baseTileKey": "marble", "scale": 1},
-    "towerbattlementcorner": {"image": "img/tiles/tower-battlement-corner.png", "baseTileKey": "marble", "scale": 1},
+    "towerentrance": {
+      "image": "img/tiles/tower-entrance.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "towerentranceopen": {
+      "image": "img/tiles/tower-entrance-open.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "towerstairsup": {
+      "image": "img/tiles/dwarven-stairs-up.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "towerstairsdown": {
+      "image": "img/tiles/stairs-down.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "groundfissure": {
+      "image": "img/tiles/ground-fissure.png",
+      "baseTileKey": "grass",
+      "scale": 1
+    },
+    "towerwindow": {
+      "image": "img/tiles/tower-window.png",
+      "baseTileKey": "dwarvenwall",
+      "scale": 1
+    },
+    "towerbattlement": {
+      "image": "img/tiles/tower-battlement.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "towerbattlementcorner": {
+      "image": "img/tiles/tower-battlement-corner.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
     "ice": {
       "image": "img/tiles/ice.png",
       "scale": 1
@@ -575,7 +948,11 @@
       "image": "img/tiles/cave-up.png",
       "scale": 1
     },
-    "dwarvenhole": {"image":"img/tiles/dwarven-hole.svg", "baseTileKey":"cavefloor2", "scale":1},
+    "dwarvenhole": {
+      "image": "img/tiles/dwarven-hole.svg",
+      "baseTileKey": "cavefloor2",
+      "scale": 1
+    },
     "dwarvenfortexit": {
       "image": "img/tiles/dwarven-stairs-up.png",
       "baseTileKey": "marble",
@@ -597,30 +974,46 @@
       "scale": 1
     },
     "dwarvenminesopen": {
-      "image": "img/tiles/dwarven-mineshaft-cleaned.png", "baseTileKey": "marble", "scale": 1
+      "image": "img/tiles/dwarven-mineshaft-cleaned.png",
+      "baseTileKey": "marble",
+      "scale": 1
     },
     "minestairsup": {
-      "image": "img/tiles/shoddy-mine-stairs-up.png", "baseTileKey": "cavefloorBrown", "scale": 1
+      "image": "img/tiles/shoddy-mine-stairs-up.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1
     },
     "minestairsdown": {
-      "image": "img/tiles/shoddy-mine-stairs-down.png", "baseTileKey": "cavefloorBrown", "scale": 1
+      "image": "img/tiles/shoddy-mine-stairs-down.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1
     },
     "minecageupperoff": {
-      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloorBrown", "scale": 1,
+      "image": "img/tiles/haulage-cage.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1,
       "filter": "brightness(0.62) saturate(0.25)"
     },
     "minecageloweroff": {
-      "image": "img/tiles/haulage-cage.png", "baseTileKey": "cavefloorBrown", "scale": 1,
+      "image": "img/tiles/haulage-cage.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1,
       "filter": "brightness(0.62) saturate(0.25)"
     },
     "minecageupperon": {
-      "image": "img/tiles/haulage-cage-upper.png", "baseTileKey": "cavefloorBrown", "scale": 1
+      "image": "img/tiles/haulage-cage-upper.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1
     },
     "minecageloweron": {
-      "image": "img/tiles/haulage-cage-lower.png", "baseTileKey": "cavefloorBrown", "scale": 1
+      "image": "img/tiles/haulage-cage-lower.png",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1
     },
     "mineshaftrope": {
-      "image": "img/tiles/mine-shaft-rope.svg", "baseTileKey": "cavefloorBrown", "scale": 1
+      "image": "img/tiles/mine-shaft-rope.svg",
+      "baseTileKey": "cavefloorBrown",
+      "scale": 1
     },
     "dwarvendoorclosed": {
       "image": "img/tiles/dwarven-door-closed.png",
@@ -1068,34 +1461,150 @@
       "image": "img/tiles/mine-support.png",
       "scale": 1
     },
-    "alcohol-barrel": {"image": "img/tiles/alcohol-barrel.png", "scale": 1, "tileOnly": true},
-    "banana-peel": {"image": "img/tiles/banana-peel.png", "scale": 1, "tileOnly": true},
-    "beast-skeleton-large": {"image": "img/tiles/beast-skeleton-large.png", "scale": 1, "tileOnly": true},
-    "beast-skeleton-small": {"image": "img/tiles/beast-skeleton-small.png", "scale": 1, "tileOnly": true},
-    "broken-sword": {"image": "img/tiles/broken-sword.png", "scale": 1, "tileOnly": true},
-    "cave-remains": {"image": "img/tiles/cave-remains.png", "scale": 1, "tileOnly": true},
-    "debris-bones": {"image": "img/tiles/debris-bones.png", "scale": 1, "tileOnly": true},
-    "debris-cloth": {"image": "img/tiles/debris-cloth.png", "scale": 1, "tileOnly": true},
-    "dwarven-wall-relief": {"image": "img/tiles/dwarven-wall-relief.png", "scale": 1, "tileOnly": true},
-    "fallen-branch-dry": {"image": "img/tiles/fallen-branch-dry.png", "scale": 1, "tileOnly": true},
-    "fallen-branch-leafy": {"image": "img/tiles/fallen-branch-leafy.png", "scale": 1, "tileOnly": true},
-    "fishbone": {"image": "img/tiles/fishbone.png", "scale": 1, "tileOnly": true},
-    "gnawed-bone": {"image": "img/tiles/gnawed-bone.png", "scale": 1, "tileOnly": true},
-    "lily-flowering": {"image": "img/tiles/lily-flowering.png", "scale": 1, "tileOnly": true},
-    "lily-pads": {"image": "img/tiles/lily-pads.png", "scale": 1, "tileOnly": true},
-    "mountain-water": {"image": "img/tiles/mountain-water.png", "scale": 1, "tileOnly": true},
-    "plant-blue-flower": {"image": "img/tiles/plant-blue-flower.png", "scale": 1, "tileOnly": true},
-    "plant-spiky": {"image": "img/tiles/plant-spiky.png", "scale": 1, "tileOnly": true},
-    "quarry-rocks": {"image": "img/tiles/quarry-rocks.png", "scale": 1, "tileOnly": true},
-    "skull": {"image": "img/tiles/skull.png", "scale": 1, "tileOnly": true},
-    "standing-stone-blunt": {"image": "img/tiles/standing-stone-blunt.png", "scale": 1, "tileOnly": true},
-    "standing-stone-leaning": {"image": "img/tiles/standing-stone-leaning.png", "scale": 1, "tileOnly": true},
-    "standing-stone-split": {"image": "img/tiles/standing-stone-split.png", "scale": 1, "tileOnly": true},
-    "stone-brown": {"image": "img/tiles/stone-brown.png", "scale": 1, "tileOnly": true},
-    "stone-grey": {"image": "img/tiles/stone-grey.png", "scale": 1, "tileOnly": true},
-    "stone-skull-altar": {"image": "img/tiles/stone-skull-altar.png", "scale": 1, "tileOnly": true},
-    "trash-wood": {"image": "img/tiles/trash-wood.png", "scale": 1, "tileOnly": true},
-    "tree-cage": {"image": "img/tiles/tree-cage.png", "scale": 1, "tileOnly": true},
-    "wall-mushrooms": {"image": "img/tiles/wall-mushrooms.png", "scale": 1, "tileOnly": true}
+    "alcohol-barrel": {
+      "image": "img/tiles/alcohol-barrel.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "banana-peel": {
+      "image": "img/tiles/banana-peel.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "beast-skeleton-large": {
+      "image": "img/tiles/beast-skeleton-large.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "beast-skeleton-small": {
+      "image": "img/tiles/beast-skeleton-small.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "broken-sword": {
+      "image": "img/tiles/broken-sword.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "cave-remains": {
+      "image": "img/tiles/cave-remains.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "debris-bones": {
+      "image": "img/tiles/debris-bones.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "debris-cloth": {
+      "image": "img/tiles/debris-cloth.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "dwarven-wall-relief": {
+      "image": "img/tiles/dwarven-wall-relief.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "fallen-branch-dry": {
+      "image": "img/tiles/fallen-branch-dry.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "fallen-branch-leafy": {
+      "image": "img/tiles/fallen-branch-leafy.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "fishbone": {
+      "image": "img/tiles/fishbone.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "gnawed-bone": {
+      "image": "img/tiles/gnawed-bone.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "lily-flowering": {
+      "image": "img/tiles/lily-flowering.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "lily-pads": {
+      "image": "img/tiles/lily-pads.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "mountain-water": {
+      "image": "img/tiles/mountain-water.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "plant-blue-flower": {
+      "image": "img/tiles/plant-blue-flower.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "plant-spiky": {
+      "image": "img/tiles/plant-spiky.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "quarry-rocks": {
+      "image": "img/tiles/quarry-rocks.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "skull": {
+      "image": "img/tiles/skull.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "standing-stone-blunt": {
+      "image": "img/tiles/standing-stone-blunt.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "standing-stone-leaning": {
+      "image": "img/tiles/standing-stone-leaning.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "standing-stone-split": {
+      "image": "img/tiles/standing-stone-split.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "stone-brown": {
+      "image": "img/tiles/stone-brown.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "stone-grey": {
+      "image": "img/tiles/stone-grey.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "stone-skull-altar": {
+      "image": "img/tiles/stone-skull-altar.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "trash-wood": {
+      "image": "img/tiles/trash-wood.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "tree-cage": {
+      "image": "img/tiles/tree-cage.png",
+      "scale": 1,
+      "tileOnly": true
+    },
+    "wall-mushrooms": {
+      "image": "img/tiles/wall-mushrooms.png",
+      "scale": 1,
+      "tileOnly": true
+    }
   }
 }
