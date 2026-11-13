@@ -257,6 +257,12 @@
   },
   "enemies": {
     "lowercaseThroughTier": 2,
+    "portraits": {
+      "Forest Spirit": "img/enemies/forest_spirit.jpg",
+      "Guardian of the Deep": "img/enemies/guardian_of_the_deep.jpg",
+      "Undead Warden": "img/enemies/undead_warden.jpg",
+      "Uninvited Guest": "img/enemies/uninvited_guest.jpg"
+    },
     "tiles": {
       "Adelocosa": {
         "image": "img/enemies-tiles/adelocosa.png",

@@ -1162,6 +1162,8 @@ more difficult:
     } else {
       paths = []
       for (const tmpl of ENEMY_TEMPLATES) paths.push(enemyPortraitPath(tmpl.name))
+      // Some special encounters use an ordinary species template but have a distinct portrait.
+      paths.push(...Object.values(RENDER_STYLE?.enemies?.portraits || {}))
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
       for (const kind of itemIconKinds()) paths.push(itemIconPath(kind))
       for (const gear of [...WEAPONS, ...SHIELDS, ...ARMORS])
@@ -12633,7 +12635,7 @@ more difficult:
   }
 
   function enemyPortraitPath(species) {
-    return `img/enemies/${slug(species === 'Forest Spirit' ? 'Ghost' : species)}.jpg`
+    return RENDER_STYLE?.enemies?.portraits?.[species] || `img/enemies/${slug(species)}.jpg`
   }
 
   function groundItemLabel(g) {
@@ -12701,7 +12703,7 @@ more difficult:
         : ''
       return {
         mini: false, enemy: e, html: `
-      <img src="${imageSrc(enemyPortraitPath(e.adaptiveEventId === 'debt_collector' ? e.name : e.adaptiveEventId === 'forest_spirit' ? 'Forest Spirit' : e.baseName || e.name))}" onerror="this.style.display='none'">
+      <img src="${imageSrc(enemyPortraitPath(e.adaptiveEventId === 'debt_collector' || e.adaptiveEventId === 'undead_shield_hunter' ? e.name : e.baseName || e.name))}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${(e.stolenItem || e.stolenGold > 0) ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}

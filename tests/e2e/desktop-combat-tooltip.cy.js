@@ -14,6 +14,27 @@ function beginNewGame(name) {
 }
 
 describe('Desktop combat enemy tooltip', () => {
+  it('loads dedicated portraits for adaptive encounters in inspection and the Bestiary', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Encounter Portrait Tester')
+    const portraits = {
+      'Forest Spirit': 'img/enemies/forest_spirit.jpg',
+      'Guardian of the Deep': 'img/enemies/guardian_of_the_deep.jpg',
+      'Undead Warden': 'img/enemies/undead_warden.jpg',
+      'Uninvited Guest': 'img/enemies/uninvited_guest.jpg'
+    }
+    cy.window().then(win => {
+      const result = win.eval(`(() => ({
+        paths: Object.fromEntries(['Forest Spirit', 'Guardian of the Deep',
+          'Undead Warden', 'Uninvited Guest'].map(species => [species, enemyPortraitPath(species)]))
+      }))()`)
+      expect(result.paths).to.deep.equal(portraits)
+    })
+    for (const file of Object.values(portraits)) {
+      cy.request(file).its('status').should('eq', 200)
+    }
+  })
+
   it('hides equipped enemy gear prefixes without changing the actual item', () => {
     cy.viewport(1440, 900)
     beginNewGame('Hidden Enemy Gear Tester')

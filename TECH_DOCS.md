@@ -11021,8 +11021,9 @@ reachable, trap-safe location at least 10 tiles from the player and outside
 sight, and occupies one of the two usual optional threat slots. Failed
 placement leaves it eligible for another check, while a successful spawn
 finishes the reaction for this character. The creature is **tier 4, 84 HP,
-13 ATK, 5 DEF, 4 SPD, 3 GRACE**, undead and melee-only; its appearance uses
-the Skeleton species art with a distinct shield marker. It yields normal
+13 ATK, 5 DEF, 4 SPD, 3 GRACE**, undead and melee-only; its walking tile
+uses the Skeleton species art with a distinct shield marker, while inspection
+uses its dedicated Undead Warden portrait. It yields normal
 combat XP and uses ordinary enemy pursuits; its distinctive shield guard is
 described immediately below. The player may spend arrows to
 break the shield, fight in melee, cast a Fireball, or withdraw.
@@ -11057,7 +11058,9 @@ If there is no valid corridor or free threat slot, the creature waits rather
 than spawning in an inaccessible location. Leaving the floor before its
 arrival cancels that warning; mining another ordinary wall can provoke a new
 warning, but there is only **one successful Guardian encounter per character**.
-The Guardian is a slow **construct** with **120 HP, 16 ATK, 8 DEF, 2 SPD,
+The Guardian uses its own stone-creature portrait in inspection and the
+Bestiary, separate from its walking tile. It is a slow **construct** with
+**120 HP, 16 ATK, 8 DEF, 2 SPD,
 1 GRACE** and tier 4, using the existing stone-golem artwork and an
 existing mining-noise investigation toward the player's last mining position
 for up to **25 movement attempts**. It then uses ordinary combat AI on contact. It is immune to poison through its construct family, but
@@ -11386,9 +11389,9 @@ spawns a second spirit for the same character.
 The Forest Spirit is a **tier-four spectral undead** with **90 HP, 13 ATK,
 3 DEF, 5 SPD, 4 GRACE** and the existing **Ethereal** ability. It is not a
 natural spawn. Its green halo and distinct name identify it, including outside
-the forest. Until its dedicated artwork is supplied, the tile and portrait
-reuse the Ghost artwork; this does not change its species identity or Bestiary
-entry. At a distance it stalks with **40% idle, 20% roaming, 40% pathfinding**
+the forest. Its walking tile reuses Ghost artwork, but inspection and the
+Bestiary use the dedicated Forest Spirit portrait. Its species identity is
+unchanged. At a distance it stalks with **40% idle, 20% roaming, 40% pathfinding**
 per action; ordinary combat AI applies within its aggression range. The
 standard speed-based loss-of-trail roll and existing concealment, invisibility
 and sanctuary rules still offer escapes.
