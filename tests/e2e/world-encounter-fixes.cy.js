@@ -884,9 +884,27 @@ describe('Surface encounters and item passives', () => {
         rebuildActiveLevelOccupancy()
         let beforeDistance=Math.max(Math.abs(hunter.x-player.x),Math.abs(hunter.y-player.y))
         turnCount=50
-        check(AdaptivePlayerTrolling.takeHungryMonsterTurn(hunter),'pursues beyond normal aggro')
-        check(Math.max(Math.abs(hunter.x-player.x),Math.abs(hunter.y-player.y))<beforeDistance,
-          'hungry monster pathfinds toward player')
+        const savedRng=rng
+        try {
+          rng=()=>0.10 // 40% stationary in distant pursuit.
+          check(AdaptivePlayerTrolling.takeHungryMonsterTurn(hunter) &&
+            hunter.x===60 && hunter.y===60,'distant hungry hunter can idle')
+          rng=()=>0.50 // 20% non-directed wandering.
+          check(AdaptivePlayerTrolling.takeHungryMonsterTurn(hunter) &&
+            Math.max(Math.abs(hunter.x-60),Math.abs(hunter.y-60))<=1,
+            'distant hungry hunter takes at most one roaming step')
+          occupied.delete(keyXY(hunter.x,hunter.y));hunter.x=60;hunter.y=60
+          rebuildActiveLevelOccupancy()
+          rng=()=>0.90 // 40% direct pursuit.
+          check(AdaptivePlayerTrolling.takeHungryMonsterTurn(hunter),'pursues beyond normal aggro')
+          check(Math.max(Math.abs(hunter.x-player.x),Math.abs(hunter.y-player.y))<beforeDistance,
+            'hungry monster pathfinds toward player during direct pursuit')
+          const originalPlayer={x:player.x,y:player.y}
+          player.x=hunter.x+2;player.y=hunter.y
+          check(!AdaptivePlayerTrolling.takeHungryMonsterTurn(hunter),
+            'within ordinary aggro range, normal combat AI takes over')
+          player.x=originalPlayer.x;player.y=originalPlayer.y
+        } finally {rng=savedRng}
         // Position a dropped pile away from the hero on connected terrain.
         occupied.delete(keyXY(hunter.x,hunter.y));hunter.x=60;hunter.y=60
         rebuildActiveLevelOccupancy()

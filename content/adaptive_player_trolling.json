@@ -195,6 +195,10 @@
       "healthMultiplier": 0.8,
       "defenseMultiplier": 0.8,
       "attackMultiplier": 1.2,
+      "pursuit": {
+        "idleChance": 0.4,
+        "roamChance": 0.2
+      },
       "droppedMeatDetectionRange": 6,
       "meatUnitsEaten": 1,
       "minSpawnDistance": 10,

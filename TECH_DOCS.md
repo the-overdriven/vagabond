@@ -11332,7 +11332,12 @@ encounter, not a new prefix available to ordinary monsters. It keeps the
 species' natural melee and ranged attacks; Fear, invisibility, sleep and the
 Temple's sanctuary retain their normal priority. The hungry creature can
 pathfind around walls and doors on its current floor, but does not teleport
-or follow the player between floors.
+or follow the player between floors. Outside normal aggression range, its
+scent-driven hunt follows the far-wandering rhythm: **40% idle, 20% attempted
+non-directed roaming, and 40% direct pathfinding toward the player** per
+monster action. Inside the ordinary aggression radius, normal combat AI takes
+over without this slowdown. The probabilities are configured in
+`content/adaptive_player_trolling.json` under `hungry_monster.pursuit`.
 
 The player may drop uncooked **Meat** from their inventory to divert it. A
 player-dropped pile within **six Chebyshev tiles** becomes the preferred goal

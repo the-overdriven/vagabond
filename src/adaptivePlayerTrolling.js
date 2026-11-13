@@ -560,6 +560,10 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isFinite(hungry.healthMultiplier) || hungry.healthMultiplier <= 0 || hungry.healthMultiplier >= 1 ||
         !Number.isFinite(hungry.defenseMultiplier) || hungry.defenseMultiplier <= 0 || hungry.defenseMultiplier >= 1 ||
         !Number.isFinite(hungry.attackMultiplier) || hungry.attackMultiplier <= 1 ||
+        !hungry.pursuit || !Number.isFinite(hungry.pursuit.idleChance) ||
+        !Number.isFinite(hungry.pursuit.roamChance) ||
+        hungry.pursuit.idleChance < 0 || hungry.pursuit.roamChance < 0 ||
+        hungry.pursuit.idleChance + hungry.pursuit.roamChance >= 1 ||
         !Number.isInteger(hungry.droppedMeatDetectionRange) || hungry.droppedMeatDetectionRange < 1 ||
         hungry.meatUnitsEaten !== 1 ||
         !Number.isInteger(hungry.minSpawnDistance) || hungry.minSpawnDistance <= UndergroundFov.RADIUS ||
@@ -3275,10 +3279,25 @@ const AdaptivePlayerTrolling = (() => {
     // At normal combat range, defer to the species' existing attack, spells,
     // missile choice and defense behavior. Beyond it, actively seek the hero.
     if (distance<=Math.max(ATTACK_RANGE,effectiveAggroRange(enemy))) return false
-    const step=enemyFindStep(enemy,true)
-    if (!step) return false
+    // Beyond aggro range, this hunter tracks scents at the far-wandering
+    // cadence instead of homing in on the player every turn. Dropped meat
+    // has already taken priority above this block.
     enemy.aware=true
-    enemyStepTowardPlayer(enemy,step)
+    const {idleChance,roamChance}=cfg.pursuit, roll=rng()
+    if(roll<idleChance)return true
+    if(roll<idleChance+roamChance) {
+      const sites=[]
+      for(const [dx,dy] of DIRS8) {
+        const x=enemy.x+dx,y=enemy.y+dy
+        if(!enemyCanPathThrough(enemy,x,y) || occupied.has(keyXY(x,y)) ||
+            enemyWanderTrapBlocked(enemy,map,x,y) || (x===player.x && y===player.y))continue
+        sites.push({x,y})
+      }
+      if(sites.length)enemyStepTowardPlayer(enemy,pick(sites))
+      return true
+    }
+    const step=enemyFindStep(enemy,true)
+    if(step)enemyStepTowardPlayer(enemy,step)
     return true
   }
 
