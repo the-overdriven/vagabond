@@ -237,7 +237,7 @@ describe('One-time Merchant Dwarven Fort hint', () => {
         activeWorldTraits=[{name:'test curse',effects:[]}]
         AdaptivePlayerTrolling.reset()
         const at=(id,dx,dy,wander='home',level=0)=>({id,name:'Rat',baseName:'Rat',
-          alive:true,hp:1,level,wander,x:spawnPoint.x+dx,y:spawnPoint.y+dy})
+          alive:true,hp:1,level,wander,abilities:[],x:spawnPoint.x+dx,y:spawnPoint.y+dy})
         const first=at('clear-1',10,0), second=at('clear-2',20,0)
         const distant=at('clear-distant',120,120), far=at('clear-far',15,0,'far')
         const underground=at('clear-underground',12,0,'home',-1)
@@ -413,7 +413,6 @@ describe('One-time Merchant Dwarven Fort hint', () => {
         hintCheck(!groundItems.some(it=>it.adaptiveEventId==='test_reward'),'ground reward removed on pickup')
         hintCheck(!AdaptivePlayerTrolling.dropRewardOnGround('test_reward',null,pos.x,pos.y),'invalid drops refused')
       } finally {
-        activeWorldTraits=traits
         loadGameFromObject(original)
       }
     })()`))

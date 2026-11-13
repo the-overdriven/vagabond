@@ -3651,6 +3651,9 @@ const AdaptivePlayerTrolling = (() => {
     enemy.alarmedZ=currentZ;enemy.alarmedLevelKind=kind
     enemy.forestConcealX=null;enemy.forestConcealY=null
     enemy.sleeping=false;enemy.summonedTurn=turnCount
+    // Champion HP must scale from the survivor's original maximum, not the
+    // near-death HP that originally qualified this encounter.
+    enemy.hp=enemy.maxHp
     enemy.prefixBase=prefixBaseStats(enemy)
     enemy.prefix=cfg.returnPrefix
     applyEnemyPrefix(enemy,cfg.returnPrefix)

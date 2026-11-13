@@ -11088,7 +11088,9 @@ Repeatedly attacking or fleeing the same enemy never credits it twice.
 
 The returning foe is **the original persistent monster**, not a clone: it
 keeps its ID, species, equipment and existing abilities, gains the ordinary
-**Champion** prefix and its bonuses, heals to its new maximum HP, and receives
+**Champion** prefix and its bonuses (including HP scaled from its original
+**maximum HP**, not the near-death HP at which it escaped), heals to its new
+maximum HP, and receives
 a random proper name (for example, *Grukhar, the Unfinished Goblin*).
 It reappears on a safe, connected, off-screen tile **12–28 path steps** away
 in a habitat appropriate to its species; it cannot attack on the appearance
@@ -11521,8 +11523,9 @@ underground floor; no patch or free slot means defer rather than force a spawn.
 In the Dwarven Ruins it enters the same depth-weighted equal-candidate lottery;
 in other fungal caves and mines it activates on the next qualifying
 scheduled check.
-All collection counts and warning state are saved and replayed. Ordinary
-worlds never accumulate this progress.
+All collection counts and the Prophet's exact warning-turn marker are saved
+with the corresponding enemy and restored for deterministic replay; a loaded
+Prophet cannot repeat its warning. Ordinary worlds never accumulate this progress.
 
 **Mushroom Prophet — warning action:**
 

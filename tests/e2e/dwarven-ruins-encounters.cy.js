@@ -21,7 +21,8 @@ describe('Dwarven Ruins encounter progression', () => {
         player.equip.weapon=null;player.equip.armor=null;player.equip.shield=null
         enter(ruins[0])
         chance=()=>true
-        check(!AdaptivePlayerTrolling.onFloorChanged(),'the early ruins cannot spawn Venom Eater')
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!enemies.some(e=>e.adaptiveEventId==='venom_eater'),'the early ruins cannot spawn Venom Eater')
         enter(ruins[ruins.length-2])
         check(AdaptivePlayerTrolling.onFloorChanged(),'the penultimate ruin floor accepts Venom Eater')
         let eater=enemies.find(e=>e.adaptiveEventId==='venom_eater')
@@ -31,7 +32,7 @@ describe('Dwarven Ruins encounter progression', () => {
         check(!undergroundTileVisible(eater.x,eater.y) &&
           !CAVE_TRANSITION_TILES.has(map[eater.y][eater.x]),
           'spawn is unseen and does not occupy a stair')
-        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1]===1,
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
           'Venom Eater occupies one persistent special threat slot')
         eater.hp=80
         applyPlayerVenomToEnemy(eater)
@@ -107,8 +108,9 @@ describe('Dwarven Ruins encounter progression', () => {
         }
         player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
         chance=()=>true
-        enter(ruins[0]);check(!AdaptivePlayerTrolling.onFloorChanged(),
-          'early ruin floor does not spawn Oculus')
+        enter(ruins[0]);AdaptivePlayerTrolling.onFloorChanged()
+        check(!enemies.some(e=>e.adaptiveEventId==='oculus'),
+          'early ruin floor does not spawn Oculus regardless of independent rewards')
         enter(ruins[ruins.length-2]);check(AdaptivePlayerTrolling.onFloorChanged(),
           'Champion Oculus appears on qualifying late floor')
         let eye=enemies.find(e=>e.adaptiveEventId==='oculus')
@@ -393,7 +395,7 @@ describe('Dwarven Ruins encounter progression', () => {
         chance=prob=>{encounterChecks++;return true}
         check(AdaptivePlayerTrolling.onFloorChanged(),'qualified trio enters an early ruin at a successful gate')
         const fan=enemies.filter(e=>e.adaptiveEventId==='fan_club' && e.level===currentZ)
-        check(fan.length===3 && enemies.length===count+3,'exactly three added monsters')
+        check(fan.length===3 && enemies.length>=count+3,'exactly three fan-club members, allowing independent ordinary-thief encounters')
         check(JSON.stringify(fan.map(e=>e.baseName))===JSON.stringify(['Kobold','Goblin','Skink']),
           'fan club consists of one member of each required species')
         check(JSON.stringify(fan.map(e=>e.equipment.kind))===JSON.stringify(['weapon','shield','armor']),
@@ -418,7 +420,8 @@ describe('Dwarven Ruins encounter progression', () => {
         const member=enemies.find(e=>e.adaptiveEventId==='fan_club')
         const preInventory=player.inventory.length,preGround=groundItems.length
         lootFromEnemy(member,false)
-        check(groundItems.length>preGround && player.inventory.length===preInventory &&
+        check(groundItems.length>preGround &&
+          !player.inventory.some(it=>it.name===member.equipment.name) &&
           groundItems.some(g=>g.kind==='droppeditem' && g.item?.name===member.equipment.name),
           'special enemy equipment is dropped on the ground, never added directly')
       } finally {
@@ -448,14 +451,18 @@ describe('Dwarven Ruins encounter progression', () => {
           ;[player.equip.weapon,player.equip.shield,player.equip.armor]=items
         }
         withPrefix('Mighty')
+        // An ordinary thief can also roll on floor entry. Check that independent
+        // mechanic once before counting the optional 500-step probability gate.
+        chance=()=>false
+        AdaptivePlayerTrolling.onFloorChanged()
         player.steps=500 // an eligible check on an early ruin floor
         let calls=0
-        chance=()=>{calls++;return false}
+        chance=p=>{if(p===0.10)calls++;return false}
         check(!AdaptivePlayerTrolling.onFloorChanged(),'initial eligible attempt fails')
         check(calls===1,'exactly one probability gate')
         check(!AdaptivePlayerTrolling.onFloorChanged() && calls===1,'same floor cannot reroll')
         // Returning with other equipment does not create a distinct event.
-        chance=oldChance;withPrefix('Swift');chance=()=>{calls++;return false}
+        chance=oldChance;withPrefix('Swift');chance=p=>{if(p===0.10)calls++;return false}
         check(!AdaptivePlayerTrolling.onFloorChanged() && calls===1,
           'changing only prefix cannot farm another roll')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -525,7 +532,7 @@ describe('Dwarven Ruins encounter progression', () => {
         player.x=stair.x;player.y=stair.y
         rebuildActiveLevelOccupancy()
         let gates=0
-        chance=()=>{gates++;return true}
+        chance=p=>{if(p===0.85)gates++;return true}
         check(AdaptivePlayerTrolling.onFloorChanged(),'two eligible optional reactions spawn')
         const specials=enemies.filter(e=>e.level===currentZ &&
           ['venom_eater','oculus'].includes(e.adaptiveEventId))
@@ -542,15 +549,15 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
         check(AdaptivePlayerTrolling.onFloorChanged(),'guaranteed Nemesis uses a bonus slot')
-        const all=enemies.filter(e=>e.level===currentZ && e.adaptiveEventId)
+        const all=enemies.filter(e=>e.level===currentZ && (e.adaptiveEventId && e.adaptiveEventId!=='unsold_equipment' || e.name==='Champion Giant Rat'))
         check(all.length===3 && all.some(e=>e.name==='Champion Giant Rat'),
-          'two optional reactions plus Nemesis remain on the floor')
+          'two optional reactions plus the independent Nemesis remain on the floor')
         check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===2,
           'Nemesis never consumes an optional slot')
         const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(snapshot)
         check(!AdaptivePlayerTrolling.onFloorChanged(),'save/load cannot duplicate committed reactions')
-        check(enemies.filter(e=>e.level===currentZ && e.adaptiveEventId).length===3,
+        check(enemies.filter(e=>e.level===currentZ && (e.adaptiveEventId && e.adaptiveEventId!=='unsold_equipment' || e.name==='Champion Giant Rat')).length===3,
           'three special monsters survive save/load')
       } finally {chance=originalChance;loadGameFromObject(before)}
     })()`))
@@ -579,7 +586,7 @@ describe('Dwarven Ruins encounter progression', () => {
         player.x=stair.x;player.y=stair.y
         rebuildActiveLevelOccupancy()
         let gates=0
-        chance=()=>++gates===1
+        chance=p=>p===0.85 ? ++gates===1 : false
         check(AdaptivePlayerTrolling.onFloorChanged(),'first successful roll creates one encounter')
         check(gates===2,'second eligible candidate receives one independent roll')
         check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
@@ -722,7 +729,8 @@ describe('Dwarven Ruins encounter progression', () => {
         rebuildActiveLevelOccupancy()
         chance=()=>true
         for(let i=0;i<9;i++)AdaptivePlayerTrolling.onDwarvenRemainsSearched()
-        check(!AdaptivePlayerTrolling.onFloorChanged(),'nine searches cannot summon the collector')
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!enemies.some(e=>e.adaptiveEventId==='debt_collector'),'nine searches cannot summon the collector')
         AdaptivePlayerTrolling.onDwarvenRemainsSearched()
         player.steps=1500 // next scheduled check after the initial late-floor visit
         check(AdaptivePlayerTrolling.onFloorChanged(),'tenth search qualifies the collector')
@@ -731,7 +739,7 @@ describe('Dwarven Ruins encounter progression', () => {
           ghost.maxHp===36 && ghost.debtDemandState==='watching',
           'a neutral dwarven ghost using Ghost stats spawns on the last ruin floor')
         check(!originalVisible(ghost.x,ghost.y),'collector starts outside sight')
-        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1]===1,
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
           'collector occupies one optional threat slot')
         undergroundTileVisible=()=>true
         enemyCanBeSeen=()=>true

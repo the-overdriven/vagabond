@@ -116,7 +116,7 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
       map[player.y][player.x]='grass';grasslandTrees.delete(keyXY(player.x,player.y))
       check(!playerInsideSanctuary()&&!playerHasForestCover(),'rare-sighting arena is unprotected and unconcealed')
       const names=['Myrka','Vampire','NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
-      check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>Number(t.rarity??1)<=RARE_FLEE.maxRarity).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
+      check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>!t.adaptiveOnly && Number(t.rarity??1)<=RARE_FLEE.maxRarity).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
       for(const prefixed of [false,true]) for(const name of names) for(const wander of ['far','homeReturn','homeReanchored','roam',false]) {
         const t=ENEMY_TEMPLATE_BY_NAME[name]
         const e={...t,...rareFleeDefaults({}),name:prefixed?'Fierce '+name:name,baseName:name,prefix:prefixed?'Fierce':null,

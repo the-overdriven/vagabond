@@ -9,6 +9,8 @@ describe('Wounded enemy flight', () => {
       window.rushCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}
       replayRecording=false; replayPlaying=false; replayData=null; replayAnimationsDisabled=true
       currentZ=0; currentCave=-1; map=surfaceMap; deathTransition=null
+      // Avoid the world-seeded Temple sanctuary suppressing the cornered attack.
+      spawnPoint={x:5,y:5}
       enemies=[]; npcs=[]; occupied=new Set(); turnCount=0
       for(let y=30;y<=50;y++) for(let x=30;x<=50;x++) {
         map[y][x]='grass'; grasslandTrees.delete(keyXY(x,y))

@@ -46,7 +46,7 @@ describe('Monster invisibility and Giant Spider web visuals', () => {
   it('draws species sprites in tile mode and preserves glyph fallbacks in ASCII', () => {
     cy.window().then(win => win.eval(`(() => {
       const visuals=Object.entries(RENDER_STYLE.enemies.tiles);
-      invisibilityAssert(visuals.length===94,'all monster sprites are mapped');
+      invisibilityAssert(visuals.length===ENEMY_TEMPLATES.length,'all monster sprites are mapped');
       invisibilityAssert(ENEMY_TEMPLATES.every(enemy=>RENDER_STYLE.enemies.tiles[enemy.name]),
         'every monster species has tile artwork');
       invisibilityAssert(visuals.every(([name,visual]) =>
