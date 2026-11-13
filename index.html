@@ -888,7 +888,7 @@ more difficult:
   let RACE_SELECTION_IMAGES = {}
   let PLAYER_TERRAIN_BACKGROUNDS = {}
   let ATTACK_RANGE, AGGRO_RANGE, ALARM_TRIGGER_RANGE, ALARM_CLEAR_RANGE, OUTER_AGGRO_GIVE_UP_CHANCE, BASE_CRIT_CHANCE, FIERCE_CRIT_CHANCE, CRIT_CHANCE, CHASE_DETOUR
-  let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS
+  let ENEMY_WANDER_ENABLED, ENEMY_WANDER_LEASH, ENEMY_WANDER_CHANCE, ENEMY_WANDER_RADIUS, ENEMY_WANDER_ACTIVE_RADIUS, ENEMY_FAR_VILLAGE_AVOID_RADIUS, ENEMY_FAR_WANDER_CADENCE
   let NPC_TALK_FREEZE_TURNS, FLEE_DISTANCE, PREFIX_STATS
   let RANGED_CONFIG = {}, DEATH_BOLT_CONFIG = {}
   let BLIND_CONFIG = {}, ROOT_CONFIG = {}, PULL_CONFIG = {}, ENEMY_DEFENSE_CONFIG = {}, ENEMY_TELEGRAPH_CONFIG = {}, COLLECTIVE_MIND_CONFIG = {}
@@ -993,6 +993,14 @@ more difficult:
     ENEMY_WANDER_RADIUS = content.enemyConfig.wandering.radius
     ENEMY_WANDER_ACTIVE_RADIUS = content.enemyConfig.wandering.activeRadius
     ENEMY_FAR_VILLAGE_AVOID_RADIUS = content.enemyConfig.wandering.farVillageAvoidRadius ?? 20
+    ENEMY_FAR_WANDER_CADENCE = content.enemyConfig.wandering.farCadence
+    if (!ENEMY_FAR_WANDER_CADENCE ||
+        !Number.isFinite(ENEMY_FAR_WANDER_CADENCE.idleChance) ||
+        !Number.isFinite(ENEMY_FAR_WANDER_CADENCE.roamChance) ||
+        ENEMY_FAR_WANDER_CADENCE.idleChance < 0 ||
+        ENEMY_FAR_WANDER_CADENCE.roamChance < 0 ||
+        ENEMY_FAR_WANDER_CADENCE.idleChance + ENEMY_FAR_WANDER_CADENCE.roamChance > 1)
+      throw new Error('Invalid far-wandering cadence in enemy_config.json.')
     NPC_TALK_FREEZE_TURNS = content.enemyConfig.npc.talkFreezeTurns
     FLEE_DISTANCE = content.enemyConfig.temple.fleeDistance
     CARRION_CONFIG = content.enemyConfig.carrionInstinct
@@ -6414,6 +6422,16 @@ more difficult:
     return false
   }
 
+  // Exactly one seeded roll selects a movement cadence for far wandering and
+  // adaptive long-distance hunters. Each caller supplies its own movement goal.
+  function enemyFarWanderAction() {
+    const roll = rng()
+    if (roll < ENEMY_FAR_WANDER_CADENCE.idleChance) return 'idle'
+    const roamThreshold = Number((ENEMY_FAR_WANDER_CADENCE.idleChance + ENEMY_FAR_WANDER_CADENCE.roamChance).toPrecision(12))
+    if (roll < roamThreshold) return 'roam'
+    return 'advance'
+  }
+
   function enemyFarWander(e, trackAge = 0) {
     const avoidingVillage = enemyFarVillageDistance(e.x, e.y) <= ENEMY_FAR_VILLAGE_AVOID_RADIUS
     if (avoidingVillage && !enemyFarTargetEscapesVillage(e)) {
@@ -6423,9 +6441,9 @@ more difficult:
       if (!enemyChooseFarTarget(e, true)) return false
     }
 
-    const roll = rng()
-    if (roll < 0.40) return false
-    if (roll < 0.60) {
+    const action = enemyFarWanderAction()
+    if (action === 'idle') return false
+    if (action === 'roam') {
       const options = []
       const currentVillageDist = avoidingVillage ? enemyFarVillageDistance(e.x, e.y) : 0
       for (const [dx, dy] of DIRS8) {

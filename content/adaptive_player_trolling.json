@@ -195,10 +195,6 @@
       "healthMultiplier": 0.8,
       "defenseMultiplier": 0.8,
       "attackMultiplier": 1.2,
-      "pursuit": {
-        "idleChance": 0.4,
-        "roamChance": 0.2
-      },
       "droppedMeatDetectionRange": 6,
       "meatUnitsEaten": 1,
       "minSpawnDistance": 10,
@@ -287,11 +283,7 @@
       "monsterPool": [
         "Spineback",
         "Manticore"
-      ],
-      "pursuit": {
-        "idleChance": 0.4,
-        "roamChance": 0.2
-      }
+      ]
     },
     "strange_green_potion": {
       "type": "unidentifiable_green_potion",
@@ -545,16 +537,13 @@
       "minDistinctForagedForestTiles": 70,
       "returnSurfaceTurns": 100,
       "returnRetryInterval": 10,
+      "minWithdrawDistance": 6,
       "minSpawnDistance": 10,
       "maxSpawnDistance": 32,
       "minEntranceDistance": 3,
       "maxCandidateSites": 80,
       "initialBiome": "forest",
-      "enemy": "Forest Spirit",
-      "pursuit": {
-        "idleChance": 0.4,
-        "roamChance": 0.2
-      }
+      "enemy": "Forest Spirit"
     },
     "explorer_galleries": {
       "type": "explorer_crossfire_reinforcement",

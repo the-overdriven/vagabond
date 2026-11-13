@@ -35,12 +35,30 @@ describe('Surface encounters and item passives', () => {
           'distinct Forest Spirit initially manifests in reachable unseen forest')
         const spiritId=spirit.id
         const hp=spirit.hp=41
-        spirit.aware=false;spirit.alarmed=false
+        // An invisible hero standing beside the spirit must not make it vanish.
+        occupied.delete(keyXY(spirit.x,spirit.y))
+        spirit.x=player.x+1;spirit.y=player.y
+        occupied.add(keyXY(spirit.x,spirit.y))
+        player.invisibleTurns=10
+        enemyTurn() // Exercise the real invisibility path, not a manually cleared awareness flag.
+        check(!spirit.aware && !spirit.forestSpiritDormant && onCurrentLevel(spirit) &&
+          occupied.has(keyXY(spirit.x,spirit.y)) &&
+          AdaptivePlayerTrolling.serialize().forestSpiritRestTurns===0,
+          'invisibility at one-tile distance does not teleport the spirit away')
+        // Nearby non-dormant, unaware spirit must survive save/replay restore.
+        let saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
+        check(spirit && spirit.id===spiritId && !spirit.forestSpiritDormant &&
+          !spirit.aware && spirit.hp===hp,
+          'nearby lost-trail spirit remains physically present after restore')
+        // Successful escape: only after creating enough distance is it removed.
+        player.x+=8;player.y+=8
         turnCount++;AdaptivePlayerTrolling.onWorldTurn()
         check(spirit.forestSpiritDormant && !onCurrentLevel(spirit) &&
           AdaptivePlayerTrolling.serialize().forestSpiritRestTurns===0,
-          'lost trail immediately makes the same spirit dormant')
-        let saved=JSON.parse(JSON.stringify(buildSaveObject()))
+          'lost-trail spirit enters dormancy after the player escapes')
+        saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
         spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
         check(spirit && spirit.id===spiritId && spirit.forestSpiritDormant && spirit.hp===hp,

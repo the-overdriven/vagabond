@@ -140,7 +140,8 @@
     "chance": 0.3,
     "radius": 1,
     "activeRadius": 20,
-    "farVillageAvoidRadius": 20
+    "farVillageAvoidRadius": 20,
+    "farCadence": {"idleChance": 0.4, "roamChance": 0.2}
   },
   "npc": {
     "talkFreezeTurns": 6

@@ -10722,7 +10722,7 @@ placement rules and seeded random draws.
 | 32 | **Undead Warden** (`undead_shield_hunter`) | Reach **30 Marksmanship**. | An Undead Warden appears, blocking 75% of the first three landed arrow hits. |
 | 33 | **Depth Guardian** (`depth_guardian`) | Break **30 ordinary mineable walls** in the Dwarven Mines. | After a warning, a stone Guardian of the Deep appears on a connected passage. |
 | 34 | **Unfinished Business** (`unfinished_business`) | Wound **3 ordinary enemies below 25% HP** and leave them alive by disengaging. | One of the same survivors returns healed as a named Champion, retaining its enemy identity and gear. |
-| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface, retreats into dormancy and can return later. |
+| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface; after losing the trail it stays nearby until the player escapes, then withdraws for at least 100 surface turns. |
 | 36 | **Explorer Galleries** (`explorer_galleries`) | Explore **50% of reachable surface** and physically reach **both opposite world edges** on one axis. | On first visits to ruins galleries, 85% chance of a Champion shooter plus two extra archers. |
 | 37 | **Fort Quest** (`fort_quest`) | Reach **level 10** before ever visiting the Dwarven Fort; accept the Merchant’s commission. | Find the Dwarven Trade Ledger at **z:−5** and return it for **350g**. |
 | 38 | **Scroll Restock** (`scroll_restock`) | Successfully use **12 non-Identification scrolls** in one character’s life. | Merchant gains one extra copy of each scroll type used, including types not previously sold. |
@@ -11333,11 +11333,14 @@ species' natural melee and ranged attacks; Fear, invisibility, sleep and the
 Temple's sanctuary retain their normal priority. The hungry creature can
 pathfind around walls and doors on its current floor, but does not teleport
 or follow the player between floors. Outside normal aggression range, its
-scent-driven hunt follows the far-wandering rhythm: **40% idle, 20% attempted
-non-directed roaming, and 40% direct pathfinding toward the player** per
-monster action. Inside the ordinary aggression radius, normal combat AI takes
-over without this slowdown. The probabilities are configured in
-`content/adaptive_player_trolling.json` under `hungry_monster.pursuit`.
+scent-driven hunt uses the **same seeded movement-cadence decision** as
+`farWandering`: **40% idle, 20% attempted non-directed roaming, and 40%
+direct pathfinding toward the player** per monster action. This shares the
+same `enemyFarWanderAction()` roll and the same distant-hunter movement
+routine as Forest Spirit and Beast Hunter, but not the far wanderer's random
+cross-map destination. Inside the ordinary aggression radius, normal combat
+AI takes over without this slowdown. A single configuration at
+`content/enemy_config.json → wandering.farCadence` controls all four rhythms.
 
 The player may drop uncooked **Meat** from their inventory to divert it. A
 player-dropped pile within **six Chebyshev tiles** becomes the preferred goal
@@ -11365,8 +11368,9 @@ no ordinary prefix stat bonus is applied. At the next scheduled check on the
 surface, the hunter appears off-screen on connected, trap-free ground
 **12–28 tiles away**, in the current surface region and away from protected
 entrances. It starts aware and tries to follow the player beyond its ordinary aggression
-range with the **far-wandering cadence**: on every distant hunting action
-40% idle, 20% attempted non-directed roaming, and 40% pursuit pathfinding.
+range with the **shared far-wandering cadence**: on every distant hunting
+action 40% idle, 20% attempted non-directed roaming, and 40% pursuit
+pathfinding, configured in `content/enemy_config.json`.
 Only within ordinary aggro range does normal, faster combat AI take over. The player sees a **HUNTED!** cue at activation.
 It **can lose the trail**: out of ordinary aggression range, the standard
 speed-advantage disengagement roll applies (5 percentage points per SPD,
@@ -11396,15 +11400,24 @@ The Forest Spirit is a **tier-four spectral undead** with **90 HP, 13 ATK,
 natural spawn. Its green halo and distinct name identify it, including outside
 the forest. Its walking tile reuses Ghost artwork, but inspection and the
 Bestiary use the dedicated Forest Spirit portrait. Its species identity is
-unchanged. At a distance it stalks with **40% idle, 20% roaming, 40% pathfinding**
-per action; ordinary combat AI applies within its aggression range. The
+unchanged. At a distance it stalks with the shared **40% idle, 20% roaming,
+40% pathfinding** cadence configured for far wandering in
+`content/enemy_config.json`; ordinary combat AI applies within its aggression range. The
 standard speed-based loss-of-trail roll and existing concealment, invisibility
 and sanctuary rules still offer escapes.
 
-When the spirit loses the trail or the player descends underground, the **same
-living enemy** becomes dormant and disappears from active surface encounters.
-It cannot attack during this interval. After **100 gameplay turns actually
-spent on the surface**, it may reappear at an off-screen reachable location,
+When the spirit loses the trail (for example, to invisibility or a speed-based
+escape), it **stays physically on the map while within 6 Chebyshev tiles of
+the player**, even when adjacent. While unaware it cannot track or attack an
+invisible player and may wander normally; if invisibility expires nearby,
+normal aggression rules can let it reacquire the player. Only when the player
+and unaware spirit are at least **6 tiles apart** does the **same living
+enemy** retreat into dormancy and disappear from active surface encounters.
+Descending underground still withdraws the spirit immediately, regardless of
+distance. The threshold is configurable at `forest_spirit.minWithdrawDistance`
+in `content/adaptive_player_trolling.json`. The spirit cannot attack during
+dormancy. After **100 gameplay turns actually spent on the surface**, it may
+reappear at an off-screen reachable location,
 including outside a forest. If no safe spot exists, it retries every 10
 additional surface turns. The spirit retains its remaining HP, unique enemy ID,
 abilities and status; no new threat slot or kill/drop opportunity is created.

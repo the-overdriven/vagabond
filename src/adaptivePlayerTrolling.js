@@ -145,11 +145,6 @@ const AdaptivePlayerTrolling = (() => {
         JSON.stringify(beastHunter.monsterPool) !== JSON.stringify(['Spineback','Manticore']) ||
         beastHunter.monsterPool.some(name => !ENEMY_TEMPLATE_BY_NAME[name] ||
           ENEMY_TEMPLATE_BY_NAME[name].rarity < 0.08 || ENEMY_TEMPLATE_BY_NAME[name].rarity > 0.4) ||
-        !beastHunter.pursuit ||
-        !Number.isFinite(beastHunter.pursuit.idleChance) ||
-        !Number.isFinite(beastHunter.pursuit.roamChance) ||
-        beastHunter.pursuit.idleChance < 0 || beastHunter.pursuit.roamChance < 0 ||
-        beastHunter.pursuit.idleChance + beastHunter.pursuit.roamChance >= 1 ||
         !Number.isInteger(beastHunter.minTier) || beastHunter.minTier < 1 ||
         !Number.isInteger(beastHunter.minHp) || beastHunter.minHp < 1 ||
         !Number.isInteger(beastHunter.minAtk) || beastHunter.minAtk < 1 ||
@@ -179,14 +174,11 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(spirit.minDistinctForagedForestTiles) || spirit.minDistinctForagedForestTiles < 1 ||
         !Number.isInteger(spirit.returnSurfaceTurns) || spirit.returnSurfaceTurns < 1 ||
         !Number.isInteger(spirit.returnRetryInterval) || spirit.returnRetryInterval < 1 ||
+        !Number.isInteger(spirit.minWithdrawDistance) || spirit.minWithdrawDistance < 2 ||
         !Number.isInteger(spirit.minSpawnDistance) || spirit.minSpawnDistance <= UndergroundFov.RADIUS ||
         !Number.isInteger(spirit.maxSpawnDistance) || spirit.maxSpawnDistance < spirit.minSpawnDistance ||
         !Number.isInteger(spirit.minEntranceDistance) || spirit.minEntranceDistance < 1 ||
-        !Number.isInteger(spirit.maxCandidateSites) || spirit.maxCandidateSites < 1 ||
-        !spirit.pursuit || !Number.isFinite(spirit.pursuit.idleChance) ||
-        !Number.isFinite(spirit.pursuit.roamChance) ||
-        spirit.pursuit.idleChance < 0 || spirit.pursuit.roamChance < 0 ||
-        spirit.pursuit.idleChance + spirit.pursuit.roamChance >= 1)
+        !Number.isInteger(spirit.maxCandidateSites) || spirit.maxCandidateSites < 1)
       throw new Error('Invalid adaptive Forest Spirit settings.')
     const survivor = value.events.last_survivor
     if (!survivor || survivor.type !== 'bestiary_species_retaliation' ||
@@ -560,10 +552,6 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isFinite(hungry.healthMultiplier) || hungry.healthMultiplier <= 0 || hungry.healthMultiplier >= 1 ||
         !Number.isFinite(hungry.defenseMultiplier) || hungry.defenseMultiplier <= 0 || hungry.defenseMultiplier >= 1 ||
         !Number.isFinite(hungry.attackMultiplier) || hungry.attackMultiplier <= 1 ||
-        !hungry.pursuit || !Number.isFinite(hungry.pursuit.idleChance) ||
-        !Number.isFinite(hungry.pursuit.roamChance) ||
-        hungry.pursuit.idleChance < 0 || hungry.pursuit.roamChance < 0 ||
-        hungry.pursuit.idleChance + hungry.pursuit.roamChance >= 1 ||
         !Number.isInteger(hungry.droppedMeatDetectionRange) || hungry.droppedMeatDetectionRange < 1 ||
         hungry.meatUnitsEaten !== 1 ||
         !Number.isInteger(hungry.minSpawnDistance) || hungry.minSpawnDistance <= UndergroundFov.RADIUS ||
@@ -3243,6 +3231,29 @@ const AdaptivePlayerTrolling = (() => {
   // Runs after ordinary Fear, sanctuary and invisibility checks, so meat
   // doesn't bypass established protections. One movement or one eating action
   // is resolved here; damage and pathing never depend on animation timing.
+  // A shared far-wandering cadence for distant adaptive hunters. The roll is
+  // owned by enemyFarWanderAction(); only the desired destination differs.
+  // No animation state, additional RNG or persistent flag is involved.
+  function takeDistantHunterCadenceTurn(enemy) {
+    const action = enemyFarWanderAction()
+    if (action === 'idle') return true
+    if (action === 'roam') {
+      const sites=[]
+      for (const [dx,dy] of DIRS8) {
+        const x=enemy.x+dx,y=enemy.y+dy
+        if (!enemyCanPathThrough(enemy,x,y) || occupied.has(keyXY(x,y)) ||
+            enemyWanderTrapBlocked(enemy,map,x,y) ||
+            (x===player.x && y===player.y)) continue
+        sites.push({x,y})
+      }
+      if (sites.length) enemyStepTowardPlayer(enemy,pick(sites))
+      return true
+    }
+    const step=enemyFindStep(enemy,true)
+    if (step) enemyStepTowardPlayer(enemy,step)
+    return true
+  }
+
   function takeHungryMonsterTurn(enemy) {
     if (!active() || enemy?.adaptiveEventId!=='hungry_monster' ||
         !enemy.alive || enemy.hp<=0 || !onCurrentLevel(enemy)) return false
@@ -3279,26 +3290,9 @@ const AdaptivePlayerTrolling = (() => {
     // At normal combat range, defer to the species' existing attack, spells,
     // missile choice and defense behavior. Beyond it, actively seek the hero.
     if (distance<=Math.max(ATTACK_RANGE,effectiveAggroRange(enemy))) return false
-    // Beyond aggro range, this hunter tracks scents at the far-wandering
-    // cadence instead of homing in on the player every turn. Dropped meat
-    // has already taken priority above this block.
+    // Dropped meat has already taken priority above this shared cadence.
     enemy.aware=true
-    const {idleChance,roamChance}=cfg.pursuit, roll=rng()
-    if(roll<idleChance)return true
-    if(roll<idleChance+roamChance) {
-      const sites=[]
-      for(const [dx,dy] of DIRS8) {
-        const x=enemy.x+dx,y=enemy.y+dy
-        if(!enemyCanPathThrough(enemy,x,y) || occupied.has(keyXY(x,y)) ||
-            enemyWanderTrapBlocked(enemy,map,x,y) || (x===player.x && y===player.y))continue
-        sites.push({x,y})
-      }
-      if(sites.length)enemyStepTowardPlayer(enemy,pick(sites))
-      return true
-    }
-    const step=enemyFindStep(enemy,true)
-    if(step)enemyStepTowardPlayer(enemy,step)
-    return true
+    return takeDistantHunterCadenceTurn(enemy)
   }
 
 
@@ -4106,7 +4100,9 @@ const AdaptivePlayerTrolling = (() => {
     const enemy=forestSpiritEntity()
     if (!enemy) return
     if (!enemy.forestSpiritDormant) {
-      if (!enemy.aware) withdrawForestSpirit(enemy)
+      const distance=Math.max(Math.abs(enemy.x-player.x),Math.abs(enemy.y-player.y))
+      if (!enemy.aware && distance>=config.events.forest_spirit.minWithdrawDistance)
+        withdrawForestSpirit(enemy)
       return
     }
     state.forestSpiritRestTurns++
@@ -4133,25 +4129,14 @@ const AdaptivePlayerTrolling = (() => {
     const distance=Math.max(Math.abs(enemy.x-player.x),Math.abs(enemy.y-player.y))
     if(distance<=Math.max(ATTACK_RANGE,effectiveAggroRange(enemy)))return false
     if(chance(speedChaseChance(playerSpd()-enemySpd(enemy)))) {
-      withdrawForestSpirit(enemy)
+      enemy.aware=false;enemy.alarmed=false
+      enemy.alarmedZ=null;enemy.alarmedLevelKind=null
+      // A nearby spirit must not blink out while the player watches it.
+      if(distance>=config.events.forest_spirit.minWithdrawDistance)
+        withdrawForestSpirit(enemy)
       return true
     }
-    const {idleChance,roamChance}=config.events.forest_spirit.pursuit,roll=rng()
-    if(roll<idleChance)return true
-    if(roll<idleChance+roamChance) {
-      const sites=[]
-      for(const [dx,dy] of DIRS8) {
-        const x=enemy.x+dx,y=enemy.y+dy
-        if(!enemyCanPathThrough(enemy,x,y) || occupied.has(keyXY(x,y)) ||
-            enemyWanderTrapBlocked(enemy,map,x,y) || x===player.x && y===player.y)continue
-        sites.push({x,y})
-      }
-      if(sites.length)enemyStepTowardPlayer(enemy,pick(sites))
-      return true
-    }
-    const step=enemyFindStep(enemy,true)
-    if(step)enemyStepTowardPlayer(enemy,step)
-    return true
+    return takeDistantHunterCadenceTurn(enemy)
   }
 
   function activeAdaptivePursuit() {
@@ -4218,26 +4203,8 @@ const AdaptivePlayerTrolling = (() => {
         spawnDamageNumber(enemy.x,enemy.y,'Lost scent','#bccebb')
       return false
     }
-    // Same movement rhythm as far wandering: 40% idle, 20% attempt a
-    // non-directed wander and 40% purposeful tracking. Never fall through to
-    // normal always-toward-player AI while still on the distant trail.
-    const roll = rng(), behavior = config.events.beast_hunter.pursuit
-    if (roll < behavior.idleChance) return true
-    if (roll < behavior.idleChance + behavior.roamChance) {
-      const options=[]
-      for (const [dx,dy] of DIRS8) {
-        const x=enemy.x+dx,y=enemy.y+dy
-        if (!enemyCanPathThrough(enemy,x,y) || occupied.has(keyXY(x,y)) ||
-            enemyWanderTrapBlocked(enemy,map,x,y) ||
-            (x===player.x && y===player.y)) continue
-        options.push({x,y})
-      }
-      if (options.length) enemyStepTowardPlayer(enemy,pick(options))
-      return true
-    }
-    const step = enemyFindStep(enemy,true)
-    if (step) enemyStepTowardPlayer(enemy,step)
-    return true
+    // The same cadence as real far wandering; hunting goals differ.
+    return takeDistantHunterCadenceTurn(enemy)
   }
 
   // These special hunters track the player outside ordinary aggression range.
