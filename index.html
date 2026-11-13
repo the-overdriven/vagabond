@@ -8200,6 +8200,12 @@ more difficult:
         return
       }
       skeleton.looted = true
+      // Only Fort and Dwarven Ruins graves count for the Debt Collector.
+      // Inspect the active floor rather than assuming every underground skeleton is dwarven.
+      if (skeleton.levelKind === 'chain' && (
+        (currentZ === -3 && map === depthUndergroundMap(3)) ||
+        currentDungeonPackageId() === 'dwarvenRuins'))
+        AdaptivePlayerTrolling.onDwarvenRemainsSearched()
       if (skeleton.dungeonKey?.keyId) {
         addInventoryItem('dwarvenkey', {keyId:skeleton.dungeonKey.keyId, progressionKey:!!skeleton.dungeonKey.progressionKey})
         skeleton.dungeonKey = null

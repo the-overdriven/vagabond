@@ -10704,7 +10704,7 @@ placement rules and seeded random draws.
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
 | 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
 | 10 | **The Previous Owner** (`previous_owner`) | Wear the **same cursed artifact for 300 gameplay turns**. | Its named former owner appears as a Ghost that recognizes the item and pursues while it is worn. |
-| 11 | **Debt Collector** (`debt_collector`) | Search **10 distinct dwarven remains**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
+| 11 | **Debt Collector** (`debt_collector`) | Search **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
 | 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
 | 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
@@ -11609,9 +11609,15 @@ are visible through tile feedback, message and enemy tooltip. Encounter
 eligibility, the selected outcome, timing, remaining guest and ground reward
 survive ordinary saves and replay. Ordinary worlds never track the trigger.
 
-**Debt Collector:** Searching **10 distinct dwarven remains** (including
-fort `ruinprop` remains) makes a unique dwarven Ghost eligible on either of
-the last two Dwarven Ruins floors. The encounter uses the same depth-weighted,
+**Debt Collector:** Searching **10 distinct searchable grave objects** across
+the Dwarven Fort and Dwarven Ruins — `dwarvenremains`, Fort `ruinprop`, or
+`skeleton` — makes a unique dwarven Ghost eligible on either of the last two
+Dwarven Ruins floors. Only skeletons on the Fort/Ruins maps count; skeletons
+in caves, the Crypt, mines, and other regions do not. Every distinct first
+search counts, even when it yields no loot or only a progression key. Searching
+an already-looted object never increments the counter. All grave types share
+the existing `dwarvenRemainsSearched` save/replay counter; skeleton loot is
+unchanged and is not marked as dwarven loot for the Ghost's payment demand. The encounter uses the same depth-weighted,
 equal-candidate lottery and occupies one of the two optional threat slots.
 It appears on reachable, trap-safe ground, at least 10 tiles away and outside
 sight. It reuses the Ghost walking sprite and combat profile (36 HP, 9 ATK,

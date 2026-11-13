@@ -637,6 +637,59 @@ describe('Dwarven Ruins encounter progression', () => {
 
 
 
+  it('counts only first searches of skeletons in the Dwarven Fort and Ruins for Debt Collector', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check = (ok, msg) => {if (!ok) throw Error(msg)}
+      const before = JSON.parse(JSON.stringify(buildSaveObject()))
+      try {
+        activeWorldTraits = [{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        const fort = deepLevels[1]
+        const ruins = deepLevels.find(level => level.dungeonPackage === 'dwarvenRuins')
+        const cave = deepLevels[0]
+        const mines = deepLevels.find(level => level.kind === 'dwarvenMines')
+        check(!!fort && !!ruins && !!cave && !!mines, 'all test habitats exist')
+        const counter = () => AdaptivePlayerTrolling.serialize().dwarvenRemainsSearched
+        function searchSkeleton(level, kind, key = false) {
+          currentZ = chainZForDepth(deepLevels.indexOf(level) + 2)
+          currentCave = -1
+          map = level.map
+          undergroundDiscovered = level.discovered
+          player.x = 20; player.y = 20
+          groundItems = [{kind:'skeleton', x:20, y:20, level:currentZ, levelKind:'chain',
+            caveIndex:-1, looted:false, hasLoot:false,
+            ...(key ? {dungeonKey:{keyId:'collector-test-key',progressionKey:false}} : {})}]
+          const start = counter()
+          lootSkeletonOrForage()
+          const found = groundItems[0]
+          check(found.looted === true, 'skeleton was actually searched')
+          check(counter() === start + (kind === 'dwarven' ? 1 : 0),
+            'only Fort/Ruins skeletons count toward the debt trigger')
+          lootSkeletonOrForage()
+          check(counter() === start + (kind === 'dwarven' ? 1 : 0),
+            'repeat search never increments the count')
+        }
+        searchSkeleton(fort, 'dwarven') // empty Fort skeleton
+        searchSkeleton(ruins, 'dwarven') // empty Ruins skeleton
+        searchSkeleton(ruins, 'dwarven', true) // a key-bearing corpse counts too
+        searchSkeleton(cave, 'other') // natural cave skeletons do not count
+        searchSkeleton(mines, 'other') // mine skeletons do not count
+        check(counter() === 3, 'only the three dwarven searches were counted')
+        for (let i = 0; i < 6; i++) searchSkeleton(ruins, 'dwarven')
+        check(counter() === 9, 'nine qualifying searches remain below the threshold')
+        const saved = JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved)
+        check(counter() === 9, 'counter survives save and restore')
+        searchSkeleton(ruins, 'dwarven')
+        check(counter() === 10, 'the tenth qualifying search reaches the threshold')
+        check(!AdaptivePlayerTrolling.serialize().dwarvenGoldLoot.length,
+          'searching empty skeletons never fabricates loot provenance')
+      } finally {
+        loadGameFromObject(before)
+      }
+    })()`))
+  })
+
   it('randomly demands recovered dwarven items or gold purses and remembers payment decisions', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
