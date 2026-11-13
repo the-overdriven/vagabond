@@ -10236,6 +10236,25 @@ more difficult:
     return 'grass'
   }
 
+  // Share the grass/sand edge choice between the playable surface and the
+  // tower's read-only surface backdrop. The two layers have different maps.
+  function sandGrassBlendImage(visual, terrain, x, y) {
+    const grassLike = tile => tile === 'grass' || tile === 'forest'
+    const n = grassLike(terrain?.[y - 1]?.[x])
+    const e = grassLike(terrain?.[y]?.[x + 1])
+    const s = grassLike(terrain?.[y + 1]?.[x])
+    const w = grassLike(terrain?.[y]?.[x - 1])
+    if (n && w) return visual.blendGrassNWImage
+    if (n && e) return visual.blendGrassNEImage
+    if (s && w) return visual.blendGrassSWImage
+    if (s && e) return visual.blendGrassSEImage
+    if (n) return visual.blendGrassNImage
+    if (s) return visual.blendGrassSImage
+    if (w) return visual.blendGrassWImage
+    if (e) return visual.blendGrassEImage
+    return null
+  }
+
   function terrainVisual(tileKey, x, y) {
     if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
         ['dwarvendoorclosed','dwarvendooropen'].includes(tileKey)) return (
@@ -10308,7 +10327,6 @@ more difficult:
     const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
     const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver' || isLakeIce(t)
     const isSandTile = t => t === 'sand'
-    const isGrassLikeTile = t => t === 'grass' || t === 'forest'
     const isSnowLikeTile = t => t === 'snow' || t === 'taiga' || t === 'snowmountain'
 
     // Transparent props/landmarks inherit the biome underneath them. When one
@@ -10365,23 +10383,7 @@ more difficult:
     }
 
     if (tileKey === 'sand') {
-      const n = tileAt(x, y - 1)
-      const e = tileAt(x + 1, y)
-      const s = tileAt(x, y + 1)
-      const w = tileAt(x - 1, y)
-      const grassN = isGrassLikeTile(n)
-      const grassE = isGrassLikeTile(e)
-      const grassS = isGrassLikeTile(s)
-      const grassW = isGrassLikeTile(w)
-      let image = null
-      if (grassN && grassW) image = visual.blendGrassNWImage
-      else if (grassN && grassE) image = visual.blendGrassNEImage
-      else if (grassS && grassW) image = visual.blendGrassSWImage
-      else if (grassS && grassE) image = visual.blendGrassSEImage
-      else if (grassN) image = visual.blendGrassNImage
-      else if (grassS) image = visual.blendGrassSImage
-      else if (grassW) image = visual.blendGrassWImage
-      else if (grassE) image = visual.blendGrassEImage
+      const image = sandGrassBlendImage(visual, map, x, y)
       if (image) return {...visual, image}
     }
 
@@ -10472,13 +10474,18 @@ more difficult:
     return drewBase || drewMain
   }
 
-  function treeCanopyVisualAt(mx, my) {
-    if (currentZ !== 0 || !map?.[my]?.[mx]) return null
-    const tileKey = map[my][mx]
+  // The tower's outside surface uses the same canopy as ordinary surface play,
+  // even though the active floor map is the tower rather than surfaceMap.
+  function surfaceTreeCanopyVisualAt(mx, my, terrain = surfaceMap) {
+    const tileKey = terrain?.[my]?.[mx]
     if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return towerGrassTreeVisual(mx, my)
     if (tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53)
     if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my)
     return null
+  }
+
+  function treeCanopyVisualAt(mx, my) {
+    return currentZ === 0 && map?.[my]?.[mx] ? surfaceTreeCanopyVisualAt(mx, my, map) : null
   }
 
   function drawTreeCanopyOverlayAt(mx, my, alpha = 1) {

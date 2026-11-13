@@ -92,6 +92,64 @@ describe('Guaranteed elevated tower',()=>{
       })()`)).to.equal(true)
     })
   })
+  it('occludes surface monsters with trees below the tower and avoids square sand patches',()=>{
+    cy.viewport(1280,800);loadTower()
+    cy.window().then(win=>{
+      const result=win.eval(`(()=>{
+        const saved={currentZ,map,enemies,useTiles:USE_TILE_IMAGES,
+          drawEnemyVisual,drawImageVisual,enemyHasAbility}
+        const x=tower.x-2,y=tower.y+4,key=keyXY(x,y)
+        const savedTile=surfaceMap[y][x],savedUnderlay=tileUnderlays[key]
+        const savedDiscovery=discovered[y][x]
+        const wasForaged=foragedTiles.has(key)
+        try {
+          const template=enemies.find(e=>e.alive&&(e.level??0)===0)
+          if(!template)throw Error('Missing surface enemy in tower fixture')
+          currentZ=4;map=towerLevels[3].map;USE_TILE_IMAGES=true
+          surfaceMap[y][x]='forest';tileUnderlays[key]='sand';discovered[y][x]=true
+          foragedTiles.delete(key)
+          const ground=towerBackgroundGround('forest',x,y)
+          const sand=RENDER_STYLE.terrainTiles.sand
+          const blend=sandGrassBlendImage(sand,[['forest','sand']],1,0)
+          const e={...template,x,y,level:0,levelKind:'surface',abilities:[],
+            animStart:undefined,invisibleUntilTurn:0,wallAmbushHidden:false,pendingAbility:null}
+          enemies=[e]
+          const draws=[]
+          drawEnemyVisual=()=>draws.push('enemy')
+          drawImageVisual=(px,py,visual)=>{draws.push(visual?.image==='img/tiles/forest-tree.png'?'forest':'other');return true}
+          enemyHasAbility=(enemy,ability)=>ability==='fly'?e.flying:saved.enemyHasAbility(enemy,ability)
+          const check=()=>{
+            draws.length=0;drawTowerSurfaceMonsters(performance.now());return [...draws]
+          }
+          const groundRoof=check()
+          currentZ=2;map=towerLevels[1].map
+          const groundRoom=check()
+          e.flying=true
+          const flying=check()
+          USE_TILE_IMAGES=false;e.flying=false
+          const ascii=check()
+          return {ground,blend:blend===sand.blendGrassWImage,
+            groundRoof,groundRoom,flying,ascii}
+        } finally {
+          currentZ=saved.currentZ;map=saved.map;enemies=saved.enemies
+          USE_TILE_IMAGES=saved.useTiles
+          drawEnemyVisual=saved.drawEnemyVisual;drawImageVisual=saved.drawImageVisual
+          enemyHasAbility=saved.enemyHasAbility
+          surfaceMap[y][x]=savedTile;discovered[y][x]=savedDiscovery
+          if(wasForaged)foragedTiles.add(key)
+          if(savedUnderlay===undefined)delete tileUnderlays[key]
+          else tileUnderlays[key]=savedUnderlay
+          render()
+        }
+      })()`)
+      expect(result.ground).to.equal('grass')
+      expect(result.blend).to.equal(true)
+      for(const order of [result.groundRoof,result.groundRoom])
+        expect(order).to.deep.equal(['enemy','forest'])
+      expect(result.flying).to.deep.equal(['enemy'])
+      expect(result.ascii).to.deep.equal(['enemy'])
+    })
+  })
   for(const [name,width,height] of [['desktop',1280,800],['mobile',390,844]]) {
     it(`hides the surface rooms and changes the exterior perspective on ${name}`,()=>{
       cy.viewport(width,height);loadTower()

@@ -288,12 +288,18 @@ function towerBackgroundVisual(tile, x, y) {
     else if (sameLeft) image=base.rightImage || base.middleImage || base.image
     else image=base.singleImage || base.image || base.middleImage
   }
+  // Unlike the current tower map, the surface map knows which sandy edges
+  // touch grass or forest. Use the same connector selection as ground level.
+  if (tile === 'sand') image = sandGrassBlendImage(base, surfaceMap, x, y) || image
   return coordinateVisualVariant({...base,image},x,y,0)
 }
 
 function towerBackgroundGround(tile,x,y) {
   if(tile==='taiga'||tile==='snowmountain')return 'snow'
-  if(['forest','ancientForest','hill','mountain','boulder'].includes(tile)) {
+  // A forest is a tree over grass on the surface, even if its worldgen underlay
+  // records old sand. Reusing that sand here created square dirt patches.
+  if(tile==='forest'||tile==='ancientForest')return 'grass'
+  if(['hill','mountain','boulder'].includes(tile)) {
     const saved=tileUnderlays[keyXY(x,y)]
     return saved==='snow'||saved==='sand' ? saved : 'grass'
   }
@@ -388,6 +394,8 @@ function towerSurfaceMonsterVisible(e) {
 // inspection/range/target lists, and so cannot reveal awareness or aggro.
 function drawTowerSurfaceMonsters(now) {
   if (currentZ <= 0 || !tower) return
+  const canopyTiles = new Set()
+  const flying = []
   for (const e of enemies) {
     if (!towerSurfaceMonsterVisible(e)) continue
     let x = e.x, y = e.y
@@ -405,8 +413,25 @@ function drawTowerSurfaceMonsters(now) {
     if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
     // Use ordinary species artwork in tile mode and its glyph in ASCII.
     // Do not expose upstairs combat indicators or targeting overlays.
-    drawEnemyVisual(vx, vy, e)
+    if (enemyHasAbility(e, 'fly')) {
+      flying.push({vx, vy, enemy:e})
+    } else {
+      drawEnemyVisual(vx, vy, e)
+      canopyTiles.add(keyXY(e.x, e.y))
+      if (e.animStart !== undefined) canopyTiles.add(keyXY(e.animFromX, e.animFromY))
+    }
   }
+  // Exactly as on the playable surface, stationary/moving ground creatures
+  // remain behind tree crowns. Do not redraw undiscovered or tower cells.
+  if (USE_TILE_IMAGES) for (const key of canopyTiles) {
+    const [x, y] = key.split(',').map(Number)
+    if (!discovered[y]?.[x] || map[y]?.[x] !== 'towervoid') continue
+    const visual = surfaceTreeCanopyVisualAt(x, y)
+    if (visual) drawImageVisual(Math.round((x-camX)*TILE_PX),
+      Math.round((y-camY)*TILE_PX), visual)
+  }
+  // Flying creatures keep the existing above-canopy privilege.
+  for (const {vx, vy, enemy} of flying) drawEnemyVisual(vx, vy, enemy)
 }
 
 // A single, inexpensive screen-space pass darkens the outside world, including

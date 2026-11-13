@@ -9045,10 +9045,14 @@ NPCs and effects remain hidden. Climbing does not reveal additional surface
 tiles. The source is the existing surface map, not a regenerated world.
 
 The renderer draws only previously explored background cells in the viewport, beneath the current floor.
-Surface scenery uses the same deterministic tile variants and grassland tree
-sprites as ground level. Rocky terrain overrides any stale forest underlay;
-rocks and trees are never composited on the same background tile. Per-tile
-desaturation filters are deliberately omitted to keep movement responsive.
+Surface scenery uses the same deterministic tile variants, forest grass
+underlays and sand-to-grass transitions as ground level; old sand metadata
+under forest trees must not create square patches around the tower. Ground
+creatures seen below are covered by tree canopies, including while moving;
+flying creatures remain visible above them. Rocky terrain overrides any stale
+forest underlay; rocks and trees are never composited on the same background
+tile. Per-tile desaturation filters are deliberately omitted to keep movement
+responsive.
 On enclosed upper floors (`z:+1` through `z:+3`), a 50% black overlay
 covers only the outside surface, including its monsters. The summit (`z:+4`)
 leaves this view undarkened. Tower walls, interiors, actors and items are never
