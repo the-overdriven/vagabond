@@ -11716,17 +11716,20 @@ updates these diagnostic flags; they are historical observations, so an already
 true condition is not repeatedly evaluated. Explorer Galleries separately use
 the saved exploration milestone to retain qualification. Logging never consumes RNG.
 
-`adaptivePlayerTrolling.debugTrolling` is a persisted tester boolean, `true`
-by default for a new character and in the tester starting save. Existing
-saves and replay snapshots restore their explicit value. Disable it with
-`AdaptivePlayerTrolling.setDebugTrolling(false)` in the browser console. When
-active, the normal message log reports **the first time each trigger condition
-is observed**, scheduled checkpoint numbers, and successful special spawns
-with location/slot details. A new save or replay restores the same setting;
-tester messages use **bold white** text in the game log (including older
-entries, which do not fade); logging does not consume gameplay RNG or change
-movement, drops or encounter probabilities. It is disabled automatically in ordinary worlds because the
-adaptive system is inactive there.
+`content/adaptive_player_trolling.json -> debugTrolling` controls diagnostic
+`[TROLLING]` messages (boolean; `true` by default). This is a **game
+configuration setting**, not character progress: it is not stored in saves or
+replay snapshots. Editing the JSON and reloading the game changes logging for
+new and existing characters, regardless of their saved state. For temporary
+in-session testing, use `AdaptivePlayerTrolling.setDebugTrolling(false)` (or
+`true`) in the browser console. The override resets on configuration reload,
+character reset, or save/replay restoration; the JSON setting then applies.
+When enabled, the normal message log reports **the first time each trigger
+condition is observed**, scheduled checkpoint numbers, and successful special
+spawns with location/slot details. Tester messages use **bold white** text in
+the game log (including older entries, which do not fade). Logging does not
+consume RNG or change movement, drops, or encounter probabilities. It is
+inactive in ordinary worlds because Adaptive Player Trolling itself is inactive.
 
 ## Persistence and balance
 

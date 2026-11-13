@@ -5,6 +5,7 @@
    This module does not start an animation or consume idle-time randomness. */
 const AdaptivePlayerTrolling = (() => {
   let config = null
+  let debugTrollingOverride = null
   let monsterNames = []
   // Stable tester-facing keys, including planned but not yet implemented reactions.
   const TRIGGER_IDS = ['venom_eater', 'opposite_weapon', 'neglected_shield', 'unread_scrolls', 'undead_shield_hunter', 'oculus', 'strong_enemy_hunter', 'unfinished_business', 'hidden_leader', 'nemesis', 'last_survivor', 'beast_hunter', 'humanoid_hunter', 'forest_spirit', 'ancient_scarab', 'trogloraptor_ambush', 'depth_guardian', 'explorer_galleries', 'gold_imp', 'hungry_monster', 'relieved_thief', 'unsold_equipment', 'merchant_expansion', 'fan_club', 'ignored_mushroom_cleaning', 'mushroom_prophet', 'debt_collector', 'uninvited_guest', 'previous_owner', 'early_descent', 'fort_quest', 'unused_scroll_ambush', 'unused_healing', 'low_hp_carrion', 'reckless_fighter', 'drowning_lure', 'trap_lure', 'self_fireball', 'strange_green_potion']
@@ -25,7 +26,7 @@ const AdaptivePlayerTrolling = (() => {
     strongFightsInitiated: [], hiddenLeaderKills: [],
     unfinishedFightCandidates: [], unfinishedLastAttackTurn: null, unfinishedEscapes: [],
     shieldlessFights: 0, shieldlessFightLastAttackTurn: null, shieldlessFightEligible: false,
-    recklessLowHpFights: 0, caveVisit: null, debugTrolling: true,
+    recklessLowHpFights: 0, caveVisit: null,
     triggerFlags: Object.fromEntries(TRIGGER_IDS.map(id => [id, false]))})
   let state = fresh()
   // Derived runtime data only: never serialized, never a second statistics ledger.
@@ -99,6 +100,7 @@ const AdaptivePlayerTrolling = (() => {
 
   function configure(value, nameData) {
     if (!value || value.schema !== 29 || typeof value.enabled !== 'boolean' ||
+        typeof value.debugTrolling !== 'boolean' ||
         !value.events || !value.limits || !value.defaults)
       throw new Error('Invalid adaptive player trolling configuration.')
     const schedule = value.activationChecks
@@ -654,6 +656,7 @@ const AdaptivePlayerTrolling = (() => {
       throw new Error('Invalid monster name pool (requires at least 50 unique names).')
     monsterNames = nameData.names.slice()
     config = structuredClone(value)
+    debugTrollingOverride = null
     clearDerivedState()
   }
 
@@ -663,7 +666,7 @@ const AdaptivePlayerTrolling = (() => {
     return !!config?.enabled && activeWorldTraits.length > 0
   }
 
-  function reset() { state = fresh(); clearDerivedState() }
+  function reset() { state = fresh(); debugTrollingOverride = null; clearDerivedState() }
 
   function serialize() {
     // No RNG or gameplay mutation during save. Flags are maintained at action
@@ -671,12 +674,15 @@ const AdaptivePlayerTrolling = (() => {
     return structuredClone(state)
   }
 
-  // Enable in the dev console with AdaptivePlayerTrolling.setDebugTrolling(true)
-  // or edit adaptivePlayerTrolling.debugTrolling in a saved JSON file.
-  // Logging must never draw RNG or change gameplay decisions.
+  // Configured in content/adaptive_player_trolling.json. The console override
+  // is temporary and does not enter saves or replays. Logging never draws RNG.
+  function debugTrollingEnabled() {
+    return debugTrollingOverride ?? !!config?.debugTrolling
+  }
+
   function setDebugTrolling(enabled) {
     if (typeof enabled !== 'boolean') return false
-    state.debugTrolling = enabled
+    debugTrollingOverride = enabled
     if (enabled && active()) {
       log('[TROLLING] Debug messages enabled. Ready flags and completed events are stored in the save.', 'trolling-debug')
       syncTriggerFlags()
@@ -685,7 +691,7 @@ const AdaptivePlayerTrolling = (() => {
   }
 
   function debugEvent(message) {
-    if (state.debugTrolling && active()) log(`[TROLLING] ${message}`, 'trolling-debug')
+    if (debugTrollingEnabled() && active()) log(`[TROLLING] ${message}`, 'trolling-debug')
   }
 
   function markTrigger(id) {
@@ -770,7 +776,6 @@ const AdaptivePlayerTrolling = (() => {
           !(kind === 'homecomingscroll' || kind.startsWith('scrollOf')) || !itemDefinition(kind)) ||
         new Set(saved.scrollKindsUsed).size !== saved.scrollKindsUsed.length ||
         !Array.isArray(saved.completed) || !saved.floorThreats || !saved.events ||
-        typeof saved.debugTrolling !== 'boolean' ||
         !saved.triggerFlags || typeof saved.triggerFlags !== 'object' ||
         Array.isArray(saved.triggerFlags) ||
         Object.keys(saved.triggerFlags).length !== TRIGGER_IDS.length ||
@@ -891,6 +896,7 @@ const AdaptivePlayerTrolling = (() => {
         new Set(saved.dwarvenGoldLoot.map(lot => lot.id)).size !== saved.dwarvenGoldLoot.length)
       throw new Error('Save is missing adaptive player trolling state.')
     clearDerivedState()
+    debugTrollingOverride = null
     state = {
       merchantSalesGold: saved.merchantSalesGold,
       merchantPurchasesGold: saved.merchantPurchasesGold,
@@ -898,7 +904,6 @@ const AdaptivePlayerTrolling = (() => {
       templeClearanceKills: saved.templeClearanceKills,
       scrollUses: saved.scrollUses,
       scrollKindsUsed: saved.scrollKindsUsed.slice(),
-      debugTrolling: saved.debugTrolling,
       triggerFlags: structuredClone(saved.triggerFlags),
       completed: saved.completed.slice(),
       floorThreats: structuredClone(saved.floorThreats),
@@ -4732,7 +4737,7 @@ const AdaptivePlayerTrolling = (() => {
     goldImpStealAmount, takeGoldImpTurn,
     onFloorChanged, onPlayerMoved, onNewSandDig, onMineMineralExtracted, onMineWallBroken,
     onPlayerTriggeredTrap, onWaterEntered, onWaterMoved, onDrowningDamage, onWaterExited,
-    configure, active, reset, serialize, restore, setDebugTrolling, syncTriggerFlags,
+    configure, active, reset, serialize, restore, setDebugTrolling, debugTrollingEnabled, syncTriggerFlags,
     completed, surfaceRegion, availableThreatSlots, recordThreat, dropRewardOnGround,
     tryNeglectedCombatGear, explorerExploration, tryExplorerGalleries,
     eligiblePreviousOwnerArtifacts, previousOwnerSpawnOptions, spawnPreviousOwner,

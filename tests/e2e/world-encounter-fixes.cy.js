@@ -554,7 +554,7 @@ describe('Surface encounters and item passives', () => {
     })()`))
   })
 
-  it('saves all trolling trigger flags and enables deterministic tester logging', () => {
+  it('persists trigger flags while reading debug logging from JSON configuration', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -564,8 +564,9 @@ describe('Surface encounters and item passives', () => {
         let state=AdaptivePlayerTrolling.serialize()
         check(Object.keys(state.triggerFlags).length===39 &&
           Object.values(state.triggerFlags).every(v=>v===false) &&
-          state.debugTrolling===true,
-          'all 39 trigger flags start false while diagnostic logging defaults to true')
+          AdaptivePlayerTrolling.debugTrollingEnabled()===true &&
+          !Object.hasOwn(state,'debugTrolling'),
+          'all 39 flags start false and debug logging comes from JSON, not save state')
         check(AdaptivePlayerTrolling.setDebugTrolling(true),'debug switch is available')
         const debugMessages=[...document.querySelectorAll('#logpanel > div.trolling-debug')]
         check(debugMessages.length>0 &&
@@ -576,7 +577,7 @@ describe('Surface encounters and item passives', () => {
         player.gold=2001
         AdaptivePlayerTrolling.syncTriggerFlags()
         state=AdaptivePlayerTrolling.serialize()
-        check(state.debugTrolling && state.triggerFlags.beast_hunter &&
+        check(AdaptivePlayerTrolling.debugTrollingEnabled() && state.triggerFlags.beast_hunter &&
           state.triggerFlags.gold_imp && !state.triggerFlags.relieved_thief &&
           !state.completed.includes('beast_hunter'),
           'ready means threshold observed; it does not spawn or complete events')
@@ -588,16 +589,24 @@ describe('Surface encounters and item passives', () => {
         const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(snapshot,{isReplayInit:true})
         state=AdaptivePlayerTrolling.serialize()
-        check(state.debugTrolling && state.triggerFlags.beast_hunter &&
+        check(AdaptivePlayerTrolling.debugTrollingEnabled() && state.triggerFlags.beast_hunter &&
           state.triggerFlags.gold_imp && !state.completed.includes('beast_hunter'),
-          'flags and diagnostic setting survive save and replay restoration')
+          'flags survive save and replay while diagnostics use JSON configuration')
         check(AdaptivePlayerTrolling.setDebugTrolling(false) &&
-          !AdaptivePlayerTrolling.serialize().debugTrolling,
-          'tester can disable debug logging')
+          !AdaptivePlayerTrolling.debugTrollingEnabled(),
+          'tester can temporarily disable debug logging')
+        const countBeforeQuiet=document.querySelectorAll('#logpanel > div.trolling-debug').length
+        player.killsBySpecies={Goblin:40}
+        AdaptivePlayerTrolling.syncTriggerFlags()
+        check(AdaptivePlayerTrolling.serialize().triggerFlags.humanoid_hunter &&
+          document.querySelectorAll('#logpanel > div.trolling-debug').length===countBeforeQuiet,
+          'disabled logging still tracks triggers without adding debug messages')
         const quietSnapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        check(!Object.hasOwn(quietSnapshot.adaptivePlayerTrolling,'debugTrolling'),
+          'console debug overrides never enter save or replay snapshots')
         loadGameFromObject(quietSnapshot,{isReplayInit:true})
-        check(!AdaptivePlayerTrolling.serialize().debugTrolling,
-          'an explicitly disabled diagnostic setting survives replay initialization')
+        check(AdaptivePlayerTrolling.debugTrollingEnabled(),
+          'loading a replay restores the JSON debug default rather than a saved override')
         activeWorldTraits=[]
         AdaptivePlayerTrolling.reset()
         const inactiveState=JSON.stringify(AdaptivePlayerTrolling.serialize())
