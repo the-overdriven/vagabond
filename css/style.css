@@ -2576,3 +2576,15 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     box-shadow: none; text-shadow: none; cursor: not-allowed;
   }
 }
+
+/* In-game warning for the one-way fort hole; native browser dialogs interrupt gameplay. */
+#holeJumpOverlay { z-index: 160; }
+#holeJumpOverlay .panelbox { width: min(380px, calc(100% - 32px)); }
+#holeJumpWarning { color: var(--parchment-dim); line-height: 1.55; }
+#holeJumpOverlay .closehint { display: flex; gap: 10px; justify-content: flex-end; }
+@media (max-width: 720px), (pointer: coarse) {
+  body.hole-jump-open #stage { position: relative; z-index: 150; }
+  #holeJumpOverlay { position: fixed; inset: 0; background: rgba(5, 4, 3, .76); }
+  #holeJumpOverlay .panelbox { box-sizing: border-box; width: min(380px, calc(100% - 28px)); }
+  #holeJumpOverlay .closehint button { min-height: 44px; }
+}

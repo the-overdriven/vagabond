@@ -2939,12 +2939,18 @@ part of the generic chain, while Crypt Level 2 entities are marked as `crypt2`,
 so enemies and items cannot appear or act on the wrong z:-2 map.
 
 Generic z:-2 caves have a **40% chance per world** of containing one reachable
-hole at least eight walking tiles from their ascent. Inspecting the hole asks
-for confirmation before a **one-way jump** to the original z:-3 Dwarven Fort
-entrance. The player cannot climb back up the hole and must exit through the
-fort gates. The drop never skips locked rooms or leads into the crypt, and is
-refused if the fort entrance is occupied. Both gameplay and replay use the
-saved deep-cave terrain and the usual fort gate coordinates.
+hole at least eight walking tiles from their ascent. Inspecting the hole opens
+an in-game confirmation before a **one-way jump** to z:-3. The player's
+**x/y coordinates never change**: a shaft at `(x,y,-2)` always lands at
+`(x,y,-3)`. The generator carves a walkable lower passage through unowned rock
+from that location to the Fort's accessible entrance hall, opening at most one
+wall of that hall. The passage is part of the existing shared z:-3 map, not a
+new floor, and does not bypass locked rooms. For an already-generated hole,
+the same deterministic connection can be established on first use; its carved
+terrain is saved normally. An occupied or obstructed landing prevents the jump.
+The player cannot climb back up the hole and must return to the surface through
+the fort gates. Both endpoints remain aligned under whole-world rotation and
+save/replay restoration.
 
 ## z:-3: Dwarven Fort
 
@@ -2952,8 +2958,10 @@ Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave. It is also D0, the entrance
 complex for the Dwarven Ruins.
 Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
-same coordinates. A one-way hole from a generic z:-2 cave can optionally lead
-to that fort entrance without creating a return passage or unlocking doors.
+same coordinates. A one-way hole from a generic z:-2 cave may land at its own
+matching x/y coordinates on z:-3, connected to the accessible Fort entrance
+area by a narrow physical passage without creating a return shaft or unlocking
+doors.
 A generated `dwarvenstairsdown` elsewhere on reachable fort marble begins the
 Ruins chain at z:-4. Generic `caveup` tiles still ascend to the preceding cave
 depth, including any encountered elsewhere on z:-3.

@@ -517,6 +517,16 @@ more difficult:
         <button class="slbtn npc-goodbye" id="btnNpcGoodbye" type="button">Goodbye</button>
       </div>
     </div>
+    <div class="overlay" id="holeJumpOverlay" role="dialog" aria-modal="true" aria-labelledby="holeJumpTitle" aria-describedby="holeJumpWarning">
+      <div class="panelbox">
+        <h2 id="holeJumpTitle">Jump into the hole?</h2>
+        <p id="holeJumpWarning">The shaft drops into the ruined Dwarven Fort. This jump is one-way: you must find your way out through the fort's main gates.</p>
+        <div class="closehint">
+          <button class="slbtn" id="btnHoleJumpCancel" type="button">Stay here</button>
+          <button class="slbtn" id="btnHoleJumpConfirm" type="button">Jump down</button>
+        </div>
+      </div>
+    </div>
     <div class="overlay" id="debtCollectorOverlay" role="dialog" aria-modal="true" aria-labelledby="debtCollectorTitle">
       <div class="panelbox" id="debtCollectorPanel">
         <div class="npc-dialogue-header">
@@ -1285,10 +1295,34 @@ more difficult:
     }
   }
 
+  let holeJumpOpen = false
+  function closeHoleJumpConfirmation() {
+    holeJumpOpen = false
+    document.getElementById('holeJumpOverlay').classList.remove('show')
+    document.body.classList.remove('hole-jump-open')
+  }
+
+  function openHoleJumpConfirmation() {
+    if (holeJumpOpen) return
+    clearAutoPath()
+    pendingMove = null
+    holeJumpOpen = true
+    document.getElementById('holeJumpOverlay').classList.add('show')
+    document.body.classList.add('hole-jump-open')
+    document.getElementById('btnHoleJumpCancel').focus()
+  }
+
   function inspect() {
-    if (surfaceCatchupBusy || enemyAttackPresentationPending()) return
-    if (currentZ === -2 && currentLevelKind() === 'chain' && map[player.y]?.[player.x] === 'dwarvenhole' &&
-        !replayPlaying && !window.confirm('Jump into the hole?\n\nIt drops into the ruined Dwarven Fort. This is ONE-WAY: you cannot climb back up. You must find your way out through the fort\'s main gates.')) return
+    if (surfaceCatchupBusy || enemyAttackPresentationPending() || holeJumpOpen) return
+    if (!replayPlaying && currentZ === -2 && currentLevelKind() === 'chain' &&
+        map[player.y]?.[player.x] === 'dwarvenhole') {
+      openHoleJumpConfirmation()
+      return
+    }
+    performInspect()
+  }
+
+  function performInspect() {
     const scope = recordReplayAction({type: 'inspect'})
     try {
       const entered = enterCave(true)
@@ -1694,20 +1728,20 @@ more difficult:
       if (currentZ !== -2 || currentLevelKind() !== 'chain' || !dwarvenRuin) return false
       const fortMap = depthUndergroundMap(3)
       if (!fortMap) return false
-      // Land only on the existing fort gate, never across a locked door.
-      const landing = {x:dwarvenRuin.x, y:dwarvenRuin.y}
-      if (fortMap[landing.y]?.[landing.x] !== 'dwarvenfortexit' ||
-          enemies.some(e => e.alive && e.level === -3 && e.x === landing.x && e.y === landing.y)) {
-        log('The fall is obstructed below. You step away from the hole.', 'info')
+      // A vertical move changes z only. Old saves may have a shaft without
+      // its lower passage; carving that passage is deterministic and persistent.
+      if (!ensureDwarvenFortHoleLanding(player.x, player.y) ||
+          !TILE[fortMap[player.y]?.[player.x]]?.walk ||
+          enemies.some(e => e.alive && e.level === -3 &&
+            e.x === player.x && e.y === player.y)) {
+        log('The shaft is obstructed below. You cannot jump safely.', 'info')
         return true
       }
       currentCave = -1
       currentZ = -3
       map = fortMap
       undergroundDiscovered = depthUndergroundDiscovered(3)
-      player.x = landing.x
-      player.y = landing.y
-      log('You jump into the hole and land amid the ruins of the Dwarven Fort. There is no way back up.', 'bad')
+      log('You jump into the hole and land beneath the Dwarven Fort. There is no way back up.', 'bad')
     } else if (tile === 'cavedown') {
       const depth = chainDepthForZ(currentZ), nextDepth = depth + 1
       const nextMap = depthUndergroundMap(nextDepth)
@@ -9105,7 +9139,7 @@ more difficult:
   }
 
   async function tryMove(dx, dy) {
-    if (fireballAim) return false
+    if (fireballAim || holeJumpOpen) return false
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
       pendingMove = {dx: dx, dy: dy}
@@ -13167,7 +13201,7 @@ more difficult:
   }, {passive: false})
 
   function handleCanvasTap(clientX, clientY) {
-    if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
+    if (holeJumpOpen || campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
@@ -15924,6 +15958,19 @@ more difficult:
       if (['Tab', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) ev.preventDefault()
       return
     }
+    if (holeJumpOpen) {
+      if (ev.key === 'Escape') {
+        ev.preventDefault()
+        closeHoleJumpConfirmation()
+      } else if (ev.key === 'Tab') {
+        ev.preventDefault()
+        const buttons = [document.getElementById('btnHoleJumpCancel'),
+          document.getElementById('btnHoleJumpConfirm')]
+        const index = buttons.indexOf(document.activeElement)
+        buttons[(index + (ev.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus()
+      } else if (ev.key !== 'Enter' && ev.key !== ' ') ev.preventDefault()
+      return
+    }
     if (raceOpen) return // name field is being typed into; game keys are dead
     if (replayPlaying) return // replay playback drives the game itself
     if (AdaptivePlayerTrolling.pendingDebtCollector()) {
@@ -16360,6 +16407,14 @@ more difficult:
       setLoading('World generation failed. Please reload to try again.')
     }
   }
+
+  document.getElementById('btnHoleJumpCancel').addEventListener('click', closeHoleJumpConfirmation)
+  document.getElementById('btnHoleJumpConfirm').addEventListener('click', () => {
+    if (!holeJumpOpen) return
+    closeHoleJumpConfirmation()
+    // Confirmation alone is not a gameplay action; replay records the actual inspect.
+    performInspect()
+  })
 
   document.getElementById('btnBegin').addEventListener('click', confirmRaceSelect)
   document.getElementById('btnRaceRandomName').addEventListener('click', randomizeRaceName)
