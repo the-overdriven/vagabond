@@ -75,9 +75,14 @@ describe('Mine-only encounters and darkness', () => {
             'deep mine '+name+' pack stays within the one-to-five roll even when space is tight')
         }
         const floorIndex=mine.findIndex(f=>f.z===z)
+        // Mandatory tier introductions can exceed a small floor's density budget.
+        // These guaranteed species use the existing hard cap before filler is added.
+        const guaranteedGroup=['early','middle','late'][floorIndex-1]
+        const mandatory=ec.guaranteeEachSpecies
+          ? (ec.groups[guaranteedGroup]?.length || 0) : 0
         const cap=Math.min(ec.maxMonstersPerFloor,
-          Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex]))
-        check(living.length<=cap,'deep mine fauna never exceeds the monster budget')
+          Math.max(mandatory,Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex])))
+        check(living.length<=cap,'deep mine fauna respects density and guaranteed species')
         check(fauna.every(e=>!e.prefix),'weak deep-mine fauna have no prefixes')
         check(fauna.every(e=>e.caveIndex===-1),
           'deeper rats and bats are ordinary encounters, not pocket-nest extras')

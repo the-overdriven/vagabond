@@ -804,7 +804,11 @@ describe('Adaptive Player Trolling', () => {
         groundItems=groundItems.filter(g=>(g.level||0)!==0)
         npcs=npcs.filter(n=>n.x<30||n.x>80||n.y<30||n.y>80)
         snapCameraToPlayer();rebuildActiveLevelOccupancy()
-        check(!AdaptivePlayerTrolling.onFloorChanged(),'1999 gold does not attract the Imp')
+        // Other floor-change effects may run; this check concerns the Gold Imp only.
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!enemies.some(e=>e.adaptiveEventId==='gold_imp') &&
+          !AdaptivePlayerTrolling.serialize().triggerFlags.gold_imp,
+          '1999 gold does not attract the Imp')
         player.gold=3600
         player.steps=500
         check(AdaptivePlayerTrolling.onPlayerMoved(),'500th step creates Gold Imp in native hill habitat')

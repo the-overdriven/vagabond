@@ -74,9 +74,22 @@ describe('Decorative caves and deep threat rarity', () => {
         const lootConfig=WORLD_GEN_CONFIG.surfaceLoot
         check(surfaceSupplies.filter(g=>g.kind==='potion').length===lootConfig.loosePotions,
           'loose Life Potion count preserved')
-        check(surfaceSupplies.filter(g=>nonHealingKinds.has(g.kind)).length===
-          lootConfig.looseSpeedPotions+lootConfig.looseScrolls,
-          'combined non-healing supply count preserved after tactical replacements')
+        const ordinaryNonHealingCount=lootConfig.looseSpeedPotions+lootConfig.looseScrolls
+        const nonHealingCount=surfaceSupplies.filter(g=>nonHealingKinds.has(g.kind)).length
+        // The Tower may guarantee one *additional* accessible Chaos scroll.
+        check(nonHealingCount===ordinaryNonHealingCount ||
+          nonHealingCount===ordinaryNonHealingCount+1,
+          'ordinary loose supply count is preserved, with at most one Tower Chaos bonus')
+        if (nonHealingCount===ordinaryNonHealingCount+1) {
+          const reachable=surfaceReachableFromTemple()
+          check(surfaceSupplies.some(g=>g.kind==='scrollOfChaos' &&
+            reachable.has(keyXY(g.x,g.y)) &&
+            (g.x<tower.x || g.x>=tower.x+tower.size ||
+              g.y<tower.y || g.y>=tower.y+tower.size) &&
+            TILE[surfaceMap[g.y]?.[g.x]]?.walk &&
+            !['water','river','ice','frozenriver'].includes(surfaceMap[g.y]?.[g.x])),
+            'extra Chaos scroll is safely reachable outside the Tower')
+        }
         for(const [kind,limit] of [['speedpotion',lootConfig.looseSpeedPotions],['scrollOfInvisibility',lootConfig.looseScrolls]])
           check(surfaceSupplies.filter(g=>g.kind===kind).length<=limit,
             'remaining original supplies do not exceed configured slots '+kind)
