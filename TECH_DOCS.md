@@ -824,6 +824,13 @@ finishing replaces the route.
 
 # 9. World
 
+A newly generated world always starts at the Temple on the **surface (z:0)**,
+with the active terrain map bound to the shared surface map and no active cave.
+Starting a new world after exploring a tower or underground level must reset
+its depth and active-map identity before generation; otherwise underground FOV
+and decorations can incorrectly appear on the surface. Surface and underground
+objects retain their own level identity and are rendered only on that level.
+
 The surface size is selected independently of Cursed world at character creation.
 **L** (260×260 tiles) is the default. The six square presets are configured in
 `content/map_config.json`:

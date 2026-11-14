@@ -1,10 +1,26 @@
 describe('Generated world dimensions and rotated cold edge', () => {
   it('keeps dimensions and places the cold band along one cardinal edge', () => {
     cy.visit('/')
+    // Simulate starting a fresh world after visiting an underground layer.
+    // A previous session's z must never turn the new surface into dungeon FOV
+    // or let cave decorations leak onto the starting landscape.
+    cy.window().then(win => win.eval('currentZ = -2; currentCave = 0'))
     cy.get('#raceName').clear().type('World Tester')
     cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.window().then(win => {
+      const startingFloor = win.eval(`({ z: currentZ, cave: currentCave,
+        surfaceMapActive: map === surfaceMap,
+        surfaceKind: currentLevelKind(),
+        cavePropsOnSurface: caveDecorations.filter(prop => onCurrentLevel(prop) &&
+          prop.levelKind !== 'surface').length })`)
+      expect(startingFloor.z).to.equal(0)
+      expect(startingFloor.cave).to.equal(-1)
+      expect(startingFloor.surfaceMapActive).to.equal(true)
+      expect(startingFloor.surfaceKind).to.equal('surface')
+      expect(startingFloor.cavePropsOnSurface).to.equal(0)
+    })
 
     cy.window().its('__VAGABOND_E2E__').invoke('getWorldShape').should(shape => {
       expect(shape.width).to.equal(260)
