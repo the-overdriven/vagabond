@@ -342,7 +342,7 @@ function spawnDwarvenMinesEncounters() {
     const target=Math.min(ec.maxMonstersPerFloor,Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex]))
     const selectGroup=()=>pickWeighted(groupKeys.map((key,i)=>({key,weight:ec.groupWeights[floorIndex][i]}))
       .filter(v=>v.weight>0),v=>v.weight).key
-    const placePack=(tmpl,count)=>{
+    const placePack=(tmpl,count,allowPrefix=true)=>{
       let leader=null,placed=0,coordinationPackId=null
       for(let member=0;member<count;member++){
         const available=(tmpl.name==='Xibal'?floodedCandidates:candidates).filter(p=>{
@@ -370,7 +370,7 @@ function spawnDwarvenMinesEncounters() {
           wallAmbushHidden:concealed,
           wallAmbushSpent:tmpl.abilities?.includes('wallAmbush') && !concealed}
         prepareEnemyEquipment(enemy)
-        if(prefixNames.length && chance(prefixChance)){
+        if(allowPrefix && prefixNames.length && chance(prefixChance)){
           const prefix=pick(prefixNames)
           enemy.prefix=prefix
           enemy.prefixBase=prefixBaseStats(enemy)
@@ -418,6 +418,16 @@ function spawnDwarvenMinesEncounters() {
       if(!enemyDepthBiomeEligible(tmpl,z) || placePack(tmpl,1)!==1)
         throw new Error(`Dwarven Mines could not place guaranteed species: ${name} at ${z}`)
       populated++
+    }
+    // Weak fauna remain present below the respite floor, in variable packs.
+    // Guaranteed mine species take precedence, and all fauna share the normal
+    // population limit and spawn-site constraints with the native encounters.
+    for (const name of ec.deeperRespiteSpecies || []) {
+      if (populated >= target) break
+      const tmpl = ENEMY_TEMPLATE_BY_NAME[name]
+      if (!tmpl) continue
+      const count = randInt(...ec.deeperRespiteCountRange)
+      populated += placePack(tmpl, Math.min(count, target - populated), false)
     }
     while(populated<target){
       const group=selectGroup()

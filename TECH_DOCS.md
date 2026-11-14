@@ -553,6 +553,9 @@ save or replay; the executed movement and combat actions remain individually
 recorded for deterministic playback.
 Auto-path footsteps and the remaining-step counter render above underground
 fog/darkness, remaining legible on already-discovered tiles beyond current sight.
+When a planned melee route ends on an occupied enemy tile, its last footprint
+is omitted in both hover previews and active pursuit, keeping the creature's
+sprite unobscured. The counter and movement/attack behavior remain unchanged.
 Pathfinding still refuses unknown underground tiles, so this does not expose
 unexplored terrain.
 
@@ -1050,10 +1053,12 @@ terrain may apply an additional SPD penalty (see Snow / Cold).
 The HUD highlights effective player DEF/SPD in green with an upward arrow for
 terrain gains and red with a downward arrow for terrain losses. The status strip
 identifies the terrain and the effective changes while the modifier is active.
-Enemy inspection tooltips show the same directional stat highlights and a
-terrain summary, including on mobile. The character sheet reflects these
-changes on its mobile stat rows. Colors and arrows describe actual effective
-changes after stat limits, not hypothetical raw bonuses. Terrain modifiers are
+Enemy inspection tooltips show effective stats without directional arrows;
+the existing **Terrain** line lists effective terrain modifiers, including on
+mobile. Numeric monster-prefix differences remain readable without arrow
+symbols. The character sheet reflects the same changes on mobile stat rows.
+Directional HUD colors and arrows reflect actual effective changes after
+stat limits, not hypothetical raw bonuses. Terrain modifiers are
 derived from the current tile, not separate timed statuses; inspecting them
 never changes combat calculations, RNG, or replay state.
 
@@ -3002,14 +3007,21 @@ early, middle, and late threats. The floor-by-floor progression is:
 | Mine floor | Depth | Population | Random prefix chance |
 |---|---|---|---|
 | 1: respite | z:-9 | Giant Rats, Giant Bats, Scarabs; at most **one Giant Spider**, appearing with **25% chance** | **0%** |
-| 2: early | z:-10 | Predominantly early mine species | **11%** |
-| 3: middle | z:-11 | Predominantly middle species, sometimes early | **13.5%** |
-| 4: late | z:-12 | Predominantly late species, sometimes early/middle | **16%** |
-| 5: late (optional) | z:-13 | Predominantly late species, sometimes early/middle | **18.5%** |
+| 2: early | z:-10 | Predominantly early mine species; 1–5 Giant Rats and 1–5 Giant Bats, subject to available space | **11%** |
+| 3: middle | z:-11 | Predominantly middle species, sometimes early; 1–5 Giant Rats and 1–5 Giant Bats, subject to available space | **13.5%** |
+| 4: late | z:-12 | Predominantly late species, sometimes early/middle; 1–5 Giant Rats and 1–5 Giant Bats, subject to available space | **16%** |
+| 5: late (optional) | z:-13 | Predominantly late species, sometimes early/middle; 1–5 Giant Rats and 1–5 Giant Bats, subject to available space | **18.5%** |
 
 **A stronger species never appears above its intended tier.** Deeper floors may
 include a small proportion of weaker tiers, with a stronger bias toward their
-own tier. Floor 1 borrows existing basic enemies without changing their
+own tier. Starting on mine floor 2, the encounter generator independently draws
+**1–5 unprefixed Giant Rats and 1–5 unprefixed Giant Bats per floor** from the
+seeded RNG (each integer equally likely). Guaranteed mine species are placed
+first; these weaker packs consume only available slots in the ordinary floor
+population limit. Spawn spacing and entrance safety are unchanged. If a rolled
+pack cannot be fully accommodated, fewer creatures appear, potentially none if
+there are no legal sites or free slots. This keeps the mine's characteristic
+species from being displaced by the weaker fauna. Floor 1 borrows existing basic enemies without changing their
 ordinary surface spawn pools. When `guaranteeEachSpecies` is enabled,
 generation reserves at least one of every early species on mine floor 2,
 every middle species on floor 3, and every late species on floor 4. Those
@@ -4493,7 +4505,7 @@ below 30% of maximum HP, their melee ATK is multiplied by 1.25 before defense.
 At exactly 30%, the bonus does not apply. Healing to the threshold or higher
 ends enrage; entering the low-HP range again can trigger it again.
 The bonus combines multiplicatively with Charge and normal critical damage;
-an enraged Minotaur charging across one gap tile uses `base ATK * 1.25 * 1.25`.
+an enraged Minotaur charging from the minimum three-tile distance uses `base ATK * 1.25 * 1.5`.
 Ranged projectile ATK and XP rewards remain unchanged.
 
 Crossing the threshold after an attack logs "Pain drives <name> into a rage!".
@@ -4585,8 +4597,9 @@ introduces these fields and the Spider web owner ID.
 Boar and Minotaur have `charge`; Giant Spider has `pull`. In the code and some
 internal descriptions, **rush** is the shared umbrella term for these two
 straight-line abilities; it is not a third ability. While the player is visible
-and within current aggro range, an aligned target at distance two or more can
-trigger either Charge or Pull, depending on the monster. Alignment is horizontal,
+and within current aggro range, an aligned target at distance **three or more**
+can trigger Charge; Pull requires **two or more** tiles. The monster's aggro
+range remains the maximum distance for either ability. Alignment is horizontal,
 vertical, or an exact diagonal.
 For Charge, every tile on the line must be walkable `grass`, `cavefloor`,
 `cavefloor2`, or `marble`, allowing Boars and Minotaurs to charge in caves and
@@ -4599,7 +4612,8 @@ additional distance cap beyond aggro range. Invalid routes use no RNG.
 Charge has a 60% chance per eligible turn. The monster crosses the gap and stops
 adjacent, then makes one melee attack with half the usual dodge chance. Before
 defense, ATK is multiplied by `1 + 0.25 * (distance - 1)`, where distance counts
-orthogonal or diagonal tile steps. Distance two gives +25%; three gives +50%.
+orthogonal or diagonal tile steps. The shortest eligible Charge (distance three)
+gives +50%; four gives +75%. Pull retains its shorter two-tile minimum.
 Normal armor, glancing, and critical rules still apply. A surviving player hit
 for positive damage is pushed one tile directly away, if traversable and free.
 Water is eligible even without Swimming; blocked destinations prevent knockback.
@@ -5375,6 +5389,14 @@ visited floor during this pass and updated after each actor moves. Shared tiles
 retain their other occupants, and NPCs continue to block surface movement.
 These indexes are temporary and do not change trap avoidance, actor order or RNG.
 
+On returning to the surface, living `"homeReanchored"` surface monsters whose
+positions lie beyond their individual home radius reset their anchor to their
+current tile. Missing home anchors are initialized there as well. This
+re-anchoring is immediate, does not move the monsters or consume RNG, and occurs
+on both ordinary and batched surface synchronization (including replay).
+`"homeReturn"`, `"roam"`, `"far"`, and underground monsters keep their existing
+anchors and behavior. The refreshed anchors use the existing save fields.
+
 Surface monsters with `"far"` wandering remain active while the player explores
 underground or the tower. The game saves the global turn count on leaving the
 surface and, on returning, advances those travelers through **every elapsed
@@ -6023,9 +6045,38 @@ Inventory actions remain reachable without horizontal scrolling.
 Each row’s action group is **aligned to the right edge** of the inventory.
 Drop is the **leftmost action button** within that group. Buttons have even
 spacing; portable crystals use the same ordering.
-On touch screens, the trade panel fills the available height: both stock
-columns have independently scrolling lists rather than the 280px desktop cap,
-and the Close control remains visible above the bottom message log.
+On touch screens, the trade panel fills the available height below the HUD,
+covering the bottom message log for more inventory space. The two stock lists
+scroll independently, with no desktop 280px cap. The Close control stays fixed
+at the bottom of the viewport (above the device's safe-area inset); closing trade
+reveals the unchanged message log.
+Merchant trading keeps the **For Sale** and **Your Items** columns visible side by
+side at every screen size. On desktop (widths above 720px), each column has its
+own independent category filters: All, Weapons, Shields, Armors, Supplies and
+Other. Equipment categories include artifacts by their equipment slot; Supplies
+includes consumables, while Other contains non-equipment and non-consumables.
+The icon filters reuse inventory's weapon, shield and armor symbols and the
+Supplies apple. Changing one column's filter leaves the other unchanged; buying
+and selling redraw the visible lists without changing the selected categories.
+The filters reset to All when trading opens and do not spend a turn or affect RNG,
+saves or replays. On desktop, the trade dialog is anchored immediately below the
+HUD rather than vertically centered. It fills the remaining desktop viewport
+height below the HUD, including on taller screens; each column's inventory list
+scrolls independently within that space while the title, category tabs and Close
+button remain visible. Category changes do not move or resize the trade panel.
+Touch-screen trade continues to occupy the available screen space below the HUD
+and cover the log. Only one tab per trade column can be highlighted at once;
+merchant and player filters never change each other's selection or the normal
+inventory tab selection. A category without stock displays an empty-state message.
+The Herbalist/Fisherman service views and mobile trade layout retain their two
+columns without category filters. Items previously sold by the character appear as
+**↩️** buyback entries in the merchant's For sale list, including items with ordinary
+stock of the same kind. Player-sold stacks are kept separate from ordinary
+stock to identify only the actual buyback inventory. Existing buyback stock
+consolidates by kind/name. The label is stored with each merchant-stock item
+and survives saves and replay, then is removed after repurchase; it does not
+change buy/sell prices. Buyback stacks carry stable IDs derived from the sold
+inventory item, so subsequent purchases resolve the correct stock in replay.
 The trade panel shows item/service prices but not a separate player-gold total;
 current gold remains visible in the HUD for merchants and service providers.
 Touch devices retain the existing full-screen layout for the other dialogs.
@@ -7795,7 +7846,10 @@ stored enemy ID's death, through the shared kill hook, makes the
 quest ready. The `!` is shown before activation, when ready, and on completed
 quests with an unclaimed reward and no pending lesson. The quest menu option
 accepts the job, reviews progress or turns it in, while Talk only supplies
-short, gruff dialogue without advancing quest state.
+short, gruff dialogue without advancing quest state. An active quest's **Ask about the nets** option
+asks about the missing fish without naming the predator; the lesson uses shore-based,
+natural instructions. Once the player has learned numeric Swimming, ordinary
+Talk also acknowledges their improved technique without consuming a turn.
 
 Turn-in completes the quest but only offers non-Merlings a persistent pending
 lesson (`player.fishermanLessonPending`). The reward is claimed and Swimming 5
@@ -9129,8 +9183,9 @@ An unexplored area on the selected floor remains fogged even if the same
 coordinates were explored on another floor. Only explicit zoom/pan controls
 change the shared map viewport while browsing.
 Discovered Dwarven Ruins lift platforms and Dwarven Mines haulage-cage endpoints
-have small bright-green, dark-outlined squares on both the nearby minimap and the
-full map (including previously explored floors). The squares identify shortcuts
+have bright-green, dark-outlined **4×4-pixel squares at base zoom**, matching
+stairs markers, on both the nearby minimap and the full map (including
+previously explored floors). The squares identify shortcuts
 whether locked or unlocked, but never reveal an undiscovered location. The
 intermediate mine rope shaft receives no marker. Markers derive from saved shortcut
 endpoints and discovery grids, without additional game state or replay RNG.
@@ -9143,10 +9198,11 @@ because generic and Crypt z:-2 maps can have the same depth and cave index.
 
 The desktop side minimap follows the player by default, but dragging directly
 on it pans its view of the currently active floor with mouse or touch. Panning
-is clamped to map bounds; double-clicking the side minimap recenters on the
-player and resumes following. Changing the active floor or map also resumes
-following. Side-map panning is UI-only and does not move the character, reveal
-unexplored terrain, affect world-map browsing, or consume replay RNG.
+is clamped to map bounds; double-clicking the side minimap or pressing its
+**recenter/follow** button recenters on the player and resumes following.
+The button is disabled while the map already follows the player. Changing the
+active floor or map also resumes following. Side-map panning is UI-only
+and does not move the character, reveal unexplored terrain, affect world-map browsing, or consume replay RNG.
 
 The hidden desktop side minimap is not repainted on mobile. Its dirty flag and
 player coordinates remain pending until it is visible again; opening the world

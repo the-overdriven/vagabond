@@ -9,7 +9,7 @@ const PULL_LINE_TILES = new Set([...CHARGE_LINE_TILES, 'sand'])
 function enemyChargeLine(e, charge = enemyHasAbility(e, 'charge')) {
   const dx = player.x - e.x, dy = player.y - e.y
   const distance = Math.max(Math.abs(dx), Math.abs(dy))
-  if (distance < 2 || distance > effectiveAggroRange(e) ||
+  if (distance < (charge ? 3 : 2) || distance > effectiveAggroRange(e) ||
       (dx !== 0 && dy !== 0 && Math.abs(dx) !== Math.abs(dy))) return null
   const sx = Math.sign(dx), sy = Math.sign(dy)
   const cornerOpen = (x, y) => isWalkable(x, y) && !grasslandTrees.has(keyXY(x, y))

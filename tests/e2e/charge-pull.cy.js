@@ -36,11 +36,14 @@ describe('Charge and Pull terrain rules', () => {
 
   it('validates cardinal/diagonal routes before rolling and respects range and invisibility', () => {
     cy.window().then(win => win.eval(`(() => {
-      const e=rushEnemy('Boar'), previousChance=chance
+      const e=rushEnemy('Boar',37,40), previousChance=chance
       let rolls=0
       try {
         chance=()=>{rolls++;return false}
-        rushCheck(enemyChargeLine(e).distance===2,'minimum gap')
+        e.x=38
+        rushCheck(!enemyChargeLine(e) && !tryEnemyRush(e),'two-tile Charge rejected without RNG')
+        e.x=37
+        rushCheck(enemyChargeLine(e).distance===3,'minimum Charge gap')
         map[40][39]='forest'; rushCheck(!tryEnemyRush(e),'non-grass blocked')
         map[40][39]='grass'; grasslandTrees.add('39,40'); rushCheck(!tryEnemyRush(e),'tree blocked')
         grasslandTrees.delete('39,40'); npcs=[{x:39,y:40}]; rushCheck(!tryEnemyRush(e),'NPC blocked')
@@ -49,10 +52,10 @@ describe('Charge and Pull terrain rules', () => {
         player.invisibleTurns=0; player.x=41;player.y=42; rushCheck(!tryEnemyRush(e),'off line blocked')
         player.x=49;player.y=40; rushCheck(!tryEnemyRush(e),'outside aggro blocked')
         rushCheck(rolls===0,'invalid routes spend no RNG')
-        player.x=40;player.y=40; e.y=38
-        rushCheck(enemyChargeLine(e).distance===2,'diagonal valid')
-        map[38][39]='mountain'; rushCheck(!tryEnemyRush(e),'diagonal corner blocked')
-        map[38][39]='forest'; rushCheck(!!enemyChargeLine(e),'walkable side terrain allowed')
+        player.x=40;player.y=40; e.y=37
+        rushCheck(enemyChargeLine(e).distance===3,'diagonal valid')
+        map[37][38]='mountain'; rushCheck(!tryEnemyRush(e),'diagonal corner blocked')
+        map[37][38]='forest'; rushCheck(!!enemyChargeLine(e),'walkable side terrain allowed')
         rushCheck(!tryEnemyRush(e) && rolls===1,'failed proc preserves position')
       } finally {chance=previousChance}
     })()`))
@@ -68,6 +71,9 @@ describe('Charge and Pull terrain rules', () => {
         occupied=new Set([keyXY(spider.x,spider.y),keyXY(boar.x,boar.y)])
         for(let x=37;x<=40;x++) map[40][x]=terrain
         rushCheck(enemyChargeLine(spider)?.distance===3,'pull line allowed on '+terrain)
+        spider.x=38
+        rushCheck(enemyChargeLine(spider)?.distance===2,'Pull retains its two-tile minimum')
+        spider.x=37
       }
       player.x=40; player.y=42
       boar.x=37; boar.y=42
@@ -82,7 +88,7 @@ describe('Charge and Pull terrain rules', () => {
 
   it('charges with gap-scaled ATK and half dodge, knocks back, and never grants extra attacks', () => {
     cy.window().then(win => win.eval(`(() => {
-      const e=rushEnemy('Minotaur'), oldChance=chance, oldDamage=damageRoll
+      const e=rushEnemy('Minotaur',37,40), oldChance=chance, oldDamage=damageRoll
       let attacks=0, attackAtk=null, dodge=null, calls=0
       try {
         chance=p=>{calls++; if(calls===1) {rushCheck(p===.60,'charge proc');return true}
@@ -91,15 +97,15 @@ describe('Charge and Pull terrain rules', () => {
         const normalDodge=missChance(enemySpd(e),playerSpd()), hp=player.hp, steps=player.steps
         rushCheck(tryEnemyRush(e),'charge success')
         rushCheck(e.x===39 && player.x===41,'charge then knockback')
-        rushCheck(attackAtk===e.atk*1.25 && dodge===normalDodge/2,'damage and dodge multipliers')
+        rushCheck(attackAtk===e.atk*1.5 && dodge===normalDodge/2,'damage and dodge multipliers')
         rushCheck(attacks===1 && player.hp===hp-10 && player.steps===steps,'one attack no walking credit')
-        rushCheck(!occupied.has('38,40') && occupied.has('39,40'),'occupancy relocated')
+        rushCheck(!occupied.has('37,40') && occupied.has('39,40'),'occupancy relocated')
         // A repeat rush when the player retreats has no cooldown.
         player.x=42; calls=0; map[40][43]='mountain'
         rushCheck(tryEnemyRush(e) && attackAtk===e.atk*1.5 && player.x===42,'repeat charge and blocked knockback')
-        map[40][43]='grass'; player.x=43; calls=0; chance=p=>{calls++;return calls<=2}
+        map[40][43]='grass'; player.x=44; calls=0; chance=p=>{calls++;return calls<=2}
         const before=player.hp; rushCheck(tryEnemyRush(e),'dodged charge still moves monster')
-        rushCheck(player.x===43 && player.hp===before,'dodge prevents damage and knockback')
+        rushCheck(player.x===44 && player.hp===before,'dodge prevents damage and knockback')
       } finally {chance=oldChance;damageRoll=oldDamage}
     })()`))
   })
@@ -117,7 +123,7 @@ describe('Charge and Pull terrain rules', () => {
         rushCheck(atkUsed===e.atk && Math.abs(dodge-missChance(enemySpd(e),playerSpd()))<1e-9,'ordinary pull attack')
         rushCheck(player.steps===steps,'pull no steps')
         e.alive=false;occupied.clear();player.x=40
-        const boar=rushEnemy('Boar');map[40][41]='water';calls=0
+        const boar=rushEnemy('Boar',37,40);map[40][41]='water';calls=0
         chance=()=>++calls===1
         const hp=player.hp
         rushCheck(tryEnemyRush(boar) && player.x===41,'knockback into water without skill')
@@ -192,7 +198,7 @@ describe('Charge and Pull terrain rules', () => {
 
   it('replays rush movement and combat with the same RNG and saved state', () => {
     cy.window().then(win => win.eval(`(async () => {
-      rushEnemy('Boar',38,40);rushEnemy('Giant Spider',43,40)
+      rushEnemy('Boar',37,40);rushEnemy('Giant Spider',43,40)
       player.freezing={active:false,turns:0};player.curseDebuffs=[]
       player.berryRegenTurns=0;player.speedPotionTurns=0
       consecutiveWaitTurns=0;rngState=917

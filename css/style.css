@@ -1320,6 +1320,53 @@ body.hint-collapsed #hint .panel-toggle {
   width: min(92vw, 900px);
 }
 
+/* On desktop, anchor trade below the HUD instead of vertically centering it.
+   Category switches can change the panel height without shifting its top edge.
+   Keep the overlay's padding inside the viewport so a tall stock list scrolls. */
+@media (min-width: 721px) and (pointer: fine),
+       (min-width: 721px) and (pointer: none) {
+  #tradeOverlay {
+    box-sizing: border-box;
+    align-items: flex-start;
+    padding: calc(var(--desktop-hud-height, 52px) + 8px) 8px 8px;
+  }
+
+  #tradeOverlay .panelbox {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Both sides use the remaining screen height; only their item lists scroll.
+     The title, filters and Close button stay visible as stock changes. */
+  #tradeOverlay .trade-cols {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #tradeOverlay .trade-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #tradeOverlay .trade-col .invlist {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  #tradeOverlay .closehint {
+    flex: 0 0 auto;
+  }
+}
+
 .trade-cols {
   display: flex;
   gap: 16px;
@@ -1981,6 +2028,11 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     width: 100%;
   }
 
+  /* Trade takes priority over the mobile log, but stays below the HUD. */
+  #tradeOverlay {
+    z-index: 120;
+  }
+
   #tradeOverlay .panelbox {
     display: flex;
     flex-direction: column;
@@ -1990,8 +2042,8 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     height: 100%;
     max-height: 100%;
     overflow: hidden;
-    /* Reserve the log and Close bar while keeping the stock lists tall. */
-    padding-bottom: calc(var(--mobile-log-height, 120px) + 58px);
+    /* The trade overlay covers the log, leaving only space for its Close bar. */
+    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
   }
 
   #tradeOverlay .trade-cols {
@@ -2019,11 +2071,11 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--mobile-log-height, 120px);
+    bottom: 0;
     z-index: 115;
     box-sizing: border-box;
     margin: 0;
-    padding: 10px;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
     background: linear-gradient(0deg, var(--panel), rgba(20, 14, 10, 0.94));
     border-top: 1px solid var(--border);
   }

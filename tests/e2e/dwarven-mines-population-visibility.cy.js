@@ -61,6 +61,24 @@ describe('Mine-only encounters and darkness', () => {
         check(namesOnFloor.every(name=>monsters.some(e=>e.baseName===name && e.level===mine[floor].z)),
           'floor '+(floor+1)+' includes every assigned species')
       }
+      check(JSON.stringify(ec.deeperRespiteCountRange)===JSON.stringify([1,5]),
+        'deeper mine rat and bat packs roll one to five per species')
+      for (const {z,level} of mine.slice(1)) {
+        const living=enemies.filter(e=>e.alive && e.level===z && e.levelKind==='chain')
+        const fauna=living.filter(e=>['Giant Rat','Giant Bat'].includes(e.baseName))
+        for (const name of ec.deeperRespiteSpecies) {
+          const count=fauna.filter(e=>e.baseName===name).length
+          check(count>=0 && count<=5,
+            'deep mine '+name+' pack stays within the one-to-five roll even when space is tight')
+        }
+        const floorIndex=mine.findIndex(f=>f.z===z)
+        const cap=Math.min(ec.maxMonstersPerFloor,
+          Math.round(level.mineFloorTiles/ec.tilesPerMonster[floorIndex]))
+        check(living.length<=cap,'deep mine fauna never exceeds the monster budget')
+        check(fauna.every(e=>!e.prefix),'weak deep-mine fauna have no prefixes')
+        check(fauna.every(e=>e.caveIndex===-1),
+          'deeper rats and bats are ordinary encounters, not pocket-nest extras')
+      }
       check(monsters.every(e=>Math.abs(e.level)>=(groups.early.includes(e.baseName)?10:
         groups.middle.includes(e.baseName)?11:12)), 'stronger species never spawn above their intended tier')
       check(monsters.every(e=>names.includes(e.baseName) &&

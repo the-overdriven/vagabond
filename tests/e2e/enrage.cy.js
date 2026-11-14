@@ -96,9 +96,9 @@ describe('Low-HP enrage', () => {
       const oldChance=chance,oldDamage=damageRoll,oldLog=log
       let calls=0,atk=null;const messages=[]
       try {
-        const e=rushEnemy('Minotaur');e.hp=1
+        const e=rushEnemy('Minotaur',37,40);e.hp=1
         chance=()=>++calls===1;damageRoll=a=>{atk=a;return 2};log=m=>messages.push(m)
-        rushCheck(tryEnemyRush(e) && atk===e.atk*1.25*1.25,'charge and rage multiply')
+        rushCheck(tryEnemyRush(e) && atk===e.atk*1.25*1.5,'charge and rage multiply')
         e.abilities.push('lifesteal');e.hp=Math.floor(e.maxHp*.30)-1
         chance=()=>true;applyEnemyLifesteal(e,12)
         rushCheck(!enemyIsEnraged(e) && enemyAtk(e)===e.atk,'healing ends rage')
@@ -109,7 +109,7 @@ describe('Low-HP enrage', () => {
   })
   it('replays combat with an enraged Minotaur without changing its base ATK', () => {
     cy.window().then(win => win.eval(`(async () => {
-      const e=rushEnemy('Minotaur',38,40);e.hp=Math.floor(e.maxHp*.20)
+      const e=rushEnemy('Minotaur',37,40);e.hp=Math.floor(e.maxHp*.20)
       player.freezing={active:false,turns:0};player.curseDebuffs=[]
       player.berryRegenTurns=0;player.speedPotionTurns=0
       consecutiveWaitTurns=0;rngState=917

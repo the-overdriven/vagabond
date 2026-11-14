@@ -221,6 +221,42 @@ describe('Non-gear item catalog', () => {
         button.dispatchEvent(new MouseEvent('click', {bubbles:true, ctrlKey:true}))
         check(!player.inventory.some(it => it.kind === 'arrows') && player.gold === 26,
           'Ctrl+Sell sells the full arrow stack for the per-unit value')
+        const soldStock=merchantStock.find(it => it.kind === 'arrows' && it.merchantSold)
+        check(!!soldStock && soldStock.count === 26,
+          'sold arrows are separate from the normal unlimited merchant bundles')
+        check(soldStock.replayId === 'merchant_sold_arrows_Arrows',
+          'sold stack uses an identity reproducible during replay playback')
+        check([...document.querySelectorAll('#tradeBuyList .nm')].some(el =>
+          el.textContent.includes('↩️') && el.textContent.includes('Arrows')),
+          'player-sold stock has a visible buyback arrow')
+        // Merchant and player columns must stay visible together while their filters
+        // operate independently, including sold-back supply stock.
+        player.inventory.push(createItem('arrows', {count:1}), createItem('amber'))
+        renderTrade()
+        setTradeFilter('buy', 'supplies')
+        const supplyCount = merchantStock.filter(it => it.count !== 0 && tradeItemMatchesFilter(it, 'supplies')).length
+        check(document.querySelectorAll('#tradeBuyList .invitem button').length === supplyCount && supplyCount > 0,
+          'merchant supplies filter includes only supplies')
+        check([...document.querySelectorAll('#tradeSellList .nm')].some(el => el.textContent.includes('Arrows')) &&
+          [...document.querySelectorAll('#tradeSellList .nm')].some(el => el.textContent.includes('Amber')),
+          'filtering merchant stock leaves player inventory untouched')
+        setTradeFilter('sell', 'other')
+        check(document.querySelector('#tradeSellFilters [data-trade-filter="other"]').getAttribute('aria-pressed') === 'true' &&
+          [...document.querySelectorAll('#tradeSellList .nm')].some(el => el.textContent.includes('Amber')) &&
+          ![...document.querySelectorAll('#tradeSellList .nm')].some(el => el.textContent.includes('Arrows')),
+          'player Other category hides supplies independently of merchant filter')
+        check(document.querySelectorAll('#tradeBuyList .invitem button').length === supplyCount,
+          'changing player category leaves merchant category selected')
+        setTradeFilter('buy', 'weapon')
+        const weaponCount = merchantStock.filter(it => it.count !== 0 && tradeItemMatchesFilter(it, 'weapon')).length
+        check(document.querySelectorAll('#tradeBuyList .invitem button').length === weaponCount && weaponCount > 0,
+          'merchant weapons filter shows only available weapon stock')
+        check([...document.querySelectorAll('#tradeSellList .nm')].some(el => el.textContent.includes('Amber')),
+          'changing merchant category leaves player Other category selected')
+        setTradeFilter('buy', 'all')
+        setTradeFilter('sell', 'all')
+        player.inventory = []
+        renderTrade()
         const action = recorded.at(-1)
         check(action.type === 'sell' && action.all === true,
           'bulk sale is identified in the replay action')
@@ -234,6 +270,11 @@ describe('Non-gear item catalog', () => {
         sellItem(0)
         check(player.inventory[0]?.count === 2 && player.gold === 1,
           'ordinary Sell continues to sell one unit')
+        check(merchantStock.find(it => it.kind === 'arrows' && it.merchantSold)?.count === 53,
+          'sold stack consolidates actual sales, including the replayed sale')
+        const saved = buildSaveObject()
+        check(saved.merchantStock.some(it => it.kind === 'arrows' && it.merchantSold),
+          'sold-item bookmark is serialized with stock')
       } finally {
         recordReplayAction = oldRecord
         player.inventory = oldInventory
@@ -242,6 +283,87 @@ describe('Non-gear item catalog', () => {
         toggleTrade(false)
       }
     })()`))
+  })
+
+  it('keeps trade tabs independently highlighted and extends the mobile trade view over the log', () => {
+    cy.viewport(1440, 900)
+    beginNewGame('Trade Categories Tester')
+    cy.window().then(win => win.eval(`
+      player.inventory = [createItem('arrows', {count:4}), createItem('amber')]
+      toggleTrade(true)
+    `))
+    cy.get('#tradePanel').should('have.attr', 'data-trade-mode', 'merchant')
+    cy.get('#tradeBuyFilters').should('be.visible')
+    cy.get('#tradeSellFilters').should('be.visible')
+    cy.get('#tradePanel [data-trade-col="buy"]').should('be.visible')
+    cy.get('#tradePanel [data-trade-col="sell"]').should('be.visible')
+    // The desktop trade panel uses the available viewport height below the HUD.
+    // Its independent scroll areas must not hide the Close button.
+    cy.window().then(win => {
+      const panel = win.document.getElementById('tradePanel')
+      const buyList = win.document.getElementById('tradeBuyList')
+      const sellList = win.document.getElementById('tradeSellList')
+      const close = win.document.getElementById('btnTradeClose')
+      const panelRect = panel.getBoundingClientRect()
+      expect(panelRect.bottom, 'trade occupies the desktop space down to the viewport edge')
+        .to.be.closeTo(win.innerHeight - 8, 2)
+      expect(panelRect.height, 'trade grows taller on a large desktop viewport')
+        .to.be.greaterThan(500)
+      for (const list of [buyList, sellList]) {
+        expect(win.getComputedStyle(list).overflowY, 'only item lists scroll').to.eq('auto')
+        expect(list.getBoundingClientRect().bottom, 'item list stays above Close')
+          .to.be.lessThan(close.getBoundingClientRect().top)
+      }
+      expect(close.getBoundingClientRect().bottom, 'Close stays in view')
+        .to.be.lessThan(win.innerHeight)
+    })
+    // The desktop dialog must not jump vertically when either list shrinks.
+    let initialTradeTop
+    cy.window().then(win => {
+      const panelTop = win.document.getElementById('tradePanel').getBoundingClientRect().top
+      const hudBottom = win.document.getElementById('hud').getBoundingClientRect().bottom
+      expect(panelTop, 'trade starts immediately below the desktop HUD').to.be.closeTo(hudBottom + 8, 2)
+      initialTradeTop = panelTop
+    })
+    cy.get('#tradeBuyFilters [data-trade-filter="supplies"]').click()
+    cy.get('#tradePanel').should($panel => {
+      expect($panel[0].getBoundingClientRect().top, 'trade does not jump when merchant filter changes')
+        .to.be.closeTo(initialTradeTop, 1)
+    })
+    cy.get('#tradeBuyFilters [data-trade-filter="supplies"]').should('have.attr', 'aria-pressed', 'true').and('have.class', 'active')
+    cy.get('#tradeBuyFilters .inv-tab.active').should('have.length', 1)
+    cy.get('#tradeSellFilters .inv-tab.active').should('have.length', 1)
+    cy.get('#invOverlay .inv-tab.active').should('have.length', 1)
+    cy.get('#tradeSellFilters [data-trade-filter="all"]').should('have.attr', 'aria-pressed', 'true').and('have.class', 'active')
+    cy.get('#tradeSellList').should('contain.text', 'Amber').and('contain.text', 'Arrows')
+    cy.get('#tradeSellFilters [data-trade-filter="other"]').click()
+    cy.get('#tradeSellList').should('contain.text', 'Amber').and('not.contain.text', 'Arrows')
+    cy.get('#tradeBuyFilters .inv-tab.active').should('have.length', 1)
+    cy.get('#tradeSellFilters .inv-tab.active').should('have.length', 1)
+    cy.get('#tradeSellFilters [data-trade-filter="other"]').should('have.class', 'active')
+    cy.get('#tradeBuyFilters [data-trade-filter="supplies"]').should('have.attr', 'aria-pressed', 'true').and('have.class', 'active')
+    cy.get('#tradePanel').should($panel => {
+      expect($panel[0].getBoundingClientRect().top, 'trade does not jump when player filter changes')
+        .to.be.closeTo(initialTradeTop, 1)
+    })
+    cy.get('#tradePanel [data-trade-col="buy"]').should('be.visible')
+    cy.get('#tradePanel [data-trade-col="sell"]').should('be.visible')
+    cy.viewport(390, 900)
+    cy.get('#tradeBuyFilters').should('not.be.visible')
+    cy.get('#tradeSellFilters').should('not.be.visible')
+    cy.get('#tradePanel [data-trade-col="buy"]').should('be.visible')
+    cy.get('#tradePanel [data-trade-col="sell"]').should('be.visible')
+    // cy.viewport changes the size, not pointer type. Only assert mobile
+    // stacking and Close placement when a coarse pointer is really present.
+    cy.window().then(win => {
+      if (!win.matchMedia('(pointer: coarse)').matches) return
+      const overlay = win.document.getElementById('tradeOverlay')
+      const log = win.document.getElementById('logpanel')
+      const close = overlay.querySelector('.closehint')
+      expect(Number(win.getComputedStyle(overlay).zIndex)).to.be.greaterThan(Number(win.getComputedStyle(log).zIndex))
+      expect(Math.round(close.getBoundingClientRect().bottom)).to.be.closeTo(win.innerHeight, 1)
+    })
+    cy.window().then(win => win.eval('toggleTrade(false)'))
   })
 
   for (const width of [1440, 390]) {

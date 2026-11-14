@@ -1596,6 +1596,8 @@
         "maxMonstersPerFloor": 70,
         "groupWeights": [[0, 0, 0], [100, 0, 0], [12, 88, 0], [3, 12, 85], [3, 12, 85]],
         "respiteSpecies": ["Giant Rat", "Giant Bat", "Scarab"],
+        "deeperRespiteSpecies": ["Giant Rat", "Giant Bat"],
+        "deeperRespiteCountRange": [1, 5],
         "respiteSpiderChance": 0.25,
         "groups": {
           "early": ["Glaber", "Marsutal", "Duiwel", "Trogloraptor", "Sifulian", "Vrakeber", "Tmusapod"],

@@ -319,6 +319,15 @@ more difficult:
         display: inline !important;
       }
     }
+    /* Merchant stock and player inventory remain side by side. Category filters
+       are independent for each column; touch trade and service views are unchanged. */
+    #tradePanel .trade-filters { display:none; }
+    #tradePanel .trade-filters .inv-tab { display:inline-flex; align-items:center; justify-content:center; min-height:30px; min-width:31px; padding:4px 6px; }
+    #tradePanel .trade-filter-icon { width:19px; height:19px; object-fit:contain; }
+    #tradePanel .trade-filter-apple { font-size:19px; line-height:19px; }
+    @media (min-width: 721px) {
+      #tradePanel[data-trade-mode="merchant"] .trade-filters { display:flex; gap:4px; flex-wrap:wrap; margin:6px 0 8px; }
+    }
   </style>
 </head>
 <body>
@@ -528,15 +537,31 @@ more difficult:
         <h2 id="tradeTitle">Trade with the Merchant</h2>
         <p id="tradeNpcSpeech" class="trade-npc-speech" hidden></p>
         <div class="trade-cols">
-          <div class="trade-col">
+          <div class="trade-col" data-trade-col="buy">
             <b class="section-title">FOR SALE</b>
+            <div class="inv-tabs trade-filters" id="tradeBuyFilters" role="group" aria-label="Filter merchant stock">
+              <button class="inv-tab active" type="button" data-trade-filter="all" aria-pressed="true" title="All items">All</button>
+              <button class="inv-tab" type="button" data-trade-filter="weapon" aria-pressed="false" aria-label="Weapons" title="Weapons"><img class="trade-filter-icon" src="img/icons/weapon.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="shield" aria-pressed="false" aria-label="Shields" title="Shields"><img class="trade-filter-icon" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="armor" aria-pressed="false" aria-label="Armors" title="Armors"><img class="trade-filter-icon" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="supplies" aria-pressed="false" aria-label="Supplies" title="Supplies"><span class="trade-filter-apple" aria-hidden="true">🍎</span></button>
+              <button class="inv-tab" type="button" data-trade-filter="other" aria-pressed="false" title="Other items">Other</button>
+            </div>
             <div class="invlist" id="tradeBuyList">
               <div class="invitem"><span class="nm empty-message">He has nothing to sell yet. Check back later.</span>
               </div>
             </div>
           </div>
-          <div class="trade-col">
+          <div class="trade-col" data-trade-col="sell">
             <b class="section-title">YOUR ITEMS</b>
+            <div class="inv-tabs trade-filters" id="tradeSellFilters" role="group" aria-label="Filter your items">
+              <button class="inv-tab active" type="button" data-trade-filter="all" aria-pressed="true" title="All items">All</button>
+              <button class="inv-tab" type="button" data-trade-filter="weapon" aria-pressed="false" aria-label="Weapons" title="Weapons"><img class="trade-filter-icon" src="img/icons/weapon.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="shield" aria-pressed="false" aria-label="Shields" title="Shields"><img class="trade-filter-icon" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="armor" aria-pressed="false" aria-label="Armors" title="Armors"><img class="trade-filter-icon" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
+              <button class="inv-tab" type="button" data-trade-filter="supplies" aria-pressed="false" aria-label="Supplies" title="Supplies"><span class="trade-filter-apple" aria-hidden="true">🍎</span></button>
+              <button class="inv-tab" type="button" data-trade-filter="other" aria-pressed="false" title="Other items">Other</button>
+            </div>
             <div class="invlist" id="tradeSellList"></div>
           </div>
         </div>
@@ -582,6 +607,7 @@ more difficult:
     <canvas id="sideMinimap"></canvas>
     <div class="mini-actions">
       <button class="slbtn" id="btnSideMap" type="button">Map</button>
+      <button class="slbtn" id="btnSideFollow" type="button" aria-label="Center on player and follow" title="Center on player and follow" disabled>◎</button>
       <button class="slbtn" id="btnSideBestiary" type="button" aria-label="Open Bestiary">Bestiary</button>
     </div>
   </div>
@@ -6579,6 +6605,20 @@ more difficult:
     }
   }
 
+  function reanchorSurfaceHomeWanderers() {
+    if (!ENEMY_WANDER_LEASH) return
+    for (const e of enemies) {
+      if (!e.alive || (e.level ?? 0) !== 0 ||
+          (e.levelKind && e.levelKind !== 'surface') ||
+          enemyWanderMode(e) !== 'homeReanchored') continue
+      if (!Number.isFinite(e.homeX) || !Number.isFinite(e.homeY) ||
+          Math.max(Math.abs(e.x - e.homeX), Math.abs(e.y - e.homeY)) > enemyHomeRadius(e)) {
+        e.homeX = e.x
+        e.homeY = e.y
+      }
+    }
+  }
+
   function updateSurfaceAbsence(previousZ, responsive = false) {
     if (previousZ === 0 && currentZ !== 0) {
       surfaceDepartureTurn = turnCount
@@ -6587,6 +6627,7 @@ more difficult:
     if (previousZ !== 0 && currentZ === 0) {
       const elapsed = Math.max(0, turnCount - (surfaceDepartureTurn ?? turnCount))
       surfaceDepartureTurn = null
+      reanchorSurfaceHomeWanderers()
       if (responsive && elapsed >= 10 && !replayPlaying && !replayAnimationsDisabled && !replaySimulationMode)
         return simulateSurfaceFarWanderingResponsive(elapsed).then(() => true)
       simulateSurfaceFarWandering(elapsed)
@@ -8469,7 +8510,7 @@ more difficult:
       else if ((fishermanQuest.state === 'ready' || fishermanQuest.state === 'completed') &&
                !player.fishermanRewardClaimed && !player.fishermanLessonPending)
         options.push({id:'quest',label:'Report the predator slain',ready:true})
-      else if (fishermanQuest.state === 'active') options.push({id:'quest',label:'Ask about the predator'})
+      else if (fishermanQuest.state === 'active') options.push({id:'quest',label:'Ask about the nets'})
       if (player.fishermanLessonPending) options.push({id:'lesson',label:'Ask about the swimming lesson'})
       if (fishermanQuest?.state === 'completed' &&
           (player.fishermanRewardClaimed || player.fishermanLessonPending))
@@ -8624,11 +8665,13 @@ more difficult:
     } else if (npc.name === 'Old Hunter' && topic === 'talk') {
       log('Old Hunter says: The country changes while folk sleep. Watch the tracks, not just the road.', 'info')
     } else if (npc.name === FISHERMAN_NAME && topic === 'lesson') {
-      log('Fisherman Hermit says: Start on a solid bank close to me, then step into the deep water. I will watch your footing.', 'info')
+      log("Fisherman Hermit says: Start on the firm shore near me, then step into the deeper water. I'll keep an eye on you.", 'info')
     } else if (npc.name === FISHERMAN_NAME && topic === 'talk') {
-      log(fishermanQuest?.state === 'completed'
-        ? 'Fisherman Hermit says: The nets are filling again. The water is finally quiet.'
-        : 'Fisherman Hermit says: The nets have been coming up empty. Something greedy is troubling the water.', 'info')
+      log(player.swimming > 0
+        ? 'Fisherman Hermit says: You move more confidently in the water now. Keep your strokes steady and mind the current.'
+        : fishermanQuest?.state === 'completed'
+          ? 'Fisherman Hermit says: The nets are filling again. The water is finally quiet.'
+          : 'Fisherman Hermit says: The nets have been coming up empty. Something greedy is troubling the water.', 'info')
     } else interactOrdinaryNpc(npc, false, topic)
     if (gifted && topic !== 'talk' && npcMenuOpen && npcMenuNpc === npc) {
       const speech = document.getElementById('npcSpeech')
@@ -8740,7 +8783,9 @@ more difficult:
       const nextStep = previewPath[i + 1] || null
       const dirX = nextStep ? nextStep.x - step.x : step.x - prevStep.x
       const dirY = nextStep ? nextStep.y - step.y : step.y - prevStep.y
-      drawPathFootstepMarker(pvx + TILE_PX * 0.5, pvy + TILE_PX * 0.5, TILE_PX, dirX, dirY)
+      const attackDestination = !nextStep && enemies.some(e =>
+        e.alive && onCurrentLevel(e) && e.x === step.x && e.y === step.y)
+      if (!attackDestination) drawPathFootstepMarker(pvx + TILE_PX * 0.5, pvy + TILE_PX * 0.5, TILE_PX, dirX, dirY)
       prevStep = step
     }
     const last = previewPath[previewPath.length - 1]
@@ -9093,7 +9138,7 @@ more difficult:
       const openingGate = map[ny]?.[nx] === 'dwarvengateclosed'
       if (openDungeonDoorAt(nx, ny)) {
         consecutiveWaitTurns = 0
-        log(openingGate ? 'You open the dwarven gate.' : 'You open the dwarven door.', 'info')
+        log(openingGate ? 'You open the dwarven gate.' : 'You open the door.', 'info')
         // Auto-travel already shifted this step before tryMove(). Only walk
         // through the newly opened doorway if the destination is beyond it.
         // Clicking the door itself must stop here, without entering its tile.
@@ -12738,7 +12783,7 @@ more difficult:
       const playerSpeed = playerSpd()
       const spdColor = effectiveEnemySpeed > playerSpeed ? '#e0473f' : playerSpeed >= effectiveEnemySpeed * 2 ? 'var(--parchment-dim)' : 'white'
       const boostHtml = boosts.length ? `<div class="pfx">${boosts.map(b =>
-        `<span class="${b.delta > 0 ? 'up' : 'down'}">${b.delta > 0 ? '+' : ''}${b.delta} ${b.label}</span>`
+        `<span>${b.delta > 0 ? '+' : ''}${b.delta} ${b.label}</span>`
       ).join(', ')}</div>` : ''
       const critChance = enemyCriticalHitChance(e)
       const critHtml = critChance > BASE_CRIT_CHANCE
@@ -12796,7 +12841,7 @@ more difficult:
       <span class="hpnum">HP ${Math.round(e.hp)} / ${Math.round(e.maxHp)}</span>
       </div>
       <div class="statrow">
-      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span class="${terrainStatClass(terrainStatChanges.defense)}" ${terrainStatChanges.defense ? '' : `style="color:${defColor}"`}>DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span class="${terrainStatClass(terrainStatChanges.speed)}" ${terrainStatChanges.speed ? '' : `style="color:${spdColor}"`}>SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
+      <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
       <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
       </div>
       </div>`
@@ -13635,7 +13680,7 @@ more difficult:
   // discovered platforms on their own floors, never intermediate mine shafts.
   function drawDungeonShortcutMarkers(ctx, scale, ox, oy, zoom, viewKey, seen) {
     const marker = RENDER_STYLE.minimap.dungeonShortcut
-    const size = Math.max(6, Math.round(Math.max(2.75, scale * 0.8) * zoom * 2))
+    const size = 4 * zoom
     ctx.save()
     ctx.fillStyle = marker.color
     ctx.strokeStyle = marker.outline
@@ -13815,6 +13860,7 @@ more difficult:
       sideMiniPanX = sideMiniPanY = null
       sideMiniPanMap = map
     }
+    document.getElementById('btnSideFollow').disabled = sideMiniPanX === null && sideMiniPanY === null
     return {
       x: Math.max(0, Math.min(MAP_W - SIDE_VIEW_W, sideMiniPanX ?? (player.x - (SIDE_VIEW_W >> 1)))),
       y: Math.max(0, Math.min(MAP_H - SIDE_VIEW_H, sideMiniPanY ?? (player.y - (SIDE_VIEW_H >> 1))))
@@ -13927,7 +13973,7 @@ more difficult:
 
   function setInvTab(tab) {
     invTab = tab
-    document.querySelectorAll('.inv-tab').forEach(btn => {
+    document.querySelectorAll('#invOverlay .inv-tab[data-tab]').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tab)
     })
     if (invOpen) renderInventory()
@@ -14382,9 +14428,36 @@ more difficult:
     return (base || 0) + (it.mod ? (it.modAmt || 1) * ITEM_BASE_VALUES.modifierPerPoint : 0)
   }
 
+  // Presentation-only filters: no turns, RNG calls, save fields or replay actions.
+  const tradeFilters = {buy:'all', sell:'all'}
+  function tradeItemMatchesFilter(it, category) {
+    if (category === 'all') return true
+    const kind = it.kind === 'artifact' ? (it.artifactSlot || 'other') : it.kind
+    if (category === 'weapon' || category === 'shield' || category === 'armor') return kind === category
+    const supplies = isConsumableKind(it.kind)
+    if (category === 'supplies') return supplies
+    return category === 'other' && !['weapon', 'shield', 'armor'].includes(kind) && !supplies
+  }
+  function setTradeFilter(side, category, rerender = true) {
+    if (!['buy', 'sell'].includes(side) || !['all', 'weapon', 'shield', 'armor', 'supplies', 'other'].includes(category)) return
+    tradeFilters[side] = category
+    document.querySelectorAll(`#trade${side === 'buy' ? 'Buy' : 'Sell'}Filters [data-trade-filter]`).forEach(button => {
+      const active = button.dataset.tradeFilter === category
+      button.classList.toggle('active', active)
+      button.setAttribute('aria-pressed', String(active))
+    })
+    if (rerender && tradeOpen) renderTrade()
+  }
+  for (const side of ['buy', 'sell']) {
+    document.querySelectorAll(`#trade${side === 'buy' ? 'Buy' : 'Sell'}Filters [data-trade-filter]`).forEach(button => {
+      button.addEventListener('click', () => setTradeFilter(side, button.dataset.tradeFilter))
+    })
+  }
+
   function renderTrade() {
     const herbalist = serviceNpc && serviceNpc.name === 'Herbalist'
     const fisherman = serviceNpc && serviceNpc.name === FISHERMAN_NAME
+    document.getElementById('tradePanel').dataset.tradeMode = herbalist || fisherman ? 'services' : 'merchant'
     document.getElementById('tradeTitle').textContent = fisherman ? 'Services of the Fisherman Hermit' : herbalist ? 'Services of the Herbalist' : 'Trade with the Merchant'
     if (herbalist || fisherman) {
       const buyList = document.getElementById('tradeBuyList')
@@ -14419,13 +14492,18 @@ more difficult:
 
     const buyList = document.getElementById('tradeBuyList')
     buyList.innerHTML = ''
-    if (!merchantStock.some(it => it.count !== 0)) {
+    const availableStock = merchantStock.filter(it => it.count !== 0)
+    const visibleStock = availableStock.filter(it => tradeItemMatchesFilter(it, tradeFilters.buy))
+    if (visibleStock.length === 0) {
       const d = document.createElement('div')
       d.className = 'invitem'
-      d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">He has nothing to sell yet. Check back later.</span>'
+      const nm = document.createElement('span')
+      nm.className = 'nm empty-message'
+      nm.textContent = availableStock.length === 0 ? 'He has nothing to sell yet. Check back later.' : 'No items in this category.'
+      d.appendChild(nm)
       buyList.appendChild(d)
     } else {
-      merchantStock.filter(it => it.count !== 0).forEach((it) => {
+      visibleStock.forEach((it) => {
         const row = document.createElement('div')
         row.className = 'invitem'
         const tier = visibleItemTier(it)
@@ -14442,8 +14520,9 @@ more difficult:
         }
         const nm = document.createElement('span')
         nm.className = 'nm ' + cls
-        nm.textContent = (it.merchantNew ? 'NEW · ' : '') + artifactDisplayName(it) + countTag +
+        nm.textContent = (it.merchantSold ? '↩️ ' : '') + (it.merchantNew ? 'NEW · ' : '') + artifactDisplayName(it) + countTag +
           (line ? ' | ' + line : '') + visibleItemTierTag(it)
+        if (it.merchantSold) nm.title = 'Buy back an item you previously sold to this merchant'
         row.appendChild(nm)
         const btn = document.createElement('button')
         const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
@@ -14460,12 +14539,16 @@ more difficult:
     list.innerHTML = ''
     const sellable = []
     player.inventory.forEach((it, idx) => {
-      if (itemSellValue(it) > 0) sellable.push({it, idx})
+      if (itemSellValue(it) > 0 && tradeItemMatchesFilter(it, tradeFilters.sell)) sellable.push({it, idx})
     })
     if (sellable.length === 0) {
       const d = document.createElement('div')
       d.className = 'invitem'
-      d.innerHTML = '<span class="nm" style="color:var(--parchment-dim)">You have nothing worth selling.</span>'
+      const nm = document.createElement('span')
+      nm.className = 'nm empty-message'
+      nm.textContent = player.inventory.some(it => itemSellValue(it) > 0)
+        ? 'No items in this category.' : 'You have nothing worth selling.'
+      d.appendChild(nm)
       list.appendChild(d)
       return
     }
@@ -14526,6 +14609,7 @@ more difficult:
       const bought = {...it}
       delete bought.merchantPrice
       delete bought.merchantNew
+      delete bought.merchantSold
       player.inventory.push(bought)
     }
     player.gold -= value
@@ -14550,14 +14634,16 @@ more difficult:
     const value = unitValue * quantity
     if (stackable) {
       it.count = (it.count || 1) - quantity
-      const existing = merchantStock.find(s => s.kind === it.kind && s.name === it.name)
-      if (existing?.unlimitedStock) { /* infinite bundles are already stocked */ }
-      else if (existing) existing.count = (existing.count ?? 1) + quantity
-      else merchantStock.push({kind: it.kind, name: it.name, count: quantity})
+      // Keep buyback stock separate from ordinary stock, including unlimited bundles.
+      // Only the actual player-sold copies carry the bookmark symbol.
+      const existing = merchantStock.find(s => s.kind === it.kind && s.name === it.name && s.merchantSold)
+      if (existing) existing.count = (existing.count ?? 1) + quantity
+      else merchantStock.push({kind: it.kind, name: it.name, count: quantity, merchantSold:true,
+        replayId: `merchant_sold_${it.kind}_${it.name}`})
       if (it.count <= 0) player.inventory.splice(idx, 1)
     } else {
       player.inventory.splice(idx, 1)
-      merchantStock.push(it)
+      merchantStock.push({...it, merchantSold:true})
     }
     player.gold += value
     recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name, all:!!all})
@@ -14578,7 +14664,11 @@ more difficult:
     }
     tradeOpen = next
     document.getElementById('tradeOverlay').classList.toggle('show', tradeOpen)
-    if (tradeOpen) renderTrade()
+    if (tradeOpen) {
+      setTradeFilter('buy', 'all', false)
+      setTradeFilter('sell', 'all', false)
+      renderTrade()
+    }
     updateTouchControlsVisibility()
   }
 
@@ -15055,7 +15145,7 @@ more difficult:
     consumeItemTurn()
   }
 
-  document.querySelectorAll('.inv-tab').forEach(button => {
+  document.querySelectorAll('#invOverlay .inv-tab[data-tab]').forEach(button => {
     button.addEventListener('click', () => setInvTab(button.dataset.tab))
   })
   function showCharacterSheet(show) {
@@ -15165,10 +15255,12 @@ more difficult:
   sideMini.addEventListener('pointerup', finishSideMiniDrag)
   sideMini.addEventListener('pointercancel', finishSideMiniDrag)
   sideMini.addEventListener('lostpointercapture', finishSideMiniDrag)
-  sideMini.addEventListener('dblclick', () => {
+  function resetSideMiniFollow() {
     sideMiniPanX = sideMiniPanY = null
     renderMinimap()
-  })
+  }
+  sideMini.addEventListener('dblclick', resetSideMiniFollow)
+  document.getElementById('btnSideFollow').addEventListener('click', resetSideMiniFollow)
 
   mini.style.touchAction = 'none'
   mini.addEventListener('click', ev => {

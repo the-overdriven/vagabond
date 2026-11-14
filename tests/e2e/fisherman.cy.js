@@ -18,6 +18,9 @@ describe('Fisherman and swimming', () => {
           throw Error('fisherman quest option missing')
         document.querySelector('#npcChoices [data-action="talk"]').click()
         if (fishermanQuest!==null) throw Error('ordinary talk incorrectly started Empty Nets')
+        fishermanQuest={type:'fish_predator',state:'active',targetId:'unseen-test-predator'}
+        if (npcMenuOptions(n).find(option=>option.id==='quest')?.label !== 'Ask about the nets')
+          throw Error('fisherman quest dialogue gives away the predator or misstates the nets')
         closeNpcMenu()
         fishermanQuest={state:'ready'}
         interactFisherman()

@@ -96,6 +96,47 @@ describe('Tracking and beast evidence', () => {
     })()`))
   })
 
+  it('reanchors displaced homeReanchored surface monsters only when returning', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const displaced=trackEnemy({id:'reanchor',wander:'homeReanchored',x:50,y:50,
+        homeX:40,homeY:40,homeRadius:2})
+      const stillHome=trackEnemy({id:'within',wander:'homeReanchored',x:60,y:60,
+        homeX:59,homeY:59,homeRadius:2})
+      const returning=trackEnemy({id:'return',wander:'homeReturn',x:70,y:70,
+        homeX:40,homeY:40})
+      const roaming=trackEnemy({id:'roaming',wander:'roam',x:71,y:70,
+        homeX:40,homeY:40})
+      const below=trackEnemy({id:'underground',wander:'homeReanchored',x:72,y:70,
+        level:-1,levelKind:'chain',homeX:40,homeY:40})
+      const dead=trackEnemy({id:'dead',wander:'homeReanchored',x:73,y:70,
+        alive:false,homeX:40,homeY:40})
+      enemies=[displaced,stillHome,returning,roaming,below,dead]
+      const beforeRng=rngState
+      currentZ=-1;map=undergroundMap;turnCount=50
+      updateSurfaceAbsence(0)
+      currentZ=0;map=surfaceMap;turnCount=55
+      trackAssert(updateSurfaceAbsence(-1),'surface return resumes sync')
+      trackAssert(displaced.homeX===50&&displaced.homeY===50,'distant anchor reset')
+      const savedAnchor=buildSaveObject().enemies.find(e=>e.id===displaced.id)
+      trackAssert(savedAnchor?.homeX===50&&savedAnchor?.homeY===50,'reanchored position serialized')
+      trackAssert(stillHome.homeX===59&&stillHome.homeY===59,'near anchor retained')
+      trackAssert(returning.homeX===40&&roaming.homeX===40&&below.homeX===40&&dead.homeX===40,
+        'other modes, levels and dead monsters untouched')
+      trackAssert(rngState===beforeRng,'reanchoring does not use RNG')
+      displaced.x=55;displaced.y=55
+      currentZ=-1;map=undergroundMap;turnCount=60
+      updateSurfaceAbsence(0)
+      currentZ=0;map=surfaceMap;turnCount=75
+      replayAnimationsDisabled=false;replayPlaying=false;replaySimulationMode=false
+      // The asynchronous sync path must refresh the same state before painting.
+      const pending=updateSurfaceAbsence(-1,true)
+      trackAssert(pending?.then&&displaced.homeX===55&&displaced.homeY===55,
+        'responsive return reanchors before its first paint')
+      replayAnimationsDisabled=true
+      return pending.then(()=>trackAssert(rngState===beforeRng,'no RNG in responsive reanchor'))
+    })()`))
+  })
+
   it('uses deterministic shortest routes around obstacles during surface catch-up', () => {
     cy.window().then(win => win.eval(`(() => {
       const traveler=trackEnemy({x:40,y:45,farTargetX:52,farTargetY:45})

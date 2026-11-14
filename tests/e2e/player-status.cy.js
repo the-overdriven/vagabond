@@ -8,6 +8,29 @@ function beginStatusGame() {
 }
 
 describe('Active player statuses', () => {
+  it('lets Rooted characters use items but prevents movement', () => {
+    beginStatusGame()
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok) throw Error(msg)}
+      replayAnimationsDisabled=true
+      const oldEnemyTurn=enemyTurn, oldNpcTurn=npcTurn
+      try {
+        enemyTurn=()=>{}; npcTurn=()=>{}
+        player.rootTurns=3; player.rootFlavor='generic'
+        player.inventory=[createItem('potion', {count:1})]
+        player.hp=Math.max(1,playerMaxHp()-15)
+        const before={x:player.x,y:player.y}
+        usePotion(0)
+        check(player.hp===playerMaxHp() && !player.inventory.length,
+          'Rooted does not prevent drinking a potion')
+        check(player.rootTurns===3,'item use did not mistakenly remove Rooted')
+        await tryMove(1,0)
+        check(player.x===before.x && player.y===before.y,
+          'Rooted still blocks a movement attempt')
+      } finally {enemyTurn=oldEnemyTurn; npcTurn=oldNpcTurn}
+    })()`))
+  })
+
   it('clears temporary effects on death without clearing them on a living Temple return', () => {
     beginStatusGame()
     cy.window().then(win => {
