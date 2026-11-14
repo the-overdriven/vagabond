@@ -368,8 +368,17 @@ describe('Player Short Bow', () => {
           'shot target fires back from behind bars instead of stopping')
         cageKobold.shotsRemaining=0
         enemyTurn(null,null,cageKobold)
-        check(cageKobold.bowEvasion?.kind==='trapped'&&cageKobold.x<37,
-          'out-of-arrows prisoner tries to withdraw toward the back of its cell')
+        const escape=cageKobold.bowEvasion
+        const destination=escape?.path.at(-1)
+        check(escape?.kind==='trapped' && destination &&
+          Math.max(Math.abs(cageKobold.x-37),Math.abs(cageKobold.y-40))===1 &&
+          Math.max(Math.abs(destination.x-player.x),Math.abs(destination.y-player.y))>3,
+          'out-of-arrows prisoner takes one legal step along a finite escape route')
+        const escapeSteps=escape.path.length
+        for(let i=0;i<escapeSteps;i++)enemyTurn()
+        check(cageKobold.x===destination.x && cageKobold.y===destination.y &&
+          !cageKobold.bowEvasion && cageKobold.bowEvasionSpent && cageKobold.shotsRemaining===0,
+          'prisoner completes the planned escape without reusing ammunition')
         for(let y=30;y<=55;y++)map[y][38]='grass'
         enemies=[];occupied=new Set()
         for(const [x,y] of [[45,39],[45,40],[45,41]])map[y][x]='mountain'

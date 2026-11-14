@@ -612,7 +612,7 @@ describe('Adaptive Player Trolling', () => {
         const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(snapshot,{isReplayInit:true})
         state=AdaptivePlayerTrolling.serialize()
-        check(AdaptivePlayerTrolling.debugTrollingEnabled() && state.triggerFlags.beast_hunter &&
+        check(AdaptivePlayerTrolling.debugTrollingEnabled()===jsonDebug && state.triggerFlags.beast_hunter &&
           state.triggerFlags.gold_imp && !state.completed.includes('beast_hunter'),
           'flags survive save and replay while diagnostics use JSON configuration')
         check(AdaptivePlayerTrolling.setDebugTrolling(false) &&
@@ -879,10 +879,13 @@ describe('Adaptive Player Trolling', () => {
         currentZ=0;currentCave=-1;map=surfaceMap
         player.inventory=[createItem('meat',{count:25})]
         player.x=55;player.y=55
-        for(let y=30;y<=80;y++)for(let x=30;x<=80;x++)map[y][x]='grass'
+        // Cover the full 28-tile spawn search radius, including its outer ring.
+        for(let y=27;y<=83;y++)for(let x=27;x<=83;x++){
+          map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+        }
         enemies=enemies.filter(e=>e.level!==0)
         groundItems=groundItems.filter(g=>(g.level||0)!==0)
-        npcs=npcs.filter(n=>n.x<30||n.x>80||n.y<30||n.y>80)
+        npcs=npcs.filter(n=>n.x<27||n.x>83||n.y<27||n.y>83)
         snapCameraToPlayer();rebuildActiveLevelOccupancy()
         player.steps=500
         check(AdaptivePlayerTrolling.onPlayerMoved(),'hungry monster spawns at the first scheduled check')
@@ -1076,7 +1079,9 @@ describe('Adaptive Player Trolling', () => {
         for(let i=0;i<29;i++) AdaptivePlayerTrolling.onMushroomsCollected(1)
         check(AdaptivePlayerTrolling.serialize().mushroomsCollected===29,
           '29 acquired mushrooms do not qualify')
-        check(!AdaptivePlayerTrolling.onFloorChanged(),
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.completed('mushroom_prophet') &&
+          !enemies.some(e=>e.adaptiveEventId==='mushroom_prophet'),
           'no prophet before the threshold')
         addMushroom() // The ordinary world acquisition hook, not a test-only counter.
         check(AdaptivePlayerTrolling.serialize().mushroomsCollected===30,

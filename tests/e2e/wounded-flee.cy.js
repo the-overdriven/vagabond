@@ -61,7 +61,9 @@ describe('Wounded enemy flight', () => {
       try {
         player.freezing={active:false,turns:0};player.curseDebuffs=[]
         player.berryRegenTurns=0;player.speedPotionTurns=0
-        const e=rushEnemy('Goblin',38,40);e.hp=1;e.shotsRemaining=10
+        const e=rushEnemy('Goblin',38,40);e.hp=1
+        // Explicit shooter fixture: this case must not depend on the spawn's 50% role roll.
+        e.shooterAbility='shooterArrows';e.shooterMode='ranged';e.shotsRemaining=10
         let probabilities=[];chance=p=>{probabilities.push(p);return false}
         const hp=player.hp;enemyTurn()
         rushCheck(Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))===3,'one retreat tile')
@@ -75,7 +77,11 @@ describe('Wounded enemy flight', () => {
           if(x!==player.x || y!==player.y) map[y][x]='mountain'
         }
         chance=()=>false;damageRoll=()=>5
-        enemyTurn();rushCheck(player.hp===hp-5 && e.shotsRemaining===10,'cornered melee attack')
+        enemyTurn()
+        rushCheck(player.hp===hp && e.shooterMode==='melee' && e.shotsRemaining===10,
+          'cornered shooter spends one turn switching to melee')
+        enemyTurn()
+        rushCheck(player.hp===hp-5 && e.shotsRemaining===10,'cornered melee attack')
         e.hp=e.maxHp*.10;rushCheck(!enemyIsFleeing(e),'healing ends flight')
         e.hp=0;rushCheck(!enemyIsFleeing(e),'dead monster no flight')
       } finally {chance=oldChance;damageRoll=oldDamage}

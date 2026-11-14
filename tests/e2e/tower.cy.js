@@ -96,7 +96,7 @@ describe('Guaranteed elevated tower',()=>{
     cy.viewport(1280,800);loadTower()
     cy.window().then(win=>{
       const result=win.eval(`(()=>{
-        const saved={currentZ,map,enemies,useTiles:USE_TILE_IMAGES,
+        const saved={currentZ,map,enemies,camX,camY,useTiles:USE_TILE_IMAGES,
           drawEnemyVisual,drawImageVisual,enemyHasAbility}
         const x=tower.x-2,y=tower.y+4,key=keyXY(x,y)
         const savedTile=surfaceMap[y][x],savedUnderlay=tileUnderlays[key]
@@ -106,6 +106,8 @@ describe('Guaranteed elevated tower',()=>{
           const template=enemies.find(e=>e.alive&&(e.level??0)===0)
           if(!template)throw Error('Missing surface enemy in tower fixture')
           currentZ=4;map=towerLevels[3].map;USE_TILE_IMAGES=true
+          // The loaded character starts at the Temple, far from this render fixture.
+          camX=x-2;camY=y-2
           surfaceMap[y][x]='forest';tileUnderlays[key]='sand';discovered[y][x]=true
           foragedTiles.delete(key)
           const ground=towerBackgroundGround('forest',x,y)
@@ -132,6 +134,7 @@ describe('Guaranteed elevated tower',()=>{
             groundRoof,groundRoom,flying,ascii}
         } finally {
           currentZ=saved.currentZ;map=saved.map;enemies=saved.enemies
+          camX=saved.camX;camY=saved.camY
           USE_TILE_IMAGES=saved.useTiles
           drawEnemyVisual=saved.drawEnemyVisual;drawImageVisual=saved.drawImageVisual
           enemyHasAbility=saved.enemyHasAbility

@@ -11763,7 +11763,7 @@ true condition is not repeatedly evaluated. Explorer Galleries separately use
 the saved exploration milestone to retain qualification. Logging never consumes RNG.
 
 `content/adaptive_player_trolling.json -> debugTrolling` controls diagnostic
-`[TROLLING]` messages (boolean; `true` by default). This is a **game
+`[TROLLING]` messages (boolean; `false` in the shipped configuration). This is a **game
 configuration setting**, not character progress: it is not stored in saves or
 replay snapshots. Editing the JSON and reloading the game changes logging for
 new and existing characters, regardless of their saved state. For temporary

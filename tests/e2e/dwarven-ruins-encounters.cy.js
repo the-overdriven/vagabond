@@ -687,7 +687,8 @@ describe('Dwarven Ruins encounter progression', () => {
         const saved = JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved)
         check(counter() === 9, 'counter survives save and restore')
-        searchSkeleton(ruins, 'dwarven')
+        // Loading reconstructs deepLevels; reacquire the floor from the loaded world.
+        searchSkeleton(deepLevels.find(level => level.dungeonPackage === 'dwarvenRuins'), 'dwarven')
         check(counter() === 10, 'the tenth qualifying search reaches the threshold')
         check(!AdaptivePlayerTrolling.serialize().dwarvenGoldLoot.length,
           'searching empty skeletons never fabricates loot provenance')
