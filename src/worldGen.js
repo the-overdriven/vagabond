@@ -774,6 +774,7 @@ function rotateGeneratedWorld(quarterTurns) {
     cave.inscriptions = rekeyObject(cave.inscriptions)
   }
   positions(caves); positions(deepLevels); positions(dungeonShortcuts)
+  positions(towerMaze)
   positions(villageHuts); positions(enemies); positions(groundItems)
   positions(npcs); positions(caveDecorations); positions(caveSpoor)
   for(const spoor of caveSpoor)spoor.direction=(spoor.direction+quarterTurns*2)%8

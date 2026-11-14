@@ -102,12 +102,14 @@ function plantTowerDeadTrees(protectedCells) {
 
 function generateTower() {
   tower = null
+  towerMaze = null
   towerLevels = []
   const natural = new Set(['grass','forest','hill','sand','snow','taiga'])
   const protectedCells = new Set([...npcs, ...groundItems.filter(g => (g.level ?? 0) === 0),
     ...enemies.filter(e => (e.level ?? 0) === 0 && e.alive), spawnPoint,
     ...(treasureMapSpot ? [treasureMapSpot] : [])].map(p => keyXY(p.x,p.y)))
   const before = surfaceReachableFromTemple()
+  const mazeCandidates = TowerMaze.candidateScanner()
   const candidates = []
   // Leave an untouched, walkable ring around the footprint. It carries old
   // routes around the tower instead of sealing a narrow overworld passage.
@@ -118,10 +120,14 @@ function generateTower() {
     for (let dy = -1; dy <= TOWER_SIZE && valid; dy++) for (let dx = -1; dx <= TOWER_SIZE; dx++) {
       if (!natural.has(map[y+dy][x+dx]) || protectedCells.has(keyXY(x+dx,y+dy))) {valid=false;break}
     }
-    if (valid && before.has(keyXY(x+5,y+TOWER_SIZE))) candidates.push({x,y})
+    if (valid && before.has(keyXY(x+5,y+TOWER_SIZE))) {
+      const layouts = mazeCandidates(x,y)
+      if (layouts.length) candidates.push({x,y,layouts})
+    }
   }
   if (!candidates.length) return false
-  tower = {...pick(candidates), size:TOWER_SIZE, cornerCut:1, floors:5, rotation:0}
+  const selection = pick(candidates)
+  tower = {x:selection.x,y:selection.y,size:TOWER_SIZE, cornerCut:1, floors:5, rotation:0}
   tower.entrance = towerPoint(5, TOWER_SIZE-1)
   // Door states are rolled during generation, never on rendering or revisits.
   // This also applies to the outside entrance (which may reveal the foyer).
@@ -161,6 +167,7 @@ function generateTower() {
       towerLevels.push({map:terrain,discovered:Array.from({length:MAP_H},()=>Array(MAP_W).fill(false))})
     } else terrain[tower.entrance.y][tower.entrance.x]=randomDoor()
   }
+  if (!TowerMaze.generate(pick(selection.layouts))) return false
   plantTowerDeadTrees(protectedCells)
   // All cells in the clear perimeter were walkable before stamping. A ring
   // gives every old ingress an egress, preserving exterior connectivity.

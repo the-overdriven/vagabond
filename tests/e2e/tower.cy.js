@@ -11,6 +11,88 @@ function loadTower() {
 }
 
 describe('Guaranteed elevated tower',()=>{
+  it('carves the connected lower Tower labyrinth without changing x/y or resetting its gates', function () {
+    this.timeout(180000)
+    cy.viewport(1280,800)
+    cy.visit('/')
+    cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
+    cy.window({timeout:180000}).then(async win=>{
+      const result=await win.eval(`(async()=>{
+        // Fixed-seed worldgen with a compact deterministic test silhouette.
+        // Reuse the same app generator, not a fabricated parallel dungeon.
+        CaveSilhouettes.prepare=async seed=>{
+          CAVE_SILHOUETTES=[{id:CaveSilhouettes.idForSeed(seed),sourceIds:['a','b'],
+            rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>
+              ((x-15)**2+(y-15)**2<212?'1':'0')).join(''))}]
+          return CAVE_SILHOUETTES[0]
+        }
+        WORLD_SEED=67893;rngState=WORLD_SEED;applyWorldTraits([],'XS')
+        map=[];surfaceMap=null;enemies=[];groundItems=[];occupied=new Set()
+        player.inventory=[];player.curseDebuffs=[];replayRecording=false
+        replayAnimationsDisabled=true;raceOpen=false
+        await generateNewWorld()
+        const count=z=>enemies.filter(e=>e.alive&&e.towerMazeResident&&e.level===z).length
+        const before={x:towerMaze.center.x,y:towerMaze.center.y}
+        currentZ=0;map=surfaceMap;Object.assign(player,before)
+        const down=TowerMaze.switchStairs()&&currentZ===-1&&player.x===before.x&&player.y===before.y
+        Object.assign(player,towerMaze.down)
+        const lower={x:player.x,y:player.y}
+        const deep=TowerMaze.switchStairs()&&currentZ===-2&&player.x===lower.x&&player.y===lower.y
+        const back=TowerMaze.switchStairs()&&currentZ===-1&&player.x===lower.x&&player.y===lower.y
+        currentZ=3;map=towerLevels[2].map
+        // Bump the basement gate before flipping the lever.
+        currentZ=-1;map=undergroundMap
+        const oldLog=log,gate=towerMaze.gate
+        const dx=Math.sign(gate.x-towerMaze.center.x),dy=Math.sign(gate.y-towerMaze.center.y)
+        Object.assign(player,{x:gate.x-dx,y:gate.y-dy})
+        let messages=[];log=text=>messages.push(text)
+        const beforeGateTurn=turnCount
+        await tryMove(dx,dy)
+        const basementFeedback=messages.length===1 &&
+          messages[0]==="The door won't budge." && turnCount===beforeGateTurn
+        log=oldLog
+        currentZ=3;map=towerLevels[2].map
+        const lever=TowerMaze.toggle(towerMaze.lever.x,towerMaze.lever.y)
+        const sealed=towerMaze.active&&surfaceMap[tower.entrance.y][tower.entrance.x]==='towerentrancesealed'
+        currentZ=0;map=surfaceMap
+        Object.assign(player,{x:tower.entrance.x,y:tower.entrance.y+1})
+        messages=[];log=text=>messages.push(text)
+        const beforeTowerTurn=turnCount
+        await tryMove(0,-1)
+        const towerFeedback=messages.length===1 &&
+          messages[0]==="The door won't budge." && turnCount===beforeTowerTurn
+        log=oldLog
+        currentZ=3;map=towerLevels[2].map
+        const oldVisible=undergroundTileVisible
+        undergroundTileVisible=()=>true
+        const leverTooltip=tileInspectInfo(towerMaze.lever.x,towerMaze.lever.y)?.html||''
+        const gateTooltip=(()=>{
+          currentZ=-1;map=undergroundMap
+          return tileInspectInfo(towerMaze.gate.x,towerMaze.gate.y)?.html||''
+        })()
+        undergroundTileVisible=oldVisible
+        const noSpoilers=leverTooltip.includes('Old Lever')&&
+          gateTooltip.includes('Basement Gate')&&
+          !/upstairs|below|exchange|opens|mechanism/i.test(leverTooltip+' '+gateTooltip)
+        const saved=buildSaveObject()
+        loadGameFromObject(saved,{isReplayInit:true})
+        return {down,deep,back,lever,sealed,basementFeedback,towerFeedback,
+          noSpoilers,persisted:towerMaze.active,
+          monsters:[count(-1),count(-2)],
+          ghost:enemies.some(e=>e.towerMazeResident &&
+            (e.abilities.includes('fly')||e.abilities.includes('ethereal'))),
+          chest:groundItems.filter(g=>g.towerMazeTreasure).length,
+          upper:undergroundMap[towerMaze.center.y][towerMaze.center.x],
+          lower:deepLevels[0].map[towerMaze.down.y][towerMaze.down.x]}
+      })()`)
+      expect(result).to.include({down:true,deep:true,back:true,lever:true,
+        sealed:true,basementFeedback:true,towerFeedback:true,
+        noSpoilers:true,persisted:true,ghost:false,chest:1,
+        upper:'mazestairsup',lower:'caveup'})
+      expect(result.monsters[0]).to.be.within(8,15)
+      expect(result.monsters[1]).to.be.within(8,15)
+    })
+  })
   for (const [device,width,height] of [['desktop',1280,800],['mobile',390,844]]) {
     it(`opens the clicked entrance without entering its tile on ${device}`,()=>{
       cy.viewport(width,height);loadTower()

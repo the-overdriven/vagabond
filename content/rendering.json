@@ -1412,6 +1412,31 @@
       "image": "img/tiles/dwarven-gas-vent.png",
       "baseTileKey": "marble",
       "scale": 1
+    },
+    "mazestairsup": {
+      "image": "img/tiles/dwarven-stairs-up.png",
+      "baseTileKey": "cavefloor",
+      "scale": 1
+    },
+    "mazestairsdown": {
+      "image": "img/tiles/stairs-down.png",
+      "baseTileKey": "marble",
+      "scale": 1
+    },
+    "mazegatesealed": {
+      "image": "img/tiles/dwarven-door-closed.png",
+      "baseTileKey": "cavefloor",
+      "scale": 1
+    },
+    "mazegateopen": {
+      "image": "img/tiles/dwarven-door-open.png",
+      "baseTileKey": "cavefloor",
+      "scale": 1
+    },
+    "towerentrancesealed": {
+      "image": "img/tiles/tower-entrance.png",
+      "baseTileKey": "marble",
+      "scale": 1
     }
   },
   "projectiles": {

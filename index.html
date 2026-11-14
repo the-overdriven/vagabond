@@ -1391,7 +1391,7 @@ more difficult:
   // to z:-1; cave stairs serve the natural caves; dedicated dwarven stairs
   // connect the fort and persistent Dwarven Ruins floors.
   const CAVE_TRANSITION_TILES = new Set([
-    'towerstairsup', 'towerstairsdown',
+    'towerstairsup', 'towerstairsdown', 'mazestairsup', 'mazestairsdown',
     'caveentrance', 'dwarvengate', 'dwarvenfortexit', 'cavedown', 'caveup', 'dwarvenhole',
     'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenminesopen',
     'minestairsup', 'minestairsdown', 'minecageupperoff', 'minecageloweroff',
@@ -1685,6 +1685,7 @@ more difficult:
     const departureZ=currentZ,departureKind=currentLevelKind(),departureCave=currentCave
     try {
     if (travelTowerStairs()) return true
+    if (TowerMaze.switchStairs()) return true
     if (enterMausoleum()) return true
     const tile = map[player.y] && map[player.y][player.x]
     if (currentZ === 0) {
@@ -2152,6 +2153,7 @@ more difficult:
     if (!map[y]) return false // world not generated yet
     if (groundItems.some(g => g.kind === 'dwarvenstove' && g.x === x && g.y === y && onCurrentLevel(g))) return false
     if (currentZ > 0 && map[y][x] === 'towervoid') return false
+    if (['towerentrancesealed','mazegatesealed'].includes(map[y][x])) return false
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
     return (raceHas('swims') || player.swimming > 0 || deepSwimmingWater(player.x, player.y) ||
@@ -2162,6 +2164,7 @@ more difficult:
 <script src="src/caveSilhouettes.js"></script>
 <script src="src/worldGen.js"></script>
 <script src="src/tower.js"></script>
+<script src="src/towerMaze.js"></script>
 <script src="src/dwarvenMines.js"></script>
 <script src="src/mining.js"></script>
 <script src="src/dungeonTraps.js"></script>
@@ -5815,7 +5818,8 @@ more difficult:
   function enemyCanTraverse(e, x, y) {
     if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false
     if (currentZ > 0 && map[y]?.[x] === 'towervoid') return false
-    if (enemyHasAbility(e, 'ethereal')) return true
+    if (['towerentrancesealed','mazegatesealed'].includes(map[y]?.[x])) return false
+    if (enemyHasAbility(e, 'ethereal')) return !TowerMaze.isProtectedWall(currentZ,x,y)
     if (Mining.blocksPathAt(x, y)) return false
     if (isWalkable(x, y)) return true
     if (e && enemyHasAbility(e, 'swim') && map[y]?.[x] === 'water') return true
@@ -8482,6 +8486,42 @@ more difficult:
         const mf = playerMf()
         const chestTier = Math.max(1, g.tier)
 
+        if (g.towerMazeTreasure) {
+          const artifact = chance(0.15)
+          const gearTier = chance(0.5) ? 3 : 4
+          let item
+          if (artifact) item=makeArtifactItem(4,mf)
+          else {
+            const bases=[...WEAPONS.filter(w=>!w.rangedAtk),...SHIELDS,...ARMORS]
+              .filter(base=>base.tier===gearTier)
+            if (!bases.length)throw new Error('Missing tier '+gearTier+' equipment for maze chest')
+            const base=pick(bases)
+            if (WEAPONS.includes(base)) item={kind:'weapon',base:base.name,name:base.name,
+              atk:base.atk,grace:base.grace,tier:base.tier,baseValue:base.baseValue,twoHanded:!!base.twoHanded}
+            else if (SHIELDS.includes(base)) item={kind:'shield',base:base.name,name:base.name,
+              def:base.def,tier:base.tier,baseValue:base.baseValue}
+            else item={kind:'armor',base:base.name,name:base.name,
+              def:base.def,tier:base.tier,baseValue:base.baseValue,
+              speedPenalty:base.speedPenalty||0,...(base.gracePenalty?{gracePenalty:base.gracePenalty}:{})}
+            item=rollModifier(base.name,item,mf,gearTier)
+          }
+          const gold=Math.max(1,Math.round(randInt(60,150)*WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
+          player.gold+=gold
+          const bonusKinds=['potion','speedpotion','herb','brushwood','arrows',
+            'scrollOfInvisibility','idscroll','flintstone']
+            .filter(kind=>itemDefinition(kind))
+          const extra=randInt(1,2)
+          const bonuses=[]
+          for(let j=0;j<extra;j++) {const kind=pick(bonusKinds);addInventoryItem(kind);bonuses.push(itemDefinition(kind).name)}
+          const name=item.kind==='artifact'?artifactDisplayName(item):item.name
+          lastLootResult=`${name}, ${gold} gold and ${bonuses.join(', ')}.`
+          lastLootHighlights=itemLogHighlight(item,name)
+          if(!suppressLootLog)lootLog(`You open the labyrinth chest: ${name}, ${gold} gold, and ${bonuses.join(' and ')}.`,item,name)
+          if(!(item.kind==='weapon'&&maybeAutoEquipWeapon(item,true)))player.inventory.push(item)
+          spawnPickupAnim(g)
+          groundItems.splice(i,1)
+          continue
+        }
         if (g.royalThroneChest) {
           const royalCfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.landmarks.throneHall.royalTreasury
           const isArtifact = chance(royalCfg.artifactChance)
@@ -9208,6 +9248,10 @@ more difficult:
       enemyTurn(); npcTurn(); updateHud(); render(); runAnimationLoop(); updateTooltip(); flushPendingMove()
       return
     }
+    if (TowerMaze.atLever(nx,ny)) {
+      TowerMaze.toggle(nx,ny)
+      return
+    }
     const npcTarget = currentZ === 0 && npcs.find(n => n.x === nx && n.y === ny)
     if (npcTarget) {
       clearAutoPath()
@@ -9236,6 +9280,14 @@ more difficult:
       return
     }
     if (['dwarvenlever', 'dwarvenleverpulled'].includes(map[ny]?.[nx]) && activateDwarvenLiftLeverAt(nx, ny)) return
+    // A blocked progression gate needs tactile feedback, but never discloses
+    // which lever moves it. Like bumping any impassable wall, it costs no turn.
+    if (['towerentrancesealed', 'mazegatesealed'].includes(map[ny]?.[nx])) {
+      clearAutoPath()
+      log("The door won't budge.", 'info')
+      render(); updateTooltip(); flushPendingMove()
+      return
+    }
     if (isClosedDungeonDoorTile(map[ny]?.[nx])) {
       const openingGate = map[ny]?.[nx] === 'dwarvengateclosed'
       if (openDungeonDoorAt(nx, ny)) {
@@ -10419,7 +10471,7 @@ more difficult:
 
   function terrainVisual(tileKey, x, y) {
     if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
-        ['dwarvendoorclosed','dwarvendooropen'].includes(tileKey)) return (
+        ['dwarvendoorclosed','dwarvendooropen','towerentrancesealed'].includes(tileKey)) return (
       RENDER_STYLE.terrainTiles[tileKey === 'dwarvendooropen' ? 'towerentranceopen' : 'towerentrance'])
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
       ? {...RENDER_STYLE.specialTiles.coffin, baseTileKey: 'cryptfloor'}
@@ -13021,6 +13073,16 @@ more difficult:
     if (mx >= 0 && my >= 0 && mx < MAP_W && my < MAP_H && map[my][mx] === 'bigbell') {
       return {mini: true, enemy: null, html: `<div class="nm">Big Bell</div>`}
     }
+    if (TowerMaze.isProtectedWall(currentZ,mx,my)) return {
+      mini:true,enemy:null,html:'<div class="nm">Reinforced Labyrinth Stone</div><div>This rock cannot be mined or broken through.</div>'
+    }
+    if (TowerMaze.atLever(mx,my)) return {
+      mini:true,enemy:null,html:'<div class="nm">Old Lever</div><div>A heavy lever set into old stonework.</div>'
+    }
+    if (['mazegatesealed','mazegateopen','towerentrancesealed'].includes(map[my]?.[mx])) return {
+      mini:true,enemy:null,html:`<div class="nm">${map[my][mx]==='towerentrancesealed'?'Sealed Tower Entrance':
+        map[my][mx]==='mazegatesealed'?'Sealed Basement Gate':'Open Basement Gate'}</div>`
+    }
     if (map[my]?.[mx] === 'dwarvengasvalve') return {
       mini: true, enemy: null,
       html: '<div class="nm">Emergency Valve</div><div>Two turns to release the pressure. Bump or tap it from an adjacent tile.</div>'
@@ -13226,6 +13288,15 @@ more difficult:
     // Valve use is the same replayable movement interaction on desktop/mobile.
     if (map[my]?.[mx] === 'dwarvengasvalve' &&
       Math.max(Math.abs(mx-player.x),Math.abs(my-player.y))===1) {
+      clearAutoPath()
+      void tryMove(mx-player.x,my-player.y)
+      return
+    }
+    // A tap on a sealed, adjacent entrance acts like a bump. Don't let a
+    // failed path request swallow the door feedback on desktop or mobile.
+    if (['towerentrancesealed', 'mazegatesealed'].includes(map[my]?.[mx]) &&
+      Math.max(Math.abs(mx-player.x),Math.abs(my-player.y))===1 &&
+      (currentZ===0 || undergroundTileVisible(mx,my))) {
       clearAutoPath()
       void tryMove(mx-player.x,my-player.y)
       return
@@ -16433,7 +16504,11 @@ more difficult:
     // active z must match the surface map before any generation-time logic.
     currentZ = 0
     currentCave = -1
-    map = surfaceMap
+    // A fresh world has no surfaceMap yet (it is null before the first
+    // generation). Allocate the new mutable surface grid before generateMap()
+    // clears and fills it; never reuse a prior world's active floor.
+    map = []
+    surfaceMap = null
     undergroundDiscovered = undergroundDiscoveredL1
     invalidateUndergroundFov()
     // Test-only notification precedes all generation work, including failures.
@@ -16524,9 +16599,11 @@ more difficult:
         continue
       }
       populateTower()
+      TowerMaze.populate()
       rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
       spawnSurfaceFissures()
+      TowerMaze.guaranteeChaosScroll()
       player.x = spawnPoint.x
       player.y = spawnPoint.y
       // Decorations are hashed against final coordinates so regeneration is

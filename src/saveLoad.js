@@ -100,6 +100,7 @@ function buildSaveObject() {
     mapHeight: MAP_H,
     map: encodeTileGrid(surfaceMap, 'g'),
     tower: structuredClone(tower),
+    towerMaze: structuredClone(towerMaze),
     towerLevels: towerLevels.map(level => ({map: encodeTileGrid(level.map, TILE_CODE.towervoid),
       discovered: encodeBoolGrid(level.discovered)})),
     tileUnderlays: tileUnderlays,
@@ -702,6 +703,7 @@ function loadGameFromObject(data, opts = {}) {
   tower = structuredClone(data.tower)
   towerLevels = data.towerLevels.map(level => ({map: decodeTileGrid(level.map, 'towervoid'),
     discovered: decodeBoolGrid(level.discovered)}))
+  TowerMaze.restore(data.towerMaze)
   // Resolve currentZ/map/currentCave for whatever z the save was on.
   // New saves also record currentLevelKind because z:-2 is shared by the
   // generic deep cave map and the crypt's dedicated second map. Older saves

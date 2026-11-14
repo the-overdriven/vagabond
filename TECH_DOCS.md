@@ -1208,7 +1208,11 @@ The closest distance from any village hut to the tower's outer footprint is
 away, exposing the original terrain below, with masonry at the new diagonal
 edges and inner corners. This rule applies equally on small worlds.
 The ring preserves routes around the structure. Generation must reject a world
-rather than silently omit its tower when no valid site exists.
+rather than silently omit its tower when no valid site exists. A new-world request first
+allocates an empty mutable surface grid rather than reusing the active map or
+assuming a previous surface exists; this also applies to the first character
+of a fresh session. World generation can retry rejected layouts without
+appending discarded terrain to the accepted world.
 Several withered grassland trees grow near the tower's outer walls, beyond the
 clear walking ring. Existing dead-tree artwork is selected deterministically
 from the tower's position, while the trees use ordinary grassland-tree collision
@@ -1282,6 +1286,94 @@ one of the intermediate floors (+1 to +3), never the entrance or roof. It
 blocks movement, is kept clear of stair landings, and uses normal cooking and
 resting rules.
 
+
+## Labyrinth beneath the Stone Tower
+
+The Tower has a hidden basement and two procedurally carved labyrinth layers on
+**z:−1 and z:−2**. Both layers occupy the existing *global* underground grids:
+there is no instanced map, virtual floor or separate movement coordinate system.
+The ground-floor stair, basement stair and matching lower stair pair all keep
+**identical X/Y** on ascent and descent. Their placement is planned with the
+Tower and rejected if either underlying grid contains a cave, dungeon, shaft,
+occupied landmark or vertical connection. A protected one-tile rock buffer
+prevents accidental openings into neighboring caves. This also holds after
+whole-world rotation and save/load.
+
+The basement is a dry, initially empty 5×5 walkable chamber inside a 7×7
+stone envelope, joined to the upper maze by a short corridor. The stair starts
+in the eastern Tower chamber beyond an interior door. On each underground level,
+a seeded Growing Tree maze occupies a **31–37-tile square** including walls,
+with predominantly one-tile corridors and **zero or one extra independent
+corridor loop**. The farthest dead end is chosen by the shortest path under
+actual eight-direction movement, which also accounts for diagonal shortcuts.
+The bottom level's far end holds the sole labyrinth chest. Optional water
+appears only at nonessential dead ends, never along the required dry route.
+The basement, the maze envelopes, their corridor and isolation ring are
+protected from mining, even when approached from an adjacent cave. Ethereal
+creatures cannot pass through this reinforced masonry.
+
+A lever on Tower floor **+3** switches the paired entrances:
+
+| Lever state | Main Tower entrance (z:0) | Basement gate (z:−1) |
+|---|---|---|
+| Initially inactive | Ordinary openable door | Sealed |
+| Activated | Sealed; cannot be opened or breached | Open |
+
+Using the lever from an adjacent tile costs **one turn on success** and no
+turn when blocked. Both entrances are validated first, then changed as one
+rule action. Monsters occupying an entrance are displaced to a legal nearby
+walkable square, with no cross-level relocation; if that cannot be done,
+neither gate changes. When switched back, the normal Tower door is left open.
+Homecoming and death do not reset the lever, enemies or treasure. The lever,
+gates and strengthened stone have visible/inspectable distinctions without
+identifying connections or solutions in tooltips or messages. Lever use only
+reports the distant sound of closing doors, regardless of the resulting state.
+Attempting to open either lever-sealed gate by bumping or tapping it gives
+only **"The door won't budge."** without using a turn or revealing its
+cause. Tile descriptions and inspection text reveal no puzzle solution;
+no native browser alert is used.
+
+| Maze level | Initial monsters | Tier distribution per monster |
+|---|---:|---|
+| −1 | 8–15 | 50% tier 2, 50% tier 3 |
+| −2 | 8–15 | 10% tier 2, 25% tier 3, 65% tier 4 |
+
+Each creature is individually sampled by weighted rarity from existing normal
+species in its rolled tier, excluding **mine-specific, event-only, flying and
+ethereal monsters (including Ghost)**. Each sampled creature that is weaker
+than the Minotaur has a separate **30% chance to become a Minotaur** before
+prefix and equipment rolls. Weaker requires a tier no higher than the
+Minotaur's, HP no higher than its base HP (84), and a strictly lower sum of
+base ATK + DEF + SPD + GRACE (Minotaur: 30). Stronger or equal candidates,
+including higher-tier creatures, keep their original species. This does not
+change the number or positions of monsters. Ordinary prefixes and world traits
+apply; adaptive player trolling does not create, modify or trigger reactions
+inside the protected basement and mazes. Each starting creature has its own
+meaningful side dead end, outside every shortest route to the goal. The number
+of such branches `B` satisfies `M < B < 2M` for `M` starting monsters, leaving
+some branches empty. No new bosses, respawns or random labyrinth chests are
+added. Creatures retain their normal behavior once encountered.
+
+The single bottom chest grants **85% tier-3/4 equipment (equal tier chance),
+or 15% tier-4-source artifact**, plus **60–150 base gold** adjusted by the
+world gold multiplier and **1–2 ordinary consumables/materials**. Magic Find
+modifies item quality under the normal equipment/artifact rules, but not the
+fixed 15% artifact-category chance. There is no build-matching reward and no
+additional generic chest roll.
+
+**Tower Chaos exception:** a Scroll of Chaos used on the surface while adjacent
+to the Tower's outer masonry (including diagonally) sends the player into a
+safe, dry, ordinary interior square **within radius 8, still on z:0**, even
+through a shut or lever-sealed entrance. If all available interior squares
+are held by monsters, the player exchanges positions with one of them.
+The lever and gate states are not changed. Other Chaos users, locations and
+reachable-area restrictions are unaffected. At world-generation completion,
+if no accessible loose surface Scroll of Chaos already exists outside the
+Tower and reachable from the Temple on dry ground, one is placed there using
+seeded RNG. This check occurs once, never restocks, and does not count scrolls
+hidden in chests, stock or inaccessible terrain. The ordinary save/replay
+system persists maze tiles, stair endpoints, gate state, loot, monsters, fog of
+war and RNG without rerolling world geometry on load.
 
 ## Temple
 
@@ -7370,10 +7462,6 @@ that describes its rules without consuming it.
 
 Radii use Chebyshev distance (eight-direction tile distance) on the current map
 and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
-Chaos can teleport creatures from one side of iron prison bars or a closed
-barred prison door to the other, but cannot land on an impassable bar or pass
-through opaque walls and ordinary shut doors. Safe landing, terrain, and
-occupancy rules remain unchanged.
 Chaos can teleport creatures from one side of iron prison bars or a closed
 barred prison door to the other, but cannot land on an impassable bar or pass
 through opaque walls and ordinary shut doors. Safe landing, terrain, and

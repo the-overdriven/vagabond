@@ -551,6 +551,8 @@ const Mining = (() => {
   }
 
   function canTarget(x, y) {
+    // Reinforced maze masonry is immutable even when struck from a neighboring cave.
+    if (TowerMaze.isProtectedWall(currentZ, x, y)) return false
     if (currentZ === 0) return map[y]?.[x] === 'boulder'
     const level = activeLevel()
     if (!level) return false

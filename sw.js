@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-camp-right-dock-cornered-bow-quick-gear-bow-retreat-path-strength-kitchens';
+const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-camp-right-dock-cornered-bow-quick-gear-bow-retreat-path-strength-kitchens-worldgen-first-start';
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
@@ -29,6 +29,7 @@ const PRECACHE_URLS = [
   './icon-512-maskable.png',
   './src/worldGen.js',
   './src/tower.js',
+  './src/towerMaze.js',
   './img/tiles/tower-entrance.png',
   './img/tiles/tower-entrance-open.png',
   './img/tiles/tower-window.png',

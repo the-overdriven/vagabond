@@ -1,12 +1,64 @@
 {
   "tiles": {
-    "towervoid": {"ch": " ", "color": "#000000", "bg": "#000000", "mini": "#000000", "walk": false, "blocksSight": true, "projectileBlock": true},
-    "towerstairsup": {"ch": "<", "color": "#eedfc0", "bg": "#4b4540", "mini": "#ff4444", "walk": true},
-    "towerstairsdown": {"ch": ">", "color": "#eedfc0", "bg": "#4b4540", "mini": "#ff4444", "walk": true},
-    "towerwindow": {"ch": "▥", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
-    "towerbattlement": {"ch": "╬", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
-    "towerbattlementcorner": {"ch": "╬", "color": "#999999", "bg": "#333333", "mini": "#777777", "walk": false, "blocksSight": true, "projectileBlock": true},
-    "groundfissure": {"ch": "◉", "color": "#c6a986", "bg": "#1b2618", "mini": "#45372b", "walk": false, "blocksSight": false, "projectileBlock": false},
+    "towervoid": {
+      "ch": " ",
+      "color": "#000000",
+      "bg": "#000000",
+      "mini": "#000000",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
+    "towerstairsup": {
+      "ch": "<",
+      "color": "#eedfc0",
+      "bg": "#4b4540",
+      "mini": "#ff4444",
+      "walk": true
+    },
+    "towerstairsdown": {
+      "ch": ">",
+      "color": "#eedfc0",
+      "bg": "#4b4540",
+      "mini": "#ff4444",
+      "walk": true
+    },
+    "towerwindow": {
+      "ch": "▥",
+      "color": "#999999",
+      "bg": "#333333",
+      "mini": "#777777",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
+    "towerbattlement": {
+      "ch": "╬",
+      "color": "#999999",
+      "bg": "#333333",
+      "mini": "#777777",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
+    "towerbattlementcorner": {
+      "ch": "╬",
+      "color": "#999999",
+      "bg": "#333333",
+      "mini": "#777777",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
+    "groundfissure": {
+      "ch": "◉",
+      "color": "#c6a986",
+      "bg": "#1b2618",
+      "mini": "#45372b",
+      "walk": false,
+      "blocksSight": false,
+      "projectileBlock": false
+    },
     "ice": {
       "ch": "=",
       "color": "#d5f2fa",
@@ -154,7 +206,13 @@
       "mini": "#ff6b2e",
       "walk": true
     },
-    "dwarvenhole": {"ch":"◉", "color":"#a68d72", "bg":"#0a0b0d", "mini":"#da6d3d", "walk":true},
+    "dwarvenhole": {
+      "ch": "◉",
+      "color": "#a68d72",
+      "bg": "#0a0b0d",
+      "mini": "#da6d3d",
+      "walk": true
+    },
     "dwarvenfortexit": {
       "ch": "^",
       "color": "#e8b85b",
@@ -185,28 +243,60 @@
       "projectileBlock": true
     },
     "dwarvenminesopen": {
-      "ch": ">", "color": "#cba260", "bg": "#302d2a", "mini": "#ff4747", "walk": true
+      "ch": ">",
+      "color": "#cba260",
+      "bg": "#302d2a",
+      "mini": "#ff4747",
+      "walk": true
     },
     "minestairsup": {
-      "ch": "<", "color": "#cba260", "bg": "#30231b", "mini": "#ff4747", "walk": true
+      "ch": "<",
+      "color": "#cba260",
+      "bg": "#30231b",
+      "mini": "#ff4747",
+      "walk": true
     },
     "minestairsdown": {
-      "ch": ">", "color": "#cba260", "bg": "#30231b", "mini": "#ff4747", "walk": true
+      "ch": ">",
+      "color": "#cba260",
+      "bg": "#30231b",
+      "mini": "#ff4747",
+      "walk": true
     },
     "minecageupperoff": {
-      "ch": "▽", "color": "#827f79", "bg": "#272320", "mini": "#827f79", "walk": true
+      "ch": "▽",
+      "color": "#827f79",
+      "bg": "#272320",
+      "mini": "#827f79",
+      "walk": true
     },
     "minecageloweroff": {
-      "ch": "△", "color": "#827f79", "bg": "#272320", "mini": "#827f79", "walk": true
+      "ch": "△",
+      "color": "#827f79",
+      "bg": "#272320",
+      "mini": "#827f79",
+      "walk": true
     },
     "minecageupperon": {
-      "ch": "⇓", "color": "#d1ba73", "bg": "#272320", "mini": "#e6c467", "walk": true
+      "ch": "⇓",
+      "color": "#d1ba73",
+      "bg": "#272320",
+      "mini": "#e6c467",
+      "walk": true
     },
     "minecageloweron": {
-      "ch": "⇑", "color": "#d1ba73", "bg": "#272320", "mini": "#e6c467", "walk": true
+      "ch": "⇑",
+      "color": "#d1ba73",
+      "bg": "#272320",
+      "mini": "#e6c467",
+      "walk": true
     },
     "mineshaftrope": {
-      "ch": "│", "color": "#d5b16c", "bg": "#100e0c", "mini": "#3c2d20", "walk": false
+      "ch": "│",
+      "color": "#d5b16c",
+      "bg": "#100e0c",
+      "mini": "#3c2d20",
+      "walk": false
     },
     "dwarvendoorclosed": {
       "ch": "+",
@@ -644,6 +734,45 @@
       "walk": true,
       "projectileBlock": false,
       "blocksSight": false
+    },
+    "mazestairsup": {
+      "ch": "<",
+      "color": "#e4c28d",
+      "bg": "#28211d",
+      "mini": "#ff4444",
+      "walk": true
+    },
+    "mazestairsdown": {
+      "ch": ">",
+      "color": "#e4c28d",
+      "bg": "#28211d",
+      "mini": "#ff4444",
+      "walk": true
+    },
+    "mazegatesealed": {
+      "ch": "▦",
+      "color": "#a0a2a6",
+      "bg": "#1a1919",
+      "mini": "#777777",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
+    "mazegateopen": {
+      "ch": "▯",
+      "color": "#c3b697",
+      "bg": "#29201b",
+      "mini": "#bb9977",
+      "walk": true
+    },
+    "towerentrancesealed": {
+      "ch": "▦",
+      "color": "#bbb3a0",
+      "bg": "#2c2c2b",
+      "mini": "#777777",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
     }
   },
   "tileCode": {
@@ -748,7 +877,12 @@
     "dwarvencrusherjaw": "█",
     "dwarvencrusherpinch": "╫",
     "dwarvengasvalve": "╢",
-    "dwarvengasvent": "╣"
+    "dwarvengasvent": "╣",
+    "mazestairsup": "␏",
+    "mazestairsdown": "␐",
+    "mazegatesealed": "␑",
+    "mazegateopen": "␒",
+    "towerentrancesealed": "␓"
   },
   "tileDesc": {
     "towerstairsup": "stone stairs ascending the tower",
@@ -850,7 +984,12 @@
     "dwarvencrusherjaw": "a solid advancing jaw of ancient dwarven masonry",
     "dwarvencrusherpinch": "two massive jaws of dwarven stone have closed with a narrow crack between them",
     "dwarvengasvalve": "a conspicuous corroded emergency pressure-release valve connected to the poison-gas vents; it takes two turns to fully open",
-    "dwarvengasvent": "a dwarven vent with green residue around its grate; something dangerous may be piped into the room"
+    "dwarvengasvent": "a dwarven vent with green residue around its grate; something dangerous may be piped into the room",
+    "mazestairsup": "a narrow stone staircase ascending",
+    "mazestairsdown": "a narrow stone staircase descending",
+    "mazegatesealed": "a heavy stone gate that refuses to move",
+    "mazegateopen": "a heavy stone gate standing open",
+    "towerentrancesealed": "a heavy stone door that refuses to open"
   },
   "terrainSpeed": {
     "hill": -1,

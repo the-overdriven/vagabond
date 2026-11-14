@@ -111,7 +111,20 @@ function applyChaosScroll(effect) {
   reserved.add(keyXY(player.x, player.y))
   if (currentZ === 0) for (const npc of npcs) reserved.add(keyXY(npc.x, npc.y))
   const cache = new Map(), moves = []
+  // The Tower alone is an exception to Chaos connectivity. An exterior cast
+  // adjacent to masonry must land inside, even when its main door is sealed.
+  // If every safe interior destination is occupied, exchange places with an
+  // interior monster, resolving both actors in the same deterministic step.
+  const forced = TowerMaze.chaosTarget(origin, reserved)
+  const swappedActor = forced?.actor || null
+  if (forced) {
+    moves.push({actor:player,fromX:origin.x,fromY:origin.y,x:forced.x,y:forced.y})
+    if(swappedActor) moves.push({actor:swappedActor,fromX:forced.x,fromY:forced.y,
+      x:origin.x,y:origin.y})
+    reserved.add(keyXY(forced.x,forced.y))
+  }
   for (const actor of actors) {
+    if ((forced && actor===player) || actor===swappedActor) continue
     const reachable = chaosReachable(actor, cache), options = [], radius = effect.destinationRadius
     for (let y = Math.max(0, actor.y - radius); y <= Math.min(MAP_H - 1, actor.y + radius); y++)
       for (let x = Math.max(0, actor.x - radius); x <= Math.min(MAP_W - 1, actor.x + radius); x++) {
