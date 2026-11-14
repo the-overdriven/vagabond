@@ -1324,7 +1324,9 @@ turn when blocked. Both entrances are validated first, then changed as one
 rule action. Monsters occupying an entrance are displaced to a legal nearby
 walkable square, with no cross-level relocation; if that cannot be done,
 neither gate changes. When switched back, the normal Tower door is left open.
-Homecoming and death do not reset the lever, enemies or treasure. The lever,
+Homecoming and death do not reset the lever, enemies or treasure. Save/load and
+replay preserve each monster's labyrinth membership alongside its identity;
+ordinary cave population checks exclude these separate residents and treasure. The lever,
 gates and strengthened stone have visible/inspectable distinctions without
 identifying connections or solutions in tooltips or messages. Lever use only
 reports the distant sound of closing doors, regardless of the resulting state.
@@ -5555,6 +5557,8 @@ for one catch-up operation; no elapsed turns are skipped or capped.
 Long returns to the surface display synchronization progress and let the browser
 paint between batches of travelers. Movement and other input remain blocked
 until all missed turns finish, including returns by Homecoming or resurrection.
+The inspection action returns that completion to its caller and closes its replay
+RNG scope only after synchronization finishes.
 Batch timing only controls presentation: traveler order, RNG, tracks and final
 positions match uninterrupted simulation. Replay resolves the same work within
 the returning action. Pathfinding reuses temporary search storage without
@@ -6204,7 +6208,9 @@ saves or replays. On desktop, the trade dialog is anchored immediately below the
 HUD rather than vertically centered. It fills the remaining desktop viewport
 height below the HUD, including on taller screens; each column's inventory list
 scrolls independently within that space while the title, category tabs and Close
-button remain visible. Category changes do not move or resize the trade panel.
+button remain visible. Category changes do not move or resize the trade panel. Its desktop positioning
+is fixed to the viewport, so focusing a category cannot scroll the clipped game
+stage and shift the dialog.
 Touch-screen Merchant trading occupies the available space below the HUD and
 covers the log; service panels instead preserve the log below them. Only one tab
 per trade column can be highlighted at once;
@@ -10324,6 +10330,11 @@ line identifies the spec, test and result. Multiple generation calls retain
 separate entries, so tests that change the seed report the seed actually used.
 The notification is test-only, consumes no RNG and adds no save/replay fields.
 These diagnostics do not pin seeds or retry failed generation.
+
+The forced post-population retry scenario uses a fixed compact silhouette and
+world size, isolating validation retries from portrait rasterization. Cave
+ecosystem/reward assertions exclude the Tower labyrinth; mine encounter-budget
+assertions distinguish ordinary corridors from separately populated hidden nests.
 
 E2E tests that start a world through Begin must wait for the loading overlay
 to close before reading or modifying generated map state. Mechanics fixtures

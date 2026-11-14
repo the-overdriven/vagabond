@@ -349,6 +349,14 @@ describe('Persistent Dwarven Ruins stratum', () => {
       const oldRange = cfg.levelCountRange.slice()
       const oldRetries = cfg.validation.postPopulationWorldRetries
       const originalValidator = validateDwarvenRuinsStratum
+      const originalPrepare = CaveSilhouettes.prepare
+      // Keep this validator-retry scenario independent of portrait rasterization.
+      CaveSilhouettes.prepare = async seed => {
+        CAVE_SILHOUETTES=[{id:CaveSilhouettes.idForSeed(seed),sourceIds:['a','b'],
+          rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>
+            ((x-15)**2+(y-15)**2<212?'1':'0')).join(''))}]
+        return CAVE_SILHOUETTES[0]
+      }
       let calls = 0
       cfg.levelCountRange = [3,3]
       cfg.validation.postPopulationWorldRetries = 3
@@ -363,7 +371,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         currentZ = 0
         currentCave = -1
         map = surfaceMap
-        applyWorldTraits([])
+        applyWorldTraits([],'XS')
         WORLD_SEED = 771239
         rngState = WORLD_SEED
         await generateNewWorld()
@@ -373,6 +381,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
         const ids = enemies.map(enemy => enemy.id).filter(Boolean)
         check(new Set(ids).size === ids.length, 'accepted retry has unique stable enemy IDs')
       } finally {
+        CaveSilhouettes.prepare = originalPrepare
         validateDwarvenRuinsStratum = originalValidator
         cfg.levelCountRange = oldRange
         cfg.validation.postPopulationWorldRetries = oldRetries

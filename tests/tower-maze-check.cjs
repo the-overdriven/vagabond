@@ -198,8 +198,11 @@ async function main() {
       return descriptions.every(text=>text &&
         !/mechanism|lever|upstairs|lower maze|distant/i.test(text))
     })()`),true,'all maze door tile descriptions are spoiler-free')
+    const residents=run('JSON.stringify(enemies.filter(e=>e.alive&&e.towerMazeResident).map(e=>e.id))')
     const saved=JSON.parse(run('JSON.stringify(buildSaveObject())'))
     run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
+    assert.equal(run('JSON.stringify(enemies.filter(e=>e.alive&&e.towerMazeResident).map(e=>e.id))'),residents,
+      'save and replay preserve every maze resident identity')
     assert.equal(run('towerMaze.active'),true,'lever state persists in saves')
     assert.equal(run('towerLevels[2].map[towerMaze.lever.y][towerMaze.lever.x]'),'dwarvenleverpulled')
     assert.equal(run('surfaceMap[tower.entrance.y][tower.entrance.x]'),'towerentrancesealed')

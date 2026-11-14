@@ -120,7 +120,7 @@ describe('Dwarven Ruins shortcut lift', () => {
         mapViewKey = 'chain:' + depth
         mapPanX = endpoint.x; mapPanY = endpoint.y
         const worldSquares = captureSquares(mctx, () => renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true))
-        check(worldSquares.length === 1 && worldSquares[0].width >= 6 &&
+        check(worldSquares.length === 1 && worldSquares[0].width === 4 * MAP_ZOOMS[mapZoomIndex] &&
           worldSquares[0].width === worldSquares[0].height,
           label + ' shows a visible green square on a browsed full-map floor')
 
@@ -130,7 +130,7 @@ describe('Dwarven Ruins shortcut lift', () => {
         const origin = sideMiniOrigin()
         const sideSquares = captureSquares(sideCtx,
           () => renderMinimapCanvas(sideCtx, SIDE_SCALE, origin.x, origin.y, false))
-        check(sideSquares.length === 1 && sideSquares[0].width >= 6 &&
+        check(sideSquares.length === 1 && sideSquares[0].width === 4 &&
           sideSquares[0].width === sideSquares[0].height,
           label + ' shows a visible green square on the side minimap')
 

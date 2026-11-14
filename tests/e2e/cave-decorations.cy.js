@@ -55,9 +55,9 @@ describe('Decorative caves and deep threat rarity', () => {
         check(population.every(c=>c.populated && !c.scenario),
           'all ordinary deep caves are populated without named scenarios')
         const disallowed=new Set(WORLD_GEN_CONFIG.cavePopulation.ecosystem.excludedSpecies)
-        check(enemies.filter(e=>e.level===-2 && e.levelKind==='chain' &&
+        check(enemies.filter(e=>e.level===-2 && e.levelKind==='chain' && !e.towerMazeResident &&
           e.baseName==='Cave Troll').length<=1,'at most one optional cave Troll')
-        check(enemies.filter(e=>e.level===-2 && e.levelKind==='chain')
+        check(enemies.filter(e=>e.level===-2 && e.levelKind==='chain' && !e.towerMazeResident)
           .every(e=>e.baseName==='Cave Troll' ||
             (!disallowed.has(e.baseName) && e.tier<=4 &&
               !ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare)),

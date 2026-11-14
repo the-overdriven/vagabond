@@ -225,6 +225,7 @@ function buildSaveObject() {
     enemies: enemies.filter(e => e.alive).map(e => ({
       id: e.id,
       ordinarySurface: !!e.ordinarySurface,
+      towerMazeResident: e.towerMazeResident === true,
       name: e.name,
       baseName: e.baseName,
       adaptiveEventId: e.adaptiveEventId || null,
@@ -939,6 +940,7 @@ function loadGameFromObject(data, opts = {}) {
     return ({
       id: e.id,
       ordinarySurface: !!e.ordinarySurface,
+      towerMazeResident: e.towerMazeResident === true,
       name: e.name, baseName: e.baseName, adaptiveEventId: e.adaptiveEventId || null,
       forestSpiritDormant: e.adaptiveEventId === 'forest_spirit' && e.forestSpiritDormant === true,
       hiddenLeaderRole: ['leader','guard'].includes(e.hiddenLeaderRole) ? e.hiddenLeaderRole : null,

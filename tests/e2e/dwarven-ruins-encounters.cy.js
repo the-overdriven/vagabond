@@ -691,10 +691,12 @@ describe('Dwarven Ruins encounter progression', () => {
         const stair=last.caves[0].entrances[0]
         player.x=stair.x;player.y=stair.y
         rebuildActiveLevelOccupancy()
-        const beforeCount=enemies.length
-        check(!AdaptivePlayerTrolling.onFloorChanged(),'no event without qualifying deaths')
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.serialize().completed.includes('nemesis'),'no Nemesis without qualifying deaths')
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
-        check(!AdaptivePlayerTrolling.onFloorChanged(),'one death does not qualify')
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.serialize().completed.includes('nemesis'),'one death does not qualify')
+        const beforeCount=enemies.length
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})

@@ -16,7 +16,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       enemies=[];groundItems=[];occupied=new Set()`)
     await run('generateNewWorld()')
     const summary=run(`(()=>{
-      const lvl=deepLevels[0],mob=enemies.filter(e=>e.level===-2 && e.levelKind==='chain')
+      const lvl=deepLevels[0],mob=enemies.filter(e=>e.level===-2 && e.levelKind==='chain' && !e.towerMazeResident)
       const campfires=groundItems.filter(g=>g.kind==='campfire' && g.level===-2 && g.levelKind==='chain')
       const excluded=new Set(WORLD_GEN_CONFIG.cavePopulation.ecosystem.excludedSpecies)
       return {seed:WORLD_SEED,styles:lvl.caves.map(c=>c.style),complexes:lvl.complexes.length,
@@ -46,7 +46,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     const save=JSON.parse(JSON.stringify(run('buildSaveObject()')))
     assert.equal(save.version,run('SAVE_VERSION'))
     run('loadGameFromObject('+JSON.stringify(save)+',{isReplayInit:true})')
-    const restored=run(`JSON.stringify({map:deepLevels[0].map,caves:deepLevels[0].caves,links:deepLevels[0].links,complexes:deepLevels[0].complexes,territories:deepLevels[0].territories,mobs:enemies.filter(e=>e.level===-2 && e.levelKind==='chain').map(e=>({baseName:e.baseName,prefix:e.prefix,x:e.x,y:e.y,caveIndex:e.caveIndex})),campfires:groundItems.filter(g=>g.kind==='campfire'&&g.level===-2&&g.levelKind==='chain').map(g=>({x:g.x,y:g.y,caveIndex:g.caveIndex,burnUntil:g.burnUntil})),rng:rngState})`)
+    const restored=run(`JSON.stringify({map:deepLevels[0].map,caves:deepLevels[0].caves,links:deepLevels[0].links,complexes:deepLevels[0].complexes,territories:deepLevels[0].territories,mobs:enemies.filter(e=>e.level===-2 && e.levelKind==='chain' && !e.towerMazeResident).map(e=>({baseName:e.baseName,prefix:e.prefix,x:e.x,y:e.y,caveIndex:e.caveIndex})),campfires:groundItems.filter(g=>g.kind==='campfire'&&g.level===-2&&g.levelKind==='chain').map(g=>({x:g.x,y:g.y,caveIndex:g.caveIndex,burnUntil:g.burnUntil})),rng:rngState})`)
     {const a=JSON.parse(summary.snapshot),b=JSON.parse(restored);for (const key of Object.keys(a))assert.equal(JSON.stringify(a[key]),JSON.stringify(b[key]),'save/replay restores '+key)}
     console.log('PASS seeded world ecosystem',seed,traits,JSON.stringify({...summary,snapshot:undefined}))
   }

@@ -23,7 +23,7 @@ describe('Dwarven Mines haulage cage', () => {
       const cage=dwarvenMinesCageShortcut()
       check(cage && cage.upper.z===-9 && cage.lower.z===mine.at(-1).z,'fixed upper and generated lower endpoints')
       check(dungeonPackageLevels('dwarvenRuins').at(-1).z===-8,'five Ruins floors transition directly into z:-9')
-      check(!cage.unlocked && mine.length>=3 && mine.length<=4,'cage starts locked')
+      check(!cage.unlocked && minePackageConfig().floorCounts.includes(mine.length),'cage starts locked')
       check(mine[0].level.map[cage.upper.y][cage.upper.x]==='minecageupperoff','top sprite is locked')
       check(mine.at(-1).level.map[cage.lower.y][cage.lower.x]==='minecageloweroff','bottom sprite is locked')
       check(cage.upper.x===cage.lower.x && cage.upper.y===cage.lower.y,

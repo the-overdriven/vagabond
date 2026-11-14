@@ -14,7 +14,7 @@ describe('Deep Caves 2.0 parametric ecosystem', () => {
       check(['silhouette','grotto','burrow'].every(style=>level.caves.some(c=>c.style===style)),
         'all three layout types survive population generation')
       check(level.caves.every(c=>c.populated&&!c.scenario),'no named z:-2 scenarios')
-      const mobs=enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')
+      const mobs=enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain' && !e.towerMazeResident)
       const excluded=new Set(cfg.excludedSpecies)
       check(mobs.every(e=>e.baseName==='Cave Troll'||
         (!excluded.has(e.baseName)&&e.tier<=4&&
@@ -40,7 +40,7 @@ describe('Deep Caves 2.0 parametric ecosystem', () => {
       loadGameFromObject(save,{isReplayInit:true})
       const restored=deepLevels[0]
       const after=JSON.stringify({caves:restored.caves,territories:restored.territories,
-        complexes:restored.complexes,spawns:enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain')
+        complexes:restored.complexes,spawns:enemies.filter(e=>e.alive&&e.level===-2&&e.levelKind==='chain' && !e.towerMazeResident)
           .map(e=>[e.id,e.baseName,e.prefix,e.x,e.y,e.caveIndex]),
         campfires:groundItems.filter(g=>g.kind==='campfire'&&g.level===-2&&g.levelKind==='chain')
           .map(g=>[g.x,g.y,g.caveIndex,g.burnUntil]),rng:rngState})

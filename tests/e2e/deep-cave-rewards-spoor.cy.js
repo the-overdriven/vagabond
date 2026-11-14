@@ -10,7 +10,7 @@ describe('Deep Caves 2.0 — rewards and permanent clues', () => {
       WORLD_SEED=12345;rngState=WORLD_SEED;applyWorldTraits([],'XS')
       await generateNewWorld()
       const level=deepLevels[0]
-      const drops=groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'&&
+      const drops=groundItems.filter(g=>g.level===-2&&g.levelKind==='chain' && !g.towerMazeTreasure&&
         ['chest','potion','scrollOfInvisibility'].includes(g.kind))
       assert(drops.length>0,'deep floor has rewards')
       assert(new Set(drops.map(g=>keyXY(g.x,g.y))).size===drops.length,'no overlapping rewards')
@@ -46,7 +46,7 @@ describe('Deep Caves 2.0 — rewards and permanent clues', () => {
       const save=structuredClone(buildSaveObject())
       assert(save.version===self.VAGABOND_SAVE_VERSION,'new permanent-spoor save schema')
       loadGameFromObject(save,{isReplayInit:true})
-      const after=JSON.stringify({items:groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'&&
+      const after=JSON.stringify({items:groundItems.filter(g=>g.level===-2&&g.levelKind==='chain' && !g.towerMazeTreasure&&
         ['chest','potion','scrollOfInvisibility'].includes(g.kind)),spoor:caveSpoor,
         complexes:deepLevels[0].complexes,decorations:caveDecorations,rng:rngState})
       assert(before===after,'save and replay initial state preserve generated rewards and clues')

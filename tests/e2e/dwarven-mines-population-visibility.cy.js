@@ -64,7 +64,10 @@ describe('Mine-only encounters and darkness', () => {
       check(JSON.stringify(ec.deeperRespiteCountRange)===JSON.stringify([1,5]),
         'deeper mine rat and bat packs roll one to five per species')
       for (const {z,level} of mine.slice(1)) {
-        const living=enemies.filter(e=>e.alive && e.level===z && e.levelKind==='chain')
+        const nestCells=new Set((level.minePockets||[]).filter(p=>p.type==='nest')
+          .flatMap(p=>p.cells.map(c=>keyXY(c.x,c.y))))
+        const living=enemies.filter(e=>e.alive && e.level===z && e.levelKind==='chain' &&
+          !nestCells.has(keyXY(e.x,e.y)))
         const fauna=living.filter(e=>['Giant Rat','Giant Bat'].includes(e.baseName))
         for (const name of ec.deeperRespiteSpecies) {
           const count=fauna.filter(e=>e.baseName===name).length

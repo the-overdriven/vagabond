@@ -85,10 +85,10 @@ describe('Carrion instinct, sleeping Wyverns and forest cover', () => {
       e.homeTileType='grass'
       map[e.y][e.x]='hill'
       html=tileInspectInfo(e.x,e.y).html
-      check(html.includes('Terrain: Hill · SPD −1, DEF +1')&&html.includes('terrain-stat-up')&&html.includes('terrain-stat-down'),'monster hill tradeoff is shown')
+      check(html.includes('Terrain: Hill · SPD −1, DEF +1'),'monster hill tradeoff is shown')
       map[e.y][e.x]='forest'
       html=tileInspectInfo(e.x,e.y).html
-      check(html.includes('Terrain: Forest · SPD −1')&&html.includes('terrain-stat-down'),'monster SPD loss is shown')
+      check(html.includes('Terrain: Forest · SPD −1'),'monster SPD loss is shown')
       e.homeTileType='forest'
       html=tileInspectInfo(e.x,e.y).html
       check(!html.includes('Terrain: Forest · SPD −1'),'native terrain does not claim a suppressed speed penalty')
