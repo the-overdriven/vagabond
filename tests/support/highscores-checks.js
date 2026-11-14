@@ -48,6 +48,13 @@ async function levelUpChecks() {
   check(record.level===5&&record.character_id===player.characterId,'milestone identity and level')
   for(const stat of ['atk','def','spd','grace']) check(record[stat]===expected[stat],`permanent ${stat}`)
   check(record.atk!==playerAtk()&&record.spd!==playerSpd(),'transient bonuses excluded')
+  for (const skill of ['oneHanded','twoHanded','shielding','marksmanship'])
+    check(record.combat_skills?.[skill] === player.combatSkills[skill], `snapshot captures ${skill}`)
+  check(record.combat_skills.swimming === player.swimming &&
+        record.combat_skills.mining === player.mining, 'snapshot captures swimming and mining')
+  check(record.life_potions === player.inventory.filter(item => item.kind === 'potion')
+    .reduce((count, item) => count + (Number.isSafeInteger(item.count) ? item.count : 1), 0),
+    'snapshot counts only Life Potions, including stacks')
   check(turnCount===turn&&rngState===seed,'online activity adds no turns or RNG')
   check(!('strength' in record)&&!('created_at' in record)&&!('id' in record),'server fields not submitted')
   gainXp(1)

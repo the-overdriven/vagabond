@@ -86,6 +86,33 @@ describe('Graveyard', () => {
     cy.get('#btnGraveyardClose').click()
   })
 
+  it('reports the actual server rejection for a Crusher death without retrying', () => {
+    configureTestGraveyard()
+    beginNewGame('Crusher Report Tester')
+    const posted=[],warnings=[]
+    cy.window().then(win => {
+      win.__VAGABOND_TEST_GRAVEYARD__=true
+      const originalWarn=win.console.warn
+      win.console.warn=(...args)=> { warnings.push(args); originalWarn.apply(win.console,args) }
+      win.supabase={createClient:()=>({from:table=>({insert:record=>{
+        posted.push({table,record})
+        return Promise.resolve({error:{code:'23514',message:'death_cause_check failed',
+          details:'dwarven crusher not allowed',hint:'check deployed constraint'},status:400})
+      }})})}
+      win.eval("die(null,'dwarven crusher')")
+    })
+    cy.wrap(posted).should(records=>{
+      expect(records.filter(p=>p.table==='death_records')).to.have.length(1)
+      expect(records[0].record.cause_of_death).to.equal('dwarven crusher')
+    })
+    cy.wrap(warnings).should(entries=>{
+      const row=entries.find(row=>row[0]==='Graveyard submission failed')
+      expect(row).to.exist
+      expect(row[1]).to.include({cause:'dwarven crusher',code:'23514',status:400,
+        message:'death_cause_check failed',details:'dwarven crusher not allowed'})
+    })
+  })
+
   it('submits the pre-penalty live death snapshot once and safely renders remote text', () => {
     configureTestGraveyard()
     beginNewGame('E2E Tester')

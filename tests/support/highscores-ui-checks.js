@@ -5,6 +5,7 @@ function highscoreRows(mode) {
     race:'elf',permadeath:mode,is_dead:mode && index%2===0,level:20-index,strength:30.25-index,
     atk:10.25,def:8,spd:6,grace:6,max_hp:240,mf:5,gold:400,
     cumulated_xp:12345,death_number:mode?0:3,steps_taken:700,creatures_slain:120,
+    combat_skills:{oneHanded:42,twoHanded:5,shielding:17,marksmanship:25,swimming:6,mining:11},life_potions:3,
     equipment:{weapon:{name:'A Very Long Sword Name',stat_line:'ATK 10.25, GRACE 6 '+('x'.repeat(600))}},
     artifacts:[{name:'Old Amulet',stat_line:'DEF +2'}],
     strongest_enemy_killed:{name:'GIANT TOAD',strength:42},world_seed:-123,
@@ -41,6 +42,9 @@ async function recordChecks() {
   check(document.querySelectorAll('#highscoresList img, #highscoresList script').length===0,'remote HTML is never parsed')
   cards[0].open=true
   check(cards[0].textContent.includes('Strongest slain enemy: GIANT TOAD'),'achievement details')
+  check(cards[0].textContent.includes('One-Handed: 42') &&
+    cards[0].textContent.includes('Swimming: 6') && cards[0].textContent.includes('Mining: 11') &&
+    cards[0].textContent.includes('Life Potions: 3'),'skill levels and Life Potions rendered')
   check(!cards[0].textContent.includes('Snapshot: Level-up achievement'),'no redundant level-up snapshot label')
   check(cards[0].textContent.includes('World traits: Cold World'),'world details')
   check(cards[0].textContent.includes('Game version: v108'),'version details')

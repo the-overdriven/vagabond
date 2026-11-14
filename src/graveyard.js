@@ -106,8 +106,14 @@ const Graveyard = (() => {
     OnlineSupabase.getOnlineClient().then(client => {
       if (!client || !OnlineSupabase.onlineAvailable()) return null
       return client.from('death_records').insert(record)
-    }).then(result => { if (result?.error) console.warn('Graveyard submission unavailable') })
-      .catch(() => console.warn('Graveyard submission unavailable'))
+    }).then(result => {
+      if (result?.error) console.warn('Graveyard submission failed', {
+        cause:record.cause_of_death, code:result.error.code ?? null,
+        message:result.error.message ?? null, details:result.error.details ?? null,
+        hint:result.error.hint ?? null, status:result.status ?? null})
+    }).catch(error => console.warn('Graveyard submission failed', {
+      cause:record.cause_of_death, code:error?.code ?? null,
+      message:error?.message ?? String(error)}))
   }
 
   function status(message) {

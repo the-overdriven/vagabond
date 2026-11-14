@@ -148,6 +148,12 @@ const Highscores = (() => {
           typeof record.character_id !== 'string' || record.character_id.length > 200 ||
           typeof record.character_name !== 'string' || !record.character_name.trim() ||
           record.character_name.length > 80 || record.level > 1000000) return
+      const skillNames = ['oneHanded','twoHanded','shielding','marksmanship','swimming','mining']
+      if (!record.combat_skills || !skillNames.every(name =>
+        Number.isSafeInteger(record.combat_skills[name]) && record.combat_skills[name] >= 0 &&
+        record.combat_skills[name] <= (name === 'swimming' ? 1000000 : 100)) ||
+        !Number.isSafeInteger(record.life_potions) || record.life_potions < 0 ||
+        record.life_potions > 1000000) return
       const candidate = {...record, strength:score}
       const board = boards[Number(record.permadeath)]
       if (!board || !eligible(candidate, board.rows)) return
@@ -230,6 +236,13 @@ const Highscores = (() => {
         ['ATK', number(row.atk)], ['DEF', number(row.def)],
         ['SPD', number(row.spd)], ['GRACE', number(row.grace)],
         ['Max HP', number(row.max_hp)], ['MF', number(row.mf)],
+        ['One-Handed', number(row.combat_skills?.oneHanded)],
+        ['Two-Handed', number(row.combat_skills?.twoHanded)],
+        ['Shielding', number(row.combat_skills?.shielding)],
+        ['Marksmanship', number(row.combat_skills?.marksmanship)],
+        ['Swimming', number(row.combat_skills?.swimming)],
+        ['Mining', number(row.combat_skills?.mining)],
+        ['Life Potions', number(row.life_potions)],
         ['Weapon', gearLabel(row.equipment?.weapon, row.weapon)],
         ['Armor', gearLabel(row.equipment?.armor, row.armor)],
         ['Shield', gearLabel(row.equipment?.shield, row.shield)],

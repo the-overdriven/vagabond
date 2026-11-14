@@ -1585,6 +1585,52 @@ more difficult:
     return false
   }
 
+  // The first entry into z:-5 may introduce a species the current character
+  // has never slain. It is a one-time encounter, not a repeatable farming route.
+  // Resolution happens on the authoritative floor transition, never in rendering.
+  function spawnUnseenBestiaryEncounter() {
+    if (currentZ !== -5 || currentLevelKind() !== 'chain' || player.bestiaryZ5EncounterResolved) return
+    player.bestiaryZ5EncounterResolved = true
+    const level = deepLevels[chainDepthForZ(-5) - 2]
+    if (level?.dungeonPackage !== 'dwarvenRuins') return
+    const candidates = ENEMY_TEMPLATES.filter(t =>
+      t.tier >= 1 && t.tier <= 4 && (t.aggro ?? AGGRO_RANGE) > 0 &&
+      t.adaptiveOnly !== true && t.ultraRare !== true && (t.rarity ?? 1) > 0.1 &&
+      !(player.killsBySpecies?.[t.name] > 0) &&
+      Array.isArray(t.biomes) && t.biomes.some(b => !/^z-\d+$/.test(b) && b !== 'adaptive-only') &&
+      !(t.abilities || []).includes('swimOnly'))
+    // If the Bestiary has no eligible unknown species, nothing is summoned.
+    if (!candidates.length) return
+    const reachable = dungeonWalkDistances(map, player)
+    const stairTiles = level.caves.flatMap(c => c.entrances || [])
+    const taken = new Set(enemies.filter(e => e.alive && e.level === -5 &&
+      (!e.levelKind || e.levelKind === 'chain')).map(e => keyXY(e.x, e.y)))
+    for (const item of groundItems) if (item.level === -5 && (!item.levelKind || item.levelKind === 'chain'))
+      taken.add(keyXY(item.x, item.y))
+    const sites = []
+    for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
+      if (map[y]?.[x] !== 'marble' || taken.has(keyXY(x, y)) ||
+          !reachable.has(keyXY(x, y)) || reachable.get(keyXY(x, y)) < 10 ||
+          Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) < 8 ||
+          stairTiles.some(p => Math.max(Math.abs(x-p.x), Math.abs(y-p.y)) < 5) ||
+          !DungeonTraps.safeSpawn(x, y, -5)) continue
+      sites.push({x, y})
+    }
+    if (!sites.length) return
+    const tmpl = pick(candidates), spot = pick(sites)
+    const enemy = {name:tmpl.name, baseName:tmpl.name, tier:tmpl.tier,
+      level:-5, levelKind:'chain', caveIndex:-1, dungeonPackage:'dwarvenRuins',
+      hp:tmpl.hp, maxHp:tmpl.hp, atk:tmpl.atk, def:tmpl.def, spd:tmpl.spd,
+      abilities:[...(tmpl.abilities || [])], humanoid:!!tmpl.humanoid,
+      aggro:tmpl.aggro ?? AGGRO_RANGE,
+      x:spot.x, y:spot.y, homeX:spot.x, homeY:spot.y, homeTileType:map[spot.y][spot.x],
+      alive:true, prefix:null, equipment:null}
+    prepareEnemyEquipment(enemy)
+    addEnemy(enemy)
+    // The stranger is intentionally placed in an accessible but distant area,
+    // with no out-of-band message giving its name or exact location away.
+  }
+
   function enterCave(responsive = false) {
     const departureZ=currentZ,departureKind=currentLevelKind(),departureCave=currentCave
     try {
@@ -1744,6 +1790,7 @@ more difficult:
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
+        spawnUnseenBestiaryEncounter()
         if (AdaptivePlayerTrolling.onFloorChanged({fromZ:departureZ,fromKind:departureKind,fromCave:departureCave})) render()
         const catchup = updateSurfaceAbsence(departureZ, responsive)
         if (catchup?.then) return catchup.then(() => { render(); updateHud(); return true })
@@ -2793,6 +2840,7 @@ more difficult:
     baseAtk: 2, baseDef: 2, baseSpd: 5, baseMf: 0,
     gold: 0, deaths: 0, steps: 0, kills: 0,
     trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
+    bestiaryZ5EncounterResolved: false,
     invisibleTurns: 0,
     spiderWebSourceId: null,
     godMode: false,
@@ -3133,6 +3181,9 @@ more difficult:
       ...playerPermanentStats(), max_hp: playerMaxHp(), mf: playerMf(),
       cumulated_xp: player.totalXpEarned, gold: player.gold, death_number: player.deaths,
       steps_taken: player.steps, creatures_slain: player.kills,
+      combat_skills: {...player.combatSkills, swimming:player.swimming, mining:player.mining},
+      life_potions: player.inventory.filter(item => item.kind === 'potion')
+        .reduce((sum, item) => sum + (Number.isSafeInteger(item.count) ? item.count : 1), 0),
       weapon: player.equip.weapon?.base || null,
       armor: player.equip.armor?.base || null,
       shield: player.equip.shield?.base || null,
@@ -5334,6 +5385,7 @@ more difficult:
       steps: 0,
       kills: 0,
       trackingLearned: false, killsBySpecies: {}, strongestEnemyKilled: null,
+    bestiaryZ5EncounterResolved: false,
       invisibleTurns: 0,
     spiderWebSourceId: null,
       godMode: false,

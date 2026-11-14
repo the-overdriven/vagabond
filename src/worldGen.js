@@ -5273,7 +5273,7 @@ function spawnEnemies() {
     return pool
   }
 
-  function spawnOneFromTemplate(tmpl, preferredPool = null, forcedSpot = null) {
+  function spawnOneFromTemplate(tmpl, preferredPool = null, forcedSpot = null, championEscort = false) {
     if (!surfaceSpawnEligible(tmpl) || !naturalSpawnEligible(tmpl)) return false
     const pool = preferredPool || poolFor(tmpl)
     if (!pool.length) return false
@@ -5303,13 +5303,17 @@ function spawnEnemies() {
     e.maxHp = e.hp
     e.baseName = tmpl.name // keep clean name for image lookup, separate from display name
     prepareEnemyEquipment(e)
-    if (chance(cfg.prefixChance)) {
+    if (!championEscort && chance(cfg.prefixChance)) {
       const names = Object.keys(ENEMY_PREFIXES)
       const pfx = pick(names)
-      e.prefix = pfx
-      e.prefixBase = prefixBaseStats(e)
-      applyEnemyPrefix(e, pfx)
-      e.name = pfx + ' ' + e.name
+      // A tier-1–3 surface Champion must have room for its promised escort.
+      // A cramped spawn stays ordinary rather than creating a lone Champion.
+      if (pfx !== 'Champion' || tmpl.tier > 3 || nearbyGroupSpots(tmpl, {x, y}).length >= 2) {
+        e.prefix = pfx
+        e.prefixBase = prefixBaseStats(e)
+        applyEnemyPrefix(e, pfx)
+        e.name = pfx + ' ' + e.name
+      }
     }
     addEnemy(e)
     // Template wandering stays authoritative unless this world explicitly
@@ -5319,6 +5323,18 @@ function spawnEnemies() {
       else if ((e.wander === 'home' || e.wander === 'homeReanchored') && cfg.roamPromotionChance > 0 && chance(cfg.roamPromotionChance)) e.wander = 'roam'
     }
     occupied.add(keyXY(x, y))
+    // A natural low-tier Champion is accompanied by ordinary members of its
+    // own species. These occupy separate real tiles, never inherit a prefix,
+    // and cannot recursively form another escort group.
+    if (!championEscort && e.prefix === 'Champion' && tmpl.tier >= 1 && tmpl.tier <= 3) {
+      const count = randInt(2, 3)
+      for (let n = 0; n < count; n++) {
+        const options = nearbyGroupSpots(tmpl, e)
+        if (!options.length) break // do not force illegal habitat or occupy a tile twice
+        const spot = pick(options)
+        if (!spawnOneFromTemplate(tmpl, null, spot, true)) break
+      }
+    }
     return e
   }
 

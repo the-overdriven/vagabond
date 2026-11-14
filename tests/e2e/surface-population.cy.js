@@ -69,4 +69,36 @@ describe('Surface monster population', () => {
         'Ghost is excluded from ordinary surface spawn, migration, and population pools').to.equal(false)
     })
   })
+
+  it('gives natural tier 1–3 surface Champions ordinary same-species escorts', () => {
+    cy.visit('/')
+    cy.get('#raceName').clear().type('Champion Pack Tester')
+    cy.get('#btnBegin').click()
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalEnemies=enemies,originalOccupied=occupied,originalChance=chance
+      const originalPick=pick,originalRng=rngState,originalId=nextEnemyId
+      const cfg=WORLD_GEN_CONFIG.surfaceEnemies,oldPrefixChance=cfg.prefixChance
+      try {
+        enemies=[];occupied=new Set()
+        cfg.prefixChance=1
+        chance=p=>p===1?true:originalChance(p)
+        pick=items=>items.includes('Champion')?'Champion':originalPick(items)
+        spawnEnemies()
+        const champs=enemies.filter(e=>e.prefix==='Champion'&&e.tier<=3&&e.ordinarySurface)
+        check(champs.length>0,'surface generation produces a Champion')
+        for(const champion of champs){
+          const kin=enemies.filter(e=>e!==champion&&e.baseName===champion.baseName&&
+            e.prefix===null&&e.ordinarySurface&&
+            Math.max(Math.abs(e.x-champion.x),Math.abs(e.y-champion.y))<=cfg.groupRadius)
+          check(kin.length>=2,'Champion has at least two ordinary nearby kin')
+        }
+      }finally {
+        enemies=originalEnemies;occupied=originalOccupied;chance=originalChance
+        pick=originalPick;rngState=originalRng;nextEnemyId=originalId;cfg.prefixChance=oldPrefixChance
+      }
+    })()`))
+  })
+
 })

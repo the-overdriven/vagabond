@@ -182,6 +182,7 @@ function buildSaveObject() {
       gold: player.gold, deaths: player.deaths, steps: player.steps, kills: player.kills,
       trackingLearned: player.trackingLearned,
       killsBySpecies: {...player.killsBySpecies},
+      bestiaryZ5EncounterResolved: player.bestiaryZ5EncounterResolved === true,
       strongestEnemyKilled: player.strongestEnemyKilled ? structuredClone(player.strongestEnemyKilled) : null,
       invisibleTurns: player.invisibleTurns,
       spiderWebSourceId: player.spiderWebSourceId,
@@ -811,6 +812,9 @@ function loadGameFromObject(data, opts = {}) {
   player.combatSkills = {...data.player.combatSkills}
   player.combatSkillXp = {...data.player.combatSkillXp}
   player.killsBySpecies = {...data.player.killsBySpecies}
+  if (typeof data.player.bestiaryZ5EncounterResolved !== 'boolean')
+    throw new Error('Invalid saved z:-5 bestiary encounter state')
+  player.bestiaryZ5EncounterResolved = data.player.bestiaryZ5EncounterResolved
   player.strongestEnemyKilled = data.player.strongestEnemyKilled ? structuredClone(data.player.strongestEnemyKilled) : null
   player.swimming = data.player.swimming || 0
   // Older completed saves awarded this character before reward tracking existed.

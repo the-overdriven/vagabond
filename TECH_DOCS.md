@@ -202,6 +202,17 @@ base-species entry; unencountered species are hidden. The list reads the saved
 per-species kill counters and refreshes when opened. It does not affect gameplay,
 RNG or replay actions. A new permadeath character begins with an empty Bestiary.
 
+On the **first entry to z:-5 in the Dwarven Ruins**, one extra ordinary
+monster of a species absent from that character's kill record appears in a
+reachable but distant area. Candidate species must be active combatants, tier
+1–4, available outside the Mines, and neither event-only nor exceptionally
+rare (rarity weight 0.1 or below, or the ultra-rare flag). It avoids occupied
+positions, traps, and stair landings; a species is chosen with the world's
+seeded RNG. The character gets only one such opportunity: if no unknown
+qualifying species or safe location exists, nothing appears. The resolved
+state persists in current saves and replay; changing floors cannot reroll it.
+
+
 Explicit save-file export errors are logged in red and also shown in a browser
 error dialog; the alert remains visible even when the game log is obscured by
 a modal. Browser download cancellations or silently blocked downloads cannot
@@ -1675,7 +1686,9 @@ format is listed in §66; older saves are rejected.
 `src/dungeonTraps.js` places reusable spikes and wall-arrow mechanisms in
 **corridors outside room footprints**, after stairs, locks, keys and the shortcut
 lift are generated. Each floor targets
-2–4 traps, stopping early if no safe placement remains. Placement uses seeded
+4–10 traps in total across spikes and wall arrows, stopping early if no
+safe placement remains. High target counts are not guaranteed: reachable
+stairways, progression keys and lifts take priority. Placement uses seeded
 RNG once; entering or loading a floor never regenerates mechanisms. Both spike
 and pressure-plate triggers reject dead ends and skippable inside corners. A
 trigger needs at least two cardinal exits (closed/locked doors count as exits).
@@ -6462,6 +6475,13 @@ The rolled bonus and tier are ordinary item fields preserved through saves,
 replay starting snapshots, equipment swaps, theft and drops. No additional
 exceptional-item flag or reroll-on-load logic exists.
 
+Natural surface Champions of tiers 1–3 appear with **2–3 ordinary
+members of the same species**, drawn from nearby legal habitat tiles. Escorts
+have no prefix or special Champion bonuses, use ordinary enemy mechanics,
+and do not recursively spawn further escorts. A would-be Champion without
+room for at least two escorts remains an ordinary monster. Pack members can
+separate through normal AI movement after generation.
+
 ## Monster quality
 
 The source monster's original tier improves ordinary quality slightly, independently
@@ -10304,6 +10324,15 @@ kind and payload-length checks. This is a database migration; the client
 continues to send the real cause and z level. Without the migration,
 PostgREST returns HTTP 400 for trap fatalities in the deeper ruins.
 
+Crusher fatalities call the same `die()` function as other deaths and
+submit the cause **`dwarven crusher`** to `death_records`. Supabase can reject
+the insert if its deployed `death_cause_check` or `death_position_check` does
+not allow the cause or deep-floor position. Rejected submissions now log the
+returned PostgREST code, message, detail, hint and HTTP status in the browser
+console; no offline queue or retry is added. Actual deployed constraints and
+live server responses must be checked before claiming Crusher submissions
+are fixed.
+
 The client maps accepted `dungeon trap` records to the display label
 **Dungeon trap**. The hotfix refreshes the service-worker asset cache so
 clients load the corrected `src/graveyard.js` without a game version bump.
@@ -10465,6 +10494,15 @@ before it is posted. There is no polling or automatic post-insert refresh.
 Opening the dialog or switching mode fetches the currently selected board.
 Late responses cannot replace another mode's list or reopen a closed dialog.
 Loading, empty, offline and failed-query states are shown in the dialog.
+
+Highscore milestones also snapshot all four combat skills (One-Handed,
+Two-Handed, Shielding and Marksmanship), Swimming and Mining, plus the count
+of Life Potions currently in the inventory (including stacked quantities).
+These appear in the expanded public highscore details, without affecting rank.
+Historical rows display a dash when these fields were not recorded. New
+uploads require the `supabase-highscores-skill-details.sql` database migration
+before updating the client; it preserves old milestones and the existing
+permadeath death-marker lookup and does not expose raw table reads.
 
 Only a live level-up triggers a submission. One XP award granting several
 levels captures one deep-cloned final-level snapshot after all gains resolve.

@@ -1,4 +1,46 @@
 describe('Dwarven Ruins encounter progression', () => {
+  it('spawns one as-yet-unbeaten non-mine species on the first visit to z:-5 and never repeats it', () => {
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__z5Save = save
+      win.eval('loadGameFromObject(window.__z5Save,{isReplayInit:true})')
+      delete win.__z5Save
+      return win.eval(`(() => {
+        const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+        const original=JSON.parse(JSON.stringify(buildSaveObject()))
+        try {
+          const layer=deepLevels[chainDepthForZ(-5)-2]
+          check(layer?.dungeonPackage==='dwarvenRuins','z:-5 is Ruins')
+          player.bestiaryZ5EncounterResolved=false
+          player.killsBySpecies=Object.fromEntries(ENEMY_TEMPLATES.map(t=>[t.name,1]))
+          player.killsBySpecies['Giant Rat']=0
+          currentZ=-5;currentCave=-1;map=layer.map;undergroundDiscovered=layer.discovered
+          const stair=layer.caves[0].entrances[0]
+          player.x=stair.x;player.y=stair.y
+          rebuildActiveLevelOccupancy()
+          const before=enemies.filter(e=>e.alive&&e.level===-5).length
+          spawnUnseenBestiaryEncounter()
+          const newcomers=enemies.filter(e=>e.alive&&e.level===-5)
+          check(player.bestiaryZ5EncounterResolved,'one-time state set')
+          check(newcomers.length===before+1,'exactly one unfamiliar monster spawned')
+          const rat=newcomers.find(e=>e.baseName==='Giant Rat')
+          check(!!rat&&map[rat.y][rat.x]==='marble'&&
+            DungeonTraps.safeSpawn(rat.x,rat.y,-5),'species and legal spawn')
+          spawnUnseenBestiaryEncounter()
+          check(enemies.filter(e=>e.alive&&e.level===-5).length===before+1,'no duplicate on reentry')
+          const save=JSON.parse(JSON.stringify(buildSaveObject()))
+          loadGameFromObject(save,{isReplayInit:true})
+          check(player.bestiaryZ5EncounterResolved,'one-time state survives save/replay restore')
+          player.bestiaryZ5EncounterResolved=false
+          player.killsBySpecies=Object.fromEntries(ENEMY_TEMPLATES.map(t=>[t.name,1]))
+          const rngBefore=rngState, countBefore=enemies.length
+          spawnUnseenBestiaryEncounter()
+          check(enemies.length===countBefore&&rngState===rngBefore&&
+            player.bestiaryZ5EncounterResolved,'no eligible species consumes no RNG and remains resolved')
+        } finally { loadGameFromObject(original,{isReplayInit:true}) }
+      })()`)
+    }))
+  })
+
   it('spawns one 150 HP Venom Eater on the last two ruin floors and absorbs venom repeatedly', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

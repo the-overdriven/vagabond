@@ -1347,8 +1347,8 @@
       },
       "traps": {
         "countRange": [
-          2,
-          4
+          4,
+          10
         ],
         "spikeAtk": 8,
         "projectileAtk": 10,
