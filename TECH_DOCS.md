@@ -10703,7 +10703,7 @@ placement rules and seeded random draws.
 | 7 | **Ancient Scarab** (`ancient_scarab`) | Dig **35 distinct sand tiles**, then dig another new sand tile. | A doubled-stat Champion Scarab emerges from sand. |
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
 | 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
-| 10 | **The Previous Owner** (`previous_owner`) | Wear the **same cursed artifact for 300 gameplay turns**. | Its named former owner appears as a Ghost that recognizes the item and pursues while it is worn. |
+| 10 | **The Previous Owner** (`previous_owner`) | Carry **any artifact named after a dwarf**, whether equipped or in inventory. | The actual named dwarf appears as a Ghost and pursues while the player possesses the artifact. |
 | 11 | **Debt Collector** (`debt_collector`) | Search **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
 | 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
 | 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
@@ -10718,7 +10718,7 @@ placement rules and seeded random draws.
 | 22 | **Trap Lure** (`trap_lure`) | Activate **5 distinct Dwarven Ruins traps**. | A Life Potion appears beyond a spike-trap shortcut that also has a safe detour. |
 | 23 | **Drowning Lure** (`drowning_lure`) | Finish **2 separate damaging deep-water crossings**. | A Scroll of Homecoming appears across water, also reachable via a longer dry route. |
 | 24 | **Low HP Carrion** (`low_hp_carrion`) | Remain below **25% HP for 30 turns** and stay wounded until a qualifying check. | A powerful Carrion beast gets long-range pursuit and bonus damage at very low HP. |
-| 25 | **Reckless Fighter** (`reckless_fighter`) | End **5 separate fights** below **10% HP**, with a Life Potion still carried. | A glowing **Graceful** monster arrives with superior GRACE and boosted HP/ATK/DEF. |
+| 25 | **Reckless Fighter** (`reckless_fighter`) | End **5 separate fights** below **10% HP**, with a Life Potion still carried. | A glowing **Graceful** high-GRACE rival or **Unpredictable** wide-damage rival appears, both with boosted HP/ATK/DEF. |
 | 26 | **Opposite Weapon** (`opposite_weapon`) | Reach **60** One-Handed or Two-Handed skill while the other remains **10 or lower**. | A tier-five artifact of the neglected weapon style appears in deep ruins. |
 | 27 | **Neglected Shield** (`neglected_shield`) | Finish **15 fights** without equipping an available shield; Shielding remains **10 or lower**. | An attribute-attuned tier-five Royal Shield artifact appears in deep ruins. |
 | 28 | **Last Survivor** (`last_survivor`) | Kill **20 enemies of one species**, representing **at least 20%** of all kills. | A named Champion survivor returns with two members of that species. |
@@ -10728,7 +10728,7 @@ placement rules and seeded random draws.
 | 32 | **Undead Warden** (`undead_shield_hunter`) | Reach **30 Marksmanship**. | An Undead Warden appears, blocking 75% of the first three landed arrow hits. |
 | 33 | **Depth Guardian** (`depth_guardian`) | Break **30 ordinary mineable walls** in the Dwarven Mines. | After a warning, a stone Guardian of the Deep appears on a connected passage. |
 | 34 | **Unfinished Business** (`unfinished_business`) | Wound **3 ordinary enemies below 25% HP** and leave them alive by disengaging. | One of the same survivors returns healed as a named Champion, retaining its enemy identity and gear. |
-| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface; after losing the trail it stays nearby until the player escapes, then withdraws for at least 100 surface turns. |
+| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface and agitates living forest beasts (+2 detection range). Its hunt can resume after 100 surface turns; killing it calms the beasts. |
 | 36 | **Explorer Galleries** (`explorer_galleries`) | Explore **50% of reachable surface** and physically reach **both opposite world edges** on one axis. | On first visits to ruins galleries, 85% chance of a Champion shooter plus two extra archers. |
 | 37 | **Fort Quest** (`fort_quest`) | Reach **level 10** before ever visiting the Dwarven Fort; accept the Merchant’s commission. | Find the Dwarven Trade Ledger at **z:−5** and return it for **350g**. |
 | 38 | **Scroll Restock** (`scroll_restock`) | Successfully use **12 non-Identification scrolls** in one character’s life. | Merchant gains one extra copy of each scroll type used, including types not previously sold. |
@@ -10898,7 +10898,7 @@ level (z:-2) at **character level 3 or below**, or the first entry into the
 Dwarven Fort (z:-3) at **character level 5 or below**, marks one premature
 expedition. A fallen adventurer's searchable remains appear on a connected,
 trap-safe tile **4–12 walking steps** from that floor's arrival.
-One ordinary, **unenchanted tier-one** weapon, armor or shield always lies
+These **noticeably fresher skeletal remains** have one of four seeded descriptive variants, shown when inspected. One ordinary, **unenchanted tier-one** weapon, armor or shield always lies
 on an adjacent ground tile. A second, mutually exclusive reward is rolled
 when the remains can be placed:
 
@@ -10910,7 +10910,7 @@ when the remains can be placed:
   both the weapon and **5–25 gold**; no Homecoming scroll is generated.
 
 The regular tier-one gear must still be picked up from the ground. The
-corpse uses ordinary search/loot behavior, and no chest is created. This
+remains use ordinary search/loot behavior, and no chest is created. Their descriptive variant persists in the saved ground item and is not rerolled by inspecting it. This
 one-time response does not consume a special-threat slot. Placement still
 requires the corpse and two clear adjacent tiles so neither reward outcome
 changes which floors can host the event. If the tiles cannot be placed,
@@ -10993,31 +10993,27 @@ The player must pick it up and choose Read to see the message. It is a one-time
 reaction and does not consume an optional monster-threat slot. The streak and
 completion are saved and replayed, with no RNG consumed during turn counting.
 
-**The Previous Owner — cursed artifact haunting:** In Cursed World, a
-*single equipped cursed artifact* (weapon, armor or shield) must be worn for
-**300 actual gameplay turns** before it can attract its former owner. Only
-turns spent equipped count, even across breaks or floor transitions; a cursed
-artifact merely carried in the backpack does not progress. The wear count
-stays on the item through inventory transfers, saving and replay. Once
-qualified, a Ghost with a seeded dwarf name can appear in either of the
+**The Previous Owner — a named dwarf's artifact:** In Cursed World, merely
+**possessing any non-cursed artifact named after a dwarf** qualifies this
+reaction immediately, without an identification, equipment, hit or turn
+requirement. Weapons, armor, shields and inventory-only trinkets qualify.
+The artifact's existing dwarven-owner name (`possessor`) determines the Ghost's
+name; no independent random owner is generated. A cursed artifact with only a
+cursed-prefix name does not qualify. A Ghost can appear in either of the
 **last two Dwarven Ruins floors**, outside sight and at least 10 tiles away,
-subject to the normal scheduled encounter roll and threat limit. Each
-character receives only one such encounter. Original cursed artifacts keep
-their existing cursed-prefix names (they normally have no named owner); the
-haunting's identity is assigned only when the ghost is created.
+subject to the scheduled encounter roll and threat limit. At most one such
+encounter appears per character.
 
-The ghost initially waits and does not attack. When the player approaches
-within **7 tiles**, with a clear sight line and without hiding from the
-Ghost, it recognizes the cursed artifact, displays a distinct gaze message
-and begins using its ordinary Ghost combat AI. **Unequipping the specific
-artifact stops its pursuit immediately**; equipping it again renews pursuit
-if the ghost has already recognized it. Wounding or poisoning the ghost
-provokes it permanently, so gear-swapping cannot safely cancel retaliation
-after hostility was initiated by the player. Removing the artifact does not
-erase the encounter, restore the threat slot, or spawn another owner. The
-same named Ghost and the linked artifact identity survive save and replay;
-no owner-copying, theft or give-back interaction is added. This encounter
-uses the existing Ghost sprite and ordinary combat stats.
+The Ghost waits until it sees the player carrying its artifact within
+**7 tiles**, with an unobstructed sight line and no successful concealment.
+Once recognized, it pursues using ordinary Ghost combat AI. Merely
+**unequipping** the artifact does not stop pursuit, because it remains owned;
+**dropping or selling** the exact linked artifact does stop an unprovoked
+Ghost. Picking it up again renews pursuit. Wounding or poisoning the Ghost
+makes it permanently hostile, even without the artifact. The ghost's name,
+linked artifact, recognition and provocation survive save and replay. Killing
+the Ghost ends this haunting; no second owner is spawned. The encounter uses
+existing Ghost visuals and normal combat stats.
 
 **Undead Warden — response to Marksmanship:** In Cursed World,
 reaching **30/100 Marksmanship** makes a single Undead Warden eligible
@@ -11403,6 +11399,17 @@ threats. No suitable forest site or free surface-region slot defers the event
 without consuming it. It takes **one surface-region threat slot** and never
 spawns a second spirit for the same character.
 
+While the Forest Spirit is alive, ordinary aggressive living beasts standing
+on **forest or ancient-forest surface tiles** become **Agitated**: they detect
+the player from **2 additional tiles** away and ignore the Humanoid Hunter
+25% hesitation roll when initiating a fight. Humanoids, passive creatures,
+special encounters and beasts outside those biomes keep their original rules.
+The Agitated label appears in monster inspection. The status is derived from
+the living spirit and the beast's current tile, not persisted or applied
+individually; leaving forest ends it and killing the spirit calms the forest.
+Concealment and sanctuary still work normally. This makes hunting the spirit
+or avoiding its forests two different counterplays.
+
 The Forest Spirit is a **tier-four spectral undead** with **90 HP, 13 ATK,
 3 DEF, 5 SPD, 4 GRACE** and the existing **Ethereal** ability. It is not a
 natural spawn. Its green halo and distinct name identify it, including outside
@@ -11456,21 +11463,29 @@ once per character; an unsuitable habitat or unsafe location defers it.
 10% maximum HP** while carrying at least one Life Potion, add one to the
 reckless-fight count. A fight consists of player or enemy combat attack
 attempts (melee, arrows or spells) and ends after **five full turns with no
-attacks from either side**. A prolonged fight, even with changing targets,
-counts only once; dying before the quiet period ends does not count. After
-**five such fights**, a scheduled encounter check can spawn a strong, native
-living beast on reachable off-screen terrain 12–28 tiles away. The beast is
-called *Graceful [species]* and uses the normal prefixed-monster glow, without
-receiving any ordinary random prefix effects. At spawning, its natural
-GRACE becomes at least **2 greater than the player's current GRACE**; it has
-**1.8× base HP** (at least **1.25× the player's maximum HP**), **1.15× ATK**
-and **1.3× DEF**, rounded to integers. SPD is unchanged. The boosted GRACE
-is fixed once spawned, even if the player later switches weapons. The enemy
-uses normal combat and paths toward the player from afar. This is a single
-special-threat encounter per character; it cannot spawn alongside a live
-Low HP Carrion pursuit on the same level. The hero can heal, fight, escape,
-use terrain and invisibility as usual; combat and qualification state is
-resolved in game turns, serialized and replayed independently of animation.
+attacks from either side**. A prolonged fight counts only once; dying before
+the quiet period does not count. After **five such fights**, a scheduled
+encounter check may spawn one strong, native living beast on reachable,
+off-screen terrain 12–28 tiles away.
+
+Both outcomes have **1.8× base HP** (at least **1.25× player maximum HP**),
+**1.15× ATK**, **1.3× DEF**, unchanged SPD and a visible prefixed-monster
+glow. Each has a **50%** chance, chosen once when the encounter is spawned:
+
+- **Graceful [species]:** GRACE is at least **player GRACE + 2** when spawned,
+  making the monster harder to evade with normal timing. Its GRACE is fixed
+  thereafter; damage variance remains ordinary.
+- **Unpredictable [species]:** Keeps the species' ordinary GRACE, but each
+  landed normal melee strike varies between **25% and 175% of mitigated ATK**
+  (rather than the usual roughly −30%/+20% triangular spread). The triangular
+  roll remains centered on mitigated ATK; it uses one seeded random draw, so
+  damage is swingier without raising expected damage. Armor, critical hits,
+  blocks and glancing hits still apply in their usual order.
+
+The outcome is preserved by the monster's name and prefix in save/replay.
+The hero can heal, fight, escape or use terrain and invisibility as usual.
+This is one special threat per character and cannot appear during an active
+Low HP Carrion pursuit on the same level.
 
 **Gold Imp:** In Cursed World, carrying **at least 2,000 gold** makes a single
 Gold Imp encounter eligible at the next scheduled check in a

@@ -110,7 +110,7 @@ const AdaptivePlayerTrolling = (() => {
           i > 0 && n <= schedule.earlyRuinsFloors[i-1]))
       throw new Error('Invalid adaptive activation-check schedule.')
     for (const [id, type] of [['low_hp_carrion', 'persistent_carrion_beast'],
-        ['reckless_fighter', 'graceful_duelist']]) {
+        ['reckless_fighter', 'reckless_counterhunter']]) {
       const e = value.events[id]
       if (!e || e.type !== type || e.location !== 'native_habitats' ||
           !Number.isInteger(e.minTier) || e.minTier < 2 ||
@@ -131,6 +131,11 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(reckless.quietTurns) || reckless.quietTurns < 1 ||
         !Number.isInteger(reckless.minCarriedPotions) || reckless.minCarriedPotions < 1 ||
         !Number.isInteger(reckless.graceLead) || reckless.graceLead < 1 ||
+        !Number.isFinite(reckless.gracefulChance) || reckless.gracefulChance < 0 || reckless.gracefulChance > 1 ||
+        !Number.isFinite(reckless.wildDamageMinMultiplier) || reckless.wildDamageMinMultiplier <= 0 ||
+        !Number.isFinite(reckless.wildDamageMaxMultiplier) ||
+        reckless.wildDamageMaxMultiplier <= 1 ||
+        reckless.wildDamageMinMultiplier + reckless.wildDamageMaxMultiplier !== 2 ||
         !Number.isFinite(reckless.hpMultiplier) || reckless.hpMultiplier <= 1 ||
         !Number.isFinite(reckless.minPlayerHpMultiplier) || reckless.minPlayerHpMultiplier < 1 ||
         !Number.isFinite(reckless.atkMultiplier) || reckless.atkMultiplier < 1 ||
@@ -178,7 +183,8 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(spirit.minSpawnDistance) || spirit.minSpawnDistance <= UndergroundFov.RADIUS ||
         !Number.isInteger(spirit.maxSpawnDistance) || spirit.maxSpawnDistance < spirit.minSpawnDistance ||
         !Number.isInteger(spirit.minEntranceDistance) || spirit.minEntranceDistance < 1 ||
-        !Number.isInteger(spirit.maxCandidateSites) || spirit.maxCandidateSites < 1)
+        !Number.isInteger(spirit.maxCandidateSites) || spirit.maxCandidateSites < 1 ||
+        !Number.isInteger(spirit.agitatedAggroBonus) || spirit.agitatedAggroBonus < 1)
       throw new Error('Invalid adaptive Forest Spirit settings.')
     const survivor = value.events.last_survivor
     if (!survivor || survivor.type !== 'bestiary_species_retaliation' ||
@@ -293,11 +299,10 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(fortQuest.mapRevealRadius) || fortQuest.mapRevealRadius < 1)
       throw new Error('Invalid adaptive Fort Quest settings.')
     const previousOwner = value.events.previous_owner
-    if (!previousOwner || previousOwner.type !== 'cursed_artifact_former_owner' ||
+    if (!previousOwner || previousOwner.type !== 'named_artifact_former_owner' ||
         previousOwner.location !== 'last_two_dwarven_ruins_floors' ||
         previousOwner.baseSpecies !== 'Ghost' ||
         ENEMY_TEMPLATE_BY_NAME.Ghost?.family !== 'undead' ||
-        !Number.isInteger(previousOwner.minEquippedTurns) || previousOwner.minEquippedTurns < 1 ||
         !Number.isInteger(previousOwner.recognitionDistance) || previousOwner.recognitionDistance < 1 ||
         !Number.isInteger(previousOwner.minSpawnDistance) || previousOwner.minSpawnDistance <= UndergroundFov.RADIUS ||
         !Number.isInteger(previousOwner.minEntranceDistance) || previousOwner.minEntranceDistance < 1 ||
@@ -596,7 +601,10 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(descent.minPathSteps) || descent.minPathSteps < 2 ||
         !Number.isInteger(descent.maxPathSteps) || descent.maxPathSteps < descent.minPathSteps ||
         !Number.isInteger(descent.minStairDistance) || descent.minStairDistance < 1 ||
-        !Number.isInteger(descent.maxCandidateSites) || descent.maxCandidateSites < 1)
+        !Number.isInteger(descent.maxCandidateSites) || descent.maxCandidateSites < 1 ||
+        !Array.isArray(descent.freshRemainsDescriptions) ||
+        descent.freshRemainsDescriptions.length < 2 ||
+        descent.freshRemainsDescriptions.some(text=>typeof text!=='string' || !text.trim()))
       throw new Error('Invalid adaptive Early Descent settings.')
     const unread = value.events.unread_scrolls
     if (!unread || unread.type !== 'hoarded_scrolls_note' ||
@@ -1126,6 +1134,7 @@ const AdaptivePlayerTrolling = (() => {
   // Applied at the point a NEW fight could start, before awareness is set.
   // Already-angered beasts and scripted/adaptive encounters retaliate normally.
   function beastMayInitiateCombat(enemy) {
+    if (forestBeastAgitated(enemy)) return true // The spirit's fury overrides humanoid-hunter hesitation.
     if (!active() || !enemy || enemy.aware || enemy.alarmed ||
         enemy.adaptiveEventId || enemy.aggro === 0) return true
     const template=ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
@@ -1731,26 +1740,18 @@ const AdaptivePlayerTrolling = (() => {
       state.shieldlessFights >= config.events.neglected_shield.minShieldlessFights
   }
 
-  // Track wear on each *individual* equipped cursed artifact, never an inventory
-  // total. The item fields travel with the equipment through saves and replay.
-  // Passive trinkets merely carried in inventory are deliberately excluded.
-  function eligiblePreviousOwnerArtifacts() {
-    if (!active() || completed('previous_owner')) return []
-    return ['weapon','shield','armor'].map(slot => player.equip?.[slot])
-      .filter(item => item?.kind==='artifact' && item.curse &&
-        !item.previousOwnerHauntedBy &&
-        (item.previousOwnerWearTurns || 0) >= config.events.previous_owner.minEquippedTurns)
+  // This reaction recognizes the actual dwarven owner engraved in any
+  // artifact's name. Merely carrying it qualifies, including trinkets.
+  function carriedNamedArtifacts() {
+    return [...(player.inventory || []), ...['weapon','shield','armor'].map(slot=>player.equip?.[slot])]
+      .filter(item => item?.kind==='artifact' &&
+        typeof item.possessor==='string' && ARTIFACT_NAMES_DWARF.includes(item.possessor) &&
+        typeof item.name==='string' && item.name.endsWith(` of ${item.possessor}`))
   }
 
-  function tickPreviousOwnerWear() {
-    if (completed('previous_owner')) return
-    for (const slot of ['weapon','shield','armor']) {
-      const item = player.equip?.[slot]
-      if (!item || item.kind!=='artifact' || !item.curse || item.previousOwnerHauntedBy ||
-          item.previousOwnerLastWearTurn===turnCount) continue
-      item.previousOwnerWearTurns = (item.previousOwnerWearTurns || 0) + 1
-      item.previousOwnerLastWearTurn = turnCount
-    }
+  function eligiblePreviousOwnerArtifacts() {
+    if (!active() || completed('previous_owner')) return []
+    return [...new Set(carriedNamedArtifacts())].filter(item=>!item.previousOwnerHauntedBy)
   }
 
   // Count consumed world turns (not frames or time in menus), once per turn.
@@ -1762,7 +1763,6 @@ const AdaptivePlayerTrolling = (() => {
     if (state.templeClearanceTargets === null && currentZ === 0) trackTempleClearanceTargets()
     if (state.survivalLastTurn !== turnCount) {
       state.survivalLastTurn = turnCount
-      tickPreviousOwnerWear()
       if (ordinaryCaveHere() && state.caveVisit?.caveIndex === currentCave &&
           state.caveVisit.lastTurn !== turnCount) {
         state.caveVisit.turns++
@@ -1900,10 +1900,11 @@ const AdaptivePlayerTrolling = (() => {
     const scroll=hasScroll ? pick(selected.lootSites.filter(p=>
       p.x!==equipment.x || p.y!==equipment.y)) : null
     const item=unenchantedDescentGear(),gold=randInt(cfg.goldMin,cfg.goldMax)
+    const description=pick(cfg.freshRemainsDescriptions)
     const body={x:selected.body.x,y:selected.body.y,level:currentZ,
       levelKind:currentLevelKind(),caveIndex:currentCave,
-      kind:'deadbody',name:'Hasty Explorer',race:'adventurer',killer:'the depths',
-      gear:hasScroll ? null : makeImprovisedWeapon(pick(STARTING_WEAPONS)),
+      kind:'deadbody',name:'Desperate Caver',race:'skeletal explorer',killer:'the depths',
+      description,gear:hasScroll ? null : makeImprovisedWeapon(pick(STARTING_WEAPONS)),
       gold,looted:false,adaptiveEventId:'early_descent'}
     if (!dropRewardOnGround('early_descent',item,equipment.x,equipment.y)) return false
     if (scroll && !dropRewardOnGround('early_descent',createItem(cfg.scrollKind),scroll.x,scroll.y)) {
@@ -1914,7 +1915,7 @@ const AdaptivePlayerTrolling = (() => {
     state.completed.push('early_descent')
     delete state.events.early_descent
     minimapDirty=true
-    log('Someone rushed down here before you. Their abandoned remains are nearby.', 'info')
+    log('Fresh skeletal remains lie ahead. Someone ventured into these depths far too early.', 'info')
     return true
   }
 
@@ -2646,11 +2647,11 @@ const AdaptivePlayerTrolling = (() => {
   function onEnemyTurn(enemy, turn) {
     if (!active() || !enemy?.adaptiveEventId) return false
     if (active() && enemy?.adaptiveEventId==='previous_owner' && enemy.alive && enemy.hp>0) {
-      // This is one artifact's owner, not a generic aggro bonus. Disarming
-      // the cause pauses pursuit unless the player has attacked the ghost.
-      const relic = ['weapon','shield','armor'].map(slot => player.equip?.[slot])
-        .find(item => item?.kind==='artifact' && item.previousOwnerHauntedBy===enemy.name &&
-          item.name===enemy.previousOwnerRelicName)
+      // Dropping or selling the named relic pacifies an unprovoked owner.
+      // Unequipping it does not: it is still in the player's possession.
+      const relic = carriedNamedArtifacts().find(item =>
+        item.previousOwnerHauntedBy===enemy.name &&
+        item.name===enemy.previousOwnerRelicName)
       if (enemy.hp < enemy.maxHp || enemy.poisonTurns>0) enemy.previousOwnerProvoked=true
       if (!relic && !enemy.previousOwnerProvoked) {
         enemy.aggro=0
@@ -2758,9 +2759,7 @@ const AdaptivePlayerTrolling = (() => {
     return true
   }
 
-  // Cursed artifacts are normally titled by their cursed prefix, not by a
-  // dwarf's name. Give this encounter its own historical name when it spawns;
-  // leave the artifact's public name and generated lore untouched.
+  // Match the engraved owner of an existing artifact, not a new random name.
   function previousOwnerSpawnOptions(floor) {
     if (!active() || completed('previous_owner') || !floor ||
         floor.dungeonFloor < floor.floorCount-1 ||
@@ -2776,7 +2775,7 @@ const AdaptivePlayerTrolling = (() => {
     if (!active()) return false
     if (!options?.sites.length || !options.relics?.length) return false
     const relic=pick(options.relics), spot=pick(options.sites)
-    const name=pick(ARTIFACT_NAMES_DWARF)
+    const name=relic.possessor
     const base=ENEMY_TEMPLATE_BY_NAME.Ghost
     const ghost={name,baseName:'Ghost',prefix:null,adaptiveEventId:'previous_owner',
       tier:base.tier,humanoid:!!base.humanoid,family:base.family,
@@ -2794,8 +2793,7 @@ const AdaptivePlayerTrolling = (() => {
       return false
     }
     relic.previousOwnerHauntedBy=name
-    // No global log announcement: the owner reveals himself by his name and
-    // by recognising the cursed relic when he sees the player carrying it.
+    // The apparition recognizes the artifact's existing name and owner lore.
     return true
   }
 
@@ -4020,6 +4018,24 @@ const AdaptivePlayerTrolling = (() => {
     return true
   }
 
+  function forestBeastAgitated(enemy) {
+    if (!active() || currentZ!==0 || !enemy?.alive || enemy.adaptiveEventId ||
+        !forestSpiritEntity() || !['forest','ancientForest'].includes(map[enemy.y]?.[enemy.x]))
+      return false
+    const species=ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]
+    return species?.family==='living' && !species.humanoid && (species.aggro ?? 0)>0 &&
+      !species.adaptiveOnly
+  }
+
+  function forestAgitationAggroBonus(enemy) {
+    return forestBeastAgitated(enemy) ? config.events.forest_spirit.agitatedAggroBonus : 0
+  }
+
+  function unpredictableDamageRange(enemy) {
+    return active() && enemy?.adaptiveEventId==='reckless_fighter' &&
+      enemy.prefix==='Unpredictable' ? config.events.reckless_fighter : null
+  }
+
   // Forest foraging already uses persistent unique surface coordinates. No
   // parallel kill/forage ledger is needed; 70 empty harvests also count.
   function forestSpiritEntity() {
@@ -4082,7 +4098,7 @@ const AdaptivePlayerTrolling = (() => {
       return false
     }
     state.forestSpiritRestTurns=0;state.forestSpiritLastSurfaceTurn=turnCount
-    log('The forest remembers every grove you stripped. Its spirit is hunting you.', 'bad')
+    log('The forest remembers every grove you stripped. Its spirit is hunting you. Forest beasts grow agitated.', 'bad')
     return true
   }
 
@@ -4151,24 +4167,25 @@ const AdaptivePlayerTrolling = (() => {
     if(!options.length || (id !== 'beast_hunter' && activeAdaptivePursuit()) ||
         completed(id))return false
     const choice=pick(options),base=choice.tmpl,spot=pick(choice.sites)
-    const cfg=config.events[id],isGraceful=id==='reckless_fighter',
-      isBeastHunter=id==='beast_hunter'
-    const hp=isGraceful ? Math.max(Math.round(base.hp*cfg.hpMultiplier),
+    const cfg=config.events[id],isReckless=id==='reckless_fighter',
+      isGraceful=isReckless && chance(cfg.gracefulChance),
+      isWild=isReckless && !isGraceful,isBeastHunter=id==='beast_hunter'
+    const hp=isReckless ? Math.max(Math.round(base.hp*cfg.hpMultiplier),
       Math.round(playerMaxHp()*cfg.minPlayerHpMultiplier)) : base.hp
-    const title=isGraceful?'Graceful':isBeastHunter?'Hunting':'Carrion'
+    const title=isGraceful?'Graceful':isWild?'Unpredictable':isBeastHunter?'Hunting':'Carrion'
     const enemy={baseName:base.name,name:`${title} ${base.name}`,
       prefix:title,adaptiveEventId:id,
       tier:base.tier,humanoid:false,family:base.family,
       hp,maxHp:hp,
-      atk:isGraceful?Math.round(base.atk*cfg.atkMultiplier):base.atk,
-      def:isGraceful?Math.round(base.def*cfg.defMultiplier):base.def,
+      atk:isReckless?Math.round(base.atk*cfg.atkMultiplier):base.atk,
+      def:isReckless?Math.round(base.def*cfg.defMultiplier):base.def,
       spd:base.spd,grace:isGraceful?Math.max(base.grace,playerGrace()+cfg.graceLead):base.grace,
       aggro:base.aggro??AGGRO_RANGE,
       abilities:[...(base.abilities||[])],
       x:spot.x,y:spot.y,homeX:spot.x,homeY:spot.y,homeTileType:map[spot.y][spot.x],
       level:currentZ,levelKind:currentLevelKind(),caveIndex:currentCave,
       alive:true,aware:true,alarmed:true,equipment:null,wander:'roam',summonedTurn:turnCount}
-    if(!isGraceful && !isBeastHunter && !enemy.abilities.includes('carrionInstinct'))
+    if(!isReckless && !isBeastHunter && !enemy.abilities.includes('carrionInstinct'))
       enemy.abilities.push('carrionInstinct')
     enemy.prefixBase={hp:base.hp,atk:base.atk,def:base.def,spd:base.spd,aggro:base.aggro??AGGRO_RANGE}
     addEnemy(enemy)
@@ -4179,6 +4196,7 @@ const AdaptivePlayerTrolling = (() => {
       return false
     }
     if(isGraceful)log(`A Graceful ${base.name} is hunting you. Its timing is frighteningly precise.`, 'bad')
+    else if(isWild)log(`An Unpredictable ${base.name} is hunting you. Its strikes can be wildly weak or devastating.`, 'bad')
     else if(isBeastHunter) {
       log(`The beasts have noticed your slaughter. A Hunting ${base.name} is tracking you!`, 'bad')
       spawnDamageNumber(player.x, player.y, 'HUNTED!', '#df9770', 0, 1200)
@@ -4726,6 +4744,7 @@ const AdaptivePlayerTrolling = (() => {
     tagDwarvenRemainsLoot,
     splitDwarvenRemainsLoot, pendingDebtCollector, debtCollectorDemand, resolveDebtCollector,
     onEnemyTurn, onCampfireLit, friendlyUninvitedGuestNearby, claimUninvitedGuestMeal,
+    forestBeastAgitated, forestAgitationAggroBonus, unpredictableDamageRange,
     onHungryMonsterAttacked, takeHungryMonsterTurn, takeAdaptiveHunterTurn, takeBeastHunterTurn, takeForestSpiritTurn,
     shieldHunterArrowHit, shieldHunterRemaining,
     goldImpStealAmount, takeGoldImpTurn,

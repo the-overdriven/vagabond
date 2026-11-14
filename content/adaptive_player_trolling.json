@@ -140,9 +140,8 @@
       "prophecy": "The harvest has a price. Flee now, or become part of the earth."
     },
     "previous_owner": {
-      "type": "cursed_artifact_former_owner",
+      "type": "named_artifact_former_owner",
       "location": "last_two_dwarven_ruins_floors",
-      "minEquippedTurns": 300,
       "recognitionDistance": 7,
       "minSpawnDistance": 10,
       "minEntranceDistance": 3,
@@ -246,7 +245,13 @@
       "minPathSteps": 4,
       "maxPathSteps": 12,
       "minStairDistance": 2,
-      "maxCandidateSites": 96
+      "maxCandidateSites": 96,
+      "freshRemainsDescriptions": [
+        "These bones are disturbingly fresh. Torn clothing and a hastily packed satchel suggest someone descended before they were ready.",
+        "Unlike the ancient skeletons nearby, these remains are almost new. A shattered lantern lies beside an explorer who went too far, too soon.",
+        "The flesh has barely left these bones. Deep scratches in the stone suggest the explorer tried to crawl back toward safety.",
+        "A newly fallen adventurer lies among much older bones. Their equipment is scarcely worn; the journey ended almost as soon as it began."
+      ]
     },
     "unused_healing": {
       "type": "unused_potions_death_count",
@@ -335,7 +340,7 @@
       "maxCandidateSites": 48
     },
     "reckless_fighter": {
-      "type": "graceful_duelist",
+      "type": "reckless_counterhunter",
       "location": "native_habitats",
       "minFights": 5,
       "quietTurns": 5,
@@ -352,7 +357,10 @@
       "minSpawnDistance": 12,
       "maxSpawnDistance": 28,
       "minEntranceDistance": 3,
-      "maxCandidateSites": 48
+      "maxCandidateSites": 48,
+      "gracefulChance": 0.5,
+      "wildDamageMinMultiplier": 0.25,
+      "wildDamageMaxMultiplier": 1.75
     },
     "opposite_weapon": {
       "type": "opposite_specialization_artifact",
@@ -543,7 +551,8 @@
       "minEntranceDistance": 3,
       "maxCandidateSites": 80,
       "initialBiome": "forest",
-      "enemy": "Forest Spirit"
+      "enemy": "Forest Spirit",
+      "agitatedAggroBonus": 2
     },
     "explorer_galleries": {
       "type": "explorer_crossfire_reinforcement",

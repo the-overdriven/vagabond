@@ -33,6 +33,19 @@ describe('Adaptive Player Trolling', () => {
         check(spirit && spirit.baseName==='Forest Spirit' && spirit.abilities.includes('ethereal') &&
           spirit.hp===90 && !enemyIsVisibleOnMainView(spirit) && map[spirit.y][spirit.x]==='forest',
           'distinct Forest Spirit initially manifests in reachable unseen forest')
+        const wolfTemplate=ENEMY_TEMPLATE_BY_NAME.Wolf
+        const wolf={name:'Wolf',baseName:'Wolf',alive:true,aware:false,alarmed:false,
+          hp:wolfTemplate.hp,maxHp:wolfTemplate.hp,atk:wolfTemplate.atk,def:wolfTemplate.def,
+          spd:wolfTemplate.spd,aggro:wolfTemplate.aggro,x:player.x+3,y:player.y,level:0,
+          levelKind:'surface',caveIndex:-1}
+        check(AdaptivePlayerTrolling.forestBeastAgitated(wolf),
+          'ordinary forest wolf becomes Agitated while the spirit lives')
+        const agitatedRange=effectiveAggroRange(wolf)
+        map[wolf.y][wolf.x]='grass'
+        check(!AdaptivePlayerTrolling.forestBeastAgitated(wolf) &&
+          effectiveAggroRange(wolf)===agitatedRange-2,
+          'leaving forest removes agitation without persistent flags')
+        map[wolf.y][wolf.x]='forest'
         const spiritId=spirit.id
         const hp=spirit.hp=41
         // An invisible hero standing beside the spirit must not make it vanish.
@@ -88,6 +101,9 @@ describe('Adaptive Player Trolling', () => {
         player.steps=1000;AdaptivePlayerTrolling.onPlayerMoved()
         check(enemies.filter(e=>e.adaptiveEventId==='forest_spirit').length===1,
           'later checkpoints cannot create another spirit')
+        spirit.alive=false
+        check(!AdaptivePlayerTrolling.forestBeastAgitated(wolf),
+          'killing the spirit calms forest animals without lingering statuses')
       } finally {loadGameFromObject(before,{isReplayInit:true})}
     })()`))
   })
@@ -716,7 +732,9 @@ describe('Adaptive Player Trolling', () => {
           player.hp=playerMaxHp();turnCount++;AdaptivePlayerTrolling.onWorldTurn()
         }
         player.steps=500
+        chance=()=>true // explicitly exercise the Graceful branch
         check(AdaptivePlayerTrolling.onPlayerMoved(),'five fights spawn a Graceful rival')
+        chance=()=>false
         let graceful=enemies.find(e=>e.adaptiveEventId==='reckless_fighter')
         check(!!graceful && graceful.prefix==='Graceful' &&
           graceful.grace>playerGrace() && graceful.spd===ENEMY_TEMPLATE_BY_NAME[graceful.baseName].spd,
@@ -728,6 +746,42 @@ describe('Adaptive Player Trolling', () => {
         graceful=enemies.find(e=>e.adaptiveEventId==='reckless_fighter')
         check(!!graceful && graceful.prefix==='Graceful' && graceful.grace>playerGrace(),
           'Graceful name, stats and prefix survive save/replay')
+        // Exercise the other outcome with the same five-fight trigger and budget.
+        graceful.alive=false;graceful.hp=0;enemies=[];occupied=new Set()
+        AdaptivePlayerTrolling.reset();player.steps=0
+        const second=AdaptivePlayerTrolling.serialize()
+        second.recklessLowHpFights=5
+        AdaptivePlayerTrolling.restore(second)
+        player.steps=500
+        chance=()=>false
+        check(AdaptivePlayerTrolling.onPlayerMoved(),'same trigger permits wide-damage rival')
+        let wild=enemies.find(e=>e.adaptiveEventId==='reckless_fighter')
+        check(wild?.prefix==='Unpredictable' &&
+          wild.grace===ENEMY_TEMPLATE_BY_NAME[wild.baseName].grace &&
+          !!AdaptivePlayerTrolling.unpredictableDamageRange(wild),
+          'Unpredictable rival preserves normal GRACE and receives wider damage range')
+        check(AdaptivePlayerTrolling.unpredictableDamageRange(graceful)===null &&
+          AdaptivePlayerTrolling.unpredictableDamageRange({baseName:'Wolf'})===null,
+          'ordinary beasts and Graceful rivals never inherit wide damage')
+        // Extreme seeded rolls exercise the actual melee damage formula.
+        const originalRng=rng
+        let lowWild,highWild,lowNormal,highNormal
+        try {
+          rng=()=>0
+          lowWild=damageRoll(100,0,wild)
+          lowNormal=damageRoll(100,0,graceful)
+          rng=()=>0.999999999
+          highWild=damageRoll(100,0,wild)
+          highNormal=damageRoll(100,0,graceful)
+        } finally {rng=originalRng}
+        check(lowWild===25 && highWild===175 && lowNormal===70 && highNormal===120,
+          'wide variance changes only Unpredictable melee rolls without extra RNG')
+        const wildSave=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(wildSave,{isReplayInit:true})
+        wild=enemies.find(e=>e.adaptiveEventId==='reckless_fighter')
+        check(wild?.prefix==='Unpredictable' &&
+          !!AdaptivePlayerTrolling.unpredictableDamageRange(wild),
+          'wide damage variant survives replay restore')
       } finally {chance=savedChance;loadGameFromObject(original,{isReplayInit:true})}
     })()`))
   })
@@ -1999,7 +2053,7 @@ describe('Adaptive Player Trolling', () => {
 
 
 
-  it('haunts a particular cursed artifact after 300 equipped turns and stops when removed', () => {
+  it('haunts any carried dwarf-named artifact, including armor, shields and trinkets', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -2014,72 +2068,82 @@ describe('Adaptive Player Trolling', () => {
         player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
         enemies=[];groundItems=[];npcs=[];occupied=new Set()
         rebuildActiveLevelOccupancy();invalidateUndergroundFov()
-        const cursed={kind:'artifact',artifactSlot:'weapon',name:'Cursed Spear',noun:'Spear',
-          base:'Spear',atk:7,grace:2,identified:true,bonuses:{},curse:{everyTurns:10,types:['hp']}}
-        player.equip.weapon=cursed
-        // Repeated checks on the *same* turn never grant extra wear progress.
-        turnCount+=1;AdaptivePlayerTrolling.onWorldTurn();AdaptivePlayerTrolling.onWorldTurn()
-        check(cursed.previousOwnerWearTurns===1,'duplicate turn hook cannot double count wear')
-        player.equip.weapon=null
-        for(let i=0;i<12;i++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
-        check(cursed.previousOwnerWearTurns===1,'cursed gear in backpack does not advance')
-        player.equip.weapon=cursed
-        for(let i=0;i<298;i++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
-        check(!AdaptivePlayerTrolling.serialize().triggerFlags.previous_owner,
-          '299 equipped turns are not enough')
-        turnCount++;AdaptivePlayerTrolling.onWorldTurn()
-        check(cursed.previousOwnerWearTurns===300 &&
-          AdaptivePlayerTrolling.serialize().triggerFlags.previous_owner,
-          '300th equipped turn records trigger without RNG')
+        const owner=ARTIFACT_NAMES_DWARF[0]
+        const makeArtifact=slot=>({kind:'artifact',artifactSlot:slot,
+          name:'Relic of '+owner,noun:'Relic',identified:false,bonuses:{},
+          possessor:owner,curse:null})
+        const cursed={kind:'artifact',artifactSlot:'weapon',name:'Cursed Spear',
+          curse:{everyTurns:10,types:['hp']},possessor:null}
+        player.inventory=[cursed]
+        check(AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().length===0,
+          'cursed-prefix artifact without named dwarven owner does not qualify')
+        for(const slot of ['weapon','shield','armor','trinket']){
+          const item=makeArtifact(slot)
+          player.inventory=slot==='trinket'?[item]:[]
+          if(slot!=='trinket')player.equip[slot]=item
+          check(AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().includes(item),
+            slot+' qualifies immediately without identification, combat or equipped turns')
+          if(slot!=='trinket')player.equip[slot]=null
+        }
+        const relic=player.inventory[0]
+        AdaptivePlayerTrolling.syncTriggerFlags()
+        check(AdaptivePlayerTrolling.serialize().triggerFlags.previous_owner,
+          'carrying a named trinket is enough to register the trigger')
         const options=AdaptivePlayerTrolling.previousOwnerSpawnOptions(floor)
-        check(!!options && !!options.sites.length,'connected off-screen site exists on deep ruin floor')
-        check(AdaptivePlayerTrolling.spawnPreviousOwner(options),'a named Ghost is created')
+        check(!!options && options.relics.includes(relic) && options.sites.length>0,
+          'deep ruin site recognizes trinket in the backpack')
+        check(AdaptivePlayerTrolling.spawnPreviousOwner(options),
+          'ghost appears from the artifact owner itself')
         let ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
-        check(ghost && ghost.name && ARTIFACT_NAMES_DWARF.includes(ghost.name) &&
-          ghost.baseName==='Ghost' && !ghost.previousOwnerRecognized &&
-          cursed.previousOwnerHauntedBy===ghost.name,'individual relic is bound to named owner')
+        check(ghost?.name===owner && relic.previousOwnerHauntedBy===owner &&
+          ghost.previousOwnerRelicName===relic.name && !ghost.previousOwnerRecognized,
+          'existing dwarf name and actual artifact remain paired')
         check(AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && !ghost.aware,
-          'owner waits before seeing the relic')
+          'owner waits until it recognizes the player')
         let saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
         ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
-        check(ghost && ghost.name===player.equip.weapon.previousOwnerHauntedBy &&
-          player.equip.weapon.previousOwnerWearTurns===300 &&
-          !ghost.previousOwnerRecognized,'owner and cursed item link survive load')
+        check(ghost?.name===player.inventory[0].previousOwnerHauntedBy &&
+          !ghost.previousOwnerRecognized,
+          'ghost and inventory-only relic remain linked on replay restore')
         player.x=ghost.x+1;player.y=ghost.y
         check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) &&
           ghost.previousOwnerRecognized && ghost.aware,
-          'seeing relic once initiates ordinary ghost pursuit')
+          'seeing a carried relic initiates Ghost pursuit')
+        player.equip.weapon=player.inventory.pop()
+        check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && ghost.aware,
+          'equipping the carried item does not reset the hunt')
         player.inventory.push(player.equip.weapon);player.equip.weapon=null
+        check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && ghost.aware,
+          'unequipping back into inventory does not pacify the owner')
+        const dropped=player.inventory.pop()
         check(AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && !ghost.aware &&
-          ghost.aggro===0,'unequipping exactly the haunted relic pauses pursuit')
+          ghost.aggro===0, 'dropping the actual named relic pauses pursuit')
         saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
         ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
         check(ghost && ghost.previousOwnerRecognized && !ghost.previousOwnerProvoked &&
           AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount),
-          'paused haunting remains paused after reloading')
-        player.equip.weapon=player.inventory.pop()
+          'unprovoked owner remains passive after reloading without the relic')
+        player.inventory.push(dropped)
         check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && ghost.aware,
-          're-equipping the same item resumes chase')
+          'picking the relic back up renews pursuit')
         ghost.hp=ghost.maxHp-1
         check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) && ghost.previousOwnerProvoked,
-          'wounding owner provokes him permanently')
-        player.equip.weapon=null
+          'wounding the former owner makes it permanently hostile')
+        player.inventory=[]
         check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount),
-          'removing cursed item cannot pacify an attacked ghost')
+          'a provoked owner cannot be pacified by abandoning the artifact')
         saved=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(saved,{isReplayInit:true})
         ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
         check(ghost && ghost.previousOwnerProvoked &&
-          !AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) &&
           AdaptivePlayerTrolling.completed('previous_owner') &&
           enemies.filter(e=>e.adaptiveEventId==='previous_owner').length===1,
-          'provocation, uniqueness and ghost identity survive replay restore')
+          'provocation, uniqueness and identity survive replay restore')
       } finally {loadGameFromObject(before,{isReplayInit:true})}
     })()`))
   })
-
 
 
   it('offers one merchant fort commission before visiting the fort and pays only for the recovered ledger', () => {

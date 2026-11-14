@@ -4418,10 +4418,14 @@ more difficult:
     gainXp(award, false)
   }
 
-  function damageRoll(atk, def) {
+  function damageRoll(atk, def, enemy = null) {
     const mitigatedAtk = atk * 10 / (10 + Math.max(0, def))
-    const lowerSpread = Math.max(1, mitigatedAtk * 0.30)
-    const upperSpread = Math.max(2, mitigatedAtk * 0.20)
+    const config = AdaptivePlayerTrolling.unpredictableDamageRange(enemy)
+    const volatile = !!config
+    const lowerSpread = volatile ? mitigatedAtk * (1 - config.wildDamageMinMultiplier)
+      : Math.max(1, mitigatedAtk * 0.30)
+    const upperSpread = volatile ? mitigatedAtk * (config.wildDamageMaxMultiplier - 1)
+      : Math.max(2, mitigatedAtk * 0.20)
     const range = lowerSpread + upperSpread
     const roll = rng()
     // Inverse triangular CDF: one seeded draw, peak at the mitigated damage.
@@ -4783,7 +4787,7 @@ more difficult:
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
     const shieldBlockChance = !glancing && shieldingBlockChance()
     const blocked = shieldBlockChance > 0 && chance(shieldBlockChance)
-    let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef())
+    let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef(), e)
     const criticalRoll = chance(enemyCriticalHitChance(e))
     const critical = !glancing && !blocked && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
@@ -5603,7 +5607,8 @@ more difficult:
 
   function effectiveAggroRange(e) {
     return Math.max(1, enemyAggroRange(e) * (e.sleeping ? WYVERN_SLEEP_CONFIG.aggroMultiplier : 1) +
-      (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.aggroBonus : 0) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus)
+      (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.aggroBonus : 0) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus +
+      AdaptivePlayerTrolling.forestAgitationAggroBonus(e))
   }
 
   // A successful forest hiding roll lasts at this player position. The player
@@ -9584,7 +9589,9 @@ more difficult:
       if (!currentGround.looted) log('There\'s something among the remains - press forage key to search them.', 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'deadbody') {
-      log(`Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
+      log(currentGround.adaptiveEventId==='early_descent'
+        ? `Fresh Skeletal Remains: ${currentGround.description || 'These bones are far fresher than the others.'}`
+        : `Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'stolenloot') {
       log(currentGround.gold > 0 ? 'A thief\'s bag of stolen gold. Press the forage key to recover the coins.' : 'A thief\'s abandoned bag. Press the forage key to recover your stolen item.', 'info')
@@ -9635,7 +9642,9 @@ more difficult:
     }
     const groundLabel = item => {
       if (item.kind === 'deadbody')
-        return `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
+        return item.adaptiveEventId==='early_descent'
+          ? `Fresh Skeletal Remains: ${item.description || 'These bones are far fresher than the others.'}`
+          : `Here lies ${item.name}, killed by ${item.killer || '???'}. Pay respects or retrieve what is left.`
       const label = groundLabels[item.kind]
       if (typeof label === 'function') return label(item)
       if (label) return label
@@ -12677,6 +12686,7 @@ more difficult:
   function groundItemLabel(g) {
     if (g.kind === 'droppeditem') return g.item
       ? (g.item.kind === 'artifact' ? g.item.noun || g.item.base || 'Artifact' : g.item.base || g.item.name || 'Item') : 'Dropped Item'
+    if (g.kind === 'deadbody' && g.adaptiveEventId === 'early_descent') return 'Fresh Skeletal Remains'
     return g.kind === 'stolenloot' ? 'Thief’s Bag' : g.kind === 'chest' ? 'Chest' : g.kind === 'skeleton' ? 'Skeletal Remains' : g.kind === 'playerremains' ? 'Your Remains' : g.kind === 'campfire' ? 'Abandoned Campfire' : g.kind === 'dwarvenstove' ? 'Dwarven Stove' : g.kind === 'deadbody' ? `dead ${g.race || '???'}` : (itemDefinition(g.kind)?.name || 'Item')
   }
 
@@ -12743,7 +12753,8 @@ more difficult:
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${(e.stolenItem || e.stolenGold > 0) ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
       ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
-      ${e.adaptiveEventId === 'reckless_fighter' ? `<div class="pfx" style="color:#9cddd7">Graceful · GRACE ${Math.round(enemyGrace(e) || 0)} · precise strikes</div>` : ''}
+      ${e.adaptiveEventId === 'reckless_fighter' ? e.prefix === 'Graceful' ? `<div class="pfx" style="color:#9cddd7">Graceful · GRACE ${Math.round(enemyGrace(e) || 0)} · precise strikes</div>` : '<div class="pfx" style="color:#e2a66e">Unpredictable · damage can vary from 25% to 175% of normal</div>' : ''}
+      ${AdaptivePlayerTrolling.forestBeastAgitated(e) ? '<div class="pfx" style="color:#dfac74">Agitated · +2 detection range in forests</div>' : ''}
       ${e.adaptiveEventId === 'low_hp_carrion' ? '<div class="pfx">Carrion hunter · tracks wounded prey across long distances</div>' : ''}
       ${e.adaptiveEventId === 'beast_hunter' ? '<div class="pfx">Beast Hunter · tracks you from afar, but can lose the trail</div>' : ''}
       ${e.adaptiveEventId === 'undead_shield_hunter' ? `<div class="pfx" style="color:#c4d7e3">Shield guard · ${e.shieldGuardBroken ? 'broken, vulnerable to arrows' : `${AdaptivePlayerTrolling.shieldHunterRemaining(e)} arrow hits until broken; melee and spells bypass`}</div>` : ''}
@@ -12833,7 +12844,9 @@ more difficult:
       if (g.kind === 'deadbody') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">dead ${g.race || '???'}</div>`
+        html: g.adaptiveEventId==='early_descent'
+          ? `<div class="nm">Fresh Skeletal Remains</div><div>${g.description || 'These bones are far fresher than the others.'}</div>`
+          : `<div class="nm">dead ${g.race || '???'}</div>`
       }
       if (g.kind === 'stolenloot') return {
         mini: true, enemy: null,

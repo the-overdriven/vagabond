@@ -947,6 +947,10 @@ describe('Dwarven Ruins encounter progression', () => {
             'ordinary adventurer gear remains unenchanted tier one in both outcomes')
           check(body.gold>=5 && body.gold<=25 && !body.looted,
             'the corpse is searchable and holds the configured gold range')
+          check(body.name==='Desperate Caver' && body.race==='skeletal explorer' &&
+            typeof body.description==='string' && body.description.length>30 &&
+            /bones|remains/i.test(body.description),
+            'fresh remains have one readable, seeded description variant')
           check(Math.abs(gear.x-body.x)+Math.abs(gear.y-body.y)===1,
             'ordinary tier-one equipment remains on the tile next to the corpse')
           if (scrollOutcome) {
@@ -974,6 +978,8 @@ describe('Dwarven Ruins encounter progression', () => {
             groundItems.filter(g=>g.adaptiveEventId==='early_descent').length===(scrollOutcome?3:2),
             're-entering the qualifying floor never duplicates loot or rerolls')
           const remains=groundItems.find(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
+          check(remains.description===body.description,
+            'the same descriptive variant survives save and replay')
           const startingGold=player.gold,startingInventory=player.inventory.length
           player.x=remains.x;player.y=remains.y
           lootSkeletonOrForage()
