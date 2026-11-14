@@ -1729,8 +1729,8 @@ more difficult:
       if (currentZ !== -2 || currentLevelKind() !== 'chain' || !dwarvenRuin) return false
       const fortMap = depthUndergroundMap(3)
       if (!fortMap) return false
-      // A vertical move changes z only. Old saves may have a shaft without
-      // its lower passage; carving that passage is deterministic and persistent.
+      // The lower endpoint must already be a safe, connected Fort floor.
+      // Never repair invalid geometry by excavating or teleporting on jump.
       if (!ensureDwarvenFortHoleLanding(player.x, player.y) ||
           !TILE[fortMap[player.y]?.[player.x]]?.walk ||
           enemies.some(e => e.alive && e.level === -3 &&
@@ -3275,6 +3275,7 @@ more difficult:
   let nextEnemyId = 1
 
   function enemyHasAbility(enemy, ability) {
+    if (ability === 'ethereal' && enemy?.adaptiveEventId === 'forest_spirit') return false
     return !(ability === 'fly' && enemy?.sleeping) && !!enemy?.abilities?.includes(ability)
   }
 
@@ -14630,7 +14631,9 @@ more difficult:
   function renderTrade() {
     const herbalist = serviceNpc && serviceNpc.name === 'Herbalist'
     const fisherman = serviceNpc && serviceNpc.name === FISHERMAN_NAME
-    document.getElementById('tradePanel').dataset.tradeMode = herbalist || fisherman ? 'services' : 'merchant'
+    const tradeMode = herbalist || fisherman ? 'services' : 'merchant'
+    document.getElementById('tradePanel').dataset.tradeMode = tradeMode
+    document.getElementById('tradeOverlay').dataset.tradeMode = tradeMode
     document.getElementById('tradeTitle').textContent = fisherman ? 'Services of the Fisherman Hermit' : herbalist ? 'Services of the Herbalist' : 'Trade with the Merchant'
     if (herbalist || fisherman) {
       const buyList = document.getElementById('tradeBuyList')

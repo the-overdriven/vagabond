@@ -3037,19 +3037,22 @@ uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
 part of the generic chain, while Crypt Level 2 entities are marked as `crypt2`,
 so enemies and items cannot appear or act on the wrong z:-2 map.
 
-Generic z:-2 caves have a **40% chance per world** of containing one reachable
-hole at least eight walking tiles from their ascent. Inspecting the hole opens
-an in-game confirmation before a **one-way jump** to z:-3. The player's
-**x/y coordinates never change**: a shaft at `(x,y,-2)` always lands at
-`(x,y,-3)`. The generator carves a walkable lower passage through unowned rock
-from that location to the Fort's accessible entrance hall, opening at most one
-wall of that hall. The passage is part of the existing shared z:-3 map, not a
-new floor, and does not bypass locked rooms. For an already-generated hole,
-the same deterministic connection can be established on first use; its carved
-terrain is saved normally. An occupied or obstructed landing prevents the jump.
-The player cannot climb back up the hole and must return to the surface through
-the fort gates. Both endpoints remain aligned under whole-world rotation and
-save/replay restoration.
+Generic z:-2 caves make a **40% per-world attempt** to place a reachable,
+one-way hole at least eight walking tiles from their ascent. A hole is allowed
+only where existing, connected **grotto floor on z:−2 lies directly over
+existing, gate-accessible marble floor inside the Dwarven Fort on z:−3**.
+Both layers use the same global X/Y position; no corridor, new chamber, Fort
+wall breach or other geometry is carved to force an intersection. When the
+cave and Fort do not overlap at a safe traversable location, the hole is
+omitted even if the 40% roll succeeds. Thus actual occurrence can be lower
+than 40%; Fort placement, locked rooms and cave geometry remain unchanged.
+Existing monsters, ground items and NPCs cannot occupy the initially chosen
+landing. Inspecting the hole opens an in-game confirmation before a one-way
+jump that changes **Z only**. A blocked or unsafe lower landing prevents the
+jump rather than moving the player somewhere else. The player cannot climb
+back up and must leave through the Fort gates. Generated topology and the
+shaft's endpoints persist through saves and replay and stay aligned under
+whole-world rotation.
 
 ## z:-3: Dwarven Fort
 
@@ -3057,10 +3060,10 @@ Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave. It is also D0, the entrance
 complex for the Dwarven Ruins.
 Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
-same coordinates. A one-way hole from a generic z:-2 cave may land at its own
-matching x/y coordinates on z:-3, connected to the accessible Fort entrance
-area by a narrow physical passage without creating a return shaft or unlocking
-doors.
+same coordinates. A one-way hole from a generic z:-2 grotto can land only on **pre-existing,
+gate-accessible Fort marble at precisely the hole's X/Y**. It neither creates
+a connecting passage nor changes the Fort's walls or doors. If no such safe
+intersection with the grotto exists, there is no hole in that world.
 A generated `dwarvenstairsdown` elsewhere on reachable fort marble begins the
 Ruins chain at z:-4. Generic `caveup` tiles still ascend to the preceding cave
 depth, including any encountered elsewhere on z:-3.
@@ -6180,11 +6183,14 @@ Inventory actions remain reachable without horizontal scrolling.
 Each row’s action group is **aligned to the right edge** of the inventory.
 Drop is the **leftmost action button** within that group. Buttons have even
 spacing; portable crystals use the same ordering.
-On touch screens, the trade panel fills the available height below the HUD,
-covering the bottom message log for more inventory space. The two stock lists
+On touch screens, **Merchant trading** fills the available height below the
+HUD and covers the bottom message log for more inventory space. Both item lists
 scroll independently, with no desktop 280px cap. The Close control stays fixed
-at the bottom of the viewport (above the device's safe-area inset); closing trade
-reveals the unchanged message log.
+at the bottom of the viewport (above the device's safe-area inset). Closing
+trade reveals the unchanged message log. The Herbalist and Fisherman Hermit
+**Services** use a shorter panel ending above the message log, which remains
+visible while using their services; their Close control stays immediately above
+that log. These layouts do not alter the trade or service rules.
 Merchant trading keeps the **For Sale** and **Your Items** columns visible side by
 side at every screen size. On desktop (widths above 720px), each column has its
 own independent category filters: All, Weapons, Shields, Armors, Supplies and
@@ -6199,12 +6205,13 @@ HUD rather than vertically centered. It fills the remaining desktop viewport
 height below the HUD, including on taller screens; each column's inventory list
 scrolls independently within that space while the title, category tabs and Close
 button remain visible. Category changes do not move or resize the trade panel.
-Touch-screen trade continues to occupy the available screen space below the HUD
-and cover the log. Only one tab per trade column can be highlighted at once;
+Touch-screen Merchant trading occupies the available space below the HUD and
+covers the log; service panels instead preserve the log below them. Only one tab
+per trade column can be highlighted at once;
 merchant and player filters never change each other's selection or the normal
 inventory tab selection. A category without stock displays an empty-state message.
-The Herbalist/Fisherman service views and mobile trade layout retain their two
-columns without category filters. Items previously sold by the character appear as
+The Herbalist/Fisherman service views retain their two columns without category
+filters. Items previously sold by the character appear as
 **↩️** buyback entries in the merchant's For sale list, including items with ordinary
 stock of the same kind. Player-sold stacks are kept separate from ordinary
 stock to identify only the actual buyback inventory. Existing buyback stock
@@ -11622,10 +11629,12 @@ individually; leaving forest ends it and killing the spirit calms the forest.
 Concealment and sanctuary still work normally. This makes hunting the spirit
 or avoiding its forests two different counterplays.
 
-The Forest Spirit is a **tier-four spectral undead** with **90 HP, 13 ATK,
-3 DEF, 5 SPD, 4 GRACE** and the existing **Ethereal** ability. It is not a
+The Forest Spirit is a **tier-four undead** with **90 HP, 13 ATK,
+3 DEF, 5 SPD and 4 GRACE**, without the Ethereal ability. It follows ordinary
+monster movement and collision rules, can be struck by mundane weapons and
+receives terrain-hazard effects according to the usual rules. It is not a
 natural spawn. Its green halo and distinct name identify it, including outside
-the forest. Its walking tile reuses Ghost artwork, but inspection and the
+the forest. Its walking tile uses Dreadling artwork, while inspection and the
 Bestiary use the dedicated Forest Spirit portrait. Its species identity is
 unchanged. At a distance it stalks with the shared **40% idle, 20% roaming,
 40% pathfinding** cadence configured for far wandering in

@@ -363,7 +363,28 @@ describe('Non-gear item catalog', () => {
       expect(Number(win.getComputedStyle(overlay).zIndex)).to.be.greaterThan(Number(win.getComputedStyle(log).zIndex))
       expect(Math.round(close.getBoundingClientRect().bottom)).to.be.closeTo(win.innerHeight, 1)
     })
-    cy.window().then(win => win.eval('toggleTrade(false)'))
+    // Services share the trade overlay, but must keep the mobile log readable.
+    for (const name of ['Herbalist', 'Fisherman Hermit']) {
+      cy.window().then(win => win.eval(`
+        toggleTrade(false)
+        serviceNpc = {name:${JSON.stringify(name)}}
+        toggleTrade(true)
+      `))
+      cy.get('#tradePanel').should('have.attr', 'data-trade-mode', 'services')
+      cy.get('#tradeOverlay').should('have.attr', 'data-trade-mode', 'services')
+      cy.window().then(win => {
+        if (!win.matchMedia('(pointer: coarse)').matches) return
+        const overlay = win.document.getElementById('tradeOverlay')
+        const log = win.document.getElementById('logpanel')
+        const close = overlay.querySelector('.closehint')
+        const logTop = log.getBoundingClientRect().top
+        expect(overlay.getBoundingClientRect().bottom, 'service panel ends above the log')
+          .to.be.closeTo(logTop, 2)
+        expect(close.getBoundingClientRect().bottom, 'service Close button remains above the log')
+          .to.be.closeTo(logTop, 2)
+      })
+    }
+    cy.window().then(win => win.eval('toggleTrade(false); serviceNpc = null'))
   })
 
   for (const width of [1440, 390]) {

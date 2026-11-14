@@ -30,7 +30,9 @@ describe('Adaptive Player Trolling', () => {
           '70 unique harvested tiles qualify even without loot')
         player.steps=500;AdaptivePlayerTrolling.onPlayerMoved()
         let spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
-        check(spirit && spirit.baseName==='Forest Spirit' && spirit.abilities.includes('ethereal') &&
+        check(spirit && spirit.baseName==='Forest Spirit' && !spirit.abilities.includes('ethereal') &&
+          !enemyHasAbility(spirit,'ethereal') &&
+          RENDER_STYLE.enemies.tiles['Forest Spirit'].image==='img/enemies-tiles/dreadling.png' &&
           spirit.hp===90 && !enemyIsVisibleOnMainView(spirit) && map[spirit.y][spirit.x]==='forest',
           'distinct Forest Spirit initially manifests in reachable unseen forest')
         const wolfTemplate=ENEMY_TEMPLATE_BY_NAME.Wolf
@@ -63,7 +65,7 @@ describe('Adaptive Player Trolling', () => {
         loadGameFromObject(saved,{isReplayInit:true})
         spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
         check(spirit && spirit.id===spiritId && !spirit.forestSpiritDormant &&
-          !spirit.aware && spirit.hp===hp,
+          !spirit.aware && spirit.hp===hp && !enemyHasAbility(spirit,'ethereal'),
           'nearby lost-trail spirit remains physically present after restore')
         // Successful escape: only after creating enough distance is it removed.
         player.x+=8;player.y+=8

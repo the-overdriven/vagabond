@@ -419,11 +419,10 @@ describe('Persistent Dwarven Ruins stratum', () => {
     })()`))
   })
 
-  it('creates a reachable one-way grotto hole with a cancellable warning and a safe fort-gate landing', () => {
+  it('places a grotto shaft only directly above accessible Fort marble', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const cfg=WORLD_GEN_CONFIG.caves.deep,originalChance=cfg.fortHoleChance
-      const originalConfirm=window.confirm
       try {
         cfg.fortHoleChance=1
         for (const seed of [17632,42618]) {
@@ -431,11 +430,12 @@ describe('Persistent Dwarven Ruins stratum', () => {
           currentZ=0;currentCave=-1;map=surfaceMap
           applyWorldTraits([]);WORLD_SEED=seed;rngState=seed
           await generateNewWorld()
-          const caveMap=deepLevels[0].map
+          const caveMap=deepLevels[0].map,fort=deepLevels[1]
           const holes=[]
           for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
             if(caveMap[y][x]==='dwarvenhole')holes.push({x,y})
-          check(holes.length===1,'forced chance produces one grotto hole for seed '+seed)
+          check(holes.length<=1,'at most one hole per world for seed '+seed)
+          if(!holes.length)continue // No natural grotto/Fort overlap is allowed to mean no shaft.
           const hole=holes[0],queue=[],seen=new Set()
           for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)if(caveMap[y][x]==='caveup'){
             queue.push({x,y});seen.add(keyXY(x,y))
@@ -445,29 +445,24 @@ describe('Persistent Dwarven Ruins stratum', () => {
             if(seen.has(k)||!TILE[caveMap[y]?.[x]]?.walk)continue
             seen.add(k);queue.push({x,y})
           }
-          check(seen.has(keyXY(hole.x,hole.y)),'hole reachable from normal cave ascent')
+          check(seen.has(keyXY(hole.x,hole.y)),'hole is reachable from a normal ascent')
           check(deepLevels[0].caveMaps.some(cm=>cm[hole.y]?.[hole.x]==='dwarvenhole'),
-            'hole is stamped into the cave map used for rendering')
-          currentZ=-2;currentCave=-1;map=caveMap
-          undergroundDiscovered=depthUndergroundDiscovered(2)
-          player.x=hole.x;player.y=hole.y
+            'hole is stamped in its real source cave')
+          check(fort.map[hole.y][hole.x]==='marble' &&
+            fort.caveMaps[dwarvenRuin.caveIndex][hole.y][hole.x]==='marble',
+            'shaft lands on original Fort floor at matching x/y')
+          const fortBefore=JSON.stringify(fort.map)
+          check(ensureDwarvenFortHoleLanding(hole.x,hole.y),
+            'Fort landing has a door-free passage to the gate')
+          check(JSON.stringify(fort.map)===fortBefore,
+            'landing verification never carves Fort floor or walls')
           const saved=JSON.parse(JSON.stringify(buildSaveObject()))
           loadGameFromObject(saved,{isReplayInit:true})
-          check(map[player.y][player.x]==='dwarvenhole','save restores hole and player position')
-          let prompts=0
-          window.confirm=message=>{prompts++;check(message.includes('ONE-WAY'),'jump warning is explicit');return false}
-          inspect()
-          check(prompts===1&&currentZ===-2,'cancel leaves player in cave')
-          window.confirm=()=>true
-          inspect()
-          check(currentZ===-3&&player.x===dwarvenRuin.x&&player.y===dwarvenRuin.y,
-            'confirmed jump lands on original fort gate, without skipping locked rooms')
-          check(map[player.y][player.x]==='dwarvenfortexit','fort gate remains usable')
-          inspect()
-          check(currentZ===0&&player.x===dwarvenRuin.x&&player.y===dwarvenRuin.y,
-            'player returns to surface via main fort gate')
+          check(deepLevels[0].map[hole.y][hole.x]==='dwarvenhole' &&
+            deepLevels[1].map[hole.y][hole.x]==='marble',
+            'save restores both endpoints without shifting x/y')
         }
-      } finally {cfg.fortHoleChance=originalChance;window.confirm=originalConfirm}
+      } finally {cfg.fortHoleChance=originalChance}
     })()`))
   })
 

@@ -22,17 +22,44 @@ describe('Dwarven Fort hole — continuous vertical coordinates', () => {
         for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
           if(deep.map[y][x]==='dwarvenhole')holes.push({x,y})
         if(!holes.length) {
+          // A seeded world need not have a natural grotto/Fort intersection.
+          // Build that intersection in this test fixture; the production
+          // generator itself must never carve a connecting corridor.
+          let site=null
+          for(let y=2;y<MAP_H-2&&!site;y++)for(let x=2;x<MAP_W-2;x++) {
+            if(ensureDwarvenFortHoleLanding(x,y) &&
+               !groundItems.some(g=>g.level===-3&&g.x===x&&g.y===y) &&
+               !enemies.some(e=>e.alive&&e.level===-3&&e.x===x&&e.y===y)) {
+              site={x,y};break
+            }
+          }
+          check(!!site && !!deep.caves[0] && !!deep.caveMaps[0],
+            'Fort has a clear real landing for the test fixture')
+          const ascent={x:site.x,y:site.y>10?site.y-9:site.y+9}
+          const dy=Math.sign(site.y-ascent.y)
+          for(let y=ascent.y;y!==site.y+dy;y+=dy) {
+            deep.map[y][site.x]='cavefloor2'
+            deep.caveMaps[0][y][site.x]='cavefloor2'
+          }
+          deep.map[ascent.y][ascent.x]='caveup'
+          deep.caveMaps[0][ascent.y][ascent.x]='caveup'
+          deep.caves[0].entrances.push(ascent)
+          const fortBefore=JSON.stringify(fort.map)
           chance=()=>true
           placeDwarvenFortHole()
           chance=oldChance
+          check(JSON.stringify(fort.map)===fortBefore,
+            'placing a hole never excavates the Fort')
           for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
             if(deep.map[y][x]==='dwarvenhole')holes.push({x,y})
         }
-        check(holes.length===1,'exactly one hole generated')
+        check(holes.length===1,'a valid overlap produces exactly one hole')
         const hole=holes[0]
-        check(TILE[fort.map[hole.y]?.[hole.x]]?.walk,'the matching fort landing is walkable')
-        check(ensureDwarvenFortHoleLanding(hole.x,hole.y),'passage remains connected after generation')
-        // The lower passage must physically lead to the Fort entrance.
+        check(fort.map[hole.y][hole.x]==='marble' &&
+          fort.caveMaps[dwarvenRuin.caveIndex][hole.y][hole.x]==='marble',
+          'landing is inside pre-existing Fort floor, not an added corridor')
+        check(ensureDwarvenFortHoleLanding(hole.x,hole.y),'landing remains gate-accessible')
+        // The original Fort corridors must physically lead to the gate.
         const seen=new Set([keyXY(hole.x,hole.y)]),queue=[hole]
         for(let i=0;i<queue.length;i++)for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
           const x=queue[i].x+dx,y=queue[i].y+dy,k=keyXY(x,y)
@@ -64,7 +91,7 @@ describe('Dwarven Fort hole — continuous vertical coordinates', () => {
         check(currentZ===-3 && player.x===hole.x && player.y===hole.y,
           'save restores the exact xyz position')
         check(TILE[deepLevels[1].map[hole.y]?.[hole.x]]?.walk,
-          'save restores carved fort landing')
+          'save restores the original Fort-floor landing')
         check(ensureDwarvenFortHoleLanding(hole.x,hole.y),'restored landing still reaches gate')
         // A blocked landing refuses the jump rather than relocating the hero.
         const blocker={alive:true,level:-3,levelKind:'chain',x:hole.x,y:hole.y}

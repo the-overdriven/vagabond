@@ -1141,83 +1141,40 @@ function generateCaves() {
   return !cryptInvalid
 }
 
-// A vertical shaft occupies the same world x/y on z:-2 and z:-3.
-// Its lower end must connect to the existing Fort rather than teleporting the
-// player to the distant gate. Carve only unowned rock on z:-3, plus one wall
-// directly outside the gate's already-accessible entrance hall.
+// A shaft can only land on a marble tile already belonging to the Fort.
+// Never excavate a corridor or breach a Fort wall to connect a distant cave.
+// Require a direct dry route from the existing gate, with no doors or locks.
 function ensureDwarvenFortHoleLanding(x, y) {
   const fort = deepLevels[1]
   const fortMap = fort?.map
   const fortCave = fort?.caveMaps?.[dwarvenRuin?.caveIndex]
-  if (!fortMap || !fortCave || !dwarvenRuin || !fortMap[y]?.[x]) return false
-  const dirs = [[0,-1],[1,0],[0,1],[-1,0]]
+  if (!fortMap || !fortCave || !dwarvenRuin ||
+      fortMap[y]?.[x] !== 'marble' || fortCave[y]?.[x] !== 'marble') return false
   const gate = {x:dwarvenRuin.x,y:dwarvenRuin.y}
   if (fortMap[gate.y]?.[gate.x] !== 'dwarvenfortexit') return false
-  const gateKey = keyXY(gate.x,gate.y)
-  const entrance = [gate], entranceDist = new Map([[gateKey,0]])
-  for (let i=0;i<entrance.length;i++) {
-    const p=entrance[i], distance=entranceDist.get(keyXY(p.x,p.y))
-    if (distance>=4) continue
+  const dirs = [[0,-1],[1,0],[0,1],[-1,0]]
+  const queue = [gate], seen = new Set([keyXY(gate.x,gate.y)])
+  for (let i=0;i<queue.length;i++) {
+    const p=queue[i]
     for (const [dx,dy] of dirs) {
-      const nx=p.x+dx,ny=p.y+dy,k=keyXY(nx,ny),tile=fortMap[ny]?.[nx]
-      if (entranceDist.has(k) || !['marble','dwarvenfortexit'].includes(tile)) continue
-      entranceDist.set(k,distance+1)
-      entrance.push({x:nx,y:ny})
+      const nx=p.x+dx,ny=p.y+dy,k=keyXY(nx,ny)
+      if (seen.has(k) || fortMap[ny]?.[nx] !== 'marble') continue
+      if (nx===x && ny===y) return true
+      seen.add(k);queue.push({x:nx,y:ny})
     }
   }
-  // An already carved passage (including a previous save/load) remains valid.
-  // Check its actual connection to the gate, not just proximity to the gate.
-  if (TILE[fortMap[y][x]]?.walk) {
-    const queue=[gate],seen=new Set([gateKey])
-    for(let i=0;i<queue.length;i++) {
-      const p=queue[i]
-      for(const [dx,dy] of dirs) {
-        const nx=p.x+dx,ny=p.y+dy,k=keyXY(nx,ny)
-        if(seen.has(k)||!TILE[fortMap[ny]?.[nx]]?.walk)continue
-        seen.add(k);queue.push({x:nx,y:ny})
-      }
-    }
-    return seen.has(keyXY(x,y))
-  }
-  if (fortMap[y][x] !== 'cavewall') return false
-  const targets = new Map()
-  for (const p of entrance) for (const [dx,dy] of dirs) {
-    const wx=p.x+dx,wy=p.y+dy,ox=wx+dx,oy=wy+dy
-    if (fortMap[wy]?.[wx] !== 'dwarvenwall' || fortMap[oy]?.[ox] !== 'cavewall') continue
-    targets.set(keyXY(ox,oy),{x:wx,y:wy})
-  }
-  if (!targets.size) return false
-  // BFS through cavewall only: never cut across Fort rooms, doors or locks.
-  const queue=[{x,y}], seen=new Set([keyXY(x,y)]), parents=new Map()
-  let exit=null
-  for(let i=0;i<queue.length;i++) {
-    const p=queue[i],k=keyXY(p.x,p.y)
-    if (targets.has(k)) { exit=k; break }
-    for(const [dx,dy] of dirs) {
-      const nx=p.x+dx,ny=p.y+dy,next=keyXY(nx,ny)
-      if(nx<1||ny<1||nx>=MAP_W-1||ny>=MAP_H-1 ||
-         seen.has(next)||fortMap[ny]?.[nx]!=='cavewall') continue
-      seen.add(next);parents.set(next,k);queue.push({x:nx,y:ny})
-    }
-  }
-  if (!exit) return false
-  const carve=(cx,cy)=>{fortMap[cy][cx]='marble';fortCave[cy][cx]='marble'}
-  const wall=targets.get(exit)
-  // The entrance-room wall is the only existing Fort wall broken.
-  carve(wall.x,wall.y)
-  for(let k=exit;k;k=parents.get(k)) {
-    const [cx,cy]=k.split(',').map(Number)
-    carve(cx,cy)
-  }
-  return true
+  return false
 }
 
-// The hole itself lives in the existing z:-2 grotto. Its corresponding z:-3
-// landing is an actual Fort-connected passage at exactly the same coordinates.
+// The hole lives on reachable z:-2 grotto floor directly over an existing,
+// gate-accessible Fort floor tile on z:-3; neither level is excavated to fit.
 function placeDwarvenFortHole() {
   const deep=deepLevels[0]
+  const fort=deepLevels[1]
   const cfg=WORLD_GEN_CONFIG.caves.deep
-  if (!deep?.map || !dwarvenRuin || !chance(cfg.fortHoleChance)) return
+  if (!deep?.map || !fort?.map || !dwarvenRuin || !chance(cfg.fortHoleChance)) return
+  const fortCave=fort.caveMaps?.[dwarvenRuin.caveIndex]
+  if (!fortCave) return
   const queue=[],distances=new Map()
   for(const cave of deep.caves||[])for(const p of cave.entrances||[]) {
     if(deep.map[p.y]?.[p.x]!=='caveup') continue
@@ -1237,14 +1194,16 @@ function placeDwarvenFortHole() {
   for(const [k,distance] of distances) {
     if(distance<cfg.fortHoleMinStairDistance)continue
     const [x,y]=k.split(',').map(Number)
-    if(deep.map[y][x]!=='cavefloor2')continue
-    if(groundItems.some(g=>g.level===-2&&g.x===x&&g.y===y)||
-       enemies.some(e=>e.alive&&(e.level===-2||e.level===-3)&&e.x===x&&e.y===y))continue
+    if(deep.map[y][x]!=='cavefloor2' || fort.map[y]?.[x]!=='marble' ||
+       fortCave[y]?.[x]!=='marble')continue
+    if(groundItems.some(g=>(g.level===-2||g.level===-3)&&g.x===x&&g.y===y)||
+       enemies.some(e=>e.alive&&(e.level===-2||e.level===-3)&&e.x===x&&e.y===y)||
+       npcs.some(n=>n.x===x&&n.y===y&&(n.level===-2||n.level===-3)))continue
     if(!deep.caveMaps.some(cm=>cm[y]?.[x]==='cavefloor2'))continue
     spots.push({x,y})
   }
-  // Favor shorter physical connecting passages below, without changing the
-  // feature's configured per-world chance or adding a new dungeon map.
+  // Prefer the gate-side interior when several natural vertical intersections
+  // exist. No candidate can create a new corridor or bypass a locked room.
   spots.sort((a,b)=>Math.abs(a.x-dwarvenRuin.x)+Math.abs(a.y-dwarvenRuin.y)-
     Math.abs(b.x-dwarvenRuin.x)-Math.abs(b.y-dwarvenRuin.y))
   const first=spots.length?randInt(0,Math.min(9,spots.length-1)):-1

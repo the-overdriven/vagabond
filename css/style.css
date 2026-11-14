@@ -2028,9 +2028,20 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     width: 100%;
   }
 
-  /* Trade takes priority over the mobile log, but stays below the HUD. */
+  /* Only merchant trading covers the log. Service interactions leave the
+     fixed message log visible below their panel and Close button. */
   #tradeOverlay {
     z-index: 120;
+  }
+
+  #tradeOverlay[data-trade-mode="services"] {
+    bottom: var(--mobile-log-height, 120px);
+    height: calc(100dvh - var(--mobile-hud-height, 56px) - var(--mobile-log-height, 120px));
+    min-height: 0;
+  }
+
+  #tradeOverlay[data-trade-mode="services"] .closehint {
+    bottom: var(--mobile-log-height, 120px);
   }
 
   #tradeOverlay .panelbox {
