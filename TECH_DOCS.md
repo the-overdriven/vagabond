@@ -206,9 +206,24 @@ On the **first entry to z:-5 in the Dwarven Ruins**, one extra ordinary
 monster of a species absent from that character's kill record appears in a
 reachable but distant area. Candidate species must be active combatants, tier
 1–4, available outside the Mines, and neither event-only nor exceptionally
-rare (rarity weight 0.1 or below, or the ultra-rare flag). It avoids occupied
-positions, traps, and stair landings; a species is chosen with the world's
-seeded RNG. The character gets only one such opportunity: if no unknown
+rare (rarity weight 0.1 or below, or the ultra-rare flag). **Flying species
+(those with the `fly` ability) are excluded**, including flying humanoids.
+
+The game's seeded RNG first chooses a **tier**, then chooses uniformly from the
+eligible un-killed species *inside that tier*:
+
+| Tier | Weight if all tiers have eligible species |
+|---|---:|
+| 3 | **40%** |
+| 2 | **30%** |
+| 4 | **20%** |
+| 1 | **10%** |
+
+If one or more tiers have no eligible species, remaining weights are
+renormalized. For example, with only tiers 2 and 3 available, their respective
+odds are 3/7 and 4/7. Species quantity within a tier does not affect its tier's
+chance of selection. The encounter avoids occupied positions, traps and stair
+landings. The character gets only one such opportunity: if no unknown
 qualifying species or safe location exists, nothing appears. The resolved
 state persists in current saves and replay; changing floors cannot reroll it.
 

@@ -1,5 +1,5 @@
 describe('Dwarven Ruins encounter progression', () => {
-  it('spawns one as-yet-unbeaten non-mine species on the first visit to z:-5 and never repeats it', () => {
+  it('spawns an un-killed grounded species on z:-5, with tier-weighted odds, only once', () => {
     cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
       win.__z5Save = save
       win.eval('loadGameFromObject(window.__z5Save,{isReplayInit:true})')
@@ -36,6 +36,37 @@ describe('Dwarven Ruins encounter progression', () => {
           spawnUnseenBestiaryEncounter()
           check(enemies.length===countBefore&&rngState===rngBefore&&
             player.bestiaryZ5EncounterResolved,'no eligible species consumes no RNG and remains resolved')
+
+          // All airborne species stay outside this special encounter, even if
+          // their individual kill counters are zero.
+          player.killsBySpecies=Object.fromEntries(ENEMY_TEMPLATES.map(t=>[t.name,0]))
+          const eligible=unseenBestiaryCandidates()
+          check(ENEMY_TEMPLATES.some(t=>(t.abilities||[]).includes('fly')) &&
+            eligible.length>0 && eligible.every(t=>!(t.abilities||[]).includes('fly')),
+            'the source pool excludes every flying species')
+          check(eligible.every(t=>t.tier>=1&&t.tier<=4), 'eligible tiers 1–4 only')
+          check(pickUnseenBestiarySpecies([])===null && rngState===rngBefore,
+            'empty tier selection consumes no random numbers')
+
+          // Draw from a deliberately uneven set of species to assert weights
+          // belong to tiers, not to the number of species within each tier.
+          const mock=[{tier:1,name:'one'}, {tier:2,name:'two'},
+            {tier:3,name:'three-a'}, {tier:3,name:'three-b'},
+            {tier:3,name:'three-c'}, {tier:4,name:'four'}]
+          const tally={1:0,2:0,3:0,4:0}
+          for(let i=0;i<5000;i++) tally[pickUnseenBestiarySpecies(mock).tier]++
+          for(const [tier, expected] of [[1,0.1],[2,0.3],[3,0.4],[4,0.2]])
+            check(Math.abs(tally[tier]/5000-expected)<0.035,
+              'tier '+tier+' follows its 10/30/40/20 weight')
+          // Only available tiers participate; their weights renormalize.
+          const available=mock.filter(t=>t.tier===2||t.tier===3)
+          const tallied={2:0,3:0}
+          for(let i=0;i<4000;i++) tallied[pickUnseenBestiarySpecies(available).tier]++
+          check(Math.abs(tallied[3]/4000-4/7)<0.035 &&
+            Math.abs(tallied[2]/4000-3/7)<0.035,
+            'missing tier 1 and 4 weights redistribute proportionally')
+          check(pickUnseenBestiarySpecies([{tier:4,name:'only'}]).tier===4,
+            'a single surviving tier can still spawn')
         } finally { loadGameFromObject(original,{isReplayInit:true}) }
       })()`)
     }))

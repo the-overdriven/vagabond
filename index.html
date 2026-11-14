@@ -1585,6 +1585,27 @@ more difficult:
     return false
   }
 
+  // A tier-first weighted draw keeps the depth-appropriate distribution stable
+  // even when some tiers contain many more untried species than others.
+  // Missing tiers automatically lose their weight; the others renormalize.
+  const UNSEEN_BESTIARY_TIER_WEIGHTS = {1:1, 2:3, 3:4, 4:2}
+
+  function unseenBestiaryCandidates() {
+    return ENEMY_TEMPLATES.filter(t =>
+      t.tier >= 1 && t.tier <= 4 && (t.aggro ?? AGGRO_RANGE) > 0 &&
+      t.adaptiveOnly !== true && t.ultraRare !== true && (t.rarity ?? 1) > 0.1 &&
+      !(player.killsBySpecies?.[t.name] > 0) &&
+      Array.isArray(t.biomes) && t.biomes.some(b => !/^z-\d+$/.test(b) && b !== 'adaptive-only') &&
+      !(t.abilities || []).includes('swimOnly') && !(t.abilities || []).includes('fly'))
+  }
+
+  function pickUnseenBestiarySpecies(candidates) {
+    const availableTiers = [1,2,3,4].filter(tier => candidates.some(t => t.tier === tier))
+    if (!availableTiers.length) return null
+    const tier = pickWeighted(availableTiers, value => UNSEEN_BESTIARY_TIER_WEIGHTS[value])
+    return pick(candidates.filter(t => t.tier === tier))
+  }
+
   // The first entry into z:-5 may introduce a species the current character
   // has never slain. It is a one-time encounter, not a repeatable farming route.
   // Resolution happens on the authoritative floor transition, never in rendering.
@@ -1593,12 +1614,7 @@ more difficult:
     player.bestiaryZ5EncounterResolved = true
     const level = deepLevels[chainDepthForZ(-5) - 2]
     if (level?.dungeonPackage !== 'dwarvenRuins') return
-    const candidates = ENEMY_TEMPLATES.filter(t =>
-      t.tier >= 1 && t.tier <= 4 && (t.aggro ?? AGGRO_RANGE) > 0 &&
-      t.adaptiveOnly !== true && t.ultraRare !== true && (t.rarity ?? 1) > 0.1 &&
-      !(player.killsBySpecies?.[t.name] > 0) &&
-      Array.isArray(t.biomes) && t.biomes.some(b => !/^z-\d+$/.test(b) && b !== 'adaptive-only') &&
-      !(t.abilities || []).includes('swimOnly'))
+    const candidates = unseenBestiaryCandidates()
     // If the Bestiary has no eligible unknown species, nothing is summoned.
     if (!candidates.length) return
     const reachable = dungeonWalkDistances(map, player)
@@ -1617,7 +1633,7 @@ more difficult:
       sites.push({x, y})
     }
     if (!sites.length) return
-    const tmpl = pick(candidates), spot = pick(sites)
+    const tmpl = pickUnseenBestiarySpecies(candidates), spot = pick(sites)
     const enemy = {name:tmpl.name, baseName:tmpl.name, tier:tmpl.tier,
       level:-5, levelKind:'chain', caveIndex:-1, dungeonPackage:'dwarvenRuins',
       hp:tmpl.hp, maxHp:tmpl.hp, atk:tmpl.atk, def:tmpl.def, spd:tmpl.spd,
