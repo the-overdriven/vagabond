@@ -9066,6 +9066,12 @@ more difficult:
         return
       }
       const next = autoPath.shift()
+      // Terrain might have changed after planning. Never auto-strike a new
+      // boulder on the next step; only explicit manual movement can mine it.
+      if (next && map[next.y]?.[next.x] === 'boulder') {
+        clearAutoPath()
+        return
+      }
       if (!next || Math.abs(next.x - player.x) > 1 || Math.abs(next.y - player.y) > 1 || (next.x === player.x && next.y === player.y)) {
         clearAutoPath()
         return
@@ -9092,6 +9098,9 @@ more difficult:
   }
 
   function playerPathCanTraverse(x, y) {
+    // A boulder is a deliberate mining interaction, never a travel shortcut.
+    // Keep it blocked with a Pickaxe and even when God Mode permits manual entry.
+    if (map[y]?.[x] === 'boulder') return false
     if (DungeonTraps.isTrigger(map[y]?.[x]) || DungeonHazards.knownDanger(x,y)) return false
     if (Mining.blocksPathAt(x, y)) return false
     if (isWalkableForPlayer(x, y) || isClosedDungeonDoorTile(map[y]?.[x])) return true
@@ -10774,44 +10783,30 @@ more difficult:
     return Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0]
   }
 
-  let diagonalRiverCanvasCache = new WeakMap()
-
   function drawDiagonalRiverChannel(px, py, visual) {
     const waterImage = resolveVisualImage(visual)
     if (!waterImage) return false
-    let variants = diagonalRiverCanvasCache.get(waterImage)
-    if (!variants) {variants = new Map(); diagonalRiverCanvasCache.set(waterImage, variants)}
-    const key = TILE_PX + '|' + visual.diagonalRiverArms
-    let image = variants.get(key)
-    if (!image) {
-      const size = TILE_PX, half = size / 2
-      const mask = document.createElement('canvas')
-      mask.width = mask.height = size
-      const mctx = mask.getContext('2d')
-      mctx.imageSmoothingEnabled = false
-      // A constant-width channel with rounded ends replaces the old clipped
-      // half-mask, whose endpoints looked like diamonds on snow.
-      mctx.strokeStyle = '#fff'
-      mctx.lineWidth = size * 0.56
-      mctx.lineCap = 'round'
-      mctx.lineJoin = 'round'
-      for (const [bit, x, y] of [[1,0,0],[2,size,0],[4,size,size],[8,0,size]]) {
-        if (!(visual.diagonalRiverArms & bit)) continue
-        mctx.beginPath()
-        mctx.moveTo(half, half)
-        mctx.lineTo(x, y)
-        mctx.stroke()
-      }
-      image = document.createElement('canvas')
-      image.width = image.height = size
-      const ictx = image.getContext('2d')
-      ictx.imageSmoothingEnabled = false
-      ictx.drawImage(scaledVisualCanvas(waterImage, visual.scale ?? 1), 0, 0)
-      ictx.globalCompositeOperation = 'destination-in'
-      ictx.drawImage(mask, 0, 0)
-      variants.set(key, image)
+    const size = TILE_PX, half = size / 2, radius = size * 0.28
+    // Clip the animated river directly to the connected channel. An offscreen
+    // destination-in mask can leave only its land-corner fillers visible.
+    ctx.save()
+    ctx.translate(px, py)
+    ctx.beginPath()
+    for (const [bit, x, y] of [[1,0,0],[2,size,0],[4,size,size],[8,0,size]]) {
+      if (!(visual.diagonalRiverArms & bit)) continue
+      const len = Math.hypot(x - half, y - half)
+      const nx = -(y - half) / len * radius, ny = (x - half) / len * radius
+      const angle = Math.atan2(ny, nx)
+      ctx.moveTo(half + nx, half + ny)
+      ctx.lineTo(x + nx, y + ny)
+      ctx.arc(x, y, radius, angle, angle - Math.PI, true)
+      ctx.lineTo(half - nx, half - ny)
+      ctx.arc(half, half, radius, angle - Math.PI, angle - 2 * Math.PI, true)
+      ctx.closePath()
     }
-    ctx.drawImage(image, px, py)
+    ctx.clip()
+    ctx.drawImage(scaledVisualCanvas(waterImage, visual.scale ?? 1), 0, 0)
+    ctx.restore()
     return true
   }
 
@@ -13707,7 +13702,10 @@ more difficult:
       if (equippedShortBow()) shootEnemy(e)
       return
     }
-    if (Math.max(Math.abs(mx - player.x), Math.abs(my - player.y)) === 1 &&
+    // Clicks/taps request travel, not mining a surface boulder. Keyboard and
+    // direction-pad movement still explicitly mine it as before.
+    if (map[my]?.[mx] !== 'boulder' &&
+      Math.max(Math.abs(mx - player.x), Math.abs(my - player.y)) === 1 &&
       (currentZ === 0 || undergroundTileVisible(mx, my)) && Mining.canTarget(mx, my)) {
       clearAutoPath()
       void tryMove(mx - player.x, my - player.y)

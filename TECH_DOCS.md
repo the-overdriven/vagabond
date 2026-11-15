@@ -677,7 +677,7 @@ The character sheet displays Swimming as **Unknown**, its numeric value, or
 
 Mining is a **0–100** numerical skill that improves through extracting minerals
 and opening mineable stone. A carried Pickaxe is required, but does not need to be
-equipped. Attempting to move into an adjacent cracked wall, a crystal formation,
+equipped. Attempting to move manually into an adjacent cracked wall, a crystal formation,
 or an overworld boulder initiates mining; all eight directions work. Mining
 cannot be performed while standing in deep water or an unfrozen river, regardless
 of race or God Mode. A blocked attempt displays a message without consuming a
@@ -826,6 +826,12 @@ the map, while pinching zooms; neither starts travel, even on mobile.
 Map travel follows the existing rules for hazards, enemies, interactions,
 manual movement, and interruptions. It uses deterministic breadth-first
 pathfinding and does not add saved or replay state.
+
+Surface boulders are never eligible destinations or intermediate steps for
+automatic travel, whether the player has a Pickaxe or is using God Mode.
+On-screen clicks and taps also do not mine an adjacent boulder; only explicit
+manual directional movement initiates mining (§6). If a boulder appears on an
+already planned route, auto-travel stops before striking it without using a turn.
 
 Auto-pathing accounts for normal walkable terrain and Swimming. For ordinary
 characters, a path can contain no more than the current Swimming skill's number
@@ -9429,7 +9435,8 @@ through a missing ground layer.
 
 A river's actual map tiles never change just to improve its appearance.
 Directly adjacent river/water tiles have no shoreline between them. Isolated
-diagonal river segments use a constant-width channel (56% of a tile) with
+diagonal river segments clip their animated texture directly into a
+constant-width channel (56% of a tile) with
 rounded ends, filled with their existing animated frames. Where a diagonal
 segment meets a cardinal river or lake, the matching arm is restored over the
 shoreline. Small triangular water overlaps on the two neighboring land-cell

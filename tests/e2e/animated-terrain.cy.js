@@ -170,9 +170,35 @@ describe('Animated terrain rendering', () => {
           currentZ = -1
           const underground = terrainVisual('water', x, y)
           const undergroundNoShore = !underground.overlayImages?.length
+
+          // A real saved frozen-river zigzag must paint water, not only the
+          // blue corner wedges. Reproduced from world seed -528562047.
+          currentZ = 0
+          reset('snow')
+          for (const [dx, dy] of [[2,-3],[1,-2],[1,-1],[0,0],[-1,1],[-1,2],[-1,3]])
+            cell(dx,dy,'frozenriver')
+          const turns = terrainVisual('frozenriver', x, y)
+          const frozenZigzag = turns.diagonalRiverArms === 10 && turns.baseTileKey === 'snow' &&
+            terrainVisual('frozenriver', x+1, y-2).diagonalRiverJoinArms === 2
+          const oldCenter = ctx.getImageData(0,0,TILE_PX,TILE_PX)
+          const oldTime = visualFrameTime
+          let frozenChannelPainted = false
+          try {
+            visualFrameTime = 0
+            drawTerrainVisualStack(0,0,'frozenriver',x,y,turns,TILE.frozenriver.bg)
+            const cx = Math.floor(TILE_PX/2), cy = Math.floor(TILE_PX/2)
+            const visible = ctx.getImageData(cx,cy,1,1).data
+            const source = scaledVisualCanvas(resolveVisualImage(ground.frozenriver),1)
+              .getContext('2d').getImageData(cx,cy,1,1).data
+            frozenChannelPainted = visible.every((value,i) => value === source[i])
+          } finally {
+            visualFrameTime = oldTime
+            ctx.putImageData(oldCenter,0,0)
+          }
           return {sandBasePreserved,sandBlend,snowBasePreserved,snowBlend,riverBasePreserved,riverDiagonalArms,riverGround,
             riverHasNoTransparentMain,cornerUsesOneRotatedSprite,undergroundNoShore,
-            mixedJoin,lakeJoin,frozenJoin,ordinaryCorner,landBridge,landBridgePixels,frozenGround,opaqueGround,sharedShoreBiomes,noWhiteCornerPatch}
+            mixedJoin,lakeJoin,frozenJoin,ordinaryCorner,landBridge,landBridgePixels,frozenGround,opaqueGround,sharedShoreBiomes,noWhiteCornerPatch,
+            frozenZigzag,frozenChannelPainted}
         } finally {
           map = originalMap
           tileUnderlays = originalUnderlays
@@ -199,6 +225,8 @@ describe('Animated terrain rendering', () => {
       expect(result.opaqueGround).to.equal(true)
       expect(result.sharedShoreBiomes).to.equal(true)
       expect(result.noWhiteCornerPatch).to.equal(true)
+      expect(result.frozenZigzag).to.equal(true)
+      expect(result.frozenChannelPainted).to.equal(true)
     })
   })
 

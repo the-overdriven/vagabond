@@ -21,7 +21,7 @@ describe('Swimming-aware auto-pathing', () => {
       const check = (ok, message) => {if (!ok) throw Error(message)}
       const previous = {map, discovered, currentZ, enemies, npcs, occupied,
         x: player.x, y: player.y, race: player.race, swimming: player.swimming,
-        swimTurns: player.swimTurns, godMode: player.godMode, autoPath,
+        swimTurns: player.swimTurns, godMode: player.godMode, inventory: player.inventory.slice(), autoPath,
         autoPathTargetEnemy, surfaceCatchupBusy}
       const startingRng = rngState
       const testMap = () => {
@@ -117,13 +117,37 @@ describe('Swimming-aware auto-pathing', () => {
         put(51, 50, 'grass')
         check(findPlayerPath(51, 50, true)?.length === 1,
           'a drowning swimmer may always auto-path directly onto adjacent shore')
+
+        // Surface boulders are mining targets for manual movement only.
+        // A carried Pickaxe and God Mode must not turn them into auto-routes.
+        testMap()
+        row(53, [])
+        put(51, 50, 'boulder')
+        put(51, 49, 'grass'); put(52, 49, 'grass')
+        player.inventory.push({kind: 'pickaxe'})
+        check(!playerPathCanTraverse(51, 50) && findPlayerPath(51, 50, true) === null,
+          'Pickaxe never makes a boulder an auto-path destination')
+        path = findPlayerPath(53, 50, true)
+        check(path?.length >= 3 && path.some(step => step.y === 49) &&
+          path.every(step => map[step.y][step.x] !== 'boulder'),
+          'auto-path takes the open detour around a boulder')
+        player.godMode = true
+        check(!playerPathCanTraverse(51, 50) && findPlayerPath(51, 50, true) === null,
+          'God Mode also refuses automatic travel into boulders')
+        player.godMode = false
+        const stepsBefore = turnCount, miningBefore = JSON.stringify(miningSurfaceProgress)
+        autoPath = [{x:51,y:50}, {x:52,y:50}]
+        flushPendingMove()
+        check(autoPath === null && player.x === 50 && player.y === 50 &&
+          turnCount === stepsBefore && JSON.stringify(miningSurfaceProgress) === miningBefore,
+          'outdated auto-path cancels before mining a newly blocked step')
         check(rngState === startingRng, 'planning routes consumes no gameplay RNG')
       } finally {
         ({map, discovered, currentZ, enemies, npcs, occupied,
           surfaceCatchupBusy} = previous)
         player.x = previous.x; player.y = previous.y; player.race = previous.race
         player.swimming = previous.swimming; player.swimTurns = previous.swimTurns
-        player.godMode = previous.godMode
+        player.godMode = previous.godMode; player.inventory = previous.inventory
         autoPath = previous.autoPath; autoPathTargetEnemy = previous.autoPathTargetEnemy
         render()
       }

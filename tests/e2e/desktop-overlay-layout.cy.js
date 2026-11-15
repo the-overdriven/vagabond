@@ -165,8 +165,20 @@ describe('Desktop overlay layout', () => {
       canvas.dispatchEvent(new win.MouseEvent('click', {bubbles:true,button:0,clientX:start.clientX+20,clientY:start.clientY+10}))
       expect(win.eval('mapOpen')).to.equal(true)
       expect(win.eval('autoPath')).to.equal(null)
+      // A boulder cannot become an automatic route or a mining action just
+      // because the player carries a Pickaxe, including with God Mode active.
+      win.eval(`
+        for(let y=96;y<=104;y++)discovered[y][101]=true
+        map[100][101]='boulder';player.inventory.push({kind:'pickaxe'})
+        player.godMode=true;renderMinimap()
+      `)
+      const miningBefore = win.eval('JSON.stringify(miningSurfaceProgress)')
+      clickTile(win, 101, 100)
+      expect(win.eval('mapOpen'), 'boulder click does not close map').to.equal(true)
+      expect(win.eval('autoPath'), 'boulder click does not create a route').to.equal(null)
+      expect(win.eval('JSON.stringify(miningSurfaceProgress)')).to.equal(miningBefore)
       // Restore the known corridor and click through the CSS-scaled canvas.
-      win.eval(`for(let y=96;y<=104;y++)discovered[y][101]=true;renderMinimap()`)
+      win.eval(`map[100][101]='grass';player.godMode=false;renderMinimap()`)
       // Coordinate hit testing requires an open map; a successful travel click closes it.
       const destPoint = win.eval(`(() => {
         const targetX=103, targetY=100
@@ -527,6 +539,13 @@ describe('Desktop overlay layout', () => {
       // A new touch resets drag suppression. It resolves the destination
       // through the same zoom/pan transform as a desktop click.
       win.eval('mapPanX=105;mapPanY=104;renderMinimap()')
+      mini.dispatchEvent(touchEvent('touchstart',[start],[start]))
+      mini.dispatchEvent(touchEvent('touchend',[],[start]))
+      win.eval(`map[100][102]='boulder';player.inventory.push({kind:'pickaxe'});renderMinimap()`)
+      mini.dispatchEvent(new win.MouseEvent('click',{bubbles:true,button:0,clientX:start.clientX,clientY:start.clientY}))
+      expect(win.eval('mapOpen'), 'mobile map ignores boulders').to.equal(true)
+      expect(win.eval('autoPath')).to.equal(null)
+      win.eval(`map[100][102]='grass';renderMinimap()`)
       mini.dispatchEvent(touchEvent('touchstart',[start],[start]))
       mini.dispatchEvent(touchEvent('touchend',[],[start]))
       mini.dispatchEvent(new win.MouseEvent('click',{bubbles:true,button:0,clientX:start.clientX,clientY:start.clientY}))
