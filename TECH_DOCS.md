@@ -8037,7 +8037,7 @@ Gossip and Services; the Drunk offers Talk and Gossip. The Old Hunter
 offers Talk, ancient-forest lore and a separate hunt action. The Fisherman
 Hermit offers Talk, the Empty Nets quest, a swimming-lesson reminder while
 training is pending, and fish purchases after turn-in. The Gravedigger offers
-Talk and a separate tombstone return when the item is held; the Ancient Lich
+Talk, Gossip and a separate tombstone return when the item is held; the Ancient Lich
 offers an additional Black Key topic when equipped. Quest labels reflect
 whether work can be taken, reviewed or turned in; a ready reward gets a visible
 `!` in the menu. Accepting work or claiming rewards requires selecting the
@@ -8479,6 +8479,13 @@ starting snapshots.
   <summary>Details</summary>
 
 The Gravedigger is associated with the cemetery mystery.
+
+His separate Gossip topic always offers a rumor about the Stone Tower, without
+revealing its exact location on the map. It uses the existing eight-point
+compass to describe the bearing from the Gravedigger's current position to the
+Tower entrance. The word `far` appears only when the eight-direction (Chebyshev)
+tile distance to the nearest Tower footprint square is **greater than 80**. The clue
+is derived from the generated world and uses no random roll or persistent flag.
 
 The anomalous tombstone can trigger a special quest interaction.
 

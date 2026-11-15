@@ -24,7 +24,10 @@
         "Who keeps checking an empty grave?"
       ],
       "free": false,
-      "portrait": "grave_digger"
+      "portrait": "grave_digger",
+      "towerGossip": {
+        "line": "There is an old stone tower {far} to the {direction}. I stopped saving graves for those who went looking. Waste of good earth."
+      }
     },
     {
       "name": "Drunk",

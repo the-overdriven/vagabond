@@ -8757,6 +8757,7 @@ more difficult:
     }
     if (npc.name === 'Gravedigger') return [
       {id:'talk',label:'Talk'},
+      {id:'gossip',label:'Gossip'},
       ...(player.inventory.some(item => item.kind === 'oddTombstone')
         ? [{id:'return',label:'Return the strange tombstone',ready:true}] : [])]
     if (npc.name === 'Drunk') return [{id:'talk',label:'Talk'},{id:'gossip',label:'Hear gossip'}]
@@ -8872,6 +8873,13 @@ more difficult:
     return true
   }
 
+  function gravediggerTowerRumor(npc) {
+    const line = NPC_TEMPLATES.find(template => template.name === 'Gravedigger').towerGossip.line
+    const bearing = trackDirection(tower.entrance.x - npc.x, tower.entrance.y - npc.y)
+    return line.replace(' {far}', towerDistance(npc.x, npc.y) > 80 ? ' far' : '')
+      .replace('{direction}', TRACK_DIRECTIONS[bearing])
+  }
+
   function interactNpcTopic(npc, topic, record = true) {
     if (!npc || currentZ !== 0 || !npcs.includes(npc) ||
         Math.max(Math.abs(npc.x - player.x), Math.abs(npc.y - player.y)) > 1 ||
@@ -8889,6 +8897,8 @@ more difficult:
       } else if (!tryMerchantFortHint(npc)) {
         log('Merchant says: Travelers bring more than goods. Tales of lost treasures, forgotten places, and fortunes waiting to be found. Most are lies, of course. But not all of them.', 'info')
       }
+    } else if (npc.name === 'Gravedigger' && topic === 'gossip') {
+      log(`Gravedigger says: ${gravediggerTowerRumor(npc)}`, 'info')
     } else if (npc.name === 'Herbalist' && topic === 'talk' && gifted) {
       // The first gift is her greeting; a second line would immediately hide it in the panel.
     } else if (npc.name === 'Herbalist' && topic === 'gossip') {
