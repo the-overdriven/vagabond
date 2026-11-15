@@ -96,20 +96,21 @@ stats entirely, without reserving their space. On desktop the remaining
 Save/Load and other HUD actions occupy a compact bar at the upper right;
 on touch layouts they keep the normal tap-sized header. The full centered
 HUD returns during play. Race cards still explain each race's gameplay bonuses.
-On desktop, the selection overlay displays one of four terrain-only captures
-from Vagabond's surface generator and original tile renderer, with a continuous
-CSS drift. They are captured offline without the player, monsters, dropped items
-or HUD and shipped as static WebP assets, cycled on successive openings of the
-selection screen (also across page reloads when browser storage is available).
+On desktop, the selection overlay cycles through eight static 1920×1080 WebP
+panoramas captured offline from Vagabond's surface world generation and tile
+renderer. The images show terrain blending, biomes, trees, and small creatures;
+some scenes use arranged creatures for composition, while others show only
+monsters in their naturally generated spawn positions. Neither the player nor
+the gameplay HUD, messages, or pointer are visible. The backdrops drift slowly
+through CSS and advance on successive race-selection openings, including after
+page reloads when browser storage is available. These visual-only assets never
+advance gameplay RNG, change world geometry, or affect replay or saving.
 No preview world is generated at runtime: world generation happens only after
-confirming **Begin your journey**. All four static WebPs are explicitly
-precached by the service worker; on desktop, their URLs are also loaded and
-decoded in parallel with essential game images while `Loading...` is still
-visible. The startup overlay disappears only after this preload finishes and
-a frame has been painted, preventing the initial black backdrop flash.
-The worker serves the precache copy immediately on subsequent visits and
-revalidates images in the background. On mobile/touch layouts the backdrop
-remains the original static dark background; the desktop preload is skipped.
+confirming **Begin your journey**. All eight WebPs are precached by the service
+worker and preloaded and decoded on desktop during `Loading...` before the
+selection appears, avoiding a black flash on first display; subsequent visits
+can use the cache. On mobile/touch layouts the original static dark background
+remains and the large-image preload is skipped.
 The 🎲 button next to the name input chooses a random name from
 `content/random_names_human.json`; this is cosmetic and does not consume the
 game's seeded RNG or affect replay.

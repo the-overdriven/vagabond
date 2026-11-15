@@ -111,7 +111,7 @@ describe('Startup assets and character creation UI', () => {
   it('precaches character-selection landscapes and mine supports', () => {
     cy.request('/sw.js').its('body').then(worker => {
       expect(worker).to.include("'./img/tiles/mine-support.png'")
-      for (let n = 1; n <= 4; n++) {
+      for (let n = 1; n <= 8; n++) {
         expect(worker).to.include(`./img/ui/race-landscape-${n}.webp`)
       }
     })
@@ -123,20 +123,20 @@ describe('Startup assets and character creation UI', () => {
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.window().then(win => {
       const overlay = win.document.getElementById('raceOverlay')
-      const className = Array.from(overlay.classList).find(c => /^race-backdrop-[1-4]$/.test(c))
+      const className = Array.from(overlay.classList).find(c => /^race-backdrop-[1-8]$/.test(c))
       expect(className).to.be.a('string')
       const css = win.getComputedStyle(overlay, '::before')
       expect(css.backgroundImage).to.contain('race-landscape-')
       expect(css.animationName).to.equal('race-backdrop-drift')
-      // All four files must be decoded before Loading... disappears, so
+      // All eight files must be decoded before Loading... disappears, so
       // changing the selected background never flashes the black overlay.
-      expect(win.eval(`[1, 2, 3, 4].every(n => {
+      expect(win.eval(`[1, 2, 3, 4, 5, 6, 7, 8].every(n => {
         const image = preloadedImages.get('img/ui/race-landscape-' + n + '.webp')
         return image?.complete && image.naturalWidth > 0
       })`)).to.equal(true)
       expect(win.eval('surfaceMap')).to.equal(null)
       win.eval('closeRaceSelect(); openRaceSelect()')
-      const next = Array.from(overlay.classList).find(c => /^race-backdrop-[1-4]$/.test(c))
+      const next = Array.from(overlay.classList).find(c => /^race-backdrop-[1-8]$/.test(c))
       expect(next).to.not.equal(className)
       expect(win.eval('surfaceMap')).to.equal(null)
     })

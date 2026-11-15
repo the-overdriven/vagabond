@@ -1599,13 +1599,13 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
 }
 
 @media (min-width: 900px) {
-  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4) {
+  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4, .race-backdrop-5, .race-backdrop-6, .race-backdrop-7, .race-backdrop-8) {
     background: rgba(5, 4, 3, 0.78);
     /* Clip the drifting backdrop without making the overlay scrollable. */
     overflow: clip;
   }
 
-  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4)::before {
+  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4, .race-backdrop-5, .race-backdrop-6, .race-backdrop-7, .race-backdrop-8)::before {
     content: '';
     position: absolute;
     inset: -8%;
@@ -1619,7 +1619,7 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     pointer-events: none;
   }
 
-  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4)::after {
+  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4, .race-backdrop-5, .race-backdrop-6, .race-backdrop-7, .race-backdrop-8)::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -1627,7 +1627,7 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
     pointer-events: none;
   }
 
-  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4) .panelbox {
+  #raceOverlay:is(.race-backdrop-1, .race-backdrop-2, .race-backdrop-3, .race-backdrop-4, .race-backdrop-5, .race-backdrop-6, .race-backdrop-7, .race-backdrop-8) .panelbox {
     position: relative;
     z-index: 1;
     background: rgba(19, 14, 10, 0.92);
@@ -1641,6 +1641,10 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
   #raceOverlay.race-backdrop-2 { --race-background: url('../img/ui/race-landscape-2.webp'); }
   #raceOverlay.race-backdrop-3 { --race-background: url('../img/ui/race-landscape-3.webp'); }
   #raceOverlay.race-backdrop-4 { --race-background: url('../img/ui/race-landscape-4.webp'); }
+  #raceOverlay.race-backdrop-5 { --race-background: url('../img/ui/race-landscape-5.webp'); }
+  #raceOverlay.race-backdrop-6 { --race-background: url('../img/ui/race-landscape-6.webp'); }
+  #raceOverlay.race-backdrop-7 { --race-background: url('../img/ui/race-landscape-7.webp'); }
+  #raceOverlay.race-backdrop-8 { --race-background: url('../img/ui/race-landscape-8.webp'); }
 }
 
 @keyframes race-backdrop-drift {

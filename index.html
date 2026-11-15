@@ -16702,7 +16702,7 @@ more difficult:
     }
   }
 
-  const RACE_BACKDROP_PATHS = [1, 2, 3, 4].map(n => `img/ui/race-landscape-${n}.webp`)
+  const RACE_BACKDROP_PATHS = [1, 2, 3, 4, 5, 6, 7, 8].map(n => `img/ui/race-landscape-${n}.webp`)
 
   // Cache and decode the exact URLs used by the CSS background before hiding
   // the Loading overlay. Service-worker precaching alone does not guarantee
@@ -16727,7 +16727,7 @@ more difficult:
   function cycleRaceBackdrop() {
     const overlay = document.getElementById('raceOverlay')
     const prefix = 'race-backdrop-'
-    const count = 4
+    const count = 8
     let index = 0
     try {
       const key = 'vagabond-race-backdrop-index'
