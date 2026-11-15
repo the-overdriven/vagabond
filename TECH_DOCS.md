@@ -8272,18 +8272,21 @@ GAUR, ASHFANG, MIREHOWL and NHALUUN. Unflagged low-weight species such as
 Myrka and Vampire use normal AI; setting a low rarity alone never enables flight.
 Underground encounters use normal AI; an off-level flight pauses until returning.
 
-Two sightings precede ordinary combat. An unaware, armed beast notices a visible,
-unconcealed player within 5 tiles. The first sighting cannot be hit or cornered;
-the second can be caught by reaching adjacency or blocking every outward step.
-Caught beasts become aware and Alarmed; a third approach uses ordinary combat.
-A visible attack can start the flight before damage or evasion. An invisible
-attacker cannot start a sighting or directed escape, and can strike a beast
-without triggering first-sighting flight protection. Becoming invisible during an
-existing flight pauses its remaining turns and removes the temporary speed bonus;
-the beast resumes its remaining escape when it can see the player again. Attacking
-it while unseen cancels that flight and resolves the normal invisible attack.
-Forest concealment and invisibility alone never start a sighting. Active visible
-flight takes priority over temple flight and idle AI.
+Two sightings precede ordinary combat. An unaware, armed beast senses a player
+within 5 tiles on its **first encounter**, even through normal or God Mode
+invisibility. Forest concealment and Temple sanctuary still apply. This sensing
+is exclusive to the first encounter, not permanent true sight or normal combat
+targeting. The first sighting cannot be hit or cornered, including by an invisible
+melee or ranged attack; its protected flight continues even if the player remains
+invisible. The second sighting follows the ordinary visibility rules and can be
+caught by reaching adjacency or blocking every outward step. Caught beasts become
+aware and Alarmed; a third approach uses ordinary combat.
+
+Attacks can initiate the protected first flight before damage or evasion. During
+later encounters, invisibility still prevents starting a new sighting, pauses an
+existing flight and removes its temporary speed bonus; revealing the player
+resumes it. An unseen attack during a later flight cancels that flight and resolves
+normally. Active flight takes priority over temple flight and idle AI.
 
 The first steps occur immediately, including when a wander step enters sighting
 range. Flight itself deals no damage, sets no alarm or spotted message, and leaves

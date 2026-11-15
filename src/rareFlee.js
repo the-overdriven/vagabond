@@ -31,8 +31,16 @@ function rareFleeSaveState(e) {
   }
 }
 
+// Ultra-rare beasts sense an invisible player only during their protected first
+// encounter. Later encounters use normal invisibility; sanctuary always wins.
+function rareFleePlayerHidden(e, hidden = playerHiddenFromEnemy(e)) {
+  const firstEncounter = (e.rareSightings || 0) === 0 ||
+    (e.rareSightings === 1 && e.rareFleeTurns > 0)
+  return playerInsideSanctuary() || (hidden && !firstEncounter)
+}
+
 function rareStartledBonus(e, ordinarySpeed = Math.max(1, e.spd + enemyTileEffects(e).speed)) {
-  return e.rareFleeTurns > 0 && rareFleeEligible(e) && !playerHiddenFromEnemy(e)
+  return e.rareFleeTurns > 0 && rareFleeEligible(e) && !rareFleePlayerHidden(e)
     ? Math.max(0, RARE_FLEE.startledMinSpd - ordinarySpeed) : 0
 }
 
@@ -44,7 +52,7 @@ function rareFleePace(e) {
 }
 
 function rareStartFlee(e, dist, attacked = false) {
-  if (playerHiddenFromEnemy(e) || dist > RARE_FLEE.sightRange || e.rareFleeTurns > 0 || e.aware ||
+  if (rareFleePlayerHidden(e) || dist > RARE_FLEE.sightRange || e.rareFleeTurns > 0 || e.aware ||
       (e.rareSightings || 0) >= RARE_FLEE.sightings || e.rareArmed === false || !rareFleeEligible(e)) return false
   if (!attacked && forestConcealsPlayer(e, dist)) return false
   e.rareSightings = (e.rareSightings || 0) + 1
@@ -74,12 +82,12 @@ function rareCatch(e) {
   log(`The ${e.name} is cornered and turns to fight!`, 'good')
 }
 
-// An unseen attack can interrupt an existing flight but cannot start a sighting.
-// This clears flight before the normal hit/alarm rules, without spending a turn
-// or advancing the flight timer based on animation timing.
+// An invisible attack triggers (or remains blocked by) the first protected
+// sighting. During later sightings it can interrupt flight as usual, without
+// spending a turn or advancing flight based on animation timing.
 function rareFleeBlocksAttack(e) {
   if (!rareFleeEligible(e)) return false
-  if (playerHiddenFromEnemy(e)) {
+  if (rareFleePlayerHidden(e)) {
     e.rareFleeTurns = 0
     e.rareFleeAcc = 0
     return false
@@ -198,11 +206,11 @@ function rareStepAwayFromPlayer(e) {
   return true
 }
 
-// A hidden player cannot direct flight. Preserve any remaining timer so
-// reappearing resumes the same encounter instead of resetting sighting count.
+// Only the first flight senses invisibility. Later flights pause while the
+// player is hidden, retaining their timer and sighting count.
 function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
-  if (!(e.rareFleeTurns > 0) || !rareFleeEligible(e) || hidden) return false
-  if (e.rareSightings > 1 && !hidden && dist <= ATTACK_RANGE) {
+  if (!(e.rareFleeTurns > 0) || !rareFleeEligible(e) || rareFleePlayerHidden(e, hidden)) return false
+  if (e.rareSightings > 1 && dist <= ATTACK_RANGE) {
     rareCatch(e)
     return false
   }
@@ -213,7 +221,7 @@ function rareFlee(e, dist, hidden = playerHiddenFromEnemy(e)) {
   e.rareFleeTurns--
   for (let step = 0; step < steps; step++) {
     if (rareStepAwayFromPlayer(e)) continue
-    if (e.rareSightings > 1 && !hidden) {
+    if (e.rareSightings > 1) {
       rareCatch(e)
       return false
     }

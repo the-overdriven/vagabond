@@ -7336,7 +7336,7 @@ more difficult:
           rareDistance >= RARE_FLEE.rearmDistance && rareFleeEligible(e)) e.rareArmed = true
       if (e.rareFleeTurns > 0 && rareFleeEligible(e)) {
         if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
-      } else if (!hiddenFromEnemy && rareStartFlee(e, rareDistance)) {
+      } else if (rareStartFlee(e, rareDistance)) {
         if (rareFlee(e, rareDistance, hiddenFromEnemy)) continue
       }
       if ((e.stolenItem || e.stolenGold > 0) && tryWoundedEnemyFlee(e)) continue

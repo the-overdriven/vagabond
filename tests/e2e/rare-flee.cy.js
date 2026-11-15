@@ -195,23 +195,66 @@ describe('Rare monster sightings and flight', () => {
       map[player.y][player.x]='forest'; e.forestConcealX=player.x;e.forestConcealY=player.y
       fleeAssert(!rareStartFlee(e,5), 'forest concealment prevents sighting')
       map[player.y][player.x]='grass'; player.invisibleTurns=20
-      fleeAssert(!rareStartFlee(e,5), 'invisibility prevents visual sighting')
-      e.x=player.x+1; occupied=new Set([keyXY(e.x,e.y)])
-      fleeAssert(!rareFleeBlocksAttack(e) && e.rareSightings===0 && e.rareFleeTurns===0,
-        'invisible first strike does not start protected flight')
-      await playerAttackEnemy(e); enemyTurn()
-      fleeAssert(e.rareSightings===0 && !e.rareFleeTurns, 'invisible hit cannot create a sighting')
-      resetFleeArena(); e=makeFleeEnemy('DRUSK',1,{rareSightings:1})
-      rareStartFlee(e,1,true)
-      const turns=e.rareFleeTurns, before={x:e.x,y:e.y}, sightings=e.rareSightings
+      const ultraRareNames=Object.values(ENEMY_TEMPLATE_BY_NAME).filter(t=>t.ultraRare).map(t=>t.name)
+      fleeAssert(ultraRareNames.length>0, 'flagged ultra-rare species are configured')
+      for(const name of ultraRareNames) {
+        resetFleeArena()
+        player.invisibleTurns=20
+        e=makeFleeEnemy(name,5,{aggro:0,wander:false})
+        enemyTurn()
+        fleeAssert(e.rareSightings===1 && e.rareFleeTurns>0,
+          name+' senses invisibility on its first approach and starts fleeing')
+        const before=e.rareFleeTurns, x=e.x
+        enemyTurn()
+        fleeAssert(e.rareFleeTurns===before-1 && e.x>x && !rareFleePlayerHidden(e),
+          name+' continues its protected flight against an invisible player')
+      }
+      resetFleeArena()
+      e=makeFleeEnemy('SKELD',1)
+      player.godMode=true
+      const beforeHp=e.hp
+      fleeAssert(rareFleeBlocksAttack(e) && e.rareSightings===1 && e.hp===beforeHp,
+        'god-mode invisibility cannot bypass first-hit protection')
+      fleeAssert(rareFleeBlocksAttack(e), 'first encounter remains protected after starting')
+      resetFleeArena()
+      e=makeFleeEnemy('SKELD',5,{wander:false,aggro:0})
+      player.godMode=true
+      enemyTurn()
+      fleeAssert(e.rareSightings===1 && e.rareFleeTurns>0,
+        'first encounter senses God Mode invisibility during an ordinary enemy turn')
+      resetFleeArena()
+      e=makeFleeEnemy('DRUSK',1)
       player.invisibleTurns=20
-      fleeAssert(!rareFlee(e,1) && !rareStartledBonus(e), 'no flight step or startled speed against invisible player')
-      const oldWander=enemyWander
-      try {enemyWander=()=>false; enemyTurn()} finally {enemyWander=oldWander}
-      fleeAssert(e.rareFleeTurns===turns && e.rareSightings===sightings &&
-        e.x===before.x && e.y===before.y, 'invisible DRUSK pauses directed flight')
-      fleeAssert(!rareFleeBlocksAttack(e) && e.rareFleeTurns===0, 'invisible ambush interrupts flight')
-      player.invisibleTurns=0
+      await playerAttackEnemy(e)
+      fleeAssert(e.rareSightings===1 && e.hp===200 && e.rareFleeTurns>0,
+        'invisible melee attack starts protected first flight before damage')
+      resetFleeArena()
+      e=makeFleeEnemy('DRUSK',5,{rareSightings:1})
+      player.invisibleTurns=20
+      enemyTurn()
+      fleeAssert(e.rareSightings===1 && !e.rareFleeTurns,
+        'invisibility still prevents the second encounter from beginning')
+      resetFleeArena()
+      e=makeFleeEnemy('GAUR',5,{aggro:0,wander:false})
+      enemyTurn()
+      player.invisibleTurns=4
+      const activeFirstFlight=e.rareFleeTurns
+      enemyTurn()
+      fleeAssert(e.rareSightings===1 && e.rareFleeTurns===activeFirstFlight-1,
+        'turning invisible during the first flight cannot pause it')
+      resetFleeArena()
+      e=makeFleeEnemy('DRUSK',5)
+      player.godMode=true
+      spawnPoint={x:player.x,y:player.y}
+      enemyTurn()
+      fleeAssert(!e.rareSightings && !e.rareFleeTurns,
+        'temple protection still overrides rare-beast sensing')
+      resetFleeArena()
+      e=makeFleeEnemy('DRUSK',5)
+      player.invisibleTurns=20
+      map[player.y][player.x]='forest';e.forestConcealX=player.x;e.forestConcealY=player.y
+      fleeAssert(!rareStartFlee(e,5), 'forest concealment remains effective during invisibility')
+      map[player.y][player.x]='grass'
       resetFleeArena(); e=makeFleeEnemy('DRUSK',5,{rareSightings:1})
       rareStartFlee(e,5,true)
       player.invisibleTurns=4;const paused=e.rareFleeTurns
