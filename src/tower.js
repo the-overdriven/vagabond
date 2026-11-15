@@ -296,10 +296,13 @@ function towerBackgroundVisual(tile, x, y) {
     else if (sameLeft) image=base.rightImage || base.middleImage || base.image
     else image=base.singleImage || base.image || base.middleImage
   }
-  // Unlike the current tower map, the surface map knows which sandy edges
-  // touch grass or forest. Use the same connector selection as ground level.
-  if (tile === 'sand') image = sandGrassBlendImage(base, surfaceMap, x, y) || image
-  return coordinateVisualVariant({...base,image},x,y,0)
+  // Use the current shared terrain blend, not a removed directional sand
+  // connector. Read neighbors from the original surface even on positive Z.
+  // The result is cosmetic: it never reads or mutates the tower gameplay map.
+  const blend = ['grass','sand','snow'].includes(tile)
+    ? surfaceBlendBiomes(tile,x,y,surfaceMap) : null
+  const groundBlend = blend?.some(biome => biome && biome !== tile) ? blend : null
+  return coordinateVisualVariant({...base,image,...(groundBlend ? {groundBlend} : {})},x,y,0)
 }
 
 function towerBackgroundGround(tile,x,y) {
@@ -329,8 +332,14 @@ function drawTowerBackground(x,y) {
     const overlayGround=towerBackgroundGround(tile,x,y)
     const visual=towerBackgroundVisual(tile,x,y)
     const ground=towerBackgroundVisual(visual?.baseTileKey||overlayGround,x,y)
-    if(ground?.image)drawImageVisual(px,py,ground)
-    if(visual?.image)drawImageVisual(px,py,visual)
+    if(ground?.image) {
+      drawImageVisual(px,py,ground)
+      if(ground.groundBlend)drawSurfaceGroundBlend(px,py,ground.groundBlend)
+    }
+    if(visual?.image) {
+      drawImageVisual(px,py,visual)
+      if(visual.groundBlend)drawSurfaceGroundBlend(px,py,visual.groundBlend)
+    }
     if(tile==='grass'&&grasslandTrees.has(k)) {
       // Surface trees use seven deterministic image variants, scaling/mirroring.
       const tree=towerGrassTreeVisual(x,y)

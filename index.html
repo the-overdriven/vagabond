@@ -10575,18 +10575,24 @@ more difficult:
     return 'grass'
   }
 
-  function visibleSurfaceTransitionBiomeAt(tx, ty) {
-    if (currentZ !== 0) return null
-    const tileKey = map?.[ty]?.[tx]
+  function visibleSurfaceTransitionBiomeAt(tx, ty, terrain = map) {
+    // Upstairs the active map is the tower, but its exterior backdrop comes
+    // from the original surface grid. Never infer a surface biome from the
+    // tower's void/masonry cells or accidentally disable exterior blends.
+    if (currentZ !== 0 && terrain !== surfaceMap) return null
+    const tileKey = terrain?.[ty]?.[tx]
     if (!tileKey) return null
     if (tileKey === 'water' || tileKey === 'river' || tileKey === 'frozenriver' || isLakeIce(tileKey)) return null
     if (['forest','ancientForest'].includes(tileKey)) return 'grass'
     if (tileKey === 'taiga') return 'snow'
-    if (tileKey === 'hill' || tileKey === 'boulder') return overlayBaseTileKey(tileKey, tx, ty)
-    const base = surfaceBaseKeyAt(tx, ty)
+    if (tileKey === 'hill' || tileKey === 'boulder') return surfaceRockGroundAt(tx, ty, terrain)
+    const base = tileUnderlays[keyXY(tx, ty)] || tileKey
     if (base === 'sand') return 'sand'
     if (base === 'grass' || base === 'forest' || base === 'ancientForest') return 'grass'
     if (base === 'snow' || base === 'taiga' || base === 'snowmountain') return 'snow'
+    // Tower backdrop queries must not run surface overlay heuristics against
+    // the positive-Z gameplay map. Built structures are not land biomes.
+    if (terrain !== map) return null
     const underlay = overlayBaseTileKey(tileKey, tx, ty)
     if (underlay === 'sand' || underlay === 'snow' || underlay === 'grass') return underlay
     return null
@@ -10632,10 +10638,10 @@ more difficult:
 
   const surfaceGroundBlendCache = new Map()
 
-  function surfaceBlendBiomes(center,x,y) {
+  function surfaceBlendBiomes(center,x,y,terrain=map) {
     const biomes=[]
     for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++)
-      biomes.push(dx || dy ? visibleSurfaceTransitionBiomeAt(x+dx,y+dy) : center)
+      biomes.push(dx || dy ? visibleSurfaceTransitionBiomeAt(x+dx,y+dy,terrain) : center)
     return biomes
   }
 

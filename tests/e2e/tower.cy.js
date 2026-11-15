@@ -182,6 +182,8 @@ describe('Guaranteed elevated tower',()=>{
           drawEnemyVisual,drawImageVisual,enemyHasAbility}
         const x=tower.x-2,y=tower.y+4,key=keyXY(x,y)
         const savedTile=surfaceMap[y][x],savedUnderlay=tileUnderlays[key]
+        const adjacentKey=keyXY(x+1,y)
+        const savedAdjacent=surfaceMap[y][x+1],savedAdjacentUnderlay=tileUnderlays[adjacentKey]
         const savedDiscovery=discovered[y][x]
         const wasForaged=foragedTiles.has(key)
         try {
@@ -193,8 +195,17 @@ describe('Guaranteed elevated tower',()=>{
           surfaceMap[y][x]='forest';tileUnderlays[key]='sand';discovered[y][x]=true
           foragedTiles.delete(key)
           const ground=towerBackgroundGround('forest',x,y)
-          const sand=RENDER_STYLE.terrainTiles.sand
-          const blend=sandGrassBlendImage(sand,[['forest','sand']],1,0)
+          // Regression: +1 backdrop used a removed sand blending helper,
+          // which threw before the player could be drawn on every repaint.
+          surfaceMap[y][x]='sand';delete tileUnderlays[key]
+          surfaceMap[y][x+1]='grass';delete tileUnderlays[adjacentKey]
+          currentZ=1;map=towerLevels[0].map
+          const sandVisual=towerBackgroundVisual('sand',x,y)
+          const blend=sandVisual.groundBlend
+          const surfaceMapIsolated=map!==surfaceMap && map[y][x]==='towervoid'
+          const backdropDrawn=(() => {drawTowerBackground(x,y);return true})()
+          surfaceMap[y][x]='forest';tileUnderlays[key]='sand'
+          currentZ=4;map=towerLevels[3].map
           const e={...template,x,y,level:0,levelKind:'surface',abilities:[],
             animStart:undefined,invisibleUntilTurn:0,wallAmbushHidden:false,pendingAbility:null}
           enemies=[e]
@@ -212,8 +223,8 @@ describe('Guaranteed elevated tower',()=>{
           const flying=check()
           USE_TILE_IMAGES=false;e.flying=false
           const ascii=check()
-          return {ground,blend:blend===sand.blendGrassWImage,
-            groundRoof,groundRoom,flying,ascii}
+          return {ground,blend:blend?.[4]==='sand' && blend?.[5]==='grass',
+            backdropDrawn,surfaceMapIsolated,groundRoof,groundRoom,flying,ascii}
         } finally {
           currentZ=saved.currentZ;map=saved.map;enemies=saved.enemies
           camX=saved.camX;camY=saved.camY
@@ -221,14 +232,19 @@ describe('Guaranteed elevated tower',()=>{
           drawEnemyVisual=saved.drawEnemyVisual;drawImageVisual=saved.drawImageVisual
           enemyHasAbility=saved.enemyHasAbility
           surfaceMap[y][x]=savedTile;discovered[y][x]=savedDiscovery
+          surfaceMap[y][x+1]=savedAdjacent
           if(wasForaged)foragedTiles.add(key)
           if(savedUnderlay===undefined)delete tileUnderlays[key]
           else tileUnderlays[key]=savedUnderlay
+          if(savedAdjacentUnderlay===undefined)delete tileUnderlays[adjacentKey]
+          else tileUnderlays[adjacentKey]=savedAdjacentUnderlay
           render()
         }
       })()`)
       expect(result.ground).to.equal('grass')
       expect(result.blend).to.equal(true)
+      expect(result.backdropDrawn).to.equal(true)
+      expect(result.surfaceMapIsolated).to.equal(true)
       for(const order of [result.groundRoof,result.groundRoom])
         expect(order).to.deep.equal(['enemy','forest'])
       expect(result.flying).to.deep.equal(['enemy'])
@@ -288,6 +304,45 @@ describe('Guaranteed elevated tower',()=>{
         })()`)).to.equal(true)
         expect(win.eval(`(()=>{const p=towerPoint(3,0);
           return terrainVisual('towerwindow',p.x,p.y)?.quarterTurns === undefined
+        })()`)).to.equal(true)
+        // Exercise an actual first-floor repaint followed by a surface repaint
+        // while an explored sandy exterior cell is visible. Both tile and ASCII
+        // must reach the player draw pass (the missing helper used to abort it).
+        expect(win.eval(`(()=>{
+          const old={currentZ,map,undergroundDiscovered,x:player.x,y:player.y,
+            useTiles:USE_TILE_IMAGES,drawPlayerVisual,camX,camY}
+          const x=tower.x-2,y=tower.y+4,key=keyXY(x,y)
+          const oldTile=surfaceMap[y][x],oldUnderlay=tileUnderlays[key]
+          const oldSeen=discovered[y][x]
+          let playerDraws=0
+          try {
+            surfaceMap[y][x]='sand';delete tileUnderlays[key];discovered[y][x]=true
+            drawPlayerVisual=(...args)=>{playerDraws++;return old.drawPlayerVisual(...args)}
+            Object.assign(player,towerStair(1,false))
+            stopCameraAnimation();snapCameraToPlayer()
+            for(const tiles of [true,false]) {
+              USE_TILE_IMAGES=tiles
+              currentZ=1;map=towerLevels[0].map
+              undergroundDiscovered=towerLevels[0].discovered
+              invalidateUndergroundFov()
+              drawTowerBackground(x,y)
+              renderScene(performance.now())
+              currentZ=0;map=surfaceMap
+              invalidateUndergroundFov()
+              renderScene(performance.now())
+            }
+            return playerDraws===4
+          } finally {
+            currentZ=old.currentZ;map=old.map
+            undergroundDiscovered=old.undergroundDiscovered
+            Object.assign(player,{x:old.x,y:old.y})
+            USE_TILE_IMAGES=old.useTiles;drawPlayerVisual=old.drawPlayerVisual
+            camX=old.camX;camY=old.camY
+            surfaceMap[y][x]=oldTile;discovered[y][x]=oldSeen
+            if(oldUnderlay===undefined)delete tileUnderlays[key]
+            else tileUnderlays[key]=oldUnderlay
+            invalidateUndergroundFov()
+          }
         })()`)).to.equal(true)
         for(const tiles of [true,false]) {
           win.eval(`USE_TILE_IMAGES=${tiles};renderScene(performance.now())`)

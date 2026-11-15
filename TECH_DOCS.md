@@ -9294,8 +9294,13 @@ tiles. The source is the existing surface map, not a regenerated world.
 
 The renderer draws only previously explored background cells in the viewport, beneath the current floor.
 Surface scenery uses the same deterministic tile variants, forest grass
-underlays and sand-to-grass transitions as ground level; old sand metadata
-under forest trees must not create square patches around the tower. Ground
+underlays and grass/sand/snow boundary blends as ground level. The tower
+backdrop samples neighboring biomes from the original surface map even while
+the active map is an elevated floor; it uses the same shared, zoom-aware
+blend renderer as surface terrain, without deprecated directional connectors.
+Old sand metadata under forest trees must not create square patches around
+the tower. Rendering the exterior cannot modify tower terrain, discovery,
+character positions or the replay RNG. Ground
 creatures seen below are covered by tree canopies, including while moving;
 flying creatures remain visible above them. Rocky terrain overrides any stale
 forest underlay; rocks and trees are never composited on the same background
