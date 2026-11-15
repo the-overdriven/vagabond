@@ -511,7 +511,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
           player.inventory=[];player.gold=0;rng=()=>roll
           const messages=[],oldLog=log
           try {log=message=>messages.push(message);describeSurroundings()} finally {log=oldLog}
-          check(messages.some(message=>message.includes('Press F to search them.')),
+          check(messages.some(message=>message.includes('Use Forage to search them.')),
             'both dwarf-remains kinds advertise foraging')
           const originalNearby=Campfires.nearby
           try {

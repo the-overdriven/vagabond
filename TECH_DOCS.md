@@ -1024,8 +1024,9 @@ attempt, without moving into that tile. Clearing consumes one turn and produces
 the same nearby/distant noise response as striking a dwarven crate. Attempting
 without a Pickaxe costs no turn. Dwarven rubble exposes its saved floor
 underlay; crypt rubble exposes `crypt2floor`. The authoritative map and its matching cave
-masks update together, except Crypt 2's legacy standalone map, which must not
-modify the ordinary grotto at the same depth. Removed underlay records are discarded. Saves and
+masks update together wherever those masks exist. Other locations on the same
+shared Z-level stay untouched. Crypt 2's legacy standalone map remains the
+exception and must not modify the ordinary grotto at the same depth. Removed underlay records are discarded. Saves and
 replays preserve cleared passages as ordinary terrain, without a new persistent
 status or random excavation roll. Dungeon generation treats uncleared rubble as
 solid when verifying paths to mandatory locations; optional rubble cannot

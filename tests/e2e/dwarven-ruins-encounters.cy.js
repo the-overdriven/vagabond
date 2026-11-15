@@ -208,10 +208,12 @@ describe('Dwarven Ruins encounter progression', () => {
 
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Ruins Encounter Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__ruinsEncounterSave = save
+      win.eval('loadGameFromObject(window.__ruinsEncounterSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__ruinsEncounterSave
+    }))
     cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   })
 

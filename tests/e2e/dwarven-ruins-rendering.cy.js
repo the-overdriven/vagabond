@@ -170,7 +170,7 @@ describe('Dwarven rubble and column floor layers', () => {
           currentZ = 0
           USE_TILE_IMAGES = false
           const asciiDoesNotComposite = overlayBaseTileKey('dwarvenstatue', 1, 1)
-          const asciiKeepsBackground = tileBackground(1, 1, 'dwarvenstatue') === TILE.snowmountain.bg
+          const asciiKeepsBackground = tileBackground(1, 1, 'dwarvenstatue') === TILE.dwarvenstatue.bg
           return {floors, cryptFloor, cryptIsTransparent, missingDoesNotGuess, surface, asciiDoesNotComposite, asciiKeepsBackground,
             surfaceColumnImage, indoorColumnImage, rubbleVariants, variantCoverage}
         } finally {
@@ -234,17 +234,23 @@ describe('Dwarven rubble and column floor layers', () => {
         const y=level.map.findIndex(row=>row.includes('dwarvenrubble'))
         const x=level.map[y].indexOf('dwarvenrubble')
         const key=tileUnderlayKey(x,y,z),floor=tileUnderlays[key]
+        const owningMasks=(level.caveMaps||[]).filter(caveMap=>caveMap?.[y]?.[x]==='dwarvenrubble')
         check(TILE[floor]?.walk,'rubble has a real walkable underlay')
         const oldMap=map,oldZ=currentZ,oldInventory=player.inventory,oldRng=rngState
+        const originalMasks=level.caveMaps
         try {
           map=level.map;currentZ=z;player.inventory=[]
+          // Non-carved cave slots may be null on shared Z-levels. The owning
+          // mask still updates, and rubble clearing must not dereference null.
+          level.caveMaps=[null,...(originalMasks||[])]
           check(!clearRubbleAt(x,y)&&map[y][x]==='dwarvenrubble',
             'without pickaxe, tile and saved underlay remain unchanged')
           player.inventory=[{kind:'pickaxe'}]
           check(clearRubbleAt(x,y)&&map[y][x]===floor,'pickaxe restores original floor')
-          check((level.caveMaps||[]).some(caveMap=>caveMap[y][x]===floor),
-            'authoritative cave mask matches the cleared tile')
+          check(owningMasks.every(caveMap=>caveMap[y][x]===floor),
+            'every matching cave mask follows the authoritative Z-level change')
           check(!Object.hasOwn(tileUnderlays,key),'removed rubble underlay is not retained')
+          level.caveMaps=originalMasks
           const saved=buildSaveObject()
           check(decodeTileGrid(saved.deepLevels[index].map,'#')[y][x]===floor,
             'save captures the cleared floor')
@@ -260,8 +266,9 @@ describe('Dwarven rubble and column floor layers', () => {
           check(deepLevels[0].caveMaps?.[0]?.[y]?.[x]===originalCave,
             'clearing crypt rubble leaves the z:-2 grotto unchanged')
         } finally {
+          level.caveMaps=originalMasks
           level.map[y][x]='dwarvenrubble'
-          for(const caveMap of level.caveMaps||[])
+          for(const caveMap of owningMasks)
             if(caveMap[y]?.[x]===floor)caveMap[y][x]='dwarvenrubble'
           tileUnderlays[key]=floor
           map=oldMap;currentZ=oldZ;player.inventory=oldInventory

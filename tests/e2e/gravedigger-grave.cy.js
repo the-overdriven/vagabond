@@ -48,12 +48,12 @@ describe('Gravedigger unfinished grave', () => {
           const originalText = gravediggerTowerRumor(digger)
           const actualDirection = TRACK_DIRECTIONS[trackDirection(
             originalTower.entrance.x - digger.x, originalTower.entrance.y - digger.y)]
-          const actualFar = towerDistance(digger.x, digger.y) > 150
+          const actualFar = towerDistance(digger.x, digger.y) > 80
           rumorCorrect = originalText.includes('to the ' + actualDirection + '.') &&
             originalText.includes('I stopped saving graves for those who went looking. Waste of good earth.') &&
             originalText.includes('tower far to') === actualFar && !originalText.includes('  ')
 
-          // The same compass sectors used by tracks and the Herbalist work for every bearing.
+          // Reuse the eight-direction Tracking compass rather than a second bearing system.
           const bearings = [[0,-1,'north'],[1,-1,'north-east'],[1,0,'east'],
             [1,1,'south-east'],[0,1,'south'],[-1,1,'south-west'],
             [-1,0,'west'],[-1,-1,'north-west']]
@@ -63,12 +63,12 @@ describe('Gravedigger unfinished grave', () => {
             return gravediggerTowerRumor(digger).includes('to the ' + name + '.')
           })
 
-          // Distance is measured to the closest footprint tile, not tower center.
-          thresholdCorrect = [149,150,151].every(distance => {
+          // Distance uses the closest tower footprint tile, not its center.
+          thresholdCorrect = [79,80,81].every(distance => {
             tower = {...originalTower,x:digger.x+distance,y:digger.y-4,
               entrance:{x:digger.x+distance+5,y:digger.y}}
             const text = gravediggerTowerRumor(digger)
-            return text.includes('tower far to') === (distance > 150) && !text.includes('  ')
+            return text.includes('tower far to') === (distance > 80) && !text.includes('  ')
           })
           tower = originalTower
           currentZ = 0; map = surfaceMap

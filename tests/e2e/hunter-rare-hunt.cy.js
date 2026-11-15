@@ -21,7 +21,7 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       const make=(id,baseName,wander,extra={})=>({id,baseName,name:'Fierce '+baseName,
         tier:3,level:0,alive:true,x:spawnPoint.x,y:spawnPoint.y,wander,prefix:{name:'Fierce'},equipment:{name:'Axe'},...extra})
       enemies=[make('ordinary','Kveld','roam'),make('promoted','Kveld','far'),
-        make('rare','Vampire','homeReturn',{alarmed:true,level:-1}),
+        make('rare','GAUR','homeReturn',{alarmed:true,level:-1}),
         make('quarry','GAUR','far',{isRareQuarry:true}),make('far','Chupacabra','far')]
       groundItems=[]
       oldHunterQuest={id:'existing-quest',type:'kill_specific',state:'active',targetEnemyId:'rare'}

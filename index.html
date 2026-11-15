@@ -2141,7 +2141,8 @@ more difficult:
     // cave masks at the same coordinates when clearing crypt rubble.
     if (level && (level.map === map || level.caveMaps?.includes(map))) {
       for (const caveMap of level.caveMaps || []) {
-        if (caveMap[y]?.[x] === rubble) caveMap[y][x] = floor
+        // Not every location has a carved cave mask on this global Z level.
+        if (caveMap?.[y]?.[x] === rubble) caveMap[y][x] = floor
       }
     }
     minimapDirty = true

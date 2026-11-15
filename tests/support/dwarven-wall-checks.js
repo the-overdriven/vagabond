@@ -10,7 +10,8 @@ function checkDwarvenWallVisuals() {
     for (const [dx,dy] of DIRS8) {
       for (const key of ['marble','dwarvenrubble','dwarvendoorclosed','dwarvendooropen','dwarvendoorlocked']) {
         map[2+dy][2+dx] = key
-        check(variants.includes(image()),'exposed walls use masonry: '+key)
+        check(key === 'dwarvenrubble' ? image() === 'img/tiles/cave-wall.png' : variants.includes(image()),
+          'walls expose masonry only next to walkable floors or doorways: '+key)
       }
       map[2+dy][2+dx] = 'dwarvenwall'
     }

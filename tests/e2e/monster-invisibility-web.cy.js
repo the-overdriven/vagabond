@@ -1,12 +1,12 @@
 describe('Monster invisibility and Giant Spider web visuals', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Invisibility Tester')
-    cy.get('#worldSizeSelect').select('XS')
-    cy.window().then(win => win.eval('WORLD_SEED = 32107; rngState = WORLD_SEED'))
-    cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__invisibilitySave = save
+      win.eval('loadGameFromObject(window.__invisibilitySave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__invisibilitySave
+    }))
     cy.window().then(win => win.eval(`(() => {
       window.invisibilityAssert=(ok,msg)=>{if(!ok)throw Error(msg)}
       currentZ=0;currentCave=-1;map=surfaceMap;enemies=[];npcs=[];occupied=new Set();

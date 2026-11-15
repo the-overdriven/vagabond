@@ -1,10 +1,12 @@
 describe('Same-species gang power', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Rush Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay').should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__gangPowerSave = save
+      win.eval('loadGameFromObject(window.__gangPowerSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__gangPowerSave
+    }))
     cy.window().then(win => win.eval(`(() => {
       window.rushCheck=(ok,msg)=>{if(!ok) throw new Error(msg)}
       replayRecording=false; replayPlaying=false; replayData=null; replayAnimationsDisabled=true

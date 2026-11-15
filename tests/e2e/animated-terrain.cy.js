@@ -80,12 +80,13 @@ describe('Animated terrain rendering', () => {
   it('keeps ground blends and diagonal rivers connected without replacing terrain textures', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
-        const originalMap = map, originalUnderlays = tileUnderlays, originalZ = currentZ
+        const originalMap = map, originalSurfaceMap = surfaceMap, originalUnderlays = tileUnderlays, originalZ = currentZ
         const ground = RENDER_STYLE.terrainTiles
         const x = 4, y = 4
         const cell = (dx, dy, tile) => {map[y + dy][x + dx] = tile}
         const reset = (tile, fill = tile) => {
           map = Array.from({length:9}, () => Array(9).fill(fill))
+          surfaceMap = map // The real renderer only blends the authoritative surface.
           cell(0, 0, tile)
         }
         try {
@@ -168,7 +169,10 @@ describe('Animated terrain rendering', () => {
           const cornerUsesOneRotatedSprite = singleCorner.length === 1 && singleCorner[0].quarterTurns === 0
 
           currentZ = -1
-          const underground = terrainVisual('water', x, y)
+          // Underground geometry is a different grid from the surface, even
+          // when its contents happen to look identical to the surface fixture.
+          const undergroundTerrain = map.map(row => row.slice())
+          const underground = terrainVisual('water', x, y, undergroundTerrain)
           const undergroundNoShore = !underground.overlayImages?.length
 
           // A real saved frozen-river zigzag must paint water, not only the
@@ -201,6 +205,7 @@ describe('Animated terrain rendering', () => {
             frozenZigzag,frozenChannelPainted}
         } finally {
           map = originalMap
+          surfaceMap = originalSurfaceMap
           tileUnderlays = originalUnderlays
           currentZ = originalZ
         }
