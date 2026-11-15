@@ -542,7 +542,7 @@
     "forest_spirit": {
       "type": "forest_overforaging_retribution",
       "location": "surface",
-      "minDistinctForagedForestTiles": 70,
+      "minDistinctForagedForestTiles": 200,
       "returnSurfaceTurns": 100,
       "returnRetryInterval": 10,
       "minWithdrawDistance": 6,

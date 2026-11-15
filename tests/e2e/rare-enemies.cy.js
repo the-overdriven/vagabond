@@ -93,7 +93,7 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
     })()`))
   })
 
-  it('gives ordinary and prefixed surface rares two sightings regardless of wander mode or humanoid type', () => {
+  it('gives flagged ultra-rare surface enemies two sightings regardless of wander mode or humanoid type', () => {
     cy.visit('/')
     cy.get('#raceOverlay .panelbox').should('be.visible')
     cy.window().then(win => win.eval('WORLD_SEED=246813579; rngState=WORLD_SEED'))
@@ -105,7 +105,7 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
       replayRecording=false; replayAnimationsDisabled=true
       currentZ=0; map=surfaceMap; player.invisibleTurns=0; player.godMode=false
       oldHunterQuest=null;enemies=[];npcs=[];occupied=new Set()
-      const control={...ENEMY_TEMPLATE_BY_NAME.Myrka,...rareFleeDefaults({}),baseName:'Myrka',
+      const control={...ENEMY_TEMPLATE_BY_NAME.GAUR,...rareFleeDefaults({}),baseName:'GAUR',
         alive:true,level:0,x:player.x+4,y:player.y,aware:false,alarmed:false}
       check(playerInsideSanctuary()&&!rareStartFlee(control,4),
         'the starting sanctuary hides the player and cannot trigger a rare sighting')
@@ -115,8 +115,8 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
       player.y=spawnPoint.y
       map[player.y][player.x]='grass';grasslandTrees.delete(keyXY(player.x,player.y))
       check(!playerInsideSanctuary()&&!playerHasForestCover(),'rare-sighting arena is unprotected and unconcealed')
-      const names=['Myrka','Vampire','NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
-      check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>!t.adaptiveOnly && Number(t.rarity??1)<=RARE_FLEE.maxRarity).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
+      const names=['NULK','SKELD','DRUSK','GAUR','ASHFANG','MIREHOWL','NHALUUN']
+      check(JSON.stringify(ENEMY_TEMPLATES.filter(t=>t.ultraRare===true).map(t=>t.name).sort())===JSON.stringify(names.slice().sort()), 'exact rare scope')
       for(const prefixed of [false,true]) for(const name of names) for(const wander of ['far','homeReturn','homeReanchored','roam',false]) {
         const t=ENEMY_TEMPLATE_BY_NAME[name]
         const e={...t,...rareFleeDefaults({}),name:prefixed?'Fierce '+name:name,baseName:name,prefix:prefixed?'Fierce':null,
@@ -127,7 +127,9 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
         e.rareFleeTurns=0; e.rareSightings=2; e.rareArmed=true
         check(!rareStartFlee(e,4), 'two sightings only')
       }
-      check(!rareFleeTemplate({baseName:'Kveld'}), 'ordinary control remains unchanged')
+      for(const name of ['Kveld','Myrka','Vampire','Forest Spirit']) {
+        check(!rareFleeTemplate({baseName:name}), name+' without ultraRare flag does not flee')
+      }
     })()`))
   })
 

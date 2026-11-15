@@ -288,7 +288,7 @@
     "name": "Flint Stone",
     "category": "other",
     "stackable": true,
-    "sellValue": 0,
+    "sellValue": 50,
     "actions": [],
     "description": "Reusable fire-lighting tool. Use an abandoned campfire to light it with brushwood.",
     "baseValue": 100

@@ -219,6 +219,55 @@ describe('Dwarven rubble and column floor layers', () => {
       expect(result.missing).to.deep.equal([])
       expect(result.stored).to.be.greaterThan(0)
       expect(result.saveHasAll).to.equal(true)
+      // Keep the regression on the existing Ruins rendering/persistence path.
+      win.eval(`(() => {
+        const check=(ok,msg)=>{if(!ok)throw new Error(msg)}
+        for(const tile of ['dwarvenrubble','cryptrubble']) {
+          check(TILE[tile].walk===false && TILE[tile].blocksSight===true &&
+            TILE[tile].projectileBlock===true, tile+' physically blocks passage, sight and shots')
+          check(!UndergroundFov.canSee([['marble',tile,'marble']],0,0,2,0),tile+' blocks FOV')
+        }
+        const index=deepLevels.findIndex((level,i)=>i>=1 &&
+          level.map.some(row=>row.includes('dwarvenrubble')))
+        check(index>=1,'at least one generated rubble tile')
+        const level=deepLevels[index],z=-index-2
+        const y=level.map.findIndex(row=>row.includes('dwarvenrubble'))
+        const x=level.map[y].indexOf('dwarvenrubble')
+        const key=tileUnderlayKey(x,y,z),floor=tileUnderlays[key]
+        check(TILE[floor]?.walk,'rubble has a real walkable underlay')
+        const oldMap=map,oldZ=currentZ,oldInventory=player.inventory,oldRng=rngState
+        try {
+          map=level.map;currentZ=z;player.inventory=[]
+          check(!clearRubbleAt(x,y)&&map[y][x]==='dwarvenrubble',
+            'without pickaxe, tile and saved underlay remain unchanged')
+          player.inventory=[{kind:'pickaxe'}]
+          check(clearRubbleAt(x,y)&&map[y][x]===floor,'pickaxe restores original floor')
+          check((level.caveMaps||[]).some(caveMap=>caveMap[y][x]===floor),
+            'authoritative cave mask matches the cleared tile')
+          check(!Object.hasOwn(tileUnderlays,key),'removed rubble underlay is not retained')
+          const saved=buildSaveObject()
+          check(decodeTileGrid(saved.deepLevels[index].map,'#')[y][x]===floor,
+            'save captures the cleared floor')
+          check(rngState===oldRng,'clearing rubble consumes no RNG')
+          // Crypt 2 is the legacy separate-map exception: its rubble must not
+          // rewrite the ordinary cave at the same x/y/z.
+          const originalCave=deepLevels[0].caveMaps?.[0]?.[y]?.[x]
+          const cryptMap=Array.from({length:MAP_H},()=>new Array(MAP_W).fill('crypt2floor'))
+          cryptMap[y][x]='cryptrubble'
+          map=cryptMap;currentZ=-2
+          check(clearRubbleAt(x,y)&&map[y][x]==='crypt2floor',
+            'crypt rubble reveals crypt floor')
+          check(deepLevels[0].caveMaps?.[0]?.[y]?.[x]===originalCave,
+            'clearing crypt rubble leaves the z:-2 grotto unchanged')
+        } finally {
+          level.map[y][x]='dwarvenrubble'
+          for(const caveMap of level.caveMaps||[])
+            if(caveMap[y]?.[x]===floor)caveMap[y][x]='dwarvenrubble'
+          tileUnderlays[key]=floor
+          map=oldMap;currentZ=oldZ;player.inventory=oldInventory
+          invalidateUndergroundFov()
+        }
+      })()`)
     })
   })
 })

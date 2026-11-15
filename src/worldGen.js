@@ -1587,7 +1587,7 @@ function buildDwarvenRuin(targetLevel) {
   // off a room even when its doorway was carved correctly.
   const fortWalkable = (x, y) => {
     const t = cm[y]?.[x]
-    return t === 'marble' || t === 'dwarvenfortexit' || t === 'dwarvengate' || t === 'dwarvenrubble'
+    return t === 'marble' || t === 'dwarvenfortexit' || t === 'dwarvengate'
   }
   const reachableFromGate = () => {
     const seen = new Set(), queue = [{x: x0, y: y0}]

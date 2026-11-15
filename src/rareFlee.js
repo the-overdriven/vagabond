@@ -4,7 +4,7 @@ let RARE_FLEE = {}
 
 function rareFleeTemplate(e) {
   const template = e && ENEMY_TEMPLATE_BY_NAME[e.baseName]
-  return template && Number(template.rarity ?? 1) <= RARE_FLEE.maxRarity ? template : null
+  return template?.ultraRare === true ? template : null
 }
 
 function rareFleeEligible(e) {

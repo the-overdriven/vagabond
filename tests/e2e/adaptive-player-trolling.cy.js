@@ -7,7 +7,7 @@ describe('Adaptive Player Trolling', () => {
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })
 
-  it('punishes 70 distinct foraged forest tiles with one recurring Forest Spirit', () => {
+  it('punishes 200 distinct foraged forest tiles with one recurring Forest Spirit', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -20,14 +20,14 @@ describe('Adaptive Player Trolling', () => {
         for(let y=20;y<=98;y++)for(let x=20;x<=98;x++)map[y][x]='forest'
         snapCameraToPlayer();rebuildActiveLevelOccupancy()
         AdaptivePlayerTrolling.reset()
-        foragedTiles=new Set(Array.from({length:69},(_,i)=>keyXY(22+i,22)))
+        foragedTiles=new Set(Array.from({length:199},(_,i)=>keyXY(22+i%78,22+Math.floor(i/78))))
         AdaptivePlayerTrolling.syncTriggerFlags()
         check(!AdaptivePlayerTrolling.serialize().triggerFlags.forest_spirit,
-          '69 different forest harvests are not sufficient')
-        foragedTiles.add(keyXY(91,24))
+          '199 different forest harvests are not sufficient')
+        foragedTiles.add(keyXY(91,27))
         AdaptivePlayerTrolling.syncTriggerFlags()
         check(AdaptivePlayerTrolling.serialize().triggerFlags.forest_spirit,
-          '70 unique harvested tiles qualify even without loot')
+          '200 unique harvested tiles qualify even without loot')
         player.steps=500;AdaptivePlayerTrolling.onPlayerMoved()
         let spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
         check(spirit && spirit.baseName==='Forest Spirit' && !spirit.abilities.includes('ethereal') &&

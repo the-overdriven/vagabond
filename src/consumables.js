@@ -65,6 +65,7 @@ function applyFearScroll(effect) {
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.hp <= 0 || !onCurrentLevel(enemy) ||
         enemy.tier < 1 || enemy.tier > effect.maxTier ||
+        ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]?.family === 'undead' ||
         Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y)) > effect.radius) continue
     enemy.fearTurns = Math.max(enemy.fearTurns, duration)
     wakeSleepingEnemy(enemy)

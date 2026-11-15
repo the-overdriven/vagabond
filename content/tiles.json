@@ -344,7 +344,9 @@
       "ch": "░",
       "color": "#62574c",
       "bg": "#201b17",
-      "walk": true
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
     },
     "temple": {
       "ch": "☦",
@@ -453,7 +455,9 @@
       "mini": "#221f1a"
     },
     "cryptrubble": {
-      "walk": true,
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true,
       "ch": "%",
       "color": "#443f34",
       "bg": "#050403",

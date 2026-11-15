@@ -40,6 +40,23 @@ describe('Tactical consumables', () => {
       for (const id of ['death-shield','stone-skin','berserk'])
         cy.get(`[data-status="${id}"]`).should('be.visible').click()
       cy.get('#playerStatusDetail').should('be.visible').and('contain','−3 DEF')
+      cy.window().then(win => win.eval(`(() => {
+        const before=enemies, beforeGround=groundItems, beforeOccupied=occupied
+        const testNames=['Skeleton','Gargoyle','Giant Crab','Orc']
+        try {
+          enemies=testNames.map((name,i)=>{
+            const t=ENEMY_TEMPLATE_BY_NAME[name]
+            return {...t,baseName:name,alive:true,hp:t.hp,maxHp:t.hp,
+              x:player.x+i+1,y:player.y,level:currentZ,levelKind:currentZ===0?'surface':'chain',
+              caveIndex:-1,fearTurns:0}
+          })
+          applyFearScroll(itemDefinition('scrollOfFear').effect)
+          const byName=Object.fromEntries(enemies.map(e=>[e.baseName,e.fearTurns]))
+          if(byName.Skeleton!==0 || !(byName.Gargoyle>0) ||
+             !(byName['Giant Crab']>0) || !(byName.Orc>0))
+            throw Error('only undead are immune; constructs and non-humanoids can still fear')
+        } finally {enemies=before;groundItems=beforeGround;occupied=beforeOccupied}
+      })()`))
       cy.window().then(win => {
         const state = win.eval(`(() => {
           const saved=JSON.parse(JSON.stringify(buildSaveObject()));

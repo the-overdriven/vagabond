@@ -37,8 +37,8 @@
       {
         "upTo": 30.5,
         "result": "gold",
-        "goldMin": 5,
-        "goldMax": 15,
+        "goldMin": 15,
+        "goldMax": 30,
         "goldPerTier": true,
         "mfGoldMultiplier": 2
       },

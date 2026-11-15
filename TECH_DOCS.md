@@ -972,13 +972,25 @@ In tile-image mode, `content/rendering.json` maps ordinary cave floors
 (`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png`; one generic
 z:-2 burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave walls
 (`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
-these textures; `marble` has a lighter stone-floor image, and walkable
+these textures; `marble` has a lighter stone-floor image, and
 `cryptrubble` uses cave rubble, while `dwarvenrubble` alternates between
 cave rubble and `img/tiles/dwarven-rubble.png` with an even-weight,
 coordinate-based visual selection (no gameplay RNG). Crypt rubble in tile mode
 overlays the original `crypt2floor` tile without a painted square, just as
 dwarven rubble overlays its recorded floor underlay; ASCII backgrounds stay
-unchanged. Crypt stairs, mausoleum stairs, trap coffins, and the sarcophagus
+
+unchanged. Both rubble types block movement, enemy and player sight, and
+projectiles. A carried Pickaxe clears one adjacent rubble tile with one movement
+attempt, without moving into that tile. Clearing consumes one turn and produces
+the same nearby/distant noise response as striking a dwarven crate. Attempting
+without a Pickaxe costs no turn. Dwarven rubble exposes its saved floor
+underlay; crypt rubble exposes `crypt2floor`. The authoritative map and its matching cave
+masks update together, except Crypt 2's legacy standalone map, which must not
+modify the ordinary grotto at the same depth. Removed underlay records are discarded. Saves and
+replays preserve cleared passages as ordinary terrain, without a new persistent
+status or random excavation roll. Dungeon generation treats uncleared rubble as
+solid when verifying paths to mandatory locations; optional rubble cannot
+replace stairs or required progression tiles. Crypt stairs, mausoleum stairs, trap coffins, and the sarcophagus
 use existing transition or coffin images over the appropriate floor. The regular coffin already uses
 `specialTiles.coffin`. Underground Dwarven columns use
 `img/tiles/dwarven-column-indoor.png`; the two surface Fort entrance columns
@@ -2015,7 +2027,7 @@ which sprite appears. The throne and dais are new encoded terrain types,
 using the unique current-save codes `╙` and `╜`. Both graphics are transparent
 over the recorded stone floor: dais engravings overlay marble; the throne uses
 the dais as its underlay, saved and rotated alongside other per-level overlays.
-The hall has two to three small patches of walkable rubble along its side
+The hall has two to three small patches of obstructing rubble along its side
 edges and up to two decorative dwarven remains taken from the existing floor
 budget. Its central aisle, columns, dais, doorway landings and tactical slots
 remain clear of ambient dressing. Searchable corpses, regular chests and the
@@ -7327,6 +7339,13 @@ For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin,
 31 gives Fireball, and 96 reaches the Identification-scroll fallback. All new supplies use their
 catalog item IDs in chest outcomes, ground pickups, inventory actions and replay.
 
+An ordinary chest's gold result is a uniform **15–30 gold per chest tier**
+(tier 1: 15–30, tier 2: 30–60, tier 3: 45–90, tier 4: 60–120,
+tier 5: 75–150). Magic Find adds **2 gold per point** before the world's
+chest-gold multiplier and rounding. This changes the payout, not the gold
+result's **30.5%** chance or any of the other loot probabilities; scripted
+and guaranteed-artifact rewards have separate tables.
+
 The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
 configured chances.
@@ -7466,13 +7485,14 @@ that describes its rules without consuming it.
 
 | Item | Effect | Duration | Base value / sell value |
 |---|---|---|---|
-| Scroll of Fear | Tier 1–3 monsters within 5 tiles flee | 10 turns | 80g / 40g |
+| Scroll of Fear | Tier 1–3 monsters within 5 tiles flee, except undead | 10 turns | 80g / 40g |
 | Scroll of Death Shield | One fatal damage event leaves the player at 1 HP | Until spent | 200g / 100g |
 | Scroll of Chaos | Relocates the player and monsters within 8 tiles | Immediate | 120g / 60g |
 | Scroll of Fireball | 21-tile, wall-clipped blast; 10–50 damage per creature, including the player | Immediate | 250g / 125g |
 | Potion of Stone Skin | `+6 + floor(DEF / 6)` DEF; −3 GRACE | 15 turns | 60g / 30g |
 | Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
 
+Fear excludes undead regardless of tier; constructs and other non-humanoid species remain eligible.
 Radii use Chebyshev distance (eight-direction tile distance) on the current map
 and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
 Chaos can teleport creatures from one side of iron prison bars or a closed
@@ -8142,11 +8162,11 @@ so the Hunter can offer a fresh quest in the surviving world.
 
 ## Rare monster sightings and flight
 
-`src/rareFlee.js` applies to living, unalarmed surface enemies whose **base template**
-has `rarity <= 0.02`, independent of the `ultraRare` uniqueness flag, quest
-membership, prefix, humanoid type and wander mode. Current species: Myrka,
-Vampire, NULK, SKELD, DRUSK, GAUR, ASHFANG,
-MIREHOWL, NHALUUN. Kveld and other more common templates retain normal AI.
+`src/rareFlee.js` applies to unalarmed surface enemies whose **base template**
+sets `ultraRare: true`, independent of numerical spawn rarity, quest membership,
+prefix, humanoid type and wander mode. Current species: NULK, SKELD, DRUSK,
+GAUR, ASHFANG, MIREHOWL and NHALUUN. Unflagged low-weight species such as
+Myrka and Vampire use normal AI; setting a low rarity alone never enables flight.
 Underground encounters use normal AI; an off-level flight pauses until returning.
 
 Two sightings precede ordinary combat. An unaware, armed beast notices a visible,
@@ -8175,7 +8195,6 @@ Configuration in `content/enemy_config.json`:
 
 ```json
 "rareFlee": {
-  "maxRarity": 0.02,
   "sightings": 2,
   "sightRange": 5,
   "rearmDistance": 14,
@@ -8448,8 +8467,8 @@ Chance, reveal radius and the hint line are configured on the Merchant template
 in `content/npcs.json` under `fortHint`.
 
 The Merchant always offers reusable **Flint Stone for 100g** and **Brushwood
-for 10g per bundle**. Both have unlimited merchant stock and cannot be sold
-back. Brushwood purchases and ordinary pickup cannot exceed five carried;
+for 10g per bundle**. Both have unlimited merchant stock; Flint Stone can be sold for **50g**
+per stone, while Brushwood cannot be sold back. Brushwood purchases and ordinary pickup cannot exceed five carried;
 excess dropped bundles stay on the ground. Flint can also be found while
 completing boulders (5%), ordinary sand digging (1%) and opening chests (0.5%).
 
@@ -10934,7 +10953,7 @@ placement rules and seeded random draws.
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
 | 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
 | 10 | **The Previous Owner** (`previous_owner`) | Carry **any artifact named after a dwarf**, whether equipped or in inventory. | The actual named dwarf appears as a Ghost and pursues while the player possesses the artifact. |
-| 11 | **Debt Collector** (`debt_collector`) | Search **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
+| 11 | **Debt Collector** (`debt_collector`) | Recover loot from **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
 | 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
 | 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
@@ -10958,7 +10977,7 @@ placement rules and seeded random draws.
 | 32 | **Undead Warden** (`undead_shield_hunter`) | Reach **30 Marksmanship**. | An Undead Warden appears, blocking 75% of the first three landed arrow hits. |
 | 33 | **Depth Guardian** (`depth_guardian`) | Break **30 ordinary mineable walls** in the Dwarven Mines. | After a warning, a stone Guardian of the Deep appears on a connected passage. |
 | 34 | **Unfinished Business** (`unfinished_business`) | Wound **3 ordinary enemies below 25% HP** and leave them alive by disengaging. | One of the same survivors returns healed as a named Champion, retaining its enemy identity and gear. |
-| 35 | **Forest Spirit** (`forest_spirit`) | Forage **70 different forest tiles**. | A spectral Forest Spirit stalks the surface and agitates living forest beasts (+2 detection range). Its hunt can resume after 100 surface turns; killing it calms the beasts. |
+| 35 | **Forest Spirit** (`forest_spirit`) | Forage **200 different forest tiles**. | A spectral Forest Spirit stalks the surface and agitates living forest beasts (+2 detection range). Its hunt can resume after 100 surface turns; killing it calms the beasts. |
 | 36 | **Explorer Galleries** (`explorer_galleries`) | Explore **50% of reachable surface** and physically reach **both opposite world edges** on one axis. | On first visits to ruins galleries, 85% chance of a Champion shooter plus two extra archers. |
 | 37 | **Fort Quest** (`fort_quest`) | Reach **level 10** before ever visiting the Dwarven Fort; accept the Merchant’s commission. | Find the Dwarven Trade Ledger at **z:−5** and return it for **350g**. |
 | 38 | **Scroll Restock** (`scroll_restock`) | Successfully use **12 non-Identification scrolls** in one character’s life. | Merchant gains one extra copy of each scroll type used, including types not previously sold. |
@@ -11066,7 +11085,8 @@ objective without resetting its state or re-rolling anything. The quest is
 available only with Adaptive Player Trolling in Cursed World.
 
 Accepting reveals the fort gate and the surrounding **radius-2 / 5×5** area on
-the overworld map, without revealing corridors or underground treasures. The
+the overworld map, without revealing corridors or underground treasures.
+The Merchant mentions only the old dwarven ruins, never the ledger's exact floor or Z coordinate, both when offering the commission and on follow-up. The
 objective is a **Dwarven Trade Ledger**, a unique physical quest item placed
 on **z:-5, the second Dwarven Ruins floor** (not in the z:-3 entrance fort or
 on the first ruins floor at z:-4). This depth exists in all 3–5-floor ruins.
@@ -11618,7 +11638,7 @@ saved `killsBySpecies` counter, so no separate persistent counter is needed.
 The selected enemy, its alert state and the completed encounter survive
 save/load and replay. Other beasts and non-Cursed-World runs are unchanged.
 
-**Forest Spirit — overforaging:** In Cursed World, searching **70 distinct
+**Forest Spirit — overforaging:** In Cursed World, searching **200 distinct
 forest tiles** (including searches that find nothing) makes the Forest Spirit
 eligible for one scheduled encounter on the surface. Previously searched tiles
 do not count again; eligibility uses the already-persisted surface `foragedTiles`
@@ -11859,12 +11879,12 @@ are visible through tile feedback, message and enemy tooltip. Encounter
 eligibility, the selected outcome, timing, remaining guest and ground reward
 survive ordinary saves and replay. Ordinary worlds never track the trigger.
 
-**Debt Collector:** Searching **10 distinct searchable grave objects** across
+**Debt Collector:** Recovering loot from **10 distinct searchable grave objects** across
 the Dwarven Fort and Dwarven Ruins — `dwarvenremains`, Fort `ruinprop`, or
 `skeleton` — makes a unique dwarven Ghost eligible on either of the last two
 Dwarven Ruins floors. Only skeletons on the Fort/Ruins maps count; skeletons
-in caves, the Crypt, mines, and other regions do not. Every distinct first
-search counts, even when it yields no loot or only a progression key. Searching
+in caves, the Crypt, mines, and other regions do not. Only searches that actually recover loot or a progression key count. Empty
+searches do not count. Searching
 an already-looted object never increments the counter. All grave types share
 the existing `dwarvenRemainsSearched` save/replay counter; skeleton loot is
 unchanged and is not marked as dwarven loot for the Ghost's payment demand. The encounter uses the same depth-weighted,

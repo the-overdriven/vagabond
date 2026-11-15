@@ -39,6 +39,13 @@ describe('Non-gear item catalog', () => {
           'Fireball takes 1.5 percentage points from chest gold only')
         check(rates.gear===22.6&&rates.potion>13.69&&rates.potion<13.71,
           'existing gear and healing chances are unchanged')
+        const goldEntry=table.find(entry=>entry.result==='gold')
+        check(goldEntry.goldMin===15&&goldEntry.goldMax===30&&goldEntry.goldPerTier,
+          'ordinary chest gold rolls are 15–30 per chest tier')
+        for(let tier=1;tier<=5;tier++)check(goldEntry.goldMin*tier===15*tier&&
+          goldEntry.goldMax*tier===30*tier,'gold reward bounds for chest tier '+tier)
+        check(itemDefinition('flint').sellValue===50 && itemSellValue(createItem('flint'))===50,
+          'flint can be sold for half its merchant purchase value')
         maybeAutoEquipWeapon=()=>false
         player.inventory=[]
         for(const [roll,kind] of [[32,'arrows'],[40,'shortBow'],[40.5,'chitin']]){

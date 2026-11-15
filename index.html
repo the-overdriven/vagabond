@@ -2122,6 +2122,32 @@ more difficult:
     return {damage, broken, lootKind: broken ? target.crate.lootKind : null}
   }
 
+  // Clearing rubble changes the authoritative floor tile on this Z level.
+  // Cave maps are kept in sync for save/load and future floor inspection.
+  // One pickaxe blow resolves instantly; no additional per-rubble HP or RNG.
+  function clearRubbleAt(x, y) {
+    const rubble = map[y]?.[x]
+    if (rubble !== 'cryptrubble' && rubble !== 'dwarvenrubble') return false
+    if (!player.inventory.some(item => item.kind === 'pickaxe')) return false
+    const underlayKey = tileUnderlayKey(x, y, currentZ)
+    const floor = rubble === 'cryptrubble' ? 'crypt2floor' : tileUnderlays[underlayKey]
+    // Never fabricate a traversable floor if the generated underlay is missing.
+    if (!TILE[floor]?.walk) return false
+    map[y][x] = floor
+    if (rubble === 'dwarvenrubble') delete tileUnderlays[underlayKey]
+    const level = currentZ < 0 ? deepLevels[chainDepthForZ(currentZ) - 2] : null
+    // Legacy Crypt 2 is a separate map. Never edit the normal z:-2
+    // cave masks at the same coordinates when clearing crypt rubble.
+    if (level && (level.map === map || level.caveMaps?.includes(map))) {
+      for (const caveMap of level.caveMaps || []) {
+        if (caveMap[y]?.[x] === rubble) caveMap[y][x] = floor
+      }
+    }
+    minimapDirty = true
+    invalidateUndergroundFov()
+    return true
+  }
+
   function breachDungeonDoorAt(x, y) {
     const tileKey = map[y]?.[x]
     const info = DUNGEON_LOCK_STATE[tileKey]
@@ -8313,7 +8339,6 @@ more difficult:
         return
       }
       dwarvenRemains.looted = true
-      AdaptivePlayerTrolling.onDwarvenRemainsSearched()
       const roll = rng()
       if (roll < 0.14) {
         const gold = randInt(5, 25)
@@ -8344,6 +8369,7 @@ more difficult:
         player.inventory.push(equipment)
         lootLog(`You search the dwarven remains and recover ${equipment.name}.`, equipment)
       } else log('You search the dwarven remains, but find nothing.', 'info')
+      if (roll < 0.31) AdaptivePlayerTrolling.onDwarvenRemainsSearched()
       consumeItemTurn()
       return
     }
@@ -8353,15 +8379,14 @@ more difficult:
         return
       }
       skeleton.looted = true
-      // Only Fort and Dwarven Ruins graves count for the Debt Collector.
-      // Inspect the active floor rather than assuming every underground skeleton is dwarven.
-      if (skeleton.levelKind === 'chain' && (
+      // Only searches with loot in the Fort or Ruins count for the Debt Collector.
+      const qualifyingDwarvenSkeleton = skeleton.levelKind === 'chain' && (
         (currentZ === -3 && map === depthUndergroundMap(3)) ||
-        currentDungeonPackageId() === 'dwarvenRuins'))
-        AdaptivePlayerTrolling.onDwarvenRemainsSearched()
+        currentDungeonPackageId() === 'dwarvenRuins')
       if (skeleton.dungeonKey?.keyId) {
         addInventoryItem('dwarvenkey', {keyId:skeleton.dungeonKey.keyId, progressionKey:!!skeleton.dungeonKey.progressionKey})
         skeleton.dungeonKey = null
+        if (qualifyingDwarvenSkeleton) AdaptivePlayerTrolling.onDwarvenRemainsSearched()
         log('Beneath the dead dwarf’s ribs, you find a Dwarven Key.', 'loot')
         updateHud()
         return
@@ -8381,6 +8406,7 @@ more difficult:
         caveIndex: skeleton.caveIndex
       }
       groundItems.push(chest)
+      if (qualifyingDwarvenSkeleton) AdaptivePlayerTrolling.onDwarvenRemainsSearched()
       suppressLootLog = true
       deferredLootEquipMessage = ''
       try {
@@ -9387,6 +9413,26 @@ more difficult:
       flushPendingMove()
       return
     }
+    if (map[ny]?.[nx] === 'dwarvenrubble' || map[ny]?.[nx] === 'cryptrubble') {
+      clearAutoPath()
+      if (!player.inventory.some(item => item.kind === 'pickaxe')) {
+        log('You need a Pickaxe to clear the rubble.', 'info')
+        render();updateTooltip();flushPendingMove()
+        return
+      }
+      if (!clearRubbleAt(nx, ny)) {
+        log('The rubble cannot be cleared here.', 'info')
+        render();updateTooltip();flushPendingMove()
+        return
+      }
+      consecutiveWaitTurns = 0
+      if (!replayAnimationsDisabled && !replaySimulationMode)
+        void animateAttackLunge(player.x, player.y, nx, ny)
+      log('You clear the rubble with your Pickaxe.', 'good')
+      alarmEnemiesFromCrateStrike(nx, ny)
+      enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return
+    }
     if (map[ny]?.[nx] === 'dwarvencrate') {
       clearAutoPath()
       const target = dungeonCrateAt(nx, ny)
@@ -9779,14 +9825,14 @@ more difficult:
       inspectedGround = true
     } else if (currentGround && (currentGround.kind === 'dwarvenremains' || currentGround.kind === 'ruinprop' || currentGround.kind === 'anvil')) {
       const remains = currentGround.kind !== 'anvil'
-      log(`${remains ? 'Dwarven remains' : 'An abandoned dwarven anvil'}. ${currentGround.description || ''}${remains ? (currentGround.looted ? ' (searched)' : ' Press F to search them.') : ''}`, 'info')
+      log(`${remains ? 'Dwarven remains' : 'An abandoned dwarven anvil'}. ${currentGround.description || ''}${remains ? (currentGround.looted ? ' (searched)' : ' Use Forage to search them.') : ''}`, 'info')
       inspectedGround = true
     } else if (currentGround && (currentGround.kind === 'wheelbarrow' || currentGround.kind === 'goldcoin')) {
       log(currentGround.description, 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'explorerremains') {
       log(currentGround.description, 'info')
-      if (!currentGround.looted) log('There\'s something among the remains - press forage key to search them.', 'info')
+      if (!currentGround.looted) log('There\'s something among the remains - use Forage to search them.', 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'deadbody') {
       log(currentGround.adaptiveEventId==='early_descent'
@@ -9794,10 +9840,10 @@ more difficult:
         : `Here lies ${currentGround.name}, killed by ${currentGround.killer || '???'}. Pay respects or retrieve what is left.`, 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'stolenloot') {
-      log(currentGround.gold > 0 ? 'A thief\'s bag of stolen gold. Press the forage key to recover the coins.' : 'A thief\'s abandoned bag. Press the forage key to recover your stolen item.', 'info')
+      log(currentGround.gold > 0 ? 'A thief\'s bag of stolen gold. Use Forage to recover the coins.' : 'A thief\'s abandoned bag. Use Forage to recover your stolen item.', 'info')
       inspectedGround = true
     } else if (currentGround && currentGround.kind === 'playerremains') {
-      log('These are the remains of your last defeat. Press the forage key to recover the item you dropped.', 'info')
+      log('These are the remains of your last defeat. Use Forage to recover the item you dropped.', 'info')
       inspectedGround = true
     }
     if (inspectedGround) return
@@ -12968,7 +13014,7 @@ more difficult:
       ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
       ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind</div>' : ''}
-      ${e.adaptiveEventId === 'uninvited_guest' ? `<div class="pfx" style="color:${e.guestDisposition === 'friendly' ? '#a5e0ac' : '#e88469'}">${e.guestDisposition === 'friendly' ? 'Offers a cooked meal · press F when adjacent' : e.guestDisposition === 'warning' ? 'Drawn blade · one turn to retreat' : 'Hostile traveler'}</div>` : ''}
+      ${e.adaptiveEventId === 'uninvited_guest' ? `<div class="pfx" style="color:${e.guestDisposition === 'friendly' ? '#a5e0ac' : '#e88469'}">${e.guestDisposition === 'friendly' ? 'Offers a cooked meal · use Forage when adjacent' : e.guestDisposition === 'warning' ? 'Drawn blade · one turn to retreat' : 'Hostile traveler'}</div>` : ''}
       ${e.adaptiveEventId === 'mushroom_prophet' ? `<div class="pfx" style="color:#c9bf83">Prophecy · ${Number.isInteger(e.prophetWarnedAtTurn) ? e.prophetWarnedAtTurn === turnCount ? 'one turn to retreat' : 'hostile' : 'waiting to speak'}</div>` : ''}
       ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
@@ -13039,7 +13085,7 @@ more difficult:
       if (Campfires.isFire(g)) return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">${groundItemLabel(g)} · ${Campfires.burning(g) ? `${Campfires.remaining(g)} turns of fire` : 'cold'}${g.kind === 'campfire' && g.searched ? ' (searched)' : ''}</div><div>Stand beside it and press F to cook or rest.</div>`
+        html: `<div class="nm">${groundItemLabel(g)} · ${Campfires.burning(g) ? `${Campfires.remaining(g)} turns of fire` : 'cold'}${g.kind === 'campfire' && g.searched ? ' (searched)' : ''}</div><div>Stand beside it and use Forage to cook or rest.</div>`
       }
       if (g.kind === 'deadbody') return {
         mini: true,
@@ -13059,12 +13105,12 @@ more difficult:
       }
       if (g.kind === 'droppeditem') return {
         mini: true, enemy: null,
-        html: `<div class="nm">${groundItemLabel(g)}</div><div>${groundHere.filter(gi => gi.kind === 'droppeditem').length > 1 ? 'More items are piled here. ' : ''}Press F to pick up.</div>`
+        html: `<div class="nm">${groundItemLabel(g)}</div><div>${groundHere.filter(gi => gi.kind === 'droppeditem').length > 1 ? 'More items are piled here. ' : ''}Use Forage to pick up.</div>`
       }
       if (g.kind === 'skeleton' || g.kind === 'dwarvenremains' || g.kind === 'ruinprop') return {
         mini: true,
         enemy: null,
-        html: `<div class="nm">${g.kind === 'skeleton' ? 'Skeletal Remains' : 'Dwarven Remains'}${g.looted ? ' (searched)' : ''}</div>${g.looted ? '' : '<div>Press F to search</div>'}`
+        html: `<div class="nm">${g.kind === 'skeleton' ? 'Skeletal Remains' : 'Dwarven Remains'}${g.looted ? ' (searched)' : ''}</div>${g.looted ? '' : '<div>Use Forage to search</div>'}`
       }
       return {mini: true, enemy: null, html: `<div class="nm">${groundItemLabel(g)}</div>`}
     }
@@ -13073,9 +13119,6 @@ more difficult:
     }
     if (mx >= 0 && my >= 0 && mx < MAP_W && my < MAP_H && map[my][mx] === 'bigbell') {
       return {mini: true, enemy: null, html: `<div class="nm">Big Bell</div>`}
-    }
-    if (TowerMaze.isProtectedWall(currentZ,mx,my)) return {
-      mini:true,enemy:null,html:'<div class="nm">Reinforced Labyrinth Stone</div><div>This rock cannot be mined or broken through.</div>'
     }
     if (TowerMaze.atLever(mx,my)) return {
       mini:true,enemy:null,html:'<div class="nm">Old Lever</div><div>A heavy lever set into old stonework.</div>'

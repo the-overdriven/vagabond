@@ -79,7 +79,7 @@ describe('Rare monster sightings and flight', () => {
   it('stampedes out of an enclosed component without damage and keeps occupancy and home consistent', () => {
     cy.window().then(win => win.eval(`(() => {
       resetFleeArena()
-      const e=makeFleeEnemy('Vampire',1,{homeRadius:0}), old=keyXY(e.x,e.y), hp=player.hp
+      const e=makeFleeEnemy('GAUR',1,{homeRadius:0,wander:'homeReturn'}), old=keyXY(e.x,e.y), hp=player.hp
       map[e.y][e.x]='forest'
       for(const [dx,dy] of DIRS8) map[e.y+dy][e.x+dx]='wall'
       map[50][60]='forest'
@@ -87,7 +87,7 @@ describe('Rare monster sightings and flight', () => {
       rareStartFlee(e,1,true); rareFlee(e,1)
       fleeAssert(!e.rareFleeTurns && fleeGap(e)>=RARE_FLEE.rearmDistance, 'boxed first sighting relocates')
       fleeAssert(!occupied.has(old) && occupied.has(keyXY(e.x,e.y)), 'occupancy follows slip')
-      fleeAssert(e.homeX===e.x && e.homeY===e.y && enemyBiomes(ENEMY_TEMPLATE_BY_NAME.Vampire).includes(e.homeTileType), 'home reanchored in native biome')
+      fleeAssert(e.homeX===e.x && e.homeY===e.y && enemyBiomes(ENEMY_TEMPLATE_BY_NAME.GAUR).includes(e.homeTileType), 'home reanchored in native biome')
       fleeAssert(e.animStart===undefined && e.hp===200 && player.hp===hp && !e.aware && !e.alarmed, 'no slide or combat')
       fleeAssert(document.getElementById('logpanel').textContent.includes('stampedes through you'), 'stampede message')
       const stampede=rareStampedeAnims[0]
@@ -191,7 +191,7 @@ describe('Rare monster sightings and flight', () => {
         resetFleeArena(); e=makeFleeEnemy(name,6,extra); currentZ=z
         fleeAssert(!rareFleeEligible(e) && !rareFleeBlocksAttack(e), 'ineligible stale flags never grant immunity')
       }
-      resetFleeArena(); e=makeFleeEnemy('Vampire',5)
+      resetFleeArena(); e=makeFleeEnemy('DRUSK',5)
       map[player.y][player.x]='forest'; e.forestConcealX=player.x;e.forestConcealY=player.y
       fleeAssert(!rareStartFlee(e,5), 'forest concealment prevents sighting')
       map[player.y][player.x]='grass'; player.invisibleTurns=20

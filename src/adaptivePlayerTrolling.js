@@ -2617,7 +2617,7 @@ const AdaptivePlayerTrolling = (() => {
       enemies=enemies.filter(e=>e!==enemy);occupied.delete(keyXY(spot.x,spot.y))
       return false
     }
-    if (friendly) log('An Uninvited Guest steps into the firelight, holding out a warm meal. Approach and press F to accept it.', 'good')
+    if (friendly) log('An Uninvited Guest steps into the firelight, holding out a warm meal. Approach and use Forage to accept it.', 'good')
     else log('An Uninvited Guest approaches the fire with a drawn blade. You have one turn to retreat!', 'bad')
     if (!replayAnimationsDisabled && !replaySimulationMode)
       spawnDamageNumber(spot.x,spot.y,friendly?'FOOD!':'FLEE!',friendly?'#a5e0ac':'#e88469',0,1100)
@@ -4045,7 +4045,7 @@ const AdaptivePlayerTrolling = (() => {
   }
 
   // Forest foraging already uses persistent unique surface coordinates. No
-  // parallel kill/forage ledger is needed; 70 empty harvests also count.
+  // parallel kill/forage ledger is needed; empty harvests also count.
   function forestSpiritEntity() {
     const enemy = encounterActor('forest_spirit')
     return enemy?.hp > 0 ? enemy : null
@@ -4147,7 +4147,7 @@ const AdaptivePlayerTrolling = (() => {
     enemy.alarmedZ=0;enemy.alarmedLevelKind='surface';enemy.summonedTurn=turnCount
     occupied.add(keyXY(site.x,site.y))
     state.forestSpiritRestTurns=0
-    log('A familiar green glow rises on the horizon. The Forest Spirit has found you again.', 'bad')
+    log('A green glow rises on the horizon. The Forest Spirit has found you again.', 'bad')
   }
 
   function takeForestSpiritTurn(enemy) {
@@ -4501,9 +4501,9 @@ const AdaptivePlayerTrolling = (() => {
       // arbitrary new landmark; no RNG is drawn and the normal rumor survives.
       if (dwarvenRuin && Number.isInteger(dwarvenRuin.x) && Number.isInteger(dwarvenRuin.y))
         revealArea(dwarvenRuin.x,dwarvenRuin.y,cfg.mapRevealRadius)
-      log('Merchant says: You have seen enough of this world to handle a real errand. Find the Dwarven Trade Ledger on the second level of the dwarven ruins, two floors beneath the fort (depth -5). Bring it back, and I will pay you well. I have marked the fort on your map.', 'info')
+      log('Merchant says: You have seen enough of this world to handle a real errand. A Dwarven Trade Ledger was lost somewhere in the old dwarven ruins. Recover it and bring it back, and I will pay you well. I have marked the fort on your map.', 'info')
     } else if (option==='active') {
-      log('Merchant says: The Dwarven Trade Ledger lies on the second level of the dwarven ruins (depth -5). I will pay when you bring it to me.', 'info')
+      log('Merchant says: Look for the Dwarven Trade Ledger among the old dwarven ruins. Bring it to me and I will pay you.', 'info')
     } else {
       const index=player.inventory.findIndex(item=>item.kind===cfg.itemKind)
       if (index<0) return false
