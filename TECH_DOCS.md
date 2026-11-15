@@ -5059,8 +5059,10 @@ spawn pools or wear equipment. Before reveal, it is a regular-looking chest;
 there is no visual, inspect, tooltip or minimap indication of its identity.
 Its location may change while unseen (see **§45. Chests**). Revealing it
 replaces the chest with a monster at exactly the same world coordinates and
-shows the normal **Ambush!** effect. It makes one immediate adjacent attack,
-which replaces (not adds to) its next ordinary enemy action.
+shows the normal **Ambush!** effect. Mere proximity does not reveal it while
+its target is invisible (including god-mode invisibility), but stepping onto
+or trying to open its disguised chest still reveals it. It makes one immediate
+adjacent attack, which replaces (not adds to) its next ordinary enemy action.
 
 After revealing, the Mimic pursues and fights using normal hostile-monster AI
 (AGGRO 4), including pathfinding around corners; it does not wander while idle.
@@ -7372,16 +7374,20 @@ labyrinth goal chests are excluded from replacement. The first Tower labyrinth
 layer (z:−1) has **one additional, guaranteed Mimic** in a dry, nonessential
 dead end and is **not** included in the Dwarven cap.
 
-An unrevealed Mimic is indistinguishable from a real chest until the player
-moves within **Chebyshev distance 1** (including diagonals) or bumps it. Each
+An unrevealed Mimic is indistinguishable from a real chest until a visible
+player moves within **Chebyshev distance 1** (including diagonals), or the
+player attempts to enter/open the disguised chest (even while invisible). Each
 consumed player turn checks Mimics **only on the active level**. Being in FOV
 resets the unseen counter and cancels an unrolled episode. After **three
 consecutive unseen turns**, each out-of-view episode receives precisely one
 **65% chance** to move by one of its eight neighboring squares. Failing the
 roll, or finding no safe destination, means it does not move again until a
 new episode; re-entering a level starts a fresh unseen episode. A destination
-must be safe, unseen, nonhazardous and unoccupied, must not be stairs/door/
-trap/loot, and must not sever a one-tile passage. No animation, detection
+must be safe, unseen, nonhazardous and unoccupied, and must not be stairs,
+doors, traps or loot. The hidden chest is a traversable ground item, not a
+wall: movement into a one-tile passage does not change walkable terrain or
+sever connectivity. A failed shift requires a blocked, unsafe, occupied or
+visible destination; only successful shifts change the position. No animation, detection
 message, tooltip, or new map-memory marker exposes the movement. The terrain
 remains explored, but its former chest sprite is not remembered there.
 

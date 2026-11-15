@@ -37,6 +37,22 @@ describe('Guaranteed elevated tower',()=>{
           hiddenMazeChests[0].x===towerMaze.levels[0].mimicSpot.x &&
           hiddenMazeChests[0].y===towerMaze.levels[0].mimicSpot.y &&
           undergroundMap[hiddenMazeChests[0].y][hiddenMazeChests[0].x]==='cavefloor'
+        const invisibleApproach=(()=>{
+          const chest=hiddenMazeChests[0]
+          if(!chest)return false
+          const before={x:player.x,y:player.y,z:currentZ,cave:currentCave,
+            mode:player.godMode,turns:player.invisibleTurns,grid:map}
+          try {
+            currentZ=-1;currentCave=-1;map=undergroundMap
+            player.x=chest.x+1;player.y=chest.y
+            player.godMode=false;player.invisibleTurns=4
+            return !Mimics.revealAdjacent() && groundItems.includes(chest)
+          } finally {
+            player.x=before.x;player.y=before.y
+            player.godMode=before.mode;player.invisibleTurns=before.turns
+            currentZ=before.z;currentCave=before.cave;map=before.grid
+          }
+        })()
         const count=z=>enemies.filter(e=>e.alive&&e.towerMazeResident&&e.level===z).length
         const before={x:towerMaze.center.x,y:towerMaze.center.y}
         currentZ=0;map=surfaceMap;Object.assign(player,before)
@@ -83,7 +99,7 @@ describe('Guaranteed elevated tower',()=>{
         const saved=buildSaveObject()
         loadGameFromObject(saved,{isReplayInit:true})
         return {down,deep,back,lever,sealed,basementFeedback,towerFeedback,
-          mimicInDeadEnd,noSpoilers,persisted:towerMaze.active,
+          mimicInDeadEnd,invisibleApproach,noSpoilers,persisted:towerMaze.active,
           monsters:[count(-1),count(-2)],
           ghost:enemies.some(e=>e.towerMazeResident &&
             (e.abilities.includes('fly')||e.abilities.includes('ethereal'))),
@@ -93,7 +109,7 @@ describe('Guaranteed elevated tower',()=>{
       })()`)
       expect(result).to.include({down:true,deep:true,back:true,lever:true,
         sealed:true,basementFeedback:true,towerFeedback:true,
-        mimicInDeadEnd:true,noSpoilers:true,persisted:true,ghost:false,chest:1,
+        mimicInDeadEnd:true,invisibleApproach:true,noSpoilers:true,persisted:true,ghost:false,chest:1,
         upper:'mazestairsup',lower:'caveup'})
       expect(result.monsters[0]).to.be.within(8,15)
       expect(result.monsters[1]).to.be.within(8,15)

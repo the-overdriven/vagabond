@@ -112,27 +112,11 @@ const Mimics = (() => {
     mark(labyrinth,'mimic_labyrinth_1')
   }
 
-  function walkable(x,y,excludedX,excludedY) {
-    if (x===excludedX && y===excludedY) return false
-    return !!TILE[map[y]?.[x]]?.walk && !['water','river','lava'].includes(map[y][x])
-  }
-  // The chest is treated as a blocker for this safety check even though
-  // unopened chests are ordinarily walkable. Use the game's 8-way geometry.
-  function keepsPassageOpen(x,y) {
-    const neighbors=dirs.filter(([dx,dy])=>walkable(x+dx,y+dy,x,y))
-      .map(([dx,dy])=>({x:x+dx,y:y+dy}))
-    if(neighbors.length<=1)return true
-    const first=neighbors[0],visited=new Set([key(first.x,first.y)]),queue=[first]
-    for(let head=0;head<queue.length;head++)for(const [dx,dy] of dirs) {
-      const px=queue[head].x+dx,py=queue[head].y+dy,k=key(px,py)
-      if(Math.max(Math.abs(px-x),Math.abs(py-y))>5 || visited.has(k) ||
-          !walkable(px,py,x,y))continue
-      visited.add(k);queue.push({x:px,y:py})
-    }
-    return neighbors.every(p=>visited.has(key(p.x,p.y)))
-  }
   function shift(chest,visible) {
     const options=[]
+    // A disguised chest is an ordinary, traversable ground item. Treating it
+    // as a solid blocker falsely prevented shifts in one-tile corridors and
+    // maze dead ends; its destination does not alter terrain connectivity.
     for (const [dx,dy] of dirs) {
       const x=chest.x+dx,y=chest.y+dy,tile=map[y]?.[x]
       if (!TILE[tile]?.walk || tile==='water' || tile==='river' ||
@@ -142,8 +126,7 @@ const Mimics = (() => {
         enemies.some(e=>e.alive&&onCurrentLevel(e)&&e.x===x&&e.y===y) ||
         !DungeonTraps.safeSpawn(x,y,currentZ) ||
         DungeonTraps.isTrigger(tile) || DungeonHazards.knownDanger(x,y) ||
-        DungeonHazards.isCrusherTrigger(x,y) || DungeonHazards.gasAt(x,y) ||
-        !keepsPassageOpen(x,y)) continue
+        DungeonHazards.isCrusherTrigger(x,y) || DungeonHazards.gasAt(x,y)) continue
       options.push({x,y})
     }
     if(!options.length)return false
@@ -212,6 +195,7 @@ const Mimics = (() => {
     return true
   }
   function revealAdjacent() {
+    if (playerIsInvisible()) return false
     const adjacent=groundItems.filter(g=>g.isMimic&&onCurrentLevel(g)&&
       Math.max(Math.abs(g.x-player.x),Math.abs(g.y-player.y))<=1)
     for (const chest of adjacent) if(player.hp>0 && !deathTransition)reveal(chest)

@@ -45,6 +45,7 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
       loot:{gold:42,items:[createItem('arrows',{count:10})]}}
     groundItems.push(testChest)
     globalThis.fakeVisible=new Set()
+    globalThis.originalMimicFov=currentUndergroundFov
     currentUndergroundFov=()=>fakeVisible
   })()`)
   run('Mimics.update()')
@@ -90,6 +91,58 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
   })()`)
   console.log('PASS single permitted destination and forbidden surrounding tiles')
 
+  // Real one-wide dead-end geometry used by the Tower labyrinth: the disguised
+  // chest does not obstruct the corridor, so an eligible shift must be able to
+  // occupy its only adjacent dry floor without changing the shared map.
+  const deadEnd=state(`(()=>{
+    for(let y=75;y<=85;y++)for(let x=75;x<=85;x++)map[y][x]='dwarvenwall'
+    for(let x=80;x<=84;x++)map[80][x]='marble'
+    const before=map.map(row=>row.slice())
+    let moved=0
+    for(let e=0;e<400;e++){
+      testChest.x=80;testChest.y=80;testChest.episode=e
+      fakeVisible=new Set(['80,80']);Mimics.update()
+      fakeVisible=new Set();Mimics.update();Mimics.update();Mimics.update()
+      if(testChest.x!==80||testChest.y!==80){
+        if(testChest.x!==81||testChest.y!==80)throw Error('Shift escaped the one-tile corridor')
+        moved++
+      }
+    }
+    return {moved,terrainUnchanged:JSON.stringify(map)===JSON.stringify(before)}
+  })()`)
+  assert(deadEnd.moved>=210&&deadEnd.moved<=310,
+    `narrow dead-end shift rate: ${deadEnd.moved}/400`)
+  assert.equal(deadEnd.terrainUnchanged,true,'shifts never change corridor terrain')
+  assert.equal(run('isWalkableForPlayer(81,80)'),true,
+    'an unrevealed chest does not make a one-wide corridor impassable')
+  console.log(`PASS narrow dead-end shifts without wall carving (${deadEnd.moved}/400)`)
+
+  // Exercise the actual underground FOV, not a simulated visibility Set.
+  // A one-wide passage bends behind an opaque wall; five consumed turns after
+  // leaving line of sight must count as a single unseen episode.
+  run(`(()=>{
+    for(let y=74;y<=88;y++)for(let x=74;x<=90;x++)map[y][x]='dwarvenwall'
+    for(let y=80;y<=84;y++)map[y][80]='marble'
+    for(let x=80;x<=88;x++)map[84][x]='marble'
+    testChest.x=80;testChest.y=80;testChest.unseenTurns=0
+    testChest.rolled=false;testChest.episode=0
+    currentUndergroundFov=originalMimicFov
+    player.x=80;player.y=82
+    invalidateUndergroundFov()
+    if(!currentUndergroundFov().has('80,80'))throw Error('Visible end of corridor')
+    Mimics.update()
+    player.x=85;player.y=84
+    invalidateUndergroundFov()
+    if(currentUndergroundFov().has('80,80'))throw Error('Corner did not hide chest')
+    for(let t=0;t<5;t++)Mimics.update()
+  })()`)
+  assert.equal(run('testChest.episode'),1,'five turns around a real FOV corner is one episode')
+  assert.equal(run('testChest.rolled'),true)
+  run('currentUndergroundFov=()=>fakeVisible;fakeVisible=new Set()')
+  console.log('PASS real underground FOV corner starts one shift episode')
+
+
+
   // Save the pending episode, restore, and ensure the exact same episode result.
   run(`(()=>{
     for(let y=70;y<90;y++)for(let x=70;x<90;x++)map[y][x]='marble'
@@ -116,6 +169,14 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
     player.x=testChest.x+1;player.y=testChest.y+1;
     globalThis.oldGold=player.gold;globalThis.oldArrows=player.inventory.filter(i=>i.kind==='arrows').reduce((n,i)=>n+(i.count||1),0)
   })()`)
+  run(`player.godMode=false;player.invisibleTurns=4`)
+  assert.equal(run('Mimics.revealAdjacent()'),false,
+    'ordinary invisibility prevents proximity revealing a Mimic')
+  assert.equal(run('groundItems.some(g=>g.id==="mimic_test")'),true)
+  run('player.godMode=true;player.godInvisible=true')
+  assert.equal(run('Mimics.revealAdjacent()'),false,
+    'god-mode invisibility also prevents proximity revealing')
+  run('player.godMode=false;player.invisibleTurns=0')
   assert.equal(run('Mimics.revealAdjacent()'),true)
   assert.equal(run('groundItems.some(g=>g.id==="mimic_test")'),false)
   assert.equal(run('popupRaised'),true)
@@ -165,7 +226,10 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
       loot:{gold:5,items:[]}})
     WORLD_GEN_CONFIG.cavePopulation.deepPrefixChance=1
   })()`)
-  assert.equal(run('Mimics.revealBump(50,50)'),true)
+  run('player.invisibleTurns=5')
+  assert.equal(run('Mimics.revealBump(50,50)'),true,
+    'an invisible player opening/entering a chest still triggers the ambush')
+  run('player.invisibleTurns=0')
   assert.equal(run('groundItems.some(g=>g.id==="mimic_bump")'),false)
   assert.equal(run('enemies.some(e=>e.baseName==="Mimic"&&e.alive&&e.prefix)'),true)
   assert.equal(run('enemies.find(e=>e.baseName==="Mimic"&&e.alive).equipment'),null)
