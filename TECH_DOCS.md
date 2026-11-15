@@ -23,6 +23,17 @@
 
 Generic roguelike mechanics are not assumed unless implemented.
 
+## Offline updates
+
+The service worker caches essential game files for offline play. Its cache key
+combines the displayed game version (`src/version.js`) with an independent
+numeric `CACHE_REVISION` in `sw.js`. Increase the revision when deploying
+changes that must refresh offline assets without a significant gameplay feature;
+change the displayed game version only for significant gameplay additions.
+Activating the updated worker removes the previous Vagabond caches, while
+normal online requests continue to refresh cached content. The cache revision
+does not affect game rules, save formats or replay determinism.
+
 ---
 
 # 2. Core Game State
@@ -10713,10 +10724,10 @@ names and resolved additive effects, or an empty array for normal worlds),
 and `game_version`
 (the current release version from `src/version.js`). `WORLD_SEED` is reassignable so
 loading a save restores its original seed instead of reporting the new page
-load's seed. The service worker imports that same version file for its cache
-name; bump `src/version.js` for each release. Registration bypasses the HTTP
-cache for service-worker imports so a changed version file triggers an update
-even when `sw.js` itself has not changed. Playtime is not recorded:
+load's seed. The service worker imports that same version file as part of its
+cache key, alongside the independent cache revision described in §1.
+Registration bypasses the HTTP cache for service-worker imports so changes to
+that version file can trigger a worker update even without editing `sw.js`. Playtime is not recorded:
 there is no reliable persisted playtime counter. Neither full saves nor
 replay/RNG histories are uploaded. The existing service worker precaches
 `src/supabase.js`, `src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.

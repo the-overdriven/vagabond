@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // HOW TO SHIP AN UPDATE
 //   1. Deploy your new files (images, JSON, index.html ...).
-//   2. Change the cache key below to refresh offline files on every deploy.
-//      Only bump the displayed game version for major gameplay features.
+//   2. Increment CACHE_REVISION to refresh offline files when the displayed
+//      game version stays the same. Bump the game version only for major features.
 //
 // The phone notices the updated worker, deletes the old cache and downloads
 // fresh files. Even if you forget step 2,
@@ -11,8 +11,9 @@
 // ---------------------------------------------------------------------------
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
-// Refresh patched game scripts without changing the displayed game version.
-const CACHE_VERSION = CACHE_PREFIX + self.VAGABOND_GAME_VERSION + '-camp-right-dock-cornered-bow-quick-gear-bow-retreat-path-strength-kitchens-worldgen-first-start-ultrarare-invisible-sense';
+// Independent from the displayed game version; increment for cache refreshes.
+const CACHE_REVISION = 18;
+const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
 
