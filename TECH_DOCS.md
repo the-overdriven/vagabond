@@ -9427,18 +9427,19 @@ instead of stacking incompatible edge strips.
 Underground water receives no surface-shore overlays. These visual rules do
 not change world generation, FOV, saves, replay state or gameplay RNG.
 
-Hills and boulders each have their own regular and snow-covered sprite
-families. Hills retain single/left/middle/right variants; boulders retain
-left/middle/right variants, using the middle image for isolated clusters.
-Connectivity selects the shape independently from snow coverage, including
-mixed rows at biome edges. Transparent sprites show grass or snow beneath
-them, and that same ground selection determines their artwork. A recorded
-underlay at the coordinate takes priority; grass-backed rocks stay regular
-beside snow. When no ground biome is recorded, the existing neighboring-snow
-fallback is shared by the artwork and its ground. This is a visual inference,
-not new stored biome data. The tower background uses the same rock-ground and
-snow-artwork selection. Hills, boulders and mountains remain distinct;
-mountain artwork and ASCII terrain retain their existing behavior.
+Hills, boulders and mountains each use their own regular and snow-covered
+sprite families. Hills retain single/left/middle/right variants; boulders
+retain left/middle/right variants, using the middle image for isolated
+clusters. Connectivity selects the shape independently from snow coverage,
+including mixed rows at biome edges. Transparent sprites show grass or snow
+beneath them, and that same visible ground selection determines their
+artwork. Hills and boulders prefer their recorded underlay when available;
+without one, nearby snow determines both their ground and artwork. Mountains
+likewise use the existing ground selection so a mountain rendered over snow
+appears snow-covered even if its stored terrain is `mountain`. These artwork
+choices do not change terrain IDs, collision, FOV or ASCII glyphs, nor any
+saved world data. The surface and tower views use the same selection at the
+same X/Y coordinates.
 On enclosed upper floors (`z:+1` through `z:+3`), a 50% black overlay
 covers only the outside surface, including its monsters. The summit (`z:+4`)
 leaves this view undarkened. Tower walls, interiors, actors and items are never

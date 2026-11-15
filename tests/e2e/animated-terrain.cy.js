@@ -202,13 +202,14 @@ describe('Animated terrain rendering', () => {
     })
   })
 
-  it('matches transparent hill variants to their ground without breaking mixed rows', () => {
+  it('matches hill, boulder and mountain artwork to the snow beneath it at every surface elevation', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
-        const previous = {map, tileUnderlays, currentZ, USE_TILE_IMAGES}
+        const previous = {map, surfaceMap, tileUnderlays, currentZ, USE_TILE_IMAGES}
         try {
           currentZ = 0; USE_TILE_IMAGES = true; tileUnderlays = {}
           map = Array.from({length:7}, () => Array(7).fill('snow'))
+          surfaceMap = map
           const hills = RENDER_STYLE.terrainTiles
           for (const x of [2,3,4]) map[3][x] = 'hill'
           tileUnderlays[keyXY(2,3)] = 'grass'
@@ -226,18 +227,49 @@ describe('Animated terrain rendering', () => {
             .every(key => preloadedImages.has(hills.hillSnow[key]))
           map[3][3] = 'snowmountain'
           const mountain = terrainVisual('snowmountain',3,3).image === hills.snowmountain.singleImage
+          // Ordinary mountains with snow visible under them should share the
+          // snowmountain artwork, without changing their stored terrain ID.
+          map = Array.from({length:7}, () => Array(7).fill('grass'))
+          surfaceMap = map
+          tileUnderlays = {}
+          map[3][3] = 'mountain'
+          tileUnderlays[keyXY(3,3)] = 'snow'
+          const snowyMountain = terrainVisual('mountain',3,3).image === hills.snowmountain.singleImage &&
+            overlayBaseTileKey('mountain',3,3) === 'snow' && map[3][3] === 'mountain'
+          const elevations = [0,1,2,3,4].map(z => {
+            currentZ = z
+            return terrainVisual('mountain',3,3,surfaceMap).image
+          })
+          const towerSame = elevations.every(image => image === hills.snowmountain.singleImage)
+          currentZ = 0
+          tileUnderlays[keyXY(3,3)] = 'grass'
+          const ordinaryMountain = terrainVisual('mountain',3,3).image === hills.mountain.singleImage
+          delete tileUnderlays[keyXY(3,3)]
+          map[2][3] = 'snow'
+          const inferredSnowMountain = terrainVisual('mountain',3,3).image === hills.snowmountain.singleImage
+          // Mixed rows keep the original left/middle/right mountain silhouette.
+          map[3][2] = map[3][4] = 'mountain'
+          tileUnderlays[keyXY(2,3)] = 'grass'
+          tileUnderlays[keyXY(3,3)] = 'snow'
+          tileUnderlays[keyXY(4,3)] = 'snow'
+          map[2][3] = 'grass'
+          const mountainRow = [2,3,4].map(x => terrainVisual('mountain',x,3).image)
           USE_TILE_IMAGES = false
-          const ascii = overlayBaseTileKey('hill',3,3) === null
-          return {row,bases,single,assetsLoaded,mountain,ascii,snowyBoulder,boulderAssets}
+          const ascii = overlayBaseTileKey('hill',3,3) === null && TILE.mountain.ch === '▲'
+          return {row,bases,single,assetsLoaded,mountain,ascii,snowyBoulder,boulderAssets,
+            snowyMountain,towerSame,ordinaryMountain,inferredSnowMountain,mountainRow}
         } finally {
-          map = previous.map; tileUnderlays = previous.tileUnderlays
+          map = previous.map; surfaceMap = previous.surfaceMap; tileUnderlays = previous.tileUnderlays
           currentZ = previous.currentZ; USE_TILE_IMAGES = previous.USE_TILE_IMAGES
         }
       })()`)
       expect(result.row).to.deep.equal(['img/tiles/hill-left.png',
         'img/tiles/hill-snow-middle.png','img/tiles/hill-snow-right.png'])
       expect(result.bases).to.deep.equal(['grass','snow','snow'])
-      for (const key of ['single','assetsLoaded','mountain','ascii','snowyBoulder','boulderAssets']) expect(result[key],key).to.equal(true)
+      expect(result.mountainRow).to.deep.equal(['img/tiles/mountain-left-tall.png',
+        'img/tiles/snow-mountain-middle.png','img/tiles/snow-mountain-right.png'])
+      for (const key of ['single','assetsLoaded','mountain','ascii','snowyBoulder','boulderAssets',
+        'snowyMountain','towerSame','ordinaryMountain','inferredSnowMountain']) expect(result[key],key).to.equal(true)
     })
   })
 

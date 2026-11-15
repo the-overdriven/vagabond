@@ -10851,6 +10851,10 @@ more difficult:
     }
   }
 
+  // A snow ground under a surface rock determines its sprite family. This
+  // remains cosmetic: mountains keep their terrain ID and collision rules.
+  const surfaceSnowRockArt = {hill: 'hillSnow', boulder: 'boulderSnow', mountain: 'snowmountain'}
+
   function terrainVisual(tileKey, x, y, terrain = map) {
     if (terrain === surfaceMap && tower && x === tower.entrance.x && y === tower.entrance.y &&
         ['dwarvendoorclosed','dwarvendooropen','towerentrancesealed'].includes(tileKey)) return (
@@ -10931,8 +10935,9 @@ more difficult:
     const rightSame = terrain?.[y]?.[x + 1] === tileKey
 
     let image = visual.variants?.length ? tileVariantImage(visual.variants, x, y) : visual.image
-    const linearVisual = ['hill','boulder'].includes(tileKey) && terrain === surfaceMap && overlayBaseTileKey(tileKey, x, y, terrain) === 'snow'
-      ? (RENDER_STYLE.terrainTiles?.[tileKey === 'hill' ? 'hillSnow' : 'boulderSnow'] || visual)
+    const snowRockArt = surfaceSnowRockArt[tileKey]
+    const linearVisual = snowRockArt && terrain === surfaceMap && overlayBaseTileKey(tileKey, x, y, terrain) === 'snow'
+      ? (RENDER_STYLE.terrainTiles?.[snowRockArt] || visual)
       : visual
     if (linearVisual.leftImage || linearVisual.middleImage || linearVisual.rightImage || linearVisual.singleImage) {
       if (leftSame && rightSame) image = linearVisual.middleImage || linearVisual.image
