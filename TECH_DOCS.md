@@ -572,8 +572,12 @@ movement/combat rules. The pursuit ends if the creature dies, becomes unseen,
 leaves the visible screen or level, or cannot be reached using known terrain.
 Clicking empty ground still targets a fixed tile. Unreachable targets do not
 start a route. Coarse-pointer/mobile input does not use this cursor or
-desktop monster-click behavior. The sword SVG is decoded with the essential startup
-images, before character selection opens, and the cursor uses that preloaded URL.
+desktop monster-click behavior. Both sword and bow SVGs are decoded with the essential startup images,
+before character selection opens. The game rasterizes them into ready-to-use
+PNG data cursors, including a greyed-out bow variant for unavailable shots;
+no new SVG fetch or PNG conversion is performed on first hover. All three
+variants retain their sword/arrow-tip hotspots. Touch layouts do not prepare
+or show desktop cursors.
 The chase target and planned route are transient UI state, cleared by loading a
 save or replay; the executed movement and combat actions remain individually
 recorded for deterministic playback.
@@ -681,9 +685,9 @@ Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
 its original brown floor. Completing an overworld boulder has a **5%** chance
 to yield one reusable Flint Stone; individual strikes and underground deposits
-do not roll for flint. Clearing an overworld boulder restores its underlying 
-surface terrain (grass, forest, hill or sand), even after world rotation or save/load. 
-Both minimaps immediately reflect the cleared tile, as does the full-world map when opened.
+do not roll for flint. Clearing an overworld boulder restores its underlying surface terrain (grass, forest, hill
+or sand), even after world rotation or save/load. Both minimaps immediately
+reflect the cleared tile, as does the full-world map when opened.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -767,6 +771,11 @@ summoning). New messages still push older ones up immediately. Popups never
 delay input or affect combat resolution, saves, or replay RNG.
 The foraging **found!** label starts closer to its tile, remains fully visible
 for 320 ms and then rises/fades across the rest of a 1,150 ms lifetime.
+Confirmed forest and cave-exit ambushes show a **red Ambush!** banner over the
+player's tile with the same hold, rise and fade. No warning appears for an
+ambush that fails its roll or cannot spawn, and concealed wall ambushers keep
+their original reveal timing. The banner is purely visual, consumes no seeded
+randomness, and is skipped during fast replay simulation.
 Successful monster drops with an absolute chance below 10%, all artifacts, and
 unusually strong rare equipment modifiers emit one gold sparkle at the death
 tile. Equipment qualifies by the less-than-10% upper tail of the modifier
@@ -8661,8 +8670,10 @@ alone does not guarantee an encounter. Ancient-forest ambushes use tier 3+
 templates, ordinary forest ambushes tier 1–2. Elves, invisible players, and god
 mode do not trigger forest ambushes. A spawned ambusher begins aware and
 Alarmed immediately, gaining the usual **+2 effective AGGRO** and its marker;
-the separate bystander sound message does not appear. Its Alarmed level
-identity is stored through the normal enemy save fields.
+the separate bystander sound message does not appear. A successful
+forest ambush also displays the red Ambush! banner; this does not reveal
+otherwise-hidden enemies. Its Alarmed level identity is stored through the
+normal enemy save fields.
 
 Planned Herbalist ideas in source comments are not treated as current mechanics.
 
@@ -11414,6 +11425,8 @@ this visit. A failed roll also ends the visit, so climbing back into the same
 cave does **not** permit another immediate attempt. The player must spend
 another 100 turns and kill another qualifying enemy on a new visit. Once it
 successfully spawns, the encounter cannot repeat during that character's life.
+The player sees the same red Ambush! banner used for forest ambushes at the
+moment the encounter is announced.
 Cave-visit identity, last counted turn, turn count and species kills persist in
 save/replay snapshots; the chance roll uses seeded gameplay RNG, independent of
 transition animation. All thresholds, odds and group dimensions are stored in

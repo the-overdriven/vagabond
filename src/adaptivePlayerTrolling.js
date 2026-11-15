@@ -1687,6 +1687,7 @@ const AdaptivePlayerTrolling = (() => {
       occupied.add(keyXY(pos.x,pos.y))
     }
     log(`Ambush! ${positions.length} ${pool.name}s have been waiting near the cave exit!`, 'bad')
+    spawnAmbushAnim()
     return true
   }
 

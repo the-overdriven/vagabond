@@ -15,6 +15,13 @@ describe('Player Short Bow', () => {
       const hunting=WEAPONS.find(w=>w.name==='Hunting Bow')
       check(short?.tier===1&&short.rangedAtk===5&&short.rangedRange===6,'short bow is unchanged')
       check(hunting?.tier===3&&hunting.rangedAtk===7&&hunting.rangedRange===6,'Hunting Bow stats')
+      if (!window.matchMedia('(pointer: coarse)').matches) {
+        check(preloadedImages.has(DESKTOP_ENEMY_CURSOR_IMAGE) && preloadedImages.has(DESKTOP_BOW_CURSOR_IMAGE),
+          'both source cursors decoded before character creation')
+        check([desktopSwordCursor,desktopBowCursor,desktopDisabledBowCursor].every(
+          cursor=>cursor?.startsWith('data:image/png;base64,')),
+          'sword, bow, and disabled bow cursors are rasterized before the game begins')
+      }
       const bow=makeBowItem('Hunting Bow')
       check(bow.twoHanded&&bow.rangedAtk===7&&bow.atk===2&&bow.baseValue===600,'Hunting Bow item')
       player.equip={weapon:bow,armor:null,shield:null}
@@ -118,12 +125,12 @@ describe('Player Short Bow', () => {
         lastMousePx=(enemy.x-camX+0.5)*TILE_PX
         lastMousePy=(enemy.y-camY+0.5)*TILE_PX
         updateTooltip()
-        check(canvas.style.cursor.includes('red-arrow.svg'),
+        check(canvas.style.cursor.includes(desktopBowCursor) && desktopBowCursor?.startsWith('data:image/png;base64,'),
           'cursor is enabled before a valid shot')
         check(shootEnemy(enemy),'legal shot succeeds')
         const afterHp=enemy.hp
         check(afterHp===beforeHp-5,'ranged damage uses fixed five ATK')
-        check(canvas.style.cursor.includes('red-arrow.svg'),
+        check(canvas.style.cursor.includes(desktopBowCursor) && desktopBowCursor?.startsWith('data:image/png;base64,'),
           'cursor refreshes immediately after a shot if ammunition and line of fire remain')
         check(enemy.alarmed,'shot immediately alarms its target')
         check(turnCount===1 && player.inventory[0].count===2,'valid shot costs one turn and one arrow')
@@ -290,7 +297,7 @@ describe('Player Short Bow', () => {
         player.baseSpd=5;chance=()=>true
         for(let y=39;y<=41;y++)map[y][47]='grass'
         setDesktopCanvasCursor(pursuer)
-        check(canvas.style.cursor.includes('red-arrow.svg?v=20261107-slim-nock'),
+        check(canvas.style.cursor.includes(desktopBowCursor) && desktopBowCursor?.startsWith('data:image/png;base64,'),
           'equipped bow uses the red arrow cursor for a legal shot')
         const farAway=spawn('Goblin','response-far-rat',49)
         setDesktopCanvasCursor(farAway)

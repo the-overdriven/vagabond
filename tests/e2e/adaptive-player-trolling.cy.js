@@ -474,8 +474,15 @@ describe('Adaptive Player Trolling', () => {
         player.x=55;player.y=55;snapCameraToPlayer();rebuildActiveLevelOccupancy()
         let seenRoll=null
         chance=p=>{if(p===0.2||p===0.4)seenRoll=p;return true}
+        replaySimulationMode=false;replayAnimationsDisabled=false
+        const fxBefore = fxAnims.filter(effect=>effect.ch==='Ambush!').length
         check(AdaptivePlayerTrolling.onFloorChanged({fromZ:-1,fromKind:'chain',fromCave:0}),
           'a successful cave-exit roll places the ambush')
+        check(fxAnims.filter(effect=>effect.ch==='Ambush!').length===fxBefore+1 &&
+          fxAnims.some(effect=>effect.ch==='Ambush!' && effect.color==='#ff5b5b' &&
+            effect.label && effect.duration===FORAGE_FOUND_ANIM_MS &&
+            effect.x===player.x && effect.y===player.y),
+          'confirmed cave-exit ambush shows one red Found-style banner')
         check(seenRoll===0.4,'more than two cave exits use 40%')
         let ambushers=enemies.filter(e=>e.adaptiveEventId==='unused_scroll_ambush')
         check(ambushers.length===3 && ambushers.every(e=>e.baseName==='Goblin' && e.aware),
@@ -1402,6 +1409,17 @@ describe('Adaptive Player Trolling', () => {
         map[y][edge-1]='forest'
         maybeSpawnForestAmbush(edge,y)
         check(called===1 && enemies.length===count,'protected spawn candidate rejected on sanctuary boundary')
+        const wild=edge+3
+        for (const [dx,dy] of DIRS8) {
+          map[y+dy][wild+dx]='forest'
+          occupied.delete(keyXY(wild+dx,y+dy))
+        }
+        map[y][wild]='forest'
+        replaySimulationMode=false;replayAnimationsDisabled=false
+        const previousFxCount=fxAnims.filter(effect=>effect.ch==='Ambush!').length
+        maybeSpawnForestAmbush(wild,y)
+        check(enemies.length===count+1 && fxAnims.filter(effect=>effect.ch==='Ambush!').length===previousFxCount+1,
+          'successful forest ambush shows one red banner after the creature spawns')
       } finally {chance=originalChance}
     })()`))
   })

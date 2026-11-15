@@ -9263,6 +9263,7 @@ more difficult:
     alarmEnemy(e)
     occupied.add(keyXY(spot.x, spot.y))
     log(`Ambush! A sneaky ${e.name} rustles out from the trees nearby!`, 'bad')
+    spawnAmbushAnim()
   }
 
   async function tryMove(dx, dy) {
@@ -11014,6 +11015,15 @@ more difficult:
     if (replayAnimationsDisabled || replaySimulationMode) return
     fxAnims.push({x: player.x, y: player.y, ch: 'found!', color: '#ddc9a3',
       label: true, dir: -1, start: performance.now(), duration: FORAGE_FOUND_ANIM_MS})
+    runAnimationLoop()
+  }
+
+  // A surprise is confirmed before this visual is queued. The banner is
+  // purely presentational: it neither reveals hidden threats nor changes RNG.
+  function spawnAmbushAnim() {
+    if (replayAnimationsDisabled || replaySimulationMode) return
+    fxAnims.push({x:player.x, y:player.y, ch:'Ambush!', color:'#ff5b5b',
+      label:true, dir:-1, start:performance.now(), duration:FORAGE_FOUND_ANIM_MS})
     runAnimationLoop()
   }
 
@@ -13227,27 +13237,54 @@ more difficult:
 
   const DESKTOP_ENEMY_CURSOR_IMAGE = 'img/cursors/red-sword.svg'
   const DESKTOP_BOW_CURSOR_IMAGE = 'img/cursors/red-arrow.svg?v=20261107-slim-nock'
+  let desktopSwordCursor = null
+  let desktopBowCursor = null
   let desktopDisabledBowCursor = null
-  const desktopBowCursorSource = new Image()
-  desktopBowCursorSource.onload = () => {
-    try {
-      const sprite = document.createElement('canvas')
-      sprite.width = desktopBowCursorSource.naturalWidth
-      sprite.height = desktopBowCursorSource.naturalHeight
-      const ctx = sprite.getContext('2d')
-      ctx.drawImage(desktopBowCursorSource, 0, 0)
-      const image = ctx.getImageData(0, 0, sprite.width, sprite.height)
-      for (let i = 0; i < image.data.length; i += 4) {
-        const grey = Math.round(0.299 * image.data[i] + 0.587 * image.data[i + 1] + 0.114 * image.data[i + 2])
-        image.data[i] = image.data[i + 1] = image.data[i + 2] = Math.min(215, 75 + Math.round(grey * 0.7))
-        image.data[i + 3] = Math.round(image.data[i + 3] * 0.75)
+
+  // CSS cursor SVGs may still take a frame to decode on their first hover,
+  // even if an Image has already fetched them. Prepare small PNG data URLs
+  // (including the disabled bow variant) before character creation opens.
+  async function prepareDesktopCursors() {
+    if (window.matchMedia('(pointer: coarse)').matches) return
+    async function rasterCursor(image, disabled = false) {
+      if (!image) return null
+      try {
+        const sprite = document.createElement('canvas')
+        const width = image.naturalWidth, height = image.naturalHeight
+        if (!width || !height) return null
+        const fit = Math.min(1, 64 / Math.max(width, height))
+        sprite.width = Math.max(1, Math.round(width * fit))
+        sprite.height = Math.max(1, Math.round(height * fit))
+        const ctx = sprite.getContext('2d')
+        ctx.drawImage(image, 0, 0, sprite.width, sprite.height)
+        if (disabled) {
+          const pixels = ctx.getImageData(0, 0, sprite.width, sprite.height)
+          for (let i = 0; i < pixels.data.length; i += 4) {
+            const grey = Math.round(0.299 * pixels.data[i] + 0.587 * pixels.data[i + 1] + 0.114 * pixels.data[i + 2])
+            pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = Math.min(215, 75 + Math.round(grey * 0.7))
+            pixels.data[i + 3] = Math.round(pixels.data[i + 3] * 0.75)
+          }
+          ctx.putImageData(pixels, 0, 0)
+        }
+        const url = sprite.toDataURL('image/png')
+        const decoded = new Image()
+        decoded.src = url
+        await decoded.decode()
+        return url
+      } catch (error) {
+        console.warn('Could not prepare desktop cursor:', error)
+        return null
       }
-      ctx.putImageData(image, 0, 0)
-      desktopDisabledBowCursor = sprite.toDataURL('image/png')
-    } catch (_) { desktopDisabledBowCursor = null }
-    if (hoveredEnemy) setDesktopCanvasCursor(hoveredEnemy)
+    }
+    const sword = preloadedImages.get(DESKTOP_ENEMY_CURSOR_IMAGE)
+    const bow = preloadedImages.get(DESKTOP_BOW_CURSOR_IMAGE)
+    const [swordCursor, bowCursor, disabledBowCursor] = await Promise.all([
+      rasterCursor(sword), rasterCursor(bow), rasterCursor(bow, true)
+    ])
+    desktopSwordCursor = swordCursor
+    desktopBowCursor = bowCursor
+    desktopDisabledBowCursor = disabledBowCursor
   }
-  desktopBowCursorSource.src = imageSrc(DESKTOP_BOW_CURSOR_IMAGE)
 
   function enemyIsDesktopClickAttackable(e) {
     return !!e && Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1
@@ -13260,7 +13297,7 @@ more difficult:
     }
     if (!e) { canvas.style.cursor = ''; return }
     if (!equippedShortBow()) {
-      canvas.style.cursor = `url("${imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair`
+      canvas.style.cursor = `url("${desktopSwordCursor || imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair`
       return
     }
     const canShoot = !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen &&
@@ -13270,7 +13307,7 @@ more difficult:
       player.inventory.some(item => item.kind === 'arrows' && item.count > 0) &&
       !!playerBowShotPath(e)
     canvas.style.cursor = canShoot
-      ? `url("${imageSrc(DESKTOP_BOW_CURSOR_IMAGE)}") 5 4, crosshair`
+      ? `url("${desktopBowCursor || imageSrc(DESKTOP_BOW_CURSOR_IMAGE)}") 5 4, crosshair`
       : desktopDisabledBowCursor
         ? `url("${desktopDisabledBowCursor}") 5 4, not-allowed`
         : 'not-allowed'
@@ -16771,7 +16808,7 @@ more difficult:
     for (const visual of Object.values(RENDER_STYLE?.caveDecorations || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
-    initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE)
+    initialVisuals.push(DESKTOP_ENEMY_CURSOR_IMAGE, DESKTOP_BOW_CURSOR_IMAGE)
     initialVisuals.push(...Object.values(PLAYER_RACE_IMAGES))
     for (const visual of Object.values(RENDER_STYLE?.groundItems || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
@@ -16793,6 +16830,7 @@ more difficult:
       if (visual?.image) initialVisuals.push(visual.image)
     }
     if (initialVisuals.length) await preloadImages(initialVisuals)
+    await prepareDesktopCursors()
     prepareAnimatedVisuals()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
