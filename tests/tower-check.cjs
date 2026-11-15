@@ -218,30 +218,42 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     }
     return true
   })`),true)
-  // Upper-floor backdrop ignores saved forest under rock sprites.
-  assert.equal(run(`towerBackgroundGround('hill',tower.x-1,tower.y-1)`),'grass')
-  assert.equal(run(`towerBackgroundVisual('grass',tower.x-1,tower.y-1).image ===
-    tileVariantImage(RENDER_STYLE.terrainTiles.grass.variants,tower.x-1,tower.y-1)`),true)
+  // Tower scenery and the playable surface must use the *same* tile painter,
+  // including the transparent grave underlay and shoreline/diagonal variants.
   assert.equal(run(`(()=>{
-    const x=tower.x-1,y=tower.y-1,k=keyXY(x,y),oldTile=surfaceMap[y][x]
-    const oldUnder=tileUnderlays[k],oldSeen=discovered[y][x],oldDraw=drawImageVisual
-    const images=[]
+    const x=tower.x-2,y=tower.y+4,k=keyXY(x,y),oldTile=surfaceMap[y][x]
+    const oldUnder=tileUnderlays[k],oldZ=currentZ,oldMap=map,oldDraw=drawImageVisual
+    const oldTiles=USE_TILE_IMAGES
+    const nearby=DIRS8.map(([dx,dy])=>({x:x+dx,y:y+dy,t:surfaceMap[y+dy]?.[x+dx]}))
     try {
-      drawImageVisual=(px,py,v)=>{images.push(v.image);return true}
-      discovered[y][x]=true;tileUnderlays[k]='forest';surfaceMap[y][x]='hill'
-      drawTowerBackground(x,y)
-      const noDoubleLayer=images.length===2 &&
-        images[0].startsWith('img/tiles/grassland') &&
-        images[1].startsWith('img/tiles/hill') &&
-        !images.some(img=>img.includes('forest-tree'))
-      images.length=0;surfaceMap[y][x]='grass';grasslandTrees.add(k)
-      drawTowerBackground(x,y)
-      const expected=coordinateVisualVariant(RENDER_STYLE.specialTiles.grassTree,x,y,41)
-      return noDoubleLayer && images.length===2 && images[1]===expected.image
-    } finally {
-      surfaceMap[y][x]=oldTile;discovered[y][x]=oldSeen;drawImageVisual=oldDraw
+      USE_TILE_IMAGES=true
+      const outcomes=[]
+      for (const tile of ['grave','hill','grass','sand','water','river','forest']) {
+        surfaceMap[y][x]=tile;delete tileUnderlays[k]
+        for(const n of nearby)surfaceMap[n.y][n.x]='grass'
+        if(tile==='water')surfaceMap[y][x+1]='sand'
+        if(tile==='river')surfaceMap[y-1][x+1]='river'
+        const drawings=[]
+        drawImageVisual=(px,py,v)=>{drawings.push(v?.image||null);return true}
+        for (const z of [0,1,2,3,4]) {
+          currentZ=z;map=z===0?surfaceMap:towerLevels[z-1].map
+          const v=terrainVisual(tile,x,y,surfaceMap)
+          const bg=tileBackground(x,y,tile,surfaceMap)
+          drawings.length=0
+          drawTerrainVisualStack(0,0,tile,x,y,v,bg,surfaceMap)
+          outcomes.push({tile,z,visual:JSON.stringify(v),bg,images:drawings.join('|')})
+        }
+      }
+      return outcomes.every(({tile,z,visual,bg,images})=>{
+        const ground=outcomes.find(o=>o.tile===tile&&o.z===0)
+        return visual===ground.visual&&bg===ground.bg&&images===ground.images &&
+          (tile!=='grave'||(images.includes('grassland')&&images.includes('grave.png')))
+      })
+    }finally{
+      surfaceMap[y][x]=oldTile;currentZ=oldZ;map=oldMap;drawImageVisual=oldDraw
+      USE_TILE_IMAGES=oldTiles
       if(oldUnder===undefined)delete tileUnderlays[k];else tileUnderlays[k]=oldUnder
-      grasslandTrees.delete(k)
+      for(const n of nearby)surfaceMap[n.y][n.x]=n.t
     }
   })()`),true)
 

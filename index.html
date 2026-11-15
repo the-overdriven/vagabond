@@ -10258,7 +10258,7 @@ more difficult:
       deep.caveMaps[i]?.[y]?.[x] !== 'cavewall' && deep.caveMaps[i]?.[y]?.[x] !== undefined)
   }
 
-  function tileBackground(x, y, tileKey) {
+  function tileBackground(x, y, tileKey, terrain = map) {
     // These sprites must not paint a synthetic floor behind their alpha.
     // The floor, when present, is composited from the recorded underlay.
     if (USE_TILE_IMAGES && (tileKey === 'cryptrubble' || tileKey === 'dwarvenrubble' || tileKey === 'dwarvenstatue' ||
@@ -10268,7 +10268,7 @@ more difficult:
     if (currentZ < 0 && ['dwarvengate', 'dwarvenfortexit', 'dwarvenstairsdown', 'dwarvenstairsup', 'dwarvenminessealed', 'dwarvenliftoff', 'dwarvenlifton'].includes(tileKey)) return TILE.marble.bg
     // Lake climate metadata must not replace the blue ASCII ground with snow.
     if (isLakeIce(tileKey) || tileKey === 'water') return TILE[tileKey].bg
-    const baseKey = (currentZ === 0 ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
+    const baseKey = (terrain === surfaceMap ? (tileUnderlays[keyXY(x, y)] || tileKey) : tileKey)
     const base = TILE[baseKey]
     if (baseKey === 'sand' && dugSandTiles.has(keyXY(x, y))) return RENDER_STYLE.specialTiles.dugSand.bg
     return base ? base.bg : RENDER_STYLE.canvas.background
@@ -10511,10 +10511,10 @@ more difficult:
     return true
   }
 
-  function surfaceBaseKeyAt(tx, ty) {
-    const t = map?.[ty]?.[tx]
+  function surfaceBaseKeyAt(tx, ty, terrain = map) {
+    const t = terrain?.[ty]?.[tx]
     if (!t) return null
-    return currentZ === 0 ? (tileUnderlays[keyXY(tx, ty)] || t) : t
+    return terrain === surfaceMap ? (tileUnderlays[keyXY(tx, ty)] || t) : t
   }
 
   function surfaceRockGroundAt(x, y, terrain = map) {
@@ -10529,7 +10529,7 @@ more difficult:
     return 'grass'
   }
 
-  function overlayBaseTileKey(tileKey, x, y) {
+  function overlayBaseTileKey(tileKey, x, y, terrain = map) {
     if (!USE_TILE_IMAGES) return null
 
     // Tree overlays.
@@ -10537,8 +10537,8 @@ more difficult:
     if (tileKey === 'ancientForest') return 'grass'
     if (tileKey === 'taiga') return 'snow'
     if (tileKey === 'snowmountain') return 'snow'
-    if ((tileKey === 'hill' || tileKey === 'boulder') && currentZ === 0)
-      return surfaceRockGroundAt(x,y)
+    if ((tileKey === 'hill' || tileKey === 'boulder') && terrain === surfaceMap)
+      return surfaceRockGroundAt(x,y,terrain)
     if (tileKey === 'marble') return null
     if (isLakeIce(tileKey)) return null
     // Opaque ground is already its own base. Recursing into a guessed biome
@@ -10553,14 +10553,14 @@ more difficult:
       return tileUnderlays[tileUnderlayKey(x, y, currentZ)] || null
 
     const neighbors = [
-      map?.[y - 1]?.[x],
-      map?.[y + 1]?.[x],
-      map?.[y]?.[x - 1],
-      map?.[y]?.[x + 1],
-      map?.[y - 1]?.[x - 1],
-      map?.[y - 1]?.[x + 1],
-      map?.[y + 1]?.[x - 1],
-      map?.[y + 1]?.[x + 1]
+      terrain?.[y - 1]?.[x],
+      terrain?.[y + 1]?.[x],
+      terrain?.[y]?.[x - 1],
+      terrain?.[y]?.[x + 1],
+      terrain?.[y - 1]?.[x - 1],
+      terrain?.[y - 1]?.[x + 1],
+      terrain?.[y + 1]?.[x - 1],
+      terrain?.[y + 1]?.[x + 1]
     ].filter(Boolean)
 
     // Underground entrances/exits use dungeon floors, never a surface fallback.
@@ -10582,7 +10582,7 @@ more difficult:
     if (snowCount > 0 && snowCount >= sandCount && snowCount >= grassCount) return 'snow'
     if (!['hill','boulder'].includes(tileKey) && sandCount > 0 && sandCount > snowCount && sandCount >= grassCount) return 'sand'
 
-    const currentBase = surfaceBaseKeyAt(x, y)
+    const currentBase = surfaceBaseKeyAt(x, y, terrain)
     if (currentBase === 'snow' || currentBase === 'taiga' || currentBase === 'snowmountain') return 'snow'
     if (currentBase === 'sand') return ['hill','boulder'].includes(tileKey) ? 'grass' : 'sand'
 
@@ -10606,16 +10606,13 @@ more difficult:
     if (base === 'sand') return 'sand'
     if (base === 'grass' || base === 'forest' || base === 'ancientForest') return 'grass'
     if (base === 'snow' || base === 'taiga' || base === 'snowmountain') return 'snow'
-    // Tower backdrop queries must not run surface overlay heuristics against
-    // the positive-Z gameplay map. Built structures are not land biomes.
-    if (terrain !== map) return null
-    const underlay = overlayBaseTileKey(tileKey, tx, ty)
+    const underlay = overlayBaseTileKey(tileKey, tx, ty, terrain)
     if (underlay === 'sand' || underlay === 'snow' || underlay === 'grass') return underlay
     return null
   }
 
-  function surfaceTransitionLayers(tileKey, x, y) {
-    if (currentZ !== 0) return []
+  function surfaceTransitionLayers(tileKey, x, y, terrain = map) {
+    if (currentZ !== 0 && terrain !== surfaceMap) return []
     const sea = tileKey === 'water' || tileKey === 'river' || tileKey === 'frozenriver' || isLakeIce(tileKey)
     if (!sea) return []
 
@@ -10635,7 +10632,7 @@ more difficult:
       ['n', 0, -1, 0], ['e', 1, 0, 1], ['s', 0, 1, 2], ['w', -1, 0, 3],
       ['nw', -1, -1, 0], ['ne', 1, -1, 1], ['se', 1, 1, 2], ['sw', -1, 1, 3]
     ]
-    for (const [dir, dx, dy] of positions) biomes[dir] = visibleSurfaceTransitionBiomeAt(x + dx, y + dy)
+    for (const [dir, dx, dy] of positions) biomes[dir] = visibleSurfaceTransitionBiomeAt(x + dx, y + dy, terrain)
     const layers = []
     for (const [dir, , , turns] of positions) {
       const biome = biomes[dir]
@@ -10661,9 +10658,9 @@ more difficult:
     return biomes
   }
 
-  function surfaceGroundBlend(tileKey,x,y) {
-    if (currentZ !== 0 || !['grass','sand','snow'].includes(tileKey)) return null
-    const biomes=surfaceBlendBiomes(tileKey,x,y)
+  function surfaceGroundBlend(tileKey,x,y,terrain=map) {
+    if (terrain !== surfaceMap || !['grass','sand','snow'].includes(tileKey)) return null
+    const biomes=surfaceBlendBiomes(tileKey,x,y,terrain)
     // Water contributes no land biome, rather than borrowing the current
     // cell's biome differently on either side of the same shoreline vertex.
     return biomes.some(b => b && b !== tileKey) ? biomes : null
@@ -10744,24 +10741,24 @@ more difficult:
     return tileKey === 'river' || tileKey === 'frozenriver' || tileKey === 'water' || isLakeIce(tileKey)
   }
 
-  function hasCardinalWater(x, y) {
-    return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy]) => surfaceWaterTile(map?.[y+dy]?.[x+dx]))
+  function hasCardinalWater(x, y, terrain = map) {
+    return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy]) => surfaceWaterTile(terrain?.[y+dy]?.[x+dx]))
   }
 
   // Preserve exposed diagonal joins even where the same tile also feeds a
   // cardinal channel. Corners already connected through either side need no arm.
-  function diagonalRiverArms(tileKey, x, y) {
-    if (currentZ !== 0 || !surfaceWaterTile(tileKey)) return 0
-    const wet = (dx, dy) => surfaceWaterTile(map?.[y + dy]?.[x + dx])
+  function diagonalRiverArms(tileKey, x, y, terrain = map) {
+    if ((currentZ !== 0 && terrain !== surfaceMap) || !surfaceWaterTile(tileKey)) return 0
+    const wet = (dx, dy) => surfaceWaterTile(terrain?.[y + dy]?.[x + dx])
     return [[-1,-1,1],[1,-1,2],[1,1,4],[-1,1,8]].reduce((mask, [dx,dy,bit]) =>
       wet(dx,dy) && !wet(dx,0) && !wet(0,dy) ? mask | bit : mask, 0)
   }
 
-  function diagonalRiverGround(x, y) {
-    if (map?.[y]?.[x] === 'frozenriver' || tileUnderlays[keyXY(x,y)] === 'snow') return 'snow'
+  function diagonalRiverGround(x, y, terrain = map) {
+    if (terrain?.[y]?.[x] === 'frozenriver' || tileUnderlays[keyXY(x,y)] === 'snow') return 'snow'
     const counts = {grass: 0, sand: 0, snow: 0}
     for (const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
-      const biome = visibleSurfaceTransitionBiomeAt(x + dx, y + dy)
+      const biome = visibleSurfaceTransitionBiomeAt(x + dx, y + dy, terrain)
       if (biome && counts[biome] !== undefined) counts[biome]++
     }
     return Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0]
@@ -10808,12 +10805,28 @@ more difficult:
     return true
   }
 
-  function diagonalWaterLandCorners(x, y) {
-    if (currentZ !== 0 || surfaceWaterTile(map?.[y]?.[x])) return []
+  // The source terrain is explicit: when looking out from Tower floors, use
+  // the real surface grid instead of the playable tower map at the same x/y.
+  function surfaceWaterVisual(tileKey, x, y, terrain = map) {
+    const riverArms = diagonalRiverArms(tileKey, x, y, terrain)
+    if (riverArms && (tileKey === 'river' || tileKey === 'frozenriver') &&
+        !hasCardinalWater(x, y, terrain))
+      return {diagonalRiverArms: riverArms, baseTileKey: diagonalRiverGround(x, y, terrain)}
+    const transitionLayers = surfaceTransitionLayers(tileKey, x, y, terrain)
+    if (transitionLayers.length || riverArms) return {
+      overlayImages: transitionLayers,
+      shoreBlend: transitionLayers.length ? surfaceBlendBiomes(null, x, y, terrain) : null,
+      diagonalRiverJoinArms: riverArms
+    }
+    return null
+  }
+
+  function diagonalWaterLandCorners(x, y, terrain = map) {
+    if ((currentZ !== 0 && terrain !== surfaceMap) || surfaceWaterTile(terrain?.[y]?.[x])) return []
     const corners = []
     for (const [dx,dy,turns] of [[-1,-1,0],[1,-1,1],[1,1,2],[-1,1,3]]) {
-      const a = map?.[y]?.[x+dx], b = map?.[y+dy]?.[x]
-      if (!surfaceWaterTile(a) || !surfaceWaterTile(b) || surfaceWaterTile(map?.[y+dy]?.[x+dx])) continue
+      const a = terrain?.[y]?.[x+dx], b = terrain?.[y+dy]?.[x]
+      if (!surfaceWaterTile(a) || !surfaceWaterTile(b) || surfaceWaterTile(terrain?.[y+dy]?.[x+dx])) continue
       // Both banks use the same family for mixed joins, independent of draw order.
       const family = [a,b].includes('river') ? 'river' : [a,b].includes('frozenriver') ? 'frozenriver' : 'water'
       corners.push({visual:RENDER_STYLE.terrainTiles[family],quarterTurns:turns})
@@ -10821,8 +10834,8 @@ more difficult:
     return corners
   }
 
-  function drawDiagonalWaterLandCorners(px, py, x, y) {
-    for (const part of diagonalWaterLandCorners(x,y)) {
+  function drawDiagonalWaterLandCorners(px, py, x, y, terrain = map) {
+    for (const part of diagonalWaterLandCorners(x,y,terrain)) {
       const image = resolveVisualImage(part.visual)
       if (!image) continue
       const size = TILE_PX, leg = size * 0.56 / Math.SQRT2
@@ -10838,8 +10851,8 @@ more difficult:
     }
   }
 
-  function terrainVisual(tileKey, x, y) {
-    if (currentZ === 0 && tower && x === tower.entrance.x && y === tower.entrance.y &&
+  function terrainVisual(tileKey, x, y, terrain = map) {
+    if (terrain === surfaceMap && tower && x === tower.entrance.x && y === tower.entrance.y &&
         ['dwarvendoorclosed','dwarvendooropen','towerentrancesealed'].includes(tileKey)) return (
       RENDER_STYLE.terrainTiles[tileKey === 'dwarvendooropen' ? 'towerentranceopen' : 'towerentrance'])
     if (tileKey === 'coffin') return currentZ === -1 && cryptCaveIndex >= 0
@@ -10907,28 +10920,18 @@ more difficult:
       return {...(RENDER_STYLE.terrainTiles?.cavefloorBrown || visual), flipX: !!(x & 1), flipY: !!(y & 1)}
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
 
-    // Diagonal rivers need a visible channel, not four overlapping shorelines
-    // that conceal the entire river tile. Mask the EXISTING animated frames and
-    // draw its actual dry neighboring biome underneath, without changing map.
-    const riverArms = diagonalRiverArms(tileKey, x, y)
-    if (riverArms && (tileKey === 'river' || tileKey === 'frozenriver') && !hasCardinalWater(x, y))
-      return {...visual, diagonalRiverArms: riverArms,
-        baseTileKey: diagonalRiverGround(x, y)}
-
-    // Always render the original opaque terrain, then transparent edge/corner
-    // layers; a transparent overlay must never replace its underlying image.
-    const groundBlend = surfaceGroundBlend(tileKey,x,y)
+    // Surface and elevated tower backdrops share the same shoreline, diagonal
+    // river and mixed-biome rules; only the source terrain grid differs.
+    const groundBlend = surfaceGroundBlend(tileKey,x,y,terrain)
     if (groundBlend) return {...visual,groundBlend}
-    const transitionLayers = surfaceTransitionLayers(tileKey, x, y)
-    if (transitionLayers.length || riverArms) return {...visual, overlayImages: transitionLayers,
-      shoreBlend: transitionLayers.length ? surfaceBlendBiomes(null,x,y) : null,
-      diagonalRiverJoinArms: riverArms}
+    const waterEffects = surfaceWaterVisual(tileKey, x, y, terrain)
+    if (waterEffects) return {...visual,...waterEffects}
 
-    const leftSame = map?.[y]?.[x - 1] === tileKey
-    const rightSame = map?.[y]?.[x + 1] === tileKey
+    const leftSame = terrain?.[y]?.[x - 1] === tileKey
+    const rightSame = terrain?.[y]?.[x + 1] === tileKey
 
     let image = visual.variants?.length ? tileVariantImage(visual.variants, x, y) : visual.image
-    const linearVisual = ['hill','boulder'].includes(tileKey) && currentZ === 0 && overlayBaseTileKey(tileKey, x, y) === 'snow'
+    const linearVisual = ['hill','boulder'].includes(tileKey) && terrain === surfaceMap && overlayBaseTileKey(tileKey, x, y, terrain) === 'snow'
       ? (RENDER_STYLE.terrainTiles?.[tileKey === 'hill' ? 'hillSnow' : 'boulderSnow'] || visual)
       : visual
     if (linearVisual.leftImage || linearVisual.middleImage || linearVisual.rightImage || linearVisual.singleImage) {
@@ -10952,14 +10955,35 @@ more difficult:
     return base ? base.bg : RENDER_STYLE.canvas.background
   }
 
-  function drawTerrainVisualStack(px, py, tileKey, mx, my, visual, fallbackBg, depth = 0) {
+  // Keep transition compositing identical on z:0 and in positive-Z
+  // tower windows. The tower only supplies a different source terrain map.
+  function drawSurfaceVisualLayer(px, py, visual) {
+    const drawn = visual.diagonalRiverArms
+      ? drawDiagonalRiverChannel(px, py, visual)
+      : drawImageVisual(px, py, visual, visual.opacity)
+    if (!drawn) return false
+    if (visual.groundBlend) drawSurfaceGroundBlend(px, py, visual.groundBlend)
+    if (visual.shoreBlend) drawSurfaceShoreBlend(px, py, visual)
+    else if (Array.isArray(visual.overlayImages)) {
+      for (const layer of visual.overlayImages) {
+        const layerVisual = typeof layer === 'string' ? {image: layer, scale: visual.scale ?? 1} : layer
+        if (layerVisual?.image) drawImageVisual(px, py, layerVisual)
+      }
+    }
+    if (visual.overlayImage) drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
+    if (visual.diagonalRiverJoinArms) drawDiagonalRiverChannel(px, py,
+      {...visual, diagonalRiverArms: visual.diagonalRiverJoinArms})
+    return true
+  }
+
+  function drawTerrainVisualStack(px, py, tileKey, mx, my, visual, fallbackBg, terrain = map, depth = 0) {
     if (!visual || depth > 4) return false
     let drewBase = false
-    const baseTileKey = visual.baseTileKey || overlayBaseTileKey(tileKey, mx, my)
+    const baseTileKey = visual.baseTileKey || overlayBaseTileKey(tileKey, mx, my, terrain)
     if (baseTileKey) {
-      const baseVisual = terrainVisual(baseTileKey, mx, my)
+      const baseVisual = terrainVisual(baseTileKey, mx, my, terrain)
       if (baseVisual) {
-        drewBase = drawTerrainVisualStack(px, py, baseTileKey, mx, my, baseVisual, terrainBaseBg(baseTileKey), depth + 1)
+        drewBase = drawTerrainVisualStack(px, py, baseTileKey, mx, my, baseVisual, terrainBaseBg(baseTileKey), terrain, depth + 1)
       } else {
         const baseBg = terrainBaseBg(baseTileKey)
         if (baseBg !== 'transparent') {
@@ -10974,28 +10998,9 @@ more difficult:
       ctx.fillRect(px, py, TILE_PX, TILE_PX)
       drewBase = true
     }
-    if (depth === 0 && baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my)
-    const drewMain = visual.diagonalRiverArms
-      ? drawDiagonalRiverChannel(px, py, visual)
-      : drawImageVisual(px, py, visual, visual.opacity)
-    if (drewMain) {
-      if (visual.groundBlend) drawSurfaceGroundBlend(px,py,visual.groundBlend)
-      if (visual.shoreBlend) drawSurfaceShoreBlend(px,py,visual)
-      else if (Array.isArray(visual.overlayImages)) {
-        for (const layer of visual.overlayImages) {
-          const layerVisual = typeof layer === 'string' ? {image: layer, scale: visual.scale ?? 1} : layer
-          if (layerVisual?.image) drawImageVisual(px, py, layerVisual)
-        }
-      }
-      if (visual.overlayImage) {
-        drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
-      }
-      // Restore only real diagonal water arms after shoreline strips. The
-      // ordinary base and cardinal channel remain intact at mixed junctions.
-      if (visual.diagonalRiverJoinArms) drawDiagonalRiverChannel(px, py,
-        {...visual, diagonalRiverArms: visual.diagonalRiverJoinArms})
-    }
-    if (depth === 0 && !baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my)
+    if (depth === 0 && baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my, terrain)
+    const drewMain = drawSurfaceVisualLayer(px, py, visual)
+    if (depth === 0 && !baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my, terrain)
     return drewBase || drewMain
   }
 
@@ -11005,7 +11010,7 @@ more difficult:
     const tileKey = terrain?.[my]?.[mx]
     if (tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))) return towerGrassTreeVisual(mx, my)
     if (tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))) return coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53)
-    if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my)
+    if (tileKey === 'forest' || tileKey === 'taiga' || tileKey === 'ancientForest') return terrainVisual(tileKey, mx, my, terrain)
     return null
   }
 
@@ -12231,9 +12236,9 @@ more difficult:
     currentSurfaceTowerFov()
     const distantTowerRoof = towerShowsSummit()
     const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
-    const mountainSpringTiles = USE_TILE_IMAGES && currentZ===0 &&
+    const mountainSpringTiles = USE_TILE_IMAGES && currentZ>=0 &&
       resolveVisualImage(RENDER_STYLE.caveDecorations['mountain-water'])
-      ? new Set(renderLevelObjects('decorations').filter(prop=>prop.level===0&&prop.kind==='mountain-water')
+      ? new Set(caveDecorations.filter(prop=>prop.level===0&&prop.kind==='mountain-water')
         .map(prop=>keyXY(prop.x,prop.y))) : null
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
@@ -12280,11 +12285,10 @@ more difficult:
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
-        if (currentZ > 0 && map[my]?.[mx] === 'towervoid') {
-          drawTowerBackground(mx, my)
-          continue
-        }
-        if (undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
+        const projectedSurface = currentZ > 0 && map[my]?.[mx] === 'towervoid'
+        if (projectedSurface && !discovered[my]?.[mx]) continue
+        const terrainSource = projectedSurface ? surfaceMap : map
+        if (!projectedSurface && undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
           !undergroundDiscovered?.[my]?.[mx]) continue
         const surfaceTowerCell = currentZ === 0 && towerContains(mx, my)
         const towerRoom = surfaceTowerCell && towerInterior(mx, my)
@@ -12303,17 +12307,17 @@ more difficult:
           drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
-        const tileKey = (surfaceTowerCell && distantTowerRoof ? towerLevels[3].map[my][mx] : map[my]?.[mx]) || 'crypt2floor'
+        const tileKey = (surfaceTowerCell && distantTowerRoof ? towerLevels[3].map[my][mx] : terrainSource[my]?.[mx]) || 'crypt2floor'
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
         const hasBeastTrack = currentZ === 0 && beastTracks.has(keyXY(mx, my))
-        const tree = currentZ === 0 && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
+        const tree = terrainSource === surfaceMap && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
         const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
         const treeStyle = tree ? towerGrassTreeStyle(mx, my) : null
         const color = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (treeStyle ? treeStyle.color : (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : t.color))
-        const bg = tileBackground(mx, my, tileKey)
+        const bg = tileBackground(mx, my, tileKey, terrainSource)
         if (!USE_TILE_IMAGES) {
           // ASCII mode must bypass all image-layer/base-compositing logic.
           // Preserve the original glyph + background renderer exactly.
@@ -12321,17 +12325,17 @@ more difficult:
         } else {
           const grassTreeVisual = tree ? towerGrassTreeVisual(mx, my) : null
           const foragedForestVisual = foraged ? {...coordinateVisualVariant(RENDER_STYLE.specialTiles.foragedForest, mx, my, 53), baseTileKey: 'grass'} : null
-          const terrainImgVisual = mountainSpringTiles?.has(keyXY(mx,my))
+          const terrainImgVisual = terrainSource === surfaceMap && mountainSpringTiles?.has(keyXY(mx,my))
             ? RENDER_STYLE.caveDecorations['mountain-water']
-            : foragedForestVisual || terrainVisual(tileKey, mx, my)
+            : foragedForestVisual || terrainVisual(tileKey, mx, my, terrainSource)
           const overlayVisual = grassTreeVisual
           const visual = overlayVisual || terrainImgVisual
           if (visual?.image || (Array.isArray(visual?.frames) && visual.frames.length)) {
             let drew = false
             if (overlayVisual) {
               // Grassland trees are transparent sprites over the grass tile.
-              const baseVisual = terrainVisual(tileKey, mx, my)
-              if (baseVisual) drew = drawTerrainVisualStack(px, py, tileKey, mx, my, baseVisual, bg)
+              const baseVisual = terrainVisual(tileKey, mx, my, terrainSource)
+              if (baseVisual) drew = drawTerrainVisualStack(px, py, tileKey, mx, my, baseVisual, bg, terrainSource)
               if (!drew && bg !== 'transparent') {
                 ctx.fillStyle = bg
                 ctx.fillRect(px, py, TILE_PX, TILE_PX)
@@ -12347,14 +12351,14 @@ more difficult:
                 // Paint the ground first; the tree returns in the foreground
                 // canopy pass above tracks and actors. Taiga uses snowy ground.
                 const groundKey = tileKey === 'taiga' ? 'snow' : 'grass'
-                const groundVisual = terrainVisual(groundKey, mx, my)
-                if (!groundVisual || !drawTerrainVisualStack(px, py, groundKey, mx, my, groundVisual, TILE[groundKey].bg)) {
+                const groundVisual = terrainVisual(groundKey, mx, my, terrainSource)
+                if (!groundVisual || !drawTerrainVisualStack(px, py, groundKey, mx, my, groundVisual, TILE[groundKey].bg, terrainSource)) {
                   ctx.fillStyle = TILE[groundKey].bg
                   ctx.fillRect(px, py, TILE_PX, TILE_PX)
                 }
                 drew = true
               } else {
-                drew = drawTerrainVisualStack(px, py, tileKey, mx, my, visual, bg)
+                drew = drawTerrainVisualStack(px, py, tileKey, mx, my, visual, bg, terrainSource)
               }
             }
             if (!drew) drawTile(px, py, glyph, color, bg)
@@ -12372,6 +12376,9 @@ more difficult:
             ctx.restore()
           }
         }
+        // The outside surface is scenery from another Z, not gameplay terrain.
+        // Its dimming is applied after the regular terrain pass.
+        if (projectedSurface) continue
         if (currentZ < 0 && undergroundVisible?.has(keyXY(mx, my))) {
           const miningLevel = Mining.activeLevel()
           if (!USE_TILE_IMAGES) {

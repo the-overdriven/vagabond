@@ -196,7 +196,81 @@ describe('Guaranteed elevated tower',()=>{
       })()`)).to.equal(true)
     })
   })
-  it('occludes surface monsters with trees below the tower and avoids square sand patches',()=>{
+  it('uses the same terrain painter for cemetery graves and water on every elevation',()=>{
+    cy.viewport(1280,800);loadTower()
+    cy.window().then(win=>{
+      const result=win.eval(`(()=>{
+        const old={z:currentZ,map,undergroundDiscovered,player:{x:player.x,y:player.y},
+          useTiles:USE_TILE_IMAGES,drawTerrainVisualStack,drawImageVisual,
+          drawSurfaceShoreBlend,drawEnemyVisual,enemyHasAbility,enemies,camX,camY}
+        const x=tower.x-2,y=tower.y+4,k=keyXY(x,y)
+        const oldTile=surfaceMap[y][x],oldUnder=tileUnderlays[k],oldSeen=discovered[y][x]
+        const neighbors=DIRS8.map(([dx,dy])=>({x:x+dx,y:y+dy,t:surfaceMap[y+dy]?.[x+dx]}))
+        try {
+          USE_TILE_IMAGES=true
+          for(const n of neighbors)surfaceMap[n.y][n.x]='grass'
+          delete tileUnderlays[k];discovered[y][x]=true
+          const comparisons=[]
+          for (const tile of ['grave','water','river','hill','forest']) {
+            surfaceMap[y][x]=tile
+            if(tile==='water')surfaceMap[y][x+1]='sand'
+            if(tile==='river')surfaceMap[y-1][x+1]='river'
+            const images=[]
+            drawImageVisual=(px,py,v)=>{images.push(v?.image||null);return true}
+            for(const z of [0,1,2,3,4]) {
+              currentZ=z;map=z===0?surfaceMap:towerLevels[z-1].map
+              const v=terrainVisual(tile,x,y,surfaceMap)
+              images.length=0
+              drawTerrainVisualStack(0,0,tile,x,y,v,tileBackground(x,y,tile,surfaceMap),surfaceMap)
+              comparisons.push({tile,z,visual:JSON.stringify(v),images:images.join('|')})
+            }
+          }
+          // Real scene repaint, not just a direct utility invocation: the
+          // exterior grave must be passed to the normal stack painter with
+          // surfaceMap, without ever replacing the tower's collision grid.
+          surfaceMap[y][x]='grave'
+          let painted=false,projectedGridIntact=false
+          drawImageVisual=old.drawImageVisual
+          drawTerrainVisualStack=(...args)=>{
+            if(args[3]===x&&args[4]===y&&args[2]==='grave'&&args[7]===surfaceMap)painted=true
+            return old.drawTerrainVisualStack(...args)
+          }
+          currentZ=1;map=towerLevels[0].map;undergroundDiscovered=towerLevels[0].discovered
+          Object.assign(player,towerStair(1,false))
+          stopCameraAnimation();snapCameraToPlayer();invalidateUndergroundFov()
+          renderScene(performance.now())
+          projectedGridIntact=map[y][x]==='towervoid'&&
+            !TILE[map[y][x]]?.walk && currentZ===1
+          return {comparisons,painted,projectedGridIntact}
+        }finally{
+          currentZ=old.z;map=old.map;undergroundDiscovered=old.undergroundDiscovered
+          Object.assign(player,old.player);USE_TILE_IMAGES=old.useTiles
+          drawTerrainVisualStack=old.drawTerrainVisualStack
+          drawImageVisual=old.drawImageVisual
+          drawSurfaceShoreBlend=old.drawSurfaceShoreBlend
+          drawEnemyVisual=old.drawEnemyVisual;enemyHasAbility=old.enemyHasAbility
+          enemies=old.enemies;camX=old.camX;camY=old.camY
+          surfaceMap[y][x]=oldTile;discovered[y][x]=oldSeen
+          for(const n of neighbors)surfaceMap[n.y][n.x]=n.t
+          if(oldUnder===undefined)delete tileUnderlays[k];else tileUnderlays[k]=oldUnder
+          invalidateUndergroundFov();render()
+        }
+      })()`)
+      expect(result.painted).to.equal(true)
+      expect(result.projectedGridIntact).to.equal(true)
+      for(const entry of result.comparisons){
+        const ground=result.comparisons.find(c=>c.tile===entry.tile&&c.z===0)
+        expect(entry.visual,`${entry.tile} visual on z:${entry.z}`).to.equal(ground.visual)
+        expect(entry.images,`${entry.tile} compositing on z:${entry.z}`).to.equal(ground.images)
+        if(entry.tile==='grave') {
+          expect(entry.images).to.include('grassland')
+          expect(entry.images).to.include('grave.png')
+        }
+      }
+    })
+  })
+
+  it('occludes surface monsters below the tower with trees',()=>{
     cy.viewport(1280,800);loadTower()
     cy.window().then(win=>{
       const result=win.eval(`(()=>{
@@ -204,30 +278,14 @@ describe('Guaranteed elevated tower',()=>{
           drawEnemyVisual,drawImageVisual,enemyHasAbility}
         const x=tower.x-2,y=tower.y+4,key=keyXY(x,y)
         const savedTile=surfaceMap[y][x],savedUnderlay=tileUnderlays[key]
-        const adjacentKey=keyXY(x+1,y)
-        const savedAdjacent=surfaceMap[y][x+1],savedAdjacentUnderlay=tileUnderlays[adjacentKey]
-        const savedDiscovery=discovered[y][x]
-        const wasForaged=foragedTiles.has(key)
+        const savedDiscovery=discovered[y][x],wasForaged=foragedTiles.has(key)
         try {
           const template=enemies.find(e=>e.alive&&(e.level??0)===0)
           if(!template)throw Error('Missing surface enemy in tower fixture')
           currentZ=4;map=towerLevels[3].map;USE_TILE_IMAGES=true
-          // The loaded character starts at the Temple, far from this render fixture.
           camX=x-2;camY=y-2
           surfaceMap[y][x]='forest';tileUnderlays[key]='sand';discovered[y][x]=true
           foragedTiles.delete(key)
-          const ground=towerBackgroundGround('forest',x,y)
-          // Regression: +1 backdrop used a removed sand blending helper,
-          // which threw before the player could be drawn on every repaint.
-          surfaceMap[y][x]='sand';delete tileUnderlays[key]
-          surfaceMap[y][x+1]='grass';delete tileUnderlays[adjacentKey]
-          currentZ=1;map=towerLevels[0].map
-          const sandVisual=towerBackgroundVisual('sand',x,y)
-          const blend=sandVisual.groundBlend
-          const surfaceMapIsolated=map!==surfaceMap && map[y][x]==='towervoid'
-          const backdropDrawn=(() => {drawTowerBackground(x,y);return true})()
-          surfaceMap[y][x]='forest';tileUnderlays[key]='sand'
-          currentZ=4;map=towerLevels[3].map
           const e={...template,x,y,level:0,levelKind:'surface',abilities:[],
             animStart:undefined,invisibleUntilTurn:0,wallAmbushHidden:false,pendingAbility:null}
           enemies=[e]
@@ -245,8 +303,7 @@ describe('Guaranteed elevated tower',()=>{
           const flying=check()
           USE_TILE_IMAGES=false;e.flying=false
           const ascii=check()
-          return {ground,blend:blend?.[4]==='sand' && blend?.[5]==='grass',
-            backdropDrawn,surfaceMapIsolated,groundRoof,groundRoom,flying,ascii}
+          return {groundRoof,groundRoom,flying,ascii}
         } finally {
           currentZ=saved.currentZ;map=saved.map;enemies=saved.enemies
           camX=saved.camX;camY=saved.camY
@@ -254,19 +311,12 @@ describe('Guaranteed elevated tower',()=>{
           drawEnemyVisual=saved.drawEnemyVisual;drawImageVisual=saved.drawImageVisual
           enemyHasAbility=saved.enemyHasAbility
           surfaceMap[y][x]=savedTile;discovered[y][x]=savedDiscovery
-          surfaceMap[y][x+1]=savedAdjacent
           if(wasForaged)foragedTiles.add(key)
           if(savedUnderlay===undefined)delete tileUnderlays[key]
           else tileUnderlays[key]=savedUnderlay
-          if(savedAdjacentUnderlay===undefined)delete tileUnderlays[adjacentKey]
-          else tileUnderlays[adjacentKey]=savedAdjacentUnderlay
           render()
         }
       })()`)
-      expect(result.ground).to.equal('grass')
-      expect(result.blend).to.equal(true)
-      expect(result.backdropDrawn).to.equal(true)
-      expect(result.surfaceMapIsolated).to.equal(true)
       for(const order of [result.groundRoof,result.groundRoom])
         expect(order).to.deep.equal(['enemy','forest'])
       expect(result.flying).to.deep.equal(['enemy'])
@@ -347,7 +397,6 @@ describe('Guaranteed elevated tower',()=>{
               currentZ=1;map=towerLevels[0].map
               undergroundDiscovered=towerLevels[0].discovered
               invalidateUndergroundFov()
-              drawTowerBackground(x,y)
               renderScene(performance.now())
               currentZ=0;map=surfaceMap
               invalidateUndergroundFov()

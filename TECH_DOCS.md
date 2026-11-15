@@ -9374,11 +9374,17 @@ NPCs and effects remain hidden. Climbing does not reveal additional surface
 tiles. The source is the existing surface map, not a regenerated world.
 
 The renderer draws only previously explored background cells in the viewport, beneath the current floor.
-Surface scenery uses the same deterministic tile variants, forest grass
-underlays and grass/sand/snow boundary blends as ground level. The tower
-backdrop samples neighboring biomes from the original surface map even while
-the active map is an elevated floor; it uses the same shared, zoom-aware
-blend renderer as surface terrain, without deprecated directional connectors.
+Surface terrain is composed by **one rendering path** on the ground and above it:
+when the active elevated map marks a cell as outside space, that same terrain
+renderer reads the original `surfaceMap` at its unchanged X/Y. Thus cemetery
+graves, trees, rocks, transparent underlays, deterministic tile variants, biome
+boundaries, shoreline masks and diagonal rivers have the same appearance at
+`z:0` and when viewed from `z:+1` through `z:+4`. The elevated map remains
+responsible for collision, visibility and interaction; the projected surface
+never becomes walkable or interactive. A separate exterior-only overlay dims
+this scenery and its wandering creatures on enclosed upper floors, without
+dimming the tower interior. This shared drawing never modifies map state or
+uses gameplay RNG.
 Old sand metadata under forest trees must not create square patches around
 the tower. Rendering the exterior cannot modify tower terrain, discovery,
 character positions or the replay RNG. Ground
