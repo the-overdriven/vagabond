@@ -31,6 +31,12 @@ describe('Guaranteed elevated tower',()=>{
         player.inventory=[];player.curseDebuffs=[];replayRecording=false
         replayAnimationsDisabled=true;raceOpen=false
         await generateNewWorld()
+        const hiddenMazeChests=groundItems.filter(g=>g.towerMazeMimic&&g.level===-1)
+        const mimicInDeadEnd=hiddenMazeChests.length===1 &&
+          hiddenMazeChests[0].isMimic===true &&
+          hiddenMazeChests[0].x===towerMaze.levels[0].mimicSpot.x &&
+          hiddenMazeChests[0].y===towerMaze.levels[0].mimicSpot.y &&
+          undergroundMap[hiddenMazeChests[0].y][hiddenMazeChests[0].x]==='cavefloor'
         const count=z=>enemies.filter(e=>e.alive&&e.towerMazeResident&&e.level===z).length
         const before={x:towerMaze.center.x,y:towerMaze.center.y}
         currentZ=0;map=surfaceMap;Object.assign(player,before)
@@ -77,7 +83,7 @@ describe('Guaranteed elevated tower',()=>{
         const saved=buildSaveObject()
         loadGameFromObject(saved,{isReplayInit:true})
         return {down,deep,back,lever,sealed,basementFeedback,towerFeedback,
-          noSpoilers,persisted:towerMaze.active,
+          mimicInDeadEnd,noSpoilers,persisted:towerMaze.active,
           monsters:[count(-1),count(-2)],
           ghost:enemies.some(e=>e.towerMazeResident &&
             (e.abilities.includes('fly')||e.abilities.includes('ethereal'))),
@@ -87,7 +93,7 @@ describe('Guaranteed elevated tower',()=>{
       })()`)
       expect(result).to.include({down:true,deep:true,back:true,lever:true,
         sealed:true,basementFeedback:true,towerFeedback:true,
-        noSpoilers:true,persisted:true,ghost:false,chest:1,
+        mimicInDeadEnd:true,noSpoilers:true,persisted:true,ghost:false,chest:1,
         upper:'mazestairsup',lower:'caveup'})
       expect(result.monsters[0]).to.be.within(8,15)
       expect(result.monsters[1]).to.be.within(8,15)

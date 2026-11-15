@@ -1839,6 +1839,7 @@ more difficult:
     return true
     } finally {
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
+        Mimics.onLevelChange()
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
         spawnUnseenBestiaryEncounter()
@@ -2191,6 +2192,7 @@ more difficult:
 <script src="src/worldGen.js"></script>
 <script src="src/tower.js"></script>
 <script src="src/towerMaze.js"></script>
+<script src="src/mimics.js"></script>
 <script src="src/dwarvenMines.js"></script>
 <script src="src/mining.js"></script>
 <script src="src/dungeonTraps.js"></script>
@@ -5375,7 +5377,7 @@ more difficult:
         kind:'stolenloot',gold:e.stolenGold})
       e.stolenGold=0
     }
-    if (cause !== 'sacrifice') {
+    if (cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE,
         visibleAtDeath, deathFxDelay)
@@ -7210,6 +7212,7 @@ more difficult:
     if (player.hp <= 0 || deathTransition) return
     updateAlarmedEnemies()
     turnCount++
+    Mimics.update()
     const trollingActive = AdaptivePlayerTrolling.active()
     if (trollingActive) AdaptivePlayerTrolling.onWorldTurn()
     Campfires.beginTurn()
@@ -7275,6 +7278,12 @@ more difficult:
     for (const e of enemies.slice()) {
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      if (e.mimicSkipTurn === turnCount) continue
+      if (e.mimicStationary) {
+        if (Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))<=ATTACK_RANGE)
+          if(enemyAttackPlayer(e)) return
+        continue
+      }
       // Prophecies resolve as a game turn before any chase or attack AI.
       if (trollingActive && e.adaptiveEventId && AdaptivePlayerTrolling.onEnemyTurn(e, turnCount)) continue
       expireEnemyInvisibility(e)
@@ -9535,6 +9544,11 @@ more difficult:
       updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
       return
     }
+    if (Mimics.revealBump(nx,ny)) {
+      clearAutoPath(); consecutiveWaitTurns=0
+      enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return
+    }
     if (isWalkableForPlayer(nx, ny)) {
       player.miningArmedTarget = null
       player.x = nx
@@ -9553,6 +9567,8 @@ more difficult:
       if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
       checkOldHunterInvestigation()
       player.steps++
+      Mimics.revealAdjacent()
+      if (player.hp <= 0 || deathTransition) return
       checkGroundAt(nx, ny)
       checkWorldEdge()
       if (isTempleGround(map[ny][nx])) {
@@ -16341,6 +16357,7 @@ more difficult:
     currentZ = destination
     currentCave = -1
     map = nextMap
+    Mimics.onLevelChange()
     undergroundDiscovered = destination === 0 ? null : destination > 0
       ? towerLevels[destination-1].discovered : depthUndergroundDiscovered(chainDepthForZ(destination))
     resetSwimming()
@@ -16951,6 +16968,7 @@ more difficult:
       }
       populateTower()
       TowerMaze.populate()
+      Mimics.initialize()
       rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
       spawnSurfaceFissures()

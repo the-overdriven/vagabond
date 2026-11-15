@@ -100,7 +100,7 @@ const TowerMaze = (() => {
   // Growing Tree: mostly newest with a random active-cell choice to shorten
   // uninterrupted runs. Edges are orthogonal on a three-tile lattice, leaving
   // thick enough walls that diagonals cannot bridge unrelated passages.
-  function growingTree(rect,root,monsterCount) {
+  function growingTree(rect,root,monsterCount,reserveMimic=false) {
     const cells=mazeCells(rect),rootIndex=cells.index(root.x,root.y)
     if(rootIndex<0)return null
     for(let attempt=0;attempt<48;attempt++) {
@@ -197,12 +197,16 @@ const TowerMaze = (() => {
         }
         if(branchLength>=3)sideEnds.push({i,length:branchLength})
       }
-      if(sideEnds.length<=monsterCount||sideEnds.length>=monsterCount*2)continue
+      if(sideEnds.length<=monsterCount+(reserveMimic?1:0)||sideEnds.length>=monsterCount*2)continue
       const endings=sideEnds.slice(),chosen=[]
       for(let i=0;i<monsterCount;i++){
         const at=randInt(0,endings.length-1)
         chosen.push(endings.splice(at,1)[0])
       }
+      // Reserve one unused dry side dead end for a concealed chest mimic on
+      // the FIRST labyrinth layer. It is never an enemy's starting branch.
+      const mimicEnd=reserveMimic?endings.splice(randInt(0,endings.length-1),1)[0]:null
+      const mimicSpot=mimicEnd?cells.point(mimicEnd.i):null
       // Water only caps optional dead ends. There are never enemies beyond it.
       const water=[]
       const waterCount=Math.min(endings.length,chance(0.6)?randInt(1,2):0)
@@ -213,7 +217,7 @@ const TowerMaze = (() => {
         water.push(pt)
       }
       return {tiles:[...floor.values()], entrance:root, exit:goal,
-        enemySpots:chosen.map(p=>cells.point(p.i)), water, metrics:{
+        enemySpots:chosen.map(p=>cells.point(p.i)), mimicSpot, water, metrics:{
           width:rect.w,height:rect.h,routeCells:Math.ceil(routeTiles/3),routeTiles,
           branchEnds:sideEnds.length,spawnBranches:monsterCount,
           emptyEnds:sideEnds.length-monsterCount,
@@ -245,12 +249,12 @@ const TowerMaze = (() => {
 
   function generate(layout) {
     const count1=randInt(8,15),count2=randInt(8,15)
-    const first=growingTree(layout.rect,layout.root,count1)
+    const first=growingTree(layout.rect,layout.root,count1,true)
     if(!first)return false
     const second=growingTree(layout.rect,first.exit,count2)
     if(!second)return false
     const l1={z:-1,patches:first.tiles.map(p=>({...p,tile:p.tile==='water'?'water':'cavefloor'})),
-      enemySpots:first.enemySpots, water:first.water, metrics:first.metrics}
+      enemySpots:first.enemySpots, mimicSpot:first.mimicSpot, water:first.water, metrics:first.metrics}
     const l2={z:-2,patches:second.tiles.map(p=>({...p})),enemySpots:second.enemySpots,
       water:second.water,metrics:second.metrics}
     for(let y=layout.basement.y+1;y<layout.basement.y+layout.basement.h-1;y++)
@@ -345,6 +349,9 @@ const TowerMaze = (() => {
         occupied.add(key(p.x,p.y))
       }
     }
+    groundItems.push({x:towerMaze.levels[0].mimicSpot.x,y:towerMaze.levels[0].mimicSpot.y,
+      kind:'chest',tier:3,level:-1,levelKind:'chain',caveIndex:-1,
+      towerMazeMimic:true,opened:false})
     groundItems.push({x:towerMaze.treasure.x,y:towerMaze.treasure.y,
       kind:'chest',tier:4,level:-2,levelKind:'chain',caveIndex:-1,
       towerMazeTreasure:true,opened:false})

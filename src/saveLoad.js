@@ -337,6 +337,9 @@ function buildSaveObject() {
       dungeonRoomId: e.dungeonRoomId || null,
       dungeonVaultId: e.dungeonVaultId || null,
       miningInvestigation: e.miningInvestigation ? structuredClone(e.miningInvestigation) : null,
+      mimicStationary: e.mimicStationary === true,
+      mimicSkipTurn: Number.isInteger(e.mimicSkipTurn) ? e.mimicSkipTurn : 0,
+      mimicLoot: e.mimicLoot ? structuredClone(e.mimicLoot) : null,
     })),
     caveDecorations: caveDecorations.map(prop => ({...prop})),
     groundItems: groundItems.map(g => ({...g})),
@@ -1038,6 +1041,9 @@ function loadGameFromObject(data, opts = {}) {
       dungeonRoomId: typeof e.dungeonRoomId === 'string' ? e.dungeonRoomId : null,
       dungeonVaultId: typeof e.dungeonVaultId === 'string' ? e.dungeonVaultId : null,
       miningInvestigation: e.miningInvestigation ? structuredClone(e.miningInvestigation) : null,
+      mimicStationary: e.mimicStationary === true,
+      mimicSkipTurn: Number.isInteger(e.mimicSkipTurn) ? e.mimicSkipTurn : 0,
+      mimicLoot: e.mimicLoot ? structuredClone(e.mimicLoot) : null,
     })
   })
   for (const enemy of enemies) removeInvalidEnemyBow(enemy)
@@ -1121,6 +1127,7 @@ function loadGameFromObject(data, opts = {}) {
     }
     return item
   })
+  Mimics.onLoad()
   clearGroundItemsUnderMerchant()
   if (dwarvenRuin && dwarvenRuin.caveIndex >= 0 && deepLevels[1]) {
     const fortMap = deepLevels[1].caveMaps[dwarvenRuin.caveIndex]

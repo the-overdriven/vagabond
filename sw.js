@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
   './src/worldGen.js',
   './src/tower.js',
   './src/towerMaze.js',
+  './src/mimics.js',
   './img/tiles/tower-entrance.png',
   './img/tiles/tower-entrance-open.png',
   './img/tiles/tower-window.png',

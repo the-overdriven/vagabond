@@ -35,6 +35,27 @@ describe('Persistent Dwarven Ruins stratum', () => {
         check(ruins.length >= 3 && ruins.length <= 5, 'Dwarven Ruins floor count is 3-5')
         check(deepLevels[0]?.kind === 'caves', 'z:-2 remains the cave layer')
         check(deepLevels[1]?.kind === 'dwarvenFort', 'z:-3 remains the Dwarven Fort')
+        check(ENEMY_TEMPLATE_BY_NAME.Mimic.aggro === 4 && Mimics.STATIONARY_AFTER_REVEAL === false,
+          'revealed Mimics use ordinary hostile pursuit rather than stationary combat')
+
+        // The count applies to the ENTIRE Dwarven Fort + Ruins, not each floor.
+        // One separate mimic must occupy a dead end on the first Tower maze floor.
+        const complexChests = groundItems.filter(g => g.kind === 'chest' &&
+          g.levelKind === 'chain' && g.level <= -3 && g.level >= -3-ruins.length)
+        const complexMimics = complexChests.filter(g => g.isMimic)
+        const fortChests = complexChests.filter(g => g.level === -3)
+        check(fortChests.length >= 5, 'Fort includes four new ordinary chests')
+        check(complexMimics.length <= 3, 'whole complex contains at most three Mimics')
+        check(complexMimics.length <= Math.floor(complexChests.length / 2),
+          'Mimics cannot replace half or more of the chests')
+        check(complexChests.some(g => !g.isMimic), 'real chest always remains')
+        check(complexMimics.every(g => g.loot && g.unseenTurns === 0 &&
+          !g.rolled && g.episode === 0 && g.opened === false),
+          'unrevealed Mimics preserve original chest state')
+        check(groundItems.filter(g => g.towerMazeMimic && g.isMimic).length === 1,
+          'first Tower maze level has an independent guaranteed Mimic')
+        check(groundItems.filter(g => g.isMimic).length === complexMimics.length + 1,
+          'there are no accidental Mimic spawns elsewhere')
 
         const positions = (grid, tile) => {
           const found = []

@@ -1340,7 +1340,10 @@ a seeded Growing Tree maze occupies a **31–37-tile square** including walls,
 with predominantly one-tile corridors and **zero or one extra independent
 corridor loop**. The farthest dead end is chosen by the shortest path under
 actual eight-direction movement, which also accounts for diagonal shortcuts.
-The bottom level's far end holds the sole labyrinth chest. Optional water
+The bottom level's far end holds its unique, high-value reward chest. The first
+maze level also reserves a dry, otherwise unoccupied side dead end for one
+guaranteed disguised Mimic chest, independent of all Dwarven Fort/Ruins limits.
+Optional water
 appears only at nonessential dead ends, never along the required dry route.
 The basement, the maze envelopes, their corridor and isolation ring are
 protected from mining, even when approached from an adjacent cave. Ethereal
@@ -1387,8 +1390,8 @@ apply; adaptive player trolling does not create, modify or trigger reactions
 inside the protected basement and mazes. Each starting creature has its own
 meaningful side dead end, outside every shortest route to the goal. The number
 of such branches `B` satisfies `M < B < 2M` for `M` starting monsters, leaving
-some branches empty. No new bosses, respawns or random labyrinth chests are
-added. Creatures retain their normal behavior once encountered.
+some branches empty. No new bosses, respawns or randomly placed labyrinth chests are added.
+Creatures retain their normal behavior once encountered.
 
 The single bottom chest grants **85% tier-3/4 equipment (equal tier chance),
 or 15% tier-4-source artifact**, plus **60–150 base gold** adjusted by the
@@ -1599,6 +1602,7 @@ A large underground dwarven settlement/ruin containing:
 - a wheelbarrow
 - a giant gold coin
 - a guaranteed artifact chest
+- four ordinary chests spaced across reachable, safe fort rooms
 - a direct surface gate
 
 Marble floor tiles in the Fort and deeper Ruins use a stable, coordinate-based
@@ -5048,6 +5052,29 @@ including replay initial states; loading never rerolls it.
 
 ---
 
+## Mimic (chest ambush)
+
+The **Mimic** is a tier-3, non-humanoid construct that does not enter ordinary
+spawn pools or wear equipment. Before reveal, it is a regular-looking chest;
+there is no visual, inspect, tooltip or minimap indication of its identity.
+Its location may change while unseen (see **§45. Chests**). Revealing it
+replaces the chest with a monster at exactly the same world coordinates and
+shows the normal **Ambush!** effect. It makes one immediate adjacent attack,
+which replaces (not adds to) its next ordinary enemy action.
+
+After revealing, the Mimic pursues and fights using normal hostile-monster AI
+(AGGRO 4), including pathfinding around corners; it does not wander while idle.
+Its immediate ambush attack replaces its next ordinary turn, even when the
+Mimic is allowed to move. Behavior switches are `STATIONARY_AFTER_REVEAL`
+and `ATTACK_ON_REVEAL`. It uses the normal tier-appropriate prefix rules; its
+HP, ATK and DEF interpolate with Dwarven Ruins floor progress from 100% to
+140% of its base stats (the Tower basement uses baseline stats), before any
+prefix modifiers. It drops exactly its pre-rolled disguised chest contents
+plus **15 base gold** scaled by the world's gold multiplier. These contents
+are preserved when the disguise moves or the game is saved/replayed.
+
+---
+
 # 21. Enemy Prefixes
 
 Underground enemies acquire the player only along an unobstructed ray through
@@ -7320,6 +7347,53 @@ Chest loot can include:
 Chest tier affects loot.
 
 Some special chests guarantee artifacts (i.e. one chest in dwarven fort ruins).
+
+## Hidden Mimic chests in the Dwarven complex
+
+The Dwarven Fort entrance level (z:−3) has **four additional ordinary chests**
+placed on safe reachable marble, away from the entrance, occupants, and other
+chests. After Fort and Ruins chests have been placed, one seeded roll chooses
+the total number of Mimics across **all Fort and Ruins levels combined**:
+
+| Mimics | Probability |
+|---:|---:|
+| 0 | 10% |
+| 1 | 63% |
+| 2 | 13.5% |
+| 3 | 13.5% |
+
+Thus, 90% of worlds receive a guaranteed first Mimic. Independently, 30% of
+those add one or two more with equal chance. The result is capped at **three
+in the complete Dwarven complex**, at most half of its total chests; at least
+one genuine chest always remains. Both Fort and Ruins can receive Mimics, but
+their individual floors need not contain one. Guaranteed artifacts, scripted
+and progression-sensitive rewards, royal treasury, vault, trap-mechanism, and
+labyrinth goal chests are excluded from replacement. The first Tower labyrinth
+layer (z:−1) has **one additional, guaranteed Mimic** in a dry, nonessential
+dead end and is **not** included in the Dwarven cap.
+
+An unrevealed Mimic is indistinguishable from a real chest until the player
+moves within **Chebyshev distance 1** (including diagonals) or bumps it. Each
+consumed player turn checks Mimics **only on the active level**. Being in FOV
+resets the unseen counter and cancels an unrolled episode. After **three
+consecutive unseen turns**, each out-of-view episode receives precisely one
+**65% chance** to move by one of its eight neighboring squares. Failing the
+roll, or finding no safe destination, means it does not move again until a
+new episode; re-entering a level starts a fresh unseen episode. A destination
+must be safe, unseen, nonhazardous and unoccupied, must not be stairs/door/
+trap/loot, and must not sever a one-tile passage. No animation, detection
+message, tooltip, or new map-memory marker exposes the movement. The terrain
+remains explored, but its former chest sprite is not remembered there.
+
+Each Mimic chest stores its ID, original chest loot, position, unseen counter,
+per-episode roll flag and episode index in the ordinary chest save/replay
+state. The 65% shift roll and destination use a stable seed of world, floor,
+chest ID, and episode, **not animation timing or a fresh random draw on
+reload**. Its normal-chest reward table is resolved when placed (at generation
+MF 0), including eligible extra Flint Stone/Potato rolls; the hidden state is
+never exposed by UI. An ordinary chest still rolls loot when opened, so any
+Magic Find gained later can affect that ordinary chest, not the Mimic's
+already fixed contents.
 
 ## Chest loot selection
 
