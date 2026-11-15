@@ -42,6 +42,10 @@ describe('Decorative caves and deep threat rarity', () => {
         check(surfaceProps.every(p=>p.kind==='mountain-water' || TILE[surfaceMap[p.y]?.[p.x]]?.walk ||
           ['lily-pads','lily-flowering'].includes(p.kind)),
           'ordinary surface scenery rests on walkable ground')
+        check(surfaceProps.every(p=>p.kind==='mountain-water' ||
+          !['hill','forest','taiga','ancientForest'].includes(surfaceMap[p.y]?.[p.x]) &&
+          !grasslandTrees.has(keyXY(p.x,p.y))),
+          'natural surface props never occupy forest, hill or grassland tree tiles')
         check(surfaceProps.filter(p=>p.kind==='mountain-water').every(p=>
           ['mountain','snowmountain'].includes(surfaceMap[p.y][p.x])),
           'river sources remain real mountains')

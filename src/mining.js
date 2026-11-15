@@ -658,7 +658,7 @@ const Mining = (() => {
           mapPreviewBase = null
           minimapDirty = true
           grantXp(0, true)
-          log('You clear the boulder, opening a new route.', 'good')
+          log('You clear the boulder.', 'good')
           Campfires.findFlint(0.05)
         } else {
           target.removed = true

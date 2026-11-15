@@ -8206,7 +8206,7 @@ function spawnSurfaceSpiderWebs(roll) {
       if (distance < 2 || distance > 3) continue
       const x = spider.x + dx, y = spider.y + dy, key = keyXY(x, y)
       if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue
-      if (!['grass','forest','ancientForest','hill'].includes(surfaceMap[y]?.[x])) continue
+      if (surfaceMap[y]?.[x] !== 'grass' || grasslandTrees.has(key)) continue
       if (occupiedProps.has(key) || used.has(key)) continue
       sites.push({x,y,rank:roll(x,y,31)})
     }
@@ -8363,14 +8363,14 @@ function spawnNaturalDecorations(roll) {
   const surface = [], wet = []
   for (let y=3;y<MAP_H-3;y++) for(let x=3;x<MAP_W-3;x++) {
     const tile = surfaceMap[y][x],site={x,y}
-    if (['grass','hill','forest','taiga'].includes(tile) &&
+    if (tile==='grass' &&
         !grasslandTrees.has(keyXY(x,y)) && clearOfHuts(x,y,5) &&
         Math.max(Math.abs(x-spawnPoint.x),Math.abs(y-spawnPoint.y))>=7 &&
         (!tower || x<tower.x-2 || x>tower.x+tower.size+1 ||
           y<tower.y-2 || y>tower.y+tower.size+1)) surface.push(site)
     if (tile==='water') wet.push(site)
   }
-  const dry = surface.filter(p => ['grass','hill'].includes(surfaceMap[p.y][p.x]))
+  const dry = surface
   const nearForest = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['forest','taiga','ancientForest'],2))
   const nearHills = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['hill'],2))
   const nearMountains = dry.filter(p=>nearby(surfaceMap,p.x,p.y,['mountain','snowmountain'],3))
@@ -8386,7 +8386,7 @@ function spawnNaturalDecorations(roll) {
       const clues = []
       for (let dy=-3;dy<=3;dy++) for (let dx=-3;dx<=3;dx++) {
         const x=target.x+dx,y=target.y+dy
-        if (['grass','sand','hill'].includes(surfaceMap[y]?.[x]) &&
+        if (['grass','sand'].includes(surfaceMap[y]?.[x]) &&
             !grasslandTrees.has(keyXY(x,y)) &&
             nearby(surfaceMap,x,y,['water','river'],2)) clues.push({x,y})
       }

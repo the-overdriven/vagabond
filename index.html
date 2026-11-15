@@ -4433,8 +4433,60 @@ more difficult:
       kind:'droppeditem', item})
   }
 
-  function lootFromEnemy(e, onGround = false) {
+  // Use the quality-roll tail probability, not the item's final tier. A
+  // rare prefix on a tier-1 item should shine; ordinary tier-5 gear should not.
+  // Humanoid gear quality was rolled at generation MF 0, with source-tier boost.
+  function monsterGearQualityTailChance(item, sourceTier = 0) {
+    if (!item?.mod) return 1
+    const stat = item.mod
+    const value = stat === 'xp' ? item.xpBonus : item.modAmt
+    if (!Number.isFinite(value)) return 1
+    const boost = modifierSourceBoost(sourceTier)
+    let ordinary = 0
+    if (stat === 'hp') {
+      if (value <= 10) ordinary = 1
+      else if (value <= 59) ordinary = Math.max(0, Math.min(1,
+        1 - Math.pow((value - 10) / 50, 1 / 5) + boost / 100))
+    } else if (stat === 'xp') {
+      if (value <= 5) ordinary = 1
+      else if (value <= 15) ordinary = Math.max(0, Math.min(1,
+        1 - (value - 5) / 11 + boost / 100))
+    } else if (['atk','def','spd','mf'].includes(stat)) {
+      if (value >= 1 && value <= 5) {
+        const first = [0,1,46,76,91,98][value]
+        ordinary = Math.max(0, Math.min(1, (101 - Math.max(1, first - boost)) / 100))
+      } else if (value >= 6 && value <= 10) {
+        ordinary = Math.min(100, boost + 1) / 100 * (11 - value) / 5
+      }
+    } else return 1
+    const catalog = item.kind === 'weapon' ? WEAPONS : item.kind === 'armor' ? ARMORS : SHIELDS
+    const baseTier = catalog.find(base => base.name === item.base)?.tier ?? item.tier ?? 1
+    const cfg = WORLD_GEN_CONFIG.lootRules
+    const gate = (cfg.exceptionalModifierChanceBase +
+      Math.max(0, sourceTier - 1) * cfg.exceptionalModifierChancePerMonsterTier) *
+      (sourceTier >= 4 && baseTier <= 2 ? cfg.exceptionalLowTierHighMonsterMultiplier : 1)
+    const [min,max] = stat === 'hp' ? [60,100] : stat === 'xp' ? [16,30] : [11,20]
+    const high = Math.max(min, Math.ceil(value))
+    const totalWeight = (max-min+1)*(max-min+2)/2
+    const remain = Math.max(0, max-high+1)
+    const exceptional = value <= min ? 1 : remain*(remain+1)/2/totalWeight
+    return ordinary * (1 - gate) + exceptional * gate
+  }
+
+  function isRareMonsterDrop(item, sourceTier = 0) {
+    return item?.kind === 'artifact' ||
+      (['weapon','armor','shield'].includes(item?.kind) && item.mod &&
+       monsterGearQualityTailChance(item, sourceTier) < 0.10)
+  }
+
+  function lootFromEnemy(e, onGround = false, visibleAtDeath = false, deathFxDelay = 0) {
     const mf = playerMf()
+    let rareFxQueued = false
+    const showRareDrop = rare => {
+      if (!rare || rareFxQueued || !visibleAtDeath) return
+      rareFxQueued = true
+      spawnRareDropAnim(e, deathFxDelay)
+    }
 
     // Remaining ammunition is recovered automatically; bow drops are rarer.
     // Use the assigned shooter role, even if its last arrow was already fired.
@@ -4453,6 +4505,10 @@ more difficult:
         else player.inventory.push(bow)
         const bowLabel = onGround ? bow.base : bow.name
         lootLog(`The ${e.name} dropped ${bowLabel}.`, bow, bowLabel)
+        // The Hunting Bow is only a quarter of the 25% shooter-bow drop.
+        showRareDrop((bow.base === 'Hunting Bow' &&
+          RANGED_CONFIG.shortBowDropChance * 0.25 < 0.10) ||
+          isRareMonsterDrop(bow, e.tier))
       }
     }
 
@@ -4492,6 +4548,7 @@ more difficult:
       else addInventoryItem(selected.kind, {count})
       const name = itemDefinition(selected.kind).name
       log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
+      showRareDrop(selected.chance < 0.10)
     }
 
     // Fungus always yields ordinary unidentified mushrooms. Keep this separate
@@ -4521,6 +4578,7 @@ more difficult:
       if (art) {
         const label = onGround ? art.noun : artifactDisplayName(art)
         lootLog(`The ${e.name} dropped ${label}.`, art, label)
+        showRareDrop(true)
         if (onGround) placeEnemyLootOnGround(e, art)
         else player.inventory.push(art)
       }
@@ -4529,6 +4587,7 @@ more difficult:
       const item = e.equipment
       const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
       lootLog(`The ${e.name} dropped ${label}.`, item, label)
+      showRareDrop(isRareMonsterDrop(item, e.tier))
       // Adaptive enemies' enchanted gear is a visible ground pickup, not
       // silently added to inventory or auto-equipped after a melee kill.
       if (onGround || e.adaptiveEventId === 'fan_club' && AdaptivePlayerTrolling.active()) {
@@ -5318,7 +5377,8 @@ more difficult:
     }
     if (cause !== 'sacrifice') {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE)
+      lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE,
+        visibleAtDeath, deathFxDelay)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
     updateHud()
@@ -5904,7 +5964,7 @@ more difficult:
         }
         if (distance === bestDistance) options.push({x, y})
       }
-      log(`The ${e.name} panics at the unseen attack and flees in terror!${options.length ? '' : ' But is cornered with no way to escape!'}`, 'info')
+      log(`The ${e.name} panics at the unseen attack and jumps away in terror!${options.length ? '' : ' But is cornered with no way to escape!'}`, 'info')
       if (options.length) {
         const fromX = e.x, fromY = e.y
         const destination = pick(options)
@@ -10862,6 +10922,8 @@ more difficult:
   const PLAYER_DODGE_ANIM_MS = 108
   const PROJECTILE_DODGE_LEAD_MS = 84
   const FX_ANIM_MS = 420
+  const FORAGE_FOUND_ANIM_MS = 1150
+  const FORAGE_FOUND_HOLD_MS = 320
   const SOUND_ANIM_MS = 700
   const DAMAGE_ANIM_MS = 850
   const SUMMON_ANIM_MS = 1000
@@ -10951,7 +11013,15 @@ more difficult:
   function spawnForageFoundAnim() {
     if (replayAnimationsDisabled || replaySimulationMode) return
     fxAnims.push({x: player.x, y: player.y, ch: 'found!', color: '#ddc9a3',
-      label: true, dir: -1, start: performance.now(), duration: 650})
+      label: true, dir: -1, start: performance.now(), duration: FORAGE_FOUND_ANIM_MS})
+    runAnimationLoop()
+  }
+
+  // Pure presentation; the loot roll has already succeeded and no RNG is used.
+  function spawnRareDropAnim(e, deathFxDelay = 0) {
+    if (replayAnimationsDisabled || replaySimulationMode) return
+    fxAnims.push({x:e.x, y:e.y, ch:'✦', color:'#f4d777', dir:-0.55,
+      rareDrop:true, start:performance.now() + deathFxDelay + 160, duration:1050})
     runAnimationLoop()
   }
 
@@ -12160,6 +12230,11 @@ more difficult:
     drawCaveSpoor(undergroundVisible)
     // Decorative overlays never enter the loot, collision or inspection systems.
     for (const prop of renderLevelObjects('decorations')) {
+      // Old saves can still carry props placed on a tree or hill. Never draw
+      // that scenery over those terrain sprites; mountain-water is terrain art.
+      if (prop.level === 0 && prop.kind !== 'mountain-water' &&
+          (['forest','taiga','ancientForest','hill'].includes(surfaceMap[prop.y]?.[prop.x]) ||
+            grasslandTrees.has(keyXY(prop.x, prop.y)))) continue
       if (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y))) continue
       const vx = Math.round((prop.x - camX) * TILE_PX), vy = Math.round((prop.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
@@ -12252,17 +12327,23 @@ more difficult:
         if (!undergroundTileVisible(p.x, p.y)) continue
         const vx = Math.round((p.x - camX) * TILE_PX)
         const vy = Math.round((p.y - camY) * TILE_PX)
-        const bump = p.dir * TILE_PX * 0.6 * Math.sin(t * Math.PI / 2) // ease-out bump, up for pickups, down for deaths
-        const scale = 1 - 0.5 * t
+        // Found labels start closer to the player and hold their full opacity
+        // before rising; ordinary death and pickup animation timing is unchanged.
+        const progress = p.label
+          ? Math.max(0, (now - p.start - FORAGE_FOUND_HOLD_MS) /
+            Math.max(1, p.duration - FORAGE_FOUND_HOLD_MS)) : t
+        const bump = p.dir * TILE_PX * 0.6 * Math.sin(progress * Math.PI / 2)
+        const scale = 1 - 0.5 * progress
         ctx.save()
-        ctx.globalAlpha = 1 - t
+        ctx.globalAlpha = 1 - progress
+        if (p.rareDrop) { ctx.shadowColor = p.color; ctx.shadowBlur = TILE_PX * 0.35 }
         ctx.translate(vx + TILE_PX / 2, vy + TILE_PX / 2 + bump)
         ctx.scale(scale, scale)
         const drewDeathTile = USE_TILE_IMAGES && p.visual &&
           drawImageVisual(-TILE_PX / 2, -TILE_PX / 2, p.visual)
         if (!drewDeathTile) {
           ctx.fillStyle = p.color
-          const textY = p.label ? -TILE_PX : 3 - TILE_PX / 2
+          const textY = p.label ? -TILE_PX * 0.65 : 3 - TILE_PX / 2
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.font = `bold ${Math.round(TILE_PX * 0.78)}px Consolas, 'Courier New', monospace`

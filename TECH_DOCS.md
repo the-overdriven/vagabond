@@ -681,10 +681,9 @@ Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
 its original brown floor. Completing an overworld boulder has a **5%** chance
 to yield one reusable Flint Stone; individual strikes and underground deposits
-do not roll for flint. Overworld boulders can be cleared to open shortcuts;
-the cleared tile restores its underlying surface terrain (grass, forest, hill
-or sand), even after world rotation or save/load. Both minimaps immediately
-reflect the cleared tile, as does the full-world map when opened.
+do not roll for flint. Clearing an overworld boulder restores its underlying 
+surface terrain (grass, forest, hill or sand), even after world rotation or save/load. 
+Both minimaps immediately reflect the cleared tile, as does the full-world map when opened.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -765,10 +764,20 @@ feedback joins the stack only when its impact is displayed. Each label remains
 fully opaque and stationary for **280 ms** before drifting and fading over the
 rest of its existing lifetime (850 ms for ordinary combat text, 1,000 ms for
 summoning). New messages still push older ones up immediately. Popups never
-delay input or affect combat resolution, saves, or replay RNG. Labels begin 5
-screen pixels above their tile anchor, stay there during the hold, and are
-drawn over creatures, lighting, attack telegraphs, and rectangular range
-overlays in both tile and ASCII modes. Screen-fade transitions still cover
+delay input or affect combat resolution, saves, or replay RNG.
+The foraging **found!** label starts closer to its tile, remains fully visible
+for 320 ms and then rises/fades across the rest of a 1,150 ms lifetime.
+Successful monster drops with an absolute chance below 10%, all artifacts, and
+unusually strong rare equipment modifiers emit one gold sparkle at the death
+tile. Equipment qualifies by the less-than-10% upper tail of the modifier
+strength roll at its monster's source tier, not by the base item's tier.
+The rarer 6.25% shooter Hunting Bow outcome also qualifies.
+Each kill emits at most one sparkle even when several rare rewards roll;
+projectile kills synchronize it with impact. These visuals do not reveal item
+identity in messages, consume RNG, or change saves and replay rules. Ordinary
+combat popup labels begin 5 screen pixels above their tile anchor, stay there
+during the hold, and are drawn over creatures, lighting, attack telegraphs, and
+rectangular range overlays in both tile and ASCII modes. Screen-fade transitions still cover
 the whole scene.
 
 Animation-only frames reuse the current status display. Actions and HUD changes
@@ -930,7 +939,11 @@ presentation changes because of them:
 Scenery is chosen after whole-world rotation by seeded coordinate hashes,
 avoids initial creatures and loose loot, and persists in the existing
 decoration layer. Each location holds at most one decoration; none appears on
-the ASCII or full-world minimap views.
+the ASCII or full-world minimap views. Natural ground props (including flowers,
+stones, wood and remains) are placed on grass or appropriate sand/water only,
+never on hills, forest or taiga terrain or over a grassland tree. Existing saved
+worlds also suppress these overlays at render time, while mountain headwater
+art remains a terrain-image replacement rather than a ground prop.
 
 Grassland tree decoration:
 
@@ -978,7 +991,6 @@ cave rubble and `img/tiles/dwarven-rubble.png` with an even-weight,
 coordinate-based visual selection (no gameplay RNG). Crypt rubble in tile mode
 overlays the original `crypt2floor` tile without a painted square, just as
 dwarven rubble overlays its recorded floor underlay; ASCII backgrounds stay
-
 unchanged. Both rubble types block movement, enemy and player sight, and
 projectiles. A carried Pickaxe clears one adjacent rubble tile with one movement
 attempt, without moving into that tile. Clearing consumes one turn and produces
@@ -3471,8 +3483,8 @@ Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
 eligible floor positions have separate 1.8% stalagmite and 2.5% mushroom bands.
 On the surface, living Giant Spiders generate up to two decorative webs per
-spider, scattered **2–3 tiles from their original spawn point** (Chebyshev
-distance, on ordinary dry grass/forest/hill ground). They never occupy the
+spider on nearby **grass** tiles, **2–3 tiles from the original spawn point**
+(Chebyshev distance). Forest, hill and grassland-tree tiles are excluded. They never occupy the
 spider's tile or an immediately adjacent tile, existing loot, NPCs, or enemy
 spawn tiles, and overlapping webs are prevented. Their placement uses the
 same seeded coordinate-hash method, not combat RNG. They remain in place if
@@ -6949,7 +6961,8 @@ random(1–5) × enemy tier, modified by Magic Find
 ```
 
 Chests and Magic Find still grant gold normally; only the per-kill enemy gold
-was removed.
+was removed. The rare-drop sparkle is visual feedback for already-resolved
+loot, not a separate loot roll or an identification effect.
 
 Monster templates may define a flat `lootTable`. Each entry specifies an item
 `kind`, its **absolute drop chance** (0–1), and an optional fixed `count`

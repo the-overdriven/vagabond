@@ -32,6 +32,55 @@ describe('Exceptional prefixes and monster loot quality', () => {
     })()`))
   })
 
+  it('animates only truly rare monster loot and never consumes an extra random roll', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const old={chance,rng,lootLog,spawnRareDropAnim,maybeAutoEquipWeapon,makeArtifactItem,
+        inventory:player.inventory}
+      const effects=[],victim={name:'Goblin',baseName:'Goblin',humanoid:true,tier:1,
+        x:player.x+1,y:player.y,level:currentZ,levelKind:currentLevelKind()}
+      try {
+        // Quality tail is about the rolled modifier, never the base gear tier.
+        const gear=(bonus)=>({kind:'weapon',base:'Dagger',name:'Mighty Dagger',tier:1,
+          atk:2,grace:5,mod:'atk',modAmt:bonus})
+        check(!isRareMonsterDrop(gear(2),1),'ordinary prefix has no sparkle')
+        check(!isRareMonsterDrop(gear(4),1),'10% tail is not below 10%')
+        check(isRareMonsterDrop(gear(5),1),'unusually strong low-tier prefix sparkles')
+        check(isRareMonsterDrop({...gear(5),modAmt:13,tier:5},4),
+          'exceptional gear qualifies regardless of base tier')
+        check(isRareMonsterDrop({kind:'artifact'},1),'all artifacts qualify')
+        check(!isRareMonsterDrop({kind:'weapon',base:'Dagger',tier:5},5),
+          'ordinary high-tier gear does not qualify on tier alone')
+        spawnRareDropAnim=(e,delay)=>effects.push({x:e.x,delay})
+        maybeAutoEquipWeapon=()=>false; lootLog=()=>{}
+        rng=()=>{throw Error('animation classifier consumed gameplay RNG')}
+        chance=()=>false
+        player.inventory=[]
+        lootFromEnemy({...victim,equipment:gear(5)},false,true,240)
+        check(effects.length===1&&effects[0].delay===240,
+          'rare equipped item queues one effect at projectile impact')
+        lootFromEnemy({...victim,equipment:gear(2)},false,true)
+        lootFromEnemy({...victim,equipment:gear(5)},false,false)
+        check(effects.length===1,'normal and offscreen drops do not queue effects')
+        makeArtifactItem=()=>({kind:'artifact',noun:'Amulet',name:'The Amulet',tier:3})
+        chance=(p)=>p>0 && p<0.1
+        lootFromEnemy({...victim,equipment:gear(5)},false,true)
+        check(effects.length===2,'artifact plus rare gear still queues only one effect')
+        const rare={name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false,
+          x:victim.x,y:victim.y,level:currentZ}
+        chance=(p)=>Math.abs(p-0.198)<1e-8
+        rng=()=>0.5
+        lootFromEnemy(rare,false,true)
+        check(effects.length===3,'6.6% group drop also receives a sparkle')
+      } finally {
+        chance=old.chance;rng=old.rng;lootLog=old.lootLog
+        spawnRareDropAnim=old.spawnRareDropAnim
+        maybeAutoEquipWeapon=old.maybeAutoEquipWeapon
+        makeArtifactItem=old.makeArtifactItem;player.inventory=old.inventory
+      }
+    })()`))
+  })
+
   it('promotes all over-range bonuses and keeps old ceilings ordinary', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)},oldRng=rng

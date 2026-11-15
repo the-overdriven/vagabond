@@ -123,7 +123,9 @@ describe('Non-gear item catalog', () => {
               const brushwoodFound = oldRoll < 0.75
               forage.push((player.inventory.find(it=>it.kind!=='brushwood')?.kind || 'nothing') === expected && draws === 2 &&
                 (player.inventory.find(it=>it.kind==='brushwood')?.count || 0) === Number(brushwoodFound) &&
-                fxAnims.filter(effect => effect.ch === 'found!').length === Number(brushwoodFound || expected !== 'nothing'))
+                fxAnims.filter(effect => effect.ch === 'found!').length === Number(brushwoodFound || expected !== 'nothing') &&
+                fxAnims.filter(effect => effect.ch === 'found!').every(effect =>
+                  effect.duration === FORAGE_FOUND_ANIM_MS && effect.duration > 650 && effect.label))
             }
           }
           return {chest,forage,chestScale:CHEST_LOOT_TABLE.scale,forageScale:FORAGE_TABLE.scale,

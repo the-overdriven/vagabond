@@ -142,7 +142,7 @@ describe('Scroll of Invisibility', () => {
       expect(result.missedHp).to.equal(50)
       expect(result.hp).to.be.lessThan(50)
     })
-    cy.get('#logpanel').should('contain.text', 'flees in terror!')
+    cy.get('#logpanel').should('contain.text', 'jumps away in terror!')
     cy.get('#logpanel').should('contain.text', 'lashes out wildly into the empty air!')
   })
 
@@ -160,12 +160,12 @@ describe('Scroll of Invisibility', () => {
           reactToInvisibleAttack(e,0)
           reactToInvisibleAttack(e,4)
           return {before,after:{x:e.x,y:e.y},messages:logs.filter(msg=>
-            msg.includes('lashes out wildly') || msg.includes('flees in terror'))}
+            msg.includes('lashes out wildly') || msg.includes('jumps away in terror'))}
         } finally {rng=oldRng;log=oldLog}
       })()`)
       expect(result.after).to.not.deep.equal(result.before)
       expect(result.messages[0]).to.include('lashes out wildly')
-      expect(result.messages[1]).to.include('flees in terror')
+      expect(result.messages[1]).to.include('jumps away in terror')
     })
   })
 
