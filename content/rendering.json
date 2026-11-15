@@ -1043,6 +1043,14 @@
       "rightImage": "img/tiles/hill-right.png",
       "scale": 1
     },
+    "hillSnow": {
+      "image": "img/tiles/hill-snow.png",
+      "singleImage": "img/tiles/hill-snow.png",
+      "leftImage": "img/tiles/hill-snow-left.png",
+      "middleImage": "img/tiles/hill-snow-middle.png",
+      "rightImage": "img/tiles/hill-snow-right.png",
+      "scale": 1
+    },
     "dwarvengate": {
       "image": "img/tiles/dwarven-fort-entrance.png",
       "scale": 1
@@ -1072,6 +1080,14 @@
       "rightImage": "img/tiles/rock-right.png",
       "scale": 1
     },
+    "boulderSnow": {
+      "image": "img/tiles/rock-snow-middle.png",
+      "singleImage": "img/tiles/rock-snow-middle.png",
+      "leftImage": "img/tiles/rock-snow-left.png",
+      "middleImage": "img/tiles/rock-snow-middle.png",
+      "rightImage": "img/tiles/rock-snow-right.png",
+      "scale": 1
+    },
     "bigbell": {
       "image": "img/tiles/big-brass-bell.png",
       "scale": 1
@@ -1092,37 +1108,11 @@
     },
     "sand": {
       "image": "img/tiles/sand.png",
-      "scale": 1,
-      "blendGrassNImage": "img/tiles/sand-grass-n.png",
-      "blendGrassSImage": "img/tiles/sand-grass-s.png",
-      "blendGrassWImage": "img/tiles/sand-grass-w.png",
-      "blendGrassEImage": "img/tiles/sand-grass-e.png",
-      "blendGrassNWImage": "img/tiles/sand-grass-nw.png",
-      "blendGrassNEImage": "img/tiles/sand-grass-ne.png",
-      "blendGrassSWImage": "img/tiles/sand-grass-sw.png",
-      "blendGrassSEImage": "img/tiles/sand-grass-se.png"
+      "scale": 1
     },
     "water": {
       "image": "img/tiles/water.gif",
       "scale": 1,
-      "shoreGrassNWImage": "img/tiles/water-grass-overlay-nw.png",
-      "shoreGrassNImage": "img/tiles/water-grass-overlay-n.png",
-      "shoreGrassNEImage": "img/tiles/water-grass-overlay-ne.png",
-      "shoreGrassWImage": "img/tiles/water-grass-overlay-w.png",
-      "shoreGrassCenterImage": "img/tiles/water-grass-center.png",
-      "shoreGrassEImage": "img/tiles/water-grass-overlay-e.png",
-      "shoreGrassSWImage": "img/tiles/water-grass-overlay-sw.png",
-      "shoreGrassSImage": "img/tiles/water-grass-overlay-s.png",
-      "shoreGrassSEImage": "img/tiles/water-grass-overlay-se.png",
-      "shoreSandNWImage": "img/tiles/water-sand-overlay-nw.png",
-      "shoreSandNImage": "img/tiles/water-sand-overlay-n.png",
-      "shoreSandNEImage": "img/tiles/water-sand-overlay-ne.png",
-      "shoreSandWImage": "img/tiles/water-sand-overlay-w.png",
-      "shoreSandCenterImage": "img/tiles/water-sand-center.png",
-      "shoreSandEImage": "img/tiles/water-sand-overlay-e.png",
-      "shoreSandSWImage": "img/tiles/water-sand-overlay-sw.png",
-      "shoreSandSImage": "img/tiles/water-sand-overlay-s.png",
-      "shoreSandSEImage": "img/tiles/water-sand-overlay-se.png",
       "frames": [
         "img/tiles/water-frame-0.png",
         "img/tiles/water-frame-1.png",
@@ -1134,14 +1124,13 @@
         "img/tiles/water-frame-7.png"
       ],
       "frameDuration": 110,
-      "shoreSnowNImage": "img/tiles/water-snow-overlay-n.png",
-      "shoreSnowSImage": "img/tiles/water-snow-overlay-s.png",
-      "shoreSnowWImage": "img/tiles/water-snow-overlay-w.png",
-      "shoreSnowEImage": "img/tiles/water-snow-overlay-e.png",
-      "shoreSnowNWImage": "img/tiles/water-snow-overlay-nw.png",
-      "shoreSnowNEImage": "img/tiles/water-snow-overlay-ne.png",
-      "shoreSnowSWImage": "img/tiles/water-snow-overlay-sw.png",
-      "shoreSnowSEImage": "img/tiles/water-snow-overlay-se.png"
+      "transitionGrassEdgeImage": "img/tiles/water-grass-overlay-n.png",
+      "transitionSandEdgeImage": "img/tiles/water-sand-overlay-n.png",
+      "transitionSnowEdgeImage": "img/tiles/water-snow-overlay-n.png",
+      "transitionGrassCornerImage": "img/tiles/terrain-corner-grass.png",
+      "transitionSandCornerImage": "img/tiles/terrain-corner-sand.png",
+      "transitionSnowCornerImage": "img/tiles/terrain-corner-snow.png",
+      "riverDiagonalMaskImage": "img/tiles/terrain-river-diagonal-mask.png"
     },
     "river": {
       "image": "img/tiles/river.gif",
@@ -1182,15 +1171,7 @@
     },
     "snow": {
       "image": "img/tiles/snow.png",
-      "scale": 1,
-      "edgeNImage": "img/tiles/snow-overlay-n.png",
-      "edgeSImage": "img/tiles/snow-overlay-s.png",
-      "edgeWImage": "img/tiles/snow-overlay-w.png",
-      "edgeEImage": "img/tiles/snow-overlay-e.png",
-      "edgeNWImage": "img/tiles/snow-overlay-nw.png",
-      "edgeNEImage": "img/tiles/snow-overlay-ne.png",
-      "edgeSWImage": "img/tiles/snow-overlay-sw.png",
-      "edgeSEImage": "img/tiles/snow-overlay-se.png"
+      "scale": 1
     },
     "forest": {
       "image": "img/tiles/forest-tree.png",

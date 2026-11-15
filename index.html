@@ -10501,6 +10501,18 @@ more difficult:
     return currentZ === 0 ? (tileUnderlays[keyXY(tx, ty)] || t) : t
   }
 
+  function surfaceRockGroundAt(x, y, terrain = map) {
+    const saved = tileUnderlays[keyXY(x,y)]
+    if (['snow','taiga','snowmountain'].includes(saved)) return 'snow'
+    if (['grass','forest','ancientForest','sand'].includes(saved)) return 'grass'
+    // No ground record exists for ordinary generated hills/boulders. Keep
+    // the established snow adjacency rule shared by the sprite and its ground.
+    for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+      if ((dx || dy) && ['snow','taiga','snowmountain'].includes(terrain?.[y+dy]?.[x+dx])) return 'snow'
+    }
+    return 'grass'
+  }
+
   function overlayBaseTileKey(tileKey, x, y) {
     if (!USE_TILE_IMAGES) return null
 
@@ -10509,8 +10521,13 @@ more difficult:
     if (tileKey === 'ancientForest') return 'grass'
     if (tileKey === 'taiga') return 'snow'
     if (tileKey === 'snowmountain') return 'snow'
+    if ((tileKey === 'hill' || tileKey === 'boulder') && currentZ === 0)
+      return surfaceRockGroundAt(x,y)
     if (tileKey === 'marble') return null
     if (isLakeIce(tileKey)) return null
+    // Opaque ground is already its own base. Recursing into a guessed biome
+    // stacks competing transitions and can cover the corner of a river join.
+    if (['grass','sand','snow','water','river','frozenriver','lava'].includes(tileKey)) return null
 
     // Rubble and columns are transparent on every level. Render the terrain
     // that was at this exact coordinate before the prop replaced the map cell.
@@ -10547,34 +10564,256 @@ more difficult:
     const grassCount = neighbors.filter(t => t === 'grass' || t === 'forest' || t === 'ancientForest').length
 
     if (snowCount > 0 && snowCount >= sandCount && snowCount >= grassCount) return 'snow'
-    if (sandCount > 0 && sandCount > snowCount && sandCount >= grassCount) return 'sand'
+    if (!['hill','boulder'].includes(tileKey) && sandCount > 0 && sandCount > snowCount && sandCount >= grassCount) return 'sand'
 
     const currentBase = surfaceBaseKeyAt(x, y)
     if (currentBase === 'snow' || currentBase === 'taiga' || currentBase === 'snowmountain') return 'snow'
-    if (currentBase === 'sand') return 'sand'
+    if (currentBase === 'sand') return ['hill','boulder'].includes(tileKey) ? 'grass' : 'sand'
 
     if (snowCount > 0) return 'snow'
-    if (sandCount > 0 && grassCount === 0) return 'sand'
+    if (!['hill','boulder'].includes(tileKey) && sandCount > 0 && grassCount === 0) return 'sand'
     return 'grass'
   }
 
-  // Share the grass/sand edge choice between the playable surface and the
-  // tower's read-only surface backdrop. The two layers have different maps.
-  function sandGrassBlendImage(visual, terrain, x, y) {
-    const grassLike = tile => tile === 'grass' || tile === 'forest'
-    const n = grassLike(terrain?.[y - 1]?.[x])
-    const e = grassLike(terrain?.[y]?.[x + 1])
-    const s = grassLike(terrain?.[y + 1]?.[x])
-    const w = grassLike(terrain?.[y]?.[x - 1])
-    if (n && w) return visual.blendGrassNWImage
-    if (n && e) return visual.blendGrassNEImage
-    if (s && w) return visual.blendGrassSWImage
-    if (s && e) return visual.blendGrassSEImage
-    if (n) return visual.blendGrassNImage
-    if (s) return visual.blendGrassSImage
-    if (w) return visual.blendGrassWImage
-    if (e) return visual.blendGrassEImage
+  function visibleSurfaceTransitionBiomeAt(tx, ty) {
+    if (currentZ !== 0) return null
+    const tileKey = map?.[ty]?.[tx]
+    if (!tileKey) return null
+    if (tileKey === 'water' || tileKey === 'river' || tileKey === 'frozenriver' || isLakeIce(tileKey)) return null
+    if (['forest','ancientForest'].includes(tileKey)) return 'grass'
+    if (tileKey === 'taiga') return 'snow'
+    if (tileKey === 'hill' || tileKey === 'boulder') return overlayBaseTileKey(tileKey, tx, ty)
+    const base = surfaceBaseKeyAt(tx, ty)
+    if (base === 'sand') return 'sand'
+    if (base === 'grass' || base === 'forest' || base === 'ancientForest') return 'grass'
+    if (base === 'snow' || base === 'taiga' || base === 'snowmountain') return 'snow'
+    const underlay = overlayBaseTileKey(tileKey, tx, ty)
+    if (underlay === 'sand' || underlay === 'snow' || underlay === 'grass') return underlay
     return null
+  }
+
+  function surfaceTransitionLayers(tileKey, x, y) {
+    if (currentZ !== 0) return []
+    const sea = tileKey === 'water' || tileKey === 'river' || tileKey === 'frozenriver' || isLakeIce(tileKey)
+    if (!sea) return []
+
+    const waterVisual = RENDER_STYLE.terrainTiles.water
+    const edgePaths = {
+      grass: waterVisual.transitionGrassEdgeImage,
+      sand: waterVisual.transitionSandEdgeImage,
+      snow: waterVisual.transitionSnowEdgeImage
+    }
+    const cornerPaths = {
+      grass: waterVisual.transitionGrassCornerImage,
+      sand: waterVisual.transitionSandCornerImage,
+      snow: waterVisual.transitionSnowCornerImage
+    }
+    const biomes = Object.create(null)
+    const positions = [
+      ['n', 0, -1, 0], ['e', 1, 0, 1], ['s', 0, 1, 2], ['w', -1, 0, 3],
+      ['nw', -1, -1, 0], ['ne', 1, -1, 1], ['se', 1, 1, 2], ['sw', -1, 1, 3]
+    ]
+    for (const [dir, dx, dy] of positions) biomes[dir] = visibleSurfaceTransitionBiomeAt(x + dx, y + dy)
+    const layers = []
+    for (const [dir, , , turns] of positions) {
+      const biome = biomes[dir]
+      if (!biome || (!sea && (biome === tileKey || (tileKey === 'sand' && biome !== 'grass')))) continue
+      if (dir.length > 1) {
+        // Only a diagonally touching biome needs an independent inside-corner
+        // cap. Adjacent edge strips already cover the ordinary two-edge corner.
+        const a = dir[0], b = dir[1]
+        if (biomes[a] === biome || biomes[b] === biome) continue
+      }
+      const path = dir.length === 1 ? edgePaths[biome] : cornerPaths[biome]
+      if (path) layers.push({image: path, quarterTurns: turns})
+    }
+    return layers
+  }
+
+  const surfaceGroundBlendCache = new Map()
+
+  function surfaceBlendBiomes(center,x,y) {
+    const biomes=[]
+    for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++)
+      biomes.push(dx || dy ? visibleSurfaceTransitionBiomeAt(x+dx,y+dy) : center)
+    return biomes
+  }
+
+  function surfaceGroundBlend(tileKey,x,y) {
+    if (currentZ !== 0 || !['grass','sand','snow'].includes(tileKey)) return null
+    const biomes=surfaceBlendBiomes(tileKey,x,y)
+    // Water contributes no land biome, rather than borrowing the current
+    // cell's biome differently on either side of the same shoreline vertex.
+    return biomes.some(b => b && b !== tileKey) ? biomes : null
+  }
+
+  function surfaceGroundBlendCanvas(biomes) {
+    const size=TILE_PX, key=size+'|'+biomes.join(',')
+    let canvas=surfaceGroundBlendCache.get(key)
+    if (!canvas) {
+      const names=['grass','sand','snow'], textures=[]
+      for (const name of names) {
+        const image=resolveVisualImage(RENDER_STYLE.terrainTiles[name])
+        if (!image) return null
+        textures.push(scaledVisualCanvas(image,1).getContext('2d').getImageData(0,0,size,size).data)
+      }
+      canvas=document.createElement('canvas');canvas.width=canvas.height=size
+      const cctx=canvas.getContext('2d'), pixels=cctx.createImageData(size,size)
+      // Shared cell-center weights give both sides of every boundary the same
+      // contour. Sharpening retains distinct ground textures with a soft edge.
+      for (let y=0;y<size;y++) for (let x=0;x<size;x++) {
+        const gx=(x+0.5)/size+0.5, gy=(y+0.5)/size+0.5
+        const ix=Math.floor(gx), iy=Math.floor(gy), fx=gx-ix, fy=gy-iy
+        const weights=[0,0,0]
+        for (const [dx,dy,w] of [[0,0,(1-fx)*(1-fy)],[1,0,fx*(1-fy)],[0,1,(1-fx)*fy],[1,1,fx*fy]]) {
+          const biome=names.indexOf(biomes[(iy+dy)*3+ix+dx])
+          if (biome >= 0) weights[biome]+=w
+        }
+        const powers=weights.map(w=>w**12),total=powers.reduce((a,b)=>a+b,0),i=(y*size+x)*4
+        if (!total) continue
+        for(let c=0;c<3;c++)pixels.data[i+c]=Math.round(powers.reduce((v,w,j)=>v+w*textures[j][i+c],0)/total)
+        pixels.data[i+3]=255
+      }
+      cctx.putImageData(pixels,0,0)
+      // Bound cosmetic cache growth on large worlds and repeated zoom changes.
+      if(surfaceGroundBlendCache.size>=512)surfaceGroundBlendCache.clear()
+      surfaceGroundBlendCache.set(key,canvas)
+    }
+    return canvas
+  }
+
+  function drawSurfaceGroundBlend(px,py,biomes) {
+    const canvas=surfaceGroundBlendCanvas(biomes)
+    if (!canvas) return false
+    ctx.drawImage(canvas,px,py)
+    return true
+  }
+
+  const surfaceShoreBlendCache=new Map()
+
+  function drawSurfaceShoreBlend(px,py,visual) {
+    const layers=visual.overlayImages || [], size=TILE_PX
+    const key=size+'|'+visual.shoreBlend.join(',')+'|'+layers.map(l=>l.image+':'+l.quarterTurns).join(',')
+    let canvas=surfaceShoreBlendCache.get(key)
+    if (!canvas) {
+      const ground=surfaceGroundBlendCanvas(visual.shoreBlend)
+      if (!ground) return false
+      const mask=document.createElement('canvas');mask.width=mask.height=size
+      const mctx=mask.getContext('2d');mctx.imageSmoothingEnabled=false
+      // Combine shoreline alpha first; their grass/sand/snow RGB never paints
+      // over a different biome. One shared land blend colors the whole mask.
+      for(const layer of layers) {
+        const image=preloadedImages.get(layer.image)
+        if(!image) return false
+        mctx.save();mctx.translate(size/2,size/2);mctx.rotate((layer.quarterTurns||0)*Math.PI/2)
+        mctx.drawImage(scaledVisualCanvas(image,1),-size/2,-size/2);mctx.restore()
+      }
+      canvas=document.createElement('canvas');canvas.width=canvas.height=size
+      const cctx=canvas.getContext('2d');cctx.drawImage(ground,0,0)
+      cctx.globalCompositeOperation='destination-in';cctx.drawImage(mask,0,0)
+      if(surfaceShoreBlendCache.size>=512)surfaceShoreBlendCache.clear()
+      surfaceShoreBlendCache.set(key,canvas)
+    }
+    ctx.drawImage(canvas,px,py)
+    return true
+  }
+
+  function surfaceWaterTile(tileKey) {
+    return tileKey === 'river' || tileKey === 'frozenriver' || tileKey === 'water' || isLakeIce(tileKey)
+  }
+
+  function hasCardinalWater(x, y) {
+    return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy]) => surfaceWaterTile(map?.[y+dy]?.[x+dx]))
+  }
+
+  // Preserve exposed diagonal joins even where the same tile also feeds a
+  // cardinal channel. Corners already connected through either side need no arm.
+  function diagonalRiverArms(tileKey, x, y) {
+    if (currentZ !== 0 || !surfaceWaterTile(tileKey)) return 0
+    const wet = (dx, dy) => surfaceWaterTile(map?.[y + dy]?.[x + dx])
+    return [[-1,-1,1],[1,-1,2],[1,1,4],[-1,1,8]].reduce((mask, [dx,dy,bit]) =>
+      wet(dx,dy) && !wet(dx,0) && !wet(0,dy) ? mask | bit : mask, 0)
+  }
+
+  function diagonalRiverGround(x, y) {
+    if (map?.[y]?.[x] === 'frozenriver' || tileUnderlays[keyXY(x,y)] === 'snow') return 'snow'
+    const counts = {grass: 0, sand: 0, snow: 0}
+    for (const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const biome = visibleSurfaceTransitionBiomeAt(x + dx, y + dy)
+      if (biome && counts[biome] !== undefined) counts[biome]++
+    }
+    return Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0]
+  }
+
+  let diagonalRiverCanvasCache = new WeakMap()
+
+  function drawDiagonalRiverChannel(px, py, visual) {
+    const waterImage = resolveVisualImage(visual)
+    if (!waterImage) return false
+    let variants = diagonalRiverCanvasCache.get(waterImage)
+    if (!variants) {variants = new Map(); diagonalRiverCanvasCache.set(waterImage, variants)}
+    const key = TILE_PX + '|' + visual.diagonalRiverArms
+    let image = variants.get(key)
+    if (!image) {
+      const size = TILE_PX, half = size / 2
+      const mask = document.createElement('canvas')
+      mask.width = mask.height = size
+      const mctx = mask.getContext('2d')
+      mctx.imageSmoothingEnabled = false
+      // A constant-width channel with rounded ends replaces the old clipped
+      // half-mask, whose endpoints looked like diamonds on snow.
+      mctx.strokeStyle = '#fff'
+      mctx.lineWidth = size * 0.56
+      mctx.lineCap = 'round'
+      mctx.lineJoin = 'round'
+      for (const [bit, x, y] of [[1,0,0],[2,size,0],[4,size,size],[8,0,size]]) {
+        if (!(visual.diagonalRiverArms & bit)) continue
+        mctx.beginPath()
+        mctx.moveTo(half, half)
+        mctx.lineTo(x, y)
+        mctx.stroke()
+      }
+      image = document.createElement('canvas')
+      image.width = image.height = size
+      const ictx = image.getContext('2d')
+      ictx.imageSmoothingEnabled = false
+      ictx.drawImage(scaledVisualCanvas(waterImage, visual.scale ?? 1), 0, 0)
+      ictx.globalCompositeOperation = 'destination-in'
+      ictx.drawImage(mask, 0, 0)
+      variants.set(key, image)
+    }
+    ctx.drawImage(image, px, py)
+    return true
+  }
+
+  function diagonalWaterLandCorners(x, y) {
+    if (currentZ !== 0 || surfaceWaterTile(map?.[y]?.[x])) return []
+    const corners = []
+    for (const [dx,dy,turns] of [[-1,-1,0],[1,-1,1],[1,1,2],[-1,1,3]]) {
+      const a = map?.[y]?.[x+dx], b = map?.[y+dy]?.[x]
+      if (!surfaceWaterTile(a) || !surfaceWaterTile(b) || surfaceWaterTile(map?.[y+dy]?.[x+dx])) continue
+      // Both banks use the same family for mixed joins, independent of draw order.
+      const family = [a,b].includes('river') ? 'river' : [a,b].includes('frozenriver') ? 'frozenriver' : 'water'
+      corners.push({visual:RENDER_STYLE.terrainTiles[family],quarterTurns:turns})
+    }
+    return corners
+  }
+
+  function drawDiagonalWaterLandCorners(px, py, x, y) {
+    for (const part of diagonalWaterLandCorners(x,y)) {
+      const image = resolveVisualImage(part.visual)
+      if (!image) continue
+      const size = TILE_PX, leg = size * 0.56 / Math.SQRT2
+      ctx.save()
+      ctx.translate(px+size/2,py+size/2)
+      ctx.rotate(part.quarterTurns*Math.PI/2)
+      ctx.translate(-size/2,-size/2)
+      ctx.beginPath()
+      ctx.moveTo(0,0); ctx.lineTo(leg,0); ctx.lineTo(0,leg); ctx.closePath()
+      ctx.clip()
+      ctx.drawImage(scaledVisualCanvas(image,1),0,0)
+      ctx.restore()
+    }
   }
 
   function terrainVisual(tileKey, x, y) {
@@ -10646,111 +10885,35 @@ more difficult:
       return {...(RENDER_STYLE.terrainTiles?.cavefloorBrown || visual), flipX: !!(x & 1), flipY: !!(y & 1)}
     if (currentZ < 0 && visual.undergroundImage) return {...visual, image: visual.undergroundImage}
 
-    const tileAt = (tx, ty) => map?.[ty]?.[tx] ?? null
-    const isWaterLike = t => t === 'water' || t === 'river' || t === 'frozenriver' || isLakeIce(t)
-    const isSandTile = t => t === 'sand'
-    const isSnowLikeTile = t => t === 'snow' || t === 'taiga' || t === 'snowmountain'
+    // Diagonal rivers need a visible channel, not four overlapping shorelines
+    // that conceal the entire river tile. Mask the EXISTING animated frames and
+    // draw its actual dry neighboring biome underneath, without changing map.
+    const riverArms = diagonalRiverArms(tileKey, x, y)
+    if (riverArms && (tileKey === 'river' || tileKey === 'frozenriver') && !hasCardinalWater(x, y))
+      return {...visual, diagonalRiverArms: riverArms,
+        baseTileKey: diagonalRiverGround(x, y)}
 
-    // Transparent props/landmarks inherit the biome underneath them. When one
-    // sits in snow, neighbouring snow tiles must treat it as snow too instead
-    // of carving a grass connector around it.
-    const isSnowAt = (tx, ty) => {
-      const t = tileAt(tx, ty)
-      if (isSnowLikeTile(surfaceBaseKeyAt(tx, ty))) return true
-      if ([
-        'mountain',
-        'dwarvengate',
-        'dwarvenstatue',
-        'bigbell',
-        'blackpillar',
-        'volcano',
-        'caveentrance',
-        'caveup',
-        'cavedown',
-        'boulder',
-        'hill'
-      ].includes(t)) {
-        return overlayBaseTileKey(t, tx, ty) === 'snow'
-      }
-      return false
-    }
-
-    if (tileKey === 'water') {
-      const n = tileAt(x, y - 1)
-      const e = tileAt(x + 1, y)
-      const s = tileAt(x, y + 1)
-      const w = tileAt(x - 1, y)
-      const landN = n && !isWaterLike(n)
-      const landE = e && !isWaterLike(e)
-      const landS = s && !isWaterLike(s)
-      const landW = w && !isWaterLike(w)
-      const landCount = [landN, landE, landS, landW].filter(Boolean).length
-      if (landCount > 0) {
-        const sandScore = (landN && isSandTile(n) ? 1 : 0) + (landE && isSandTile(e) ? 1 : 0) + (landS && isSandTile(s) ? 1 : 0) + (landW && isSandTile(w) ? 1 : 0)
-        const snowScore = (landN && isSnowAt(x, y - 1) ? 1 : 0) + (landE && isSnowAt(x + 1, y) ? 1 : 0) + (landS && isSnowAt(x, y + 1) ? 1 : 0) + (landW && isSnowAt(x - 1, y) ? 1 : 0)
-        let prefix = 'shoreGrass'
-        if (snowScore > 0 && snowScore >= Math.ceil(landCount / 2)) prefix = 'shoreSnow'
-        else if (sandScore > 0 && sandScore >= Math.ceil(landCount / 2)) prefix = 'shoreSand'
-        let overlayImage = null
-        if (landN && landW) overlayImage = visual[prefix + 'NWImage']
-        else if (landN && landE) overlayImage = visual[prefix + 'NEImage']
-        else if (landS && landW) overlayImage = visual[prefix + 'SWImage']
-        else if (landS && landE) overlayImage = visual[prefix + 'SEImage']
-        else if (landN) overlayImage = visual[prefix + 'NImage']
-        else if (landS) overlayImage = visual[prefix + 'SImage']
-        else if (landW) overlayImage = visual[prefix + 'WImage']
-        else if (landE) overlayImage = visual[prefix + 'EImage']
-        if (overlayImage) return {...visual, overlayImage}
-      }
-    }
-
-    if (tileKey === 'sand') {
-      const image = sandGrassBlendImage(visual, map, x, y)
-      if (image) return {...visual, image}
-    }
-
-    if (tileKey === 'snow') {
-      const n = tileAt(x, y - 1)
-      const e = tileAt(x + 1, y)
-      const s = tileAt(x, y + 1)
-      const w = tileAt(x - 1, y)
-
-      // Snowmountain/taiga are part of the snow mass, so they must not trigger
-      // grass connectors around snowy areas.
-      const landN = n && !isSnowAt(x, y - 1) && !isWaterLike(n)
-      const landE = e && !isSnowAt(x + 1, y) && !isWaterLike(e)
-      const landS = s && !isSnowAt(x, y + 1) && !isWaterLike(s)
-      const landW = w && !isSnowAt(x - 1, y) && !isWaterLike(w)
-      const landCount = [landN, landE, landS, landW].filter(Boolean).length
-
-      if (landCount > 0) {
-        const sandScore = (landN && n === 'sand' ? 1 : 0) + (landE && e === 'sand' ? 1 : 0) + (landS && s === 'sand' ? 1 : 0) + (landW && w === 'sand' ? 1 : 0)
-        let baseTileKey = 'grass'
-        if (sandScore > 0 && sandScore >= Math.ceil(landCount / 2)) baseTileKey = 'sand'
-
-        let image = null
-        if (landN && landW) image = visual.edgeNWImage
-        else if (landN && landE) image = visual.edgeNEImage
-        else if (landS && landW) image = visual.edgeSWImage
-        else if (landS && landE) image = visual.edgeSEImage
-        else if (landN) image = visual.edgeNImage
-        else if (landS) image = visual.edgeSImage
-        else if (landW) image = visual.edgeWImage
-        else if (landE) image = visual.edgeEImage
-
-        if (image) return {...visual, image, baseTileKey}
-      }
-    }
+    // Always render the original opaque terrain, then transparent edge/corner
+    // layers; a transparent overlay must never replace its underlying image.
+    const groundBlend = surfaceGroundBlend(tileKey,x,y)
+    if (groundBlend) return {...visual,groundBlend}
+    const transitionLayers = surfaceTransitionLayers(tileKey, x, y)
+    if (transitionLayers.length || riverArms) return {...visual, overlayImages: transitionLayers,
+      shoreBlend: transitionLayers.length ? surfaceBlendBiomes(null,x,y) : null,
+      diagonalRiverJoinArms: riverArms}
 
     const leftSame = map?.[y]?.[x - 1] === tileKey
     const rightSame = map?.[y]?.[x + 1] === tileKey
 
     let image = visual.variants?.length ? tileVariantImage(visual.variants, x, y) : visual.image
-    if (visual.leftImage || visual.middleImage || visual.rightImage || visual.singleImage) {
-      if (leftSame && rightSame) image = visual.middleImage || visual.image
-      else if (!leftSame && rightSame) image = visual.leftImage || visual.middleImage || visual.image
-      else if (leftSame && !rightSame) image = visual.rightImage || visual.middleImage || visual.image
-      else image = visual.singleImage || visual.image || visual.middleImage || visual.leftImage || visual.rightImage
+    const linearVisual = ['hill','boulder'].includes(tileKey) && currentZ === 0 && overlayBaseTileKey(tileKey, x, y) === 'snow'
+      ? (RENDER_STYLE.terrainTiles?.[tileKey === 'hill' ? 'hillSnow' : 'boulderSnow'] || visual)
+      : visual
+    if (linearVisual.leftImage || linearVisual.middleImage || linearVisual.rightImage || linearVisual.singleImage) {
+      if (leftSame && rightSame) image = linearVisual.middleImage || linearVisual.image
+      else if (!leftSame && rightSame) image = linearVisual.leftImage || linearVisual.middleImage || linearVisual.image
+      else if (leftSame && !rightSame) image = linearVisual.rightImage || linearVisual.middleImage || linearVisual.image
+      else image = linearVisual.singleImage || linearVisual.image || linearVisual.middleImage || linearVisual.leftImage || linearVisual.rightImage
     }
 
     if (tileKey === 'dwarvenwall' && [
@@ -10789,10 +10952,28 @@ more difficult:
       ctx.fillRect(px, py, TILE_PX, TILE_PX)
       drewBase = true
     }
-    const drewMain = drawImageVisual(px, py, visual, visual.opacity)
-    if (drewMain && visual.overlayImage) {
-      drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
+    if (depth === 0 && baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my)
+    const drewMain = visual.diagonalRiverArms
+      ? drawDiagonalRiverChannel(px, py, visual)
+      : drawImageVisual(px, py, visual, visual.opacity)
+    if (drewMain) {
+      if (visual.groundBlend) drawSurfaceGroundBlend(px,py,visual.groundBlend)
+      if (visual.shoreBlend) drawSurfaceShoreBlend(px,py,visual)
+      else if (Array.isArray(visual.overlayImages)) {
+        for (const layer of visual.overlayImages) {
+          const layerVisual = typeof layer === 'string' ? {image: layer, scale: visual.scale ?? 1} : layer
+          if (layerVisual?.image) drawImageVisual(px, py, layerVisual)
+        }
+      }
+      if (visual.overlayImage) {
+        drawImageVisual(px, py, {image: visual.overlayImage, scale: visual.scale ?? 1})
+      }
+      // Restore only real diagonal water arms after shoreline strips. The
+      // ordinary base and cardinal channel remain intact at mixed junctions.
+      if (visual.diagonalRiverJoinArms) drawDiagonalRiverChannel(px, py,
+        {...visual, diagonalRiverArms: visual.diagonalRiverJoinArms})
     }
+    if (depth === 0 && !baseTileKey) drawDiagonalWaterLandCorners(px, py, mx, my)
     return drewBase || drewMain
   }
 

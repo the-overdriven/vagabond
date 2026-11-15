@@ -282,7 +282,8 @@ function travelTowerStairs() {
 }
 
 function towerBackgroundVisual(tile, x, y) {
-  const base = RENDER_STYLE.terrainTiles[tile]
+  const snowRock = ['hill','boulder'].includes(tile) && surfaceRockGroundAt(x,y,surfaceMap) === 'snow'
+  const base = RENDER_STYLE.terrainTiles[snowRock ? (tile === 'hill' ? 'hillSnow' : 'boulderSnow') : tile]
   if (!base) return null
   // Use the same coordinate variants and rock-strip pieces as the surface.
   // Read adjacent terrain from the surface map, not the current tower map.
@@ -306,7 +307,8 @@ function towerBackgroundGround(tile,x,y) {
   // A forest is a tree over grass on the surface, even if its worldgen underlay
   // records old sand. Reusing that sand here created square dirt patches.
   if(tile==='forest'||tile==='ancientForest')return 'grass'
-  if(['hill','mountain','boulder'].includes(tile)) {
+  if(tile==='hill'||tile==='boulder')return surfaceRockGroundAt(x,y,surfaceMap)
+  if(tile==='mountain') {
     const saved=tileUnderlays[keyXY(x,y)]
     return saved==='snow'||saved==='sand' ? saved : 'grass'
   }

@@ -9300,7 +9300,53 @@ creatures seen below are covered by tree canopies, including while moving;
 flying creatures remain visible above them. Rocky terrain overrides any stale
 forest underlay; rocks and trees are never composited on the same background
 tile. Per-tile desaturation filters are deliberately omitted to keep movement
-responsive.
+responsive. Terrain transition rendering is cosmetic and deterministic. Grass,
+sand and snow boundaries use shared cell-center biome weights, sharpened to
+retain distinct textures with a soft edge. Neighboring tiles agree on the
+same contour at convex and concave corners. The resulting opaque ground is
+cached by local biome layout and zoom, with a bounded cache.
+Water contributes no land-biome weight; remaining grass/sand/snow weights
+are normalized consistently on both sides of shoreline junctions. Water and
+surface ice keep their full base texture. Shoreline edge/corner alpha masks
+are combined first, then colored with that same shared land blend. Independent
+grass, sand or snow sprite colors cannot overwrite each other at a three-biome
+corner. One north-edge and one corner source per ground type supply the masks,
+rotated for all orientations. A blend never exposes an ASCII background color
+through a missing ground layer.
+
+A river's actual map tiles never change just to improve its appearance.
+Directly adjacent river/water tiles have no shoreline between them. Isolated
+diagonal river segments use a constant-width channel (56% of a tile) with
+rounded ends, filled with their existing animated frames. Where a diagonal
+segment meets a cardinal river or lake, the matching arm is restored over the
+shoreline. Small triangular water overlaps on the two neighboring land-cell
+corners complete the diagonal ribbon; they are drawn below trees and rocks.
+These overlaps are cosmetic: the land cells retain their terrain identity,
+collision, movement cost and swimming rules. The channel and corner overlap
+share the same width at every zoom. Frozen rivers keep their existing animated
+artwork and use snow ground, rather than inferring a possibly grassy base.
+No directional image copies or new animation frames are needed.
+
+Opaque ground has no inferred underlay. Its edge/corner overlays are applied
+once, avoiding recursively stacked, conflicting biome transitions. Visible
+shoreline biomes follow the ground actually drawn under trees and rocks;
+stale forest underlays cannot introduce sand patches. Convex and concave grass/snow/sand corners follow the shared ground blend
+instead of stacking incompatible edge strips.
+Underground water receives no surface-shore overlays. These visual rules do
+not change world generation, FOV, saves, replay state or gameplay RNG.
+
+Hills and boulders each have their own regular and snow-covered sprite
+families. Hills retain single/left/middle/right variants; boulders retain
+left/middle/right variants, using the middle image for isolated clusters.
+Connectivity selects the shape independently from snow coverage, including
+mixed rows at biome edges. Transparent sprites show grass or snow beneath
+them, and that same ground selection determines their artwork. A recorded
+underlay at the coordinate takes priority; grass-backed rocks stay regular
+beside snow. When no ground biome is recorded, the existing neighboring-snow
+fallback is shared by the artwork and its ground. This is a visual inference,
+not new stored biome data. The tower background uses the same rock-ground and
+snow-artwork selection. Hills, boulders and mountains remain distinct;
+mountain artwork and ASCII terrain retain their existing behavior.
 On enclosed upper floors (`z:+1` through `z:+3`), a 50% black overlay
 covers only the outside surface, including its monsters. The summit (`z:+4`)
 leaves this view undarkened. Tower walls, interiors, actors and items are never
