@@ -1,11 +1,18 @@
 describe('Surface monster population', () => {
-  it('scales random spawns with the walkable land available', () => {
+  beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Population Tester')
-    cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    // Exercise the current spawn rules on fixed terrain without generating
+    // an unrelated random dungeon chain before each population assertion.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__populationSave = save
+      win.eval('loadGameFromObject(window.__populationSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__populationSave
+    }))
     cy.get('#raceOverlay').should('not.have.class', 'show')
+  })
 
+  it('scales random spawns with the walkable land available', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
         const originalEnemies = enemies
@@ -71,10 +78,6 @@ describe('Surface monster population', () => {
   })
 
   it('gives natural tier 1–3 surface Champions ordinary same-species escorts', () => {
-    cy.visit('/')
-    cy.get('#raceName').clear().type('Champion Pack Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const originalEnemies=enemies,originalOccupied=occupied,originalChance=chance

@@ -10556,6 +10556,11 @@ case. They do not use the older general mechanics fixture as a source of
 Ruins progression metadata. Rubble persistence assertions inspect the encoded
 `caveMaps` used by the save format. NPC map-discovery tests settle ordinary
 player-position discovery before checking whether dialogue reveals landmarks.
+Performance and surface-population specs restore a fixed mechanics save after
+startup assets finish loading. They exercise current pathing, rendering and
+spawn rules without regenerating unrelated dungeons; pixel and animation
+assertions still use the real browser renderer. Random generation failures
+must not become setup failures that skip these mechanics checks.
 
 The replay save/load E2E test starts a character through Begin and waits for
 world generation to finish before arranging its deterministic Temple fixture.

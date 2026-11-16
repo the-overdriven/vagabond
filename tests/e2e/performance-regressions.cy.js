@@ -61,9 +61,14 @@ function referencePath(e, targetX, targetY, avoidVillage = false) {
 describe('Turn and idle rendering performance regressions', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Performance Tester')
-    cy.get('#btnBegin').click()
+    // These checks arrange their own actors/terrain; random world generation
+    // is unrelated and a failed beforeEach would skip the remaining suite.
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__performanceSave = save
+      win.eval('loadGameFromObject(window.__performanceSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__performanceSave
+    }))
     cy.get('#raceOverlay').should('not.have.class', 'show')
   })
 
