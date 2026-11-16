@@ -77,7 +77,7 @@ const Mimics = (() => {
         choice<entry.weaponChance+entry.armorChance ? makeArmorItem(itemTier,mf) :
         makeShieldItem(itemTier,mf))
     } else loot.items.push(createItem(result))
-    if (chance(0.005)) loot.items.push(createItem('flintstone'))
+    if (chance(0.005)) loot.items.push(createItem('flint'))
     if (chance(0.005)) loot.items.push(createItem('potato'))
     return loot
   }

@@ -9,7 +9,7 @@ describe('Persistent Dwarven Ruins stratum', () => {
   })
 
   for (const fixture of [
-    {seed: 12345, traits: []},
+    {seed: -469464482, traits: []},
     {seed: 24680, traits: []},
     {seed: 424242, traits: ['underkings_legacy']}
   ]) {

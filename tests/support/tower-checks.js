@@ -72,4 +72,19 @@ async function checkTowerReplayAndIsolation() {
     'far-away enemies on an adjacent floor do not wander')
   return true
 }
-if(typeof module!=='undefined')module.exports={checkTowerReplayAndIsolation}
+// Force one topology rejection while keeping every actual geometry rule active.
+async function generateWorldWithTowerRetry() {
+  const original = TowerMaze.generate, plans = []
+  try {
+    TowerMaze.generate = layout => {
+      plans.push(structuredClone(layout))
+      return plans.length === 1 ? false : original(layout)
+    }
+    await generateNewWorld()
+    if (plans.length < 2 || plans.some(p => p.center.x !== plans[0].center.x ||
+        p.center.y !== plans[0].center.y)) throw Error('maze retry must keep the same tower site')
+    if (JSON.stringify(plans[0]) === JSON.stringify(plans[1]))
+      throw Error('maze retry must try another validated footprint')
+  } finally { TowerMaze.generate = original }
+}
+if(typeof module!=='undefined')module.exports={checkTowerReplayAndIsolation,generateWorldWithTowerRetry}

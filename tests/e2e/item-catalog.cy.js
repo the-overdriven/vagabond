@@ -1,3 +1,5 @@
+const {checkMimicRareLoot} = require('../helpers/mimic-loot-checks')
+
 // Starts a fresh game with the given character name and waits for the race
 // overlay to close after world generation. Callers add their own assertions.
 function beginNewGame(name = 'E2E Tester') {
@@ -67,6 +69,11 @@ describe('Non-gear item catalog', () => {
         maybeAutoEquipWeapon=previous.autoEquip
       }
     })()`))
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mimicLootFixture = save
+      try { win.eval(`(${checkMimicRareLoot.toString()})(window.__mimicLootFixture)`) }
+      finally { delete win.__mimicLootFixture }
+    }))
   })
   it('respects configured chest boundaries and forage chances on percentage scales', () => {
     beginNewGame('Percentage Loot Tester')

@@ -1349,7 +1349,12 @@ The ground-floor stair, basement stair and matching lower stair pair all keep
 Tower and rejected if either underlying grid contains a cave, dungeon, shaft,
 occupied landmark or vertical connection. A protected one-tile rock buffer
 prevents accidental openings into neighboring caves. This also holds after
-whole-world rotation and save/load.
+whole-world rotation and save/load. A geometrically clear footprint may still
+fail the maze's dead-end and monster-placement constraints. Generation then
+tries the remaining validated footprints at the same Tower site in a stable,
+seeded order. Rejected plans carve nothing; both layers must pass before any
+underground tiles are stamped. If every footprint fails, the world attempt is
+rejected without weakening isolation or moving stair endpoints.
 
 The basement is a dry, initially empty 5×5 walkable chamber inside a 7×7
 stone envelope, joined to the upper maze by a short corridor. The stair starts
@@ -1413,10 +1418,10 @@ Creatures retain their normal behavior once encountered.
 
 The single bottom chest grants **85% tier-3/4 equipment (equal tier chance),
 or 15% tier-4-source artifact**, plus **60–150 base gold** adjusted by the
-world gold multiplier and **1–2 ordinary consumables/materials**. Magic Find
-modifies item quality under the normal equipment/artifact rules, but not the
-fixed 15% artifact-category chance. There is no build-matching reward and no
-additional generic chest roll.
+world gold multiplier and **1–2 ordinary consumables/materials**, including
+Flint Stone in the bonus pool. Magic Find modifies item quality under the 
+normal equipment/artifact rules, but not the fixed 15% artifact-category chance. 
+There is no build-matching reward and no additional generic chest roll.
 
 **Tower Chaos exception:** a Scroll of Chaos used on the surface while adjacent
 to the Tower's outer masonry (including diagonally) sends the player into a
@@ -7414,7 +7419,9 @@ per-episode roll flag and episode index in the ordinary chest save/replay
 state. The 65% shift roll and destination use a stable seed of world, floor,
 chest ID, and episode, **not animation timing or a fresh random draw on
 reload**. Its normal-chest reward table is resolved when placed (at generation
-MF 0), including eligible extra Flint Stone/Potato rolls; the hidden state is
+MF 0), including separate **0.5% Flint Stone** and **0.5% Potato** bonus
+rolls. Both extras use the normal item catalog and are saved with the fixed
+contents, so restoring a save/replay never rerolls them. The hidden state is
 never exposed by UI. An ordinary chest still rolls loot when opened, so any
 Magic Find gained later can affect that ordinary chest, not the Mimic's
 already fixed contents.

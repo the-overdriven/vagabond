@@ -3,6 +3,7 @@ const {run} = require('./helpers/node-game-runtime.cjs')
 
 async function main() {
   await run('loadContent()')
+  run(require('node:fs').readFileSync(__dirname+'/support/tower-checks.js','utf8'))
   run(`CaveSilhouettes.prepare=async seed=>{
     CAVE_SILHOUETTES=[{id:CaveSilhouettes.idForSeed(seed),sourceIds:['a','b'],
       rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>
@@ -51,7 +52,7 @@ async function main() {
     run(`WORLD_SEED=${seed};rngState=WORLD_SEED;applyWorldTraits([],'XS');
       player.inventory=[];player.curseDebuffs=[];enemies=[];groundItems=[];
       occupied=new Set();map=[];surfaceMap=null;currentZ=0;currentCave=-1`)
-    await run('generateNewWorld()')
+    await run('generateWorldWithTowerRetry()')
     assert.equal(run('!!towerMaze'),true,'tower and labyrinth must be generated together')
     const details=run(`(()=>{
       const maze=towerMaze,stairs=maze.center,lower=maze.down

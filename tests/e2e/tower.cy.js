@@ -1,4 +1,4 @@
-import {checkTowerReplayAndIsolation} from '../support/tower-checks'
+import {checkTowerReplayAndIsolation,generateWorldWithTowerRetry} from '../support/tower-checks'
 
 function loadTower() {
   cy.visit('/')
@@ -30,7 +30,7 @@ describe('Guaranteed elevated tower',()=>{
         map=[];surfaceMap=null;enemies=[];groundItems=[];occupied=new Set()
         player.inventory=[];player.curseDebuffs=[];replayRecording=false
         replayAnimationsDisabled=true;raceOpen=false
-        await generateNewWorld()
+        await (${generateWorldWithTowerRetry.toString()})()
         const hiddenMazeChests=groundItems.filter(g=>g.towerMazeMimic&&g.level===-1)
         const mimicInDeadEnd=hiddenMazeChests.length===1 &&
           hiddenMazeChests[0].isMimic===true &&

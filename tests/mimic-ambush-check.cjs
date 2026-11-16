@@ -10,6 +10,9 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
   context.fixture=fixture
   run(`loadGameFromObject(fixture,{isReplayInit:true});replayRecording=false;
     replayAnimationsDisabled=true;raceOpen=false;log=()=>{};renderInventory=()=>{}`)
+  run(fs.readFileSync(path.join(__dirname,'helpers/mimic-loot-checks.js'),'utf8'))
+  run('checkMimicRareLoot(fixture)')
+  console.log('PASS forced mimic flint/potato bonuses, save/replay restore and maze flint reward')
   // The saved world's real fort and ruins support additional ordinary chests.
   run(`groundItems.push({x:10,y:10,kind:'chest',tier:3,level:-1,levelKind:'chain',
     caveIndex:-1,towerMazeMimic:true,opened:false});Mimics.initialize()`)

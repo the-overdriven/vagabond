@@ -167,7 +167,17 @@ function generateTower() {
       towerLevels.push({map:terrain,discovered:Array.from({length:MAP_H},()=>Array(MAP_W).fill(false))})
     } else terrain[tower.entrance.y][tower.entrance.x]=randomDoor()
   }
-  if (!TowerMaze.generate(pick(selection.layouts))) return false
+  const firstLayout = pick(selection.layouts)
+  const firstIndex = selection.layouts.indexOf(firstLayout)
+  let mazeGenerated = false
+  // A clear footprint can still fail the maze's branch/monster constraints.
+  // Try the other already-validated footprints at this same tower site before
+  // rejecting the world. Failed plans consume seeded RNG but stamp no terrain.
+  for (let offset = 0; offset < selection.layouts.length; offset++) {
+    const layout = selection.layouts[(firstIndex + offset) % selection.layouts.length]
+    if (TowerMaze.generate(layout)) { mazeGenerated = true; break }
+  }
+  if (!mazeGenerated) return false
   plantTowerDeadTrees(protectedCells)
   // All cells in the clear perimeter were walkable before stamping. A ring
   // gives every old ingress an egress, preserving exterior connectivity.
