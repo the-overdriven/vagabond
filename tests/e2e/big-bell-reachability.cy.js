@@ -1,10 +1,12 @@
 describe('Big Bell Temple reachability', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Bell Reachability Tester')
-    cy.get('#btnBegin').click()
-    cy.get('#loadingOverlay', {timeout: 90000}).should('not.be.visible')
-    cy.get('#raceOverlay', {timeout: 90000}).should('not.have.class', 'show')
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mechanicsSave = save
+      win.eval('loadGameFromObject(window.__mechanicsSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__mechanicsSave
+    }))
   })
 
   it('ignores isolated mountain pockets even when they border snow, and never fabricates a disconnected grass tile', () => {

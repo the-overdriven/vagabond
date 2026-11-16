@@ -1,9 +1,12 @@
 describe('Carrion instinct, sleeping Wyverns and forest cover', () => {
   beforeEach(() => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Instinct Tester')
-    cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__mechanicsSave = save
+      win.eval('loadGameFromObject(window.__mechanicsSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__mechanicsSave
+    }))
     cy.window().then(win => win.eval(`(() => {
       window.check=(ok,msg)=>{if(!ok)throw new Error(msg)}
       replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true

@@ -1,4 +1,24 @@
 describe('Dwarven Ruins encounter progression', () => {
+  let encounterSave
+
+  before(() => {
+    cy.visit('/')
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then({timeout:120000}, win => {
+      win.__ruinsEncounterSave = save
+      win.eval('loadGameFromObject(window.__ruinsEncounterSave,{isReplayInit:true});closeRaceSelect()')
+      delete win.__ruinsEncounterSave
+      // The general mechanics save predates Ruins depth metadata and Mines.
+      // Generate one current, seeded world, then restore it independently per test.
+      return win.eval(`(async () => {
+        replayRecording=false;replayPlaying=false
+        applyWorldTraits([], 'L')
+        WORLD_SEED=12345;rngState=WORLD_SEED
+        await generateNewWorld()
+        return JSON.parse(JSON.stringify(buildSaveObject()))
+      })()`)
+    })).then(save => { encounterSave = save })
+  })
   it('spawns an un-killed grounded species on z:-5, with tier-weighted odds, only once', () => {
     cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
       win.__z5Save = save
@@ -209,11 +229,11 @@ describe('Dwarven Ruins encounter progression', () => {
   beforeEach(() => {
     cy.visit('/')
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
-    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
-      win.__ruinsEncounterSave = save
+    cy.window().then(win => {
+      win.__ruinsEncounterSave = JSON.parse(JSON.stringify(encounterSave))
       win.eval('loadGameFromObject(window.__ruinsEncounterSave,{isReplayInit:true});closeRaceSelect()')
       delete win.__ruinsEncounterSave
-    }))
+    })
     cy.window().should(win => expect(win.eval('worldGenerating')).to.equal(false))
   })
 

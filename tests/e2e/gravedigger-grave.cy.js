@@ -74,6 +74,9 @@ describe('Gravedigger unfinished grave', () => {
           currentZ = 0; map = surfaceMap
           raceOpen = false; player.x = digger.x+1; player.y = digger.y
           const opened = openNpcMenu(digger)
+          // Moving the test player can reveal nearby fog on the next redraw.
+          // Settle that ordinary discovery before testing gossip's map effects.
+          render()
           const discoveredBefore = JSON.stringify(discovered)
           if (opened) selectNpcMenuOption('gossip')
           menuCorrect = opened && document.getElementById('npcSpeech').textContent === originalText

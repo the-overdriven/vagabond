@@ -10550,7 +10550,12 @@ assertions distinguish ordinary corridors from separately populated hidden nests
 E2E tests that start a world through Begin must wait for the loading overlay
 to close before reading or modifying generated map state. Mechanics fixtures
 use controlled terrain; procedural-generation tests check generated terrain
-separately.
+separately. Ruins encounter tests generate one fixed-seed world with the current
+floor metadata and Mines, then restore an independent snapshot before each
+case. They do not use the older general mechanics fixture as a source of
+Ruins progression metadata. Rubble persistence assertions inspect the encoded
+`caveMaps` used by the save format. NPC map-discovery tests settle ordinary
+player-position discovery before checking whether dialogue reveals landmarks.
 
 The replay save/load E2E test starts a character through Begin and waits for
 world generation to finish before arranging its deterministic Temple fixture.

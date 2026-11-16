@@ -252,8 +252,10 @@ describe('Dwarven rubble and column floor layers', () => {
           check(!Object.hasOwn(tileUnderlays,key),'removed rubble underlay is not retained')
           level.caveMaps=originalMasks
           const saved=buildSaveObject()
-          check(decodeTileGrid(saved.deepLevels[index].map,'#')[y][x]===floor,
-            'save captures the cleared floor')
+          const savedMasks=saved.deepLevels[index].caveMaps.map(cm=>decodeTileGrid(cm,'cavewall'))
+          check(savedMasks.some(cm=>cm?.[y]?.[x]===floor) &&
+            savedMasks.every(cm=>cm?.[y]?.[x]!=='dwarvenrubble'),
+            'serialized cave maps capture the cleared floor')
           check(rngState===oldRng,'clearing rubble consumes no RNG')
           // Crypt 2 is the legacy separate-map exception: its rubble must not
           // rewrite the ordinary cave at the same x/y/z.
