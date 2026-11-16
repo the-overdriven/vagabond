@@ -1,11 +1,19 @@
 describe('Replay log animation', () => {
   it('finishes in-flight text and shows replay messages instantly', () => {
     cy.visit('/')
-    cy.get('#raceName').clear().type('Log Tester')
-    cy.get('#replayToggle').check()
-    cy.get('#btnBegin').click()
     cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
-    cy.get('#raceOverlay').should('not.have.class', 'show')
+    // Log animation does not depend on world generation. Start from a fixed
+    // save so an unrelated procedural generation timeout cannot mask this test.
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__replayLogFixture = save
+      try {
+        win.eval('loadGameFromObject(window.__replayLogFixture, {isReplayInit: true})')
+        win.eval('replayRecording = false; replayData = null; startReplayRecording()')
+      } finally {
+        delete win.__replayLogFixture
+      }
+    }))
+    cy.window().should(win => expect(win.eval('replayRecording')).to.equal(true))
     cy.window().then(win => {
       win.eval('inspect()')
       return win.eval('waitForLogIdle()')
