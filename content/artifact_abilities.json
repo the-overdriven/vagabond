@@ -20,10 +20,33 @@
     "martial": [
       "shadow_strike",
       "flurry",
-      "dreadful_strike"
+      "dreadful_strike",
+      "enrage",
+      "knockback",
+      "lifesteal",
+      "slow",
+      "poison",
+      "sunder",
+      "blindness",
+      "martial_bravery",
+      "riposte",
+      "retribution",
+      "blood_pact",
+      "executioner",
+      "cleave",
+      "soulburst",
+      "martial_evasion",
+      "binding",
+      "petrifying_strike",
+      "silence",
+      "confusion",
+      "disarm",
+      "soul_eater"
     ],
     "archery": [
-      "long_shot"
+      "long_shot",
+      "deadeye",
+      "crippling_shot"
     ],
     "bulwark": [
       "fleetfoot",
@@ -31,9 +54,28 @@
       "gods_chosen",
       "brace",
       "vigorplate",
-      "hold_the_line"
+      "hold_the_line",
+      "bulwark_bravery",
+      "blood_reservoir",
+      "pain_eater",
+      "last_stand",
+      "sacred_aegis",
+      "rhythm_guard",
+      "bulwark_evasion",
+      "boneplate",
+      "plague_mail",
+      "elusive",
+      "death_veil",
+      "taunt",
+      "fear_aura",
+      "fear_eater",
+      "executioners_aura"
     ],
-    "shields": []
+    "shields": [
+      "shield_mastery",
+      "counterguard",
+      "shield_bash"
+    ]
   },
   "abilities": {
     "shadow_strike": {
@@ -87,6 +129,268 @@
       "duration": 5,
       "chance": 0.2,
       "enabled": true
+    },
+    "enrage": {
+      "name": "Enrage",
+      "description": "Below 30% maximum HP, your melee attacks gain 25% ATK.",
+      "enabled": true,
+      "threshold": 0.3,
+      "attackMultiplier": 1.25
+    },
+    "knockback": {
+      "name": "Knockback",
+      "description": "Damaging critical melee hits push surviving enemies one legal tile away.",
+      "enabled": true
+    },
+    "lifesteal": {
+      "name": "Lifesteal",
+      "description": "Damaging melee hits have a 30% chance to heal one third of actual damage dealt.",
+      "enabled": true,
+      "chance": 0.3
+    },
+    "slow": {
+      "name": "Slow",
+      "description": "Damaging melee hits have a 30% chance to slow enemies for 3 player turns.",
+      "enabled": true,
+      "chance": 0.3,
+      "duration": 3
+    },
+    "poison": {
+      "name": "Poison",
+      "description": "Damaging melee hits have a 20% chance to apply the normal venom effect.",
+      "enabled": true,
+      "chance": 0.2
+    },
+    "sunder": {
+      "name": "Sunder",
+      "description": "Each damaging melee hit permanently lowers the target DEF by 1, up to 10 (minimum DEF 0).",
+      "enabled": true,
+      "maxStacks": 10
+    },
+    "blindness": {
+      "name": "Blindness",
+      "description": "Damaging melee hits have a 10% chance to permanently lower enemy ATK or, once, AGGRO.",
+      "enabled": true,
+      "chance": 0.1,
+      "maxAtkPenalty": 5
+    },
+    "martial_bravery": {
+      "name": "Bravery",
+      "description": "Melee damage +25% against a stronger enemy or when at least 3 enemies surround you.",
+      "enabled": true,
+      "damageBonus": 0.25
+    },
+    "deadeye": {
+      "name": "Deadeye",
+      "description": "After holding position since the preceding action, arrows gain +15 percentage points to hit and +50% damage.",
+      "enabled": true,
+      "hitBonus": 0.15,
+      "damageBonus": 0.5
+    },
+    "crippling_shot": {
+      "name": "Crippling Shot",
+      "description": "Damaging bow shots have a 30% chance to slow enemies for 3 player turns.",
+      "enabled": true,
+      "chance": 0.3,
+      "duration": 3
+    },
+    "bulwark_bravery": {
+      "name": "Bravery",
+      "description": "Damage from a stronger enemy empowers your next successful melee hit by 25%.",
+      "enabled": true,
+      "damageBonus": 0.25
+    },
+    "riposte": {
+      "name": "Riposte",
+      "description": "Blocking or receiving a glancing melee hit empowers your next damaging melee strike by 50%. Misses keep the charge.",
+      "enabled": true,
+      "damageBonus": 0.5
+    },
+    "retribution": {
+      "name": "Retribution",
+      "description": "Store all HP lost. Your next damaging melee hit adds 50% of that stored damage; misses do not consume it.",
+      "enabled": true,
+      "returnedFraction": 0.5
+    },
+    "blood_pact": {
+      "name": "Blood Pact",
+      "description": "Every landed melee strike costs 1% of maximum HP, rounded up, and adds the same amount to damage. This can kill you.",
+      "enabled": true,
+      "costFraction": 0.01
+    },
+    "shield_mastery": {
+      "name": "Shield Mastery",
+      "description": "Increases your existing shielding block chance by 10 percentage points.",
+      "enabled": true,
+      "blockBonus": 0.1
+    },
+    "counterguard": {
+      "name": "Counterguard",
+      "description": "Increases block chance by 15 percentage points against armed enemies.",
+      "enabled": true,
+      "blockBonus": 0.15
+    },
+    "shield_bash": {
+      "name": "Shield Bash",
+      "description": "After blocking an adjacent enemy, 50% chance to bash for 30% of your DEF (subject to target DEF), then push one legal tile.",
+      "enabled": true,
+      "chance": 0.5,
+      "defFraction": 0.3
+    },
+    "last_stand": {
+      "name": "Last Stand",
+      "description": "When HP drops from above 25% to 25% or less without killing you, reduce subsequent damage by 50% for 3 turns; 50-turn cooldown.",
+      "enabled": true,
+      "hpThreshold": 0.25,
+      "damageReduction": 0.5,
+      "duration": 3,
+      "cooldown": 50
+    },
+    "sacred_aegis": {
+      "name": "Sacred Aegis",
+      "description": "Absorbs one damaging melee, projectile or direct spell hit. Recharge: 10 player turns.",
+      "enabled": true,
+      "cooldown": 10
+    },
+    "rhythm_guard": {
+      "name": "Rhythm Guard",
+      "description": "Two damaging direct strikes in one action prepare a guard that halves the next incoming hit.",
+      "enabled": true,
+      "damageReduction": 0.5
+    },
+    "bulwark_evasion": {
+      "name": "Evasion",
+      "description": "Each attack you make prepares a 30% chance to dodge the next landed melee or projectile hit; preparing again never stacks.",
+      "enabled": true,
+      "chance": 0.3
+    },
+    "boneplate": {
+      "name": "Boneplate",
+      "description": "Each enemy death within 2 tiles grants +1 DEF for 5 turns, up to 5 independent stacks.",
+      "enabled": true,
+      "radius": 2,
+      "duration": 5,
+      "maxStacks": 5
+    },
+    "plague_mail": {
+      "name": "Plague Mail",
+      "description": "Gain +1 DEF for every poisoned enemy within 2 tiles. Enemy attacks normally able to poison you always do, unless you are immune.",
+      "enabled": true,
+      "radius": 2
+    },
+    "blood_reservoir": {
+      "name": "Blood Reservoir",
+      "description": "Store 25% of HP lost, up to 25% of maximum HP. Add the stored damage to your next damaging melee hit.",
+      "enabled": true,
+      "fraction": 0.25,
+      "capacity": 0.25
+    },
+    "pain_eater": {
+      "name": "Pain Eater",
+      "description": "Each separate HP-loss event adds 1 damage to your next melee attack. A miss spends the charge.",
+      "enabled": true
+    },
+    "executioner": {
+      "name": "Executioner",
+      "description": "A melee strike that brings a living enemy from above 20% HP to 20% HP or below immediately grants one extra strike against it, once per enemy.",
+      "enabled": true,
+      "threshold": 0.2
+    },
+    "cleave": {
+      "name": "Cleave",
+      "description": "Each landed melee strike also strikes enemies adjacent to both you and the target, at 60% power before their defenses. Extra targets do not trigger on-hit effects.",
+      "enabled": true,
+      "damageFraction": 0.6
+    },
+    "soulburst": {
+      "name": "Soulburst",
+      "description": "A direct melee killing blow releases a blast across a 7×7 area around the victim. It deals 30% of the finishing blow, subject to each enemy’s DEF, and cannot pass walls or chain.",
+      "enabled": true,
+      "radius": 3,
+      "damageFraction": 0.3
+    },
+    "martial_evasion": {
+      "name": "Evasion",
+      "description": "Damaging a surviving enemy grants a 30% chance to step onto a random legal adjacent tile after the attack sequence. At most one step per attack action.",
+      "enabled": true,
+      "chance": 0.3
+    },
+    "binding": {
+      "name": "Binding",
+      "description": "Every landed melee strike binds the surviving enemy, preventing its Flee and Thief abilities until you actually move.",
+      "enabled": true
+    },
+    "elusive": {
+      "name": "Elusive",
+      "description": "When an enemy misses you in melee, you may take one free step with your next movement action. An attack or another action forfeits it.",
+      "enabled": true
+    },
+    "death_veil": {
+      "name": "Death Veil",
+      "description": "Killing an enemy with a direct melee strike while invisible adds 5 turns to your existing invisibility without breaking it.",
+      "enabled": true,
+      "duration": 5
+    },
+    "petrifying_strike": {
+      "name": "Petrifying Strike",
+      "description": "Damaging melee hits have a 15% chance to make a foe lose its next action.",
+      "enabled": true,
+      "chance": 0.15
+    },
+    "silence": {
+      "name": "Silence",
+      "description": "Damaging melee hits have a 30% chance to prevent enemy spellcasting for 3 player turns.",
+      "enabled": true,
+      "chance": 0.3,
+      "duration": 3
+    },
+    "confusion": {
+      "name": "Confusion",
+      "description": "Damaging melee hits have a 20% chance to confuse a foe for 3 turns; it may move randomly or attack another creature.",
+      "enabled": true,
+      "chance": 0.2,
+      "duration": 3
+    },
+    "disarm": {
+      "name": "Disarm",
+      "description": "Damaging melee hits have a 10% chance to knock a weapon or shield from an equipped enemy. The dropped item can be picked up.",
+      "enabled": true,
+      "chance": 0.1
+    },
+    "taunt": {
+      "name": "Taunt",
+      "description": "Enemies detect you from 3 tiles farther away and do not retreat solely because of your strength or bow.",
+      "enabled": true,
+      "aggroBonus": 3
+    },
+    "fear_aura": {
+      "name": "Fear Aura",
+      "description": "A frightened foe fleeing can spread fear to nearby enemies (20% per target, once per turn).",
+      "enabled": true,
+      "chance": 0.2,
+      "duration": 3
+    },
+    "fear_eater": {
+      "name": "Fear Eater",
+      "description": "Gain +1 ATK per visible frightened enemy within 10 tiles, up to +5.",
+      "enabled": true,
+      "radius": 10,
+      "maxBonus": 5
+    },
+    "executioners_aura": {
+      "name": "Executioner's Aura",
+      "description": "Killing an unharmed enemy with one direct melee strike can frighten nearby foes for 3 turns (50% chance).",
+      "enabled": true,
+      "radius": 3,
+      "chance": 0.5,
+      "duration": 3
+    },
+    "soul_eater": {
+      "name": "Soul Eater",
+      "description": "Killing a non-ghost humanoid has a 50% chance to summon its hostile ghost. Killing it grants +1 ATK for 300 turns; each bonus expires separately.",
+      "enabled": true,
+      "chance": 0.5,
+      "soulFedDuration": 300
     }
   }
 }

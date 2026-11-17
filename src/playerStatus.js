@@ -82,6 +82,58 @@ function activePlayerStatuses() {
   }
   if (player.deathShieldReady) statuses.push({id: 'death-shield', icon: '⛨', label: 'Death Shield', counter: '',
     detail: 'Death Shield ready: survive one fatal damage event at 1 HP. Further damage can kill you immediately.'})
+  // Active powers still work on unidentified gear, but their names stay hidden.
+  const knownArtifactPower = playerKnowsArtifactAbility
+  if (knownArtifactPower('enrage') && playerHasArtifactAbility('enrage') &&
+      player.hp < playerMaxHp() * 0.30)
+    statuses.push({id:'artifact-enrage',icon:'⚔',label:'Enraged',counter:'',tone:'up',
+      detail:'Enrage: melee attack power is 25% higher while below 30% maximum HP.'})
+  if (knownArtifactPower('deadeye') && playerHasArtifactAbility('deadeye') && playerHeldPosition())
+    statuses.push({id:'artifact-deadeye',icon:'◎',label:'Deadeye',counter:'',tone:'up',
+      detail:'Deadeye ready: the next bow shot gains +15 percentage points to hit and deals 50% more damage.'})
+  if (knownArtifactPower('bulwark_bravery') && playerHasArtifactAbility('bulwark_bravery') && player.artifactBraveryCharge)
+    statuses.push({id:'artifact-bravery',icon:'⚔',label:'Bravery',counter:'',tone:'up',
+      detail:'Bravery: the next successful melee hit deals 25% more damage.'})
+  const preparedPowers = [
+    ['riposte', player.artifactRiposteReady, 'Riposte ready', '⚔', '+50% on next damaging melee hit.'],
+    ['retribution', player.artifactRetributionStored > 0, `Retribution · ${player.artifactRetributionStored || 0} HP`, '⚔', 'Half of stored HP loss boosts the next damaging melee hit.'],
+    ['blood_reservoir', player.artifactBloodReservoirStored > 0, `Blood Reservoir · ${Math.floor(player.artifactBloodReservoirStored || 0)}`, '◆', 'Stored damage boosts the next damaging melee hit.'],
+    ['pain_eater', player.artifactPainEaterHits > 0, `Pain Eater · +${player.artifactPainEaterHits || 0}`, '⚔', 'Charged damage for the next attack action.'],
+    ['rhythm_guard', player.artifactRhythmGuardReady, 'Rhythm Guard ready', '⛨', 'Halves the next incoming blow.'],
+    ['bulwark_evasion', player.artifactEvasionPrepared, 'Evasion prepared', '◇', 'A 30% chance to dodge the next landed blow.'],
+    ['sacred_aegis', turnCount >= (player.artifactSacredReadyTurn || 0), 'Sacred Aegis ready', '⛨', 'Absorbs the next eligible damaging hit.'],
+    ['elusive', player.artifactElusiveReady, 'Elusive step ready', '◇', 'Your next movement can be a free step. Another action forfeits it.'],
+  ]
+  for (const [id, ready, label, icon, detail] of preparedPowers)
+    if (ready && knownArtifactPower(id) && playerHasArtifactAbility(id))
+      statuses.push({id:'artifact-'+id,icon,label,counter:'',tone:'up',detail})
+  if (knownArtifactPower('last_stand') && artifactLastStandActive())
+    statuses.push({id:'artifact-last-stand',icon:'⛨',label:'Last Stand',
+      counter:`${player.artifactLastStandUntilTurn-turnCount}t`,tone:'up',
+      detail:'Incoming damage reduced by 50% while this protection lasts.'})
+  if (knownArtifactPower('last_stand') && playerHasArtifactAbility('last_stand') &&
+      !artifactLastStandActive() && turnCount < (player.artifactLastStandCooldownUntil || 0))
+    statuses.push({id:'artifact-last-stand-cooldown',icon:'⛨',label:'Last Stand recharging',
+      counter:`${player.artifactLastStandCooldownUntil-turnCount}t`,tone:'down',
+      detail:'Last Stand cannot trigger again until its fifty-turn cooldown ends.'})
+  const soulFed = artifactSoulFedStacks()
+  if (soulFed) {
+    const left = player.artifactSoulFedExpiries.reduce((earliest, expiry) =>
+      expiry > turnCount ? Math.min(earliest,expiry) : earliest,Infinity) - turnCount
+    const named = knownArtifactPower('soul_eater')
+    statuses.push({id:'artifact-soul-fed',icon:'☾',label: named ? `Soul Fed · +${soulFed} ATK` : `Empowered · +${soulFed} ATK`,
+      counter:`${left}t`,tone:'up',detail:named
+        ? `Soul Fed grants +${soulFed} ATK. The next stack expires in ${turns(left)}; other stacks expire independently.`
+        : `A spirit's fading power grants +${soulFed} ATK for a limited time.`})
+  }
+  if (knownArtifactPower('boneplate') && playerHasArtifactAbility('boneplate') && artifactBoneplateStacks())
+    statuses.push({id:'artifact-boneplate',icon:'▣',label:`Boneplate +${artifactBoneplateStacks()} DEF`,
+      counter:'',tone:'up',detail:'Each stack expires independently five turns after its source dies.'})
+  if (knownArtifactPower('sacred_aegis') && playerHasArtifactAbility('sacred_aegis') &&
+      turnCount < (player.artifactSacredReadyTurn || 0))
+    statuses.push({id:'artifact-aegis-cooldown',icon:'⛨',label:'Sacred Aegis recharging',
+      counter:`${player.artifactSacredReadyTurn-turnCount}t`,tone:'down',
+      detail:'Sacred Aegis cannot absorb another hit until its ten-turn recharge completes.'})
   for (const [id, label, icon, duration, detail] of [
     ['stone-skin', 'Stone Skin', '▣', player.stoneSkinTurns, `+${player.stoneSkinBonus} DEF, −3 GRACE`],
     ['berserk', 'Berserk', '⚔', player.berserkTurns, `+${player.berserkBonus} ATK, −3 DEF, −2 GRACE; 25% chance per turn to attack a random adjacent enemy instead of acting`]

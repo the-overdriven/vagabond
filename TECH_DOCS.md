@@ -4722,6 +4722,10 @@ Enrage is derived from current HP, maximum HP, and the saved abilities array;
 base ATK is never mutated. Save/load and replay therefore restore it directly,
 without an additional persistent flag, extra RNG, or save-format change.
 
+The equipment-artifact **Enrage** power uses the same below-30% threshold and
+1.25 attack multiplier, but applies to the player's melee attacks; it is
+recalculated from current HP without a separate cooldown or duration.
+
 ## Critical knockback
 
 Ogre and Cyclops have `knockback`. A damaging critical melee strike pushes a
@@ -4907,6 +4911,11 @@ persist in current saves and replay initial states, and restore exactly.
 Re-entering levels and loading never reset the once-only summon. Saves also
 preserve an explicit GRACE value when present. Older save formats are rejected.
 
+Artifact **Soul Eater** uses the same summoning construction and occupancy
+rules but summons a hostile Ghost derived from a slain humanoid, not a loyal
+escort. Its special eligibility, stats and reward are defined under artifact
+powers; it never changes the existing monster summon cooldown or species rules.
+
 ## Lifesteal
 
 Vampire has the `lifesteal` ability. Each damaging melee hit independently has
@@ -4919,7 +4928,17 @@ before the normal killer victory bonus. Healing logs its actual amount,
 shows a green +HP number, and updates the Vampire's HP display. Existing enemy
 HP and abilities serialization preserve it without an additional status.
 
+Equipped **Lifesteal** artifacts use the same per-hit 30% chance and
+one-third effective-damage healing formula as Vampire. Enemy Lifesteal and
+player Lifesteal share their core calculation, while using their respective
+HP limits and feedback.
+
 ## Poison
+
+Artifact Poison calls this same venom application (20% of damaging melee hits),
+including poison budgets, immunity and refresh behavior; it does not create
+a second poison type. Crippling Shot and melee Slow also share a single
+enemy-Slow status and duration rules (documented with artifact powers).
 
 **Player-applied venom:** A Venom Gland can be used from the inventory to
 coat the currently equipped melee weapon or prepare one arrow when a Short Bow
@@ -6558,7 +6577,11 @@ hit into a shield block, with a chance rising from 0% to 20%. It reduces the
 damage to one-third and suppresses critical damage, without eliminating any
 equipment penalty or replacing the shield's passive DEF. Projectiles and
 spells cannot trigger this special block. Landed melee attacks train Shielding
-when a shield is equipped, subject to the per-enemy budget in §5.
+when a shield is equipped, subject to the per-enemy budget in §5. An artifact
+shield with **Shield Mastery** adds 10 percentage points to the same block
+roll; **Counterguard** adds another 15 percentage points only against enemies
+carrying a weapon. These percentages add to trained Shielding before the
+single block roll and can never exceed 100%.
 
 ---
 
@@ -6997,6 +7020,47 @@ log. Inspecting does not reroll anything.
 | Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
 | Vigorplate | bulwark | At **75% maximum HP or more**, grants **+30% DEF**, minimum **+3**. Re-evaluated for each incoming attack. |
 | Hold the Line | bulwark | Grants **+1 DEF** for each adjacent living enemy on the **same Z level**, maximum **+3**. |
+| Enrage | martial | Below **30% HP**, melee ATK is multiplied by **1.25** before the normal mitigation roll, matching monsters' Enrage rule. |
+| Knockback | martial | A damaging **critical melee strike** pushes a surviving target **one tile away** if the destination and diagonal corners are legal and unoccupied. On-entry traps and terrain hazards apply; no movement across floors. |
+| Lifesteal | martial | Each damaging melee hit has a **30%** chance to restore **floor(actual HP removed / 3)**, capped by missing HP. |
+| Slow | martial | Each damaging melee hit has a **30%** chance to apply **Slow for 3 player turns**. |
+| Poison | martial | Each damaging melee hit has a **20%** chance to apply the **existing venom** status, including its budget, ticks and immunities. |
+| Sunder | martial | Each damaging melee hit permanently reduces the enemy's effective DEF by **1**, up to **10**; minimum DEF is **0**. |
+| Blindness | martial | Each damaging hit has a **10%** chance to lower enemy **ATK by 1** or lower **AGGRO by 1 once** (50/50 until AGGRO falls). Afterwards only ATK is reduced; maximum **−5 ATK**, minimum **1 ATK** and **1 AGGRO**. |
+| Bravery (martial) | martial | Melee damage is **25% higher** against an enemy with greater current strength, **or** while at least **3 same-level enemies** are adjacent. Both conditions still grant only one bonus. |
+| Deadeye | archery | After holding position since the preceding player action, bow shots gain **+15 percentage points to hit** (within normal hit limits) and **+50% damage**. Forced movement breaks the condition. |
+| Crippling Shot | archery | Each damaging arrow has a **30%** chance to apply the same **3-turn Slow**. |
+| Bravery (bulwark) | bulwark | Taking damage from a stronger enemy prepares **+25% damage** on the next successful melee hit. Misses do not consume it; the charge is unique, saved, and never duplicated by gear swaps. |
+| Riposte | martial | A **successful shield block** or an enemy **glancing melee hit** prepares +50% on the next damaging melee strike. A miss keeps the charge; removing the Riposte weapon clears it. |
+| Retribution | martial | Stores **all HP actually lost** while equipped; the next damaging melee strike gains **floor(50% × total HP lost)** as added damage. A miss keeps the charge; the next hit spends it. |
+| Blood Pact | martial | Every landed melee strike, including GRACE strikes, costs **ceil(1% of maximum HP)** and adds that same number to its damage. The cost is direct HP loss, unaffected by Last Stand; it can kill the player, but the blow still resolves, allowing mutual death. |
+| Blood Reservoir | bulwark | Stores **25% of every HP-loss event**, capped at **25% of maximum HP**. Its next damaging melee strike adds the **whole-number portion** of the reserve; a miss keeps it. |
+| Pain Eater | bulwark | Each separate HP-loss event adds **+1 damage** to the next melee attack action. This charge is spent on an attack, **including misses**, and applies to at most the first landed blow of a GRACE series. Damage taken during Blood Pact charges the next attack instead. |
+| Shield Mastery | shields | **+10 percentage points** to normal shield block chance, without removing existing Shielding skill rules. |
+| Counterguard | shields | **+15 percentage points** to block against enemies carrying a weapon. |
+| Shield Bash | shields | After a successful block against an adjacent foe, a **50%** chance to counterattack for damage based on **30% of current player DEF**, reduced by the foe's ordinary DEF. A surviving foe is pushed **one legal free tile** away, triggering normal on-entry hazards; no weapon on-hit effects. |
+| Last Stand | bulwark | Crossing from **above 25% HP to 25% or lower**, while surviving, grants **50% incoming damage reduction** for the triggering reaction and the next **3 player turns** (not for the triggering damage), with a **50-turn cooldown**. Damage costs bypass it. |
+| Sacred Aegis | bulwark | Absorbs the next damaging melee, projectile or direct spell hit, then recharges over **10 player turns**. Does not absorb poison ticks, terrain, traps or HP costs. Equipping another artifact cannot reset recharge. |
+| Rhythm Guard | bulwark | A second **damaging direct hit in the same player attack action** (such as a GRACE follow-up) prepares a single guard. The next landed incoming blow deals **50% less damage**. Extra targets of later AoE effects do not count. |
+| Evasion (bulwark) | bulwark | Each attack action prepares a **30% chance** to dodge the next landed melee or projectile hit. A dodge test consumes the preparation regardless of its result. Not used against poison ticks or environmental damage. |
+| Boneplate | bulwark | Every enemy death within **2 tiles at the same Z level** grants **+1 DEF** for **5 player turns**; up to **5 independent charges**, which expire separately, even if an enemy dies from poison or a trap. |
+| Plague Mail | bulwark | **+1 DEF** per poisoned, living enemy within **2 tiles at the same Z level**, without an extra cap. A damaging eligible attack from a poison-capable foe has **100% poison application chance** instead of the usual 30%; normal immunity rules still apply. |
+| Executioner | martial | A direct melee strike that brings a living foe from **above 20% to 20% or less maximum HP** grants one immediate additional attack. Triggers **once per enemy** across weapon swaps, and its extra strike is not a GRACE/Flurry strike. |
+| Cleave | martial | A landed direct melee strike also strikes enemies adjacent to **both** the player and primary target for **60% of that strike's damage**, reduced by each secondary enemy's own DEF. Secondary strikes cannot trigger other weapon on-hit powers or further Cleave. |
+| Soulburst | martial | Killing a foe with a direct melee strike bursts over a **7×7** area centered on the victim. Other enemies in sight on the same Z level take damage with **30% of the killing strike's damage** before their own DEF reduction. Bursts cannot trigger further bursts or weapon powers; the player is unharmed. |
+| Evasion (martial) | martial | After a damaging melee strike leaves its target alive, **30%** chance to make **one random legal adjacent step** when the current attack action finishes, regardless of the number of strikes. Respect rooted and terrain hazards; entering a tile applies normal entry rules. |
+| Binding | martial | A landed melee hit prevents the struck enemy's Flee and Thief behavior, without deleting its underlying abilities. **Any actual relocation** of the player releases all bound enemies; blocked movement attempts do not. |
+| Elusive | bulwark | When an enemy's melee attack misses, the next player action may be a **free one-tile move** chosen with normal movement controls. The move does not advance world time, but runs normal tile-entry effects. Attacking or choosing another action forfeits the opportunity; free steps cannot stack. |
+| Death Veil | bulwark | Killing an enemy with a direct melee strike while already invisible adds **5 turns** to the remaining invisibility. It does not grant invisibility when none was active. |
+| Soul Eater | martial | Every player-credited kill of a **humanoid other than a Ghost** has a **50%** chance to create a hostile `ghost of <victim>` on a free safe neighboring floor tile on the same global Z level. Only **one** Soul Eater ghost can be alive anywhere in the world at once. The ghost has **half the slain creature’s maximum HP, ATK, DEF, SPD and GRACE** (rounded to nearest integer, minimum 1 for HP/ATK/SPD), but retains Ghost species behavior, including ethereal and invisibility. It does not inherit the victim’s gear, abilities, prefix or loot. It grants normal stat-based **XP**, but drops **nothing**. Killing that ghost with player credit awards **Soul Fed: +1 ATK for 300 player turns**, with **independent uncapped stack expiries**. |
+| Petrifying Strike | martial | Each damaging melee hit has a **15%** chance to make its victim skip its next action opportunity, without stacking. |
+| Silence | martial | Each damaging melee hit has a **30%** chance to prevent only enemy spellcasting for **3 player turns**; regular attacks and movement still work. |
+| Confusion | martial | Each damaging melee hit has a **20%** chance to cause **3 player turns** of confusion. Each enemy action has a **50%** normal / **25%** random legal move / **25%** attack a random adjacent monster split. With no target, the final case wastes the action. |
+| Disarm | martial | Each damaging melee hit has a **10%** chance to knock an enemy's actual equipped **weapon or shield** to a legal nearby tile (or beneath the enemy). A modeled archer bow may also be disarmed. If a shield and modeled bow both exist, one is chosen uniformly. Each item is dropped at most once, loses its stat bonuses or ability to shoot as applicable, and cannot drop again on death. |
+| Taunt | bulwark | Increases enemy detection radius by **3 tiles** and suppresses strength-based bow avoidance and ranged spacing, but never fear or invisibility. |
+| Fear Aura | bulwark | Fleeing from fear may frighten adjacent monsters for **3 turns** with **20%** probability per monster per player turn. Fear caused exclusively by this aura does not spread further. Standard fear immunities remain. |
+| Fear Eater | bulwark | Gain **+1 ATK** per visible frightened enemy within **10 tiles** on the same Z level, up to **+5 ATK**. |
+| Executioner's Aura | bulwark | Killing an uninjured monster with a single direct melee hit has **50%** chance to scare other monsters within **3 tiles** for **3 turns**, subject to fear immunities. |
 
 Brace and Vigorplate round fractional DEF bonuses **down**, using the same
 pre-conditional DEF basis; neither feeds the other's percentage. Hold the Line
@@ -7006,10 +7070,82 @@ The stationary condition depends on consumed world turns and actual position
 changes, never animation progress. For damaging melee powers, the regular
 critical/glancing calculations occur before the added damage multipliers.
 
+Enrage and martial Bravery modify the melee attack input before DEF mitigation;
+Shadow Strike and Flurry apply after hit/critical/glancing resolution. When more
+than one distinct percentage effect applies to one strike, existing damage
+multipliers combine **multiplicatively** (for example two +25% effects produce
+1.25 × 1.25 damage). Bulwark Bravery is expended only after a damaging hit
+and never by a miss. Poison, Slow and other status procs use the same seeded
+combat rolls as ordinary attacks; they do not run on zero-damage hits.
+
+Artifact charges and cooldowns are shared by the character rather than by
+individual artifacts: two copies of an ability never add extra stacks, and
+swapping equipment cannot refresh a used ward. Charges are saved and restored
+with replay. Incoming-hit resolution follows this order: normal hit/critical,
+armor glance/shield block, prepared Evasion, Sacred Aegis, Last Stand,
+Rhythm Guard, HP loss, HP-loss reactions, and finally ordinary contact effects.
+Last Stand also reduces poison, self-inflicted spell and terrain damage but
+never the Blood Pact cost. HP-loss charges only count **actual HP removed**;
+armor wards which prevent damage don't generate charges. For compounded
+damage reductions, round down after each reduction. Temporary charges and
+shields are shown in the status panel only when their artifact is identified.
+
+Slow uses the same **10% SPD reduction** rule as the player's Slow. This affects
+enemy hit/miss and chase calculations; it starts with the immediate enemy
+reaction, lasts three player turns and does not affect inactive Z-levels.
+Sunder and Blindness modify effective stats without rewriting the original
+monster stats, and appear in monster inspection. Blindness' AGGRO reduction
+never cancels an already initiated pursuit. Its permanent penalties remain
+with that monster until death. Knockback uses standard enemy on-entry trap
+and hazard processing; a pushed enemy that is no longer adjacent cannot
+receive a follow-up melee hit from that attack series.
+
+Direct melee strikes resolve independently of animation timing. A qualifying
+Executioner threshold crossing yields one extra strike, without inheriting the
+GRACE-only Flurry modifier. Cleave and Soulburst deal secondary damage with the
+existing enemy DEF and death-resolution paths but are not themselves weapon
+hits; their victims cannot set off additional Cleave or Soulburst effects.
+A single attack action can grant at most one post-attack martial Evasion step.
+Both Evasion steps and Elusive free movement use ordinary tile entry rules,
+including traps and movement-state changes; Elusive does not spend a turn.
+Binding is tied to enemies, and every genuine player position change clears all
+bindings, including forced relocation and level transitions. Effects never
+propagate from one Z level to another.
+Petrification skips one actual opportunity for that enemy to act; silence only
+blocks the existing spell dispatch, while confusion reuses the ordinary movement,
+attack and death rules. The fear origins and per-target propagation attempts are
+stored on enemies; fear never crosses Z levels or recurses. Disarm checks actual
+equipment first, then a modeled archer bow when present; enemies currently equip
+one physical item, not separate physical weapon and shield slots. A removed physical item
+is the exact original equipment object, not newly rolled loot; only the virtual
+archer bow is materialized as a new item. When the item is
+dropped, its stat modifications are reversed using the same gear logic as
+ordinary unequipping. Disarm and the separate loss of a modeled bow both survive
+save, load and replay.
+
+Soul Eater reuses the ordinary summoning constructor, spawn validation, occupied
+cells, enemy turn lockout and Ghost species template; no special level or
+teleportation is introduced. A summon roll occurs only if the victim is on the
+player's current Z level and no previous Soul Eater ghost remains alive, even
+on another Z level. If the roll succeeds but there is no safe free neighboring
+floor tile, nothing is created. Ghosts remain hostile and can be fought after
+the weapon is swapped; killing an existing ghost awards Soul Fed even if its
+summoning artifact is no longer equipped. Soul Fed is a timed boon already
+earned, not a permanent item property, so unequipping does not erase it. Death
+clears its stacks. Soul Fed does not contribute to permanent character ATK;
+while active it increases ordinary effective ATK and expires independently per
+stack. Each recorded expiry and each ghost's provenance flag are serialized
+and restored through normal save/replay, without animation-driven decisions.
+
+
 The power identity, position-change turn and relevant combat statuses survive
 save/load and deterministic replay. Enemy Fear uses the same status and rules
 whether caused by an artifact or a scroll, including its countdown and
 interruptions from damage. Range and adjacency do not cross Z levels.
+Executioner's once-per-enemy marker, enemy Binding, the player's pending
+martial Evasion step and an available Elusive step are all part of the current
+save and replay state. Their resolution uses the deterministic game RNG only;
+neither post-attack movement nor free movement depends on animation progress.
 
 ---
 

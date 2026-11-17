@@ -190,6 +190,22 @@ function buildSaveObject() {
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       lastPositionChangeTurn: player.lastPositionChangeTurn,
+      artifactBraveryCharge: player.artifactBraveryCharge === true,
+      artifactRiposteReady: player.artifactRiposteReady === true,
+      artifactRetributionStored: player.artifactRetributionStored,
+      artifactBloodReservoirStored: player.artifactBloodReservoirStored,
+      artifactPainEaterHits: player.artifactPainEaterHits,
+      artifactPainAttackBonus: player.artifactPainAttackBonus,
+      artifactRhythmHitsThisAction: player.artifactRhythmHitsThisAction,
+      artifactRhythmGuardReady: player.artifactRhythmGuardReady === true,
+      artifactEvasionPrepared: player.artifactEvasionPrepared === true,
+      artifactMartialEvasionPending: player.artifactMartialEvasionPending === true,
+      artifactElusiveReady: player.artifactElusiveReady === true,
+      artifactLastStandUntilTurn: player.artifactLastStandUntilTurn,
+      artifactLastStandCooldownUntil: player.artifactLastStandCooldownUntil,
+      artifactSacredReadyTurn: player.artifactSacredReadyTurn,
+      artifactBoneplateExpiries: [...player.artifactBoneplateExpiries],
+      artifactSoulFedExpiries: [...player.artifactSoulFedExpiries],
       speedPotionTurns: player.speedPotionTurns,
       speedPotionBonus: player.speedPotionBonus,
       stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,
@@ -258,13 +274,28 @@ function buildSaveObject() {
       poisonDamageRemaining: e.poisonDamageRemaining,
       poisonDamagePerTurn: e.poisonDamagePerTurn,
       poisonAppliedTurn: e.poisonAppliedTurn,
+      artifactSlowUntilTurn: e.artifactSlowUntilTurn,
+      artifactSunderStacks: e.artifactSunderStacks,
+      artifactBlindAtkPenalty: e.artifactBlindAtkPenalty,
+      artifactBlindAggroPenalty: e.artifactBlindAggroPenalty === true,
+      artifactExecutionerUsed: e.artifactExecutionerUsed === true,
+      artifactBound: e.artifactBound === true,
+      artifactPetrified: e.artifactPetrified === true,
+      artifactSilencedUntilTurn: e.artifactSilencedUntilTurn || 0,
+      artifactConfusedUntilTurn: e.artifactConfusedUntilTurn || 0,
+      artifactDisarmed: e.artifactDisarmed === true,
+      artifactRangedDisarmed: e.artifactRangedDisarmed === true,
+      artifactFearAuraOnly: e.artifactFearAuraOnly === true,
+      artifactFearAuraCheckedTurn: e.artifactFearAuraCheckedTurn ?? -1,
+      artifactSoulGhost: e.artifactSoulGhost === true,
       meleeHitXpGranted: e.meleeHitXpGranted,
       combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0,
       atk: e.atk,
       def: e.def,
       spd: e.spd,
-      aggro: enemyAggroRange(e),
+      // Save the raw detection range. A Blindness penalty is saved separately.
+      aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,
       abilities: [...e.abilities],
       stolenItemEquipped: e.stolenItemEquipped === true,
       bowRetreatHold: e.bowRetreatHold === true,
@@ -883,6 +914,21 @@ function loadGameFromObject(data, opts = {}) {
       player.inventory.find(i => i.kind === 'blackkey') || null
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
+  player.artifactBraveryCharge = player.artifactBraveryCharge === true
+  for (const field of ['artifactRetributionStored','artifactBloodReservoirStored','artifactPainEaterHits',
+    'artifactPainAttackBonus','artifactRhythmHitsThisAction','artifactLastStandUntilTurn',
+    'artifactLastStandCooldownUntil','artifactSacredReadyTurn']) {
+    if (!Number.isFinite(player[field])) throw new Error('Invalid saved artifact combat state: ' + field)
+  }
+  player.artifactRiposteReady = player.artifactRiposteReady === true
+  player.artifactRhythmGuardReady = player.artifactRhythmGuardReady === true
+  player.artifactEvasionPrepared = player.artifactEvasionPrepared === true
+  player.artifactMartialEvasionPending = player.artifactMartialEvasionPending === true
+  player.artifactElusiveReady = player.artifactElusiveReady === true
+  if (!Array.isArray(player.artifactSoulFedExpiries) ||
+      !player.artifactSoulFedExpiries.every(Number.isSafeInteger)) throw new Error('Invalid saved Soul Fed state')
+  if (!Array.isArray(player.artifactBoneplateExpiries) ||
+      !player.artifactBoneplateExpiries.every(Number.isFinite)) throw new Error('Invalid saved Boneplate state')
   player.spiderWebSourceId = typeof player.spiderWebSourceId === 'string' ? player.spiderWebSourceId : null
   spiderWebOverlayStart = 0
   player.godMode = !!data.player.godMode
@@ -967,6 +1013,20 @@ function loadGameFromObject(data, opts = {}) {
       poisonDamageRemaining: e.poisonDamageRemaining,
       poisonDamagePerTurn: e.poisonDamagePerTurn,
       poisonAppliedTurn: e.poisonAppliedTurn,
+      artifactSlowUntilTurn: e.artifactSlowUntilTurn,
+      artifactSunderStacks: e.artifactSunderStacks,
+      artifactBlindAtkPenalty: e.artifactBlindAtkPenalty,
+      artifactBlindAggroPenalty: e.artifactBlindAggroPenalty === true,
+      artifactExecutionerUsed: e.artifactExecutionerUsed === true,
+      artifactBound: e.artifactBound === true,
+      artifactPetrified: e.artifactPetrified === true,
+      artifactSilencedUntilTurn: e.artifactSilencedUntilTurn || 0,
+      artifactConfusedUntilTurn: e.artifactConfusedUntilTurn || 0,
+      artifactDisarmed: e.artifactDisarmed === true,
+      artifactRangedDisarmed: e.artifactRangedDisarmed === true,
+      artifactFearAuraOnly: e.artifactFearAuraOnly === true,
+      artifactFearAuraCheckedTurn: e.artifactFearAuraCheckedTurn ?? -1,
+      artifactSoulGhost: e.artifactSoulGhost === true,
       meleeHitXpGranted: Number.isInteger(e.meleeHitXpGranted) ? Math.max(0, e.meleeHitXpGranted) : 0,
       combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,

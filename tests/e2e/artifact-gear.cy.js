@@ -218,6 +218,93 @@ describe('Gear bases on procedural artifacts', () => {
   })
 
 
+  it('keeps enemy artifact debuffs and bravery charge through current save/replay', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const t=ENEMY_TEMPLATE_BY_NAME.Goblin
+      const victim=addEnemy({...t,id:'artifact-batch2-check',name:'Goblin',baseName:'Goblin',
+        level:currentZ,levelKind:currentLevelKind(),x:player.x+1,y:player.y,
+        alive:true,hp:100,maxHp:100,atk:10,def:10,spd:8,aggro:6,
+        artifactSunderStacks:3,artifactBlindAtkPenalty:2,
+        artifactBlindAggroPenalty:true,artifactSlowUntilTurn:turnCount+3})
+      player.artifactBraveryCharge=true
+      player.artifactRiposteReady=true;player.artifactRetributionStored=14
+      player.artifactBloodReservoirStored=2.5;player.artifactPainEaterHits=3
+      player.artifactRhythmGuardReady=true;player.artifactEvasionPrepared=true
+      player.artifactSacredReadyTurn=turnCount+7
+      player.artifactLastStandCooldownUntil=turnCount+40
+      player.artifactBoneplateExpiries=[turnCount+3,turnCount+6]
+      victim.artifactExecutionerUsed=true;victim.artifactBound=true
+      player.artifactElusiveReady=true;player.artifactMartialEvasionPending=true
+      const before={def:enemyDef(victim),atk:enemyAtk(victim),aggro:enemyAggroRange(victim),spd:enemySpd(victim)}
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      check(saved.enemies.find(e=>e.id===victim.id).aggro===6,'save raw AGGRO')
+      loadGameFromObject(saved,{isReplayInit:true})
+      const restored=enemies.find(e=>e.id===victim.id)
+      check(restored && enemyDef(restored)===before.def && enemyAtk(restored)===before.atk &&
+        enemyAggroRange(restored)===before.aggro && enemySpd(restored)===before.spd,
+        'status does not stack twice after restoration')
+      check(restored.artifactExecutionerUsed===true && restored.artifactBound===true,
+        'Executioner and Binding retain enemy-local markers')
+      check(player.artifactBraveryCharge===true,'Bravery charge survives replay state')
+      check(player.artifactRiposteReady===true && player.artifactRetributionStored===14 &&
+        player.artifactBloodReservoirStored===2.5 && player.artifactPainEaterHits===3,
+        'martial and damage-event charges survive the save')
+      check(player.artifactRhythmGuardReady===true && player.artifactEvasionPrepared===true &&
+        player.artifactSacredReadyTurn===turnCount+7 &&
+        player.artifactLastStandCooldownUntil===turnCount+40 &&
+        JSON.stringify(player.artifactBoneplateExpiries)===JSON.stringify([turnCount+3,turnCount+6]),
+        'ward cooldowns and independent Boneplate expiries survive the save')
+      check(player.artifactElusiveReady===true && player.artifactMartialEvasionPending===true,
+        'free-step and sidestep state survives the save')
+    })()`))
+  })
+
+  it('retains enemy control and fear-source fields in saves and the shared ability pool', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const abilities=ARTIFACT_ABILITIES.abilities
+      const expected=['petrifying_strike','silence','confusion','disarm','taunt',
+        'fear_aura','fear_eater','executioners_aura']
+      for(const id of expected) if(!abilities[id]?.enabled)throw Error('Missing ability '+id)
+      const target=enemies.find(e=>e.alive&&onCurrentLevel(e))
+      if(!target)throw Error('Missing test enemy')
+      target.artifactPetrified=true
+      target.artifactSilencedUntilTurn=turnCount+4
+      target.artifactConfusedUntilTurn=turnCount+4
+      target.artifactDisarmed=true
+      target.artifactRangedDisarmed=true
+      target.artifactFearAuraOnly=true
+      target.artifactFearAuraCheckedTurn=turnCount
+      const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      const restored=enemies.find(e=>e.id===target.id)
+      if(!restored?.artifactPetrified||!restored.artifactDisarmed||!restored.artifactRangedDisarmed||
+         restored.artifactSilencedUntilTurn!==turnCount+4||
+         restored.artifactConfusedUntilTurn!==turnCount+4||
+         !restored.artifactFearAuraOnly||restored.artifactFearAuraCheckedTurn!==turnCount)
+        throw Error('Control and fear state lost during save/replay restoration')
+    })()`))
+  })
+
+  it('keeps Soul Eater ghosts and independent Soul Fed stacks in current saves', () => {
+    cy.window().then(win => win.eval(`(() => {
+      if (!ARTIFACT_ABILITIES.abilities.soul_eater?.enabled) throw Error('Soul Eater missing')
+      player.equip.weapon={kind:'artifact',artifactSlot:'weapon',name:'Soul Eater',
+        base:'Dagger',identified:true,abilityId:'soul_eater'}
+      player.artifactSoulFedExpiries=[turnCount+20,turnCount+90]
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      if(JSON.stringify(saved.player.artifactSoulFedExpiries)!==JSON.stringify(player.artifactSoulFedExpiries))
+        throw Error('Soul Fed stack durations not saved')
+      const enemy=enemies.find(e=>e.alive&&onCurrentLevel(e))
+      if(!enemy)throw Error('No fixture enemy')
+      enemy.artifactSoulGhost=true
+      const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      if(!enemies.find(e=>e.id===enemy.id)?.artifactSoulGhost || artifactSoulFedStacks()!==2)
+        throw Error('Soul Eater state lost during save/replay restoration')
+    })()`))
+  })
+
   for (const width of [1440,390]) it('displays granted powers and inspection text at '+width+'px', () => {
     cy.viewport(width,900)
     cy.window().then(win=>win.eval(`(() => {

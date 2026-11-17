@@ -2509,6 +2509,16 @@ more difficult:
     return activeArtifactAbilities().has(id)
   }
 
+  function playerKnowsArtifactAbility(id) {
+    let known = false
+    forEachActiveArtifact(item => {if (item.identified && item.abilityId === id) known = true})
+    return known
+  }
+
+  function artifactAbilityMessage(id, named, hidden) {
+    log(playerKnowsArtifactAbility(id) ? named : hidden, 'good')
+  }
+
   function artifactInspectionText(item) {
     const ability = artifactAbilityDefinition(item)
     return [item.description, ability && `${ability.name}: ${ability.description}`].filter(Boolean).join('\n')
@@ -2518,10 +2528,323 @@ more difficult:
   // voluntary moves, forced movement, teleportation, and global-Z changes.
   function markPlayerPositionChanged() {
     player.lastPositionChangeTurn = turnCount
+    // Binding belongs to the victim, not to its source weapon. Every real
+    // relocation breaks every binding the player has created, on any level.
+    for (const enemy of enemies) if (enemy.artifactBound) enemy.artifactBound = false
   }
 
   function playerHeldPosition() {
     return turnCount > (player.lastPositionChangeTurn ?? -2) + 1
+  }
+
+  // The same stationary check drives Brace and Deadeye. Only actual tile
+  // changes reset it; animation and UI input never affect this state.
+  function artifactRule(id, key) {
+    return ARTIFACT_ABILITIES?.abilities?.[id]?.[key]
+  }
+
+  function slowedCombatSpeed(speed) {
+    return Math.max(1, speed - Math.max(1, Math.ceil(Math.max(1, speed) * 0.10)))
+  }
+
+  function enemySlowed(e) {
+    return (e.artifactSlowUntilTurn || 0) > turnCount
+  }
+
+  function applyArtifactSlow(e, source = 'strike') {
+    if (!e.alive || e.hp <= 0) return false
+    const duration = artifactRule(source === 'arrow' ? 'crippling_shot' : 'slow', 'duration') || 3
+    const wasSlowed = enemySlowed(e)
+    // +1 accounts for the reaction turn immediately following the strike.
+    e.artifactSlowUntilTurn = turnCount + duration + 1
+    if (enemyIsVisibleOnMainView(e)) {
+      log(wasSlowed ? `The ${e.name} remains slowed.` :
+        `${source === 'arrow' ? 'Your arrow' : 'Your strike'} slows the ${e.name}!`, 'good')
+      if (!wasSlowed) spawnDamageNumber(e.x, e.y, 'Slowed!', '#a9c6dd')
+    }
+    return true
+  }
+
+  function artifactStrongEnemy(e) {
+    // Existing strength sum (ATK/DEF/SPD/GRACE) is also used by bow AI.
+    // Never feed the Bravery damage multiplier back into this comparison.
+    return monsterStrength({atk:enemyAtk(e), def:enemyDef(e), spd:enemySpd(e),
+      grace:enemyGrace(e) || 0}) > monsterStrength({atk:playerAtk(),def:playerDef(),
+      spd:playerSpd(),grace:playerGrace()})
+  }
+
+  function martialBraveryActive(e) {
+    if (!playerHasArtifactAbility('martial_bravery')) return false
+    return artifactStrongEnemy(e) || enemies.filter(other => other.alive && other.hp > 0 &&
+      onCurrentLevel(other) && Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y)) === 1).length >= 3
+  }
+
+  function artifactMeleeDamageMultiplier(e) {
+    let modifier = 1
+    if (playerHasArtifactAbility('enrage') && player.hp > 0 &&
+        player.hp < playerMaxHp() * 0.30) modifier *= ENRAGE_ATTACK_MULTIPLIER
+    if (martialBraveryActive(e)) modifier *= 1 + artifactRule('martial_bravery','damageBonus')
+    return modifier
+  }
+
+  // Direct strikes are the only trigger for these powers. Cleave and Soulburst
+  // deliberately bypass this hook to avoid explosive proc chains and extra XP.
+  function artifactOnLandedMeleeStrike(e, beforeHp, damage) {
+    if (e.hp <= 0 || !e.alive) return false
+    if (playerHasArtifactAbility('binding') && !e.artifactBound) {
+      e.artifactBound = true
+      artifactAbilityMessage('binding', `Your strike binds the ${e.name}!`,
+        `The ${e.name} is unable to flee!`)
+    }
+    if (damage > 0 && playerHasArtifactAbility('martial_evasion') &&
+        !player.artifactMartialEvasionPending && chance(artifactRule('martial_evasion','chance')))
+      player.artifactMartialEvasionPending = true
+    if (damage > 0 && playerHasArtifactAbility('executioner') && !e.artifactExecutionerUsed &&
+        beforeHp > e.maxHp * artifactRule('executioner','threshold') &&
+        e.hp <= e.maxHp * artifactRule('executioner','threshold')) {
+      // A marker on the victim is immune to weapon swaps or GRACE recursion.
+      e.artifactExecutionerUsed = true
+      return true
+    }
+    return false
+  }
+
+  // Additional targets take their own DEF reduction and one ordinary seeded
+  // damage roll. A splash is never another direct weapon hit.
+  function artifactSplashDamage(target, strength, cause, message) {
+    if (!target.alive || target.hp <= 0 || !onCurrentLevel(target)) return
+    const damage = damageRoll(strength, twoHandedDefence(enemyDef(target)))
+    target.hp -= damage
+    absorbEnemyFatalHit(target)
+    spawnDamageNumber(target.x,target.y,damage,RENDER_STYLE.damage.enemyHit)
+    if (enemyIsVisibleOnMainView(target)) log(`${message} ${target.name} for ${damage} damage!`, 'good')
+    if (target.hp <= 0) killEnemy(target,true,cause)
+    else {
+      triggerEnemyShellRetreat(target)
+      alarmEnemy(target)
+    }
+  }
+
+  function artifactCleave(primary, damage) {
+    if (!playerHasArtifactAbility('cleave') || damage <= 0) return
+    const strength = damage * artifactRule('cleave','damageFraction')
+    // Snapshot eligible targets before the first side hit can kill an actor.
+    const targets = enemies.filter(other => other !== primary && other.alive && other.hp > 0 &&
+      onCurrentLevel(other) && Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y)) === 1 &&
+      Math.max(Math.abs(other.x-primary.x),Math.abs(other.y-primary.y)) === 1)
+    for (const other of targets) artifactSplashDamage(other,strength,'cleave','Your cleave strikes the')
+  }
+
+  function artifactSoulburst(victim, killingDamage) {
+    if (!playerHasArtifactAbility('soulburst') || killingDamage <= 0) return
+    const radius = artifactRule('soulburst','radius')
+    const strength = killingDamage * artifactRule('soulburst','damageFraction')
+    const targets = enemies.filter(other => other.alive && other.hp > 0 &&
+      onCurrentLevel(other) && Math.max(Math.abs(other.x-victim.x),Math.abs(other.y-victim.y)) <= radius &&
+      UndergroundFov.canSee(map,victim.x,victim.y,other.x,other.y))
+    if (enemyIsVisibleOnMainView(victim))
+      artifactAbilityMessage('soulburst',`Soulburst erupts from the ${victim.name}!`,
+        `A violent shockwave bursts from the ${victim.name}!`)
+    for (const other of targets) artifactSplashDamage(other,strength,'soulburst','The blast strikes the')
+  }
+
+  function artifactDeathVeil() {
+    if (!playerHasArtifactAbility('death_veil') || player.invisibleTurns <= 0 || player.godMode) return
+    player.invisibleTurns += artifactRule('death_veil','duration')
+    artifactAbilityMessage('death_veil','Death Veil deepens your invisibility!',
+      'The shadows cling to you a little longer!')
+  }
+
+  // Control statuses use the same combat/hazard/death paths as normal turns.
+  // Absolute expiration makes off-level actors deterministic across saves.
+  function artifactControlEnemy(e, id, field) {
+    if (!playerHasArtifactAbility(id) || !chance(artifactRule(id,'chance'))) return false
+    if (id === 'petrifying_strike') {
+      if (e.artifactPetrified) return false
+      e.artifactPetrified = true
+      cancelPreparedEnemyAbility(e)
+    } else {
+      const until = turnCount + artifactRule(id,'duration') + 1
+      e[field] = Math.max(e[field] || 0,until)
+    }
+    if (enemyIsVisibleOnMainView(e)) {
+      const label = id === 'petrifying_strike' ? 'Petrified!' : id === 'silence' ? 'Silenced!' : 'Confused!'
+      log(`The ${e.name} is ${label.slice(0,-1).toLowerCase()}!`, 'good')
+      spawnDamageNumber(e.x,e.y,label,'#c6a6dd')
+    }
+    return true
+  }
+
+  // Humanoids currently equip one physical item, but archers may also carry
+  // a modeled bow. Treat both as eligible armaments without manufacturing
+  // copies of already-dropped equipment or selecting the same item twice.
+  function artifactDisarmCandidates(e) {
+    const candidates = []
+    const physical = e.equipment
+    const slot = physical?.kind === 'artifact' ? physical.artifactSlot : physical?.kind
+    if (slot === 'weapon' || slot === 'shield')
+      candidates.push({item:physical, modeledBow:false})
+    if (e.humanoid && e.shooterAbility === 'shooterArrows' &&
+        e.shotsRemaining > 0 && !e.artifactRangedDisarmed &&
+        !e.equipment?.rangedAtk)
+      candidates.push({item:null, modeledBow:true})
+    return candidates
+  }
+
+  function artifactDisarmEnemy(e) {
+    if (!playerHasArtifactAbility('disarm')) return false
+    const candidates = artifactDisarmCandidates(e)
+    if (!candidates.length || !chance(artifactRule('disarm','chance'))) return false
+    const chosen = candidates.length === 1 ? candidates[0] : pick(candidates)
+    const item = chosen.item || makeBowItem('Short Bow',0,e.tier || 1,true)
+    if (!chosen.modeledBow) {
+      const held = e.equipment
+      removeEnemyEquipmentBonuses(e)
+      e.maxHp = Math.max(1,e.maxHp)
+      e.hp = Math.max(1,Math.min(e.maxHp,e.hp))
+      e.equipment = null
+      e.gearBonuses = null
+      if (e.stolenItem === held) e.stolenItem = null
+      e.stolenItemEquipped = false
+    }
+    // Losing a shield or melee weapon must not magically disable the
+    // separately modeled archer bow. Losing the bow must disable shooting.
+    if (chosen.modeledBow || item.rangedAtk) {
+      e.artifactRangedDisarmed = true
+      e.shooterMode = 'melee'
+    }
+    e.artifactDisarmed = true
+    // If no safe adjacent tile exists, the item stays beneath its owner.
+    const spaces = DIRS8.map(([dx,dy])=>({x:e.x+dx,y:e.y+dy})).filter(pos =>
+      enemyTileOpen(e,pos.x,pos.y) &&
+      (currentZ !== 0 || !npcs.some(n=>n.x===pos.x&&n.y===pos.y)))
+    const spot = spaces.length ? pick(spaces) : {x:e.x,y:e.y}
+    placeEnemyLootOnGround({...e,x:spot.x,y:spot.y},item)
+    if (enemyIsVisibleOnMainView(e)) {
+      log(`You knock the ${item.base || item.name} from the ${e.name}'s grip!`, 'good')
+      spawnDamageNumber(e.x,e.y,'Disarmed!','#d8bd92')
+    }
+    return true
+  }
+
+  function artifactFearAuraOnFleeStep(source) {
+    if (!playerHasArtifactAbility('fear_aura') || source.artifactFearAuraOnly ||
+        !onCurrentLevel(source) || source.fearTurns <= 0) return
+    for (const other of enemies) {
+      if (other === source || !other.alive || other.hp <= 0 || !onCurrentLevel(other) ||
+          Math.max(Math.abs(other.x-source.x),Math.abs(other.y-source.y)) > 1 ||
+          other.artifactFearAuraCheckedTurn === turnCount) continue
+      // One seeded attempt per candidate per player turn, never per fleeing enemy.
+      other.artifactFearAuraCheckedTurn = turnCount
+      if (chance(artifactRule('fear_aura','chance')) &&
+          applyEnemyFear(other,artifactRule('fear_aura','duration'),'fear_aura') &&
+          enemyIsVisibleOnMainView(other)) log(`Fear spreads to the ${other.name}!`, 'good')
+    }
+  }
+
+  function artifactExecutionersAura(victim,beforeHp) {
+    if (!playerHasArtifactAbility('executioners_aura') || beforeHp !== victim.maxHp ||
+        !onCurrentLevel(victim)) return
+    for (const other of enemies) {
+      if (!other.alive || other.hp <= 0 || !onCurrentLevel(other) ||
+          Math.max(Math.abs(other.x-victim.x),Math.abs(other.y-victim.y)) >
+            artifactRule('executioners_aura','radius')) continue
+      if (chance(artifactRule('executioners_aura','chance')) &&
+          applyEnemyFear(other,artifactRule('executioners_aura','duration')) &&
+          enemyIsVisibleOnMainView(other)) log(`The ${other.name} recoils from the killing blow!`, 'good')
+    }
+  }
+
+  function artifactConfusedEnemyAction(e) {
+    if ((e.artifactConfusedUntilTurn || 0) <= turnCount) return false
+    const roll = rng()
+    if (roll < 0.5) return false
+    if (roll < 0.75) {
+      const spots = DIRS8.map(([dx,dy])=>({x:e.x+dx,y:e.y+dy})).filter(pos=>
+        enemyTileOpen(e,pos.x,pos.y) &&
+        (currentZ !== 0 || !npcs.some(n=>n.x===pos.x&&n.y===pos.y)))
+      if (!spots.length) return true
+      const step=pick(spots)
+      if (enemyOpenDoorInsteadOfMove(e,step.x,step.y)) return true
+      const fromX=e.x, fromY=e.y
+      occupied.delete(keyXY(fromX,fromY))
+      e.x=step.x;e.y=step.y
+      occupied.add(keyXY(e.x,e.y))
+      finishEnemyMove(e,fromX,fromY)
+      return true
+    }
+    const others=enemies.filter(other=>other!==e && other.alive && other.hp>0 &&
+      onCurrentLevel(other) && Math.max(Math.abs(other.x-e.x),Math.abs(other.y-e.y))===1)
+    if (!others.length) return true
+    const target=pick(others)
+    const damage=damageRoll(enemyAtk(e),twoHandedDefence(enemyDef(target)),e)
+    target.hp-=damage
+    absorbEnemyFatalHit(target)
+    spawnDamageNumber(target.x,target.y,damage,RENDER_STYLE.damage.enemyHit)
+    if (enemyIsVisibleOnMainView(e) || enemyIsVisibleOnMainView(target))
+      log(`The confused ${e.name} attacks the ${target.name} for ${damage} damage!`, 'info')
+    if (target.hp<=0) killEnemy(target,false,'confusion')
+    else {breakEnemyFear(target);triggerEnemyShellRetreat(target);alarmEnemy(target)}
+    return true
+  }
+
+  function applyArtifactMeleeStatuses(e, damage) {
+    if (damage <= 0 || e.hp <= 0 || !e.alive) return
+    artifactControlEnemy(e,'petrifying_strike')
+    artifactControlEnemy(e,'silence','artifactSilencedUntilTurn')
+    artifactControlEnemy(e,'confusion','artifactConfusedUntilTurn')
+    // Check eligibility before consuming RNG for physical disarm.
+    artifactDisarmEnemy(e)
+    if (playerHasArtifactAbility('slow') && chance(artifactRule('slow','chance'))) applyArtifactSlow(e)
+    if (playerHasArtifactAbility('poison') && chance(artifactRule('poison','chance')))
+      applyPlayerVenomToEnemy(e)
+    if (playerHasArtifactAbility('sunder')) {
+      const previous = e.artifactSunderStacks || 0
+      e.artifactSunderStacks = Math.min(artifactRule('sunder','maxStacks'), previous + 1)
+      if (e.artifactSunderStacks !== previous && enemyIsVisibleOnMainView(e)) {
+        log(`Your strike sunders the ${e.name}'s defenses! (DEF −${e.artifactSunderStacks})`, 'good')
+        spawnDamageNumber(e.x, e.y, 'Sunder!', '#e7b677')
+      }
+    }
+    if (playerHasArtifactAbility('blindness') && chance(artifactRule('blindness','chance'))) {
+      // AGGRO is lowered just once; further procs reduce ATK, never duration.
+      const attackDown = e.artifactBlindAtkPenalty || 0
+      const lowerAggro = !e.artifactBlindAggroPenalty && enemyAggroRange(e) > 1 && chance(.5)
+      if (lowerAggro) e.artifactBlindAggroPenalty = true
+      else if (attackDown < artifactRule('blindness','maxAtkPenalty') && e.atk - attackDown > 1)
+        e.artifactBlindAtkPenalty = attackDown + 1
+      else return
+      if (enemyIsVisibleOnMainView(e)) {
+        log(`Your strike blinds the ${e.name}, weakening its ${lowerAggro ? 'awareness' : 'attack'}!`, 'good')
+        spawnDamageNumber(e.x, e.y, 'Blinded!', '#b4abd9')
+      }
+    }
+  }
+
+  // Forced knockback shares normal enemy tile legality and on-entry effects.
+  // It may not cross obstacles/actors or connect two different Z levels.
+  function enemyKnockbackTileOpen(e,x,y) {
+    // Unlike deliberate ethereal movement, knockback must never pass walls.
+    return (isWalkable(x,y) || (map[y]?.[x] === 'water' && enemyCanTraverse(e,x,y))) &&
+      enemyCanTraverse(e,x,y) && enemyTileOpen(e,x,y) && !enemySanctuaryTileForbidden(e,x,y)
+  }
+
+  function pushEnemyFromPlayer(e, source = 'critical strike') {
+    if (!e.alive || e.hp <= 0 || !onCurrentLevel(e)) return false
+    const dx=Math.sign(e.x-player.x), dy=Math.sign(e.y-player.y)
+    if (!dx && !dy) return false
+    const x=e.x+dx,y=e.y+dy
+    if (!enemyKnockbackTileOpen(e,x,y) ||
+        (dx && dy && (!enemyKnockbackTileOpen(e,e.x+dx,e.y) ||
+          !enemyKnockbackTileOpen(e,e.x,e.y+dy)))) return false
+    const fromX=e.x,fromY=e.y
+    occupied.delete(keyXY(fromX,fromY))
+    e.x=x;e.y=y
+    occupied.add(keyXY(x,y))
+    e.farPath=null
+    log(`Your ${source} knocks the ${e.name} back!`, 'good')
+    finishEnemyMove(e,fromX,fromY)
+    return true
   }
 
   function playerArtifactDefenseBonus(baseDefense) {
@@ -2535,7 +2858,172 @@ more difficult:
     if (active.has('hold_the_line'))
       bonus += Math.min(3, enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1).length)
+    if (active.has('boneplate')) bonus += artifactBoneplateStacks()
+    if (active.has('plague_mail')) bonus += enemies.filter(e => e.alive && e.hp > 0 &&
+      onCurrentLevel(e) && e.poisonTurns > 0 &&
+      Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) <= artifactRule('plague_mail','radius')).length
     return bonus
+  }
+
+  // Artifact charges belong to the character, not a gear instance: exchanging
+  // equipment cannot instantly refill a ward or duplicate a stored charge.
+  function artifactSoulFedStacks() {
+    // Independent absolute expiry per kill: no shared timer and no stack cap.
+    return (player.artifactSoulFedExpiries || []).filter(expiry => expiry > turnCount).length
+  }
+
+  function awardArtifactSoulFed() {
+    const duration = artifactRule('soul_eater','soulFedDuration')
+    player.artifactSoulFedExpiries.push(turnCount + duration + 1)
+    if (playerKnowsArtifactAbility('soul_eater'))
+      log(`Soul Fed strengthens you! (+${artifactSoulFedStacks()} ATK)`, 'good')
+    else log('A defeated spirit leaves you stronger.', 'good')
+    spawnDamageNumber(player.x,player.y,'+1 ATK','#b9d5cf')
+  }
+
+  function artifactBoneplateStacks() {
+    return (player.artifactBoneplateExpiries || []).filter(expiry => expiry > turnCount).length
+  }
+
+  function artifactLastStandActive() {
+    return playerHasArtifactAbility('last_stand') && (player.artifactLastStandUntilTurn || 0) > turnCount
+  }
+
+  function artifactOnEnemyDeath(e) {
+    if (!playerHasArtifactAbility('boneplate') || !onCurrentLevel(e) ||
+        Math.max(Math.abs(player.x-e.x), Math.abs(player.y-e.y)) > artifactRule('boneplate','radius')) return
+    const remaining = (player.artifactBoneplateExpiries || []).filter(expiry => expiry > turnCount)
+    if (remaining.length >= artifactRule('boneplate','maxStacks')) return
+    remaining.push(turnCount + artifactRule('boneplate','duration') + 1)
+    player.artifactBoneplateExpiries = remaining
+    artifactAbilityMessage('boneplate', 'Boneplate hardens from nearby death.',
+      'Nearby death hardens your armor.')
+    spawnDamageNumber(player.x, player.y, '+1 DEF', '#b9bac8')
+  }
+
+  // This is the sole HP-loss accounting hook for effects which react to
+  // damage, including poison, terrain hazards, self-damage and attack costs.
+  // Ward mitigation occurs before HP is removed and never touches this hook.
+  function artifactRecordHpLoss(previousHp) {
+    const lost = Math.min(Math.max(0, previousHp), Math.max(0, previousHp - player.hp))
+    if (lost <= 0) return
+    if (playerHasArtifactAbility('retribution'))
+      player.artifactRetributionStored = (player.artifactRetributionStored || 0) + lost
+    if (playerHasArtifactAbility('blood_reservoir'))
+      player.artifactBloodReservoirStored = Math.min(playerMaxHp() * artifactRule('blood_reservoir','capacity'),
+        (player.artifactBloodReservoirStored || 0) + lost * artifactRule('blood_reservoir','fraction'))
+    if (playerHasArtifactAbility('pain_eater'))
+      player.artifactPainEaterHits = (player.artifactPainEaterHits || 0) + 1
+    const threshold = playerMaxHp() * artifactRule('last_stand','hpThreshold')
+    if (playerHasArtifactAbility('last_stand') && previousHp > threshold && player.hp > 0 &&
+        player.hp <= threshold && turnCount >= (player.artifactLastStandCooldownUntil || 0)) {
+      player.artifactLastStandUntilTurn = turnCount + artifactRule('last_stand','duration') + 1
+      player.artifactLastStandCooldownUntil = turnCount + artifactRule('last_stand','cooldown')
+      artifactAbilityMessage('last_stand', 'Last Stand steels you against further blows!',
+        'You steel yourself against further blows!')
+      spawnDamageNumber(player.x, player.y,
+        playerKnowsArtifactAbility('last_stand') ? 'Last Stand!' : 'Guarded!', '#d6bb84')
+    }
+  }
+
+  // Return the effective HP loss before Death Shield resolves. Sources not
+  // considered direct attacks still call this for charging pain-based powers.
+  function artifactLosePlayerHp(amount, {directHit = false, cost = false} = {}) {
+    if (!(amount > 0)) return 0
+    // Last Stand protects against environmental/periodic damage too. Direct
+    // hits already pass its reduction in artifactIncomingHit; HP costs never do.
+    const reduced = !directHit && !cost && artifactLastStandActive()
+      ? Math.floor(amount * (1 - artifactRule('last_stand','damageReduction'))) : amount
+    if (!reduced) return 0
+    const before = player.hp
+    player.hp = Math.max(0, player.hp - reduced)
+    artifactRecordHpLoss(before)
+    return Math.min(Math.max(0,before), reduced)
+  }
+
+  // Melee and projectile attacks share mitigation. Periodic/environmental HP
+  // loss bypasses these shields, but still feeds the common HP-loss hook.
+  function artifactIncomingHit(rawDamage) {
+    if (rawDamage <= 0) return {damage:rawDamage,evaded:false,absorbed:false}
+    if (player.artifactEvasionPrepared && playerHasArtifactAbility('bulwark_evasion')) {
+      player.artifactEvasionPrepared = false
+      if (chance(artifactRule('bulwark_evasion','chance'))) {
+        log('You evade the incoming blow!', 'good')
+        spawnDamageNumber(player.x,player.y,'Evaded!','#aadbe2')
+        return {damage:0,evaded:true,absorbed:false}
+      }
+    }
+    if (playerHasArtifactAbility('sacred_aegis') &&
+        turnCount >= (player.artifactSacredReadyTurn || 0)) {
+      player.artifactSacredReadyTurn = turnCount + artifactRule('sacred_aegis','cooldown')
+      artifactAbilityMessage('sacred_aegis', 'Sacred Aegis absorbs the blow!',
+        'A protective ward absorbs the blow!')
+      spawnDamageNumber(player.x,player.y,
+        playerKnowsArtifactAbility('sacred_aegis') ? 'Aegis!' : 'Ward!', '#c9dfff')
+      return {damage:0,evaded:false,absorbed:true}
+    }
+    let damage = rawDamage
+    if (artifactLastStandActive()) damage = Math.floor(damage * (1 - artifactRule('last_stand','damageReduction')))
+    if (player.artifactRhythmGuardReady && playerHasArtifactAbility('rhythm_guard')) {
+      player.artifactRhythmGuardReady = false
+      damage = Math.floor(damage * (1 - artifactRule('rhythm_guard','damageReduction')))
+      artifactAbilityMessage('rhythm_guard', 'Rhythm Guard absorbs part of the impact!',
+        'A prepared guard absorbs part of the impact!')
+    }
+    return {damage,evaded:false,absorbed:false}
+  }
+
+  function artifactOnPlayerAttack() {
+    if (playerHasArtifactAbility('bulwark_evasion')) player.artifactEvasionPrepared = true
+    player.artifactMartialEvasionPending = false
+    player.artifactRhythmHitsThisAction = 0
+    // Pain Eater spends its charge on any attack, including misses; copy the
+    // current count so Blood Pact can charge the *next* attack instead.
+    player.artifactPainAttackBonus = playerHasArtifactAbility('pain_eater')
+      ? player.artifactPainEaterHits || 0 : 0
+    player.artifactPainEaterHits = 0
+  }
+
+  function artifactMeleeHitBonuses(damage) {
+    let result = damage
+    // All prepared bonuses are snapshotted before Blood Pact creates new pain.
+    const riposte = player.artifactRiposteReady && playerHasArtifactAbility('riposte')
+    const retribution = playerHasArtifactAbility('retribution') ? player.artifactRetributionStored || 0 : 0
+    const reservoir = playerHasArtifactAbility('blood_reservoir') ? player.artifactBloodReservoirStored || 0 : 0
+    if (riposte) result = Math.round(result * (1 + artifactRule('riposte','damageBonus')))
+    result += Math.floor(retribution * artifactRule('retribution','returnedFraction')) +
+      Math.floor(reservoir) + (player.artifactPainAttackBonus || 0)
+    player.artifactRiposteReady = false
+    player.artifactRetributionStored = 0
+    player.artifactBloodReservoirStored = 0
+    player.artifactPainAttackBonus = 0
+    return result
+  }
+
+  function artifactOnDirectPlayerHit() {
+    if (!playerHasArtifactAbility('rhythm_guard')) return
+    player.artifactRhythmHitsThisAction = (player.artifactRhythmHitsThisAction || 0) + 1
+    if (player.artifactRhythmHitsThisAction === 2) {
+      player.artifactRhythmGuardReady = true
+      artifactAbilityMessage('rhythm_guard', 'Rhythm Guard is ready!',
+        'Your rhythm prepares a guard!')
+    }
+  }
+
+  function artifactShieldBash(e) {
+    if (!playerHasArtifactAbility('shield_bash') || !player.equip.shield || !e.alive ||
+        !onCurrentLevel(e) || Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y)) !== 1 ||
+        !chance(artifactRule('shield_bash','chance'))) return false
+    const wasEnraged = enemyIsEnraged(e)
+    const damage = damageRoll(playerDef() * artifactRule('shield_bash','defFraction'), enemyDef(e))
+    e.hp -= damage
+    absorbEnemyFatalHit(e)
+    spawnDamageNumber(e.x,e.y,damage,RENDER_STYLE.damage.enemyHit)
+    log(`You bash the ${e.name} with your shield for ${damage} damage!`, 'good')
+    logEnemyEnrageTransition(e,wasEnraged)
+    if (e.hp <= 0) killEnemy(e,true,'shieldbash')
+    else pushEnemyFromPlayer(e,'shield bash')
+    return true
   }
 
   function playerBowRange(bow = equippedShortBow()) {
@@ -2786,7 +3274,7 @@ more difficult:
     const type = pick(it.curse.types)
     if (type === 'hp') {
       const amt = randInt(1, 3)
-      player.hp = Math.max(1, player.hp - amt)
+      artifactLosePlayerHp(Math.min(Math.max(0,player.hp - 1),amt))
       log(curseLine('hp', it, amt), 'bad')
       checkPlayerHealthWarning()
     } else if (type === 'gold') {
@@ -2881,13 +3369,18 @@ more difficult:
     return e?.shooterAbility === 'shooterArrows'
   }
 
+  function removeEnemyEquipmentBonuses(e) {
+    if (!e.gearBonuses) return
+    for (const [stat,amount] of Object.entries(e.gearBonuses))
+      if (['atk','def','spd','hp','maxHp'].includes(stat) && Number.isFinite(amount))
+        e[stat] -= amount
+  }
+
   function removeInvalidEnemyBow(e) {
     if (!e?.equipment?.rangedAtk || enemyCanEquipBow(e)) return false
     // Restore the unmodified monster stats when a saved enemy carries a bow
     // it cannot use. This also applies to current-version replay snapshots.
-    if (e.gearBonuses) for (const [stat, bonus] of Object.entries(e.gearBonuses)) {
-      if (['atk', 'def', 'spd', 'hp', 'maxHp'].includes(stat) && Number.isFinite(bonus)) e[stat] -= bonus
-    }
+    removeEnemyEquipmentBonuses(e)
     e.hp = Math.max(1, Math.min(e.hp, e.maxHp))
     e.equipment = null
     e.gearBonuses = null
@@ -2898,7 +3391,7 @@ more difficult:
   function applyEnemyEquipment(e, item) {
     if (!e || !item || (item.rangedAtk && !enemyCanEquipBow(e))) return false
     initializeEnemyGearScale(e)
-    if (e.gearBonuses) for (const [stat, value] of Object.entries(e.gearBonuses)) e[stat] -= value
+    removeEnemyEquipmentBonuses(e)
     const before = {atk:e.atk, def:e.def, spd:e.spd, hp:e.hp, maxHp:e.maxHp}
     e.equipment = item
     e.stolenItemEquipped = item === e.stolenItem
@@ -3055,6 +3548,15 @@ more difficult:
     permadeath: false,
     curseDebuffs: [],
     lastPositionChangeTurn: -2,
+    artifactBraveryCharge: false,
+    artifactRiposteReady: false, artifactRetributionStored: 0,
+    artifactBloodReservoirStored: 0, artifactPainEaterHits: 0,
+    artifactPainAttackBonus: 0, artifactRhythmHitsThisAction: 0,
+    artifactRhythmGuardReady: false, artifactEvasionPrepared: false,
+    artifactMartialEvasionPending: false, artifactElusiveReady: false,
+    artifactLastStandUntilTurn: 0, artifactLastStandCooldownUntil: 0,
+    artifactSacredReadyTurn: 0, artifactBoneplateExpiries: [],
+    artifactSoulFedExpiries: [],
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
@@ -3091,8 +3593,15 @@ more difficult:
       if (it.mod === 'atk') a += it.modAmt
     }
     a += artifactBonusSum('atk') + (permanent ? 0 : curseDebuffSum('atk'))
+    if (!permanent) a += artifactSoulFedStacks()
     if (!permanent && !excludePotions && player.berserkTurns > 0) a += player.berserkBonus
     if (!permanent && player.mummyCurseTurns > 0) a -= 2
+    if (!permanent && playerHasArtifactAbility('fear_eater')) {
+      const terrified = enemies.filter(e=>e.alive && e.hp>0 && onCurrentLevel(e) &&
+        e.fearTurns>0 && Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y)) <=
+          artifactRule('fear_eater','radius') && enemyIsVisibleOnMainView(e)).length
+      a += Math.min(artifactRule('fear_eater','maxBonus'),terrified)
+    }
     return a
   }
 
@@ -3156,7 +3665,7 @@ more difficult:
       s += carriedItemStat('spd')
     }
     if (!permanent && player.slowTurns > 0 && !playerHasArtifactAbility('fleetfoot'))
-      s -= Math.max(1, Math.ceil(Math.max(1, s) * 0.10))
+      s = slowedCombatSpeed(s)
     return s
   }
 
@@ -3242,12 +3751,14 @@ more difficult:
   }
 
   function enemyDef(e) {
-    return Math.max(0, enemyDefensiveBase(e) + enemyTileEffects(e).defense + (inspiringChampionFor(e) ? INSPIRED_DEF : 0))
+    return Math.max(0, enemyDefensiveBase(e) + enemyTileEffects(e).defense +
+      (inspiringChampionFor(e) ? INSPIRED_DEF : 0) - (e.artifactSunderStacks || 0))
   }
 
   function enemySpd(e) {
     const ordinary = Math.max(1, e.spd + enemyTileEffects(e).speed)
-    return ordinary + rareStartledBonus(e, ordinary)
+    const effective = ordinary + rareStartledBonus(e, ordinary)
+    return enemySlowed(e) ? slowedCombatSpeed(effective) : effective
   }
 
   function playerMf() {
@@ -3411,7 +3922,71 @@ more difficult:
 
   function enemyHasAbility(enemy, ability) {
     if (ability === 'ethereal' && enemy?.adaptiveEventId === 'forest_spirit') return false
+    // Binding suppresses these behaviors temporarily; it never edits the
+    // monster's actual ability catalog, so the powers return after movement.
+    if (enemy?.artifactBound && (ability === 'flee' || ability === 'thief')) return false
     return !(ability === 'fly' && enemy?.sleeping) && !!enemy?.abilities?.includes(ability)
+  }
+
+  // Shared monster spawn constructor. The species template supplies natural
+  // abilities and behavior, while explicitly provided stats may override its
+  // combat values. Both ordinary summons and Soul Eater use this path.
+  function createSummonedEnemy(template, source, spot, options = {}) {
+    const strength = options.strength ?? 1
+    const scale = (stat, min = 0) => Math.max(min, Math.round((template[stat] || 0) * strength))
+    const maxHp = options.maxHp ?? scale('hp', 1)
+    const summoned = {
+      name: options.name || template.name, baseName: template.name, tier: template.tier,
+      hp: maxHp, maxHp, atk: options.atk ?? scale('atk', 1),
+      def: options.def ?? scale('def'), spd: options.spd ?? template.spd,
+      grace: options.grace ?? template.grace, aggro: template.aggro,
+      abilities: template.abilities.filter(ability => ability !== 'summon'),
+      humanoid: template.humanoid, x: spot.x, y: spot.y,
+      homeX: spot.x, homeY: spot.y, homeTileType: map[spot.y][spot.x],
+      level: source.level, levelKind: source.levelKind, caveIndex: source.caveIndex,
+      alive: true, aware: true, prefix: null, equipment: null,
+      summonUsed: false, summonedTurn: turnCount,
+      artifactSoulGhost: options.artifactSoulGhost === true,
+    }
+    addEnemy(summoned)
+    alarmEnemy(summoned)
+    occupied.add(keyXY(spot.x, spot.y))
+    spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df', 0, SUMMON_ANIM_MS)
+    return summoned
+  }
+
+  // Use the same placement constraints as normal monster summoning. Soul Eater
+  // additionally requires a floor tile so a spirit cannot appear inside a wall.
+  function summonAdjacentSpots(source, template, requireFloor = false) {
+    return DIRS8.map(([dx,dy]) => ({x:source.x+dx,y:source.y+dy}))
+      .filter(p => enemyCanTraverse(template,p.x,p.y) &&
+        (!requireFloor || isWalkable(p.x,p.y)) &&
+        DungeonTraps.safeSpawn(p.x,p.y,currentZ,currentLevelKind()) &&
+        !(p.x === player.x && p.y === player.y) &&
+        !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === p.x && e.y === p.y) &&
+        !npcs.some(n => currentZ === 0 && n.x === p.x && n.y === p.y))
+  }
+
+  function artifactSoulEaterOnKill(victim) {
+    if (!playerHasArtifactAbility('soul_eater') || !victim.humanoid ||
+        victim.artifactSoulGhost || (victim.baseName || victim.name) === 'Ghost' ||
+        !onCurrentLevel(victim) ||
+        enemies.some(e => e.alive && e.artifactSoulGhost)) return false
+    if (!chance(artifactRule('soul_eater','chance'))) return false
+    const template = ENEMY_TEMPLATE_BY_NAME.Ghost
+    const spots = summonAdjacentSpots(victim,template,true)
+    if (!spots.length) return false
+    const spot = spots[randInt(0,spots.length-1)]
+    const half = (value,min=0) => Math.max(min,Math.round((Number(value) || 0)/2))
+    createSummonedEnemy(template,victim,spot,{
+      name:`ghost of ${victim.name}`,
+      maxHp:half(victim.maxHp,1), atk:half(victim.atk,1),
+      def:half(victim.def),spd:half(victim.spd,1),grace:half(victim.grace),
+      artifactSoulGhost:true,
+    })
+    artifactAbilityMessage('soul_eater',`Soul Eater summons a ghost of ${victim.name}!`,
+      `The spirit of ${victim.name} rises against you!`)
+    return true
   }
 
   const DEFAULT_SUMMON_MSG = 'The <name> waves a hand and mutters incomprehensible words. Moments later, <amount> <species> appear!'
@@ -3423,34 +3998,13 @@ more difficult:
       ? casterTemplate.summonSpeciesOptions[randInt(0, casterTemplate.summonSpeciesOptions.length - 1)]
       : casterTemplate.summonSpecies
     const summonTemplate = ENEMY_TEMPLATE_BY_NAME[summonSpecies]
-    const spots = DIRS8.map(([dx, dy]) => ({x: enemy.x + dx, y: enemy.y + dy}))
-      .filter(p => enemyCanTraverse(summonTemplate, p.x, p.y) &&
-        DungeonTraps.safeSpawn(p.x, p.y, currentZ, currentLevelKind()) &&
-        !(p.x === player.x && p.y === player.y) &&
-        !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === p.x && e.y === p.y) &&
-        !npcs.some(n => currentZ === 0 && n.x === p.x && n.y === p.y))
+    const spots = summonAdjacentSpots(enemy,summonTemplate)
     if (!spots.length) return false
     const amount = Math.min(spots.length, randInt(1, casterTemplate.summonAmount))
     const strength = casterTemplate.summonStrength ?? 1
     for (let i = 0; i < amount; i++) {
       const index = randInt(0, spots.length - 1), spot = spots.splice(index, 1)[0]
-      const hp = Math.max(1, Math.round(summonTemplate.hp * strength))
-      const summoned = {
-        name: summonTemplate.name, baseName: summonTemplate.name, tier: summonTemplate.tier,
-        hp, maxHp: hp, atk: Math.max(1, Math.round(summonTemplate.atk * strength)),
-        def: Math.max(0, Math.round(summonTemplate.def * strength)),
-        spd: summonTemplate.spd, grace: summonTemplate.grace, aggro: summonTemplate.aggro,
-        abilities: summonTemplate.abilities.filter(ability => ability !== 'summon'),
-        humanoid: summonTemplate.humanoid, x: spot.x, y: spot.y,
-        homeX: spot.x, homeY: spot.y, homeTileType: map[spot.y][spot.x],
-        level: enemy.level, levelKind: enemy.levelKind, caveIndex: enemy.caveIndex,
-        alive: true, aware: true, prefix: null, equipment: null,
-        summonUsed: false, summonedTurn: turnCount
-      }
-      addEnemy(summoned)
-      alarmEnemy(summoned)
-      occupied.add(keyXY(spot.x, spot.y))
-      spawnDamageNumber(spot.x, spot.y, 'Summoned!', '#b998df', 0, SUMMON_ANIM_MS)
+      createSummonedEnemy(summonTemplate,enemy,spot,{strength})
     }
     enemy.summonUsed = true
     if (!enemy.aware) {
@@ -3520,11 +4074,11 @@ more difficult:
   }
 
   function enemyIsShooter(e) {
-    return !!shooterDefinition(e) && Number.isFinite(e.shotsRemaining) && e.shotsRemaining > 0
+    return !e?.artifactRangedDisarmed && !!shooterDefinition(e) && Number.isFinite(e.shotsRemaining) && e.shotsRemaining > 0
   }
 
   function switchEnemyShooterMode(e, mode) {
-    if (!e.shooterAbility || e.shooterMode === mode || (mode === 'ranged' && !enemyIsShooter(e))) return false
+    if (e.artifactRangedDisarmed || !e.shooterAbility || e.shooterMode === mode || (mode === 'ranged' && !enemyIsShooter(e))) return false
     e.shooterMode = mode
     if (enemyIsVisibleOnMainView(e)) {
       const melee = e.equipment?.kind === 'weapon' ? e.equipment.base || 'weapon'
@@ -3594,6 +4148,17 @@ more difficult:
     enemy.lowHpTeleportUsed = enemy.lowHpTeleportUsed === true
     enemy.immunityUntilTurn = Number.isInteger(enemy.immunityUntilTurn) ? Math.max(0, enemy.immunityUntilTurn) : 0
     enemy.fearTurns = Math.max(0, Math.floor(enemy.fearTurns || 0))
+    enemy.artifactFearAuraOnly = enemy.artifactFearAuraOnly === true
+    enemy.artifactFearAuraCheckedTurn = Number.isInteger(enemy.artifactFearAuraCheckedTurn) ? enemy.artifactFearAuraCheckedTurn : -1
+    enemy.artifactPetrified = enemy.artifactPetrified === true
+    enemy.artifactSilencedUntilTurn = Number.isInteger(enemy.artifactSilencedUntilTurn) ? Math.max(0,enemy.artifactSilencedUntilTurn) : 0
+    enemy.artifactConfusedUntilTurn = Number.isInteger(enemy.artifactConfusedUntilTurn) ? Math.max(0,enemy.artifactConfusedUntilTurn) : 0
+    enemy.artifactDisarmed = enemy.artifactDisarmed === true
+    enemy.artifactRangedDisarmed = enemy.artifactRangedDisarmed === true
+    enemy.artifactSlowUntilTurn = Number.isInteger(enemy.artifactSlowUntilTurn) ? Math.max(0,enemy.artifactSlowUntilTurn) : 0
+    enemy.artifactSunderStacks = Number.isInteger(enemy.artifactSunderStacks) ? Math.max(0,Math.min(10,enemy.artifactSunderStacks)) : 0
+    enemy.artifactBlindAtkPenalty = Number.isInteger(enemy.artifactBlindAtkPenalty) ? Math.max(0,Math.min(5,enemy.artifactBlindAtkPenalty)) : 0
+    enemy.artifactBlindAggroPenalty = enemy.artifactBlindAggroPenalty === true
     enemy.poisonTurns = Math.max(0, Math.floor(enemy.poisonTurns || 0))
     enemy.poisonDamageRemaining = Math.max(0, Math.floor(enemy.poisonDamageRemaining || 0))
     enemy.poisonDamagePerTurn = Math.max(0, Math.floor(enemy.poisonDamagePerTurn || 0))
@@ -3611,6 +4176,7 @@ more difficult:
           .map(p => ({x:p.x,y:p.y})),
       } : null
     enemy.bowEvasionSpent = enemy.bowEvasionSpent === true
+    enemy.artifactSoulGhost = enemy.artifactSoulGhost === true
     enemy.summonUsed = enemy.summonUsed === true
     enemy.exposedUntilTurn = Number.isInteger(enemy.exposedUntilTurn) ? Math.max(0, enemy.exposedUntilTurn) : 0
     enemy.shellRetreatUsed = enemy.shellRetreatUsed === true
@@ -4608,7 +5174,7 @@ more difficult:
           ? `The ${e.name} drops ${remaining} arrow${remaining === 1 ? '' : 's'} on the ground.`
           : `You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
       }
-      if (chance(RANGED_CONFIG.shortBowDropChance)) {
+      if (!e.artifactRangedDisarmed && chance(RANGED_CONFIG.shortBowDropChance)) {
         const bow = makeBowItem(e.tier >= 3 && chance(0.25) ? 'Hunting Bow' : 'Short Bow', mf, e.tier || 0, true)
         if (onGround) placeEnemyLootOnGround(e, bow)
         else player.inventory.push(bow)
@@ -4806,7 +5372,7 @@ more difficult:
   }
 
   function enemyIsFleeing(e) {
-    return e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) &&
+    return !e.artifactBound && e.alive !== false && e.hp > 0 && !playerHiddenFromEnemy(e) &&
       (((!!e.stolenItem || e.stolenGold > 0) && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps) ||
       (e.hp < e.maxHp * 0.10 && enemyHasAbility(e, 'flee')))
   }
@@ -4922,6 +5488,7 @@ more difficult:
     return true
   }
 
+  const ENRAGE_ATTACK_MULTIPLIER = 1.25
   function enemyIsEnraged(e) {
     return e.alive !== false && e.hp > 0 && e.hp < e.maxHp * 0.30 && enemyHasAbility(e, 'enrage')
   }
@@ -4941,7 +5508,9 @@ more difficult:
   }
 
   function enemyAtk(e) {
-    return (e.atk + enemyGangPower(e) + (inspiringChampionFor(e) ? INSPIRED_ATK : 0)) * (enemyIsEnraged(e) ? 1.25 : 1) *
+    const baseAtk = Math.max(1, e.atk - (e.artifactBlindAtkPenalty || 0))
+    return (baseAtk + enemyGangPower(e) + (inspiringChampionFor(e) ? INSPIRED_ATK : 0)) *
+      (enemyIsEnraged(e) ? ENRAGE_ATTACK_MULTIPLIER : 1) *
       (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.attackMultiplier : 1)
   }
 
@@ -4986,8 +5555,12 @@ more difficult:
     return true
   }
 
-  async function playerAttackEnemy(e, isExtraAttack = false) {
+  async function playerAttackEnemy(e, extraAttackKind = null) {
+    // Keep existing callers that pass true for a GRACE follow-up working.
+    if (extraAttackKind === true) extraAttackKind = 'grace'
+    const isExtraAttack = extraAttackKind !== null && extraAttackKind !== false
     if (rareFleeBlocksAttack(e)) return false
+    if (!isExtraAttack) artifactOnPlayerAttack()
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     if (!isExtraAttack) AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
     AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
@@ -5028,28 +5601,52 @@ more difficult:
     }
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
-    let dmg = damageRoll(playerAtk(), twoHandedDefence(enemyDef(e)))
+    let dmg = damageRoll(playerAtk() * artifactMeleeDamageMultiplier(e), twoHandedDefence(enemyDef(e)))
     const criticalRoll = chance(playerCriticalHitChance(e))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     if (playerHasArtifactAbility('shadow_strike') && artifactInvisibleAttack) dmg = Math.round(dmg * 1.50)
-    if (isExtraAttack && playerHasArtifactAbility('flurry')) dmg = Math.round(dmg * 1.50)
+    // Executioner's bonus strike is not the GRACE follow-up rewarded by Flurry.
+    if (extraAttackKind === 'grace' && playerHasArtifactAbility('flurry')) dmg = Math.round(dmg * 1.50)
+    const consumeBulwarkBravery = dmg > 0 && player.artifactBraveryCharge &&
+      playerHasArtifactAbility('bulwark_bravery')
+    if (consumeBulwarkBravery) dmg = Math.round(dmg * (1 + artifactRule('bulwark_bravery','damageBonus')))
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
+    const bloodPactCost = playerHasArtifactAbility('blood_pact')
+      ? Math.ceil(playerMaxHp() * artifactRule('blood_pact','costFraction')) : 0
+    // Every landed blow (including a zero-damage glance) can release a
+    // prepared charge. Only an actual miss preserves Retribution/Riposte.
+    dmg = artifactMeleeHitBonuses(dmg) + bloodPactCost
+    if (bloodPactCost) {
+        artifactLosePlayerHp(bloodPactCost,{cost:true})
+        if (playerKnowsArtifactAbility('blood_pact'))
+          log(`Blood Pact consumes ${bloodPactCost} HP!`, 'bad')
+        else log(`Your weapon draws ${bloodPactCost} HP from you!`, 'bad')
+      }
+    const pactFatal = player.hp <= 0
+    const beforeHitHp = e.hp
+    const effectiveDamage = Math.min(Math.max(0,e.hp),dmg)
     e.hp -= dmg
+    if (effectiveDamage > 0) artifactOnDirectPlayerHit()
+    if (consumeBulwarkBravery) player.artifactBraveryCharge = false
     awardMeleeHitXp(e, dmg)
     const trainedMeleeSkill = meleeCombatSkill(player.equip.weapon)
     if (trainedMeleeSkill) trainCombatSkill(trainedMeleeSkill, e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
+    absorbEnemyFatalHit(e)
+    const executeFollowUp = artifactOnLandedMeleeStrike(e, beforeHitHp, effectiveDamage)
     if (dmg > 0) {
       breakEnemyFear(e)
       const dread = ARTIFACT_ABILITIES.abilities.dreadful_strike
       if (e.hp > 0 && playerHasArtifactAbility('dreadful_strike') && chance(dread.chance) &&
           applyEnemyFear(e, dread.duration)) log(`The ${e.name} recoils in terror!`, 'good')
+      applyArtifactMeleeStatuses(e,dmg)
+      if (playerHasArtifactAbility('lifesteal'))
+        applyLifesteal({attacker:player,effectiveDamage,source:'player'})
     }
     if (scrollInvisibleAttack) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
-    absorbEnemyFatalHit(e)
     triggerEnemyShellRetreat(e)
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
@@ -5077,10 +5674,17 @@ more difficult:
       player.equip.weapon.venomCoated = false
       applyPlayerVenomToEnemy(e)
     }
+    if (critical && dmg > 0 && e.hp > 0 && playerHasArtifactAbility('knockback')) pushEnemyFromPlayer(e)
     logEnemyEnrageTransition(e, wasEnraged)
     if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
-    if (e.hp <= 0) {
-      killEnemy(e)
+    artifactCleave(e,dmg)
+    if (!e.alive || e.hp <= 0) {
+      if (e.alive) {
+        killEnemy(e)
+        artifactExecutionersAura(e,beforeHitHp)
+        artifactDeathVeil()
+        artifactSoulburst(e,dmg)
+      }
       updateMobileInfoPanel(e.x, e.y)
       showDesktopCombatTooltip(e)
     } else {
@@ -5088,11 +5692,25 @@ more difficult:
       showDesktopCombatTooltip(e)
       const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
         ? e.equipment : null
-      if (!isExtraAttack && canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
+      if (executeFollowUp && !pactFatal && e.alive && e.hp > 0 &&
+          Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y)) <= ATTACK_RANGE) {
+        artifactAbilityMessage('executioner',`Executioner strikes the weakened ${e.name} again!`,
+          `Your weapon follows through against the weakened ${e.name}!`)
+        await playerAttackEnemy(e,'executioner')
+      }
+      if (!isExtraAttack && !pactFatal && e.alive && e.hp > 0 &&
+          Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y)) <= ATTACK_RANGE &&
+          canGetExtraWeaponAttack(player.equip.weapon, enemyWeapon, true, false, null, e)) {
         const enemyTimingText = enemyWeapon ? `the ${e.name}'s ${enemyWeapon.base}` :  e.name
         log(`Your ${weaponName} outpaces ${enemyTimingText}, striking again!`, 'good')
-        await playerAttackEnemy(e, true)
+        await playerAttackEnemy(e, 'grace')
       }
+    }
+    if (pactFatal) {
+      // A lethal pact still resolves this blow and the enemy's death before the
+      // player's death; XP healing cannot undo the already-lethal blood cost.
+      player.hp = 0
+      die(null,'blood_pact')
     }
     return true
   }
@@ -5114,23 +5732,36 @@ more difficult:
       : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, attackPresentation.delay + 100)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
+      if (playerHasArtifactAbility('elusive') && !player.artifactElusiveReady) {
+        player.artifactElusiveReady = true
+        artifactAbilityMessage('elusive', 'Elusive: a free step is ready!',
+          'You spot an opening to slip away!')
+      }
       return false
     }
     const armor = equippedArmor(player.equip.armor)
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
-    const shieldBlockChance = !glancing && shieldingBlockChance()
+    const shieldBlockChance = !glancing && shieldingBlockChance(e)
     const blocked = shieldBlockChance > 0 && chance(shieldBlockChance)
     let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef(), e)
     const criticalRoll = chance(enemyCriticalHitChance(e))
     const critical = !glancing && !blocked && criticalRoll && !playerHasArtifactAbility('gods_chosen')
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing || blocked) dmg = Math.floor(dmg / 3)
+    const incoming = artifactIncomingHit(dmg)
+    if (incoming.evaded) return false
+    dmg = incoming.damage
     if (player.equip.shield) trainCombatSkill('shielding', e)
-    const effectiveDamage = Math.min(Math.max(0, player.hp), dmg)
-    player.hp -= dmg
+    const effectiveDamage = artifactLosePlayerHp(dmg,{directHit:true})
+    const braveryFromStronger = effectiveDamage > 0 && playerHasArtifactAbility('bulwark_bravery') && artifactStrongEnemy(e)
+    if ((blocked || glancing) && playerHasArtifactAbility('riposte')) player.artifactRiposteReady = true
+    if (braveryFromStronger) player.artifactBraveryCharge = true
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, attackPresentation.delay + 100)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, attackPresentation.delay + 100 + (critical ? 120 : 0))
-    if (blocked) {
+    if (incoming.absorbed) {
+      // The protection is an independent layer after a landed attack.
+      spawnDamageNumber(player.x,player.y,'Absorbed!', '#b8d4ff', attackPresentation.delay + 100)
+    } else if (blocked) {
       spawnDamageNumber(player.x, player.y, 'Block!', '#8dc4e8', attackPresentation.delay + 100)
       log(`You block the ${e.name}'s attack with your ${artifactDisplayName(player.equip.shield)}! ${dmg} damage gets through.`, 'good')
     } else if (glancing) {
@@ -5160,11 +5791,13 @@ more difficult:
       applyEnemyContactStatuses(e)
     }
     if (player.hp > 0 && options?.onHit) options.onHit()
+    if (blocked && player.hp > 0) artifactShieldBash(e)
     updateHud()
     if (player.hp <= 0) {
       die(e)
       return true
     }
+    if (!e.alive) return false
     if (!options?.suppressKnockback && effectiveDamage > 0 &&
         (charge || (critical && enemyHasAbility(e, 'knockback')))) {
       const line = charge?.line ?? {sx: Math.sign(player.x - e.x), sy: Math.sign(player.y - e.y)}
@@ -5248,6 +5881,7 @@ more difficult:
     try {
       clearAutoPath()
       consecutiveWaitTurns = 0
+      artifactOnPlayerAttack()
       if (--arrowStack.count <= 0) player.inventory.splice(player.inventory.indexOf(arrowStack), 1)
       // A prepared arrow is spent as soon as it is fired, even on a miss.
       const venomArrow = bow.venomCoated === true
@@ -5289,7 +5923,8 @@ more difficult:
         spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss, deathFxDelay)
       } else if (tryEvadePlayerAttack(e)) {
         log(`Your arrow misses the dodging ${e.name}.`, 'info')
-      } else if (chance(marksmanshipMissChance(missChance(playerSpd(), enemySpd(e))))) {
+      } else if (chance(Math.max(0, marksmanshipMissChance(missChance(playerSpd(), enemySpd(e))) -
+          (playerHasArtifactAbility('deadeye') && playerHeldPosition() ? artifactRule('deadeye','hitBonus') : 0)))) {
         log(`You shoot at the ${e.name} but miss.`, 'info')
         spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss, deathFxDelay)
       } else {
@@ -5300,9 +5935,13 @@ more difficult:
         const critical = !glancing && chance(shotCriticalChance)
         if (critical) dmg = Math.round(dmg * 2)
         if (glancing) dmg = Math.floor(dmg / 3)
+        if (playerHasArtifactAbility('deadeye') && playerHeldPosition())
+          dmg = Math.round(dmg * (1 + artifactRule('deadeye','damageBonus')))
         const shield = AdaptivePlayerTrolling.shieldHunterArrowHit(e,dmg)
         dmg = shield.damage
+        const directDamage = Math.min(Math.max(0,e.hp),dmg)
         e.hp -= dmg
+        if (directDamage > 0) artifactOnDirectPlayerHit()
         trainCombatSkill('marksmanship', e, dmg)
         if (targetWasInvisible) revealEnemyInvisibility(e)
         if (dmg > 0) breakEnemyFear(e)
@@ -5318,6 +5957,8 @@ more difficult:
           : `${critical ? 'Critical hit! ' : ''}Your arrow hits the ${e.name} for ${dmg} damage.`, 'good')
         if (shield.broken) spawnDamageNumber(e.x,e.y,'BREAK!', '#f2c17c', deathFxDelay)
         if (venomArrow && !glancing) applyPlayerVenomToEnemy(e)
+        if (dmg > 0 && e.alive && e.hp > 0 && playerHasArtifactAbility('crippling_shot') &&
+            chance(artifactRule('crippling_shot','chance'))) applyArtifactSlow(e,'arrow')
         logEnemyEnrageTransition(e, wasEnraged)
         if (!wasFleeing && enemyIsFleeing(e)) log(`Wounded ${e.name} retreats!`, 'info')
         if (e.hp <= 0) killEnemy(e, true, 'arrow', deathFxDelay)
@@ -5383,18 +6024,24 @@ more difficult:
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
-    player.hp -= dmg
+    const incoming = artifactIncomingHit(dmg)
+    if (incoming.evaded) return false
+    dmg = incoming.damage
+    artifactLosePlayerHp(dmg,{directHit:true})
 
     const presentation = queueEnemyAttackPresentation(animationDelay, !spellAttack)
     spawnProjectileAnim(projectilePath, projectile, animationDelay, presentation.delay)
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, presentation.delay + animationDelay)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, presentation.delay + animationDelay + (critical ? 120 : 0))
-    if (glancing) {
+    if (incoming.absorbed) {
+      // Aegis has already logged its activation at impact.
+    } else if (glancing) {
       if (dmg === 0) log(`The ${possessive} glances off your ${armor.name}!`, 'bad')
       else log(`The ${possessive} glances off your ${armor.name} and deals only ${dmg} damage.`, 'bad')
     } else {
       log(`${critical ? 'Critical hit! ' : ''}The ${e.name} ${shot.verb} ${shot.article} ${shot.label || projectile} at you for ${dmg} damage.`, 'bad')
     }
+    if (dmg > 0 && !glancing && player.hp > 0) applyEnemyPoison(e)
     // Ranged hits use the same cause-before-shield log order as melee.
     absorbPlayerFatalDamage()
     checkPlayerHealthWarning()
@@ -5456,6 +6103,7 @@ more difficult:
       if (cause === 'trap') log(`The ${e.name} is killed by a trap.`, 'info')
     }
     e.alive = false
+    artifactOnEnemyDeath(e)
     if (inspiredNearby && visibleAtDeath) {
       log(`The ${e.name} falls; its followers lose their inspiration!`, 'good')
       spawnDamageNumber(e.x,e.y,'Aura fades!','#dfd7ad')
@@ -5467,11 +6115,15 @@ more difficult:
       log(`The ${e.name}'s web falls away.`, 'good')
       spawnDamageNumber(player.x, player.y, 'Freed!', '#9fe3bf')
     }
-    if (playerCredit) player.kills++
+    if (playerCredit) {
+      player.kills++
+      if (e.artifactSoulGhost) awardArtifactSoulFed()
+    }
     spawnDeathAnim(e, deathFxDelay)
     occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
     if (playerCredit) gainXp(xpForEnemy(e))
+    if (playerCredit) artifactSoulEaterOnKill(e)
     if (e.carriedDungeonKey) {
       groundItems.push({x:e.x,y:e.y,level:e.level ?? currentZ,levelKind:e.levelKind || currentLevelKind(),
         caveIndex:e.caveIndex ?? currentCave,kind:'dwarvenkey',keyId:e.carriedDungeonKey.keyId,progressionKey:true})
@@ -5492,7 +6144,7 @@ more difficult:
         kind:'stolenloot',gold:e.stolenGold})
       e.stolenGold=0
     }
-    if (cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
+    if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE,
         visibleAtDeath, deathFxDelay)
@@ -5520,6 +6172,19 @@ more difficult:
     resetSwimming()
     cancelAllPreparedEnemyAbilities()
     const wasDead = player.hp <= 0
+    if (wasDead) {
+      player.artifactBraveryCharge = false
+      player.artifactRiposteReady = false
+      player.artifactRetributionStored = 0
+      player.artifactBloodReservoirStored = 0
+      player.artifactPainEaterHits = 0
+      player.artifactRhythmGuardReady = false
+      player.artifactEvasionPrepared = false
+      player.artifactMartialEvasionPending = false
+      player.artifactElusiveReady = false
+      player.artifactBoneplateExpiries = []
+      player.artifactSoulFedExpiries = []
+    }
     currentZ = 0
     currentCave = -1
     map = surfaceMap
@@ -5650,6 +6315,15 @@ more difficult:
       godMode: false,
       godInvisible: false,
       lastPositionChangeTurn: turnCount,
+      artifactBraveryCharge: false,
+      artifactRiposteReady: false, artifactRetributionStored: 0,
+      artifactBloodReservoirStored: 0, artifactPainEaterHits: 0,
+      artifactPainAttackBonus: 0, artifactRhythmHitsThisAction: 0,
+      artifactRhythmGuardReady: false, artifactEvasionPrepared: false,
+      artifactMartialEvasionPending: false, artifactElusiveReady: false,
+      artifactLastStandUntilTurn: 0, artifactLastStandCooldownUntil: 0,
+      artifactSacredReadyTurn: 0, artifactBoneplateExpiries: [],
+    artifactSoulFedExpiries: [],
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
@@ -5862,7 +6536,8 @@ more difficult:
   /* ============================== ENEMY AI TURN ============================== */
   // Enemy tuning values in this section are loaded from content/enemy_config.json.
   function enemyAggroRange(e) {
-    return e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE
+    const base = e && typeof e.aggro === 'number' ? Math.round(e.aggro) : AGGRO_RANGE
+    return base === 0 ? 0 : Math.max(1, base - (e?.artifactBlindAggroPenalty ? 1 : 0))
   }
 
   function alarmEnemy(e) {
@@ -5946,7 +6621,8 @@ more difficult:
   function effectiveAggroRange(e) {
     return Math.max(1, enemyAggroRange(e) * (e.sleeping ? WYVERN_SLEEP_CONFIG.aggroMultiplier : 1) +
       (enemyCarrionInstinctActive(e) ? CARRION_CONFIG.aggroBonus : 0) + (e.alarmed && !enemyIsPassive(e) ? 2 : 0) + raceAggroMod() + WORLD_GEN_CONFIG.environment.enemyAggroBonus +
-      AdaptivePlayerTrolling.forestAgitationAggroBonus(e))
+      AdaptivePlayerTrolling.forestAgitationAggroBonus(e) +
+      (playerHasArtifactAbility('taunt') ? artifactRule('taunt','aggroBonus') : 0))
   }
 
   // A successful forest hiding roll lasts at this player position. The player
@@ -6223,7 +6899,7 @@ more difficult:
   // Undead, constructs and non-humanoid creatures ignore the bow-strength
   // comparison. Other Fear, rare flight and wounded-flee abilities are separate.
   function enemyFearlessOfBow(e) {
-    return e.family === 'undead' || e.family === 'construct' || !e.humanoid
+    return playerHasArtifactAbility('taunt') || e.family === 'undead' || e.family === 'construct' || !e.humanoid
   }
 
   // Compare current combat strength, including equipment and terrain, for
@@ -7163,16 +7839,29 @@ more difficult:
   let surfaceDepartureTurn = null
   let consecutiveWaitTurns = 0
   const MAX_CONSECUTIVE_WAIT_TURNS = 10
+  function applyLifesteal({attacker, effectiveDamage, source}) {
+    if (!(effectiveDamage > 0) || !chance(0.30)) return 0
+    const maxHp = source === 'player' ? playerMaxHp() : attacker.maxHp
+    const heal = Math.min(Math.max(0, maxHp - attacker.hp), Math.floor(effectiveDamage / 3))
+    if (heal <= 0) return 0
+    const wasEnraged = source === 'monster' && enemyIsEnraged(attacker)
+    attacker.hp += heal
+    if (source === 'monster') {
+      logEnemyEnrageTransition(attacker, wasEnraged)
+      log(`The ${attacker.name} steals your life and recovers ${heal} HP!`, 'bad')
+      spawnDamageNumber(attacker.x, attacker.y, `+${heal}`, '#78c878')
+      updateMobileInfoPanel(attacker.x, attacker.y)
+    } else {
+      log(`Your Lifesteal restores ${heal} HP!`, 'good')
+      spawnDamageNumber(player.x, player.y, `+${heal}`, '#78c878')
+      updateHud()
+    }
+    return heal
+  }
+
   function applyEnemyLifesteal(enemy, effectiveDamage) {
-    if (!(effectiveDamage > 0) || !enemyHasAbility(enemy, 'lifesteal') || !chance(0.30)) return
-    const heal = Math.min(Math.max(0, enemy.maxHp - enemy.hp), Math.floor(effectiveDamage / 3))
-    if (heal <= 0) return
-    const wasEnraged = enemyIsEnraged(enemy)
-    enemy.hp += heal
-    logEnemyEnrageTransition(enemy, wasEnraged)
-    log(`The ${enemy.name} steals your life and recovers ${heal} HP!`, 'bad')
-    spawnDamageNumber(enemy.x, enemy.y, `+${heal}`, '#78c878')
-    updateMobileInfoPanel(enemy.x, enemy.y)
+    if (enemyHasAbility(enemy, 'lifesteal'))
+      applyLifesteal({attacker:enemy,effectiveDamage,source:'monster'})
   }
 
   function rollPoisonDuration(maxHp) {
@@ -7239,7 +7928,8 @@ more difficult:
   }
 
   function applyEnemyPoison(enemy) {
-    if (!enemyHasAbility(enemy, 'poison') || !chance(0.30)) return
+    if (!enemyHasAbility(enemy, 'poison') ||
+        (!playerHasArtifactAbility('plague_mail') && !chance(0.30))) return
     const refreshed = player.poisonTurns > 0
     player.poisonTurns = rollPoisonDuration(playerMaxHp())
     log(refreshed ? `The ${enemy.name}'s venom renews your poison.`
@@ -7255,11 +7945,13 @@ more difficult:
   function tickPlayerPoison() {
     if (!(player.poisonTurns > 0)) return
     player.poisonTurns--
-    player.hp = Math.max(0, player.hp - 1)
+    const damage = artifactLosePlayerHp(1)
     absorbPlayerFatalDamage()
-    log('Poison deals 1 HP damage.', 'bad')
+    if (damage) {
+      log(`Poison deals ${damage} HP damage.`, 'bad')
+      spawnDamageNumber(player.x, player.y, damage, RENDER_STYLE.damage.playerHit)
+    }
     checkPlayerHealthWarning()
-    spawnDamageNumber(player.x, player.y, 1, RENDER_STYLE.damage.playerHit)
     if (player.hp <= 0) {
       die(null, 'poison')
       return
@@ -7309,9 +8001,9 @@ more difficult:
     if (player.freezing.turns >= WORLD_GEN_CONFIG.environment.freezingDamageIntervalTurns) {
       player.freezing.turns = 0
       const freezingDamage = WORLD_GEN_CONFIG.environment.freezingDamage
-      player.hp = Math.max(0, player.hp - freezingDamage)
+      const damage = artifactLosePlayerHp(freezingDamage)
       absorbPlayerFatalDamage()
-      log(`The freezing cold bites you for ${freezingDamage} HP.`, 'bad')
+      if (damage) log(`The freezing cold bites you for ${damage} HP.`, 'bad')
       checkPlayerHealthWarning()
       updateHud()
       if (player.hp <= 0) {
@@ -7328,8 +8020,13 @@ more difficult:
 
   function enemyTurn(reactedEnemy = null, playerMovement = null, bowShotTarget = null) {
     if (player.hp <= 0 || deathTransition) return
+    // A pending Elusive step is available only for the player's next action.
+    // Clear the previous opportunity BEFORE enemies can create a new one.
+    player.artifactElusiveReady = false
     updateAlarmedEnemies()
     turnCount++
+    // Keep independent temporary ATK boosts compact without resetting later stacks.
+    player.artifactSoulFedExpiries = player.artifactSoulFedExpiries.filter(expiry => expiry > turnCount)
     Mimics.update()
     const trollingActive = AdaptivePlayerTrolling.active()
     if (trollingActive) AdaptivePlayerTrolling.onWorldTurn()
@@ -7397,6 +8094,11 @@ more difficult:
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
       if (e.mimicSkipTurn === turnCount) continue
+      if (e.artifactPetrified) {
+        e.artifactPetrified = false
+        if (enemyIsVisibleOnMainView(e)) log(`The ${e.name} is unable to act!`, 'good')
+        continue
+      }
       if (e.mimicStationary) {
         if (Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))<=ATTACK_RANGE)
           if(enemyAttackPlayer(e)) return
@@ -7446,6 +8148,7 @@ more difficult:
         if (takeFearTurn(e)) return
         continue
       }
+      if (artifactConfusedEnemyAction(e)) continue
       if (collectiveMindSearchingScout(e) && takeCollectiveMindRetreatTurn(e)) continue
       const hiddenFromEnemy = playerHiddenFromEnemy(e)
       const rareDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
@@ -7485,6 +8188,10 @@ more difficult:
         if (AdaptivePlayerTrolling.takeBeastHunterTurn(e)) continue
         if (AdaptivePlayerTrolling.takeForestSpiritTurn(e)) continue
         if (AdaptivePlayerTrolling.takeHiddenLeaderTurn(e)) continue
+      }
+      if (playerHasArtifactAbility('taunt')) {
+        e.bowRetreatHold = false
+        e.bowEvasion = null
       }
       const distFromPlayer = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       const dx = player.x - e.x, dy = player.y - e.y
@@ -9412,6 +10119,127 @@ more difficult:
     spawnAmbushAnim()
   }
 
+  // The shared, fully resolved player tile-entry path also serves free
+  // steps from artifacts. It runs hazards, swimming, pickups, tracking
+  // and discovery exactly once; its caller owns whether time advances.
+  function finishPlayerStep(nx,ny) {
+    const fromPos={x:player.x,y:player.y}
+    player.miningArmedTarget = null
+    player.x = nx
+    player.y = ny
+    markPlayerPositionChanged()
+    if (player.spiderWebSourceId) {
+      clearSpiderWeb()
+      log('You tear free of the spider web!', 'good')
+      spawnDamageNumber(nx, ny, 'Freed!', '#9fe3bf')
+    }
+    DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
+    DungeonHazards.onActorEntered(player, fromPos.x, fromPos.y)
+    alarmGalleryShootersAt(player.x, player.y)
+    if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return false
+    completeFishermanLesson(fromPos)
+    advanceSwimming(true, fromPos)
+    if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return false
+    checkOldHunterInvestigation()
+    player.steps++
+    Mimics.revealAdjacent()
+    if (player.hp <= 0 || deathTransition) return false
+    checkGroundAt(nx, ny)
+    checkWorldEdge()
+    if (isTempleGround(map[ny][nx])) {
+      const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
+      if (player.poisonTurns > 0 || canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
+    }
+    if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
+      log('You enter a dense ancient forest.', 'info')
+    }
+    if (currentZ === 0 && map[ny][nx] === 'ruinedchapel' && map[fromPos.y][fromPos.x] !== 'ruinedchapel') {
+      log(bellRung
+        ? 'The ruined chapel is no longer sealed. There are no marks of a breach - it looks like it was opened from the inside. Beyond the broken doorway, a narrow passage descends into darkness.'
+        : 'The ruined chapel is forgotten by both the living and the gods. Its doors are sealed; no living hand has opened them in ages.', 'info')
+    }
+    if (CAVE_TRANSITION_TILES.has(map[ny][nx])) {
+      const onto = map[ny][nx]
+      if (onto === 'dwarvengate') {
+        log(currentZ === 0
+          ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
+          : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info')
+      } else if (onto === 'caveentrance') {
+        const cryptExit = currentZ === -1 && (
+          currentCave === cryptCaveIndex ||
+          caves[currentCave]?.crypt ||
+          (caves[cryptCaveIndex]?.entrances || []).some(e => e.x === nx && e.y === ny)
+        )
+        log(currentZ === 0
+          ? `You're standing at the entrance to the cave. ${caveScenarioClue(-1, nx, ny) || ''} Press "inspect" to enter if you dare.`
+          : cryptExit
+            ? 'You\'re standing beneath the ruined chapel. Press "inspect" to climb back into it.'
+            : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
+      } else if (onto === 'dwarvenhole') {
+        log('A deep hole opens in the cave floor. It leads into the ruined Dwarven Fort. Press "inspect" to consider a one-way jump.', 'bad')
+      } else if (onto === 'cavedown') {
+        log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
+      } else if (onto === 'dwarvenfortexit') {
+        log('You stand at the Dwarven Fort exit. Press "inspect" to climb out through the gates.', 'info')
+      } else if (onto === 'dwarvenstairsdown') {
+        log('A broad dwarven stair descends into the ruined settlement below. Press "inspect" to descend.', 'info')
+      } else if (onto === 'dwarvenstairsup') {
+        log('A broad dwarven stair leads back toward the upper ruins. Press "inspect" to climb up.', 'info')
+      } else if (onto === 'dwarvenminessealed') {
+        log('A collapsed mine stairway leads toward the old Deep Mines. Press "inspect" to examine it.', 'info')
+      } else if (onto === 'dwarvenminesopen') {
+        log('The cleared mine entrance leads downward. Press "inspect" to descend.', 'info')
+      } else if (onto === 'minestairsup' || onto === 'minestairsdown') {
+        log(onto === 'minestairsup' ? 'Shoddy Mine Stairs lead upward. Press "inspect" to climb.' :
+          'Shoddy Mine Stairs lead deeper underground. Press "inspect" to descend.', 'info')
+      } else if (onto === 'minecageupperoff') {
+        log('The upper haulage cage is locked. Press "inspect" to examine it.', 'info')
+      } else if (onto === 'minecageloweroff') {
+        log('The lower haulage cage has a release mechanism. Press "inspect" to unlock it.', 'info')
+      } else if (onto === 'minecageupperon' || onto === 'minecageloweron') {
+        log(onto === 'minecageupperon'
+          ? 'The unlocked haulage cage descends to the deepest mine. Press "inspect" to ride.'
+          : 'The unlocked haulage cage ascends to the upper mine. Press "inspect" to ride.', 'info')
+      } else if (onto === 'caveup') {
+        log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
+      } else if (onto === 'cryptstairsdown') {
+        log('A shoddy old stone staircase leads down into deeper dark. Press "inspect" to descend.', 'info')
+      } else if (onto === 'cryptstairsup') {
+        log('The old stone staircase leads back up. Press "inspect" to climb up.', 'info')
+      }
+    }
+    if (currentZ === -2 && cryptLevel2 && map[ny][nx] === 'crypttrap') {
+      log(CRYPT2_TRAP_DISCOVER, 'info')
+    }
+    AdaptivePlayerTrolling.onPlayerMoved()
+    maybeSpawnForestAmbush(nx, ny)
+    consecutiveWaitTurns = 0
+    hideDesktopCombatTooltip()
+    if (mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.'
+    return true
+  }
+
+  function artifactFreeStepTileOpen(x,y) {
+    return isWalkableForPlayer(x,y) && !occupied.has(keyXY(x,y)) &&
+      !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) &&
+      !(currentZ === 0 && npcs.some(n => n.x === x && n.y === y))
+  }
+
+  function artifactFinishMartialEvasion() {
+    const pending = player.artifactMartialEvasionPending
+    player.artifactMartialEvasionPending = false
+    if (!pending || !playerHasArtifactAbility('martial_evasion') ||
+        player.rootTurns > 0 || player.hp <= 0 || deathTransition) return false
+    const destinations = DIRS8.map(([dx,dy]) => ({x:player.x+dx,y:player.y+dy}))
+      .filter(p => artifactFreeStepTileOpen(p.x,p.y))
+    if (!destinations.length) return false
+    const next = pick(destinations)
+    const moved = finishPlayerStep(next.x,next.y)
+    if (moved) artifactAbilityMessage('martial_evasion','Evasion carries you to a new position!',
+      'You slip away after the strike!')
+    return moved
+  }
+
   async function tryMove(dx, dy) {
     if (fireballAim || holeJumpOpen) return false
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
@@ -9435,6 +10263,19 @@ more difficult:
     const nx = player.x + dx, ny = player.y + dy
     const ek = keyXY(nx, ny)
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
+    if (player.artifactElusiveReady && playerHasArtifactAbility('elusive') &&
+        player.rootTurns <= 0 && !target && artifactFreeStepTileOpen(nx,ny)) {
+      player.artifactElusiveReady = false
+      clearAutoPath()
+      const fromPos = {x:player.x,y:player.y}
+      const moved = finishPlayerStep(nx,ny)
+      if (moved) {
+        artifactAbilityMessage('elusive','Elusive grants a free step!', 'You slip through the opening!')
+        animateCameraToPlayer(fromPos)
+      } else render()
+      updateHud(); updateTooltip(); flushPendingMove()
+      return
+    }
     if (target) {
       clearAutoPath()
       if (target.wallAmbushHidden || target.pendingAbility?.type === 'burrow') {
@@ -9463,11 +10304,14 @@ more difficult:
       const invisibleAttack = playerHiddenFromEnemy(target)
       const targetHp = target.hp
       const hit = await playerAttackEnemy(target)
+      const fromPos={x:player.x,y:player.y}
+      const evaded = artifactFinishMartialEvasion()
       if (invisibleAttack && target.alive && hit) reactToInvisibleAttack(target, Math.max(0, targetHp - target.hp))
       enemyTurn(invisibleAttack && hit ? target : null)
       npcTurn()
-      render()
-      runAnimationLoop()
+      if (evaded && !['pull','charge-knockback','wrestle'].includes(moveAnim?.kind))
+        animateCameraToPlayer(fromPos)
+      else {render(); runAnimationLoop()}
       updateHud()
       updateTooltip()
       flushPendingMove()
@@ -9687,99 +10531,8 @@ more difficult:
       return
     }
     if (isWalkableForPlayer(nx, ny)) {
-      player.miningArmedTarget = null
-      player.x = nx
-      player.y = ny
-      markPlayerPositionChanged()
-      if (player.spiderWebSourceId) {
-        clearSpiderWeb()
-        log('You tear free of the spider web!', 'good')
-        spawnDamageNumber(nx, ny, 'Freed!', '#9fe3bf')
-      }
-      DungeonTraps.onEntry(player, fromPos.x, fromPos.y)
-      DungeonHazards.onActorEntered(player, fromPos.x, fromPos.y)
-      alarmGalleryShootersAt(player.x, player.y)
-      if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
-      completeFishermanLesson(fromPos)
-      advanceSwimming(true, fromPos)
-      if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return
-      checkOldHunterInvestigation()
-      player.steps++
-      Mimics.revealAdjacent()
-      if (player.hp <= 0 || deathTransition) return
-      checkGroundAt(nx, ny)
-      checkWorldEdge()
-      if (isTempleGround(map[ny][nx])) {
-        const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
-        if (player.poisonTurns > 0 || canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
-      }
-      if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
-        log('You enter a dense ancient forest.', 'info')
-      }
-      if (currentZ === 0 && map[ny][nx] === 'ruinedchapel' && map[fromPos.y][fromPos.x] !== 'ruinedchapel') {
-        log(bellRung
-          ? 'The ruined chapel is no longer sealed. There are no marks of a breach - it looks like it was opened from the inside. Beyond the broken doorway, a narrow passage descends into darkness.'
-          : 'The ruined chapel is forgotten by both the living and the gods. Its doors are sealed; no living hand has opened them in ages.', 'info')
-      }
-      if (CAVE_TRANSITION_TILES.has(map[ny][nx])) {
-        const onto = map[ny][nx]
-        if (onto === 'dwarvengate') {
-          log(currentZ === 0
-            ? 'You stand beneath the open dwarven gates. Press "inspect" to enter the settlement.'
-            : 'You stand at the dwarven gate. Press "inspect" to climb back into the mountain air.', 'info')
-        } else if (onto === 'caveentrance') {
-          const cryptExit = currentZ === -1 && (
-            currentCave === cryptCaveIndex ||
-            caves[currentCave]?.crypt ||
-            (caves[cryptCaveIndex]?.entrances || []).some(e => e.x === nx && e.y === ny)
-          )
-          log(currentZ === 0
-            ? `You're standing at the entrance to the cave. ${caveScenarioClue(-1, nx, ny) || ''} Press "inspect" to enter if you dare.`
-            : cryptExit
-              ? 'You\'re standing beneath the ruined chapel. Press "inspect" to climb back into it.'
-              : 'You\'re standing at the cave exit. Press "inspect", to come back to surface.', 'info')
-        } else if (onto === 'dwarvenhole') {
-          log('A deep hole opens in the cave floor. It leads into the ruined Dwarven Fort. Press "inspect" to consider a one-way jump.', 'bad')
-        } else if (onto === 'cavedown') {
-          log(`You're standing over a narrow crack descending further into the dark. ${caveScenarioClue(-2, nx, ny) || ''} Press "inspect" to climb down.`, 'info')
-        } else if (onto === 'dwarvenfortexit') {
-          log('You stand at the Dwarven Fort exit. Press "inspect" to climb out through the gates.', 'info')
-        } else if (onto === 'dwarvenstairsdown') {
-          log('A broad dwarven stair descends into the ruined settlement below. Press "inspect" to descend.', 'info')
-        } else if (onto === 'dwarvenstairsup') {
-          log('A broad dwarven stair leads back toward the upper ruins. Press "inspect" to climb up.', 'info')
-        } else if (onto === 'dwarvenminessealed') {
-          log('A collapsed mine stairway leads toward the old Deep Mines. Press "inspect" to examine it.', 'info')
-        } else if (onto === 'dwarvenminesopen') {
-          log('The cleared mine entrance leads downward. Press "inspect" to descend.', 'info')
-        } else if (onto === 'minestairsup' || onto === 'minestairsdown') {
-          log(onto === 'minestairsup' ? 'Shoddy Mine Stairs lead upward. Press "inspect" to climb.' :
-            'Shoddy Mine Stairs lead deeper underground. Press "inspect" to descend.', 'info')
-        } else if (onto === 'minecageupperoff') {
-          log('The upper haulage cage is locked. Press "inspect" to examine it.', 'info')
-        } else if (onto === 'minecageloweroff') {
-          log('The lower haulage cage has a release mechanism. Press "inspect" to unlock it.', 'info')
-        } else if (onto === 'minecageupperon' || onto === 'minecageloweron') {
-          log(onto === 'minecageupperon'
-            ? 'The unlocked haulage cage descends to the deepest mine. Press "inspect" to ride.'
-            : 'The unlocked haulage cage ascends to the upper mine. Press "inspect" to ride.', 'info')
-        } else if (onto === 'caveup') {
-          log('You\'re standing at a passage leading back up. Press "inspect" to climb up.', 'info')
-        } else if (onto === 'cryptstairsdown') {
-          log('A shoddy old stone staircase leads down into deeper dark. Press "inspect" to descend.', 'info')
-        } else if (onto === 'cryptstairsup') {
-          log('The old stone staircase leads back up. Press "inspect" to climb up.', 'info')
-        }
-      }
-      if (currentZ === -2 && cryptLevel2 && map[ny][nx] === 'crypttrap') {
-        log(CRYPT2_TRAP_DISCOVER, 'info')
-      }
-      AdaptivePlayerTrolling.onPlayerMoved()
-      maybeSpawnForestAmbush(nx, ny)
+      if (!finishPlayerStep(nx,ny)) return
       moved = true
-      consecutiveWaitTurns = 0
-      hideDesktopCombatTooltip()
-      if (mobileInfoPanel) mobileInfoPanel.innerHTML = 'Tap an enemy or NPC to inspect it.'
     } else if (autoPath) {
       clearAutoPath()
     }
@@ -13436,7 +14189,14 @@ more difficult:
       ${e.adaptiveEventId === 'undead_shield_hunter' ? `<div class="pfx" style="color:#c4d7e3">Shield guard · ${e.shieldGuardBroken ? 'broken, vulnerable to arrows' : `${AdaptivePlayerTrolling.shieldHunterRemaining(e)} arrow hits until broken; melee and spells bypass`}</div>` : ''}
       ${e.adaptiveEventId === 'debt_collector' && e.debtDemandState !== 'hostile' ? '<div class="pfx">Demands stolen dwarven loot</div>' : ''}
       ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${e.poisonDamagePerTurn} HP/turn, ${e.poisonDamageRemaining} HP remaining)</div>` : ''}
+      ${enemySlowed(e) ? `<div class="pfx">Slowed · ${e.artifactSlowUntilTurn-turnCount} turns (SPD −10%)</div>` : ''}
+      ${e.artifactSunderStacks > 0 ? `<div class="pfx">Sundered · DEF −${e.artifactSunderStacks}</div>` : ''}
+      ${(e.artifactBlindAtkPenalty > 0 || e.artifactBlindAggroPenalty) ? `<div class="pfx">Blinded · ${e.artifactBlindAtkPenalty || 0} ATK lost${e.artifactBlindAggroPenalty ? ', −1 AGGRO' : ''}</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
+      ${e.artifactPetrified ? '<div class="pfx">Petrified · next action lost</div>' : ''}
+      ${(e.artifactSilencedUntilTurn || 0) > turnCount ? `<div class="pfx">Silenced · ${e.artifactSilencedUntilTurn-turnCount} turns</div>` : ''}
+      ${(e.artifactConfusedUntilTurn || 0) > turnCount ? `<div class="pfx">Confused · ${e.artifactConfusedUntilTurn-turnCount} turns</div>` : ''}
+      ${e.artifactDisarmed ? '<div class="pfx">Disarmed</div>' : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'lowHpTeleport') ? `<div class="pfx">Low-HP Teleport · ${e.lowHpTeleportUsed ? 'used' : 'ready below 25% HP'}</div>` : ''}
@@ -15477,6 +16237,7 @@ more difficult:
     const old = player.equip[slot]
     const before = statSnapshot()
     player.equip[slot] = it
+    if (slot === 'weapon' && old?.abilityId === 'riposte') player.artifactRiposteReady = false
     player.inventory.splice(idx, 1)
     if (old) player.inventory.push(old)
     const equipLead = old ? `You unequip the ${artifactDisplayName(old)} and equip` : 'You equip'
@@ -15557,6 +16318,7 @@ more difficult:
     recordReplayAction({type:'unequip', slot})
     const before = statSnapshot()
     player.equip[slot] = null
+    if (slot === 'weapon' && item.abilityId === 'riposte') player.artifactRiposteReady = false
     player.inventory.push(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     consumeItemTurn()
@@ -15711,9 +16473,9 @@ more difficult:
       const restored = healPlayer(healed)
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
-      player.hp = Math.max(0, player.hp - amt)
+      const actualLoss = artifactLosePlayerHp(amt)
       absorbPlayerFatalDamage()
-      log(`You eat the Mushroom. It was poisonous! You lose ${amt} HP.`, 'bad')
+      log(`You eat the Mushroom. It was poisonous! You lose ${actualLoss} HP.`, 'bad')
       checkPlayerHealthWarning()
       if (player.hp <= 0) die(null, 'poisonous_mushroom')
     }
@@ -16953,6 +17715,20 @@ more difficult:
       player.permadeath = document.getElementById('permadeathToggle').checked
       player.characterId = Graveyard.newCharacterId()
       player.lastPositionChangeTurn = turnCount
+      player.artifactBraveryCharge = false
+      player.artifactRiposteReady = false
+      player.artifactRetributionStored = 0
+      player.artifactBloodReservoirStored = 0
+      player.artifactPainEaterHits = 0
+      player.artifactPainAttackBonus = 0
+      player.artifactRhythmHitsThisAction = 0
+      player.artifactRhythmGuardReady = false
+      player.artifactEvasionPrepared = false
+      player.artifactLastStandUntilTurn = 0
+      player.artifactLastStandCooldownUntil = 0
+      player.artifactSacredReadyTurn = 0
+      player.artifactBoneplateExpiries = []
+      player.artifactSoulFedExpiries = []
       player.highscoresDisqualified = false
       if (reusingWorldAfterPermadeath) snapCameraToPlayer()
       else {
