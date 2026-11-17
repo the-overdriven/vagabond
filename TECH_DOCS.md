@@ -1416,12 +1416,14 @@ of such branches `B` satisfies `M < B < 2M` for `M` starting monsters, leaving
 some branches empty. No new bosses, respawns or randomly placed labyrinth chests are added.
 Creatures retain their normal behavior once encountered.
 
-The single bottom chest grants **85% tier-3/4 equipment (equal tier chance),
-or 15% tier-4-source artifact**, plus **60–150 base gold** adjusted by the
-world gold multiplier and **1–2 ordinary consumables/materials**, including
-Flint Stone in the bonus pool. Magic Find modifies item quality under the 
-normal equipment/artifact rules, but not the fixed 15% artifact-category chance. 
-There is no build-matching reward and no additional generic chest roll.
+The single bottom chest guarantees **one unidentified tier-4-source gear
+artifact** (a weapon, shield, or armor), plus **60–150 base gold** adjusted by
+the world gold multiplier and **1–2 ordinary consumables/materials**, including
+Flint Stone in the bonus pool. Its base equipment, magical effect, ability and
+possible curse use normal artifact generation; Magic Find affects the artifact
+under the usual rules. The chest rolls its reward when opened, including for
+already-generated worlds whose labyrinth chest remains unopened. There is no
+build-matching reward or additional generic chest roll.
 
 **Tower Chaos exception:** a Scroll of Chaos used on the surface while adjacent
 to the Tower's outer masonry (including diagonally) sends the player into a
@@ -6847,6 +6849,12 @@ Current content includes approximately:
 8 curse definitions
 ```
 
+Guaranteed gear-artifact sources draw only from eligible weapon, shield, and
+armor bases; ordinary artifact sources continue to include non-gear trinkets.
+All generated artifacts start unidentified, including Merchant stock, buried
+finds and the Tower labyrinth reward. Identification reveals their powers and
+potential curses; generation never identifies them automatically.
+
 Artifact gear bases are selected only if their ordinary gear tier is no higher
 than the rolled artifact effect tier. A selected gear noun retains its **full
 ordinary base properties**, including weapon ATK/GRACE and two-handed status,
@@ -7817,11 +7825,14 @@ Guaranteed artifact and royal treasury chests retain their separate rewards.
 Gear generated from a chest uses the chest tier (capped by the entry's
 `gearMaxTier`) and passes the player's Magic Find into the item generator.
 
-World generation also buries five equipment objects beneath random surface
-sand tiles. These hidden `buriedgear` objects have their positions, item types,
-tiers, and modifiers fixed during world generation. They are not rendered and
-cannot be collected by walking over them. Digging the exact tile with a shovel
-uncovers the predetermined item before the ordinary 1–100 digging roll.
+World generation buries five equipment finds beneath random surface sand tiles.
+**Two of the five are guaranteed unidentified gear artifacts** (weapon, shield
+or armor, tier-3–5 artifact source); the other three are ordinary gear. The
+counts and tier range are configured in `surfaceLoot`. These hidden
+`buriedgear` objects have their positions, complete rolled items and identities
+fixed during world generation. They are not rendered and cannot be collected
+by walking over them. Digging the exact tile with a shovel uncovers the
+predetermined item before the ordinary 1–100 digging roll.
 
 Two additional random artifacts are buried on separate surface sand tiles as
 hidden `buriedartifact` objects. Each rolls a random artifact tier from 3–5
@@ -8960,6 +8971,10 @@ stacks already present in older saves, keeping their total count.
 
 The game's base **sell value** is calculated by `itemSellValue()`.
 
+The Merchant stocks **one guaranteed unidentified gear artifact** from a
+tier-3 source instead of a random trinket-or-gear artifact. It is generated
+once with the normal artifact ability and curse rules and retains the existing
+artifact gambling price: the base price plus **200g** while unidentified.
 The Merchant also stocks a Short Bow for **300g** and unlimited separate
 bundles of **10 arrows for 20g**. Bows resell for **30g**, arrows for **1g**
 each. Purchasing a bow includes no free arrows; normal buy/sell and save/replay

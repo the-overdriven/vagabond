@@ -98,7 +98,18 @@ describe('Guaranteed elevated tower',()=>{
           !/upstairs|below|exchange|opens|mechanism/i.test(leverTooltip+' '+gateTooltip)
         const saved=buildSaveObject()
         loadGameFromObject(saved,{isReplayInit:true})
+        const buried=groundItems.filter(g=>g.kind==='buriedgear')
+        const buriedArtifacts=buried.filter(g=>g.item?.kind==='artifact')
+        const merchantArtifacts=merchantStock.filter(i=>i.kind==='artifact')
         return {down,deep,back,lever,sealed,basementFeedback,towerFeedback,
+          buriedTotal:buried.length,buriedArtifacts:buriedArtifacts.length,
+          buriedHidden:buriedArtifacts.every(g=>g.item.identified===false &&
+            ['weapon','shield','armor'].includes(g.item.artifactSlot) &&
+            ARTIFACT_ABILITIES.abilities[g.item.abilityId]?.enabled),
+          merchantArtifactCount:merchantArtifacts.length,
+          merchantUnidentifiedGear:merchantArtifacts.every(it=>it.identified===false &&
+            ['weapon','shield','armor'].includes(it.artifactSlot) &&
+            ARTIFACT_ABILITIES.abilities[it.abilityId]?.enabled),
           mimicInDeadEnd,invisibleApproach,noSpoilers,persisted:towerMaze.active,
           monsters:[count(-1),count(-2)],
           ghost:enemies.some(e=>e.towerMazeResident &&
@@ -110,6 +121,8 @@ describe('Guaranteed elevated tower',()=>{
       expect(result).to.include({down:true,deep:true,back:true,lever:true,
         sealed:true,basementFeedback:true,towerFeedback:true,
         mimicInDeadEnd:true,invisibleApproach:true,noSpoilers:true,persisted:true,ghost:false,chest:1,
+        buriedTotal:5,buriedArtifacts:2,buriedHidden:true,
+        merchantArtifactCount:1,merchantUnidentifiedGear:true,
         upper:'mazestairsup',lower:'caveup'})
       expect(result.monsters[0]).to.be.within(8,15)
       expect(result.monsters[1]).to.be.within(8,15)

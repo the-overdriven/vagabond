@@ -83,6 +83,16 @@ async function main() {
     assert.equal(d.chests[0].level,-2)
     assert.equal(d.chests[0].x,d.maze.treasure.x)
     assert.equal(d.chests[0].y,d.maze.treasure.y)
+    assert.equal(run(`groundItems.filter(g=>g.kind==='buriedgear').length`),5)
+    assert.equal(run(`groundItems.filter(g=>g.kind==='buriedgear' &&
+      g.item?.kind==='artifact' && !g.item.identified &&
+      ['weapon','shield','armor'].includes(g.item.artifactSlot) &&
+      !!g.item.abilityId).length`),2,'two buried equipment finds are unidentified gear artifacts')
+    assert.equal(run(`groundItems.filter(g=>g.kind==='buriedgear' &&
+      g.item?.kind!=='artifact').length`),3,'three ordinary equipment finds remain')
+    assert.equal(run(`merchantStock.filter(g=>g.kind==='artifact' &&
+      !g.identified && ['weapon','shield','armor'].includes(g.artifactSlot) &&
+      !!g.abilityId).length`),1,'merchant stocks one unidentified gear artifact')
     assert.equal(d.positions.length,2)
     assert.ok(d.looseChaos.length>=1,'a loose surface Chaos scroll is guaranteed')
     const pool = run(`JSON.stringify(ENEMY_TEMPLATES.filter(t=>t.tier>=2&&t.tier<=4&&
@@ -252,11 +262,15 @@ async function main() {
     assert.equal(run(`(()=>{
       currentZ=-2;map=deepLevels[0].map;currentCave=-1
       Object.assign(player,towerMaze.treasure)
-      const before=player.gold
+      const before=player.gold, count=player.inventory.length
       checkGroundAt(player.x,player.y)
-      return player.gold>before&&
+      const reward=player.inventory.slice(count)
+      return player.gold>before && reward.length>=1 &&
+        reward.filter(item=>item.kind==='artifact' &&
+          ['weapon','shield','armor'].includes(item.artifactSlot) &&
+          item.identified===false && !!item.abilityId).length===1 &&
         groundItems.filter(g=>g.towerMazeTreasure).length===0
-    })()`),true,'the final chest is a single persistent custom reward')
+    })()`),true,'labyrinth chest awards one unidentified gear artifact and no duplicate reward')
     const savedJson=JSON.stringify(saved)
     run(`loadGameFromObject(${savedJson},{isReplayInit:true})`)
     assert.equal(run('towerMaze.active'),true)

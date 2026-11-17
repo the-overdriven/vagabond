@@ -7914,8 +7914,15 @@ function spawnGroundStuff() {
   for (let i = 0; i < cfg.buriedGearCount && sandSpots.length; i++) {
     const spot = sandSpots.splice(randInt(0, sandSpots.length - 1), 1)[0]
     const tier = Math.min(cfg.buriedGearMaxTier, 1 + Math.floor((Math.abs(spot.x - spawnPoint.x) + Math.abs(spot.y - spawnPoint.y)) / cfg.chestDistancePerTier))
-    const gearRoll = rng()
-    const item = gearRoll < cfg.buriedWeaponChance ? makeWeaponItem(tier) : gearRoll < cfg.buriedWeaponChance + cfg.buriedArmorChance ? makeArmorItem(tier) : makeShieldItem(tier)
+    let item
+    if (i < cfg.buriedGearArtifactCount) {
+      item = makeArtifactItem(randInt(...cfg.buriedArtifactTierRange), 0, {gearOnly:true})
+    } else {
+      const gearRoll = rng()
+      item = gearRoll < cfg.buriedWeaponChance ? makeWeaponItem(tier)
+        : gearRoll < cfg.buriedWeaponChance + cfg.buriedArmorChance ? makeArmorItem(tier)
+        : makeShieldItem(tier)
+    }
     groundItems.push({x: spot.x, y: spot.y, kind: 'buriedgear', item})
   }
   // Two rarer buried finds are full artifacts. Their artifact tier is rolled

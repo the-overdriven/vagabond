@@ -1995,6 +1995,7 @@
     "looseSpeedPotions": 3,
     "looseItemPlacementTries": 200,
     "buriedGearCount": 5,
+    "buriedGearArtifactCount": 2,
     "buriedGearMaxTier": 4,
     "buriedWeaponChance": 0.5,
     "buriedArmorChance": 0.25,

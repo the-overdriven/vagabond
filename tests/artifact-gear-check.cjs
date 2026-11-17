@@ -45,6 +45,88 @@ test('artifact noun catalog uses every gear base, including Short Bow', async ()
   assert.notEqual(artifact('Titan Warpick', 3).base, 'Titan Warpick', 'tier-3 artifact must not pick a tier-5 base')
 })
 
+test('test gear artifacts are unidentified and the merchant sells one as a gamble', async () => {
+  await ready()
+  for (const tier of [3, 4, 5]) {
+    const results = JSON.parse(run(`(() => {
+      rngState = ${23009 + tier}
+      return JSON.stringify(Array.from({length:24}, () => makeArtifactItem(${tier}, 0, {gearOnly:true})))
+    })()`))
+    for (const item of results) {
+      assert.equal(item.kind, 'artifact')
+      assert.ok(['weapon','shield','armor'].includes(item.artifactSlot))
+      assert.equal(item.identified, false)
+      assert.ok(item.abilityId, 'every guaranteed gear artifact has a real power')
+      assert.ok(item.base && item.noun === item.base)
+      assert.equal(run(`[...WEAPONS,...SHIELDS,...ARMORS].some(base=>base.name===${JSON.stringify(item.base)})`),true)
+    }
+  }
+  const merchant = JSON.parse(run(`(() => {
+    merchantStock=[];ensureMerchantStock()
+    const artifact=merchantStock.filter(i=>i.kind==='artifact')
+    return JSON.stringify({count:artifact.length,item:artifact[0],price:artifact[0]&&itemBuyValue(artifact[0])})
+  })()`))
+  assert.equal(merchant.count, 1)
+  assert.ok(['weapon','shield','armor'].includes(merchant.item.artifactSlot))
+  assert.equal(merchant.item.identified,false)
+  assert.ok(merchant.item.abilityId)
+  assert.equal(merchant.price,
+    Math.min(1000,merchant.item.merchantPrice+200),'gambling markup applies without revealing the power')
+  assert.equal(run('merchantStock.filter(i=>i.kind==="artifact").length'),1,
+    'merchant does not spawn extra artifacts when stock is queried')
+  const before = run('JSON.stringify(merchantStock)')
+  run('ensureMerchantStock()')
+  assert.equal(run('JSON.stringify(merchantStock)'),before,'stock is stable under repeated checks')
+  const state = run('JSON.stringify(buildSaveObject())')
+  run(`loadGameFromObject(${state},{isReplayInit:true})`)
+  assert.equal(run('JSON.stringify(merchantStock)'),before,'unidentified stock survives replay/save restoration')
+})
+
+test('buried equipment reliably hides two seeded gear artifacts without changing the other finds', async () => {
+  await ready()
+  const checks = JSON.parse(run(`(() => {
+    const oldOrdinary=spawnOrdinarySurfaceChests, oldSubmerged=spawnSubmergedSurfaceChests
+    const oldCfg=WORLD_GEN_CONFIG.surfaceLoot, oldMap=map, oldGround=groundItems
+    const supplyFields=['loosePotions','looseScrolls','looseSpeedPotions','looseHerbs','looseMushrooms']
+    const savedSupplies=Object.fromEntries(supplyFields.map(key=>[key,oldCfg[key]]))
+    try {
+      spawnOrdinarySurfaceChests=()=>{};spawnSubmergedSurfaceChests=()=>{}
+      for(const key of supplyFields)oldCfg[key]=0
+      map=surfaceMap
+      const checks=[]
+      for(const seed of [4513,7927,19317]) {
+        const generate=()=>{
+          groundItems=[];occupied=new Set();rngState=seed
+          spawnGroundStuff()
+          const buried=groundItems.filter(g=>g.kind==='buriedgear')
+          const gearArts=buried.filter(g=>g.item?.kind==='artifact')
+          return {snapshot:JSON.stringify(groundItems), total:buried.length,
+            artifacts:gearArts.length, normal:buried.length-gearArts.length,
+            hidden:gearArts.every(g=>g.item.identified===false &&
+              ['weapon','shield','armor'].includes(g.item.artifactSlot) &&
+              ARTIFACT_ABILITIES.abilities[g.item.abilityId]?.enabled),
+            unique:new Set(groundItems.map(g=>keyXY(g.x,g.y))).size===groundItems.length}
+        }
+        const first=generate(),second=generate()
+        checks.push({...first,repeat:first.snapshot===second.snapshot})
+      }
+      return JSON.stringify(checks)
+    } finally {
+      spawnOrdinarySurfaceChests=oldOrdinary;spawnSubmergedSurfaceChests=oldSubmerged
+      for(const key of supplyFields)oldCfg[key]=savedSupplies[key]
+      map=oldMap;groundItems=oldGround
+    }
+  })()`))
+  for (const result of checks) {
+    assert.equal(result.total,5)
+    assert.equal(result.artifacts,2)
+    assert.equal(result.normal,3)
+    assert.equal(result.hidden,true)
+    assert.equal(result.unique,true)
+    assert.equal(result.repeat,true,'same seed must generate identical buried loot')
+  }
+})
+
 test('generated artifacts inherit the stats of every available gear base', async () => {
   await ready()
   for (const [slot, gear] of Object.entries(catalogs)) {

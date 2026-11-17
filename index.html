@@ -3326,7 +3326,7 @@ more difficult:
     return result
   }
 
-  function makeArtifactItem(tier, mf = 0) {
+  function makeArtifactItem(tier, mf = 0, {gearOnly = false} = {}) {
     if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length) return null
     // Magic Find's "quality" effect on artifacts: a chance to roll the
     // effect pool as if the source were one tier higher, and a reduced
@@ -3345,7 +3345,9 @@ more difficult:
     // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
     const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
       .filter(base => base.tier <= effect.tier).map(base => base.name)
-    const noun = pick([...ARTIFACT_NOUNS, ...eligibleGearNames])
+    if (gearOnly && !eligibleGearNames.length)
+      throw new Error('No eligible equipment bases for artifact tier ' + effect.tier)
+    const noun = pick(gearOnly ? eligibleGearNames : [...ARTIFACT_NOUNS, ...eligibleGearNames])
     const gear = artifactGearBase(noun)
     const slot = gear?.slot || 'trinket'
     const isCursed = chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
@@ -9796,24 +9798,7 @@ more difficult:
         const chestTier = Math.max(1, g.tier)
 
         if (g.towerMazeTreasure) {
-          const artifact = chance(0.15)
-          const gearTier = chance(0.5) ? 3 : 4
-          let item
-          if (artifact) item=makeArtifactItem(4,mf)
-          else {
-            const bases=[...WEAPONS.filter(w=>!w.rangedAtk),...SHIELDS,...ARMORS]
-              .filter(base=>base.tier===gearTier)
-            if (!bases.length)throw new Error('Missing tier '+gearTier+' equipment for maze chest')
-            const base=pick(bases)
-            if (WEAPONS.includes(base)) item={kind:'weapon',base:base.name,name:base.name,
-              atk:base.atk,grace:base.grace,tier:base.tier,baseValue:base.baseValue,twoHanded:!!base.twoHanded}
-            else if (SHIELDS.includes(base)) item={kind:'shield',base:base.name,name:base.name,
-              def:base.def,tier:base.tier,baseValue:base.baseValue}
-            else item={kind:'armor',base:base.name,name:base.name,
-              def:base.def,tier:base.tier,baseValue:base.baseValue,
-              speedPenalty:base.speedPenalty||0,...(base.gracePenalty?{gracePenalty:base.gracePenalty}:{})}
-            item=rollModifier(base.name,item,mf,gearTier)
-          }
+          const item = makeArtifactItem(4, mf, {gearOnly:true})
           const gold=Math.max(1,Math.round(randInt(60,150)*WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
           player.gold+=gold
           const bonusKinds=['potion','speedpotion','herb','brushwood','arrows',
@@ -16188,7 +16173,7 @@ more difficult:
       merchantStock.push(armor)
     }
     if (!merchantStock.some(it => it.kind === 'artifact')) {
-      const art = makeArtifactItem(gear.artifact.tier)
+      const art = makeArtifactItem(gear.artifact.tier, 0, {gearOnly:true})
       if (art) {
         art.merchantPrice = itemBaseValue(art) * gear.artifact.priceMultiplier / 2
         merchantStock.push(art)
