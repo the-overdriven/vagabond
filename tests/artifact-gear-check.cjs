@@ -78,6 +78,8 @@ test('generated artifacts inherit the stats of every available gear base', async
 test('artifact Short Bow fires at fixed bow damage and consumes ammunition', async () => {
   await ready()
   const bow = artifact('Short Bow', 3)
+  // Isolate the bow's fixed base damage from randomly rolled proc abilities.
+  bow.abilityId = 'long_shot'
   assert.equal(bow.kind, 'artifact')
   assert.equal(bow.artifactSlot, 'weapon')
   assert.equal(bow.rangedAtk, 5)
@@ -146,6 +148,9 @@ test('non-equipment artifacts retain the generic icon', async () => {
 test('artifact base stats and enchantments stack; penalties, GRACE, inventory and save/load work', async () => {
   await ready()
   const brigandine = artifact('Brigandine', 3)
+  // This test covers mundane stats, not a randomly rolled Berserker conversion.
+  brigandine.abilityId = 'immovable'
+  delete brigandine.berserkerOathRoll
   brigandine.identified = true
   brigandine.bonuses = {def:4, atk:2, spd:3}
   const normal = {kind:'armor', base:'Brigandine', def:12, speedPenalty:2}
@@ -293,7 +298,7 @@ test('domain powers are guaranteed on gear, unique across overlapping domains, a
     assert.equal(new Set(pool).size, pool.length, `${base.name} duplicate domain powers are unique`)
     assert.equal(run(`artifactAbilityDefinition(${JSON.stringify(item)})?.name`),
       loadJson('artifact_abilities.json').abilities[item.abilityId].name)
-    if (base.rangedAtk) assert.deepEqual(pool, ['long_shot','deadeye','crippling_shot'], 'bows cannot roll martial abilities')
+    if (base.rangedAtk) assert.deepEqual(pool, ['long_shot','deadeye','crippling_shot','ambusher'], 'bows allow shared Ambusher, not unrelated martial powers')
   }
   assert.equal(artifact('Amulet', 3).abilityId, null, 'non-gear artifacts have no enabled domain yet')
   assert.deepEqual(clone(run(`(() => {
@@ -713,15 +718,15 @@ test('Batch 3: HP-loss charges collect from poison and Blood Pact cost charges t
     assert.equal(run('artifactLosePlayerHp(8)'),8)
     assert.equal(run('player.artifactBloodReservoirStored'),2)
     await run('playerAttackEnemy(batchTarget)')
-    assert.equal(run('batchTarget.hp'),187,'base 10, stored 2 and blood pact cost 1')
-    assert.equal(run('player.hp'),71,'lost eight HP plus pact cost')
-    assert.equal(run('player.artifactBloodReservoirStored'),.25,'cost accumulates only for next strike')
+    assert.equal(run('batchTarget.hp'),186,'base 10, stored 2 and blood pact bonus 2')
+    assert.equal(run('player.hp'),70,'lost eight HP plus pact cost 2 based on enemy maximum HP')
+    assert.equal(run('player.artifactBloodReservoirStored'),.5,'cost accumulates only for next strike')
     run(`(() => {player.equip.armor.abilityId='pain_eater';player.artifactPainEaterHits=0;
       player.artifactPainAttackBonus=0})()`)
     run('artifactLosePlayerHp(1);artifactLosePlayerHp(2)')
     assert.equal(run('player.artifactPainEaterHits'),2)
     await run('playerAttackEnemy(batchTarget)')
-    assert.equal(run('batchTarget.hp'),174,'pain eater +2 and pact +1 on first strike')
+    assert.equal(run('batchTarget.hp'),172,'pain eater +2 and pact bonus +2 on first strike')
     assert.equal(run('player.artifactPainEaterHits'),1,'pact cost feeds next action')
     assert.equal(run('player.artifactPainAttackBonus'),0)
     run(`(() => {player.equip.weapon.abilityId='retribution';player.equip.armor=null;
@@ -729,7 +734,7 @@ test('Batch 3: HP-loss charges collect from poison and Blood Pact cost charges t
     run('artifactLosePlayerHp(10);artifactLosePlayerHp(4)')
     assert.equal(run('player.artifactRetributionStored'),14)
     await run('playerAttackEnemy(batchTarget)')
-    assert.equal(run('batchTarget.hp'),157,'retribution adds floor(14/2)=7 to base 10')
+    assert.equal(run('batchTarget.hp'),155,'retribution adds floor(14/2)=7 to base 10')
     assert.equal(run('player.artifactRetributionStored'),0)
   } finally {restoreArtifactCombat()}
 })
@@ -1506,8 +1511,8 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
     return {examined, powerCount:Object.keys(powers).length}
   })()`)
-  assert.equal(result.powerCount, 51)
-  assert.equal(result.examined, 51 * 14)
+  assert.equal(result.powerCount, 59)
+  assert.equal(result.examined, 59 * 14)
 })
 
 test('artifact activations log and animate while concealing unidentified powers', async () => {
@@ -1568,4 +1573,241 @@ test('ability selection filters equipment slots and weapon classes before rollin
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     count:1,oneHanded:false,bow:false,armor:false,disabled:false
   })
+})
+
+
+// Batch 2: ordinary derived-stat and combat paths must resolve all percentages
+// without extra RNG calls or animation-dependent decisions.
+test('Batch 2: new artifact definitions filter slots, weapon classes and combined domains', async () => {
+  await ready()
+  const result=clone(run(`(() => {
+    const item=(slot,base,twoHanded=false,rangedAtk=0)=>({kind:'artifact',artifactSlot:slot,
+      base, twoHanded, rangedAtk})
+    const types={one:artifactAbilityPool(item('weapon','Dagger')),
+      two:artifactAbilityPool(item('weapon','Two-handed Sword',true)),
+      bow:artifactAbilityPool(item('weapon','Short Bow',true,5)),
+      armor:artifactAbilityPool(item('armor','Tunic')),
+      shield:artifactAbilityPool(item('shield','Buckler'))}
+    return {count:Object.keys(ARTIFACT_ABILITIES.abilities).length,types}
+  })()`))
+  assert.equal(result.count,59)
+  for (const type of Object.values(result.types)) assert.equal(new Set(type).size,type.length)
+  for (const type of ['one','two','bow']) assert(result.types[type].includes('ambusher'))
+  for (const type of ['one','two']) {
+    assert(result.types[type].includes('fortunes_fang'))
+    assert(result.types[type].includes('veteran_xp'))
+    assert(result.types[type].includes('veteran_level'))
+  }
+  for (const id of ['fortunes_fang','veteran_level','veteran_xp','duelist','weaponmaster'])
+    assert(!result.types.bow.includes(id), 'bows must exclude '+id)
+  for (const id of ['tideguard','berserkers_oath','duelist','weaponmaster','veteran_xp','veteran_level'])
+    assert(result.types.armor.includes(id), 'armor must allow '+id)
+  assert(result.types.shield.includes('tideguard'))
+  for (const id of ['veteran_xp','veteran_level','berserkers_oath','duelist','weaponmaster'])
+    assert(!result.types.shield.includes(id), 'shield must exclude '+id)
+})
+
+test('Batch 2: Ambusher snapshots effective AGGRO independently for each melee hit and bow shot', async () => {
+  await ready();setupArtifactCombat('ambusher')
+  try {
+    run(`(() => {
+      player.race='human';player.godMode=false;player.invisibleTurns=0
+      batchTarget.aggro=4;batchTarget.aware=false;batchTarget.alarmed=false
+      batchTarget.abilities=[];damageRoll=()=>10;chance=()=>false
+    })()`)
+    const first=run('artifactAmbusherDamageBonus(batchTarget)')
+    assert(first>0 && first<=.50)
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('batchTarget.hp'),200-Math.round(10*(1+first)))
+    const second=run('artifactAmbusherDamageBonus(batchTarget)')
+    assert(second>0 && second<first, 'alarm after opening strike changes the next hit')
+    const hp=run('batchTarget.hp')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('batchTarget.hp'),hp-Math.round(10*(1+second)))
+    run('batchTarget.aware=true')
+    assert.equal(run('artifactAmbusherDamageBonus(batchTarget)'),0)
+    const hp2=run('batchTarget.hp')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('batchTarget.hp'),hp2-10)
+    // Ranged attacks alert the victim before resolving damage, but the opener
+    // must still receive the bonus sampled before this mandatory alert.
+    run(`(() => {
+      player.equip.weapon={kind:'artifact',artifactSlot:'weapon',base:'Short Bow',
+        rangedAtk:5,rangedRange:6,abilityId:'ambusher',identified:true}
+      player.inventory=[createItem('arrows',{count:2})]
+      batchTarget.aware=false;batchTarget.alarmed=false;batchTarget.hp=200
+      batchTarget.x=44;batchTarget.y=40;occupied=new Set([keyXY(44,40)])
+      enemyTurn=()=>{};npcTurn=()=>{}
+    })()`)
+    const bowBonus=run('artifactAmbusherDamageBonus(batchTarget)')
+    assert.equal(run('shootEnemy(batchTarget)'),true)
+    assert.equal(run('batchTarget.hp'),200-Math.round(10*(1+bowBonus)))
+    assert.equal(run('batchTarget.aware'),true)
+    assert.equal(run('player.inventory.find(i=>i.kind==="arrows").count'),1)
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 2: Tideguard uses only current unfrozen terrain and both allowed slots', async () => {
+  await ready();setupArtifactCombat('slow')
+  try {
+    run(`(() => {
+      player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,abilityId:null}
+      player.baseDef=20;player.combatSkills.shielding=100
+      player.equip.shield={kind:'artifact',artifactSlot:'shield',base:'Buckler',def:0,abilityId:null}
+      map[40][40]='river'
+    })()`)
+    const base=run('playerDef()')
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.20)
+    run("player.equip.armor.abilityId='tideguard'")
+    assert.equal(run('playerDef()'),base+Math.floor(Math.max(0,base)*.20))
+    run("player.equip.shield.abilityId='tideguard'")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.35)
+    run("map[40][40]='frozenriver'")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.20)
+    run("player.equip.armor.abilityId=null")
+    const frozenBase=run('playerDef()')
+    run("player.equip.armor.abilityId='tideguard'")
+    assert.equal(run('playerDef()'),frozenBase)
+    run("map[40][40]='water'")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.35)
+    run("map[40][40]='ice'")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.20)
+    run("player.equip.shield.abilityId='shield_mastery'")
+    assert(Math.abs(run('shieldingBlockChance(batchTarget)')-.30)<1e-12)
+    run("player.equip.shield.abilityId='counterguard';batchTarget.equipment={kind:'weapon',base:'Club',atk:2}")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.35)
+    run('batchTarget.equipment=null')
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.20)
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 2: Fortune’s Fang uses MF thresholds and Berserker armor modifies ordinary critical chance', async () => {
+  await ready();setupArtifactCombat('fortunes_fang')
+  try {
+    run(`player.race='human';player.baseMf=23;player.invisibleTurns=0;batchTarget.alarmed=false;
+      player.equip.armor=null`)
+    assert.equal(run('playerCriticalHitChance(batchTarget)'),run('BASE_CRIT_CHANCE')+.07)
+    run('player.baseMf=24')
+    assert.equal(run('playerCriticalHitChance(batchTarget)'),run('BASE_CRIT_CHANCE')+.08)
+    run("player.equip.weapon.rangedAtk=5;player.equip.weapon.base='Short Bow'")
+    assert.equal(run('playerCriticalHitChance(batchTarget)'),run('BASE_CRIT_CHANCE'))
+    run(`player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,
+        abilityId:'berserkers_oath',berserkerOathRoll:2}`)
+    const expected=run(`BASE_CRIT_CHANCE + Math.min(15,
+      Math.floor(Math.max(0,playerAtk()-playerDef())/2))/100`)
+    assert.equal(run('playerCriticalHitChance(batchTarget)'),expected)
+    run('player.equip.armor=null')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 2: Veteran XP and level modifiers share damage and flat defense calculations', async () => {
+  await ready();setupArtifactCombat('veteran_xp')
+  try {
+    run(`player.race='human';player.lvl=12;player.equip.weapon.mod='xp';
+      player.equip.weapon.xpBonus=30;chance=()=>false;damageRoll=()=>10`)
+    const before=run('batchTarget.hp')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('artifactXpBonusPP()'),50,'racial and equipment XP bonuses both count')
+    assert.equal(run('batchTarget.hp'),before-13,'50% XP boost gives +25% damage')
+    run('player.equip.weapon.abilityId="veteran_level"')
+    const now=run('batchTarget.hp')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('batchTarget.hp'),now-11,'level 12 gives +12% damage')
+    run(`player.equip.weapon.abilityId=null
+      player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,abilityId:null}`)
+    const base=run('playerDef()')
+    run("player.equip.armor.abilityId='veteran_xp'")
+    assert.equal(run('playerDef()'),base+3,'50% XP boost grants +3 DEF')
+    run("player.equip.armor.abilityId='veteran_level'")
+    assert.equal(run('playerDef()'),base+4,'level 12 gives +4 DEF')
+    run('player.lvl=15')
+    assert.equal(run('playerDef()'),base+6,'level 15 gives +6 DEF')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 2: Berserker rolls once, changes stats and saves without consuming RNG in queries', async () => {
+  await ready()
+  const item=clone(run(`(() => {
+    const oldPick=pick,oldRng=rng
+    try {
+      rng=()=>0.5
+      pick=pool=>pool.includes('Tunic')?'Tunic':pool.includes('berserkers_oath')?
+        'berserkers_oath':oldPick(pool)
+      return makeArtifactItem(3)
+    } finally {pick=oldPick;rng=oldRng}
+  })()`))
+  assert.equal(item.abilityId,'berserkers_oath')
+  assert.equal(item.berserkerOathRoll,2)
+  run(`(() => {
+    player.equip={weapon:null,shield:null,armor:${JSON.stringify(item)}}
+    player.equip.armor.identified=true
+    player.inventory=[];player.race='human';player.invisibleTurns=0
+  })()`)
+  const stats=clone(run(`(() => {
+    const id=player.equip.armor.abilityId
+    player.equip.armor.abilityId=null
+    const baseline={atk:playerAtk(),def:playerDef()}
+    player.equip.armor.abilityId=id
+    return {baseline,active:{atk:playerAtk(),def:playerDef()},text:itemStatLine(player.equip.armor)}
+  })()`))
+  assert.equal(stats.active.atk,stats.baseline.atk+2)
+  assert.equal(stats.active.def,stats.baseline.def-2)
+  assert.match(stats.text,/ATK \+2.*DEF -2/)
+  const save=clone(run('buildSaveObject()'))
+  run(`rngState=1117;loadGameFromObject(${JSON.stringify(save)},{isReplayInit:true})`)
+  assert.equal(run('player.equip.armor.berserkerOathRoll'),2)
+  const seed=run('rngState')
+  run('playerCriticalHitChance(enemies.find(e=>e.alive&&onCurrentLevel(e)) || {alarmed:true})')
+  run('playerAtk();playerDef();itemStatLine(player.equip.armor)')
+  assert.equal(run('rngState'),seed,'derived queries are RNG-free')
+})
+
+test('Batch 2: Duelist requires an empty shield slot; Weaponmaster rewards both melee skills', async () => {
+  await ready();setupArtifactCombat('slow')
+  try {
+    run(`(() => {
+      player.race='human';player.combatSkills.oneHanded=80;player.combatSkills.twoHanded=40
+      player.equip.weapon={kind:'weapon',base:'Dagger',twoHanded:false,atk:2,grace:5}
+      player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,
+        abilityId:'duelist'}
+    })()`)
+    assert.equal(run('artifactDuelistBonus()'),.20)
+    assert.equal(run('artifactPlayerStrikeMultiplier({melee:true})'),1.2)
+    run("player.equip.shield={kind:'shield',base:'Buckler',def:1}")
+    assert.equal(run('artifactDuelistBonus()'),0)
+    run('player.equip.shield=null;player.equip.weapon.twoHanded=true')
+    assert.equal(run('artifactDuelistBonus()'),0)
+    run('player.equip.weapon.twoHanded=false;player.equip.armor.abilityId=null')
+    const before=run('playerGraceBonus()')
+    run("player.equip.armor.abilityId='weaponmaster'")
+    assert.equal(run('playerGraceBonus()'),before+2)
+    run('player.combatSkills.twoHanded=60')
+    assert.equal(run('playerGraceBonus()'),before+3)
+    run("player.equip.weapon.base='Short Bow';player.equip.weapon.rangedAtk=5")
+    assert.equal(run('playerGraceBonus()'),before)
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 2: Blood Pact separately calculates both rates from the greater maximum HP', async () => {
+  await ready();setupArtifactCombat('blood_pact')
+  try {
+    run(`(() => {
+      player.maxHp=100;player.hp=100;batchTarget.maxHp=252;batchTarget.hp=252
+      chance=()=>false;damageRoll=()=>10
+    })()`)
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('player.hp'),97,'maximum enemy HP determines the cost: 3')
+    assert.equal(run('batchTarget.hp'),239,'ten ordinary damage plus 3 pact damage')
+    run(`(() => {
+      player.maxHp=500;player.hp=500;batchTarget.maxHp=100;batchTarget.hp=100
+      ARTIFACT_ABILITIES.abilities.blood_pact.hpCostRate=.01
+      ARTIFACT_ABILITIES.abilities.blood_pact.bonusDamageRate=.02
+    })()`)
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('player.hp'),495,'independent cost rate still costs 5')
+    assert.equal(run('batchTarget.hp'),80,'independent damage rate adds 10')
+  } finally {
+    run('ARTIFACT_ABILITIES.abilities.blood_pact.bonusDamageRate=.01')
+    restoreArtifactCombat()
+  }
 })

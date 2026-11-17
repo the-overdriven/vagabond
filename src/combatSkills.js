@@ -73,8 +73,16 @@ function marksmanshipMissChance(normalMissChance) {
     RANGED_CONFIG.dodgeMultiplier - 0.5 * combatSkillValue('marksmanship') / COMBAT_SKILL_MAX))
 }
 
-function shieldingBlockChance() {
-  return player.equip.shield ? 0.20 * combatSkillValue('shielding') / COMBAT_SKILL_MAX : 0
+function shieldingBlockChance(enemy = null) {
+  if (!player.equip.shield) return 0
+  let chance = 0.20 * combatSkillValue('shielding') / COMBAT_SKILL_MAX
+  if (artifactEquippedInSlot('shield','shield_mastery'))
+    chance += artifactRule('shield_mastery','blockBonus')
+  if (artifactEquippedInSlot('shield','counterguard') && enemy?.equipment?.kind === 'weapon')
+    chance += artifactRule('counterguard','blockBonus')
+  if (artifactEquippedInSlot('shield','tideguard') && artifactWaterPosition())
+    chance += artifactRule('tideguard','blockBonus')
+  return Math.min(1, Math.max(0,chance))
 }
 
 function combatTrainingMinTier() {

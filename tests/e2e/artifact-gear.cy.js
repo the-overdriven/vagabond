@@ -336,6 +336,64 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('keeps the new slot-restricted abilities and Berserker roll deterministic across saves', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const verify=(condition,message)=>{if(!condition)throw Error(message)}
+      for(const id of ['ambusher','tideguard','fortunes_fang','veteran_xp','veteran_level',
+        'berserkers_oath','duelist','weaponmaster']) {
+        verify(ARTIFACT_ABILITIES.abilities[id]?.enabled,'Missing enabled ability '+id)
+        verify(Number.isInteger(ARTIFACT_ABILITIES.abilities[id].priceBonus),'Missing price '+id)
+      }
+      const bow={kind:'artifact',artifactSlot:'weapon',base:'Short Bow',rangedAtk:5,twoHanded:true}
+      const armor={kind:'artifact',artifactSlot:'armor',base:'Tunic'}
+      const shield={kind:'artifact',artifactSlot:'shield',base:'Buckler'}
+      verify(artifactAbilityPool(bow).includes('ambusher'),'Ambusher not available for bows')
+      verify(!artifactAbilityPool(bow).includes('fortunes_fang'),'Bow rolled a melee-only ability')
+      verify(!artifactAbilityPool(bow).includes('weaponmaster'),'Bow rolled armor ability')
+      verify(artifactAbilityPool(armor).includes('berserkers_oath'),'Berserker missing from armor')
+      verify(artifactAbilityPool(shield).includes('tideguard'),'Shield lacks Tideguard')
+      verify(!artifactAbilityPool(shield).includes('berserkers_oath'),'Shield rolled armor-only ability')
+      player.equip={weapon:{kind:'weapon',base:'Dagger',atk:2,grace:5},shield:null,
+        armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,bonuses:{},
+          name:'Tunic of the Oath',noun:'Tunic',identified:true,abilityId:'berserkers_oath',
+          berserkerOathRoll:2}}
+      const originalId=player.equip.armor.abilityId
+      player.equip.armor.abilityId=null
+      const before={atk:playerAtk(),def:playerDef()}
+      player.equip.armor.abilityId=originalId
+      verify(playerAtk()===before.atk+2 && playerDef()===before.def-2,
+        'Berserker rolled stat exchange is not applied')
+      const beforeSave={atk:playerAtk(),def:playerDef()}
+      const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(saved,{isReplayInit:true})
+      verify(player.equip.armor?.berserkerOathRoll===2,'Berserker roll rerolled during load')
+      verify(playerAtk()===beforeSave.atk && playerDef()===beforeSave.def,
+        'Berserker derived stats changed during restoration')
+      verify(itemStatLine(player.equip.armor).includes('DEF -2'),
+        'Identified Berserker roll is not disclosed in item details')
+    })()`))
+  })
+
+  it('recalculates the skill-built artifact bonuses when the loadout changes', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const verify=(condition,message)=>{if(!condition)throw Error(message)}
+      player.combatSkills.oneHanded=80;player.combatSkills.twoHanded=60
+      player.equip={weapon:{kind:'weapon',base:'Dagger',twoHanded:false,atk:2,grace:5},
+        armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,identified:true,
+          abilityId:'duelist'},shield:null}
+      verify(artifactDuelistBonus()===.20,'Duelist damage does not scale with skill')
+      player.equip.shield={kind:'shield',base:'Buckler',def:1}
+      verify(artifactDuelistBonus()===0,'Equipping shield must cancel Duelist')
+      player.equip.shield=null
+      player.equip.armor.abilityId=null
+      const grace=playerGraceBonus()
+      player.equip.armor.abilityId='weaponmaster'
+      verify(playerGraceBonus()===grace+3,'Weaponmaster does not reward both skills')
+      player.equip.weapon={kind:'weapon',base:'Short Bow',twoHanded:true,rangedAtk:5}
+      verify(playerGraceBonus()===grace,'Bow must not receive Weaponmaster GRACE')
+    })()`))
+  })
+
   for (const width of [1440,390]) it('displays granted powers and inspection text at '+width+'px', () => {
     cy.viewport(width,900)
     cy.window().then(win=>win.eval(`(() => {

@@ -2537,6 +2537,69 @@ more difficult:
     return activeArtifactAbilities().has(id)
   }
 
+  function artifactEquippedInSlot(slot, id) {
+    const it = player.equip[slot]
+    return it?.abilityId === id && !!artifactAbilityDefinition(it)
+  }
+
+  function artifactWaterPosition() {
+    return ['water', 'river'].includes(map?.[player.y]?.[player.x])
+  }
+
+  function artifactXpBonusPP() {
+    return Math.max(0, (xpMultiplier() - 1) * 100)
+  }
+
+  function artifactBerserkerRoll() {
+    return artifactEquippedInSlot('armor', 'berserkers_oath')
+      ? (player.equip.armor.berserkerOathRoll || 0) : 0
+  }
+
+  // Inspect the target before its current strike changes awareness. For a bow
+  // this snapshot precedes the existing mandatory alert-on-shot update.
+  function artifactAmbusherDamageBonus(e) {
+    if (!artifactEquippedInSlot('weapon','ambusher') || e.aware) return 0
+    const bonus = Math.max(0, Math.min(artifactRule('ambusher','maxBonus'),
+      artifactRule('ambusher','baseBonus') - effectiveAggroRange(e) * artifactRule('ambusher','aggroPenalty')))
+    return e.alarmed ? bonus * artifactRule('ambusher','alarmedMultiplier') : bonus
+  }
+
+  function artifactDuelistBonus() {
+    return artifactEquippedInSlot('armor','duelist') && !player.equip.shield &&
+      meleeCombatSkill(player.equip.weapon) === 'oneHanded'
+      ? combatSkillValue('oneHanded') * artifactRule('duelist','damagePerSkillPoint') : 0
+  }
+
+  function artifactPlayerStrikeMultiplier({ambusher = 0, invisible = false, flurry = false, melee = false} = {}) {
+    let multiplier = (1 + ambusher)
+    if (melee && invisible && playerHasArtifactAbility('shadow_strike')) multiplier *= 1.5
+    if (melee && flurry && playerHasArtifactAbility('flurry')) multiplier *= 1.5
+    if (melee) multiplier *= 1 + artifactDuelistBonus()
+    // Distinct percentages multiply once, and flat prepared damage is added later.
+    if (artifactEquippedInSlot('weapon','veteran_xp'))
+      multiplier *= 1 + artifactXpBonusPP() * artifactRule('veteran_xp','damagePerXpPoint')
+    if (artifactEquippedInSlot('weapon','veteran_level'))
+      multiplier *= 1 + player.lvl * artifactRule('veteran_level','damagePerLevel')
+    return multiplier
+  }
+
+  function artifactStrikeFeedback(e, {ambusher = 0, melee = true, invisible = false, flurry = false} = {}) {
+    if (ambusher > 0) artifactAbilityMessage('ambusher',
+      `Ambusher exploits the ${e.name}'s hesitation!`, `You exploit the ${e.name}'s hesitation!`)
+    if (melee && invisible && playerHasArtifactAbility('shadow_strike'))
+      artifactAbilityMessage('shadow_strike', `Shadow Strike catches the ${e.name} unawares!`,
+        `Your hidden strike hits the ${e.name} harder!`)
+    if (melee && flurry && playerHasArtifactAbility('flurry'))
+      artifactAbilityMessage('flurry', `Flurry drives another powerful strike!`,
+        'Your follow-up strikes harder!')
+    if (melee && artifactDuelistBonus()) artifactAbilityMessage('duelist',
+      'Duelist finds an opening!', 'You strike with an unguarded flourish!')
+    for (const id of ['veteran_xp','veteran_level']) {
+      if (artifactEquippedInSlot('weapon',id)) artifactAbilityMessage(id,
+        `${ARTIFACT_ABILITIES.abilities[id].name} sharpens your attack!`, 'Your experience strengthens the strike!')
+    }
+  }
+
   function playerKnowsArtifactAbility(id) {
     let known = false
     forEachActiveArtifact(item => {if (item.identified && item.abilityId === id) known = true})
@@ -2556,7 +2619,9 @@ more difficult:
 
   function artifactInspectionText(item) {
     const ability = artifactAbilityDefinition(item)
-    return [item.description, ability && `${ability.name}: ${ability.description}`].filter(Boolean).join('\n')
+    const roll = item.abilityId === 'berserkers_oath' && item.berserkerOathRoll
+      ? ` (Rolled: ATK +${item.berserkerOathRoll}, DEF -${item.berserkerOathRoll})` : ''
+    return [item.description, ability && `${ability.name}: ${ability.description}${roll}`].filter(Boolean).join('\n')
   }
 
   // Relocation is gameplay state, never tied to camera animation. It covers
@@ -2886,6 +2951,13 @@ more difficult:
     const active = activeArtifactAbilities()
     let bonus = 0
     // Percentage abilities use the same base, never one another's results.
+    if (artifactEquippedInSlot('armor','tideguard') && artifactWaterPosition())
+      bonus += Math.floor(Math.max(0, baseDefense) * artifactRule('tideguard','defBonus'))
+    if (artifactEquippedInSlot('armor','veteran_xp'))
+      bonus += Math.floor((artifactXpBonusPP() + 1e-8) / artifactRule('veteran_xp','defPerXpPoints'))
+    if (artifactEquippedInSlot('armor','veteran_level'))
+      bonus += artifactRule('veteran_level','defPerStep') *
+        Math.floor(player.lvl / artifactRule('veteran_level','levelsPerDef'))
     if (active.has('brace') && playerHeldPosition())
       bonus += Math.max(2, Math.floor(baseDefense * 0.20))
     if (active.has('vigorplate') && player.hp >= playerMaxHp() * 0.75)
@@ -3168,6 +3240,9 @@ more difficult:
       description: generateArtifactDescription(noun, name, effect, curse, possessor, ownerLore),
     }
     item.abilityId = rollArtifactAbility(item)
+    if (item.abilityId === 'berserkers_oath')
+      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
+        artifactRule('berserkers_oath','rollMax'))
     return item
   }
 
@@ -3198,6 +3273,9 @@ more difficult:
       description: generateArtifactDescription(baseName, name, effect, null, possessor, ownerLore)
     }
     item.abilityId = rollArtifactAbility(item)
+    if (item.abilityId === 'berserkers_oath')
+      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
+        artifactRule('berserkers_oath','rollMax'))
     return item
   }
 
@@ -3472,6 +3550,8 @@ more difficult:
       }
       if (it.maxHpPct) parts.push('Max HP ' + it.maxHpPct + '%')
       const ability = artifactAbilityDefinition(it)
+      if (it.abilityId === 'berserkers_oath' && it.berserkerOathRoll)
+        parts.push(`ATK +${it.berserkerOathRoll}`, `DEF -${it.berserkerOathRoll}`)
       if (ability) parts.push(ability.name)
       // CURSED is an instance property, not an artifact-effect property.
       // Only artifacts that actually rolled a curse should display it.
@@ -3627,7 +3707,7 @@ more difficult:
       if (it.atk) a += it.atk
       if (it.mod === 'atk') a += it.modAmt
     }
-    a += artifactBonusSum('atk') + (permanent ? 0 : curseDebuffSum('atk'))
+    a += artifactBonusSum('atk') + artifactBerserkerRoll() + (permanent ? 0 : curseDebuffSum('atk'))
     if (!permanent) a += artifactSoulFedStacks()
     if (!permanent && !excludePotions && player.berserkTurns > 0) a += player.berserkBonus
     if (!permanent && player.mummyCurseTurns > 0) a -= 2
@@ -3649,7 +3729,7 @@ more difficult:
       if (it.mod === 'def') d += it.modAmt
     }
     if (!permanent) d += playerTerrainEffects().defense
-    d += artifactBonusSum('def') + (permanent ? 0 : curseDebuffSum('def'))
+    d += artifactBonusSum('def') - artifactBerserkerRoll() + (permanent ? 0 : curseDebuffSum('def'))
     if (!permanent && !excludePotions) {
       if (player.stoneSkinTurns > 0) d += player.stoneSkinBonus
       if (player.berserkTurns > 0) d -= itemDefinition('berserkPotion').effect.defPenalty
@@ -3721,7 +3801,11 @@ more difficult:
   }
 
   function playerGraceBonus() {
-    return raceGrace() + levelGrace() + artifactBonusSum('grace')
+    const master = artifactEquippedInSlot('armor','weaponmaster') &&
+      meleeCombatSkill(player.equip.weapon)
+      ? Math.floor(Math.min(combatSkillValue('oneHanded'), combatSkillValue('twoHanded')) /
+        artifactRule('weaponmaster','skillPerGrace')) : 0
+    return raceGrace() + levelGrace() + artifactBonusSum('grace') + master
   }
 
   function armorGracePenalty(armor) {
@@ -5561,8 +5645,16 @@ more difficult:
   }
 
   function playerCriticalHitChance(e) {
-    return BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed &&
+    let crit = BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed &&
       !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : 0)
+    if (artifactEquippedInSlot('weapon','fortunes_fang') && isBreachWeapon(player.equip.weapon))
+      crit += Math.min(artifactRule('fortunes_fang','maxCritBonusPP'),
+        Math.floor(Math.max(0,playerMf()) / artifactRule('fortunes_fang','mfPerPoint'))) / 100
+    if (artifactEquippedInSlot('armor','berserkers_oath'))
+      crit += Math.min(artifactRule('berserkers_oath','maxCritBonusPP'),
+        Math.floor(Math.max(0, playerAtk()-playerDef()) /
+          artifactRule('berserkers_oath','gapPerCritPoint'))) / 100
+    return crit
   }
 
   function tryEvadePlayerAttack(e) {
@@ -5601,6 +5693,7 @@ more difficult:
     AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
     const scrollInvisibleAttack = !player.godMode && player.invisibleTurns > 0
     const artifactInvisibleAttack = playerIsInvisible()
+    const ambusherOpeningBonus = artifactAmbusherDamageBonus(e)
     const weaponName = player.equip.weapon ? artifactDisplayName(player.equip.weapon).replace(/^The\s+/i, '') : 'bare fists'
     // The player can swing at the last known tile of an invisible enemy.
     // A miss does not expose it; a successful hit breaks its invisibility.
@@ -5641,25 +5734,34 @@ more difficult:
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
-    if (playerHasArtifactAbility('shadow_strike') && artifactInvisibleAttack) dmg = Math.round(dmg * 1.50)
-    // Executioner's bonus strike is not the GRACE follow-up rewarded by Flurry.
-    if (extraAttackKind === 'grace' && playerHasArtifactAbility('flurry')) dmg = Math.round(dmg * 1.50)
+    // Each direct strike evaluates its own awareness, including GRACE follow-ups.
+    // Percentage bonuses share one rounding point before the prepared flat damage.
+    const strikeMultiplier = artifactPlayerStrikeMultiplier({ambusher:ambusherOpeningBonus,
+      invisible:artifactInvisibleAttack,flurry:extraAttackKind==='grace',melee:true})
+    const beforePercent = dmg
+    dmg = Math.round(dmg * strikeMultiplier)
+    if (strikeMultiplier > 1 && beforePercent > 0)
+      artifactStrikeFeedback(e,{ambusher:ambusherOpeningBonus,melee:true,
+        invisible:artifactInvisibleAttack,flurry:extraAttackKind==='grace'})
     const consumeBulwarkBravery = dmg > 0 && player.artifactBraveryCharge &&
       playerHasArtifactAbility('bulwark_bravery')
     if (consumeBulwarkBravery) dmg = Math.round(dmg * (1 + artifactRule('bulwark_bravery','damageBonus')))
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
+    const pactReferenceHp = Math.max(playerMaxHp(), e.maxHp)
     const bloodPactCost = playerHasArtifactAbility('blood_pact')
-      ? Math.ceil(playerMaxHp() * artifactRule('blood_pact','costFraction')) : 0
+      ? Math.ceil(pactReferenceHp * artifactRule('blood_pact','hpCostRate')) : 0
+    const bloodPactBonus = playerHasArtifactAbility('blood_pact')
+      ? Math.ceil(pactReferenceHp * artifactRule('blood_pact','bonusDamageRate')) : 0
     // Every landed blow (including a zero-damage glance) can release a
     // prepared charge. Only an actual miss preserves Retribution/Riposte.
-    dmg = artifactMeleeHitBonuses(dmg) + bloodPactCost
+    dmg = artifactMeleeHitBonuses(dmg) + bloodPactBonus
     if (bloodPactCost) {
-        artifactLosePlayerHp(bloodPactCost,{cost:true})
-        if (playerKnowsArtifactAbility('blood_pact'))
-          log(`Blood Pact consumes ${bloodPactCost} HP!`, 'bad')
-        else log(`Your weapon draws ${bloodPactCost} HP from you!`, 'bad')
-      }
+      artifactLosePlayerHp(bloodPactCost,{cost:true})
+      artifactAbilityMessage('blood_pact',
+        `Blood Pact consumes ${bloodPactCost} HP and adds ${bloodPactBonus} damage!`,
+        `Your weapon draws ${bloodPactCost} HP from you!`)
+    }
     const pactFatal = player.hp <= 0
     const beforeHitHp = e.hp
     const effectiveDamage = Math.min(Math.max(0,e.hp),dmg)
@@ -5685,7 +5787,14 @@ more difficult:
     triggerEnemyShellRetreat(e)
     alarmEnemy(e)
     alarmEnemiesNearHit(e)
-    if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
+    if (critical) {
+      for (const id of ['fortunes_fang','berserkers_oath']) if (
+        (id === 'fortunes_fang' && artifactEquippedInSlot('weapon',id)) ||
+        (id === 'berserkers_oath' && artifactEquippedInSlot('armor',id)))
+        artifactAbilityMessage(id, `${ARTIFACT_ABILITIES.abilities[id].name} lands a critical!`,
+          'Your magic drives a critical strike!')
+      spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical)
+    }
     spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, critical ? 120 : 0)
     if (glancing) {
       if (player.equip.weapon) {
@@ -5791,6 +5900,17 @@ more difficult:
     const braveryFromStronger = effectiveDamage > 0 && playerHasArtifactAbility('bulwark_bravery') && artifactStrongEnemy(e)
     if ((blocked || glancing) && playerHasArtifactAbility('riposte')) player.artifactRiposteReady = true
     if (braveryFromStronger) player.artifactBraveryCharge = true
+    if (blocked) {
+      for (const id of ['shield_mastery','counterguard','tideguard']) {
+        if (artifactEquippedInSlot('shield',id) && (id !== 'counterguard' || e.equipment?.kind === 'weapon') &&
+            (id !== 'tideguard' || artifactWaterPosition()))
+          artifactAbilityMessage(id, `${ARTIFACT_ABILITIES.abilities[id].name} reinforces your block!`,
+            'Your enchanted shield deflects the blow!')
+      }
+    }
+    if (artifactEquippedInSlot('armor','tideguard') && artifactWaterPosition() && dmg > 0)
+      artifactAbilityMessage('tideguard','Tideguard hardens your defenses in water!',
+        'The water strengthens your armor!')
     if (critical) spawnDamageNumber(player.x, player.y, 'Crit!', RENDER_STYLE.damage.critical, attackPresentation.delay + 100)
     spawnDamageNumber(player.x, player.y, dmg, RENDER_STYLE.damage.playerHit, attackPresentation.delay + 100 + (critical ? 120 : 0))
     if (incoming.absorbed) {
@@ -5931,6 +6051,7 @@ more difficult:
       const wasEnraged = enemyIsEnraged(e)
       const wasFleeing = enemyIsFleeing(e)
       const shotCriticalChance = playerCriticalHitChance(e)
+      const ambusherOpeningBonus = artifactAmbusherDamageBonus(e)
       // Preserve rare creatures' two-sighting escape rules. Ordinary targets
       // become alerted on being shot at, even when the arrow misses.
       // A six-tile bow shot must not bypass the five-tile first-sighting gate.
@@ -5970,8 +6091,13 @@ more difficult:
         const critical = !glancing && chance(shotCriticalChance)
         if (critical) dmg = Math.round(dmg * 2)
         if (glancing) dmg = Math.floor(dmg / 3)
-        if (playerHasArtifactAbility('deadeye') && playerHeldPosition())
-          dmg = Math.round(dmg * (1 + artifactRule('deadeye','damageBonus')))
+        const deadeyeBonus = playerHasArtifactAbility('deadeye') && playerHeldPosition()
+          ? artifactRule('deadeye','damageBonus') : 0
+        const strikeMultiplier = artifactPlayerStrikeMultiplier({ambusher:ambusherOpeningBonus}) *
+          (1 + deadeyeBonus)
+        if (dmg > 0 && strikeMultiplier > 1)
+          artifactStrikeFeedback(e,{ambusher:ambusherOpeningBonus,melee:false})
+        dmg = Math.round(dmg * strikeMultiplier)
         const shield = AdaptivePlayerTrolling.shieldHunterArrowHit(e,dmg)
         dmg = shield.damage
         const directDamage = Math.min(Math.max(0,e.hp),dmg)
@@ -5984,7 +6110,12 @@ more difficult:
         absorbEnemyFatalHit(e)
         triggerEnemyShellRetreat(e)
         alarmEnemiesNearHit(e)
-        if (critical) spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical, deathFxDelay)
+        if (critical) {
+          if (artifactEquippedInSlot('armor','berserkers_oath'))
+            artifactAbilityMessage('berserkers_oath', "Berserker's Oath sharpens your shot!",
+              'Your armor lends savage precision!')
+          spawnDamageNumber(e.x, e.y, 'Crit!', RENDER_STYLE.damage.critical, deathFxDelay)
+        }
         spawnDamageNumber(e.x, e.y, dmg, RENDER_STYLE.damage.enemyHit, deathFxDelay + (critical ? 120 : 0))
         log(shield.absorbed
           ? `The ${e.name}'s shield absorbs your arrow. ${dmg} damage gets through.${shield.broken ? ' Its shield SHATTERS!' : ''}`

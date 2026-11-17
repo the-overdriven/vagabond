@@ -7040,7 +7040,7 @@ combat outcomes or consume game RNG.
 | Bravery (bulwark) | bulwark | Taking damage from a stronger enemy prepares **+25% damage** on the next successful melee hit. Misses do not consume it; the charge is unique, saved, and never duplicated by gear swaps. |
 | Riposte | martial | A **successful shield block** or an enemy **glancing melee hit** prepares +50% on the next damaging melee strike. A miss keeps the charge; removing the Riposte weapon clears it. |
 | Retribution | martial | Stores **all HP actually lost** while equipped; the next damaging melee strike gains **floor(50% × total HP lost)** as added damage. A miss keeps the charge; the next hit spends it. |
-| Blood Pact | martial | Every landed melee strike, including GRACE strikes, costs **ceil(1% of maximum HP)** and adds that same number to its damage. The cost is direct HP loss, unaffected by Last Stand; it can kill the player, but the blow still resolves, allowing mutual death. |
+| Blood Pact | martial | Each landed melee strike, including GRACE strikes, uses **max(player maximum HP, target maximum HP)** as its reference. It costs **ceil(1% of the reference HP)** in direct HP loss and separately adds **ceil(1% of the same reference HP)** damage after defenses. The two rates are independently configurable. The cost ignores damage reduction, can kill the player, and still allows the blow to resolve and cause mutual death. |
 | Blood Reservoir | bulwark | Stores **25% of every HP-loss event**, capped at **25% of maximum HP**. Its next damaging melee strike adds the **whole-number portion** of the reserve; a miss keeps it. |
 | Pain Eater | bulwark | Each separate HP-loss event adds **+1 damage** to the next melee attack action. This charge is spent on an attack, **including misses**, and applies to at most the first landed blow of a GRACE series. Damage taken during Blood Pact charges the next attack instead. |
 | Shield Mastery | shields | **+10 percentage points** to normal shield block chance, without removing existing Shielding skill rules. |
@@ -7068,13 +7068,46 @@ combat outcomes or consume game RNG.
 | Fear Aura | bulwark | Fleeing from fear may frighten adjacent monsters for **3 turns** with **20%** probability per monster per player turn. Fear caused exclusively by this aura does not spread further. Standard fear immunities remain. |
 | Fear Eater | bulwark | Gain **+1 ATK** per visible frightened enemy within **10 tiles** on the same Z level, up to **+5 ATK**. |
 | Executioner's Aura | bulwark | Killing an uninjured monster with a single direct melee hit has **50%** chance to scare other monsters within **3 tiles** for **3 turns**, subject to fear immunities. |
+| Ambusher | martial, archery | **Melee weapons and bows only.** Against an enemy that is **unaware**, direct hits deal up to **+50% damage** depending on effective AGGRO. Awareness is sampled before that individual hit alerts the victim, including bow shots and GRACE follow-ups. If the victim is alarmed but still unaware, the bonus is halved; once aware, it vanishes. |
+| Tideguard | bulwark | **Armor or shields only.** While standing on unfrozen **water or river** terrain, armor grants **+20% DEF** (rounded down from the ordinary pre-conditional DEF basis) and shields grant **+15 percentage points** to normal melee block chance. Both slot effects may operate together, but duplicate copies of either effect do not stack. Frozen rivers and lake ice do not qualify. |
+| Fortune's Fang | martial | **Melee weapons only.** Each **3 complete MF** adds **+1 percentage point** of melee critical chance, capped at **+8 points** (24 MF). Uses current effective MF and the normal critical roll. |
+| Veteran — Experience | martial, bulwark | **Melee weapon:** +5% direct melee damage per 10 percentage points of effective XP bonus, scaling continuously. **Armor:** +1 DEF per **15 complete XP-bonus percentage points**. Uses all existing racial/equipment XP multipliers. Bows and shields excluded. |
+| Veteran — Level | martial, bulwark | **Melee weapon:** +1% direct melee damage per character level. **Armor:** +2 DEF per **5 complete character levels**. Bows and shields excluded. |
+| Berserker's Oath | bulwark | **Armor only.** On generation, roll **1–3** with equal probability: **−rolled DEF, +rolled ATK** while equipped. Gain **+1 critical-chance percentage point per 2 whole points** by which effective ATK exceeds effective DEF, capped at **+15 points**. The critical bonus applies to melee and bows; the ATK modifier does not change the bow's fixed ranged ATK. |
+| Duelist | bulwark | **Armor only.** While equipped with a **one-handed melee weapon and no shield**, direct melee damage gains **0.25% for each One-Handed proficiency point** (**+25%** at skill 100). Bows and unarmed strikes excluded. Changing weapon or equipping a shield removes the bonus immediately. |
+| Weaponmaster | bulwark | **Armor only.** With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded. |
 
 Brace and Vigorplate round fractional DEF bonuses **down**, using the same
 pre-conditional DEF basis; neither feeds the other's percentage. Hold the Line
 adds its flat bonus afterward. All bonuses are calculated dynamically and
 relinquished immediately when their conditions or the equipped ability change.
 The stationary condition depends on consumed world turns and actual position
-changes, never animation progress. For damaging melee powers, the regular
+changes, never animation progress. Tideguard uses the current global level's
+terrain (not cosmetic underlays); a movement onto or off qualifying water
+changes the bonus immediately. Veteran armor bonuses are additive flat DEF
+applied to the same derived-stat calculation; Berserker's Oath uses ordinary
+ATK and DEF so its stat trade affects the critical gap without circularity.
+
+For Ambusher, the current effective AGGRO includes racial, sleeping, alarm and
+other existing adjustments. The opening bonus before awareness is:
+
+```text
+baseBonus = clamp(0.60 − 0.05 × effectiveAggro, 0, 0.50)
+actualBonus = 0 if aware, baseBonus / 2 if alarmed but unaware, else baseBonus
+```
+
+For effective AGGRO 4 / 8 / 12, the unaware bonus is **40% / 20% / 0%**.
+Fractional AGGRO retains continuous scaling. Each direct strike checks again:
+a newly aware enemy does not remain vulnerable throughout the same attack
+sequence, and an arrow's existing pre-damage alerting cannot erase its
+opening snapshot. Damage bonuses apply after ordinary critical/glancing damage
+but before flat prepared damage, and distinct percentage bonuses multiply
+before the final rounding. Armor powers use the same ordinary stat and skill
+functions rather than storing duplicate derived values. Only the generation
+roll for Berserker's Oath becomes item state; it is serialized with the item
+and never rerolled on equip, identification or restoration.
+
+For damaging melee powers, the regular
 critical/glancing calculations occur before the added damage multipliers.
 
 Enrage and martial Bravery modify the melee attack input before DEF mitigation;
@@ -7146,7 +7179,13 @@ and restored through normal save/replay, without animation-driven decisions.
 
 
 The power identity, position-change turn and relevant combat statuses survive
-save/load and deterministic replay. Enemy Fear uses the same status and rules
+save/load and deterministic replay. Current XP, level, MF, combat skills, gear,
+terrain and awareness determine the new derived bonuses without new timer
+states or extra rolls during rendering. The once-rolled Berserker modifier is
+part of the saved artifact. Successful ability triggers are communicated
+through the normal message log and animated combat popups; both keep hidden
+ability identities concealed until identification. The popups never determine
+gameplay outcomes. Enemy Fear uses the same status and rules
 whether caused by an artifact or a scroll, including its countdown and
 interruptions from damage. Range and adjacency do not cross Z levels.
 Executioner's once-per-enemy marker, enemy Binding, the player's pending

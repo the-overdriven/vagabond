@@ -41,12 +41,17 @@
       "silence",
       "confusion",
       "disarm",
-      "soul_eater"
+      "soul_eater",
+      "ambusher",
+      "fortunes_fang",
+      "veteran_xp",
+      "veteran_level"
     ],
     "archery": [
       "long_shot",
       "deadeye",
-      "crippling_shot"
+      "crippling_shot",
+      "ambusher"
     ],
     "bulwark": [
       "fleetfoot",
@@ -69,7 +74,13 @@
       "taunt",
       "fear_aura",
       "fear_eater",
-      "executioners_aura"
+      "executioners_aura",
+      "tideguard",
+      "veteran_xp",
+      "veteran_level",
+      "berserkers_oath",
+      "duelist",
+      "weaponmaster"
     ],
     "shields": [
       "shield_mastery",
@@ -237,9 +248,10 @@
     },
     "blood_pact": {
       "name": "Blood Pact",
-      "description": "Every landed melee strike costs 1% of maximum HP, rounded up, and adds the same amount to damage. This can kill you.",
+      "description": "Each landed melee hit costs 1% of the greater of your and the target’s maximum HP and adds that much damage after defenses; each amount rounds up and can kill you.",
       "enabled": true,
-      "costFraction": 0.01,
+      "hpCostRate": 0.01,
+      "bonusDamageRate": 0.01,
       "priceBonus": 250
     },
     "shield_mastery": {
@@ -442,6 +454,117 @@
       "chance": 0.5,
       "soulFedDuration": 300,
       "priceBonus": 650
+    },
+    "ambusher": {
+      "name": "Ambusher",
+      "description": "Unaware targets take up to 50% extra melee or bow damage based on their effective AGGRO. Alarmed but unaware targets receive half the bonus; aware targets receive none.",
+      "enabled": true,
+      "slots": [
+        "weapon"
+      ],
+      "weaponTypes": [
+        "bow",
+        "oneHandedMelee",
+        "twoHandedMelee"
+      ],
+      "baseBonus": 0.6,
+      "aggroPenalty": 0.05,
+      "maxBonus": 0.5,
+      "alarmedMultiplier": 0.5,
+      "priceBonus": 480
+    },
+    "tideguard": {
+      "name": "Tideguard",
+      "description": "On water or an unfrozen river: armor grants 20% DEF; a shield adds 15 percentage points to melee block chance.",
+      "enabled": true,
+      "slots": [
+        "armor",
+        "shield"
+      ],
+      "defBonus": 0.2,
+      "blockBonus": 0.15,
+      "priceBonus": 260
+    },
+    "fortunes_fang": {
+      "name": "Fortune's Fang",
+      "description": "Melee critical chance gains +1 percentage point per complete 3 Magic Find, up to +8 points.",
+      "enabled": true,
+      "slots": [
+        "weapon"
+      ],
+      "weaponTypes": [
+        "oneHandedMelee",
+        "twoHandedMelee"
+      ],
+      "mfPerPoint": 3,
+      "maxCritBonusPP": 8,
+      "priceBonus": 430
+    },
+    "veteran_xp": {
+      "name": "Veteran — Experience",
+      "description": "Melee weapon: +5% damage per 10 percentage points of XP bonus. Armor: +1 DEF per complete 15 percentage points of XP bonus.",
+      "enabled": true,
+      "slots": [
+        "weapon",
+        "armor"
+      ],
+      "weaponTypes": [
+        "oneHandedMelee",
+        "twoHandedMelee"
+      ],
+      "damagePerXpPoint": 0.005,
+      "defPerXpPoints": 15,
+      "priceBonus": 320
+    },
+    "veteran_level": {
+      "name": "Veteran — Level",
+      "description": "Melee weapon: +1% damage per character level. Armor: +2 DEF per complete 5 levels.",
+      "enabled": true,
+      "slots": [
+        "weapon",
+        "armor"
+      ],
+      "weaponTypes": [
+        "oneHandedMelee",
+        "twoHandedMelee"
+      ],
+      "damagePerLevel": 0.01,
+      "levelsPerDef": 5,
+      "defPerStep": 2,
+      "priceBonus": 410
+    },
+    "berserkers_oath": {
+      "name": "Berserker's Oath",
+      "description": "Armor trades 1–3 DEF for the same ATK, rolled once. Gain +1 percentage point to melee and bow critical chance per 2 points that ATK exceeds DEF, up to +15 points.",
+      "enabled": true,
+      "slots": [
+        "armor"
+      ],
+      "rollMin": 1,
+      "rollMax": 3,
+      "gapPerCritPoint": 2,
+      "maxCritBonusPP": 15,
+      "priceBonus": 390
+    },
+    "duelist": {
+      "name": "Duelist",
+      "description": "With a one-handed melee weapon and no shield, deal +0.25% melee damage per point of One-Handed skill.",
+      "enabled": true,
+      "slots": [
+        "armor"
+      ],
+      "damagePerSkillPoint": 0.0025,
+      "priceBonus": 350
+    },
+    "weaponmaster": {
+      "name": "Weaponmaster",
+      "description": "With a melee weapon, gain +1 GRACE for each complete 20 points in the lower of One-Handed and Two-Handed proficiency.",
+      "enabled": true,
+      "slots": [
+        "armor"
+      ],
+      "skillPerGrace": 20,
+      "priceBonus": 430
     }
   },
   "pricing": {
