@@ -206,6 +206,12 @@ function buildSaveObject() {
       artifactSacredReadyTurn: player.artifactSacredReadyTurn,
       artifactBoneplateExpiries: [...player.artifactBoneplateExpiries],
       artifactSoulFedExpiries: [...player.artifactSoulFedExpiries],
+      artifactDancerUntilTurn: player.artifactDancerUntilTurn,
+      artifactMaliceTargetId: player.artifactMaliceTargetId,
+      artifactMaliceHits: player.artifactMaliceHits,
+      artifactVengefulPrecisionReady: player.artifactVengefulPrecisionReady === true,
+      artifactReaperStored: player.artifactReaperStored,
+      artifactReaperOriginId: player.artifactReaperOriginId,
       speedPotionTurns: player.speedPotionTurns,
       speedPotionBonus: player.speedPotionBonus,
       stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,
@@ -917,7 +923,8 @@ function loadGameFromObject(data, opts = {}) {
   player.artifactBraveryCharge = player.artifactBraveryCharge === true
   for (const field of ['artifactRetributionStored','artifactBloodReservoirStored','artifactPainEaterHits',
     'artifactPainAttackBonus','artifactRhythmHitsThisAction','artifactLastStandUntilTurn',
-    'artifactLastStandCooldownUntil','artifactSacredReadyTurn']) {
+    'artifactLastStandCooldownUntil','artifactSacredReadyTurn',
+    'artifactDancerUntilTurn','artifactMaliceHits','artifactReaperStored']) {
     if (!Number.isFinite(player[field])) throw new Error('Invalid saved artifact combat state: ' + field)
   }
   player.artifactRiposteReady = player.artifactRiposteReady === true
@@ -925,6 +932,13 @@ function loadGameFromObject(data, opts = {}) {
   player.artifactEvasionPrepared = player.artifactEvasionPrepared === true
   player.artifactMartialEvasionPending = player.artifactMartialEvasionPending === true
   player.artifactElusiveReady = player.artifactElusiveReady === true
+  player.artifactVengefulPrecisionReady = player.artifactVengefulPrecisionReady === true
+  if (!Number.isSafeInteger(player.artifactDancerUntilTurn) || player.artifactDancerUntilTurn < 0 ||
+      !Number.isSafeInteger(player.artifactMaliceHits) || player.artifactMaliceHits < 0 ||
+      !Number.isSafeInteger(player.artifactReaperStored) || player.artifactReaperStored < 0 ||
+      (player.artifactMaliceTargetId !== null && typeof player.artifactMaliceTargetId !== 'string') ||
+      (player.artifactReaperOriginId !== null && typeof player.artifactReaperOriginId !== 'string'))
+    throw new Error('Invalid saved artifact combat state')
   if (!Array.isArray(player.artifactSoulFedExpiries) ||
       !player.artifactSoulFedExpiries.every(Number.isSafeInteger)) throw new Error('Invalid saved Soul Fed state')
   if (!Array.isArray(player.artifactBoneplateExpiries) ||

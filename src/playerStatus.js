@@ -94,7 +94,18 @@ function activePlayerStatuses() {
   if (knownArtifactPower('bulwark_bravery') && playerHasArtifactAbility('bulwark_bravery') && player.artifactBraveryCharge)
     statuses.push({id:'artifact-bravery',icon:'⚔',label:'Bravery',counter:'',tone:'up',
       detail:'Bravery: the next successful melee hit deals 25% more damage.'})
+  if (knownArtifactPower('dancer') && artifactDancerActive())
+    statuses.push({id:'artifact-dancer',icon:'◇',label:'Dancer · +20% DEF',
+      counter:'',tone:'up',detail:'Moving prepares a defense worth 20% of pre-conditional DEF; move again to maintain it.'})
+  if (knownArtifactPower('growing_malice') && artifactEquippedInSlot('weapon','growing_malice') &&
+      player.artifactMaliceHits > 0)
+    statuses.push({id:'artifact-growing-malice',icon:'⚔',label:`Growing Malice · +${Math.min(10,player.artifactMaliceHits*artifactRule('growing_malice','critPerHitPP'))}% crit`,
+      counter:'',tone:'up',detail:'Additional landed strikes against the same living enemy build critical chance. A miss or target change resets it.'})
+  if (knownArtifactPower('reaper') && artifactEquippedInSlot('weapon','reaper') && player.artifactReaperStored > 0)
+    statuses.push({id:'artifact-reaper',icon:'⚔',label:`Reaper · +${player.artifactReaperStored} damage`,
+      counter:'',tone:'up',detail:'Stored killing-blow overkill adds to your next landed strike against another enemy.'})
   const preparedPowers = [
+    ['vengeful_precision', player.artifactVengefulPrecisionReady, 'Vengeful Precision ready', '⚔', '+8 percentage points critical chance for the next melee weapon strike, even if it misses.'],
     ['riposte', player.artifactRiposteReady, 'Riposte ready', '⚔', '+50% on next damaging melee hit.'],
     ['retribution', player.artifactRetributionStored > 0, `Retribution · ${player.artifactRetributionStored || 0} HP`, '⚔', 'Half of stored HP loss boosts the next damaging melee hit.'],
     ['blood_reservoir', player.artifactBloodReservoirStored > 0, `Blood Reservoir · ${Math.floor(player.artifactBloodReservoirStored || 0)}`, '◆', 'Stored damage boosts the next damaging melee hit.'],

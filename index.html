@@ -1479,7 +1479,7 @@ more difficult:
     const nextMap = depthUndergroundMap(depth)
     if (!nextMap) return false
     currentZ = destination.z
-    markPlayerPositionChanged()
+    markPlayerPositionChanged(true)
     currentCave = -1
     map = nextMap
     undergroundDiscovered = depthUndergroundDiscovered(depth)
@@ -1557,7 +1557,9 @@ more difficult:
     const arrival=mineTransitionArrival(destination,nextMap)
     if(!arrival){log('There is no safe space to use this passage.', 'info');return true}
     currentZ=destination.z
-    markPlayerPositionChanged()
+    // A legacy mine arrival may be displaced by its fallback search.
+    // Such geometry is not a qualifying pure-Z move for Dancer.
+    markPlayerPositionChanged(arrival.x === player.x && arrival.y === player.y)
     currentCave=-1
     map=nextMap
     undergroundDiscovered=depthUndergroundDiscovered(depth)
@@ -1596,7 +1598,7 @@ more difficult:
       if (!undergroundMap || !mausoleumMap) return true
       map = undergroundMap
       currentZ = -1
-      markPlayerPositionChanged()
+      markPlayerPositionChanged(true)
       currentCave = -1
       undergroundDiscovered = undergroundDiscoveredL1
       player.x = hut.x
@@ -1611,7 +1613,7 @@ more difficult:
     if (currentZ === -1 && map[player.y]?.[player.x] === 'mausoleumstairsup') {
       map = surfaceMap
       currentZ = 0
-      markPlayerPositionChanged()
+      markPlayerPositionChanged(true)
       currentCave = -1
       player.x = hut?.x ?? player.x
       player.y = hut?.y ?? player.y
@@ -1847,7 +1849,7 @@ more difficult:
     return true
     } finally {
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
-        markPlayerPositionChanged()
+        markPlayerPositionChanged(true)
         Mimics.onLevelChange()
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
@@ -2606,6 +2608,92 @@ more difficult:
     return known
   }
 
+  // All combat-state powers share the same stable enemy IDs and individual
+  // strike resolution. None of these queries consumes RNG or alters rendering.
+  function artifactDancerActive() {
+    return artifactEquippedInSlot('armor','dancer') && turnCount < (player.artifactDancerUntilTurn || 0)
+  }
+
+  function artifactDancerMovement() {
+    if (!artifactEquippedInSlot('armor','dancer')) return
+    const first = !artifactDancerActive()
+    // The next enemy reaction increments the world clock by one. Unless
+    // refreshed by another step, the following action's reaction is unguarded.
+    player.artifactDancerUntilTurn = turnCount + 2
+    if (first) artifactAbilityMessage('dancer','Dancer readies a flowing defense!',
+      'Your armor responds to the rhythm of your steps!')
+  }
+
+  function artifactClearGrowingMalice() {
+    player.artifactMaliceTargetId = null
+    player.artifactMaliceHits = 0
+  }
+
+  function artifactGrowingMaliceTarget(e) {
+    if (!artifactEquippedInSlot('weapon','growing_malice') || !e?.id) {
+      artifactClearGrowingMalice()
+      return
+    }
+    if (player.artifactMaliceTargetId !== e.id) artifactClearGrowingMalice()
+  }
+
+  function artifactGrowingMaliceCritBonus(e) {
+    if (!artifactEquippedInSlot('weapon','growing_malice') ||
+        !e?.id || e.id !== player.artifactMaliceTargetId) return 0
+    return Math.min(artifactRule('growing_malice','maxCritBonusPP'),
+      player.artifactMaliceHits * artifactRule('growing_malice','critPerHitPP')) / 100
+  }
+
+  function artifactGrowingMaliceHit(e) {
+    if (!artifactEquippedInSlot('weapon','growing_malice') || !e.id) return
+    player.artifactMaliceTargetId = e.id
+    const before = Math.min(artifactRule('growing_malice','maxCritBonusPP'),
+      player.artifactMaliceHits * artifactRule('growing_malice','critPerHitPP'))
+    player.artifactMaliceHits++
+    const after = Math.min(artifactRule('growing_malice','maxCritBonusPP'),
+      player.artifactMaliceHits * artifactRule('growing_malice','critPerHitPP'))
+    if (after > before) artifactAbilityMessage('growing_malice',
+      `Growing Malice sharpens your next strike (+${after}% crit)!`,
+      `Your weapon gathers a sharper edge (+${after}% crit)!`)
+  }
+
+  function artifactTakeVengefulPrecision() {
+    const charged = player.artifactVengefulPrecisionReady &&
+      artifactEquippedInSlot('shield','vengeful_precision')
+    // Consume on the next real melee weapon attack attempt, even if it misses
+    // or the target is immune; Shield Bash and bow attacks never consume it.
+    if (charged && isBreachWeapon(player.equip.weapon)) {
+      player.artifactVengefulPrecisionReady = false
+      return artifactRule('vengeful_precision','critBonusPP') / 100
+    }
+    return 0
+  }
+
+  function artifactReaperStoredFor(e) {
+    return artifactEquippedInSlot('weapon','reaper') &&
+      (player.artifactReaperStored || 0) > 0 && e?.id !== player.artifactReaperOriginId
+      ? player.artifactReaperStored : 0
+  }
+
+  function artifactReaperOnDirectKill(e, targetHpBeforeHit, damageWithoutReserve, attackAtHit, skillAtHit) {
+    if (!artifactEquippedInSlot('weapon','reaper') || !e.id || e.alive) return
+    const overkill = Math.max(0,damageWithoutReserve - targetHpBeforeHit)
+    const reserve = Math.min(Math.floor(Math.max(0,attackAtHit) * artifactRule('reaper','capacityAtkFraction')),
+      Math.floor(overkill * Math.max(0,skillAtHit) * artifactRule('reaper','transferPerSkillPoint')))
+    // A new kill replaces the previous reserve, rather than adding to it.
+    player.artifactReaperStored = reserve
+    player.artifactReaperOriginId = reserve ? e.id : null
+    if (reserve) artifactAbilityMessage('reaper',
+      `Reaper harvests ${reserve} damage from the killing blow!`,
+      `Your weapon draws ${reserve} damage from the fallen enemy!`)
+  }
+
+  function artifactClearWeaponCombatState() {
+    artifactClearGrowingMalice()
+    player.artifactReaperStored = 0
+    player.artifactReaperOriginId = null
+  }
+
   function artifactAbilityMessage(id, named, hidden) {
     const known = playerKnowsArtifactAbility(id)
     log(known ? named : hidden, 'good')
@@ -2626,8 +2714,14 @@ more difficult:
 
   // Relocation is gameplay state, never tied to camera animation. It covers
   // voluntary moves, forced movement, teleportation, and global-Z changes.
-  function markPlayerPositionChanged() {
+  function markPlayerPositionChanged(voluntary = false) {
     player.lastPositionChangeTurn = turnCount
+    // Target identity is global, but a foe on another Z level can no longer
+    // sustain the current direct-hit series.
+    if (player.artifactMaliceTargetId && !enemies.some(e => e.alive && e.hp > 0 &&
+        e.id === player.artifactMaliceTargetId && onCurrentLevel(e)))
+      artifactClearGrowingMalice()
+    if (voluntary) artifactDancerMovement()
     // Binding belongs to the victim, not to its source weapon. Every real
     // relocation breaks every binding the player has created, on any level.
     for (const enemy of enemies) if (enemy.artifactBound) enemy.artifactBound = false
@@ -2951,6 +3045,8 @@ more difficult:
     const active = activeArtifactAbilities()
     let bonus = 0
     // Percentage abilities use the same base, never one another's results.
+    if (artifactDancerActive())
+      bonus += Math.floor(Math.max(0,baseDefense) * artifactRule('dancer','defBonus'))
     if (artifactEquippedInSlot('armor','tideguard') && artifactWaterPosition())
       bonus += Math.floor(Math.max(0, baseDefense) * artifactRule('tideguard','defBonus'))
     if (artifactEquippedInSlot('armor','veteran_xp'))
@@ -3672,6 +3768,10 @@ more difficult:
     artifactLastStandUntilTurn: 0, artifactLastStandCooldownUntil: 0,
     artifactSacredReadyTurn: 0, artifactBoneplateExpiries: [],
     artifactSoulFedExpiries: [],
+    artifactDancerUntilTurn: 0,
+    artifactMaliceTargetId: null, artifactMaliceHits: 0,
+    artifactVengefulPrecisionReady: false,
+    artifactReaperStored: 0, artifactReaperOriginId: null,
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
@@ -5644,7 +5744,7 @@ more difficult:
       log(`${e.name}'s rage subsides.`, 'info')
   }
 
-  function playerCriticalHitChance(e) {
+  function playerCriticalHitChance(e, {meleeStrike = false, vengefulBonus = 0} = {}) {
     let crit = BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed &&
       !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : 0)
     if (artifactEquippedInSlot('weapon','fortunes_fang') && isBreachWeapon(player.equip.weapon))
@@ -5654,6 +5754,7 @@ more difficult:
       crit += Math.min(artifactRule('berserkers_oath','maxCritBonusPP'),
         Math.floor(Math.max(0, playerAtk()-playerDef()) /
           artifactRule('berserkers_oath','gapPerCritPoint'))) / 100
+    if (meleeStrike) crit += artifactGrowingMaliceCritBonus(e) + vengefulBonus
     return crit
   }
 
@@ -5687,6 +5788,10 @@ more difficult:
     if (extraAttackKind === true) extraAttackKind = 'grace'
     const isExtraAttack = extraAttackKind !== null && extraAttackKind !== false
     if (rareFleeBlocksAttack(e)) return false
+    artifactGrowingMaliceTarget(e)
+    const vengefulBonus = artifactTakeVengefulPrecision()
+    if (vengefulBonus) artifactAbilityMessage('vengeful_precision',
+      'Vengeful Precision drives your next melee strike!', 'Your blocked blow charges your strike!')
     if (!isExtraAttack) artifactOnPlayerAttack()
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     if (!isExtraAttack) AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
@@ -5707,6 +5812,7 @@ more difficult:
     // It cannot consume the separate one-use Death Shield.
     if (enemyImmunityActive(e)) {
       log(`Your attack cannot harm the ${e.name} while it is immune!`, 'bad')
+      artifactClearGrowingMalice()
       spawnDamageNumber(e.x, e.y, 'Immune!', '#c7a5f6')
       return false
     }
@@ -5714,23 +5820,27 @@ more difficult:
     // Evasion requires seeing the attacker, including through true sight.
     if (enemyHasAbility(e, 'ethereal') && !player.equip.weapon?.mod && player.equip.weapon?.kind !== 'artifact') {
       log(`Your attack passes harmlessly through the ${e.name}. Only a magical weapon can harm it.`, 'info')
+      artifactClearGrowingMalice()
       spawnDamageNumber(e.x, e.y, 'Immune!', RENDER_STYLE.damage.miss)
       return false
     }
-    if (tryEvadePlayerAttack(e)) return false
+    if (tryEvadePlayerAttack(e)) {artifactClearGrowingMalice(); return false}
     const trainedMiss = Math.max(0, missChance(playerSpd(), enemySpd(e)) - oneHandedMissReduction())
     if (chance(targetWasInvisible
       ? Math.max(MONSTER_INVISIBILITY_MISS_CHANCE, trainedMiss) : trainedMiss)) {
+      artifactClearGrowingMalice()
       spawnDamageNumber(e.x, e.y, 'Miss!', RENDER_STYLE.damage.miss)
       log(`You swing your ${weaponName} at the ${e.name} but miss.`, 'bad')
       updateMobileInfoPanel(e.x, e.y)
       showDesktopCombatTooltip(e)
       return false
     }
+    const reaperAttackAtHit = playerAtk()
+    const reaperSkillAtHit = combatSkillValue('twoHanded')
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
     let dmg = damageRoll(playerAtk() * artifactMeleeDamageMultiplier(e), twoHandedDefence(enemyDef(e)))
-    const criticalRoll = chance(playerCriticalHitChance(e))
+    const criticalRoll = chance(playerCriticalHitChance(e,{meleeStrike:true,vengefulBonus}))
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
@@ -5756,6 +5866,15 @@ more difficult:
     // Every landed blow (including a zero-damage glance) can release a
     // prepared charge. Only an actual miss preserves Retribution/Riposte.
     dmg = artifactMeleeHitBonuses(dmg) + bloodPactBonus
+    const damageWithoutReaperBonus = dmg
+    const reaperBonus = artifactReaperStoredFor(e)
+    if (reaperBonus) {
+      player.artifactReaperStored = 0
+      player.artifactReaperOriginId = null
+      dmg += reaperBonus
+      artifactAbilityMessage('reaper', `Reaper releases ${reaperBonus} stored damage!`,
+        `Your weapon releases ${reaperBonus} gathered damage!`)
+    }
     if (bloodPactCost) {
       artifactLosePlayerHp(bloodPactCost,{cost:true})
       artifactAbilityMessage('blood_pact',
@@ -5766,6 +5885,7 @@ more difficult:
     const beforeHitHp = e.hp
     const effectiveDamage = Math.min(Math.max(0,e.hp),dmg)
     e.hp -= dmg
+    artifactGrowingMaliceHit(e)
     if (effectiveDamage > 0) artifactOnDirectPlayerHit()
     if (consumeBulwarkBravery) player.artifactBraveryCharge = false
     awardMeleeHitXp(e, dmg)
@@ -5825,6 +5945,8 @@ more difficult:
     if (!e.alive || e.hp <= 0) {
       if (e.alive) {
         killEnemy(e)
+        artifactReaperOnDirectKill(e,beforeHitHp,damageWithoutReaperBonus,reaperAttackAtHit,reaperSkillAtHit)
+        artifactClearGrowingMalice()
         artifactExecutionersAura(e,beforeHitHp)
         artifactDeathVeil()
         artifactSoulburst(e,dmg)
@@ -5899,6 +6021,12 @@ more difficult:
     const effectiveDamage = artifactLosePlayerHp(dmg,{directHit:true})
     const braveryFromStronger = effectiveDamage > 0 && playerHasArtifactAbility('bulwark_bravery') && artifactStrongEnemy(e)
     if ((blocked || glancing) && playerHasArtifactAbility('riposte')) player.artifactRiposteReady = true
+    if (blocked && artifactEquippedInSlot('shield','vengeful_precision') &&
+        !player.artifactVengefulPrecisionReady) {
+      player.artifactVengefulPrecisionReady = true
+      artifactAbilityMessage('vengeful_precision',
+        'Vengeful Precision prepares your next strike!', 'Your shield stores a precise counterattack!')
+    }
     if (braveryFromStronger) player.artifactBraveryCharge = true
     if (blocked) {
       for (const id of ['shield_mastery','counterguard','tideguard']) {
@@ -6269,6 +6397,7 @@ more difficult:
       if (cause === 'trap') log(`The ${e.name} is killed by a trap.`, 'info')
     }
     e.alive = false
+    if (e.id && e.id === player.artifactMaliceTargetId) artifactClearGrowingMalice()
     artifactOnEnemyDeath(e)
     if (inspiredNearby && visibleAtDeath) {
       log(`The ${e.name} falls; its followers lose their inspiration!`, 'good')
@@ -6350,6 +6479,9 @@ more difficult:
       player.artifactElusiveReady = false
       player.artifactBoneplateExpiries = []
       player.artifactSoulFedExpiries = []
+      player.artifactDancerUntilTurn = 0
+      artifactClearWeaponCombatState()
+      player.artifactVengefulPrecisionReady = false
     }
     currentZ = 0
     currentCave = -1
@@ -6490,6 +6622,10 @@ more difficult:
       artifactLastStandUntilTurn: 0, artifactLastStandCooldownUntil: 0,
       artifactSacredReadyTurn: 0, artifactBoneplateExpiries: [],
     artifactSoulFedExpiries: [],
+    artifactDancerUntilTurn: 0,
+    artifactMaliceTargetId: null, artifactMaliceHits: 0,
+    artifactVengefulPrecisionReady: false,
+    artifactReaperStored: 0, artifactReaperOriginId: null,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
@@ -10288,12 +10424,12 @@ more difficult:
   // The shared, fully resolved player tile-entry path also serves free
   // steps from artifacts. It runs hazards, swimming, pickups, tracking
   // and discovery exactly once; its caller owns whether time advances.
-  function finishPlayerStep(nx,ny) {
+  function finishPlayerStep(nx,ny, {voluntary = true} = {}) {
     const fromPos={x:player.x,y:player.y}
     player.miningArmedTarget = null
     player.x = nx
     player.y = ny
-    markPlayerPositionChanged()
+    markPlayerPositionChanged(voluntary)
     if (player.spiderWebSourceId) {
       clearSpiderWeb()
       log('You tear free of the spider web!', 'good')
@@ -10400,7 +10536,7 @@ more difficult:
       .filter(p => artifactFreeStepTileOpen(p.x,p.y))
     if (!destinations.length) return false
     const next = pick(destinations)
-    const moved = finishPlayerStep(next.x,next.y)
+    const moved = finishPlayerStep(next.x,next.y,{voluntary:false})
     if (moved) artifactAbilityMessage('martial_evasion','Evasion carries you to a new position!',
       'You slip away after the strike!')
     return moved
@@ -16419,7 +16555,12 @@ more difficult:
     const old = player.equip[slot]
     const before = statSnapshot()
     player.equip[slot] = it
-    if (slot === 'weapon' && old?.abilityId === 'riposte') player.artifactRiposteReady = false
+    if (slot === 'weapon') {
+      if (old?.abilityId === 'riposte') player.artifactRiposteReady = false
+      artifactClearWeaponCombatState()
+    }
+    if (slot === 'shield') player.artifactVengefulPrecisionReady = false
+    if (slot === 'armor') player.artifactDancerUntilTurn = 0
     player.inventory.splice(idx, 1)
     if (old) player.inventory.push(old)
     const equipLead = old ? `You unequip the ${artifactDisplayName(old)} and equip` : 'You equip'
@@ -16427,6 +16568,7 @@ more difficult:
     if (slot === 'weapon' && it.twoHanded && player.equip.shield) {
       const oldShield = player.equip.shield
       player.equip.shield = null
+      player.artifactVengefulPrecisionReady = false
       player.inventory.push(oldShield)
       equipmentLog(`${equipLead} the ${artifactDisplayName(it)}, removing the ${artifactDisplayName(oldShield)} because it is a two-handed weapon.${statDeltaText(before)}`, [old, it, oldShield])
     } else {
@@ -16500,7 +16642,12 @@ more difficult:
     recordReplayAction({type:'unequip', slot})
     const before = statSnapshot()
     player.equip[slot] = null
-    if (slot === 'weapon' && item.abilityId === 'riposte') player.artifactRiposteReady = false
+    if (slot === 'weapon') {
+      if (item.abilityId === 'riposte') player.artifactRiposteReady = false
+      artifactClearWeaponCombatState()
+    }
+    if (slot === 'shield') player.artifactVengefulPrecisionReady = false
+    if (slot === 'armor') player.artifactDancerUntilTurn = 0
     player.inventory.push(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     consumeItemTurn()
@@ -17911,6 +18058,9 @@ more difficult:
       player.artifactSacredReadyTurn = 0
       player.artifactBoneplateExpiries = []
       player.artifactSoulFedExpiries = []
+      player.artifactDancerUntilTurn = 0
+      artifactClearWeaponCombatState()
+      player.artifactVengefulPrecisionReady = false
       player.highscoresDisqualified = false
       if (reusingWorldAfterPermadeath) snapCameraToPlayer()
       else {

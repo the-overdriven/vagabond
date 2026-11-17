@@ -7077,6 +7077,20 @@ combat outcomes or consume game RNG.
 | Duelist | bulwark | **Armor only.** While equipped with a **one-handed melee weapon and no shield**, direct melee damage gains **0.25% for each One-Handed proficiency point** (**+25%** at skill 100). Bows and unarmed strikes excluded. Changing weapon or equipping a shield removes the bonus immediately. |
 | Weaponmaster | bulwark | **Armor only.** With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded. |
 
+| Dancer | bulwark | **Armor only.** After a voluntary successful move, gain **floor(20% of pre-conditional DEF)** for the following enemy response. Taking another voluntary step refreshes this defense; attacking, waiting, or using an item instead causes it to expire before that action's enemy response. Forced movement and teleportation do not activate it; voluntary stair/lift traversal does. |
+| Growing Malice | martial | **Melee weapons only.** Every consecutive landed direct strike on the same enemy improves critical chance for the **next** strike by **+2 percentage points**, up to **+10**. A miss, enemy evasion/immunity, target change, target death, leaving its global Z-level or weapon swap resets the series. A landed zero-damage glance counts; GRACE follow-ups count individually. |
+| Vengeful Precision | shields | **Shields only.** A successful ordinary melee shield block readies **+8 percentage points** critical chance for the next individual melee weapon strike. The strike consumes it even if it misses, and a second block cannot stack another charge. Shield Bash does not spend it. Removing the shield clears it. |
+| Reaper | martial | **Two-handed melee weapons only**, excluding bows. On a direct killing strike, store **floor(overkill × Two-Handed skill × 0.005)** damage, capped at **floor(current ATK × 0.5)**. The next landed direct strike on a **different** enemy releases it after ordinary mitigation and multipliers. Misses, evasion and immunity preserve it; a landed zero-damage glance releases it. The former reserve is excluded when computing a new reserve; new reserves replace, never add. |
+
+Dancer uses the same pre-conditional defense basis as Brace, Vigorplate and
+Tideguard, so percentages never compound. Only actual, voluntary legal
+relocations trigger it; opening doors, blocked steps, free actions without
+movement, knockback, teleportation and randomly forced artifact steps do not.
+Its expiry uses consumed player turns: a move protects against its immediate
+enemy reaction, and a following action must be another voluntary move to keep
+that protection. Movement between global levels changes Z only and obeys the
+ordinary stairs/lifts rules, without separate maps.
+
 Brace and Vigorplate round fractional DEF bonuses **down**, using the same
 pre-conditional DEF basis; neither feeds the other's percentage. Hold the Line
 adds its flat bonus afterward. All bonuses are calculated dynamically and
@@ -7106,6 +7120,22 @@ before the final rounding. Armor powers use the same ordinary stat and skill
 functions rather than storing duplicate derived values. Only the generation
 roll for Berserker's Oath becomes item state; it is serialized with the item
 and never rerolled on equip, identification or restoration.
+
+Growing Malice tracks a stable enemy ID and successful strike count. On each
+eligible attack the current critical bonus is sampled *before* that strike;
+only then does a successful direct hit advance it. A genuine miss or immunity
+clears the count, including on a GRACE follow-up. Vengeful Precision's
+prepared charge is removed at the start of the next actual melee weapon
+strike, so it cannot reward an entire attack sequence, and ordinary melee
+blocking still reduces rather than cancels damage. Reaper spends a stored
+reserve only when a qualifying weapon blow lands, adding a flat amount after
+all percentage bonuses and Blood Pact. Its next reserve is based on
+**damage excluding any prior Reaper release minus the target's pre-hit HP**;
+only confirmed direct kills can generate reserves. A prevented fatal hit,
+poison tick, indirect Cleave/Soulburst or Shield Bash never generates one.
+Reserve and source-target ID survive save/replay and clear on weapon removal
+or player death. The same rules cover unidentified artifacts without
+revealing the hidden ability in status displays or activation popups.
 
 For damaging melee powers, the regular
 critical/glancing calculations occur before the added damage multipliers.
@@ -7177,6 +7207,13 @@ while active it increases ordinary effective ATK and expires independently per
 stack. Each recorded expiry and each ghost's provenance flag are serialized
 and restored through normal save/replay, without animation-driven decisions.
 
+
+Dancer's movement-expiry turn, Growing Malice's target ID and hit series,
+Vengeful Precision's pending charge, and Reaper's stored integer damage and
+originating enemy ID are saved as authoritative state. They are initialized for
+each new character, restored without additional RNG, and cleared when their
+granting equipment is removed or replaced and on death. Stat queries and
+presentation do not spend or refresh resources.
 
 The power identity, position-change turn and relevant combat statuses survive
 save/load and deterministic replay. Current XP, level, MF, combat skills, gear,

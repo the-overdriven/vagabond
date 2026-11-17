@@ -45,7 +45,9 @@
       "ambusher",
       "fortunes_fang",
       "veteran_xp",
-      "veteran_level"
+      "veteran_level",
+      "growing_malice",
+      "reaper"
     ],
     "archery": [
       "long_shot",
@@ -80,12 +82,14 @@
       "veteran_level",
       "berserkers_oath",
       "duelist",
-      "weaponmaster"
+      "weaponmaster",
+      "dancer"
     ],
     "shields": [
       "shield_mastery",
       "counterguard",
-      "shield_bash"
+      "shield_bash",
+      "vengeful_precision"
     ]
   },
   "abilities": {
@@ -565,6 +569,49 @@
       ],
       "skillPerGrace": 20,
       "priceBonus": 430
+    },
+    "dancer": {
+      "name": "Dancer",
+      "description": "Voluntary movement grants +20% DEF during the enemy response; move again next action to refresh.",
+      "enabled": true,
+      "slots": [
+        "armor"
+      ],
+      "defBonus": 0.2,
+      "priceBonus": 330
+    },
+    "growing_malice": {
+      "name": "Growing Malice",
+      "description": "Consecutive landed strikes against the same enemy build +2 percentage points critical chance for the next hit, up to +10; misses or switching targets reset it.",
+      "enabled": true,
+      "weaponTypes": [
+        "oneHandedMelee",
+        "twoHandedMelee"
+      ],
+      "critPerHitPP": 2,
+      "maxCritBonusPP": 10,
+      "priceBonus": 350
+    },
+    "vengeful_precision": {
+      "name": "Vengeful Precision",
+      "description": "A shield block readies +8 percentage points critical chance for the next individual melee weapon strike, spent even on a miss.",
+      "enabled": true,
+      "slots": [
+        "shield"
+      ],
+      "critBonusPP": 8,
+      "priceBonus": 300
+    },
+    "reaper": {
+      "name": "Reaper",
+      "description": "A direct killing blow stores up to 0.5% of its overkill per Two-Handed skill point, capped at half your ATK. The next landed strike against another foe adds that damage.",
+      "enabled": true,
+      "weaponTypes": [
+        "twoHandedMelee"
+      ],
+      "transferPerSkillPoint": 0.005,
+      "capacityAtkFraction": 0.5,
+      "priceBonus": 450
     }
   },
   "pricing": {

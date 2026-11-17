@@ -843,7 +843,7 @@ test('Batch 3: save and replay retain combat charges, independent expiries and r
       player.artifactLastStandUntilTurn=turnCount+2;
       player.artifactBoneplateExpiries=[turnCount+4,turnCount+9]})()`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,181)
+    assert.equal(snapshot.version,182)
     const fields=['artifactRetributionStored','artifactBloodReservoirStored',
       'artifactPainEaterHits','artifactRiposteReady','artifactRhythmGuardReady',
       'artifactEvasionPrepared','artifactSacredReadyTurn','artifactLastStandCooldownUntil',
@@ -1050,7 +1050,7 @@ test('Batch 4: save and deterministic replay preserve execution markers and move
       player.artifactMartialEvasionPending=true;rngState=91822
     })()`)
     const saved=clone(run('buildSaveObject()'))
-    assert.equal(saved.version,181)
+    assert.equal(saved.version,182)
     assert.equal(saved.player.artifactElusiveReady,true)
     assert.equal(saved.player.artifactMartialEvasionPending,true)
     assert.equal(saved.enemies.find(e=>e.id==='batch-target').artifactExecutionerUsed,true)
@@ -1402,7 +1402,7 @@ test('Batch 6: save and replay restore ghost provenance and independent Soul Fed
     run(`killEnemy(enemies.find(e=>e.id==='persist-soul'),true,'test')`)
     run(`player.artifactSoulFedExpiries=[turnCount+2,turnCount+300]`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,181)
+    assert.equal(snapshot.version,182)
     assert.deepEqual(snapshot.player.artifactSoulFedExpiries,[run('turnCount+2'),run('turnCount+300')])
     assert.equal(snapshot.enemies.filter(e=>e.artifactSoulGhost).length,1)
     const ghost=snapshot.enemies.find(e=>e.artifactSoulGhost)
@@ -1511,8 +1511,8 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
     return {examined, powerCount:Object.keys(powers).length}
   })()`)
-  assert.equal(result.powerCount, 59)
-  assert.equal(result.examined, 59 * 14)
+  assert.equal(result.powerCount, 63)
+  assert.equal(result.examined, 63 * 14)
 })
 
 test('artifact activations log and animate while concealing unidentified powers', async () => {
@@ -1590,7 +1590,7 @@ test('Batch 2: new artifact definitions filter slots, weapon classes and combine
       shield:artifactAbilityPool(item('shield','Buckler'))}
     return {count:Object.keys(ARTIFACT_ABILITIES.abilities).length,types}
   })()`))
-  assert.equal(result.count,59)
+  assert.equal(result.count,63)
   for (const type of Object.values(result.types)) assert.equal(new Set(type).size,type.length)
   for (const type of ['one','two','bow']) assert(result.types[type].includes('ambusher'))
   for (const type of ['one','two']) {
@@ -1810,4 +1810,150 @@ test('Batch 2: Blood Pact separately calculates both rates from the greater maxi
     run('ARTIFACT_ABILITIES.abilities.blood_pact.bonusDamageRate=.01')
     restoreArtifactCombat()
   }
+})
+
+// Batch 3: these focus on the existing strike, movement and save paths.
+test('Batch 3: new combat-state powers preserve equipment restrictions and JSON price order', async () => {
+  await ready()
+  const powers=clone(run(`(() => {
+    const item=(slot,handed=false,rangedAtk=0)=>({kind:'artifact',artifactSlot:slot,
+      base:'Test',twoHanded:handed,rangedAtk})
+    return {count:Object.keys(ARTIFACT_ABILITIES.abilities).length,
+      prices:Object.entries(ARTIFACT_ABILITIES.abilities).every(([id,obj])=>
+        Object.keys(obj).at(-1)==='priceBonus'),
+      one:artifactAbilityPool(item('weapon')),
+      two:artifactAbilityPool(item('weapon',true)),
+      bow:artifactAbilityPool(item('weapon',true,5)),
+      armor:artifactAbilityPool(item('armor')),
+      shield:artifactAbilityPool(item('shield'))}
+  })()`))
+  assert.equal(powers.count,63)
+  assert(powers.prices,'every ability ends with priceBonus')
+  assert(powers.one.includes('growing_malice') && !powers.one.includes('reaper'))
+  assert(powers.two.includes('growing_malice') && powers.two.includes('reaper'))
+  assert(!powers.bow.includes('growing_malice') && !powers.bow.includes('reaper'))
+  assert(powers.armor.includes('dancer') && !powers.shield.includes('dancer'))
+  assert(powers.shield.includes('vengeful_precision') && !powers.armor.includes('vengeful_precision'))
+})
+
+test('Batch 3: Dancer uses the existing DEF basis and consumed-world-turn timing', async () => {
+  await ready();setupArtifactCombat('slow')
+  try {
+    run(`(() => {
+      player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,
+        identified:true,abilityId:'dancer'}
+      player.baseDef=12;player.artifactDancerUntilTurn=0
+      player.artifactVengefulPrecisionReady=false
+    })()`)
+    const base=run('playerDef()'), turn=run('turnCount')
+    run('markPlayerPositionChanged(false)')
+    assert.equal(run('playerDef()'),base,'forced relocation cannot activate')
+    run('markPlayerPositionChanged(true)')
+    assert.equal(run('playerDef()'),base+Math.floor(base*.20))
+    run(`turnCount=${turn+1}`)
+    assert.equal(run('artifactDancerActive()'),true,'first enemy response is protected')
+    run('markPlayerPositionChanged(true)')
+    run(`turnCount=${turn+2}`)
+    assert.equal(run('artifactDancerActive()'),true,'a second voluntary move refreshes defense')
+    run(`turnCount=${turn+3}`)
+    assert.equal(run('artifactDancerActive()'),false,'an action without moving expires before reaction')
+    assert.equal(run('playerDef()'),base)
+    run('markPlayerPositionChanged(true);player.equip.armor=null')
+    assert.equal(run('artifactDancerActive()'),false,'armor removal cancels defense')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 3: Growing Malice scales each landed hit, resets on miss and target change', async () => {
+  await ready();setupArtifactCombat('growing_malice')
+  try {
+    run(`(() => {player.invisibleTurns=0;player.godMode=false;batchTarget.abilities=[];
+      player.artifactMaliceHits=0;player.artifactMaliceTargetId=null
+      damageRoll=()=>10;chance=()=>false})()`)
+    const base=run('playerCriticalHitChance(batchTarget,{meleeStrike:true})')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('player.artifactMaliceHits'),1)
+    assert(Math.abs(run('playerCriticalHitChance(batchTarget,{meleeStrike:true})')-base-.02)<1e-9)
+    for (let i=0;i<5;i++) await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('player.artifactMaliceHits'),6)
+    assert(Math.abs(run('playerCriticalHitChance(batchTarget,{meleeStrike:true})')-base-.10)<1e-9)
+    run(`artifactGrowingMaliceTarget({id:'another'})`)
+    assert.equal(run('player.artifactMaliceHits'),0)
+    assert.equal(run('playerCriticalHitChance(batchTarget,{meleeStrike:true})'),base)
+    await run('playerAttackEnemy(batchTarget)')
+    run('chance=()=>true')
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('player.artifactMaliceHits'),0,'miss resets uninterrupted series')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 3: Vengeful Precision spends one strike, never boosts arrows or Shield Bash', async () => {
+  await ready();setupArtifactCombat('slow')
+  try {
+    run(`(() => {
+      player.equip.shield={kind:'artifact',artifactSlot:'shield',base:'Buckler',def:2,
+        identified:true,abilityId:'vengeful_precision'}
+      player.artifactVengefulPrecisionReady=true
+    })()`)
+    assert.equal(run('artifactTakeVengefulPrecision()'),.08)
+    assert.equal(run('player.artifactVengefulPrecisionReady'),false)
+    assert.equal(run('artifactTakeVengefulPrecision()'),0)
+    run(`player.artifactVengefulPrecisionReady=true;player.equip.weapon.rangedAtk=5`)
+    assert.equal(run('artifactTakeVengefulPrecision()'),0)
+    assert.equal(run('player.artifactVengefulPrecisionReady'),true,'bow never spends melee charge')
+    run('player.equip.weapon.rangedAtk=0;player.equip.shield=null')
+    assert.equal(run('artifactTakeVengefulPrecision()'),0,'removed shield never grants bonus')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 3: Reaper caps overkill, consumes after mitigation and never recycles prior reserve', async () => {
+  await ready();setupArtifactCombat('reaper')
+  try {
+    run(`(() => {
+      player.equip.weapon.twoHanded=true;player.combatSkills.twoHanded=60
+      player.artifactReaperStored=0;player.artifactReaperOriginId=null
+      player.invisibleTurns=0;player.godMode=false;batchTarget.hp=4;
+      damageRoll=()=>24;chance=()=>false
+      // Prevent rare secondary sources and skill progression from interfering.
+      player.lvl=1;player.xp=0
+    })()`)
+    await run('playerAttackEnemy(batchTarget)')
+    const reserved=run('player.artifactReaperStored')
+    assert(reserved>0 && reserved<=Math.floor(run('playerAtk()')*.5),'bounded reserve')
+    assert.equal(run('player.artifactReaperOriginId'), 'batch-target')
+    run(`(() => {const template=ENEMY_TEMPLATE_BY_NAME.Goblin;
+      window.reaperSecond=addEnemy({...template,id:'reaper-second',name:'Goblin',baseName:'Goblin',
+        x:41,y:40,level:0,alive:true,hp:25,maxHp:25,def:0,spd:8,
+        equipment:null,abilities:[],summonedTurn:-1});damageRoll=()=>24
+    })()`)
+    await run('playerAttackEnemy(reaperSecond)')
+    assert.equal(run('reaperSecond.alive'),false)
+    assert.equal(run('player.artifactReaperStored'),0,
+      'a previous reserve must not create the next one if own damage did not overkill')
+  } finally {restoreArtifactCombat()}
+})
+
+test('Batch 3: combat state is serialised exactly and cleared on equipment replacement', async () => {
+  await ready();setupArtifactCombat('growing_malice')
+  try {
+    run(`(() => {
+      player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:1,abilityId:'dancer'}
+      player.equip.shield={kind:'artifact',artifactSlot:'shield',base:'Buckler',def:1,abilityId:'vengeful_precision'}
+      player.artifactDancerUntilTurn=turnCount+2
+      player.artifactMaliceTargetId='batch-target';player.artifactMaliceHits=4
+      player.artifactVengefulPrecisionReady=true
+      player.artifactReaperStored=4;player.artifactReaperOriginId='former-enemy'
+    })()`)
+    const saved=clone(run('buildSaveObject()'))
+    assert.equal(saved.version,182)
+    assert.equal(saved.player.artifactMaliceHits,4)
+    run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
+    assert.equal(run('player.artifactMaliceHits'),4)
+    assert.equal(run('player.artifactDancerUntilTurn'),saved.player.artifactDancerUntilTurn)
+    assert.equal(run('player.artifactVengefulPrecisionReady'),true)
+    assert.equal(run('player.artifactReaperStored'),4)
+    run('artifactClearWeaponCombatState();player.artifactVengefulPrecisionReady=false;player.artifactDancerUntilTurn=0')
+    assert.equal(run('player.artifactMaliceHits'),0)
+    assert.equal(run('player.artifactReaperStored'),0)
+    assert.equal(run('player.artifactVengefulPrecisionReady'),false)
+  } finally {restoreArtifactCombat()}
 })

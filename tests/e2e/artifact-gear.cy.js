@@ -394,6 +394,70 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('keeps Dancer, Growing Malice and Vengeful Precision deterministic through save/replay', () => {
+    cy.window().then(win=>win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayAnimationsDisabled=true;replaySimulationMode=true
+      player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',base:'Dagger',name:'Dagger',
+        identified:true,atk:2,grace:0,abilityId:'growing_malice',twoHanded:false},
+        shield:{kind:'artifact',artifactSlot:'shield',base:'Buckler',def:2,
+          identified:true,abilityId:'vengeful_precision'},
+        armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:1,
+          identified:true,abilityId:'dancer'}}
+      player.artifactMaliceTargetId=null;player.artifactMaliceHits=0
+      player.artifactVengefulPrecisionReady=true;player.artifactDancerUntilTurn=0
+      const normalDef=playerDef()
+      markPlayerPositionChanged(true)
+      check(artifactDancerActive(),'voluntary move must activate Dancer')
+      check(playerDef()>=normalDef,'Dancer must never reduce defense')
+      const enemy={id:'artifact-series-target'}
+      artifactGrowingMaliceHit(enemy)
+      check(player.artifactMaliceHits===1,'first landed hit prepares a critical chance bonus')
+      check(artifactTakeVengefulPrecision()===.08,'block charge must aid one melee strike')
+      check(!player.artifactVengefulPrecisionReady,'charge must be spent once')
+      player.artifactVengefulPrecisionReady=true
+      const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+      check(snapshot.version===SAVE_VERSION,'fixture and saved format must match')
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      check(artifactDancerActive() && player.artifactMaliceHits===1 &&
+        player.artifactMaliceTargetId==='artifact-series-target' &&
+        player.artifactVengefulPrecisionReady,'combat state must survive replay restoration')
+      const statuses=activePlayerStatuses().map(s=>s.label)
+      check(statuses.some(s=>s.includes('Dancer')) &&
+        statuses.some(s=>s.includes('Growing Malice')) &&
+        statuses.some(s=>s.includes('Vengeful Precision')),'known charges remain visible')
+      player.equip.armor.identified=false
+      player.equip.weapon.identified=false
+      player.equip.shield.identified=false
+      const hidden=activePlayerStatuses().map(s=>s.label).join(' ')
+      check(!['Dancer','Growing Malice','Vengeful Precision'].some(s=>hidden.includes(s)),
+        'unidentified abilities must remain concealed in the status UI')
+    })()`))
+  })
+
+  it('restores Reaper reserve and restricts it to two-handed melee weapons', () => {
+    cy.window().then(win=>win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const candidate=(twoHanded,rangedAtk=0)=>({kind:'artifact',artifactSlot:'weapon',
+        base:'War Hammer',twoHanded,rangedAtk})
+      check(artifactAbilityPool(candidate(true)).includes('reaper'),'two-handed weapon allowed')
+      check(!artifactAbilityPool(candidate(false)).includes('reaper'),'one-handed weapon excluded')
+      check(!artifactAbilityPool(candidate(true,5)).includes('reaper'),'bow excluded')
+      player.equip={weapon:{...candidate(true),abilityId:'reaper',identified:true},
+        shield:null,armor:null}
+      player.artifactReaperStored=7;player.artifactReaperOriginId='former-enemy'
+      check(artifactReaperStoredFor({id:'new-enemy'})===7,'different target releases reserve')
+      check(artifactReaperStoredFor({id:'former-enemy'})===0,'origin cannot receive reserve')
+      const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      check(player.artifactReaperStored===7 && player.artifactReaperOriginId==='former-enemy',
+        'reserve and origin must survive save/replay')
+      artifactClearWeaponCombatState()
+      check(player.artifactReaperStored===0 && player.artifactReaperOriginId===null,
+        'weapon removal must clear reserve')
+    })()`))
+  })
+
   for (const width of [1440,390]) it('displays granted powers and inspection text at '+width+'px', () => {
     cy.viewport(width,900)
     cy.window().then(win=>win.eval(`(() => {
