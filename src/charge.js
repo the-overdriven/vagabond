@@ -30,6 +30,7 @@ function forcePlayerPosition(x, y, presentation, fromPosition = null) {
   clearAutoPath()
   if (x !== player.x || y !== player.y) clearSpiderWeb()
   player.x = x; player.y = y
+  if (from.x !== x || from.y !== y) markPlayerPositionChanged()
   DungeonTraps.onEntry(player, from.x, from.y)
   DungeonHazards.onActorEntered(player, from.x, from.y)
   if (player.hp <= 0 || deathTransition) return
@@ -43,6 +44,7 @@ function forcePlayerPosition(x, y, presentation, fromPosition = null) {
 }
 
 function enemyKnockback(e, line, charge = false) {
+  if (playerHasArtifactAbility('immovable')) return
   const x = player.x + line.sx, y = player.y + line.sy
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H ||
       !(isWalkable(x, y) || deepSwimmingWater(x, y)) ||
@@ -65,6 +67,7 @@ function tryEnemyRush(e) {
   const charge = enemyHasAbility(e, 'charge')
   if ((!charge && !enemyHasAbility(e, 'pull')) || playerHiddenFromEnemy(e) ||
       enemyIsPassive(e) || playerInsideSanctuary() || e.summonedTurn === turnCount) return false
+  if (!charge && playerHasArtifactAbility('immovable')) return false
   const line = enemyChargeLine(e, charge)
   if (!line || !chance(charge ? 0.60 : 0.70)) return false
   e.aware = true

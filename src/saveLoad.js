@@ -189,6 +189,7 @@ function buildSaveObject() {
       spiderWebSourceId: player.spiderWebSourceId,
       godMode: player.godMode,
       godInvisible: player.godMode ? player.godInvisible !== false : false,
+      lastPositionChangeTurn: player.lastPositionChangeTurn,
       speedPotionTurns: player.speedPotionTurns,
       speedPotionBonus: player.speedPotionBonus,
       stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,

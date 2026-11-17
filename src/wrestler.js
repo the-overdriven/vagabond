@@ -13,7 +13,7 @@ function playerWrestleTileOpen(x, y) {
 }
 
 function enemyWrestleEligible(e) {
-  if (!enemyHasAbility(e, 'wrestler') || !e.alive || e.summonedTurn === turnCount ||
+  if (playerHasArtifactAbility('immovable') || !enemyHasAbility(e, 'wrestler') || !e.alive || e.summonedTurn === turnCount ||
       enemyIsPassive(e) || playerHiddenFromEnemy(e) || playerInsideSanctuary() ||
       enemyInsideSanctuary(e) || turnCount < e.wrestleReadyTurn) return false
   const dx = player.x - e.x, dy = player.y - e.y
@@ -52,6 +52,7 @@ function tryEnemyWrestle(e) {
   clearSpiderWeb()
   player.x = fromEnemy.x
   player.y = fromEnemy.y
+  markPlayerPositionChanged()
   e.wrestleReadyTurn = turnCount + WRESTLE_COOLDOWN + 1
   e.aware = true
   log(`The ${e.name} grabs you and swaps places with you!`, 'bad')

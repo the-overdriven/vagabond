@@ -282,3 +282,195 @@ test('artifact stat summaries keep bonuses but omit equipment labels', async () 
     assert.equal(run(`itemStatLine(${JSON.stringify(item)})`),'???')
   }
 })
+
+test('domain powers are guaranteed on gear, unique across overlapping domains, and persisted', async () => {
+  await ready()
+  for (const [slot, gear] of Object.entries(catalogs)) for (const base of gear) {
+    const item = artifact(base.name, Math.max(3, base.tier))
+    const pool = clone(run(`artifactAbilityPool(${JSON.stringify(item)})`))
+    assert(pool.length > 0, `${base.name} must have enabled abilities`)
+    assert(pool.includes(item.abilityId), `${base.name} must roll from its own domains`)
+    assert.equal(new Set(pool).size, pool.length, `${base.name} duplicate domain powers are unique`)
+    assert.equal(run(`artifactAbilityDefinition(${JSON.stringify(item)})?.name`),
+      loadJson('artifact_abilities.json').abilities[item.abilityId].name)
+    if (base.rangedAtk) assert.deepEqual(pool, ['long_shot'], 'bows cannot roll martial abilities')
+  }
+  assert.equal(artifact('Amulet', 3).abilityId, null, 'non-gear artifacts have no enabled domain yet')
+  assert.deepEqual(clone(run(`(() => {
+    ARTIFACT_ABILITIES.domains.shields=['brace','fleetfoot'];
+    const pool=artifactAbilityPool({kind:'artifact',artifactSlot:'shield',base:'Buckler'})
+    ARTIFACT_ABILITIES.domains.shields=[];
+    return pool
+  })()`)).filter(x => ['brace','fleetfoot'].includes(x)), ['fleetfoot','brace'],
+  'abilities shared by shield and bulwark domains appear once')
+
+  const armor=artifact('Brigandine', 3); armor.identified=true
+  run(`player.equip={armor:${JSON.stringify(armor)},weapon:null,shield:null};player.inventory=[];
+    player.lastPositionChangeTurn=turnCount-1`)
+  assert.match(run('itemStatLine(player.equip.armor)'),
+    new RegExp(loadJson('artifact_abilities.json').abilities[armor.abilityId].name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
+  const snapshot=clone(run('buildSaveObject()'))
+  run(`loadGameFromObject(${JSON.stringify(snapshot)},{isReplayInit:true})`)
+  assert.equal(run('player.equip.armor.abilityId'),armor.abilityId)
+  assert.equal(run('player.lastPositionChangeTurn'),snapshot.player.lastPositionChangeTurn)
+  assert.match(run('artifactInspectionText(player.equip.armor)'),/\w+: /, 'inspecting reveals the ability rules')
+  armor.identified=false
+  assert.equal(run(`itemStatLine(${JSON.stringify(armor)})`),'???', 'ability name stays secret before identification')
+})
+
+test('conditional DEF powers use the unboosted defense and do not stack duplicate abilities', async () => {
+  await ready()
+  run(`(() => {
+    currentZ=0;map=surfaceMap;enemies=[];npcs=[];
+    player.x=40;player.y=40;player.baseDef=10;player.hp=playerMaxHp();
+    player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:4,abilityId:null}}
+    player.inventory=[];turnCount=200;player.lastPositionChangeTurn=200
+  })()`)
+  const base=run('playerDef()')
+  run("player.equip.armor.abilityId='brace'")
+  assert.equal(run('playerDef()'),base,'brace is not ready immediately after moving')
+  run('player.lastPositionChangeTurn=198')
+  assert.equal(run('playerDef()'),base+Math.max(2,Math.floor(base*.2)))
+  run("player.equip.shield={kind:'artifact',artifactSlot:'shield',base:'Buckler',def:0,abilityId:'brace'}")
+  assert.equal(run('playerDef()'),base+Math.max(2,Math.floor(base*.2)), 'two Brace artifacts give one bonus')
+  run("player.equip.shield=null;player.equip.armor.abilityId='vigorplate'")
+  assert.equal(run('playerDef()'),base+Math.max(3,Math.floor(base*.3)))
+  run('player.hp=1')
+  assert.equal(run('playerDef()'),base,'vigorplate turns off below 75% HP')
+  run(`(() => {
+    player.equip.armor.abilityId='hold_the_line'
+    player.hp=playerMaxHp()
+    const tpl=ENEMY_TEMPLATE_BY_NAME.Goblin
+    enemies=[]
+    for(let i=0;i<4;i++)enemies.push({...tpl,id:'hold'+i,x:40+(i%2?1:-1),y:40+(i>=2?1:0),level:0,hp:10,alive:true})
+  })()`)
+  assert.equal(run('playerDef()'),base+3,'hold the line caps at 3 and counts current-Z enemies')
+  run('enemies.forEach(e=>e.level=-1)')
+  assert.equal(run('playerDef()'),base,'monsters on another Z do not contribute')
+})
+
+test('Fleetfoot removes equipment SPD penalties and Slow; Long Shot works only with a bow', async () => {
+  await ready()
+  run(`(() => {
+    player.equip={weapon:null,shield:{kind:'shield',base:'Buckler',def:3},
+      armor:{kind:'artifact',artifactSlot:'armor',base:'Hauberk',def:9,speedPenalty:3,abilityId:null}}
+    player.inventory=[];player.slowTurns=3
+  })()`)
+  const slowed=run('playerSpdRaw()')
+  run("player.equip.armor.abilityId='fleetfoot'")
+  const fleet=run('playerSpdRaw()')
+  assert(fleet-slowed>=4,'removes penalties plus Slow')
+  run('player.slowTurns=0')
+  assert.equal(run('playerSpdRaw()'),fleet,'Slow makes no difference with Fleetfoot')
+  run(`player.equip.weapon={kind:'artifact',artifactSlot:'weapon',base:'Short Bow',rangedAtk:5,
+    rangedRange:6,abilityId:'long_shot'}`)
+  assert.equal(run('playerBowRange()'),7)
+  run('player.equip.weapon.abilityId=null')
+  assert.equal(run('playerBowRange()'),6)
+  run('player.equip.weapon=null')
+  assert.equal(run('playerBowRange()'),0)
+})
+
+test('Dreadful Strike gives five turns of existing fear, which still respects undead immunity', async () => {
+  await ready()
+  assert.equal(loadJson('artifact_abilities.json').abilities.dreadful_strike.duration,5)
+  run(`(() => {
+    replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+    enemies=[];npcs=[];occupied=new Set();player.x=40;player.y=40;player.hp=1000
+    player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',base:'Dagger',name:'Dagger of Dread',
+      identified:true,atk:8,grace:0,abilityId:'dreadful_strike'},armor:null,shield:null}
+    player.inventory=[];player.invisibleTurns=0
+    map[40][40]='grass';map[40][41]='grass'
+    const tpl=ENEMY_TEMPLATE_BY_NAME.Goblin
+    window.dreadTarget=addEnemy({...tpl,id:'fear-target',baseName:'Goblin',name:'Goblin',
+      x:41,y:40,level:0,alive:true,hp:100,maxHp:100,equipment:null})
+    occupied.add(keyXY(41,40))
+    window.savedDreadFns={chance,damageRoll,log}
+    let count=0;chance=()=>++count===3;damageRoll=()=>5;log=()=>{}
+  })()`)
+  try {
+    await run('playerAttackEnemy(dreadTarget)')
+    assert.equal(run('dreadTarget.fearTurns'),5,'melee fear uses requested five turns')
+    assert.equal(run('dreadTarget.hp'),95)
+    assert.equal(run("applyEnemyFear({alive:true,hp:10,baseName:'Skeleton',name:'Skeleton'},5)"),false,
+      'the shared fear application refuses undead')
+  } finally {
+    run('chance=savedDreadFns.chance;damageRoll=savedDreadFns.damageRoll;log=savedDreadFns.log')
+  }
+})
+
+test('the single artifact RNG draw is deterministic and independent of domain order', async () => {
+  await ready()
+  run("rngState=897234; replayPlaying=false; replayRecording=false")
+  const initial=run('rngState')
+  const a=clone(run('makeArtifactItem(4)'))
+  const next=run('rngState')
+  run(`rngState=${initial}`)
+  const b=clone(run('makeArtifactItem(4)'))
+  assert.deepEqual(b,a)
+  assert.equal(run('rngState'),next, 'a repeat artifact roll has the same RNG consumption')
+  run(`(() => {ARTIFACT_ABILITIES.baseDomains.Buckler=['martial']})()`)
+  try {
+    const pool=clone(run(`artifactAbilityPool({kind:'artifact',artifactSlot:'shield',base:'Buckler'})`))
+    assert(pool.includes('brace') && pool.includes('dreadful_strike'),
+      'per-base domains augment slot domains instead of replacing them')
+  } finally { run('delete ARTIFACT_ABILITIES.baseDomains.Buckler') }
+})
+
+test('Shadow Strike and Flurry apply only to eligible strikes and do not alter miss resolution', async () => {
+  await ready()
+  run(`(() => {
+    replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+    enemies=[];npcs=[];occupied=new Set();player.x=40;player.y=40;player.hp=1000
+    player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',base:'Dagger',name:'Dagger of Shadows',
+      identified:true,atk:8,grace:0,abilityId:'shadow_strike'},armor:null,shield:null}
+    player.inventory=[];player.godMode=false;player.invisibleTurns=3
+    map[40][40]='grass';map[40][41]='grass'
+    const tpl=ENEMY_TEMPLATE_BY_NAME.Goblin
+    window.strikeTarget=addEnemy({...tpl,id:'strike-target',baseName:'Goblin',name:'Goblin',
+      x:41,y:40,level:0,alive:true,hp:200,maxHp:200,equipment:null})
+    occupied.add(keyXY(41,40))
+    window.savedStrikeFns={chance,damageRoll,log};chance=()=>false;damageRoll=()=>10;log=()=>{}
+  })()`)
+  try {
+    await run('playerAttackEnemy(strikeTarget)')
+    assert.equal(run('strikeTarget.hp'),185, 'invisible Shadow Strike gives 15 instead of 10')
+    run('player.invisibleTurns=0')
+    await run('playerAttackEnemy(strikeTarget)')
+    assert.equal(run('strikeTarget.hp'),175, 'visible hits lose the damage bonus')
+    run("player.equip.weapon.abilityId='flurry'")
+    await run('playerAttackEnemy(strikeTarget,true)')
+    assert.equal(run('strikeTarget.hp'),160, 'the GRACE bonus strike gains 50% damage')
+    await run('playerAttackEnemy(strikeTarget,false)')
+    assert.equal(run('strikeTarget.hp'),150, 'normal strikes do not receive Flurry')
+  } finally {run('chance=savedStrikeFns.chance;damageRoll=savedStrikeFns.damageRoll;log=savedStrikeFns.log')}
+})
+
+test('God’s Chosen prevents critical multiplier and Immovable cancels displacement', async () => {
+  await ready()
+  run(`(() => {
+    replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+    enemies=[];npcs=[];occupied=new Set();player.x=40;player.y=40;player.hp=200
+    player.equip={weapon:null,shield:null,armor:null};player.inventory=[]
+    const tpl=ENEMY_TEMPLATE_BY_NAME.Goblin
+    window.critEnemy=addEnemy({...tpl,id:'crit-target',baseName:'Goblin',name:'Goblin',
+      x:41,y:40,level:0,alive:true,hp:100,maxHp:100,equipment:null,summonedTurn:-1})
+    critEnemy.shooterAbility=null;critEnemy.shooterMode=null
+    window.savedCritFns={chance,damageRoll,log,playerInsideSanctuary,enemyInsideSanctuary}
+    playerInsideSanctuary=()=>false;enemyInsideSanctuary=()=>false
+    damageRoll=()=>10;log=()=>{}
+  })()`)
+  try {
+    run('window.rolls=0;chance=()=>++window.rolls===2')
+    run('enemyAttackPlayer(critEnemy)')
+    const lostWithout=200-run('player.hp')
+    assert.equal(lostWithout,20,'control attack is critical '+JSON.stringify(clone(run('({rolls:window.rolls,turn:turnCount,msg:window.testCombatMessages,passive:enemyIsPassive(critEnemy),summoned:critEnemy.summonedTurn,hp:player.hp,inside:playerInsideSanctuary(),insideEnemy:enemyInsideSanctuary(critEnemy),mode:critEnemy.shooterMode,shooter:enemyIsShooter(critEnemy)})'))))
+    run(`player.hp=200;player.equip.armor={kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,abilityId:'gods_chosen'};
+      window.rolls=0`)
+    run('enemyAttackPlayer(critEnemy)')
+    assert.equal(200-run('player.hp'),10,'the same critical is now ordinary damage')
+    run(`player.equip.armor.abilityId='immovable';player.x=40;player.y=40`)
+    run('enemyKnockback(critEnemy,{sx:-1,sy:0},true)')
+    assert.deepEqual(clone(run('({x:player.x,y:player.y})')),{x:40,y:40})
+  } finally {run('chance=savedCritFns.chance;damageRoll=savedCritFns.damageRoll;log=savedCritFns.log;playerInsideSanctuary=savedCritFns.playerInsideSanctuary;enemyInsideSanctuary=savedCritFns.enemyInsideSanctuary')}
+})

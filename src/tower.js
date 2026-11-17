@@ -282,7 +282,7 @@ function travelTowerStairs() {
     if(isNpc) {occupant.animFromX=from.x;occupant.animFromY=from.y;occupant.animStart=performance.now()}
     else beginEnemyMoveAnim(occupant,from.x,from.y)
   }
-  currentZ=destination;currentCave=-1;map=terrain
+  currentZ=destination;markPlayerPositionChanged();currentCave=-1;map=terrain
   undergroundDiscovered=destination===0?undergroundDiscoveredL1:towerLevels[destination-1].discovered
   resetSwimming();clearAutoPath();pendingMove=null;hoveredEnemy=null;stopCameraAnimation()
   rebuildActiveLevelOccupancy()

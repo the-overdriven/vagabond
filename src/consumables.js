@@ -59,19 +59,25 @@ function takeFearTurn(enemy) {
   return player.hp <= 0 || !!deathTransition
 }
 
+function applyEnemyFear(enemy, duration) {
+  if (!enemy?.alive || enemy.hp <= 0 ||
+      ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]?.family === 'undead') return false
+  enemy.fearTurns = Math.max(enemy.fearTurns || 0, duration)
+  wakeSleepingEnemy(enemy)
+  enemy.attackStart = undefined
+  enemy.farPath = null
+  spawnDamageNumber(enemy.x, enemy.y, 'Fear!', '#d99bff')
+  return true
+}
+
 function applyFearScroll(effect) {
   const duration = consumablePower(effect.durationTurns)
   let affected = 0
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.hp <= 0 || !onCurrentLevel(enemy) ||
         enemy.tier < 1 || enemy.tier > effect.maxTier ||
-        ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name]?.family === 'undead' ||
         Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y)) > effect.radius) continue
-    enemy.fearTurns = Math.max(enemy.fearTurns, duration)
-    wakeSleepingEnemy(enemy)
-    enemy.attackStart = undefined; enemy.farPath = null
-    spawnDamageNumber(enemy.x, enemy.y, 'Fear!', '#d99bff')
-    affected++
+    if (applyEnemyFear(enemy, duration)) affected++
   }
   log(affected ? `Terror seizes ${affected} creature${affected === 1 ? '' : 's'}!` : 'The scroll finds no creature it can frighten.', 'info')
 }
@@ -147,6 +153,7 @@ function applyChaosScroll(effect) {
     if (actor !== player) occupied.delete(keyXY(fromX, fromY))
     spawnDamageNumber(fromX, fromY, 'Chaos!', '#d9a9ff')
     actor.x = x; actor.y = y
+    if (actor === player && (x !== fromX || y !== fromY)) markPlayerPositionChanged()
     DungeonHazards.onActorEntered(actor, fromX, fromY)
     actor.animStart = undefined; actor.attackStart = undefined; actor.chargeAnim = null
     if (actor !== player) {

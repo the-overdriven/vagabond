@@ -779,6 +779,7 @@ more difficult:
   let ARTIFACT_VOCATIONS_DWARF = []
   let ARTIFACT_REPUTATIONS_DWARF = []
   let ARTIFACT_EFFECTS = []
+  let ARTIFACT_ABILITIES = null
   let ARTIFACT_CURSES = []
   let ARTIFACT_DESC = {}
   let DWARVEN_RUIN_ENTRANCES = []
@@ -975,6 +976,7 @@ more difficult:
       artifactVocationsDwarf: 'random_vocations_dwarf.json',
       artifactReputationsDwarf: 'random_reputations_dwarf.json',
       artifactEffects: 'artifact_effects.json',
+      artifactAbilities: 'artifact_abilities.json',
       artifactCurses: 'artifact_curses.json',
       artifactDesc: 'artifact_desc_fragments.json',
       dwarvenRuinEntrances: 'dwarven_ruin_entrances.json',
@@ -1062,6 +1064,8 @@ more difficult:
     ARTIFACT_VOCATIONS_DWARF = content.artifactVocationsDwarf
     ARTIFACT_REPUTATIONS_DWARF = content.artifactReputationsDwarf
     ARTIFACT_EFFECTS = content.artifactEffects
+    ARTIFACT_ABILITIES = content.artifactAbilities
+    validateArtifactAbilities(ARTIFACT_ABILITIES)
     ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : []
     ARTIFACT_DESC = content.artifactDesc
     DWARVEN_RUIN_ENTRANCES = content.dwarvenRuinEntrances
@@ -1475,6 +1479,7 @@ more difficult:
     const nextMap = depthUndergroundMap(depth)
     if (!nextMap) return false
     currentZ = destination.z
+    markPlayerPositionChanged()
     currentCave = -1
     map = nextMap
     undergroundDiscovered = depthUndergroundDiscovered(depth)
@@ -1552,6 +1557,7 @@ more difficult:
     const arrival=mineTransitionArrival(destination,nextMap)
     if(!arrival){log('There is no safe space to use this passage.', 'info');return true}
     currentZ=destination.z
+    markPlayerPositionChanged()
     currentCave=-1
     map=nextMap
     undergroundDiscovered=depthUndergroundDiscovered(depth)
@@ -1590,6 +1596,7 @@ more difficult:
       if (!undergroundMap || !mausoleumMap) return true
       map = undergroundMap
       currentZ = -1
+      markPlayerPositionChanged()
       currentCave = -1
       undergroundDiscovered = undergroundDiscoveredL1
       player.x = hut.x
@@ -1604,6 +1611,7 @@ more difficult:
     if (currentZ === -1 && map[player.y]?.[player.x] === 'mausoleumstairsup') {
       map = surfaceMap
       currentZ = 0
+      markPlayerPositionChanged()
       currentCave = -1
       player.x = hut?.x ?? player.x
       player.y = hut?.y ?? player.y
@@ -1839,6 +1847,7 @@ more difficult:
     return true
     } finally {
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
+        markPlayerPositionChanged()
         Mimics.onLevelChange()
         cancelPreparedEnemyAbilitiesOutsideFloor()
         rebuildActiveLevelOccupancy()
@@ -2446,6 +2455,93 @@ more difficult:
   }
 
 
+  function validateArtifactAbilities(config) {
+    if (!config || !config.domains || !config.abilities || !config.itemDomains || !config.baseDomains)
+      throw new Error('Missing artifact ability catalog')
+    for (const [domain, ids] of Object.entries(config.domains)) {
+      if (!Array.isArray(ids) || ids.some(id => !config.abilities[id]))
+        throw new Error('Invalid artifact ability domain: ' + domain)
+    }
+    for (const [key, domains] of Object.entries({...config.itemDomains, ...config.baseDomains})) {
+      if (!Array.isArray(domains) || domains.some(domain => !config.domains[domain]))
+        throw new Error('Invalid artifact domain assignment: ' + key)
+    }
+  }
+
+  function artifactDomains(item) {
+    if (!item || item.kind !== 'artifact') return []
+    const key = item.artifactSlot === 'weapon'
+      ? (item.rangedAtk ? 'bow' : 'meleeWeapon') : item.artifactSlot
+    // Per-base domains augment the generic slot domains; neither gets rolled
+    // first. Selection always uses the union of all eligible ability IDs.
+    return [...new Set([...(ARTIFACT_ABILITIES?.itemDomains?.[key] || []),
+      ...(ARTIFACT_ABILITIES?.baseDomains?.[item.base || item.noun] || [])])]
+  }
+
+  function artifactAbilityPool(item) {
+    return [...new Set(artifactDomains(item).flatMap(domain => ARTIFACT_ABILITIES.domains[domain] || []))]
+      .filter(id => ARTIFACT_ABILITIES.abilities[id]?.enabled === true)
+  }
+
+  function rollArtifactAbility(item) {
+    const pool = artifactAbilityPool(item)
+    // Trinkets do not enter the equipment-domain system until configured.
+    if (!pool.length && item.artifactSlot !== 'trinket')
+      throw new Error('Artifact equipment has no enabled ability pool: ' + (item.base || item.noun))
+    return pool.length ? pick(pool) : null
+  }
+
+  function artifactAbilityDefinition(item) {
+    return item?.kind === 'artifact' && ARTIFACT_ABILITIES?.abilities?.[item.abilityId]?.enabled
+      ? ARTIFACT_ABILITIES.abilities[item.abilityId] : null
+  }
+
+  function activeArtifactAbilities() {
+    const abilities = new Set()
+    forEachActiveArtifact(item => {
+      if (artifactAbilityDefinition(item)) abilities.add(item.abilityId)
+    })
+    return abilities
+  }
+
+  function playerHasArtifactAbility(id) {
+    // Ability IDs identify the power, not its source: two copies never stack.
+    return activeArtifactAbilities().has(id)
+  }
+
+  function artifactInspectionText(item) {
+    const ability = artifactAbilityDefinition(item)
+    return [item.description, ability && `${ability.name}: ${ability.description}`].filter(Boolean).join('\n')
+  }
+
+  // Relocation is gameplay state, never tied to camera animation. It covers
+  // voluntary moves, forced movement, teleportation, and global-Z changes.
+  function markPlayerPositionChanged() {
+    player.lastPositionChangeTurn = turnCount
+  }
+
+  function playerHeldPosition() {
+    return turnCount > (player.lastPositionChangeTurn ?? -2) + 1
+  }
+
+  function playerArtifactDefenseBonus(baseDefense) {
+    const active = activeArtifactAbilities()
+    let bonus = 0
+    // Percentage abilities use the same base, never one another's results.
+    if (active.has('brace') && playerHeldPosition())
+      bonus += Math.max(2, Math.floor(baseDefense * 0.20))
+    if (active.has('vigorplate') && player.hp >= playerMaxHp() * 0.75)
+      bonus += Math.max(3, Math.floor(baseDefense * 0.30))
+    if (active.has('hold_the_line'))
+      bonus += Math.min(3, enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
+        Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1).length)
+    return bonus
+  }
+
+  function playerBowRange(bow = equippedShortBow()) {
+    return (bow?.rangedRange || 0) + (bow && playerHasArtifactAbility('long_shot') ? 1 : 0)
+  }
+
   // Resolve artifact bonus ranges when the item is created. A bonus like
   // [3,10] means the generated artifact gets one random value from 3 through 10.
   function rollArtifactBonuses(bonuses) {
@@ -2548,6 +2644,7 @@ more difficult:
       ownerLore,
       description: generateArtifactDescription(noun, name, effect, curse, possessor, ownerLore),
     }
+    item.abilityId = rollArtifactAbility(item)
     return item
   }
 
@@ -2566,7 +2663,7 @@ more difficult:
     const bonuses = rollArtifactBonuses(effect.bonuses)
     for (const [stat, value] of Object.entries(extraBonuses))
       bonuses[stat] = (bonuses[stat] || 0) + value
-    return {
+    const item = {
       kind: 'artifact', name, noun: baseName, tier: effect.tier,
       effectId: effect.id, baseValue: effect.baseValue, artifactSlot: gear.slot,
       base: baseName,
@@ -2577,6 +2674,8 @@ more difficult:
       curse: null, curseTimer: 0, possessor, ownerLore,
       description: generateArtifactDescription(baseName, name, effect, null, possessor, ownerLore)
     }
+    item.abilityId = rollArtifactAbility(item)
+    return item
   }
 
   function artifactDisplayName(it) {
@@ -2623,7 +2722,7 @@ more difficult:
     // replay and shift the stream before consumeItemTurn().
     ensureArtifactOwnerLore(it)
     log(`You examine the ${it.noun} closely... it is ${it.name}!`, 'good')
-    log(it.description, 'loot')
+    log(artifactInspectionText(it), 'loot')
     consumeItemTurn()
   }
 
@@ -2647,7 +2746,7 @@ more difficult:
     if (!it || it.kind !== 'artifact' || !it.identified) return
     if (!canUseItemsWhileSwimming()) return
     ensureArtifactOwnerLore(it)
-    log(it.description, 'info')
+    log(artifactInspectionText(it), 'info')
   }
 
   function forEachActiveArtifact(fn) {
@@ -2844,6 +2943,8 @@ more difficult:
         if (it.bonuses.grace) parts.push('GRACE +' + it.bonuses.grace)
       }
       if (it.maxHpPct) parts.push('Max HP ' + it.maxHpPct + '%')
+      const ability = artifactAbilityDefinition(it)
+      if (ability) parts.push(ability.name)
       // CURSED is an instance property, not an artifact-effect property.
       // Only artifacts that actually rolled a curse should display it.
       if (it.curse !== null && it.curse !== undefined) parts.push('CURSED')
@@ -2953,6 +3054,7 @@ more difficult:
     freezing: {active: false, turns: 0},
     permadeath: false,
     curseDebuffs: [],
+    lastPositionChangeTurn: -2,
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
@@ -3008,6 +3110,7 @@ more difficult:
       if (player.stoneSkinTurns > 0) d += player.stoneSkinBonus
       if (player.berserkTurns > 0) d -= itemDefinition('berserkPotion').effect.defPenalty
     }
+    if (!permanent) d += playerArtifactDefenseBonus(d)
     return d
   }
 
@@ -3040,8 +3143,10 @@ more difficult:
 
   function playerSpdRaw(permanent = false, ignoreTerrain = false) {
     let s = player.baseSpd + raceBonus('spd') + Math.floor(player.lvl / 2) + artifactBonusSum('spd')
-    if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
-    if (player.equip.armor) s -= (player.equip.armor.speedPenalty || 0)
+    if (!playerHasArtifactAbility('fleetfoot')) {
+      if (player.equip.shield) s -= player.equip.shield.base === 'Buckler' ? 1 : 2
+      if (player.equip.armor) s -= (player.equip.armor.speedPenalty || 0)
+    }
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
     if (!permanent) {
       if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
@@ -3050,7 +3155,8 @@ more difficult:
       s += curseDebuffSum('spd')
       s += carriedItemStat('spd')
     }
-    if (!permanent && player.slowTurns > 0) s -= Math.max(1, Math.ceil(Math.max(1, s) * 0.10))
+    if (!permanent && player.slowTurns > 0 && !playerHasArtifactAbility('fleetfoot'))
+      s -= Math.max(1, Math.ceil(Math.max(1, s) * 0.10))
     return s
   }
 
@@ -4886,6 +4992,7 @@ more difficult:
     if (!isExtraAttack) AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
     AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
     const scrollInvisibleAttack = !player.godMode && player.invisibleTurns > 0
+    const artifactInvisibleAttack = playerIsInvisible()
     const weaponName = player.equip.weapon ? artifactDisplayName(player.equip.weapon).replace(/^The\s+/i, '') : 'bare fists'
     // The player can swing at the last known tile of an invisible enemy.
     // A miss does not expose it; a successful hit breaks its invisibility.
@@ -4926,6 +5033,8 @@ more difficult:
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
+    if (playerHasArtifactAbility('shadow_strike') && artifactInvisibleAttack) dmg = Math.round(dmg * 1.50)
+    if (isExtraAttack && playerHasArtifactAbility('flurry')) dmg = Math.round(dmg * 1.50)
     const wasEnraged = enemyIsEnraged(e)
     const wasFleeing = enemyIsFleeing(e)
     e.hp -= dmg
@@ -4933,7 +5042,12 @@ more difficult:
     const trainedMeleeSkill = meleeCombatSkill(player.equip.weapon)
     if (trainedMeleeSkill) trainCombatSkill(trainedMeleeSkill, e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
-    if (dmg > 0) breakEnemyFear(e)
+    if (dmg > 0) {
+      breakEnemyFear(e)
+      const dread = ARTIFACT_ABILITIES.abilities.dreadful_strike
+      if (e.hp > 0 && playerHasArtifactAbility('dreadful_strike') && chance(dread.chance) &&
+          applyEnemyFear(e, dread.duration)) log(`The ${e.name} recoils in terror!`, 'good')
+    }
     if (scrollInvisibleAttack) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
     absorbEnemyFatalHit(e)
     triggerEnemyShellRetreat(e)
@@ -5008,7 +5122,7 @@ more difficult:
     const blocked = shieldBlockChance > 0 && chance(shieldBlockChance)
     let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef(), e)
     const criticalRoll = chance(enemyCriticalHitChance(e))
-    const critical = !glancing && !blocked && criticalRoll
+    const critical = !glancing && !blocked && criticalRoll && !playerHasArtifactAbility('gods_chosen')
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing || blocked) dmg = Math.floor(dmg / 3)
     if (player.equip.shield) trainCombatSkill('shielding', e)
@@ -5099,7 +5213,7 @@ more difficult:
   function playerBowShotPath(e) {
     const bow = equippedShortBow()
     if (!bow || !e?.alive || !onCurrentLevel(e) || !undergroundTileVisible(e.x, e.y) || !enemyCanBeSeen(e)) return null
-    if (Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > bow.rangedRange) return null
+    if (Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > playerBowRange(bow)) return null
     const origin = {x:player.x, y:player.y}
     if (!UndergroundFov.canSee(map, origin.x, origin.y, e.x, e.y)) return null
     const path = projectilePathBetween(origin.x, origin.y, e.x, e.y)
@@ -5124,7 +5238,7 @@ more difficult:
     }
     if (!canUseItemsWhileSwimming()) return false
     const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-    if (distance > bow.rangedRange) { log('Target out of bow range.', 'info'); return false }
+    if (distance > playerBowRange(bow)) { log('Target out of bow range.', 'info'); return false }
     const path = playerBowShotPath(e)
     if (!path) { log('Your arrow has no clear shot.', 'info'); return false }
     const arrowStack = player.inventory.find(item => item.kind === 'arrows' && item.count > 0)
@@ -5265,7 +5379,7 @@ more difficult:
     const glancing = !!armor && chance(missChance(enemySpd(e), playerSpd()))
     let dmg = damageRoll(shot.atk, playerDef())
     const criticalRoll = chance(enemyCriticalHitChance(e))
-    const critical = !glancing && criticalRoll
+    const critical = !glancing && criticalRoll && !playerHasArtifactAbility('gods_chosen')
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
@@ -5411,8 +5525,10 @@ more difficult:
     map = surfaceMap
     undergroundDiscovered = undergroundDiscoveredL1
     rebuildActiveLevelOccupancy()
+    const relocated = departureZ !== 0 || player.x !== spawnPoint.x || player.y !== spawnPoint.y
     player.x = spawnPoint.x
     player.y = spawnPoint.y
+    if (relocated) markPlayerPositionChanged()
     const catchup = updateSurfaceAbsence(departureZ, responsive)
     const finish = () => {
       clearSpiderWeb()
@@ -5533,6 +5649,7 @@ more difficult:
     spiderWebSourceId: null,
       godMode: false,
       godInvisible: false,
+      lastPositionChangeTurn: turnCount,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
@@ -6128,7 +6245,7 @@ more difficult:
   // Sorting is fixed and uses no RNG, keeping replay deterministic.
   function rangedRetreatDestination(e, allowRangeEscape = true) {
     const startDistance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-    const range = equippedShortBow()?.rangedRange ?? 6
+    const range = playerBowRange() || 6
     const awayX = e.x - player.x, awayY = e.y - player.y
     const retreatDirs = DIRS8.slice().sort((a, b) =>
       (b[0] * awayX + b[1] * awayY) - (a[0] * awayX + a[1] * awayY) ||
@@ -6154,7 +6271,7 @@ more difficult:
   function bowEvasionPath(e, kind) {
     const distance = (x, y) => Math.max(Math.abs(x-player.x), Math.abs(y-player.y))
     const startDist = distance(e.x,e.y)
-    const bowRange = equippedShortBow()?.rangedRange ?? 6
+    const bowRange = playerBowRange() || 6
     const limit = kind === 'thief' ? 4 : 9
     const queue = [{x:e.x,y:e.y,path:[]}]
     const visited = new Set([keyXY(e.x,e.y)])
@@ -6229,7 +6346,7 @@ more difficult:
   // blocks their return shot. Check both sight and projectile obstruction at
   // each legal adjacent tile; do not expose gear prefixes in these decisions.
   function shooterSideStepForClearShot(e) {
-    const maxDist=Math.max(2,effectiveAggroRange(e),equippedShortBow()?.rangedRange ?? 6)
+    const maxDist=Math.max(2,effectiveAggroRange(e),playerBowRange() || 6)
     let best=null
     for (const [dx,dy] of DIRS8) {
       const x=e.x+dx,y=e.y+dy
@@ -7406,7 +7523,7 @@ more difficult:
       // repositions to regain a clear shot.
       if (e.bowRetreatHold && (enemyFearlessOfBow(e) || dist <= ATTACK_RANGE)) e.bowRetreatHold = false
       if (e.bowRetreatHold && equippedShortBow() && dist > ATTACK_RANGE) {
-        if (dist > equippedShortBow().rangedRange || bowCoverBlocksPlayerShot(e)) continue
+        if (dist > playerBowRange() || bowCoverBlocksPlayerShot(e)) continue
         // One step beyond range is an escape, not a permanent kiting loop.
         // Once chased out of shelter, only immediate terrain cover warrants
         // further retreat; otherwise turn and pursue, even outside AGGRO.
@@ -9573,6 +9690,7 @@ more difficult:
       player.miningArmedTarget = null
       player.x = nx
       player.y = ny
+      markPlayerPositionChanged()
       if (player.spiderWebSourceId) {
         clearSpiderWeb()
         log('You tear free of the spider web!', 'good')
@@ -16834,6 +16952,7 @@ more difficult:
       player.race = selectedRaceId
       player.permadeath = document.getElementById('permadeathToggle').checked
       player.characterId = Graveyard.newCharacterId()
+      player.lastPositionChangeTurn = turnCount
       player.highscoresDisqualified = false
       if (reusingWorldAfterPermadeath) snapCameraToPlayer()
       else {

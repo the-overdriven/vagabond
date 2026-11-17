@@ -455,7 +455,7 @@ const TowerMaze = (() => {
       occupant.homeX=free.x;occupant.homeY=free.y
       occupant.animStart=undefined;occupant.attackStart=undefined;occupant.farPath=null
     }
-    currentZ=target;currentCave=-1;map=terrain
+    currentZ=target;markPlayerPositionChanged();currentCave=-1;map=terrain
     undergroundDiscovered=target===0?undergroundDiscoveredL1:
       target===-1?undergroundDiscoveredL1:deepLevels[0].discovered
     resetSwimming();clearAutoPath();pendingMove=null;hoveredEnemy=null;stopCameraAnimation()

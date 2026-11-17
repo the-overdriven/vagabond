@@ -6926,6 +6926,7 @@ A Scroll of Identification reveals:
 - stats
 - description
 - owner/lore information
+- granted ability name and explanation (also shown on later inspection)
 
 While God Mode is active, the player can identify artifacts without consuming
 or possessing a Scroll of Identification. Identification otherwise follows the
@@ -6948,6 +6949,67 @@ Max HP %
 ```
 
 Some effects are lore-oriented or interact with curses/other systems.
+
+### Domains and granted powers
+
+Each generated **equipment artifact** also grants exactly **one power** in
+addition to its ordinary item properties, artifact bonuses and possible curse.
+The assignment is made when the item is generated and persists as its own
+`abilityId`. It never rerolls upon identification, equipping, dropping, saving
+or loading. Adaptive artifact rewards follow the same rule. Passive trinkets
+have no eligible powers until they receive configured domains.
+
+The domain catalog lives in `content/artifact_abilities.json`:
+
+| Equipment | Eligible domains |
+|---|---|
+| Melee weapon | `martial` |
+| Bow | `archery` (never `martial`) |
+| Armor | `bulwark` |
+| Shield | `bulwark`, `shields` |
+
+Specific item bases can add more domains. The eligible pool is the **union of
+all enabled, unique ability IDs** in the item's domains: every power in that
+union has equal probability, regardless of its domain's size. A power listed
+in several domains is included only once. Only fully implemented powers are
+eligible to roll. Adding a future trinket or other equipment domain uses the
+same assignment and selection system.
+
+An artifact ability is active while its weapon, armor or shield is equipped.
+Identical abilities on several equipped artifacts **do not stack**; different
+abilities can interact. An unidentified artifact conceals the power's name and
+description, even when equipped, but its power still works. An identified
+artifact shows the power's name alongside its other inventory statistics;
+identifying or inspecting it displays the power's description in the message
+log. Inspecting does not reroll anything.
+
+### Enabled powers
+
+| Power | Domain | Rule |
+|---|---|---|
+| Shadow Strike | martial | A melee hit begun while invisible deals **50% more damage**. Invisibility is checked independently at the start of each strike, including additional strikes. |
+| Flurry | martial | A bonus melee strike granted by **GRACE** deals **50% more damage**. |
+| Dreadful Strike | martial | A damaging melee hit has a **20%** chance to cause **Fear for 5 player turns**. A repeat application refreshes its duration; undead are immune, as with Scroll of Fear. |
+| Long Shot | archery | Equipped bow range **+1** without extending line of sight or bypassing obstacles. |
+| Fleetfoot | bulwark | Ignores shield/armor **SPD penalties** and gives immunity to **Slow** while equipped; unrelated speed penalties still apply. |
+| Immovable | bulwark | Prevents forced player displacement by **knockback, pulls and wrestler swaps**, but does not prevent the damage of the attack. |
+| God's Chosen | bulwark | Critical melee attacks, arrows and direct spell projectiles against the player become ordinary hits, not misses. |
+| Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
+| Vigorplate | bulwark | At **75% maximum HP or more**, grants **+30% DEF**, minimum **+3**. Re-evaluated for each incoming attack. |
+| Hold the Line | bulwark | Grants **+1 DEF** for each adjacent living enemy on the **same Z level**, maximum **+3**. |
+
+Brace and Vigorplate round fractional DEF bonuses **down**, using the same
+pre-conditional DEF basis; neither feeds the other's percentage. Hold the Line
+adds its flat bonus afterward. All bonuses are calculated dynamically and
+relinquished immediately when their conditions or the equipped ability change.
+The stationary condition depends on consumed world turns and actual position
+changes, never animation progress. For damaging melee powers, the regular
+critical/glancing calculations occur before the added damage multipliers.
+
+The power identity, position-change turn and relevant combat statuses survive
+save/load and deterministic replay. Enemy Fear uses the same status and rules
+whether caused by an artifact or a scroll, including its countdown and
+interruptions from damage. Range and adjacency do not cross Z levels.
 
 ---
 

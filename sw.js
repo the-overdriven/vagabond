@@ -92,6 +92,7 @@ const PRECACHE_URLS = [
   './css/style.css?v=20261107-mobile-npc-dialogue',
   './content/starting_weapons.json',
   './content/gear_weapons.json',
+  './content/artifact_abilities.json',
   './content/ranged_weapons.json',
   './content/gear_shields.json',
   './content/gear_armors.json',

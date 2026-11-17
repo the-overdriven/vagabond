@@ -59,7 +59,7 @@ function activePlayerStatuses() {
     ['mummy-curse', '☾', 'Cursed', player.mummyCurseTurns, 'Mummy curse: −2 ATK.'],
     ['confused', '⁇', 'Confused', player.confusionTurns, '40% of movement attempts redirect to another walkable adjacent tile. Kill the Banshee to end early.'],
     ['weaken', '↓', 'Weakened', player.weakenTurns, 'Maximum HP reduced by 10%.'],
-    ['slow', '↓', 'Slowed', player.slowTurns, 'SPD reduced by 10%.']
+    ['slow', '↓', 'Slowed', playerHasArtifactAbility('fleetfoot') ? 0 : player.slowTurns, 'SPD reduced by 10%.']
   ]) if (counter > 0) statuses.push({id,icon,label,counter:`${counter}t`,detail:`${detail} ${turns(counter)} remaining.`})
   if (player.poisonTurns > 0) {
     statuses.push({id: 'poison', icon: '☠', label: 'Poisoned', counter: `${player.poisonTurns}t`,

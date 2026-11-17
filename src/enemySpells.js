@@ -87,7 +87,7 @@ function enemySacrificeTargets(e) {
 function availableEnemySpells(e) {
   const spells = []
   if (enemyHasAbility(e, 'weaken') && player.weakenTurns <= 0) spells.push('weaken')
-  if (enemyHasAbility(e, 'slow') && player.slowTurns <= 0) spells.push('slow')
+  if (enemyHasAbility(e, 'slow') && player.slowTurns <= 0 && !playerHasArtifactAbility('fleetfoot')) spells.push('slow')
   if (enemyHasAbility(e, 'disarm') && playerDisarmSlots().length) spells.push('disarm')
   if (enemyHasAbility(e, 'dispel') && playerDispelTargets().length) spells.push('dispel')
   if (enemyHasAbility(e, 'deathBolt') && clearProjectilePath(e)) spells.push('deathBolt')

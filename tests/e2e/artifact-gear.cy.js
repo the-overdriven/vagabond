@@ -104,6 +104,12 @@ describe('Gear bases on procedural artifacts', () => {
         check(item.noun===base.name && item.base===base.name,'selected noun '+base.name)
         check(item.artifactSlot===slot,'slot '+base.name)
         check(item.tier===tier,'effect tier '+base.name)
+        check(!!ARTIFACT_ABILITIES.abilities[item.abilityId]?.enabled,
+          'generated gear has an enabled ability '+base.name)
+        check(artifactAbilityPool(item).includes(item.abilityId),
+          'ability belongs to the gear domain '+base.name)
+        if(base.rangedAtk)check(artifactAbilityPool(item).every(id=>ARTIFACT_ABILITIES.domains.archery.includes(id)),
+          'bow has archery powers only '+base.name)
         if(slot==='weapon'){
           check(item.atk===base.atk && item.grace===base.grace,'weapon stats '+base.name)
           check(item.twoHanded===base.twoHanded,'weapon handedness '+base.name)
@@ -209,6 +215,25 @@ describe('Gear bases on procedural artifacts', () => {
     cy.get('#invList').should('contain.text','DEF 12')
     cy.get('#invList').should('contain.text','DEF +4')
     cy.get('#invList').should('contain.text','SPD -2')
+  })
+
+
+  for (const width of [1440,390]) it('displays granted powers and inspection text at '+width+'px', () => {
+    cy.viewport(width,900)
+    cy.window().then(win=>win.eval(`(() => {
+      const ability=ARTIFACT_ABILITIES.abilities.vigorplate
+      if(!ability?.enabled)throw Error('Vigorplate must be enabled')
+      const item={kind:'artifact',name:'Brigandine of Aldrek',noun:'Brigandine',base:'Brigandine',
+        artifactSlot:'armor',tier:3,identified:true,def:12,speedPenalty:2,bonuses:{},
+        description:'A remarkably resilient suit.',abilityId:'vigorplate'}
+      player.inventory=[item];player.equip={weapon:null,shield:null,armor:null}
+      const originalLog=log, messages=[]
+      try {log=(msg)=>messages.push(msg);inspectArtifact(0)}finally{log=originalLog}
+      if(!messages.some(msg=>msg.includes('Vigorplate:') && msg.includes(ability.description)))
+        throw Error('inspecting an identified artifact must describe its power')
+      invTab='armor';toggleInv(true)
+    })()`))
+    cy.get('#invList').should('contain.text','Brigandine of Aldrek').and('contain.text','Vigorplate')
   })
 
   for (const width of [1440,390]) it('equips an unidentified artifact without revealing it at '+width+'px', () => {

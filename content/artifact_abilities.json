@@ -1,0 +1,92 @@
+{
+  "itemDomains": {
+    "meleeWeapon": [
+      "martial"
+    ],
+    "bow": [
+      "archery"
+    ],
+    "armor": [
+      "bulwark"
+    ],
+    "shield": [
+      "bulwark",
+      "shields"
+    ],
+    "trinket": []
+  },
+  "baseDomains": {},
+  "domains": {
+    "martial": [
+      "shadow_strike",
+      "flurry",
+      "dreadful_strike"
+    ],
+    "archery": [
+      "long_shot"
+    ],
+    "bulwark": [
+      "fleetfoot",
+      "immovable",
+      "gods_chosen",
+      "brace",
+      "vigorplate",
+      "hold_the_line"
+    ],
+    "shields": []
+  },
+  "abilities": {
+    "shadow_strike": {
+      "name": "Shadow Strike",
+      "description": "Melee strikes made while invisible deal 50% more damage.",
+      "enabled": true
+    },
+    "flurry": {
+      "name": "Flurry",
+      "description": "The bonus melee hit from GRACE deals 50% more damage.",
+      "enabled": true
+    },
+    "long_shot": {
+      "name": "Long Shot",
+      "description": "Increases bow range by 1 tile without extending vision.",
+      "enabled": true
+    },
+    "fleetfoot": {
+      "name": "Fleetfoot",
+      "description": "Ignores equipment SPD penalties and makes you immune to Slow.",
+      "enabled": true
+    },
+    "immovable": {
+      "name": "Immovable",
+      "description": "Prevents involuntary displacement by knockback, pulls and wrestlers.",
+      "enabled": true
+    },
+    "gods_chosen": {
+      "name": "God's Chosen",
+      "description": "Enemy critical hits against you become ordinary hits.",
+      "enabled": true
+    },
+    "brace": {
+      "name": "Brace",
+      "description": "While stationary since the previous action, gain 20% DEF (at least +2).",
+      "enabled": true
+    },
+    "vigorplate": {
+      "name": "Vigorplate",
+      "description": "At 75% HP or higher, gain 30% DEF (at least +3).",
+      "enabled": true
+    },
+    "hold_the_line": {
+      "name": "Hold the Line",
+      "description": "Gain +1 DEF per adjacent enemy, up to +3.",
+      "enabled": true
+    },
+    "dreadful_strike": {
+      "name": "Dreadful Strike",
+      "description": "Damaging melee hits have a 20% chance to cause fear for 5 player turns.",
+      "duration": 5,
+      "chance": 0.2,
+      "enabled": true
+    }
+  }
+}
