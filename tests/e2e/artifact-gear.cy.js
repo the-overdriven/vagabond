@@ -86,6 +86,37 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('uses identification-dependent artifact prices without repricing merchant stock', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const ability=ARTIFACT_ABILITIES.abilities
+      check(Object.keys(ability).length===51,'the implemented artifact catalog still has 51 powers')
+      check(Object.entries(ability).every(([id,a])=>Number.isInteger(a.priceBonus)&&a.priceBonus>=0),
+        'every ability has an individual nonnegative premium')
+      check(ability.sacred_aegis.priceBonus===720&&ability.taunt.priceBonus===70,
+        'high and low prices are configured per ability')
+      const item={kind:'artifact',tier:5,baseValue:280,artifactSlot:'armor',
+        abilityId:'sacred_aegis',identified:false,curse:null,merchantPrice:280}
+      check(itemBuyValue(item)===480,'unidentified costs base plus 200 gold')
+      check(itemSellValue(item)===70,'unidentified selling has no premium')
+      item.identified=true
+      check(itemBuyValue(item)===1000,'identified price uses ability premium and purchase cap')
+      check(itemSellValue(item)===320,'identified selling adds 25 percent of ability premium')
+      item.curse={everyTurns:10,types:['hp']}
+      check(itemSellValue(item)===215,'curse only discounts base selling price')
+      check(item.merchantPrice===280&&itemBaseValue(item)===280,'base inputs are never mutated')
+      item.abilityId='taunt';item.curse=null
+      check(itemBuyValue(item)===350,'cheap power uses its own premium')
+      item.identified=false
+      check(itemBuyValue(item)===480,'unidentified price is independent of hidden ability')
+      const trinket={kind:'artifact',artifactSlot:'trinket',baseValue:280,identified:false}
+      check(itemBuyValue(trinket)===280,'powerless trinket has no gambling surcharge')
+      check(itemBuyValue({kind:'weapon',baseValue:80,merchantPrice:60})===60,
+        'ordinary merchant base overrides are unchanged')
+      check(itemBuyValue(item)===480,'repeated price reads cannot accumulate surcharges')
+    })()`))
+  })
+
   it('pulls names from all gear catalogs and carries base stats on every generated gear artifact', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

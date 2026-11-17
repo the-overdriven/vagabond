@@ -2466,6 +2466,22 @@ more difficult:
       if (!Array.isArray(domains) || domains.some(domain => !config.domains[domain]))
         throw new Error('Invalid artifact domain assignment: ' + key)
     }
+    const pricing = config.pricing
+    if (!pricing || !Number.isFinite(pricing.unidentifiedBuySurcharge) ||
+        !Number.isFinite(pricing.identifiedSellPremiumFraction) ||
+        !Number.isFinite(pricing.maxBuyPrice) || pricing.unidentifiedBuySurcharge < 0 ||
+        pricing.identifiedSellPremiumFraction < 0 || pricing.maxBuyPrice < 0)
+      throw new Error('Invalid artifact pricing configuration')
+    for (const [id, ability] of Object.entries(config.abilities)) {
+      if (!Number.isInteger(ability.priceBonus) || ability.priceBonus < 0)
+        throw new Error('Invalid artifact price bonus: ' + id)
+      if (ability.slots && (!Array.isArray(ability.slots) || !ability.slots.length ||
+          ability.slots.some(slot => !['weapon', 'armor', 'shield', 'trinket'].includes(slot))))
+        throw new Error('Invalid artifact slot eligibility: ' + id)
+      if (ability.weaponTypes && (!Array.isArray(ability.weaponTypes) || !ability.weaponTypes.length ||
+          ability.weaponTypes.some(type => !['bow', 'oneHandedMelee', 'twoHandedMelee'].includes(type))))
+        throw new Error('Invalid artifact weapon eligibility: ' + id)
+    }
   }
 
   function artifactDomains(item) {
@@ -2478,9 +2494,21 @@ more difficult:
       ...(ARTIFACT_ABILITIES?.baseDomains?.[item.base || item.noun] || [])])]
   }
 
+  function artifactAbilityEligible(item, ability) {
+    if (!ability || !item) return false
+    const slot = item.artifactSlot
+    if (ability.slots && !ability.slots.includes(slot)) return false
+    if (slot === 'weapon' && ability.weaponTypes) {
+      const type = item.rangedAtk ? 'bow' : item.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
+      if (!ability.weaponTypes.includes(type)) return false
+    }
+    return true
+  }
+
   function artifactAbilityPool(item) {
     return [...new Set(artifactDomains(item).flatMap(domain => ARTIFACT_ABILITIES.domains[domain] || []))]
-      .filter(id => ARTIFACT_ABILITIES.abilities[id]?.enabled === true)
+      .filter(id => ARTIFACT_ABILITIES.abilities[id]?.enabled === true &&
+        artifactAbilityEligible(item, ARTIFACT_ABILITIES.abilities[id]))
   }
 
   function rollArtifactAbility(item) {
@@ -2516,7 +2544,14 @@ more difficult:
   }
 
   function artifactAbilityMessage(id, named, hidden) {
-    log(playerKnowsArtifactAbility(id) ? named : hidden, 'good')
+    const known = playerKnowsArtifactAbility(id)
+    log(known ? named : hidden, 'good')
+    // The normal damage-text animator is presentation only; it neither rolls
+    // RNG nor advances combat time, and concealed powers remain unnamed.
+    if (!replayAnimationsDisabled && !replaySimulationMode)
+      spawnDamageNumber(player.x, player.y,
+        known ? (ARTIFACT_ABILITIES.abilities[id]?.name || 'Magic!') : 'Magic!',
+        '#e3c589', 0, 1050)
   }
 
   function artifactInspectionText(item) {
@@ -15852,6 +15887,8 @@ more difficult:
       if (it.kind === 'artifact') {
         if (!it.identified) v = Math.floor(v / 2)
         else if (it.curse) v = Math.floor(v / 4)
+        if (it.identified) v += Math.floor(artifactPriceBonus(it) *
+          ARTIFACT_ABILITIES.pricing.identifiedSellPremiumFraction)
       }
       return v
     }
@@ -15863,6 +15900,20 @@ more difficult:
     if (definition) return definition.baseValue
     const base = it.startingWeapon ? ITEM_BASE_VALUES.startingWeapon : it.baseValue
     return (base || 0) + (it.mod ? (it.modAmt || 1) * ITEM_BASE_VALUES.modifierPerPoint : 0)
+  }
+
+  // Read, do not mutate, the saved merchantPrice: it always remains a base input.
+  // Identification determines one and only one artifact price adjustment.
+  function artifactPriceBonus(it) {
+    return it?.kind === 'artifact' ? (ARTIFACT_ABILITIES?.abilities?.[it.abilityId]?.priceBonus || 0) : 0
+  }
+
+  function itemBuyValue(it) {
+    const base = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
+    if (it.kind !== 'artifact' || !it.abilityId) return base
+    const pricing = ARTIFACT_ABILITIES.pricing
+    const adjustment = it.identified ? artifactPriceBonus(it) : pricing.unidentifiedBuySurcharge
+    return Math.min(pricing.maxBuyPrice, base + adjustment)
   }
 
   // Presentation-only filters: no turns, RNG calls, save fields or replay actions.
@@ -15964,7 +16015,7 @@ more difficult:
         if (it.merchantSold) nm.title = 'Buy back an item you previously sold to this merchant'
         row.appendChild(nm)
         const btn = document.createElement('button')
-        const buyValue = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
+        const buyValue = itemBuyValue(it)
         btn.textContent = 'Buy for ' + buyValue + 'g'
         btn.onclick = () => {
           buyItem(it)
@@ -16027,7 +16078,7 @@ more difficult:
     }
     ensureReplayItemIds()
     const replayId = it.replayId
-    const value = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
+    const value = itemBuyValue(it)
     if (value <= 0 || player.gold < value) return
     const stackable = isStackableKind(it.kind)
     if (stackable) {
@@ -17225,13 +17276,13 @@ more difficult:
     if (!player.inventory.some(item => item.kind === 'pickaxe')) addInventoryItem('pickaxe')
     resetSwimming()
     player.godInvisible = true
-    player.gold = 500
+    player.gold = 5000
     // The minimap is cached for performance; filling the discovery grids
     // alone leaves the old fog-painted pixels in those canvases.
     rebuildMinimapBases()
     updateHud()
     render()
-    log('God mode: every map revealed. SPD 50. MF 25.', 'good')
+    log('God mode: every map revealed. SPD 50. MF 25. 5000 gold.', 'good')
   }
 
   // Hidden debug navigation changes only the active layer. It deliberately

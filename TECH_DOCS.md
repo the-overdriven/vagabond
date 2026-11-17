@@ -6996,7 +6996,11 @@ all enabled, unique ability IDs** in the item's domains: every power in that
 union has equal probability, regardless of its domain's size. A power listed
 in several domains is included only once. Only fully implemented powers are
 eligible to roll. Adding a future trinket or other equipment domain uses the
-same assignment and selection system.
+same assignment and selection system. Individual powers may additionally restrict
+eligible equipment slots or, for weapons, distinguish bows from one-handed and
+two-handed melee weapons. Filter these restrictions before selecting uniformly
+from the deduplicated domain pool; an ability never receives an extra roll or
+higher weight because it belongs to several domains.
 
 An artifact ability is active while its weapon, armor or shield is equipped.
 Identical abilities on several equipped artifacts **do not stack**; different
@@ -7004,7 +7008,10 @@ abilities can interact. An unidentified artifact conceals the power's name and
 description, even when equipped, but its power still works. An identified
 artifact shows the power's name alongside its other inventory statistics;
 identifying or inspecting it displays the power's description in the message
-log. Inspecting does not reroll anything.
+log. Inspecting does not reroll anything. Activated powers use the existing
+message log and floating combat-text animation. An unidentified power uses a
+generic popup without disclosing its hidden identity; animations never decide
+combat outcomes or consume game RNG.
 
 ### Enabled powers
 
@@ -8860,7 +8867,12 @@ calculation: **unidentified artifacts sell for half**, and **identified cursed
 artifacts for one quarter**, rounded down to whole gold. Identified artifacts
 without a curse retain the normal tier-based sell value. An unidentified cursed
 artifact receives only the unidentified discount until it is identified.
-These discounts affect selling only; merchant purchase prices are unchanged.
+After the ordinary sell-value discounts, an **identified equipment artifact**
+receives an additional **floor(25% × its ability's `priceBonus`)** gold on sale.
+Unidentified artifacts receive no ability premium. The curse reduction applies
+to the ordinary sell base before the premium; it does not reduce the premium
+again. All 51 currently enabled powers have an individual nonnegative
+`priceBonus` in `content/artifact_abilities.json` (70g–720g).
 
 ### Non-tiered items
 
@@ -8909,7 +8921,23 @@ The normal default merchant buy price is:
 itemBaseValue(item)
 ```
 
-However, an item with an explicit `merchantPrice` uses that price instead.
+However, an item with an explicit `merchantPrice` uses that price instead
+as its **base**. The same `itemBuyValue()` calculation is authoritative for the
+merchant's displayed price and the gold actually charged.
+
+An equipment artifact with a generated power has identification-dependent
+pricing, with mutually exclusive adjustments to its base buy price:
+
+- **Unidentified:** +200g, regardless of the hidden ability or its rolled data.
+- **Identified:** +the ability's individual `priceBonus`, with no gambling surcharge.
+
+The final artifact purchase price is capped at **1000g**, after the adjustment.
+Sell prices do not include the gambling surcharge. Passive trinkets lacking an
+ability are excluded from this adjustment. Neither displaying prices nor
+identifying a purchased artifact consumes an ability-generation RNG roll or
+mutates `merchantPrice`; buyback stock and ordinary gear keep their established
+base-price rules. Changing identification can therefore make an artifact's buy
+valuation rise or fall, without changing its generated power or properties.
 
 Merchant-generated stock can therefore use configured price multipliers or
 fixed prices from `content/merchant_stock.json`. The exact multipliers and
@@ -9979,8 +10007,9 @@ Recorded God Mode actions are replayed without a confirmation or browser-ledger
 writes. Disabling an active God Mode needs no confirmation and cannot undo the
 exclusion. Once enabled, God Mode makes the player invisible. Pressing
 `G` again turns god mode and its invisibility off, restoring normal movement
-restrictions and drowning. Granted stats/gold remain, and discovery on other
-floors is unchanged.
+restrictions and drowning. Activating God Mode sets the character's gold to
+**5000g**, along with its normal debug stat grants. Granted stats/gold remain,
+and discovery on other floors is unchanged.
 Disabling God Mode forgets only the **current map's** discovered terrain,
 including the surface or a separate dungeon map. Terrain within ordinary
 current sight (and valid underground light) is rediscovered immediately;

@@ -1472,3 +1472,100 @@ test('Batch 6: ordinary monster summons retain the shared pre-existing rules', a
     run('chance=summonOriginal.chance;randInt=summonOriginal.randInt')
   }
 })
+
+test('artifact pricing is identification-dependent, capped and non-profitable on immediate resale', async () => {
+  await ready()
+  const result = run(`(() => {
+    const powers = ARTIFACT_ABILITIES.abilities
+    const cfg = ARTIFACT_ABILITIES.pricing
+    const items = ARTIFACT_EFFECTS.flatMap(effect => Object.keys(powers).map(abilityId => ({
+      kind:'artifact',tier:effect.tier,baseValue:effect.baseValue,merchantPrice:effect.baseValue,
+      artifactSlot:'weapon',abilityId,identified:false,curse:null
+    })))
+    let examined = 0
+    for (const item of items) {
+      const hiddenBuy = itemBuyValue(item)
+      const hiddenSell = itemSellValue(item)
+      if (hiddenBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + 200)) throw Error('hidden buy')
+      if (hiddenSell > hiddenBuy) throw Error('hidden resale profit')
+      item.identified = true
+      const premium = powers[item.abilityId].priceBonus
+      const identifiedBuy = itemBuyValue(item)
+      const identifiedSell = itemSellValue(item)
+      if (identifiedBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + premium)) throw Error('identified buy')
+      if (identifiedSell !== SELL_VALUE_BY_TIER[item.tier] + Math.floor(premium * .25))
+        throw Error('identified sale')
+      if (identifiedSell > identifiedBuy) throw Error('identified resale profit')
+      item.curse={everyTurns:10,types:['hp']}
+      if (itemSellValue(item) !== Math.floor(SELL_VALUE_BY_TIER[item.tier] / 4) + Math.floor(premium * .25))
+        throw Error('cursed identified sale')
+      if (item.merchantPrice !== item.baseValue) throw Error('base price mutated')
+      examined++
+    }
+    const empty = {kind:'artifact',artifactSlot:'trinket',baseValue:280,identified:false}
+    if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
+    return {examined, powerCount:Object.keys(powers).length}
+  })()`)
+  assert.equal(result.powerCount, 51)
+  assert.equal(result.examined, 51 * 14)
+})
+
+test('artifact activations log and animate while concealing unidentified powers', async () => {
+  await ready()
+  const feedback = run(`(() => {
+    player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',abilityId:'shadow_strike',identified:true},
+      shield:null,armor:null}
+    replayAnimationsDisabled=false;replaySimulationMode=false
+    damageAnims=[]
+    const previousLog=log, messages=[]
+    try {
+      log=(message,cls)=>messages.push({message,cls})
+      artifactAbilityMessage('shadow_strike','Shadow Strike awakens!','Your weapon stirs!')
+      const known={message:messages.at(-1).message,popup:damageAnims.at(-1)?.amount}
+      player.equip.weapon.identified=false
+      artifactAbilityMessage('shadow_strike','Shadow Strike awakens!','Your weapon stirs!')
+      const hidden={message:messages.at(-1).message,popup:damageAnims.at(-1)?.amount}
+      return {known,hidden}
+    } finally {log=previousLog}
+  })()`)
+  assert.deepEqual(JSON.parse(JSON.stringify(feedback)), {
+    known: {message:'Shadow Strike awakens!',popup:'Shadow Strike'},
+    hidden: {message:'Your weapon stirs!',popup:'Magic!'}
+  })
+})
+
+test('god mode activation includes the 5000-gold grant', () => {
+  // Browser-driven activation is covered by the existing god-mode E2E spec.
+  assert.match(run('useGodModeKey.toString()'), /player\.gold\s*=\s*5000/)
+})
+
+test('ability selection filters equipment slots and weapon classes before rolling', async () => {
+  await ready()
+  const result = run(`(() => {
+    const config = ARTIFACT_ABILITIES
+    const abilityId = '__restricted_test__'
+    config.abilities[abilityId]={enabled:true,priceBonus:100,slots:['weapon'],weaponTypes:['twoHandedMelee']}
+    config.domains.martial.push(abilityId,abilityId)
+    config.domains.archery.push(abilityId)
+    config.domains.bulwark.push(abilityId)
+    const artifact = values => ({kind:'artifact',base:'Test Base',...values})
+    try {
+      const twoHanded=artifactAbilityPool(artifact({artifactSlot:'weapon',twoHanded:true}))
+      const oneHanded=artifactAbilityPool(artifact({artifactSlot:'weapon',twoHanded:false}))
+      const bow=artifactAbilityPool(artifact({artifactSlot:'weapon',twoHanded:true,rangedAtk:5}))
+      const armor=artifactAbilityPool(artifact({artifactSlot:'armor'}))
+      config.abilities[abilityId].enabled=false
+      const disabled=artifactAbilityPool(artifact({artifactSlot:'weapon',twoHanded:true}))
+      return {count:twoHanded.filter(id=>id===abilityId).length,
+        oneHanded:oneHanded.includes(abilityId),bow:bow.includes(abilityId),
+        armor:armor.includes(abilityId),disabled:disabled.includes(abilityId)}
+    } finally {
+      for(const list of Object.values(config.domains))
+        for(let i=list.length-1;i>=0;i--)if(list[i]===abilityId)list.splice(i,1)
+      delete config.abilities[abilityId]
+    }
+  })()`)
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    count:1,oneHanded:false,bow:false,armor:false,disabled:false
+  })
+})

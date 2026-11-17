@@ -16,6 +16,7 @@ describe('Disabling god mode in hazardous terrain', () => {
         window.dispatchEvent(new KeyboardEvent('keydown', {key: 'g'}))
         window.dispatchEvent(new KeyboardEvent('keydown', {key: 'G', shiftKey: true}))
         const shiftIgnoredWhileOn = player.godMode
+        const awardedGold = player.gold
         player.x = 50; player.y = 50
         map[50][50] = 'mountain'; map[50][51] = 'mountain'
         map[50][49] = 'grass'; map[50][48] = 'water'
@@ -38,11 +39,11 @@ describe('Disabling god mode in hazardous terrain', () => {
         await tryMove(0, -1)
         await tryMove(0, 1)
         const cannotReenter = player.x === 52 && player.y === 51 && player.swimTurns === 0
-        return {disabled, shiftIgnoredWhileOn, shiftIgnoredWhileOff,
+        return {disabled, shiftIgnoredWhileOn, shiftIgnoredWhileOff, awardedGold,
           mountainBlocked, entryBlocked, canSwimWhileSubmerged, cannotReenter}
       })()`)
       expect(result).to.deep.equal({
-        disabled: true, shiftIgnoredWhileOn: true, shiftIgnoredWhileOff: true,
+        disabled: true, shiftIgnoredWhileOn: true, shiftIgnoredWhileOff: true, awardedGold: 5000,
         mountainBlocked: true, entryBlocked: true,
         canSwimWhileSubmerged: true, cannotReenter: true
       })
