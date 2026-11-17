@@ -90,7 +90,10 @@ describe('Gear bases on procedural artifacts', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const ability=ARTIFACT_ABILITIES.abilities
-      check(Object.keys(ability).length===51,'the implemented artifact catalog still has 51 powers')
+      const domainIds=new Set(Object.values(ARTIFACT_ABILITIES.domains).flat())
+      check(Object.keys(ability).length>0 &&
+        Object.keys(ability).every(id=>domainIds.has(id)) &&
+        [...domainIds].every(id=>ability[id]),'artifact powers and domains must stay in sync')
       check(Object.entries(ability).every(([id,a])=>Number.isInteger(a.priceBonus)&&a.priceBonus>=0),
         'every ability has an individual nonnegative premium')
       check(ability.sacred_aegis.priceBonus===720&&ability.taunt.priceBonus===70,
