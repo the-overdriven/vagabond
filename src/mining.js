@@ -645,7 +645,7 @@ const Mining = (() => {
           log('You are too exhausted to finish mining this rock safely.', 'bad')
           return 'warn'
         }
-        player.hp -= strain
+        artifactLosePlayerHp(strain,{cost:true})
         if (strain) log(`The work strains you for ${strain} HP.`, 'bad')
         if (currentZ === 0) {
           map[y][x] = tileUnderlays[surfaceKey] || 'grass'

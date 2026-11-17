@@ -7,7 +7,8 @@
       "archery"
     ],
     "armor": [
-      "bulwark"
+      "bulwark",
+      "armors"
     ],
     "shield": [
       "bulwark",
@@ -77,13 +78,17 @@
       "fear_aura",
       "fear_eater",
       "executioners_aura",
-      "tideguard",
+      "tideguard"
+    ],
+    "armors": [
       "veteran_xp",
       "veteran_level",
       "berserkers_oath",
       "duelist",
       "weaponmaster",
-      "dancer"
+      "dancer",
+      "alchemists_vest_hp",
+      "alchemists_vest_guard"
     ],
     "shields": [
       "shield_mastery",
@@ -463,14 +468,6 @@
       "name": "Ambusher",
       "description": "Unaware targets take up to 50% extra melee or bow damage based on their effective AGGRO. Alarmed but unaware targets receive half the bonus; aware targets receive none.",
       "enabled": true,
-      "slots": [
-        "weapon"
-      ],
-      "weaponTypes": [
-        "bow",
-        "oneHandedMelee",
-        "twoHandedMelee"
-      ],
       "baseBonus": 0.6,
       "aggroPenalty": 0.05,
       "maxBonus": 0.5,
@@ -481,10 +478,6 @@
       "name": "Tideguard",
       "description": "On water or an unfrozen river: armor grants 20% DEF; a shield adds 15 percentage points to melee block chance.",
       "enabled": true,
-      "slots": [
-        "armor",
-        "shield"
-      ],
       "defBonus": 0.2,
       "blockBonus": 0.15,
       "priceBonus": 260
@@ -493,13 +486,6 @@
       "name": "Fortune's Fang",
       "description": "Melee critical chance gains +1 percentage point per complete 3 Magic Find, up to +8 points.",
       "enabled": true,
-      "slots": [
-        "weapon"
-      ],
-      "weaponTypes": [
-        "oneHandedMelee",
-        "twoHandedMelee"
-      ],
       "mfPerPoint": 3,
       "maxCritBonusPP": 8,
       "priceBonus": 430
@@ -508,14 +494,6 @@
       "name": "Veteran — Experience",
       "description": "Melee weapon: +5% damage per 10 percentage points of XP bonus. Armor: +1 DEF per complete 15 percentage points of XP bonus.",
       "enabled": true,
-      "slots": [
-        "weapon",
-        "armor"
-      ],
-      "weaponTypes": [
-        "oneHandedMelee",
-        "twoHandedMelee"
-      ],
       "damagePerXpPoint": 0.005,
       "defPerXpPoints": 15,
       "priceBonus": 320
@@ -524,14 +502,6 @@
       "name": "Veteran — Level",
       "description": "Melee weapon: +1% damage per character level. Armor: +2 DEF per complete 5 levels.",
       "enabled": true,
-      "slots": [
-        "weapon",
-        "armor"
-      ],
-      "weaponTypes": [
-        "oneHandedMelee",
-        "twoHandedMelee"
-      ],
       "damagePerLevel": 0.01,
       "levelsPerDef": 5,
       "defPerStep": 2,
@@ -541,9 +511,6 @@
       "name": "Berserker's Oath",
       "description": "Armor trades 1–3 DEF for the same ATK, rolled once. Gain +1 percentage point to melee and bow critical chance per 2 points that ATK exceeds DEF, up to +15 points.",
       "enabled": true,
-      "slots": [
-        "armor"
-      ],
       "rollMin": 1,
       "rollMax": 3,
       "gapPerCritPoint": 2,
@@ -554,9 +521,6 @@
       "name": "Duelist",
       "description": "With a one-handed melee weapon and no shield, deal +0.25% melee damage per point of One-Handed skill.",
       "enabled": true,
-      "slots": [
-        "armor"
-      ],
       "damagePerSkillPoint": 0.0025,
       "priceBonus": 350
     },
@@ -564,9 +528,6 @@
       "name": "Weaponmaster",
       "description": "With a melee weapon, gain +1 GRACE for each complete 20 points in the lower of One-Handed and Two-Handed proficiency.",
       "enabled": true,
-      "slots": [
-        "armor"
-      ],
       "skillPerGrace": 20,
       "priceBonus": 430
     },
@@ -574,9 +535,6 @@
       "name": "Dancer",
       "description": "Voluntary movement grants +20% DEF during the enemy response; move again next action to refresh.",
       "enabled": true,
-      "slots": [
-        "armor"
-      ],
       "defBonus": 0.2,
       "priceBonus": 330
     },
@@ -584,10 +542,6 @@
       "name": "Growing Malice",
       "description": "Consecutive landed strikes against the same enemy build +2 percentage points critical chance for the next hit, up to +10; misses or switching targets reset it.",
       "enabled": true,
-      "weaponTypes": [
-        "oneHandedMelee",
-        "twoHandedMelee"
-      ],
       "critPerHitPP": 2,
       "maxCritBonusPP": 10,
       "priceBonus": 350
@@ -596,9 +550,6 @@
       "name": "Vengeful Precision",
       "description": "A shield block readies +8 percentage points critical chance for the next individual melee weapon strike, spent even on a miss.",
       "enabled": true,
-      "slots": [
-        "shield"
-      ],
       "critBonusPP": 8,
       "priceBonus": 300
     },
@@ -612,6 +563,22 @@
       "transferPerSkillPoint": 0.005,
       "capacityAtkFraction": 0.5,
       "priceBonus": 450
+    },
+    "alchemists_vest_hp": {
+      "name": "Alchemist's Vest — Vitality",
+      "description": "Excess healing from Life Potions, Healing Herbs and edible Mushrooms becomes temporary HP, absorbing damage before normal HP. It never stacks and cannot exceed 50% of maximum HP; removing the armor clears it.",
+      "enabled": true,
+      "maxHpFraction": 0.5,
+      "priceBonus": 540
+    },
+    "alchemists_vest_guard": {
+      "name": "Alchemist's Vest — Guard",
+      "description": "Every 5 excess HP from a Life Potion, Healing Herb or edible Mushroom grants +1 DEF for 5 player turns, converting up to 50% of maximum HP. Only a stronger grant replaces and refreshes the bonus; removing the armor clears it.",
+      "enabled": true,
+      "excessHpFractionCap": 0.5,
+      "hpPerDef": 5,
+      "durationTurns": 5,
+      "priceBonus": 380
     }
   },
   "pricing": {

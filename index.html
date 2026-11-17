@@ -2477,9 +2477,6 @@ more difficult:
     for (const [id, ability] of Object.entries(config.abilities)) {
       if (!Number.isInteger(ability.priceBonus) || ability.priceBonus < 0)
         throw new Error('Invalid artifact price bonus: ' + id)
-      if (ability.slots && (!Array.isArray(ability.slots) || !ability.slots.length ||
-          ability.slots.some(slot => !['weapon', 'armor', 'shield', 'trinket'].includes(slot))))
-        throw new Error('Invalid artifact slot eligibility: ' + id)
       if (ability.weaponTypes && (!Array.isArray(ability.weaponTypes) || !ability.weaponTypes.length ||
           ability.weaponTypes.some(type => !['bow', 'oneHandedMelee', 'twoHandedMelee'].includes(type))))
         throw new Error('Invalid artifact weapon eligibility: ' + id)
@@ -2498,13 +2495,12 @@ more difficult:
 
   function artifactAbilityEligible(item, ability) {
     if (!ability || !item) return false
-    const slot = item.artifactSlot
-    if (ability.slots && !ability.slots.includes(slot)) return false
-    if (slot === 'weapon' && ability.weaponTypes) {
-      const type = item.rangedAtk ? 'bow' : item.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
-      if (!ability.weaponTypes.includes(type)) return false
-    }
-    return true
+    // Domains handle equipment-slot eligibility. Only weapon subtypes need a
+    // finer filter (e.g. Reaper cannot appear on one-handed melee weapons).
+    if (!ability.weaponTypes) return true
+    if (item.artifactSlot !== 'weapon') return false
+    const type = item.rangedAtk ? 'bow' : item.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
+    return ability.weaponTypes.includes(type)
   }
 
   function artifactAbilityPool(item) {
@@ -3041,6 +3037,72 @@ more difficult:
     return true
   }
 
+  // Two separately rolled armor abilities share the same nominal-healing calculation.
+  // Temporary HP is a damage buffer, never normal HP and never consumed by HP costs.
+  function artifactAlchemistHpCap() {
+    return Math.floor(playerMaxHp() * artifactRule('alchemists_vest_hp','maxHpFraction'))
+  }
+
+  function artifactAlchemistGuardCap() {
+    return Math.floor(playerMaxHp() * artifactRule('alchemists_vest_guard','excessHpFractionCap') /
+      artifactRule('alchemists_vest_guard','hpPerDef'))
+  }
+
+  // Called as part of authoritative state changes, not by the stat calculators.
+  function artifactAlchemistClamp() {
+    player.artifactAlchemistTempHp = artifactEquippedInSlot('armor','alchemists_vest_hp')
+      ? Math.min(player.artifactAlchemistTempHp || 0, artifactAlchemistHpCap()) : 0
+    player.artifactAlchemistGuardDef = artifactEquippedInSlot('armor','alchemists_vest_guard')
+      ? Math.min(player.artifactAlchemistGuardDef || 0, artifactAlchemistGuardCap()) : 0
+    if ((player.artifactAlchemistGuardUntilTurn || 0) <= turnCount || !player.artifactAlchemistGuardDef) {
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
+    }
+  }
+
+  function artifactAlchemistGuardBonus() {
+    return artifactEquippedInSlot('armor','alchemists_vest_guard') &&
+      (player.artifactAlchemistGuardUntilTurn || 0) > turnCount
+      ? Math.min(player.artifactAlchemistGuardDef || 0, artifactAlchemistGuardCap()) : 0
+  }
+
+  function artifactAlchemistExcessHealing(nominalHealing, restored) {
+    artifactAlchemistClamp()
+    const excess = Math.max(0, nominalHealing - restored)
+    if (!excess) return
+    if (artifactEquippedInSlot('armor','alchemists_vest_hp')) {
+      const candidate = Math.min(excess, artifactAlchemistHpCap())
+      const previous = player.artifactAlchemistTempHp || 0
+      if (candidate > previous) {
+        player.artifactAlchemistTempHp = candidate
+        artifactAbilityMessage('alchemists_vest_hp',
+          `Alchemist's Vest prepares ${candidate} temporary HP!`,
+          `A hidden power gathers around you!`)
+      }
+    } else if (artifactEquippedInSlot('armor','alchemists_vest_guard')) {
+      const candidate = Math.floor(Math.min(excess,
+        playerMaxHp() * artifactRule('alchemists_vest_guard','excessHpFractionCap')) /
+        artifactRule('alchemists_vest_guard','hpPerDef'))
+      const previous = artifactAlchemistGuardBonus()
+      if (candidate > 0 && candidate > previous) {
+        player.artifactAlchemistGuardDef = candidate
+        player.artifactAlchemistGuardUntilTurn = turnCount +
+          artifactRule('alchemists_vest_guard','durationTurns') + 1
+        artifactAbilityMessage('alchemists_vest_guard',
+          `Alchemist's Vest grants +${candidate} DEF for 5 turns!`,
+          `A hidden power strengthens your defenses!`)
+      }
+    }
+  }
+
+  // Only eligible consumables convert unused nominal healing. Passive healing,
+  // lifesteal, revival, food, and artifact healing continue through healPlayer.
+  function healWithAlchemist(nominalHealing) {
+    const restored = healPlayer(nominalHealing)
+    artifactAlchemistExcessHealing(nominalHealing, restored)
+    return restored
+  }
+
   function playerArtifactDefenseBonus(baseDefense) {
     const active = activeArtifactAbilities()
     let bonus = 0
@@ -3061,6 +3123,7 @@ more difficult:
     if (active.has('hold_the_line'))
       bonus += Math.min(3, enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) === 1).length)
+    bonus += artifactAlchemistGuardBonus()
     if (active.has('boneplate')) bonus += artifactBoneplateStacks()
     if (active.has('plague_mail')) bonus += enemies.filter(e => e.alive && e.hp > 0 &&
       onCurrentLevel(e) && e.poisonTurns > 0 &&
@@ -3138,10 +3201,24 @@ more difficult:
     const reduced = !directHit && !cost && artifactLastStandActive()
       ? Math.floor(amount * (1 - artifactRule('last_stand','damageReduction'))) : amount
     if (!reduced) return 0
+    // Apply normal mitigation first, then consume a temporary buffer. Only
+    // damage which reaches normal HP can charge retaliation or Last Stand.
+    let remaining = reduced
+    if (!cost && artifactEquippedInSlot('armor','alchemists_vest_hp')) {
+      const available = Math.min(player.artifactAlchemistTempHp || 0, artifactAlchemistHpCap())
+      const absorbed = Math.min(available, remaining)
+      if (absorbed > 0) {
+        player.artifactAlchemistTempHp = available - absorbed
+        remaining -= absorbed
+        artifactAbilityMessage('alchemists_vest_hp',
+          `Alchemist's Vest absorbs ${absorbed} damage!`,
+          `A hidden force softens the impact!`)
+      }
+    }
     const before = player.hp
-    player.hp = Math.max(0, player.hp - reduced)
+    player.hp = Math.max(0, player.hp - remaining)
     artifactRecordHpLoss(before)
-    return Math.min(Math.max(0,before), reduced)
+    return Math.min(Math.max(0,before), remaining)
   }
 
   // Melee and projectile attacks share mitigation. Periodic/environmental HP
@@ -3772,6 +3849,7 @@ more difficult:
     artifactMaliceTargetId: null, artifactMaliceHits: 0,
     artifactVengefulPrecisionReady: false,
     artifactReaperStored: 0, artifactReaperOriginId: null,
+    artifactAlchemistTempHp: 0, artifactAlchemistGuardDef: 0, artifactAlchemistGuardUntilTurn: 0,
     equip: {weapon: null, shield: null, armor: null, blackkey: null},
     inventory: [],
   }
@@ -6480,6 +6558,9 @@ more difficult:
       player.artifactBoneplateExpiries = []
       player.artifactSoulFedExpiries = []
       player.artifactDancerUntilTurn = 0
+      player.artifactAlchemistTempHp = 0
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
       artifactClearWeaponCombatState()
       player.artifactVengefulPrecisionReady = false
     }
@@ -6626,6 +6707,7 @@ more difficult:
     artifactMaliceTargetId: null, artifactMaliceHits: 0,
     artifactVengefulPrecisionReady: false,
     artifactReaperStored: 0, artifactReaperOriginId: null,
+    artifactAlchemistTempHp: 0, artifactAlchemistGuardDef: 0, artifactAlchemistGuardUntilTurn: 0,
       speedPotionTurns: 0,
       speedPotionBonus: 0,
       stoneSkinTurns: 0, stoneSkinBonus: 0,
@@ -6757,6 +6839,9 @@ more difficult:
     player.confusionTurns = 0; player.confusionSourceId = null
     player.weakenTurns = 0; player.slowTurns = 0
     player.deathShieldReady = false
+    player.artifactAlchemistTempHp = 0
+    player.artifactAlchemistGuardDef = 0
+    player.artifactAlchemistGuardUntilTurn = 0
     player.poisonTurns = 0
     player.berryRegenTurns = 0
     player.campRestProgress = 0
@@ -8327,6 +8412,7 @@ more difficult:
     player.artifactElusiveReady = false
     updateAlarmedEnemies()
     turnCount++
+    artifactAlchemistClamp()
     // Keep independent temporary ATK boosts compact without resetting later stacks.
     player.artifactSoulFedExpiries = player.artifactSoulFedExpiries.filter(expiry => expiry > turnCount)
     Mimics.update()
@@ -15639,6 +15725,7 @@ more difficult:
     document.getElementById('hLvl').textContent = player.lvl
     const maxHp = playerMaxHp()
     player.hp = Math.min(player.hp, maxHp)
+    artifactAlchemistClamp()
     checkPlayerHealthWarning()
     const hpRatio = maxHp > 0 ? player.hp / maxHp : 0
     document.getElementById('hpbar').style.width = Math.max(0, hpRatio * 100) + '%'
@@ -16560,7 +16647,12 @@ more difficult:
       artifactClearWeaponCombatState()
     }
     if (slot === 'shield') player.artifactVengefulPrecisionReady = false
-    if (slot === 'armor') player.artifactDancerUntilTurn = 0
+    if (slot === 'armor') {
+      player.artifactDancerUntilTurn = 0
+      player.artifactAlchemistTempHp = 0
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
+    }
     player.inventory.splice(idx, 1)
     if (old) player.inventory.push(old)
     const equipLead = old ? `You unequip the ${artifactDisplayName(old)} and equip` : 'You equip'
@@ -16574,6 +16666,7 @@ more difficult:
     } else {
       equipmentLog(`${equipLead} the ${artifactDisplayName(it)}.${statDeltaText(before)}`, [old, it])
     }
+    artifactAlchemistClamp()
     consumeItemTurn()
     bowAimTarget = null
     clearHoveredAutoPath()
@@ -16647,9 +16740,15 @@ more difficult:
       artifactClearWeaponCombatState()
     }
     if (slot === 'shield') player.artifactVengefulPrecisionReady = false
-    if (slot === 'armor') player.artifactDancerUntilTurn = 0
+    if (slot === 'armor') {
+      player.artifactDancerUntilTurn = 0
+      player.artifactAlchemistTempHp = 0
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
+    }
     player.inventory.push(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
+    artifactAlchemistClamp()
     consumeItemTurn()
     bowAimTarget = null
     clearHoveredAutoPath()
@@ -16702,7 +16801,12 @@ more difficult:
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     AdaptivePlayerTrolling.onPotionDrunk()
-    if (itemDefinition(it.kind).effect.fullHeal) healPlayer(playerMaxHp() - player.hp)
+    if (itemDefinition(it.kind).effect.fullHeal) {
+      const nominal = artifactEquippedInSlot('armor','alchemists_vest_hp') ||
+        artifactEquippedInSlot('armor','alchemists_vest_guard')
+        ? consumablePower(playerMaxHp()) : playerMaxHp() - player.hp
+      healWithAlchemist(nominal)
+    }
     log('You drink a Life Potion and feel fully restored.', 'good')
     curePlayerPoison()
     consumeItemTurn()
@@ -16783,7 +16887,7 @@ more difficult:
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     const heal = healingHerbAmount()
-    const restored = healPlayer(heal)
+    const restored = healWithAlchemist(heal)
     log(`You eat the Healing Herb and recover ${restored} HP.`, 'good')
     curePlayerPoison()
     consumeItemTurn()
@@ -16799,7 +16903,7 @@ more difficult:
     const amt = itemHpAmount(it.kind)
     if (chance(1 - WORLD_GEN_CONFIG.environment.mushroomPoisonChance)) {
       const healed = itemEffectPower(it.kind, amt)
-      const restored = healPlayer(healed)
+      const restored = healWithAlchemist(healed)
       log(`You eat the Mushroom. It was edible! You recover ${restored} HP.`, 'good')
     } else {
       const actualLoss = artifactLosePlayerHp(amt)
@@ -16819,7 +16923,7 @@ more difficult:
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     const healed = itemEffectPower(it.kind, itemHpAmount(it.kind))
-    const restored = healPlayer(healed)
+    const restored = healWithAlchemist(healed)
     log(`You eat the Edible Mushroom and recover ${restored} HP.`, 'good')
     consumeItemTurn()
   }
@@ -18059,6 +18163,9 @@ more difficult:
       player.artifactBoneplateExpiries = []
       player.artifactSoulFedExpiries = []
       player.artifactDancerUntilTurn = 0
+      player.artifactAlchemistTempHp = 0
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
       artifactClearWeaponCombatState()
       player.artifactVengefulPrecisionReady = false
       player.highscoresDisqualified = false

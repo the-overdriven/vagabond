@@ -229,12 +229,13 @@ const DungeonTraps = (() => {
     if (glancing) damage = Math.floor(damage / 3)
     else if (critical) damage *= 2
     const wasEnraged = !isPlayer && enemyIsEnraged(target)
-    target.hp -= damage
     if (isPlayer) {
+      artifactLosePlayerHp(damage)
       absorbPlayerFatalDamage()
       checkPlayerHealthWarning()
       // Fatal outcomes resolve after triggerTrap logs the damage.
     } else {
+      target.hp -= damage
       if (damage > 0) breakEnemyFear(target)
       absorbEnemyFatalHit(target)
       triggerEnemyShellRetreat(target)

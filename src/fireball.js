@@ -162,14 +162,15 @@ async function castFireball(idx, x, y) {
     }
     // Resolve self damage before XP healing. A lethal simultaneous blast cannot
     // be survived merely by leveling up from one of its kills.
+    let actualSelfHpLoss = 0
     if (selfHit) {
-      player.hp -= selfDamage
+      actualSelfHpLoss = artifactLosePlayerHp(selfDamage)
       spawnDamageNumber(player.x, player.y, selfDamage, RENDER_STYLE.damage.playerHit || '#ff6655', impactDelay)
       log(`Your fireball burns you for ${selfDamage} damage!`, 'bad')
       absorbPlayerFatalDamage()
     }
     // Count only a committed cast which actually damages its own caster.
-    if (selfHit && selfDamage > 0) AdaptivePlayerTrolling.onSelfFireballHit()
+    if (selfHit && actualSelfHpLoss > 0) AdaptivePlayerTrolling.onSelfFireballHit()
     const fatal = player.hp <= 0
     for (const {enemy} of hits) if (enemy.hp <= 0) killEnemy(enemy, true, 'fireball', impactDelay)
     if (fatal) { player.hp = 0; die(null, 'fireball') }

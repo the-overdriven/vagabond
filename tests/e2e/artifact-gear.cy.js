@@ -161,6 +161,44 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('converts excess consumable healing with Alchemist armor and preserves save state', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalRace=player.race,originalEquip=player.equip,originalHp=player.hp
+      const originalMaxHp=player.maxHp,originalTurn=turnCount
+      try {
+        player.race='human';player.maxHp=100;player.hp=75
+        player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',
+          base:'Tunic',def:0,identified:true,abilityId:'alchemists_vest_hp'}}
+        player.artifactAlchemistTempHp=0
+        check(healWithAlchemist(100)===25,'normal HP heals once')
+        check(player.hp===100 && player.artifactAlchemistTempHp===50,'excess caps at 50% maximum HP')
+        check(artifactLosePlayerHp(20,{directHit:true})===0,'buffer absorbs enemy attack')
+        check(player.hp===100 && player.artifactAlchemistTempHp===30,'buffer consumed first')
+        const saved=buildSaveObject()
+        check(saved.version===SAVE_VERSION && saved.player.artifactAlchemistTempHp===30,
+          'save includes temporary HP')
+        player.equip.armor.abilityId='alchemists_vest_guard'
+        player.artifactAlchemistTempHp=0
+        player.artifactAlchemistGuardDef=0
+        player.artifactAlchemistGuardUntilTurn=0
+        const baseline=playerDef()
+        healWithAlchemist(100)
+        check(player.artifactAlchemistGuardDef===10 && playerDef()===baseline+10,
+          'Guard contributes existing DEF for five turns')
+        const until=player.artifactAlchemistGuardUntilTurn
+        healWithAlchemist(20)
+        check(player.artifactAlchemistGuardUntilTurn===until && player.artifactAlchemistGuardDef===10,
+          'smaller conversion cannot extend or weaken Guard')
+      } finally {
+        player.equip=originalEquip;player.race=originalRace;player.hp=originalHp
+        player.maxHp=originalMaxHp;turnCount=originalTurn
+        player.artifactAlchemistTempHp=0;player.artifactAlchemistGuardDef=0
+        player.artifactAlchemistGuardUntilTurn=0
+      }
+    })()`))
+  })
+
   it('keeps physical stats, bonus effects, speed, grace and item data after saving and equipping', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -336,7 +374,7 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
-  it('keeps the new slot-restricted abilities and Berserker roll deterministic across saves', () => {
+  it('keeps domain-gated abilities and Berserker roll deterministic across saves', () => {
     cy.window().then(win => win.eval(`(() => {
       const verify=(condition,message)=>{if(!condition)throw Error(message)}
       for(const id of ['ambusher','tideguard','fortunes_fang','veteran_xp','veteran_level',
@@ -350,9 +388,20 @@ describe('Gear bases on procedural artifacts', () => {
       verify(artifactAbilityPool(bow).includes('ambusher'),'Ambusher not available for bows')
       verify(!artifactAbilityPool(bow).includes('fortunes_fang'),'Bow rolled a melee-only ability')
       verify(!artifactAbilityPool(bow).includes('weaponmaster'),'Bow rolled armor ability')
+      verify(JSON.stringify(artifactDomains(armor))===JSON.stringify(['bulwark','armors']),
+        'Armor must combine shared bulwark and exclusive armors domains')
+      verify(JSON.stringify(artifactDomains(shield))===JSON.stringify(['bulwark','shields']),
+        'Shields must combine shared bulwark and exclusive shields domains')
       verify(artifactAbilityPool(armor).includes('berserkers_oath'),'Berserker missing from armor')
       verify(artifactAbilityPool(shield).includes('tideguard'),'Shield lacks Tideguard')
-      verify(!artifactAbilityPool(shield).includes('berserkers_oath'),'Shield rolled armor-only ability')
+      for (const id of ARTIFACT_ABILITIES.domains.armors) {
+        verify(artifactAbilityPool(armor).includes(id),'Armor must include '+id)
+        verify(!artifactAbilityPool(shield).includes(id),'Shield must exclude '+id)
+        verify(!ARTIFACT_ABILITIES.domains.bulwark.includes(id),
+          'Armor-only ability leaked into shared bulwark domain: '+id)
+      }
+      verify(Object.values(ARTIFACT_ABILITIES.abilities).every(ability=>!('slots' in ability)),
+        'Artifact equipment-slot restrictions must be expressed through domains')
       player.equip={weapon:{kind:'weapon',base:'Dagger',atk:2,grace:5},shield:null,
         armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,bonuses:{},
           name:'Tunic of the Oath',noun:'Tunic',identified:true,abilityId:'berserkers_oath',

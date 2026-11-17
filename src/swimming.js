@@ -73,8 +73,8 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
   if (drowning && !player.drowning) log('You are drowning! Get back to shore!', 'bad')
   player.drowning = drowning
   const damage = Math.max(1, Math.round(playerMaxHp() * (fellThroughIce ? 0.08 : 0.05)))
-  player.hp = Math.max(0, player.hp - damage)
-  if (damage > 0 && !fellThroughIce) AdaptivePlayerTrolling.onDrowningDamage()
+  const actualLoss = artifactLosePlayerHp(damage)
+  if (actualLoss > 0 && !fellThroughIce) AdaptivePlayerTrolling.onDrowningDamage()
   absorbPlayerFatalDamage()
   if (fellThroughIce) log(`The plunge into freezing water costs you ${damage} HP.`, 'bad')
   checkPlayerHealthWarning()

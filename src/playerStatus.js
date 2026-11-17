@@ -94,6 +94,16 @@ function activePlayerStatuses() {
   if (knownArtifactPower('bulwark_bravery') && playerHasArtifactAbility('bulwark_bravery') && player.artifactBraveryCharge)
     statuses.push({id:'artifact-bravery',icon:'⚔',label:'Bravery',counter:'',tone:'up',
       detail:'Bravery: the next successful melee hit deals 25% more damage.'})
+  if (knownArtifactPower('alchemists_vest_hp') &&
+      artifactEquippedInSlot('armor','alchemists_vest_hp') && player.artifactAlchemistTempHp > 0)
+    statuses.push({id:'artifact-alchemist-vitality',icon:'✚',
+      label:`Vitality · ${Math.min(player.artifactAlchemistTempHp,artifactAlchemistHpCap())} temporary HP`,
+      counter:'',tone:'up',detail:'Absorbs ordinary incoming damage before normal HP; explicit HP costs bypass it. Removing the armor clears it.'})
+  if (knownArtifactPower('alchemists_vest_guard') && artifactAlchemistGuardBonus() > 0)
+    statuses.push({id:'artifact-alchemist-guard',icon:'⛨',
+      label:`Guard · +${artifactAlchemistGuardBonus()} DEF`,
+      counter:`${player.artifactAlchemistGuardUntilTurn-turnCount}t`,tone:'up',
+      detail:'Temporary defense from excess consumable healing. A stronger grant replaces it; lesser grants cannot extend it.'})
   if (knownArtifactPower('dancer') && artifactDancerActive())
     statuses.push({id:'artifact-dancer',icon:'◇',label:'Dancer · +20% DEF',
       counter:'',tone:'up',detail:'Moving prepares a defense worth 20% of pre-conditional DEF; move again to maintain it.'})

@@ -410,7 +410,7 @@ function resolveEnemyRupture(e, pending) {
     return false
   }
   const damage=damageRoll(enemyAtk(e)*cfg.damageMultiplier,playerDef())
-  player.hp-=damage
+  artifactLosePlayerHp(damage)
   spawnDamageNumber(player.x,player.y,damage,RENDER_STYLE.damage.playerHit)
   log(cfg.hitMessage.replace(/<enemy>/g,e.name).replace(/<damage>/g,String(damage)),'bad')
   absorbPlayerFatalDamage()

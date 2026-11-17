@@ -463,7 +463,7 @@ const DungeonHazards = (() => {
         (advancing.has(encode(actor)) || level.map[actor.y]?.[actor.x]==='dwarvencrusherjaw')
       if(crushed(player)) {
         const damage=player.godMode?0:Math.ceil(playerMaxHp()*cfg.playerDamageMaxHpFraction)
-        if(damage){player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()}
+        if(damage){artifactLosePlayerHp(damage);absorbPlayerFatalDamage();checkPlayerHealthWarning()}
         log(`The opposing stone jaws crush you for ${damage} HP!`,'bad')
         spawnDamageNumber(player.x,player.y,damage||'Immune!',RENDER_STYLE.damage.playerHit)
         if(player.hp<=0)die(null,'dwarven crusher')
@@ -514,7 +514,7 @@ const DungeonHazards = (() => {
         const damageFor = actor => Math.max(1,Math.ceil(actor.maxHp * (gasConfig().damageMaxHpFraction||.08)))
         if (exposed(hazard,player.x,player.y)) {
           const damage=player.godMode?0:Math.max(1,Math.ceil(playerMaxHp()*(gasConfig().damageMaxHpFraction||.08)))
-          player.hp-=damage;absorbPlayerFatalDamage();checkPlayerHealthWarning()
+          artifactLosePlayerHp(damage);absorbPlayerFatalDamage();checkPlayerHealthWarning()
           log(`Poison gas burns your lungs for ${damage} HP!`, 'bad')
           spawnDamageNumber(player.x,player.y,damage||'Immune!',RENDER_STYLE.damage.playerHit)
           if (player.hp<=0) {die(null,'poison gas');return}

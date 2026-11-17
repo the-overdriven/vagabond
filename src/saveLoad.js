@@ -212,6 +212,9 @@ function buildSaveObject() {
       artifactVengefulPrecisionReady: player.artifactVengefulPrecisionReady === true,
       artifactReaperStored: player.artifactReaperStored,
       artifactReaperOriginId: player.artifactReaperOriginId,
+      artifactAlchemistTempHp: player.artifactAlchemistTempHp,
+      artifactAlchemistGuardDef: player.artifactAlchemistGuardDef,
+      artifactAlchemistGuardUntilTurn: player.artifactAlchemistGuardUntilTurn,
       speedPotionTurns: player.speedPotionTurns,
       speedPotionBonus: player.speedPotionBonus,
       stoneSkinTurns: player.stoneSkinTurns, stoneSkinBonus: player.stoneSkinBonus,
@@ -924,7 +927,8 @@ function loadGameFromObject(data, opts = {}) {
   for (const field of ['artifactRetributionStored','artifactBloodReservoirStored','artifactPainEaterHits',
     'artifactPainAttackBonus','artifactRhythmHitsThisAction','artifactLastStandUntilTurn',
     'artifactLastStandCooldownUntil','artifactSacredReadyTurn',
-    'artifactDancerUntilTurn','artifactMaliceHits','artifactReaperStored']) {
+    'artifactDancerUntilTurn','artifactMaliceHits','artifactReaperStored',
+    'artifactAlchemistTempHp','artifactAlchemistGuardDef','artifactAlchemistGuardUntilTurn']) {
     if (!Number.isFinite(player[field])) throw new Error('Invalid saved artifact combat state: ' + field)
   }
   player.artifactRiposteReady = player.artifactRiposteReady === true
@@ -937,7 +941,10 @@ function loadGameFromObject(data, opts = {}) {
       !Number.isSafeInteger(player.artifactMaliceHits) || player.artifactMaliceHits < 0 ||
       !Number.isSafeInteger(player.artifactReaperStored) || player.artifactReaperStored < 0 ||
       (player.artifactMaliceTargetId !== null && typeof player.artifactMaliceTargetId !== 'string') ||
-      (player.artifactReaperOriginId !== null && typeof player.artifactReaperOriginId !== 'string'))
+      (player.artifactReaperOriginId !== null && typeof player.artifactReaperOriginId !== 'string') ||
+      !Number.isSafeInteger(player.artifactAlchemistTempHp) || player.artifactAlchemistTempHp < 0 ||
+      !Number.isSafeInteger(player.artifactAlchemistGuardDef) || player.artifactAlchemistGuardDef < 0 ||
+      !Number.isSafeInteger(player.artifactAlchemistGuardUntilTurn) || player.artifactAlchemistGuardUntilTurn < 0)
     throw new Error('Invalid saved artifact combat state')
   if (!Array.isArray(player.artifactSoulFedExpiries) ||
       !player.artifactSoulFedExpiries.every(Number.isSafeInteger)) throw new Error('Invalid saved Soul Fed state')
@@ -962,6 +969,7 @@ function loadGameFromObject(data, opts = {}) {
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
   player.weakenTurns = data.player.weakenTurns
+  artifactAlchemistClamp()
   player.slowTurns = data.player.slowTurns
   player.permadeath = !!player.permadeath
   tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length

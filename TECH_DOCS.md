@@ -6988,7 +6988,7 @@ The domain catalog lives in `content/artifact_abilities.json`:
 |---|---|
 | Melee weapon | `martial` |
 | Bow | `archery` (never `martial`) |
-| Armor | `bulwark` |
+| Armor | `bulwark`, `armors` |
 | Shield | `bulwark`, `shields` |
 
 Specific item bases can add more domains. The eligible pool is the **union of
@@ -6996,11 +6996,12 @@ all enabled, unique ability IDs** in the item's domains: every power in that
 union has equal probability, regardless of its domain's size. A power listed
 in several domains is included only once. Only fully implemented powers are
 eligible to roll. Adding a future trinket or other equipment domain uses the
-same assignment and selection system. Individual powers may additionally restrict
-eligible equipment slots or, for weapons, distinguish bows from one-handed and
-two-handed melee weapons. Filter these restrictions before selecting uniformly
-from the deduplicated domain pool; an ability never receives an extra roll or
-higher weight because it belongs to several domains.
+same assignment and selection system. `bulwark` powers are shared between
+armor and shields; `armors` and `shields` contain their respective slot-exclusive
+powers. Slot eligibility follows domain membership, not individual slot checks.
+For weapon-class-specific powers, a further one-handed/two-handed melee filter
+is applied before uniform selection. Membership in multiple domains never adds
+extra copies or increases selection weight.
 
 An artifact ability is active while its weapon, armor or shield is equipped.
 Identical abilities on several equipped artifacts **do not stack**; different
@@ -7017,70 +7018,72 @@ combat outcomes or consume game RNG.
 
 | Power | Domain | Rule |
 |---|---|---|
-| Shadow Strike | martial | A melee hit begun while invisible deals **50% more damage**. Invisibility is checked independently at the start of each strike, including additional strikes. |
-| Flurry | martial | A bonus melee strike granted by **GRACE** deals **50% more damage**. |
-| Dreadful Strike | martial | A damaging melee hit has a **20%** chance to cause **Fear for 5 player turns**. A repeat application refreshes its duration; undead are immune, as with Scroll of Fear. |
-| Long Shot | archery | Equipped bow range **+1** without extending line of sight or bypassing obstacles. |
-| Fleetfoot | bulwark | Ignores shield/armor **SPD penalties** and gives immunity to **Slow** while equipped; unrelated speed penalties still apply. |
-| Immovable | bulwark | Prevents forced player displacement by **knockback, pulls and wrestler swaps**, but does not prevent the damage of the attack. |
-| God's Chosen | bulwark | Critical melee attacks, arrows and direct spell projectiles against the player become ordinary hits, not misses. |
-| Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
-| Vigorplate | bulwark | At **75% maximum HP or more**, grants **+30% DEF**, minimum **+3**. Re-evaluated for each incoming attack. |
-| Hold the Line | bulwark | Grants **+1 DEF** for each adjacent living enemy on the **same Z level**, maximum **+3**. |
-| Enrage | martial | Below **30% HP**, melee ATK is multiplied by **1.25** before the normal mitigation roll, matching monsters' Enrage rule. |
-| Knockback | martial | A damaging **critical melee strike** pushes a surviving target **one tile away** if the destination and diagonal corners are legal and unoccupied. On-entry traps and terrain hazards apply; no movement across floors. |
-| Lifesteal | martial | Each damaging melee hit has a **30%** chance to restore **floor(actual HP removed / 3)**, capped by missing HP. |
-| Slow | martial | Each damaging melee hit has a **30%** chance to apply **Slow for 3 player turns**. |
-| Poison | martial | Each damaging melee hit has a **20%** chance to apply the **existing venom** status, including its budget, ticks and immunities. |
-| Sunder | martial | Each damaging melee hit permanently reduces the enemy's effective DEF by **1**, up to **10**; minimum DEF is **0**. |
-| Blindness | martial | Each damaging hit has a **10%** chance to lower enemy **ATK by 1** or lower **AGGRO by 1 once** (50/50 until AGGRO falls). Afterwards only ATK is reduced; maximum **−5 ATK**, minimum **1 ATK** and **1 AGGRO**. |
-| Bravery (martial) | martial | Melee damage is **25% higher** against an enemy with greater current strength, **or** while at least **3 same-level enemies** are adjacent. Both conditions still grant only one bonus. |
-| Deadeye | archery | After holding position since the preceding player action, bow shots gain **+15 percentage points to hit** (within normal hit limits) and **+50% damage**. Forced movement breaks the condition. |
+| Ambusher | archery, martial | **Melee weapons and bows only.** Against an enemy that is **unaware**, direct hits deal up to **+50% damage** depending on effective AGGRO. Awareness is sampled before that individual hit alerts the victim, including bow shots and GRACE follow-ups. If the victim is alarmed but still unaware, the bonus is halved; once aware, it vanishes. |
 | Crippling Shot | archery | Each damaging arrow has a **30%** chance to apply the same **3-turn Slow**. |
-| Bravery (bulwark) | bulwark | Taking damage from a stronger enemy prepares **+25% damage** on the next successful melee hit. Misses do not consume it; the charge is unique, saved, and never duplicated by gear swaps. |
-| Riposte | martial | A **successful shield block** or an enemy **glancing melee hit** prepares +50% on the next damaging melee strike. A miss keeps the charge; removing the Riposte weapon clears it. |
-| Retribution | martial | Stores **all HP actually lost** while equipped; the next damaging melee strike gains **floor(50% × total HP lost)** as added damage. A miss keeps the charge; the next hit spends it. |
-| Blood Pact | martial | Each landed melee strike, including GRACE strikes, uses **max(player maximum HP, target maximum HP)** as its reference. It costs **ceil(1% of the reference HP)** in direct HP loss and separately adds **ceil(1% of the same reference HP)** damage after defenses. The two rates are independently configurable. The cost ignores damage reduction, can kill the player, and still allows the blow to resolve and cause mutual death. |
+| Deadeye | archery | After holding position since the preceding player action, bow shots gain **+15 percentage points to hit** (within normal hit limits) and **+50% damage**. Forced movement breaks the condition. |
+| Long Shot | archery | Equipped bow range **+1** without extending line of sight or bypassing obstacles. |
+| Alchemist's Vest — Guard | armors | For every **complete 5 HP of excess healing**, gain **+1 DEF** for **5 consumed player turns**, using at most **50% of effective maximum HP** as input. A stronger grant replaces and refreshes; smaller or equal grants do neither. Only normal DEF-applicable attacks benefit. |
+| Alchemist's Vest — Vitality | armors | Excess nominal healing from Life Potions, Healing Herbs, edible Mushrooms, and edible unidentified Mushrooms becomes **temporary HP** up to **floor(50% × effective maximum HP)**. This separate buffer absorbs damage after normal mitigation but before normal HP; it does not stack, expire with turns, or cover explicit HP costs. |
+| Berserker's Oath | armors | On generation, roll **1–3** with equal probability: **−rolled DEF, +rolled ATK** while equipped. Gain **+1 critical-chance percentage point per 2 whole points** by which effective ATK exceeds effective DEF, capped at **+15 points**. The critical bonus applies to melee and bows; the ATK modifier does not change the bow's fixed ranged ATK. |
+| Dancer | armors | After a voluntary successful move, gain **floor(20% of pre-conditional DEF)** for the following enemy response. Taking another voluntary step refreshes this defense; attacking, waiting, or using an item instead causes it to expire before that action's enemy response. Forced movement and teleportation do not activate it; voluntary stair/lift traversal does. |
+| Duelist | armors | While equipped with a **one-handed melee weapon and no shield**, direct melee damage gains **0.25% for each One-Handed proficiency point** (**+25%** at skill 100). Bows and unarmed strikes excluded. Changing weapon or equipping a shield removes the bonus immediately. |
+| Veteran — Experience | armors, martial | **Melee weapon:** +5% direct melee damage per 10 percentage points of effective XP bonus, scaling continuously. **Armor:** +1 DEF per **15 complete XP-bonus percentage points**. Uses all existing racial/equipment XP multipliers. Bows and shields excluded. |
+| Veteran — Level | armors, martial | **Melee weapon:** +1% direct melee damage per character level. **Armor:** +2 DEF per **5 complete character levels**. Bows and shields excluded. |
+| Weaponmaster | armors | With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded. |
 | Blood Reservoir | bulwark | Stores **25% of every HP-loss event**, capped at **25% of maximum HP**. Its next damaging melee strike adds the **whole-number portion** of the reserve; a miss keeps it. |
-| Pain Eater | bulwark | Each separate HP-loss event adds **+1 damage** to the next melee attack action. This charge is spent on an attack, **including misses**, and applies to at most the first landed blow of a GRACE series. Damage taken during Blood Pact charges the next attack instead. |
-| Shield Mastery | shields | **+10 percentage points** to normal shield block chance, without removing existing Shielding skill rules. |
-| Counterguard | shields | **+15 percentage points** to block against enemies carrying a weapon. |
-| Shield Bash | shields | After a successful block against an adjacent foe, a **50%** chance to counterattack for damage based on **30% of current player DEF**, reduced by the foe's ordinary DEF. A surviving foe is pushed **one legal free tile** away, triggering normal on-entry hazards; no weapon on-hit effects. |
-| Last Stand | bulwark | Crossing from **above 25% HP to 25% or lower**, while surviving, grants **50% incoming damage reduction** for the triggering reaction and the next **3 player turns** (not for the triggering damage), with a **50-turn cooldown**. Damage costs bypass it. |
-| Sacred Aegis | bulwark | Absorbs the next damaging melee, projectile or direct spell hit, then recharges over **10 player turns**. Does not absorb poison ticks, terrain, traps or HP costs. Equipping another artifact cannot reset recharge. |
-| Rhythm Guard | bulwark | A second **damaging direct hit in the same player attack action** (such as a GRACE follow-up) prepares a single guard. The next landed incoming blow deals **50% less damage**. Extra targets of later AoE effects do not count. |
-| Evasion (bulwark) | bulwark | Each attack action prepares a **30% chance** to dodge the next landed melee or projectile hit. A dodge test consumes the preparation regardless of its result. Not used against poison ticks or environmental damage. |
 | Boneplate | bulwark | Every enemy death within **2 tiles at the same Z level** grants **+1 DEF** for **5 player turns**; up to **5 independent charges**, which expire separately, even if an enemy dies from poison or a trap. |
-| Plague Mail | bulwark | **+1 DEF** per poisoned, living enemy within **2 tiles at the same Z level**, without an extra cap. A damaging eligible attack from a poison-capable foe has **100% poison application chance** instead of the usual 30%; normal immunity rules still apply. |
-| Executioner | martial | A direct melee strike that brings a living foe from **above 20% to 20% or less maximum HP** grants one immediate additional attack. Triggers **once per enemy** across weapon swaps, and its extra strike is not a GRACE/Flurry strike. |
-| Cleave | martial | A landed direct melee strike also strikes enemies adjacent to **both** the player and primary target for **60% of that strike's damage**, reduced by each secondary enemy's own DEF. Secondary strikes cannot trigger other weapon on-hit powers or further Cleave. |
-| Soulburst | martial | Killing a foe with a direct melee strike bursts over a **7×7** area centered on the victim. Other enemies in sight on the same Z level take damage with **30% of the killing strike's damage** before their own DEF reduction. Bursts cannot trigger further bursts or weapon powers; the player is unharmed. |
-| Evasion (martial) | martial | After a damaging melee strike leaves its target alive, **30%** chance to make **one random legal adjacent step** when the current attack action finishes, regardless of the number of strikes. Respect rooted and terrain hazards; entering a tile applies normal entry rules. |
-| Binding | martial | A landed melee hit prevents the struck enemy's Flee and Thief behavior, without deleting its underlying abilities. **Any actual relocation** of the player releases all bound enemies; blocked movement attempts do not. |
-| Elusive | bulwark | When an enemy's melee attack misses, the next player action may be a **free one-tile move** chosen with normal movement controls. The move does not advance world time, but runs normal tile-entry effects. Attacking or choosing another action forfeits the opportunity; free steps cannot stack. |
+| Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
+| Bravery (bulwark) | bulwark | Taking damage from a stronger enemy prepares **+25% damage** on the next successful melee hit. Misses do not consume it; the charge is unique, saved, and never duplicated by gear swaps. |
 | Death Veil | bulwark | Killing an enemy with a direct melee strike while already invisible adds **5 turns** to the remaining invisibility. It does not grant invisibility when none was active. |
-| Soul Eater | martial | Every player-credited kill of a **humanoid other than a Ghost** has a **50%** chance to create a hostile `ghost of <victim>` on a free safe neighboring floor tile on the same global Z level. Only **one** Soul Eater ghost can be alive anywhere in the world at once. The ghost has **half the slain creature’s maximum HP, ATK, DEF, SPD and GRACE** (rounded to nearest integer, minimum 1 for HP/ATK/SPD), but retains Ghost species behavior, including ethereal and invisibility. It does not inherit the victim’s gear, abilities, prefix or loot. It grants normal stat-based **XP**, but drops **nothing**. Killing that ghost with player credit awards **Soul Fed: +1 ATK for 300 player turns**, with **independent uncapped stack expiries**. |
-| Petrifying Strike | martial | Each damaging melee hit has a **15%** chance to make its victim skip its next action opportunity, without stacking. |
-| Silence | martial | Each damaging melee hit has a **30%** chance to prevent only enemy spellcasting for **3 player turns**; regular attacks and movement still work. |
-| Confusion | martial | Each damaging melee hit has a **20%** chance to cause **3 player turns** of confusion. Each enemy action has a **50%** normal / **25%** random legal move / **25%** attack a random adjacent monster split. With no target, the final case wastes the action. |
-| Disarm | martial | Each damaging melee hit has a **10%** chance to knock an enemy's actual equipped **weapon or shield** to a legal nearby tile (or beneath the enemy). A modeled archer bow may also be disarmed. If a shield and modeled bow both exist, one is chosen uniformly. Each item is dropped at most once, loses its stat bonuses or ability to shoot as applicable, and cannot drop again on death. |
-| Taunt | bulwark | Increases enemy detection radius by **3 tiles** and suppresses strength-based bow avoidance and ranged spacing, but never fear or invisibility. |
+| Elusive | bulwark | When an enemy's melee attack misses, the next player action may be a **free one-tile move** chosen with normal movement controls. The move does not advance world time, but runs normal tile-entry effects. Attacking or choosing another action forfeits the opportunity; free steps cannot stack. |
+| Evasion (bulwark) | bulwark | Each attack action prepares a **30% chance** to dodge the next landed melee or projectile hit. A dodge test consumes the preparation regardless of its result. Not used against poison ticks or environmental damage. |
+| Executioner's Aura | bulwark | Killing an uninjured monster with a single direct melee hit has **50%** chance to scare other monsters within **3 tiles** for **3 turns**, subject to fear immunities. |
 | Fear Aura | bulwark | Fleeing from fear may frighten adjacent monsters for **3 turns** with **20%** probability per monster per player turn. Fear caused exclusively by this aura does not spread further. Standard fear immunities remain. |
 | Fear Eater | bulwark | Gain **+1 ATK** per visible frightened enemy within **10 tiles** on the same Z level, up to **+5 ATK**. |
-| Executioner's Aura | bulwark | Killing an uninjured monster with a single direct melee hit has **50%** chance to scare other monsters within **3 tiles** for **3 turns**, subject to fear immunities. |
-| Ambusher | martial, archery | **Melee weapons and bows only.** Against an enemy that is **unaware**, direct hits deal up to **+50% damage** depending on effective AGGRO. Awareness is sampled before that individual hit alerts the victim, including bow shots and GRACE follow-ups. If the victim is alarmed but still unaware, the bonus is halved; once aware, it vanishes. |
-| Tideguard | bulwark | **Armor or shields only.** While standing on unfrozen **water or river** terrain, armor grants **+20% DEF** (rounded down from the ordinary pre-conditional DEF basis) and shields grant **+15 percentage points** to normal melee block chance. Both slot effects may operate together, but duplicate copies of either effect do not stack. Frozen rivers and lake ice do not qualify. |
+| Fleetfoot | bulwark | Ignores shield/armor **SPD penalties** and gives immunity to **Slow** while equipped; unrelated speed penalties still apply. |
+| God's Chosen | bulwark | Critical melee attacks, arrows and direct spell projectiles against the player become ordinary hits, not misses. |
+| Hold the Line | bulwark | Grants **+1 DEF** for each adjacent living enemy on the **same Z level**, maximum **+3**. |
+| Immovable | bulwark | Prevents forced player displacement by **knockback, pulls and wrestler swaps**, but does not prevent the damage of the attack. |
+| Last Stand | bulwark | Crossing from **above 25% HP to 25% or lower**, while surviving, grants **50% incoming damage reduction** for the triggering reaction and the next **3 player turns** (not for the triggering damage), with a **50-turn cooldown**. Damage costs bypass it. |
+| Pain Eater | bulwark | Each separate HP-loss event adds **+1 damage** to the next melee attack action. This charge is spent on an attack, **including misses**, and applies to at most the first landed blow of a GRACE series. Damage taken during Blood Pact charges the next attack instead. |
+| Plague Mail | bulwark | **+1 DEF** per poisoned, living enemy within **2 tiles at the same Z level**, without an extra cap. A damaging eligible attack from a poison-capable foe has **100% poison application chance** instead of the usual 30%; normal immunity rules still apply. |
+| Rhythm Guard | bulwark | A second **damaging direct hit in the same player attack action** (such as a GRACE follow-up) prepares a single guard. The next landed incoming blow deals **50% less damage**. Extra targets of later AoE effects do not count. |
+| Sacred Aegis | bulwark | Absorbs the next damaging melee, projectile or direct spell hit, then recharges over **10 player turns**. Does not absorb poison ticks, terrain, traps or HP costs. Equipping another artifact cannot reset recharge. |
+| Taunt | bulwark | Increases enemy detection radius by **3 tiles** and suppresses strength-based bow avoidance and ranged spacing, but never fear or invisibility. |
+| Tideguard | bulwark | While standing on unfrozen **water or river** terrain, armor grants **+20% DEF** (rounded down from the ordinary pre-conditional DEF basis) and shields grant **+15 percentage points** to normal melee block chance. Both slot effects may operate together, but duplicate copies of either effect do not stack. Frozen rivers and lake ice do not qualify. |
+| Vigorplate | bulwark | At **75% maximum HP or more**, grants **+30% DEF**, minimum **+3**. Re-evaluated for each incoming attack. |
+| Binding | martial | A landed melee hit prevents the struck enemy's Flee and Thief behavior, without deleting its underlying abilities. **Any actual relocation** of the player releases all bound enemies; blocked movement attempts do not. |
+| Blindness | martial | Each damaging hit has a **10%** chance to lower enemy **ATK by 1** or lower **AGGRO by 1 once** (50/50 until AGGRO falls). Afterwards only ATK is reduced; maximum **−5 ATK**, minimum **1 ATK** and **1 AGGRO**. |
+| Blood Pact | martial | Each landed melee strike, including GRACE strikes, uses **max(player maximum HP, target maximum HP)** as its reference. It costs **ceil(1% of the reference HP)** in direct HP loss and separately adds **ceil(1% of the same reference HP)** damage after defenses. The two rates are independently configurable. The cost ignores damage reduction, can kill the player, and still allows the blow to resolve and cause mutual death. |
+| Bravery (martial) | martial | Melee damage is **25% higher** against an enemy with greater current strength, **or** while at least **3 same-level enemies** are adjacent. Both conditions still grant only one bonus. |
+| Cleave | martial | A landed direct melee strike also strikes enemies adjacent to **both** the player and primary target for **60% of that strike's damage**, reduced by each secondary enemy's own DEF. Secondary strikes cannot trigger other weapon on-hit powers or further Cleave. |
+| Confusion | martial | Each damaging melee hit has a **20%** chance to cause **3 player turns** of confusion. Each enemy action has a **50%** normal / **25%** random legal move / **25%** attack a random adjacent monster split. With no target, the final case wastes the action. |
+| Disarm | martial | Each damaging melee hit has a **10%** chance to knock an enemy's actual equipped **weapon or shield** to a legal nearby tile (or beneath the enemy). A modeled archer bow may also be disarmed. If a shield and modeled bow both exist, one is chosen uniformly. Each item is dropped at most once, loses its stat bonuses or ability to shoot as applicable, and cannot drop again on death. |
+| Dreadful Strike | martial | A damaging melee hit has a **20%** chance to cause **Fear for 5 player turns**. A repeat application refreshes its duration; undead are immune, as with Scroll of Fear. |
+| Enrage | martial | Below **30% HP**, melee ATK is multiplied by **1.25** before the normal mitigation roll, matching monsters' Enrage rule. |
+| Evasion (martial) | martial | After a damaging melee strike leaves its target alive, **30%** chance to make **one random legal adjacent step** when the current attack action finishes, regardless of the number of strikes. Respect rooted and terrain hazards; entering a tile applies normal entry rules. |
+| Executioner | martial | A direct melee strike that brings a living foe from **above 20% to 20% or less maximum HP** grants one immediate additional attack. Triggers **once per enemy** across weapon swaps, and its extra strike is not a GRACE/Flurry strike. |
+| Flurry | martial | A bonus melee strike granted by **GRACE** deals **50% more damage**. |
 | Fortune's Fang | martial | **Melee weapons only.** Each **3 complete MF** adds **+1 percentage point** of melee critical chance, capped at **+8 points** (24 MF). Uses current effective MF and the normal critical roll. |
-| Veteran — Experience | martial, bulwark | **Melee weapon:** +5% direct melee damage per 10 percentage points of effective XP bonus, scaling continuously. **Armor:** +1 DEF per **15 complete XP-bonus percentage points**. Uses all existing racial/equipment XP multipliers. Bows and shields excluded. |
-| Veteran — Level | martial, bulwark | **Melee weapon:** +1% direct melee damage per character level. **Armor:** +2 DEF per **5 complete character levels**. Bows and shields excluded. |
-| Berserker's Oath | bulwark | **Armor only.** On generation, roll **1–3** with equal probability: **−rolled DEF, +rolled ATK** while equipped. Gain **+1 critical-chance percentage point per 2 whole points** by which effective ATK exceeds effective DEF, capped at **+15 points**. The critical bonus applies to melee and bows; the ATK modifier does not change the bow's fixed ranged ATK. |
-| Duelist | bulwark | **Armor only.** While equipped with a **one-handed melee weapon and no shield**, direct melee damage gains **0.25% for each One-Handed proficiency point** (**+25%** at skill 100). Bows and unarmed strikes excluded. Changing weapon or equipping a shield removes the bonus immediately. |
-| Weaponmaster | bulwark | **Armor only.** With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded. |
-
-| Dancer | bulwark | **Armor only.** After a voluntary successful move, gain **floor(20% of pre-conditional DEF)** for the following enemy response. Taking another voluntary step refreshes this defense; attacking, waiting, or using an item instead causes it to expire before that action's enemy response. Forced movement and teleportation do not activate it; voluntary stair/lift traversal does. |
 | Growing Malice | martial | **Melee weapons only.** Every consecutive landed direct strike on the same enemy improves critical chance for the **next** strike by **+2 percentage points**, up to **+10**. A miss, enemy evasion/immunity, target change, target death, leaving its global Z-level or weapon swap resets the series. A landed zero-damage glance counts; GRACE follow-ups count individually. |
-| Vengeful Precision | shields | **Shields only.** A successful ordinary melee shield block readies **+8 percentage points** critical chance for the next individual melee weapon strike. The strike consumes it even if it misses, and a second block cannot stack another charge. Shield Bash does not spend it. Removing the shield clears it. |
+| Knockback | martial | A damaging **critical melee strike** pushes a surviving target **one tile away** if the destination and diagonal corners are legal and unoccupied. On-entry traps and terrain hazards apply; no movement across floors. |
+| Lifesteal | martial | Each damaging melee hit has a **30%** chance to restore **floor(actual HP removed / 3)**, capped by missing HP. |
+| Petrifying Strike | martial | Each damaging melee hit has a **15%** chance to make its victim skip its next action opportunity, without stacking. |
+| Poison | martial | Each damaging melee hit has a **20%** chance to apply the **existing venom** status, including its budget, ticks and immunities. |
 | Reaper | martial | **Two-handed melee weapons only**, excluding bows. On a direct killing strike, store **floor(overkill × Two-Handed skill × 0.005)** damage, capped at **floor(current ATK × 0.5)**. The next landed direct strike on a **different** enemy releases it after ordinary mitigation and multipliers. Misses, evasion and immunity preserve it; a landed zero-damage glance releases it. The former reserve is excluded when computing a new reserve; new reserves replace, never add. |
+| Retribution | martial | Stores **all HP actually lost** while equipped; the next damaging melee strike gains **floor(50% × total HP lost)** as added damage. A miss keeps the charge; the next hit spends it. |
+| Riposte | martial | A **successful shield block** or an enemy **glancing melee hit** prepares +50% on the next damaging melee strike. A miss keeps the charge; removing the Riposte weapon clears it. |
+| Shadow Strike | martial | A melee hit begun while invisible deals **50% more damage**. Invisibility is checked independently at the start of each strike, including additional strikes. |
+| Silence | martial | Each damaging melee hit has a **30%** chance to prevent only enemy spellcasting for **3 player turns**; regular attacks and movement still work. |
+| Slow | martial | Each damaging melee hit has a **30%** chance to apply **Slow for 3 player turns**. |
+| Soul Eater | martial | Every player-credited kill of a **humanoid other than a Ghost** has a **50%** chance to create a hostile `ghost of <victim>` on a free safe neighboring floor tile on the same global Z level. Only **one** Soul Eater ghost can be alive anywhere in the world at once. The ghost has **half the slain creature’s maximum HP, ATK, DEF, SPD and GRACE** (rounded to nearest integer, minimum 1 for HP/ATK/SPD), but retains Ghost species behavior, including ethereal and invisibility. It does not inherit the victim’s gear, abilities, prefix or loot. It grants normal stat-based **XP**, but drops **nothing**. Killing that ghost with player credit awards **Soul Fed: +1 ATK for 300 player turns**, with **independent uncapped stack expiries**. |
+| Soulburst | martial | Killing a foe with a direct melee strike bursts over a **7×7** area centered on the victim. Other enemies in sight on the same Z level take damage with **30% of the killing strike's damage** before their own DEF reduction. Bursts cannot trigger further bursts or weapon powers; the player is unharmed. |
+| Sunder | martial | Each damaging melee hit permanently reduces the enemy's effective DEF by **1**, up to **10**; minimum DEF is **0**. |
+| Counterguard | shields | **+15 percentage points** to block against enemies carrying a weapon. |
+| Shield Bash | shields | After a successful block against an adjacent foe, a **50%** chance to counterattack for damage based on **30% of current player DEF**, reduced by the foe's ordinary DEF. A surviving foe is pushed **one legal free tile** away, triggering normal on-entry hazards; no weapon on-hit effects. |
+| Shield Mastery | shields | **+10 percentage points** to normal shield block chance, without removing existing Shielding skill rules. |
+| Vengeful Precision | shields | A successful ordinary melee shield block readies **+8 percentage points** critical chance for the next individual melee weapon strike. The strike consumes it even if it misses, and a second block cannot stack another charge. Shield Bash does not spend it. Removing the shield clears it. |
+
 
 Dancer uses the same pre-conditional defense basis as Brace, Vigorplate and
 Tideguard, so percentages never compound. Only actual, voluntary legal
@@ -7090,6 +7093,53 @@ Its expiry uses consumed player turns: a move protects against its immediate
 enemy reaction, and a following action must be another voluntary move to keep
 that protection. Movement between global levels changes Z only and obeys the
 ordinary stairs/lifts rules, without separate maps.
+
+### Alchemist's Vest: healing and temporary protection
+
+Both variants belong to the **armors** domain. Armor rolls from the shared
+`bulwark` and armor-exclusive `armors` powers together, selecting one ability
+from their deduplicated union. Both use one shared
+calculation for nominal healing **after** the existing consumable/racial
+modifiers and **before** clipping to missing normal HP:
+
+```text
+normal healing = min(missing normal HP, nominal healing)
+excess healing = max(0, nominal healing - normal healing)
+```
+
+Eligible sources are **Life Potions**, **Healing Herbs**, **Edible Mushrooms**,
+and edible results from unidentified **Mushrooms**. Poisonous mushrooms and
+healing from regeneration, food, resting, revival, lifesteal, and other powers
+do not grant either protection. Life Potions ordinarily heal exactly the missing
+HP; **with either Alchemist variant**, their nominal healing is the effective
+maximum HP (**125% for Wyrdlings**, rounded with the ordinary consumable rule)
+and any unused amount converts to the armor's protection. Temporary HP never
+changes the missing-normal-HP calculation, and healing occurs only once.
+
+**Vitality** stores `min(excess healing, floor(maximum HP × 0.5))` temporary HP.
+The stored value is replaced only when the candidate is greater than the
+remaining buffer. After DEF, blocks, wards and other existing mitigation, the
+buffer takes ordinary incoming damage before normal HP. Poison, environment,
+traps, self-inflicted spell damage, and enemy attacks all use that buffer.
+Explicit HP expenditures, including Blood Pact and mining strain, bypass it.
+Only actual loss of normal HP triggers HP-loss-based artifact abilities. This
+buffer never lasts for a timed number of turns.
+
+**Guard** converts
+`floor(min(excess healing, maximum HP × 0.5) / 5)` into DEF. It protects against
+the reaction immediately following drinking/eating and the next **four** consumed
+world turns. A greater grant replaces strength and restarts the duration;
+smaller or equal grants leave both unchanged. Free actions, UI and animations
+do not advance its clock. It is a flat derived DEF bonus and does not multiply
+any percentage-based DEF effects or protect against damage which ignores DEF.
+
+Both resources clear on armor removal/replacement or death, and can never be
+restored by re-equipping the same piece. When maximum HP decreases, stored
+protection is clamped to the lower cap (never refilled on later increases).
+The resources, active DEF and duration are visible in the status panel only
+when their granting armor is identified. Unidentified artifacts still activate,
+with concealed names. Activation and consumption generate message-log feedback
+and animated popups but never consume RNG or control gameplay timing.
 
 Brace and Vigorplate round fractional DEF bonuses **down**, using the same
 pre-conditional DEF basis; neither feeds the other's percentage. Hold the Line
@@ -8947,7 +8997,7 @@ After the ordinary sell-value discounts, an **identified equipment artifact**
 receives an additional **floor(25% × its ability's `priceBonus`)** gold on sale.
 Unidentified artifacts receive no ability premium. The curse reduction applies
 to the ordinary sell base before the premium; it does not reduce the premium
-again. All 51 currently enabled powers have an individual nonnegative
+again. All 65 enabled powers have an individual nonnegative
 `priceBonus` in `content/artifact_abilities.json` (70g–720g).
 
 ### Non-tiered items

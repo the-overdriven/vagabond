@@ -87,7 +87,7 @@ function enemySacrificeTargets(e) {
 function availableEnemySpells(e) {
   const spells = []
   if (enemyHasAbility(e, 'weaken') && player.weakenTurns <= 0) spells.push('weaken')
-  if (enemyHasAbility(e, 'slow') && player.slowTurns <= 0 && !playerHasArtifactAbility('fleetfoot')) spells.push('slow')
+  if (enemyHasAbility(e, 'slow') && player.slowTurns <= 0) spells.push('slow')
   if (enemyHasAbility(e, 'disarm') && playerDisarmSlots().length) spells.push('disarm')
   if (enemyHasAbility(e, 'dispel') && playerDispelTargets().length) spells.push('dispel')
   if (enemyHasAbility(e, 'deathBolt') && clearProjectilePath(e)) spells.push('deathBolt')
@@ -133,6 +133,7 @@ function tryEnemySpell(e) {
     player.weakenTurns = ENEMY_DEBUFF_TURNS
     const lost = before - playerMaxHp()
     player.hp = Math.min(player.hp, playerMaxHp())
+    artifactAlchemistClamp()
     log(`The ${e.name} weakens you! Your maximum HP falls by ${lost} for ${ENEMY_DEBUFF_TURNS} turns.`, 'bad')
     spawnDamageNumber(player.x, player.y, 'Weakened!', '#c7a5f6')
   } else if (spell === 'slow') {
@@ -148,6 +149,13 @@ function tryEnemySpell(e) {
     player.inventory.push(item)
     // Removing HP gear affects subsequent monsters now, even in headless replay.
     player.hp = Math.min(player.hp, playerMaxHp())
+    if (slot === 'armor') {
+      player.artifactAlchemistTempHp = 0
+      player.artifactAlchemistGuardDef = 0
+      player.artifactAlchemistGuardUntilTurn = 0
+      player.artifactDancerUntilTurn = 0
+    }
+    artifactAlchemistClamp()
     equipmentLog(`The ${e.name} casts a disarming spell! Your ${artifactDisplayName(item)} is sent to your inventory.${statDeltaText(before)}`, [item], 'bad')
     spawnDamageNumber(player.x, player.y, 'Disarmed!', '#c7a5f6')
   } else if (spell === 'immunity') {

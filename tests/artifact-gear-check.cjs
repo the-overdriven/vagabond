@@ -843,7 +843,7 @@ test('Batch 3: save and replay retain combat charges, independent expiries and r
       player.artifactLastStandUntilTurn=turnCount+2;
       player.artifactBoneplateExpiries=[turnCount+4,turnCount+9]})()`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,182)
+    assert.equal(snapshot.version,183)
     const fields=['artifactRetributionStored','artifactBloodReservoirStored',
       'artifactPainEaterHits','artifactRiposteReady','artifactRhythmGuardReady',
       'artifactEvasionPrepared','artifactSacredReadyTurn','artifactLastStandCooldownUntil',
@@ -1050,7 +1050,7 @@ test('Batch 4: save and deterministic replay preserve execution markers and move
       player.artifactMartialEvasionPending=true;rngState=91822
     })()`)
     const saved=clone(run('buildSaveObject()'))
-    assert.equal(saved.version,182)
+    assert.equal(saved.version,183)
     assert.equal(saved.player.artifactElusiveReady,true)
     assert.equal(saved.player.artifactMartialEvasionPending,true)
     assert.equal(saved.enemies.find(e=>e.id==='batch-target').artifactExecutionerUsed,true)
@@ -1402,7 +1402,7 @@ test('Batch 6: save and replay restore ghost provenance and independent Soul Fed
     run(`killEnemy(enemies.find(e=>e.id==='persist-soul'),true,'test')`)
     run(`player.artifactSoulFedExpiries=[turnCount+2,turnCount+300]`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,182)
+    assert.equal(snapshot.version,183)
     assert.deepEqual(snapshot.player.artifactSoulFedExpiries,[run('turnCount+2'),run('turnCount+300')])
     assert.equal(snapshot.enemies.filter(e=>e.artifactSoulGhost).length,1)
     const ghost=snapshot.enemies.find(e=>e.artifactSoulGhost)
@@ -1511,8 +1511,8 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
     return {examined, powerCount:Object.keys(powers).length}
   })()`)
-  assert.equal(result.powerCount, 63)
-  assert.equal(result.examined, 63 * 14)
+  assert.equal(result.powerCount, 65)
+  assert.equal(result.examined, 65 * 14)
 })
 
 test('artifact activations log and animate while concealing unidentified powers', async () => {
@@ -1544,15 +1544,13 @@ test('god mode activation includes the 5000-gold grant', () => {
   assert.match(run('useGodModeKey.toString()'), /player\.gold\s*=\s*5000/)
 })
 
-test('ability selection filters equipment slots and weapon classes before rolling', async () => {
+test('ability selection follows domains and filters weapon classes before rolling', async () => {
   await ready()
   const result = run(`(() => {
     const config = ARTIFACT_ABILITIES
     const abilityId = '__restricted_test__'
-    config.abilities[abilityId]={enabled:true,priceBonus:100,slots:['weapon'],weaponTypes:['twoHandedMelee']}
+    config.abilities[abilityId]={enabled:true,priceBonus:100,weaponTypes:['twoHandedMelee']}
     config.domains.martial.push(abilityId,abilityId)
-    config.domains.archery.push(abilityId)
-    config.domains.bulwark.push(abilityId)
     const artifact = values => ({kind:'artifact',base:'Test Base',...values})
     try {
       const twoHanded=artifactAbilityPool(artifact({artifactSlot:'weapon',twoHanded:true}))
@@ -1575,10 +1573,38 @@ test('ability selection filters equipment slots and weapon classes before rollin
   })
 })
 
+test('armor domain contains exclusive powers without changing either equipment pool', async () => {
+  await ready()
+  const result=clone(run(`(() => {
+    const domains=ARTIFACT_ABILITIES.domains
+    const armor={kind:'artifact',artifactSlot:'armor',base:'Tunic'}
+    const shield={kind:'artifact',artifactSlot:'shield',base:'Buckler'}
+    const powerList=Object.values(ARTIFACT_ABILITIES.abilities)
+    return {armorDomains:artifactDomains(armor),shieldDomains:artifactDomains(shield),
+      armorPool:artifactAbilityPool(armor),shieldPool:artifactAbilityPool(shield),
+      bulwark:domains.bulwark,armors:domains.armors,shields:domains.shields,
+      hasSlotOverrides:powerList.some(power=>'slots' in power)}
+  })()`))
+  assert.deepEqual(result.armorDomains,['bulwark','armors'])
+  assert.deepEqual(result.shieldDomains,['bulwark','shields'])
+  assert.deepEqual(result.armorPool,[...result.bulwark,...result.armors],
+    'armor receives shared and exclusive powers once, in the original selection order')
+  assert.deepEqual(result.shieldPool,[...result.bulwark,...result.shields],
+    'shields receive only shared and shield-exclusive powers')
+  assert.equal(result.hasSlotOverrides,false,'equipment eligibility must be domain-driven')
+  assert.deepEqual(result.armors, ['veteran_xp','veteran_level','berserkers_oath',
+    'duelist','weaponmaster','dancer','alchemists_vest_hp','alchemists_vest_guard'])
+  assert(result.armors.every(id=>!result.bulwark.includes(id)))
+  assert(result.armors.every(id=>!result.shieldPool.includes(id)))
+  for(const id of ['veteran_xp','veteran_level']) {
+    assert(result.armorPool.includes(id))
+    assert(run(`ARTIFACT_ABILITIES.domains.martial.includes(${JSON.stringify(id)})`))
+  }
+})
 
 // Batch 2: ordinary derived-stat and combat paths must resolve all percentages
 // without extra RNG calls or animation-dependent decisions.
-test('Batch 2: new artifact definitions filter slots, weapon classes and combined domains', async () => {
+test('Batch 2: new artifact definitions follow domain unions and weapon classes', async () => {
   await ready()
   const result=clone(run(`(() => {
     const item=(slot,base,twoHanded=false,rangedAtk=0)=>({kind:'artifact',artifactSlot:slot,
@@ -1590,7 +1616,7 @@ test('Batch 2: new artifact definitions filter slots, weapon classes and combine
       shield:artifactAbilityPool(item('shield','Buckler'))}
     return {count:Object.keys(ARTIFACT_ABILITIES.abilities).length,types}
   })()`))
-  assert.equal(result.count,63)
+  assert.equal(result.count,65)
   for (const type of Object.values(result.types)) assert.equal(new Set(type).size,type.length)
   for (const type of ['one','two','bow']) assert(result.types[type].includes('ambusher'))
   for (const type of ['one','two']) {
@@ -1827,7 +1853,7 @@ test('Batch 3: new combat-state powers preserve equipment restrictions and JSON 
       armor:artifactAbilityPool(item('armor')),
       shield:artifactAbilityPool(item('shield'))}
   })()`))
-  assert.equal(powers.count,63)
+  assert.equal(powers.count,65)
   assert(powers.prices,'every ability ends with priceBonus')
   assert(powers.one.includes('growing_malice') && !powers.one.includes('reaper'))
   assert(powers.two.includes('growing_malice') && powers.two.includes('reaper'))
@@ -1944,7 +1970,7 @@ test('Batch 3: combat state is serialised exactly and cleared on equipment repla
       player.artifactReaperStored=4;player.artifactReaperOriginId='former-enemy'
     })()`)
     const saved=clone(run('buildSaveObject()'))
-    assert.equal(saved.version,182)
+    assert.equal(saved.version,183)
     assert.equal(saved.player.artifactMaliceHits,4)
     run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
     assert.equal(run('player.artifactMaliceHits'),4)
@@ -1956,4 +1982,215 @@ test('Batch 3: combat state is serialised exactly and cleared on equipment repla
     assert.equal(run('player.artifactReaperStored'),0)
     assert.equal(run('player.artifactVengefulPrecisionReady'),false)
   } finally {restoreArtifactCombat()}
+})
+
+
+// Node's inert DOM cannot animate the message log; silence only its
+// presentation sink while checking deterministic game rules.
+async function alchemistReady() {
+  await ready()
+  run('log = () => {}')
+}
+
+// Batch 4: healing conversion must be computed exactly once, after racial
+// consumable modifiers, before ordinary HP clipping, and outside animation.
+test('Alchemist: both Alchemist variants are armor-only and preserve catalog price order', async () => {
+  await alchemistReady()
+  const powers=clone(run(`(() => {
+    const item=(slot)=>({kind:'artifact',artifactSlot:slot,base:'Tunic'})
+    return {abilities:Object.entries(ARTIFACT_ABILITIES.abilities).map(([id,o])=>[id,Object.keys(o).at(-1)]),
+      armor:artifactAbilityPool(item('armor')),shield:artifactAbilityPool(item('shield'))}
+  })()`))
+  assert.equal(powers.abilities.length,65)
+  assert(powers.abilities.every(([,last])=>last==='priceBonus'))
+  for (const id of ['alchemists_vest_hp','alchemists_vest_guard']) {
+    assert(powers.armor.includes(id),id+' must roll on armor')
+    assert(!powers.shield.includes(id),id+' must not roll on shields')
+    assert.equal(run(`ARTIFACT_ABILITIES.abilities.${id}.priceBonus`),
+      id.endsWith('_hp')?540:380)
+  }
+})
+
+test('Alchemist: Vitality captures only excess healing, replaces rather than stacks, and spends after mitigation', async () => {
+  await alchemistReady()
+  const result=clone(run(`(() => {
+    replayAnimationsDisabled=true;replaySimulationMode=true
+    player.race='human';player.maxHp=100;player.hp=80
+    player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',
+      base:'Tunic',def:0,identified:true,abilityId:'alchemists_vest_hp'}}
+    player.artifactAlchemistTempHp=0;artifactAlchemistClamp()
+    const recovered=healWithAlchemist(100)
+    const initially={hp:player.hp,temp:player.artifactAlchemistTempHp,recovered}
+    const firstDamage=artifactLosePlayerHp(30,{directHit:true})
+    const afterFirst={hp:player.hp,temp:player.artifactAlchemistTempHp,firstDamage}
+    healWithAlchemist(10) // Smaller healing cannot weaken or increase reserve.
+    const afterSmaller=player.artifactAlchemistTempHp
+    const secondDamage=artifactLosePlayerHp(50,{directHit:true})
+    const afterSecond={hp:player.hp,temp:player.artifactAlchemistTempHp,secondDamage}
+    const maxBefore=playerMaxHp()
+    player.weakenTurns=3;artifactAlchemistClamp()
+    const afterWeaken=player.artifactAlchemistTempHp
+    player.weakenTurns=0
+    return {initially,afterFirst,afterSmaller,afterSecond,maxBefore,afterWeaken}
+  })()`))
+  assert.deepEqual(result.initially,{hp:100,temp:50,recovered:20})
+  assert.deepEqual(result.afterFirst,{hp:100,temp:20,firstDamage:0})
+  assert.equal(result.afterSmaller,20)
+  assert.deepEqual(result.afterSecond,{hp:70,temp:0,secondDamage:30})
+})
+
+test('Alchemist: Blood Pact and mining HP costs bypass Vitality; HP-loss reactions observe only actual loss', async () => {
+  await alchemistReady()
+  const result=clone(run(`(() => {
+    replayAnimationsDisabled=true;replaySimulationMode=true
+    player.maxHp=100;player.hp=60
+    player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',abilityId:'retribution'},
+      shield:null,armor:{kind:'artifact',artifactSlot:'armor',def:0,base:'Tunic',abilityId:'alchemists_vest_hp'}}
+    player.artifactAlchemistTempHp=20;player.artifactRetributionStored=0
+    const damage1=artifactLosePlayerHp(10,{directHit:true})
+    const afterDamage={hp:player.hp,temp:player.artifactAlchemistTempHp,
+      retribution:player.artifactRetributionStored,damage1}
+    const cost=artifactLosePlayerHp(7,{cost:true})
+    const afterCost={hp:player.hp,temp:player.artifactAlchemistTempHp,
+      retribution:player.artifactRetributionStored,cost}
+    artifactLosePlayerHp(15)
+    return {afterDamage,afterCost,afterEnvironmental:{hp:player.hp,
+      temp:player.artifactAlchemistTempHp,retribution:player.artifactRetributionStored}}
+  })()`))
+  assert.deepEqual(result.afterDamage,{hp:60,temp:10,retribution:0,damage1:0})
+  assert.deepEqual(result.afterCost,{hp:53,temp:10,retribution:7,cost:7})
+  assert.deepEqual(result.afterEnvironmental,{hp:48,temp:0,retribution:12})
+})
+
+test('Alchemist: Guard uses five consumed turns, never refreshes on smaller/equal conversion', async () => {
+  await alchemistReady()
+  const result=clone(run(`(() => {
+    replayAnimationsDisabled=true;replaySimulationMode=true
+    player.race='human';player.maxHp=100;player.hp=80
+    player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',
+      base:'Tunic',def:0,abilityId:'alchemists_vest_guard',identified:true}}
+    player.artifactAlchemistGuardDef=0;player.artifactAlchemistGuardUntilTurn=0
+    const basicDef=playerDef()
+    healWithAlchemist(100) // 20 normal, 80 excess -> capped to 50 -> +10 DEF.
+    const first={strength:player.artifactAlchemistGuardDef,until:player.artifactAlchemistGuardUntilTurn,
+      def:playerDef()-basicDef}
+    healWithAlchemist(20)
+    const lesser={strength:player.artifactAlchemistGuardDef,until:player.artifactAlchemistGuardUntilTurn}
+    healWithAlchemist(100)
+    const equal={strength:player.artifactAlchemistGuardDef,until:player.artifactAlchemistGuardUntilTurn}
+    turnCount=first.until-1
+    const finalProtected=playerDef()-basicDef
+    turnCount=first.until
+    const expired=playerDef()-basicDef
+    healWithAlchemist(20)
+    const renewed={strength:player.artifactAlchemistGuardDef,until:player.artifactAlchemistGuardUntilTurn,
+      active:playerDef()-basicDef}
+    return {first,lesser,equal,finalProtected,expired,renewed,now:turnCount}
+  })()`))
+  assert.equal(result.first.strength,10)
+  assert.equal(result.first.def,10)
+  assert.deepEqual(result.lesser,{strength:10,until:result.first.until})
+  assert.deepEqual(result.equal,{strength:10,until:result.first.until})
+  assert.equal(result.finalProtected,10)
+  assert.equal(result.expired,0)
+  assert.equal(result.renewed.strength,4)
+  assert.equal(result.renewed.active,4)
+  assert.equal(result.renewed.until,result.now+6)
+})
+
+test('Alchemist: full-health Life Potions and Wyrdling healing produce correct excess', async () => {
+  await alchemistReady()
+  const result=clone(run(`(() => {
+    replayAnimationsDisabled=true;replaySimulationMode=true
+    const outcomes=[]
+    for(const race of ['human','wyrdling']){
+      player.race=race;player.maxHp=100;player.hp=100
+      player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',
+        def:0,base:'Tunic',abilityId:'alchemists_vest_hp'}}
+      player.artifactAlchemistTempHp=0
+      const fullPotionNominal=consumablePower(playerMaxHp())
+      healWithAlchemist(fullPotionNominal)
+      outcomes.push({race,nominal:fullPotionNominal,normalHp:player.hp,temp:player.artifactAlchemistTempHp})
+    }
+    return outcomes
+  })()`))
+  assert.deepEqual(result,[
+    {race:'human',nominal:100,normalHp:100,temp:50},
+    {race:'wyrdling',nominal:125,normalHp:100,temp:50}])
+})
+
+test('Alchemist: save/load preserves buffers and expiry and equipment removal clears them', async () => {
+  await alchemistReady()
+  const saved=clone(run(`(() => {
+    player.maxHp=100;player.hp=90
+    player.equip.armor={kind:'artifact',base:'Tunic',def:0,artifactSlot:'armor',
+      abilityId:'alchemists_vest_hp',identified:true}
+    player.artifactAlchemistTempHp=35;player.artifactAlchemistGuardDef=0
+    player.artifactAlchemistGuardUntilTurn=0
+    return buildSaveObject()
+  })()`))
+  assert.equal(saved.version,183)
+  assert.equal(saved.player.artifactAlchemistTempHp,35)
+  run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
+  assert.equal(run('player.artifactAlchemistTempHp'),35)
+  run(`(() => {
+    player.equip.armor={kind:'artifact',base:'Tunic',def:0,artifactSlot:'armor',
+      abilityId:'alchemists_vest_guard',identified:true}
+    player.artifactAlchemistTempHp=0;player.artifactAlchemistGuardDef=6
+    player.artifactAlchemistGuardUntilTurn=turnCount+5
+  })()`)
+  const guardSave=clone(run('buildSaveObject()'))
+  run(`loadGameFromObject(${JSON.stringify(guardSave)},{isReplayInit:true})`)
+  assert.equal(run('artifactAlchemistGuardBonus()'),6)
+  run('player.equip.armor=null;artifactAlchemistClamp()')
+  assert.equal(run('player.artifactAlchemistGuardDef'),0)
+  assert.equal(run('player.artifactAlchemistTempHp'),0)
+})
+
+test('Alchemist: all ordinary HP damage paths use the same absorption hook', () => {
+  const paths=['src/dungeonTraps.js','src/dungeonHazards.js','src/enemyTelegraphs.js',
+    'src/fireball.js','src/swimming.js','src/mining.js']
+  for(const file of paths){
+    const code=fs.readFileSync(path.join(root,file),'utf8')
+    assert.match(code,/artifactLosePlayerHp\(/,`${file} must resolve via shared HP accounting`)
+  }
+  const mining=fs.readFileSync(path.join(root,'src/mining.js'),'utf8')
+  assert.match(mining,/artifactLosePlayerHp\(strain,\{cost:true\}\)/,
+    'mining remains an explicit cost, not shieldable ordinary damage')
+})
+
+
+test('Alchemist: real consumables use the same healing conversion and poisonous mushrooms never heal', async () => {
+  await alchemistReady()
+  const result=clone(run(`(() => {
+    replayAnimationsDisabled=true;replaySimulationMode=true
+    const oldEnemy=enemyTurn,oldNpc=npcTurn,oldChance=chance
+    try {
+      enemyTurn=()=>{};npcTurn=()=>{}
+      player.race='human';player.maxHp=100;player.hp=50
+      player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',
+        base:'Tunic',def:0,abilityId:'alchemists_vest_hp'}}
+      player.inventory=[{kind:'potion',count:1}]
+      player.artifactAlchemistTempHp=0
+      usePotion(0)
+      const potion={hp:player.hp,temp:player.artifactAlchemistTempHp}
+      artifactLosePlayerHp(40,{directHit:true})
+      player.inventory=[{kind:'herb',count:1}]
+      useHerb(0)
+      const herb={hp:player.hp,temp:player.artifactAlchemistTempHp}
+      player.race='wyrdling'
+      player.inventory=[{kind:'ediblemushroom',count:1}]
+      useEdibleMushroom(0)
+      const edible={hp:player.hp,temp:player.artifactAlchemistTempHp}
+      player.inventory=[{kind:'mushroom',count:1}]
+      chance=()=>false // poisonous result; it cannot feed excess healing
+      useMushroom(0)
+      const poisonous={hp:player.hp,temp:player.artifactAlchemistTempHp}
+      return {potion,herb,edible,poisonous}
+    } finally { enemyTurn=oldEnemy;npcTurn=oldNpc;chance=oldChance }
+  })()`))
+  assert.deepEqual(result.potion,{hp:100,temp:50})
+  assert.deepEqual(result.herb,{hp:100,temp:25})
+  assert.deepEqual(result.edible,{hp:100,temp:31})
+  assert.deepEqual(result.poisonous,{hp:100,temp:6})
 })
