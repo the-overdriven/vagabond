@@ -119,6 +119,50 @@ describe('Tactical consumables', () => {
     })
   }
 
+  it('reveals Mimic chests with Fireball and Fear and applies the spell immediately', () => {
+    loadConsumableWorld(1440)
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const before=JSON.parse(JSON.stringify(buildSaveObject()))
+      const oldDisabled=replayAnimationsDisabled,oldSimulation=replaySimulationMode
+      const oldChance=chance
+      try {
+        toggleInv(false)
+        replayAnimationsDisabled=true;replaySimulationMode=true
+        currentZ=-1;currentCave=-1;map=undergroundMap
+        player.x=40;player.y=40;player.hp=playerMaxHp();player.berserkTurns=0
+        player.inventory=[createItem('scrollOfFireball')]
+        enemies=[];groundItems=[];occupied=new Set();npcs=[]
+        for(let y=34;y<=49;y++)for(let x=34;x<=49;x++)map[y][x]='cavefloor'
+        snapCameraToPlayer();invalidateUndergroundFov()
+        chance=()=>false
+        const chest=x=>({id:'spell_mimic_'+x,kind:'chest',tier:3,opened:false,
+          x,y:40,level:-1,levelKind:'chain',caveIndex:-1,isMimic:true,
+          towerMazeMimic:true,episode:0,rolled:false,unseenTurns:0,
+          loot:{gold:5,items:[]}})
+        groundItems.push(chest(44))
+        check(await castFireball(0,44,40),'fireball cast completes')
+        const burned=enemies.find(e=>e.baseName==='Mimic'&&e.alive)
+        check(burned && burned.hp<burned.maxHp &&
+          !groundItems.some(g=>g.id==='spell_mimic_44'),
+          'the chest reveals and receives damage from the same Fireball')
+        check(burned.mimicSkipTurn===0,'spell reveal does not schedule a free ambush')
+        // Fear applies to constructs, but does not affect a hidden chest
+        // until it is revealed by the spell itself.
+        groundItems.push(chest(42))
+        applyFearScroll(itemDefinition('scrollOfFear').effect)
+        const frightened=enemies.find(e=>e.baseName==='Mimic'&&e.x===42&&e.y===40)
+        check(frightened?.fearTurns>0 && frightened.mimicSkipTurn===0 &&
+          !groundItems.some(g=>g.id==='spell_mimic_42'),
+          'the same Fear scroll reveals and frightens the Mimic')
+      } finally {
+        chance=oldChance;replayAnimationsDisabled=oldDisabled
+        replaySimulationMode=oldSimulation
+        loadGameFromObject(before,{isReplayInit:true})
+      }
+    })()`))
+  })
+
   it('plays a lethal self-fireball impact before the player falls and the death screen fades', () => {
     loadConsumableWorld(1440)
     cy.window().then(win => win.eval(`(async () => {

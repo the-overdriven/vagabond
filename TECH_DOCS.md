@@ -4754,7 +4754,7 @@ persistent flag or save-version change.
 
 ## Wrestler
 
-Sasquatch, Yeti, and Owlbear have `wrestler`. When they could otherwise melee
+Sasquatch, Yeti, Owlbear and Marsutal have `wrestler`. When they could otherwise melee
 an adjacent, visible player, they have a **25%** chance to exchange tiles with
 the player instead of attacking; both cardinal and diagonal adjacency count.
 A successful swap starts a **five-turn cooldown**: the next five enemy turns
@@ -5112,8 +5112,13 @@ Its location may change while unseen (see **§45. Chests**). Revealing it
 replaces the chest with a monster at exactly the same world coordinates and
 shows the normal **Ambush!** effect. Mere proximity does not reveal it while
 its target is invisible (including god-mode invisibility), but stepping onto
-or trying to open its disguised chest still reveals it. It makes one immediate
-adjacent attack, which replaces (not adds to) its next ordinary enemy action.
+or trying to open its disguised chest still reveals it. A Fireball that hits
+the chest or a Scroll of Fear whose radius reaches it also reveals the Mimic.
+The revealed monster takes the triggering spell’s normal damage or Fear effect
+in that same turn; ordinary immunity, tier and radius rules still apply.
+Spell-triggered revelation does not grant a free adjacent ambush attack.
+Physical revelation makes one immediate adjacent attack, which replaces (not
+adds to) its next ordinary enemy action.
 
 After revealing, the Mimic pursues and fights using normal hostile-monster AI
 (AGGRO 4), including pathfinding around corners; it does not wander while idle.
@@ -7970,6 +7975,8 @@ that describes its rules without consuming it.
 | Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
 
 Fear excludes undead regardless of tier; constructs and other non-humanoid species remain eligible.
+A disguised Mimic within Fear radius reveals before target selection, so its tier-3
+construct is frightened by the same cast (unless protected by an existing immunity).
 Radii use Chebyshev distance (eight-direction tile distance) on the current map
 and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
 Chaos can teleport creatures from one side of iron prison bars or a closed
@@ -8081,6 +8088,8 @@ Walls, opaque terrain and shut opaque doors block both the shot and straight
 blast rays; two touching opaque corners also block diagonal fire. Bars pass fire.
 The blast does not bend around walls. Other creatures do not intercept the shot.
 Only visible cells are previewed; creatures in unseen blast cells still take damage.
+A disguised Mimic inside the clipped blast is revealed and damaged by that
+same cast, without a free opening ambush attack.
 
 Each living monster in the footprint and the player independently roll an integer
 from **10 through 50**, uniformly (mean **30**), without armor/DEF reduction,
@@ -11833,9 +11842,12 @@ reaction immediately, without an identification, equipment, hit or turn
 requirement. Weapons, armor, shields and inventory-only trinkets qualify.
 The artifact's existing dwarven-owner name (`possessor`) determines the Ghost's
 name; no independent random owner is generated. A cursed artifact with only a
-cursed-prefix name does not qualify. A Ghost can appear in either of the
+cursed-prefix name does not qualify. A **Champion Ghost** can appear in either of the
 **last two Dwarven Ruins floors**, outside sight and at least 10 tiles away,
-subject to the scheduled encounter roll and threat limit. At most one such
+subject to the scheduled encounter roll and threat limit. Spawn candidates
+are reachable, clear of hazards and no more than **12 tiles (Chebyshev)** from
+the downward stairs. If that floor has no downward stair, the same search uses
+its upward stairs; if neither has a valid candidate, placement is deferred. At most one such
 encounter appears per character.
 
 The Ghost waits until it sees the player carrying its artifact within
@@ -11846,8 +11858,9 @@ Once recognized, it pursues using ordinary Ghost combat AI. Merely
 Ghost. Picking it up again renews pursuit. Wounding or poisoning the Ghost
 makes it permanently hostile, even without the artifact. The ghost's name,
 linked artifact, recognition and provocation survive save and replay. Killing
-the Ghost ends this haunting; no second owner is spawned. The encounter uses
-existing Ghost visuals and normal combat stats.
+the Ghost ends this haunting; no second owner is spawned. The encounter uses existing Ghost visuals with the Champion aura, prefix
+bonuses and ordinary Ghost abilities. Its personal name and artifact link
+remain unchanged by the Champion prefix.
 
 **Undead Warden — response to Marksmanship:** In Cursed World,
 reaching **30/100 Marksmanship** makes a single Undead Warden eligible
@@ -12043,6 +12056,10 @@ cave or dungeon location can form a band. At a later **scheduled 500-step
 check**, a reachable group may gather off-screen: **one individually named Last Survivor**
 with Champion stats, Champion aura and **50% additional HP after ordinary
 modifiers**, accompanied by **two ordinary members of the same species**.
+The leader is never below **tier 3** and has stat floors of **80 max HP,
+13 ATK, 5 DEF, 6 SPD and 3 GRACE** after bonuses; the companions remain
+ordinary species members. These floors prevent a low-tier species from
+creating a trivial Champion while preserving species-specific abilities.
 The group appears 12–28 path steps from the player, outside the viewport or
 underground FOV, away from occupied tiles, traps and transitions, and within
 two tiles of one another. The most-killed currently placeable qualifying
@@ -12154,7 +12171,9 @@ special threats. If no suitable position exists, the event waits; it never
 forces a spawn into the player's path. In the Dwarven Ruins it participates
 in the ordinary depth-weighted event lottery. Elsewhere it uses the next eligible scheduled check, respecting the
 surface-region or underground-floor two-threat limit. It is one encounter per character, ignoring the ordinary
-monster population limit.
+monster population limit. Spawning is not announced in ordinary
+message logs before the player discovers the threat; checkpoint announcements
+are available only with adaptive debug logging.
 
 The name uses **Hungry** without granting ordinary monster-prefix powers.
 Its starting HP and DEF are multiplied by **0.8**, and ATK by **1.2**,
@@ -12571,7 +12590,9 @@ Cleared galleries remain cleared. A gallery's outcome is persistent, never
 rerolled on a return visit, including failed 15% rolls. Temporarily blocked
 placement defers the roll. Reinforcement does **not** consume either of the
 floor's two optional special-threat slots, alter dungeon generation, or
-force the player through this optional branch. Combat alternatives remain
+force the player through this optional branch. Reinforcement is not announced
+in ordinary logs when it occurs out of sight; debug logging retains its check.
+Combat alternatives remain
 fighting through bars, reaching the side cell, or ignoring the gallery.
 
 **Fireball self-harm lure:** In Cursed World, two separately cast Fireballs

@@ -195,6 +195,9 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(survivor.companions) || survivor.companions < 1 || survivor.companions > 4 ||
         survivor.leaderPrefix !== 'Champion' ||
         !Number.isFinite(survivor.leaderHpMultiplier) || survivor.leaderHpMultiplier < 1 ||
+        !Number.isInteger(survivor.leaderMinTier) || survivor.leaderMinTier < 3 ||
+        !survivor.leaderMinStats || ['hp','atk','def','spd','grace'].some(stat =>
+          !Number.isInteger(survivor.leaderMinStats[stat]) || survivor.leaderMinStats[stat] < 1) ||
         !Number.isInteger(survivor.minSpawnDistance) ||
         survivor.minSpawnDistance <= UndergroundFov.RADIUS ||
         !Number.isInteger(survivor.maxSpawnDistance) ||
@@ -306,6 +309,8 @@ const AdaptivePlayerTrolling = (() => {
         !Number.isInteger(previousOwner.recognitionDistance) || previousOwner.recognitionDistance < 1 ||
         !Number.isInteger(previousOwner.minSpawnDistance) || previousOwner.minSpawnDistance <= UndergroundFov.RADIUS ||
         !Number.isInteger(previousOwner.minEntranceDistance) || previousOwner.minEntranceDistance < 1 ||
+        previousOwner.prefix !== 'Champion' ||
+        !Number.isInteger(previousOwner.maxDownStairDistance) || previousOwner.maxDownStairDistance <= previousOwner.minEntranceDistance ||
         !Number.isInteger(previousOwner.maxCandidateSites) || previousOwner.maxCandidateSites < 1 ||
         !Array.isArray(ARTIFACT_NAMES_DWARF) || !ARTIFACT_NAMES_DWARF.length)
       throw new Error('Invalid adaptive Previous Owner settings.')
@@ -2775,8 +2780,16 @@ const AdaptivePlayerTrolling = (() => {
         !availableThreatSlots('chain',currentZ,-1)) return null
     const relics=eligiblePreviousOwnerArtifacts()
     if (!relics.length) return null
-    const sites=adaptiveMonsterSpawnSites(floor,config.events.previous_owner,
-      ENEMY_TEMPLATE_BY_NAME.Ghost)
+    const settings=config.events.previous_owner
+    // Favor the actual descent route, not a random part of a sprawling floor.
+    // The shared reachability and safe-spawn checks still govern every candidate.
+    const downstairs=spawnEntrances().filter(p => map[p.y]?.[p.x]==='dwarvenstairsdown')
+    const stairs=downstairs.length ? downstairs : spawnEntrances().filter(p =>
+      map[p.y]?.[p.x]==='dwarvenstairsup')
+    if (!stairs.length) return null
+    const sites=adaptiveMonsterSpawnSites(floor,settings,ENEMY_TEMPLATE_BY_NAME.Ghost,
+      (x,y) => stairs.some(p => Math.max(Math.abs(x-p.x),Math.abs(y-p.y)) <=
+        settings.maxDownStairDistance))
     return sites.length ? {relics,sites} : null
   }
 
@@ -2794,6 +2807,11 @@ const AdaptivePlayerTrolling = (() => {
       level:currentZ,levelKind:'chain',caveIndex:-1,alive:true,aware:false,
       equipment:null,previousOwnerRelicName:relic.name,
       previousOwnerRecognized:false,previousOwnerProvoked:false}
+    ghost.prefix=config.events.previous_owner.prefix
+    ghost.prefixBase=prefixBaseStats(ghost)
+    applyEnemyPrefix(ghost,ghost.prefix)
+    // Recognition, not the prefix, determines when this Champion becomes hostile.
+    ghost.aggro=0
     addEnemy(ghost)
     occupied.add(keyXY(spot.x,spot.y))
     if (!recordThreat('previous_owner','chain',currentZ,-1)) {
@@ -3221,7 +3239,7 @@ const AdaptivePlayerTrolling = (() => {
       occupied.delete(keyXY(pos.x,pos.y))
       return false
     }
-    log('The scent of meat has drawn a hungry hunter.', 'bad')
+    debugEvent('The scent of meat has drawn a hungry hunter.')
     return true
   }
 
@@ -4012,7 +4030,11 @@ const AdaptivePlayerTrolling = (() => {
       prepareEnemyEquipment(enemy)
       if (leader) {
         enemy.hp=Math.max(1,Math.round(enemy.hp*cfg.leaderHpMultiplier))
-        enemy.maxHp=enemy.hp
+        enemy.maxHp=Math.max(enemy.hp,cfg.leaderMinStats.hp)
+        enemy.hp=enemy.maxHp
+        enemy.tier=Math.max(enemy.tier,cfg.leaderMinTier)
+        for (const stat of ['atk','def','spd','grace'])
+          enemy[stat]=Math.max(enemy[stat],cfg.leaderMinStats[stat])
       }
       addEnemy(enemy)
       occupied.add(keyXY(pos.x,pos.y))
@@ -4023,7 +4045,7 @@ const AdaptivePlayerTrolling = (() => {
       enemies=enemies.filter(e=>!created.includes(e))
       return false
     }
-    log(`The ${tmpl.name} you have hunted are gathering. A Last Survivor has rallied the remaining fighters.`, 'bad')
+    debugEvent(`The ${speciesPlural(tmpl.name)} you have hunted are gathering. A Last Survivor has rallied the remaining fighters.`)
     return true
   }
 
@@ -4476,7 +4498,7 @@ const AdaptivePlayerTrolling = (() => {
       state.explorerGalleryRolls[key]=true
       changed=true
       debugEvent(`Explorer gallery ${key}: Champion promoted and two archers added.`)
-      log('The far-travelled adventurer finds a prison gallery reinforced with veteran guards.', 'bad')
+      // Reinforcement is an unseen adaptation; do not announce it before discovery.
     }
     return changed
   }

@@ -238,5 +238,25 @@ const state=code=>JSON.parse(JSON.stringify(run(code)))
   assert.equal(run('enemies.find(e=>e.baseName==="Mimic"&&e.alive).equipment'),null)
   console.log('PASS bump reveal and prefixed Mimic without humanoid equipment')
 
+  // A spell-triggered reveal bypasses the free ambush but keeps the original
+  // saved chest loot and normal construct targeting for Fear.
+  run(`(()=>{
+    currentZ=-1;map=undergroundMap;player.x=50;player.y=51;player.invisibleTurns=0
+    for(let y=46;y<55;y++)for(let x=46;x<55;x++)map[y][x]='cavefloor'
+    groundItems.push({id:'spell_mimic',kind:'chest',tier:3,opened:false,
+      x:51,y:51,level:-1,levelKind:'chain',caveIndex:-1,isMimic:true,
+      towerMazeMimic:true,episode:0,rolled:false,unseenTurns:0,
+      loot:{gold:9,items:[]}})
+    globalThis.spellAttacks=revealAttacks
+    Mimics.revealBySpell((x,y)=>x===51 && y===51)
+  })()`)
+  assert.equal(run('revealAttacks'),run('spellAttacks'),'spell reveal never triggers a free ambush')
+  assert.equal(run('groundItems.some(g=>g.id==="spell_mimic")'),false)
+  assert.equal(run('enemies.find(e=>e.baseName==="Mimic"&&e.alive&&e.x===51)?.mimicSkipTurn'),0)
+  run('applyFearScroll(itemDefinition("scrollOfFear").effect)')
+  assert(run('enemies.some(e=>e.baseName==="Mimic"&&e.alive&&e.x===51&&e.fearTurns>0)'),
+    'Fear can affect a spell-revealed Mimic through existing construct rules')
+  console.log('PASS spell reveals dormant Mimic with no free ambush, ordinary fear still applies')
+
   function MimicsBonus(){return run('Math.max(1,Math.round(Mimics.BONUS_GOLD*WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))')}
 })().catch(e=>{console.error(e.stack);process.exitCode=1})

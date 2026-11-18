@@ -161,7 +161,7 @@ const Mimics = (() => {
   }
   function onLoad() {lastLevel=levelKey()}
 
-  function reveal(chest) {
+  function reveal(chest, surprise=true) {
     if(!chest?.isMimic || !onCurrentLevel(chest))return false
     const template=ENEMY_TEMPLATE_BY_NAME.Mimic
     if(!template)throw new Error('Mimic monster template missing')
@@ -176,7 +176,7 @@ const Mimics = (() => {
       def:Math.round(template.def*scale),spd:template.spd,grace:template.grace,
       aggro:template.aggro,humanoid:false,equipment:null,prefix:null,alive:true,aware:true,
       mimicStationary:STATIONARY_AFTER_REVEAL,mimicLoot:structuredClone(chest.loot),
-      mimicSkipTurn:ATTACK_ON_REVEAL ? turnCount+1 : 0}
+      mimicSkipTurn:surprise && ATTACK_ON_REVEAL ? turnCount+1 : 0}
     const prefixChance=chest.towerMazeMimic ? WORLD_GEN_CONFIG.cavePopulation.deepPrefixChance :
       Math.min(1,(dungeonPackageConfig('dwarvenRuins')?.encounters?.prefixBaseChance||0.1)+
       Math.max(0,-chest.level-4)*(dungeonPackageConfig('dwarvenRuins')?.encounters?.prefixGrowthPerFloor||0))
@@ -188,11 +188,20 @@ const Mimics = (() => {
     groundItems.splice(groundItems.indexOf(chest),1)
     addEnemy(e)
     rebuildActiveLevelOccupancy()
-    spawnAmbushAnim()
-    log(`Ambush! The chest transforms into a ${e.name}!`,'bad')
-    if(ATTACK_ON_REVEAL && Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))<=1 &&
+    if (surprise) spawnAmbushAnim()
+    log(surprise ? `Ambush! The chest transforms into a ${e.name}!` :
+      `The chest transforms into a ${e.name}!`, 'bad')
+    if(surprise && ATTACK_ON_REVEAL && Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))<=1 &&
       !deathTransition && player.hp>0)enemyAttackPlayer(e)
     return true
+  }
+  // Spell effects reveal hidden chests first, so this same spell can affect
+  // the resulting monster. A spell-caused reveal never grants a free ambush hit.
+  function revealBySpell(affects) {
+    const targets=groundItems.filter(g => g.isMimic && !g.opened &&
+      onCurrentLevel(g) && affects(g.x,g.y))
+    for (const chest of targets) reveal(chest,false)
+    return targets.length
   }
   function revealAdjacent() {
     if (playerIsInvisible()) return false
@@ -218,6 +227,6 @@ const Mimics = (() => {
     }
     return true
   }
-  return {initialize,update,onLoad,onLevelChange,revealAdjacent,revealBump,deathLoot,
+  return {initialize,update,onLoad,onLevelChange,revealAdjacent,revealBump,revealBySpell,deathLoot,
     UNSEEN_THRESHOLD,SHIFT_CHANCE,BONUS_GOLD,STATIONARY_AFTER_REVEAL,ATTACK_ON_REVEAL}
 })()

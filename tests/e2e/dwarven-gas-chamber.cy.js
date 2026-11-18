@@ -37,6 +37,10 @@ describe('Sealed Dwarven gas chambers', () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const h=deepLevels[3].hazards[0],hp=player.hp
       check(DungeonHazards.validate(deepLevels[3]),'gas fixture is valid')
+      const chestTooltip=tileInspectInfo(13,13)?.html || ''
+      check(chestTooltip.includes('>Chest<') &&
+        !chestTooltip.includes('valve') && !chestTooltip.includes('pipes'),
+        'an unopened trap chest does not explain its mechanism in the tooltip')
       check(map[13][16]==='dwarvengasvalve' && map[11][16]==='dwarvengasvent','visible warnings')
       await tryMove(1,0)
       check(h.state==='active' && player.hp===hp,'opening action has no damage')

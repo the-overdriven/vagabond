@@ -72,6 +72,8 @@ function applyEnemyFear(enemy, duration) {
 
 function applyFearScroll(effect) {
   const duration = consumablePower(effect.durationTurns)
+  // Expose dormant mimics before collecting victims of this same Fear cast.
+  Mimics.revealBySpell((x,y) => Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) <= effect.radius)
   let affected = 0
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.hp <= 0 || !onCurrentLevel(enemy) ||

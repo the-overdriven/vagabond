@@ -28,8 +28,12 @@ describe('Gear bases on procedural artifacts', () => {
       check(groundGlyph({kind:'droppeditem',item:artifact}).ch ===
         groundGlyph({kind:'droppeditem',item:club}).ch,
         'ASCII floor symbol does not reveal an artifact weapon')
-      check(groundGlyph({kind:'droppeditem',item:{...artifact,artifactSlot:'trinket'}}).ch !== '♦',
-        'non-gear artifacts use a neutral floor symbol')
+      const trinket={...artifact,artifactSlot:'trinket'}
+      check(groundGlyph({kind:'droppeditem',item:trinket}).ch !== '♦',
+        'non-gear artifacts use a neutral ASCII floor symbol')
+      const trinketVisual=droppedInventoryVisual(trinket)
+      check(trinketVisual?.image==='img/icons/artifact.svg',
+        'trinket artifacts render a neutral SVG rather than a font glyph in tile mode')
       currentZ=0;map=surfaceMap;player.x=40;player.y=40;enemies=[];npcs=[]
       const drop={kind:'droppeditem',item:club,x:41,y:40,level:0}
       groundItems=[drop]

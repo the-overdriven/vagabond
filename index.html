@@ -4854,9 +4854,15 @@ more difficult:
     return oldHunterQuest
   }
 
-  function hunterPlural(name, count = 2) {
+  // Shared monster-species inflection for Hunter dialogue and adaptive events.
+  function speciesPlural(name, count = 2) {
     if (count === 1) return name
-    return /s$/i.test(name) ? name : `${name}s`
+    const irregular = {Wolf:'Wolves',Dwarf:'Dwarves',Elf:'Elves',Mouse:'Mice',
+      Goose:'Geese',Ox:'Oxen',Deer:'Deer',Sheep:'Sheep',Fish:'Fish'}
+    if (irregular[name]) return irregular[name]
+    if (/[^aeiou]y$/i.test(name)) return name.slice(0,-1)+'ies'
+    if (/(s|x|z|ch|sh)$/i.test(name)) return name+'es'
+    return name+'s'
   }
 
   function hunterLocationPhrase(q) {
@@ -4875,9 +4881,9 @@ more difficult:
       `Old Hunter says: A ${q.targetName} is making trouble ${hunterLocationPhrase(q)}. I have seen what it leaves behind. Track the individual one, not some other beast wearing the same face.`
     ])
     if (q.type === 'kill_group') return pick([
-      `Old Hunter says: ${hunterPlural(q.targetBaseName)} have gathered ${hunterLocationPhrase(q)}. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
-      `Old Hunter says: I counted ${q.required} ${hunterPlural(q.targetBaseName)} ${hunterLocationPhrase(q)}. They are not merely passing through - they are settling in. Thin their numbers before someone else pays for it.`,
-      `Old Hunter says: The ${hunterPlural(q.targetBaseName)} have been disturbing the dead and frightening the living ${hunterLocationPhrase(q)}. Bring down ${q.required} of them. That should quiet things for a while.`
+      `Old Hunter says: ${speciesPlural(q.targetBaseName)} have gathered ${hunterLocationPhrase(q)}. ${reason}. Hunt ${q.required} of them before the trouble spreads.`,
+      `Old Hunter says: I counted ${q.required} ${speciesPlural(q.targetBaseName)} ${hunterLocationPhrase(q)}. They are not merely passing through - they are settling in. Thin their numbers before someone else pays for it.`,
+      `Old Hunter says: The ${speciesPlural(q.targetBaseName)} have been disturbing the dead and frightening the living ${hunterLocationPhrase(q)}. Bring down ${q.required} of them. That should quiet things for a while.`
     ])
     if (q.type === 'recover_item') return pick([
       `Old Hunter says: ${q.targetName} took my ${q.targetItemName}. I saw the wretch carrying it ${hunterLocationPhrase(q)}. Bring the old thing back - it has more history than that thief deserves.`,
@@ -5453,6 +5459,11 @@ more difficult:
        monsterGearQualityTailChance(item, sourceTier) < 0.10)
   }
 
+  function enemyLootSubject(e) {
+    return e.adaptiveEventId==='last_survivor' && e.name?.endsWith(', Last Survivor')
+      ? e.name : `The ${e.name}`
+  }
+
   function lootFromEnemy(e, onGround = false, visibleAtDeath = false, deathFxDelay = 0) {
     const mf = playerMf()
     let rareFxQueued = false
@@ -5470,7 +5481,7 @@ more difficult:
         if (onGround) placeEnemyLootOnGround(e, createItem('arrows', {count:remaining}))
         else addInventoryItem('arrows', {count:remaining})
         log(onGround
-          ? `The ${e.name} drops ${remaining} arrow${remaining === 1 ? '' : 's'} on the ground.`
+          ? `${enemyLootSubject(e)} drops ${remaining} arrow${remaining === 1 ? '' : 's'} on the ground.`
           : `You collect ${remaining} arrow${remaining === 1 ? '' : 's'} from the ${e.name}.`, 'loot')
       }
       if (!e.artifactRangedDisarmed && chance(RANGED_CONFIG.shortBowDropChance)) {
@@ -5478,7 +5489,7 @@ more difficult:
         if (onGround) placeEnemyLootOnGround(e, bow)
         else player.inventory.push(bow)
         const bowLabel = onGround ? bow.base : bow.name
-        lootLog(`The ${e.name} dropped ${bowLabel}.`, bow, bowLabel)
+        lootLog(`${enemyLootSubject(e)} dropped ${bowLabel}.`, bow, bowLabel)
         // The Hunting Bow is only a quarter of the 25% shooter-bow drop.
         showRareDrop((bow.base === 'Hunting Bow' &&
           RANGED_CONFIG.shortBowDropChance * 0.25 < 0.10) ||
@@ -5521,7 +5532,7 @@ more difficult:
       if (onGround) placeEnemyLootOnGround(e, createItem(selected.kind, {count}))
       else addInventoryItem(selected.kind, {count})
       const name = itemDefinition(selected.kind).name
-      log(`The ${e.name} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
+      log(`${enemyLootSubject(e)} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
       showRareDrop(selected.chance < 0.10)
     }
 
@@ -5534,7 +5545,7 @@ more difficult:
         if (onGround) placeEnemyLootOnGround(e, createItem('mushroom'))
         else addMushroom()
       }
-      log(`The ${e.name} dropped ${mushroomCount} mushroom${mushroomCount === 1 ? '' : 's'}.`, 'loot')
+      log(`${enemyLootSubject(e)} dropped ${mushroomCount} mushroom${mushroomCount === 1 ? '' : 's'}.`, 'loot')
     }
 
     // Gold drops from enemies have been disabled (per design decision) -
@@ -5551,7 +5562,7 @@ more difficult:
       const art = makeArtifactItem(e.tier, mf)
       if (art) {
         const label = onGround ? art.noun : artifactDisplayName(art)
-        lootLog(`The ${e.name} dropped ${label}.`, art, label)
+        lootLog(`${enemyLootSubject(e)} dropped ${label}.`, art, label)
         showRareDrop(true)
         if (onGround) placeEnemyLootOnGround(e, art)
         else player.inventory.push(art)
@@ -5560,7 +5571,7 @@ more difficult:
     if (e.humanoid && e.equipment) {
       const item = e.equipment
       const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
-      lootLog(`The ${e.name} dropped ${label}.`, item, label)
+      lootLog(`${enemyLootSubject(e)} dropped ${label}.`, item, label)
       showRareDrop(isRareMonsterDrop(item, e.tier))
       // Adaptive enemies' enchanted gear is a visible ground pickup, not
       // silently added to inventory or auto-equipped after a melee kill.
@@ -12460,10 +12471,10 @@ more difficult:
       ? (item.base || (item.kind === 'artifact' ? item.noun : item.name)) : null
     const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
       ? 'img/icons/' + base + '.svg' : null
-    // The artifact-specific icon would reveal its identity before pickup.
-    // Use the mundane equipment fallback, or a neutral glyph for trinkets.
+    // Keep gear disguised as its ordinary base, while trinkets use the
+    // generic artifact icon instead of falling back to a font glyph in tile mode.
     const fallback = item.kind === 'artifact'
-      ? (['weapon','shield','armor'].includes(gearKind) ? itemIconPath(gearKind) : null)
+      ? (['weapon','shield','armor'].includes(gearKind) ? itemIconPath(gearKind) : itemIconPath('artifact'))
       : itemIconPath(item.kind)
     const path = [specific, fallback].find(path => path && preloadedImages.has(path))
     return path ? {image:path, scale:0.72} : null
@@ -14641,10 +14652,6 @@ more difficult:
       gi.x === mx && gi.y === my && !(gi.kind === 'chest' && gi.opened))
     const g = groundHere.find(gi => gi.kind === 'droppeditem') || groundHere[0]
     if (g) {
-      if (g.kind === 'chest' && g.gasChamberId) return {
-        mini: true, enemy: null,
-        html: '<div class="nm">Dwarven Chest</div><div>Strange pipes lead toward this chest. An emergency valve stands nearby.</div>'
-      }
       if (Campfires.isFire(g)) return {
         mini: true,
         enemy: null,

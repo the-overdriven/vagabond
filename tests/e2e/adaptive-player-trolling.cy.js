@@ -569,7 +569,8 @@ describe('Adaptive Player Trolling', () => {
         const leader=group.find(e=>e.prefix==='Champion')
         const leaderName=leader?.name
         check(!!leader && /^[A-Za-z'-]+, Last Survivor$/.test(leader.name) &&
-          leader.maxHp>ENEMY_TEMPLATE_BY_NAME.Goblin.hp &&
+          leader.maxHp>=80 && leader.atk>=13 && leader.def>=5 &&
+          leader.spd>=6 && leader.grace>=3 && leader.tier>=3 &&
           group.filter(e=>e.prefix===null).length===2,
           'one named Champion leader and two ordinary allies')
         check(group.every(e=>!(e.x>=camX && e.x<camX+VIEW_W &&
@@ -2087,8 +2088,19 @@ describe('Adaptive Player Trolling', () => {
         const floor=deepLevels[3]
         floor.dungeonPackage='dwarvenRuins';floor.dungeonFloor=3;floor.floorCount=4
         currentZ=-5;currentCave=-1;map=floor.map
-        for(let y=30;y<=75;y++)for(let x=30;x<=75;x++)map[y][x]='marble'
-        player.x=50;player.y=50;player.inventory=[]
+        const stairs=[]
+        for(let y=1;y<MAP_H-1;y++)for(let x=1;x<MAP_W-1;x++)
+          if(['dwarvenstairsdown','dwarvenstairsup'].includes(map[y][x]))
+            stairs.push({x,y,down:map[y][x]==='dwarvenstairsdown'})
+        const stair=stairs.find(p=>p.down) || stairs[0]
+        check(!!stair,'the real shared ruin level has a vertical endpoint')
+        const px=stair.x+14<MAP_W-3 ? stair.x+14 : stair.x-14
+        const py=stair.y
+        for(let y=Math.max(1,py-20);y<=Math.min(MAP_H-2,py+20);y++)
+          for(let x=Math.max(1,Math.min(px,stair.x)-20);
+              x<=Math.min(MAP_W-2,Math.max(px,stair.x)+20);x++)
+            if(!CAVE_TRANSITION_TILES.has(map[y][x]))map[y][x]='marble'
+        player.x=px;player.y=py;player.inventory=[]
         player.equip.weapon=null;player.equip.shield=null;player.equip.armor=null
         enemies=[];groundItems=[];npcs=[];occupied=new Set()
         rebuildActiveLevelOccupancy();invalidateUndergroundFov()
@@ -2114,11 +2126,16 @@ describe('Adaptive Player Trolling', () => {
         check(AdaptivePlayerTrolling.serialize().triggerFlags.previous_owner,
           'carrying a named trinket is enough to register the trigger')
         const options=AdaptivePlayerTrolling.previousOwnerSpawnOptions(floor)
-        check(!!options && options.relics.includes(relic) && options.sites.length>0,
-          'deep ruin site recognizes trinket in the backpack')
+        check(!!options && options.relics.includes(relic) && options.sites.length>0 &&
+          options.sites.every(site=>Math.max(Math.abs(site.x-stair.x),Math.abs(site.y-stair.y))<=12),
+          'deep ruin owner sites cluster near the down staircase')
         check(AdaptivePlayerTrolling.spawnPreviousOwner(options),
           'ghost appears from the artifact owner itself')
         let ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
+        check(ghost?.name===owner && ghost.prefix==='Champion' &&
+          ghost.maxHp>ENEMY_TEMPLATE_BY_NAME.Ghost.hp &&
+          ghost.tier===ENEMY_TEMPLATE_BY_NAME.Ghost.tier,
+          'the named owner gains Champion combat stats without changing its identity')
         check(ghost?.name===owner && relic.previousOwnerHauntedBy===owner &&
           ghost.previousOwnerRelicName===relic.name && !ghost.previousOwnerRecognized,
           'existing dwarf name and actual artifact remain paired')
@@ -2128,7 +2145,7 @@ describe('Adaptive Player Trolling', () => {
         loadGameFromObject(saved,{isReplayInit:true})
         ghost=enemies.find(e=>e.adaptiveEventId==='previous_owner')
         check(ghost?.name===player.inventory[0].previousOwnerHauntedBy &&
-          !ghost.previousOwnerRecognized,
+          ghost.prefix==='Champion' && !ghost.previousOwnerRecognized,
           'ghost and inventory-only relic remain linked on replay restore')
         player.x=ghost.x+1;player.y=ghost.y
         check(!AdaptivePlayerTrolling.onEnemyTurn(ghost,turnCount) &&

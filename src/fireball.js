@@ -128,6 +128,7 @@ async function castFireball(idx, x, y) {
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     const scrollInvisibleCast = !player.godMode && player.invisibleTurns > 0
     const tiles = fireballBlastTiles(x, y), cells = new Set(tiles.map(p => keyXY(p.x, p.y)))
+    Mimics.revealBySpell((mx,my) => cells.has(keyXY(mx,my)))
     const victims = enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) && cells.has(keyXY(e.x, e.y)))
     const selfHit = cells.has(keyXY(player.x, player.y))
     const effect = itemDefinition('scrollOfFireball').effect
