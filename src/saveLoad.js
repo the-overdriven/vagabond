@@ -106,6 +106,8 @@ function buildSaveObject() {
     tileUnderlays: tileUnderlays,
     grasslandTrees: [...grasslandTrees],
     caveMaps: caveMaps.map(cm => encodeTileGrid(cm, '#')),
+    // Local cave maps omit shared-only terrain and special-location overlays.
+    undergroundMap: encodeTileGrid(undergroundMap, '#'),
     caves: caves,
     currentZ: currentZ,
     currentLevelKind: currentLevelKind(),
@@ -786,7 +788,6 @@ function loadGameFromObject(data, opts = {}) {
   // saved state before rebuilding the cached minimap bases.
   foragedTiles = new Set(Array.isArray(data.foragedTiles) ? data.foragedTiles : [])
   dugSandTiles = new Set(Array.isArray(data.dugSandTiles) ? data.dugSandTiles : [])
-  rebuildMinimapBases()
 
   spawnPoint = {x: data.spawnPoint.x, y: data.spawnPoint.y}
   rngState = data.rngState | 0
@@ -899,6 +900,16 @@ function loadGameFromObject(data, opts = {}) {
     : mausoleumHut ? inferMausoleumQuarterTurns(mausoleumHut, data.groundItems, undergroundDiscoveredL1) : 0
   mausoleumMap = null
   initializeMausoleum({restore: true})
+  // The saved shared z:-1 terrain is authoritative. Local cave maps, maze
+  // patches and mausoleum metadata have already been restored above; loading
+  // the final grid last preserves terrain edits not owned by any local cave.
+  // Update in place because `map` can already reference `undergroundMap`.
+  if (data.undergroundMap !== undefined) {
+    const restoredShallow = decodeTileGrid(data.undergroundMap, 'cavewall')
+    if (!restoredShallow) throw new Error('Save file shallow map dimensions do not match.')
+    for (let y = 0; y < MAP_H; y++) undergroundMap[y] = restoredShallow[y]
+  }
+  rebuildMinimapBases()
   // Reconcile progression for saves made before the explicit quest fields
   // existed, or saves where only one side of the event was serialized.
   if (!bellRung && Array.isArray(data.npcs) && data.npcs.some(n => n.name === 'Ancient Lich')) bellRung = true

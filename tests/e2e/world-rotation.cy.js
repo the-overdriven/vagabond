@@ -52,12 +52,34 @@ describe('Whole-world rotation and Dwarven Key floors', () => {
       }
       player.x=spawnPoint.x;player.y=spawnPoint.y
       const state=buildSaveObject()
+      check(state.undergroundMap===encodeTileGrid(undergroundMap,'#'),'save encodes the finished shared shallow terrain')
       loadGameFromObject(state,{isReplayInit:true})
       check(JSON.stringify(map)===JSON.stringify(rotateGrid(surfaceBefore)),'save restores rotated surface')
       check(JSON.stringify(deepLevels[1].map)===JSON.stringify(rotateGrid(fortBefore)),'save restores rotated fort')
-      check(JSON.stringify(undergroundMap)===JSON.stringify(rotateGrid(undergroundBefore)),'save restores rotated shallow map without extra coffins')
+      const expectedShallow=rotateGrid(undergroundBefore),mismatches=[]
+      for(let y=0;y<MAP_H&&mismatches.length<3;y++)for(let x=0;x<MAP_W;x++){
+        if(undergroundMap[y][x]!==expectedShallow[y][x])
+          mismatches.push(x+','+y+': '+expectedShallow[y][x]+' => '+undergroundMap[y][x])
+      }
+      check(!mismatches.length,'save restores exact rotated z:-1 terrain: '+mismatches.join('; '))
       check(JSON.stringify(caves.find(c=>c.crypt))===cryptSnapshot,'save preserves rotated crypt metadata and inscriptions')
+      for(const key of caves[cryptCaveIndex].graves){
+        const [x,y]=key.split(',').map(Number)
+        check(undergroundMap[y][x]==='coffin' && caveMaps[cryptCaveIndex][y][x]==='coffin',
+          'restored crypt burial tiles match local and shared maps')
+      }
       check(state.mapWidth===MAP_W&&state.mapHeight===MAP_H,'saved rotation dimensions')
+      // Shared terrain edits outside caveMaps must survive save and replay.
+      let editedTile=null
+      for(let y=0;y<MAP_H&&!editedTile;y++)for(let x=0;x<MAP_W;x++){
+        if(undergroundMap[y][x]==='cavefloor') {editedTile={x,y};break}
+      }
+      check(!!editedTile,'find a traversable shallow tile for save regression')
+      undergroundMap[editedTile.y][editedTile.x]='cryptfloor'
+      const editSave=buildSaveObject(),rngBefore=rngState
+      loadGameFromObject(editSave,{isReplayInit:true})
+      check(undergroundMap[editedTile.y][editedTile.x]==='cryptfloor','direct shared map edit survives save and replay init')
+      check(rngState===rngBefore,'restoring shared terrain consumes no gameplay RNG')
     })()`))
   })
 })

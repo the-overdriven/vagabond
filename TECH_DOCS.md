@@ -2816,7 +2816,14 @@ are then hashed against the final rotated coordinates without consuming RNG.
 
 ## z:-1: Shared cave layer (includes crypt and mausoleum)
 
-Normal caves are generated on the shared underground map.
+Normal caves are generated on the shared underground map. The complete z:-1
+world-space terrain grid is also saved, alongside each cave's local geometry.
+When restoring a save or replay, that shared grid remains authoritative after
+special-location overlays are reconstructed. This preserves terrain changed
+independently of individual caves, including the exact positions of passages,
+stairs and burial tiles, without generating a new layout or advancing gameplay
+RNG. Cave-local maps describe geometry and ownership, not separate playable
+levels.
 
 The ruined chapel provides a separate entrance into the **Crypt area on this
 same underground level**. The crypt is kept separate from randomly generated
@@ -2829,7 +2836,7 @@ assigned to one coffin only. Whole-world rotation moves the crypt's stored
 coffin coordinates and inscription keys with its terrain. Saving/loading and
 replay initialization preserve both the exact coffin positions and each
 coffin's generated inscription; they do not create coffins at pre-rotation
-coordinates or reassign the inscriptions. No save-format change is needed.
+coordinates or reassign the inscriptions. No extra rotation flag is required.
 
 If the crypt contains more coffins than the four stored inscriptions:
 
