@@ -143,8 +143,10 @@
       "type": "named_artifact_former_owner",
       "location": "last_two_dwarven_ruins_floors",
       "recognitionDistance": 7,
+      "prefix": "Champion",
       "minSpawnDistance": 10,
       "minEntranceDistance": 3,
+      "maxDownStairDistance": 12,
       "maxCandidateSites": 96,
       "baseSpecies": "Ghost"
     },
@@ -428,6 +430,14 @@
       "companions": 2,
       "leaderPrefix": "Champion",
       "leaderHpMultiplier": 1.5,
+      "leaderMinTier": 3,
+      "leaderMinStats": {
+        "hp": 80,
+        "atk": 13,
+        "def": 5,
+        "spd": 6,
+        "grace": 3
+      },
       "minSpawnDistance": 12,
       "maxSpawnDistance": 28,
       "maxCompanionDistance": 2,
