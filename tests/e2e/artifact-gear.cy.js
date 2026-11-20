@@ -16,7 +16,12 @@ describe('Gear bases on procedural artifacts', () => {
   beforeEach(loadedGame)
 
   it('keeps ground item prefixes and artifact identities concealed until collection', () => {
-    cy.window().then(win => win.eval(`(() => {
+    // Item icons are decoded in the background after the loading overlay closes.
+    // Retry the readiness check without injecting an image or retrying state mutations.
+    cy.window({timeout:60000}).should(win => {
+      expect(win.eval("preloadedImages.has('img/icons/artifact.svg')"),
+        'artifact SVG is preloaded and decoded').to.equal(true)
+    }).then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const club={kind:'weapon',base:'Club',name:'Profound Club',atk:2,mod:'mf',modAmt:3}
       const artifact={kind:'artifact',name:'Scimitar of Thingar',noun:'Scimitar',
