@@ -1839,13 +1839,28 @@ platform is on D1, is guaranteed reachable from the D1 entrance with all locks
 still closed, and begins unpowered. The deeper endpoint is selected with
 seeded RNG from the configured normalized depth range **50–100%** of the
 stratum, which means D2–D3 for a three-floor stratum and D3–D5 for a five-floor
-stratum. A wall-mounted control lever is generated beside the deeper platform.
+stratum. Both platforms occupy the same global X/Y coordinates. The generator
+tries eligible depths in seeded order, accepting only a shared, accessible
+platform location with solid rock throughout the intervening levels. Each
+intermediate level stores an enclosed, impassable lift shaft at that X/Y, with
+no access from the surrounding floor. No room, corridor, stair or special
+encounter is carved through to make room for the shaft. If no valid column
+exists, the layout is rejected and regenerated. The upper platform remains
+reachable with locks closed; the lower platform is reachable through normal
+progression. Both retain a safe approach and adjacent landing space; timed
+hazard rooms cannot overlap the lift approaches. A wall-mounted control lever
+is generated beside the deeper platform.
 Its inactive and pulled sprites visually use marble as their underlay, even
 though the underlying lever terrain remains blocking like a wall. Bumping that lever costs **1 turn**, permanently powers both endpoints, changes
 the lever itself to a persistent pulled/locked-down terrain state, and enables
 two-way inspect-to-travel between the two fixed platforms. The D1 side
 cannot activate the lift remotely. Lift travel itself follows the existing
-level-transition convention and does not add a separate combat turn.
+level-transition convention and does not add a separate combat turn. Travel
+changes Z only; a creature occupying the destination yields to the nearest
+safe available tile deterministically, without consuming RNG or moving the
+player sideways. If no safe displacement exists, the transition is not
+performed. The shaft and both platforms rotate with and are saved in the
+ordinary global level grids.
 
 Lift endpoint/lever coordinates and powered state are persisted explicitly in
 the generic dungeon-shortcut registry; runtime lever activation and inspect-to-travel
@@ -11717,7 +11732,7 @@ placement rules and seeded random draws.
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
 | 15 | **Gold Imp** (`gold_imp`) | Carry **2,000g or more**. | A Gold Imp tracks the player and may steal 10% of current gold (maximum 300g), recoverable on defeat. |
 | 16 | **Unread Scrolls** (`unread_scrolls`) | Never read a scroll and hold at least one continuously for **500 gameplay turns**. | A mocking note, “I wish I could read,” appears in Dwarven Ruins. |
-| 17 | **Early Descent** (`early_descent`) | First enter depth −2 by **level 3**, or enter the Dwarven Fort by **level 5**. | Nearby remains hold 5–25g and either a Scroll of Homecoming (30%, beside the corpse) or a random improvised weapon (70%, inside it); one ordinary tier-one gear item lies beside the corpse. |
+| 17 | **Early Descent** (`early_descent`) | First enter depth −2 by **level 3**, or enter the Dwarven Fort by **level 5**. | Nearby remains hold 5–25g and either a Scroll of Homecoming (30%, beside the corpse) or a random improvised weapon (70%, inside it); one ordinary tier-one gear item lies beside the corpse (armor or shield only if the corpse holds a weapon). |
 | 18 | **Unused Healing** (`unused_healing`) | Die **twice**, each time still holding **at least 2 Life Potions**. | Searchable underground remains offer two Life Potions. |
 | 19 | **Humanoid Hunter** (`humanoid_hunter`) | Kill **30+ humanoids**, making up **at least 70%** of all credited kills. | Ordinary living beasts initiate combat only 75% as often while the condition holds. |
 | 20 | **Beast Hunter** (`beast_hunter`) | Kill **40+ beasts**, making up **at least 60%** of credited kills. | A marked native tier-four beast begins a persistent surface hunt. |
@@ -11907,16 +11922,21 @@ level (z:-2) at **character level 3 or below**, or the first entry into the
 Dwarven Fort (z:-3) at **character level 5 or below**, marks one premature
 expedition. A fallen adventurer's searchable remains appear on a connected,
 trap-safe tile **4–12 walking steps** from that floor's arrival.
-These **noticeably fresher skeletal remains** have one of four seeded descriptive variants, shown when inspected. One ordinary, **unenchanted tier-one** weapon, armor or shield always lies
-on an adjacent ground tile. A second, mutually exclusive reward is rolled
-when the remains can be placed:
+These **noticeably fresher skeletal remains** have one of four seeded
+descriptive variants, revealed only through the Inspect action. The desktop
+and mobile tooltips show only their name; no announcement is made on spawn
+outside debug mode. One ordinary, **unenchanted tier-one** gear item lies on
+an adjacent ground tile. Its type depends on the other reward rolled when
+the remains can be placed:
 
 - **30%:** an unread **Scroll of Homecoming** lies on a different adjacent
-  ground tile; searching the corpse recovers **5–25 gold**.
+  ground tile; searching the corpse recovers **5–25 gold**. The adjacent gear
+  can be a weapon, armor or shield (equally likely).
 - **70%:** the corpse contains a randomly named **improvised weapon** drawn
   from `content/starting_weapons.json`, with the same ATK 1, GRACE 1 and
   one-handed rules as the village starter weapon. Searching the corpse recovers
   both the weapon and **5–25 gold**; no Homecoming scroll is generated.
+  The adjacent gear is armor or a shield (equally likely), never a second weapon.
 
 The regular tier-one gear must still be picked up from the ground. The
 remains use ordinary search/loot behavior, and no chest is created. Their descriptive variant persists in the saved ground item and is not rerolled by inspecting it. This

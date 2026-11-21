@@ -1857,11 +1857,11 @@ const AdaptivePlayerTrolling = (() => {
     return true
   }
 
-  function unenchantedDescentGear() {
+  function unenchantedDescentGear(hasCorpseWeapon) {
     const cfg=config.events.early_descent
     // Copy existing ordinary tier-one gear properties, without rolling a
     // random modifier or a high-tier item for an intentionally early reward.
-    const kind=pick(cfg.gearKinds)
+    const kind=pick(hasCorpseWeapon ? cfg.gearKinds.filter(kind=>kind!=='weapon') : cfg.gearKinds)
     const pool=(kind==='weapon' ? WEAPONS.filter(w=>!w.rangedAtk) :
       kind==='armor' ? ARMORS : SHIELDS).filter(base=>base.tier===cfg.gearTier)
     const base=pick(pool)
@@ -1906,8 +1906,8 @@ const AdaptivePlayerTrolling = (() => {
         visited.add(key);queue.push({x,y,steps:pos.steps+1})
       }
     }
-    // Ordinary tier-one gear always lies beside the corpse. The second reward
-    // is either a ground scroll or a weapon inside the searchable remains.
+    // Ordinary tier-one gear lies beside the corpse. When it contains an
+    // improvised weapon, the adjacent gear can only be armor or a shield.
     // Retain two safe adjacent sites for either outcome to avoid rerolling loot
     // when a specific floor has insufficient placement space.
     const available=new Set(safe.map(p=>keyXY(p.x,p.y)))
@@ -1921,7 +1921,7 @@ const AdaptivePlayerTrolling = (() => {
     const hasScroll=chance(cfg.scrollChance)
     const scroll=hasScroll ? pick(selected.lootSites.filter(p=>
       p.x!==equipment.x || p.y!==equipment.y)) : null
-    const item=unenchantedDescentGear(),gold=randInt(cfg.goldMin,cfg.goldMax)
+    const item=unenchantedDescentGear(!hasScroll),gold=randInt(cfg.goldMin,cfg.goldMax)
     const description=pick(cfg.freshRemainsDescriptions)
     const body={x:selected.body.x,y:selected.body.y,level:currentZ,
       levelKind:currentLevelKind(),caveIndex:currentCave,
@@ -1937,7 +1937,7 @@ const AdaptivePlayerTrolling = (() => {
     state.completed.push('early_descent')
     delete state.events.early_descent
     minimapDirty=true
-    log('Fresh skeletal remains lie ahead. Someone ventured into these depths far too early.', 'info')
+    debugEvent('Early Descent remains placed.')
     return true
   }
 

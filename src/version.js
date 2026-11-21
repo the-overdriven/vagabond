@@ -2,4 +2,4 @@
 // Cosmetic updates, minor balance changes and bug fixes do not bump it.
 // Bump the save version only for incompatible save or replay formats.
 self.VAGABOND_GAME_VERSION = 'v323'
-self.VAGABOND_SAVE_VERSION = 192
+self.VAGABOND_SAVE_VERSION = 193

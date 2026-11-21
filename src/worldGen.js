@@ -3781,22 +3781,18 @@ function placeDwarvenRuinsLift(levelCount) {
 
   const minFloor = Math.max(2, Math.min(levelCount, Math.ceil(levelCount * progressRange[0])))
   const maxFloor = Math.max(minFloor, Math.min(levelCount, Math.ceil(levelCount * progressRange[1])))
-  const targetFloor = randInt(minFloor, maxFloor)
   const upperIndex = 2
-  const lowerIndex = targetFloor + 1
   const upperLevel = deepLevels[upperIndex]
-  const lowerLevel = deepLevels[lowerIndex]
-  if (!upperLevel || !lowerLevel) return false
-
-  const occupiedGround = (z) => new Set(groundItems.filter(g => (g.level ?? 0) === z).map(g => keyXY(g.x, g.y)))
+  const occupiedGround = (z) => new Set([
+    ...groundItems.filter(g => (g.level ?? 0) === z),
+    ...enemies.filter(e => e.alive && (e.level ?? 0) === z)
+  ].map(g => keyXY(g.x, g.y)))
   const upperZ = chainZForDepth(4)
-  const lowerZ = chainZForDepth(targetFloor + 3)
   const upperGround = occupiedGround(upperZ)
-  const lowerGround = occupiedGround(lowerZ)
 
   const endpointCandidates = (level, ground, requireWall, reachable = null) => {
     const out = []
-    const reservedRooms = (level.rooms || []).filter(room => room.stairRoom || room.landmark || room.gallery)
+    const reservedRooms = (level.rooms || []).filter(room => room.stairRoom || room.landmark || room.gallery || room.crusherReserved)
     const tacticalSlots = new Set((level.rooms || []).flatMap(room =>
       Object.values(room.tacticalSlots || {}).flat().map(p => keyXY(p.x, p.y))))
     const reserved = (x,y) => reservedRooms.some(room =>
@@ -3809,6 +3805,10 @@ function placeDwarvenRuinsLift(levelCount) {
       if ((level.caves?.[0]?.entrances || []).some(stair =>
         Math.max(Math.abs(x - stair.x), Math.abs(y - stair.y)) <= 1)) continue
       if (reachable && !reachable.has(keyXY(x, y))) continue
+      // Leave at least one ordinary cardinal exit for both travel and a
+      // creature yielding an occupied arrival. Avoid isolated furniture pads.
+      if (![[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy]) =>
+        level.map[y+dy]?.[x+dx] === 'marble' && !ground.has(keyXY(x+dx,y+dy)))) continue
       const wallNeighbors = [[0,-1],[1,0],[0,1],[-1,0]].map(([dx,dy]) => ({x:x+dx,y:y+dy}))
         .filter(p => !reserved(p.x,p.y) && level.map[p.y]?.[p.x] === 'dwarvenwall')
       if (requireWall && !wallNeighbors.length) continue
@@ -3822,15 +3822,44 @@ function placeDwarvenRuinsLift(levelCount) {
   // point stranded behind D1's progression gate.
   const upperReachable = dungeonWalkDistances(upperLevel.map, upperLevel.caves[0].entrances[0])
   const upperCandidates = endpointCandidates(upperLevel, upperGround, false, upperReachable)
-  const lowerCandidates = endpointCandidates(lowerLevel, lowerGround, true)
-  if (!upperCandidates.length || !lowerCandidates.length) return false
-  const upper = pick(upperCandidates)
-  const lower = pick(lowerCandidates)
+  const upperByPosition = new Map(upperCandidates.map(p => [keyXY(p.x,p.y),p]))
+  if (!upperByPosition.size) return false
+
+  // Each intermediate floor must have untouched rock at the shaft's column.
+  // The shaft is enclosed within that rock, with no door or landing on those
+  // floors. Never bore through a room, corridor, trap or another connection.
+  // Try the seeded preferred depth first, then the other configured depths.
+  const preferredFloor = randInt(minFloor, maxFloor)
+  const alternatives = Array.from({length:maxFloor-minFloor+1},(_,i)=>minFloor+i).filter(floor=>floor!==preferredFloor)
+  // Randomized fallback avoids systematically favoring the shallowest floor.
+  for (let i=alternatives.length-1;i>0;i--) {
+    const j=randInt(0,i); [alternatives[i],alternatives[j]]=[alternatives[j],alternatives[i]]
+  }
+  const floors = [preferredFloor, ...alternatives]
+  let selected = null
+  for (const targetFloor of floors) {
+    const lowerIndex = targetFloor + 1
+    const lowerLevel = deepLevels[lowerIndex]
+    if (!lowerLevel) continue
+    const lowerZ = chainZForDepth(targetFloor + 3)
+    const reachable = dungeonWalkDistancesWithDoorTraversal(lowerLevel.map, lowerLevel.caves[0].entrances[0])
+    const lowerCandidates = endpointCandidates(lowerLevel, occupiedGround(lowerZ), true, reachable)
+      .filter(p => upperByPosition.has(keyXY(p.x,p.y)) &&
+        deepLevels.slice(upperIndex+1,lowerIndex).every(level => level.map[p.y]?.[p.x] === 'cavewall'))
+    if (!lowerCandidates.length) continue
+    const lower = pick(lowerCandidates)
+    selected = {targetFloor,lowerLevel,lowerZ,lower,upper:upperByPosition.get(keyXY(lower.x,lower.y))}
+    break
+  }
+  if (!selected) return false
+  const {targetFloor,lowerLevel,lowerZ,lower,upper} = selected
   const lever = pick(lower.wallNeighbors)
 
   upperLevel.map[upper.y][upper.x] = 'dwarvenliftoff'
   lowerLevel.map[lower.y][lower.x] = 'dwarvenliftoff'
   lowerLevel.map[lever.y][lever.x] = 'dwarvenlever'
+  for (const level of deepLevels.slice(upperIndex+1,targetFloor+1))
+    level.map[upper.y][upper.x] = 'dwarvenliftshaft'
   dungeonShortcuts.push({
     id: shortcutCfg.id || 'dwarven-ruins-lift-1',
     packageId: 'dwarvenRuins',
@@ -7672,6 +7701,33 @@ function validateDwarvenRuinsStratum() {
     const lower = deepLevels[chainDepthForZ(ruinLift.lower.z)-2]
     if (upper?.map[ruinLift.upper.y]?.[ruinLift.upper.x] !== 'dwarvenliftoff') issues.push('upper lift endpoint is invalid')
     if (!['dwarvenliftoff','dwarvenlifton'].includes(lower?.map[ruinLift.lower.y]?.[ruinLift.lower.x])) issues.push('lower lift endpoint is invalid')
+    const {x,y} = ruinLift.upper
+    if (x !== ruinLift.lower.x || y !== ruinLift.lower.y || ruinLift.lower.z >= ruinLift.upper.z)
+      issues.push('shortcut lift is not a vertical column')
+    for (let z=ruinLift.upper.z-1; z>ruinLift.lower.z; z--)
+      if (depthUndergroundMap(chainDepthForZ(z))?.[y]?.[x] !== 'dwarvenliftshaft')
+        issues.push('shortcut lift shaft intersects intermediate floor geometry')
+    if (ruinLift.lever.z !== ruinLift.lower.z ||
+        Math.abs(ruinLift.lever.x-x)+Math.abs(ruinLift.lever.y-y)!==1 ||
+        lower?.map[ruinLift.lever.y]?.[ruinLift.lever.x]!=='dwarvenlever')
+      issues.push('shortcut lift lever is invalid')
+    for (const [level,endpoint] of [[upper,ruinLift.upper],[lower,ruinLift.lower]]) {
+      if (!level) continue
+      const key=keyXY(endpoint.x,endpoint.y)
+      const blocked=new Set((level.traps||[]).map(t=>keyXY(t.trigger.x,t.trigger.y)))
+      if (!DungeonTraps.safeReachable(level.map,level.caves[0].entrances[0],blocked).has(key))
+        issues.push('shortcut lift has no trap-free approach')
+      if (![[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>{
+        const px=endpoint.x+dx,py=endpoint.y+dy
+        return level.map[py]?.[px]==='marble' && DungeonTraps.safeSpawn(px,py,endpoint.z) &&
+          !groundItems.some(g=>g.level===endpoint.z && g.x===px && g.y===py && g.kind==='dwarvenstove')
+      })) issues.push('shortcut lift has no safe adjacent landing space')
+      if (groundItems.some(g=>g.level===endpoint.z && g.x===endpoint.x && g.y===endpoint.y) ||
+          enemies.some(e=>e.alive && e.level===endpoint.z && e.x===endpoint.x && e.y===endpoint.y))
+        issues.push('shortcut lift landing occupied at generation')
+    }
+    if (upper && !dungeonWalkDistances(upper.map,upper.caves[0].entrances[0]).has(keyXY(x,y)))
+      issues.push('upper lift is beyond intact locks')
   }
   return {ok:issues.length === 0, issues}
 }

@@ -13,6 +13,12 @@ const DungeonHazards = (() => {
   const crusherConfig = () => config()?.crusher || {}
   const gasConfig = () => config()?.gas || {}
   const contains = (points,x,y) => (points || []).some(p => p.x === x && p.y === y)
+  const liftPoints = z => {
+    const lift = dwarvenRuinsLiftShortcut()
+    return lift ? [lift.upper,lift.lower,lift.lever].filter(p=>p?.z===z) : []
+  }
+  const nearRoom = (room,p) => p.x >= room.x-2 && p.x < room.x+room.w+2 &&
+    p.y >= room.y-2 && p.y < room.y+room.h+2
 
   function hash(z, salt, x=0, y=0) {
     let h = (WORLD_SEED >>> 0) ^ Math.imul(z, 0x9e3779b1) ^ salt
@@ -25,7 +31,7 @@ const DungeonHazards = (() => {
   // safely reachable before the mechanism is committed to the generated map.
   function placeGasChamber(level, z) {
     const barred = new Set((level.traps || []).map(t => encode(t.trigger)))
-    const entryPoints = (level.caves?.[0]?.entrances || [])
+    const entryPoints = [...(level.caves?.[0]?.entrances || []),...liftPoints(z)]
     const occupied = new Set(groundItems.filter(g => g.level === z).map(encode))
     for (const e of enemies) if (e.alive && e.level === z) occupied.add(encode(e))
     const rooms = (level.rooms || []).filter(r => !r.stairRoom && r.optional && !r.onMainRoute && !r.gallery &&
@@ -37,7 +43,7 @@ const DungeonHazards = (() => {
       const doors = room.doorways[0]
       const doorKeys = new Set(doors.map(encode))
       if (!doors.every(d => ['marble','dwarvendoorclosed','dwarvendooropen'].includes(level.map[d.y]?.[d.x]))) continue
-      if (entryPoints.some(p => p.x >= room.x-2 && p.x < room.x+room.w+2 && p.y >= room.y-2 && p.y < room.y+room.h+2)) continue
+      if (entryPoints.some(p => nearRoom(room,p))) continue
       const interior = []
       for (let y=room.y+1; y<room.y+room.h-1; y++) for (let x=room.x+1; x<room.x+room.w-1; x++) {
         if (level.map[y]?.[x] === 'marble' && !barred.has(keyXY(x,y)) && !occupied.has(keyXY(x,y)) &&
@@ -139,7 +145,9 @@ const DungeonHazards = (() => {
       // Between two opposing original room walls, never a tiny isolated tile.
       ((r.w>=7 && r.w<=10 && r.h>=9) || (r.h>=7 && r.h<=10 && r.w>=9)))
     const candidates=[]
+    const shortcutPoints = liftPoints(z)
     for (const room of rooms) {
+      if (shortcutPoints.some(p=>nearRoom(room,p))) continue
       const acrossX = room.w <= room.h
       const width = acrossX ? room.w-2 : room.h-2
       const long = acrossX ? room.h-2 : room.w-2

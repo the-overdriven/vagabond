@@ -563,6 +563,14 @@
       "bg": "#302d2a",
       "walk": true
     },
+    "dwarvenliftshaft": {
+      "ch": "#",
+      "color": "#493022",
+      "bg": "#0d0805",
+      "walk": false,
+      "blocksSight": true,
+      "projectileBlock": true
+    },
     "dwarvenliftoff": {
       "ch": "O",
       "color": "#8f8170",
@@ -859,6 +867,7 @@
     "dwarvengateclosed": "♮",
     "dwarvengateopen": "Q",
     "dwarvengatebreached": "J",
+    "dwarvenliftshaft": "⛓",
     "dwarvenliftoff": "K",
     "dwarvenlifton": "N",
     "dwarvenlever": "P",
@@ -966,6 +975,7 @@
     "dwarvengateclosed": "an intact dwarven gate pulled shut; its lock has already been opened",
     "dwarvengateopen": "an intact dwarven progression gate standing open",
     "dwarvengatebreached": "a ruined dwarven gate whose broken leaves no longer bar passage",
+    "dwarvenliftshaft": "a solid cave wall",
     "dwarvenliftoff": "an old dwarven lift platform, dark and without power",
     "dwarvenlifton": "a powered dwarven lift platform humming with restored machinery",
     "dwarvenlever": "a heavy dwarven control lever fixed into the wall beside the lift",

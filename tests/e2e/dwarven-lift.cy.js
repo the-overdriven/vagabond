@@ -43,6 +43,11 @@ describe('Dwarven Ruins shortcut lift', () => {
         'D1 platform stays on the entrance side of intact locks')
       check(lift.lower.floor >= 3 && lift.lower.floor <= 5, 'five-floor target is chosen from D3-D5')
       check(lift.lower.z === chainZForDepth(lift.lower.floor + 3), 'lower floor z matches floor metadata')
+      check(lift.upper.x === lift.lower.x && lift.upper.y === lift.lower.y, 'platforms share global X/Y')
+      for(let z=lift.upper.z-1;z>lift.lower.z;z--)
+        check(depthUndergroundMap(chainDepthForZ(z))[lift.upper.y][lift.upper.x] === 'dwarvenliftshaft', 'intermediate shaft is reserved on global map')
+      check(!TILE.dwarvenliftshaft.walk && TILE.dwarvenliftshaft.blocksSight && TILE.dwarvenliftshaft.projectileBlock,
+        'enclosed shaft is not accessible from an intermediate floor')
       check(!lift.unlocked, 'lift begins unpowered')
       check(depthUndergroundMap(4)[lift.upper.y][lift.upper.x] === 'dwarvenliftoff', 'upper platform begins off')
       const lowerDepth = chainDepthForZ(lift.lower.z)
@@ -88,11 +93,19 @@ describe('Dwarven Ruins shortcut lift', () => {
       check(RENDER_STYLE.terrainTiles.dwarvenleverpulled?.image === 'img/tiles/dwarven-lever-pulled.png', 'pulled lever uses its dedicated sprite')
 
       const beforeTravelTurn = turnCount
-      inspect()
+      const beforeTravelRng = rngState
+      const rat=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+      const occupant=addEnemy({...rat,baseName:rat.name,x:lift.upper.x,y:lift.upper.y,
+        level:lift.upper.z,levelKind:'chain',alive:true,hp:rat.hp,maxHp:rat.hp})
+      rebuildActiveLevelOccupancy()
+      await inspect()
       check(currentZ === lift.upper.z && player.x === lift.upper.x && player.y === lift.upper.y,
         'lower lift arrives at exact D1 endpoint')
       check(turnCount === beforeTravelTurn, 'lift travel follows transition convention and costs no combat turn')
-      inspect()
+      check(occupant.x !== player.x || occupant.y !== player.y, 'occupant yields the exact platform')
+      check(occupied.has(keyXY(occupant.x,occupant.y)) && !occupied.has(keyXY(player.x,player.y)), 'destination occupancy is rebuilt')
+      check(rngState === beforeTravelRng, 'displacing the creature consumes no RNG')
+      await inspect()
       check(currentZ === lift.lower.z && player.x === lift.lower.x && player.y === lift.lower.y,
         'upper lift returns to exact deeper endpoint')
 
@@ -190,17 +203,30 @@ describe('Dwarven Ruins shortcut lift', () => {
       const dx = lift.lever.x - player.x
       const dy = lift.lever.y - player.y
 
+      const rat=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+      const occupant=addEnemy({...rat,baseName:rat.name,x:lift.upper.x,y:lift.upper.y,
+        level:lift.upper.z,levelKind:'chain',alive:true,hp:rat.hp,maxHp:rat.hp})
+      const occupantId=occupant.id
       startReplayRecording()
       await tryMove(dx, dy)
-      const recorded = JSON.parse(JSON.stringify(replayData))
-      check(recorded.actions.length === 1 && recorded.actions[0].type === 'move', 'lever bump records as one move action')
-      check(recorded.rng.length === 0, 'lift activation consumes no gameplay RNG')
+      check(replayData.actions.length === 1 && replayData.actions[0].type === 'move', 'lever bump records as one move action')
       check(dwarvenRuinsLiftShortcut().unlocked && turnCount === 1, 'recorded activation powers lift in one turn')
+      const beforeInspectRng=replayData.rng.length
+      await inspect()
+      const recorded = JSON.parse(JSON.stringify(replayData))
+      check(recorded.actions.length===2 && recorded.actions[1].type==='inspect','lift travel records as inspect')
+      check(recorded.rng.length===beforeInspectRng,'occupied arrival consumes no extra RNG')
+      check(currentZ===lift.upper.z && player.x===lift.upper.x && player.y===lift.upper.y,'recorded travel preserves X/Y')
+      const displaced={x:occupant.x,y:occupant.y}
 
       const save = JSON.parse(JSON.stringify(buildSaveObject()))
       check(save.version === SAVE_VERSION && save.dungeonShortcuts.find(shortcut => shortcut.id === WORLD_GEN_CONFIG.dungeons.dwarvenRuins.shortcut.id)?.unlocked === true, 'current save schema stores powered lift metadata')
       loadGameFromObject(save, {isReplayInit:true})
       check(dwarvenRuinsLiftShortcut().unlocked, 'powered state restores')
+      const restored=dwarvenRuinsLiftShortcut()
+      check(restored.upper.x===restored.lower.x && restored.upper.y===restored.lower.y,'saved platforms retain their shared coordinates')
+      for(let z=restored.upper.z-1;z>restored.lower.z;z--)
+        check(depthUndergroundMap(chainDepthForZ(z))[restored.upper.y][restored.upper.x]==='dwarvenliftshaft','saved intermediate shaft restores')
       check(depthUndergroundMap(4)[dwarvenRuinsLiftShortcut().upper.y][dwarvenRuinsLiftShortcut().upper.x] === 'dwarvenlifton',
         'powered upper platform terrain restores')
       check(depthUndergroundMap(chainDepthForZ(dwarvenRuinsLiftShortcut().lower.z))[dwarvenRuinsLiftShortcut().lower.y][dwarvenRuinsLiftShortcut().lower.x] === 'dwarvenlifton',
@@ -218,7 +244,11 @@ describe('Dwarven Ruins shortcut lift', () => {
       try {
         for (const action of recorded.actions) await runReplayAction(action)
         check(dwarvenRuinsLiftShortcut().unlocked && turnCount === 1, 'replay reaches identical powered state and turn count')
-        check(replayRngIndex === recorded.rng.length, 'replay consumes identical zero-length RNG trace')
+        const replayed=dwarvenRuinsLiftShortcut()
+        const replayedOccupant=enemies.find(e=>e.id===occupantId)
+        check(currentZ===replayed.upper.z && player.x===replayed.upper.x && player.y===replayed.upper.y,'replay restores exact upper landing')
+        check(replayedOccupant.x===displaced.x && replayedOccupant.y===displaced.y,'replay displaces the creature identically')
+        check(replayRngIndex === recorded.rng.length, 'replay consumes identical RNG trace')
       } finally {
         replayPlaying = false
         replaySimulationMode = false

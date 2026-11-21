@@ -1287,6 +1287,10 @@
       "baseTileKey": "marble",
       "scale": 1
     },
+    "dwarvenliftshaft": {
+      "image": "img/tiles/cave-wall.png",
+      "scale": 1
+    },
     "dwarvenliftoff": {
       "image": "img/tiles/dwarven-lift-off.png",
       "baseTileKey": "marble",

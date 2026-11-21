@@ -1014,9 +1014,9 @@ describe('Dwarven Ruins encounter progression', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const before=JSON.parse(JSON.stringify(buildSaveObject()))
-      const originalChance=chance
+      const originalChance=chance, originalPick=pick, originalLog=log
       try {
-        for (const scrollOutcome of [true,false]) {
+        for (const [scrollOutcome,gearIndex,expectedGear] of [[true,0,'weapon'],[true,1,'armor'],[true,2,'shield'],[false,0,'armor'],[false,1,'shield']]) {
           loadGameFromObject(before,{isReplayInit:true})
           activeWorldTraits=[{name:'test curse',effects:[]}]
           AdaptivePlayerTrolling.reset()
@@ -1033,7 +1033,15 @@ describe('Dwarven Ruins encounter progression', () => {
           player.x=39;player.y=39;player.lvl=3
           enemies=[];groundItems=[];occupied=new Set()
           rebuildActiveLevelOccupancy()
+          // Force each adjacent gear category and capture non-debug announcements.
+          pick=pool=>pool.length>=2 && pool.every(k=>['weapon','armor','shield'].includes(k))
+            ? pool[gearIndex] : originalPick(pool)
+          const spawnMessages=[]
+          log=(msg)=>spawnMessages.push(msg)
           check(AdaptivePlayerTrolling.onFloorChanged(),'early arrival produces an encounter')
+          pick=originalPick;log=originalLog
+          check(!spawnMessages.some(msg=>/fresh skeletal remains|early descent|ventured into these depths/i.test(msg)),
+            'no advance narrative announcement in normal mode')
           const bodies=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
           const drops=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='droppeditem')
           check(bodies.length===1 && drops.length===(scrollOutcome?2:1),
@@ -1043,6 +1051,8 @@ describe('Dwarven Ruins encounter progression', () => {
           check(outcomeRolls===1,'the 30/70 reward is rolled exactly once when placed')
           check(!!gear && gear.item.tier===1 && !gear.item.mod,
             'ordinary adventurer gear remains unenchanted tier one in both outcomes')
+          check(gear.item.kind===expectedGear && (scrollOutcome || gear.item.kind!=='weapon'),
+            'adjacent gear never duplicates the improvised corpse weapon')
           check(body.gold>=5 && body.gold<=25 && !body.looted,
             'the corpse is searchable and holds the configured gold range')
           check(body.name==='Desperate Caver' && body.race==='skeletal explorer' &&
@@ -1078,6 +1088,19 @@ describe('Dwarven Ruins encounter progression', () => {
           const remains=groundItems.find(g=>g.adaptiveEventId==='early_descent' && g.kind==='deadbody')
           check(remains.description===body.description,
             'the same descriptive variant survives save and replay')
+          player.x=remains.x;player.y=remains.y+1
+          invalidateUndergroundFov()
+          const tooltip=tileInspectInfo(remains.x,remains.y)
+          check(tooltip?.html==='<div class="nm">Fresh Skeletal Remains</div>',
+            'shared desktop/mobile tooltip contains only the name')
+          player.x=remains.x;player.y=remains.y
+          const inspection=[]
+          log=(msg)=>inspection.push(msg)
+          describeSurroundings()
+          log=originalLog
+          check(inspection.some(msg=>msg.includes(remains.description)),
+            'Inspect reveals the saved narrative description')
+          check(!remains.looted,'Inspect does not search the remains')
           const startingGold=player.gold,startingInventory=player.inventory.length
           player.x=remains.x;player.y=remains.y
           lootSkeletonOrForage()
@@ -1117,7 +1140,7 @@ describe('Dwarven Ruins encounter progression', () => {
         check(!AdaptivePlayerTrolling.onFloorChanged() &&
           !groundItems.some(g=>g.adaptiveEventId==='early_descent'),
           'ordinary worlds never create adaptive remains')
-      } finally {chance=originalChance;loadGameFromObject(before,{isReplayInit:true})}
+      } finally {chance=originalChance;pick=originalPick;log=originalLog;loadGameFromObject(before,{isReplayInit:true})}
     })()`))
   })
 

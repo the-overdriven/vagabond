@@ -357,7 +357,10 @@ describe('Persistent Dwarven Ruins stratum', () => {
           'every forced-count stratum ends at the sealed Mines continuation')
         const lift = dungeonShortcutById(cfg.shortcut.id)
         check(!!lift && lift.packageId === 'dwarvenRuins', 'forced-count stratum owns one package-tagged lift shortcut')
-        check(lift.lower.floor >= 2 && lift.lower.floor <= fixture.count, 'lift target remains inside the generated stratum')
+        check(lift.lower.floor >= Math.max(2,Math.ceil(fixture.count*cfg.shortcut.targetFloorProgressRange[0])) && lift.lower.floor <= fixture.count, 'lift target remains inside the configured depth range')
+        check(lift.upper.x===lift.lower.x && lift.upper.y===lift.lower.y, 'all generated lifts preserve X/Y')
+        for(let z=lift.upper.z-1;z>lift.lower.z;z--)
+          check(depthUndergroundMap(chainDepthForZ(z))[lift.upper.y][lift.upper.x]==='dwarvenliftshaft','intermediate floor reserves the enclosed shaft')
       }
       WORLD_GEN_CONFIG.dungeons.dwarvenRuins.levelCountRange = oldRange
     })()`))
