@@ -240,11 +240,6 @@ qualifying species or safe location exists, nothing appears. The resolved
 state persists in current saves and replay; changing floors cannot reroll it.
 
 
-Explicit save-file export errors are logged in red and also shown in a browser
-error dialog; the alert remains visible even when the game log is obscured by
-a modal. Browser download cancellations or silently blocked downloads cannot
-be detected by the game.
-
 ## Mobile character sheet and level feedback
 
 Mobile inventory includes a **Character** button. It opens a fullscreen sheet
@@ -3370,7 +3365,12 @@ brighter. The underlying visibility and targeting rules remain tile-based and
 deterministic; only the mine's tile-mode presentation is softened. ASCII
 graphics retain cell-by-cell illumination. Light tint, visual intensity,
 spread and gentle pulse are data-driven, and animation does not alter visibility
-rules, turns or RNG.
+rules, turns or RNG. The tile renderer builds crystal masks only for light
+footprints intersecting the rendered cells, preserving the full visible halo.
+Mine-only lighting and fog buffers are released when leaving tile-mode mines;
+ordinary underground tile glow retains its shared layer, which is released on
+returning above ground or switching to ASCII. Re-entering the mines recreates
+these visual resources on demand without changing exploration or save state.
 Breaking into a water pocket can fill 2–5 nearby tiles only when the pocket's
 interior is actually breached, reusing the existing
 Swimming, drowning and shore-escape behavior. Flooding must preserve safe
@@ -9442,17 +9442,30 @@ the same data, and stairs replay through the normal inspect action. Background
 terrain is not duplicated. New-world initialization clears the tower registry;
 restoration does not generate or repopulate the tower.
 
-
-Current save version (defined in `src/version.js`):
-
-```text
-129
-```
-
-The game release version changes for each deployment. The save format changes
-only when stored data or replay action/turn rules become incompatible.
+The current save version is defined in `src/version.js`. The save format changes
+only when stored data or replay action/turn rules become incompatible. The
+service worker uses an independent cache revision to refresh offline files.
 The Save Game button stays hidden until a character begins or a saved game
-is loaded.
+is loaded. Each manual save serializes one snapshot, requests a JSON download
+and independently replaces the latest device-local recovery save in IndexedDB.
+The file request is initiated directly within the user interaction; its temporary
+Blob URL remains valid for a short grace period for mobile download managers.
+The browser cannot confirm that a requested download was actually written to disk.
+The game reports the download request separately from a confirmed local database
+commit. Explicit download failure is reported visibly even when the local backup
+succeeds; a failed local backup warns the player to verify the downloaded file.
+If both fail, the game reports a save failure; a failed write does not replace
+an earlier committed recovery snapshot.
+
+Character selection offers **Load local save** when the latest manual snapshot
+uses the current save format. Recovery uses the ordinary save loader, including
+its version validation, and does not create a new world or consume RNG. The
+single backup is shared by manual saves on the same browser profile/site;
+starting a character does not overwrite it until the next manual save. It is
+not an autosave, cloud sync, or a substitute for exported JSON files: browser
+storage can be cleared, blocked, or evicted. Replay playback cannot write a
+recovery save, and neither the backup metadata nor download status enters the
+save payload or replay tape.
 Generation-only changes keep the format: saves store the complete generated
 world and current RNG state, and replays load their complete initial snapshot
 rather than rerunning generation. Optional cave metadata stored in existing

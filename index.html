@@ -407,6 +407,7 @@ more difficult:
             <span class="cursed-world-mobile-note" aria-hidden="true">Even more random world. Highly experimental and potentially unbalanced. Careful!</span>
           </div>
           <span id="raceError"></span>
+          <button class="slbtn" id="btnRaceRecover" type="button" hidden title="Load the latest manual save stored on this device">Load local save</button>
           <span class="inline-actions">
             <button class="slbtn" id="btnRaceLoad" type="button" title="Load an existing character from a .json save">📂 Load save</button>
             <button class="slbtn" id="btnBegin" type="button">Begin your journey</button>
@@ -13058,6 +13059,7 @@ more difficult:
 
   function render(now, terrainCells = null) {
     if (surfaceCatchupBusy) return
+    releaseUnusedMineLighting()
     if (now === undefined) updatePlayerStatuses()
     const previousObjects = frameObjects
     frameObjects = {}
@@ -13087,6 +13089,24 @@ more difficult:
   // reachable cells softened so their visual edges do not form hard squares.
   // Terrain uses a radial field with its own continuous wall-aware shadow.
   const mineLightingCanvases = {}
+  // The mine buffers are lazily allocated and can hold several viewport-sized
+  // backing stores. Reset their dimensions before dropping references so mobile
+  // renderers can release their pixel memory even after a long underground session.
+  function releaseUnusedMineLighting() {
+    const undergroundTiles = USE_TILE_IMAGES && currentZ < 0
+    if (undergroundTiles && Mining.activeLevel()) return
+    for (const name of Object.keys(mineLightingCanvases)) {
+      // Ordinary caves still use the shared crystal glow layer.
+      if (undergroundTiles && name === 'crystalGlow') continue
+      const layer = mineLightingCanvases[name]
+      layer.width = layer.height = 0
+      delete mineLightingCanvases[name]
+    }
+    if (mineDarknessLayer) mineDarknessLayer.width = mineDarknessLayer.height = 0
+    if (mineUnknownFogLayer) mineUnknownFogLayer.width = mineUnknownFogLayer.height = 0
+    mineDarknessLayer = mineUnknownFogLayer = mineWallFogCache = null
+  }
+
   function mineLightingCanvas(name) {
     const layer = mineLightingCanvases[name] ||
       (mineLightingCanvases[name] = document.createElement('canvas'))
@@ -13123,13 +13143,22 @@ more difficult:
 
   function mineCrystalMask(source, radius, visible, baseX, baseY, columns, rows) {
     const maskRadius = radius + MINING_CONFIG.lighting.tileFadeMargin
+    // Intersect the original mask footprint with the rendered cells before
+    // allocating/clearing a canvas. Do not cull by player FOV: distant crystals
+    // can still light visible terrain, including the softened boundary.
+    const minX = Math.max(baseX, Math.ceil(source.x - maskRadius))
+    const maxX = Math.min(baseX + columns - 1, Math.floor(source.x + maskRadius))
+    const minY = Math.max(baseY, Math.ceil(source.y - maskRadius))
+    const maxY = Math.min(baseY + rows - 1, Math.floor(source.y + maskRadius))
+    if (minX > maxX || minY > maxY) return null
     return mineSoftCellMask((mx, my) => {
       const dx = mx - source.x, dy = my - source.y
       return dx * dx + dy * dy <= maskRadius * maskRadius &&
         (visible.has(keyXY(mx, my)) ||
           UndergroundFov.canSee(map, player.x, player.y, mx, my)) &&
         Mining.lightCanReach(map, source.x, source.y, mx, my, player.x, player.y)
-    }, baseX, baseY, columns, rows, MINING_CONFIG.lighting.tileLightEdgeSoftness)
+    }, minX, minY, maxX - minX + 1, maxY - minY + 1,
+      MINING_CONFIG.lighting.tileLightEdgeSoftness)
   }
 
   function mineMaskedRadialLight(mask, centerX, centerY, radiusPx, stops, targetCtx, blend) {
@@ -18099,6 +18128,7 @@ more difficult:
     cycleRaceBackdrop()
     buildRaceGrid()
     document.getElementById('raceOverlay').classList.add('show')
+    refreshRecoverySaveButton()
     document.getElementById('btnBegin').disabled = false
     document.getElementById('permadeathToggle').checked = false
     const cursedWorldToggle = document.getElementById('cursedWorldToggle')

@@ -202,10 +202,25 @@ describe('Mine-only encounters and darkness', () => {
         USE_TILE_IMAGES=originalTileMode
         render()
       }
+      // A distant source must not even allocate or clear a full viewport mask.
+      const maskCanvas=mineLightingCanvases.shape
+      const maskCount=Object.keys(mineLightingCanvases).length
+      check(mineCrystalMask({x:MAP_W+100,y:MAP_H+100},4,new Set(),0,0,VIEW_W,VIEW_H)===null &&
+        Object.keys(mineLightingCanvases).length===maskCount && mineLightingCanvases.shape===maskCanvas,
+        'offscreen crystal footprints skip mask allocation')
       const caveLightingState={z:currentZ,map,caves,x:player.x,y:player.y,
         camX,camY,tileMode:USE_TILE_IMAGES}
       try {
+        USE_TILE_IMAGES=true
+        const retainedGlow=mineLightingCanvas('crystalGlow')
+        const oldShape=mineLightingCanvas('shape')
+        const oldDarkness=mineDarknessLayer
         currentZ=-1
+        releaseUnusedMineLighting()
+        check(!mineLightingCanvases.shape && oldShape.width===0 && oldShape.height===0 &&
+          !mineDarknessLayer && (!oldDarkness || oldDarkness.width===0) &&
+          !mineUnknownFogLayer && !mineWallFogCache && mineLightingCanvases.crystalGlow===retainedGlow,
+          'leaving the mine releases its buffers but retains ordinary underground glow')
         map=Array.from({length:25},()=>Array(25).fill('cavefloor'))
         map[5][7]='caveentrance'
         caves=[{entrances:[{x:7,y:5}]}]
@@ -230,6 +245,10 @@ describe('Mine-only encounters and darkness', () => {
           drawCrystalGlow(0,visible,0,0,VIEW_W,VIEW_H)
           check(radialGlows===tileGlows,'ASCII exit illumination keeps cell-based lighting')
         } finally {gradientProto.createRadialGradient=createGradient}
+        currentZ=0
+        releaseUnusedMineLighting()
+        check(!Object.keys(mineLightingCanvases).length && retainedGlow.width===0 && retainedGlow.height===0,
+          'returning to surface releases the shared underground glow too')
       } finally {
         currentZ=caveLightingState.z;map=caveLightingState.map;caves=caveLightingState.caves
         player.x=caveLightingState.x;player.y=caveLightingState.y
@@ -261,6 +280,8 @@ describe('Mine-only encounters and darkness', () => {
         first.level.mineExcavations=[{x:10,y:5,kind:'exposed',mineral:'ruby',removed:false,threshold:0}]
         const visible=UndergroundFov.compute(map,5,5,5)
         drawFreshMineFog(visible,0,0,VIEW_W,VIEW_H)
+        check(mineDarknessLayer && mineUnknownFogLayer && mineLightingCanvases.shape,
+          'returning to tile-mode mines recreates the released buffers')
         const shadow=mineDarknessLayer.getContext('2d')
         const opacityAt=(x,y)=>shadow.getImageData(Math.floor((x+0.5)*TILE_PX),
           Math.floor((y+0.5)*TILE_PX),1,1).data[3]

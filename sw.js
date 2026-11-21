@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Independent from the displayed game version; increment for cache refreshes.
-const CACHE_REVISION = 21;
+const CACHE_REVISION = 22;
 const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';

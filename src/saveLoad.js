@@ -408,30 +408,143 @@ function buildSaveObject() {
   }
 }
 
+// Device-local recovery is deliberately outside buildSaveObject and replay.
+// One transaction replaces the previous snapshot only after a successful write.
+const RECOVERY_DB_NAME = 'vagabond-save-recovery'
+const RECOVERY_STORE = 'manualSaves'
+const RECOVERY_KEY = 'latest'
+const SAVE_DOWNLOAD_URL_LIFETIME_MS = 60000
+let recoverySaveQueue = Promise.resolve()
+
+function recoverySaveTransaction(mode, operation) {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable')); return }
+    const request = window.indexedDB.open(RECOVERY_DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(RECOVERY_STORE))
+        request.result.createObjectStore(RECOVERY_STORE)
+    }
+    let blocked = false
+    request.onblocked = () => { blocked = true; reject(new Error('Local save database is blocked')) }
+    request.onerror = () => reject(request.error || new Error('Cannot open local save database'))
+    request.onsuccess = () => {
+      const db = request.result
+      if (blocked) { db.close(); return }
+      try {
+        const transaction = db.transaction(RECOVERY_STORE, mode)
+        let result
+        transaction.oncomplete = () => { db.close(); resolve(result) }
+        transaction.onabort = () => { db.close(); reject(transaction.error || new Error('Local save transaction aborted')) }
+        const action = operation(transaction.objectStore(RECOVERY_STORE))
+        action.onsuccess = () => { result = action.result }
+        // Request errors abort the transaction; success is only reported on commit.
+      } catch (err) { db.close(); reject(err) }
+    }
+  })
+}
+
+function storeRecoverySave(json, version) {
+  // Preserve click order even when several saves are requested before IndexedDB opens.
+  const write = recoverySaveQueue.then(() => recoverySaveTransaction('readwrite', store =>
+    store.put({version, json}, RECOVERY_KEY)))
+  recoverySaveQueue = write.catch(() => {})
+  return write
+}
+
+function readRecoverySave() {
+  return recoverySaveQueue.then(() => recoverySaveTransaction('readonly', store => store.get(RECOVERY_KEY)))
+}
+
+function refreshRecoverySaveButton() {
+  const button = document.getElementById('btnRaceRecover')
+  button.hidden = true
+  return readRecoverySave().then(record => {
+    if (raceOpen && record?.version === SAVE_VERSION && typeof record.json === 'string')
+      button.hidden = false
+  }).catch(() => {}) // Storage may be unavailable in private/restricted browsing.
+}
+
+async function loadRecoverySave() {
+  if (!raceOpen || worldGenerating) return
+  const button = document.getElementById('btnRaceRecover')
+  if (button.disabled) return
+  button.disabled = true
+  try {
+    const record = await readRecoverySave()
+    if (!raceOpen || worldGenerating) return
+    if (record?.version !== SAVE_VERSION || typeof record.json !== 'string')
+      throw new Error('No local save with the current game format was found.')
+    loadGameFromObject(JSON.parse(record.json))
+  } catch (err) {
+    console.error(err)
+    window.alert('Failed to load local save: ' + (err?.message || err))
+  } finally {
+    button.disabled = false
+  }
+}
+
+function requestSaveDownload(json, filename) {
+  const blob = new Blob([json], {type: 'application/json'})
+  const url = URL.createObjectURL(blob)
+  let anchor, requested = false
+  try {
+    anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    requested = true
+  } finally {
+    if (anchor) anchor.remove()
+    // Android download managers may consume the Blob URL after click returns.
+    if (requested) setTimeout(() => URL.revokeObjectURL(url), SAVE_DOWNLOAD_URL_LIFETIME_MS)
+    else URL.revokeObjectURL(url)
+  }
+}
+
 function saveGame() {
   if (replayPlaying) {
     log('Cannot save while watching a replay.', 'info')
     return
   }
+  let json
   try {
-    const data = buildSaveObject()
-    const blob = new Blob([JSON.stringify(data)], {type: 'application/json'})
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    const ts = new Date().toISOString().replace(/[:.]/g, '-')
-    a.href = url
-    a.download = `vagabond-save-${ts}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    log('Game saved to file.', 'good')
+    json = JSON.stringify(buildSaveObject())
   } catch (err) {
     console.error(err)
     log('Failed to save the game.', 'bad')
-    // A save exception must be visible even if the message log is obscured.
     window.alert('Failed to save the game: ' + (err?.message || err))
+    return
   }
+  // Request the download synchronously while the button's user activation is
+  // still valid. Do not wait for the database or claim the browser wrote a file.
+  const ts = new Date().toISOString().replace(/[:.]/g, '-')
+  let downloadError = null
+  try {
+    requestSaveDownload(json, `vagabond-save-${ts}.json`)
+    log('Save download requested.', 'info')
+  } catch (err) {
+    downloadError = err
+    console.error(err)
+  }
+  return storeRecoverySave(json, SAVE_VERSION).then(() => {
+    log('Game saved locally.', 'good')
+    if (raceOpen) refreshRecoverySaveButton()
+    if (downloadError) {
+      log('Save download failed; the local save is available.', 'bad')
+      window.alert('Save download failed: ' + (downloadError?.message || downloadError) +
+        '\nYour game was saved locally. Use Load local save on character selection to recover it.')
+    }
+  }, err => {
+    console.error(err)
+    if (downloadError) {
+      log('Failed to save the game.', 'bad')
+      window.alert('Failed to save the game: ' + (downloadError?.message || downloadError) +
+        '\nLocal backup also failed: ' + (err?.message || err))
+    } else {
+      log('Local save failed. Check that the downloaded save file exists.', 'bad')
+    }
+  })
 }
 
 function loadGameFromObject(data, opts = {}) {
@@ -1301,6 +1414,7 @@ function loadGame(file) {
 }
 
 document.getElementById('btnSave').addEventListener('click', saveGame)
+document.getElementById('btnRaceRecover').addEventListener('click', loadRecoverySave)
 document.getElementById('btnLoad').addEventListener('click', () => {
   document.getElementById('fileLoad').click()
 })
