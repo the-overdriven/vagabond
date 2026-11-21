@@ -147,6 +147,15 @@ describe('Animated terrain rendering', () => {
           cell(1, 0, 'river')
           const ordinaryCorner = !terrainVisual('frozenriver', x, y).diagonalRiverJoinArms
 
+          reset('lava')
+          tileUnderlays[keyXY(x-1,y)] = 'sand'
+          if (terrainVisual('lava',x,y).shoreBlend) throw new Error('land seam inside lava pool')
+          delete tileUnderlays[keyXY(x-1,y)]
+          cell(0,-1,'snow'); cell(-1,0,'sand'); cell(1,1,'grass')
+          const lava = terrainVisual('lava',x,y)
+          if (lava.shoreBlend[1] !== 'snow' || lava.shoreBlend[3] !== 'sand' ||
+              lava.shoreBlend[8] !== 'grass' || lava.frames !== ground.lava.frames)
+            throw new Error('mixed terrain around animated lava')
           // Grass/snow/water junction from the reported white corner patch.
           reset('water')
           cell(0,-1,'grass'); cell(-1,-1,'snow')

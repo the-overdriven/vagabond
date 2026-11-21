@@ -10009,6 +10009,9 @@ A blend never exposes an ASCII background color
 through a missing ground layer.
 
 A river's actual map tiles never change just to improve its appearance.
+Surface lava pools use the same irregular bank contour along grass, sand, 
+snow and the ground beneath mountains and volcano cones. Connected lava tiles share an uninterrupted animated interior.
+
 Directly adjacent river/water tiles have no shoreline between them. 
 Flowing and frozen river banks vary along cardinal and diagonal runs. Diagonal
 segments use curved centerlines and variable widths. Each pair of connected

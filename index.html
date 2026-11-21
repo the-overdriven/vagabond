@@ -12170,7 +12170,7 @@ more difficult:
     // tower's void/masonry cells or accidentally disable exterior blends.
     if (currentZ !== 0 && terrain !== surfaceMap) return null
     const tileKey = terrain?.[ty]?.[tx]
-    if (!tileKey) return null
+    if (!tileKey || tileKey === 'lava') return null
     if (tileKey === 'water' || tileKey === 'river' || tileKey === 'frozenriver' || isLakeIce(tileKey)) return null
     if (['forest','ancientForest'].includes(tileKey)) return 'grass'
     if (tileKey === 'taiga') return 'snow'
@@ -12533,6 +12533,10 @@ more difficult:
     // river and mixed-biome rules; only the source terrain grid differs.
     const groundBlend = surfaceGroundBlend(tileKey,x,y,terrain)
     if (groundBlend) return {...visual,groundBlend}
+    if (tileKey === 'lava' && terrain === surfaceMap) {
+      const shoreBlend = surfaceBlendBiomes(null,x,y,terrain)
+      if (shoreBlend.some(Boolean)) return {...visual,shoreBlend,shoreX:x%8,shoreY:y%8}
+    }
     const waterEffects = surfaceWaterVisual(tileKey, x, y, terrain)
     if (waterEffects) return {...visual,...waterEffects}
 
