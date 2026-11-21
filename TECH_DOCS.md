@@ -10154,9 +10154,9 @@ Therefore:
 Wide, fine-pointer desktop layouts use a UI font scale of **1.1**; narrow
 or touch layouts retain **1.0**.
 
-The XP bar fills with white on both desktop and touch layouts. On desktop,
-it displays `<current> / <needed> XP` centered inside the bar with a contrasting
-outline. Enemy inspection displays rounded ATK, DEF and SPD, and the terrain DEF
+The XP bar fills with white on both desktop and touch layouts and shows
+progress toward the next level without a numeric XP label. Enemy inspection
+displays rounded ATK, DEF and SPD, and the terrain DEF
 change compares rounded defense with and without terrain (excluding unrelated
 status changes from the terrain bonus).
 The character statistics show steps alongside elapsed turns and list how many

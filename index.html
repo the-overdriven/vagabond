@@ -289,22 +289,8 @@ more difficult:
       50% { opacity: 0.35; }
     }
 
-    #xpbartext { display: none; }
     @media (pointer: fine) {
       #xpbarwrap { position: relative; min-width: 112px; }
-      #xpbartext {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #f9ecd0;
-        font-size: 10px;
-        font-weight: bold;
-        white-space: nowrap;
-        text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000;
-        pointer-events: none;
-      }
     }
 
     .race-card img {
@@ -347,7 +333,6 @@ more difficult:
     <div class="stat">
       <div id="xpbarwrap">
         <div id="xpbar"></div>
-        <span id="xpbartext"></span>
       </div>
     </div>
     <div class="stat" title="Attack - increases the damage you deal.">⚔️ATK <b id="hAtk"></b></div>
@@ -16076,7 +16061,6 @@ more difficult:
     document.getElementById('hptext').textContent = player.hp + ' / ' + maxHp
     const xpNeeded = xpToNext(player.lvl)
     document.getElementById('xpbar').style.width = Math.max(0, player.xp / xpNeeded * 100) + '%'
-    document.getElementById('xpbartext').textContent = `${player.xp} / ${xpNeeded} XP`
     document.getElementById('hAtk').textContent = playerAtk()
     document.getElementById('hDef').textContent = playerDef()
     document.getElementById('hSpd').textContent = playerSpd()

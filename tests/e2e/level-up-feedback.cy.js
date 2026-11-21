@@ -10,11 +10,21 @@ describe('Nonblocking level-up feedback', () => {
       player.lvl=1;player.xp=0;player.maxHp=50;player.race='human'
       player.equip={weapon:null,shield:null,armor:null}
       replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=false
+      const xpBar=document.getElementById('xpbar')
+      const xpWrap=document.getElementById('xpbarwrap')
+      const checkXpBar=()=>{
+        check(xpWrap.textContent.trim()==='', 'XP bar has no numeric label')
+        check(getComputedStyle(xpBar).backgroundColor==='rgb(255, 255, 255)', 'XP fill remains white')
+        check(Math.abs(parseFloat(xpBar.style.width)-Math.max(0,player.xp/xpToNext(player.lvl)*100))<0.001,'XP bar reflects progress')
+      }
+      player.xp=Math.floor(xpToNext(player.lvl)/2);updateHud();checkXpBar()
+      player.xp=0;updateHud();checkXpBar()
       const amount=Math.ceil([1,2,3,4].reduce((sum,lvl)=>sum+xpToNext(lvl),0)/xpMultiplier())
       const turn=turnCount,seed=rngState
       gainXp(amount)
       const popup=document.getElementById('levelUpPopup')
       check(player.lvl===5&&player.maxHp===90,'all gameplay gains applied immediately')
+      checkXpBar()
       check(!popup.hidden&&popup.textContent==='Level Up!Level 5 · +40 max HP · +2 SPD · +1 GRACE','one combined notice')
       check(getComputedStyle(popup).pointerEvents==='none','notice does not intercept input')
       check(turnCount===turn&&rngState===seed,'notice adds no turns or RNG')
