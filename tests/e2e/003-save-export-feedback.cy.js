@@ -10,8 +10,16 @@ describe('Save export and recovery', () => {
     cy.window().then({timeout: 60000}, async win => {
       const alert = cy.stub(win, 'alert').as('saveErrorAlert')
       const click = cy.stub(win.HTMLAnchorElement.prototype, 'click')
-      const revoke = cy.stub(win.URL, 'revokeObjectURL')
-      const create = cy.stub(win.URL, 'createObjectURL').returns('blob:save-test')
+      // The game also creates Blob URLs during background image preloading.
+      // Simulate failures only for the JSON export, not unrelated startup assets.
+      const nativeCreate = win.URL.createObjectURL.bind(win.URL)
+      const nativeRevoke = win.URL.revokeObjectURL.bind(win.URL)
+      const create = cy.stub().returns('blob:save-test')
+      const revoke = cy.stub()
+      const createUrl = cy.stub(win.URL, 'createObjectURL').callsFake(blob =>
+        blob.type === 'application/json' ? create(blob) : nativeCreate(blob))
+      const revokeUrl = cy.stub(win.URL, 'revokeObjectURL').callsFake(url =>
+        url === 'blob:save-test' ? revoke(url) : nativeRevoke(url))
       // Exercise the reported location using an actual generated mine floor.
       win.eval(`(()=>{
         const first = dungeonPackageLevels('dwarvenMines')[0]
@@ -54,17 +62,26 @@ describe('Save export and recovery', () => {
       expect(alert.thirdCall.args[0]).to.equal('Failed to save the game: serialization error')
       brokenSerializer.restore()
       expect((await win.eval('readRecoverySave()')).json).to.equal(expectedJson)
-      create.restore()
+      createUrl.restore()
       click.restore()
-      revoke.restore()
+      revokeUrl.restore()
+      alert.restore()
       // A requested file download alone is not a verified disk write.
       expect(win.eval('logQueue.map(entry => entry.msg).join(" ")') +
         win.document.getElementById('logpanel').textContent).not.to.contain('Game saved to file.')
+      win.__saveRecoveryBeforeNavigation = true
     })
 
-    // Reload the page, not just the in-memory game state.
-    cy.reload()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    // Navigate to a fresh document on the same origin (and thus the same
+    // IndexedDB), without reusing the Cypress reload lifecycle of the old page.
+    cy.visit('/?save-recovery=1')
+    cy.get('#loadingOverlay', {timeout: 60000}).should($overlay => {
+      expect($overlay.find('#loadingText').text()).not.to.contain('Loading failed')
+      expect($overlay).not.to.be.visible
+    })
+    cy.window().then(win => {
+      expect(win.__saveRecoveryBeforeNavigation).to.equal(undefined)
+    })
     cy.get('#btnRaceRecover', {timeout: 15000}).should('be.visible').click()
     cy.get('#raceOverlay', {timeout: 60000}).should('not.have.class', 'show')
     cy.window().then(win => {

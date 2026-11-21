@@ -30,6 +30,8 @@ describe('God Mode artifact identification',()=>{
   })
   it('identifies without scrolls on desktop/mobile and preserves normal scroll use',()=>{
     cy.visit('/')
+    // The exact-save loader validates adaptive state against loaded content.
+    cy.get('#loadingOverlay',{timeout:60000}).should('not.be.visible')
     cy.readFile('tests/saves/Tester_start.json').then(save=>cy.window().then(win=>{
       win.__identifyBootstrapSave=save
       win.eval(`(() => {
