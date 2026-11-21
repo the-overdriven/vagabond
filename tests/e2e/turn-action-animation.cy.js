@@ -72,5 +72,28 @@ describe('Stationary turn animation handoff', () => {
       })()`)
       expect(result).to.deep.equal({itemLoops: 1, forageLoops: 1, digLoops: 1})
     })
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const old={enemyTurn,npcTurn,runAnimationLoop}
+      try {
+        currentZ=0;currentCave=-1;map=surfaceMap
+        player.x=50;player.y=50;player.confusionTurns=0;player.rootTurns=0
+        player.artifactElusiveReady=false;player.berserkTurns=0
+        replayAnimationsDisabled=false;replayRecording=false
+        map[50][50]=map[50][51]=map[50][52]='grass'
+        for(let x=50;x<=52;x++)grasslandTrees.delete(keyXY(x,50))
+        enemies=[];npcs=[];groundItems=[];occupied=new Set()
+        enemyTurn=()=>{};npcTurn=()=>{};runAnimationLoop=()=>{}
+        stopCameraAnimation();clearAutoPath();pendingMove=null
+        await tryMove(1,0)
+        check(player.x===51 && moveAnim?.duration===140,'manual movement stays at 140 ms')
+        stopCameraAnimation()
+        startPlannedAutoPath([{x:52,y:50}])
+        check(player.x===52 && moveAnim?.duration===100,'even the last autopath step uses the accelerated animation')
+      } finally {
+        stopCameraAnimation();clearAutoPath();pendingMove=null
+        enemyTurn=old.enemyTurn;npcTurn=old.npcTurn;runAnimationLoop=old.runAnimationLoop
+      }
+    })()`))
   })
 })

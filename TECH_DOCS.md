@@ -695,7 +695,7 @@ Most mine walls are unbreakable. Each generated weak seam or mineral deposit is
 finite and keeps its identity even while concealed from an inexperienced miner.
 Partial damage persists across interruptions. Opening a mine wall leaves gray
 excavated floor; extracting a crystal already exposed on a mine floor leaves
-its original brown floor. Completing an overworld boulder has a **5%** chance
+its original brown floor. Completing an overworld boulder has a **2.5%** chance
 to yield one reusable Flint Stone; individual strikes and underground deposits
 do not roll for flint. Clearing an overworld boulder restores its underlying surface terrain (grass, forest, hill
 or sand), even after world rotation or save/load. Both minimaps immediately
@@ -825,7 +825,10 @@ the map, while pinching zooms; neither starts travel, even on mobile.
 
 Map travel follows the existing rules for hazards, enemies, interactions,
 manual movement, and interruptions. It uses deterministic breadth-first
-pathfinding and does not add saved or replay state.
+pathfinding and does not add saved or replay state. Automatic walking uses a
+**100 ms** player movement pan instead of the manual **140 ms** pan (+40%
+animation speed). Turn resolution, combat reactions and replay actions are
+unchanged.
 
 Surface boulders are never eligible destinations or intermediate steps for
 automatic travel, whether the player has a Pickaxe or is using God Mode.
@@ -1141,7 +1144,10 @@ identifies the terrain and the effective changes while the modifier is active.
 Enemy inspection tooltips show effective stats without directional arrows;
 the existing **Terrain** line lists effective terrain modifiers, including on
 mobile. Numeric monster-prefix differences remain readable without arrow
-symbols. The character sheet reflects the same changes on mobile stat rows.
+symbols. Effective monster stats, displayed bonuses and status-related 
+stat values are rounded to whole numbers for inspection only; 
+combat uses their unrounded values. The character sheet reflects 
+the same changes on mobile stat rows.
 Directional HUD colors and arrows reflect actual effective changes after
 stat limits, not hypothetical raw bonuses. Terrain modifiers are
 derived from the current tile, not separate timed statuses; inspecting them
@@ -3178,7 +3184,12 @@ always starting at **z:-9**. The established 3–5-floor Dwarven Ruins generator
 is unchanged. If the Ruins end at z:-6 or z:-7, a direct staircase leads to
 z:-9; unused depths are not accessible play areas. When the Ruins end at z:-8,
 they connect directly to z:-9. Mines extend through z:-12 or z:-13 and contain
-paired up/down stairs, allowing the player to return along the same route.
+paired up/down stairs, allowing the player to return along the same route. 
+Every ordinary mine staircase and the Ruins entrance share identical X/Y 
+on both connected global Z-levels. The generator anchors each new floor 
+to the preceding exit, keeps it within world bounds and checks reachability;
+transitions never relocate the player horizontally. Mine depths must remain
+reserved in the global chain rather than overwrite another dungeon.
 The first floor offers a comparatively quiet respite after the Dwarven Fort;
 the second is a deliberate difficulty spike. Mine floors use **brown cave-floor
 tiles**, with dedicated brownish **Shoddy Mine Stairs** art for stair travel.
@@ -3209,7 +3220,9 @@ Ruins floor. It is a normal inventory item, **40 gold** base value and **20 gold
 sell value, and is not consumed by clearing the mine entrance. The opened
 entrance, every mine floor and transition, monster positions, discovery, and
 inventory state persist through current saves and replay. Gameplay transitions
-and excavation resolve on the turn; animations never determine their outcomes.
+and excavation resolve on the turn; animations never determine their outcomes. 
+Excavation and any released water immediately refresh both maps without revealing
+unexplored terrain.
 
 The separate mine encounter generator uses **19 new species** grouped into
 early, middle, and late threats. The floor-by-floor progression is:
@@ -3262,8 +3275,11 @@ between those two floors. Inspecting the upper cage while locked consumes no
 turn; riding a released cage uses the existing dungeon-stair transition turn
 rules, with no resource cost or simulation of skipped floors. As on other mine
 transitions, pending monster warnings are canceled when changing floors.
-Arrival uses the ordinary safe-landing search: a creature occupying the cage
-cannot be overwritten, and travel is denied if no legal arrival exists.
+All mine transitions, including the cage and the Ruins entrance, 
+displace a creature occupying the landing to the nearest safe, 
+unoccupied dry tile on the destination level, in a fixed search order.
+The player keeps their X/Y; only invalid geometry or a completely saturated landing
+can prevent travel.
 Locked platforms use a muted cage graphic; the released upper and lower cages
 have distinct directional tile and ASCII visuals. The endpoint coordinates,
 both tile states and the **one shared unlock flag** persist through saves and
@@ -4139,8 +4155,9 @@ Movement, water clipping, flying draw order, invisibility, awareness/enrage
 outlines, warning/status marks, and prefixed-enemy terrain tint apply equally
 to monster sprites. In tile mode, a subtle, semi-transparent **one-tile circular
 backing** beneath each visible enemy improves contrast without obscuring
-its sprite or changing ASCII. Graphics have no effect on enemy identity, mechanics,
-randomness, saves, or replay.
+its sprite or changing ASCII. For prefixed enemies, the backing matches the
+color of their surrounding tile tint. Graphics have no effect on enemy identity,
+mechanics, randomness, saves, or replay.
 
 ---
 
@@ -5172,11 +5189,12 @@ On the game canvas, a prefixed enemy keeps its original tier-colored letter.
 The letter comes from the final word of `baseName` (or the display name for
 legacy enemies without one), so multiword monster names retain the right
 initial after a prefix (for example, Tough Giant Rat uses `r`).
-`content/rendering.json` supplies a translucent violet tile overlay in a
-one-tile radius (3×3 square), or a gold overlay in a two-tile radius (5×5
-square) for Champions. The outer Champion tiles are fainter. The overlay is
-drawn below all enemy glyphs, moves tile by tile with its owner, and does not reveal
-undiscovered underground tiles or change stats, terrain, or save data.
+`content/rendering.json` supplies a distinct translucent color for each prefix
+in a one-tile radius (3×3 square), with a two-tile radius (5×5 square) for
+gold Champions. The outer Champion tiles are fainter. The tile-mode circular
+backing uses the same prefix color; unprefixed monsters retain a neutral backing.
+The overlay is drawn below all enemy glyphs, moves tile by tile with its owner, 
+and does not reveal undiscovered underground tiles or change stats, terrain, or save data.
 
 Examples:
 
@@ -7053,8 +7071,12 @@ An artifact ability is active while its weapon, armor or shield is equipped.
 Identical abilities on several equipped artifacts **do not stack**; different
 abilities can interact. An unidentified artifact conceals the power's name and
 description, even when equipped, but its power still works. An identified
-artifact shows the power's name alongside its other inventory statistics;
-identifying or inspecting it displays the power's description in the message
+artifact shows the power's name alongside its other inventory statistics.
+Base stats and additive modifiers are displayed together (e.g. `DEF 9+3`);
+innate armor/shield SPD and GRACE penalties are omitted from the item stat
+line, but still apply under the normal equipment rules. Fleetfoot cancels
+equipment SPD penalties while equipped, but does not cancel GRACE penalties.
+Identifying or inspecting it displays the power's description in the message
 log. Inspecting does not reroll anything. Activated powers use the existing
 message log and floating combat-text animation. An unidentified power uses a
 generic popup without disclosing its hidden identity; animations never decide
@@ -8028,6 +8050,27 @@ its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 70g, with
 nine in stock at world creation. This stock is finite and never automatically
 replenished after purchases, save/load, or replay restoration. Selling a scroll
 back adds exactly one scroll to the available stock. The stock config key is `scrolls.homecomingScroll`.
+
+## Scroll of Wayfaring
+
+Reading Homecoming consumes one unit of its stack and creates a bound Scroll of
+Wayfaring storing the exact departure coordinates (X, Y, Z and level identity,
+including the exceptional Crypt map). Only one return scroll can be held: a
+subsequent Homecoming replaces its remembered destination. Reading Wayfaring
+consumes it and returns the player to that exact tile from any location; it
+cannot be purchased, sold, dropped or independently generated, and it does not
+qualify for merchant scroll resupply. Both readings follow the normal inventory
+and swimming restrictions and each costs one turn. Wayfaring does not grant
+Temple healing or a new Homecoming scroll.
+
+A blocked or invalid destination (or already standing on the remembered tile)
+leaves the scroll intact without spending a turn. An actor occupying a valid
+landing is deterministically displaced to a safe free tile when possible; the
+player never arrives at substitute coordinates. Normal floor-entry effects,
+surface absence tracking, and landing hazards still apply. The spell is a
+magical relocation, not a vertical passage: it does not change world geometry
+or relax the matching X/Y rule for physical connections. The bound destination
+is part of the inventory instance persisted in saves and replay snapshots.
 
 ## Potion of Speed
 
@@ -9062,7 +9105,7 @@ The Merchant always offers reusable **Flint Stone for 100g** and **Brushwood
 for 10g per bundle**. Both have unlimited merchant stock; Flint Stone can be sold for **50g**
 per stone, while Brushwood cannot be sold back. Brushwood purchases and ordinary pickup cannot exceed five carried;
 excess dropped bundles stay on the ground. Flint can also be found while
-completing boulders (5%), ordinary sand digging (1%) and opening chests (0.5%).
+completing boulders (2.5%), ordinary sand digging (0.5%) and opening chests (0.5%).
 
 Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
 world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
@@ -10096,7 +10139,11 @@ Therefore:
 Wide, fine-pointer desktop layouts use a UI font scale of **1.1**; narrow
 or touch layouts retain **1.0**.
 
-On desktop, the XP bar displays `<current> / <needed> XP` centered inside the bar.
+The XP bar fills with white on both desktop and touch layouts. On desktop,
+it displays `<current> / <needed> XP` centered inside the bar with a contrasting
+outline. Enemy inspection displays rounded ATK, DEF and SPD, and the terrain DEF
+change compares rounded defense with and without terrain (excluding unrelated
+status changes from the terrain bonus).
 The character statistics show steps alongside elapsed turns and list how many
 of the four world edges have been discovered, with their compass directions.
 Reached directions appear as uppercase initials (`N`, `S`, `E`, `W`).
@@ -10767,7 +10814,7 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 | 14 | Find a broken shovel handle |
 | 15–16 | A Scarab emerges beside the player, if a valid adjacent tile is available |
 | 17 | Find a silver spoon; flavor message only |
-| 18 | Find one Flint Stone |
+| 18 | 50% chance to find one Flint Stone; otherwise nothing |
 | 19–100 | Find nothing |
 
 </details>
@@ -10775,9 +10822,10 @@ If the dig is not at the treasure-map location, a roll from 1 to 100 determines 
 Amber (worth 20g) and Seashell (worth 10g) are stackable inventory items.
 The silver spoon has a **1%** chance on an ordinary dig and logs “You dig up a
 silver spoon. Someone threw away a good spoon.” It is never an inventory item.
-Flint occupies another single outcome; ordinary empty digs have an 82% chance.
-Neither result changes guaranteed buried finds, turn costs or the number of
-RNG rolls.
+Flint has a **0.5%** chance in the ordinary loot table; empty digs have an
+82.5% chance (before accounting for the independent Potato roll). A single
+200-outcome roll preserves all other loot probabilities and does not add RNG
+calls or change guaranteed buried finds or turn costs.
 
 ## Scarab spawning
 
@@ -11662,8 +11710,8 @@ placement rules and seeded random draws.
 | 7 | **Ancient Scarab** (`ancient_scarab`) | Dig **35 distinct sand tiles**, then dig another new sand tile. | A doubled-stat Champion Scarab emerges from sand. |
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
 | 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
-| 10 | **The Previous Owner** (`previous_owner`) | Carry **any artifact named after a dwarf**, whether equipped or in inventory. | The actual named dwarf appears as a Ghost and pursues while the player possesses the artifact. |
-| 11 | **Debt Collector** (`debt_collector`) | Recover loot from **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot, the related gold or a 100g payment; refuse to fight. |
+| 10 | **The Previous Owner** (`previous_owner`) | Carry **a non-purchased artifact named after a dwarf**, whether equipped or in inventory. | The actual named dwarf appears as a Ghost and pursues while the player possesses the artifact. |
+| 11 | **Debt Collector** (`debt_collector`) | Recover loot from **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot or a gold payment of at least 100g; refuse to fight. |
 | 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
 | 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
@@ -11808,7 +11856,8 @@ an optional enemy-threat slot or an RNG roll. A placed ledger is never
 duplicated by floor revisits: it remains a normal, saved ground pickup, then
 a non-droppable, non-sellable inventory item after collection.
 
-With the ledger in inventory, the Merchant offers **Return the Dwarven Trade
+With the ledger in inventory, a white exclamation mark appears above the
+Merchant in both display modes, and he offers **Return the Dwarven Trade
 Ledger**, consuming exactly one ledger and paying **350 gold** once. Merely
 visiting the fort or speaking to the Merchant without the ledger never grants
 a reward. The quest's accepted/fort-visited flags and `completed` entry are
@@ -11954,9 +12003,14 @@ reaction and does not consume an optional monster-threat slot. The streak and
 completion are saved and replayed, with no RNG consumed during turn counting.
 
 **The Previous Owner — a named dwarf's artifact:** In Cursed World, merely
-**possessing any non-cursed artifact named after a dwarf** qualifies this
+**possessing a non-cursed artifact named after a dwarf that was 
+not originally bought from the Merchant** qualifies this
 reaction immediately, without an identification, equipment, hit or turn
 requirement. Weapons, armor, shields and inventory-only trinkets qualify.
+Purchases from original merchant stock retain their acquisition provenance
+through inventory, equipment, drops, trade, save and replay. Selling and
+buying back a found artifact does not change its provenance or prevent an
+existing haunting.
 The artifact's existing dwarven-owner name (`possessor`) determines the Ghost's
 name; no independent random owner is generated. A cursed artifact with only a
 cursed-prefix name does not qualify. A **Champion Ghost** can appear in either of the
@@ -12024,6 +12078,9 @@ If there is no valid corridor or free threat slot, the creature waits rather
 than spawning in an inaccessible location. Leaving the floor before its
 arrival cancels that warning; mining another ordinary wall can provoke a new
 warning, but there is only **one successful Guardian encounter per character**.
+Normal warning and arrival messages describe distant, unsettling stone noises
+without naming the creature or revealing the encounter trigger or timing.
+Explicit encounter diagnostics are debug-only.
 The Guardian uses its own stone-creature portrait in inspection and the
 Bestiary, separate from its walking tile. It is a slow **construct** with
 **120 HP, 16 ATK, 8 DEF, 2 SPD,
@@ -12479,8 +12536,8 @@ amount rounded down and preserved on the enemy. The original amount is
 recoverable from a regular thief bag after it dies; the bag lies on the
 floor and requires a normal forage action. The one-time encounter, stolen
 coins and threat reservation survive saves and replay; ordinary Imp theft
-is unchanged. If no safe spawn site exists the event waits for another
-eligible scheduled check.
+is unchanged. The Gold Imp has no advance spawn announcement outside debug mode. 
+If no safe spawn site exists the event waits for another eligible scheduled check.
 
 **Ignored mushroom cleaning:** In Cursed World, three **separate visits to
 Herbalist Services** while carrying untreated Mushrooms, without purifying
@@ -12619,12 +12676,13 @@ surrender the randomly selected eligible loot or gold, or refuse and fight/flee.
 
 The Ghost selects **one random recovered object** among currently carried
 remains items (including equipped gear, gems and ammunition stacks) **and
-affordable purses of gold recovered from those remains**. Each original find
+affordable purses of gold recovered from those remains** (affordability is
+checked against the minimum demand, not the original purse amount). Each original find
 is one equally weighted candidate, regardless of arrow-stack size or coin
 quantity. The ghost does not target an ordinary item merely because its name
 matches: items carry an origin identifier, and recovered gold is recorded by
-its original find amount. When a purse is selected, the ghost demands exactly
-the amount found on those remains (5–25g), payable using any current gold;
+its original find amount. When a purse is selected, the ghost demands
+the greater of the original purse amount and **100g**, payable using any current gold;
 there is no artificial distinction between physical coins after pickup.
 An eligible item stack is surrendered in full. If no recovered items or
 affordable remains purses qualify, the demand is **100 gold** instead. The

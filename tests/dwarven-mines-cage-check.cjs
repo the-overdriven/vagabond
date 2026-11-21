@@ -114,15 +114,16 @@ const copy=value=>JSON.parse(JSON.stringify(value))
   assert(run('enterCave()'),'upper cage returns to final mine floor')
   assert.equal(run('currentZ'),lowerZ)
 
-  // A creature on the intended landing cannot be overwritten; the existing
-  // arrival search instead chooses a legal adjacent place.
+  // An occupied landing displaces the monster, not the player.
   run(`placeOnCage(dwarvenMinesCageShortcut().upper);
     const p=dwarvenMinesCageShortcut().lower;
     enemies.push({id:'cage_landing_blocker',alive:true,level:p.z,levelKind:'chain',x:p.x,y:p.y})`)
   assert(run('enterCave()'))
   assert.equal(run('currentZ'),lowerZ)
-  assert.notDeepEqual(copy(run('({x:player.x,y:player.y})')),
-    {x:endpoints.lower.x,y:endpoints.lower.y},'occupied endpoint is not used as landing')
+  assert.deepEqual(copy(run('({x:player.x,y:player.y})')),
+    {x:endpoints.lower.x,y:endpoints.lower.y},'occupied endpoint still preserves player X/Y')
+  assert.notDeepEqual(copy(run('(()=>{const e=enemies.find(e=>e.id==="cage_landing_blocker");return {x:e.x,y:e.y}})()')),
+    {x:endpoints.lower.x,y:endpoints.lower.y},'the monster yields the endpoint')
   assert(run('TILE[map[player.y][player.x]].walk'))
 
   // Exercise the real denial path, retaining all active state if even the

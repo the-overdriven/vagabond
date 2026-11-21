@@ -880,11 +880,11 @@ describe('Dwarven Ruins encounter progression', () => {
         ghost=enemies.find(e=>e.adaptiveEventId==='debt_collector')
         player.inventory=player.inventory.filter(it=>!it.dwarvenRemainsLootId)
         player.equip.shield=null
-        player.gold=13
-        AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(18)
+        player.gold=113
+        AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(118)
         AdaptivePlayerTrolling.onDwarvenRemainsGoldFound(9)
         const purses=AdaptivePlayerTrolling.serialize().dwarvenGoldLoot
-        check(purses.length===2 && purses[0].amount===18 && purses[1].amount===9 &&
+        check(purses.length===2 && purses[0].amount===118 && purses[1].amount===9 &&
           new Set(purses.map(p=>p.id)).size===2,
           'dwarven gold finds have distinct, persisted provenance identities')
         ghost.debtDemandState='watching';ghost.debtDemandLootId=null
@@ -893,17 +893,17 @@ describe('Dwarven Ruins encounter progression', () => {
           'unaffordable recovered gold is not an eligible choice')
         let goldDemand=AdaptivePlayerTrolling.debtCollectorDemand(ghost)
         check(goldDemand.isGold && goldDemand.recoveredGold &&
-          goldDemand.gold===9 && goldDemand.canPay,
-          'collector demands the exact amount recovered, not the 100g fallback')
+          goldDemand.gold===100 && goldDemand.canPay,
+          'collector demands at least 100g even for a small recovered purse')
         const goldDemandSnapshot=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(goldDemandSnapshot)
         ghost=AdaptivePlayerTrolling.pendingDebtCollector()
         check(ghost && ghost.debtDemandLootId===purses[1].id &&
-          AdaptivePlayerTrolling.debtCollectorDemand(ghost).gold===9,
+          AdaptivePlayerTrolling.debtCollectorDemand(ghost).gold===100,
           'the gold-purse demand stays locked through save and restore')
         check(AdaptivePlayerTrolling.resolveDebtCollector('pay',ghost.id,false) &&
-          player.gold===4 && AdaptivePlayerTrolling.serialize().dwarvenGoldLoot.length===1,
-          'payment consumes exactly the demanded recovered gold amount')
+          player.gold===13 && AdaptivePlayerTrolling.serialize().dwarvenGoldLoot.length===1,
+          'payment consumes the minimum gold demand and the selected purse provenance')
         // Restore pre-negotiation state to check the original 100g fallback
         // when no traceable recovered item or affordable purse is held.
         loadGameFromObject(refusedSnapshot)

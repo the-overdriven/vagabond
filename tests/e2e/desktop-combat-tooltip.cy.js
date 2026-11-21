@@ -50,14 +50,17 @@ describe('Desktop combat enemy tooltip', () => {
           alive:true,hp:20,maxHp:20,homeX:x,homeY:y,homeTileType:'grass',
           prefix:null,equipment:null,abilities:[]})
         e.equipment={kind:'weapon',base:'Dagger',name:'Mighty Dagger',tier:2}
+        e.atk=7.25;e.def=4.4;e.spd=5.75;e.aggro=3.6
         const tooltip=tileInspectInfo(x,y)?.html || ''
         return {showsBase:tooltip.includes('Equipped:') && tooltip.includes('Dagger'),
           hidesPrefix:!tooltip.includes('Mighty'),
-          preservesLootName:e.equipment.name==='Mighty Dagger'}
+          preservesLootName:e.equipment.name==='Mighty Dagger',
+          roundedStats:!/(?:ATK|DEF|SPD|Aggro) -?\\d+\\.\\d+/.test(tooltip)}
       })()`)
       expect(result.showsBase).to.equal(true)
       expect(result.hidesPrefix).to.equal(true)
       expect(result.preservesLootName).to.equal(true)
+      expect(result.roundedStats).to.equal(true)
     })
   })
 

@@ -441,7 +441,12 @@ describe('Mine-only encounters and darkness', () => {
       check(rngState===partialRng,'partial mining restoration consumes no RNG')
       check(Mining.find(Mining.activeLevel(),seam.x,seam.y).progress===1&&player.miningTutorialSeen,
         'partial excavation and the one-time mining warning survive save and replay initialization')
+      undergroundDiscovered[seam.y][seam.x]=true
+      rebuildMinimapBases()
+      const pixel=(scale)=>Array.from(miniBases[scale].ctx.getImageData(seam.x*scale,seam.y*scale,1,1).data).join(',')
+      const beforePixels=MINI_SCALES.map(pixel)
       await tryMove(seam.x-from.x,seam.y-from.y)
+      check(MINI_SCALES.every((scale,i)=>pixel(scale)!==beforePixels[i]),'mined tile updates both world map scales')
       check(map[seam.y][seam.x]==='cavefloor2'&&player.mining===0&&
         player.miningXpUnits===MINING_CONFIG.skill.surfaceFractionScale,
         'finishing the weak wall opens a route and earns one of three XP for the first level')

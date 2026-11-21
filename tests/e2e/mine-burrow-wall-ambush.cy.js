@@ -228,7 +228,13 @@ describe('Mine creatures: hidden Burrow and Wall Ambush',()=>{
           check(!enemies.some(e=>e.adaptiveEventId==='depth_guardian'),
             'no guardian before the fifth complete world turn')
         }
-        turnCount=255;AdaptivePlayerTrolling.onWorldTurn()
+        turnCount=255
+        AdaptivePlayerTrolling.setDebugTrolling(false)
+        const originalLog=log,spawnMessages=[]
+        try {log=msg=>spawnMessages.push(msg);AdaptivePlayerTrolling.onWorldTurn()} finally {log=originalLog}
+        check(spawnMessages.some(msg=>msg.includes('heavy stones tumbling')) &&
+          !spawnMessages.some(msg=>msg.includes('Guardian of the Deep')),
+          'non-debug arrival is atmospheric and does not reveal the monster')
         const golems=enemies.filter(e=>e.adaptiveEventId==='depth_guardian')
         check(golems.length===1 && golems[0].name==='Guardian of the Deep' &&
           golems[0].family==='construct' && golems[0].hp===120,

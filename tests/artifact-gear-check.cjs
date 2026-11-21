@@ -80,6 +80,28 @@ test('test gear artifacts are unidentified and the merchant sells one as a gambl
   const state = run('JSON.stringify(buildSaveObject())')
   run(`loadGameFromObject(${state},{isReplayInit:true})`)
   assert.equal(run('JSON.stringify(merchantStock)'),before,'unidentified stock survives replay/save restoration')
+  // Exercise the actual replay buy handler and the same instance after a save.
+  run('window.originalTradeLog=log')
+  try {
+    run(`log=()=>{};activeWorldTraits=[{name:'test curse',effects:[]}];AdaptivePlayerTrolling.reset();
+      currentZ=0;currentCave=-1;map=surfaceMap;player.inventory=[];
+      player.equip={weapon:null,shield:null,armor:null};player.gold=1000;replayRecording=false;
+      window.testOwner=ARTIFACT_NAMES_DWARF[0];
+      window.testRelic=()=>({kind:'artifact',artifactSlot:'trinket',name:'Relic of '+testOwner,
+        noun:'Relic',identified:false,bonuses:{},tier:2,baseValue:100,possessor:testOwner,curse:null});
+      merchantStock=[testRelic()];ensureReplayItemIds();`)
+    await run(`runReplayAction({type:'buy',replayId:merchantStock[0].replayId})`)
+    assert(run('player.inventory[0].merchantPurchased && AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().length===0'))
+    const boughtSave=run('JSON.stringify(buildSaveObject())')
+    run(`loadGameFromObject(${boughtSave},{isReplayInit:true})`)
+    assert(run('player.inventory[0].merchantPurchased && AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().length===0'))
+    run(`player.inventory.push(testRelic());window.foundRelic=player.inventory[1];sellItem(1);
+      buyItem(merchantStock.find(i=>i.merchantSold && i.replayId===foundRelic.replayId))`)
+    assert(run('AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().length===1 && !AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts()[0].merchantPurchased'))
+  } finally {
+    // The VM log sink is restored before the next fixture.
+    run('log=originalTradeLog')
+  }
 })
 
 test('buried equipment reliably hides two seeded gear artifacts without changing the other finds', async () => {
@@ -247,17 +269,15 @@ test('artifact base stats and enchantments stack; penalties, GRACE, inventory an
   assert.equal(artifactStats.atk - normalStats.atk, 2)
   assert.equal(artifactStats.spd - normalStats.spd, 3, 'artifact SPD bonus adds to base armor penalty')
   assert.equal(artifactStats.grace, normalStats.grace)
-  assert.match(run('itemStatLine(player.equip.armor)'), /DEF 12/)
-  assert.match(run('itemStatLine(player.equip.armor)'), /DEF \+4/)
-  assert.match(run('itemStatLine(player.equip.armor)'), /SPD -2/)
+  assert.match(run('itemStatLine(player.equip.armor)'), /DEF 12\+4/)
+  assert.doesNotMatch(run('itemStatLine(player.equip.armor)'), /SPD -|GRACE -|DEF \+4/)
   const saved = clone(run('buildSaveObject()'))
   run(`loadGameFromObject(${JSON.stringify(saved)}, {isReplayInit:true})`)
   assert.deepEqual(clone(run('player.equip.armor')), brigandine)
   assert.deepEqual(clone(run('playerPermanentStats()')), clone(artifactStats))
 
   const hauberk = artifact('Hauberk',3); hauberk.identified = true
-  assert.match(run(`itemStatLine(${JSON.stringify(hauberk)})`), /SPD -3/)
-  assert.match(run(`itemStatLine(${JSON.stringify(hauberk)})`), /GRACE -1/)
+  assert.doesNotMatch(run(`itemStatLine(${JSON.stringify(hauberk)})`), /SPD -|GRACE -/)
 
   const buckler = artifact('Buckler',3); buckler.identified = true
   const tower = artifact('Tower Shield',4); tower.identified = true
@@ -267,7 +287,7 @@ test('artifact base stats and enchantments stack; penalties, GRACE, inventory an
   const towerStats = run('playerPermanentStats()')
   assert.equal(bucklerStats.spd - towerStats.spd, 1)
   assert.equal(bucklerStats.grace - towerStats.grace, 1)
-  assert.match(run('itemStatLine(player.equip.shield)'), /GRACE -1/)
+  assert.doesNotMatch(run('itemStatLine(player.equip.shield)'), /SPD -|GRACE -/)
 
   const dagger = artifact('Dagger',3); dagger.identified = true
   const sword = artifact('Two-handed Sword',4); sword.identified = true
@@ -445,6 +465,9 @@ test('Fleetfoot removes equipment SPD penalties and Slow; Long Shot works only w
   })()`)
   const slowed=run('playerSpdRaw()')
   run("player.equip.armor.abilityId='fleetfoot'")
+  run('player.equip.armor.identified=true;player.equip.armor.bonuses={def:3};player.equip.armor.mod="def";player.equip.armor.modAmt=2')
+  assert.match(run('itemStatLine(player.equip.armor)'), /DEF 9\+5/)
+  assert.doesNotMatch(run('itemStatLine(player.equip.armor)'), /SPD -|GRACE -/)
   const fleet=run('playerSpdRaw()')
   assert(fleet-slowed>=4,'removes penalties plus Slow')
   run('player.slowTurns=0')

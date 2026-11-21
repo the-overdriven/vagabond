@@ -103,11 +103,15 @@ async function main() {
     player.inventory.find(i=>i.kind==='brushwood').count=4;lootSkeletonOrForage();`)
   check('Campfires.count("brushwood")===5 && groundItems.find(g=>g.kind==="droppeditem").item.count===2','partial fuel pickup leaves excess on the ground')
   run(`groundItems=groundItems.filter(g=>g.kind!=='droppeditem');map[player.y][player.x]='sand';
-    addInventoryItem('shovel');dugSandTiles=new Set();rng=()=>0.175;tryDig();window.digTurn=turnCount;tryDig();`)
+    addInventoryItem('shovel');dugSandTiles=new Set();rng=()=>0.172;tryDig();window.digTurn=turnCount;tryDig();`)
   check('Campfires.count("flint")===1 && turnCount===digTurn','flint sand find can be claimed only once')
+  run(`dugSandTiles=new Set();rng=()=>0.177;tryDig();`)
+  check('Campfires.count("flint")===1','second half of former sand flint bucket is empty')
   run(`rng=()=>0;map[player.y][player.x]='grass';addInventoryItem('pickaxe');player.miningTutorialSeen=true;
     map[50][62]='boulder';for(let n=0;n<10&&map[50][62]==='boulder';n++)Mining.strike(62,50);`)
   check('Campfires.count("flint")===2 && !Mining.strike(62,50)','completed boulder grants one flint roll, never repeat strikes')
+  run(`rng=()=>0.03;map[50][62]='boulder';for(let n=0;n<10&&map[50][62]==='boulder';n++)Mining.strike(62,50);rng=()=>0;`)
+  check('map[50][62]!=="boulder" && Campfires.count("flint")===2','3% roll no longer yields surface flint')
   run(`groundItems.push({kind:'chest',x:60,y:50,level:0,tier:1});checkGroundAt(60,50);checkGroundAt(60,50)`)
   check('Campfires.count("flint")===3','chest bonus flint is not duplicated by repeat pickup')
   run(`rng=oldRng;player.hp=30;player.berryRegenTurns=0;fire.burnUntil=turnCount+100;

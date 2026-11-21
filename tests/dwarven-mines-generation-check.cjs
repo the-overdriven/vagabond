@@ -72,6 +72,8 @@ const plain = value => JSON.parse(JSON.stringify(value))
     assert(floors.every(f=>f.cage.x===cageShortcut.upper.x && f.cage.y===cageShortcut.upper.y),
       'middle floors reserve the same shaft position')
     assert(floors[0].up.z===ruins.at(-1), 'Mines lead directly back to the last Ruins floor')
+    assert.deepEqual({x:floors[0].up.x,y:floors[0].up.y},floors[0].upstairs)
+    for(let i=1;i<floors.length;i++)assert.deepEqual(floors[i].upstairs,floors[i-1].downstairs,'paired stairs align')
     for (let i=0; i<floors.length; i++) {
       const f=floors[i]
       assert.equal(f.map[f.upstairs.y][f.upstairs.x], 'minestairsup')

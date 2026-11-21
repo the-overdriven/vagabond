@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Independent from the displayed game version; increment for cache refreshes.
-const CACHE_REVISION = 23;
+const CACHE_REVISION = 26;
 const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
@@ -86,6 +86,7 @@ const PRECACHE_URLS = [
   './img/tiles/dwarven-stove.svg',
   './img/tiles/dwarven-hole.svg',
   './img/icons/flint.svg',
+  './img/icons/wayfaringscroll.svg',
   './img/icons/brushwood.svg',
   './src/fireball.js',
   './img/icons/scroll-of-fireball.svg',

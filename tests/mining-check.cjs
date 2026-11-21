@@ -12,7 +12,7 @@ const plain = value => JSON.parse(JSON.stringify(value))
     if(!miningTrial)throw Error('mine floor candidate failed');
     Mining.generate([miningTrial]);
     deepLevels=Array.from({length:7},()=>mineUnusedChainLevel()).concat(miningTrial);
-    surfaceMap=blankCaveMap();caveMaps=[blankCaveMap()];caves=[];
+    surfaceMap=blankCaveMap();undergroundMap=blankCaveMap();caveMaps=[undergroundMap];caves=[];
     discovered=Array.from({length:MAP_H},()=>Array(MAP_W).fill(false));
     undergroundDiscoveredL1=Array.from({length:MAP_H},()=>Array(MAP_W).fill(false));
     spawnPoint={x:5,y:5};currentZ=-9;currentCave=-1;map=miningTrial.map;
@@ -77,7 +77,16 @@ const plain = value => JSON.parse(JSON.stringify(value))
   assert.equal(run('rngState'),rngBefore)
   assert.equal(run('player.miningTutorialSeen'),true,'loading never shows the tutorial again')
   assert.equal(run('Mining.find(Mining.activeLevel(),testSeam.x,testSeam.y).progress'),1)
+  run(`undergroundDiscovered[testSeam.y][testSeam.x]=true;ensureMiniBases();
+    var originalMiniPaint=paintMiniTile;var seamPaints=[];
+    paintMiniTile=(base,x,y,view)=>{originalMiniPaint(base,x,y,view);
+      if(x===testSeam.x&&y===testSeam.y)seamPaints.push({scale:base.scale,color:base.ctx.fillStyle})};
+    mapPreviewBase={};`)
   await run('tryMove(testSeam.x-player.x,testSeam.y-player.y)')
+  assert(run('MINI_SCALES.every(scale=>seamPaints.some(p=>p.scale===scale&&p.color===(TILE.cavefloor2.mini||TILE.cavefloor2.color)))'),
+    'mined wall repaints the discovered floor on both cached maps')
+  assert.equal(run('mapPreviewBase'),null,'stale full-map preview is invalidated')
+  run('paintMiniTile=originalMiniPaint')
   assert.equal(run('map[testSeam.y][testSeam.x]'),'cavefloor2')
   assert.equal(run('Mining.excavatedAt(Mining.activeLevel(),testSeam.x,testSeam.y)'),true)
   assert.equal(run('player.mining'),0,'one weak seam no longer grants an entire Mining level')

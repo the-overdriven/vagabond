@@ -323,9 +323,8 @@ describe('Gear bases on procedural artifacts', () => {
       const after=playerPermanentStats()
       check(after.def===initial.def+16,'12 base + 4 enchanted DEF')
       check(after.spd===initial.spd+1,'-2 armor SPD + 3 enchanted SPD')
-      check(itemStatLine(player.equip.armor).includes('DEF 12'),'base DEF visible')
-      check(itemStatLine(player.equip.armor).includes('DEF +4'),'enchantment visible')
-      check(itemStatLine(player.equip.armor).includes('SPD -2'),'penalty visible')
+      check(itemStatLine(player.equip.armor).includes('DEF 12+4'),'base DEF and enchantment combined')
+      check(!['SPD -','GRACE -','DEF +4'].some(part=>itemStatLine(player.equip.armor).includes(part)),'no duplicate DEF or inherent penalties')
       const recorded=JSON.parse(JSON.stringify(replayData))
       const saved=JSON.parse(JSON.stringify(buildSaveObject()))
       loadGameFromObject(saved,{isReplayInit:true})
@@ -374,7 +373,7 @@ describe('Gear bases on procedural artifacts', () => {
       check(playerGrace(true)===Math.max(0,weapon.grace+playerGraceBonus()-1),'artifact weapon uses GRACE')
       check(Math.abs(combatDelay(weapon,true)-6/playerCombatGrace(weapon))<1e-9,
         'artifact weapon uses effective combat GRACE')
-      check(itemStatLine(armor).includes('GRACE -1'),'armor penalty in UI')
+      check(!itemStatLine(armor).includes('GRACE -1'),'inherent armor GRACE penalty hidden in UI')
     })()`))
   })
 
@@ -386,9 +385,9 @@ describe('Gear bases on procedural artifacts', () => {
       player.inventory=[item];invTab='armor';toggleInv(true)
     })()`))
     cy.get('#invList').should('contain.text','Brigandine of Ingvar')
-    cy.get('#invList').should('contain.text','DEF 12')
-    cy.get('#invList').should('contain.text','DEF +4')
-    cy.get('#invList').should('contain.text','SPD -2')
+    cy.get('#invList').should('contain.text','DEF 12+4')
+    cy.get('#invList').should('not.contain.text','DEF +4')
+    cy.get('#invList').should('not.contain.text','SPD -2')
   })
 
 

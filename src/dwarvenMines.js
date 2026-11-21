@@ -47,7 +47,7 @@ function mineFloorWalkable(cm, start) {
   return seen
 }
 
-function mineFloorCandidate(floorIndex, floorCount) {
+function mineFloorCandidate(floorIndex, floorCount, entryAnchor = null) {
   const cfg = minePackageConfig().layout
   const width = randInt(...cfg.widthRange), height = randInt(...cfg.heightRange)
   if (width + cfg.edgeMargin*2 >= MAP_W || height + cfg.edgeMargin*2 >= MAP_H) return null
@@ -63,7 +63,7 @@ function mineFloorCandidate(floorIndex, floorCount) {
     {x:xL,y:yT}, {x:xA,y:yT}, {x:xA,y:yB},
     {x:xB,y:yB}, {x:xB,y:yT}, {x:xR,y:yT}
   ]
-  const cm = blankCaveMap()
+  let cm = blankCaveMap()
   const widthAt = () => chance(cfg.widePassageChance) ? cfg.passageWidthRange[1] : cfg.passageWidthRange[0]
   for (let i = 1; i < main.length; i++) mineCarveLine(cm,main[i-1],main[i],bounds,widthAt())
   // This deliberately links distant portions of the winding backbone. Before
@@ -118,14 +118,36 @@ function mineFloorCandidate(floorIndex, floorCount) {
   if(reachable.size!==floorTiles || usefulBranches===0 ||
       caveDryPathLength(cm,main[0],main[5],'cavefloor2')<cfg.minStairWalkingDistance)return null
 
-  const upper=main[0], lower=main[5]
+  let upper=main[0], lower=main[5]
   // Keep the shortcut away from both stair approaches, even on a short floor.
   const cageCandidates=floorCells.filter(p=>
     Math.max(Math.abs(p.x-upper.x),Math.abs(p.y-upper.y))>8 &&
     Math.max(Math.abs(p.x-lower.x),Math.abs(p.y-lower.y))>8 &&
     reachable.has(keyXY(p.x,p.y)))
   if(!cageCandidates.length)return null
-  const cagePad=pick(cageCandidates)
+  let cagePad=pick(cageCandidates)
+  // Place the entire connected layout at the previous floor's exit. Reflect
+  // inward when necessary; never shift the entrance or carve a remote landing.
+  if(entryAnchor) {
+    const axisSign=(anchor, origin, low, high, size)=>{
+      const preferred=anchor < size/2 ? 1 : -1
+      return [preferred,-preferred].find(sign=>[low,high].every(edge=>{
+        const p=anchor+sign*(edge-origin)
+        return p>=cfg.edgeMargin && p<size-cfg.edgeMargin
+      }))
+    }
+    const sx=axisSign(entryAnchor.x,upper.x,bounds.x1,bounds.x2,MAP_W)
+    const sy=axisSign(entryAnchor.y,upper.y,bounds.y1,bounds.y2,MAP_H)
+    if(!sx||!sy)return null
+    const origin=upper
+    const place=p=>({x:entryAnchor.x+sx*(p.x-origin.x),y:entryAnchor.y+sy*(p.y-origin.y)})
+    const placed=blankCaveMap()
+    for(let y=bounds.y1;y<=bounds.y2;y++)for(let x=bounds.x1;x<=bounds.x2;x++) {
+      if(cm[y][x]!=='cavefloor2')continue
+      const p=place({x,y});placed[p.y][p.x]='cavefloor2'
+    }
+    cm=placed;upper=place(upper);lower=place(lower);cagePad=place(cagePad)
+  }
   cm[upper.y][upper.x]='minestairsup'
   if(floorIndex<floorCount-1)cm[lower.y][lower.x]='minestairsdown'
   return {
@@ -284,10 +306,15 @@ function buildDwarvenMinesStratum() {
   const sealed=last&&minePlacedStair(last.level,'dwarvenminessealed')
   if(!sealed)return false
   const count=pickWeighted(cfg.floorCounts.map((n,i)=>({n,weight:cfg.floorCountWeights[i]})),e=>e.weight).n
+  // Mine depths are reserved in the global chain; do not overwrite an
+  // existing dungeon if another package is ever added at these depths.
+  if(deepLevels.length>Math.abs(cfg.firstZ)-2)return false
   const mine=[]
   for(let index=0;index<count;index++){
     let level=null
-    for(let attempt=0;attempt<cfg.layout.floorGenerationRetries&&!level;attempt++)level=mineFloorCandidate(index,count)
+    const entryAnchor=index===0?sealed:mine[index-1].mineDownstairs
+    for(let attempt=0;attempt<cfg.layout.floorGenerationRetries&&!level;attempt++)
+      level=mineFloorCandidate(index,count,entryAnchor)
     if(!level)return false
     mine.push(level)
   }
@@ -297,13 +324,13 @@ function buildDwarvenMinesStratum() {
   // The Ruins jump to the fixed first mine depth from their actual final floor.
   while(deepLevels.length<Math.abs(cfg.firstZ)-2)deepLevels.push(mineUnusedChainLevel())
   for(const level of mine)deepLevels.push(level)
-  last.level.mineTransitions={...(last.level.mineTransitions||{}),down:{z:cfg.firstZ,...mine[0].mineUpstairs}}
+  last.level.mineTransitions={...(last.level.mineTransitions||{}),down:{z:cfg.firstZ,...sealed}}
   mine[0].mineTransitions.up={z:last.z,...sealed}
   for(let index=1;index<count;index++){
     const above=mine[index-1],below=mine[index]
     const aboveZ=cfg.firstZ-index+1,belowZ=cfg.firstZ-index
-    above.mineTransitions.down={z:belowZ,...below.mineUpstairs}
-    below.mineTransitions.up={z:aboveZ,...above.mineDownstairs}
+    above.mineTransitions.down={z:belowZ,...above.mineDownstairs}
+    below.mineTransitions.up={z:aboveZ,...below.mineUpstairs}
   }
   const upper=mine[0].mineCagePad,lower=mine[count-1].mineCagePad
   dungeonShortcuts.push({

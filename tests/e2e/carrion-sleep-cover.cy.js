@@ -89,6 +89,10 @@ describe('Carrion instinct, sleeping Wyverns and forest cover', () => {
       map[e.y][e.x]='hill'
       html=tileInspectInfo(e.x,e.y).html
       check(html.includes('Terrain: Hill · SPD −1, DEF +1'),'monster hill tradeoff is shown')
+      e.def=1.4; e.artifactSunderStacks=1
+      html=tileInspectInfo(e.x,e.y).html
+      check(html.includes('Terrain: Hill · SPD −1, DEF +1'),'fractional defense and Sunder do not distort terrain DEF')
+      e.artifactSunderStacks=0
       map[e.y][e.x]='forest'
       html=tileInspectInfo(e.x,e.y).html
       check(html.includes('Terrain: Forest · SPD −1'),'monster SPD loss is shown')

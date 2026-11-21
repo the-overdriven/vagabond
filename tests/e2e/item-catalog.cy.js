@@ -214,6 +214,46 @@ describe('Non-gear item catalog', () => {
     })
   })
 
+  it('turns Homecoming into one bound return scroll and preserves its exact destination through a save', () => {
+    cy.visit('/')
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.readFile('tests/saves/Tester_start.json').then(save => cy.window().then(win => {
+      win.__wayfaringFixture=save
+      return win.eval(`(async () => {
+        const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+        loadGameFromObject(window.__wayfaringFixture,{isReplayInit:true})
+        delete window.__wayfaringFixture
+        replayRecording=false;replayAnimationsDisabled=true
+        enemies=[];npcs=[];groundItems=[];occupied=new Set()
+        currentZ=-1;currentCave=0;map=undergroundMap;undergroundDiscovered=undergroundDiscoveredL1
+        player.x=40;player.y=40;map[40][40]='cavefloor';map[39][40]='cavefloor'
+        surfaceDepartureTurn=turnCount;player.berserkTurns=0
+        player.inventory=[createItem('homecomingscroll',{count:2})]
+        const before=turnCount
+        startReplayRecording()
+        await ITEM_ACTION_HANDLERS.homecomingscroll(0)
+        const scroll=player.inventory.find(i=>i.kind==='wayfaringscroll')
+        check(currentZ===0&&player.inventory[0].count===1&&turnCount===before+1,'one Homecoming spent')
+        check(scroll.destination.x===40&&scroll.destination.y===40&&scroll.destination.z===-1,'exact remembered coordinates')
+        check(!canDropInventoryItem(scroll)&&itemSellValue(scroll)===0&&
+          itemIconHTML(scroll).includes('wayfaringscroll.svg'),'bound scroll has its own icon and cannot be traded or dropped')
+        const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(saved,{isReplayInit:true})
+        const item=player.inventory.find(i=>i.kind==='wayfaringscroll')
+        check(item.destination.levelKind==='chain'&&item.destination.caveIndex===0,'destination survives save/load')
+        const index=player.inventory.indexOf(item),turn=turnCount
+        undergroundMap[40][40]='cavewall'
+        await ITEM_ACTION_HANDLERS.wayfaringscroll(index)
+        check(turnCount===turn&&player.inventory.includes(item)&&currentZ===0,'obstruction never spends the scroll')
+        undergroundMap[40][40]='cavefloor'
+        await ITEM_ACTION_HANDLERS.wayfaringscroll(index)
+        check(currentZ===-1&&player.x===40&&player.y===40&&map===undergroundMap,'exact tile restored')
+        check(turnCount===turn+1&&!player.inventory.some(i=>i.kind==='wayfaringscroll'),'one-time return')
+        check(replayData.actions.map(a=>a.action).join(',')==='homecomingscroll,wayfaringscroll','both successful readings recorded')
+      })()`)
+    }))
+  })
+
   it('creates stacks and distinct inscriptions and sells Homecoming for 70g', () => {
     beginNewGame('Catalog Tester')
     cy.window().then(win => {

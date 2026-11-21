@@ -344,6 +344,21 @@
     ],
     "baseValue": 70
   },
+  "wayfaringscroll": {
+    "name": "Scroll of Wayfaring",
+    "description": "Returns you to the place where you last read a Scroll of Homecoming. The magic fades after one return journey.",
+    "category": "supplies",
+    "stackable": false,
+    "droppable": false,
+    "sellValue": 0,
+    "actions": [
+      {
+        "label": "Read",
+        "handler": "wayfaringscroll"
+      }
+    ],
+    "baseValue": 0
+  },
   "idscroll": {
     "name": "Scroll of Identification",
     "description": "Reveals the true name, effects and possible curse of one unidentified artifact.",

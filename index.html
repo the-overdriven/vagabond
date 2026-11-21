@@ -302,7 +302,7 @@ more difficult:
         font-size: 10px;
         font-weight: bold;
         white-space: nowrap;
-        text-shadow: 0 1px 2px #090807, 1px 0 2px #090807;
+        text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000;
         pointer-events: none;
       }
     }
@@ -1538,20 +1538,57 @@ more difficult:
   }
 
   function mineTransitionArrival(destination, destinationMap) {
-    const allowed = (x,y) => TILE[destinationMap[y]?.[x]]?.walk &&
-      !enemies.some(e => e.alive && e.level === destination.z && e.levelKind === 'chain' && e.x === x && e.y === y)
-    const queue=[{x:destination.x,y:destination.y}],seen=new Set([keyXY(destination.x,destination.y)])
-    const directions=[[0,-1],[1,0],[0,1],[-1,0]]
-    for(let i=0;i<queue.length;i++) {
-      const spot=queue[i]
-      if(allowed(spot.x,spot.y))return spot
-      for(const [dx,dy] of directions){
-        const x=spot.x+dx,y=spot.y+dy,k=keyXY(x,y)
-        if(seen.has(k)||!TILE[destinationMap[y]?.[x]]?.walk)continue
-        seen.add(k);queue.push({x,y})
-      }
+    const {x,y,z}=destination
+    const source=map[player.y]?.[player.x], target=destinationMap[y]?.[x]
+    const paired=source==='dwarvenminesopen' || source==='minestairsdown' ? target==='minestairsup' :
+      source==='minestairsup' ? ['minestairsdown','dwarvenminesopen'].includes(target) :
+      source==='minecageupperon' ? target==='minecageloweron' :
+      source==='minecageloweron' && target==='minecageupperon'
+    if(x!==player.x || y!==player.y || z===currentZ || !paired || !TILE[target]?.walk)return null
+    return clearTransitionLanding(destination, destinationMap, 'chain') ? {x,y} : null
+  }
+
+  // A creature on the destination floor yields the exact landing, never the
+  // player. Search destination geometry without consulting active occupancy.
+  function clearTransitionLanding({x,y,z}, destinationMap, kind) {
+    const matches=e=>(e.level??0)===z && (!e.levelKind || e.levelKind===kind)
+    const actors=enemies.filter(e=>e.alive && matches(e))
+    if(kind==='surface')actors.push(...npcs)
+    const occupants=actors.filter(e=>e.x===x && e.y===y)
+    if(!occupants.length)return true
+    const level=kind==='chain'?deepLevels[chainDepthForZ(z)-2]:null
+    const blocked=new Set(actors.map(e=>keyXY(e.x,e.y)))
+    const traversable=(px,py)=>{
+      const tile=destinationMap[py]?.[px]
+      return TILE[tile]?.walk && !['water','river','lava','ice','crackingice','crypttrap'].includes(tile) &&
+        !(kind==='surface' && grasslandTrees.has(keyXY(px,py))) &&
+        Mining.find(level,px,py)?.kind!=='exposed' &&
+        !groundItems.some(g=>g.kind==='dwarvenstove' && matches(g) && g.x===px && g.y===py)
     }
-    return null
+    const moves=[]
+    for(const actor of occupants){
+      const queue=[{x,y}],seen=new Set([keyXY(x,y)])
+      let free=null
+      for(let i=0;i<queue.length&&!free;i++)for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]){
+        const px=queue[i].x+dx,py=queue[i].y+dy,k=keyXY(px,py)
+        if(seen.has(k)||!traversable(px,py))continue
+        seen.add(k)
+        if(!blocked.has(k) && !CAVE_TRANSITION_TILES.has(destinationMap[py][px]) &&
+          DungeonTraps.safeSpawn(px,py,z,kind) && !DungeonTraps.isTrigger(destinationMap[py][px]) &&
+          !level?.hazards?.some(h=>h.type==='crusher' && h.geometry.dangerTiles.some(p=>p.x===px && p.y===py))){free={x:px,y:py};blocked.add(k);break}
+        queue.push({x:px,y:py})
+      }
+      if(!free)return false // Never overlap actors or relocate the player instead.
+      moves.push({actor,free})
+    }
+    for(const {actor,free} of moves){
+      cancelPreparedEnemyAbility(actor)
+      actor.x=free.x;actor.y=free.y
+      actor.animStart=undefined;actor.attackStart=undefined;actor.farPath=null
+      actor.farTargetX=null;actor.farTargetY=null
+      actor.forestConcealX=null;actor.forestConcealY=null
+    }
+    return true
   }
 
   function travelDwarvenMineStair(destination, direction, travelMessage=null) {
@@ -1561,13 +1598,10 @@ more difficult:
     const arrival=mineTransitionArrival(destination,nextMap)
     if(!arrival){log('There is no safe space to use this passage.', 'info');return true}
     currentZ=destination.z
-    // A legacy mine arrival may be displaced by its fallback search.
-    // Such geometry is not a qualifying pure-Z move for Dancer.
-    markPlayerPositionChanged(arrival.x === player.x && arrival.y === player.y)
+    markPlayerPositionChanged(true)
     currentCave=-1
     map=nextMap
     undergroundDiscovered=depthUndergroundDiscovered(depth)
-    player.x=arrival.x;player.y=arrival.y
     log(travelMessage || (direction==='down'?'You descend into the abandoned Dwarven Mines.':'You climb toward the upper workings.'), 'info')
     return true
   }
@@ -1824,10 +1858,12 @@ more difficult:
     } else if (tile === 'dwarvenminesopen') {
       const level=deepLevels[chainDepthForZ(currentZ)-2]
       if(!travelDwarvenMineStair(level?.mineTransitions?.down,'down'))return false
+      if(currentZ===departureZ)return true
     } else if (tile === 'minestairsup' || tile === 'minestairsdown') {
       const level=deepLevels[chainDepthForZ(currentZ)-2]
       const down=tile==='minestairsdown'
       if(!travelDwarvenMineStair(level?.mineTransitions?.[down?'down':'up'],down?'down':'up'))return false
+      if(currentZ===departureZ)return true
     } else if (tile === 'minecageupperoff' || tile === 'minecageloweroff' ||
                tile === 'minecageupperon' || tile === 'minecageloweron') {
       const beforeCageZ=currentZ
@@ -3888,22 +3924,6 @@ more difficult:
       if (!it.identified) return '???'
       parts.push(...physicalGearStatParts(it))
       if (it.mod && it.originalGearName) parts.push(`Original: ${it.originalGearName}`)
-      if (it.artifactSlot === 'shield') {
-        parts.push('SPD ' + (it.base === 'Buckler' ? -1 : -2))
-        if (it.base !== 'Buckler') parts.push('GRACE -1')
-      }
-      if (it.artifactSlot === 'armor') {
-        if (it.speedPenalty) parts.push('SPD -' + it.speedPenalty)
-        if (it.gracePenalty) parts.push('GRACE -' + it.gracePenalty)
-      }
-      if (it.bonuses) {
-        if (it.bonuses.atk) parts.push('ATK +' + it.bonuses.atk)
-        if (it.bonuses.def) parts.push('DEF +' + it.bonuses.def)
-        if (it.bonuses.hp) parts.push('HP +' + it.bonuses.hp)
-        if (it.bonuses.mf) parts.push('MF +' + it.bonuses.mf)
-        if (it.bonuses.spd) parts.push('SPD +' + it.bonuses.spd)
-        if (it.bonuses.grace) parts.push('GRACE +' + it.bonuses.grace)
-      }
       if (it.maxHpPct) parts.push('Max HP ' + it.maxHpPct + '%')
       const ability = artifactAbilityDefinition(it)
       if (it.abilityId === 'berserkers_oath' && it.berserkerOathRoll)
@@ -3918,29 +3938,34 @@ more difficult:
   }
 
   function physicalGearStatParts(it) {
-    const parts = []
+    const parts = [], extras = []
     const modifierStat = playerGearModifierStat(it)
-    if (it.atk) parts.push('ATK ' + it.atk + (modifierStat === 'atk' ? ('+' + it.modAmt) : ''))
-    if (it.rangedAtk) parts.push('RANGED ATK ' + it.rangedAtk +
-      (modifierStat === 'rangedAtk' ? ('+' + it.modAmt) : '') + ', RANGE ' + it.rangedRange)
-    if (it.def) parts.push('DEF ' + it.def + (it.mod === 'def' ? ('+' + it.modAmt) : ''))
-    if (isWeaponItem(it) && (it.grace !== undefined || it.spd !== undefined)) {
-      const baseGrace = it.grace !== undefined ? it.grace : 6 - it.spd
-      const graceBonus = it.mod === 'grace' ? it.modAmt : 0
-      parts.push('GRACE ' + baseGrace + (graceBonus ? (graceBonus > 0 ? '+' : '') + graceBonus : ''))
+    const bonuses = it.kind === 'artifact' ? (it.bonuses || {}) : {}
+    const bonus = stat => (modifierStat === stat ? (it.modAmt || 0) : 0) + (bonuses[stat] || 0)
+    const signed = value => (value > 0 ? '+' : '') + value
+    const add = (label, base, extra) => {
+      if (base !== undefined) parts.push(label + ' ' + base + (extra ? signed(extra) : ''))
+      else if (extra) extras.push(label + ' ' + signed(extra))
     }
-    if (!isWeaponItem(it) && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
-
-    if (modifierStat === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
-    if (it.mod === 'def' && !it.def) parts.push('DEF +' + it.modAmt)
-    if (it.mod === 'grace' && !(isWeaponItem(it) && (it.grace !== undefined || it.spd !== undefined))) parts.push('GRACE +' + it.modAmt)
-    if (it.mod === 'spd' && (isWeaponItem(it) || it.spd === undefined)) parts.push('SPD +' + it.modAmt)
-
-    if (it.mod === 'hp') parts.push('HP +' + it.modAmt)
-    if (it.mod === 'mf') parts.push('MF +' + it.modAmt)
-    if (it.mod === 'xp') parts.push('XP +' + it.xpBonus + '%')
-
-    return parts
+    add('ATK', it.atk || undefined, bonus('atk'))
+    if (it.rangedAtk) {
+      add('RANGED ATK', it.rangedAtk, bonus('rangedAtk'))
+      parts[parts.length - 1] += ', RANGE ' + it.rangedRange
+    }
+    add('DEF', it.def || undefined, bonus('def'))
+    const weapon = isWeaponItem(it)
+    const baseGrace = weapon && (it.grace !== undefined || it.spd !== undefined)
+      ? (it.grace ?? 6 - it.spd) : undefined
+    add('GRACE', baseGrace, bonus('grace'))
+    // Inherent armor/shield penalties are deliberately omitted from artifact
+    // descriptions. Fleetfoot already cancels equipment SPD penalties live.
+    const baseSpd = !weapon && it.spd !== undefined &&
+      !(it.kind === 'artifact' && it.spd < 0) ? it.spd : undefined
+    add('SPD', baseSpd, bonus('spd'))
+    add('HP', undefined, bonus('hp'))
+    add('MF', undefined, bonus('mf'))
+    if (it.mod === 'xp') extras.push('XP +' + it.xpBonus + '%')
+    return parts.concat(extras)
   }
 
   function weaponGrace(weapon) {
@@ -9042,6 +9067,7 @@ more difficult:
     cookedFood: idx => Campfires.eat(idx),
     scrollOfInvisibility: idx => useInvisibilityScroll(idx),
     homecomingscroll: idx => useHomecomingScroll(idx, true),
+    wayfaringscroll: idx => useWayfaringScroll(idx, true),
     tombstone: idx => readTombstone(idx),
     tauntingNote: idx => readTauntingNote(idx),
     echoBlightHorn: idx => useEchoBlightHorn(idx),
@@ -9068,7 +9094,7 @@ more difficult:
 
   const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','strangeGreenPotion','scrollOfFear','scrollOfDeathShield',
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
-    'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','echoBlightHorn','venomGland'])
+    'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','wayfaringscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
     async idx => {
       const item = player.inventory[idx]
@@ -9588,7 +9614,8 @@ more difficult:
       updateHud()
       return
     }
-    const roll = randInt(1, 100)
+    const fineRoll = randInt(1, 200)
+    const roll = Math.ceil(fineRoll / 2)
     if (roll <= 5) log('You hit something hard. It turns out to be a stone.', 'loot')
     else if (roll <= 8) {
       player.gold += 1
@@ -9641,7 +9668,7 @@ more difficult:
         log('Something bursts from the sand beside you - a scarab!', 'bad')
       } else log('You hear something moving beneath the sand, but nothing emerges.', 'info')
     } else if (roll === 17) log('You dig up a silver spoon. Someone threw away a good spoon.', 'loot')
-    else if (roll === 18) { addInventoryItem('flint'); log('You dig up a Flint Stone.', 'loot') }
+    else if (fineRoll === 35) { addInventoryItem('flint'); log('You dig up a Flint Stone.', 'loot') }
     else log('You dig carefully, but find nothing.', 'info')
     render()
     updateHud()
@@ -10195,6 +10222,12 @@ more difficult:
   let worldGenerating = false
   let reusingWorldAfterPermadeath = false
 
+  function npcHasNewDialogue(npc) {
+    return (npc.name === 'Old Hunter' && oldHunterHasNewDialogue()) ||
+      (npc.name === FISHERMAN_NAME && fishermanHasNewDialogue()) ||
+      (npc.name === 'Merchant' && AdaptivePlayerTrolling.fortQuestOption() === 'turnin')
+  }
+
   function npcMenuOptions(npc) {
     if (npc.name === 'Old Hunter') {
       const options = [{id:'talk',label:'Talk'},{id:'gossip',label:'Ask about the ancient forest'}]
@@ -10541,13 +10574,13 @@ more difficult:
         clearAutoPath()
         return
       }
-      tryMove(next.x - player.x, next.y - player.y)
+      tryMove(next.x - player.x, next.y - player.y, true)
       return
     }
     if (!pendingMove) return
     const next = pendingMove
     pendingMove = null
-    tryMove(next.dx, next.dy)
+    tryMove(next.dx, next.dy, next.autoTravel)
   }
 
   function clearAutoPath() {
@@ -10880,11 +10913,11 @@ more difficult:
     return moved
   }
 
-  async function tryMove(dx, dy) {
+  async function tryMove(dx, dy, autoTravel = false) {
     if (fireballAim || holeJumpOpen) return false
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
-      pendingMove = {dx: dx, dy: dy}
+      pendingMove = {dx: dx, dy: dy, autoTravel}
       return
     }
     // Bumping an NPC opens the same zero-turn menu as clicking. While confused,
@@ -10911,7 +10944,7 @@ more difficult:
       const moved = finishPlayerStep(nx,ny)
       if (moved) {
         artifactAbilityMessage('elusive','Elusive grants a free step!', 'You slip through the opening!')
-        animateCameraToPlayer(fromPos)
+        animateCameraToPlayer(fromPos, {duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
       } else render()
       updateHud(); updateTooltip(); flushPendingMove()
       return
@@ -11193,7 +11226,8 @@ more difficult:
     // replace it with the ordinary 140 ms walking pan when the spider reacts
     // to this movement in the same turn (the normal pan would snap the player
     // to the pulled destination before the web arrives).
-    if (moved && !['pull', 'charge-knockback', 'wrestle'].includes(moveAnim?.kind)) animateCameraToPlayer(fromPos)
+    if (moved && !['pull', 'charge-knockback', 'wrestle'].includes(moveAnim?.kind))
+      animateCameraToPlayer(fromPos, {duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
     else {
       render()
       runAnimationLoop()
@@ -11829,13 +11863,29 @@ more difficult:
     ctx.fillText(ch, px + TILE_PX / 2, py + 3)
   }
 
+  function enemyPrefixVisual(e) {
+    return e.adaptiveEventId === 'forest_spirit' ? 'ForestSpirit' : e.prefix
+  }
+
+  function enemyPrefixTint(prefix, alpha) {
+    const colors = RENDER_STYLE.enemies.prefixArea.colors
+    const [r, g, b] = colors[prefix] || colors.other
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+
+  function enemyBackingColor(e) {
+    const prefix = enemyPrefixVisual(e)
+    return prefix ? enemyPrefixTint(prefix, RENDER_STYLE.enemies.prefixArea.circleAlpha) :
+      'rgba(240, 243, 246, 0.17)'
+  }
+
   // Tint nearby visible tiles below all enemy glyphs. The square follows the
   // monster without altering the letter, terrain, or fog of war.
   function drawEnemyPrefixArea(px, py, x, y, prefix, visibleTiles) {
     if (!prefix) return
     const spirit = prefix === 'ForestSpirit'
     const champion = prefix === 'Champion'
-    const style = champion ? RENDER_STYLE.enemies.prefixArea.champion : RENDER_STYLE.enemies.prefixArea.other
+    const style = RENDER_STYLE.enemies.prefixArea
     const radius = champion ? 2 : 1
     for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
       const mx = x + dx, my = y + dy
@@ -11843,8 +11893,9 @@ more difficult:
       if ((visibleTiles && !visibleTiles.has(keyXY(mx, my))) || !undergroundTileVisible(mx, my)) continue
       const vx = px + dx * TILE_PX, vy = py + dy * TILE_PX
       if (vx <= -TILE_PX || vy <= -TILE_PX || vx >= canvas.width || vy >= canvas.height) continue
-      ctx.fillStyle = spirit ? 'rgba(75, 195, 119, 0.17)' :
-        champion && Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outer : style.inner
+      const alpha = spirit ? style.spiritAlpha : champion ?
+        (Math.max(Math.abs(dx), Math.abs(dy)) === 2 ? style.outerAlpha : style.championAlpha) : style.innerAlpha
+      ctx.fillStyle = enemyPrefixTint(prefix, alpha)
       ctx.fillRect(vx, vy, TILE_PX, TILE_PX)
     }
   }
@@ -12632,6 +12683,7 @@ more difficult:
   let attackAnimResolve = null
   let deathTransition = null
   const MOVE_ANIM_MS = 140
+  const AUTO_MOVE_ANIM_MS = MOVE_ANIM_MS / 1.4
   const CHARGE_STEP_MOVE_MS = 85
   const CHARGE_STEP_PAUSE_MS = 35
   const CHARGE_STEP_MS = CHARGE_STEP_MOVE_MS + CHARGE_STEP_PAUSE_MS
@@ -14202,13 +14254,13 @@ more difficult:
     }
     for (const {e} of visibleEnemies) if (!enemyInvisibleActive(e)) drawEnemyPrefixArea(
       Math.round((e.x - camX) * TILE_PX), Math.round((e.y - camY) * TILE_PX),
-      e.x, e.y, e.adaptiveEventId === 'forest_spirit' ? 'ForestSpirit' : e.prefix, undergroundVisible)
+      e.x, e.y, enemyPrefixVisual(e), undergroundVisible)
     // A restrained, one-tile round backing separates small monster sprites
     // from busy scenery. ASCII stays fully unchanged.
     if (USE_TILE_IMAGES) for (const {e, vx, vy} of visibleEnemies) {
       if (enemyInvisibleActive(e)) continue
       ctx.save()
-      ctx.fillStyle = 'rgba(240, 243, 246, 0.17)'
+      ctx.fillStyle = enemyBackingColor(e)
       ctx.beginPath()
       ctx.arc(vx + TILE_PX / 2, vy + TILE_PX / 2, TILE_PX * 0.48, 0, Math.PI * 2)
       ctx.fill()
@@ -14348,8 +14400,7 @@ more difficult:
       const vx = Math.round((nxp - camX) * TILE_PX), vy = Math.round((nyp - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
       drawSwimmingCreature(vx, vy, () => drawNpcVisual(vx, vy, n))
-      if ((n.name === 'Old Hunter' && oldHunterHasNewDialogue()) ||
-        (n.name === FISHERMAN_NAME && fishermanHasNewDialogue())) {
+      if (npcHasNewDialogue(n)) {
         ctx.save()
         ctx.font = `bold ${Math.max(12, Math.round(TILE_PX * 0.46))}px Consolas, 'Courier New', monospace`
         ctx.textAlign = 'center'
@@ -14825,8 +14876,9 @@ more difficult:
       const effectiveEnemySpeed = enemySpd(e)
       const ordinarySpeedWithoutTerrain = Math.max(1, e.spd)
       const terrainStatChanges = {
-        defense: effectiveEnemyDef - Math.max(0, enemyDefensiveBase(e) + (inspiringChampionFor(e) ? INSPIRED_DEF : 0)),
-        speed: effectiveEnemySpeed - (ordinarySpeedWithoutTerrain + rareStartledBonus(e, ordinarySpeedWithoutTerrain)),
+        defense: Math.round(effectiveEnemyDef) - Math.round(Math.max(0, enemyDefensiveBase(e) +
+          (inspiringChampionFor(e) ? INSPIRED_DEF : 0) - (e.artifactSunderStacks || 0))),
+        speed: Math.round(effectiveEnemySpeed) - Math.round(ordinarySpeedWithoutTerrain + rareStartledBonus(e, ordinarySpeedWithoutTerrain)),
       }
       const terrainInfo = terrainModifierText(terrainStatChanges)
       const terrainName = terrainDisplayName(map[e.y]?.[e.x])
@@ -14849,17 +14901,17 @@ more difficult:
       <img src="${imageSrc(enemyPortraitPath(e.adaptiveEventId === 'debt_collector' || e.adaptiveEventId === 'undead_shield_hunter' ? e.name : e.baseName || e.name))}" onerror="this.style.display='none'">
       <div class="info-body">
       <div class="nm tier${e.tier} enemy-tier${e.tier}">${e.name}${(e.stolenItem || e.stolenGold > 0) ? ' ' + thiefMarkerHTML() : ''}${enemyIsShooter(e) ? (e.shooterMode === 'melee' ? ' <span class="shooter-marker" title="Melee ready">⚔</span>' : ' <span class="shooter-marker" title="Ranged ready">&#127993;&#xfe0e;</span>') : ''}${e.victoryLevel ? ` <span style="color:#e0473f">☠︎ ${e.victoryLevel}</span>` : ''}</div>
-      ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${rareStartledBonus(e)} SPD)` : ''}</div>` : ''}
+      ${e.rareFleeTurns > 0 && rareFleeEligible(e) ? `<div class="pfx">Fleeing${rareStartledBonus(e) ? ` · Startled (+${Math.round(rareStartledBonus(e))} SPD)` : ''}</div>` : ''}
       ${e.adaptiveEventId === 'reckless_fighter' ? e.prefix === 'Graceful' ? `<div class="pfx" style="color:#9cddd7">Graceful · GRACE ${Math.round(enemyGrace(e) || 0)} · precise strikes</div>` : '<div class="pfx" style="color:#e2a66e">Unpredictable · damage can vary from 25% to 175% of normal</div>' : ''}
       ${AdaptivePlayerTrolling.forestBeastAgitated(e) ? '<div class="pfx" style="color:#dfac74">Agitated · +2 detection range in forests</div>' : ''}
       ${e.adaptiveEventId === 'low_hp_carrion' ? '<div class="pfx">Carrion hunter · tracks wounded prey across long distances</div>' : ''}
       ${e.adaptiveEventId === 'beast_hunter' ? '<div class="pfx">Beast Hunter · tracks you from afar, but can lose the trail</div>' : ''}
       ${e.adaptiveEventId === 'undead_shield_hunter' ? `<div class="pfx" style="color:#c4d7e3">Shield guard · ${e.shieldGuardBroken ? 'broken, vulnerable to arrows' : `${AdaptivePlayerTrolling.shieldHunterRemaining(e)} arrow hits until broken; melee and spells bypass`}</div>` : ''}
       ${e.adaptiveEventId === 'debt_collector' && e.debtDemandState !== 'hostile' ? '<div class="pfx">Demands stolen dwarven loot</div>' : ''}
-      ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${e.poisonDamagePerTurn} HP/turn, ${e.poisonDamageRemaining} HP remaining)</div>` : ''}
+      ${e.poisonTurns > 0 ? `<div class="pfx" style="color:#52d778">Poisoned · ${e.poisonTurns} turns (−${Math.round(e.poisonDamagePerTurn)} HP/turn, ${Math.round(e.poisonDamageRemaining)} HP remaining)</div>` : ''}
       ${enemySlowed(e) ? `<div class="pfx">Slowed · ${e.artifactSlowUntilTurn-turnCount} turns (SPD −10%)</div>` : ''}
-      ${e.artifactSunderStacks > 0 ? `<div class="pfx">Sundered · DEF −${e.artifactSunderStacks}</div>` : ''}
-      ${(e.artifactBlindAtkPenalty > 0 || e.artifactBlindAggroPenalty) ? `<div class="pfx">Blinded · ${e.artifactBlindAtkPenalty || 0} ATK lost${e.artifactBlindAggroPenalty ? ', −1 AGGRO' : ''}</div>` : ''}
+      ${e.artifactSunderStacks > 0 ? `<div class="pfx">Sundered · DEF −${Math.round(e.artifactSunderStacks)}</div>` : ''}
+      ${(e.artifactBlindAtkPenalty > 0 || e.artifactBlindAggroPenalty) ? `<div class="pfx">Blinded · ${Math.round(e.artifactBlindAtkPenalty || 0)} ATK lost${e.artifactBlindAggroPenalty ? ', −1 AGGRO' : ''}</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${e.artifactPetrified ? '<div class="pfx">Petrified · next action lost</div>' : ''}
       ${(e.artifactSilencedUntilTurn || 0) > turnCount ? `<div class="pfx">Silenced · ${e.artifactSilencedUntilTurn-turnCount} turns</div>` : ''}
@@ -14887,8 +14939,8 @@ more difficult:
       ${enemyHasAbility(e, 'consumeHealingItem') ? `<div class="pfx">Consumable healing · ${e.consumableHealUsed ? 'spent' : 'ready below 50% HP'}</div>` : ''}
       ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
       ${enemyHasAbility(e, 'exposed') ? `<div class="pfx" style="color:#ffbb71">Exposed · ${enemyExposed(e) ? 'DEF reduced until next action' : 'after melee attack'}</div>` : ''}
-      ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">Shell Retreat · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
-      ${enemyHasAbility(e, 'regen') ? `<div class="pfx" style="color:#82e49b">Regen · +${ENEMY_DEFENSE_CONFIG.regen.healAmount} HP every ${ENEMY_DEFENSE_CONFIG.regen.intervalTurns} turns</div>` : ''}
+      ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">Shell Retreat · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${Math.round(ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus)} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'regen') ? `<div class="pfx" style="color:#82e49b">Regen · +${Math.round(ENEMY_DEFENSE_CONFIG.regen.healAmount)} HP every ${ENEMY_DEFENSE_CONFIG.regen.intervalTurns} turns</div>` : ''}
       ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
       ${e.prefix !== 'Champion' && inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${terrainHtml}
@@ -14901,7 +14953,7 @@ more difficult:
       </div>
       <div class="statrow">
       <span style="color:${atkColor}">ATK ${Math.round(effectiveEnemyAtk)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${defColor}">DEF ${Math.round(effectiveEnemyDef)}</span><span class="statsep" style="color:var(--parchment-dim)"> · </span><span style="color:${spdColor}">SPD ${Math.round(effectiveEnemySpeed)}</span><br class="statbreak"><span class="mobile-hit-separator" style="color:var(--parchment-dim)"> · </span>
-      <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${aggroRange}</span>
+      <span style="color:#e0473f">Hit ${Math.round((1 - missChance(playerSpeed, effectiveEnemySpeed)) * 100)}% · </span><span style="color:#e0473f;opacity:0.7">Aggro ${Math.round(aggroRange)}</span>
       </div>
       </div>`
       }
@@ -15635,6 +15687,16 @@ more difficult:
       ? RENDER_STYLE.specialTiles.dugSand.bg : visible && brownCave ? RENDER_STYLE.minimap.brownCave : visible ? (foraged ? RENDER_STYLE.specialTiles.foragedForest.color : (tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.color : (tileKey === 'grave' || tileKey === 'taiga'
       ? (under.mini || under.color) : (t.mini || t.color)))) : RENDER_STYLE.minimap.fog
     c.fillRect(x * s, y * s, s, s)
+  }
+
+  // Terrain and excavation flags can change in place, while discovery stays
+  // true. Patch those cached pixels without revealing any new terrain.
+  function repaintMinimapTiles(points) {
+    ensureMiniBases()
+    for (const {x,y} of points) for (const scale of MINI_SCALES)
+      paintMiniTile(miniBases[scale],x,y)
+    mapPreviewBase = null
+    minimapDirty = true
   }
 
   function rebuildMinimapBases() {
@@ -16729,6 +16791,9 @@ more difficult:
       if (idx < 0) return
       merchantStock.splice(idx, 1)
       const bought = {...it}
+      // Buying fresh merchant stock proves lawful acquisition. Buybacks
+      // preserve the original provenance so selling and rebuying cannot erase it.
+      if (bought.kind === 'artifact' && !it.merchantSold) bought.merchantPurchased = true
       delete bought.merchantPrice
       delete bought.merchantNew
       delete bought.merchantSold
@@ -17109,14 +17174,97 @@ more difficult:
     if (!it || it.kind !== 'homecomingscroll') return
     if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); const scope = recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
+    const destination = {x:player.x, y:player.y, z:currentZ,
+      levelKind:currentLevelKind(), caveIndex:currentCave}
+    // One return journey can be pending. A new Homecoming replaces its
+    // destination, not a second independent teleport anchor.
+    const returnScroll = player.inventory.find(item => item.kind === 'wayfaringscroll')
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
+    if (returnScroll) returnScroll.destination = destination
+    else player.inventory.push(createItem('wayfaringscroll', {destination}))
     AdaptivePlayerTrolling.onScrollUsed('homecomingscroll')
     log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
     const finish = () => { toggleInv(false); consumeItemTurn() }
     const catchup = returnPlayerToTemple(responsive)
     if (catchup?.then) return catchup.then(finish).finally(() => finishRecordedReplayAction(scope))
     finish()
+  }
+
+  function wayfaringDestination(item) {
+    const d = item?.destination
+    if (!d || ![d.x,d.y,d.z,d.caveIndex].every(Number.isInteger) ||
+        d.x<0 || d.y<0 || d.x>=MAP_W || d.y>=MAP_H) return null
+    let terrain, seen, level
+    if (d.levelKind==='surface' && d.z===0) {
+      terrain=surfaceMap;seen=undergroundDiscoveredL1
+    } else if(d.levelKind==='tower' && d.z>0) {
+      terrain=towerLevels[d.z-1]?.map;seen=towerLevels[d.z-1]?.discovered
+    } else if(d.levelKind==='crypt2' && d.z===-2) {
+      terrain=cryptLevel2?.map;seen=cryptLevel2?.discovered
+    } else if(d.levelKind==='chain' && d.z<0) {
+      const depth=chainDepthForZ(d.z)
+      level=deepLevels[depth-2]
+      if(level?.kind==='unused')return null
+      terrain=depthUndergroundMap(depth);seen=depthUndergroundDiscovered(depth)
+    }
+    const tile=terrain?.[d.y]?.[d.x]
+    if (!terrain || !seen || !(TILE[tile]?.walk || (tile==='water' && raceHas('swims'))) ||
+        ['towervoid','towerentrancesealed','mazegatesealed'].includes(tile) ||
+        Mining.find(level,d.x,d.y)?.kind==='exposed' ||
+        groundItems.some(g=>g.kind==='dwarvenstove' && (g.level??0)===d.z &&
+          (!g.levelKind || g.levelKind===d.levelKind) && g.x===d.x && g.y===d.y)) return null
+    return {d,terrain,seen}
+  }
+
+  function useWayfaringScroll(idx, responsive = false) {
+    if (surfaceCatchupBusy) return
+    const it=player.inventory[idx]
+    if (!it || it.kind!=='wayfaringscroll' || !canUseItemsWhileSwimming()) return
+    const target=wayfaringDestination(it)
+    if (!target) { log('The way back is obstructed. The scroll remains intact.', 'info'); return }
+    const {d,terrain,seen}=target
+    const departureZ=currentZ, departureKind=currentLevelKind(), departureCave=currentCave
+    const changedFloor=d.z!==departureZ || d.levelKind!==departureKind
+    const fromX=player.x, fromY=player.y
+    if (!changedFloor && d.x===fromX && d.y===fromY) {
+      log('You are already at the place the scroll remembers.', 'info'); return
+    }
+    // The landing resolver is deterministic, and failed searches have no
+    // effects. Never spend the scroll or move the player to a substitute tile.
+    if (!clearTransitionLanding(d,terrain,d.levelKind)) {
+      log('The way back is obstructed. The scroll remains intact.', 'info'); return
+    }
+    ensureReplayItemIds()
+    const scope=recordReplayAction({type:'useItem',action:'wayfaringscroll',idx,replayId:it.replayId})
+    player.inventory.splice(idx,1)
+    // This derivative scroll is not eligible for merchant scroll resupply.
+    AdaptivePlayerTrolling.onScrollUsed('wayfaringscroll')
+    currentZ=d.z;currentCave=d.caveIndex;map=terrain;undergroundDiscovered=seen
+    player.x=d.x;player.y=d.y
+    markPlayerPositionChanged()
+    resetSwimming();clearSpiderWeb();player.miningArmedTarget=null
+    pendingMove=null;clearAutoPath();hoveredEnemy=null;bowAimTarget=null
+    stopCameraAnimation();stopAttackAnimation();clearEnemyAnims();snapCameraToPlayer()
+    if(changedFloor){Mimics.onLevelChange();cancelPreparedEnemyAbilitiesOutsideFloor()}
+    rebuildActiveLevelOccupancy()
+    invalidateUndergroundFov();minimapDirty=true
+    if(changedFloor){
+      spawnUnseenBestiaryEncounter()
+      AdaptivePlayerTrolling.onFloorChanged({fromZ:departureZ,fromKind:departureKind,fromCave:departureCave})
+    }
+    log('You read the Scroll of Wayfaring. The familiar world folds around you.', 'good')
+    const finish=()=>{
+      toggleInv(false)
+      // Entering a trigger by magic still activates it; do not grant a free
+      // step or automatically activate stairs, doors or other interactions.
+      DungeonTraps.onEntry(player,changedFloor?-1:fromX,changedFloor?-1:fromY)
+      if(player.hp>0 && !deathTransition)DungeonHazards.onActorEntered(player,changedFloor?-1:fromX,changedFloor?-1:fromY)
+      if(player.hp>0 && !deathTransition)consumeItemTurn()
+    }
+    const catchup=updateSurfaceAbsence(departureZ,responsive)
+    if(catchup?.then)return catchup.then(finish).finally(()=>finishRecordedReplayAction(scope))
+    try{return finish()}finally{finishRecordedReplayAction(scope)}
   }
 
   function useStrangeGreenPotion(idx) {

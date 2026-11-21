@@ -599,8 +599,10 @@ const Mining = (() => {
       !level.mineExcavations.some(d => d.x === p.x && d.y === p.y && !d.removed))
     targets.sort((a, b) => Math.abs(a.x - deposit.x) + Math.abs(a.y - deposit.y) -
       (Math.abs(b.x - deposit.x) + Math.abs(b.y - deposit.y)) || a.y - b.y || a.x - b.x)
-    for (const p of targets.slice(0, limit)) level.map[p.y][p.x] = 'water'
+    const flooded = targets.slice(0, limit)
+    for (const p of flooded) level.map[p.y][p.x] = 'water'
     log('Water seeps from the broken rock and fills the nearby hollow!', 'bad')
+    return flooded
   }
 
   function strike(x, y) {
@@ -653,13 +655,10 @@ const Mining = (() => {
           delete miningSurfaceProgress[surfaceKey]
           // The cached map identities do not change when a boulder clears.
           // Repaint its pixel now, as with dug sand and foraged forest.
-          ensureMiniBases()
-          for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y)
-          mapPreviewBase = null
-          minimapDirty = true
+          repaintMinimapTiles([{x,y}])
           grantXp(0, true)
           log('You clear the boulder.', 'good')
-          Campfires.findFlint(0.05)
+          Campfires.findFlint(0.025)
         } else {
           target.removed = true
           if (target.kind !== 'exposed') map[y][x] = 'cavefloor2'
@@ -674,7 +673,8 @@ const Mining = (() => {
             log('The cracked wall gives way.', 'good')
             brokenOrdinaryMineWall = target.kind === 'wall'
           }
-          flood(level, target)
+          const flooded = flood(level, target) || []
+          repaintMinimapTiles([{x,y}, ...flooded])
         }
         player.miningArmedTarget = null
         invalidateUndergroundFov()

@@ -30,6 +30,8 @@ describe('Dwarven Mines haulage cage', () => {
         'shaft stays at same map coordinates through the mine')
       for(let i=0;i<mine.length;i++){
         const level=mine[i].level,p=level.mineCagePad
+        if(i){const prev=mine[i-1].level.mineDownstairs;check(prev.x===level.mineUpstairs.x&&prev.y===level.mineUpstairs.y,'ordinary stairs preserve x/y')}
+        else check(level.mineUpstairs.x===level.mineTransitions.up.x&&level.mineUpstairs.y===level.mineTransitions.up.y,'Ruins entrance aligns')
         check(p.x===cage.upper.x && p.y===cage.upper.y,'every floor shares the shaft position')
         check(level.map[p.y][p.x]===
           (i===0?'minecageupperoff':i===mine.length-1?'minecageloweroff':'mineshaftrope'),
@@ -80,8 +82,14 @@ describe('Dwarven Mines haulage cage', () => {
       const beforeTravel=turnCount
       inspect()
       check(currentZ===-9 && turnCount===beforeTravel,'lower cage skips all intermediate mine floors')
+      const t=ENEMY_TEMPLATE_BY_NAME['Giant Rat']
+      const blocker=addEnemy({...t,x:cage.lower.x,y:cage.lower.y,level:cage.lower.z,levelKind:'chain',alive:true,hp:t.hp,maxHp:t.hp})
+      const rngBeforeTravel=rngState
       inspect()
       check(currentZ===cage.lower.z,'upper cage returns directly to final floor')
+      check(player.x===cage.lower.x&&player.y===cage.lower.y,'occupied cage preserves player X/Y')
+      check(blocker.x!==player.x||blocker.y!==player.y,'monster yields the cage landing')
+      check(rngBeforeTravel===rngState,'landing displacement does not consume RNG')
 
       // Rendering is pure: switching the same unlocked endpoint into ASCII
       // and back must not change the RNG stream or gameplay state.

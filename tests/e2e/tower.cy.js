@@ -432,8 +432,15 @@ describe('Guaranteed elevated tower',()=>{
           win.eval(`USE_TILE_IMAGES=${tiles};renderScene(performance.now())`)
           const roundBackings=win.eval(`(()=>{
             const original=ctx.fill;let drawn=0
+            const oldFill=ctx.fillStyle
+            const backings=new Set([enemyBackingColor({prefix:null}),
+              ...Object.keys(RENDER_STYLE.enemies.prefixArea.colors).map(prefix=>enemyBackingColor({prefix}))]
+              .map(color=>{ctx.fillStyle=color;return ctx.fillStyle}))
+            ctx.fillStyle=oldFill
+            if(new Set(Object.keys(ENEMY_PREFIXES).map(prefix=>enemyBackingColor({prefix}))).size!==Object.keys(ENEMY_PREFIXES).length)
+              throw Error('ordinary prefixes must have distinct backing colors')
             ctx.fill=function(...args){
-              if(ctx.fillStyle==='rgba(240, 243, 246, 0.17)')drawn++
+              if(backings.has(ctx.fillStyle))drawn++
               return original.apply(this,args)
             }
             try{renderScene(performance.now());return drawn}finally{ctx.fill=original}

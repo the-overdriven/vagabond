@@ -27,7 +27,8 @@ describe('Swimming restrictions and visibility', () => {
           {kind: 'artifact', name: 'Artifact', noun: 'Relic', identified: false},
           {kind: 'idscroll', name: 'Scroll of Identification'},
           {kind: 'treasurecasket', name: 'Old Rotten Casket'},
-          {kind: 'blackkey', name: 'Black Key'}
+          {kind: 'blackkey', name: 'Black Key'},
+          createItem('wayfaringscroll', {destination:{x:51,y:50,z:0,levelKind:'surface',caveIndex:-1}})
         ]
         const before = JSON.stringify(player.inventory)
         const turns = turnCount
@@ -35,7 +36,7 @@ describe('Swimming restrictions and visibility', () => {
           useHerb, useMushroom, useEdibleMushroom, useBerries, useFish, readTombstone]
         actions.forEach((action, index) => action(index))
         equipItem(10); identifyArtifact(11); openTreasureCasket(); toggleBlackKey()
-        inspectTreasureMap()
+        useWayfaringScroll(15); inspectTreasureMap()
         player.equip.weapon = {kind: 'weapon', name: 'Equipped sword'}
         unequipItem('weapon')
         const blocked = JSON.stringify(player.inventory) === before && turnCount === turns &&

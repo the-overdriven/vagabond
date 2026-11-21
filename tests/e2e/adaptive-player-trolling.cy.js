@@ -819,7 +819,13 @@ describe('Adaptive Player Trolling', () => {
           '1999 gold does not attract the Imp')
         player.gold=3600
         player.steps=500
-        check(AdaptivePlayerTrolling.onPlayerMoved(),'500th step creates Gold Imp in native hill habitat')
+        AdaptivePlayerTrolling.setDebugTrolling(false)
+        const originalLog=log,spawnMessages=[]
+        try {
+          log=(msg)=>spawnMessages.push(msg)
+          check(AdaptivePlayerTrolling.onPlayerMoved(),'500th step creates Gold Imp in native hill habitat')
+        } finally {log=originalLog}
+        check(!spawnMessages.some(msg=>/gold imp|gold_imp/i.test(msg)), 'normal Gold Imp spawn remains unannounced')
         let imp=enemies.find(e=>e.adaptiveEventId==='gold_imp')
         check(!!imp && imp.baseName==='Imp' && imp.name==='Gold Imp', 'uses ordinary Imp species and name')
         check(Math.max(Math.abs(imp.x-player.x),Math.abs(imp.y-player.y))>=10,
@@ -2107,12 +2113,26 @@ describe('Adaptive Player Trolling', () => {
         const owner=ARTIFACT_NAMES_DWARF[0]
         const makeArtifact=slot=>({kind:'artifact',artifactSlot:slot,
           name:'Relic of '+owner,noun:'Relic',identified:false,bonuses:{},
-          possessor:owner,curse:null})
+          tier:2,baseValue:100,possessor:owner,curse:null})
         const cursed={kind:'artifact',artifactSlot:'weapon',name:'Cursed Spear',
           curse:{everyTurns:10,types:['hp']},possessor:null}
         player.inventory=[cursed]
         check(AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().length===0,
           'cursed-prefix artifact without named dwarven owner does not qualify')
+        // Merchant purchases retain provenance through actual trading.
+        const purchase=makeArtifact('trinket')
+        player.gold=1000;merchantStock=[purchase]
+        buyItem(purchase)
+        const bought=player.inventory.find(i=>i.name===purchase.name)
+        check(bought?.merchantPurchased===true && !AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().includes(bought),
+          'buying regular merchant stock exempts the artifact')
+        // A buyback cannot launder a found artifact's provenance.
+        const found=makeArtifact('trinket');player.inventory.push(found)
+        sellItem(player.inventory.indexOf(found))
+        buyItem(merchantStock.find(i=>i.merchantSold && i.name===found.name))
+        check(AdaptivePlayerTrolling.eligiblePreviousOwnerArtifacts().some(i=>i.replayId===found.replayId && !i.merchantPurchased),
+          'found artifact remains eligible after resale and buyback')
+        player.inventory=[]
         for(const slot of ['weapon','shield','armor','trinket']){
           const item=makeArtifact(slot)
           player.inventory=slot==='trinket'?[item]:[]
@@ -2213,6 +2233,7 @@ describe('Adaptive Player Trolling', () => {
         const accepted=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(accepted,{isReplayInit:true})
         check(AdaptivePlayerTrolling.fortQuestOption()==='active','accepted quest survives load')
+        check(!npcHasNewDialogue(merchant),'no merchant marker without the ledger')
         // Prepare deterministic, reachable ruined corridors without depending
         // on a particular generated layout or a new world-generation test.
         const floor=deepLevels[3]
@@ -2251,6 +2272,7 @@ describe('Adaptive Player Trolling', () => {
         currentZ=0;currentCave=-1;map=surfaceMap
         player.x=merchant.x;player.y=merchant.y+1
         check(AdaptivePlayerTrolling.fortQuestOption()==='turnin','carrying ledger enables return')
+        check(npcHasNewDialogue(merchant),'merchant marker signals the recovered ledger')
         const priorGold=player.gold
         check(interactNpcTopic(npcs.find(n=>n.name==='Merchant'),'fortQuest',false),
           'merchant accepts the physical ledger')
@@ -2258,6 +2280,7 @@ describe('Adaptive Player Trolling', () => {
           !player.inventory.some(i=>i.kind==='dwarvenTradeLedger') &&
           AdaptivePlayerTrolling.completed('fort_quest') &&
           AdaptivePlayerTrolling.fortQuestOption()===null,'350 gold is paid exactly once')
+        check(!npcHasNewDialogue(merchant),'merchant marker disappears after the reward')
         const paid=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(paid,{isReplayInit:true})
         check(AdaptivePlayerTrolling.completed('fort_quest') &&

@@ -987,7 +987,7 @@ const AdaptivePlayerTrolling = (() => {
   // Each distinct gold find still enters the collector's candidate lottery as
   // one original coin purse, with its exact find amount. Any current coins can
   // repay that purse; we do not attempt to distinguish physically identical
-  // coins from later earnings. A purse is eligible only while affordable.
+  // coins from later earnings. The demand has a configurable minimum.
   function onDwarvenRemainsGoldFound(amount) {
     if (!active() || !Number.isInteger(amount) || amount <= 0) return
     state.dwarvenGoldLoot.push({id: `dwarven-loot-${state.nextDwarvenLootId++}`, amount})
@@ -1016,9 +1016,13 @@ const AdaptivePlayerTrolling = (() => {
     return items.sort((a,b) => a.dwarvenRemainsLootId.localeCompare(b.dwarvenRemainsLootId))
   }
 
+  function recoveredPurseDemand(purse) {
+    return Math.max(purse.amount, config.events.debt_collector.goldDemand)
+  }
+
   function recoverableRemainsCandidates() {
     const items = recoverableRemainsLoot().map(item => ({id: item.dwarvenRemainsLootId}))
-    const gold = state.dwarvenGoldLoot.filter(lot => player.gold >= lot.amount)
+    const gold = state.dwarvenGoldLoot.filter(lot => player.gold >= recoveredPurseDemand(lot))
     // One random candidate per original item/purse, not per coin or arrow.
     return items.concat(gold).sort((a, b) => a.id.localeCompare(b.id))
   }
@@ -1035,8 +1039,10 @@ const AdaptivePlayerTrolling = (() => {
     if (item) return {itemName: artifactDisplayName(item), count: item.count || 1,
       isGold: false, canPay: true}
     const purse = state.dwarvenGoldLoot.find(lot => lot.id === enemy.debtDemandLootId)
-    if (purse) return {itemName: null, count: 0, isGold: true,
-      gold: purse.amount, recoveredGold: true, canPay: player.gold >= purse.amount}
+    if (purse) {
+      const gold = recoveredPurseDemand(purse)
+      return {itemName: null, count: 0, isGold: true, gold, recoveredGold: true, canPay: player.gold >= gold}
+    }
     return {itemName: null, count: 0, isGold: true,
       gold: config.events.debt_collector.goldDemand, recoveredGold: false,
       canPay: player.gold >= config.events.debt_collector.goldDemand}
@@ -1711,7 +1717,7 @@ const AdaptivePlayerTrolling = (() => {
   function carryingScroll() {
     return player.inventory.some(item => item && (item.count ?? 1) > 0 &&
       typeof item.kind === 'string' &&
-      (item.kind === 'homecomingscroll' || item.kind === 'idscroll' || item.kind.startsWith('scrollOf')))
+      (item.kind === 'homecomingscroll' || item.kind === 'wayfaringscroll' || item.kind === 'idscroll' || item.kind.startsWith('scrollOf')))
   }
 
   // Trading/dropping can happen without advancing a world turn. If the last
@@ -1755,7 +1761,8 @@ const AdaptivePlayerTrolling = (() => {
   }
 
   // This reaction recognizes the actual dwarven owner engraved in any
-  // artifact's name. Merely carrying it qualifies, including trinkets.
+  // artifact's name. Merely carrying it qualifies, including trinkets,
+  // unless it was originally bought from the Merchant.
   function carriedNamedArtifacts() {
     return [...(player.inventory || []), ...['weapon','shield','armor'].map(slot=>player.equip?.[slot])]
       .filter(item => item?.kind==='artifact' &&
@@ -1765,7 +1772,7 @@ const AdaptivePlayerTrolling = (() => {
 
   function eligiblePreviousOwnerArtifacts() {
     if (!active() || completed('previous_owner')) return []
-    return [...new Set(carriedNamedArtifacts())].filter(item=>!item.previousOwnerHauntedBy)
+    return [...new Set(carriedNamedArtifacts())].filter(item=>!item.previousOwnerHauntedBy && !item.merchantPurchased)
   }
 
   // Count consumed world turns (not frames or time in menus), once per turn.
@@ -1828,8 +1835,9 @@ const AdaptivePlayerTrolling = (() => {
     if (!active()) return false
     state.scrollEverRead = true
     state.unreadScrollTurns = 0
-    // Identification disqualifies the unread-scroll encounter but earns no
-    // resupply progress. Other scrolls are counted only after consumption.
+    // Identification and the derivative Wayfaring scroll disqualify the unread-
+    // scroll encounter but earn no resupply progress. Other scrolls count only
+    // after consumption.
     return onScrollResupply(kind)
   }
 
@@ -2370,7 +2378,8 @@ const AdaptivePlayerTrolling = (() => {
     markTrigger('depth_guardian')
     if (availableThreatSlots('chain',currentZ,-1)<1) return false
     state.depthGuardianWarning={z:currentZ,startedAtTurn:turnCount}
-    log('Deep in the stone, something heavy stirs. The next few moments may be your last chance to leave.', 'bad')
+    log('Somewhere deep in the dark, stone grinds against stone. Then silence.', 'bad')
+    debugEvent('Depth Guardian warning armed.')
     return true
   }
 
@@ -2413,7 +2422,8 @@ const AdaptivePlayerTrolling = (() => {
       return false
     }
     state.depthGuardianWarning=null
-    log('The Guardian of the Deep has awakened and is coming for you!', 'bad')
+    log('From far down the passage, you hear heavy stones tumbling. Something scrapes against the rock.', 'bad')
+    debugEvent('The Guardian of the Deep has awakened and is coming for you!')
     return true
   }
 
@@ -2725,7 +2735,7 @@ const AdaptivePlayerTrolling = (() => {
       const wanted = debtCollectorDemand(enemy)
       log(wanted.isGold
         ? (wanted.recoveredGold
-          ? `Debt Collector demands the ${wanted.gold} gold you recovered from the dwarven dead.`
+          ? `Debt Collector demands ${wanted.gold} gold in repayment for looting the dwarven dead.`
           : `Debt Collector demands ${wanted.gold} gold for disturbing dwarven remains.`)
         : `Debt Collector demands ${wanted.count > 1 ? wanted.count+' × ' : ''}${wanted.itemName}, recovered from the dwarven dead.`, 'bad')
       return true
@@ -3380,7 +3390,7 @@ const AdaptivePlayerTrolling = (() => {
     if(!recordThreat('gold_imp',currentLevelKind(),currentZ,currentCave)) {
       enemies=enemies.filter(e=>e!==enemy);occupied.delete(keyXY(pos.x,pos.y));return false
     }
-    log('A Gold Imp has caught the scent of your wealth.', 'bad')
+    debugEvent('A Gold Imp has caught the scent of your wealth.')
     return true
   }
 
