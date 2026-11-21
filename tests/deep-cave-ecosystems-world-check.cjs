@@ -21,7 +21,10 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       const excluded=new Set(WORLD_GEN_CONFIG.cavePopulation.ecosystem.excludedSpecies)
       return {seed:WORLD_SEED,styles:lvl.caves.map(c=>c.style),complexes:lvl.complexes.length,
         territories:lvl.territories.length,enemies:mob.length,species:new Set(mob.map(e=>e.baseName)).size,
-        illegal:mob.filter(e=>excluded.has(e.baseName)||e.tier===5||ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare).length,
+        caveTrolls:mob.filter(e=>e.baseName==='Cave Troll').length,
+        caveTrollLimit:minePackageConfig().encounters.caveTrollZ2Max,
+        illegal:mob.filter(e=>e.baseName!=='Cave Troll' &&
+          (excluded.has(e.baseName)||e.tier===5||ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare)).length,
         ordinaryScenario:lvl.caves.some(c=>c.scenario||!c.populated),
         sourceValid:mob.every(e=>lvl.caveMaps[e.caveIndex]?.[e.y]?.[e.x]==='cavefloor2'),
         campfires:campfires.map(g=>({x:g.x,y:g.y,caveIndex:g.caveIndex,burnUntil:g.burnUntil})),
@@ -35,6 +38,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     })()`)
     assert(summary.styles.includes('silhouette')&&summary.styles.includes('grotto')&&summary.styles.includes('burrow'),'required cave layout styles')
     assert.equal(summary.illegal,0,'ineligible deep-cave monster')
+    assert(summary.caveTrolls<=summary.caveTrollLimit,'optional Cave Troll stays within its spawn limit')
     assert.equal(summary.ordinaryScenario,false,'deep caves no longer use named scenarios')
     assert.equal(summary.sourceValid,true,'deep spawns have correct source cave')
     assert.equal(summary.campfireValid,true,'deep campfires sit on accessible source cave floors away from entrances')

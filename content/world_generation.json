@@ -144,8 +144,8 @@
       "secondVolcanoChance": 0.35,
       "minSeparation": 20,
       "candidateEdgeMargin": 3,
-      "lavaScanRadius": 3,
-      "lavaRadius": 2
+      "lavaRadius": 2.4,
+      "lavaRadiusVariation": 0.36
     }
   },
   "caves": {

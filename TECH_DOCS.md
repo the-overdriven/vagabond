@@ -917,8 +917,9 @@ or run alongside one another.
 
 Each world contains one volcano, with a chance of a second. A volcano is an
 impassable central cone surrounded by a small impassable lava field. Volcanoes
-are placed on mountain terrain and are represented by the `volcano` and `lava`
-tile keys.
+grow round, uneven lava pools from the cone across connected mountain or
+snow-mountain tiles. Existing terrain can cut the pool short, and seeded edge
+variation gives different volcanoes different outlines.
 
 ---
 

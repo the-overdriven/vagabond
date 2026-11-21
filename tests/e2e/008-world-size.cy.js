@@ -30,6 +30,21 @@ describe('Generated world dimensions and rotated cold edge', () => {
     })
     cy.window().then(win => {
       const dimensions = win.eval(`(() => {
+        const visited = new Set()
+        const {lavaRadius, lavaRadiusVariation} = WORLD_GEN_CONFIG.surface.volcanoes
+        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+          if (surfaceMap[y][x] !== 'volcano') continue
+          const pool = [{x,y}]
+          for (const cell of pool) for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+            const nx = cell.x+dx, ny = cell.y+dy, key = keyXY(nx,ny)
+            if (surfaceMap[ny]?.[nx] !== 'lava' || visited.has(key)) continue
+            if (Math.hypot(nx-x,ny-y) > lavaRadius + lavaRadiusVariation) throw new Error('lava outside rounded footprint')
+            visited.add(key)
+            pool.push({x:nx,y:ny})
+          }
+        }
+        if (surfaceMap.flat().filter(tile => tile === 'lava').length !== visited.size)
+          throw new Error('lava disconnected from its volcano')
         const save = buildSaveObject()
         loadGameFromObject(save)
         const band = Math.max(6, Math.floor(Math.min(MAP_W, MAP_H) * .10))

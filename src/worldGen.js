@@ -591,10 +591,20 @@ function placeVolcanoes() {
     if (chosen.every(other => Math.max(Math.abs(spot.x - other.x), Math.abs(spot.y - other.y)) >= cfg.minSeparation)) {
       chosen.push(spot)
       map[spot.y][spot.x] = 'volcano'
-      for (let dy = -cfg.lavaScanRadius; dy <= cfg.lavaScanRadius; dy++) for (let dx = -cfg.lavaScanRadius; dx <= cfg.lavaScanRadius; dx++) {
-        if (dx === 0 && dy === 0 || Math.max(Math.abs(dx), Math.abs(dy)) > cfg.lavaRadius) continue
-        const x = spot.x + dx, y = spot.y + dy
-        if (map[y] && (map[y][x] === 'mountain' || map[y][x] === 'snowmountain')) map[y][x] = 'lava'
+      // Grow a connected pool from the cone. Seeded edge variation makes
+      // lobes without consuming additional draws from the world RNG.
+      const pool = [spot]
+      for (const {x, y} of pool) {
+        for (const [dx, dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+          const nx = x + dx, ny = y + dy
+          const tile = map[ny]?.[nx]
+          if (tile !== 'mountain' && tile !== 'snowmountain') continue
+          const variation = 2 * worldDecorationRoll(nx, ny, 73) - 1
+          const radius = cfg.lavaRadius + cfg.lavaRadiusVariation * variation
+          if (Math.hypot(nx - spot.x, ny - spot.y) > radius) continue
+          map[ny][nx] = 'lava'
+          pool.push({x: nx, y: ny})
+        }
       }
     }
   }
