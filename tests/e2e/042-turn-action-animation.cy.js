@@ -87,9 +87,18 @@ describe('Stationary turn animation handoff', () => {
         stopCameraAnimation();clearAutoPath();pendingMove=null
         await tryMove(1,0)
         check(player.x===51 && moveAnim?.duration===140,'manual movement stays at 140 ms')
+        check(moveAnim.walking,'manual land step animates the sprite')
         stopCameraAnimation()
         startPlannedAutoPath([{x:52,y:50}])
         check(player.x===52 && moveAnim?.duration===100,'even the last autopath step uses the accelerated animation')
+        check(moveAnim.walking,'autopath land step animates the sprite')
+        stopCameraAnimation()
+        map[50][53]='river'
+        await tryMove(1,0)
+        check(player.x===53 && moveAnim?.walking===false,'entering a river skips the walking bob')
+        stopCameraAnimation()
+        await tryMove(-1,0)
+        check(player.x===52 && moveAnim?.walking===false,'leaving a river skips the walking bob')
       } finally {
         stopCameraAnimation();clearAutoPath();pendingMove=null
         enemyTurn=old.enemyTurn;npcTurn=old.npcTurn;runAnimationLoop=old.runAnimationLoop

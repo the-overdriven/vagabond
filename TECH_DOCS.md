@@ -859,6 +859,10 @@ desktop preview returns when the pointer enters a new destination tile.
 On touch screens, tapping another destination while a movement animation is
 finishing replaces the route.
 
+In tile mode, the full player sprite rises about one pixel at normal zoom
+and settles during each land step, including automatic travel. Steps into,
+through, or out of water and rivers skip the walking bob.
+
 ---
 
 # 9. World
