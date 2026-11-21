@@ -8569,6 +8569,10 @@ function spawnNaturalDecorations(roll) {
     }
     const barrels=scatter(level,'alcohol-barrel',floors,cfg.dwarfBarrelsPerFloor,80+i*5,5)
     const reliefs=scatter(level,'dwarven-wall-relief',walls,cfg.dwarfReliefsPerFloor,81+i*5,5)
+    if (layer.kind === 'dwarvenFort') {
+      const northWalls = walls.filter(({x,y}) => layer.map[y+1][x] === 'marble')
+      scatter(level,'dwarven-wall-torch',northWalls,cfg.fortWallTorches,119,5)
+    }
     if(barrels<cfg.dwarfBarrelsPerFloor||reliefs<cfg.dwarfReliefsPerFloor)
       throw new Error(`Could not decorate dwarven floor ${level} with its required barrels and reliefs.`)
   }

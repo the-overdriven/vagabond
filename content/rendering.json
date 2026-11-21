@@ -1470,6 +1470,7 @@
     }
   },
   "caveDecorations": {
+    "dwarven-wall-torch": {"image": "img/tiles/dwarven-wall-torch.png", "tileOnly": true},
     "web": {
       "glyph": "%",
       "color": "#aaa69a",

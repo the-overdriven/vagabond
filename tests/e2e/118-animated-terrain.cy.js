@@ -149,6 +149,14 @@ describe('Animated terrain rendering', () => {
           reset('water')
           cell(0,-1,'grass'); cell(-1,-1,'snow')
           const mixedShore = terrainVisual('water',x,y)
+          const bank = [null,'sand',null,null,null,null,null,null,null]
+          const straight = ['sand','sand','sand',null,null,null,null,null,null]
+          if (shorelineAlpha(bank,0,0,0.5,0.5,64) !== 0 ||
+              !Array.from({length: 32}, (_,i) =>
+                shorelineAlpha(straight,0,0,(i+0.5)/32,0.31,64)).some(alpha => alpha === 0) ||
+              !Array.from({length: 32}, (_,i) =>
+                shorelineAlpha(straight,0,0,(i+0.5)/32,0.31,64)).some(alpha => alpha === 1))
+            throw new Error('water centers stay open and straight banks vary within one tile')
           const sharedShoreBiomes = mixedShore.shoreBlend[4] === null &&
             mixedShore.shoreBlend[0] === 'snow' && mixedShore.shoreBlend[1] === 'grass'
           const oldPixels = ctx.getImageData(0,0,TILE_PX,TILE_PX)

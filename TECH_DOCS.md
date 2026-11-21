@@ -3523,13 +3523,15 @@ Ordinary caves on z:-1 and z:-2 contain cobwebs, small stalagmite clusters and
 small mushrooms. These are cosmetic overlays: they do not block movement,
 vision or projectiles, alter terrain bonuses, slow actors, offer harvesting or
 loot, or participate in quests. Crypts and mausoleums are excluded. The Dwarven Fort and deeper
-Dwarven Ruins also receive webs only (35% of eligible masonry corners),
+Dwarven Ruins also receive webs (35% of eligible masonry corners),
 without extra stalagmites or mushrooms. Each eligible marble-floor corner
 anchors a web on **one of its two adjacent perpendicular masonry wall tiles**,
 chosen by a seeded coordinate hash. Webs never lie on the room floor, cover an
 existing ground item, or change wall collision or opacity. The ordinary cave
 props instead occupy clear floor tiles at least three tiles from entrances or
 stairs, with webs requiring cave walls on two perpendicular sides.
+
+The Dwarven Fort has up to eight iron wall torches mounted on masonry with marble floor immediately south. These tile-mode decorations emit no light and leave wall collision and visibility unchanged.
 
 Dwarven Mines have wooden support frames over selected dry passage tiles.
 Supports are placed **after whole-world rotation**, so their fixed upright art
@@ -9989,11 +9991,10 @@ same contour at convex and concave corners. The resulting opaque ground is
 cached by local biome layout and zoom, with a bounded cache.
 Water contributes no land-biome weight; remaining grass/sand/snow weights
 are normalized consistently on both sides of shoreline junctions. Water and
-surface ice keep their full base texture. Shoreline edge/corner alpha masks
-are combined first, then colored with that same shared land blend. Independent
-grass, sand or snow sprite colors cannot overwrite each other at a three-biome
-corner. One north-edge and one corner source per ground type supply the masks,
-rotated for all orientations. A blend never exposes an ASCII background color
+surface ice keep their full base texture. A continuous contour interpolates the neighboring land and water
+cells. Small world-coordinate variations break up straight banks, while
+each water tile keeps its center and mixed shores use the shared ground textures.
+A blend never exposes an ASCII background color
 through a missing ground layer.
 
 A river's actual map tiles never change just to improve its appearance.

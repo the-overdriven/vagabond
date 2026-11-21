@@ -12282,27 +12282,39 @@ more difficult:
 
   const surfaceShoreBlendCache=new Map()
 
-  function drawSurfaceShoreBlend(px,py,visual) {
-    const layers=visual.overlayImages || [], size=TILE_PX
-    const key=size+'|'+visual.shoreBlend.join(',')+'|'+layers.map(l=>l.image+':'+l.quarterTurns).join(',')
-    let canvas=surfaceShoreBlendCache.get(key)
+  // Sample one continuous bank contour in world coordinates. The threshold
+  // varies below tile scale while neighboring tiles share the same field.
+  function shorelineAlpha(biomes, x, y, u, v, size) {
+    const gx = u + 0.5, gy = v + 0.5
+    const ix = Math.floor(gx), iy = Math.floor(gy)
+    const fx = gx - ix, fy = gy - iy, i = iy * 3 + ix
+    const top = (biomes[i] ? 1-fx : 0) + (biomes[i+1] ? fx : 0)
+    const bottom = (biomes[i+3] ? 1-fx : 0) + (biomes[i+4] ? fx : 0)
+    const land = top * (1-fy) + bottom * fy
+    const wx = (x+u) * Math.PI/4, wy = (y+v) * Math.PI/4
+    const threshold = 0.185 + 0.032*Math.sin(3*wx+5*wy) +
+      0.021*Math.sin(7*wx-4*wy) + 0.011*Math.sin(13*wx+11*wy)
+    return Math.max(0, Math.min(1, (land-threshold)*size + 0.5))
+  }
+
+  function drawSurfaceShoreBlend(px, py, visual) {
+    const size = TILE_PX, biomes = visual.shoreBlend
+    const {shoreX, shoreY} = visual
+    const key = [size, shoreX, shoreY, ...biomes].join(',')
+    let canvas = surfaceShoreBlendCache.get(key)
     if (!canvas) {
-      const ground=surfaceGroundBlendCanvas(visual.shoreBlend)
+      const ground = surfaceGroundBlendCanvas(biomes)
       if (!ground) return false
-      const mask=document.createElement('canvas');mask.width=mask.height=size
-      const mctx=mask.getContext('2d');mctx.imageSmoothingEnabled=false
-      // Combine shoreline alpha first; their grass/sand/snow RGB never paints
-      // over a different biome. One shared land blend colors the whole mask.
-      for(const layer of layers) {
-        const image=preloadedImages.get(layer.image)
-        if(!image) return false
-        mctx.save();mctx.translate(size/2,size/2);mctx.rotate((layer.quarterTurns||0)*Math.PI/2)
-        mctx.drawImage(scaledVisualCanvas(image,1),-size/2,-size/2);mctx.restore()
+      canvas = document.createElement('canvas')
+      canvas.width = canvas.height = size
+      const cctx = canvas.getContext('2d')
+      const pixels = ground.getContext('2d').getImageData(0,0,size,size)
+      for (let y=0; y<size; y++) for (let x=0; x<size; x++) {
+        pixels.data[(y*size+x)*4+3] *= shorelineAlpha(biomes,shoreX,shoreY,
+          (x+0.5)/size,(y+0.5)/size,size)
       }
-      canvas=document.createElement('canvas');canvas.width=canvas.height=size
-      const cctx=canvas.getContext('2d');cctx.drawImage(ground,0,0)
-      cctx.globalCompositeOperation='destination-in';cctx.drawImage(mask,0,0)
-      if(surfaceShoreBlendCache.size>=512)surfaceShoreBlendCache.clear()
+      cctx.putImageData(pixels,0,0)
+      if (surfaceShoreBlendCache.size >= 512) surfaceShoreBlendCache.clear()
       surfaceShoreBlendCache.set(key,canvas)
     }
     ctx.drawImage(canvas,px,py)
@@ -12373,6 +12385,7 @@ more difficult:
     const transitionLayers = surfaceTransitionLayers(tileKey, x, y, terrain)
     if (transitionLayers.length || riverArms) return {
       overlayImages: transitionLayers,
+      shoreX: x % 8, shoreY: y % 8,
       shoreBlend: transitionLayers.length ? surfaceBlendBiomes(null, x, y, terrain) : null,
       diagonalRiverJoinArms: riverArms
     }

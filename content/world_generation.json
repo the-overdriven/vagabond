@@ -2108,6 +2108,7 @@
     "lakesidePlantsPerKind": 10,
     "quarries": 2,
     "dwarfBarrelsPerFloor": 2,
+    "fortWallTorches": 8,
     "dwarfReliefsPerFloor": 2,
     "mineWallMushroomsPerFloor": 6,
     "goblinoidCampDecorationChance": 0.90

@@ -491,7 +491,7 @@
       "priceBonus": 430
     },
     "veteran_xp": {
-      "name": "Veteran — Experience",
+      "name": "Veteran",
       "description": "Melee weapon: +5% damage per 10 percentage points of XP bonus. Armor: +1 DEF per complete 15 percentage points of XP bonus.",
       "enabled": true,
       "damagePerXpPoint": 0.005,
@@ -499,7 +499,7 @@
       "priceBonus": 320
     },
     "veteran_level": {
-      "name": "Veteran — Level",
+      "name": "Veteran",
       "description": "Melee weapon: +1% damage per character level. Armor: +2 DEF per complete 5 levels.",
       "enabled": true,
       "damagePerLevel": 0.01,
@@ -565,14 +565,14 @@
       "priceBonus": 450
     },
     "alchemists_vest_hp": {
-      "name": "Alchemist's Vest — Vitality",
+      "name": "Alchemist's Vest",
       "description": "Excess healing from Life Potions, Healing Herbs and edible Mushrooms becomes temporary HP, absorbing damage before normal HP. It never stacks and cannot exceed 50% of maximum HP; removing the armor clears it.",
       "enabled": true,
       "maxHpFraction": 0.5,
       "priceBonus": 540
     },
     "alchemists_vest_guard": {
-      "name": "Alchemist's Vest — Guard",
+      "name": "Alchemist's Vest",
       "description": "Every 5 excess HP from a Life Potion, Healing Herb or edible Mushroom grants +1 DEF for 5 player turns, converting up to 50% of maximum HP. Only a stronger grant replaces and refreshes the bonus; removing the armor clears it.",
       "enabled": true,
       "excessHpFractionCap": 0.5,

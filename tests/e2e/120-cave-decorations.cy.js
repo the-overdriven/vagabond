@@ -137,6 +137,13 @@ describe('Decorative caves and deep threat rarity', () => {
         const terrainBefore=JSON.stringify(undergroundMap)
         resetForNewCharacter()
         check(JSON.stringify(caveDecorations)===original && JSON.stringify(undergroundMap)===terrainBefore,'reused world keeps cosmetic layout')
+        const torches = caveDecorations.filter(p => p.kind === 'dwarven-wall-torch')
+        check(torches.length > 0 && torches.length <= decorCfg.fortWallTorches &&
+          torches.every(p => {
+            const layer = deepLevels[-p.level-2]
+            return layer.kind === 'dwarvenFort' && layer.map[p.y][p.x] === 'dwarvenwall' &&
+              layer.map[p.y+1][p.x] === 'marble'
+          }), 'fort torches mount above a south-facing floor')
         const fortWebs=caveDecorations.filter(p=>p.level<=-3 && p.kind==='web')
         check(fortWebs.length>0, 'dwarven masonry receives webs')
         for(const p of fortWebs) {
