@@ -621,6 +621,15 @@ const plain = value => JSON.parse(JSON.stringify(value))
     if (UndergroundFov.canSee(room,11,11,15,8) || !seesFlame(11,11) || !seesFlame(11,12))
       throw Error('shallow and steep views should both show the mounted flame')
     if (seesFlame(15,7)) throw Error('torch visible from behind the wall')
+    const seesWall = (x, viewerX=10, viewerY=10) =>
+      Mining.lightCanReach(room,15,8,x,8,viewerX,viewerY,'dwarven-wall-torch')
+    if (UndergroundFov.canSee(room,10,10,16,8) || !seesWall(16) || !seesWall(14,20,10))
+      throw Error('the torch should reveal both adjacent wall faces at shallow angles')
+    if (seesWall(16,16,7) || Mining.lightCanReach(room,15,8,16,7,10,10,'dwarven-wall-torch'))
+      throw Error('torch light should not reveal the far side of the wall')
+    room[9][16]='dwarvenwall'
+    if (seesWall(16)) throw Error('solid masonry should block torch light along the wall')
+    room[9][16]='marble'
     room[9][13]='dwarvenwall'
     if (seesFlame(10,9)) throw Error('intervening wall should hide the flame')
   })()`)

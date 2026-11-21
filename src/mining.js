@@ -806,7 +806,11 @@ const Mining = (() => {
       if (ty < sy || !torchFaceVisible(mapTiles,sx,sy,viewerX,viewerY)) return false
       // The flame sits on the south face. At a shallow angle, a ray to
       // the wall center can enter an adjacent wall before reaching it.
-      if (tx === sx && ty === sy) return true
+      if (ty === sy && mapTiles[ty]?.[tx] === 'dwarvenwall' &&
+          TILE[mapTiles[ty+1]?.[tx]]?.walk) {
+        return UndergroundFov.canSee(mapTiles, sx, sy+1, tx, ty+1) &&
+          torchFaceVisible(mapTiles, tx, ty, viewerX, viewerY)
+      }
       sy++
     }
     if (!UndergroundFov.canSee(mapTiles, sx, sy, tx, ty) ||
