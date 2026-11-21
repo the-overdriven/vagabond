@@ -60,12 +60,11 @@ const Mimics = (() => {
   // This is the same normal-chest loot table/gear factory, resolved at world
   // placement instead of at opening. No player action or save reload rerolls it.
   function rollChestContents(chest) {
-    const tier = Math.max(1,chest.tier || 1), mf = 0
-    const roll = rng() * CHEST_LOOT_TABLE.scale
-    const entry = (CHEST_LOOT_TABLE.table || []).find(e=>roll<e.upTo) || {}
-    const result = entry.result || CHEST_LOOT_TABLE.elseResult || 'idscroll'
+    const tier = chest.tier, mf = 0
+    const {result, entry, item} = rollOrdinaryChestMainReward(tier, mf)
     const loot = {gold:0,items:[]}
-    if (result==='gold') loot.gold = Math.max(1,Math.round(
+    if (result==='artifact') loot.items.push(item)
+    else if (result==='gold') loot.gold = Math.max(1,Math.round(
       randInt(entry.goldMin,entry.goldMax)*(entry.goldPerTier?tier:1)*
       WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
     else if (result==='arrows' || result==='chitin')
@@ -223,7 +222,9 @@ const Mimics = (() => {
       // These are precisely the pre-rolled contents of the disguised chest.
       if(isStackableKind(item.kind))addInventoryItem(item.kind,{count:item.count||1})
       else player.inventory.push(item)
-      lootLog(`The ${e.name} contained ${item.name||itemDefinition(item.kind)?.name||item.kind}.`,item)
+      const label = item.kind === 'artifact' ? artifactDisplayName(item) : item.name || itemDefinition(item.kind)?.name || item.kind
+      lootLog(`The ${e.name} contained ${label}.`,item,label)
+      if (item.kind === 'artifact' && enemyIsVisibleOnMainView(e)) spawnRareDropAnim(e)
     }
     return true
   }

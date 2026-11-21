@@ -75,6 +75,28 @@ describe('Non-gear item catalog', () => {
       finally { delete win.__mimicLootFixture }
     }))
   })
+  it('uses source tier and MF for ordinary chest artifacts without auto-equipping them', () => {
+    beginNewGame('Chest Artifact Tester')
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const old={rng,groundItems,inventory:player.inventory,equip:player.equip,baseMf:player.baseMf}
+      try {
+        player.baseMf=20;player.inventory=[];player.equip={weapon:null,shield:null,armor:null}
+        check(Math.abs(ordinaryChestArtifactChance(5,20)-.09)<1e-12,'tier five MF chance')
+        for(const gear of [true,false]) {
+          player.inventory=[];let draws=0
+          rng=()=>{const i=draws++;return i===0 ? .08 : i===1 ? (gear ? .499999 : .5):.999}
+          groundItems=[{kind:'chest',tier:5,level:currentZ,x:player.x,y:player.y}]
+          checkGroundAt(player.x,player.y);checkGroundAt(player.x,player.y)
+          const item=player.inventory[0]
+          check(player.inventory.length===1&&item.kind==='artifact'&&!item.identified&&
+            (item.artifactSlot!=='trinket')===gear&&!player.equip.weapon&&!groundItems.length,
+            'one unidentified artifact in selected category')
+        }
+      } finally {rng=old.rng;groundItems=old.groundItems;player.inventory=old.inventory;
+        player.equip=old.equip;player.baseMf=old.baseMf}
+    })()`))
+  })
   it('respects configured chest boundaries and forage chances on percentage scales', () => {
     beginNewGame('Percentage Loot Tester')
     cy.window().then(win => {
@@ -184,8 +206,8 @@ describe('Non-gear item catalog', () => {
           player.inventory = previous.inventory; groundItems = previous.groundItems; rng = previous.rng
         }
       })()`)
-      // Each chest also rolls separately for the rare Flint Stone and Potato.
-      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 12,
+      // One artifact roll, then the normal table and two independent bonuses per chest.
+      expect(result).to.deep.equal({chestKinds: ['potion', 'scrollOfInvisibility', 'speedpotion', 'idscroll'], draws: 16,
         groundKinds: ['homecomingscroll', 'idscroll', 'potion', 'scrollOfInvisibility', 'speedpotion'],
         names: ['Life Potion', 'Potion of Speed', 'Scroll of Homecoming',
           'Scroll of Identification', 'Scroll of Invisibility'], remainingGround: 0})

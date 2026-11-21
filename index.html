@@ -1067,6 +1067,7 @@ more difficult:
     ARTIFACT_EFFECTS = content.artifactEffects
     ARTIFACT_ABILITIES = content.artifactAbilities
     validateArtifactAbilities(ARTIFACT_ABILITIES)
+    validateConvertibleArtifactPools()
     ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : []
     ARTIFACT_DESC = content.artifactDesc
     DWARVEN_RUIN_ENTRANCES = content.dwarvenRuinEntrances
@@ -1102,6 +1103,7 @@ more difficult:
     LOOSE_SCROLL_VARIANTS = content.lootTables.looseScrollVariants
     FORAGE_TABLE = content.lootTables.forage
     CHEST_LOOT_TABLE = content.lootTables.chestLoot
+    validateChestArtifactConfig()
     BASE_MAP_CONFIG = content.mapConfig
     MAP_W = content.mapConfig.world.width
     MAP_H = content.mapConfig.world.height
@@ -1119,6 +1121,7 @@ more difficult:
     if (!CAVE_SILHOUETTE_SOURCES.length) throw new Error('No cave silhouettes available')
     BASE_WORLD_GEN_CONFIG = content.worldGeneration
     WORLD_GEN_CONFIG = structuredClone(BASE_WORLD_GEN_CONFIG)
+    validateEnemyArtifactConfig()
     MINING_CONFIG = content.miningConfig
     Mining.validateConfig()
     WORLD_TRAITS = content.worldTraits.traits
@@ -2459,8 +2462,12 @@ more difficult:
     return null
   }
 
+  function equipmentSlot(item) {
+    return item?.kind === 'artifact' ? item.artifactSlot : item?.kind
+  }
+
   function isWeaponItem(item) {
-    return !!item && (item.kind === 'weapon' || (item.kind === 'artifact' && item.artifactSlot === 'weapon'))
+    return equipmentSlot(item) === 'weapon'
   }
 
   function isBreachWeapon(item) {
@@ -2492,6 +2499,21 @@ more difficult:
           ability.weaponTypes.some(type => !['bow', 'oneHandedMelee', 'twoHandedMelee'].includes(type))))
         throw new Error('Invalid artifact weapon eligibility: ' + id)
     }
+  }
+
+  function validateConvertibleArtifactPools() {
+    for (const [slot, catalog] of [['weapon', WEAPONS], ['shield', SHIELDS], ['armor', ARMORS]]) {
+      for (const base of catalog) {
+        if (!artifactAbilityPool({...base, kind:'artifact', artifactSlot:slot, base:base.name}).length)
+          throw new Error('Equipment has no enabled artifact ability pool: ' + base.name)
+      }
+    }
+    for (const name of STARTING_WEAPONS) {
+      if (!artifactAbilityPool({kind:'artifact', artifactSlot:'weapon', base:name, twoHanded:false}).length)
+        throw new Error('Starting weapon has no enabled artifact ability pool: ' + name)
+    }
+    if (ARTIFACT_EFFECTS.some(effect => effect.id === CONVERTED_GEAR_EFFECT.id))
+      throw new Error('Ability-only metadata must not enter the natural artifact effect pool')
   }
 
   function artifactDomains(item) {
@@ -2898,6 +2920,9 @@ more difficult:
     if (!candidates.length || !chance(artifactRule('disarm','chance'))) return false
     const chosen = candidates.length === 1 ? candidates[0] : pick(candidates)
     const item = chosen.item || makeBowItem('Short Bow',0,e.tier || 1,true)
+    // Abstract shooter bows are not stored equipment and cannot convert.
+    const converted = !chosen.modeledBow && enemyGearArtifactEligible(e, item) &&
+      tryEnemyGearArtifactConversion(e, item, monsterLootStrength(enemyPermanentStats(e)), playerMf())
     if (!chosen.modeledBow) {
       const held = e.equipment
       removeEnemyEquipmentBonuses(e)
@@ -2905,7 +2930,7 @@ more difficult:
       e.hp = Math.max(1,Math.min(e.maxHp,e.hp))
       e.equipment = null
       e.gearBonuses = null
-      if (e.stolenItem === held) e.stolenItem = null
+      if (e.stolenItemEquipped || e.stolenItem === held) e.stolenItem = null
       e.stolenItemEquipped = false
     }
     // Losing a shield or melee weapon must not magically disable the
@@ -2924,6 +2949,7 @@ more difficult:
     if (enemyIsVisibleOnMainView(e)) {
       log(`You knock the ${item.base || item.name} from the ${e.name}'s grip!`, 'good')
       spawnDamageNumber(e.x,e.y,'Disarmed!','#d8bd92')
+      if (converted) spawnRareDropAnim({...e,x:spot.x,y:spot.y})
     }
     return true
   }
@@ -3337,30 +3363,52 @@ more difficult:
     return result
   }
 
-  function makeArtifactItem(tier, mf = 0, {gearOnly = false} = {}) {
-    if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length) return null
-    // Magic Find's "quality" effect on artifacts: a chance to roll the
-    // effect pool as if the source were one tier higher, and a reduced
-    // chance of the artifact turning out cursed.
-    if (mf > 0 && chance(Math.min(WORLD_GEN_CONFIG.lootRules.artifactTierBoostChanceCap, mf * WORLD_GEN_CONFIG.lootRules.artifactTierBoostChancePerMagicFind))) tier += 1
-    let pool = ARTIFACT_EFFECTS.filter(fx => fx.tier <= tier)
-    if (!pool.length) pool = ARTIFACT_EFFECTS.filter(fx => fx.tier === Math.min(...ARTIFACT_EFFECTS.map(f => f.tier)))
-    // Keep truly effect-less lore artifacts rare: 4% of artifact drops.
-    // When no empty effect is available for the current tier, use a normal effect.
-    const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0)
-    const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0)
-    const effect = emptyEffects.length && chance(WORLD_GEN_CONFIG.lootRules.emptyArtifactEffectChance)
-      ? pick(emptyEffects)
-      : pick(normalEffects.length ? normalEffects : pool)
-    // A low-tier artifact must not roll the statistics of a higher-tier
-    // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
-    const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
-      .filter(base => base.tier <= effect.tier).map(base => base.name)
-    if (gearOnly && !eligibleGearNames.length)
-      throw new Error('No eligible equipment bases for artifact tier ' + effect.tier)
-    const noun = pick(gearOnly ? eligibleGearNames : [...ARTIFACT_NOUNS, ...eligibleGearNames])
-    const gear = artifactGearBase(noun)
-    const slot = gear?.slot || 'trinket'
+  function artifactMagicFindMultiplier(mf) {
+    return 1 + mf * WORLD_GEN_CONFIG.lootRules.enemyArtifactMagicFindMultiplierPerPoint
+  }
+
+  function validateEnemyArtifactConfig() {
+    const cfg = BASE_WORLD_GEN_CONFIG.lootRules
+    for (const key of ['enemyArtifactDropRateMultiplier','enemyGearArtifactChancePerStrength',
+      'enemyGearArtifactStrengthReference','enemyGearArtifactStrengthExponent',
+      'enemyGearArtifactChanceCap','enemyTrinketArtifactChancePerStrength',
+      'enemyArtifactChanceCapBeforeRate','enemyArtifactMagicFindMultiplierPerPoint']) {
+      if (!Number.isFinite(cfg[key]) || cfg[key] < 0)
+        throw new Error('Invalid enemy artifact configuration: ' + key)
+    }
+    if (cfg.enemyArtifactDropRateMultiplier <= 0 || cfg.enemyGearArtifactStrengthReference <= 0 ||
+        cfg.enemyGearArtifactChanceCap > 1 || cfg.enemyArtifactChanceCapBeforeRate > 1)
+      throw new Error('Invalid enemy artifact probability limits')
+  }
+
+  function enemyArtifactWorldMultiplier() {
+    return WORLD_GEN_CONFIG.lootRules.enemyArtifactDropRateMultiplier /
+      BASE_WORLD_GEN_CONFIG.lootRules.enemyArtifactDropRateMultiplier
+  }
+
+  function enemyGearArtifactChance(strength, mf) {
+    const cfg = WORLD_GEN_CONFIG.lootRules
+    return Math.max(0, Math.min(cfg.enemyGearArtifactChanceCap,
+      cfg.enemyGearArtifactChancePerStrength * strength *
+      Math.pow(strength / cfg.enemyGearArtifactStrengthReference, cfg.enemyGearArtifactStrengthExponent) *
+      artifactMagicFindMultiplier(mf) * enemyArtifactWorldMultiplier()))
+  }
+
+  function enemyTrinketArtifactChance(strength, mf) {
+    const cfg = WORLD_GEN_CONFIG.lootRules
+    return Math.max(0, Math.min(1, cfg.enemyArtifactChanceCapBeforeRate * cfg.enemyArtifactDropRateMultiplier,
+      strength * cfg.enemyTrinketArtifactChancePerStrength *
+      artifactMagicFindMultiplier(mf) * enemyArtifactWorldMultiplier()))
+  }
+
+  // Ability-only conversions use explicit metadata outside the natural effect pool.
+  const CONVERTED_GEAR_EFFECT = Object.freeze({id:'gear_ability_only', flavor:'lore', maxHpPct:0})
+
+  function artifactEffectDefinition(id) {
+    return id === CONVERTED_GEAR_EFFECT.id ? CONVERTED_GEAR_EFFECT : ARTIFACT_EFFECTS.find(fx => fx.id === id)
+  }
+
+  function rollArtifactIdentity(noun, slot, mf) {
     const isCursed = chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
 
     // Every non-cursed artifact gets a named owner. Cursed artifacts use
@@ -3384,7 +3432,7 @@ more difficult:
 
     // Only equipment artifacts drop the article. Non-gear artifacts keep
     // their ceremonial "The ..." names, including cursed variants.
-    if (gear) name = name.replace(/^The\s+/i, '')
+    if (slot !== 'trinket') name = name.replace(/^The\s+/i, '')
     else if (!/^The\s+/i.test(name)) name = 'The ' + name
 
     // Preserve the existing curse behaviour as a pool of possible curse
@@ -3401,6 +3449,46 @@ more difficult:
         curse = {everyTurns: randInt(8, 12), types: ['hp', 'gold', 'atk_debuff', 'def_debuff', 'spd_debuff']}
       }
     }
+
+    return {name, possessor, ownerLore, curse}
+  }
+
+  function initializeArtifactAbility(item) {
+    item.abilityId = rollArtifactAbility(item)
+    if (item.abilityId === 'berserkers_oath')
+      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
+        artifactRule('berserkers_oath','rollMax'))
+    return item
+  }
+
+  function makeArtifactItem(tier, mf = 0, {gearOnly = false, nonGearOnly = false} = {}) {
+    if (gearOnly && nonGearOnly) throw new Error('Conflicting artifact category filters')
+    if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length) return null
+    // Magic Find's "quality" effect on artifacts: a chance to roll the
+    // effect pool as if the source were one tier higher, and a reduced
+    // chance of the artifact turning out cursed.
+    if (mf > 0 && chance(Math.min(WORLD_GEN_CONFIG.lootRules.artifactTierBoostChanceCap, mf * WORLD_GEN_CONFIG.lootRules.artifactTierBoostChancePerMagicFind))) tier += 1
+    let pool = ARTIFACT_EFFECTS.filter(fx => fx.tier <= tier)
+    if (!pool.length) pool = ARTIFACT_EFFECTS.filter(fx => fx.tier === Math.min(...ARTIFACT_EFFECTS.map(f => f.tier)))
+    // Keep truly effect-less lore artifacts rare: 4% of artifact drops.
+    // When no empty effect is available for the current tier, use a normal effect.
+    const emptyEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length === 0 && (fx.maxHpPct || 0) === 0)
+    const normalEffects = pool.filter(fx => Object.keys(fx.bonuses || {}).length > 0 || (fx.maxHpPct || 0) !== 0)
+    const effect = emptyEffects.length && chance(WORLD_GEN_CONFIG.lootRules.emptyArtifactEffectChance)
+      ? pick(emptyEffects)
+      : pick(normalEffects.length ? normalEffects : pool)
+    // A low-tier artifact must not roll the statistics of a higher-tier
+    // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
+    const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
+      .filter(base => base.tier <= effect.tier).map(base => base.name)
+    if (gearOnly && !eligibleGearNames.length)
+      throw new Error('No eligible equipment bases for artifact tier ' + effect.tier)
+    if (nonGearOnly && !ARTIFACT_NOUNS.length)
+      throw new Error('No eligible standalone artifact nouns')
+    const noun = pick(gearOnly ? eligibleGearNames : nonGearOnly ? ARTIFACT_NOUNS : [...ARTIFACT_NOUNS, ...eligibleGearNames])
+    const gear = artifactGearBase(noun)
+    const slot = gear?.slot || 'trinket'
+    const {name, possessor, ownerLore, curse} = rollArtifactIdentity(noun, slot, mf)
 
     const item = {
       kind: 'artifact', name, noun, tier: effect.tier, effectId: effect.id, baseValue: effect.baseValue,
@@ -3425,11 +3513,64 @@ more difficult:
       ownerLore,
       description: generateArtifactDescription(noun, name, effect, curse, possessor, ownerLore),
     }
-    item.abilityId = rollArtifactAbility(item)
-    if (item.abilityId === 'berserkers_oath')
-      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
-        artifactRule('berserkers_oath','rollMax'))
-    return item
+    return initializeArtifactAbility(item)
+  }
+
+  function isConvertibleArtifactEquipment(item) {
+    if (!item || !['weapon','shield','armor'].includes(item.kind) ||
+        !Number.isInteger(item.tier) || item.tier < 1 || item.tier > 5 ||
+        !Number.isFinite(item.baseValue) || item.baseValue < 0) return false
+    const gear = artifactGearBase(item.base)
+    return gear?.slot === item.kind
+  }
+
+  // Call only after the owning enemy's conversion chance succeeds. Mutate the
+  // original instance atomically, so the physical item and its replay ID survive.
+  // Ownership, quest exclusions and the once-per-enemy roll belong to the caller.
+  function convertEquipmentToArtifact(item, mf = 0) {
+    if (!isConvertibleArtifactEquipment(item)) return null
+    const noun = item.base, slot = item.kind
+    const converted = {...item, kind:'artifact', artifactSlot:slot, noun,
+      effectId:CONVERTED_GEAR_EFFECT.id, originalGearName:item.name,
+      identified:false, bonuses:{}, maxHpPct:0, curseTimer:0}
+    if (!artifactAbilityPool(converted).length) {
+      console.error('Cannot convert equipment without an enabled artifact ability: ' + noun)
+      return null
+    }
+    const identity = rollArtifactIdentity(noun, slot, mf)
+    Object.assign(converted, identity, {description:generateArtifactDescription(noun,
+      identity.name, CONVERTED_GEAR_EFFECT, identity.curse, identity.possessor, identity.ownerLore)})
+    initializeArtifactAbility(converted)
+    // No natural-effect bonus, tier boost, equipment reroll or replacement copy.
+    return Object.assign(item, converted)
+  }
+
+  function enemyArtifactLootEligible(e) {
+    return !!e.humanoid && !e.artifactSoulGhost && !e.mimicLoot
+  }
+
+  function enemyEquipmentProtected(e, item) {
+    if (item === e.stolenItem || (e.stolenItemEquipped && item === e.equipment) || item.hunterQuestId) return true
+    const quest = oldHunterQuest
+    if (!quest || !['active','ready'].includes(quest.state) ||
+        !['recover_item','deliver_item'].includes(quest.type)) return false
+    return quest.targetItem === item || (quest.targetEnemyId === e.id &&
+      (item.name === quest.targetItemName || item.base === quest.targetItemName))
+  }
+
+  function enemyGearArtifactEligible(e, item) {
+    return enemyArtifactLootEligible(e) && Object.hasOwn(ENEMY_PREFIXES, e.prefix) &&
+      !e.gearArtifactConversionChecked && isConvertibleArtifactEquipment(item) &&
+      !enemyEquipmentProtected(e, item)
+  }
+
+  // Shared by physical Disarm and credited death. A valid failed roll spends
+  // the same persistent opportunity as a success. No RNG for excluded items.
+  function tryEnemyGearArtifactConversion(e, item, strength, mf) {
+    if (!enemyGearArtifactEligible(e, item) || !Number.isFinite(strength)) return false
+    e.gearArtifactConversionChecked = true
+    if (!chance(enemyGearArtifactChance(strength, mf))) return false
+    return !!convertEquipmentToArtifact(item, mf)
   }
 
   // Special adaptive loot uses the normal unidentified artifact structure,
@@ -3458,11 +3599,7 @@ more difficult:
       curse: null, curseTimer: 0, possessor, ownerLore,
       description: generateArtifactDescription(baseName, name, effect, null, possessor, ownerLore)
     }
-    item.abilityId = rollArtifactAbility(item)
-    if (item.abilityId === 'berserkers_oath')
-      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
-        artifactRule('berserkers_oath','rollMax'))
-    return item
+    return initializeArtifactAbility(item)
   }
 
   function artifactDisplayName(it) {
@@ -3519,7 +3656,7 @@ more difficult:
       it.ownerLore = makeDwarfOwnerLore(it.possessor)
     }
     if (!it.description || !it.description.includes(it.ownerLore.text)) {
-      const effect = (ARTIFACT_EFFECTS || []).find(fx => fx.id === it.effectId)
+      const effect = artifactEffectDefinition(it.effectId)
       if (effect) {
         it.description = generateArtifactDescription(
           it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
@@ -3696,14 +3833,14 @@ more difficult:
     e.stolenItemEquipped = item === e.stolenItem
     for (const stat of ['atk', 'def', 'spd', 'hp']) {
       // Weapon SPD is legacy GRACE data, not a movement bonus.
-      const base = stat === 'spd' && item.kind === 'weapon' ? 0 : (item[stat] || 0)
+      const base = stat === 'spd' && isWeaponItem(item) ? 0 : (item[stat] || 0)
       let bonus = enemyGearStat(e, base) + (item.mod === stat ? enemyGearStat(e, item.modAmt) : 0)
       if (stat === 'hp') {
         bonus = Math.round(bonus)
         e.maxHp += bonus; e.hp += bonus
       } else e[stat] += bonus
     }
-    if (item.kind !== 'weapon') e.spd = Math.max(1, e.spd - 1)
+    if (!isWeaponItem(item)) e.spd = Math.max(1, e.spd - 1)
     e.gearBonuses = Object.fromEntries(Object.entries(before).map(([stat,value]) => [stat,e[stat]-value]))
     e.hp = Math.max(1, Math.min(e.hp,e.maxHp))
     return true
@@ -3715,9 +3852,8 @@ more difficult:
 
     if (it.kind === 'artifact') {
       if (!it.identified) return '???'
-      if (it.atk) parts.push('ATK ' + it.atk)
-      if (it.def) parts.push('DEF ' + it.def)
-      if (isWeaponItem(it) && it.grace !== undefined) parts.push('GRACE ' + it.grace)
+      parts.push(...physicalGearStatParts(it))
+      if (it.mod && it.originalGearName) parts.push(`Original: ${it.originalGearName}`)
       if (it.artifactSlot === 'shield') {
         parts.push('SPD ' + (it.base === 'Buckler' ? -1 : -2))
         if (it.base !== 'Buckler') parts.push('GRACE -1')
@@ -3744,28 +3880,33 @@ more difficult:
       if (it.curse !== null && it.curse !== undefined) parts.push('CURSED')
       return parts.join(', ')
     }
+    return physicalGearStatParts(it).join(', ')
+  }
+
+  function physicalGearStatParts(it) {
+    const parts = []
     const modifierStat = playerGearModifierStat(it)
     if (it.atk) parts.push('ATK ' + it.atk + (modifierStat === 'atk' ? ('+' + it.modAmt) : ''))
     if (it.rangedAtk) parts.push('RANGED ATK ' + it.rangedAtk +
       (modifierStat === 'rangedAtk' ? ('+' + it.modAmt) : '') + ', RANGE ' + it.rangedRange)
     if (it.def) parts.push('DEF ' + it.def + (it.mod === 'def' ? ('+' + it.modAmt) : ''))
-    if (it.kind === 'weapon' && (it.grace !== undefined || it.spd !== undefined)) {
+    if (isWeaponItem(it) && (it.grace !== undefined || it.spd !== undefined)) {
       const baseGrace = it.grace !== undefined ? it.grace : 6 - it.spd
       const graceBonus = it.mod === 'grace' ? it.modAmt : 0
       parts.push('GRACE ' + baseGrace + (graceBonus ? (graceBonus > 0 ? '+' : '') + graceBonus : ''))
     }
-    if (it.kind !== 'weapon' && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
+    if (!isWeaponItem(it) && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
 
     if (modifierStat === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
     if (it.mod === 'def' && !it.def) parts.push('DEF +' + it.modAmt)
-    if (it.mod === 'grace' && it.grace === undefined) parts.push('GRACE +' + it.modAmt)
-    if (it.mod === 'spd' && (it.kind === 'weapon' || it.spd === undefined)) parts.push('SPD +' + it.modAmt)
+    if (it.mod === 'grace' && !(isWeaponItem(it) && (it.grace !== undefined || it.spd !== undefined))) parts.push('GRACE +' + it.modAmt)
+    if (it.mod === 'spd' && (isWeaponItem(it) || it.spd === undefined)) parts.push('SPD +' + it.modAmt)
 
     if (it.mod === 'hp') parts.push('HP +' + it.modAmt)
     if (it.mod === 'mf') parts.push('MF +' + it.modAmt)
     if (it.mod === 'xp') parts.push('XP +' + it.xpBonus + '%')
 
-    return parts.join(', ')
+    return parts
   }
 
   function weaponGrace(weapon) {
@@ -4393,7 +4534,7 @@ more difficult:
     if (e.artifactRangedDisarmed || !e.shooterAbility || e.shooterMode === mode || (mode === 'ranged' && !enemyIsShooter(e))) return false
     e.shooterMode = mode
     if (enemyIsVisibleOnMainView(e)) {
-      const melee = e.equipment?.kind === 'weapon' ? e.equipment.base || 'weapon'
+      const melee = isWeaponItem(e.equipment) ? e.equipment.base || 'weapon'
         : e.humanoid ? 'bare hands' : 'claws'
       const ranged = e.shooterAbility === 'shooterArrows' ? 'a bow and arrows' : 'stones'
       log(mode === 'ranged'
@@ -4467,6 +4608,7 @@ more difficult:
     enemy.artifactConfusedUntilTurn = Number.isInteger(enemy.artifactConfusedUntilTurn) ? Math.max(0,enemy.artifactConfusedUntilTurn) : 0
     enemy.artifactDisarmed = enemy.artifactDisarmed === true
     enemy.artifactRangedDisarmed = enemy.artifactRangedDisarmed === true
+    enemy.gearArtifactConversionChecked = enemy.gearArtifactConversionChecked === true
     enemy.artifactSlowUntilTurn = Number.isInteger(enemy.artifactSlowUntilTurn) ? Math.max(0,enemy.artifactSlowUntilTurn) : 0
     enemy.artifactSunderStacks = Number.isInteger(enemy.artifactSunderStacks) ? Math.max(0,Math.min(10,enemy.artifactSunderStacks)) : 0
     enemy.artifactBlindAtkPenalty = Number.isInteger(enemy.artifactBlindAtkPenalty) ? Math.max(0,Math.min(5,enemy.artifactBlindAtkPenalty)) : 0
@@ -5477,8 +5619,10 @@ more difficult:
       ? e.name : `The ${e.name}`
   }
 
-  function lootFromEnemy(e, onGround = false, visibleAtDeath = false, deathFxDelay = 0) {
-    const mf = playerMf()
+  function lootFromEnemy(e, onGround = false, visibleAtDeath = false, deathFxDelay = 0, deathContext = null) {
+    const mf = deathContext?.mf ?? playerMf()
+    const strength = deathContext?.strength ?? (enemyArtifactLootEligible(e)
+      ? monsterLootStrength(enemyPermanentStats(e)) : 0)
     let rareFxQueued = false
     const showRareDrop = rare => {
       if (!rare || rareFxQueued || !visibleAtDeath) return
@@ -5565,14 +5709,11 @@ more difficult:
     // code kept/commented for easy reinstatement rather than deleted.
     // player.gold += Math.max(1, Math.round(randInt(1,5)*e.tier*(1+mf*0.05)));
     maybeDropTombstone(e, onGround)
-    // Artifact drops are reduced to 40% of their former chance (60% rarer).
-    // Guaranteed artifact chests are intentionally unaffected.
-    const artifactDropRate = WORLD_GEN_CONFIG.lootRules.enemyArtifactDropRateMultiplier
-    const artifactChance = artifactDropRate *
-      (WORLD_GEN_CONFIG.lootRules.enemyArtifactBaseChance + (e.tier - 1) * WORLD_GEN_CONFIG.lootRules.enemyArtifactTierChanceStep) *
-      (1 + mf * WORLD_GEN_CONFIG.lootRules.enemyArtifactMagicFindMultiplierPerPoint)
-    if (e.humanoid && chance(Math.min(WORLD_GEN_CONFIG.lootRules.enemyArtifactChanceCapBeforeRate * artifactDropRate, artifactChance))) {
-      const art = makeArtifactItem(e.tier, mf)
+    // Independent trinket roll first, then the one stored equipment attempt.
+    // Preserve the existing trinket death-credit rules (including trap deaths).
+    if (enemyArtifactLootEligible(e) && Number.isFinite(strength) &&
+        chance(enemyTrinketArtifactChance(strength, mf))) {
+      const art = makeArtifactItem(e.tier, mf, {nonGearOnly:true})
       if (art) {
         const label = onGround ? art.noun : artifactDisplayName(art)
         lootLog(`${enemyLootSubject(e)} dropped ${label}.`, art, label)
@@ -5583,6 +5724,10 @@ more difficult:
     }
     if (e.humanoid && e.equipment) {
       const item = e.equipment
+      // There is currently exactly one stored equipment slot. The candidate
+      // is captured before quest/death mutations and excludes the thief's bag.
+      if (deathContext?.conversionItem === item)
+        tryEnemyGearArtifactConversion(e, item, strength, mf)
       const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
       lootLog(`${enemyLootSubject(e)} dropped ${label}.`, item, label)
       showRareDrop(isRareMonsterDrop(item, e.tier))
@@ -5655,7 +5800,7 @@ more difficult:
   }
 
   function equippedArmor(equipment) {
-    return equipment && equipment.kind === 'armor' ? equipment : null
+    return equipmentSlot(equipment) === 'armor' ? equipment : null
   }
 
   function enemyCriticalHitChance(e) {
@@ -5668,7 +5813,7 @@ more difficult:
     if (!e) return null
     const template = enemyTemplateForSavedEnemy(e)
     const natural = e.grace ?? (template && template.grace)
-    const grace = natural + (e.equipment?.kind !== 'weapon' && e.equipment?.mod === 'grace' ? enemyGearStat(e,e.equipment.modAmt) : 0)
+    const grace = natural + (!isWeaponItem(e.equipment) && e.equipment?.mod === 'grace' ? enemyGearStat(e,e.equipment.modAmt) : 0)
     return Number.isFinite(grace) && grace > 0 ? grace : null
   }
 
@@ -6060,7 +6205,7 @@ more difficult:
     } else {
       updateMobileInfoPanel(e.x, e.y)
       showDesktopCombatTooltip(e)
-      const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
+      const enemyWeapon = e.humanoid && isWeaponItem(e.equipment)
         ? e.equipment : null
       if (executeFollowUp && !pactFatal && e.alive && e.hp > 0 &&
           Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y)) <= ATTACK_RANGE) {
@@ -6092,7 +6237,7 @@ more difficult:
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     revealEnemyInvisibility(e)
     clearAutoPath()
-    const enemyWeapon = e.humanoid && e.equipment && e.equipment.kind === 'weapon'
+    const enemyWeapon = e.humanoid && isWeaponItem(e.equipment)
       ? e.equipment : null
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     const attackPresentation = beginEnemyAttackAnim(e)
@@ -6134,7 +6279,7 @@ more difficult:
     if (braveryFromStronger) player.artifactBraveryCharge = true
     if (blocked) {
       for (const id of ['shield_mastery','counterguard','tideguard']) {
-        if (artifactEquippedInSlot('shield',id) && (id !== 'counterguard' || e.equipment?.kind === 'weapon') &&
+        if (artifactEquippedInSlot('shield',id) && (id !== 'counterguard' || isWeaponItem(e.equipment)) &&
             (id !== 'tideguard' || artifactWaterPosition()))
           artifactAbilityMessage(id, `${ARTIFACT_ABILITIES.abilities[id].name} reinforces your block!`,
             'Your enchanted shield deflects the blow!')
@@ -6455,18 +6600,33 @@ more difficult:
     return ['atk', 'def', 'spd', 'grace'].reduce((sum, stat) => sum + (Number.isFinite(stats?.[stat]) ? stats[stat] : 0), 0)
   }
 
-  function recordStrongestEnemyKill(e) {
-    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
-    const naturalGrace = enemyGrace(e) || 0
-    const grace = weapon ? enemyWeaponGrace(e, weapon) : naturalGrace
-    const stats = {atk: e.atk, def: e.def, spd: e.spd,
-      grace: grace > 0 ? Math.max(1, grace - gearGracePenalty(e.equipment)) : 0}
-    const exactStrength = monsterStrength(stats)
-    const previousExactStrength = player.strongestEnemyKilled
-      ? monsterStrength(player.strongestEnemyKilled.stats) : -Infinity
-    if (exactStrength <= previousExactStrength) return
+  // Loot and achievement strength is intentionally separate from the four-stat
+  // combat comparison used by AI, artifact powers and adaptive encounters.
+  const MONSTER_STRENGTH_HP_DIVISOR = 10
+  function monsterLootStrength(stats) {
+    return Math.round(monsterStrength(stats) + stats.maxHp / MONSTER_STRENGTH_HP_DIVISOR)
+  }
+
+  function enemyPermanentStats(e) {
+    const weapon = isWeaponItem(e.equipment) ? e.equipment : null
+    const grace = weapon ? enemyWeaponGrace(e, weapon) : (enemyGrace(e) || 0)
+    // Shooters use the configured projectile attack, not their melee fallback.
+    // Ammunition count and current attack mode do not change permanent strength.
+    const shot = e.artifactRangedDisarmed ? null : shooterDefinition(e)
+    return {atk: shot?.atk ?? e.atk, def: e.def, spd: e.spd,
+      grace: grace > 0 ? Math.max(1, grace - gearGracePenalty(e.equipment)) : 0,
+      maxHp: e.maxHp}
+  }
+
+  function baseMonsterLootStrength(template) {
+    return monsterLootStrength({...template, maxHp: template.hp})
+  }
+
+  function recordStrongestEnemyKill(e, stats = enemyPermanentStats(e), strength = monsterLootStrength(stats)) {
+    if (!Number.isFinite(strength) || !Object.values(stats).every(Number.isFinite)) return
+    if (strength <= (player.strongestEnemyKilled?.strength ?? -Infinity)) return
     player.strongestEnemyKilled = {name: e.name, species: trackSpecies(e), tier: e.tier,
-      strength: Math.round(exactStrength), stats}
+      strength, stats: {...stats}}
   }
 
   function absorbEnemyFatalHit(e) {
@@ -6482,10 +6642,17 @@ more difficult:
     const visibleAtDeath = enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
+    const permanentStats = playerCredit || enemyArtifactLootEligible(e) ? enemyPermanentStats(e) : null
+    const deathContext = {
+      mf: playerMf(),
+      strength: permanentStats ? monsterLootStrength(permanentStats) : 0,
+      conversionItem: playerCredit && cause !== 'sacrifice' && enemyGearArtifactEligible(e, e.equipment)
+        ? e.equipment : null
+    }
     cancelPreparedEnemyAbility(e)
     worldKilledSpecies.add(trackSpecies(e))
     if (playerCredit) {
-      recordStrongestEnemyKill(e)
+      recordStrongestEnemyKill(e, permanentStats, deathContext.strength)
       const species = trackSpecies(e)
       player.killsBySpecies[species] = (player.killsBySpecies[species] || 0) + 1
       AdaptivePlayerTrolling.onEnemyKilled(e)
@@ -6546,7 +6713,7 @@ more difficult:
     if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE,
-        visibleAtDeath, deathFxDelay)
+        visibleAtDeath, deathFxDelay, deathContext)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
     updateHud()
@@ -7318,7 +7485,7 @@ more difficult:
   // Compare current combat strength, including equipment and terrain, for
   // the targeted bow reaction. A weaker living enemy retreats if safe escape exists.
   function enemyOutmatchesPlayer(e) {
-    const weapon = e.equipment?.kind === 'weapon' ? e.equipment : null
+    const weapon = isWeaponItem(e.equipment) ? e.equipment : null
     const naturalGrace = weapon ? enemyWeaponGrace(e, weapon) : enemyGrace(e)
     const enemyStrength = monsterStrength({atk: enemyAtk(e), def: enemyDef(e), spd: enemySpd(e),
       grace: Math.max(0, (naturalGrace || 0) - gearGracePenalty(e.equipment))})
@@ -9205,7 +9372,7 @@ more difficult:
     if (modifierStat && modifierStat !== primaryStat) {
       if (item.mod === 'xp') secondary += Math.round((item.xpBonus || 0) / 3)
       else if (item.mod === 'hp') secondary += (item.modAmt || 0) / 3
-      else if (item.mod !== 'grace' || item.kind === 'weapon') secondary += item.modAmt || 0
+      else if (item.mod !== 'grace' || isWeaponItem(item)) secondary += item.modAmt || 0
     }
 
     if (item.kind === 'artifact') {
@@ -9711,6 +9878,9 @@ more difficult:
         kind: 'chest',
         tier: 1,
         opened: false,
+        // This transient chest reuses ordinary loot delivery for remains.
+        // It is not a physical chest and does not gain a new artifact source.
+        remainsLoot: true,
         level: skeleton.level ?? 0,
         levelKind: skeleton.levelKind,
         caveIndex: skeleton.caveIndex
@@ -9730,6 +9900,40 @@ more difficult:
       return
     }
     tryForage()
+  }
+
+  function validateChestArtifactConfig() {
+    const config = CHEST_LOOT_TABLE.artifact
+    const probability = p => Number.isFinite(p) && p >= 0 && p <= 1
+    if (!config || !probability(config.gearChance) ||
+        ![1,2,3,4,5].every(tier => probability(config.chanceByTier?.[tier])) ||
+        Object.keys(config.chanceByTier || {}).length !== 5)
+      throw new Error('Invalid ordinary chest artifact probabilities')
+    if (!ARTIFACT_NOUNS.length || ARTIFACT_NOUNS.some(noun => artifactGearBase(noun)) ||
+        !ARTIFACT_EFFECTS.length || ARTIFACT_EFFECTS.some(effect =>
+          ![...WEAPONS, ...SHIELDS, ...ARMORS].some(base => base.tier <= effect.tier)))
+      throw new Error('Missing or invalid ordinary chest artifact category pool')
+  }
+
+  function ordinaryChestArtifactChance(tier, mf) {
+    const chances = CHEST_LOOT_TABLE.artifact.chanceByTier
+    if (!Number.isInteger(tier) || !Object.hasOwn(chances, tier))
+      throw new Error('Unsupported ordinary chest tier: ' + tier)
+    return Math.min(1, Math.max(0, chances[tier] * artifactMagicFindMultiplier(mf)))
+  }
+
+  // Shared by opening-time chests and generation-time Mimic contents.
+  // The artifact branch replaces the main reward, but never the bonus rolls.
+  function rollOrdinaryChestMainReward(tier, mf, artifactEligible = true) {
+    if (artifactEligible && chance(ordinaryChestArtifactChance(tier, mf))) {
+      const gearOnly = chance(CHEST_LOOT_TABLE.artifact.gearChance)
+      const item = makeArtifactItem(tier, mf, {gearOnly, nonGearOnly: !gearOnly})
+      if (!item) throw new Error('Ordinary chest artifact generation failed')
+      return {result:'artifact', item}
+    }
+    const roll = rng() * CHEST_LOOT_TABLE.scale
+    const entry = (CHEST_LOOT_TABLE.table || []).find(e => roll < e.upTo) || {}
+    return {result:entry.result || CHEST_LOOT_TABLE.elseResult || 'idscroll', entry}
   }
 
   // Chest loot outcomes: thresholds/odds come from content/loot_tables.json
@@ -9884,16 +10088,18 @@ more difficult:
           groundItems.splice(i, 1)
           continue
         }
-        const roll = rng() * CHEST_LOOT_TABLE.scale
-        let chestEntry = null
-        for (const entry of (CHEST_LOOT_TABLE.table || [])) {
-          if (roll < entry.upTo) {
-            chestEntry = entry
-            break
-          }
+        const reward = rollOrdinaryChestMainReward(g.tier, mf, !g.remainsLoot)
+        if (reward.result === 'artifact') {
+          const item = reward.item
+          const label = artifactDisplayName(item)
+          player.inventory.push(item)
+          lastLootResult = `${label}.`
+          lastLootHighlights = itemLogHighlight(item, label)
+          if (!suppressLootLog) lootLog(`You open a chest and find ${label}.`, item, label)
+          spawnRareDropAnim(g)
+        } else {
+          (CHEST_LOOT_HANDLERS[reward.result] || CHEST_LOOT_HANDLERS.idscroll)(chestTier, mf, reward.entry)
         }
-        const chestResult = chestEntry ? chestEntry.result : (CHEST_LOOT_TABLE.elseResult || 'idscroll');
-        (CHEST_LOOT_HANDLERS[chestResult] || CHEST_LOOT_HANDLERS.idscroll)(chestTier, mf, chestEntry || {})
 
         Campfires.findFlint(0.005)
         if (chance(0.005)) { addPotato(); log('You find a Potato tucked away in the chest.', 'loot') }
@@ -16266,10 +16472,12 @@ more difficult:
 
   // Gear/artifact tier pricing stays in loot_tables.json; other values live in items.json.
   function itemSellValue(it) {
-    if (it.startingWeapon) return 2
     const definition = itemDefinition(it.kind)
     if (definition) return definition.sellValue
-    if (Number.isFinite(it.sellValue)) return it.sellValue
+    if (it.kind !== 'artifact') {
+      if (it.startingWeapon) return 2
+      if (Number.isFinite(it.sellValue)) return it.sellValue
+    }
     if (it.tier) {
       let v = SELL_VALUE_BY_TIER[it.tier] || 0
       if (it.mod) v += (it.modAmt || 1) * 5
@@ -17524,7 +17732,7 @@ more difficult:
     list.replaceChildren()
     const strength = species => {
       const template = ENEMY_TEMPLATE_BY_NAME[species]
-      return template ? monsterStrength(template) : Infinity
+      return template ? baseMonsterLootStrength(template) : Infinity
     }
     const known = Object.entries(player.killsBySpecies || {})
       .filter(([, count]) => Number.isFinite(count) && count > 0)

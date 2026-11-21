@@ -78,7 +78,7 @@ function shieldingBlockChance(enemy = null) {
   let chance = 0.20 * combatSkillValue('shielding') / COMBAT_SKILL_MAX
   if (artifactEquippedInSlot('shield','shield_mastery'))
     chance += artifactRule('shield_mastery','blockBonus')
-  if (artifactEquippedInSlot('shield','counterguard') && enemy?.equipment?.kind === 'weapon')
+  if (artifactEquippedInSlot('shield','counterguard') && isWeaponItem(enemy?.equipment))
     chance += artifactRule('counterguard','blockBonus')
   if (artifactEquippedInSlot('shield','tideguard') && artifactWaterPosition())
     chance += artifactRule('tideguard','blockBonus')

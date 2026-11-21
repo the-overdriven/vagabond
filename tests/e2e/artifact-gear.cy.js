@@ -76,6 +76,73 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('converts exceptional bows and low-tier gear without replacing their original properties', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const bow=makeBowItem('Hunting Bow')
+      Object.assign(bow,{name:'Mighty Hunting Bow',mod:'atk',modAmt:20,tier:5,replayId:'converted_bow_test'})
+      const original=structuredClone(bow)
+      check(convertEquipmentToArtifact(bow,20)===bow,'same physical item')
+      check(bow.kind==='artifact'&&bow.tier===5&&bow.replayId===original.replayId,'tier and identity')
+      check(bow.rangedAtk===original.rangedAtk&&bow.rangedRange===original.rangedRange&&bow.twoHanded,'physical bow properties')
+      check(bowRangedAtk(bow)===original.rangedAtk+20&&bow.atk===original.atk,'Mighty applies to ranged ATK only')
+      check(!Object.keys(bow.bonuses).length&&bow.maxHpPct===0,'no random additional artifact stats')
+      check(artifactAbilityPool(bow).includes(bow.abilityId),'eligible ability')
+      check(itemStatLine(bow)==='???'&&visibleItemTier(bow)===null,'unidentified is concealed')
+      check(itemSellValue(bow)===Math.floor((SELL_VALUE_BY_TIER[5]+100)/2),'bow sell value cannot bypass artifact pricing')
+      const dagger={kind:'weapon',base:'Dagger',name:'Swift Dagger',atk:2,grace:5,tier:1,baseValue:30,mod:'spd',modAmt:5}
+      convertEquipmentToArtifact(dagger,20)
+      check(dagger.tier===1&&dagger.modAmt===5,'low-tier modifier preserved')
+      player.inventory=[bow,dagger]
+      player.godMode=true
+      replayAnimationsDisabled=true
+      identifyArtifact(0)
+      check(bow.identified&&itemStatLine(bow).includes('RANGED ATK 7+20')&&itemStatLine(bow).includes('Mighty Hunting Bow'),'identified modifier visible')
+      const save=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(save,{isReplayInit:true})
+      check(player.inventory.some(item=>item.replayId==='converted_bow_test'&&item.abilityId===bow.abilityId&&item.identified),'converted item survived save/reload')
+      check(player.inventory.some(item=>item.base==='Dagger'&&item.kind==='artifact'&&item.tier===1&&!item.identified),'low tier artifact survives restore')
+    })()`))
+  })
+
+  it('uses one persistent conversion chance across Disarm, save/load and death', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalChance=chance
+      try {
+        replayAnimationsDisabled=true;currentZ=0;currentCave=-1;map=surfaceMap
+        player.x=40;player.y=40;player.baseMf=10;player.inventory=[];oldHunterQuest=null
+        player.equip={weapon:{kind:'artifact',artifactSlot:'weapon',base:'Dagger',name:'Testing',
+          atk:8,grace:4,identified:true,abilityId:'disarm'},armor:null,shield:null,blackkey:null}
+        enemies=[];npcs=[];groundItems=[];occupied=new Set()
+        for(let y=39;y<=42;y++)for(let x=39;x<=43;x++)map[y][x]='grass'
+        let target=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'artifact_conversion_target',
+          name:'Brutal Goblin',baseName:'Goblin',prefix:'Brutal',level:0,alive:true,x:41,y:40,
+          homeX:41,homeY:40,homeTileType:'grass',hp:100,maxHp:100,grace:3,gearScale:.5,abilities:[],equipment:null,shooterAbility:null,shotsRemaining:0})
+        occupied.add(keyXY(41,40))
+        const weapon={kind:'weapon',base:'Dagger',name:'Mighty Dagger',tier:1,baseValue:30,atk:2,grace:5,mod:'atk',modAmt:20}
+        applyEnemyEquipment(target,weapon)
+        const probability=enemyGearArtifactChance(monsterLootStrength(enemyPermanentStats(target)),playerMf())
+        chance=p=>p===artifactRule('disarm','chance')||p===probability
+        check(artifactDisarmEnemy(target)&&target.gearArtifactConversionChecked,'disarm spent conversion')
+        check(weapon.kind==='artifact'&&weapon.modAmt===20&&weapon.tier===1&&!weapon.identified,'physical conversion')
+        check(groundItems.filter(g=>g.item===weapon).length===1,'one physical drop')
+        applyEnemyEquipment(target,{kind:'shield',base:'Buckler',name:'Buckler',tier:1,baseValue:30,def:3})
+        const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        loadGameFromObject(snapshot,{isReplayInit:true})
+        target=enemies.find(e=>e.id==='artifact_conversion_target')
+        check(target.gearArtifactConversionChecked,'attempt restored')
+        const strength=monsterLootStrength(enemyPermanentStats(target))
+        const mf=playerMf(),gearChance=enemyGearArtifactChance(strength,mf),trinketChance=enemyTrinketArtifactChance(strength,mf)
+        chance=p=>p===gearChance||p===trinketChance
+        target.hp=0;killEnemy(target,true,'melee')
+        check(player.inventory.some(i=>i.kind==='shield'&&i.base==='Buckler'),'replacement shield cannot convert')
+        check(player.inventory.some(i=>i.artifactSlot==='trinket'),'independent trinket still rolls')
+        check(groundItems.filter(g=>g.item?.base==='Dagger'&&g.item?.kind==='artifact').length===1,'save/death keeps exact disarm drop')
+      } finally {chance=originalChance}
+    })()`))
+  })
+
   it('discounts only artifact selling when unidentified or identified as cursed', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}

@@ -37,7 +37,8 @@ describe('Exceptional prefixes and monster loot quality', () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const old={chance,rng,lootLog,spawnRareDropAnim,maybeAutoEquipWeapon,makeArtifactItem,
         inventory:player.inventory}
-      const effects=[],victim={name:'Goblin',baseName:'Goblin',humanoid:true,tier:1,
+      const effects=[],victim={...ENEMY_TEMPLATE_BY_NAME.Goblin,name:'Goblin',baseName:'Goblin',humanoid:true,tier:1,
+        maxHp:ENEMY_TEMPLATE_BY_NAME.Goblin.hp,
         x:player.x+1,y:player.y,level:currentZ,levelKind:currentLevelKind()}
       try {
         // Quality tail is about the rolled modifier, never the base gear tier.
@@ -62,9 +63,11 @@ describe('Exceptional prefixes and monster loot quality', () => {
         lootFromEnemy({...victim,equipment:gear(2)},false,true)
         lootFromEnemy({...victim,equipment:gear(5)},false,false)
         check(effects.length===1,'normal and offscreen drops do not queue effects')
-        makeArtifactItem=()=>({kind:'artifact',noun:'Amulet',name:'The Amulet',tier:3})
+        let artifactRolls=0
+        makeArtifactItem=(tier,mf,options)=>{check(options.nonGearOnly,'only trinkets may roll independently');artifactRolls++;return {kind:'artifact',artifactSlot:'trinket',noun:'Amulet',name:'The Amulet',tier:3}}
         chance=(p)=>p>0 && p<0.1
         lootFromEnemy({...victim,equipment:gear(5)},false,true)
+        check(artifactRolls===1,'independent artifact actually dropped')
         check(effects.length===2,'artifact plus rare gear still queues only one effect')
         const rare={name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false,
           x:victim.x,y:victim.y,level:currentZ}

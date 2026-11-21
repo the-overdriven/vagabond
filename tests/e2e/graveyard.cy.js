@@ -242,7 +242,7 @@ describe('Graveyard', () => {
     cy.get('#graveyardList').should('not.contain.text', 'Thingar')
   })
 
-  it('rounds every uploaded strongest-kill number while preserving exact gameplay ranking', () => {
+  it('includes max HP in rounded strongest-kill ranking and keeps the first rounded tie', () => {
     configureTestGraveyard()
     beginNewGame('Strength Tester')
     const rows = []
@@ -253,26 +253,27 @@ describe('Graveyard', () => {
       })})}
       win.eval(`player.strongestEnemyKilled = null
         recordStrongestEnemyKill({name:'First Banshee', baseName:'Banshee', tier:4,
-          atk:21.2, def:2, spd:4, grace:1.35})
+          atk:21.2, def:2, spd:4, grace:1.35, maxHp:84, hp:0})
         recordStrongestEnemyKill({name:'Second Banshee', baseName:'Banshee', tier:4,
-          atk:21.289643402164803, def:2, spd:4, grace:1.3976985338144003})`)
+          atk:21.289643402164803, def:2, spd:4, grace:1.3976985338144003, maxHp:84, hp:0})`)
       const strongest = win.eval('structuredClone(player.strongestEnemyKilled)')
-      expect(strongest.name).to.equal('Second Banshee')
-      expect(strongest.strength).to.equal(29)
-      expect(strongest.stats.atk).to.equal(21.289643402164803)
-      expect(strongest.stats.grace).to.equal(1.3976985338144003)
+      expect(strongest.name).to.equal('First Banshee')
+      expect(strongest.strength).to.equal(37)
+      expect(strongest.stats.atk).to.equal(21.2)
+      expect(strongest.stats.grace).to.equal(1.35)
+      expect(strongest.stats.maxHp).to.equal(84)
       win.eval(`die({name:'Lich', alive:false})`)
     })
     cy.wrap(rows).should(records => {
       expect(records).to.have.length(1)
       expect(records[0].strongest_enemy_killed).to.deep.equal({
-        name: 'Second Banshee', species: 'Banshee', tier: 4, strength: 29,
-        stats: {atk: 21, def: 2, spd: 4, grace: 1}
+        name: 'First Banshee', species: 'Banshee', tier: 4, strength: 37,
+        stats: {atk: 21, def: 2, spd: 4, grace: 1, maxHp: 84}
       })
     })
   })
 
-  it('normalizes a saved fractional-strength Lich trophy at a drowning death without changing saved stats', () => {
+  it('preserves the saved authoritative Lich score when rounding components for an online death', () => {
     configureTestGraveyard()
     beginNewGame('Saved Trophy Tester')
     const rows = []
@@ -280,7 +281,7 @@ describe('Graveyard', () => {
       win.__VAGABOND_TEST_GRAVEYARD__ = true
       win.supabase = {createClient: () => ({from: () => ({
         insert: record => {
-          // Model the pre-migration database constraint: every trophy number must be an integer.
+          // Preserve the online integer-component representation.
           const trophy = record.strongest_enemy_killed
           expect([trophy.tier, trophy.strength, ...Object.values(trophy.stats)]
             .every(Number.isInteger)).to.equal(true)
@@ -289,13 +290,14 @@ describe('Graveyard', () => {
         }
       })})}
       win.eval(`player.strongestEnemyKilled = {
-        name: 'Lich', species: 'Lich', tier: 5, strength: 46.45342130316421,
-        stats: {atk: 36.45342130316421, def: 6, spd: 3, grace: 1}
+        name: 'Lich', species: 'Lich', tier: 5, strength: 55,
+        stats: {atk: 36.45342130316421, def: 6, spd: 3, grace: 1, maxHp: 84}
       }
       window.__trophySave = buildSaveObject()
       loadGameFromObject(window.__trophySave)`)
       const saved = win.eval('structuredClone(player.strongestEnemyKilled)')
-      expect(saved.strength).to.equal(46.45342130316421)
+      expect(saved.strength).to.equal(55)
+      expect(saved.stats.maxHp).to.equal(84)
       expect(saved.stats.atk).to.equal(36.45342130316421)
       win.eval(`die(null, 'drowning')`)
       expect(win.eval('player.strongestEnemyKilled.stats.atk')).to.equal(36.45342130316421)
@@ -304,8 +306,8 @@ describe('Graveyard', () => {
       expect(records).to.have.length(1)
       expect(records[0]).to.include({cause_of_death: 'drowning', killer_name: null})
       expect(records[0].strongest_enemy_killed).to.deep.equal({
-        name: 'Lich', species: 'Lich', tier: 5, strength: 46,
-        stats: {atk: 36, def: 6, spd: 3, grace: 1}
+        name: 'Lich', species: 'Lich', tier: 5, strength: 55,
+        stats: {atk: 36, def: 6, spd: 3, grace: 1, maxHp: 84}
       })
     })
   })
@@ -321,7 +323,7 @@ describe('Graveyard', () => {
       })})}
       win.eval(`player.strongestEnemyKilled = {
         name: 'Lich', species: 'Lich', tier: 5, strength: 46,
-        stats: {atk: NaN, def: 6, spd: 3, grace: 1}
+        stats: {atk: NaN, def: 6, spd: 3, grace: 1, maxHp: 84}
       }; die()`)
     })
     cy.wrap(rows).should(records => {

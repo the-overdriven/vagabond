@@ -767,6 +767,8 @@ test('Batch 3: shield powers extend the same block roll and bash without weapon 
     assert.equal(run('shieldingBlockChance(batchTarget)'),.10)
     run("player.equip.shield.abilityId='counterguard'")
     assert.equal(run('shieldingBlockChance(batchTarget)'),.15)
+    run("batchTarget.equipment={...batchTarget.equipment,kind:'artifact',artifactSlot:'weapon'}")
+    assert.equal(run('shieldingBlockChance(batchTarget)'),.15,'artifact weapons also count as armed')
     run('batchTarget.equipment=null')
     assert.equal(run('shieldingBlockChance(batchTarget)'),0)
     run(`(() => {
@@ -925,7 +927,7 @@ test('Batch 3: save and replay retain combat charges, independent expiries and r
       player.artifactLastStandUntilTurn=turnCount+2;
       player.artifactBoneplateExpiries=[turnCount+4,turnCount+9]})()`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,183)
+    assert.equal(snapshot.version,run('self.VAGABOND_SAVE_VERSION'))
     const fields=['artifactRetributionStored','artifactBloodReservoirStored',
       'artifactPainEaterHits','artifactRiposteReady','artifactRhythmGuardReady',
       'artifactEvasionPrepared','artifactSacredReadyTurn','artifactLastStandCooldownUntil',
@@ -1132,7 +1134,7 @@ test('Batch 4: save and deterministic replay preserve execution markers and move
       player.artifactMartialEvasionPending=true;rngState=91822
     })()`)
     const saved=clone(run('buildSaveObject()'))
-    assert.equal(saved.version,183)
+    assert.equal(saved.version,run('self.VAGABOND_SAVE_VERSION'))
     assert.equal(saved.player.artifactElusiveReady,true)
     assert.equal(saved.player.artifactMartialEvasionPending,true)
     assert.equal(saved.enemies.find(e=>e.id==='batch-target').artifactExecutionerUsed,true)
@@ -1219,6 +1221,29 @@ test('Batch 5: disarm drops the exact weapon once and removes equipment stats', 
       'ordinary enemy loot cannot duplicate the dropped weapon')
     const item=clone(run('groundItems.find(g=>g.item===disarmedWeapon).item'))
     assert.equal(item.name,'Heavy Club')
+  } finally {restoreArtifactCombat()}
+})
+
+test('credited melee Disarm converts prefixed equipment only once', async () => {
+  await ready();setupArtifactCombat('disarm')
+  try {
+    run(`(() => {
+      batchTarget.prefix='Brutal';batchTarget.name='Brutal Goblin';batchTarget.gearScale=.5
+      const weapon={kind:'weapon',base:'Club',name:'Mighty Club',tier:2,baseValue:50,atk:9,mod:'atk',modAmt:2}
+      applyEnemyEquipment(batchTarget,weapon);window.disarmedWeapon=weapon
+      const probability=enemyGearArtifactChance(monsterLootStrength(enemyPermanentStats(batchTarget)),playerMf())
+      chance=p=>p===artifactRule('disarm','chance')||p===probability;damageRoll=()=>2
+    })()`)
+    await run('playerAttackEnemy(batchTarget)')
+    assert.equal(run('batchTarget.gearArtifactConversionChecked'),true)
+    assert.equal(run('batchTarget.equipment'),null)
+    assert.equal(run('disarmedWeapon.kind'), 'artifact')
+    assert.equal(run('disarmedWeapon.modAmt'),2)
+    assert.equal(run('groundItems.filter(g=>g.item===disarmedWeapon).length'),1)
+    run(`applyEnemyEquipment(batchTarget,{kind:'shield',base:'Buckler',name:'Buckler',tier:1,baseValue:30,def:3})
+      chance=()=>true;batchTarget.hp=0;killEnemy(batchTarget,true,'melee')`)
+    assert.equal(run('player.inventory.some(i=>i.kind==="shield"&&i.base==="Buckler")'),true)
+    assert.equal(run('groundItems.filter(g=>g.item===disarmedWeapon).length'),1)
   } finally {restoreArtifactCombat()}
 })
 
@@ -1484,7 +1509,7 @@ test('Batch 6: save and replay restore ghost provenance and independent Soul Fed
     run(`killEnemy(enemies.find(e=>e.id==='persist-soul'),true,'test')`)
     run(`player.artifactSoulFedExpiries=[turnCount+2,turnCount+300]`)
     const snapshot=clone(run('buildSaveObject()'))
-    assert.equal(snapshot.version,183)
+    assert.equal(snapshot.version,run('self.VAGABOND_SAVE_VERSION'))
     assert.deepEqual(snapshot.player.artifactSoulFedExpiries,[run('turnCount+2'),run('turnCount+300')])
     assert.equal(snapshot.enemies.filter(e=>e.artifactSoulGhost).length,1)
     const ghost=snapshot.enemies.find(e=>e.artifactSoulGhost)
@@ -2052,7 +2077,7 @@ test('Batch 3: combat state is serialised exactly and cleared on equipment repla
       player.artifactReaperStored=4;player.artifactReaperOriginId='former-enemy'
     })()`)
     const saved=clone(run('buildSaveObject()'))
-    assert.equal(saved.version,183)
+    assert.equal(saved.version,run('self.VAGABOND_SAVE_VERSION'))
     assert.equal(saved.player.artifactMaliceHits,4)
     run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
     assert.equal(run('player.artifactMaliceHits'),4)
@@ -2211,7 +2236,7 @@ test('Alchemist: save/load preserves buffers and expiry and equipment removal cl
     player.artifactAlchemistGuardUntilTurn=0
     return buildSaveObject()
   })()`))
-  assert.equal(saved.version,183)
+  assert.equal(saved.version,run('self.VAGABOND_SAVE_VERSION'))
   assert.equal(saved.player.artifactAlchemistTempHp,35)
   run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
   assert.equal(run('player.artifactAlchemistTempHp'),35)
@@ -2275,4 +2300,237 @@ test('Alchemist: real consumables use the same healing conversion and poisonous 
   assert.deepEqual(result.herb,{hp:100,temp:25})
   assert.deepEqual(result.edible,{hp:100,temp:31})
   assert.deepEqual(result.poisonous,{hp:100,temp:6})
+})
+
+
+test('ordinary chest artifact chances and reward categories', async () => {
+  await ready()
+  run(`(() => {
+    const check = (ok, msg) => {if (!ok) throw Error(msg)}
+    const old = {rng, inventory:player.inventory, groundItems, baseMf:player.baseMf,
+      gold:player.gold, equip:player.equip, resolver:rollOrdinaryChestMainReward, log}
+    try {
+      log=()=>{} // Stub presentation only in the non-browser runtime.
+      const rates = [.0015,.0035,.013,.024,.045]
+      for (let tier=1; tier<=5; tier++) {
+        for (const mf of [0,10,20,40]) {
+          const expected = rates[tier-1]*(1+mf*.05)
+          check(Math.abs(ordinaryChestArtifactChance(tier,mf)-expected)<1e-12,'tier and MF')
+          let draws=0; rng=()=>draws++===0?expected:.999
+          check(rollOrdinaryChestMainReward(tier,mf).result==='idscroll','strict chance boundary')
+          for (const gear of [true,false]) {
+            draws=0; rng=()=>{const i=draws++;return i===0?expected-1e-9:i===1?(gear ? .499999 : .5):.999}
+            const reward=rollOrdinaryChestMainReward(tier,mf)
+            check(reward.result==='artifact'&&!reward.item.identified,'artifact below boundary')
+            check((reward.item.artifactSlot!=='trinket')===gear,'explicit 50/50 category')
+            if (gear) check(!!reward.item.abilityId,'gear artifact has an eligible ability')
+          }
+        }
+      }
+      check(ordinaryChestArtifactChance(5,1000)===1,'clamp')
+      let invalid=false;try {ordinaryChestArtifactChance(0,0)} catch {invalid=true}
+      check(invalid,'invalid tier rejected')
+      player.inventory=[];player.baseMf=0;player.equip={weapon:null,shield:null,armor:null}
+      const gold=player.gold
+      let draws=0; rng=()=>draws++<2?0:.999
+      groundItems=[{kind:'chest',tier:5,x:player.x,y:player.y,level:currentZ}]
+      checkGroundAt(player.x,player.y);checkGroundAt(player.x,player.y)
+      check(player.inventory.length===1&&player.inventory[0].kind==='artifact'&&
+        player.gold===gold&&!player.equip.weapon&&!groundItems.length,'artifact replaces main reward without autoequip or duplicate')
+      for (const flag of ['artifactGuaranteed','royalThroneChest','towerMazeTreasure']) {
+        rollOrdinaryChestMainReward=()=>{throw Error('special chest used ordinary roll')}
+        player.inventory=[];rng=()=>.999
+        groundItems=[{kind:'chest',tier:5,[flag]:true,x:player.x,y:player.y,level:currentZ}]
+        checkGroundAt(player.x,player.y)
+        check(!groundItems.length&&player.inventory.length>0,'special chest reward preserved')
+      }
+    } finally {
+      rng=old.rng;player.inventory=old.inventory;groundItems=old.groundItems
+      player.baseMf=old.baseMf;player.gold=old.gold;player.equip=old.equip
+      rollOrdinaryChestMainReward=old.resolver;log=old.log
+    }
+  })()`)
+})
+
+
+test('ordinary chest reward is deterministic across saved starting state and replay RNG', async () => {
+  await ready()
+  run(`(() => {
+    player.inventory=[];player.baseMf=20;player.equip={weapon:null,shield:null,armor:null,blackkey:null}
+    groundItems=[{kind:'chest',tier:5,x:player.x,y:player.y,level:currentZ}]
+    // Find a deterministic seed whose first draw succeeds at the real chance.
+    for(let seed=1;seed<10000;seed++) {
+      rngState=seed
+      if(rng()<ordinaryChestArtifactChance(5,playerMf())) {rngState=seed;break}
+    }
+  })()`)
+  const before=clone(run('buildSaveObject()'))
+  run('window.chestOriginalLog=log;log=()=>{}')
+  try {
+    const open=()=>clone(run(`(() => {checkGroundAt(player.x,player.y);return {
+      items:player.inventory, gold:player.gold, rng:rngState, remaining:groundItems.length}})()`))
+    const first=open()
+    assert.equal(first.items[0].kind,'artifact')
+    assert.equal(first.remaining,0)
+    run(`loadGameFromObject(${JSON.stringify(before)},{isReplayInit:true})`)
+    assert.deepEqual(open(),first)
+    // Recording/playback use the same rng() choke point, not an animation callback.
+    run(`loadGameFromObject(${JSON.stringify(before)},{isReplayInit:true});startReplayRecording()`)
+    const recorded=open()
+    const tape=clone(run('replayData.rng'))
+    assert.deepEqual(recorded.items,first.items)
+    run(`loadGameFromObject(${JSON.stringify(before)},{isReplayInit:true});
+      activeReplay={rng:${JSON.stringify(tape)}};replayPlaying=true;replayRngIndex=0`)
+    const played=open()
+    assert.deepEqual(played.items,first.items)
+    assert.equal(run('replayRngIndex'),tape.length)
+  } finally {
+    run('replayPlaying=false;activeReplay=null;replayRecording=false;log=chestOriginalLog')
+  }
+})
+
+test('converted equipment preserves physical stats, modifiers, tiers, identity, pricing and eligible powers', async () => {
+  await ready()
+  run(`(() => {
+    const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+    const old={rng,pick,rollArtifactBonuses,makeArtifactItem,equip:player.equip,inventory:player.inventory}
+    const stats=()=>({atk:playerAtk(true),def:playerDef(true),spd:playerSpdRaw(true),grace:playerGrace(true),
+      hp:playerMaxHp(),mf:playerMf(),xp:xpMultiplier(),ranged:bowRangedAtk(player.equip.weapon),
+      range:player.equip.weapon?.rangedRange||0})
+    try {
+      rng=()=>.999
+      // Select powers without passive numeric changes; still use the real eligibility pool.
+      pick=pool=>['ambusher','immovable'].find(id=>pool.includes(id)) || old.pick(pool)
+      rollArtifactBonuses=()=>{throw Error('conversion rolled natural bonuses')}
+      makeArtifactItem=()=>{throw Error('conversion generated unrelated artifact')}
+      let n=0
+      const mods=['atk','def','spd','hp','mf','xp','grace']
+      for(const [slot,catalog] of [['weapon',WEAPONS],['shield',SHIELDS],['armor',ARMORS]]) {
+        for(const base of catalog) {
+          const mod=mods[n++%mods.length], amount=mod==='hp'?100:20
+          const item={...base,kind:slot,base:base.name,name:'Modified '+base.name,mod,modAmt:amount,
+            ...(mod==='xp'?{xpBonus:30}:{}),replayId:'conversion_'+n}
+          const original=structuredClone(item)
+          player.inventory=[];player.equip={weapon:null,shield:null,armor:null,blackkey:null}
+          player.equip[slot]=item
+          const before=stats(), beforeScore=equipmentSortValues(item).sum
+          const enemy={humanoid:true,atk:10,def:5,spd:5,grace:3,maxHp:50,hp:50,gearScale:.5,
+            shooterAbility:base.rangedAtk?'shooterArrows':null}
+          applyEnemyEquipment(enemy,original)
+          const beforeEnemy=enemyPermanentStats(enemy)
+          check(convertEquipmentToArtifact(item,40)===item,'instance identity '+base.name)
+          check(item.kind==='artifact'&&item.artifactSlot===slot&&item.tier===base.tier,'slot/tier '+base.name)
+          for(const [key,value] of Object.entries(original)) {
+            if(key==='name'||key==='kind')continue
+            check(JSON.stringify(item[key])===JSON.stringify(value),'lost '+key+' on '+base.name)
+          }
+          check(item.originalGearName===original.name,'original modifier name')
+          check(item.effectId==='gear_ability_only'&&Object.keys(item.bonuses).length===0&&item.maxHpPct===0,'no natural effect')
+          check(!ARTIFACT_EFFECTS.some(effect=>effect.id===item.effectId),'natural pool unchanged')
+          check(artifactAbilityPool(item).includes(item.abilityId),'eligible power '+base.name)
+          check(itemStatLine(item)==='???'&&visibleItemTier(item)===null,'unidentified')
+          check(!('mod' in Graveyard.snapshotItem(item,itemStatLine)),'public unidentified modifier hidden')
+          check(JSON.stringify(stats())===JSON.stringify(before),'physical stats preserved '+base.name+' '+mod)
+          check(equipmentSortValues(item).sum===beforeScore,'sorting preserved '+base.name)
+          applyEnemyEquipment(enemy,item)
+          check(JSON.stringify(enemyPermanentStats(enemy))===JSON.stringify(beforeEnemy),'enemy physical stats preserved '+base.name)
+          check(!!equippedArmor(item)===(slot==='armor'),'glancing armor behavior '+base.name)
+          const sellBase=SELL_VALUE_BY_TIER[item.tier]+item.modAmt*5
+          check(itemSellValue(item)===Math.floor(sellBase/2),'unidentified sale '+base.name)
+          check(itemBuyValue(item)===Math.min(ARTIFACT_ABILITIES.pricing.maxBuyPrice,itemBaseValue(item)+200),'unidentified price')
+          item.identified=true
+          check(visibleItemTier(item)===item.tier,'identified tier')
+          const line=itemStatLine(item)
+          check(line.includes(original.name)&&line.includes(artifactAbilityDefinition(item).name),'visible modifier and power')
+          check(itemSellValue(item)===sellBase+Math.floor(artifactPriceBonus(item)*.25),'identified sale')
+          const publicItem=Graveyard.snapshotItem(item,itemStatLine)
+          check(publicItem.abilityId===item.abilityId&&publicItem.modAmt===item.modAmt&&publicItem.rangedAtk===original.rangedAtk,'online gear data')
+          if(base.rangedAtk&&mod==='atk')check(bowRangedAtk(item)===base.rangedAtk+amount,'bow Mighty applies once')
+          check(convertEquipmentToArtifact(item,40)===null,'existing artifact cannot reconvert')
+        }
+      }
+      const bow=makeBowItem('Hunting Bow');Object.assign(bow,{name:'Mighty Hunting Bow',mod:'atk',modAmt:20,tier:5})
+      convertEquipmentToArtifact(bow,20);bow.identified=true
+      check(bowRangedAtk(bow)===27 && bow.atk===2 && itemStatLine(bow).includes('RANGED ATK 7+20'),'exceptional bow')
+      const mighty={kind:'weapon',base:'Sabre',name:'Mighty Sabre',atk:6,grace:5,tier:5,baseValue:110,mod:'atk',modAmt:20}
+      convertEquipmentToArtifact(mighty,0);mighty.identified=true
+      check(itemStatLine(mighty).includes('ATK 6+20'),'exceptional melee base retained')
+      rng=()=>0
+      const cursed=makeBowItem('Short Bow');convertEquipmentToArtifact(cursed,0)
+      check(cursed.curse&&cursed.possessor===null&&cursed.tier===1,'normal curse generation')
+      cursed.identified=true
+      check(itemSellValue(cursed)===Math.floor(SELL_VALUE_BY_TIER[1]/4)+Math.floor(artifactPriceBonus(cursed)*.25),'curse and explicit bow sellValue')
+      const noPool={kind:'weapon',base:'Dagger',name:'Dagger',tier:1,baseValue:30,atk:2,grace:5}
+      const original=JSON.stringify(noPool), domain=ARTIFACT_ABILITIES.domains.martial
+      ARTIFACT_ABILITIES.domains.martial=[]
+      try {check(convertEquipmentToArtifact(noPool)===null&&JSON.stringify(noPool)===original,'missing ability pool is atomic')}
+      finally {ARTIFACT_ABILITIES.domains.martial=domain}
+    } finally {rng=old.rng;pick=old.pick;rollArtifactBonuses=old.rollArtifactBonuses;makeArtifactItem=old.makeArtifactItem;
+      player.equip=old.equip;player.inventory=old.inventory}
+  })()`)
+})
+
+test('converted equipment persists through save, identification and seeded replay', async () => {
+  await ready()
+  const make=()=>clone(run(`(() => {
+    const item=makeBowItem('Hunting Bow');Object.assign(item,{name:'Mighty Hunting Bow',mod:'atk',modAmt:20,tier:5,replayId:'converted_test'})
+    return convertEquipmentToArtifact(item,10)
+  })()`))
+  const seed=run('rngState'), first=make(), firstEnd=run('rngState')
+  run(`rngState=${seed};startReplayRecording()`)
+  assert.deepEqual(make(),first)
+  assert.equal(run('rngState'),firstEnd)
+  const tape=clone(run('replayData.rng'))
+  try {
+    run(`activeReplay={rng:${JSON.stringify(tape)}};replayPlaying=true;replayRngIndex=0`)
+    assert.deepEqual(make(),first)
+    assert.equal(run('replayRngIndex'),tape.length)
+  } finally {run('replayPlaying=false;activeReplay=null;replayRecording=false')}
+  run(`player.inventory=[${JSON.stringify(first)}];player.equip={weapon:null,shield:null,armor:null,blackkey:null};
+    merchantStock.push({...player.inventory[0],replayId:'merchant_converted'});
+    groundItems.push({kind:'droppeditem',item:{...player.inventory[0],replayId:'ground_converted'},x:player.x,y:player.y,level:currentZ});
+    globalThis.conversionOwner=enemies.find(e=>e.alive&&e.humanoid&&e.equipment);
+    conversionOwner.stolenItem={...player.inventory[0],replayId:'stolen_converted'};
+    globalThis.conversionOwnerId=conversionOwner.id`)
+  const saved=clone(run('buildSaveObject()'))
+  run(`loadGameFromObject(${JSON.stringify(saved)},{isReplayInit:true})`)
+  assert.deepEqual(clone(run('player.inventory[0]')),first)
+  assert.deepEqual(clone(run("merchantStock.find(i=>i.replayId==='merchant_converted')")),{...first,replayId:'merchant_converted'})
+  assert.deepEqual(clone(run("groundItems.find(g=>g.item?.replayId==='ground_converted').item")),{...first,replayId:'ground_converted'})
+  assert.deepEqual(clone(run('enemies.find(e=>e.id===conversionOwnerId).stolenItem')),{...first,replayId:'stolen_converted'})
+  run(`globalThis.identifyTestLog=log;log=()=>{};player.godMode=true;
+    globalThis.identifyTestTurn=consumeItemTurn;consumeItemTurn=()=>{};`)
+  try {
+    const before=run('rngState')
+    run('identifyArtifact(0)')
+    assert.equal(run('rngState'),before,'identification consumes no artifact RNG')
+    assert.deepEqual(clone(run('player.inventory[0]')),{...first,identified:true})
+  } finally {run('consumeItemTurn=identifyTestTurn;log=identifyTestLog;player.godMode=false')}
+  run(`globalThis.conversionTradeSinks={renderTrade,renderInventory,log};renderTrade=()=>{};renderInventory=()=>{};log=()=>{};player.gold=3000`)
+  try {
+    const sell=run('itemSellValue(player.inventory[0])')
+    run('sellItem(0)')
+    assert.equal(run('player.gold'),3000+sell)
+    const buy=run("itemBuyValue(merchantStock.find(i=>i.replayId==='converted_test'))")
+    run("buyItem(merchantStock.find(i=>i.replayId==='converted_test'))")
+    assert.equal(run('player.gold'),3000+sell-buy)
+    assert.deepEqual(clone(run('player.inventory[0]')),{...first,identified:true})
+  } finally {run('renderTrade=conversionTradeSinks.renderTrade;renderInventory=conversionTradeSinks.renderInventory;log=conversionTradeSinks.log')}
+})
+
+test('converted armor uses the normal glancing-hit branch during enemy melee', async () => {
+  await ready();setupArtifactCombat('slow')
+  try {
+    run(`(() => {
+      player.equip.armor={kind:'armor',name:'Sturdy Tunic',base:'Tunic',tier:1,baseValue:30,def:4,mod:'def',modAmt:2}
+      const oldPick=pick
+      try {pick=pool=>pool.includes('immovable')?'immovable':oldPick(pool);convertEquipmentToArtifact(player.equip.armor,20)}
+      finally {pick=oldPick}
+      player.hp=playerMaxHp();damageRoll=()=>12
+      let draws=0;chance=()=>++draws===2
+    })()`)
+    const hp=run('player.hp')
+    run('enemyAttackPlayer(batchTarget)')
+    assert.equal(run('player.hp'),hp-4,'second hit check glances instead of receiving full damage')
+  } finally {restoreArtifactCombat()}
 })

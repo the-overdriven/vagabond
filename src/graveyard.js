@@ -51,9 +51,10 @@ const Graveyard = (() => {
         identified: false, stat_line: '???'}
     const {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
-      speedPenalty, xpBonus} = item
+      speedPenalty, gracePenalty, rangedAtk, rangedRange, xpBonus, abilityId, berserkerOathRoll, originalGearName} = item
     return {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
-      atk, def, spd, grace, speedPenalty, xpBonus, stat_line: statLine(item),
+      atk, def, spd, grace, speedPenalty, gracePenalty, rangedAtk, rangedRange, xpBonus,
+      abilityId, berserkerOathRoll, originalGearName, stat_line: statLine(item),
       bonuses: bonuses ? {...bonuses} : undefined,
       curse: curse ? {...curse, types: curse.types?.slice()} : curse,
       artifactSlot, maxHpPct, twoHanded}
@@ -69,26 +70,24 @@ const Graveyard = (() => {
 
   function snapshotStrongestEnemyKill(kill) {
     if (!kill) return null
-    const statNames = ['atk', 'def', 'spd', 'grace']
-    // Spawned enemy stats stay exact in saves/replays for ranking. Supabase's
-    // death_strongest_enemy_check expects integers for all five uploaded numbers.
+    const statNames = ['atk', 'def', 'spd', 'grace', 'maxHp']
+    // Keep the authoritative HP-inclusive strength calculated in gameplay from
+    // precise permanent stats, even when individual uploaded stats are rounded.
     if (typeof kill.name !== 'string' || !kill.name ||
         typeof kill.species !== 'string' || !kill.species ||
-        !Number.isFinite(kill.tier) ||
-        !statNames.every(stat => Number.isFinite(kill.stats?.[stat]))) {
+        !Number.isInteger(kill.tier) || kill.tier < 1 || kill.tier > 5 ||
+        !Number.isSafeInteger(kill.strength) || kill.strength < 0 ||
+        !statNames.every(stat => Number.isFinite(kill.stats?.[stat])) ||
+        kill.stats.maxHp <= 0) {
       console.warn('Invalid strongest-kill snapshot; uploading death without the trophy')
       return null
     }
-    const exactStrength = statNames.reduce((sum, stat) => sum + kill.stats[stat], 0)
-    const strength = Math.round(exactStrength)
-    const tier = Math.round(kill.tier)
+    const {tier, strength} = kill
     const stats = Object.fromEntries(statNames.map(stat => [stat, Math.round(kill.stats[stat])]))
-    if (![strength, tier, ...Object.values(stats)].every(Number.isSafeInteger)) {
+    if (!Object.values(stats).every(Number.isSafeInteger) || stats.maxHp <= 0) {
       console.warn('Out-of-range strongest-kill snapshot; uploading death without the trophy')
       return null
     }
-    // Derive strength from exact stats, not an old saved strength field. It may
-    // differ from the sum of independently rounded stats by one or two points.
     return {name: kill.name, species: kill.species, tier, strength, stats}
   }
 

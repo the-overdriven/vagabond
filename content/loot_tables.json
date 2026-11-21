@@ -31,7 +31,17 @@
     "scale": 100
   },
   "chestLoot": {
-    "_note": "Rolls once from 0 up to (excluding) 100. upTo is a cumulative percentage threshold: the first entry with roll < upTo wins. An outcome's chance is its upTo minus the previous upTo; elseResult has the remaining percentage. Guaranteed-artifact chests skip this roll.",
+    "_note": "Ordinary chests first roll for an artifact. On failure, roll once from 0 up to (excluding) 100. upTo is a cumulative percentage threshold: the first entry with roll < upTo wins. An outcome's conditional chance is its upTo minus the previous upTo; elseResult has the remaining percentage. Special reward chests bypass this table.",
+    "artifact": {
+      "chanceByTier": {
+        "1": 0.0015,
+        "2": 0.0035,
+        "3": 0.013,
+        "4": 0.024,
+        "5": 0.045
+      },
+      "gearChance": 0.5
+    },
     "scale": 100,
     "table": [
       {

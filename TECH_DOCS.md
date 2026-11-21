@@ -201,7 +201,7 @@ inventory panel. It lists each base species the current character has killed
 at least once and shows its total count. Its introduction reports how many
 different species have been slain (zero for an empty list), rather than the
 total number of kills. Entries run from weakest to strongest
-by base `ATK + DEF + SPD + GRACE`, with alphabetical ties. Prefixes and
+by base `round(ATK + DEF + SPD + GRACE + MaxHP / 10)`, with alphabetical ties. Prefixes and
 random equipment do not affect the order; records without a species template
 follow the known species. On desktop, hovering or keyboard-
 focusing an entry shows its portrait above the Bestiary overlay; on touch
@@ -260,29 +260,33 @@ clears any outstanding notice.
 ## Strongest kill achievement
 
 The Character sheet records the strongest individual enemy killed by this
-character, showing its actual name and strength. It uses the same
-`ATK + DEF + SPD + GRACE` formula as Bestiary sorting, evaluated on that enemy’s
-permanent spawned stats, including prefixes and equipped gear. Equipped weapon
-GRACE replaces natural GRACE; defensive gear GRACE penalties apply. Terrain,
-Alarmed, Enrage, Charge and temporary flight bonuses do not inflate the record.
-HP, rarity and abilities are outside this ranking. Exact unrounded stat totals
-decide which kill is stronger, so two enemies that display the same rounded
-strength can still be ordered correctly; exact ties retain the first kill. The
-stored/displayed strength is rounded to the nearest integer. No kills displays
-“None”.
+character, showing its actual name and strength. The shared loot and achievement
+strength is:
 
-The record survives normal deaths, current saves and replay; a new character
-starts without it. Every actual death snapshots it before penalties or character
-reset and sends it as `strongest_enemy_killed` to the Graveyard. The in-game
-achievement and save/replay keep exact permanent ATK/DEF/SPD/GRACE stats for
-ranking (humanoid gear can produce fractions). At the online submission boundary,
-the total strength is recomputed from those exact stats and rounded, and **each**
-ATK/DEF/SPD/GRACE stat is independently rounded to an integer. Consequently the
-rounded total need not equal the sum of the individually rounded stats. This
-also normalizes records restored from saves that contain an unrounded strength.
-An invalid or non-finite trophy is omitted from the submitted death, not from
-the live game, so it cannot prevent the death record being posted. Expanded online
-records show the same achievement. This trophy grants no gameplay bonus.
+`strength = round(ATK + DEF + SPD + GRACE + MaxHP / 10)`
+
+Round the final sum, not its components (44.4 → 44; 44.5 → 45). Bestiary
+sorting uses base species stats; individual kill records and enemy artifact
+probabilities use a permanent enemy snapshot. It includes spawn variance,
+prefixes, equipment and permanent maximum-HP changes. Equipped weapon GRACE
+replaces natural GRACE; defensive gear GRACE penalties apply. Assigned shooters
+use their configured ranged ATK (melee ATK after permanent ranged disarm),
+regardless of current ammunition or combat mode. Remaining HP, terrain,
+Alarmed, Enrage, Charge, inspiration, temporary stat penalties and temporary
+flight bonuses do not contribute. Combat comparisons for AI and relative-strength
+abilities retain the original four-stat formula without HP or rounding.
+
+The highest rounded strength wins; equal rounded scores retain the first kill.
+Only player-credited kills qualify. The snapshot is taken before death-time
+mutations. No kills displays “None”. The record grants no gameplay bonus.
+
+The achievement survives normal deaths, current saves and replay; a new
+character starts without it. Saves retain exact permanent ATK/DEF/SPD/GRACE/MaxHP
+and the authoritative rounded score. Graveyard and Highscores upload that score
+unchanged with independently rounded integer component stats; their sum need
+not reproduce the exact score. Invalid snapshots are omitted rather than
+blocking the online record. Historical online achievements are not recalculated.
+Player leaderboard ranking remains separate.
 
 ## ATK
 
@@ -349,8 +353,8 @@ MF comes from base MF, race bonuses, equipment modifiers, and artifacts.
 Magic Find influences loot chances **and** loot quality:
 
 - Gold drops from enemies are currently disabled (see 43. Loot).
-- Artifact drop chance from enemy kills scales with MF using the same
-  `(1 + MF*0.05)` multiplier as the old gold formula, still capped at 4.8%.
+- Enemy gear conversion and independent trinket drops both use `(1 + MF*0.05)`;
+  their separate strength-based probabilities and caps are defined in §43–44.
 - Only humanoid enemies can wear and drop normal equipment. MF improves the
   humanoid fallback equipment roll and reduces its chance to roll one tier
   below the enemy (`35% - (tier - 1)*5% - MF*1%`, floor 5%).
@@ -359,8 +363,9 @@ Magic Find influences loot chances **and** loot quality:
   modifier amount upward, and reduces artifact curse chance
   (`10% - MF*0.5%`, floor 2%) while giving a chance to roll the artifact
   effect pool one tier higher (`MF*3%`, capped 50%).
-- Chest loot (gold amount, and the equipment/artifact found inside) also
-  scales with MF the same way.
+- Ordinary chest artifact probability multiplies by `(1 + MF*0.05)` (see
+  §45); chest gold amount, equipment quality and artifact quality also scale
+  with MF. Mimic chest contents are fixed at generation MF 0.
 
 ## Max HP
 
@@ -5128,8 +5133,10 @@ and `ATTACK_ON_REVEAL`. It uses the normal tier-appropriate prefix rules; its
 HP, ATK and DEF interpolate with Dwarven Ruins floor progress from 100% to
 140% of its base stats (the Tower basement uses baseline stats), before any
 prefix modifiers. It drops exactly its pre-rolled disguised chest contents
-plus **15 base gold** scaled by the world's gold multiplier. These contents
-are preserved when the disguise moves or the game is saved/replayed.
+plus **15 base gold** scaled by the world's gold multiplier. The contents use
+ordinary chest artifact chances and independent bonuses at generation MF 0;
+later MF does not affect them. These contents are preserved when the disguise
+moves or the game is saved/replayed.
 
 ---
 
@@ -5962,7 +5969,8 @@ Glancing damage:
 floor(damage / 3)
 ```
 
-This applies to attacks against armored enemies and attacks against an armored player.
+This applies to attacks against armored enemies and attacks against an armored player,
+including any equipped armor artifact.
 
 ---
 
@@ -6866,20 +6874,21 @@ Current content includes approximately:
 8 curse definitions
 ```
 
-Guaranteed gear-artifact sources draw only from eligible weapon, shield, and
-armor bases; ordinary artifact sources continue to include non-gear trinkets.
+Natural artifact sources may select unrestricted, gear-only or standalone
+non-gear-only generation. The category filter is applied directly to the noun
+pool; it does not change effect tiers, quality, or curses.
 All generated artifacts start unidentified, including Merchant stock, buried
 finds and the Tower labyrinth reward. Identification reveals their powers and
 potential curses; generation never identifies them automatically.
 
-Artifact gear bases are selected only if their ordinary gear tier is no higher
+Naturally generated artifact gear bases are selected only if their ordinary gear tier is no higher
 than the rolled artifact effect tier. A selected gear noun retains its **full
 ordinary base properties**, including weapon ATK/GRACE and two-handed status,
 shield DEF and shield SPD/GRACE penalties, or armor DEF and its exact SPD/GRACE
 penalties. The rolled artifact effect then adds its own independent bonuses (including
 SPD, which affects the player's movement) and curse; it never replaces the
 base statistics. For example, a Brigandine artifact
-starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield
+starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield, armor
 and weapon artifacts retain normal physical gear behavior (including weapon
 attacks on doors/crates). Trinkets have no inherent equipment stats and remain
 passive in inventory. An identified gear artifact appears in its corresponding
@@ -6889,7 +6898,19 @@ generic artifact icon; trinkets retain the generic icon, and missing gear
 SVGs fall back to the generic icon. Artifact combat messages use names without
 a leading `The`, including for already-named equipped artifact weapons.
 
-These percentages apply only after an enemy has already rolled an artifact
+**Converted equipment.** Existing weapons, shields and armor can also be
+augmented with an artifact power without rolling a new base or natural effect.
+The original item instance retains its exact tier (1–5), base stats, range,
+handedness, penalties, original modifier and exceptional values, purchase base,
+and identity. Its ordinary modifier continues to apply once; a Mighty bow
+adds its modifier to ranged ATK, not melee ATK. Conversion adds one eligible
+power using the normal domain pool, artifact naming, lore and curse rules, but
+no independent random stat bonuses or MF tier boost. The ability-only effect
+metadata is not part of the natural effect pool. The item starts unidentified;
+identification reveals the retained modifier and tier alongside its power and
+curse. Ability-specific bonuses or penalties still apply normally.
+
+These natural-effect percentages apply only after a source has already rolled an artifact
 drop. They do not describe the chance of getting an artifact in the first
 place. Once the drop happens, the effect tier is selected uniformly from the
 effects available to that enemy tier. The current pool has 4 tier-3 effects,
@@ -7083,7 +7104,7 @@ combat outcomes or consume game RNG.
 | Bravery (martial) | martial | Melee damage is **25% higher** against an enemy with greater current strength, **or** while at least **3 same-level enemies** are adjacent. Both conditions still grant only one bonus. |
 | Cleave | martial | A landed direct melee strike also strikes enemies adjacent to **both** the player and primary target for **60% of that strike's damage**, reduced by each secondary enemy's own DEF. Secondary strikes cannot trigger other weapon on-hit powers or further Cleave. |
 | Confusion | martial | Each damaging melee hit has a **20%** chance to cause **3 player turns** of confusion. Each enemy action has a **50%** normal / **25%** random legal move / **25%** attack a random adjacent monster split. With no target, the final case wastes the action. |
-| Disarm | martial | Each damaging melee hit has a **10%** chance to knock an enemy's actual equipped **weapon or shield** to a legal nearby tile (or beneath the enemy). A modeled archer bow may also be disarmed. If a shield and modeled bow both exist, one is chosen uniformly. Each item is dropped at most once, loses its stat bonuses or ability to shoot as applicable, and cannot drop again on death. |
+| Disarm | martial | Each damaging melee hit has a **10%** chance to knock an enemy's actual equipped **weapon or shield** to a legal nearby tile (or beneath the enemy). A modeled archer bow may also be disarmed. If a shield and modeled bow both exist, one is chosen uniformly. Each item is dropped at most once, loses its stat bonuses or ability to shoot as applicable, and cannot drop again on death. Eligible stored equipment may convert into an unidentified artifact using the pre-Disarm strength and the same once-per-enemy attempt as death (§44). Modeled bows do not convert. |
 | Dreadful Strike | martial | A damaging melee hit has a **20%** chance to cause **Fear for 5 player turns**. A repeat application refreshes its duration; undead are immune, as with Scroll of Fear. |
 | Enrage | martial | Below **30% HP**, melee ATK is multiplied by **1.25** before the normal mitigation roll, matching monsters' Enrage rule. |
 | Evasion (martial) | martial | After a damaging melee strike leaves its target alive, **30%** chance to make **one random legal adjacent step** when the current attack action finishes, regardless of the number of strikes. Respect rooted and terrain hazards; entering a tile applies normal entry rules. |
@@ -7470,47 +7491,37 @@ Fireball and Death Shield. Rooms get independent rolls; a successful room receiv
 most one additional scroll on an accessible unoccupied floor tile. Both chance
 and item kinds are configurable in `dwarvenRuins.loot.libraryScrolls`.
 
-Artifact drop chance by enemy tier:
+## Enemy artifact drops
 
-| Tier | Base chance |
-|---|---:|
-| 1 | 0.40% |
-| 2 | 0.70% |
-| 3 | 1.00% |
-| 4 | 1.30% |
-| 5 | 1.60% |
+Only ordinary loot-eligible humanoids can roll an independent non-gear artifact
+at death; prefix and equipment are not required. Lootless summoned ghosts,
+Mimics (which retain their stored chest loot), and sacrificial deaths do not use
+this path. Non-player deaths keep their ordinary loot eligibility, but cannot
+trigger equipment conversion. A humanoid may drop both a trinket and converted
+gear during the same death.
 
-These are the chances for any artifact to drop from an enemy; higher-tier
-enemies intentionally have a higher artifact drop chance. They do not describe
-the chance of a high-tier artifact effect. When an artifact drops, its effect
-pool is limited by the enemy tier (with Magic Find occasionally allowing one
-tier higher), so high-tier effects remain available only from stronger and
-rarer sources. Magic Find modifies the drop chances below. Guaranteed artifact
-chests are unaffected.
-
-Any-artifact enemy drop chance is capped at:
+The permanent, rounded strength `S` is captured before death processing (including
+equipment removal), using the same HP-inclusive score as the strongest-kill record.
+`W` is the active enemy artifact drop-rate multiplier divided by its configured
+neutral value: normally 1, or 1.875 in Relic World (0.75 / 0.40).
 
 ```text
-4.8%
+trinket chance = min(4.8% × W, S × 0.00025 × (1 + MF × 0.05) × W)
 ```
 
-The cap is reached only at high Magic Find. The minimum MF needed is
-approximately 220 for tier 1, 117 for tier 2, 76 for tier 3, 54 for tier 4,
-or 40 for tier 5. Therefore, a 4.8% chance for any artifact is possible
-against a tier-5 enemy when the player has MF 40 or higher; lower-tier enemies
-require even more MF.
-
-Artifact chance and quality (effect tier, curse odds) scale with Magic Find
-(see "Magic Find" above).
+The normal cap is 4.8%; Relic World has a 9% cap. Natural trinket generation
+retains its source-tier effect pool, MF quality and curse rules. This roll never
+creates a new weapon, shield or armor. Converted equipment uses the separate
+rule in §44. Other artifact sources (including guaranteed adaptive rewards and
+special chests) are independent and retain their own generation rules.
 
 ---
 
 # 44. Enemy Equipment Drops
 
 Humanoid enemies can carry equipment. The worn item affects the enemy's stats
-and is dropped as that same item when the humanoid dies. Only humanoids are
-eligible for the random artifact drop roll; biological monsters retain their
-ordinary material drops.
+and is dropped as that same item when the humanoid dies. Biological monsters
+retain ordinary material drops.
 
 ## Humanoid equipment effectiveness
 
@@ -7626,32 +7637,64 @@ The item type is selected independently:
 
 ## Death drop
 
-When a humanoid with `e.equipment` dies, the game drops that exact stored
-equipment item. It does not generate a new item at death.
+When a humanoid with stored equipment dies, the game drops that exact weapon,
+armor or shield, rather than generating replacement gear. A player-credited
+kill of an ordinarily prefixed humanoid or a successful player-caused physical
+Disarm may augment eligible stored equipment as an unidentified artifact.
+Special encounter names without an ordinary prefix do not qualify. An already
+existing artifact, stolen player property, a protected Hunter quest item, and
+abstract shooter weapons or ammunition cannot convert.
 
-This means the timeline is:
+## Equipment artifact conversion
+
+With rounded permanent monster strength `S`, current Magic Find and world
+multiplier `W` (see §43):
 
 ```text
-enemy spawns
-    ↓
-equipment is rolled
-    ↓
-equipment affects enemy stats
-    ↓
-player encounters/fights enemy
-    ↓
-enemy dies
-    ↓
-the stored equipment is dropped
+conversion chance = min(0.325, 0.0035 × S × sqrt(S / 35) × (1 + MF × 0.05) × W)
 ```
 
-Possible equipment includes:
+| Strength | MF 0 | MF 10 | MF 20 |
+|---:|---:|---:|---:|
+| 20 | 5.29% | 7.94% | 10.58% |
+| 30 | 9.72% | 14.58% | 19.44% |
+| 40 | 14.97% | 22.45% | 29.93% |
+| 50 | 20.92% | 31.37% | 32.50% |
+| 60 | 27.50% | 32.50% | 32.50% |
+| 80+ | 32.50% | 32.50% | 32.50% |
 
-- weapon
-- armor
-- shield
+These are normal-world probabilities conditional on eligibility, not per kill.
+The hard 32.5% cap applies in all worlds. Prefix identity does not independently
+modify the probability. Higher strength does not upgrade the original item's
+tier or modifier. See §38 for preserved properties and ability-only generation.
 
-Non-humanoid enemies do not wear or drop normal weapons, armor, or shields.
+A humanoid currently has one physical equipment slot. A valid conversion roll
+consumes the enemy's sole attempt whether it succeeds or fails. Ineligible
+gear and unsuccessful Disarm do not spend an attempt. The persistent spent flag
+survives re-equipping, acquiring replacement gear, floor changes, save/load and
+replay. Disarm uses the pre-removal strength and only the actual disarmed item;
+later death uses the then-current permanent score for its independent trinket
+roll and the strongest-kill record. An already spent attempt never resets.
+
+Death resolves the trinket roll before conversion, using one shared snapshot of
+strength and MF. Conversion and Disarm are synchronous seeded decisions; item
+placement, automatic collection, hidden identification and rare-drop feedback
+follow the existing loot rules. Each equipment instance is delivered at most
+once, including stolen gear recovered after Disarm.
+
+The level-11 target of 3–5 additional gear artifacts is a balance estimate,
+not a guaranteed outcome. A deterministic calibration (`tests/enemy-artifact-balance.cjs`)
+used two XS seeds per world type with synthetic cave silhouette input, actual
+spawned stats/prefixes/equipment, and 10,000 sampled routes of 75 humanoid kills
+(30/25/15/5 at tiers 1/2/3/4, MF 0/5/10 over consecutive groups of 25).
+Other kills and exceptional guaranteed rewards are excluded. The normal-world
+sample averaged 0.27 conversions (0.08 net additional gear artifacts after
+removing the former random gear roll); Relic World averaged 0.42 conversions
+(0.06 net). The zero-conversion probabilities were 76% and 66%, respectively.
+These samples are not actual player routes. In particular, ordinary prefix
+frequencies and equipped humanoid density are lower than in the illustrative
+40%-prefix model; the agreed 32.5% ceiling cannot alone deliver the target
+with roughly 4–5 eligible enemies per modeled route.
 
 ---
 
@@ -7784,8 +7827,31 @@ already fixed contents.
 
 ## Chest loot selection
 
-For ordinary chests, the loot outcome is selected with **one RNG roll on a
-0–100 scale**:
+Ordinary physical chests first roll for an artifact using their source tier:
+
+| Chest tier | Base artifact chance (MF 0) |
+|---:|---:|
+| 1 | 0.15% |
+| 2 | 0.35% |
+| 3 | 1.30% |
+| 4 | 2.40% |
+| 5 | 4.50% |
+
+```text
+artifact chance = min(1, base chance × (1 + MF × 0.05))
+```
+
+A success replaces the main reward with one unidentified natural artifact,
+50% gear and 50% standalone trinket. Generation uses the chest's source tier
+(not its ordinary gear cap) and opening-time MF. Existing independent Flint
+Stone and Potato rolls still occur. The enemy artifact world multiplier does
+not apply. Guaranteed, labyrinth final and royal treasury rewards retain
+their dedicated rules; skeletal remains that reuse the ordinary loot table
+are not physical chests. All rolls resolve synchronously. Mimics resolve
+this same reward at generation MF 0 (see §20).
+
+On artifact failure, the ordinary loot outcome is selected with **one RNG
+roll on a 0–100 scale**:
 
 ```text
 roll = rng() × 100
@@ -7799,7 +7865,7 @@ exceeds the roll determines the result. If no entry matches, the configured
 The roll is at least 0 and strictly below 100. Thresholds are cumulative:
 each result's percentage chance is its upper threshold minus the previous
 threshold (starting at 0). `elseResult` gets the remaining percentage above
-the last threshold. The table uses the configured percentages directly.
+the last threshold. The table uses the configured percentages directly, conditional on artifact failure.
 
 | Result | Cumulative upper threshold (rounded) | Chance (rounded) |
 |---|---:|---:|
@@ -7827,7 +7893,7 @@ An ordinary chest's gold result is a uniform **15–30 gold per chest tier**
 (tier 1: 15–30, tier 2: 30–60, tier 3: 45–90, tier 4: 60–120,
 tier 5: 75–150). Magic Find adds **2 gold per point** before the world's
 chest-gold multiplier and rounding. This changes the payout, not the gold
-result's **30.5%** chance or any of the other loot probabilities; scripted
+result's **30.5%** conditional chance or any of the other conditional loot probabilities; scripted
 and guaranteed-artifact rewards have separate tables.
 
 The **100-point roll chooses the result category**. If the result is gear, a
@@ -7836,7 +7902,7 @@ configured chances.
 Arrows and Chitin use seeded uniform stack counts and merge with existing
 inventory stacks. Short Bows may have ordinary weapon prefixes and use the normal
 auto-equip rule. The nine percentage points assigned to these three outcomes
-come entirely from gold; every other ordinary chest outcome retains its chance.
+come entirely from gold; every other ordinary chest outcome retains its conditional chance.
 Guaranteed artifact and royal treasury chests retain their separate rewards.
 
 Gear generated from a chest uses the chest tier (capped by the entry's
@@ -9024,6 +9090,9 @@ sell value = tier sell value + modifier amount × 5
 ```
 
 The modifier's name/stat does not change this formula; only `modAmt` matters.
+Converted equipment uses this same tier/modifier sell base, including bows
+with an ordinary explicit sell value; it does not bypass artifact discounts
+or the identified ability premium.
 Artifact sell prices apply an additional discount **after** the tier/modifier
 calculation: **unidentified artifacts sell for half**, and **identified cursed
 artifacts for one quarter**, rounded down to whole gold. Identified artifacts
@@ -9063,8 +9132,8 @@ and purchase price remain configured in `merchant_stock.json`.
 
 Every non-gear definition in `content/items.json` and every weapon, shield and
 armor template has a nonnegative `baseValue`, representing the normal per-unit
-purchase value. Generated artifacts take their `baseValue` from their selected
-entry in `artifact_effects.json`. The common household starting-weapon value
+purchase value. Naturally generated artifacts take their `baseValue` from their selected
+entry in `artifact_effects.json`; converted gear keeps its original purchase base. The common household starting-weapon value
 and modifier purchase increment are configured in `loot_tables.json`.
 
 Initial values preserve the prior pricing: ordinary base purchase values are
@@ -9769,7 +9838,7 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires **version 43** saves. Other versions are rejected
+Current gameplay state requires the save version defined in `src/version.js`. Other versions are rejected
 before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
@@ -11064,14 +11133,12 @@ other dashboard configuration is required for a new default project. If the
 project already has a `pgrst.db_pre_request` hook, compose the checks rather
 than overwrite it.
 The database uses a nullable JSONB `strongest_enemy_killed` column with bounded
-name, species, tier, strength and stat snapshot validation. The client submits
-integers for the tier, strength and four stats even if the underlying monster
-stats are fractional; this also works with the original all-integer constraint.
-The earlier `supabase-graveyard-strongest-decimals.sql` migration allowed decimals
-in stat fields, but is **not required** for current client submissions. Existing
-databases must still have the `strongest_enemy_killed` JSONB column and its
-corresponding constraint. Older online records display “None”. The frontend
-includes the column in both death submission and Graveyard queries.
+name, species, tier, strength and stat snapshot validation. New snapshots include
+`stats.maxHp` alongside the four existing integer component stats and preserve
+the rounded HP-inclusive score from gameplay. Older online rows retain their
+original scores and need no invented HP value. The existing Graveyard constraint
+permits extra JSON fields without requiring the strength to equal a four-stat
+sum. The frontend includes the snapshot in death and highscore submissions.
 
 For an existing database, also run
 `supabase-graveyard-add-world-death-fields.sql` **before deploying this
@@ -11155,7 +11222,7 @@ present, artifact effect ID when present, and the inventory-formatted
 `stat_line`), `artifacts` (compact JSONB artifact inventory snapshots with
 their `stat_line`), `steps_taken`,
 `creatures_slain`, `strongest_enemy_killed` (name, species, integer tier,
-rounded integer strength and independently rounded integer ATK/DEF/SPD/GRACE),
+rounded integer strength and independently rounded integer ATK/DEF/SPD/GRACE/MaxHP),
 `turn_count` (turns in the current page session, reset on
 load), `world_seed` (original seed restored from saves), `world_size` (the
 selected XS–XXL preset), `world_traits` (JSONB array of actual selected trait
