@@ -1365,7 +1365,9 @@ function loadGameFromObject(data, opts = {}) {
     }
     // Action scope is an in-flight runtime reference, not serialized metadata.
     recordingAction = null
-    replayRecording = true
+    // Keep an incompatible recording in exports, but never append actions
+    // resolved under different combat rules or attempt to replay its tape.
+    replayRecording = replayData.version === REPLAY_VERSION
   } else {
     replayData = null
     recordingAction = null
@@ -1393,7 +1395,11 @@ function loadGameFromObject(data, opts = {}) {
   minimapDirty = true
   updateHud()
   render()
-  if (!isReplayInit && !opts.isReplayRestore) log('Game loaded.', 'good')
+  if (!isReplayInit && !opts.isReplayRestore) {
+    log('Game loaded.', 'good')
+    if (replayData && replayData.version !== REPLAY_VERSION)
+      log('The saved replay uses incompatible combat rules and cannot be played or extended.', 'info')
+  }
 }
 
 function loadGame(file) {

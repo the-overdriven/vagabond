@@ -25,6 +25,28 @@ async function main() {
       'separate arrow bundle adds ten arrows')
     equipItem(player.inventory.findIndex(i=>i.base==='Short Bow'))
     check(equippedShortBow()?.atk===1 && player.equip.shield===null,'two-handed weak-melee bow equips')
+    for (const base of ['Short Bow','Hunting Bow']) {
+      const normal=makeBowItem(base)
+      player.equip.weapon=normal
+      const melee=playerAtk()
+      const mighty={...normal,name:'Mighty '+base,mod:'atk',modAmt:3}
+      player.equip.weapon=mighty
+      check(playerAtk()===melee&&bowRangedAtk(mighty)===normal.rangedAtk+3,
+        'Mighty modifies ranged power only for '+base)
+      check(itemStatLine(mighty).includes('RANGED ATK '+normal.rangedAtk+'+3'),
+        'item stat line shows ranged bonus for '+base)
+      check(equipmentSortValues(mighty).primary===normal.rangedAtk+3,'ranking counts the ranged bonus')
+    }
+    const club={kind:'weapon',base:'Club',name:'Club',atk:3,grace:1}
+    player.equip.weapon=club
+    const clubAtk=playerAtk()
+    player.equip.weapon={...club,mod:'atk',modAmt:3}
+    check(playerAtk()===clubAtk+3,'Mighty melee weapons still increase melee ATK')
+    const mightyShort={...makeBowItem('Short Bow'),name:'Mighty Short Bow',mod:'atk',modAmt:3}
+    player.equip.weapon=makeBowItem('Hunting Bow')
+    player.inventory=[mightyShort,createItem('arrows',{count:3})]
+    check(bestLoadoutItem('weapon',item=>!!item.rangedAtk,true)===mightyShort,'ranged loadout considers Mighty')
+    player.equip.weapon=mightyShort;player.inventory=[createItem('arrows',{count:3})]
   })()`)
   console.log('PASS bow merchant, inventory and equipment')
 
@@ -40,7 +62,7 @@ async function main() {
       x:44,y:40,level:0,alive:true,hp:100,maxHp:100,
       shooterAbility:null,shotsRemaining:0,equipment:null})
     occupied.add(keyXY(target.x,target.y))
-    enemyTurn=()=>{turnCount++};npcTurn=()=>{};chance=()=>false;damageRoll=()=>5
+    enemyTurn=()=>{turnCount++};npcTurn=()=>{};chance=()=>false;damageRoll=atk=>atk
     check(playerBowShotPath(target)?.length>1,'unobstructed target in range')
     map[40][42]='mountain'
     const turnBefore=turnCount
@@ -54,7 +76,7 @@ async function main() {
     player.inventory=[createItem('arrows',{count:3})]
     startReplayRecording()
     check(shootEnemy(target),'shot succeeded')
-    check(target.hp===95 && target.alarmed,'shot damages and alerts target')
+    check(target.hp===92 && target.alarmed,'Mighty shot deals eight damage and alerts target')
     check(player.inventory[0].count===2 && turnCount===turnBefore+1,'shot costs arrow and turn')
     check(replayData.actions.length===1 && replayData.actions[0].type==='shoot' &&
       replayData.actions[0].targetId===target.id,'shot targets stable enemy identity')
@@ -75,6 +97,13 @@ async function main() {
       player.inventory.find(i=>i.kind==='arrows')?.count===expected.arrows,
       'replay reproduces health, turn and arrow usage')
     replayPlaying=false;replaySimulationMode=false
+    const save=JSON.parse(JSON.stringify(buildSaveObject()))
+    save.replay={...record,version:REPLAY_VERSION-1}
+    loadGameFromObject(save,{isReplayInit:true})
+    check(!replayRecording&&buildSaveObject().replay.version===REPLAY_VERSION-1,'old recording is preserved but not extended')
+    startReplayPlayback()
+    check(!replayPlaying&&bowRangedAtk(player.equip.weapon)===8,'incompatible recording is blocked and save remains playable')
+    replayData=null;replayRecording=false
   })()`)
   console.log('PASS bow firing, obstruction, range, ammo and replay')
 

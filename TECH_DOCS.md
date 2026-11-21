@@ -6135,8 +6135,9 @@ uses only `equipmentSortValues().sum`, not the inventory sort's subsequent
 tier and primary-stat tiebreakers.
 
 The score is **3 times the primary stat, plus weighted secondary bonuses**.
-The primary stat is ATK for weapons and DEF for armor/shields, including a
-modifier to that primary stat. Weapons also count their built-in GRACE.
+For monster equipment comparison, the primary stat is melee ATK for weapons
+and DEF for armor/shields, including a modifier to that primary stat. Player
+bow scoring is separate; monsters retain their existing gear and fixed projectile rules. Weapons also count their built-in GRACE.
 A secondary modifier contributes its amount, except HP contributes one third,
 XP contributes `Math.round(xpBonus / 3)`, and GRACE modifiers count only for
 weapons.
@@ -6245,9 +6246,10 @@ if it is one-handed, the strongest available shield. **2** selects the strongest
 ranged weapon. Both shortcuts consider backpack gear and what is already
 equipped; they leave a matching or equally strong equipped item alone. Melee
 selection uses the inventory's existing equipment score (primary combat stat,
-GRACE and secondary bonuses). Ranged selection prioritizes ranged ATK, then
-range, then that equipment score. Inventory items with unidentified artifact
-properties are not auto-selected; an already-equipped unidentified artifact is
+GRACE and secondary bonuses). Player inventory scoring uses ranged ATK as
+a bow's primary stat instead of melee ATK. Ranged selection prioritizes
+effective ranged ATK (including Mighty), then range, then that equipment
+score. Inventory items with unidentified artifact properties are not auto-selected; an already-equipped unidentified artifact is
 left in place when it belongs to the requested weapon category. The shield is
 automatically put away when a two-handed weapon is selected.
 
@@ -6457,8 +6459,8 @@ Current base weapons include:
 
 ### Bows and player ranged attacks
 
-The Short Bow is a tier-1 two-handed weapon with **1 melee ATK** and **5 fixed
-ranged ATK**. The tier-3 Hunting Bow has **2 melee ATK** and **7 fixed ranged
+The Short Bow is a tier-1 two-handed weapon with **1 melee ATK** and **5 base
+ranged ATK**. The tier-3 Hunting Bow has **2 melee ATK** and **7 base ranged
 ATK**. Both have a maximum range of **6 Chebyshev tiles**, spend one action and
 one arrow per shot, and use the same Marksmanship, accuracy, poison, artifact,
 and projectile rules. Their melee GRACE of 1 does not change ranged shot timing.
@@ -6494,8 +6496,11 @@ enemy immunity, or rare-monster flight protection. Ranged attacks use double
 the normal SPD-based miss chance, ordinary critical and armor-glancing rules,
 reduced linearly to **1.5×** by maximum Marksmanship proficiency. Successful
 damaging bow hits train Marksmanship but not Two-Handed. Shots have no melee
-GRACE timing or extra attacks. Base melee ATK and equipment ATK
-bonuses do not increase the bow's fixed projectile damage. Enemy turns, XP,
+GRACE timing or extra attacks. Base melee ATK and ATK bonuses on other equipment do not increase projectile
+damage. Mighty on the equipped bow adds its full modifier to ranged ATK
+instead of melee ATK. For example, a Mighty +3 Short Bow has 8 ranged ATK
+and 1 melee weapon ATK; a Mighty +3 Hunting Bow has 10 ranged ATK and 2
+melee weapon ATK. This applies to every ranged bow, including restored items. Enemy turns, XP,
 quests, and stealth reactions resolve with ordinary combat rules; projectile
 flight is visual-only and cannot affect the deterministic result. A lethal
 arrow starts the monster's falling-and-fading death effect at visual impact,
@@ -6518,8 +6523,8 @@ artifacts retain their hidden names while equipped and firing. Like ordinary
 bows, they use the existing equipment, ammunition, and save rules. Replays
 record shots by enemy ID and tile. Monster-dropped and chest Short Bows can
 roll normal weapon prefixes, while the Merchant's basic bow is unmodified.
-Prefixes change melee properties, not fixed ranged ATK; the aiming cursor
-refreshes immediately after an attack;
+Mighty increases the bow's ranged ATK, while other prefixes retain their
+ordinary effects; the aiming cursor refreshes immediately after an attack;
 failed attempts do not mutate gameplay. Valid shots may also provoke one
 response step beyond a monster's normal AGGRO;
 the rules are in Enemy AI (§22). The bow's hover cursor uses the same glowing
@@ -6646,7 +6651,7 @@ buy/sell profit when an exceptional modifier promotes a cheap base to tier 5. Ba
 
 | Prefix | Equipped effect | Ordinary range at MF 0, without monster quality | Exceptional range |
 |---|---|---:|---:|
-| Mighty | Player ATK | +1–10 | +11–20 |
+| Mighty | Player melee ATK; ranged ATK instead when on a bow | +1–10 | +11–20 |
 | Sturdy | Player DEF | +1–10 | +11–20 |
 | Swift | Player SPD; weapon GRACE is unchanged | +1–10 | +11–20 |
 | Lucky | Player MF | +1–10 | +11–20 |
@@ -9443,7 +9448,9 @@ terrain is not duplicated. New-world initialization clears the tower registry;
 restoration does not generate or repopulate the tower.
 
 The current save version is defined in `src/version.js`. The save format changes
-only when stored data or replay action/turn rules become incompatible. The
+when stored gameplay data becomes incompatible. Incompatible replay action/turn
+rules can instead invalidate the recording independently when the character
+snapshot remains valid. The
 service worker uses an independent cache revision to refresh offline files.
 The Save Game button stays hidden until a character begins or a saved game
 is loaded. Each manual save serializes one snapshot, requests a JSON download
@@ -9469,9 +9476,9 @@ save payload or replay tape.
 Generation-only changes keep the format: saves store the complete generated
 world and current RNG state, and replays load their complete initial snapshot
 rather than rerunning generation. Optional cave metadata stored in existing
-cave descriptors does not require a new format. Incompatible required fields,
-terrain encodings or gameplay/RNG changes during recorded turns still require
-review and, when incompatible, a save-version bump.
+cave descriptors does not require a new format. Incompatible required fields
+and terrain encodings require a save-version bump; incompatible replay rules
+require a replay or save version bump.
 
 The loader retains its exact-version check; this does not introduce migration
 or acceptance of differently numbered saves.
@@ -10821,7 +10828,7 @@ The replay payload is stored inside the normal save as:
 
 ```text
 save.replay = {
-  version: 3,
+  version: REPLAY_VERSION,
   initialState,
   actions: [],
   rng: [],
@@ -10829,7 +10836,11 @@ save.replay = {
 }
 ```
 
-The replay tape format version is independent of the current game save schema version (97).
+The recording version is independent of the game save schema and covers
+recorded turn rules as well as tape structure. A recording from incompatible
+rules remains in the exported JSON but cannot be played or extended; the
+character snapshot can still be loaded if its save schema matches. The game
+notifies the player when loading such a recording.
 The replay field is written for characters with a recording, including after
 watching it; characters without one do not gain an empty replay structure.
 RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
@@ -10838,7 +10849,7 @@ diagnostics, so saving it again retains its actions and RNG values without
 the debug payload.
 Watching a replay temporarily rewinds the game; on completion (or desync) the
 live state from before playback is restored, including its RNG state and
-recording. Loading a recorded save resumes appending actions to that replay.
+recording. Loading a compatible recorded save resumes appending actions to that replay.
 NPC save records include `talkFreezeTurns`. This counter is deterministic gameplay
 state, not presentation state: while it is positive, `npcTurn()` skips that NPC
 without consuming its wandering RNG. Persisting it is required when a recorded

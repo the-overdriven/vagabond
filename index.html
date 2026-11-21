@@ -2344,6 +2344,16 @@ more difficult:
     return makeBowItem('Short Bow', mf, sourceTier, enchanted)
   }
 
+  // Mighty retains its existing serialized modifier; the bow's attack type
+  // determines which player stat receives it, including on restored gear.
+  function playerGearModifierStat(item) {
+    return item?.rangedAtk && item.mod === 'atk' ? 'rangedAtk' : item?.mod
+  }
+
+  function bowRangedAtk(bow) {
+    return (bow?.rangedAtk || 0) + (playerGearModifierStat(bow) === 'rangedAtk' ? (bow.modAmt || 0) : 0)
+  }
+
   function equippedShortBow() {
     return player.equip?.weapon?.rangedAtk ? player.equip.weapon : null
   }
@@ -3734,8 +3744,10 @@ more difficult:
       if (it.curse !== null && it.curse !== undefined) parts.push('CURSED')
       return parts.join(', ')
     }
-    if (it.atk) parts.push('ATK ' + it.atk + (it.mod === 'atk' ? ('+' + it.modAmt) : ''))
-    if (it.rangedAtk) parts.push('RANGED ATK ' + it.rangedAtk + ', RANGE ' + it.rangedRange)
+    const modifierStat = playerGearModifierStat(it)
+    if (it.atk) parts.push('ATK ' + it.atk + (modifierStat === 'atk' ? ('+' + it.modAmt) : ''))
+    if (it.rangedAtk) parts.push('RANGED ATK ' + it.rangedAtk +
+      (modifierStat === 'rangedAtk' ? ('+' + it.modAmt) : '') + ', RANGE ' + it.rangedRange)
     if (it.def) parts.push('DEF ' + it.def + (it.mod === 'def' ? ('+' + it.modAmt) : ''))
     if (it.kind === 'weapon' && (it.grace !== undefined || it.spd !== undefined)) {
       const baseGrace = it.grace !== undefined ? it.grace : 6 - it.spd
@@ -3744,7 +3756,7 @@ more difficult:
     }
     if (it.kind !== 'weapon' && it.spd !== undefined) parts.push('SPD ' + it.spd + (it.mod === 'spd' ? ('+' + it.modAmt) : ''))
 
-    if (it.mod === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
+    if (modifierStat === 'atk' && !it.atk) parts.push('ATK +' + it.modAmt)
     if (it.mod === 'def' && !it.def) parts.push('DEF +' + it.modAmt)
     if (it.mod === 'grace' && it.grace === undefined) parts.push('GRACE +' + it.modAmt)
     if (it.mod === 'spd' && (it.kind === 'weapon' || it.spd === undefined)) parts.push('SPD +' + it.modAmt)
@@ -3886,7 +3898,7 @@ more difficult:
       const it = player.equip[slot]
       if (!it) continue
       if (it.atk) a += it.atk
-      if (it.mod === 'atk') a += it.modAmt
+      if (playerGearModifierStat(it) === 'atk') a += it.modAmt
     }
     a += artifactBonusSum('atk') + artifactBerserkerRoll() + (permanent ? 0 : curseDebuffSum('atk'))
     if (!permanent) a += artifactSoulFedStacks()
@@ -6307,7 +6319,7 @@ more difficult:
         hit = true
         const armor = equippedArmor(e.equipment)
         const glancing = !!armor && chance(missChance(playerSpd(), enemySpd(e)))
-        let dmg = damageRoll(bow.rangedAtk, enemyDef(e))
+        let dmg = damageRoll(bowRangedAtk(bow), enemyDef(e))
         const critical = !glancing && chance(shotCriticalChance)
         if (critical) dmg = Math.round(dmg * 2)
         if (glancing) dmg = Math.floor(dmg / 3)
@@ -6614,7 +6626,7 @@ more difficult:
     const remainingWeapons = gear.filter(i => !bodyGear || i !== bodyGear).filter(i => i.kind === 'weapon')
     if (killer && killer.humanoid && remainingWeapons.length) {
       const candidate = pick(remainingWeapons)
-      if ((!killer.equipment || equipmentSortValues(candidate).sum > equipmentSortValues(killer.equipment).sum) &&
+      if ((!killer.equipment || equipmentSortValues(candidate, true).sum > equipmentSortValues(killer.equipment, true).sum) &&
           applyEnemyEquipment(killer, {...candidate})) {
         killer.stolenItemEquipped = false
         equipmentLog(`The ${killer.name} takes up ${killer.equipment.name}.`, [killer.equipment], 'bad')
@@ -9176,9 +9188,11 @@ more difficult:
     return itemDefinition(kind)?.category === 'supplies'
   }
 
-  function equipmentSortValues(item) {
-    const primaryStat = isWeaponItem(item) ? 'atk' : 'def'
-    const primary = (item[primaryStat] || 0) + (item.mod === primaryStat ? (item.modAmt || 0) : 0) +
+  function equipmentSortValues(item, monsterGear = false) {
+    // Monsters retain their separate equipment/melee and projectile rules.
+    const primaryStat = isWeaponItem(item) ? (!monsterGear && item.rangedAtk ? 'rangedAtk' : 'atk') : 'def'
+    const modifierStat = monsterGear ? item.mod : playerGearModifierStat(item)
+    const primary = (item[primaryStat] || 0) + (modifierStat === primaryStat ? (item.modAmt || 0) : 0) +
       (item.kind === 'artifact' ? (item.bonuses?.[primaryStat] || 0) : 0)
 
     // A weapon's built-in GRACE is part of its combat value. This also ensures
@@ -9188,7 +9202,7 @@ more difficult:
     // by 3 for sorting. GRACE affects combat only on weapons, so do not give
     // shields/armor credit for an ineffective GRACE modifier.
     let secondary = isWeaponItem(item) ? (item.grace || 0) : 0
-    if (item.mod && item.mod !== primaryStat) {
+    if (modifierStat && modifierStat !== primaryStat) {
       if (item.mod === 'xp') secondary += Math.round((item.xpBonus || 0) / 3)
       else if (item.mod === 'hp') secondary += (item.modAmt || 0) / 3
       else if (item.mod !== 'grace' || item.kind === 'weapon') secondary += item.modAmt || 0
@@ -16702,7 +16716,7 @@ more difficult:
       return current
     let best = current && accepts(current) ? current : null
     const rank = item => ranged
-      ? [item.rangedAtk || 0, item.rangedRange || 0, equipmentSortValues(item).sum]
+      ? [bowRangedAtk(item), item.rangedRange || 0, equipmentSortValues(item).sum]
       : [equipmentSortValues(item).sum]
     const better = (candidate, equipped) => {
       const a = rank(candidate), b = rank(equipped)

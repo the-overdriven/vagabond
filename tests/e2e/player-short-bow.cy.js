@@ -30,6 +30,41 @@ describe('Player Short Bow', () => {
       loadGameFromObject(saved,{isReplayInit:true})
       check(player.equip.weapon.base==='Hunting Bow'&&equippedShortBow()?.rangedAtk===7,
         'Hunting Bow survives save and replay restoration')
+      for (const base of ['Short Bow','Hunting Bow']) {
+        const normal=makeBowItem(base)
+        player.equip.weapon=normal
+        const melee=playerAtk()
+        const mighty={...normal,name:'Mighty '+base,mod:'atk',modAmt:3}
+        player.equip.weapon=mighty
+        check(playerAtk()===melee,'Mighty bow does not boost melee ATK')
+        check(bowRangedAtk(mighty)===normal.rangedAtk+3,'Mighty boosts ranged ATK for '+base)
+        const stats=itemStatLine(mighty)
+        check(stats.includes('RANGED ATK '+normal.rangedAtk+'+3')&&!stats.startsWith('ATK '+normal.atk+'+3'),
+          'item stats show the modifier on ranged ATK only')
+        check(equipmentSortValues(mighty).primary===normal.rangedAtk+3,'inventory uses effective ranged ATK')
+      }
+      const club={kind:'weapon',base:'Club',name:'Club',atk:3,grace:1}
+      player.equip.weapon=club
+      const clubAtk=playerAtk()
+      player.equip.weapon={...club,mod:'atk',modAmt:3}
+      check(playerAtk()===clubAtk+3,'Mighty melee weapons still increase melee ATK')
+      const mightyShort={...makeBowItem('Short Bow'),name:'Mighty Short Bow',mod:'atk',modAmt:3}
+      player.equip.weapon=makeBowItem('Hunting Bow')
+      player.inventory=[mightyShort,createItem('arrows',{count:3})]
+      check(bestLoadoutItem('weapon',item=>!!item.rangedAtk,true)===mightyShort,
+        'Mighty Short Bow outranks plain Hunting Bow')
+      player.equip.weapon=mightyShort;player.inventory=[createItem('arrows',{count:3})]
+      startReplayRecording()
+      const mightySave=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(mightySave,{isReplayInit:true})
+      check(bowRangedAtk(player.equip.weapon)===8&&replayRecording,'Mighty bonus and current recording survive restore')
+      mightySave.replay.version=REPLAY_VERSION-1
+      mightySave.replay.actions=[{type:'shoot',targetId:'old'}]
+      loadGameFromObject(mightySave,{isReplayInit:true})
+      check(bowRangedAtk(player.equip.weapon)===8&&!replayRecording&&buildSaveObject().replay.version===REPLAY_VERSION-1,
+        'older recording is preserved without extending it or rejecting the character')
+      startReplayPlayback()
+      check(!replayPlaying,'old combat recording cannot start playback')
     })()`))
   })
   it('sells bow and separate ten-arrow bundles; distant shooter loot remains recoverable on the ground', () => {
@@ -96,7 +131,7 @@ describe('Player Short Bow', () => {
       player.x=40;player.y=40;player.hp=1000;player.maxHp=1000
       player.rootTurns=0;player.confusionTurns=0;player.berserkTurns=0
       player.godMode=false;player.invisibleTurns=0
-      player.equip={weapon:makeShortBowItem(),armor:null,shield:null}
+      player.equip={weapon:{...makeShortBowItem(),name:'Mighty Short Bow',mod:'atk',modAmt:3},armor:null,shield:null}
       player.inventory=[createItem('arrows',{count:3})]
       snapCameraToPlayer()
       const t=ENEMY_TEMPLATE_BY_NAME.Goblin
@@ -107,7 +142,7 @@ describe('Player Short Bow', () => {
       const oldEnemyTurn=enemyTurn,oldNpcTurn=npcTurn,oldChance=chance,oldDamage=damageRoll
       try {
         enemyTurn=()=>{turnCount++};npcTurn=()=>{}
-        chance=()=>false;damageRoll=()=>5
+        chance=()=>false;damageRoll=atk=>atk
         check(playerBowShotPath(enemy)?.length>1,'visible enemy in range can be shot')
         map[40][42]='mountain'
         check(!shootEnemy(enemy),'mountain blocks arrow')
@@ -129,7 +164,7 @@ describe('Player Short Bow', () => {
           'cursor is enabled before a valid shot')
         check(shootEnemy(enemy),'legal shot succeeds')
         const afterHp=enemy.hp
-        check(afterHp===beforeHp-5,'ranged damage uses fixed five ATK')
+        check(afterHp===beforeHp-8,'ranged damage uses base five ATK plus Mighty three')
         check(canvas.style.cursor.includes(desktopBowCursor) && desktopBowCursor?.startsWith('data:image/png;base64,'),
           'cursor refreshes immediately after a shot if ammunition and line of fire remain')
         check(enemy.alarmed,'shot immediately alarms its target')

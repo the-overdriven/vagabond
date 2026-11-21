@@ -99,7 +99,7 @@ let replayRngCallers = []
        path (movement/combat/loot/etc.) reproduces the exact same run. */
 // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
 // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
-const REPLAY_VERSION = 3
+const REPLAY_VERSION = 4
 const REPLAY_ACTION_DELAY_MS = 99
 // const REPLAY_ACTION_DELAY_MS = 169
 
@@ -244,7 +244,7 @@ function replayForSave() {
 function updateReplayButton() {
   const btn = document.getElementById('btnReplay')
   if (!btn) return
-  if (!replayData || !replayData.actions || !replayData.actions.length) {
+  if (!replayData || replayData.version !== REPLAY_VERSION || !replayData.actions || !replayData.actions.length) {
     btn.style.display = 'none'
     return
   }
@@ -704,6 +704,10 @@ function startReplayPlayback() {
   replayActionDiagnostics = []
   replayCurrentActionIndex = null
   if (!replayData || !replayData.actions || !replayData.actions.length) return
+  if (replayData.version !== REPLAY_VERSION) {
+    log('This replay was recorded using incompatible combat rules.', 'bad')
+    return
+  }
   stopReplayPlayback()
   const replayToPlay = replayData
   preReplaySnapshot = JSON.parse(JSON.stringify(buildSaveObject()))
