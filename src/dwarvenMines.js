@@ -369,9 +369,9 @@ function spawnDwarvenMinesEncounters() {
           collectiveMindPackId:tmpl.abilities?.includes('collectiveMind') ? coordinationPackId : null,
           wallAmbushHidden:concealed,
           wallAmbushSpent:tmpl.abilities?.includes('wallAmbush') && !concealed}
-        prepareEnemyEquipment(enemy)
-        if(allowPrefix && prefixNames.length && chance(prefixChance)){
-          const prefix=pick(prefixNames)
+        const prefix=allowPrefix && prefixNames.length && chance(prefixChance) ? pick(prefixNames) : null
+        prepareEnemyEquipment(enemy, prefix)
+        if(prefix){
           enemy.prefix=prefix
           enemy.prefixBase=prefixBaseStats(enemy)
           applyEnemyPrefix(enemy,prefix)

@@ -7542,29 +7542,50 @@ The multiplier and applied bonuses persist in current saves and replay states.
 
 ## Equipment is generated on spawn
 
-A humanoid is assigned equipment when the enemy is created, before the player
-necessarily encounters it.
+Humanoid equipment is determined once at spawn, before the player encounters
+it. All ordinary humanoid populations (surface, caves, Fort, Ruins, Tower,
+Labyrinth and Mines) use the same equipment generator. Scripted encounters and
+summons with dedicated equipment rules retain those rules. There is no separate
+underground roll or second attempt on floor entry, loading or replay restoration.
 
-The game performs up to two independent equipment rolls:
+Preparation is recorded for each ordinary humanoid before rolling. Even if both
+rolls fail, another preparation call cannot reroll equipment or reapply humanoid
+HP scaling. The completed state survives saving and replay. Enemies that arrive
+with scripted equipment also count as prepared.
 
-1. **First roll:** `min(90%, 45% + tier*3%)`
-2. **Fallback roll if the first fails:** `min(90%, 45% + MF*2% + tier*3%)`
-
-Therefore the chance that a humanoid is wearing at least one item is:
+The game performs up to two independent rolls:
 
 ```text
-1 - (1 - firstRoll) * (1 - fallbackRoll)
+firstRoll    = min(90%, (45% + tier × 3%) × depthMultiplier × prefixMultiplier)
+fallbackRoll = min(90%, (45% + MF × 2% + tier × 3%) × depthMultiplier × prefixMultiplier)
+P(equipment) = 1 - (1 - firstRoll) × (1 - fallbackRoll)
 ```
 
-At MF 0, the resulting chances are:
+The fallback runs only if the first roll fails. The existing world-trait
+adjustment to the first roll's base probability and category weights is retained.
+The prefix multiplier is 1 by default; individual ordinary prefixes can be
+configured to increase both rolls through `enemyEquipmentPrefixMultipliers`.
+No additional prefix bonus is enabled by default. The actual selected prefix
+is known before the ordinary equipment rolls, even when its stat effects are
+applied afterward.
 
-| Enemy tier | Chance of wearing gear |
-| --- | ---: |
-| 1 | 72.96% |
-| 2 | 75.99% |
-| 3 | 78.84% |
-| 4 | 81.49% |
-| 5 | 84.00% |
+The depth multiplier is `min(1.10, 1 + max(0, -z) × 0.02)`, applied to each
+roll before its existing 90% cap. It uses the monster's spawn Z, not the
+player's current floor.
+
+| Z | Depth multiplier | Tier 1, MF 0 | Tier 3, MF 0 | Tier 5, MF 0 |
+|---:|---:|---:|---:|---:|
+| 0 or above | ×1.00 | 72.96% | 78.84% | 84.00% |
+| -1 | ×1.02 | 73.95% | 79.82% | 84.95% |
+| -2 | ×1.04 | 74.92% | 80.78% | 85.86% |
+| -3 | ×1.06 | 75.87% | 81.72% | 86.75% |
+| -4 | ×1.08 | 76.81% | 82.63% | 87.61% |
+| -5 or deeper | ×1.10 | 77.72% | 83.52% | 88.44% |
+
+These are combined probabilities at neutral world settings with no prefix
+multiplier. Unprefixed tier-1/2 enemies can carry gear without being eligible
+for artifact conversion; prefixed humanoids and unprefixed tier-3+ humanoids
+use the existing strength-based artifact conversion rule below.
 
 ### What Magic Find does here
 
@@ -7572,7 +7593,7 @@ At MF 0, the resulting chances are:
 not improve the quality of the worn item.**
 
 The first equipment roll does not use MF. If that roll fails, MF increases the
-fallback roll's chance by `2%` per MF, capped at the overall 90% roll chance.
+fallback's base chance by `2%` per MF before the spawn multipliers and 90% cap.
 The first roll creates equipment at the enemy's own tier. On the fallback
 roll, the chance to generate one tier lower is:
 
@@ -7639,9 +7660,11 @@ The item type is selected independently:
 
 When a humanoid with stored equipment dies, the game drops that exact weapon,
 armor or shield, rather than generating replacement gear. A player-credited
-kill of an ordinarily prefixed humanoid or a successful player-caused physical
-Disarm may augment eligible stored equipment as an unidentified artifact.
-Special encounter names without an ordinary prefix do not qualify. An already
+kill of a humanoid with an ordinary prefix or tier 3 or higher, or a
+successful player-caused physical Disarm of such a humanoid, may augment
+eligible stored equipment as an unidentified artifact. Special encounter names
+do not substitute for an ordinary prefix on tier 1–2 humanoids. No new gear
+is generated solely to provide a conversion candidate. An already
 existing artifact, stolen player property, a protected Hunter quest item, and
 abstract shooter weapons or ammunition cannot convert.
 
@@ -7665,7 +7688,8 @@ conversion chance = min(0.325, 0.0035 × S × sqrt(S / 35) × (1 + MF × 0.05) �
 
 These are normal-world probabilities conditional on eligibility, not per kill.
 The hard 32.5% cap applies in all worlds. Prefix identity does not independently
-modify the probability. Higher strength does not upgrade the original item's
+modify the probability; unprefixed tier-3+ humanoids use the same formula.
+Higher strength does not upgrade the original item's
 tier or modifier. See §38 for preserved properties and ability-only generation.
 
 A humanoid currently has one physical equipment slot. A valid conversion roll
@@ -7683,18 +7707,19 @@ follow the existing loot rules. Each equipment instance is delivered at most
 once, including stolen gear recovered after Disarm.
 
 The level-11 target of 3–5 additional gear artifacts is a balance estimate,
-not a guaranteed outcome. A deterministic calibration (`tests/enemy-artifact-balance.cjs`)
-used two XS seeds per world type with synthetic cave silhouette input, actual
-spawned stats/prefixes/equipment, and 10,000 sampled routes of 75 humanoid kills
-(30/25/15/5 at tiers 1/2/3/4, MF 0/5/10 over consecutive groups of 25).
-Other kills and exceptional guaranteed rewards are excluded. The normal-world
-sample averaged 0.27 conversions (0.08 net additional gear artifacts after
-removing the former random gear roll); Relic World averaged 0.42 conversions
-(0.06 net). The zero-conversion probabilities were 76% and 66%, respectively.
-These samples are not actual player routes. In particular, ordinary prefix
-frequencies and equipped humanoid density are lower than in the illustrative
-40%-prefix model; the agreed 32.5% ceiling cannot alone deliver the target
-with roughly 4–5 eligible enemies per modeled route.
+not a guaranteed outcome. The calibration script (`tests/enemy-artifact-balance.cjs`)
+samples 75 humanoid kills (30/25/15/5 at tiers 1/2/3/4; MF 0/5/10 over
+consecutive groups of 25). Other kills and guaranteed rewards are excluded.
+Its fast `--fixture` mode evaluates the saved population unchanged. An absent
+item does not reveal whether preparation was skipped or its rolls failed, so
+this mode never regenerates equipment or adjusts monster stats. It compares
+current conversion eligibility with a prefixed-only counterfactual on the same
+population; neither result measures the equipment-generation fix. Relic World
+figures in this mode apply only the artifact probability multiplier, not a new
+world's population or traits. Fresh generation is required to measure current
+spawn rules. Neither mode simulates XP progression to level 11 or acquisition
+from all sources. Actual exploration routes and generated populations vary;
+conversions are gross rewards, not net gain over random artifact loot.
 
 ---
 
@@ -11584,8 +11609,9 @@ enemies, using each template's `humanoid` flag. It changes species composition
 while keeping the same surface population count, cave scenarios, and
 guaranteed Liches. `lootRules.enemyEquipmentChanceBase/PerTier/Cap` and
 `enemyEquipmentWeaponShare/ArmorShare` configure what ordinary humanoids
-carry; the remaining share is shields. The fallback equipment drop roll is
-unchanged. `lootRules.worldGoldMultiplier` scales chest gold but leaves
+carry; the remaining share is shields. The first-roll trait bonus does not
+change the fallback base probability; depth and configured prefix multipliers
+scale both rolls (see §44). `lootRules.worldGoldMultiplier` scales chest gold but leaves
 merchant prices untouched. The Age of Rust `commonStartingWeapons` switch
 still adds the hut's improvised weapons as tier-one ordinary drops and marks
 the hut copy tier one. World size presets live in `map_config.json` and are independent of all
@@ -11597,7 +11623,7 @@ threshold, widens the sand band, cuts forest forage and cave Fungus, and
 raises forest ambush chance. It leaves the frozen-river guarantee active. Its
 non-humanoid rarity multiplier is 0.4 and prepared humanoid HP multiplier is
 0.85; the equipment roll rises from `0.45 + 0.03 × tier` to
-`0.61 + 0.03 × tier`, with weapon share rising from 50% to 70%. It excludes
+`0.61 + 0.03 × tier` before spawn multipliers, with weapon share rising from 50% to 70%. It excludes
 Herbal Bloom, Blighted Harvest, Fungal Bloom, Flooded Depths,
 Beast Kingdom and Drowned Lands. Ordinary
 population is unchanged, so humanoids replace some beasts rather than making

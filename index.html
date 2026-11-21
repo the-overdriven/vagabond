@@ -3372,13 +3372,20 @@ more difficult:
     for (const key of ['enemyArtifactDropRateMultiplier','enemyGearArtifactChancePerStrength',
       'enemyGearArtifactStrengthReference','enemyGearArtifactStrengthExponent',
       'enemyGearArtifactChanceCap','enemyTrinketArtifactChancePerStrength',
-      'enemyArtifactChanceCapBeforeRate','enemyArtifactMagicFindMultiplierPerPoint']) {
+      'enemyArtifactChanceCapBeforeRate','enemyArtifactMagicFindMultiplierPerPoint',
+      'enemyEquipmentDepthMultiplierPerLevel','enemyEquipmentDepthMultiplierCap']) {
       if (!Number.isFinite(cfg[key]) || cfg[key] < 0)
         throw new Error('Invalid enemy artifact configuration: ' + key)
     }
     if (cfg.enemyArtifactDropRateMultiplier <= 0 || cfg.enemyGearArtifactStrengthReference <= 0 ||
-        cfg.enemyGearArtifactChanceCap > 1 || cfg.enemyArtifactChanceCapBeforeRate > 1)
+        cfg.enemyGearArtifactChanceCap > 1 || cfg.enemyArtifactChanceCapBeforeRate > 1 ||
+        cfg.enemyEquipmentDepthMultiplierCap < 1)
       throw new Error('Invalid enemy artifact probability limits')
+    if (!cfg.enemyEquipmentPrefixMultipliers || Array.isArray(cfg.enemyEquipmentPrefixMultipliers) ||
+        typeof cfg.enemyEquipmentPrefixMultipliers !== 'object' ||
+        Object.entries(cfg.enemyEquipmentPrefixMultipliers).some(([prefix, multiplier]) =>
+          !Object.hasOwn(ENEMY_PREFIXES, prefix) || !Number.isFinite(multiplier) || multiplier < 1))
+      throw new Error('Invalid enemy equipment prefix multiplier')
   }
 
   function enemyArtifactWorldMultiplier() {
@@ -3559,7 +3566,8 @@ more difficult:
   }
 
   function enemyGearArtifactEligible(e, item) {
-    return enemyArtifactLootEligible(e) && Object.hasOwn(ENEMY_PREFIXES, e.prefix) &&
+    return enemyArtifactLootEligible(e) &&
+      (Object.hasOwn(ENEMY_PREFIXES, e.prefix) || e.tier >= 3) &&
       !e.gearArtifactConversionChecked && isConvertibleArtifactEquipment(item) &&
       !enemyEquipmentProtected(e, item)
   }
@@ -3748,22 +3756,42 @@ more difficult:
     return sum
   }
 
-  function rollEnemyEquipment(e) {
-    if (!e || !e.humanoid) return null
+  function enemyEquipmentDepthMultiplier(z = 0) {
     const cfg = WORLD_GEN_CONFIG.lootRules
-    const dropChance = cfg.enemyEquipmentChanceBase + e.tier * cfg.enemyEquipmentChancePerTier
-    if (!chance(Math.min(cfg.enemyEquipmentChanceCap, dropChance))) return null
+    return Math.min(cfg.enemyEquipmentDepthMultiplierCap,
+      1 + Math.max(0, -z) * cfg.enemyEquipmentDepthMultiplierPerLevel)
+  }
+
+  function enemyEquipmentRollChance(e, fallback = false, mf = 0, prefix = e.prefix) {
+    const cfg = WORLD_GEN_CONFIG.lootRules
+    // Preserve the fallback's original neutral base and cap: world traits
+    // affecting the first roll keep their existing scope.
+    const base = fallback ? BASE_WORLD_GEN_CONFIG.lootRules : cfg
+    const raw = base.enemyEquipmentChanceBase + e.tier * base.enemyEquipmentChancePerTier + (fallback ? mf * 0.02 : 0)
+    const prefixMultiplier = Object.hasOwn(cfg.enemyEquipmentPrefixMultipliers, prefix)
+      ? cfg.enemyEquipmentPrefixMultipliers[prefix] : 1
+    return Math.min(base.enemyEquipmentChanceCap,
+      raw * enemyEquipmentDepthMultiplier(e.level) * prefixMultiplier)
+  }
+
+  function rollEnemyEquipment(e, prefix = e?.prefix) {
+    if (!e || !e.humanoid) return null
+    if (!chance(enemyEquipmentRollChance(e, false, 0, prefix))) return null
+    return makeEnemyEquipment(e)
+  }
+
+  function makeEnemyEquipment(e) {
+    const cfg = WORLD_GEN_CONFIG.lootRules
     const roll = rng()
     if (roll < cfg.enemyEquipmentWeaponShare) return makeWeaponItem(e.tier, 0, e.tier, enemyCanEquipBow(e))
     if (roll < cfg.enemyEquipmentWeaponShare + cfg.enemyEquipmentArmorShare) return makeArmorItem(e.tier, 0, e.tier)
     return makeShieldItem(e.tier, 0, e.tier)
   }
 
-  function rollEnemyDropEquipment(e) {
+  function rollEnemyDropEquipment(e, prefix = e?.prefix) {
     if (!e || !e.humanoid) return null
     const mf = playerMf()
-    const dropChance = 0.45 + mf * 0.02 + e.tier * 0.03
-    if (!chance(Math.min(0.9, dropChance))) return null
+    if (!chance(enemyEquipmentRollChance(e, true, mf, prefix))) return null
     const roll = rng()
     let tier = e.tier
     const lowerTierChance = Math.max(0.05, 0.35 - (tier - 1) * 0.05 - mf * 0.01)
@@ -3773,15 +3801,21 @@ more difficult:
     return makeShieldItem(tier, 0, e.tier)
   }
 
-  function prepareEnemyEquipment(e) {
+  function prepareEnemyEquipment(e, prefix = e?.prefix) {
     if (!e || !e.humanoid) return
+    // Existing scripted equipment also spends the preparation opportunity.
+    if (e.equipment) { e.equipmentPrepared = true; return }
+    if (e.equipmentPrepared) return
+    // A failed equipment roll is still a completed preparation. This also
+    // prevents repeat HP scaling if a spawn path calls us twice.
+    e.equipmentPrepared = true
     // Choose the actual ranged role before rolling gear, not merely the
     // species' potential shooter ability. Some Kobolds never become shooters.
     initializeEnemyShooter(e)
     const hpMultiplier = WORLD_GEN_CONFIG.environment.humanoidHpMultiplier
     e.hp = Math.max(1, Math.round(e.hp * hpMultiplier))
     e.maxHp = e.hp
-    applyEnemyEquipment(e, rollEnemyEquipment(e) || rollEnemyDropEquipment(e))
+    applyEnemyEquipment(e, rollEnemyEquipment(e, prefix) || rollEnemyDropEquipment(e, prefix))
   }
 
   function initializeEnemyGearScale(e) {
@@ -4609,6 +4643,7 @@ more difficult:
     enemy.artifactDisarmed = enemy.artifactDisarmed === true
     enemy.artifactRangedDisarmed = enemy.artifactRangedDisarmed === true
     enemy.gearArtifactConversionChecked = enemy.gearArtifactConversionChecked === true
+    enemy.equipmentPrepared = enemy.equipmentPrepared === true
     enemy.artifactSlowUntilTurn = Number.isInteger(enemy.artifactSlowUntilTurn) ? Math.max(0,enemy.artifactSlowUntilTurn) : 0
     enemy.artifactSunderStacks = Number.isInteger(enemy.artifactSunderStacks) ? Math.max(0,Math.min(10,enemy.artifactSunderStacks)) : 0
     enemy.artifactBlindAtkPenalty = Number.isInteger(enemy.artifactBlindAtkPenalty) ? Math.max(0,Math.min(5,enemy.artifactBlindAtkPenalty)) : 0

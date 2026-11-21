@@ -128,10 +128,14 @@ describe('Gear bases on procedural artifacts', () => {
         check(weapon.kind==='artifact'&&weapon.modAmt===20&&weapon.tier===1&&!weapon.identified,'physical conversion')
         check(groundItems.filter(g=>g.item===weapon).length===1,'one physical drop')
         applyEnemyEquipment(target,{kind:'shield',base:'Buckler',name:'Buckler',tier:1,baseValue:30,def:3})
+        prepareEnemyEquipment(target)
+        check(target.equipmentPrepared,'existing equipment marks preparation complete')
         const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+        check(snapshot.enemies.find(e=>e.id==='artifact_conversion_target').equipmentPrepared,'preparation saved')
         loadGameFromObject(snapshot,{isReplayInit:true})
         target=enemies.find(e=>e.id==='artifact_conversion_target')
         check(target.gearArtifactConversionChecked,'attempt restored')
+        check(target.equipmentPrepared,'preparation restored')
         const strength=monsterLootStrength(enemyPermanentStats(target))
         const mf=playerMf(),gearChance=enemyGearArtifactChance(strength,mf),trinketChance=enemyTrinketArtifactChance(strength,mf)
         chance=p=>p===gearChance||p===trinketChance
@@ -140,6 +144,28 @@ describe('Gear bases on procedural artifacts', () => {
         check(player.inventory.some(i=>i.artifactSlot==='trinket'),'independent trinket still rolls')
         check(groundItems.filter(g=>g.item?.base==='Dagger'&&g.item?.kind==='artifact').length===1,'save/death keeps exact disarm drop')
       } finally {chance=originalChance}
+    })()`))
+  })
+
+  it('allows equipped ordinary tier-3+ humanoids to convert with the same strength rule', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)},oldChance=chance
+      try {
+        const item={kind:'weapon',base:'Dagger',name:'Dagger',tier:1,baseValue:30,atk:2,grace:5}
+        const e={humanoid:true,prefix:null,tier:2,equipment:item,level:-3}
+        check(!enemyGearArtifactEligible(e,item),'ordinary tier 2 excluded')
+        e.tier=3
+        check(enemyGearArtifactEligible(e,item),'ordinary tier 3 qualifies')
+        check(!enemyGearArtifactEligible(e,null),'no equipment means no attempt')
+        const probability=enemyGearArtifactChance(40,10)
+        chance=p=>p===probability
+        check(tryEnemyGearArtifactConversion(e,item,40,10)&&item.kind==='artifact','same conversion odds and retained tier')
+        check(e.gearArtifactConversionChecked,'attempt consumed')
+        check(!enemyGearArtifactEligible(e,{kind:'weapon',base:'Dagger',tier:1}),'no second attempt')
+        check([0,-1,-2,-3,-4,-5,-6].map(z=>Math.round(enemyEquipmentDepthMultiplier(z)*100)).join(',')==='100,102,104,106,108,110,110','depth progression')
+        check(Math.abs(enemyEquipmentRollChance(e)-.54*1.06)<1e-10,'depth scales the existing first roll')
+        check(Math.abs(enemyEquipmentRollChance(e,true,10)-.74*1.06)<1e-10,'depth scales the existing MF fallback')
+      } finally {chance=oldChance}
     })()`))
   })
 

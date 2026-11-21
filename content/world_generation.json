@@ -2060,6 +2060,9 @@
     "enemyEquipmentChanceBase": 0.45,
     "enemyEquipmentChancePerTier": 0.03,
     "enemyEquipmentChanceCap": 0.9,
+    "enemyEquipmentDepthMultiplierPerLevel": 0.02,
+    "enemyEquipmentDepthMultiplierCap": 1.1,
+    "enemyEquipmentPrefixMultipliers": {},
     "enemyEquipmentWeaponShare": 0.5,
     "enemyEquipmentArmorShare": 0.25
   },

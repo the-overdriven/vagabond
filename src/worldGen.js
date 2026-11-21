@@ -1677,16 +1677,14 @@ function buildDwarvenRuin(targetLevel) {
         prefix: null,
         equipment: null
       }
-      prepareEnemyEquipment(e)
-      if (chance(cfg.ghostPrefixChance)) {
-        const names = Object.keys(ENEMY_PREFIXES)
-        if (names.length) {
-          const prefix = pick(names)
-          e.prefix = prefix
-          e.prefixBase = prefixBaseStats(e)
-          applyEnemyPrefix(e, prefix)
-          e.name = prefix + ' ' + e.name
-        }
+      const names = Object.keys(ENEMY_PREFIXES)
+      const prefix = chance(cfg.ghostPrefixChance) && names.length ? pick(names) : null
+      prepareEnemyEquipment(e, prefix)
+      if (prefix) {
+        e.prefix = prefix
+        e.prefixBase = prefixBaseStats(e)
+        applyEnemyPrefix(e, prefix)
+        e.name = prefix + ' ' + e.name
       }
       addEnemy(e)
     }
@@ -5339,18 +5337,22 @@ function spawnEnemies() {
     }
     e.maxHp = e.hp
     e.baseName = tmpl.name // keep clean name for image lookup, separate from display name
-    prepareEnemyEquipment(e)
+    let prefix = null
     if (!championEscort && chance(cfg.prefixChance)) {
       const names = Object.keys(ENEMY_PREFIXES)
       const pfx = pick(names)
       // A tier-1–3 surface Champion must have room for its promised escort.
       // A cramped spawn stays ordinary rather than creating a lone Champion.
       if (pfx !== 'Champion' || tmpl.tier > 3 || nearbyGroupSpots(tmpl, {x, y}).length >= 2) {
-        e.prefix = pfx
-        e.prefixBase = prefixBaseStats(e)
-        applyEnemyPrefix(e, pfx)
-        e.name = pfx + ' ' + e.name
+        prefix = pfx
       }
+    }
+    prepareEnemyEquipment(e, prefix)
+    if (prefix) {
+      e.prefix = prefix
+      e.prefixBase = prefixBaseStats(e)
+      applyEnemyPrefix(e, prefix)
+      e.name = prefix + ' ' + e.name
     }
     addEnemy(e)
     // Template wandering stays authoritative unless this world explicitly
@@ -5788,11 +5790,12 @@ function populateDeepCaveEcosystems(deep, fungusTopUpSites) {
         hp:t.hp,maxHp:t.hp,atk:t.atk,def:t.def,spd:t.spd,abilities:[...t.abilities],
         humanoid:!!t.humanoid,aggro:t.aggro??AGGRO_RANGE,x:p.x,y:p.y,
         homeX:p.x,homeY:p.y,homeTileType:floor,alive:true,prefix:null,equipment:null}
-      if(prefix){e.prefix=prefix;e.prefixBase=prefixBaseStats(e);applyEnemyPrefix(e,prefix);e.name=prefix+' '+e.name}
       const z=zones[p.territory]
       const effectiveCost=t.name==='Fungus'?0:cost(t,p,prefix)
       if(t.name!=='Fungus' && (spent+effectiveCost>budget*1.05 ||
          z.spent+effectiveCost>z.budget*1.15))return false
+      prepareEnemyEquipment(e, prefix)
+      if(prefix){e.prefix=prefix;e.prefixBase=prefixBaseStats(e);applyEnemyPrefix(e,prefix);e.name=prefix+' '+e.name}
       addEnemy(e);occupied.add(keyXY(p.x,p.y));spent+=effectiveCost;z.spent+=effectiveCost
       if (t.name !== 'Fungus') {
         spawned++;introduced.add(t.name);z.spawned++
@@ -6232,6 +6235,7 @@ function spawnCaveScenarios() {
         aggro: tmpl.aggro ?? AGGRO_RANGE,
         x: spot.x, y: spot.y, homeX: spot.x, homeY: spot.y, homeTileType: floorTile,
         alive: true, prefix: null, equipment: null}
+      prepareEnemyEquipment(e, prefix)
       if (prefix) {
         e.prefix = prefix
         e.prefixBase = prefixBaseStats(e)
@@ -6672,23 +6676,18 @@ function spawnDungeonPackageEncounters(packageId, hooks = {}) {
         enemy.shooterAbility = null
         enemy.shotsRemaining = 0
       }
-      // Gallery guards use ordinary humanoid equipment/HP scaling before
-      // their existing dungeon-depth prefix roll, just like roaming enemies.
-      if (role === 'galleryBackline') prepareEnemyEquipment(enemy)
+      // All ordinary roles use the same equipment preparation, with the
+      // actual ranged role and selected prefix known before the gear rolls.
+      if (!prefix) {
+        const prefixChance = Math.min(cfg.prefixChanceCap ?? 1, (cfg.prefixBaseChance ?? 0) + floorIndex * (cfg.prefixGrowthPerFloor ?? 0))
+        if (prefixNames.length && chance(prefixChance)) prefix = pick(prefixNames)
+      }
+      prepareEnemyEquipment(enemy, prefix)
       if (prefix) {
         enemy.prefix = prefix
         enemy.prefixBase = prefixBaseStats(enemy)
         applyEnemyPrefix(enemy, prefix)
         enemy.name = prefix + ' ' + enemy.name
-      } else {
-        const prefixChance = Math.min(cfg.prefixChanceCap ?? 1, (cfg.prefixBaseChance ?? 0) + floorIndex * (cfg.prefixGrowthPerFloor ?? 0))
-        if (prefixNames.length && chance(prefixChance)) {
-          const rolled = pick(prefixNames)
-          enemy.prefix = rolled
-          enemy.prefixBase = prefixBaseStats(enemy)
-          applyEnemyPrefix(enemy, rolled)
-          enemy.name = rolled + ' ' + enemy.name
-        }
       }
       addEnemy(enemy)
       if (familyId) spawnedFamilies.add(familyId)
@@ -8047,7 +8046,7 @@ function spawnCemeteryGhouls() {
     const [gx, gy] = graves[i % graves.length]
     const x = gx + 1, y = gy
     if (!isWalkable(x, y) || occupied.has(keyXY(x, y))) continue
-    addEnemy({
+    const enemy = {
       name: 'Ghoul',
       baseName: 'Ghoul',
       tier: gh.tier,
@@ -8064,8 +8063,11 @@ function spawnCemeteryGhouls() {
       level: 0,
       alive: true,
       humanoid: true,
-      abilities: []
-    })
+      abilities: [],
+      prefix: null, equipment: null
+    }
+    prepareEnemyEquipment(enemy)
+    addEnemy(enemy)
     occupied.add(keyXY(x, y))
   }
 }
