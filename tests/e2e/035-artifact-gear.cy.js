@@ -1,5 +1,5 @@
 // Artifact gear should behave as normal gear with independent magical bonuses.
-// Keep this separate from 1-smoke.cy.js.
+// Keep this separate from 001-smoke.cy.js.
 function loadedGame() {
   cy.visit('/')
   cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
