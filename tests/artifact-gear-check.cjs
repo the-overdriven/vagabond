@@ -2464,7 +2464,8 @@ test('converted equipment preserves physical stats, modifiers, tiers, identity, 
           item.identified=true
           check(visibleItemTier(item)===item.tier,'identified tier')
           const line=itemStatLine(item)
-          check(line.includes(original.name)&&line.includes(artifactAbilityDefinition(item).name),'visible modifier and power')
+          check(physicalGearStatParts(original).every(part=>line.includes(part))&&line.includes(artifactAbilityDefinition(item).name),'visible modifier and power')
+           check(!line.includes('Original:')&&!line.includes(original.name),'no redundant original name')
           check(itemSellValue(item)===sellBase+Math.floor(artifactPriceBonus(item)*.25),'identified sale')
           const publicItem=Graveyard.snapshotItem(item,itemStatLine)
           check(publicItem.abilityId===item.abilityId&&publicItem.modAmt===item.modAmt&&publicItem.rangedAtk===original.rangedAtk,'online gear data')

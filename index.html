@@ -3914,7 +3914,6 @@ more difficult:
     if (it.kind === 'artifact') {
       if (!it.identified) return '???'
       parts.push(...physicalGearStatParts(it))
-      if (it.mod && it.originalGearName) parts.push(`Original: ${it.originalGearName}`)
       if (it.maxHpPct) parts.push('Max HP ' + it.maxHpPct + '%')
       const ability = artifactAbilityDefinition(it)
       if (it.abilityId === 'berserkers_oath' && it.berserkerOathRoll)

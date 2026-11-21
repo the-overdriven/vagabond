@@ -97,7 +97,8 @@ describe('Gear bases on procedural artifacts', () => {
       player.godMode=true
       replayAnimationsDisabled=true
       identifyArtifact(0)
-      check(bow.identified&&itemStatLine(bow).includes('RANGED ATK 7+20')&&itemStatLine(bow).includes('Mighty Hunting Bow'),'identified modifier visible')
+      check(bow.identified&&itemStatLine(bow).includes('RANGED ATK 7+20')&&itemStatLine(bow).includes(artifactAbilityDefinition(bow).name),'identified modifier and power visible')
+       check(!itemStatLine(bow).includes('Original:')&&!itemStatLine(bow).includes('Mighty Hunting Bow'),'no redundant original name')
       const save=JSON.parse(JSON.stringify(buildSaveObject()))
       loadGameFromObject(save,{isReplayInit:true})
       check(player.inventory.some(item=>item.replayId==='converted_bow_test'&&item.abilityId===bow.abilityId&&item.identified),'converted item survived save/reload')

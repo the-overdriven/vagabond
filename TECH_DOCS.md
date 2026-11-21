@@ -6954,8 +6954,9 @@ adds its modifier to ranged ATK, not melee ATK. Conversion adds one eligible
 power using the normal domain pool, artifact naming, lore and curse rules, but
 no independent random stat bonuses or MF tier boost. The ability-only effect
 metadata is not part of the natural effect pool. The item starts unidentified;
-identification reveals the retained modifier and tier alongside its power and
-curse. Ability-specific bonuses or penalties still apply normally.
+identification reveals the retained modifier through its numeric stat bonus,
+alongside the item tier, power and curse. Ability-specific bonuses or penalties
+still apply normally.
 
 These natural-effect percentages apply only after a source has already rolled an artifact
 drop. They do not describe the chance of getting an artifact in the first
