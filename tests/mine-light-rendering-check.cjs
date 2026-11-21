@@ -26,6 +26,7 @@ const env = {
   preloadedImages:new Map(),RENDER_STYLE:{groundItems:{}},
   resolveVisualImage:visual=>env.preloadedImages.get(visual?.image),
   outlinedVisualCanvas:image=>image,
+  renderLightSources:()=>env.Mining.lightSources(),
   Mining:{activeLevel:()=>({}),lightSources:()=>[],lightInfo:s=>s,
     lightCanReach:(_map,sx,sy,x,y)=>y===sy || (x===sx && Math.abs(y-sy)<1)},
   UndergroundFov:{canSee:(_map,px,py,x,y)=>true},

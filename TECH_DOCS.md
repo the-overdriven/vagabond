@@ -3531,7 +3531,14 @@ existing ground item, or change wall collision or opacity. The ordinary cave
 props instead occupy clear floor tiles at least three tiles from entrances or
 stairs, with webs requiring cave walls on two perpendicular sides.
 
-The Dwarven Fort has up to eight iron wall torches mounted on masonry with marble floor immediately south. These tile-mode decorations emit no light and leave wall collision and visibility unchanged.
+The Dwarven Fort has up to eight iron wall torches mounted on masonry with 
+marble floor immediately south. Their flames animate in tile mode. 
+The flame is visible from the room whenever the floor directly in front of 
+its mount is in line of sight. Each reveals tiles within two tiles of its 
+center on the exposed side, even beyond ordinary underground sight. 
+As with cave fires and crystals, walls block the view and distant light 
+alone does not permanently uncover the exploration map. The flame animation 
+consumes no turns or gameplay RNG.
 
 Dwarven Mines have wooden support frames over selected dry passage tiles.
 Supports are placed **after whole-world rotation**, so their fixed upright art
@@ -9998,16 +10005,12 @@ A blend never exposes an ASCII background color
 through a missing ground layer.
 
 A river's actual map tiles never change just to improve its appearance.
-Directly adjacent river/water tiles have no shoreline between them. Isolated
-diagonal river segments clip their animated texture directly into a
-constant-width channel (56% of a tile) with
-rounded ends, filled with their existing animated frames. Where a diagonal
-segment meets a cardinal river or lake, the matching arm is restored over the
-shoreline. Small triangular water overlaps on the two neighboring land-cell
-corners complete the diagonal ribbon; they are drawn below trees and rocks.
-These overlaps are cosmetic: the land cells retain their terrain identity,
-collision, movement cost and swimming rules. The channel and corner overlap
-share the same width at every zoom. Frozen rivers keep their existing animated
+Directly adjacent river/water tiles have no shoreline between them. 
+Flowing and frozen river banks vary along cardinal and diagonal runs. Diagonal
+segments use curved centerlines and variable widths. Each pair of connected
+tiles shares its bank contour with the two intervening land corners and
+with river or lake junctions. The original terrain still controls collision,
+movement cost and swimming. Frozen rivers keep their existing animated
 artwork and use snow ground, rather than inferring a possibly grassy base.
 No directional image copies or new animation frames are needed.
 

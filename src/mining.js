@@ -753,6 +753,7 @@ const Mining = (() => {
   }
 
   function lightInfo(deposit) {
+    if (deposit.kind === 'dwarven-wall-torch') return config().lighting.fortTorch
     if (Campfires.isFire(deposit) && Campfires.burning(deposit)) return {radius:3,opacity:1,color:'#ffae55',pulse:false}
     if (deposit.kind === 'surfaceExit') {
       const daylight = config().lighting.surfaceExit
@@ -790,11 +791,24 @@ const Mining = (() => {
       seen.add(position)
       exits.push({x: entrance.x, y: entrance.y, kind: 'surfaceExit'})
     }
-    return [...natural, ...carriedOntoFloor, ...exits, ...groundItems.filter(f =>
+    const torches = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenFort'
+      ? caveDecorations.filter(p => p.kind === 'dwarven-wall-torch' && onCurrentLevel(p)) : []
+    return [...natural, ...carriedOntoFloor, ...exits, ...torches, ...groundItems.filter(f =>
       Campfires.isFire(f) && onCurrentLevel(f) && Campfires.burning(f))]
   }
 
-  function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY) {
+  function torchFaceVisible(mapTiles, sx, sy, viewerX, viewerY) {
+    return viewerY > sy && UndergroundFov.canSee(mapTiles, viewerX, viewerY, sx, sy+1)
+  }
+
+  function lightCanReach(mapTiles, sx, sy, tx, ty, viewerX, viewerY, kind) {
+    if (kind === 'dwarven-wall-torch') {
+      if (ty < sy || !torchFaceVisible(mapTiles,sx,sy,viewerX,viewerY)) return false
+      // The flame sits on the south face. At a shallow angle, a ray to
+      // the wall center can enter an adjacent wall before reaching it.
+      if (tx === sx && ty === sy) return true
+      sy++
+    }
     if (!UndergroundFov.canSee(mapTiles, sx, sy, tx, ty) ||
       !UndergroundFov.canSee(mapTiles, viewerX, viewerY, tx, ty)) return false
     const opaque = (x, y) => {
@@ -839,14 +853,14 @@ const Mining = (() => {
       // the player's darkness radius. Distance alone must never hide a light.
       for (let yy = t.y - radius; yy <= t.y + radius; yy++) for (let xx = t.x - radius; xx <= t.x + radius; xx++) {
         if ((xx - t.x) ** 2 + (yy - t.y) ** 2 > radius * radius || !mapTiles[yy]?.[xx]) continue
-        if (lightCanReach(mapTiles, t.x, t.y, xx, yy, px, py))
+        if (lightCanReach(mapTiles, t.x, t.y, xx, yy, px, py, t.kind))
           visibleSet.add(key(xx, yy))
       }
     }
     return visibleSet
   }
 
-  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, lightInfo, lightSources, lightCanReach, isMineralKind, activeLevel, visible,
+  return {validateConfig, generate, spawnNests, find, blocksPathAt, excavatedAt, clue, canTarget, strike, investigate, lightVisible, lightInfo, lightSources, lightCanReach, torchFaceVisible, isMineralKind, activeLevel, visible,
     config}
 })()
 

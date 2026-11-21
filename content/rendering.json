@@ -1470,7 +1470,12 @@
     }
   },
   "caveDecorations": {
-    "dwarven-wall-torch": {"image": "img/tiles/dwarven-wall-torch.png", "tileOnly": true},
+    "dwarven-wall-torch": {
+      "image": "img/tiles/dwarven-wall-torch.png",
+      "frames": ["img/tiles/dwarven-wall-torch.png", "img/tiles/dwarven-wall-torch-1.png", "img/tiles/dwarven-wall-torch-2.png", "img/tiles/dwarven-wall-torch-3.png", "img/tiles/dwarven-wall-torch-4.png", "img/tiles/dwarven-wall-torch-5.png"],
+      "frameDuration": 180,
+      "tileOnly": true
+    },
     "web": {
       "glyph": "%",
       "color": "#aaa69a",

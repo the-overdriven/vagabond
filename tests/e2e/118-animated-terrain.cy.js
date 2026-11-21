@@ -124,7 +124,9 @@ describe('Animated terrain rendering', () => {
           const lakeJoin = terrainVisual('water', x, y).diagonalRiverJoinArms === 2
           cell(0, 0, 'frozenriver'); cell(0, 1, 'frozenriver'); cell(1, -1, 'frozenriver')
           const frozenJoin = terrainVisual('frozenriver', x, y).diagonalRiverJoinArms === 2
-          const landBridge = diagonalWaterLandCorners(x+1,y).length === 1
+          const bridges = diagonalWaterLandCorners(x+1,y)
+          const landBridge = bridges.length === 1 && bridges[0].ax === x+1 &&
+            bridges[0].ay === y-1 && bridges[0].dx === -1
           const frozenGround = diagonalRiverGround(x+1,y-1) === 'snow'
           const savedPixels = ctx.getImageData(0,0,TILE_PX,TILE_PX)
           const savedFrameTime = visualFrameTime

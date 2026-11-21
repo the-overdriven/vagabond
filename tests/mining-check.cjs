@@ -614,5 +614,15 @@ const plain = value => JSON.parse(JSON.stringify(value))
       player.miningTutorialSeen=previous.tutorial;enemies=previous.enemyList
     }
   })()`)
+  run(`(() => {
+    const room = Array.from({length:24}, () => Array(24).fill('marble'))
+    room[8].fill('dwarvenwall')
+    const seesFlame = (x,y) => Mining.lightCanReach(room,15,8,15,8,x,y,'dwarven-wall-torch')
+    if (UndergroundFov.canSee(room,11,11,15,8) || !seesFlame(11,11) || !seesFlame(11,12))
+      throw Error('shallow and steep views should both show the mounted flame')
+    if (seesFlame(15,7)) throw Error('torch visible from behind the wall')
+    room[9][13]='dwarvenwall'
+    if (seesFlame(10,9)) throw Error('intervening wall should hide the flame')
+  })()`)
   console.log('PASS Mining generation, turn cost, persistence and skill progression')
 })().catch(err => { console.error(err.stack); process.exitCode = 1 })

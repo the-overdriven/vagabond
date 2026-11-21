@@ -144,6 +144,12 @@ describe('Decorative caves and deep threat rarity', () => {
             return layer.kind === 'dwarvenFort' && layer.map[p.y][p.x] === 'dwarvenwall' &&
               layer.map[p.y+1][p.x] === 'marble'
           }), 'fort torches mount above a south-facing floor')
+        const torchArt = RENDER_STYLE.caveDecorations['dwarven-wall-torch']
+        check(torchArt.frames.every(path => {
+          const frame = preloadedImages.get(path)
+          return frame?.naturalWidth === 100 && frame.naturalHeight === 100
+        }) && new Set(torchArt.frames).size > 1, 'full-resolution torch animation is ready')
+        check(Mining.lightInfo(torches[0]).radius === 2, 'torch visibility has a two-tile radius')
         const fortWebs=caveDecorations.filter(p=>p.level<=-3 && p.kind==='web')
         check(fortWebs.length>0, 'dwarven masonry receives webs')
         for(const p of fortWebs) {
