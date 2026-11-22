@@ -1229,6 +1229,7 @@ more difficult:
       // Some special encounters use an ordinary species template but have a distinct portrait.
       paths.push(...Object.values(RENDER_STYLE?.enemies?.portraits || {}))
       for (const tmpl of NPC_TEMPLATES) paths.push('img/npc/' + tmpl.portrait + '.jpg')
+      paths.push(...Object.values(RENDER_STYLE.trinketIcons || {}))
       for (const kind of itemIconKinds()) paths.push(itemIconPath(kind))
       for (const gear of [...WEAPONS, ...SHIELDS, ...ARMORS])
         paths.push('img/icons/' + gear.name + '.svg')
@@ -9614,18 +9615,21 @@ more difficult:
     img.src = imageSrc(fallbackPath)
   }
 
+  function specificItemIconPath(item) {
+    const slot = item.kind === 'artifact' ? item.artifactSlot : item.kind
+    if (item.kind === 'artifact' && slot === 'trinket')
+      return RENDER_STYLE.trinketIcons?.[item.noun] || null
+    if (!['weapon', 'armor', 'shield'].includes(slot)) return null
+    const base = item.base || (item.kind === 'artifact' ? item.noun : item.name)
+    return base && /^[A-Za-z0-9 -]+$/.test(base) ? 'img/icons/' + base + '.svg' : null
+  }
+
   function itemIconHTML(item) {
     const kind = item?.kind
     if (!itemIconKinds().includes(kind)) return ''
     const fallbackPath = itemIconPath(kind)
     const fallback = imageSrc(fallbackPath)
-    const gearKind = kind === 'artifact' ? item.artifactSlot : kind
-    const base = ['weapon', 'armor', 'shield'].includes(gearKind) ? (item.base || (kind === 'artifact' ? item.noun : item.name)) : null
-    // Gear keeps its unmodified base name even when it has a magic prefix.
-    // Remember missing specific SVGs so repeated inventory redraws use the
-    // generic kind icon immediately instead of flashing a broken image first.
-    const specificPath = base && /^[A-Za-z0-9 -]+$/.test(base)
-      ? 'img/icons/' + base + '.svg' : null
+    const specificPath = specificItemIconPath(item)
     const specific = specificPath && !failedImagePaths.has(specificPath)
       ? imageSrc(specificPath) : null
     return specific
@@ -13121,12 +13125,7 @@ more difficult:
   function droppedInventoryVisual(item) {
     if (!item) return null
     const gearKind = item.kind === 'artifact' ? item.artifactSlot : item.kind
-    const base = ['weapon','shield','armor'].includes(gearKind)
-      ? (item.base || (item.kind === 'artifact' ? item.noun : item.name)) : null
-    const specific = base && /^[A-Za-z0-9 -]+$/.test(base)
-      ? 'img/icons/' + base + '.svg' : null
-    // Keep gear disguised as its ordinary base, while trinkets use the
-    // generic artifact icon instead of falling back to a font glyph in tile mode.
+    const specific = specificItemIconPath(item)
     const fallback = item.kind === 'artifact'
       ? (['weapon','shield','armor'].includes(gearKind) ? itemIconPath(gearKind) : itemIconPath('artifact'))
       : itemIconPath(item.kind)

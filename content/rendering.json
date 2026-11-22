@@ -1,5 +1,21 @@
 {
   "schemaVersion": 1,
+  "trinketIcons": {
+    "Feather": "img/icons/trinkets/Feather.svg",
+    "Girdle": "img/icons/trinkets/Girdle.svg",
+    "Tippet": "img/icons/trinkets/Tippet.svg",
+    "Scarf": "img/icons/trinkets/Scarf.svg",
+    "Anklet": "img/icons/trinkets/Anklet.svg",
+    "Flint": "img/icons/trinkets/Flint.svg",
+    "Sextant": "img/icons/trinkets/Sextant.svg",
+    "Shoehorn": "img/icons/trinkets/Shoehorn.svg",
+    "Adze": "img/icons/trinkets/Adze.svg",
+    "Amphora": "img/icons/trinkets/Amphora.svg",
+    "Jug": "img/icons/trinkets/Jug.svg",
+    "Bridle": "img/icons/trinkets/Bridle.svg",
+    "Saddle": "img/icons/trinkets/Saddle.svg",
+    "Rope": "img/icons/trinkets/Rope.svg"
+  },
   "canvas": {
     "background": "#050403"
   },

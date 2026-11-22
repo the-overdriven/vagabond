@@ -6601,11 +6601,11 @@ does not auto-pick up on movement. A dropped worn Black Key is automatically
 unequipped. Crystals retain their existing mineral floor art, light emission and
 collection rules. Ground-item labels and hover tooltips show an item's base type
 only, not its unidentified artifact status or generated modifier prefix. Ground
-tile icons and ASCII symbols likewise disguise artifacts as their ordinary
-equipment types, or as neutral objects for trinkets. Picking an item up reveals
-ordinary gear prefixes, while artifact identity follows the existing
-identification rules. Environmental ground objects are identified by their
-specific Inspect descriptions.
+tile icons show the equipment base or trinket form. In ASCII mode, gear keeps
+its ordinary equipment symbol and trinkets use a neutral object symbol. Picking
+an item up reveals ordinary gear prefixes, while artifact identity follows the
+existing identification rules. Environmental ground objects are identified by
+their specific Inspect descriptions.
 
 Drop locations and probabilities stay in `loot_tables.json` and world-generation
 configuration. Merchant quantities and purchase prices stay in
@@ -7107,11 +7107,11 @@ base price, but receive one eligible power instead of random numeric bonuses or
 maximum-HP effects. Existing trinkets retain all saved bonuses, tier and prices.
 Trinkets remain passive in inventory. An identified gear artifact appears in its
 corresponding inventory tab and compares with normal gear for upgrade
-suggestions. Gear-based artifacts use their base weapon, shield or armor SVG
-icon rather than the generic artifact icon; trinkets retain the generic icon,
-and missing gear SVGs fall back to the generic icon. Artifact combat messages
-use names without a leading `The`, including for already-named equipped artifact
-weapons.
+suggestions. Gear artifacts use their base equipment icon. In inventory, trade and
+tile mode, trinkets use the icon for their noun before and after identification.
+Trinkets without dedicated artwork use the generic artifact icon. Artifact combat
+messages use names without a leading `The`, including for already-named equipped
+artifact weapons.
 
 **Converted equipment.** Existing weapons, shields and armor can also be
 augmented with an artifact power without rolling a new base or natural effect.

@@ -243,11 +243,18 @@ test('non-gear artifacts keep The, equipment artifacts do not', async () => {
   assert(cursed.curse, 'cursed non-gear artifact retains its curse')
 })
 
-test('non-equipment artifacts retain the generic icon', async () => {
+test('trinkets resolve noun artwork and fall back for unillustrated nouns', async () => {
   await ready()
   const icon = run('itemIconHTML({kind:"artifact",artifactSlot:"trinket",noun:"Amulet",name:"Amulet of Ermis"})')
   assert(icon.includes('img/icons/artifact.svg'))
   assert(!icon.includes('img/icons/Amulet.svg'))
+  for (const [noun, image] of Object.entries(loadJson('rendering.json').trinketIcons)) {
+    assert.ok(fs.existsSync(path.join(root, image)), image)
+    for (const identified of [true, false]) {
+      const item = {kind:'artifact', artifactSlot:'trinket', noun, identified}
+      assert.ok(run(`itemIconHTML(${JSON.stringify(item)})`).includes(image), noun)
+    }
+  }
 })
 
 test('artifact base stats and enchantments stack; penalties, GRACE, inventory and save/load work', async () => {

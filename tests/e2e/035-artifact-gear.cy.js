@@ -19,7 +19,7 @@ describe('Gear bases on procedural artifacts', () => {
     // Item icons are decoded in the background after the loading overlay closes.
     // Retry the readiness check without injecting an image or retrying state mutations.
     cy.window({timeout:60000}).should(win => {
-      expect(win.eval("preloadedImages.has('img/icons/artifact.svg')"),
+      expect(win.eval("preloadedImages.has('img/icons/trinkets/Feather.svg')"),
         'artifact SVG is preloaded and decoded').to.equal(true)
     }).then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -33,12 +33,12 @@ describe('Gear bases on procedural artifacts', () => {
       check(groundGlyph({kind:'droppeditem',item:artifact}).ch ===
         groundGlyph({kind:'droppeditem',item:club}).ch,
         'ASCII floor symbol does not reveal an artifact weapon')
-      const trinket={...artifact,artifactSlot:'trinket'}
+      const trinket={kind:'artifact',artifactSlot:'trinket',noun:'Feather'}
       check(groundGlyph({kind:'droppeditem',item:trinket}).ch !== '♦',
         'non-gear artifacts use a neutral ASCII floor symbol')
       const trinketVisual=droppedInventoryVisual(trinket)
-      check(trinketVisual?.image==='img/icons/artifact.svg',
-        'trinket artifacts render a neutral SVG rather than a font glyph in tile mode')
+      check(trinketVisual?.image==='img/icons/trinkets/Feather.svg',
+        'ground tiles use the trinket noun artwork')
       currentZ=0;map=surfaceMap;player.x=40;player.y=40;enemies=[];npcs=[]
       const drop={kind:'droppeditem',item:club,x:41,y:40,level:0}
       groundItems=[drop]
