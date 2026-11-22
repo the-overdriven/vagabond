@@ -38,6 +38,10 @@ describe('Decorative caves and deep threat rarity', () => {
         check(surfaceProps.filter(p=>p.kind==='mountain-water').every(p=>
           ['mountain','snowmountain'].includes(surfaceMap[p.y][p.x])),
           'river sources remain real mountains')
+        check(surfaceProps.filter(p=>p.kind==='mountain-water' && p.outlet).every(p=>
+          Math.max(Math.abs(p.x-p.outlet.x),Math.abs(p.y-p.outlet.y))===1 &&
+          ['river','frozenriver'].includes(surfaceMap[p.outlet.y]?.[p.outlet.x])),
+          'each open crater drains into an adjacent river')
         check(surfaceProps.filter(p=>p.kind==='tree-cage').every(p=>
           villageHuts.every(h=>Math.max(Math.abs(h.x-p.x),Math.abs(h.y-p.y))>=decorCfg.uniqueVillageClearance)),
           'caged tree stays far away from huts')

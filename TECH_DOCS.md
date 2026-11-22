@@ -985,7 +985,10 @@ presentation changes because of them:
 - Water lilies grow in small lakes; blue and spiky plants favor the boundary
   between green land and open water. At river headwaters, the mountain-water
   image takes the place of the ordinary mountain art, without altering the
-  impassable mountain terrain.
+  impassable mountain terrain. Some crater lakes show a narrow outlet through the
+  rim that widens into the first downstream river tile. The outlet follows the
+  original downhill course, including diagonal and frozen channels. Other crater
+  lakes remain enclosed.
 
 Scenery is chosen after whole-world rotation by seeded coordinate hashes,
 avoids initial creatures and loose loot, and persists in the existing

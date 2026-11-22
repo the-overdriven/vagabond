@@ -224,7 +224,10 @@ function initDiscovered() {
   for (let y = 0; y < MAP_H; y++) discovered.push(new Array(MAP_W).fill(false))
 }
 
+let generatedHeadwaters = []
+
 function generateSurface() {
+  generatedHeadwaters = []
   const cfg = WORLD_GEN_CONFIG.surface
   tombstonesRemaining = TOMBSTONE_INSCRIPTIONS.length
   shuffleTombstoneOrder()
@@ -417,6 +420,7 @@ function generateSurface() {
   }
   for (const src of riverSources) {
     let x = src.x, y = src.y
+    let firstChannel = true
     let previousX = -1, previousY = -1
     if (elev[y][x] < cfg.rivers.minSourceElevation) continue
     for (let step = 0; step < cfg.rivers.maxSteps; step++) {
@@ -435,7 +439,12 @@ function generateSurface() {
         }
       }
       if (besideRiver) break
-      if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain' && map[y][x] !== 'cavewall') map[y][x] = (y < SNOW_BAND ? 'frozenriver' : 'river')
+      if (map[y][x] !== 'mountain' && map[y][x] !== 'snowmountain' && map[y][x] !== 'cavewall') {
+        if (firstChannel && ['mountain','snowmountain'].includes(map[previousY]?.[previousX]))
+          generatedHeadwaters.push({x:previousX, y:previousY, outlet:{x,y}})
+        firstChannel = false
+        map[y][x] = y < SNOW_BAND ? 'frozenriver' : 'river'
+      }
       if (y < SNOW_BAND) tileUnderlays[keyXY(x, y)] = 'snow'
       // find lowest neighbor
       let bestX = x, bestY = y, bestE = elev[y][x]
@@ -786,7 +795,7 @@ function rotateGeneratedWorld(quarterTurns) {
   positions(caves); positions(deepLevels); positions(dungeonShortcuts)
   positions(towerMaze)
   positions(villageHuts); positions(enemies); positions(groundItems)
-  positions(npcs); positions(caveDecorations); positions(caveSpoor)
+  positions(generatedHeadwaters); positions(npcs); positions(caveDecorations); positions(caveSpoor)
   for(const spoor of caveSpoor)spoor.direction=(spoor.direction+quarterTurns*2)%8
   for (const value of [spawnPoint, villageCenter, mausoleumHutPos,
     dwarvenRuin, bigBellPos, blackPillarPos, cryptCaveExclusionCenter,
@@ -8464,7 +8473,24 @@ function spawnNaturalDecorations(roll) {
     if (!nearby(surfaceMap,x,y,['mountain','snowmountain'],1)) continue
     springs.push({x,y})
   }
-  scatter(0,'mountain-water',springs,Math.min(12,springs.length),27,3)
+  const connected = []
+  for (const site of generatedHeadwaters) {
+    if (connected.length >= 8) break
+    const {x,y,outlet} = site
+    if (!['mountain','snowmountain'].includes(surfaceMap[y]?.[x]) ||
+        !['river','frozenriver'].includes(surfaceMap[outlet.y]?.[outlet.x])) continue
+    if (x !== outlet.x && y !== outlet.y &&
+        ![surfaceMap[y][outlet.x],surfaceMap[outlet.y][x]].every(t =>
+          ['grass','sand','snow','hill','mountain','snowmountain'].includes(t))) continue
+    if (connected.some(p => Math.max(Math.abs(x-p.x),Math.abs(y-p.y)) < 3)) continue
+    if (add(0,'mountain-water',site)) {
+      caveDecorations[caveDecorations.length-1].outlet = {...outlet}
+      connected.push(site)
+    }
+  }
+  const enclosed = springs.filter(s => connected.every(p =>
+    Math.max(Math.abs(s.x-p.x),Math.abs(s.y-p.y)) >= 3))
+  scatter(0,'mountain-water',enclosed,12-connected.length,27,3)
 
   // Flood-fill water only; large oceans and river channels are not lily ponds.
   const visited = new Set(), pondSites=[]

@@ -14211,6 +14211,36 @@ more difficult:
   }
 
 
+  function drawSpringOutlet(px, py, x, y, spring) {
+    const {outlet} = spring
+    const dx = outlet.x - spring.x, dy = outlet.y - spring.y
+    const family = surfaceMap[outlet.y]?.[outlet.x]
+    if (family !== 'river' && family !== 'frozenriver') return
+    const image = resolveVisualImage(RENDER_STYLE.terrainTiles[family])
+    if (!image) return
+    ctx.save()
+    ctx.translate(px, py)
+    ctx.scale(TILE_PX, TILE_PX)
+    ctx.beginPath()
+    ctx.rect(0, 0, 1, 1)
+    ctx.clip()
+    // Draw the same tapered channel in each touched cell, including diagonal corners.
+    ctx.save()
+    ctx.translate(spring.x - x + 0.5, spring.y - y + 0.57)
+    ctx.rotate(Math.atan2(dy - 0.07, dx))
+    const length = Math.hypot(dx, dy - 0.07)
+    ctx.beginPath()
+    ctx.moveTo(0, -0.055)
+    ctx.bezierCurveTo(length*0.34, -0.025, length*0.68, -0.16, length, -0.16)
+    ctx.lineTo(length, 0.16)
+    ctx.bezierCurveTo(length*0.65, 0.10, length*0.32, 0.13, 0, 0.055)
+    ctx.closePath()
+    ctx.restore()
+    ctx.clip()
+    ctx.drawImage(image, 0, 0, 1, 1)
+    ctx.restore()
+  }
+
   // Draw one bronze-bound stone segment immediately outside the surface map.
   function drawWorldBorder(mx, my, width, height) {
     if (mx < -1 || my < -1 || mx > width || my > height) return
@@ -14272,6 +14302,13 @@ more difficult:
       resolveVisualImage(RENDER_STYLE.caveDecorations['mountain-water'])
       ? new Set(caveDecorations.filter(prop=>prop.level===0&&prop.kind==='mountain-water')
         .map(prop=>keyXY(prop.x,prop.y))) : null
+    const springChannels = new Map()
+    if (mountainSpringTiles?.size) for (const spring of caveDecorations) {
+      if (spring.kind !== 'mountain-water' || !spring.outlet) continue
+      const {x,y,outlet} = spring
+      for (const tx of new Set([x,outlet.x])) for (const ty of new Set([y,outlet.y]))
+        springChannels.set(keyXY(tx,ty),spring)
+    }
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
     const asciiLights = !vision && currentZ < 0 && !USE_TILE_IMAGES
@@ -14404,6 +14441,8 @@ more difficult:
           } else {
             drawTile(px, py, treeStyle ? treeStyle.glyph : glyph, color, bg)
           }
+          const spring = terrainSource === surfaceMap && springChannels.get(keyXY(mx,my))
+          if (spring) drawSpringOutlet(px,py,mx,my,spring)
           if (tileKey === 'sand' && dugSandTiles.has(keyXY(mx, my))) {
             // Keep the original sand/grass connector and the entire outer edge
             // untouched; the dug hole is only a transparent central overlay.
