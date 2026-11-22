@@ -88,22 +88,41 @@ describe('Dwarven Ruins rendering paths', () => {
         check(document.getElementById('game').width > 0 && document.getElementById('game').height > 0, 'ASCII canvas renders')
         // A known route can extend past current sight. Its markers must stay
         // above underground darkness without uncovering unknown terrain.
-        const distantX = player.x + 10 < MAP_W ? player.x + 10 : player.x - 10
-        check(!undergroundTileVisible(distantX, player.y), 'route test tile is outside underground FOV')
+        // Select an actual known, walkable route beyond sight. A one-step
+        // preview ending on a monster intentionally has no footprint.
+        const reachable = dungeonWalkDistancesWithDoorTraversal(map, entry)
+        const distant = [...reachable.keys()].map(key => {
+          const [x,y] = key.split(',').map(Number)
+          return {x,y}
+        }).find(p => undergroundDiscovered[p.y]?.[p.x] && TILE[map[p.y]?.[p.x]]?.walk &&
+          !undergroundTileVisible(p.x,p.y) && !enemies.some(e => e.alive && onCurrentLevel(e) && e.x===p.x && e.y===p.y))
+        check(distant, 'known route test has an unoccupied walkable tile outside underground FOV')
         const oldFootstep = drawPathFootstepMarker, oldDarkness = drawMineSightDarkness
         const oldAutoPath = autoPath, oldHoverPath = hoveredAutoPath
         const drawOrder = []
         try {
           autoPath = null
-          hoveredAutoPath = [{x:distantX,y:player.y}]
+          hoveredAutoPath = [distant]
           drawPathFootstepMarker = (...args) => {drawOrder.push('footstep');return oldFootstep(...args)}
           drawMineSightDarkness = (...args) => {drawOrder.push('darkness');return oldDarkness(...args)}
           for (const tileMode of [true,false]) {
             USE_TILE_IMAGES = tileMode
             drawOrder.length = 0
             render()
-            check(drawOrder.includes('darkness') && drawOrder.indexOf('footstep') > drawOrder.indexOf('darkness'),
+            check(drawOrder.includes('darkness'), 'darkness pass ran in mode '+tileMode)
+            check(drawOrder.includes('footstep'), 'known unoccupied route marker ran in mode '+tileMode)
+            check(drawOrder.indexOf('footstep') > drawOrder.indexOf('darkness'),
               'known underground route draws on top of darkness in mode '+tileMode)
+            // The very same path must not uncover a tile that has not been explored.
+            undergroundDiscovered[distant.y][distant.x] = false
+            drawOrder.length = 0
+            try {
+              render()
+              check(!drawOrder.includes('footstep'), 'unknown tile has no route marker in mode '+tileMode)
+              check(!undergroundDiscovered[distant.y][distant.x], 'path preview does not reveal terrain')
+            } finally {
+              undergroundDiscovered[distant.y][distant.x] = true
+            }
           }
         } finally {
           drawPathFootstepMarker = oldFootstep

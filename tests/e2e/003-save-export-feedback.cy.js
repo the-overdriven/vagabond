@@ -10,8 +10,24 @@ describe('Save export and recovery', () => {
     cy.window().then({timeout: 60000}, async win => {
       const alert = cy.stub(win, 'alert').as('saveErrorAlert')
       const click = cy.stub(win.HTMLAnchorElement.prototype, 'click')
-      const revoke = cy.stub(win.URL, 'revokeObjectURL')
-      const create = cy.stub(win.URL, 'createObjectURL').returns('blob:save-test')
+      // Startup continues preloading pictures after the race overlay opens.
+      // Only fake save-file Blob URLs, not image requests sharing the same API.
+      const nativeCreate = win.URL.createObjectURL.bind(win.URL)
+      const nativeRevoke = win.URL.revokeObjectURL.bind(win.URL)
+      const saveUrl = 'blob:save-test'
+      const saveBlobs = []
+      const revokedSaveUrls = []
+      let failDownload = false
+      const revoke = cy.stub(win.URL, 'revokeObjectURL').callsFake(url => {
+        if (url === saveUrl) revokedSaveUrls.push(url)
+        else nativeRevoke(url)
+      })
+      const create = cy.stub(win.URL, 'createObjectURL').callsFake(blob => {
+        if (blob.type !== 'application/json') return nativeCreate(blob)
+        saveBlobs.push(blob)
+        if (failDownload) throw new Error('download blocked')
+        return saveUrl
+      })
       // Exercise the reported location using an actual generated mine floor.
       win.eval(`(()=>{
         const first = dungeonPackageLevels('dwarvenMines')[0]
@@ -23,15 +39,16 @@ describe('Save export and recovery', () => {
       // A browser may accept a click without actually writing any file.
       await win.eval('saveGame()')
       expect(click).to.have.been.calledOnce
-      expect(revoke).not.to.have.been.called
+      expect(revokedSaveUrls).to.be.empty
       const first = await win.eval('readRecoverySave()')
-      expect(await create.firstCall.args[0].text()).to.equal(first.json)
+      expect(saveBlobs).to.have.length(1)
+      expect(await saveBlobs[0].text()).to.equal(first.json)
       expect(JSON.parse(first.json).version).to.equal(win.eval('SAVE_VERSION'))
       expect(alert).not.to.have.been.called
 
       // Explicit download failure must still preserve the new manual snapshot.
       win.eval('player.gold += 7')
-      create.throws(new Error('download blocked'))
+      failDownload = true
       await win.eval('saveGame()')
       const latest = await win.eval('readRecoverySave()')
       expected = JSON.parse(latest.json)
@@ -57,6 +74,7 @@ describe('Save export and recovery', () => {
       create.restore()
       click.restore()
       revoke.restore()
+      alert.restore()
       // A requested file download alone is not a verified disk write.
       expect(win.eval('logQueue.map(entry => entry.msg).join(" ")') +
         win.document.getElementById('logpanel').textContent).not.to.contain('Game saved to file.')
@@ -65,25 +83,30 @@ describe('Save export and recovery', () => {
     // Reload the page, not just the in-memory game state.
     const pending = new Set()
     const errors = []
-    cy.once('window:before:load', win => {
-      const capture = value => {
-        if (errors.length < 8) errors.push(String(value?.stack || value))
-      }
-      const originalError = win.console.error.bind(win.console)
-      win.console.error = (...args) => {
-        args.forEach(capture)
-        originalError(...args)
-      }
-      win.addEventListener('error', event => {
-        capture(event.error || event.message || event.target?.src || event.target?.href)
-      }, true)
-      win.addEventListener('unhandledrejection', event => capture(event.reason))
-      const fetch = win.fetch.bind(win)
-      win.fetch = (...args) => {
-        const request = {url: String(args[0]?.url || args[0])}
-        pending.add(request)
-        return fetch(...args).finally(() => pending.delete(request))
-      }
+    // Cypress event registrations execute immediately, not at the point the
+    // surrounding queued commands run. Register here, after the first visit
+    // and all intentional save errors, to observe ONLY the reloaded page.
+    cy.then(() => {
+      cy.once('window:before:load', win => {
+        const capture = value => {
+          if (errors.length < 8) errors.push(String(value?.stack || value))
+        }
+        const originalError = win.console.error.bind(win.console)
+        win.console.error = (...args) => {
+          args.forEach(capture)
+          originalError(...args)
+        }
+        win.addEventListener('error', event => {
+          capture(event.error || event.message || event.target?.src || event.target?.href)
+        }, true)
+        win.addEventListener('unhandledrejection', event => capture(event.reason))
+        const fetch = win.fetch.bind(win)
+        win.fetch = (...args) => {
+          const request = {url: String(args[0]?.url || args[0])}
+          pending.add(request)
+          return fetch(...args).finally(() => pending.delete(request))
+        }
+      })
     })
     cy.reload()
     cy.get('#loadingOverlay', {timeout: 60000}).should($overlay => {

@@ -55,9 +55,10 @@ describe('Blind monster feedback and concealed mine ambushers',()=>{
               hp:t.hp,maxHp:t.hp,homeX:42,homeY:40,homeTileType:'grass',equipment:null,
               wallAmbushHidden:true,wallAmbushSpent:false})
             check(!enemyCanBeSeen(hidden),'concealed ambusher is not drawn')
-            check(!tileInspectInfo(hidden.x,hidden.y).enemy,'cannot inspect concealed ambusher')
+            check(!tileInspectInfo(hidden.x,hidden.y)?.enemy,'cannot inspect concealed ambusher')
             revealEnemyWallAmbush(hidden)
             check(enemyCanBeSeen(hidden),'reveal exposes the ambusher')
+            check(tileInspectInfo(hidden.x,hidden.y)?.enemy===hidden,'revealed ambusher is inspectable')
           } finally {
             log=oldLog;chance=oldChance;enemyFindStep=oldStep
             enemyIsVisibleOnMainView=oldVisible

@@ -94,6 +94,8 @@ The world is generated **only after Begin confirms a valid name and race**.
 Startup loads content and essential images under a rotating skull with
 `Loading...`; after confirmation, the overlay says `Generating world...`.
 The overlay blocks input and allows a paint before synchronous generation.
+If animation frames are suspended, startup and game operations continue after
+a short presentation-only fallback instead of waiting indefinitely for a paint.
 Character race and Permadeath are set before world generation. Invalid names
 and duplicate Begin clicks cannot start a second world.
 

@@ -253,20 +253,29 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
 
       const cfg = WORLD_GEN_CONFIG.dungeons.dwarvenRuins
       const oldLevelRange = cfg.levelCountRange.slice()
-      const oldDoorChance = cfg.doors.ordinaryDoorChance
-      const oldLockedChance = cfg.doors.ordinaryLockedDoorChance
       const oldPreBreached = cfg.doors.progressionGatePreBreachedChance
+      const oldPrepare = CaveSilhouettes.prepare
+      // Keep normal door/lock odds: greatly increasing both creates more
+      // locks than distinct reachable key rooms and can exhaust world retries.
+      // Only isolate the progression gate and use a fixed cave mask, as in
+      // the Tower topology test, so this seed is independent of artwork.
       cfg.levelCountRange = [3, 3]
-      cfg.doors.ordinaryDoorChance = 0.7
-      cfg.doors.ordinaryLockedDoorChance = 0.35
       cfg.doors.progressionGatePreBreachedChance = 1
-      WORLD_SEED = 24680
+      CaveSilhouettes.prepare = async seed => {
+        CAVE_SILHOUETTES = [{id:CaveSilhouettes.idForSeed(seed),sourceIds:['a','b'],
+          rows:Array.from({length:32},(_,y)=>Array.from({length:32},(_,x)=>
+            ((x-15)**2+(y-15)**2<212?'1':'0')).join(''))}]
+        return CAVE_SILHOUETTES[0]
+      }
+      WORLD_SEED = 73304
       rngState = WORLD_SEED
-      await generateNewWorld()
-      cfg.levelCountRange = oldLevelRange
-      cfg.doors.ordinaryDoorChance = oldDoorChance
-      cfg.doors.ordinaryLockedDoorChance = oldLockedChance
-      cfg.doors.progressionGatePreBreachedChance = oldPreBreached
+      try {
+        await generateNewWorld()
+      } finally {
+        cfg.levelCountRange = oldLevelRange
+        cfg.doors.progressionGatePreBreachedChance = oldPreBreached
+        CaveSilhouettes.prepare = oldPrepare
+      }
 
       let level = null, floorZ = null, locked = []
       for (let i = 2; i < deepLevels.length && !level; i++) {
@@ -277,7 +286,7 @@ describe('Dwarven Ruins locks, keys, gates and breaching', () => {
         if (found.length) { level = candidate; floorZ = chainZForDepth(i + 2); locked = found }
       }
       check(level && locked.length >= 2 && locked.length % 2 === 0,
-        'forced ordinary locks generate at least one complete leaf pair across the Ruins stratum')
+        'ordinary locks generate at least one complete leaf pair across the Ruins stratum')
 
       const seen = new Set()
       const pairs = []

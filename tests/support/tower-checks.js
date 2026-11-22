@@ -47,6 +47,28 @@ async function checkTowerReplayAndIsolation() {
   check(enemies.find(e=>e.id===guard.id).hp===3,'damaged defender survives saving upstairs')
   check(groundItems.find(g=>g.level===1&&g.kind==='chest').opened,'collected treasure survives saving upstairs')
   check(rngState===savedRng,'restoring tower state consumes no gameplay RNG')
+  // Exercise real pickup (which removes the chest), not just an opened flag.
+  const summitChest=groundItems.find(g=>g.kind==='chest'&&g.levelKind==='tower'&&g.level===4)
+  check(summitChest&&!summitChest.opened,'summit has an unopened chest before looting')
+  const oldSummitSave=JSON.parse(JSON.stringify(buildSaveObject()))
+  currentZ=4;currentCave=-1;map=towerLevels[3].map;undergroundDiscovered=towerLevels[3].discovered
+  Object.assign(player,{x:summitChest.x,y:summitChest.y});rebuildActiveLevelOccupancy();invalidateUndergroundFov()
+  checkGroundAt(player.x,player.y)
+  const hasSummitChest=()=>groundItems.some(g=>g.kind==='chest'&&g.levelKind==='tower'&&g.level===4)
+  check(!hasSummitChest(),'looting removes the actual summit chest')
+  const summitSave=JSON.parse(JSON.stringify(buildSaveObject()))
+  for (const opts of [{},{isReplayInit:true}]) {
+    loadGameFromObject(summitSave,opts)
+    check(currentZ===4&&!hasSummitChest(),'normal and replay loads do not recreate a looted summit chest')
+    const beforePickup={rng:rngState,gold:player.gold,inventory:JSON.stringify(player.inventory)}
+    checkGroundAt(summitChest.x,summitChest.y)
+    check(rngState===beforePickup.rng&&player.gold===beforePickup.gold&&
+      JSON.stringify(player.inventory)===beforePickup.inventory,'old summit chest position cannot grant loot twice')
+    Object.assign(player,towerStair(4,false));inspect();inspect()
+    check(currentZ===4&&!hasSummitChest(),'leaving and returning to summit does not recreate treasure')
+  }
+  loadGameFromObject(oldSummitSave,{isReplayInit:true})
+  check(hasSummitChest(),'a save made before opening the chest retains the unopened chest')
   // An idle creature directly above/below gets nearby wandering opportunities
   // but never cross-floor aggro or a second turn of movement.
   const upstairs=enemies.find(e=>e.level===2&&e.alive)
@@ -72,19 +94,38 @@ async function checkTowerReplayAndIsolation() {
     'far-away enemies on an adjacent floor do not wander')
   return true
 }
-// Force one topology rejection while keeping every actual geometry rule active.
+// Force one rejection at a site with multiple validated footprints. A later
+// independent world retry may legitimately select another site if all fail.
 async function generateWorldWithTowerRetry() {
-  const original = TowerMaze.generate, plans = []
+  const original = TowerMaze.generate, originalScanner = TowerMaze.candidateScanner
+  let rejected = null, retried = false
   try {
+    TowerMaze.candidateScanner = () => {
+      const scan = originalScanner()
+      return (x,y) => {
+        const layouts = scan(x,y)
+        return layouts.length >= 2 ? layouts : []
+      }
+    }
     TowerMaze.generate = layout => {
-      plans.push(structuredClone(layout))
-      return plans.length === 1 ? false : original(layout)
+      if (!rejected) {
+        rejected = {site:tower, layout:structuredClone(layout)}
+        return false
+      }
+      if (!retried) {
+        if (tower !== rejected.site || layout.center.x !== rejected.layout.center.x ||
+            layout.center.y !== rejected.layout.center.y) throw Error('maze retry must keep the same tower site')
+        if (JSON.stringify(layout) === JSON.stringify(rejected.layout))
+          throw Error('maze retry must try another validated footprint')
+        retried = true
+      }
+      return original(layout)
     }
     await generateNewWorld()
-    if (plans.length < 2 || plans.some(p => p.center.x !== plans[0].center.x ||
-        p.center.y !== plans[0].center.y)) throw Error('maze retry must keep the same tower site')
-    if (JSON.stringify(plans[0]) === JSON.stringify(plans[1]))
-      throw Error('maze retry must try another validated footprint')
-  } finally { TowerMaze.generate = original }
+    if (!retried) throw Error('expected a same-site maze footprint retry')
+  } finally {
+    TowerMaze.generate = original
+    TowerMaze.candidateScanner = originalScanner
+  }
 }
 if(typeof module!=='undefined')module.exports={checkTowerReplayAndIsolation,generateWorldWithTowerRetry}

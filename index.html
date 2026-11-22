@@ -10474,7 +10474,20 @@ more difficult:
     }, {capture: true, passive: false})
   }
   function paintLoading() {
-    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)))
+    // A restored/background tab or reloading iframe may have suspended
+    // animation frames. Painting is a presentation courtesy, not a condition
+    // for completing startup or any deterministic gameplay operation.
+    return new Promise(resolve => {
+      let frame
+      const fallback = setTimeout(() => {
+        cancelAnimationFrame(frame)
+        resolve()
+      }, 250)
+      frame = requestAnimationFrame(() => {
+        clearTimeout(fallback)
+        setTimeout(resolve, 0)
+      })
+    })
   }
   // Buffering one move while the step animation plays keeps held-key walking
   // continuous - without it every input during the 140ms pan is dropped, which
